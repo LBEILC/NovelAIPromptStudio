@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, safeStorage, screen, shell } from 'electron';
 import { openDatabase } from './database.js';
 import { importImage, importVibeImage } from './assets.js';
 import { openPreferences } from './preferences.js';
@@ -17,11 +17,14 @@ let assetsDirectory;
 let preferences;
 
 function createWindow() {
+  const { width: workAreaWidth, height: workAreaHeight } = screen.getPrimaryDisplay().workAreaSize;
+  const defaultWidth = Math.min(1720, Math.max(960, workAreaWidth - 16));
+  const defaultHeight = Math.min(1040, Math.max(680, workAreaHeight - 16));
   const window = new BrowserWindow({
-    width: 1540,
-    height: 980,
-    minWidth: 1180,
-    minHeight: 700,
+    width: defaultWidth,
+    height: defaultHeight,
+    minWidth: Math.min(1280, defaultWidth),
+    minHeight: Math.min(720, defaultHeight),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     autoHideMenuBar: process.platform === 'win32',
     backgroundColor: '#10151b',
