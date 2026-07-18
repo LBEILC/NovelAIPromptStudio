@@ -35,3 +35,12 @@
 - Action: Launch the app on macOS on a normal laptop display and, if available, a larger external display. Confirm the initial window fits inside the usable work area, expands up to the new desktop default without covering the menu bar or Dock, and the three-column layout plus top actions remain visible. Check Chinese labels in the category legend and any mixed mono/CJK fields.
 - Expected: The window respects the current display work area, macOS title-bar behavior is unchanged, controls do not clip, and Chinese glyphs fall back to PingFang SC rather than a serif or generic monospace face.
 - Observed: Awaiting macOS verification; Windows passed clean install, 15 tests, production build, and default-window visual inspection.
+
+## Verify reusable Vibe library and file dialogs
+
+- Status: Pending
+- Date/source: 2026-07-19, Windows
+- Related commit: `8c4c53f`
+- Action: On macOS, import image-based and encoding-only `.naiv4vibe` files plus a NovelAI PNG containing embedded Vibe metadata. Verify file dialogs accept `.naiv4vibe`, raw files are copied without modification, thumbnails render, duplicate encodings merge into one library entry, and the imported Vibe can be reused by another project. Confirm metadata-only Vibes show a locked Information Extracted value and multi-cache files only offer cached values.
+- Expected: All Vibe paths and copied assets work with macOS path conventions; no re-encoding or network request occurs; Reference Strength remains editable while uncached Information Extracted values cannot be selected.
+- Observed: Awaiting macOS verification; Windows parsed all 10 supplied Vibe files, matched the supplied PNG to `5.naiv4vibe`, passed 22 tests/build, and completed real-window migration checks.
