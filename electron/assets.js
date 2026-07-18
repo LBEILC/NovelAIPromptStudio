@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import sharp from 'sharp';
 import { readNovelAIMetadata } from './metadata.js';
 import { parsePrompt } from '../src/lib/prompt.js';
+import { createPromptStructure } from '../src/lib/promptStructure.js';
 
 function safeName(filePath) {
   return path.basename(filePath, path.extname(filePath)).replace(/[^\p{L}\p{N}._-]+/gu, ' ').trim() || 'Untitled';
@@ -37,6 +38,7 @@ export async function importImage(sourcePath, assetsDirectory) {
     updated_at: now,
     metadata,
     tags: parsePrompt(metadata.prompt_raw, () => crypto.randomUUID()),
+    prompt_structure: createPromptStructure(metadata, () => crypto.randomUUID()),
     vibes: [],
     versions: [],
   };

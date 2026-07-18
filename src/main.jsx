@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import './styles.css';
 
+document.documentElement.dataset.platform = navigator.platform.startsWith('Win')
+  ? 'windows'
+  : navigator.platform.startsWith('Mac') ? 'macos' : 'other';
+
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

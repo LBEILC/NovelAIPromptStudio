@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import zlib from 'node:zlib';
+import { extractV4PromptData } from '../src/lib/promptStructure.js';
 
 function parsePngText(buffer) {
   const signature = buffer.subarray(0, 8).toString('hex');
@@ -55,11 +56,13 @@ export function readNovelAIMetadata(filePath) {
   const text = parsePngText(fs.readFileSync(filePath));
   const candidates = Object.values(text).map(safeJson).filter((value) => value && typeof value === 'object');
   const raw = candidates.reduce((merged, item) => ({ ...merged, ...item }), {});
-  const prompt = first(raw, ['prompt', 'description'], text.Description || '');
-  const negative = first(raw, ['uc', 'negative_prompt', 'negativePrompt'], '');
+  const legacyPrompt = first(raw, ['prompt', 'description'], text.Description || '');
+  const legacyNegative = first(raw, ['uc', 'negative_prompt', 'negativePrompt'], '');
+  const promptStructure = extractV4PromptData(raw, legacyPrompt, legacyNegative);
   return {
-    prompt_raw: typeof prompt === 'string' ? prompt : '',
-    negative_prompt: typeof negative === 'string' ? negative : '',
+    prompt_raw: promptStructure.base_prompt_raw,
+    negative_prompt: promptStructure.base_undesired_raw,
+    prompt_structure_raw: promptStructure,
     model: String(first(raw, ['model', 'source'], text.Source || text.Software || '')),
     seed: String(first(raw, ['seed'], '')),
     steps: first(raw, ['steps'], ''),

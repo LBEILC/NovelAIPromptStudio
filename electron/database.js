@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS generation_metadata (
   project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
   prompt_raw TEXT NOT NULL DEFAULT '',
   negative_prompt TEXT NOT NULL DEFAULT '',
+  prompt_structure_json TEXT NOT NULL DEFAULT '{}',
   model TEXT NOT NULL DEFAULT '',
   seed TEXT NOT NULL DEFAULT '',
   steps INTEGER,
@@ -73,6 +74,15 @@ function rows(statement) {
   return output;
 }
 
+function safeJson(value, fallback = {}) {
+  try {
+    const parsed = JSON.parse(value || '');
+    return parsed && typeof parsed === 'object' ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function openDatabase(dataDirectory) {
   fs.mkdirSync(dataDirectory, { recursive: true });
   const filePath = path.join(dataDirectory, 'studio.sqlite');
@@ -85,6 +95,10 @@ export async function openDatabase(dataDirectory) {
   const versionColumns = database.exec('PRAGMA table_info(prompt_versions)')[0]?.values.map((row) => row[1]) || [];
   if (!versionColumns.includes('change_summary')) {
     database.run("ALTER TABLE prompt_versions ADD COLUMN change_summary TEXT NOT NULL DEFAULT ''");
+  }
+  const metadataColumns = database.exec('PRAGMA table_info(generation_metadata)')[0]?.values.map((row) => row[1]) || [];
+  if (!metadataColumns.includes('prompt_structure_json')) {
+    database.run("ALTER TABLE generation_metadata ADD COLUMN prompt_structure_json TEXT NOT NULL DEFAULT '{}'");
   }
 
   const persist = () => {
@@ -102,13 +116,17 @@ export async function openDatabase(dataDirectory) {
 
   const loadLibrary = () => {
     const projects = query('SELECT * FROM projects ORDER BY updated_at DESC');
-    return projects.map((project) => ({
-      ...project,
-      tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', { $id: project.id }),
-      metadata: query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] || {},
-      vibes: query('SELECT * FROM vibe_transfers WHERE project_id = $id ORDER BY position', { $id: project.id }),
-      versions: query('SELECT * FROM prompt_versions WHERE project_id = $id ORDER BY created_at DESC', { $id: project.id }),
-    }));
+    return projects.map((project) => {
+      const metadata = query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] || {};
+      return {
+        ...project,
+        tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', { $id: project.id }),
+        metadata,
+        prompt_structure: safeJson(metadata.prompt_structure_json),
+        vibes: query('SELECT * FROM vibe_transfers WHERE project_id = $id ORDER BY position', { $id: project.id }),
+        versions: query('SELECT * FROM prompt_versions WHERE project_id = $id ORDER BY created_at DESC', { $id: project.id }),
+      };
+    });
   };
 
   const insertProject = (project) => {
@@ -156,15 +174,17 @@ export async function openDatabase(dataDirectory) {
 
     const metadata = project.metadata || {};
     database.run(
-      `INSERT INTO generation_metadata (project_id, prompt_raw, negative_prompt, model, seed, steps, sampler, guidance, extra_json)
-       VALUES ($project_id, $prompt_raw, $negative_prompt, $model, $seed, $steps, $sampler, $guidance, $extra_json)
+      `INSERT INTO generation_metadata (project_id, prompt_raw, negative_prompt, prompt_structure_json, model, seed, steps, sampler, guidance, extra_json)
+       VALUES ($project_id, $prompt_raw, $negative_prompt, $prompt_structure_json, $model, $seed, $steps, $sampler, $guidance, $extra_json)
        ON CONFLICT(project_id) DO UPDATE SET prompt_raw = excluded.prompt_raw, negative_prompt = excluded.negative_prompt,
+       prompt_structure_json = excluded.prompt_structure_json,
        model = excluded.model, seed = excluded.seed, steps = excluded.steps, sampler = excluded.sampler,
        guidance = excluded.guidance, extra_json = excluded.extra_json`,
       {
         $project_id: project.id,
         $prompt_raw: metadata.prompt_raw || '',
         $negative_prompt: metadata.negative_prompt || '',
+        $prompt_structure_json: JSON.stringify(project.prompt_structure || {}),
         $model: metadata.model || '',
         $seed: String(metadata.seed || ''),
         $steps: metadata.steps === '' || metadata.steps == null ? null : Number(metadata.steps),

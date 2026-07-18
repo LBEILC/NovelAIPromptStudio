@@ -48,4 +48,52 @@ describe('NovelAI PNG metadata', () => {
       model: 'nai-diffusion-4-5-full',
     });
   });
+
+  it('separates V4 base and character prompts with undesired content and positions', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
+    temporaryDirectories.push(directory);
+    const filePath = path.join(directory, 'v4.png');
+    const description = JSON.stringify({
+      prompt: 'legacy prompt',
+      uc: 'legacy undesired',
+      v4_prompt: {
+        use_coords: true,
+        use_order: true,
+        caption: {
+          base_caption: '2girls, outdoors',
+          char_captions: [
+            { char_caption: 'girl, red hair', centers: [{ x: 0.3, y: 0.5 }] },
+            { char_caption: 'girl, blue hair', centers: [{ x: 0.7, y: 0.5 }] },
+          ],
+        },
+      },
+      v4_negative_prompt: {
+        caption: {
+          base_caption: 'lowres, blurry',
+          char_captions: [
+            { char_caption: 'blue hair', centers: [{ x: 0.3, y: 0.5 }] },
+            { char_caption: 'red hair', centers: [{ x: 0.7, y: 0.5 }] },
+          ],
+        },
+      },
+    });
+    const png = Buffer.concat([
+      Buffer.from('89504e470d0a1a0a', 'hex'),
+      chunk('tEXt', Buffer.concat([Buffer.from('Description'), Buffer.from([0]), Buffer.from(description)])),
+      chunk('IEND'),
+    ]);
+    fs.writeFileSync(filePath, png);
+
+    const metadata = readNovelAIMetadata(filePath);
+    expect(metadata.prompt_raw).toBe('2girls, outdoors');
+    expect(metadata.negative_prompt).toBe('lowres, blurry');
+    expect(metadata.prompt_structure_raw).toMatchObject({
+      use_coords: true,
+      use_order: true,
+      characters: [
+        { prompt_raw: 'girl, red hair', undesired_raw: 'blue hair', center: { x: 0.3, y: 0.5 } },
+        { prompt_raw: 'girl, blue hair', undesired_raw: 'red hair', center: { x: 0.7, y: 0.5 } },
+      ],
+    });
+  });
 });
