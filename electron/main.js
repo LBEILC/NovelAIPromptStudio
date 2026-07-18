@@ -32,7 +32,8 @@ function createWindow() {
     },
   });
 
-  if (process.env.NOVELAI_DEV_URL) window.loadURL(process.env.NOVELAI_DEV_URL);
+  const developmentUrl = process.env.NOVELAI_DEV_URL || (process.argv.includes('--dev') ? 'http://127.0.0.1:5173' : '');
+  if (developmentUrl) window.loadURL(developmentUrl);
   else window.loadFile(path.join(import.meta.dirname, '..', 'dist', 'index.html'));
 }
 
