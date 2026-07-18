@@ -1,6 +1,16 @@
 import crypto from 'node:crypto';
-import { describe, expect, it } from 'vitest';
-import { extractEmbeddedVibes, parseVibeDocument, toProjectVibe } from './vibes.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import sharp from 'sharp';
+import { afterEach, describe, expect, it } from 'vitest';
+import { extractEmbeddedVibes, importVibeFile, parseVibeDocument, toProjectVibe } from './vibes.js';
+
+const temporaryDirectories = [];
+
+afterEach(() => {
+  for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
+});
 
 describe('NovelAI V4 Vibe files', () => {
   it('parses cached encoding variants without changing them', () => {
@@ -53,5 +63,31 @@ describe('NovelAI V4 Vibe files', () => {
       importInfo: { model: 'nai-diffusion-4-5-full', information_extracted: null, strength: 0.4 },
     }, 'metadata.naiv4vibe');
     expect(parsed.information_extracted_known).toBe(0);
+  });
+
+  it('preserves raw files and fingerprints identical embedded source images', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-vibe-import-'));
+    temporaryDirectories.push(directory);
+    const assetsDirectory = path.join(directory, 'assets');
+    const image = await sharp({ create: { width: 8, height: 8, channels: 4, background: '#e9a84b' } }).png().toBuffer();
+    const makeDocument = (encoding, strength) => ({
+      identifier: 'novelai-vibe-transfer', version: 1, type: 'image', image: image.toString('base64'),
+      encodings: { 'v4-5full': { modelHash: { encoding, params: { information_extracted: 0.7 } } } },
+      importInfo: { model: 'nai-diffusion-4-5-full', information_extracted: 0.7, strength },
+    });
+    const firstPath = path.join(directory, '风格 0.4.naiv4vibe');
+    const secondPath = path.join(directory, '风格 0.8.naiv4vibe');
+    fs.writeFileSync(firstPath, JSON.stringify(makeDocument('first-encoding', 0.4)));
+    fs.writeFileSync(secondPath, JSON.stringify(makeDocument('second-encoding', 0.8)));
+
+    const first = await importVibeFile(firstPath, assetsDirectory);
+    const second = await importVibeFile(secondPath, assetsDirectory);
+
+    expect(first.id).not.toBe(second.id);
+    expect(first.source_image_hash).toBe(second.source_image_hash);
+    expect(fs.readFileSync(first.vibe_file)).toEqual(fs.readFileSync(firstPath));
+    expect(fs.readFileSync(second.vibe_file)).toEqual(fs.readFileSync(secondPath));
+    expect(fs.readFileSync(first.reference_image)).toEqual(image);
+    expect(fs.existsSync(first.thumbnail_path)).toBe(true);
   });
 });

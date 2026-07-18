@@ -16,6 +16,7 @@ import {
   updatePromptScope,
 } from './lib/promptStructure.js';
 import PromptOverview from './PromptOverview.jsx';
+import { groupVibeLibraryBySource } from './lib/vibeLibrary.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
@@ -401,17 +402,7 @@ function VibePanel({ project, updateProject, showToast }) {
   const [library, setLibrary] = useState([]);
   const [importing, setImporting] = useState(false);
   useEffect(() => { studio.loadVibeLibrary().then(setLibrary); }, []);
-  const libraryGroups = useMemo(() => {
-    const groups = new Map();
-    for (const entry of library) {
-      const key = entry.source_image_hash || `missing:${entry.id}`;
-      if (!groups.has(key)) groups.set(key, { key, entries: [], source: entry });
-      const group = groups.get(key);
-      group.entries.push(entry);
-      if (!group.source.reference_image && entry.reference_image) group.source = entry;
-    }
-    return [...groups.values()];
-  }, [library]);
+  const libraryGroups = useMemo(() => groupVibeLibraryBySource(library), [library]);
 
   const importVibes = async () => {
     setImporting(true);
