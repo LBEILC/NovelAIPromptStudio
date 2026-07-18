@@ -70,6 +70,7 @@ export async function importVibeImage(sourcePath, assetsDirectory) {
     encoding_variants_json: '[]',
     encoding_count: 0,
     has_source_image: 1,
+    source_image_hash: crypto.createHash('sha256').update(sourceBytes).digest('hex'),
     created_at: new Date().toISOString(),
   };
 }

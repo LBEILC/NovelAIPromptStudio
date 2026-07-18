@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import initSqlJs from 'sql.js';
+import { inferCategory } from '../src/lib/prompt.js';
 
 const require = createRequire(import.meta.url);
 
@@ -53,6 +55,8 @@ CREATE TABLE IF NOT EXISTS vibe_transfers (
   information_extracted REAL NOT NULL DEFAULT 0.7,
   information_extracted_known INTEGER NOT NULL DEFAULT 1,
   encoded_values_json TEXT NOT NULL DEFAULT '[]',
+  source_image_hash TEXT NOT NULL DEFAULT '',
+  has_source_image INTEGER NOT NULL DEFAULT 0,
   enabled INTEGER NOT NULL DEFAULT 1,
   position INTEGER NOT NULL
 );
@@ -72,6 +76,7 @@ CREATE TABLE IF NOT EXISTS vibe_library (
   encoding_variants_json TEXT NOT NULL DEFAULT '[]',
   encoding_count INTEGER NOT NULL DEFAULT 0,
   has_source_image INTEGER NOT NULL DEFAULT 0,
+  source_image_hash TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS vibe_encoding_index (
@@ -92,9 +97,29 @@ CREATE TABLE IF NOT EXISTS tag_dictionary (
   tag TEXT PRIMARY KEY,
   translation TEXT NOT NULL,
   category TEXT NOT NULL,
+  has_translation INTEGER NOT NULL DEFAULT 0,
+  has_classification INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL
 );
 `;
+
+const TAG_CATEGORIES = new Set(['Artist', 'Character', 'Clothing', 'Scene', 'Style', 'Unsorted']);
+
+function dictionaryKey(value) {
+  return String(value || '').trim().toLocaleLowerCase('en-US');
+}
+
+function projectTags(project) {
+  const structure = project.prompt_structure || {};
+  return [
+    ...(project.tags || []),
+    ...(structure.base_undesired_tags || []),
+    ...(structure.characters || []).flatMap((character) => [
+      ...(character.prompt_tags || []),
+      ...(character.undesired_tags || []),
+    ]),
+  ];
+}
 
 function rows(statement) {
   const output = [];
@@ -138,9 +163,24 @@ export async function openDatabase(dataDirectory) {
     ['model', "TEXT NOT NULL DEFAULT ''"],
     ['information_extracted_known', 'INTEGER NOT NULL DEFAULT 1'],
     ['encoded_values_json', "TEXT NOT NULL DEFAULT '[]'"],
+    ['source_image_hash', "TEXT NOT NULL DEFAULT ''"],
+    ['has_source_image', 'INTEGER NOT NULL DEFAULT 0'],
   ];
   for (const [column, definition] of vibeMigrations) {
     if (!vibeColumns.includes(column)) database.run(`ALTER TABLE vibe_transfers ADD COLUMN ${column} ${definition}`);
+  }
+  const vibeLibraryColumns = database.exec('PRAGMA table_info(vibe_library)')[0]?.values.map((row) => row[1]) || [];
+  if (!vibeLibraryColumns.includes('source_image_hash')) {
+    database.run("ALTER TABLE vibe_library ADD COLUMN source_image_hash TEXT NOT NULL DEFAULT ''");
+  }
+  const dictionaryColumns = database.exec('PRAGMA table_info(tag_dictionary)')[0]?.values.map((row) => row[1]) || [];
+  if (!dictionaryColumns.includes('has_translation')) {
+    database.run('ALTER TABLE tag_dictionary ADD COLUMN has_translation INTEGER NOT NULL DEFAULT 0');
+    database.run("UPDATE tag_dictionary SET has_translation = CASE WHEN TRIM(translation) != '' THEN 1 ELSE 0 END");
+  }
+  if (!dictionaryColumns.includes('has_classification')) {
+    database.run('ALTER TABLE tag_dictionary ADD COLUMN has_classification INTEGER NOT NULL DEFAULT 0');
+    database.run("UPDATE tag_dictionary SET has_classification = CASE WHEN TRIM(category) != '' THEN 1 ELSE 0 END");
   }
 
   const persist = () => {
@@ -156,18 +196,110 @@ export async function openDatabase(dataDirectory) {
     return rows(statement);
   };
 
+  for (const entry of query("SELECT id, reference_image FROM vibe_library WHERE source_image_hash = '' AND reference_image != ''")) {
+    if (!fs.existsSync(entry.reference_image)) continue;
+    const sourceImageHash = crypto.createHash('sha256').update(fs.readFileSync(entry.reference_image)).digest('hex');
+    database.run('UPDATE vibe_library SET source_image_hash = $hash, has_source_image = 1 WHERE id = $id', { $hash: sourceImageHash, $id: entry.id });
+  }
+  for (const vibe of query("SELECT id, library_id, reference_image FROM vibe_transfers WHERE source_image_hash = ''")) {
+    const libraryEntry = vibe.library_id
+      ? query('SELECT source_image_hash, has_source_image FROM vibe_library WHERE id = $id', { $id: vibe.library_id })[0]
+      : null;
+    let sourceImageHash = libraryEntry?.source_image_hash || '';
+    if (!sourceImageHash && vibe.reference_image && fs.existsSync(vibe.reference_image)) {
+      sourceImageHash = crypto.createHash('sha256').update(fs.readFileSync(vibe.reference_image)).digest('hex');
+    }
+    if (sourceImageHash) database.run(
+      'UPDATE vibe_transfers SET source_image_hash = $hash, has_source_image = 1 WHERE id = $id',
+      { $hash: sourceImageHash, $id: vibe.id },
+    );
+  }
+  persist();
+
+  const lookupTagDictionary = (tags = []) => {
+    const found = new Map();
+    for (const tag of tags) {
+      const key = dictionaryKey(tag);
+      if (!key || found.has(key)) continue;
+      const row = query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0];
+      if (row) found.set(key, row);
+    }
+    return found;
+  };
+
+  const upsertTagDictionary = (entries = [], updatedAt = new Date().toISOString()) => {
+    for (const entry of entries) {
+      const key = dictionaryKey(entry.tag);
+      if (!key) continue;
+      const translation = String(entry.translation || '').trim();
+      const category = TAG_CATEGORIES.has(entry.category) ? entry.category : 'Unsorted';
+      const hasTranslation = entry.has_translation ?? Boolean(translation);
+      const hasClassification = entry.has_classification ?? Boolean(entry.category);
+      if (!hasTranslation && !hasClassification) continue;
+      database.run(
+        `INSERT INTO tag_dictionary (tag, translation, category, has_translation, has_classification, updated_at)
+         VALUES ($tag, $translation, $category, $has_translation, $has_classification, $updated_at)
+         ON CONFLICT(tag) DO UPDATE SET
+          translation = CASE WHEN excluded.has_translation = 1 THEN excluded.translation ELSE tag_dictionary.translation END,
+          category = CASE WHEN excluded.has_classification = 1 THEN excluded.category ELSE tag_dictionary.category END,
+          has_translation = MAX(tag_dictionary.has_translation, excluded.has_translation),
+          has_classification = MAX(tag_dictionary.has_classification, excluded.has_classification),
+          updated_at = excluded.updated_at`,
+        {
+          $tag: key,
+          $translation: translation,
+          $category: category,
+          $has_translation: hasTranslation ? 1 : 0,
+          $has_classification: hasClassification ? 1 : 0,
+          $updated_at: updatedAt,
+        },
+      );
+    }
+  };
+
+  const enrichProjectTags = (project) => {
+    const cached = lookupTagDictionary(projectTags(project).map((tag) => tag.tag));
+    const enrich = (tag) => {
+      const entry = cached.get(dictionaryKey(tag.tag));
+      const inferred = inferCategory(tag.tag);
+      const migrated = inferred === 'Artist' && tag.category === 'Style'
+        ? { ...tag, category: 'Artist', category_source: 'heuristic' }
+        : tag;
+      if (!entry) return migrated;
+      return {
+        ...migrated,
+        ...(entry.has_translation ? { translation: entry.translation, translation_source: 'cache' } : {}),
+        ...(entry.has_classification ? { category: entry.category, category_source: 'cache' } : {}),
+      };
+    };
+    const structure = project.prompt_structure || {};
+    return {
+      ...project,
+      tags: (project.tags || []).map(enrich),
+      prompt_structure: {
+        ...structure,
+        base_undesired_tags: (structure.base_undesired_tags || []).map(enrich),
+        characters: (structure.characters || []).map((character) => ({
+          ...character,
+          prompt_tags: (character.prompt_tags || []).map(enrich),
+          undesired_tags: (character.undesired_tags || []).map(enrich),
+        })),
+      },
+    };
+  };
+
   const loadLibrary = () => {
     const projects = query('SELECT * FROM projects ORDER BY updated_at DESC');
     return projects.map((project) => {
       const metadata = query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] || {};
-      return {
+      return enrichProjectTags({
         ...project,
         tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', { $id: project.id }),
         metadata,
         prompt_structure: safeJson(metadata.prompt_structure_json),
         vibes: query('SELECT * FROM vibe_transfers WHERE project_id = $id ORDER BY position', { $id: project.id }),
         versions: query('SELECT * FROM prompt_versions WHERE project_id = $id ORDER BY created_at DESC', { $id: project.id }),
-      };
+      });
     });
   };
 
@@ -189,10 +321,10 @@ export async function openDatabase(dataDirectory) {
       database.run(
         `INSERT INTO vibe_library (id, name, source_kind, original_vibe_id, reference_image, vibe_file, thumbnail_path, model,
           strength, information_extracted, information_extracted_known, encoded_values_json, encoding_variants_json,
-          encoding_count, has_source_image, created_at)
+          encoding_count, has_source_image, source_image_hash, created_at)
          VALUES ($id, $name, $source_kind, $original_vibe_id, $reference_image, $vibe_file, $thumbnail_path, $model,
           $strength, $information_extracted, $information_extracted_known, $encoded_values_json, $encoding_variants_json,
-          $encoding_count, $has_source_image, $created_at)
+          $encoding_count, $has_source_image, $source_image_hash, $created_at)
          ON CONFLICT(id) DO UPDATE SET
           name = CASE WHEN (excluded.has_source_image = 1 AND vibe_library.has_source_image = 0)
             OR (vibe_library.source_kind = 'metadata' AND excluded.source_kind = 'metadata') THEN excluded.name ELSE vibe_library.name END,
@@ -208,7 +340,8 @@ export async function openDatabase(dataDirectory) {
           encoded_values_json = CASE WHEN excluded.encoding_count >= vibe_library.encoding_count THEN excluded.encoded_values_json ELSE vibe_library.encoded_values_json END,
           encoding_variants_json = CASE WHEN excluded.encoding_count >= vibe_library.encoding_count THEN excluded.encoding_variants_json ELSE vibe_library.encoding_variants_json END,
           encoding_count = MAX(vibe_library.encoding_count, excluded.encoding_count),
-          has_source_image = MAX(vibe_library.has_source_image, excluded.has_source_image)`,
+          has_source_image = MAX(vibe_library.has_source_image, excluded.has_source_image),
+          source_image_hash = COALESCE(NULLIF(excluded.source_image_hash, ''), vibe_library.source_image_hash)`,
         {
           $id: libraryId,
           $name: entry.name || libraryId.slice(0, 12),
@@ -225,6 +358,7 @@ export async function openDatabase(dataDirectory) {
           $encoding_variants_json: entry.encoding_variants_json || '[]',
           $encoding_count: Number(entry.encoding_count || 0),
           $has_source_image: entry.has_source_image ? 1 : 0,
+          $source_image_hash: entry.source_image_hash || '',
           $created_at: entry.created_at || new Date().toISOString(),
         },
       );
@@ -279,14 +413,15 @@ export async function openDatabase(dataDirectory) {
           $note: tag.note || '',
         },
       );
-      if (tag.translation) {
-        database.run(
-          `INSERT INTO tag_dictionary (tag, translation, category, updated_at) VALUES ($tag, $translation, $category, $updated_at)
-           ON CONFLICT(tag) DO UPDATE SET translation = excluded.translation, category = excluded.category, updated_at = excluded.updated_at`,
-          { $tag: tag.tag, $translation: tag.translation, $category: tag.category || 'Unsorted', $updated_at: project.updated_at },
-        );
-      }
     }
+    upsertTagDictionary(projectTags(project).map((tag) => ({
+      tag: tag.tag,
+      translation: tag.translation,
+      category: tag.category,
+      has_translation: Boolean(tag.translation?.trim()) && tag.translation_source !== 'builtin',
+      has_classification: ['ai', 'manual', 'cache'].includes(tag.category_source)
+        || (!tag.category_source && Boolean(tag.translation?.trim())),
+    })), project.updated_at);
 
     const metadata = project.metadata || {};
     database.run(
@@ -314,9 +449,9 @@ export async function openDatabase(dataDirectory) {
     for (const [position, vibe] of (project.vibes || []).entries()) {
       database.run(
         `INSERT INTO vibe_transfers (id, project_id, library_id, name, source_kind, reference_image, vibe_file, thumbnail_path,
-          model, strength, information_extracted, information_extracted_known, encoded_values_json, enabled, position)
+          model, strength, information_extracted, information_extracted_known, encoded_values_json, source_image_hash, has_source_image, enabled, position)
          VALUES ($id, $project_id, $library_id, $name, $source_kind, $reference_image, $vibe_file, $thumbnail_path,
-          $model, $strength, $information_extracted, $information_extracted_known, $encoded_values_json, $enabled, $position)`,
+          $model, $strength, $information_extracted, $information_extracted_known, $encoded_values_json, $source_image_hash, $has_source_image, $enabled, $position)`,
         {
           $id: vibe.id,
           $project_id: project.id,
@@ -331,6 +466,8 @@ export async function openDatabase(dataDirectory) {
           $information_extracted: Number(vibe.information_extracted),
           $information_extracted_known: vibe.information_extracted_known ? 1 : 0,
           $encoded_values_json: vibe.encoded_values_json || '[]',
+          $source_image_hash: vibe.source_image_hash || '',
+          $has_source_image: vibe.has_source_image ? 1 : 0,
           $enabled: vibe.enabled ? 1 : 0,
           $position: position,
         },
@@ -377,5 +514,5 @@ export async function openDatabase(dataDirectory) {
     persist();
   };
 
-  return { loadLibrary, loadVibeLibrary, upsertVibeLibrary, resolveVibeLibraryId, insertProject, updateProject, deleteProject, persist, filePath };
+  return { loadLibrary, loadVibeLibrary, upsertVibeLibrary, resolveVibeLibraryId, lookupTagDictionary, upsertTagDictionary, enrichProjectTags, insertProject, updateProject, deleteProject, persist, filePath };
 }

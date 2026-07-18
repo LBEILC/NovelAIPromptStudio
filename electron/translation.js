@@ -95,6 +95,8 @@ export async function testModel(settings, fetcher = globalThis.fetch) {
   return { model, latencyMs: Date.now() - startedAt, response: chatContent(body) };
 }
 
+const TAG_CATEGORIES = new Set(['Artist', 'Character', 'Clothing', 'Scene', 'Style', 'Unsorted']);
+
 function parseTranslationJson(content, expectedLength) {
   const withoutFence = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   const firstBrace = withoutFence.indexOf('{');
@@ -106,12 +108,19 @@ function parseTranslationJson(content, expectedLength) {
   } catch {
     throw new Error('模型返回的译文 JSON 无法解析');
   }
-  const translations = parsed?.translations;
-  if (!Array.isArray(translations) || translations.length !== expectedLength) {
+  const rawItems = Array.isArray(parsed?.items)
+    ? parsed.items
+    : Array.isArray(parsed?.translations)
+      ? parsed.translations.map((translation) => ({ translation, category: 'Unsorted' }))
+      : null;
+  if (!rawItems || rawItems.length !== expectedLength) {
     throw new Error('模型返回的译文数量与 Tag 数量不一致');
   }
-  const cleaned = translations.map((item) => String(item || '').trim());
-  if (cleaned.some((item) => !item)) throw new Error('模型返回了空译文');
+  const cleaned = rawItems.map((item) => ({
+    translation: String(item?.translation || '').trim(),
+    category: TAG_CATEGORIES.has(item?.category) ? item.category : 'Unsorted',
+  }));
+  if (cleaned.some((item) => !item.translation)) throw new Error('模型返回了空译文');
   return cleaned;
 }
 
@@ -130,16 +139,19 @@ export async function translateTags(texts, settings, fetcher = globalThis.fetch)
       {
         role: 'system',
         content: [
-          'You translate NovelAI Diffusion prompt tags from English to concise Simplified Chinese.',
-          'Preserve tag meaning, anatomy terms, clothing details, camera terms, and artist/style names.',
-          'Do not add explanations. Return only valid JSON in this exact shape: {"translations":["译文"]}.',
+          'You translate and classify NovelAI Diffusion prompt tags.',
+          'Translate each tag into concise Simplified Chinese while preserving anatomy, clothing, camera, and artist names.',
+          'Classify each tag as exactly one of: Artist, Character, Clothing, Scene, Style, Unsorted.',
+          'Artist is for artist attribution or artist-name tags. Character is for identity, anatomy, expression, or pose. Clothing is for apparel and accessories. Scene is for environment or background. Style is for visual style, quality, camera, lighting, or rendering terms, but never artist attribution.',
+          'Do not add explanations. Return only valid JSON in this exact shape: {"items":[{"translation":"译文","category":"Character"}]}.',
           'Keep the array length and order identical to the input tags.',
         ].join(' '),
       },
       { role: 'user', content: JSON.stringify({ tags: cleaned }) },
     ])),
   }, fetcher, 60000);
-  return { model, translations: parseTranslationJson(chatContent(body), cleaned.length) };
+  const items = parseTranslationJson(chatContent(body), cleaned.length);
+  return { model, items, translations: items.map((item) => item.translation), categories: items.map((item) => item.category) };
 }
 
 export { DEFAULT_BASE_URL, normalizeBaseUrl };

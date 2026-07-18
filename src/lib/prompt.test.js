@@ -42,6 +42,8 @@ describe('NovelAI prompt codec', () => {
   });
 
   it('classifies common prompt concepts', () => {
+    expect(inferCategory('artist:ciloranko')).toBe('Artist');
+    expect(inferCategory('artist_shion')).toBe('Artist');
     expect(inferCategory('black military uniform')).toBe('Clothing');
     expect(inferCategory('cinematic lighting')).toBe('Style');
     expect(inferCategory('rainy city street')).toBe('Scene');

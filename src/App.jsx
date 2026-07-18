@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, normalizeSearch, parsePrompt, repairLegacyPromptTags } from './lib/prompt.js';
+import { CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, inferCategory, normalizeSearch, parsePrompt, repairLegacyPromptTags } from './lib/prompt.js';
 import {
   addPromptCharacter,
   allPromptTags,
@@ -153,14 +153,14 @@ function TagCard({ tag, index, translating, dragging, dropTarget, onTranslate, o
     <div className="tag-line">
       <button className="drag-handle" onPointerDown={(event) => onPointerStart(index, event)} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} onKeyDown={(event) => onKeyboardMove(index, event)} title="按住拖动排序；Option + 方向键微调" aria-label={`拖动 ${tag.tag} 排序`}><Icon name="grip"/></button>
       <div className="tag-fields">
-        <input className="tag-name" value={tag.tag} onChange={(event) => onChange({ tag: event.target.value })} aria-label="Tag"/>
-        <input className="translation" value={tag.translation || ''} onChange={(event) => onChange({ translation: event.target.value })} placeholder="添加中文翻译" aria-label="中文翻译"/>
+        <input className="tag-name" value={tag.tag} onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic' })} aria-label="Tag"/>
+        <input className="translation" value={tag.translation || ''} onChange={(event) => onChange({ translation: event.target.value, translation_source: 'manual' })} placeholder="添加中文翻译" aria-label="中文翻译"/>
       </div>
       <button className={`translate-tag ${translating ? 'working' : ''}`} onClick={onTranslate} disabled={translating} aria-label={`翻译 ${tag.tag}`}>{translating ? '···' : '译'}</button>
       <button className="icon-button danger" onClick={onDelete} aria-label="删除标签"><Icon name="close" size={14}/></button>
     </div>
     <div className="tag-options">
-      <select value={tag.category} onChange={(event) => onChange({ category: event.target.value })}>{CATEGORY_OPTIONS.map((option) => <option key={option} value={option}>{CATEGORY_LABELS[option]}</option>)}</select>
+      <select value={tag.category} onChange={(event) => onChange({ category: event.target.value, category_source: 'manual' })}>{CATEGORY_OPTIONS.map((option) => <option key={option} value={option}>{CATEGORY_LABELS[option]}</option>)}</select>
       <WeightControl value={tag.weight} onChange={(weight) => onChange({ weight })}/>
     </div>
     <input className="tag-note" value={tag.note || ''} onChange={(event) => onChange({ note: event.target.value })} placeholder="备注（可选）"/>
@@ -277,7 +277,7 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
     const targets = tags.filter((tag) => ids.includes(tag.id)).slice(0, 50);
     if (!targets.length) return;
     setTranslatingIds((current) => new Set([...current, ...targets.map((tag) => tag.id)]));
-    setAIStatus({ type: 'progress', text: `正在用 AI 翻译 ${targets.length} 个 Tag…` });
+    setAIStatus({ type: 'progress', text: `正在整理 ${targets.length} 个 Tag：先查本地词典，再补翻译与分类…` });
     const result = await studio.translateTags(targets.map((tag) => tag.tag));
     setTranslatingIds((current) => {
       const next = new Set(current);
@@ -285,13 +285,14 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
       return next;
     });
     if (!result.ok) { setAIStatus({ type: 'error', text: result.error }); return; }
-    const translated = new Map(targets.map((tag, index) => [tag.id, result.translations[index]]));
-    updateProject(updatePromptScope(project, scope.key, tags.map((tag) => translated.has(tag.id) ? { ...tag, translation: translated.get(tag.id) } : tag)));
-    setAIStatus({ type: 'success', text: `${result.model} 已补齐 ${targets.length} 个译名` });
-    showToast(`AI 已翻译 ${targets.length} 个 Tag`);
+    const organized = new Map(targets.map((tag, index) => [tag.id, result.items?.[index] || { translation: result.translations[index], category: result.categories?.[index] || tag.category }]));
+    updateProject(updatePromptScope(project, scope.key, tags.map((tag) => organized.has(tag.id) ? { ...tag, ...organized.get(tag.id) } : tag)));
+    const cacheText = result.cache_hits ? `，${result.cache_hits} 个命中本地词典` : '';
+    setAIStatus({ type: 'success', text: `${result.model} 已完成翻译与分类${cacheText}` });
+    showToast(`已整理 ${targets.length} 个 Tag${cacheText}`);
   };
 
-  const missingTranslationIds = tags.filter((tag) => !tag.translation?.trim()).map((tag) => tag.id);
+  const missingTranslationIds = tags.filter((tag) => !tag.translation?.trim() || !['ai', 'manual', 'cache'].includes(tag.category_source)).map((tag) => tag.id);
   const addTag = () => {
     if (!newTag.trim()) return;
     const created = parsePrompt(newTag)[0];
@@ -376,19 +377,19 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
     <section className={`ai-channel ${showAISettings ? 'expanded' : ''}`}>
       <div className="ai-channel-bar">
         <span className="ai-signal"><Icon name="spark"/><i/></span>
-        <span className="ai-channel-copy"><b>{aiSettings.model || 'AI 翻译未配置'}</b><small>{aiSettings.model ? 'OpenAI-compatible channel' : '配置 API 后可批量翻译'}</small></span>
-        <button className="translate-missing" disabled={!missingTranslationIds.length || translatingIds.size > 0} onClick={() => translateTagIds(missingTranslationIds)}>{translatingIds.size ? '翻译中' : `翻译 ${missingTranslationIds.length}`}</button>
-        <button className="ai-settings-toggle" onClick={() => setShowAISettings((value) => !value)} aria-label="AI 翻译设置"><Icon name="settings"/></button>
+        <span className="ai-channel-copy"><b>{aiSettings.model || 'AI 整理未配置'}</b><small>{aiSettings.model ? '翻译 · 分类 · 本地复用' : '配置 API 后可翻译并分类'}</small></span>
+        <button className="translate-missing" disabled={!missingTranslationIds.length || translatingIds.size > 0} onClick={() => translateTagIds(missingTranslationIds)}>{translatingIds.size ? '整理中' : `AI 整理 ${missingTranslationIds.length}`}</button>
+        <button className="ai-settings-toggle" onClick={() => setShowAISettings((value) => !value)} aria-label="AI 整理设置"><Icon name="settings"/></button>
       </div>
       {showAISettings && <div className="ai-config">
         <label><span>API Base URL</span><input value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
         <label><span>API Key <em>{aiSettings.hasApiKey ? '已加密保存' : '未保存'}</em></span><div className="secret-input"><input type="password" value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '留空则保留现有 Key' : 'sk-…'}/><button onClick={saveAISettings}>保存</button></div></label>
         <label><span>Model</span><div className="model-input"><input list="ai-model-list" value={aiSettings.model} onChange={(event) => setAISettings((current) => ({ ...current, model: event.target.value }))} placeholder="读取或输入模型 ID"/><datalist id="ai-model-list">{models.map((model) => <option key={model} value={model}/>)}</datalist><button onClick={loadModels} disabled={aiBusy === 'models'} title="读取模型列表"><Icon name="refresh"/></button></div></label>
-        <div className="ai-config-actions"><button className="outline" onClick={testAIModel} disabled={Boolean(aiBusy)}>{aiBusy === 'test' ? '测试中…' : '测试模型'}</button><small>翻译时会把英文 Tag 发送到此 Base URL</small></div>
+        <div className="ai-config-actions"><button className="outline" onClick={testAIModel} disabled={Boolean(aiBusy)}>{aiBusy === 'test' ? '测试中…' : '测试模型'}</button><small>仅未缓存的 Tag 会发送到此 Base URL</small></div>
       </div>}
       {aiStatus && <div className={`ai-status ${aiStatus.type}`}>{aiStatus.text}</div>}
     </section>
-    <div className="category-legend">{CATEGORY_OPTIONS.slice(0, 4).map((category) => <span key={category} className={`cat-${category.toLowerCase()}`}>{CATEGORY_LABELS[category]}<b>{tags.filter((tag) => tag.category === category).length}</b></span>)}</div>
+    <div className="category-legend">{CATEGORY_OPTIONS.filter((category) => category !== 'Unsorted').map((category) => <span key={category} className={`cat-${category.toLowerCase()}`}>{CATEGORY_LABELS[category]}<b>{tags.filter((tag) => tag.category === category).length}</b></span>)}</div>
     <div className="tag-stack">
       {tags.map((tag, index) => <TagCard key={tag.id} tag={tag} index={index} translating={translatingIds.has(tag.id)} dragging={draggingIndex === index} dropTarget={dropIndex === index && draggingIndex !== index} onTranslate={() => translateTagIds([tag.id])} onChange={(patch) => updateTag(index, patch)} onDelete={() => updateProject(updatePromptScope(project, scope.key, tags.filter((_, itemIndex) => itemIndex !== index)))} onPointerStart={beginPointerDrag} onPointerMove={movePointerDrag} onPointerEnd={endPointerDrag} onKeyboardMove={keyboardMove}/>)}
       {!tags.length && <div className="panel-empty"><Icon name="layers"/><strong>这里还没有 Tag</strong><span>从含 NovelAI V4 metadata 的图片自动恢复，或在上方逐个添加。</span></div>}
@@ -400,6 +401,17 @@ function VibePanel({ project, updateProject, showToast }) {
   const [library, setLibrary] = useState([]);
   const [importing, setImporting] = useState(false);
   useEffect(() => { studio.loadVibeLibrary().then(setLibrary); }, []);
+  const libraryGroups = useMemo(() => {
+    const groups = new Map();
+    for (const entry of library) {
+      const key = entry.source_image_hash || `missing:${entry.id}`;
+      if (!groups.has(key)) groups.set(key, { key, entries: [], source: entry });
+      const group = groups.get(key);
+      group.entries.push(entry);
+      if (!group.source.reference_image && entry.reference_image) group.source = entry;
+    }
+    return [...groups.values()];
+  }, [library]);
 
   const importVibes = async () => {
     setImporting(true);
@@ -443,19 +455,31 @@ function VibePanel({ project, updateProject, showToast }) {
           <div className="vibe-card-title"><strong>{vibe.name || 'Vibe reference'}</strong><span className={`vibe-source ${vibe.source_kind}`}>{vibe.source_kind === 'image' ? '待编码' : '已编码'}</span></div>
           <label><span>Reference Strength <b>{Number(vibe.strength).toFixed(2)}</b></span><input type="range" min="0" max="1" step="0.01" value={vibe.strength} onChange={(event) => updateVibe(index, { strength: Number(event.target.value) })}/></label>
           {vibe.source_kind === 'image' ? <label><span>Information Extracted <b>{Number(vibe.information_extracted).toFixed(2)}</b></span><input type="range" min="0" max="1" step="0.01" value={vibe.information_extracted} onChange={(event) => updateVibe(index, { information_extracted: Number(event.target.value) })}/><small className="vibe-cost-warning">在 NovelAI 改动会重新编码并消耗 Anlas</small></label> : cachedInformationValues(vibe.encoded_values_json).length > 1 ? <label className="vibe-cached-information"><span>Information Extracted <b>仅缓存值</b></span><select value={vibe.information_extracted} onChange={(event) => updateVibe(index, { information_extracted: Number(event.target.value), information_extracted_known: 1 })}>{cachedInformationValues(vibe.encoded_values_json).map((value) => <option key={value} value={value}>{value.toFixed(2)} · 已缓存</option>)}</select></label> : <div className="vibe-encoding-lock"><Icon name="check" size={13}/><span>Information Extracted</span><b>{vibe.information_extracted_known ? Number(vibe.information_extracted).toFixed(2) : '固定编码'}</b></div>}
+          {vibe.reference_image
+            ? <button className="vibe-file-action source-image" onClick={() => studio.revealFile(vibe.reference_image)}><Icon name="image" size={13}/>打开源图所在文件夹</button>
+            : <div className="vibe-source-warning"><Icon name="info" size={13}/><span>缺少源 PNG；编码仍可复用，但无法查看图源</span></div>}
           {vibe.vibe_file && <button className="vibe-file-action" onClick={() => studio.revealFile(vibe.vibe_file)}><Icon name="folder" size={13}/>显示 .naiv4vibe 文件</button>}
           <button className="text-danger" onClick={() => updateProject({ ...project, vibes: project.vibes.filter((_, itemIndex) => itemIndex !== index) })}><Icon name="trash"/>移除参考图</button>
         </div>
       </article>)}
       {!project.vibes.length && <div className="panel-empty"><Icon name="image"/><strong>当前作品还没有 Vibe</strong><span>从下面的 Vibe 库加入，或导入 `.naiv4vibe` 与参考图。</span></div>}
     </div>
-    <div className="vibe-section-heading library-heading"><span>Vibe 库</span><b>{library.length}</b></div>
+    <div className="vibe-section-heading library-heading"><span>Vibe 库</span><b>{library.length}</b><small>{libraryGroups.length} 个图源组</small></div>
     <div className="vibe-library-list">
-      {library.map((entry) => <article className="vibe-library-card" key={entry.id}>
-        <img src={mediaUrl(entry.thumbnail_path)} alt=""/>
-        <div><strong>{entry.name}</strong><small>{entry.source_kind === 'image' ? '参考图 · 尚未编码' : `${entry.encoding_count || 1} 个缓存编码 · ${entry.model || 'NovelAI V4'}`}</small><span>{entry.information_extracted_known ? `Information ${Number(entry.information_extracted).toFixed(2)}` : '来自 PNG metadata · 固定编码'}</span></div>
-        <button onClick={() => useLibraryVibe(entry)} disabled={project.vibes.some((vibe) => vibe.library_id === entry.id)}>{project.vibes.some((vibe) => vibe.library_id === entry.id) ? '已用' : '使用'}</button>
-      </article>)}
+      {libraryGroups.map((group) => <section className={`vibe-source-group ${group.source.reference_image ? '' : 'missing-source'}`} key={group.key}>
+        <header>
+          <img src={mediaUrl(group.source.thumbnail_path)} alt="Vibe 源图"/>
+          <div><strong>{group.source.name}</strong><small>{group.entries.length} 个参数版本 · {group.source.reference_image ? '已绑定源图' : '缺少源 PNG'}</small></div>
+          {group.source.reference_image && <button onClick={() => studio.revealFile(group.source.reference_image)} title="打开源图所在文件夹"><Icon name="folder" size={14}/></button>}
+        </header>
+        {!group.source.reference_image && <div className="vibe-group-warning"><Icon name="info" size={13}/>导入原始 PNG 或带内嵌图片的 `.naiv4vibe` 后可建立可视绑定</div>}
+        <div className="vibe-variant-list">
+          {group.entries.map((entry) => <article className="vibe-library-card" key={entry.id}>
+            <div><strong>{entry.source_kind === 'image' ? '原始参考图' : entry.name}</strong><small>{entry.source_kind === 'image' ? '尚未编码' : `${entry.encoding_count || 1} 个缓存编码 · ${entry.model || 'NovelAI V4'}`}</small><span>{entry.information_extracted_known ? `Information ${Number(entry.information_extracted).toFixed(2)} · Strength ${Number(entry.strength).toFixed(2)}` : '来自 PNG metadata · 固定编码'}</span></div>
+            <button onClick={() => useLibraryVibe(entry)} disabled={project.vibes.some((vibe) => vibe.library_id === entry.id)}>{project.vibes.some((vibe) => vibe.library_id === entry.id) ? '已用' : '使用'}</button>
+          </article>)}
+        </div>
+      </section>)}
       {!library.length && <button className="vibe-library-empty" onClick={importVibes}><Icon name="plus"/><span><strong>建立 Vibe 库</strong><small>导入 `.naiv4vibe` 可直接复用缓存编码，不必重新计算。</small></span></button>}
     </div>
   </div>;

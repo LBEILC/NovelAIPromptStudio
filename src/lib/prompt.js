@@ -1,5 +1,6 @@
-export const CATEGORY_OPTIONS = ['Character', 'Clothing', 'Scene', 'Style', 'Unsorted'];
+export const CATEGORY_OPTIONS = ['Artist', 'Character', 'Clothing', 'Scene', 'Style', 'Unsorted'];
 export const CATEGORY_LABELS = {
+  Artist: '画师',
   Character: '角色',
   Clothing: '服装',
   Scene: '场景',
@@ -8,10 +9,11 @@ export const CATEGORY_LABELS = {
 };
 
 const categoryRules = [
+  ['Artist', /(?:^|[\s{[(,:])(?:artist\s*[:_]|by\s+artist\b|artist\b)/i],
   ['Character', /(?:\b\d+girls?\b|\b\d+boys?\b|\b(?:girl|boy|woman|man|solo|hair|eyes?|face|smile|expression|pose|looking|standing|sitting|hands?|body)\b)/i],
   ['Clothing', /\b(dress|shirt|sweater|jacket|uniform|skirt|pants|shorts|shoes|boots|hat|gloves|armor|necklace|earrings?)\b/i],
   ['Scene', /\b(city|street|room|forest|beach|sky|background|location|indoors|outdoors|weather|rain|snow|night|day|sunset|ocean)\b/i],
-  ['Style', /\b(artist|chibi|lineart|line art|lighting|camera|lens|angle|style|illustration|anime|cinematic|detailed|masterpiece|quality|aesthetic|highres|absurdres|depth of field|bokeh)\b/i],
+  ['Style', /\b(chibi|lineart|line art|lighting|camera|lens|angle|style|illustration|anime|cinematic|detailed|masterpiece|quality|aesthetic|highres|absurdres|depth of field|bokeh)\b/i],
 ];
 
 const dictionary = {
@@ -81,7 +83,9 @@ export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
         id: createId(),
         tag,
         translation: dictionary[tag.toLowerCase()] || '',
+        translation_source: dictionary[tag.toLowerCase()] ? 'builtin' : '',
         category: inferCategory(tag),
+        category_source: 'heuristic',
         weight,
         position,
         note: '',

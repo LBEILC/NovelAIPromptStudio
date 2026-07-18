@@ -70,6 +70,7 @@ describe('prompt structure persistence', () => {
       encoding_variants_json: '[]',
       encoding_count: 1,
       has_source_image: 1,
+      source_image_hash: 'shared-png-hash',
       created_at: now,
     };
     database.upsertVibeLibrary([libraryEntry]);
@@ -89,9 +90,40 @@ describe('prompt structure persistence', () => {
       vibes: [{ ...libraryEntry, id: 'project-vibe-link', library_id: libraryEntry.id, enabled: true }],
     });
 
-    expect(database.loadVibeLibrary()[0]).toMatchObject({ id: 'encoding-fingerprint', information_extracted_known: 1 });
+    expect(database.loadVibeLibrary()[0]).toMatchObject({ id: 'encoding-fingerprint', information_extracted_known: 1, source_image_hash: 'shared-png-hash' });
     expect(database.loadVibeLibrary()).toHaveLength(1);
     expect(database.resolveVibeLibraryId('second-information-encoding')).toBe('encoding-fingerprint');
     expect(database.loadLibrary()[0].vibes[0]).toMatchObject({ library_id: 'encoding-fingerprint', vibe_file: 'style.naiv4vibe', source_kind: 'naiv4vibe' });
+  });
+
+  it('reuses AI and manual tag knowledge across prompt scopes and projects', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-database-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    const now = new Date().toISOString();
+    const common = {
+      image_path: 'image.png', thumbnail_path: 'thumb.webp', created_at: now, updated_at: now,
+      metadata: { extra_json: '{}' }, vibes: [], versions: [],
+    };
+    database.insertProject({
+      ...common,
+      id: 'dictionary-source', name: 'Dictionary source', tags: [],
+      prompt_structure: {
+        base_undesired_tags: [], use_coords: false, use_order: true,
+        characters: [{
+          id: 'character', label: 'Character 1', undesired_tags: [], center: { x: 0.5, y: 0.5 },
+          prompt_tags: [{ id: 'artist-source', tag: 'Artist:Ciloranko', translation: '画师 Ciloranko', translation_source: 'manual', category: 'Artist', category_source: 'manual', weight: 1, note: '' }],
+        }],
+      },
+    });
+    database.insertProject({
+      ...common,
+      id: 'dictionary-target', name: 'Dictionary target',
+      tags: [{ id: 'artist-target', tag: 'artist:ciloranko', translation: '', category: 'Unsorted', category_source: 'heuristic', weight: 1, note: '' }],
+      prompt_structure: { base_undesired_tags: [], use_coords: false, use_order: true, characters: [] },
+    });
+
+    const target = database.loadLibrary().find((project) => project.id === 'dictionary-target');
+    expect(target.tags[0]).toMatchObject({ translation: '画师 Ciloranko', translation_source: 'cache', category: 'Artist', category_source: 'cache' });
   });
 });

@@ -83,7 +83,7 @@ app.whenReady().then(async () => {
     if (result.canceled) return [];
     const projects = [];
     for (const filePath of result.filePaths) {
-      const project = await importImage(filePath, assetsDirectory);
+      let project = await importImage(filePath, assetsDirectory);
       database.upsertVibeLibrary(project.vibe_library_entries || []);
       const vibeLibrary = new Map(database.loadVibeLibrary().map((entry) => [entry.id, entry]));
       project.vibes = (project.vibes || []).map((vibe) => {
@@ -91,6 +91,7 @@ app.whenReady().then(async () => {
         return libraryEntry ? { ...toProjectVibe(libraryEntry, vibe.id), strength: vibe.strength } : vibe;
       });
       delete project.vibe_library_entries;
+      project = database.enrichProjectTags(project);
       database.insertProject(project);
       projects.push(project);
     }
@@ -150,7 +151,38 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle('translation:tags', async (_event, tags) => {
     try {
-      return { ok: true, ...(await translateTags(tags, preferences.credentials(), net.fetch)) };
+      const cleaned = (tags || []).map((tag) => String(tag || '').trim());
+      const keyOf = (tag) => tag.toLocaleLowerCase('en-US');
+      const cached = database.lookupTagDictionary(cleaned);
+      const missing = cleaned.map((tag, index) => {
+        const entry = cached.get(keyOf(tag));
+        return !entry?.has_translation || !entry?.has_classification ? { tag, index, entry } : null;
+      }).filter(Boolean);
+      const generated = missing.length
+        ? await translateTags(missing.map((item) => item.tag), preferences.credentials(), net.fetch)
+        : null;
+      const generatedByIndex = new Map(missing.map((item, index) => [item.index, generated.items[index]]));
+      const items = cleaned.map((tag, index) => {
+        const entry = cached.get(keyOf(tag));
+        const ai = generatedByIndex.get(index);
+        return {
+          translation: entry?.has_translation ? entry.translation : ai.translation,
+          category: entry?.has_classification ? entry.category : ai.category,
+          translation_source: entry?.has_translation ? 'cache' : 'ai',
+          category_source: entry?.has_classification ? 'cache' : 'ai',
+        };
+      });
+      database.upsertTagDictionary(cleaned.map((tag, index) => ({ tag, ...items[index], has_translation: true, has_classification: true })));
+      database.persist();
+      return {
+        ok: true,
+        model: generated?.model || '本地词典',
+        items,
+        translations: items.map((item) => item.translation),
+        categories: items.map((item) => item.category),
+        cache_hits: cleaned.length - missing.length,
+        ai_count: missing.length,
+      };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }

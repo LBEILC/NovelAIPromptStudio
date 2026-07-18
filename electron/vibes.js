@@ -130,7 +130,13 @@ export async function importVibeFile(sourcePath, assetsDirectory) {
   const thumbnailData = decodeDataUrl(document.thumbnail)?.buffer || embeddedImage;
   const thumbnailPath = path.join(thumbnailDirectory, `vibe-${entry.id}.webp`);
   await writeThumbnail(thumbnailData, thumbnailPath, entry.id.slice(0, 12));
-  return { ...entry, vibe_file: vibeFile, reference_image: referenceImage, thumbnail_path: thumbnailPath };
+  return {
+    ...entry,
+    vibe_file: vibeFile,
+    reference_image: referenceImage,
+    thumbnail_path: thumbnailPath,
+    source_image_hash: embeddedImage?.length ? fingerprint(embeddedImage) : '',
+  };
 }
 
 export function extractEmbeddedVibes(raw, modelLabel = '') {
@@ -182,6 +188,7 @@ export async function importEmbeddedVibe(item, assetsDirectory, sourceName, inde
     encoding_variants_json: JSON.stringify([{ model: modelKey, model_hash: 'unknown', fingerprint: id, information_extracted: information }]),
     encoding_count: 1,
     has_source_image: 0,
+    source_image_hash: '',
     created_at: new Date().toISOString(),
     vibe_file: vibeFile,
     reference_image: '',
@@ -203,6 +210,8 @@ export function toProjectVibe(entry, id = crypto.randomUUID()) {
     information_extracted: finiteNumber(entry.information_extracted, 0.7),
     information_extracted_known: entry.information_extracted_known ? 1 : 0,
     encoded_values_json: entry.encoded_values_json || '[]',
+    source_image_hash: entry.source_image_hash || '',
+    has_source_image: entry.has_source_image ? 1 : 0,
     enabled: true,
   };
 }

@@ -23,15 +23,23 @@ describe('OpenAI-compatible AI translation', () => {
     expect(fetcher.mock.calls[0][0]).toBe('http://localhost:1234/v1/chat/completions');
   });
 
-  it('translates tags and tolerates fenced JSON model output', async () => {
+  it('translates and classifies tags while tolerating fenced JSON model output', async () => {
     const fetcher = vi.fn(async () => jsonResponse({
-      choices: [{ message: { content: '```json\n{"translations":["银色头发","电影感光照"]}\n```' } }],
+      choices: [{ message: { content: '```json\n{"items":[{"translation":"银色头发","category":"Character"},{"translation":"电影感光照","category":"Style"}]}\n```' } }],
     }));
     await expect(translateTags(['silver hair', 'cinematic lighting'], {
       baseUrl: 'https://api.example.com/v1',
       apiKey: 'secret',
       model: 'translator-model',
-    }, fetcher)).resolves.toEqual({ model: 'translator-model', translations: ['银色头发', '电影感光照'] });
+    }, fetcher)).resolves.toEqual({
+      model: 'translator-model',
+      items: [
+        { translation: '银色头发', category: 'Character' },
+        { translation: '电影感光照', category: 'Style' },
+      ],
+      translations: ['银色头发', '电影感光照'],
+      categories: ['Character', 'Style'],
+    });
   });
 
   it('only permits insecure HTTP for local model servers', () => {
