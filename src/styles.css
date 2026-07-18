@@ -1,6 +1,13 @@
 :root {
   color-scheme: dark;
-  font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-kerning: normal;
+  --font-mono: "SFMono-Regular", "Cascadia Mono", "Roboto Mono", Consolas, monospace;
+  --text-micro: .6875rem;
+  --text-caption: .75rem;
+  --text-secondary: .8125rem;
+  --text-ui: .875rem;
+  --text-heading: 1rem;
   --ink: #0c1015;
   --panel: #121820;
   --panel-2: #171e27;
@@ -9,7 +16,7 @@
   --line-soft: #222c36;
   --text: #eef3f6;
   --muted: #8996a3;
-  --faint: #5e6b77;
+  --faint: #6f7d88;
   --accent: #e9a84b;
   --accent-strong: #ffc269;
   --blue: #78a9c5;
@@ -20,14 +27,14 @@
 
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
-body { background: var(--ink); color: var(--text); font-size: 13px; }
+body { background: var(--ink); color: var(--text); font-size: 1rem; line-height: 1.5; }
 button, input, select, textarea { font: inherit; }
 button { color: inherit; }
 button, select, input[type="range"] { cursor: pointer; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent), transparent 20%); outline-offset: 1px; }
 button { border: 0; }
 
-.app-shell { width: 100%; height: 100%; min-height: 0; display: grid; grid-template-columns: 252px minmax(490px, 1fr) 390px; background: var(--ink); }
+.app-shell { width: 100%; height: 100%; min-height: 0; display: grid; grid-template-columns: 264px minmax(500px, 1fr) 420px; background: var(--ink); }
 .app-shell > * { min-height: 0; }
 
 .library-panel { display: flex; min-width: 0; flex-direction: column; background: #11171e; border-right: 1px solid var(--line); padding-top: 38px; }
@@ -233,6 +240,87 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; heigh
 .toast { position: fixed; left: 50%; bottom: 22px; z-index: 20; padding: 9px 13px; display: flex; align-items: center; gap: 7px; color: #cbd5da; background: #1b252d; border: 1px solid #3c4a55; border-radius: 6px; box-shadow: 0 10px 35px #0008; font-size: 10px; animation: toast-in .2s ease-out; }
 .toast svg { color: var(--green); }
 .loading-screen { height: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--muted); background: var(--ink); font-size: 11px; }
+
+/* Semantic readability scale for the dense desktop workspace. */
+.brand-row strong, .panel-intro strong { font-size: var(--text-heading); line-height: 1.25; letter-spacing: .005em; }
+.brand-row small { margin-top: 3px; color: #71808c; font: var(--text-micro)/1.35 var(--font-mono); letter-spacing: .08em; }
+.brand-symbol span, .import-button kbd, .search-box span, .section-heading b, .asset-copy small,
+.library-footer i, .image-index, .stage-meta, .rail-title button, .version-card small, .version-card em,
+.version-empty, .inspector-tabs i, .panel-intro small, .saved-dot, .ai-channel-copy b,
+.ai-channel-copy small, .translate-missing, .ai-config > label > span, .ai-config input,
+.secret-input button, .model-input button, .ai-config-actions small, .ai-status, .category-legend span,
+.translate-tag, .tag-options select, .weight-number, .tag-note, .vibe-note span,
+.vibe-controls label span, .vibe-controls label b, .text-danger, .metadata-badge,
+.metadata-grid label span, .textarea-label > span, .raw-metadata summary, .raw-metadata pre,
+.empty-mark span, .empty-hint { font-size: var(--text-micro); }
+
+.import-button, .search-box input, .asset-copy strong, .add-tag input, .tag-name,
+.metadata-grid input, .textarea-label textarea { font-size: var(--text-secondary); }
+
+.section-heading, .list-empty, .library-footer, .breadcrumb, .copy-button, .rail-title > span,
+.version-card b, .inspector-tabs button, .translation, .small-primary, .vibe-note,
+.vibe-image label, .panel-empty strong, .panel-empty span, .outline, .toast,
+.loading-screen { font-size: var(--text-caption); }
+
+.import-button { height: 40px; padding-inline: 12px; }
+.search-box { height: 38px; padding-inline: 10px; gap: 8px; }
+.section-heading { height: 32px; color: #94a2ad; letter-spacing: .07em; }
+.asset-row { height: 64px; padding-block: 6px; gap: 10px; }
+.asset-row img { width: 48px; height: 48px; }
+.asset-copy strong { color: #e2e8ec; font-weight: 650; }
+.asset-copy small, .library-footer { color: #7e8c97; }
+.library-footer { height: 42px; }
+.library-footer i { color: #8796a2; font-family: var(--font-mono); }
+
+.preview-column { grid-template-rows: 62px minmax(300px, 1fr) 164px; }
+.copy-button { height: 34px; padding-inline: 13px; }
+.image-index { right: -30px; width: 40px; font-family: var(--font-mono); letter-spacing: .08em; }
+.image-index b { font-size: var(--text-secondary); }
+.stage-meta { color: #72828e; font-family: var(--font-mono); font-variant-numeric: tabular-nums; line-height: 1.2; letter-spacing: .06em; }
+.rail-title > span { color: #bdc7ce; letter-spacing: .03em; }
+.rail-title button { color: #95a3ad; }
+.version-card b { color: #d5dde2; }
+.version-card small, .version-empty { color: #71808b; }
+.version-card em, .version-number { font-family: var(--font-mono); }
+
+.inspector { grid-template-rows: 62px minmax(0, 1fr); }
+.inspector-tabs button { height: 38px; gap: 6px; color: #83919c; }
+.inspector-tabs i { min-width: 16px; color: #9ba7b0; font-family: var(--font-mono); }
+.panel-intro small { margin-top: 4px; color: #71808b; }
+.add-tag { height: 39px; }
+.ai-channel-copy b, .ai-channel-copy small, .ai-config > label > span, .ai-config input,
+.category-legend span, .translate-tag, .weight-number, .vibe-note span,
+.vibe-controls label b, .metadata-badge, .metadata-grid label span,
+.textarea-label > span, .raw-metadata pre, .empty-mark span, .empty-hint { font-family: var(--font-mono); }
+.ai-channel-copy b { color: #c7d3da; }
+.ai-channel-copy small { color: #70808b; line-height: 1.35; }
+.translate-missing { height: 28px; padding-inline: 9px; }
+.ai-config > label > span { color: #81909b; }
+.ai-config input { height: 34px; color: #d2dbe0; }
+.secret-input button, .model-input button { color: #9babb4; }
+.ai-config-actions small, .ai-status { color: #71808a; line-height: 1.45; }
+.category-legend span { padding-block: 5px; }
+
+.tag-name { color: #e8edf0; font: 600 var(--text-secondary)/1.3 var(--font-mono) !important; }
+.translation { margin-top: 3px; color: #98a5ae; }
+.translate-tag { width: 26px; height: 26px; }
+.tag-options { grid-template-columns: 98px 1fr; }
+.tag-options select { width: 98px; height: 29px; padding-left: 7px; color: #a5b1b9; }
+.weight-number { width: 46px; height: 28px; font-variant-numeric: tabular-nums; }
+.tag-note { height: 28px; padding-inline: 7px; color: #8c9aa4; }
+
+.small-primary { height: 30px; }
+.vibe-note { color: #8997a1; }
+.vibe-controls label span, .vibe-image label { color: #8998a2; }
+.panel-empty strong { color: #9aa6ae; }
+.panel-empty span { color: #74828d; line-height: 1.65; }
+.outline { height: 32px; }
+.metadata-grid input { height: 35px; }
+.textarea-label textarea { line-height: 1.6; }
+.raw-metadata summary { color: #7b8993; }
+.raw-metadata pre { color: #91a0aa; }
+.empty-state p { font-size: var(--text-ui); }
+.toast, .loading-screen { color: #cbd5da; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes translate-pulse { from { opacity: .45; } to { opacity: 1; } }
 .toast { transform: translateX(-50%); }
@@ -242,9 +330,9 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; heigh
 ::-webkit-scrollbar-thumb { background: #2b3741; border: 2px solid transparent; background-clip: padding-box; border-radius: 5px; }
 
 @media (max-width: 1260px) {
-  .app-shell { grid-template-columns: 220px minmax(430px, 1fr) 350px; }
-  .tag-options { grid-template-columns: 82px 1fr; }
-  .tag-options select { width: 82px; }
+  .app-shell { grid-template-columns: 230px minmax(420px, 1fr) 380px; }
+  .tag-options { grid-template-columns: 92px 1fr; }
+  .tag-options select { width: 92px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

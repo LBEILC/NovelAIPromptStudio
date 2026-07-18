@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, BrowserWindow, dialog, ipcMain, net, protocol, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, safeStorage, shell } from 'electron';
 import { openDatabase } from './database.js';
 import { importImage, importVibeImage } from './assets.js';
 import { openPreferences } from './preferences.js';
@@ -20,9 +20,10 @@ function createWindow() {
   const window = new BrowserWindow({
     width: 1540,
     height: 980,
-    minWidth: 1120,
+    minWidth: 1180,
     minHeight: 700,
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    autoHideMenuBar: process.platform === 'win32',
     backgroundColor: '#10151b',
     webPreferences: {
       preload: path.join(import.meta.dirname, 'preload.cjs'),
@@ -38,6 +39,8 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === 'win32') Menu.setApplicationMenu(null);
+
   const dataDirectory = path.join(app.getPath('userData'), 'data');
   assetsDirectory = path.join(app.getPath('userData'), 'assets');
   database = await openDatabase(dataDirectory);

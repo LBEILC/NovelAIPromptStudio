@@ -61,14 +61,14 @@ function EmptyState({ onImport }) {
   </main>;
 }
 
-function LibraryPanel({ projects, activeId, setActiveId, query, setQuery, onImport }) {
+function LibraryPanel({ projects, activeId, setActiveId, query, setQuery, onImport, shortcutModifier }) {
   return <aside className="library-panel">
     <div className="brand-row">
       <div className="brand-symbol">N<span>4</span></div>
       <div><strong>Prompt Studio</strong><small>NovelAI asset desk</small></div>
     </div>
-    <button className="primary import-button" onClick={onImport}><Icon name="plus"/>导入图片 <kbd>⌘ I</kbd></button>
-    <label className="search-box"><Icon name="search"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索标签、译名或文件…"/><span>⌘ K</span></label>
+    <button className="primary import-button" onClick={onImport}><Icon name="plus"/>导入图片 <kbd>{shortcutModifier} I</kbd></button>
+    <label className="search-box"><Icon name="search"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索标签、译名或文件…"/><span>{shortcutModifier} K</span></label>
     <div className="section-heading"><span>作品库</span><b>{projects.length}</b></div>
     <div className="asset-list">
       {projects.map((project) => <button key={project.id} className={`asset-row ${project.id === activeId ? 'active' : ''}`} onClick={() => setActiveId(project.id)}>
@@ -360,6 +360,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeVersion, setActiveVersion] = useState('current');
   const saveTimers = useRef(new Map());
+  const shortcutModifier = useMemo(() => navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl', []);
 
   useEffect(() => {
     studio.loadLibrary().then((items) => {
@@ -377,8 +378,9 @@ export default function App() {
 
   useEffect(() => {
     const keydown = (event) => {
-      if (event.metaKey && event.key.toLowerCase() === 'i') { event.preventDefault(); importImages(); }
-      if (event.metaKey && event.key.toLowerCase() === 'k') { event.preventDefault(); document.querySelector('.search-box input')?.focus(); }
+      const commandKey = event.metaKey || event.ctrlKey;
+      if (commandKey && event.key.toLowerCase() === 'i') { event.preventDefault(); importImages(); }
+      if (commandKey && event.key.toLowerCase() === 'k') { event.preventDefault(); document.querySelector('.search-box input')?.focus(); }
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
@@ -457,7 +459,7 @@ export default function App() {
   if (loading) return <div className="loading-screen"><div className="brand-symbol">N<span>4</span></div><span>正在打开本地资料库…</span></div>;
 
   return <div className="app-shell">
-    <LibraryPanel projects={filteredProjects} activeId={activeId} setActiveId={(id) => { setActiveId(id); setActiveVersion('current'); }} query={query} setQuery={setQuery} onImport={importImages}/>
+    <LibraryPanel projects={filteredProjects} activeId={activeId} setActiveId={(id) => { setActiveId(id); setActiveVersion('current'); }} query={query} setQuery={setQuery} onImport={importImages} shortcutModifier={shortcutModifier}/>
     {activeProject ? <>
       <PreviewStage project={activeProject} onCopy={copyPrompt} onReveal={studio.revealFile} saveVersion={saveVersion} restoreVersion={restoreVersion} activeVersion={activeVersion} setActiveVersion={setActiveVersion}/>
       <Inspector tab={tab} setTab={setTab} project={activeProject} updateProject={updateProject} showToast={showToast}/>

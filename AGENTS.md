@@ -18,3 +18,13 @@ Read `coordination/README.md` before platform-sensitive work. Check the file for
 - macOS Codex writes requests that require Windows to `coordination/WINDOWS.md`.
 
 Only add a handoff when the work genuinely requires the other platform. Include the commit, exact action, expected result, and observed result. Mark completed items in place so both environments retain the history.
+
+## Delivery workflow
+
+After completing a code change:
+
+1. Run the relevant tests and production build.
+2. Commit the completed change with a focused message.
+3. Push the current branch to its configured remote.
+
+Never force-push. If the push is rejected or requires work from the other operating system, record an actionable handoff in `coordination/` and report the blocker.
