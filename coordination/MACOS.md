@@ -44,3 +44,12 @@
 - Action: On macOS, import image-based and encoding-only `.naiv4vibe` files plus a NovelAI PNG containing embedded Vibe metadata. Verify file dialogs accept `.naiv4vibe`, raw files are copied without modification, thumbnails render, duplicate encodings merge into one library entry, and the imported Vibe can be reused by another project. Confirm metadata-only Vibes show a locked Information Extracted value and multi-cache files only offer cached values.
 - Expected: All Vibe paths and copied assets work with macOS path conventions; no re-encoding or network request occurs; Reference Strength remains editable while uncached Information Extracted values cannot be selected.
 - Observed: Awaiting macOS verification; Windows parsed all 10 supplied Vibe files, matched the supplied PNG to `5.naiv4vibe`, passed 22 tests/build, and completed real-window migration checks.
+
+## Verify cached AI classification and source-grouped Vibes
+
+- Status: Pending
+- Date/source: 2026-07-19, Windows
+- Related commit: `fd8a4f7`
+- Action: On macOS, import two projects containing the same NovelAI tags, run AI 整理 on the first, manually edit one translation/category, then confirm the second project reuses both results without another model request. Confirm artist attribution tags appear under 画师. Import two `.naiv4vibe` files derived from the same embedded source image and verify they appear as parameter versions in one source-image group; test the source-image folder action and an encoding-only Vibe with no embedded PNG.
+- Expected: The local dictionary reuses normalized tags across Base/Undesired/Character scopes and persists AI/manual edits; macOS paths remain valid. Vibes with identical source-image bytes share one visual group, the source folder opens in Finder, and missing-PNG entries show a clear warning while remaining reusable.
+- Observed: Awaiting macOS verification; Windows passed clean install, 23 tests, production build, database migration, and real-window layout checks.
