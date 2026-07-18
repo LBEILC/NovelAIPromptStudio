@@ -17,3 +17,12 @@
 - Action: Launch the app on macOS and confirm the standard macOS application menu remains available, `hiddenInset` title-bar behavior is unchanged, shortcuts display with `⌘`, and the enlarged typography does not clip in the library, version rail, Prompt, Vibe, or metadata panels.
 - Expected: macOS keeps its native menu and title-bar conventions while using the same readable type scale without overflow.
 - Observed: Awaiting macOS verification.
+
+## Verify structured V4 prompt workspace
+
+- Status: Pending
+- Date/source: 2026-07-19, Windows
+- Related commit: `7403d61`
+- Action: On macOS, import a NovelAI V4/V4.5 PNG containing Base Prompt, Base Undesired Content, at least one Character Prompt and Character Undesired Content, and character coordinates. Click the library thumbnail to open Prompt overview; verify every scope is separated, tags can be clicked and reordered, the right panel switches to the matching scope, and the 5 x 5 position editor persists changes. Also confirm the macOS Avenir Next/PingFang font stack and native menu/title bar remain visually correct.
+- Expected: V4 metadata migrates without losing tags, Prompt overview and scoped editing behave the same as Windows, and macOS keeps native typography and window conventions without clipping.
+- Observed: Awaiting macOS verification; Windows passed `npm ci`, 15 tests, production build, and real-window interaction checks.
