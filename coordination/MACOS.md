@@ -26,3 +26,12 @@
 - Action: On macOS, import a NovelAI V4/V4.5 PNG containing Base Prompt, Base Undesired Content, at least one Character Prompt and Character Undesired Content, and character coordinates. Click the library thumbnail to open Prompt overview; verify every scope is separated, tags can be clicked and reordered, the right panel switches to the matching scope, and the 5 x 5 position editor persists changes. Also confirm the macOS Avenir Next/PingFang font stack and native menu/title bar remain visually correct.
 - Expected: V4 metadata migrates without losing tags, Prompt overview and scoped editing behave the same as Windows, and macOS keeps native typography and window conventions without clipping.
 - Observed: Awaiting macOS verification; Windows passed `npm ci`, 15 tests, production build, and real-window interaction checks.
+
+## Verify adaptive default window and CJK font fallback
+
+- Status: Pending
+- Date/source: 2026-07-19, Windows
+- Related commit: `51bd5b6`
+- Action: Launch the app on macOS on a normal laptop display and, if available, a larger external display. Confirm the initial window fits inside the usable work area, expands up to the new desktop default without covering the menu bar or Dock, and the three-column layout plus top actions remain visible. Check Chinese labels in the category legend and any mixed mono/CJK fields.
+- Expected: The window respects the current display work area, macOS title-bar behavior is unchanged, controls do not clip, and Chinese glyphs fall back to PingFang SC rather than a serif or generic monospace face.
+- Observed: Awaiting macOS verification; Windows passed clean install, 15 tests, production build, and default-window visual inspection.
