@@ -1,0 +1,138 @@
+export const CATEGORY_OPTIONS = ['Character', 'Clothing', 'Scene', 'Style', 'Unsorted'];
+export const CATEGORY_LABELS = {
+  Character: '角色',
+  Clothing: '服装',
+  Scene: '场景',
+  Style: '风格',
+  Unsorted: '未分类',
+};
+
+const categoryRules = [
+  ['Character', /(?:\b\d+girls?\b|\b\d+boys?\b|\b(?:girl|boy|woman|man|solo|hair|eyes?|face|smile|expression|pose|looking|standing|sitting|hands?|body)\b)/i],
+  ['Clothing', /\b(dress|shirt|sweater|jacket|uniform|skirt|pants|shorts|shoes|boots|hat|gloves|armor|necklace|earrings?)\b/i],
+  ['Scene', /\b(city|street|room|forest|beach|sky|background|location|indoors|outdoors|weather|rain|snow|night|day|sunset|ocean)\b/i],
+  ['Style', /\b(artist|chibi|lineart|line art|lighting|camera|lens|angle|style|illustration|anime|cinematic|detailed|masterpiece|quality|aesthetic|highres|absurdres|depth of field|bokeh)\b/i],
+];
+
+const dictionary = {
+  '1girl': '1名女孩',
+  '1boy': '1名男孩',
+  'silver hair': '银色头发',
+  'white hair': '白色头发',
+  'long silver hair': '银色长发',
+  'red eyes': '红色眼睛',
+  'blue eyes': '蓝色眼睛',
+  'black military uniform': '黑色军装',
+  'futuristic city': '未来城市',
+  'cinematic lighting': '电影感光照',
+  'ribbed knit sweater': '罗纹针织毛衣',
+  'solo': '单人',
+  'chibi': 'Q版',
+  'chibi only': '仅Q版',
+  'thick lineart': '粗线稿',
+  'simple background': '简单背景',
+  'white background': '白色背景',
+  'cherry blossom petals': '樱花花瓣',
+  'motion lines': '速度线',
+  'motion blur': '运动模糊',
+  'shiny skin': '光泽皮肤',
+};
+
+export function inferCategory(tag) {
+  return categoryRules.find(([, expression]) => expression.test(tag))?.[0] || 'Unsorted';
+}
+
+function promptSegments(prompt) {
+  const source = String(prompt || '');
+  const segments = [];
+  let cursor = 0;
+  while (cursor < source.length) {
+    while (cursor < source.length && /[\s,]/.test(source[cursor])) cursor += 1;
+    if (cursor >= source.length) break;
+
+    const weighted = source.slice(cursor).match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+))::/);
+    if (weighted) {
+      const contentStart = cursor + weighted[0].length;
+      const contentEnd = source.indexOf('::', contentStart);
+      if (contentEnd !== -1) {
+        const weight = Number(weighted[1]);
+        source.slice(contentStart, contentEnd).split(',').map((tag) => tag.trim()).filter(Boolean)
+          .forEach((tag) => segments.push({ tag, weight }));
+        cursor = contentEnd + 2;
+        continue;
+      }
+    }
+
+    const comma = source.indexOf(',', cursor);
+    const newline = source.indexOf('\n', cursor);
+    const boundaries = [comma, newline].filter((value) => value !== -1);
+    const end = boundaries.length ? Math.min(...boundaries) : source.length;
+    const tag = source.slice(cursor, end).trim();
+    if (tag) segments.push({ tag, weight: 1 });
+    cursor = end + 1;
+  }
+  return segments;
+}
+
+export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
+  return promptSegments(prompt)
+    .map(({ tag, weight }, position) => {
+      return {
+        id: createId(),
+        tag,
+        translation: dictionary[tag.toLowerCase()] || '',
+        category: inferCategory(tag),
+        weight,
+        position,
+        note: '',
+      };
+    });
+}
+
+export function repairLegacyPromptTags(tags = [], prompt = '', createId = () => crypto.randomUUID()) {
+  const hasLegacyFragments = tags.some((item) => /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)::/.test(item.tag) || /::$/.test(item.tag));
+  if (!hasLegacyFragments || !prompt.trim()) return tags;
+
+  const existingByTag = new Map();
+  for (const item of tags) {
+    const key = item.tag.trim().toLowerCase();
+    if (!existingByTag.has(key)) existingByTag.set(key, []);
+    existingByTag.get(key).push(item);
+  }
+  return parsePrompt(prompt, createId).map((parsed) => {
+    const existing = existingByTag.get(parsed.tag.toLowerCase())?.shift();
+    if (!existing) return parsed;
+    return {
+      ...parsed,
+      id: existing.id,
+      translation: existing.translation || parsed.translation,
+      category: existing.category && existing.category !== 'Unsorted' ? existing.category : parsed.category,
+      note: existing.note || '',
+    };
+  });
+}
+
+export function formatTag(tag) {
+  const value = Number(tag.weight);
+  return Math.abs(value - 1) < 0.001 ? tag.tag.trim() : `${Number(value.toFixed(2))}::${tag.tag.trim()} ::`;
+}
+
+export function formatPrompt(tags = []) {
+  return tags.filter((tag) => tag.tag.trim()).map(formatTag).join(',\n');
+}
+
+export function normalizeSearch(value = '') {
+  return value.trim().toLocaleLowerCase();
+}
+
+const searchAliases = {
+  '银发': ['银色头发', '白色头发', 'silver hair', 'white hair'],
+  '白发': ['银色头发', '白色头发', 'silver hair', 'white hair'],
+  '军装': ['military uniform', '军服', '制服'],
+  '夜景': ['night', 'nighttime', '夜晚', '夜间'],
+};
+
+export function expandSearch(value = '') {
+  const normalized = normalizeSearch(value);
+  return [normalized, ...(searchAliases[normalized] || [])].map(normalizeSearch).filter(Boolean);
+}

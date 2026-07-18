@@ -1,0 +1,28 @@
+{
+  "name": "novelai-prompt-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A local-first asset and prompt manager for NovelAI Diffusion V4/V4.5.",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && NOVELAI_DEV_URL=http://127.0.0.1:5173 electron .\"",
+    "build": "vite build",
+    "start": "electron .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "6.0.3",
+    "vite": "8.1.5",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "sharp": "0.35.3",
+    "sql.js": "1.14.1"
+  },
+  "devDependencies": {
+    "concurrently": "9.2.4",
+    "electron": "43.1.1",
+    "vitest": "4.1.10",
+    "wait-on": "9.0.3"
+  }
+}
