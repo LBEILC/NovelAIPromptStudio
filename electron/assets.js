@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import { readNovelAIMetadata } from './metadata.js';
 import { parsePrompt } from '../src/lib/prompt.js';
 import { createPromptStructure } from '../src/lib/promptStructure.js';
+import { extractEmbeddedVibes, importEmbeddedVibe, toProjectVibe } from './vibes.js';
 
 function safeName(filePath) {
   return path.basename(filePath, path.extname(filePath)).replace(/[^\p{L}\p{N}._-]+/gu, ' ').trim() || 'Untitled';
@@ -28,6 +29,11 @@ export async function importImage(sourcePath, assetsDirectory) {
   const id = crypto.randomUUID();
   const { targetPath, thumbnailPath } = await copyWithThumbnail(sourcePath, assetsDirectory);
   const metadata = readNovelAIMetadata(sourcePath);
+  const vibeLibraryEntries = [];
+  for (const [index, item] of (metadata.embedded_vibes || []).entries()) {
+    vibeLibraryEntries.push(await importEmbeddedVibe(item, assetsDirectory, sourcePath, index));
+  }
+  delete metadata.embedded_vibes;
   const now = new Date().toISOString();
   return {
     id,
@@ -39,19 +45,48 @@ export async function importImage(sourcePath, assetsDirectory) {
     metadata,
     tags: parsePrompt(metadata.prompt_raw, () => crypto.randomUUID()),
     prompt_structure: createPromptStructure(metadata, () => crypto.randomUUID()),
-    vibes: [],
+    vibes: vibeLibraryEntries.map((entry) => toProjectVibe(entry)),
+    vibe_library_entries: vibeLibraryEntries,
     versions: [],
   };
 }
 
 export async function importVibeImage(sourcePath, assetsDirectory) {
   const { targetPath, thumbnailPath } = await copyWithThumbnail(sourcePath, assetsDirectory, 'vibes');
+  const sourceBytes = fs.readFileSync(sourcePath);
   return {
-    id: crypto.randomUUID(),
+    id: crypto.createHash('sha256').update(sourceBytes).digest('hex'),
+    name: safeName(sourcePath),
+    source_kind: 'image',
+    original_vibe_id: '',
     reference_image: targetPath,
+    vibe_file: '',
     thumbnail_path: thumbnailPath,
+    model: '',
     strength: 0.6,
     information_extracted: 0.7,
-    enabled: true,
+    information_extracted_known: 1,
+    encoded_values_json: '[]',
+    encoding_variants_json: '[]',
+    encoding_count: 0,
+    has_source_image: 1,
+    created_at: new Date().toISOString(),
   };
+}
+
+export async function recoverEmbeddedVibes(project, assetsDirectory) {
+  let raw = {};
+  try {
+    raw = JSON.parse(project.metadata?.extra_json || '{}').parsed || {};
+  } catch {
+    return { project, libraryEntries: [] };
+  }
+  const items = extractEmbeddedVibes(raw, project.metadata?.model || '');
+  const libraryEntries = [];
+  for (const [index, item] of items.entries()) {
+    libraryEntries.push(await importEmbeddedVibe(item, assetsDirectory, project.name || project.image_path, index));
+  }
+  const existingIds = new Set((project.vibes || []).map((vibe) => vibe.library_id).filter(Boolean));
+  const additions = libraryEntries.filter((entry) => !existingIds.has(entry.id)).map((entry) => toProjectVibe(entry));
+  return { project: additions.length ? { ...project, vibes: [...(project.vibes || []), ...additions] } : project, libraryEntries };
 }

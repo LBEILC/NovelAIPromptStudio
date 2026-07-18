@@ -48,4 +48,50 @@ describe('prompt structure persistence', () => {
       characters: [{ center: { x: 0.3, y: 0.5 }, prompt_tags: [{ tag: 'girl' }], undesired_tags: [{ tag: 'blue hair' }] }],
     });
   });
+
+  it('stores reusable encoded Vibes and project links', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-database-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    const now = new Date().toISOString();
+    const libraryEntry = {
+      id: 'encoding-fingerprint',
+      name: 'Reusable style',
+      source_kind: 'naiv4vibe',
+      original_vibe_id: 'original',
+      reference_image: 'reference.png',
+      vibe_file: 'style.naiv4vibe',
+      thumbnail_path: 'thumb.webp',
+      model: 'nai-diffusion-4-5-full',
+      strength: 0.4,
+      information_extracted: 0.7,
+      information_extracted_known: 1,
+      encoded_values_json: '[0.7]',
+      encoding_variants_json: '[]',
+      encoding_count: 1,
+      has_source_image: 1,
+      created_at: now,
+    };
+    database.upsertVibeLibrary([libraryEntry]);
+    database.upsertVibeLibrary([{
+      ...libraryEntry,
+      id: 'second-information-encoding',
+      encoded_values_json: '[0.7,1]',
+      encoding_variants_json: JSON.stringify([
+        { fingerprint: 'encoding-fingerprint', information_extracted: 0.7 },
+        { fingerprint: 'second-information-encoding', information_extracted: 1 },
+      ]),
+      encoding_count: 2,
+    }]);
+    database.insertProject({
+      id: 'project-vibe', name: 'Vibe project', image_path: 'image.png', thumbnail_path: 'thumb.webp', created_at: now, updated_at: now,
+      tags: [], prompt_structure: { base_undesired_tags: [], use_coords: false, use_order: true, characters: [] }, metadata: { extra_json: '{}' }, versions: [],
+      vibes: [{ ...libraryEntry, id: 'project-vibe-link', library_id: libraryEntry.id, enabled: true }],
+    });
+
+    expect(database.loadVibeLibrary()[0]).toMatchObject({ id: 'encoding-fingerprint', information_extracted_known: 1 });
+    expect(database.loadVibeLibrary()).toHaveLength(1);
+    expect(database.resolveVibeLibraryId('second-information-encoding')).toBe('encoding-fingerprint');
+    expect(database.loadLibrary()[0].vibes[0]).toMatchObject({ library_id: 'encoding-fingerprint', vibe_file: 'style.naiv4vibe', source_kind: 'naiv4vibe' });
+  });
 });

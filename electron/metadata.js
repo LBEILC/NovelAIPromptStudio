@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import { extractV4PromptData } from '../src/lib/promptStructure.js';
+import { extractEmbeddedVibes } from './vibes.js';
 
 function parsePngText(buffer) {
   const signature = buffer.subarray(0, 8).toString('hex');
@@ -59,15 +60,17 @@ export function readNovelAIMetadata(filePath) {
   const legacyPrompt = first(raw, ['prompt', 'description'], text.Description || '');
   const legacyNegative = first(raw, ['uc', 'negative_prompt', 'negativePrompt'], '');
   const promptStructure = extractV4PromptData(raw, legacyPrompt, legacyNegative);
+  const model = String(first(raw, ['model', 'source'], text.Source || text.Software || ''));
   return {
     prompt_raw: promptStructure.base_prompt_raw,
     negative_prompt: promptStructure.base_undesired_raw,
     prompt_structure_raw: promptStructure,
-    model: String(first(raw, ['model', 'source'], text.Source || text.Software || '')),
+    model,
     seed: String(first(raw, ['seed'], '')),
     steps: first(raw, ['steps'], ''),
     sampler: String(first(raw, ['sampler'], '')),
     guidance: first(raw, ['scale', 'cfg_scale', 'guidance'], ''),
+    embedded_vibes: extractEmbeddedVibes(raw, model),
     extra_json: JSON.stringify({ pngText: text, parsed: raw }),
   };
 }

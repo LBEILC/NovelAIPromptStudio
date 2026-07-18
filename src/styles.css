@@ -210,18 +210,50 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; heigh
 .small-primary { margin-left: auto; height: 27px; padding: 0 8px; display: flex; align-items: center; gap: 4px; color: #241a0e; background: var(--accent); border-radius: 4px; font-size: 9px; font-weight: 700; }
 .vibe-note { padding: 9px; margin-bottom: 13px; color: #76848f; background: #161f27; border-left: 2px solid var(--blue); font-size: 9px; line-height: 1.5; }
 .vibe-note span { display: block; margin-bottom: 2px; color: var(--blue); font: 8px var(--font-mono); }
+.vibe-note.safe { color: #91a19f; background: #121d1c; border-left-color: var(--green); }
+.vibe-note.safe span { color: var(--green); }
+.vibe-section-heading { min-height: 30px; display: flex; align-items: center; gap: 7px; color: #8997a1; font-size: var(--text-caption); font-weight: 700; }
+.vibe-section-heading b { min-width: 18px; padding: 1px 5px; color: #7f8f99; background: #222d35; border-radius: 8px; font: 500 var(--text-micro) var(--font-mono); text-align: center; }
+.vibe-section-heading.library-heading { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
 .vibe-stack { display: grid; gap: 9px; }
-.vibe-card { display: grid; grid-template-columns: 105px 1fr; gap: 10px; padding: 9px; background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 6px; }
+.vibe-card { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; padding: 9px; background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 6px; }
 .vibe-card.disabled { opacity: .48; }
 .vibe-image { min-width: 0; }
-.vibe-image img { width: 105px; height: 105px; display: block; object-fit: cover; background: #0a0e12; border-radius: 4px; }
+.vibe-image img { width: 96px; height: 96px; display: block; object-fit: cover; background: #0a0e12; border-radius: 4px; }
 .vibe-image label { margin-top: 6px; display: flex; gap: 5px; align-items: center; color: #84929c; font-size: 9px; }
 .vibe-image input { accent-color: var(--accent); }
 .vibe-controls { min-width: 0; display: flex; flex-direction: column; }
-.vibe-controls > label { margin-bottom: 12px; }
+.vibe-controls > label { margin-bottom: 10px; }
 .vibe-controls label span { margin-bottom: 7px; display: flex; gap: 5px; color: #778590; font-size: 8px; }
 .vibe-controls label b { margin-left: auto; color: #bdc7cd; font: 8px var(--font-mono); }
 .vibe-controls input[type="range"] { width: 100%; }
+.vibe-card-title { min-width: 0; margin-bottom: 10px; display: flex; align-items: start; gap: 6px; }
+.vibe-card-title strong { min-width: 0; flex: 1; overflow: hidden; color: #d5dde2; font-size: var(--text-caption); font-weight: 650; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.vibe-source { flex: 0 0 auto; padding: 2px 4px; color: var(--green); background: #17251f; border: 1px solid #2c493b; border-radius: 3px; font-size: var(--text-micro); line-height: 1.2; }
+.vibe-source.image { color: #c79b65; background: #251e15; border-color: #4a3924; }
+.vibe-cost-warning { display: block; margin-top: 6px; color: #a57b63; font-size: var(--text-micro); line-height: 1.4; }
+.vibe-cached-information select { width: 100%; height: 30px; padding: 0 8px; color: #aac2b6; background: #101b18; border: 1px solid #294239; border-radius: 4px; font-size: var(--text-micro); }
+.vibe-encoding-lock { min-height: 30px; margin-bottom: 8px; padding: 6px 7px; display: flex; align-items: center; gap: 6px; color: #789888; background: #101b18; border: 1px solid #294239; border-radius: 4px; font-size: var(--text-micro); }
+.vibe-encoding-lock span { min-width: 0; flex: 1; }
+.vibe-encoding-lock b { color: #a8c0b4; font: 500 var(--text-micro) var(--font-mono); }
+.vibe-file-action { margin-bottom: 4px; padding: 3px 0; display: flex; align-items: center; gap: 5px; color: #8199a7; background: transparent; font-size: var(--text-micro); text-align: left; }
+.vibe-file-action:hover { color: var(--blue); }
+.vibe-library-list { display: grid; gap: 7px; }
+.vibe-library-card { min-width: 0; min-height: 62px; padding: 7px; display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 9px; background: #141c23; border: 1px solid #26323b; border-radius: 5px; }
+.vibe-library-card img { width: 48px; height: 48px; object-fit: cover; background: #0b1015; border-radius: 3px; }
+.vibe-library-card > div { min-width: 0; }
+.vibe-library-card strong, .vibe-library-card small, .vibe-library-card span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vibe-library-card strong { color: #d3dce1; font-size: var(--text-caption); font-weight: 650; }
+.vibe-library-card small { margin-top: 2px; color: #72818c; font-size: var(--text-micro); }
+.vibe-library-card span { margin-top: 3px; color: #779786; font-size: var(--text-micro); }
+.vibe-library-card > button { min-width: 42px; height: 28px; padding: 0 7px; color: #dce4e8; background: #24313a; border: 1px solid #3b4c57; border-radius: 4px; font-size: var(--text-micro); }
+.vibe-library-card > button:hover:not(:disabled) { color: #2a1d0d; background: var(--accent); border-color: var(--accent); }
+.vibe-library-card > button:disabled { opacity: .38; cursor: default; }
+.vibe-library-empty { min-height: 76px; padding: 12px; display: flex; align-items: center; gap: 10px; color: var(--accent); background: transparent; border: 1px dashed #34434e; border-radius: 5px; text-align: left; }
+.vibe-library-empty > span { color: inherit; }
+.vibe-library-empty strong, .vibe-library-empty small { display: block; }
+.vibe-library-empty strong { color: #aab6bd; font-size: var(--text-caption); }
+.vibe-library-empty small { margin-top: 3px; color: #6f7f8a; font-size: var(--text-micro); line-height: 1.4; }
 .text-danger { margin-top: auto; padding: 0; display: flex; align-items: center; gap: 4px; color: #765d5e; background: transparent; font-size: 8px; }
 .text-danger:hover { color: var(--red); }
 .panel-empty { min-height: 150px; padding: 25px; display: flex; align-items: center; flex-direction: column; justify-content: center; color: #4f5d68; border: 1px dashed #2b3740; border-radius: 6px; text-align: center; }

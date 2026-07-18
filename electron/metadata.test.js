@@ -96,4 +96,27 @@ describe('NovelAI PNG metadata', () => {
       ],
     });
   });
+
+  it('extracts encoded Vibes from NovelAI PNG metadata', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
+    temporaryDirectories.push(directory);
+    const filePath = path.join(directory, 'vibes.png');
+    const description = JSON.stringify({
+      reference_image_multiple: ['a'.repeat(1000)],
+      reference_strength_multiple: [0.4],
+      reference_information_extracted_multiple: [],
+    });
+    const png = Buffer.concat([
+      Buffer.from('89504e470d0a1a0a', 'hex'),
+      chunk('tEXt', Buffer.concat([Buffer.from('Description'), Buffer.from([0]), Buffer.from(description)])),
+      chunk('tEXt', Buffer.concat([Buffer.from('Source'), Buffer.from([0]), Buffer.from('NovelAI Diffusion V4.5')])),
+      chunk('IEND'),
+    ]);
+    fs.writeFileSync(filePath, png);
+
+    const metadata = readNovelAIMetadata(filePath);
+    expect(metadata.embedded_vibes).toEqual([
+      expect.objectContaining({ strength: 0.4, information_extracted: null, model: 'nai-diffusion-4-5-full' }),
+    ]);
+  });
 });
