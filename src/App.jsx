@@ -19,8 +19,11 @@ import LobeInputPassword from '@lobehub/ui/es/Input/InputPassword';
 import LobeTextArea from '@lobehub/ui/es/Input/TextArea';
 import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
 import LobeSelect from '@lobehub/ui/es/Select/index';
+import LobeSideNav from '@lobehub/ui/es/SideNav/index';
 import LobeSliderWithInput from '@lobehub/ui/es/SliderWithInput/index';
 import LobeSortableList from '@lobehub/ui/es/SortableList/index';
+import LobeTabs from '@lobehub/ui/es/Tabs/index';
+import LobeGrid from '@lobehub/ui/es/Grid/index';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
 import { toast as lobeToast } from '@lobehub/ui/es/Toast/index';
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, inferCategory, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
@@ -1030,6 +1033,318 @@ function Inspector({ tab, setTab, project, branch, updateProject, showToast, pro
   </aside>;
 }
 
+function StudioSideNav({ page, onNavigate }) {
+  const navigation = [
+    { key: 'gallery', icon: 'library', label: '图库' },
+    { key: 'vibes', icon: 'image', label: 'Vibe 库' },
+    { key: 'tags', icon: 'layers', label: 'Tag 库' },
+  ];
+  return <LobeSideNav
+    className="studio-side-nav"
+    avatar={<button className="studio-brand" onClick={() => onNavigate('gallery')} title="NovelAI Prompt Studio">N<span>4</span></button>}
+    topActions={<>{navigation.map((item) => <LobeActionIcon active={page === item.key} icon={<Icon name={item.icon} size={19}/>} key={item.key} onClick={() => onNavigate(item.key)} placement="right" size="large" title={item.label} variant="borderless"/>)}</>}
+    bottomActions={<LobeActionIcon active={page === 'settings'} icon={<Icon name="settings" size={19}/>} onClick={() => onNavigate('settings')} placement="right" size="large" title="设置" variant="borderless"/>}
+  />;
+}
+
+function currentLibraryLabel(view, collections, series, experiments) {
+  if (view === 'favorites') return '收藏';
+  if (view === 'ungrouped') return '未分组';
+  if (view === 'trash') return '回收站';
+  if (view.startsWith('collection:')) return collections.find((item) => `collection:${item.id}` === view)?.name || '收藏集';
+  if (view.startsWith('series:')) return series.find((item) => `series:${item.id}` === view)?.name || '创作系列';
+  if (view.startsWith('experiment:')) return experiments.find((item) => `experiment:${item.id}` === view)?.name || '对比实验';
+  return '全部图片';
+}
+
+function GalleryGroupControls({
+  libraryView,
+  collections,
+  series,
+  experiments,
+  selectedCount,
+  onViewChange,
+  onCreateCollection,
+  onRenameCollection,
+  onDeleteCollection,
+  onCreateSeries,
+  onRenameSeries,
+  onDeleteSeries,
+  onCreateExperiment,
+  onRenameExperiment,
+  onDeleteExperiment,
+}) {
+  const [editor, setEditor] = useState(null);
+  const [draft, setDraft] = useState('');
+  const activeCollection = collections.find((item) => `collection:${item.id}` === libraryView);
+  const activeSeries = series.find((item) => `series:${item.id}` === libraryView);
+  const activeExperiment = experiments.find((item) => `experiment:${item.id}` === libraryView);
+  const openEditor = (kind, item = null) => {
+    setEditor({ kind, item });
+    setDraft(item?.name || '');
+  };
+  const save = async () => {
+    const name = draft.trim();
+    if (!name || !editor) return;
+    const handlers = {
+      collection: editor.item ? () => onRenameCollection(editor.item.id, name) : () => onCreateCollection(name),
+      series: editor.item ? () => onRenameSeries(editor.item.id, name) : () => onCreateSeries(name),
+      experiment: () => onRenameExperiment(editor.item.id, name),
+    };
+    if (await handlers[editor.kind]?.()) setEditor(null);
+  };
+  const groupSelect = (kind, items, activeItem, icon) => <div className="gallery-group-select" key={kind}>
+    <LobeSelect
+      allowClear
+      aria-label={kind}
+      onChange={(value) => onViewChange(value || 'all')}
+      options={items.map((item) => ({ label: item.name, value: `${kind}:${item.id}` }))}
+      placeholder={kind === 'collection' ? '收藏集' : kind === 'series' ? '创作系列' : '对比实验'}
+      value={activeItem ? `${kind}:${activeItem.id}` : undefined}
+    />
+    <LobeActionIcon disabled={kind === 'experiment' && selectedCount < 2} icon={<Icon name="plus" size={15}/>} onClick={() => kind === 'experiment' ? onCreateExperiment() : openEditor(kind)} size="small" title={kind === 'experiment' ? '用已选图片建立实验' : `新建${kind === 'collection' ? '收藏集' : '系列'}`} variant="borderless"/>
+    {activeItem && <LobeActionIcon icon={<Icon name="edit" size={14}/>} onClick={() => openEditor(kind, activeItem)} size="small" title="重命名" variant="borderless"/>}
+    {activeItem && <LobeActionIcon danger icon={<Icon name="trash" size={14}/>} onClick={() => ({ collection: onDeleteCollection, series: onDeleteSeries, experiment: onDeleteExperiment }[kind])(activeItem.id)} size="small" title="删除分组" variant="borderless"/>}
+    <span className="gallery-group-icon"><Icon name={icon} size={13}/></span>
+  </div>;
+
+  return <>
+    <div className="gallery-scope-row">
+      <LobeSegmented className="gallery-core-filter" onChange={onViewChange} options={[
+        { label: '全部', value: 'all' },
+        { label: '收藏', value: 'favorites' },
+        { label: '未分组', value: 'ungrouped' },
+        { label: '回收站', value: 'trash' },
+      ]} value={['all', 'favorites', 'ungrouped', 'trash'].includes(libraryView) ? libraryView : null}/>
+      <div className="gallery-group-filters">
+        {groupSelect('collection', collections, activeCollection, 'folder')}
+        {groupSelect('series', series, activeSeries, 'layers')}
+        {groupSelect('experiment', experiments, activeExperiment, 'spark')}
+      </div>
+    </div>
+    {editor && <div className="gallery-inline-editor">
+      <span>{editor.item ? '重命名' : '新建'}{editor.kind === 'collection' ? '收藏集' : editor.kind === 'series' ? '创作系列' : '对比实验'}</span>
+      <LobeInput autoFocus maxLength={80} onChange={(event) => setDraft(event.target.value)} onPressEnter={save} value={draft}/>
+      <LobeButton onClick={() => setEditor(null)} size="small">取消</LobeButton>
+      <LobeButton disabled={!draft.trim()} onClick={save} size="small" type="primary">保存</LobeButton>
+    </div>}
+  </>;
+}
+
+function GalleryPage({
+  projects,
+  allProjects,
+  collections,
+  series,
+  experiments,
+  libraryView,
+  query,
+  sort,
+  selectionMode,
+  selectedIds,
+  scrollRef,
+  restoreScrollTop,
+  onQueryChange,
+  onSortChange,
+  onViewChange,
+  onImport,
+  onOpenProject,
+  onToggleSelectionMode,
+  onToggleSelected,
+  onSelectAll,
+  onClearSelection,
+  onSetFavorite,
+  onSetDeleted,
+  onProjectContextMenu,
+  onCreateCollection,
+  onRenameCollection,
+  onDeleteCollection,
+  onAddToCollection,
+  onRemoveFromCollection,
+  onCreateSeries,
+  onRenameSeries,
+  onDeleteSeries,
+  onAddToSeries,
+  onRemoveFromSeries,
+  onCreateExperiment,
+  onRenameExperiment,
+  onDeleteExperiment,
+  onAddToExperiment,
+  onRemoveFromExperiment,
+  onOpenExperiment,
+}) {
+  const [batchTarget, setBatchTarget] = useState('');
+  const selectedProjects = allProjects.filter((project) => selectedIds.has(project.id));
+  const allSelectedAreFavorite = selectedProjects.length > 0 && selectedProjects.every((project) => project.is_favorite);
+  const activeCollection = collections.find((item) => `collection:${item.id}` === libraryView);
+  const activeSeries = series.find((item) => `series:${item.id}` === libraryView);
+  const activeExperiment = experiments.find((item) => `experiment:${item.id}` === libraryView);
+  const targetOptions = [
+    ...collections.map((item) => ({ label: `收藏集 · ${item.name}`, value: `collection:${item.id}` })),
+    ...series.map((item) => ({ label: `创作系列 · ${item.name}`, value: `series:${item.id}` })),
+    ...experiments.map((item) => ({ label: `对比实验 · ${item.name}`, value: `experiment:${item.id}` })),
+  ];
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = restoreScrollTop.current || 0;
+  }, [libraryView, restoreScrollTop, scrollRef]);
+  const addToTarget = () => {
+    if (batchTarget.startsWith('collection:')) onAddToCollection(batchTarget.slice('collection:'.length));
+    if (batchTarget.startsWith('series:')) onAddToSeries(batchTarget.slice('series:'.length));
+    if (batchTarget.startsWith('experiment:')) onAddToExperiment(batchTarget.slice('experiment:'.length));
+  };
+  return <main className="gallery-page">
+    <header className="workspace-page-header">
+      <div><span>LIBRARY / 01</span><h1>{currentLibraryLabel(libraryView, collections, series, experiments)}</h1><p>{projects.length} 张可见图片 · 本地资料库</p></div>
+      <div className="workspace-page-actions"><LobeButton icon={<Icon name="plus"/>} onClick={onImport} type="primary">导入图片</LobeButton></div>
+    </header>
+    <section className="gallery-toolbar">
+      <div className="gallery-primary-tools">
+        <LobeSearchBar allowClear className="gallery-search search-box" onChange={(value) => onQueryChange(value)} placeholder="搜索名称、Tag 或翻译" value={query}/>
+        <LobeSelect className="gallery-sort" onChange={onSortChange} options={[{ label: '最近更新', value: 'recent' }, { label: '最早更新', value: 'oldest' }, { label: '名称', value: 'name' }, { label: 'Tag 数量', value: 'tags' }]} value={sort}/>
+        <LobeButton icon={<Icon name={selectionMode ? 'check' : 'library'} size={15}/>} onClick={onToggleSelectionMode} type={selectionMode ? 'primary' : 'default'}>{selectionMode ? '完成多选' : '多选'}</LobeButton>
+        {activeExperiment && <LobeButton icon={<Icon name="spark" size={15}/>} onClick={() => onOpenExperiment(activeExperiment.id)}>打开对比</LobeButton>}
+      </div>
+      <GalleryGroupControls
+        collections={collections}
+        experiments={experiments}
+        libraryView={libraryView}
+        onCreateCollection={onCreateCollection}
+        onCreateExperiment={onCreateExperiment}
+        onCreateSeries={onCreateSeries}
+        onDeleteCollection={onDeleteCollection}
+        onDeleteExperiment={onDeleteExperiment}
+        onDeleteSeries={onDeleteSeries}
+        onRenameCollection={onRenameCollection}
+        onRenameExperiment={onRenameExperiment}
+        onRenameSeries={onRenameSeries}
+        onViewChange={onViewChange}
+        selectedCount={selectedIds.size}
+        series={series}
+      />
+      {selectionMode && <div className="gallery-batch-bar">
+        <div><LobeButton onClick={onSelectAll} size="small">全选可见</LobeButton><span>已选 {selectedIds.size}</span><LobeButton onClick={onClearSelection} size="small" type="text">清除</LobeButton></div>
+        <div className="gallery-batch-actions">
+          <LobeSelect disabled={!selectedIds.size} onChange={setBatchTarget} options={targetOptions} placeholder="加入分组…" value={batchTarget || undefined}/>
+          <LobeButton disabled={!selectedIds.size || !batchTarget} onClick={addToTarget} size="small">加入</LobeButton>
+          {activeCollection && <LobeButton disabled={!selectedIds.size} onClick={() => onRemoveFromCollection(activeCollection.id)} size="small">移出当前收藏集</LobeButton>}
+          {activeSeries && <LobeButton disabled={!selectedIds.size} onClick={() => onRemoveFromSeries(activeSeries.id)} size="small">移出当前系列</LobeButton>}
+          {activeExperiment && <LobeButton disabled={!selectedIds.size} onClick={() => onRemoveFromExperiment(activeExperiment.id)} size="small">移出当前实验</LobeButton>}
+          {libraryView !== 'trash' && <LobeButton disabled={selectedIds.size < 2} icon={<Icon name="spark" size={13}/>} onClick={onCreateExperiment} size="small">建立实验</LobeButton>}
+          {libraryView !== 'trash' && <LobeButton disabled={!selectedIds.size} icon={<Icon name="star" size={13}/>} onClick={() => onSetFavorite(!allSelectedAreFavorite)} size="small">{allSelectedAreFavorite ? '取消收藏' : '收藏'}</LobeButton>}
+          <LobeButton danger={libraryView !== 'trash'} disabled={!selectedIds.size} icon={<Icon name={libraryView === 'trash' ? 'refresh' : 'trash'} size={13}/>} onClick={() => onSetDeleted(libraryView !== 'trash')} size="small">{libraryView === 'trash' ? '恢复' : '移到回收站'}</LobeButton>
+        </div>
+      </div>}
+    </section>
+    <section className="gallery-scroll" ref={scrollRef}>
+      {projects.length ? <LobeGrid className="gallery-grid" gap={16} maxItemWidth={235} rows={5}>
+        {projects.map((project) => <article className={`gallery-card ${selectedIds.has(project.id) ? 'selected' : ''}`} key={project.id} onContextMenu={(event) => onProjectContextMenu(event, project)}>
+          <button className="gallery-card-open" onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenProject(project.id)} aria-label={`打开 ${project.name}`}>
+            <img src={mediaUrl(project.thumbnail_path)} alt="" loading="lazy"/>
+            {hasLimitedReproduction(project.metadata) && <span className="gallery-warning-badge"><Icon name="warning" size={12}/>INPAINT</span>}
+            {(project.branches || []).length > 0 && <span className="gallery-branch-badge">{project.branches.length} 方案</span>}
+          </button>
+          {selectionMode && <div className="gallery-card-check" onClick={(event) => event.stopPropagation()}><LobeCheckbox checked={selectedIds.has(project.id)} onChange={() => onToggleSelected(project.id)} size={19}/></div>}
+          <footer><button onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenProject(project.id)}><strong title={project.name}>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.vibes || []).length} vibe · {relativeTime(project.updated_at)}</small></button>{libraryView !== 'trash' && <LobeActionIcon active={Boolean(project.is_favorite)} icon={<Icon name="star" size={14}/>} onClick={() => onSetFavorite(!project.is_favorite, [project.id])} size="small" title={project.is_favorite ? '取消收藏' : '收藏'} variant="borderless"/>}</footer>
+        </article>)}
+      </LobeGrid> : <LobeEmpty className="gallery-empty" description={query ? '换个关键词，或清除当前分组筛选。' : '可以导入图片，或切换到其他分组。'} image={<Icon name="image" size={28}/>} title={query ? '没有匹配的图片' : '这个视图还是空的'}/>}
+    </section>
+  </main>;
+}
+
+function ProjectOverviewPanel({ project, sourceProject, activeBranch, onCopy, onReveal, onCreateRecipe }) {
+  const metadata = project.metadata || {};
+  const structure = normalizePromptStructure(project.prompt_structure, metadata);
+  const baseTags = structure.base_prompt_tags || [];
+  const facts = [
+    ['模型', metadata.model || '未知'],
+    ['Seed', metadata.seed || '—'],
+    ['尺寸', metadata.width && metadata.height ? `${metadata.width} × ${metadata.height}` : '—'],
+    ['采样器', metadata.sampler || '—'],
+    ['Steps', metadata.steps ?? '—'],
+    ['Guidance', metadata.guidance ?? '—'],
+  ];
+  return <div className="detail-overview">
+    <section className="detail-image-column">
+      <div className="detail-image-frame"><img src={mediaUrl(project.image_path)} alt={project.name}/></div>
+      {hasLimitedReproduction(metadata) && <LobeAlert description="图片使用了局部重绘；metadata 不含完整底图与蒙版，因此无法精确复现。" message="局部重绘 · 无法从 metadata 精确复现" type="warning" variant="outlined"/>}
+    </section>
+    <section className="detail-summary-column">
+      <div className={`generation-context detail-generation-context ${activeBranch ? 'branch' : 'result'}`}><Icon name={activeBranch ? 'spark' : 'lock'} size={14}/><div><strong>{activeBranch ? activeBranch.name : '原图生成结果'}</strong><small>{activeBranch ? `${BRANCH_STATUS_LABELS[activeBranch.status] || activeBranch.status} · 修改保存在此方案中` : '生成事实只读；编辑 Prompt、Vibe 或参数会创建方案'}</small></div></div>
+      <div className="detail-facts">{facts.map(([label, value]) => <div key={label}><span>{label}</span><strong title={String(value)}>{value}</strong></div>)}</div>
+      <div className="detail-prompt-preview"><header><div><span>Base Prompt</span><strong>{baseTags.length} Tags · {structure.characters.length} Characters</strong></div><LobeButton onClick={onCopy} size="small">复制 Prompt</LobeButton></header><div>{baseTags.slice(0, 18).map((tag) => <span className={`prompt-preview-tag cat-${String(tag.category || 'Unsorted').toLowerCase()}`} key={tag.id || tag.tag}>{tag.tag}</span>)}{baseTags.length > 18 && <span className="prompt-preview-more">+{baseTags.length - 18}</span>}</div></div>
+      <div className="detail-overview-actions"><LobeButton icon={<Icon name="folder" size={14}/>} onClick={() => onReveal(sourceProject.image_path)}>打开所在文件夹</LobeButton><LobeButton icon={<Icon name="spark" size={14}/>} onClick={onCreateRecipe} type="primary">{activeBranch ? '从当前方案新建' : '创建生成方案'}</LobeButton></div>
+    </section>
+  </div>;
+}
+
+function ReadOnlyMetadataPanel({ project }) {
+  const metadata = project.metadata || {};
+  const limitedReproduction = hasLimitedReproduction(metadata);
+  const rows = [
+    ['Model', metadata.model], ['Seed', metadata.seed], ['Steps', metadata.steps], ['Sampler', metadata.sampler],
+    ['Guidance / CFG', metadata.guidance], ['Width', metadata.width], ['Height', metadata.height],
+  ];
+  return <div className="detail-metadata panel-scroll">
+    <div className="panel-intro"><div><strong>Generation Metadata</strong><small>来自原图的生成事实，默认只读</small></div><span className={`metadata-badge ${limitedReproduction ? 'limited' : ''}`}>{limitedReproduction ? 'INPAINT' : 'PNG'}</span></div>
+    {limitedReproduction && <LobeAlert description="metadata 不包含完整的原始底图与蒙版；仍可复制 Prompt 或创建近似生成方案。" message="此图片使用局部重绘，无法精确复现" type="warning" variant="outlined"/>}
+    <dl className="detail-metadata-list">{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? '—'}</dd></div>)}</dl>
+    <label className="textarea-label"><span>Base Undesired Content</span><LobeTextArea autoSize={{ minRows: 3, maxRows: 8 }} readOnly value={formatPrompt(project.prompt_structure?.base_undesired_tags || [])}/></label>
+    <LobeCollapse className="raw-metadata" items={[{ key: 'raw-metadata', label: '查看原始 metadata', children: <LobeHighlighter copyable language="json" showLanguage={false} variant="borderless" wrap>{metadata.extra_json || '{}'}</LobeHighlighter> }]} variant="borderless"/>
+  </div>;
+}
+
+function RelationsPanel({ project, activeBranchId, experiments, onSelectBranch, onBranchContextMenu, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, onOpenResult, onUseLegacyVersion, onOpenExperiment, branchResultImporting }) {
+  const branches = project.branches || [];
+  const relatedExperiments = experiments.filter((experiment) => (experiment.member_ids || []).includes(project.id));
+  return <div className="relations-panel panel-scroll">
+    <section className="relation-section"><header><div><span>GENERATION RECIPES</span><h2>生成方案</h2><p>修改生成信息会形成独立方案；原图始终保留为只读结果。</p></div><b>{branches.length}</b></header>
+      <div className="relation-list">
+        <button className={`relation-row source ${!activeBranchId ? 'active' : ''}`} onClick={() => onSelectBranch('')}><span className="relation-thumb"><img src={mediaUrl(project.thumbnail_path)} alt=""/></span><span><strong>原图结果</strong><small>生成事实只读 · {relativeTime(project.updated_at)}</small></span><em>RESULT</em></button>
+        {branches.map((branch) => <article className={`relation-row branch ${activeBranchId === branch.id ? 'active' : ''}`} key={branch.id} onContextMenu={(event) => onBranchContextMenu(event, branch)}>
+          <button className="relation-row-main" onClick={() => onSelectBranch(branch.id)}><span className="relation-thumb">{branch.results?.[0] ? <img src={mediaUrl(branch.results[0].thumbnail_path)} alt=""/> : <Icon name="spark" size={18}/>}</span><span><strong>{branch.name}</strong><small>{branch.change_summary || relativeTime(branch.updated_at)}</small></span><em className={`branch-status ${branch.status}`}>{BRANCH_STATUS_LABELS[branch.status] || branch.status}</em></button>
+          <div className="relation-row-actions">{branch.status === 'draft' && <><LobeButton danger onClick={() => onDiscardBranch(branch.id)} size="small" type="text">放弃</LobeButton><LobeButton onClick={() => onMarkBranchWaiting(branch.id)} size="small">标记待生成</LobeButton></>}{['waiting', 'result', 'mismatch'].includes(branch.status) && <LobeButton disabled={branchResultImporting === branch.id} icon={<Icon name="upload" size={13}/>} onClick={() => onImportBranchResult(branch.id)} size="small">{branchResultImporting === branch.id ? '核对中…' : '上传结果图'}</LobeButton>}{(branch.results || []).map((result) => <LobeButton key={result.project_id} onClick={() => onOpenResult(result.project_id)} size="small" type="text">查看结果</LobeButton>)}</div>
+        </article>)}
+        {(project.versions || []).map((version) => <button className="relation-row legacy" key={version.id} onClick={() => onUseLegacyVersion(version)}><span className="relation-thumb"><Icon name="history" size={18}/></span><span><strong>{version.label}</strong><small>旧版 Prompt · 转成新方案后继续编辑</small></span><em>转换</em></button>)}
+      </div>
+    </section>
+    <section className="relation-section"><header><div><span>COMPARISON GROUPS</span><h2>对比实验</h2><p>这张图片参与的受控对比与变量分组。</p></div><b>{relatedExperiments.length}</b></header>
+      <div className="relation-list">{relatedExperiments.map((experiment) => <button className="relation-row experiment" key={experiment.id} onClick={() => onOpenExperiment(experiment.id)}><span className="relation-thumb"><Icon name="spark" size={18}/></span><span><strong>{experiment.name}</strong><small>{(experiment.member_ids || []).length} 个成员 · {(experiment.variable_fields || []).join(' / ') || '参数相同'}</small></span><em>打开对比</em></button>)}{!relatedExperiments.length && <LobeEmpty className="relation-empty" description="在图库中多选至少两张图片，即可建立对比实验。" image={<Icon name="spark" size={22}/>} title="尚未加入对比实验"/>}</div>
+    </section>
+  </div>;
+}
+
+function ImageDetailPage({ project, sourceProject, activeBranch, detailTab, experiments, promptScopeKey, focusTagId, branchResultImporting, onBack, onTabChange, onCopy, onReveal, onCreateRecipe, updateProject, onTagContextMenu, onPrepareTagEditor, setPromptScopeKey, onCopyContextChange, onCopyText, onNotify, onSelectBranch, onBranchContextMenu, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, onOpenResult, onUseLegacyVersion, onOpenExperiment }) {
+  const [promptMode, setPromptMode] = useState('overview');
+  const tabs = [
+    { key: 'overview', label: '概览' }, { key: 'prompt', label: 'Prompt' }, { key: 'vibe', label: `Vibe${project.vibes?.length ? ` ${project.vibes.length}` : ''}` }, { key: 'metadata', label: '元数据' }, { key: 'relations', label: `关系${sourceProject.branches?.length ? ` ${sourceProject.branches.length}` : ''}` },
+  ];
+  const editTag = (scopeKey, tagId) => { setPromptMode('edit'); onPrepareTagEditor(scopeKey, tagId); };
+  return <main className="image-detail-page">
+    <header className="detail-header">
+      <div className="detail-title-row"><LobeActionIcon icon={<Icon name="close" size={18}/>} onClick={onBack} size="large" title="返回图库" variant="borderless"/><div><span>图库 / 图片详情</span><h1 title={sourceProject.name}>{sourceProject.name}</h1><small>{activeBranch ? `${activeBranch.name} · ${BRANCH_STATUS_LABELS[activeBranch.status] || activeBranch.status}` : '原图结果'}</small></div></div>
+      <div className="detail-header-actions"><LobeButton icon={<Icon name="folder" size={14}/>} onClick={() => onReveal(sourceProject.image_path)}>文件夹</LobeButton><LobeButton icon={<Icon name="copy" size={14}/>} onClick={onCopy}>复制 Prompt</LobeButton><LobeButton icon={<Icon name="spark" size={14}/>} onClick={onCreateRecipe} type="primary">创建方案</LobeButton></div>
+    </header>
+    <LobeTabs activeKey={detailTab} className="detail-tabs" items={tabs} onChange={onTabChange} variant="point"/>
+    <section className={`detail-content detail-tab-${detailTab}`}>
+      {detailTab === 'overview' && <ProjectOverviewPanel activeBranch={activeBranch} onCopy={onCopy} onCreateRecipe={onCreateRecipe} onReveal={onReveal} project={project} sourceProject={sourceProject}/>}
+      {detailTab === 'prompt' && <div className="detail-prompt-workspace"><div className="detail-prompt-mode"><LobeSegmented onChange={setPromptMode} options={[{ label: '总览', value: 'overview' }, { label: '编辑', value: 'edit' }]} value={promptMode}/><span>{activeBranch ? `正在编辑 ${activeBranch.name}` : '编辑时自动创建生成方案'}</span></div>{promptMode === 'overview' ? <PromptOverview onCopyContextChange={onCopyContextChange} onCopyText={onCopyText} onEditTag={editTag} onNotify={onNotify} onTagContextMenu={onTagContextMenu} project={project} updateProject={updateProject}/> : <TagsPanel focusTagId={focusTagId} onTagContextMenu={onTagContextMenu} project={project} scopeKey={promptScopeKey} setScopeKey={setPromptScopeKey} showToast={onNotify} updateProject={updateProject}/>}</div>}
+      {detailTab === 'vibe' && <VibePanel project={project} showToast={onNotify} updateProject={updateProject}/>}
+      {detailTab === 'metadata' && (activeBranch ? <MetadataPanel project={project} updateProject={updateProject}/> : <ReadOnlyMetadataPanel project={project}/>)}
+      {detailTab === 'relations' && <RelationsPanel activeBranchId={activeBranch?.id || ''} branchResultImporting={branchResultImporting} experiments={experiments} onBranchContextMenu={onBranchContextMenu} onDiscardBranch={onDiscardBranch} onImportBranchResult={onImportBranchResult} onMarkBranchWaiting={onMarkBranchWaiting} onOpenExperiment={onOpenExperiment} onOpenResult={onOpenResult} onSelectBranch={onSelectBranch} onUseLegacyVersion={onUseLegacyVersion} project={sourceProject}/>}
+    </section>
+  </main>;
+}
+
+function LibraryPlaceholderPage({ kind, projects, onGoGallery }) {
+  const isVibe = kind === 'vibes';
+  const count = isVibe ? projects.reduce((total, project) => total + (project.vibes || []).length, 0) : new Set(projects.flatMap((project) => allPromptTags(project).map((tag) => normalizeSearch(tag.tag)))).size;
+  return <main className="resource-placeholder-page"><header className="workspace-page-header"><div><span>{isVibe ? 'VIBE LIBRARY / 02' : 'TAG LIBRARY / 03'}</span><h1>{isVibe ? 'Vibe 库' : 'Tag 库'}</h1><p>{isVibe ? `${count} 个作品 Vibe 引用` : `${count} 个唯一 Tag`}</p></div></header><section><div className="resource-placeholder-mark"><Icon name={isVibe ? 'image' : 'layers'} size={28}/></div><h2>{isVibe ? 'Vibe 资产页将在第二阶段迁入' : 'Tag 资产页将在第二阶段迁入'}</h2><p>{isVibe ? '当前可以从任意图片详情的 Vibe 页签继续使用完整的 Vibe 库、参数标记与源图绑定能力。' : '当前可以从任意图片详情的 Prompt 页签查看、筛选、翻译和分类 Tag。'}</p><LobeButton onClick={onGoGallery} type="primary">返回图库选择图片</LobeButton></section></main>;
+}
+
+function ExperimentWorkspace({ experiment, projects, comparisonIds, onBack, onToggleComparison, onOpenProject }) {
+  return <main className="experiment-workspace"><header className="detail-header"><div className="detail-title-row"><LobeActionIcon icon={<Icon name="close" size={18}/>} onClick={onBack} size="large" title="返回图库" variant="borderless"/><div><span>图库 / 对比实验</span><h1>{experiment.name}</h1><small>选择 2–4 个成员同步对比</small></div></div></header><div className="experiment-workspace-content"><ExperimentCompare experiment={experiment} projects={projects} selectedIds={comparisonIds}/><div className="experiment-member-picker">{projects.map((project) => <button className={comparisonIds.has(project.id) ? 'active' : ''} key={project.id} onClick={() => onToggleComparison(project.id)} onDoubleClick={() => onOpenProject(project.id)}><img src={mediaUrl(project.thumbnail_path)} alt=""/><span><strong>{project.name}</strong><small>{project.id === experiment.baseline_project_id ? '基准 · 固定保留' : comparisonIds.has(project.id) ? '对比中' : '点击加入'}</small></span></button>)}</div></div></main>;
+}
+
 function SettingsPage({ appearance, onAppearanceChange, onClose, showToast }) {
   const [section, setSection] = useState('appearance');
   const [aiSettings, setAISettings] = useState({ baseUrl: 'https://api.openai.com/v1', model: '', apiKey: '', hasApiKey: false, encryptionAvailable: true });
@@ -1119,6 +1434,7 @@ export default function App({ appearance, setAppearance }) {
   const [experiments, setExperiments] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [query, setQuery] = useState('');
+  const [gallerySort, setGallerySort] = useState('recent');
   const [libraryView, setLibraryView] = useState('all');
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -1135,10 +1451,15 @@ export default function App({ appearance, setAppearance }) {
   const [branchResultImporting, setBranchResultImporting] = useState('');
   const [comparisonIds, setComparisonIds] = useState(new Set());
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [appPage, setAppPage] = useState('gallery');
+  const [galleryScreen, setGalleryScreen] = useState('list');
+  const [detailTab, setDetailTab] = useState('overview');
   const saveTimers = useRef(new Map());
   const branchSaveTimers = useRef(new Map());
   const branchCreatePromises = useRef(new Map());
   const appShellRef = useRef(null);
+  const galleryScrollRef = useRef(null);
+  const galleryScrollTop = useRef(0);
   const dropFilesHandlerRef = useRef(null);
   const shortcutModifier = useMemo(() => navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl', []);
 
@@ -1269,8 +1590,8 @@ export default function App({ appearance, setAppearance }) {
   }, [activeExperiment?.id, activeExperiment?.baseline_project_id, activeExperiment?.member_ids?.join('|')]);
 
   useEffect(() => {
-    if (workspaceMode !== 'prompt') setOverviewCopy({ text: '', count: 0, selected: false, categoryCount: 0 });
-  }, [activeId, workspaceMode]);
+    if (galleryScreen !== 'detail' || detailTab !== 'prompt') setOverviewCopy({ text: '', count: 0, selected: false, categoryCount: 0 });
+  }, [activeId, detailTab, galleryScreen]);
   const filteredProjects = useMemo(() => {
     let viewProjects = projects.filter((project) => {
       if (libraryView === 'trash') return Boolean(project.deleted_at);
@@ -1288,9 +1609,17 @@ export default function App({ appearance, setAppearance }) {
       viewProjects = [...viewProjects].sort((left, right) => (positions.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (positions.get(right.id) ?? Number.MAX_SAFE_INTEGER));
     }
     const needles = expandSearch(query);
-    if (!needles.length) return viewProjects;
-    return viewProjects.filter((project) => [project.name, ...allPromptTags(project).flatMap((tag) => [tag.tag, tag.translation, tag.category, CATEGORY_LABELS[tag.category]])].some((value) => needles.some((needle) => normalizeSearch(value).includes(needle))));
-  }, [projects, query, libraryView, experiments]);
+    const matched = needles.length
+      ? viewProjects.filter((project) => [project.name, ...allPromptTags(project).flatMap((tag) => [tag.tag, tag.translation, tag.category, CATEGORY_LABELS[tag.category]])].some((value) => needles.some((needle) => normalizeSearch(value).includes(needle))))
+      : viewProjects;
+    if (libraryView.startsWith('experiment:') && gallerySort === 'recent') return matched;
+    return [...matched].sort((left, right) => {
+      if (gallerySort === 'oldest') return new Date(left.updated_at || 0) - new Date(right.updated_at || 0);
+      if (gallerySort === 'name') return String(left.name || '').localeCompare(String(right.name || ''), 'zh-CN', { numeric: true });
+      if (gallerySort === 'tags') return countPromptTags(right) - countPromptTags(left);
+      return new Date(right.updated_at || 0) - new Date(left.updated_at || 0);
+    });
+  }, [projects, query, libraryView, experiments, gallerySort]);
 
   useEffect(() => {
     if (activeId && filteredProjects.some((project) => project.id === activeId)) return;
@@ -1332,6 +1661,8 @@ export default function App({ appearance, setAppearance }) {
 
   const changeLibraryView = (view) => {
     setSettingsOpen(false);
+    setAppPage('gallery');
+    setGalleryScreen('list');
     setLibraryView(view);
     setSelectedIds(new Set());
     setWorkspaceMode(view.startsWith('experiment:') ? 'compare' : workspaceMode === 'compare' ? 'image' : workspaceMode);
@@ -1786,7 +2117,29 @@ export default function App({ appearance, setAppearance }) {
     setLibraryView('all');
     setActiveBranchId('');
     setActiveId(projectId);
-    setWorkspaceMode('image');
+    setAppPage('gallery');
+    setGalleryScreen('detail');
+    setDetailTab('overview');
+  };
+
+  const openProjectDetail = (projectId, nextTab = 'overview') => {
+    galleryScrollTop.current = galleryScrollRef.current?.scrollTop || galleryScrollTop.current;
+    setAppPage('gallery');
+    setActiveId(projectId);
+    setActiveBranchId('');
+    setPromptScopeKey('base:prompt');
+    setDetailTab(nextTab);
+    setGalleryScreen('detail');
+  };
+
+  const returnToGallery = () => {
+    setGalleryScreen('list');
+    setActiveBranchId('');
+  };
+
+  const openExperimentWorkspace = (experimentId) => {
+    changeLibraryView(`experiment:${experimentId}`);
+    setGalleryScreen('compare');
   };
 
   const branchContextMenu = async (event, branch) => {
@@ -1825,7 +2178,7 @@ export default function App({ appearance, setAppearance }) {
   };
 
   const copyPrompt = async () => {
-    if (workspaceMode === 'prompt') {
+    if (galleryScreen === 'detail' && detailTab === 'prompt' && overviewCopy.count) {
       await copyOverviewText(overviewCopy.text, overviewCopy.count, overviewCopy.selected);
       return;
     }
@@ -1843,15 +2196,18 @@ export default function App({ appearance, setAppearance }) {
 
   const openPromptOverview = (projectId) => {
     setSettingsOpen(false);
+    setAppPage('gallery');
     setActiveId(projectId);
     setActiveBranchId('');
-    setWorkspaceMode('prompt');
+    setGalleryScreen('detail');
+    setDetailTab('prompt');
   };
 
   const openTagEditor = (scopeKey, tagId) => {
     setSettingsOpen(false);
-    setWorkspaceMode('prompt');
-    setTab('tags');
+    setAppPage('gallery');
+    setGalleryScreen('detail');
+    setDetailTab('prompt');
     if (scopeKey) setPromptScopeKey(scopeKey);
     setFocusTagId(null);
     if (tagId) requestAnimationFrame(() => setFocusTagId(tagId));
@@ -1871,55 +2227,95 @@ export default function App({ appearance, setAppearance }) {
     }
   };
 
+  const navigatePage = (nextPage) => {
+    setAppPage(nextPage);
+    setSettingsOpen(nextPage === 'settings');
+    if (nextPage === 'gallery') setGalleryScreen('list');
+  };
+
   if (loading) return <div className="loading-screen" style={studioThemeStyle}><div className="brand-symbol">N<span>4</span></div><span>正在打开本地资料库…</span></div>;
 
-  return <div className={`app-shell ${settingsOpen ? 'settings-open' : ''}`} ref={appShellRef} style={studioThemeStyle}>
-    <LibraryPanel
-      projects={filteredProjects}
-      allProjects={projects}
-      collections={collections}
-      series={series}
-      experiments={experiments}
-      activeId={activeId}
-      setActiveId={(id) => { setSettingsOpen(false); setActiveId(id); setActiveBranchId(''); setPromptScopeKey('base:prompt'); }}
-      query={query}
-      setQuery={setQuery}
-      onImport={importImages}
-      onOpenPromptOverview={openPromptOverview}
-      shortcutModifier={shortcutModifier}
-      libraryView={libraryView}
-      onViewChange={changeLibraryView}
-      selectionMode={selectionMode}
-      setSelectionMode={setSelectionMode}
-      selectedIds={selectedIds}
-      onToggleSelected={toggleSelected}
-      onSelectAll={toggleSelectAll}
-      onClearSelection={() => setSelectedIds(new Set())}
-      onCreateCollection={createCollection}
-      onRenameCollection={renameCollection}
-      onDeleteCollection={deleteCollection}
-      onAddToCollection={addSelectedToCollection}
-      onRemoveFromCollection={removeSelectedFromCollection}
-      onCreateSeries={createSeries}
-      onRenameSeries={renameSeries}
-      onDeleteSeries={deleteSeries}
-      onAddToSeries={addSelectedToSeries}
-      onRemoveFromSeries={removeSelectedFromSeries}
-      onCreateExperiment={createExperiment}
-      onRenameExperiment={renameExperiment}
-      onDeleteExperiment={deleteExperiment}
-      onAddToExperiment={addSelectedToExperiment}
-      onRemoveFromExperiment={removeSelectedFromExperiment}
-      onSetFavorite={setFavorite}
-      onSetDeleted={setDeleted}
-      onProjectContextMenu={projectContextMenu}
-      settingsOpen={settingsOpen}
-      onOpenSettings={() => setSettingsOpen(true)}
-    />
-    {settingsOpen ? <SettingsPage appearance={appearance} onAppearanceChange={updateAppearance} onClose={() => setSettingsOpen(false)} showToast={showToast}/> : activeProject ? <>
-      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} experiment={activeExperiment} experimentProjects={experimentProjects} comparisonIds={comparisonIds} onToggleComparison={toggleComparison} onReorderExperiment={reorderExperiment} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} onTagContextMenu={tagContextMenu} onProjectContextMenu={projectContextMenu} onBranchContextMenu={branchContextMenu} onOpenResult={openResultProject} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onImportBranchResult={importBranchResult} branchResultImporting={branchResultImporting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
-      <Inspector tab={tab} setTab={setTab} project={activeProject} branch={activeBranch} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId} onTagContextMenu={tagContextMenu}/>
-    </> : <EmptyState onImport={importImages} hasProjects={projects.length > 0}/>}
+  return <div className="app-shell studio-app" ref={appShellRef} style={studioThemeStyle}>
+    <StudioSideNav onNavigate={navigatePage} page={appPage}/>
+    <div className="studio-workspace">
+      {appPage === 'settings' && <SettingsPage appearance={appearance} onAppearanceChange={updateAppearance} onClose={() => navigatePage('gallery')} showToast={showToast}/>}
+      {appPage === 'vibes' && <LibraryPlaceholderPage kind="vibes" onGoGallery={() => navigatePage('gallery')} projects={projects}/>}
+      {appPage === 'tags' && <LibraryPlaceholderPage kind="tags" onGoGallery={() => navigatePage('gallery')} projects={projects}/>}
+      {appPage === 'gallery' && galleryScreen === 'list' && <GalleryPage
+        allProjects={projects}
+        collections={collections}
+        experiments={experiments}
+        libraryView={libraryView}
+        onAddToCollection={addSelectedToCollection}
+        onAddToExperiment={addSelectedToExperiment}
+        onAddToSeries={addSelectedToSeries}
+        onClearSelection={() => setSelectedIds(new Set())}
+        onCreateCollection={createCollection}
+        onCreateExperiment={createExperiment}
+        onCreateSeries={createSeries}
+        onDeleteCollection={deleteCollection}
+        onDeleteExperiment={deleteExperiment}
+        onDeleteSeries={deleteSeries}
+        onImport={importImages}
+        onOpenExperiment={openExperimentWorkspace}
+        onOpenProject={openProjectDetail}
+        onProjectContextMenu={projectContextMenu}
+        onQueryChange={setQuery}
+        onSortChange={setGallerySort}
+        onRemoveFromCollection={removeSelectedFromCollection}
+        onRemoveFromExperiment={removeSelectedFromExperiment}
+        onRemoveFromSeries={removeSelectedFromSeries}
+        onRenameCollection={renameCollection}
+        onRenameExperiment={renameExperiment}
+        onRenameSeries={renameSeries}
+        onSelectAll={toggleSelectAll}
+        onSetDeleted={setDeleted}
+        onSetFavorite={setFavorite}
+        onToggleSelected={toggleSelected}
+        onToggleSelectionMode={() => setSelectionMode((current) => { if (current) setSelectedIds(new Set()); return !current; })}
+        onViewChange={changeLibraryView}
+        projects={filteredProjects}
+        query={query}
+        sort={gallerySort}
+        restoreScrollTop={galleryScrollTop}
+        scrollRef={galleryScrollRef}
+        selectedIds={selectedIds}
+        selectionMode={selectionMode}
+        series={series}
+      />}
+      {appPage === 'gallery' && galleryScreen === 'detail' && activeProject && <ImageDetailPage
+        activeBranch={activeBranch}
+        branchResultImporting={branchResultImporting}
+        detailTab={detailTab}
+        experiments={experiments}
+        focusTagId={focusTagId}
+        onBack={returnToGallery}
+        onBranchContextMenu={branchContextMenu}
+        onCopy={copyPrompt}
+        onCopyContextChange={setOverviewCopy}
+        onCopyText={copyOverviewText}
+        onCreateRecipe={() => createDraftBranch(activeProject, activeBranch?.id || null)}
+        onDiscardBranch={discardBranch}
+        onImportBranchResult={importBranchResult}
+        onMarkBranchWaiting={markBranchWaiting}
+        onNotify={showToast}
+        onOpenExperiment={openExperimentWorkspace}
+        onOpenResult={openResultProject}
+        onPrepareTagEditor={openTagEditor}
+        onReveal={studio.revealFile}
+        onSelectBranch={setActiveBranchId}
+        onTabChange={setDetailTab}
+        onTagContextMenu={tagContextMenu}
+        onUseLegacyVersion={useLegacyVersion}
+        project={activeProject}
+        promptScopeKey={promptScopeKey}
+        setPromptScopeKey={setPromptScopeKey}
+        sourceProject={sourceProject}
+        updateProject={updateProject}
+      />}
+      {appPage === 'gallery' && galleryScreen === 'compare' && activeExperiment && <ExperimentWorkspace comparisonIds={comparisonIds} experiment={activeExperiment} onBack={returnToGallery} onOpenProject={openProjectDetail} onToggleComparison={toggleComparison} projects={experimentProjects}/>}
+      {appPage === 'gallery' && galleryScreen !== 'list' && !activeProject && <EmptyState hasProjects={projects.length > 0} onImport={importImages}/>}
+    </div>
     <ImportExperience
       dragState={dragState}
       progress={importProgress}
