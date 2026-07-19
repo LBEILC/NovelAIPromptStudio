@@ -52,6 +52,7 @@ import { applyGenerationSnapshot, branchChangeFields, branchChangeSummary, gener
 import { contextMenuPosition, isTextEditingTarget } from './lib/contextMenu.js';
 import { panCompareViewport, zoomCompareViewport } from './lib/compareViewport.js';
 import { moveExperimentMember } from './lib/experiments.js';
+import { buildRelationshipGroups } from './lib/relationships.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
@@ -173,208 +174,6 @@ function ImportExperience({ dragState, progress, result, onCancel, onDismiss }) 
   </>;
 }
 
-function LibraryPanel({
-  projects,
-  allProjects,
-  collections,
-  series,
-  experiments,
-  activeId,
-  setActiveId,
-  query,
-  setQuery,
-  onImport,
-  onOpenPromptOverview,
-  shortcutModifier,
-  libraryView,
-  onViewChange,
-  selectionMode,
-  setSelectionMode,
-  selectedIds,
-  onToggleSelected,
-  onSelectAll,
-  onClearSelection,
-  onCreateCollection,
-  onRenameCollection,
-  onDeleteCollection,
-  onAddToCollection,
-  onRemoveFromCollection,
-  onCreateSeries,
-  onRenameSeries,
-  onDeleteSeries,
-  onAddToSeries,
-  onRemoveFromSeries,
-  onCreateExperiment,
-  onRenameExperiment,
-  onDeleteExperiment,
-  onAddToExperiment,
-  onRemoveFromExperiment,
-  onSetFavorite,
-  onSetDeleted,
-  onProjectContextMenu,
-  settingsOpen,
-  onOpenSettings,
-}) {
-  const [creatingCollection, setCreatingCollection] = useState(false);
-  const [collectionName, setCollectionName] = useState('');
-  const [editingCollectionId, setEditingCollectionId] = useState('');
-  const [editingCollectionName, setEditingCollectionName] = useState('');
-  const [deleteArmedId, setDeleteArmedId] = useState('');
-  const [batchCollectionId, setBatchCollectionId] = useState('');
-  const [creatingSeries, setCreatingSeries] = useState(false);
-  const [seriesName, setSeriesName] = useState('');
-  const [editingSeriesId, setEditingSeriesId] = useState('');
-  const [editingSeriesName, setEditingSeriesName] = useState('');
-  const [deleteArmedSeriesId, setDeleteArmedSeriesId] = useState('');
-  const [batchSeriesId, setBatchSeriesId] = useState('');
-  const [editingExperimentId, setEditingExperimentId] = useState('');
-  const [editingExperimentName, setEditingExperimentName] = useState('');
-  const [deleteArmedExperimentId, setDeleteArmedExperimentId] = useState('');
-  const [batchExperimentId, setBatchExperimentId] = useState('');
-  const activeProjects = allProjects.filter((project) => !project.deleted_at);
-  const counts = {
-    all: activeProjects.length,
-    favorites: activeProjects.filter((project) => project.is_favorite).length,
-    ungrouped: activeProjects.filter((project) => !(project.collection_ids || []).length).length,
-    trash: allProjects.filter((project) => project.deleted_at).length,
-  };
-  const viewItems = [
-    { id: 'all', label: '全部作品', icon: 'library', count: counts.all },
-    { id: 'favorites', label: '收藏', icon: 'star', count: counts.favorites },
-    { id: 'ungrouped', label: '未分组', icon: 'layers', count: counts.ungrouped },
-    { id: 'trash', label: '回收站', icon: 'trash', count: counts.trash },
-  ];
-  const currentCollection = libraryView.startsWith('collection:') ? collections.find((collection) => `collection:${collection.id}` === libraryView) : null;
-  const currentSeries = libraryView.startsWith('series:') ? series.find((entry) => `series:${entry.id}` === libraryView) : null;
-  const currentExperiment = libraryView.startsWith('experiment:') ? experiments.find((entry) => `experiment:${entry.id}` === libraryView) : null;
-  const currentLabel = currentCollection?.name || currentSeries?.name || currentExperiment?.name || viewItems.find((item) => item.id === libraryView)?.label || '作品库';
-  const selectedProjects = allProjects.filter((project) => selectedIds.has(project.id));
-  const allSelectedAreFavorite = selectedProjects.length > 0 && selectedProjects.every((project) => project.is_favorite);
-
-  const submitCollection = async () => {
-    if (!(await onCreateCollection(collectionName))) return;
-    setCollectionName('');
-    setCreatingCollection(false);
-  };
-  const submitRename = async (id) => {
-    if (!(await onRenameCollection(id, editingCollectionName))) return;
-    setEditingCollectionId('');
-    setEditingCollectionName('');
-  };
-  const submitSeries = async () => {
-    if (!(await onCreateSeries(seriesName))) return;
-    setSeriesName('');
-    setCreatingSeries(false);
-  };
-  const submitSeriesRename = async (id) => {
-    if (!(await onRenameSeries(id, editingSeriesName))) return;
-    setEditingSeriesId('');
-    setEditingSeriesName('');
-  };
-  const submitExperimentRename = async (id) => {
-    if (!(await onRenameExperiment(id, editingExperimentName))) return;
-    setEditingExperimentId('');
-    setEditingExperimentName('');
-  };
-
-  return <aside className="library-panel">
-    <div className="brand-row">
-      <div className="brand-symbol">N<span>4</span></div>
-      <div><strong>Prompt Studio</strong><small>NovelAI asset desk</small></div>
-    </div>
-    <LobeButton block className="import-button" icon={<Icon name="plus"/>} onClick={onImport} type="primary">导入图片 <kbd>{shortcutModifier} I</kbd></LobeButton>
-    <LobeSearchBar className="search-box" enableShortKey onInputChange={setQuery} placeholder="搜索当前视图…" styles={{ input: { width: '100%' } }} value={query} variant="outlined"/>
-    <nav className="library-views" aria-label="作品库视图">
-      {viewItems.map((item) => <LobeButton block key={item.id} className={libraryView === item.id ? 'active' : ''} icon={<Icon name={item.icon} size={14}/>} onClick={() => onViewChange(item.id)} type="text"><span>{item.label}</span><b>{item.count}</b></LobeButton>)}
-    </nav>
-    <div className="collection-heading"><span>收藏集</span><LobeActionIcon icon={<Icon name="plus" size={14}/>} onClick={() => { setCreatingCollection(true); setDeleteArmedId(''); }} size="small" title="新建收藏集" variant="borderless"/></div>
-    <div className="collection-list">
-      {creatingCollection && <div className="collection-editor"><LobeInput autoFocus maxLength={80} value={collectionName} onChange={(event) => setCollectionName(event.target.value)} onKeyDown={(event) => {
-        if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitCollection();
-        if (event.key === 'Escape') { setCreatingCollection(false); setCollectionName(''); }
-      }} placeholder="收藏集名称" size="small"/><LobeActionIcon disabled={!collectionName.trim()} icon={<Icon name="check" size={13}/>} onClick={submitCollection} size="small" title="保存收藏集" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => { setCreatingCollection(false); setCollectionName(''); }} size="small" title="取消" variant="borderless"/></div>}
-      {collections.map((collection) => <div className={`collection-row ${libraryView === `collection:${collection.id}` ? 'active' : ''}`} key={collection.id}>
-        {editingCollectionId === collection.id
-          ? <div className="collection-editor"><LobeInput autoFocus maxLength={80} value={editingCollectionName} onChange={(event) => setEditingCollectionName(event.target.value)} onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitRename(collection.id);
-            if (event.key === 'Escape') setEditingCollectionId('');
-          }} size="small"/><LobeActionIcon disabled={!editingCollectionName.trim()} icon={<Icon name="check" size={13}/>} onClick={() => submitRename(collection.id)} size="small" title="保存名称" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => setEditingCollectionId('')} size="small" title="取消" variant="borderless"/></div>
-          : <><LobeButton className="collection-open" icon={<Icon name="folder" size={13}/>} onClick={() => onViewChange(`collection:${collection.id}`)} type="text"><span>{collection.name}</span><b>{collection.project_count}</b></LobeButton><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingCollectionId(collection.id); setEditingCollectionName(collection.name); setDeleteArmedId(''); }} size="small" title={`重命名 ${collection.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedId === collection.id ? 'armed' : ''}`} onClick={async () => {
-            if (deleteArmedId !== collection.id) { setDeleteArmedId(collection.id); return; }
-            if (await onDeleteCollection(collection.id)) setDeleteArmedId('');
-          }} size="small" title={deleteArmedId === collection.id ? `确认删除 ${collection.name}` : `删除 ${collection.name}`} type="text">{deleteArmedId === collection.id ? '确认' : <Icon name="close" size={12}/>}</LobeButton></>}
-      </div>)}
-      {!collections.length && !creatingCollection && <div className="collection-empty">创建收藏集来手动整理作品</div>}
-    </div>
-    <div className="collection-heading series-heading"><span>创作系列</span><LobeActionIcon icon={<Icon name="plus" size={14}/>} onClick={() => { setCreatingSeries(true); setDeleteArmedSeriesId(''); }} size="small" title="新建创作系列" variant="borderless"/></div>
-    <div className="collection-list series-list">
-      {creatingSeries && <div className="collection-editor"><LobeInput autoFocus maxLength={80} value={seriesName} onChange={(event) => setSeriesName(event.target.value)} onKeyDown={(event) => {
-        if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitSeries();
-        if (event.key === 'Escape') { setCreatingSeries(false); setSeriesName(''); }
-      }} placeholder="系列名称" size="small"/><LobeActionIcon disabled={!seriesName.trim()} icon={<Icon name="check" size={13}/>} onClick={submitSeries} size="small" title="保存系列" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => { setCreatingSeries(false); setSeriesName(''); }} size="small" title="取消" variant="borderless"/></div>}
-      {series.map((entry) => <div className={`collection-row series-row ${libraryView === `series:${entry.id}` ? 'active' : ''}`} key={entry.id}>
-        {editingSeriesId === entry.id
-          ? <div className="collection-editor"><LobeInput autoFocus maxLength={80} value={editingSeriesName} onChange={(event) => setEditingSeriesName(event.target.value)} onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitSeriesRename(entry.id);
-            if (event.key === 'Escape') setEditingSeriesId('');
-          }} size="small"/><LobeActionIcon disabled={!editingSeriesName.trim()} icon={<Icon name="check" size={13}/>} onClick={() => submitSeriesRename(entry.id)} size="small" title="保存名称" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => setEditingSeriesId('')} size="small" title="取消" variant="borderless"/></div>
-          : <><LobeButton className="collection-open" icon={<Icon name="layers" size={13}/>} onClick={() => onViewChange(`series:${entry.id}`)} type="text"><span>{entry.name}</span><b>{entry.project_count}</b></LobeButton><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingSeriesId(entry.id); setEditingSeriesName(entry.name); setDeleteArmedSeriesId(''); }} size="small" title={`重命名 ${entry.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedSeriesId === entry.id ? 'armed' : ''}`} onClick={async () => {
-            if (deleteArmedSeriesId !== entry.id) { setDeleteArmedSeriesId(entry.id); return; }
-            if (await onDeleteSeries(entry.id)) setDeleteArmedSeriesId('');
-          }} size="small" title={deleteArmedSeriesId === entry.id ? `确认删除 ${entry.name}` : `删除 ${entry.name}`} type="text">{deleteArmedSeriesId === entry.id ? '确认' : <Icon name="close" size={12}/>}</LobeButton></>}
-      </div>)}
-      {!series.length && !creatingSeries && <div className="collection-empty">把同一创作脉络的结果放进系列</div>}
-    </div>
-    <div className="collection-heading experiment-heading"><span>对比实验</span><small>控制变量</small></div>
-    <div className="collection-list experiment-list">
-      {experiments.map((experiment) => <div className={`collection-row experiment-row ${libraryView === `experiment:${experiment.id}` ? 'active' : ''}`} key={experiment.id}>
-        {editingExperimentId === experiment.id
-          ? <div className="collection-editor"><LobeInput autoFocus maxLength={80} value={editingExperimentName} onChange={(event) => setEditingExperimentName(event.target.value)} onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitExperimentRename(experiment.id);
-            if (event.key === 'Escape') setEditingExperimentId('');
-          }} size="small"/><LobeActionIcon disabled={!editingExperimentName.trim()} icon={<Icon name="check" size={13}/>} onClick={() => submitExperimentRename(experiment.id)} size="small" title="保存名称" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => setEditingExperimentId('')} size="small" title="取消" variant="borderless"/></div>
-          : <><LobeButton className="collection-open" icon={<Icon name="spark" size={13}/>} onClick={() => onViewChange(`experiment:${experiment.id}`)} title={`基准：${experiment.baseline_name || '未知'} · 变化：${experiment.variable_fields?.join(' / ') || '无'}`} type="text"><span>{experiment.name}</span><em className={`experiment-state ${experiment.analysis_status}`}>{({ identical: '相同', single: '单变量', mixed: '混合', incomplete: '待补全' })[experiment.analysis_status] || '待分析'}</em><b>{experiment.project_count}</b></LobeButton><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingExperimentId(experiment.id); setEditingExperimentName(experiment.name); setDeleteArmedExperimentId(''); }} size="small" title={`重命名 ${experiment.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedExperimentId === experiment.id ? 'armed' : ''}`} onClick={async () => {
-            if (deleteArmedExperimentId !== experiment.id) { setDeleteArmedExperimentId(experiment.id); return; }
-            if (await onDeleteExperiment(experiment.id)) setDeleteArmedExperimentId('');
-          }} size="small" title={deleteArmedExperimentId === experiment.id ? `确认删除 ${experiment.name}` : `删除 ${experiment.name}`} type="text">{deleteArmedExperimentId === experiment.id ? '确认' : <Icon name="close" size={12}/>}</LobeButton></>}
-      </div>)}
-      {!experiments.length && <div className="collection-empty">多选至少 2 张作品，建立控制变量实验</div>}
-    </div>
-    <div className="section-heading library-result-heading"><span>{currentLabel}</span><b>{projects.length}</b><LobeButton className={selectionMode ? 'active' : ''} onClick={() => { setSelectionMode(!selectionMode); onClearSelection(); }} size="small" type="text">{selectionMode ? '完成' : '多选'}</LobeButton></div>
-    {currentExperiment && <div className={`experiment-summary ${currentExperiment.analysis_status}`}>
-      <div><span>基准</span><strong>{currentExperiment.baseline_name || '未知作品'}</strong></div>
-      <div><span>固定</span><strong>{currentExperiment.fixed_fields?.join(' · ') || '暂无可靠字段'}</strong></div>
-      <div><span>变化</span><strong>{currentExperiment.variable_fields?.join(' · ') || '参数相同'}</strong></div>
-      {currentExperiment.analysis_status === 'mixed' && <p><Icon name="warning" size={13}/>混合变量只能用于视觉筛选，不能判断单一参数影响。</p>}
-      {currentExperiment.incomplete_fields?.length > 0 && <p><Icon name="info" size={13}/>缺少 {currentExperiment.incomplete_fields.join('、')}，未把这些字段计为固定条件。</p>}
-    </div>}
-    {selectionMode && <div className="library-batch-toolbar">
-      <div><LobeButton onClick={onSelectAll} size="small">{selectedIds.size === projects.length && projects.length ? '取消全选' : '全选'}</LobeButton><span>已选 <b>{selectedIds.size}</b></span><LobeButton disabled={!selectedIds.size} onClick={onClearSelection} size="small">清除</LobeButton></div>
-      {libraryView !== 'trash' && <div><LobeSelect allowClear aria-label="目标收藏集" className="batch-select" onChange={(value) => setBatchCollectionId(value || '')} options={collections.map((collection) => ({ label: collection.name, value: collection.id }))} placeholder="加入收藏集…" size="small" value={batchCollectionId || undefined}/><LobeButton disabled={!selectedIds.size || !batchCollectionId} onClick={() => onAddToCollection(batchCollectionId)} size="small">加入</LobeButton></div>}
-      {libraryView !== 'trash' && <div><LobeSelect allowClear aria-label="目标创作系列" className="batch-select" onChange={(value) => setBatchSeriesId(value || '')} options={series.map((entry) => ({ label: entry.name, value: entry.id }))} placeholder="加入创作系列…" size="small" value={batchSeriesId || undefined}/><LobeButton disabled={!selectedIds.size || !batchSeriesId} onClick={() => onAddToSeries(batchSeriesId)} size="small">加入</LobeButton></div>}
-      {libraryView !== 'trash' && experiments.length > 0 && <div><LobeSelect allowClear aria-label="目标对比实验" className="batch-select" onChange={(value) => setBatchExperimentId(value || '')} options={experiments.map((experiment) => ({ label: experiment.name, value: experiment.id }))} placeholder="加入已有实验…" size="small" value={batchExperimentId || undefined}/><LobeButton disabled={!selectedIds.size || !batchExperimentId} onClick={() => onAddToExperiment(batchExperimentId)} size="small">加入</LobeButton></div>}
-      <div className="batch-actions">
-        {currentCollection && <LobeButton disabled={!selectedIds.size} onClick={() => onRemoveFromCollection(currentCollection.id)} size="small">移出当前组</LobeButton>}
-        {currentSeries && <LobeButton disabled={!selectedIds.size} onClick={() => onRemoveFromSeries(currentSeries.id)} size="small">移出当前系列</LobeButton>}
-        {currentExperiment && <LobeButton disabled={!selectedIds.size} onClick={() => onRemoveFromExperiment(currentExperiment.id)} size="small">移出当前实验</LobeButton>}
-        {libraryView !== 'trash' && <LobeButton disabled={selectedIds.size < 2} icon={<Icon name="spark" size={13}/>} onClick={onCreateExperiment} size="small">建立实验</LobeButton>}
-        {libraryView !== 'trash' && <LobeButton disabled={!selectedIds.size} icon={<Icon name="star" size={13}/>} onClick={() => onSetFavorite(!allSelectedAreFavorite)} size="small">{allSelectedAreFavorite ? '取消收藏' : '收藏'}</LobeButton>}
-        <LobeButton danger={libraryView !== 'trash'} disabled={!selectedIds.size} icon={<Icon name={libraryView === 'trash' ? 'refresh' : 'trash'} size={13}/>} onClick={() => onSetDeleted(libraryView !== 'trash')} size="small">{libraryView === 'trash' ? '恢复' : '回收站'}</LobeButton>
-      </div>
-    </div>}
-    <div className="asset-list">
-      {projects.map((project) => <div key={project.id} className={`asset-row ${project.id === activeId ? 'active' : ''} ${selectedIds.has(project.id) ? 'selected' : ''}`} onContextMenu={(event) => onProjectContextMenu(event, project)}>
-        {selectionMode && <LobeCheckbox checked={selectedIds.has(project.id)} className="asset-check" onChange={() => onToggleSelected(project.id)} aria-label={`${selectedIds.has(project.id) ? '取消选择' : '选择'} ${project.name}`} size={18}/>}
-        <button className="asset-thumbnail" onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenPromptOverview(project.id)} title={selectionMode ? '选择作品' : '打开 Prompt 总览'}><img src={mediaUrl(project.thumbnail_path)} alt=""/><span><Icon name="layers" size={13}/></span></button>
-        <button className="asset-select" onClick={() => selectionMode ? onToggleSelected(project.id) : setActiveId(project.id)}><span className="asset-copy"><strong>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.collection_ids || []).length} 组 · {(project.series_ids || []).length} 系列 · {(project.experiment_ids || []).length} 实验 · {relativeTime(project.updated_at)}</small></span></button>
-        {libraryView !== 'trash' && <LobeActionIcon active={Boolean(project.is_favorite)} className="asset-favorite" icon={<Icon name="star" size={13}/>} onClick={() => onSetFavorite(!project.is_favorite, [project.id])} size="small" title={`${project.is_favorite ? '取消收藏' : '收藏'} ${project.name}`} variant="borderless"/>}
-      </div>)}
-      {!projects.length && <div className="list-empty">{query ? '没有匹配的作品' : `「${currentLabel}」还是空的`}</div>}
-    </div>
-    <div className="library-footer"><span><Icon name="folder"/>本地资料库</span><i>SQLite</i><LobeButton className={settingsOpen ? 'active' : ''} icon={<Icon name="settings" size={14}/>} onClick={onOpenSettings} size="small" type="text">设置</LobeButton></div>
-  </aside>;
-}
-
 const BRANCH_STATUS_LABELS = {
   draft: '草稿',
   waiting: '待生成',
@@ -384,8 +183,10 @@ const BRANCH_STATUS_LABELS = {
 
 function experimentFieldValue(project, field) {
   if (field === 'Prompt') return formatPositivePromptForCopy(project) || '空 Prompt';
-  if (field === 'Vibe') return (project.vibes || []).filter((vibe) => vibe.enabled).map((vibe) => `${vibe.name || 'Vibe'} ${Number(vibe.strength ?? .6).toFixed(2)}`).join(' + ') || '无';
-  if (field === 'Size') return `${project.metadata?.width || '—'} × ${project.metadata?.height || '—'}`;
+  if (field === 'Base Prompt') return formatPrompt(project.tags || []) || '空 Base Prompt';
+  if (field === 'Character') return (project.prompt_structure?.characters || []).map((character, index) => `${character.label || `Character ${index + 1}`}: ${formatPrompt(character.prompt_tags || [])}`).join(' / ') || '无 Character';
+  if (['Vibe', 'Vibe 配置'].includes(field)) return (project.vibes || []).filter((vibe) => vibe.enabled).map((vibe) => `${vibe.name || 'Vibe'} ${Number(vibe.strength ?? .6).toFixed(2)}`).join(' + ') || '无';
+  if (['Size', '尺寸'].includes(field)) return `${project.metadata?.width || '—'} × ${project.metadata?.height || '—'}`;
   const key = { Seed: 'seed', Model: 'model', Sampler: 'sampler', Steps: 'steps', CFG: 'guidance' }[field];
   return String(project.metadata?.[key] ?? '') || '—';
 }
@@ -429,7 +230,7 @@ function ExperimentCompare({ experiment, projects, selectedIds }) {
   </div>;
 }
 
-function ExperimentFilmCard({ member, baselineProject, selected, baseline, onToggle, onMove, onContextMenu }) {
+function ExperimentMemberCard({ member, baselineProject, selected, baseline, onToggle, onMove, onContextMenu, onOpen }) {
   const cardRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [dropTarget, setDropTarget] = useState(false);
@@ -437,7 +238,7 @@ function ExperimentFilmCard({ member, baselineProject, selected, baseline, onTog
 
   useEffect(() => {
     const element = cardRef.current;
-    if (!element) return undefined;
+    if (!element || !onMove) return undefined;
     const cleanup = [dropTargetForElements({
       element,
       getData: () => ({ type: 'experiment-member', projectId: member.id }),
@@ -458,83 +259,13 @@ function ExperimentFilmCard({ member, baselineProject, selected, baseline, onTog
     return combine(...cleanup);
   }, [baseline, member.id, onMove]);
 
-  return <button ref={cardRef} className={`version-card experiment-card ${selected ? 'selected' : ''} ${baseline ? 'baseline' : ''} ${dragging ? 'dragging' : ''} ${dropTarget ? 'drop-target' : ''}`} onClick={() => onToggle(member.id)} onContextMenu={(event) => onContextMenu(event, member)} onKeyDown={(event) => {
+  return <button ref={cardRef} className={`experiment-member-card ${selected ? 'selected' : ''} ${baseline ? 'baseline' : ''} ${dragging ? 'dragging' : ''} ${dropTarget ? 'drop-target' : ''}`} onClick={() => onToggle(member.id)} onContextMenu={(event) => onContextMenu?.(event, member)} onDoubleClick={() => onOpen?.(member.id)} onKeyDown={(event) => {
     if (!event.altKey || baseline || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
     event.preventDefault();
-    onMove(member.id, event.key === 'ArrowLeft' ? 'keyboard:previous' : 'keyboard:next');
+    onMove?.(member.id, event.key === 'ArrowLeft' ? 'keyboard:previous' : 'keyboard:next');
   }} aria-pressed={selected} title={baseline ? '基准结果固定在首位' : '拖动排序；Alt/Option + 左右键微调'}>
     <img src={mediaUrl(member.thumbnail_path)} alt=""/><span><b>{member.name}</b><small>{baseline ? '基准结果' : differences.join(' · ') || '参数相同'}</small></span><em>{baseline ? 'BASE' : selected ? '对比中' : '加入'}</em>
   </button>;
-}
-
-function PreviewStage({ project, sourceProject, mode, setMode, experiment, experimentProjects, comparisonIds, onToggleComparison, onReorderExperiment, onCopy, onReveal, onEditTag, onTagContextMenu, onProjectContextMenu, onBranchContextMenu, onOpenResult, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, branchResultImporting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
-  const limitedReproduction = hasLimitedReproduction(project.metadata);
-  const activeBranch = (sourceProject.branches || []).find((branch) => branch.id === activeBranchId);
-  const mismatchResult = activeBranch?.results?.find((result) => result.match_status === 'mismatch');
-  const copyLabel = mode === 'prompt'
-    ? overviewCopy.selected ? `复制已选 ${overviewCopy.count}` : `复制可见 ${overviewCopy.count}`
-    : '复制 Prompt';
-  const compactCopyLabel = mode === 'prompt' ? `复制 ${overviewCopy.count}` : '复制';
-  return <section className="preview-column">
-    <header className="topbar">
-      <div className="breadcrumb branch-breadcrumb"><span>作品库</span><b>/</b><strong>{sourceProject.name}</strong>{activeBranch && <em>{activeBranch.name}</em>}</div>
-      <div className="top-actions">
-        <LobeSegmented aria-label="工作区视图" className="workspace-switch" onChange={setMode} options={[
-          { label: <span><Icon name="image"/>图像</span>, value: 'image' },
-          { label: <span><Icon name="layers"/>Prompt</span>, value: 'prompt' },
-          ...(experiment ? [{ label: <span><Icon name="library"/>对比</span>, value: 'compare' }] : []),
-        ]} value={mode}/>
-        <LobeActionIcon className="ghost" icon={<Icon name="folder"/>} onClick={() => onReveal(sourceProject.image_path)} size="small" title="在文件夹中显示原图" variant="outlined"/>
-        <LobeButton className="copy-button" disabled={mode === 'prompt' && !overviewCopy.count} icon={<Icon name="copy"/>} onClick={onCopy} title={copyLabel} type="primary"><span className="copy-label-full">{copyLabel}</span><span className="copy-label-compact">{compactCopyLabel}</span></LobeButton>
-      </div>
-    </header>
-    {mode === 'compare' && experiment ? <ExperimentCompare experiment={experiment} projects={experimentProjects} selectedIds={comparisonIds}/> : mode === 'image' ? <div className="stage">
-      <div className="image-mat">
-        <img src={mediaUrl(sourceProject.image_path)} alt={sourceProject.name}/>
-        <div className="image-index">ASSET<br/><b>{String(countPromptTags(project)).padStart(2, '0')}</b></div>
-      </div>
-      <div className="stage-meta">
-        <span>{project.metadata.model || 'MODEL UNKNOWN'}</span>
-        <i/>
-        <span>SEED {project.metadata.seed || '—'}</span>
-        <i/>
-        <span>{project.metadata.steps || '—'} STEPS</span>
-        <i/><span>{project.metadata.width || '—'} × {project.metadata.height || '—'}</span>
-        {limitedReproduction && <><i/><span className="reproduction-status" title="局部重绘 metadata 不包含完整底图与蒙版">INPAINT · 无法精确复现</span></>}
-      </div>
-      {mismatchResult && <aside className="branch-match-panel" role="status">
-        <header><Icon name="warning" size={16}/><div><strong>上传结果与方案不一致</strong><small>原方案已保留，并按图片实际 metadata 创建子分支</small></div></header>
-        <div className="branch-match-details">
-          {(mismatchResult.details || []).map((detail) => <div key={detail.field}><b>{detail.field}</b><span><em>方案</em>{detail.expected || '—'}</span><span><em>结果</em>{detail.actual || '—'}</span></div>)}
-          {!(mismatchResult.details || []).length && <div className="match-detail-empty">差异：{mismatchResult.differences?.join('、') || 'metadata 不一致'}</div>}
-        </div>
-        <footer>{mismatchResult.actual_branch_id && <LobeButton onClick={() => onSelectBranch(mismatchResult.actual_branch_id)} size="small" type="primary">打开实际结果分支</LobeButton>}<LobeButton onClick={() => onOpenResult(mismatchResult.project_id)} size="small">查看结果图</LobeButton></footer>
-      </aside>}
-    </div> : <PromptOverview project={project} updateProject={updateProject} onEditTag={onEditTag} onTagContextMenu={onTagContextMenu} onCopyContextChange={onOverviewCopyChange} onCopyText={onCopyText} onNotify={onNotify}/>}
-    {mode === 'compare' && experiment ? <footer className="version-rail experiment-rail">
-      <div className="rail-title"><span><Icon name="history"/>实验胶片</span><small>选择 2–4 个成员；基准固定保留</small></div>
-      <div className="version-strip experiment-strip">
-        {experimentProjects.map((member) => <ExperimentFilmCard key={member.id} member={member} baselineProject={experimentProjects.find((item) => item.id === experiment.baseline_project_id)} selected={comparisonIds.has(member.id)} baseline={member.id === experiment.baseline_project_id} onToggle={onToggleComparison} onMove={onReorderExperiment} onContextMenu={onProjectContextMenu}/>)}
-      </div>
-    </footer> : <footer className="version-rail branch-rail">
-      <div className="rail-title"><span><Icon name="history"/>生成分支</span><div className="rail-actions">
-        {activeBranch?.status === 'draft' && <><LobeButton danger onClick={() => onDiscardBranch(activeBranch.id)} size="small" type="text">放弃草稿</LobeButton><LobeButton icon={<Icon name="check"/>} onClick={() => onMarkBranchWaiting(activeBranch.id)} size="small" type="text">标记待生成</LobeButton></>}
-        {activeBranch && ['waiting', 'result', 'mismatch'].includes(activeBranch.status) && <LobeButton disabled={branchResultImporting === activeBranch.id} icon={<Icon name="upload"/>} onClick={() => onImportBranchResult(activeBranch.id)} size="small" type="text">{branchResultImporting === activeBranch.id ? '正在核对…' : '上传结果图'}</LobeButton>}
-      </div></div>
-      <div className="version-strip">
-        <button className={`version-card current result-card ${!activeBranchId ? 'selected' : ''}`} onClick={() => onSelectBranch('')} onContextMenu={(event) => onProjectContextMenu(event, sourceProject)}>
-          <img src={mediaUrl(sourceProject.thumbnail_path)} alt=""/><span><b>原图结果</b><small>生成信息只读 · {relativeTime(sourceProject.updated_at)}</small></span><em><Icon name="lock" size={11}/>RESULT</em>
-        </button>
-        {(sourceProject.branches || []).map((branch, index) => <button key={branch.id} className={`version-card branch-card ${activeBranchId === branch.id ? 'selected' : ''}`} onClick={() => onSelectBranch(branch.id)} onContextMenu={(event) => onBranchContextMenu(event, branch)}>
-          {branch.results?.[0] ? <img src={mediaUrl(branch.results[0].thumbnail_path)} alt=""/> : <div className="version-number">B{(sourceProject.branches || []).length - index}</div>}<span><b>{branch.name}</b><small>{branch.results?.length ? `${branch.results.length} 张结果 · ${branch.results[0].match_status === 'matched' ? 'metadata 匹配' : `${branch.results[0].differences?.join(' / ') || 'metadata 不匹配'}`}` : branch.change_summary || relativeTime(branch.updated_at)}</small></span><em className={`branch-status ${branch.status}`}>{BRANCH_STATUS_LABELS[branch.status] || branch.status}</em>
-        </button>)}
-        {(sourceProject.versions || []).map((version, index) => <button key={version.id} className="version-card legacy-version" onClick={() => onUseLegacyVersion(version)} title="把旧版 Prompt 作为新的分支草稿打开">
-          <div className="version-number">V{(sourceProject.versions || []).length - index}</div><span><b>{version.label}</b><small>旧版本 · 点击转为分支</small></span>
-        </button>)}
-        {!(sourceProject.branches || []).length && !(sourceProject.versions || []).length && <div className="version-empty">修改 Prompt、Vibe 或生成参数时，会自动创建分支草稿</div>}
-      </div>
-    </footer>}
-  </section>;
 }
 
 function WeightControl({ value, onChange }) {
@@ -1019,23 +750,6 @@ function MetadataPanel({ project, updateProject }) {
   </div>;
 }
 
-function Inspector({ tab, setTab, project, branch, updateProject, showToast, promptScopeKey, setPromptScopeKey, focusTagId, onTagContextMenu }) {
-  return <aside className="inspector">
-    <LobeSegmented block className="inspector-tabs" onChange={setTab} options={[
-      { label: <span><Icon name="layers"/>Prompt</span>, value: 'tags' },
-      { label: <span><Icon name="image"/>Vibe {project.vibes.length > 0 && <i>{project.vibes.length}</i>}</span>, value: 'vibe' },
-      { label: <span><Icon name="info"/>参数</span>, value: 'metadata' },
-    ]} value={tab}/>
-    <div className={`generation-context ${branch ? 'branch' : 'result'}`}>
-      <Icon name={branch ? 'spark' : 'lock'} size={14}/>
-      <div><strong>{branch ? branch.name : '原图生成结果'}</strong><small>{branch ? `${BRANCH_STATUS_LABELS[branch.status] || branch.status} · 改动保存在这个分支中` : '生成事实已锁定；修改 Prompt、Vibe 或参数会新建分支'}</small></div>
-    </div>
-    {tab === 'tags' && <TagsPanel project={project} updateProject={updateProject} showToast={showToast} scopeKey={promptScopeKey} setScopeKey={setPromptScopeKey} focusTagId={focusTagId} onTagContextMenu={onTagContextMenu}/>}
-    {tab === 'vibe' && <VibePanel project={project} updateProject={updateProject} showToast={showToast}/>}
-    {tab === 'metadata' && <MetadataPanel project={project} updateProject={updateProject}/>}
-  </aside>;
-}
-
 function StudioSideNav({ page, onNavigate }) {
   const navigation = [
     { key: 'gallery', icon: 'library', label: '图库' },
@@ -1296,10 +1010,61 @@ function ReadOnlyMetadataPanel({ project }) {
   </div>;
 }
 
-function RelationsPanel({ project, activeBranchId, experiments, onSelectBranch, onBranchContextMenu, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, onOpenResult, onUseLegacyVersion, onOpenExperiment, branchResultImporting }) {
+function RelationshipGroupContent({ group, currentProject, projects, selectedIds, expanded, onExpand, onOpenProject, onToggleSelected, onCompare }) {
+  const members = group.member_ids.map((id) => projects.find((project) => project.id === id)).filter(Boolean);
+  const ordered = [currentProject, ...members.filter((project) => project.id !== currentProject.id)];
+  const visible = expanded ? ordered : ordered.slice(0, 8);
+  const selectedInGroup = ordered.filter((project) => selectedIds.has(project.id));
+  return <div className="relationship-group-content">
+    <div className="relationship-explanation">
+      <span>{group.exact ? '精确关系' : '关联关系'}</span>
+      <p>{group.fixed_summary}</p>
+      <div>{group.changed_fields.map((field) => <b key={field}>{field}</b>)}</div>
+    </div>
+    <LobeGrid className="relationship-image-grid" gap={12} maxItemWidth={220} rows={4}>
+      {visible.map((member) => {
+        const differences = member.id === currentProject.id ? [] : branchChangeFields(currentProject, member);
+        const checked = selectedIds.has(member.id);
+        return <article className={`relationship-image-card ${member.id === currentProject.id ? 'current' : ''} ${checked ? 'selected' : ''}`} key={member.id}>
+          <LobeCheckbox aria-label={`${checked ? '取消选择' : '选择'} ${member.name}`} checked={checked} onChange={() => onToggleSelected(member.id)} size={18}/>
+          <button onClick={() => onOpenProject(member.id)}>
+            <img alt="" loading="lazy" src={mediaUrl(member.thumbnail_path)}/>
+            <span><strong title={member.name}>{member.name}</strong><small>{member.id === currentProject.id ? '当前图片' : differences.join(' · ') || '可比较字段相同'}</small></span>
+          </button>
+        </article>;
+      })}
+    </LobeGrid>
+    <footer>
+      {ordered.length > 8 && <LobeButton onClick={onExpand} size="small" type="text">{expanded ? '收起预览' : `查看全部 ${ordered.length} 张`}</LobeButton>}
+      <span>{selectedInGroup.length} / 4 已选</span>
+      <LobeButton disabled={selectedInGroup.length < 2 || selectedInGroup.length > 4} icon={<Icon name="layers" size={13}/>} onClick={() => onCompare(selectedInGroup.map((project) => project.id))} size="small" type="primary">对比所选</LobeButton>
+    </footer>
+  </div>;
+}
+
+function RelationsPanel({ project, projects, relationshipGroups, activeBranchId, experiments, series, onSelectBranch, onBranchContextMenu, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, onOpenResult, onUseLegacyVersion, onOpenExperiment, onOpenSeries, onOpenComparison, branchResultImporting }) {
   const branches = project.branches || [];
+  const projectRelationshipGroups = relationshipGroups.filter((group) => group.member_ids.includes(project.id));
   const relatedExperiments = experiments.filter((experiment) => (experiment.member_ids || []).includes(project.id));
+  const relatedSeries = series.filter((entry) => (project.series_ids || []).includes(entry.id));
+  const [relationSelection, setRelationSelection] = useState(() => new Set([project.id]));
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
+  useEffect(() => { setRelationSelection(new Set([project.id])); setExpandedGroups(new Set()); }, [project.id]);
+  const toggleRelationSelection = (projectId) => setRelationSelection((current) => {
+    const next = new Set(current);
+    if (next.has(projectId)) next.delete(projectId);
+    else if (next.size < 4) next.add(projectId);
+    return next;
+  });
+  const relationshipItems = projectRelationshipGroups.map((group) => ({
+    key: group.id,
+    label: <div className="relationship-collapse-label"><span>{group.conditions.join('；')}</span><b>{group.member_ids.length} 张</b></div>,
+    children: <RelationshipGroupContent currentProject={project} expanded={expandedGroups.has(group.id)} group={group} onCompare={(ids) => onOpenComparison(group, ids)} onExpand={() => setExpandedGroups((current) => { const next = new Set(current); if (next.has(group.id)) next.delete(group.id); else next.add(group.id); return next; })} onOpenProject={onOpenResult} onToggleSelected={toggleRelationSelection} projects={projects} selectedIds={relationSelection}/>,
+  }));
   return <div className="relations-panel panel-scroll">
+    <section className="relation-section relationship-section"><header><div><span>AUTOMATIC RELATIONSHIPS</span><h2>关联图片</h2><p>根据只读生成事实解释共享字段和变化字段；缺失值不会被当成相同。</p></div><b>{projectRelationshipGroups.length}</b></header>
+      {relationshipItems.length ? <LobeCollapse className="relationship-collapse" defaultActiveKey={projectRelationshipGroups.slice(0, 3).map((group) => group.id)} items={relationshipItems} variant="borderless"/> : <LobeEmpty className="relation-empty" description="导入具有相同 Prompt、Seed、Character 或 Vibe 来源的图片后，会在这里自动分组。" image={<Icon name="layers" size={22}/>} title="尚未发现可解释关系"/>}
+    </section>
     <section className="relation-section"><header><div><span>GENERATION RECIPES</span><h2>生成方案</h2><p>修改生成信息会形成独立方案；原图始终保留为只读结果。</p></div><b>{branches.length}</b></header>
       <div className="relation-list">
         <button className={`relation-row source ${!activeBranchId ? 'active' : ''}`} onClick={() => onSelectBranch('')}><span className="relation-thumb"><img src={mediaUrl(project.thumbnail_path)} alt=""/></span><span><strong>原图结果</strong><small>生成事实只读 · {relativeTime(project.updated_at)}</small></span><em>RESULT</em></button>
@@ -1310,13 +1075,17 @@ function RelationsPanel({ project, activeBranchId, experiments, onSelectBranch, 
         {(project.versions || []).map((version) => <button className="relation-row legacy" key={version.id} onClick={() => onUseLegacyVersion(version)}><span className="relation-thumb"><Icon name="history" size={18}/></span><span><strong>{version.label}</strong><small>旧版 Prompt · 转成新方案后继续编辑</small></span><em>转换</em></button>)}
       </div>
     </section>
-    <section className="relation-section"><header><div><span>COMPARISON GROUPS</span><h2>对比实验</h2><p>这张图片参与的受控对比与变量分组。</p></div><b>{relatedExperiments.length}</b></header>
-      <div className="relation-list">{relatedExperiments.map((experiment) => <button className="relation-row experiment" key={experiment.id} onClick={() => onOpenExperiment(experiment.id)}><span className="relation-thumb"><Icon name="spark" size={18}/></span><span><strong>{experiment.name}</strong><small>{(experiment.member_ids || []).length} 个成员 · {(experiment.variable_fields || []).join(' / ') || '参数相同'}</small></span><em>打开对比</em></button>)}{!relatedExperiments.length && <LobeEmpty className="relation-empty" description="在图库中多选至少两张图片，即可建立对比实验。" image={<Icon name="spark" size={22}/>} title="尚未加入对比实验"/>}</div>
+    <section className="relation-section"><header><div><span>MANUAL GROUPS</span><h2>人工系列与实验</h2><p>由你明确建立的整理关系，不与自动推导混合。</p></div><b>{relatedSeries.length + relatedExperiments.length}</b></header>
+      <div className="relation-list">
+        {relatedSeries.map((entry) => <button className="relation-row series" key={entry.id} onClick={() => onOpenSeries(entry.id)}><span className="relation-thumb"><Icon name="library" size={18}/></span><span><strong>{entry.name}</strong><small>{entry.project_count || 0} 个成员 · 人工创作系列</small></span><em>打开系列</em></button>)}
+        {relatedExperiments.map((experiment) => <button className="relation-row experiment" key={experiment.id} onClick={() => onOpenExperiment(experiment.id)}><span className="relation-thumb"><Icon name="spark" size={18}/></span><span><strong>{experiment.name}</strong><small>{(experiment.member_ids || []).length} 个成员 · {(experiment.variable_fields || []).join(' / ') || '参数相同'}</small></span><em>打开对比</em></button>)}
+        {!relatedSeries.length && !relatedExperiments.length && <LobeEmpty className="relation-empty" description="可在图库多选图片，加入创作系列或建立对比实验。" image={<Icon name="spark" size={22}/>} title="尚未加入人工分组"/>}
+      </div>
     </section>
   </div>;
 }
 
-function ImageDetailPage({ project, sourceProject, activeBranch, detailTab, experiments, promptScopeKey, focusTagId, branchResultImporting, onBack, onTabChange, onCopy, onReveal, onCreateRecipe, updateProject, onTagContextMenu, onPrepareTagEditor, setPromptScopeKey, onCopyContextChange, onCopyText, onNotify, onSelectBranch, onBranchContextMenu, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, onOpenResult, onUseLegacyVersion, onOpenExperiment, onOpenTagResource, onOpenVibeResource }) {
+function ImageDetailPage({ project, projects, relationshipGroups, sourceProject, activeBranch, detailTab, experiments, series, promptScopeKey, focusTagId, branchResultImporting, onBack, onTabChange, onCopy, onReveal, onCreateRecipe, updateProject, onTagContextMenu, onPrepareTagEditor, setPromptScopeKey, onCopyContextChange, onCopyText, onNotify, onSelectBranch, onBranchContextMenu, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, onOpenResult, onUseLegacyVersion, onOpenExperiment, onOpenSeries, onOpenComparison, onOpenTagResource, onOpenVibeResource }) {
   const [promptMode, setPromptMode] = useState('overview');
   const tabs = [
     { key: 'overview', label: '概览' }, { key: 'prompt', label: 'Prompt' }, { key: 'vibe', label: `Vibe${project.vibes?.length ? ` ${project.vibes.length}` : ''}` }, { key: 'metadata', label: '元数据' }, { key: 'relations', label: `关系${sourceProject.branches?.length ? ` ${sourceProject.branches.length}` : ''}` },
@@ -1333,7 +1102,7 @@ function ImageDetailPage({ project, sourceProject, activeBranch, detailTab, expe
       {detailTab === 'prompt' && <div className="detail-prompt-workspace"><div className="resource-jump-bar"><span>在 Tag 库中反向查看</span><LobeSelect allowClear onChange={(value) => value && onOpenTagResource(value)} options={[...new Map(allPromptTags(project).map((tag) => [normalizeSearch(tag.tag), { label: tag.translation ? `${tag.tag} · ${tag.translation}` : tag.tag, value: tag.tag }])).values()]} placeholder="选择当前图片中的 Tag" showSearch value={undefined}/></div><div className="detail-prompt-mode"><LobeSegmented onChange={setPromptMode} options={[{ label: '总览', value: 'overview' }, { label: '编辑', value: 'edit' }]} value={promptMode}/><span>{activeBranch ? `正在编辑 ${activeBranch.name}` : '编辑时自动创建生成方案'}</span></div>{promptMode === 'overview' ? <PromptOverview onCopyContextChange={onCopyContextChange} onCopyText={onCopyText} onEditTag={editTag} onNotify={onNotify} onTagContextMenu={onTagContextMenu} project={project} updateProject={updateProject}/> : <TagsPanel focusTagId={focusTagId} onTagContextMenu={onTagContextMenu} project={project} scopeKey={promptScopeKey} setScopeKey={setPromptScopeKey} showToast={onNotify} updateProject={updateProject}/>}</div>}
       {detailTab === 'vibe' && <div className="detail-vibe-workspace"><div className="resource-jump-bar"><span>在 Vibe 库中反向查看</span><LobeSelect allowClear disabled={!project.vibes?.length} onChange={(value) => value && onOpenVibeResource(project.vibes.find((vibe) => vibe.id === value))} options={(project.vibes || []).map((vibe, index) => ({ label: vibe.name || `Vibe ${index + 1}`, value: vibe.id }))} placeholder={project.vibes?.length ? '选择当前图片中的 Vibe' : '当前图片没有 Vibe'} value={undefined}/></div><VibePanel project={project} showToast={onNotify} updateProject={updateProject}/></div>}
       {detailTab === 'metadata' && (activeBranch ? <MetadataPanel project={project} updateProject={updateProject}/> : <ReadOnlyMetadataPanel project={project}/>)}
-      {detailTab === 'relations' && <RelationsPanel activeBranchId={activeBranch?.id || ''} branchResultImporting={branchResultImporting} experiments={experiments} onBranchContextMenu={onBranchContextMenu} onDiscardBranch={onDiscardBranch} onImportBranchResult={onImportBranchResult} onMarkBranchWaiting={onMarkBranchWaiting} onOpenExperiment={onOpenExperiment} onOpenResult={onOpenResult} onSelectBranch={onSelectBranch} onUseLegacyVersion={onUseLegacyVersion} project={sourceProject}/>}
+      {detailTab === 'relations' && <RelationsPanel activeBranchId={activeBranch?.id || ''} branchResultImporting={branchResultImporting} experiments={experiments} onBranchContextMenu={onBranchContextMenu} onDiscardBranch={onDiscardBranch} onImportBranchResult={onImportBranchResult} onMarkBranchWaiting={onMarkBranchWaiting} onOpenComparison={onOpenComparison} onOpenExperiment={onOpenExperiment} onOpenResult={onOpenResult} onOpenSeries={onOpenSeries} onSelectBranch={onSelectBranch} onUseLegacyVersion={onUseLegacyVersion} project={sourceProject} projects={projects} relationshipGroups={relationshipGroups} series={series}/>}
     </section>
   </main>;
 }
@@ -1462,8 +1231,17 @@ function TagDetailPage({ tag, projects, onBack, onOpenProject, onSaveTag, onTran
   </main>;
 }
 
-function ExperimentWorkspace({ experiment, projects, comparisonIds, onBack, onToggleComparison, onOpenProject }) {
-  return <main className="experiment-workspace"><header className="detail-header"><div className="detail-title-row"><LobeActionIcon icon={<Icon name="close" size={18}/>} onClick={onBack} size="large" title="返回图库" variant="borderless"/><div><span>图库 / 对比实验</span><h1>{experiment.name}</h1><small>选择 2–4 个成员同步对比</small></div></div></header><div className="experiment-workspace-content"><ExperimentCompare experiment={experiment} projects={projects} selectedIds={comparisonIds}/><div className="experiment-member-picker">{projects.map((project) => <button className={comparisonIds.has(project.id) ? 'active' : ''} key={project.id} onClick={() => onToggleComparison(project.id)} onDoubleClick={() => onOpenProject(project.id)}><img src={mediaUrl(project.thumbnail_path)} alt=""/><span><strong>{project.name}</strong><small>{project.id === experiment.baseline_project_id ? '基准 · 固定保留' : comparisonIds.has(project.id) ? '对比中' : '点击加入'}</small></span></button>)}</div></div></main>;
+function ExperimentWorkspace({ experiment, projects, comparisonIds, onBack, onToggleComparison, onOpenProject, onReorderExperiment, onProjectContextMenu }) {
+  const baseline = projects.find((project) => project.id === experiment.baseline_project_id) || projects[0];
+  return <main className="experiment-workspace">
+    <header className="detail-header"><div className="detail-title-row"><LobeActionIcon icon={<Icon name="close" size={18}/>} onClick={onBack} size="large" title="返回上一页" variant="borderless"/><div><span>图库 / {experiment.inferred ? '关系对比' : '对比实验'}</span><h1>{experiment.name}</h1><small>选择 2–4 个成员同步对比；双击图片打开详情</small></div></div></header>
+    <div className="experiment-workspace-content">
+      <ExperimentCompare experiment={experiment} projects={projects} selectedIds={comparisonIds}/>
+      <section className="experiment-members-section"><header><div><strong>{experiment.inferred ? '关系成员' : '实验成员'}</strong><small>{experiment.inferred ? '自动关系只读，不改变人工分组。' : '拖动排序；Alt/Option + 左右键可精确调整。'}</small></div><span>{comparisonIds.size} / 4 已选</span></header>
+        <div className="experiment-member-picker">{projects.map((project) => <ExperimentMemberCard baseline={project.id === experiment.baseline_project_id} baselineProject={baseline} key={project.id} member={project} onContextMenu={onProjectContextMenu} onMove={experiment.inferred ? undefined : onReorderExperiment} onOpen={onOpenProject} onToggle={onToggleComparison} selected={comparisonIds.has(project.id)}/>)}</div>
+      </section>
+    </div>
+  </main>;
 }
 
 function SettingsPage({ appearance, onAppearanceChange, onClose, showToast }) {
@@ -1564,16 +1342,14 @@ export default function App({ appearance, setAppearance }) {
   const [dragState, setDragState] = useState({ active: false, valid: false, count: 0, label: '图片' });
   const [importProgress, setImportProgress] = useState(null);
   const [importResult, setImportResult] = useState(null);
-  const [tab, setTab] = useState('tags');
   const [loading, setLoading] = useState(true);
   const [activeBranchId, setActiveBranchId] = useState('');
-  const [workspaceMode, setWorkspaceMode] = useState('image');
   const [overviewCopy, setOverviewCopy] = useState({ text: '', count: 0, selected: false, categoryCount: 0 });
   const [promptScopeKey, setPromptScopeKey] = useState('base:prompt');
   const [focusTagId, setFocusTagId] = useState(null);
   const [branchResultImporting, setBranchResultImporting] = useState('');
   const [comparisonIds, setComparisonIds] = useState(new Set());
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [relationshipComparison, setRelationshipComparison] = useState(null);
   const [appPage, setAppPage] = useState('gallery');
   const [galleryScreen, setGalleryScreen] = useState('list');
   const [detailTab, setDetailTab] = useState('overview');
@@ -1693,7 +1469,9 @@ export default function App({ appearance, setAppearance }) {
 
   const sourceProject = projects.find((project) => project.id === activeId) || null;
   const activeExperiment = libraryView.startsWith('experiment:') ? experiments.find((entry) => `experiment:${entry.id}` === libraryView) : null;
-  const experimentProjects = (activeExperiment?.member_ids || []).map((id) => projects.find((project) => project.id === id)).filter(Boolean);
+  const activeComparison = relationshipComparison || activeExperiment;
+  const experimentProjects = (activeComparison?.member_ids || []).map((id) => projects.find((project) => project.id === id)).filter(Boolean);
+  const relationshipGroups = useMemo(() => buildRelationshipGroups(projects), [projects]);
   const activeBranch = sourceProject?.branches?.find((branch) => branch.id === activeBranchId) || null;
   const activeProject = sourceProject && activeBranch
     ? applyGenerationSnapshot(sourceProject, parseBranchSnapshot(activeBranch))
@@ -1705,18 +1483,18 @@ export default function App({ appearance, setAppearance }) {
   }, [activeBranchId, sourceProject]);
 
   useEffect(() => {
-    if (!activeExperiment) { setComparisonIds(new Set()); return; }
-    const memberIds = activeExperiment.member_ids || [];
+    if (!activeComparison) { setComparisonIds(new Set()); return; }
+    const memberIds = activeComparison.member_ids || [];
     setComparisonIds((current) => {
-      const next = new Set([...current].filter((id) => memberIds.includes(id) && id !== activeExperiment.baseline_project_id).slice(0, 3));
-      if (activeExperiment.baseline_project_id) next.add(activeExperiment.baseline_project_id);
+      const next = new Set([...current].filter((id) => memberIds.includes(id) && id !== activeComparison.baseline_project_id).slice(0, 3));
+      if (activeComparison.baseline_project_id) next.add(activeComparison.baseline_project_id);
       for (const id of memberIds) {
         if (next.size >= 2) break;
         next.add(id);
       }
       return next;
     });
-  }, [activeExperiment?.id, activeExperiment?.baseline_project_id, activeExperiment?.member_ids?.join('|')]);
+  }, [activeComparison?.id, activeComparison?.baseline_project_id, activeComparison?.member_ids?.join('|')]);
 
   useEffect(() => {
     if (galleryScreen !== 'detail' || detailTab !== 'prompt') setOverviewCopy({ text: '', count: 0, selected: false, categoryCount: 0 });
@@ -1789,12 +1567,11 @@ export default function App({ appearance, setAppearance }) {
   };
 
   const changeLibraryView = (view) => {
-    setSettingsOpen(false);
     setAppPage('gallery');
     setGalleryScreen('list');
     setLibraryView(view);
     setSelectedIds(new Set());
-    setWorkspaceMode(view.startsWith('experiment:') ? 'compare' : workspaceMode === 'compare' ? 'image' : workspaceMode);
+    setRelationshipComparison(null);
   };
 
   const toggleSelected = (projectId) => setSelectedIds((current) => {
@@ -1812,8 +1589,8 @@ export default function App({ appearance, setAppearance }) {
   });
 
   const toggleComparison = (projectId) => {
-    if (!activeExperiment) return;
-    if (projectId === activeExperiment.baseline_project_id) { showToast('基准作品固定保留在对比中'); return; }
+    if (!activeComparison) return;
+    if (projectId === activeComparison.baseline_project_id) { showToast('基准作品固定保留在对比中'); return; }
     setComparisonIds((current) => {
       const next = new Set(current);
       if (next.has(projectId)) {
@@ -1930,7 +1707,7 @@ export default function App({ appearance, setAppearance }) {
     if (nextIds.every((id, index) => id === currentIds[index])) return false;
     return runLibraryOrganization(
       () => studio.reorderExperimentMembers(activeExperiment.id, nextIds),
-      '实验胶片顺序已保存',
+      '实验成员顺序已保存',
     );
   };
   const setFavorite = async (favorite, projectIds = [...selectedIds]) => {
@@ -2013,7 +1790,6 @@ export default function App({ appearance, setAppearance }) {
     setActiveBranchId('');
     if (!collectionId) setLibraryView('all');
     setSelectedIds(new Set());
-    setWorkspaceMode('image');
     setPromptScopeKey('base:prompt');
     const limitedCount = imported.filter((project) => hasLimitedReproduction(project.metadata)).length;
     const duplicateText = result.duplicates?.length ? ` · 跳过 ${result.duplicates.length} 个重复` : '';
@@ -2259,6 +2035,7 @@ export default function App({ appearance, setAppearance }) {
     setAppPage('gallery');
     setResourceReturn(null);
     setResourceOrigin(null);
+    setRelationshipComparison(null);
     setActiveId(projectId);
     setActiveBranchId('');
     setPromptScopeKey('base:prompt');
@@ -2267,6 +2044,12 @@ export default function App({ appearance, setAppearance }) {
   };
 
   const returnToGallery = () => {
+    if (relationshipComparison) {
+      setRelationshipComparison(null);
+      setGalleryScreen('detail');
+      setDetailTab('relations');
+      return;
+    }
     if (resourceReturn) {
       setAppPage(resourceReturn.page);
       if (resourceReturn.page === 'vibes') setActiveVibeKey(resourceReturn.key);
@@ -2281,7 +2064,29 @@ export default function App({ appearance, setAppearance }) {
   };
 
   const openExperimentWorkspace = (experimentId) => {
+    setRelationshipComparison(null);
     changeLibraryView(`experiment:${experimentId}`);
+    setGalleryScreen('compare');
+  };
+
+  const openRelationshipComparison = (group, projectIds) => {
+    const memberIds = [...new Set(projectIds)].slice(0, 4);
+    if (memberIds.length < 2 || !sourceProject) return;
+    const variableFields = group.changed_fields || [];
+    const baselineId = memberIds.includes(sourceProject.id) ? sourceProject.id : memberIds[0];
+    const baselineProject = projects.find((project) => project.id === baselineId);
+    setRelationshipComparison({
+      id: `relationship:${group.id}`,
+      inferred: true,
+      name: group.conditions.join('；'),
+      baseline_project_id: baselineId,
+      baseline_name: baselineProject?.name || sourceProject.name,
+      member_ids: memberIds,
+      fixed_fields: group.fixed_fields || [],
+      variable_fields: variableFields,
+      analysis_status: group.exact && variableFields.length === 1 ? 'single' : 'mixed',
+    });
+    setComparisonIds(new Set(memberIds));
     setGalleryScreen('compare');
   };
 
@@ -2338,7 +2143,6 @@ export default function App({ appearance, setAppearance }) {
   };
 
   const openPromptOverview = (projectId) => {
-    setSettingsOpen(false);
     setAppPage('gallery');
     setActiveId(projectId);
     setActiveBranchId('');
@@ -2347,7 +2151,6 @@ export default function App({ appearance, setAppearance }) {
   };
 
   const openTagEditor = (scopeKey, tagId) => {
-    setSettingsOpen(false);
     setAppPage('gallery');
     setGalleryScreen('detail');
     setDetailTab('prompt');
@@ -2459,7 +2262,6 @@ export default function App({ appearance, setAppearance }) {
     setResourceReturn(null);
     setResourceOrigin(null);
     setAppPage(nextPage);
-    setSettingsOpen(nextPage === 'settings');
     if (nextPage === 'gallery') setGalleryScreen('list');
     if (nextPage === 'vibes') studio.loadVibeLibrary().then((items) => setVibeLibrary(items || []));
     if (nextPage === 'tags') studio.loadTagDictionary().then((items) => setTagDictionary(items || []));
@@ -2520,6 +2322,9 @@ export default function App({ appearance, setAppearance }) {
         branchResultImporting={branchResultImporting}
         detailTab={detailTab}
         experiments={experiments}
+        series={series}
+        projects={projects}
+        relationshipGroups={relationshipGroups}
         focusTagId={focusTagId}
         onBack={returnToGallery}
         onBranchContextMenu={branchContextMenu}
@@ -2532,7 +2337,9 @@ export default function App({ appearance, setAppearance }) {
         onMarkBranchWaiting={markBranchWaiting}
         onNotify={showToast}
         onOpenExperiment={openExperimentWorkspace}
+        onOpenComparison={openRelationshipComparison}
         onOpenResult={openResultProject}
+        onOpenSeries={(seriesId) => changeLibraryView(`series:${seriesId}`)}
         onOpenTagResource={openTagResource}
         onOpenVibeResource={openVibeResource}
         onPrepareTagEditor={openTagEditor}
@@ -2547,7 +2354,7 @@ export default function App({ appearance, setAppearance }) {
         sourceProject={sourceProject}
         updateProject={updateProject}
       />}
-      {appPage === 'gallery' && galleryScreen === 'compare' && activeExperiment && <ExperimentWorkspace comparisonIds={comparisonIds} experiment={activeExperiment} onBack={returnToGallery} onOpenProject={openProjectDetail} onToggleComparison={toggleComparison} projects={experimentProjects}/>}
+      {appPage === 'gallery' && galleryScreen === 'compare' && activeComparison && <ExperimentWorkspace comparisonIds={comparisonIds} experiment={activeComparison} onBack={returnToGallery} onOpenProject={openProjectDetail} onProjectContextMenu={projectContextMenu} onReorderExperiment={reorderExperiment} onToggleComparison={toggleComparison} projects={experimentProjects}/>}
       {appPage === 'gallery' && galleryScreen !== 'list' && !activeProject && <EmptyState hasProjects={projects.length > 0} onImport={importImages}/>}
     </div>
     <ImportExperience
