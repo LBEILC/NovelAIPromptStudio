@@ -6,8 +6,9 @@ import sharp from 'sharp';
 const VIBE_IDENTIFIER = 'novelai-vibe-transfer';
 const MAX_VIBE_BYTES = 256 * 1024 * 1024;
 
-function fingerprint(value) {
-  return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+export function fingerprintVibe(value) {
+  const payload = Buffer.isBuffer(value) ? value : String(value || '');
+  return crypto.createHash('sha256').update(payload).digest('hex');
 }
 
 function finiteNumber(value, fallback = null) {
@@ -35,7 +36,7 @@ function collectVariants(document) {
       variants.push({
         model,
         model_hash: modelHash,
-        fingerprint: fingerprint(item.encoding),
+        fingerprint: fingerprintVibe(item.encoding),
         information_extracted: finiteNumber(item.params?.information_extracted),
         encoding: item.encoding,
       });
@@ -135,7 +136,7 @@ export async function importVibeFile(sourcePath, assetsDirectory) {
     vibe_file: vibeFile,
     reference_image: referenceImage,
     thumbnail_path: thumbnailPath,
-    source_image_hash: embeddedImage?.length ? fingerprint(embeddedImage) : '',
+    source_image_hash: embeddedImage?.length ? fingerprintVibe(embeddedImage) : '',
   };
 }
 
@@ -153,7 +154,7 @@ export function extractEmbeddedVibes(raw, modelLabel = '') {
 }
 
 export async function importEmbeddedVibe(item, assetsDirectory, sourceName, index = 0) {
-  const id = fingerprint(item.encoding);
+  const id = fingerprintVibe(item.encoding);
   const modelKey = modelKeyFromName(item.model);
   const information = finiteNumber(item.information_extracted);
   const document = {
@@ -166,7 +167,7 @@ export async function importEmbeddedVibe(item, assetsDirectory, sourceName, inde
     createdAt: Date.now(),
     importInfo: {
       model: item.model || modelNameFromKey(modelKey),
-      information_extracted: information ?? 0.7,
+      information_extracted: information,
       strength: finiteNumber(item.strength, 0.6),
     },
   };
@@ -208,10 +209,12 @@ export function toProjectVibe(entry, id = crypto.randomUUID()) {
     model: entry.model || '',
     strength: finiteNumber(entry.strength, 0.6),
     information_extracted: finiteNumber(entry.information_extracted, 0.7),
+    information_extracted_origin: finiteNumber(entry.information_extracted, 0.7),
     information_extracted_known: entry.information_extracted_known ? 1 : 0,
     encoded_values_json: entry.encoded_values_json || '[]',
     source_image_hash: entry.source_image_hash || '',
     has_source_image: entry.has_source_image ? 1 : 0,
+    information_extracted_dirty: 0,
     enabled: true,
   };
 }

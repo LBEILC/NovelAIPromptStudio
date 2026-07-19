@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS vibe_transfers (
   strength REAL NOT NULL DEFAULT 0.6,
   information_extracted REAL NOT NULL DEFAULT 0.7,
   information_extracted_known INTEGER NOT NULL DEFAULT 1,
+  information_extracted_dirty INTEGER NOT NULL DEFAULT 0,
+  information_extracted_origin REAL NOT NULL DEFAULT 0.7,
   encoded_values_json TEXT NOT NULL DEFAULT '[]',
   source_image_hash TEXT NOT NULL DEFAULT '',
   has_source_image INTEGER NOT NULL DEFAULT 0,
@@ -162,6 +164,8 @@ export async function openDatabase(dataDirectory) {
     ['vibe_file', "TEXT NOT NULL DEFAULT ''"],
     ['model', "TEXT NOT NULL DEFAULT ''"],
     ['information_extracted_known', 'INTEGER NOT NULL DEFAULT 1'],
+    ['information_extracted_dirty', 'INTEGER NOT NULL DEFAULT 0'],
+    ['information_extracted_origin', 'REAL NOT NULL DEFAULT 0.7'],
     ['encoded_values_json', "TEXT NOT NULL DEFAULT '[]'"],
     ['source_image_hash', "TEXT NOT NULL DEFAULT ''"],
     ['has_source_image', 'INTEGER NOT NULL DEFAULT 0'],
@@ -449,9 +453,9 @@ export async function openDatabase(dataDirectory) {
     for (const [position, vibe] of (project.vibes || []).entries()) {
       database.run(
         `INSERT INTO vibe_transfers (id, project_id, library_id, name, source_kind, reference_image, vibe_file, thumbnail_path,
-          model, strength, information_extracted, information_extracted_known, encoded_values_json, source_image_hash, has_source_image, enabled, position)
+          model, strength, information_extracted, information_extracted_known, information_extracted_dirty, information_extracted_origin, encoded_values_json, source_image_hash, has_source_image, enabled, position)
          VALUES ($id, $project_id, $library_id, $name, $source_kind, $reference_image, $vibe_file, $thumbnail_path,
-          $model, $strength, $information_extracted, $information_extracted_known, $encoded_values_json, $source_image_hash, $has_source_image, $enabled, $position)`,
+          $model, $strength, $information_extracted, $information_extracted_known, $information_extracted_dirty, $information_extracted_origin, $encoded_values_json, $source_image_hash, $has_source_image, $enabled, $position)`,
         {
           $id: vibe.id,
           $project_id: project.id,
@@ -465,6 +469,8 @@ export async function openDatabase(dataDirectory) {
           $strength: Number(vibe.strength),
           $information_extracted: Number(vibe.information_extracted),
           $information_extracted_known: vibe.information_extracted_known ? 1 : 0,
+          $information_extracted_dirty: vibe.information_extracted_dirty ? 1 : 0,
+          $information_extracted_origin: Number(vibe.information_extracted_origin ?? vibe.information_extracted ?? 0.7),
           $encoded_values_json: vibe.encoded_values_json || '[]',
           $source_image_hash: vibe.source_image_hash || '',
           $has_source_image: vibe.has_source_image ? 1 : 0,

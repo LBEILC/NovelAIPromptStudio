@@ -2,8 +2,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, safeStorage, screen, shell } from 'electron';
 import { openDatabase } from './database.js';
-import { importImage, importVibeImage, recoverEmbeddedVibes } from './assets.js';
-import { importVibeFile, toProjectVibe } from './vibes.js';
+import { importImage, importVibeImage, projectEmbeddedVibes } from './assets.js';
+import { fingerprintVibe, importEmbeddedVibe, importVibeFile, toProjectVibe } from './vibes.js';
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
 
@@ -16,6 +16,51 @@ protocol.registerSchemesAsPrivileged([
 let database;
 let assetsDirectory;
 let preferences;
+
+function embeddedVibeState(project) {
+  const items = projectEmbeddedVibes(project);
+  const library = new Map(database.loadVibeLibrary().map((entry) => [entry.id, entry]));
+  const linked = new Set((project.vibes || []).map((vibe) => database.resolveVibeLibraryId(vibe.library_id)).filter(Boolean));
+  const candidates = items.map((item, index) => {
+    const fingerprint = fingerprintVibe(item.encoding);
+    const libraryId = database.resolveVibeLibraryId(fingerprint);
+    return { item, index, fingerprint, libraryId, entry: library.get(libraryId), linked: linked.has(libraryId) };
+  });
+  return {
+    items,
+    candidates,
+    summary: {
+      total: candidates.length,
+      linked: candidates.filter((candidate) => candidate.linked).length,
+      available: candidates.filter((candidate) => candidate.entry && !candidate.linked).length,
+      missing: candidates.filter((candidate) => !candidate.entry).map((candidate) => ({
+        index: candidate.index,
+        fingerprint: candidate.fingerprint,
+        strength: candidate.item.strength,
+        information_extracted: candidate.item.information_extracted,
+        information_extracted_known: candidate.item.information_extracted === null ? 0 : 1,
+      })),
+    },
+  };
+}
+
+function linkAvailableEmbeddedVibes(project) {
+  const state = embeddedVibeState(project);
+  const seen = new Set((project.vibes || []).map((vibe) => database.resolveVibeLibraryId(vibe.library_id)).filter(Boolean));
+  const additions = [];
+  for (const candidate of state.candidates) {
+    if (!candidate.entry || seen.has(candidate.libraryId)) continue;
+    seen.add(candidate.libraryId);
+    additions.push({
+      ...toProjectVibe(candidate.entry),
+      strength: candidate.item.strength,
+      information_extracted: candidate.item.information_extracted ?? candidate.entry.information_extracted,
+      information_extracted_known: candidate.item.information_extracted === null ? candidate.entry.information_extracted_known : 1,
+    });
+  }
+  const linkedProject = additions.length ? { ...project, vibes: [...(project.vibes || []), ...additions] } : project;
+  return { project: linkedProject, additions, status: embeddedVibeState(linkedProject).summary };
+}
 
 function createWindow() {
   const { width: workAreaWidth, height: workAreaHeight } = screen.getPrimaryDisplay().workAreaSize;
@@ -51,19 +96,8 @@ app.whenReady().then(async () => {
   preferences = openPreferences(dataDirectory, safeStorage);
 
   for (const storedProject of database.loadLibrary()) {
-    const recovered = await recoverEmbeddedVibes(storedProject, assetsDirectory);
-    if (!recovered.libraryEntries.length) continue;
-    database.upsertVibeLibrary(recovered.libraryEntries);
-    const vibeLibrary = new Map(database.loadVibeLibrary().map((entry) => [entry.id, entry]));
-    const seenVibes = new Set();
-    recovered.project.vibes = recovered.project.vibes.flatMap((vibe) => {
-      const resolvedId = database.resolveVibeLibraryId(vibe.library_id);
-      if (seenVibes.has(resolvedId)) return [];
-      seenVibes.add(resolvedId);
-      const libraryEntry = vibeLibrary.get(resolvedId);
-      return [libraryEntry ? { ...toProjectVibe(libraryEntry, vibe.id), strength: vibe.strength, enabled: Boolean(vibe.enabled) } : vibe];
-    });
-    database.updateProject(recovered.project);
+    const linked = linkAvailableEmbeddedVibes(storedProject);
+    if (linked.additions.length) database.updateProject(linked.project);
   }
 
   protocol.handle('novelai-media', (request) => {
@@ -84,13 +118,7 @@ app.whenReady().then(async () => {
     const projects = [];
     for (const filePath of result.filePaths) {
       let project = await importImage(filePath, assetsDirectory);
-      database.upsertVibeLibrary(project.vibe_library_entries || []);
-      const vibeLibrary = new Map(database.loadVibeLibrary().map((entry) => [entry.id, entry]));
-      project.vibes = (project.vibes || []).map((vibe) => {
-        const libraryEntry = vibeLibrary.get(database.resolveVibeLibraryId(vibe.library_id));
-        return libraryEntry ? { ...toProjectVibe(libraryEntry, vibe.id), strength: vibe.strength } : vibe;
-      });
-      delete project.vibe_library_entries;
+      project = linkAvailableEmbeddedVibes(project).project;
       project = database.enrichProjectTags(project);
       database.insertProject(project);
       projects.push(project);
@@ -116,7 +144,7 @@ app.whenReady().then(async () => {
         { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] },
       ],
     });
-    if (result.canceled) return { ok: true, library: database.loadVibeLibrary(), imported: [], errors: [] };
+    if (result.canceled) return { ok: true, canceled: true, library: database.loadVibeLibrary(), imported: [], errors: [] };
     const imported = [];
     const errors = [];
     for (const filePath of result.filePaths) {
@@ -129,9 +157,38 @@ app.whenReady().then(async () => {
       }
     }
     database.upsertVibeLibrary(imported);
-    return { ok: errors.length === 0, library: database.loadVibeLibrary(), imported: imported.map((entry) => entry.id), errors };
+    return { ok: errors.length === 0, canceled: false, library: database.loadVibeLibrary(), imported: imported.map((entry) => entry.id), errors };
   });
   ipcMain.handle('vibe:library:use', (_event, entry) => toProjectVibe(entry));
+  ipcMain.handle('vibe:project:embedded-status', (_event, project) => embeddedVibeState(project).summary);
+  ipcMain.handle('vibe:project:resolve-embedded', async (_event, project, mode = 'retry') => {
+    try {
+      let extracted = 0;
+      if (mode === 'extract') {
+        const state = embeddedVibeState(project);
+        const entries = [];
+        for (const candidate of state.candidates.filter((item) => !item.entry)) {
+          entries.push(await importEmbeddedVibe(candidate.item, assetsDirectory, project.name || project.image_path, candidate.index));
+        }
+        if (entries.length) {
+          database.upsertVibeLibrary(entries);
+          extracted = entries.length;
+        }
+      }
+      const linked = linkAvailableEmbeddedVibes(project);
+      if (linked.additions.length) database.updateProject(linked.project);
+      return {
+        ok: true,
+        project: linked.project,
+        status: linked.status,
+        library: database.loadVibeLibrary(),
+        linked: linked.additions.length,
+        extracted,
+      };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle('file:reveal', (_event, filePath) => shell.showItemInFolder(filePath));
   ipcMain.handle('ai:settings:get', () => preferences.publicSettings());
   ipcMain.handle('ai:settings:save', (_event, settings) => preferences.saveAISettings(settings));

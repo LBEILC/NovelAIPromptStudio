@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { recoverEmbeddedVibes } from './assets.js';
+import { projectEmbeddedVibes, recoverEmbeddedVibes } from './assets.js';
 
 const temporaryDirectories = [];
 
@@ -11,6 +11,18 @@ afterEach(() => {
 });
 
 describe('embedded Vibe recovery', () => {
+  it('detects PNG metadata Vibes without extracting files automatically', () => {
+    const project = {
+      metadata: {
+        model: 'NovelAI Diffusion V4.5',
+        extra_json: JSON.stringify({ parsed: { reference_image_multiple: ['x'.repeat(1000)], reference_strength_multiple: [0.5] } }),
+      },
+    };
+    expect(projectEmbeddedVibes(project)).toEqual([
+      expect.objectContaining({ strength: 0.5, information_extracted: null }),
+    ]);
+  });
+
   it('migrates encoded PNG metadata into a reusable project Vibe', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-vibe-assets-'));
     temporaryDirectories.push(directory);

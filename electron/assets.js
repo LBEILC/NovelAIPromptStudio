@@ -29,10 +29,6 @@ export async function importImage(sourcePath, assetsDirectory) {
   const id = crypto.randomUUID();
   const { targetPath, thumbnailPath } = await copyWithThumbnail(sourcePath, assetsDirectory);
   const metadata = readNovelAIMetadata(sourcePath);
-  const vibeLibraryEntries = [];
-  for (const [index, item] of (metadata.embedded_vibes || []).entries()) {
-    vibeLibraryEntries.push(await importEmbeddedVibe(item, assetsDirectory, sourcePath, index));
-  }
   delete metadata.embedded_vibes;
   const now = new Date().toISOString();
   return {
@@ -45,8 +41,7 @@ export async function importImage(sourcePath, assetsDirectory) {
     metadata,
     tags: parsePrompt(metadata.prompt_raw, () => crypto.randomUUID()),
     prompt_structure: createPromptStructure(metadata, () => crypto.randomUUID()),
-    vibes: vibeLibraryEntries.map((entry) => toProjectVibe(entry)),
-    vibe_library_entries: vibeLibraryEntries,
+    vibes: [],
     versions: [],
   };
 }
@@ -75,14 +70,18 @@ export async function importVibeImage(sourcePath, assetsDirectory) {
   };
 }
 
-export async function recoverEmbeddedVibes(project, assetsDirectory) {
+export function projectEmbeddedVibes(project) {
   let raw = {};
   try {
     raw = JSON.parse(project.metadata?.extra_json || '{}').parsed || {};
   } catch {
-    return { project, libraryEntries: [] };
+    return [];
   }
-  const items = extractEmbeddedVibes(raw, project.metadata?.model || '');
+  return extractEmbeddedVibes(raw, project.metadata?.model || '');
+}
+
+export async function recoverEmbeddedVibes(project, assetsDirectory) {
+  const items = projectEmbeddedVibes(project);
   const libraryEntries = [];
   for (const [index, item] of items.entries()) {
     libraryEntries.push(await importEmbeddedVibe(item, assetsDirectory, project.name || project.image_path, index));

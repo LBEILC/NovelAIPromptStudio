@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('studio', {
   loadVibeLibrary: () => ipcRenderer.invoke('vibe:library:load'),
   importVibeLibrary: () => ipcRenderer.invoke('vibe:library:import'),
   useVibeFromLibrary: (entry) => ipcRenderer.invoke('vibe:library:use', entry),
+  inspectEmbeddedVibes: (project) => ipcRenderer.invoke('vibe:project:embedded-status', project),
+  resolveEmbeddedVibes: (project, mode) => ipcRenderer.invoke('vibe:project:resolve-embedded', project, mode),
   revealFile: (path) => ipcRenderer.invoke('file:reveal', path),
   getAISettings: () => ipcRenderer.invoke('ai:settings:get'),
   saveAISettings: (settings) => ipcRenderer.invoke('ai:settings:save', settings),

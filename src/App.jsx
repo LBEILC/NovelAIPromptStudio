@@ -17,6 +17,7 @@ import {
 } from './lib/promptStructure.js';
 import PromptOverview from './PromptOverview.jsx';
 import { groupVibeLibraryBySource } from './lib/vibeLibrary.js';
+import { informationExtractedPatch, informationExtractedState, restoreOriginalInformationPatch } from './lib/vibes.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
@@ -26,6 +27,8 @@ const studio = window.studio || {
   loadVibeLibrary: async () => [],
   importVibeLibrary: async () => ({ ok: true, library: [], imported: [], errors: [] }),
   useVibeFromLibrary: async (entry) => ({ ...entry, id: crypto.randomUUID(), library_id: entry.id, enabled: true }),
+  inspectEmbeddedVibes: async () => ({ total: 0, linked: 0, available: 0, missing: [] }),
+  resolveEmbeddedVibes: async (project) => ({ ok: true, project, status: { total: 0, linked: 0, available: 0, missing: [] }, library: [], linked: 0, extracted: 0 }),
   revealFile: async () => {},
   getAISettings: async () => ({ baseUrl: 'https://api.openai.com/v1', model: '', hasApiKey: false, encryptionAvailable: true }),
   saveAISettings: async (settings) => ({ ...settings, hasApiKey: Boolean(settings.apiKey) }),
@@ -168,12 +171,25 @@ function TagCard({ tag, index, translating, dragging, dropTarget, onTranslate, o
   </article>;
 }
 
-function cachedInformationValues(value) {
-  try {
-    return JSON.parse(value || '[]').map(Number).filter(Number.isFinite);
-  } catch {
-    return [];
-  }
+function InformationExtractedControl({ vibe, onChange }) {
+  const state = informationExtractedState(vibe);
+  const value = Number(vibe.information_extracted ?? 0.7);
+  const status = {
+    source: { icon: 'info', text: '待编码；在 NovelAI 计算会消耗 Anlas' },
+    cached: { icon: 'check', text: '已命中缓存；当前 .naiv4vibe 可用' },
+    unknown: { icon: 'check', text: '原编码位置未知；未改动时文件仍可用' },
+    uncached: { icon: 'info', text: '这个位置尚未计算，需要重新提取 Vibe' },
+  }[state.kind];
+  return <div className={`information-control ${state.kind}`}>
+    <div className="information-heading"><span>Information Extracted</span><b>{value.toFixed(2)}</b></div>
+    <div className="information-range">
+      <input type="range" min="0" max="1" step="0.01" value={value} aria-label="Information Extracted" onChange={(event) => onChange(informationExtractedPatch(vibe, event.target.value))}/>
+      <div className="information-marks" aria-label="已计算位置">
+        {state.cachedValues.map((cached) => <button key={cached} style={{ insetInlineStart: `${cached * 100}%`, transform: cached <= 0.05 ? 'translateX(0)' : cached >= 0.95 ? 'translateX(-100%)' : 'translateX(-50%)' }} onClick={() => onChange(informationExtractedPatch(vibe, cached))} title={`使用已缓存位置 ${cached.toFixed(2)}`} aria-label={`使用已缓存位置 ${cached.toFixed(2)}`}><i/><span>{cached.toFixed(2)}</span></button>)}
+      </div>
+    </div>
+    <small><Icon name={status.icon} size={12}/><span>{status.text}</span>{state.kind === 'uncached' && !state.cachedValues.length && <button onClick={() => onChange(restoreOriginalInformationPatch(vibe))}>恢复原编码</button>}</small>
+  </div>;
 }
 
 function PositionEditor({ project, character, updateProject }) {
@@ -401,27 +417,78 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
 function VibePanel({ project, updateProject, showToast }) {
   const [library, setLibrary] = useState([]);
   const [importing, setImporting] = useState(false);
+  const [embeddedStatus, setEmbeddedStatus] = useState(null);
+  const [resolving, setResolving] = useState('');
   useEffect(() => { studio.loadVibeLibrary().then(setLibrary); }, []);
+  useEffect(() => {
+    let active = true;
+    studio.inspectEmbeddedVibes(project).then((status) => { if (active) setEmbeddedStatus(status); });
+    return () => { active = false; };
+  }, [project.id]);
   const libraryGroups = useMemo(() => groupVibeLibraryBySource(library), [library]);
 
-  const importVibes = async () => {
+  const importVibes = async (retryEmbedded = false) => {
     setImporting(true);
     try {
       const result = await studio.importVibeLibrary();
+      if (result.canceled) return;
       setLibrary(result.library || []);
       const importedLibrary = new Map((result.library || []).map((entry) => [entry.id, entry]));
       const enrichedVibes = project.vibes.map((vibe) => {
         const entry = importedLibrary.get(vibe.library_id);
-        return entry ? { ...vibe, ...entry, id: vibe.id, library_id: vibe.library_id, strength: vibe.strength, enabled: vibe.enabled } : vibe;
+        return entry ? {
+          ...vibe,
+          ...entry,
+          id: vibe.id,
+          library_id: vibe.library_id,
+          strength: vibe.strength,
+          information_extracted: vibe.information_extracted,
+          information_extracted_known: vibe.information_extracted_known,
+          information_extracted_dirty: vibe.information_extracted_dirty,
+          information_extracted_origin: vibe.information_extracted_origin,
+          enabled: vibe.enabled,
+        } : vibe;
       });
+      let nextProject = { ...project, vibes: enrichedVibes };
+      const resolved = await studio.resolveEmbeddedVibes(nextProject, 'retry');
+      if (!resolved.ok) throw new Error(resolved.error || '无法重新匹配 PNG 中的 Vibe');
+      if (resolved.ok) {
+        nextProject = resolved.project;
+        setEmbeddedStatus(resolved.status);
+        setLibrary(resolved.library || result.library || []);
+      }
       if (enrichedVibes.some((vibe, index) => vibe.information_extracted_known !== project.vibes[index].information_extracted_known
-        || vibe.name !== project.vibes[index].name || vibe.source_kind !== project.vibes[index].source_kind || vibe.vibe_file !== project.vibes[index].vibe_file)) {
-        updateProject({ ...project, vibes: enrichedVibes });
+        || vibe.name !== project.vibes[index].name || vibe.source_kind !== project.vibes[index].source_kind
+        || vibe.vibe_file !== project.vibes[index].vibe_file || vibe.reference_image !== project.vibes[index].reference_image
+        || vibe.encoded_values_json !== project.vibes[index].encoded_values_json)
+        || resolved.linked) {
+        updateProject(nextProject);
       }
       if (result.imported?.length) showToast(`已导入 ${result.imported.length} 个 Vibe`);
       if (result.errors?.length) showToast(`${result.errors.length} 个文件未能导入`);
+      if (retryEmbedded && resolved.ok && !resolved.linked && resolved.status?.missing?.length) showToast('仍未找到对应 Vibe；可以从 PNG metadata 提取');
+    } catch (error) {
+      showToast(`导入失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setImporting(false);
+    }
+  };
+
+  const resolveEmbedded = async (mode) => {
+    setResolving(mode);
+    try {
+      const result = await studio.resolveEmbeddedVibes(project, mode);
+      if (!result.ok) { showToast(result.error || 'Vibe 处理失败'); return; }
+      setLibrary(result.library || []);
+      setEmbeddedStatus(result.status);
+      if (result.linked || result.extracted) updateProject(result.project);
+      showToast(mode === 'extract'
+        ? `已从 PNG metadata 提取 ${result.extracted} 个 Vibe`
+        : result.linked ? `已匹配 ${result.linked} 个 Vibe` : '库中仍没有对应 Vibe');
+    } catch (error) {
+      showToast(`Vibe 处理失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setResolving('');
     }
   };
 
@@ -436,23 +503,30 @@ function VibePanel({ project, updateProject, showToast }) {
   };
   const updateVibe = (index, patch) => updateProject({ ...project, vibes: project.vibes.map((vibe, itemIndex) => itemIndex === index ? { ...vibe, ...patch } : vibe) });
   return <div className="panel-scroll vibe-panel">
-    <div className="panel-intro"><div><strong>Vibe Library</strong><small>跨作品复用已编码的 NovelAI Vibe</small></div><button className="small-primary" onClick={importVibes} disabled={importing}><Icon name="plus"/>{importing ? '导入中' : '导入'}</button></div>
-    <div className="vibe-note safe"><span>ENCODING SAFE</span>已编码 Vibe 会原样保存；只允许调整安全的 Reference Strength，不会改写编码。</div>
+    <div className="panel-intro"><div><strong>Vibe Library</strong><small>跨作品复用已编码的 NovelAI Vibe</small></div><button className="small-primary" onClick={() => importVibes(false)} disabled={importing}><Icon name="plus"/>{importing ? '导入中' : '导入'}</button></div>
+    <div className="vibe-note safe"><span>ENCODING SAFE</span>滑杆可自由预览参数；只有标记过的缓存位置能继续使用当前 `.naiv4vibe`。</div>
+    {embeddedStatus?.missing?.length > 0 && <section className="embedded-vibe-recovery">
+      <div className="recovery-heading"><Icon name="spark"/><span><strong>PNG 中发现 {embeddedStatus.missing.length} 个未匹配 Vibe</strong><small>库中没有对应编码，是否提取由你决定。</small></span></div>
+      <p>优先上传 NovelAI 保存的原始 `.naiv4vibe`；也可以从当前 PNG metadata 提取 encoding-only 文件。提取不会联网或消耗 Anlas，但通常不含源参考图。</p>
+      <div><button className="outline" onClick={() => importVibes(true)} disabled={importing || Boolean(resolving)}><Icon name="plus"/>上传后重试</button><button className="extract-action" onClick={() => resolveEmbedded('extract')} disabled={importing || Boolean(resolving)}><Icon name="spark"/>{resolving === 'extract' ? '提取中…' : '从 PNG 提取'}</button></div>
+    </section>}
     <div className="vibe-section-heading"><span>当前作品</span><b>{project.vibes.length}</b></div>
     <div className="vibe-stack">
-      {project.vibes.map((vibe, index) => <article className={`vibe-card ${!vibe.enabled ? 'disabled' : ''}`} key={vibe.id}>
+      {project.vibes.map((vibe, index) => {
+        const informationState = informationExtractedState(vibe);
+        return <article className={`vibe-card ${!vibe.enabled ? 'disabled' : ''}`} key={vibe.id}>
         <div className="vibe-image"><img src={mediaUrl(vibe.thumbnail_path)} alt="Vibe reference"/><label><input type="checkbox" checked={Boolean(vibe.enabled)} onChange={(event) => updateVibe(index, { enabled: event.target.checked })}/><span>{vibe.enabled ? '启用' : '停用'}</span></label></div>
         <div className="vibe-controls">
           <div className="vibe-card-title"><strong>{vibe.name || 'Vibe reference'}</strong><span className={`vibe-source ${vibe.source_kind}`}>{vibe.source_kind === 'image' ? '待编码' : '已编码'}</span></div>
           <label><span>Reference Strength <b>{Number(vibe.strength).toFixed(2)}</b></span><input type="range" min="0" max="1" step="0.01" value={vibe.strength} onChange={(event) => updateVibe(index, { strength: Number(event.target.value) })}/></label>
-          {vibe.source_kind === 'image' ? <label><span>Information Extracted <b>{Number(vibe.information_extracted).toFixed(2)}</b></span><input type="range" min="0" max="1" step="0.01" value={vibe.information_extracted} onChange={(event) => updateVibe(index, { information_extracted: Number(event.target.value) })}/><small className="vibe-cost-warning">在 NovelAI 改动会重新编码并消耗 Anlas</small></label> : cachedInformationValues(vibe.encoded_values_json).length > 1 ? <label className="vibe-cached-information"><span>Information Extracted <b>仅缓存值</b></span><select value={vibe.information_extracted} onChange={(event) => updateVibe(index, { information_extracted: Number(event.target.value), information_extracted_known: 1 })}>{cachedInformationValues(vibe.encoded_values_json).map((value) => <option key={value} value={value}>{value.toFixed(2)} · 已缓存</option>)}</select></label> : <div className="vibe-encoding-lock"><Icon name="check" size={13}/><span>Information Extracted</span><b>{vibe.information_extracted_known ? Number(vibe.information_extracted).toFixed(2) : '固定编码'}</b></div>}
+          <InformationExtractedControl vibe={vibe} onChange={(patch) => updateVibe(index, patch)}/>
           {vibe.reference_image
             ? <button className="vibe-file-action source-image" onClick={() => studio.revealFile(vibe.reference_image)}><Icon name="image" size={13}/>打开源图所在文件夹</button>
             : <div className="vibe-source-warning"><Icon name="info" size={13}/><span>缺少源 PNG；编码仍可复用，但无法查看图源</span></div>}
-          {vibe.vibe_file && <button className="vibe-file-action" onClick={() => studio.revealFile(vibe.vibe_file)}><Icon name="folder" size={13}/>显示 .naiv4vibe 文件</button>}
+          {vibe.vibe_file && <button className={`vibe-file-action ${informationState.fileUsable ? '' : 'unavailable'}`} disabled={!informationState.fileUsable} title={informationState.fileUsable ? '在文件夹中显示当前 Vibe 文件' : '当前 Information Extracted 尚未计算，此文件与所选参数不匹配'} onClick={() => studio.revealFile(vibe.vibe_file)}><Icon name="folder" size={13}/>{informationState.fileUsable ? '显示 .naiv4vibe 文件' : '.naiv4vibe 当前参数不可用'}</button>}
           <button className="text-danger" onClick={() => updateProject({ ...project, vibes: project.vibes.filter((_, itemIndex) => itemIndex !== index) })}><Icon name="trash"/>移除参考图</button>
         </div>
-      </article>)}
+      </article>;})}
       {!project.vibes.length && <div className="panel-empty"><Icon name="image"/><strong>当前作品还没有 Vibe</strong><span>从下面的 Vibe 库加入，或导入 `.naiv4vibe` 与参考图。</span></div>}
     </div>
     <div className="vibe-section-heading library-heading"><span>Vibe 库</span><b>{library.length}</b><small>{libraryGroups.length} 个图源组</small></div>
@@ -471,7 +545,7 @@ function VibePanel({ project, updateProject, showToast }) {
           </article>)}
         </div>
       </section>)}
-      {!library.length && <button className="vibe-library-empty" onClick={importVibes}><Icon name="plus"/><span><strong>建立 Vibe 库</strong><small>导入 `.naiv4vibe` 可直接复用缓存编码，不必重新计算。</small></span></button>}
+      {!library.length && <button className="vibe-library-empty" onClick={() => importVibes(false)}><Icon name="plus"/><span><strong>建立 Vibe 库</strong><small>导入 `.naiv4vibe` 可直接复用缓存编码，不必重新计算。</small></span></button>}
     </div>
   </div>;
 }
