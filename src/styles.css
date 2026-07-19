@@ -176,14 +176,11 @@ button { border: 0; }
 .library-batch-toolbar > div { min-width: 0; display: flex; align-items: center; gap: 5px; }
 .library-batch-toolbar > div:first-child span { margin-inline: auto; }
 .library-batch-toolbar b { color: var(--accent); font-family: var(--font-mono); }
-.library-batch-toolbar button, .library-batch-toolbar select { min-width: 0; height: 25px; padding: 0 6px; color: #aab5bc; background: #1b2730; border: 1px solid #394852; border-radius: 4px; font-size: var(--text-micro); }
-.library-batch-toolbar select { flex: 1; padding-inline-end: 22px; }
-.library-batch-toolbar button { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.library-batch-toolbar button { min-width: 0; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: var(--text-micro); }
+.library-batch-toolbar .batch-select { min-width: 0; flex: 1; }
 .library-batch-toolbar button:disabled { opacity: .35; cursor: default; }
 .library-batch-toolbar .batch-actions { flex-wrap: wrap; }
 .library-batch-toolbar .batch-actions button { flex: 1 1 auto; }
-.library-batch-toolbar button.danger { color: #d39a96; border-color: #513536; background: #21191b; }
-.library-batch-toolbar button.restore { color: #99c0ab; border-color: #345143; background: #15231c; }
 .asset-list { flex: 1; overflow: auto; padding: 1px 8px 15px; }
 .asset-row { width: 100%; min-width: 0; height: 58px; margin-bottom: 3px; padding: 5px 8px; display: flex; align-items: center; gap: 9px; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 7px; }
 .asset-row:hover { background: var(--raised); }

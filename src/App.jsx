@@ -10,6 +10,7 @@ import LobeButton from '@lobehub/ui/es/Button/index';
 import LobeInput from '@lobehub/ui/es/Input/Input';
 import LobeInputPassword from '@lobehub/ui/es/Input/InputPassword';
 import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
+import LobeSelect from '@lobehub/ui/es/Select/index';
 import LobeSegmented from '@lobehub/ui/es/Segmented/index';
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, inferCategory, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import {
@@ -332,17 +333,17 @@ function LibraryPanel({
       {currentExperiment.incomplete_fields?.length > 0 && <p><Icon name="info" size={13}/>缺少 {currentExperiment.incomplete_fields.join('、')}，未把这些字段计为固定条件。</p>}
     </div>}
     {selectionMode && <div className="library-batch-toolbar">
-      <div><button onClick={onSelectAll}>{selectedIds.size === projects.length && projects.length ? '取消全选' : '全选'}</button><span>已选 <b>{selectedIds.size}</b></span><button onClick={onClearSelection} disabled={!selectedIds.size}>清除</button></div>
-      {libraryView !== 'trash' && <div><select value={batchCollectionId} onChange={(event) => setBatchCollectionId(event.target.value)} aria-label="目标收藏集"><option value="">加入收藏集…</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select><button onClick={() => onAddToCollection(batchCollectionId)} disabled={!selectedIds.size || !batchCollectionId}>加入</button></div>}
-      {libraryView !== 'trash' && <div><select value={batchSeriesId} onChange={(event) => setBatchSeriesId(event.target.value)} aria-label="目标创作系列"><option value="">加入创作系列…</option>{series.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select><button onClick={() => onAddToSeries(batchSeriesId)} disabled={!selectedIds.size || !batchSeriesId}>加入</button></div>}
-      {libraryView !== 'trash' && experiments.length > 0 && <div><select value={batchExperimentId} onChange={(event) => setBatchExperimentId(event.target.value)} aria-label="目标对比实验"><option value="">加入已有实验…</option>{experiments.map((experiment) => <option key={experiment.id} value={experiment.id}>{experiment.name}</option>)}</select><button onClick={() => onAddToExperiment(batchExperimentId)} disabled={!selectedIds.size || !batchExperimentId}>加入</button></div>}
+      <div><LobeButton onClick={onSelectAll} size="small">{selectedIds.size === projects.length && projects.length ? '取消全选' : '全选'}</LobeButton><span>已选 <b>{selectedIds.size}</b></span><LobeButton disabled={!selectedIds.size} onClick={onClearSelection} size="small">清除</LobeButton></div>
+      {libraryView !== 'trash' && <div><LobeSelect allowClear aria-label="目标收藏集" className="batch-select" onChange={(value) => setBatchCollectionId(value || '')} options={collections.map((collection) => ({ label: collection.name, value: collection.id }))} placeholder="加入收藏集…" size="small" value={batchCollectionId || undefined}/><LobeButton disabled={!selectedIds.size || !batchCollectionId} onClick={() => onAddToCollection(batchCollectionId)} size="small">加入</LobeButton></div>}
+      {libraryView !== 'trash' && <div><LobeSelect allowClear aria-label="目标创作系列" className="batch-select" onChange={(value) => setBatchSeriesId(value || '')} options={series.map((entry) => ({ label: entry.name, value: entry.id }))} placeholder="加入创作系列…" size="small" value={batchSeriesId || undefined}/><LobeButton disabled={!selectedIds.size || !batchSeriesId} onClick={() => onAddToSeries(batchSeriesId)} size="small">加入</LobeButton></div>}
+      {libraryView !== 'trash' && experiments.length > 0 && <div><LobeSelect allowClear aria-label="目标对比实验" className="batch-select" onChange={(value) => setBatchExperimentId(value || '')} options={experiments.map((experiment) => ({ label: experiment.name, value: experiment.id }))} placeholder="加入已有实验…" size="small" value={batchExperimentId || undefined}/><LobeButton disabled={!selectedIds.size || !batchExperimentId} onClick={() => onAddToExperiment(batchExperimentId)} size="small">加入</LobeButton></div>}
       <div className="batch-actions">
-        {currentCollection && <button onClick={() => onRemoveFromCollection(currentCollection.id)} disabled={!selectedIds.size}>移出当前组</button>}
-        {currentSeries && <button onClick={() => onRemoveFromSeries(currentSeries.id)} disabled={!selectedIds.size}>移出当前系列</button>}
-        {currentExperiment && <button onClick={() => onRemoveFromExperiment(currentExperiment.id)} disabled={!selectedIds.size}>移出当前实验</button>}
-        {libraryView !== 'trash' && <button onClick={onCreateExperiment} disabled={selectedIds.size < 2}><Icon name="spark" size={13}/>建立实验</button>}
-        {libraryView !== 'trash' && <button onClick={() => onSetFavorite(!allSelectedAreFavorite)} disabled={!selectedIds.size}><Icon name="star" size={13}/>{allSelectedAreFavorite ? '取消收藏' : '收藏'}</button>}
-        <button className={libraryView === 'trash' ? 'restore' : 'danger'} onClick={() => onSetDeleted(libraryView !== 'trash')} disabled={!selectedIds.size}><Icon name={libraryView === 'trash' ? 'refresh' : 'trash'} size={13}/>{libraryView === 'trash' ? '恢复' : '回收站'}</button>
+        {currentCollection && <LobeButton disabled={!selectedIds.size} onClick={() => onRemoveFromCollection(currentCollection.id)} size="small">移出当前组</LobeButton>}
+        {currentSeries && <LobeButton disabled={!selectedIds.size} onClick={() => onRemoveFromSeries(currentSeries.id)} size="small">移出当前系列</LobeButton>}
+        {currentExperiment && <LobeButton disabled={!selectedIds.size} onClick={() => onRemoveFromExperiment(currentExperiment.id)} size="small">移出当前实验</LobeButton>}
+        {libraryView !== 'trash' && <LobeButton disabled={selectedIds.size < 2} icon={<Icon name="spark" size={13}/>} onClick={onCreateExperiment} size="small">建立实验</LobeButton>}
+        {libraryView !== 'trash' && <LobeButton disabled={!selectedIds.size} icon={<Icon name="star" size={13}/>} onClick={() => onSetFavorite(!allSelectedAreFavorite)} size="small">{allSelectedAreFavorite ? '取消收藏' : '收藏'}</LobeButton>}
+        <LobeButton danger={libraryView !== 'trash'} disabled={!selectedIds.size} icon={<Icon name={libraryView === 'trash' ? 'refresh' : 'trash'} size={13}/>} onClick={() => onSetDeleted(libraryView !== 'trash')} size="small">{libraryView === 'trash' ? '恢复' : '回收站'}</LobeButton>
       </div>
     </div>}
     <div className="asset-list">
@@ -350,7 +351,7 @@ function LibraryPanel({
         {selectionMode && <button className="asset-check" onClick={() => onToggleSelected(project.id)} aria-pressed={selectedIds.has(project.id)} aria-label={`${selectedIds.has(project.id) ? '取消选择' : '选择'} ${project.name}`}><SelectionMark selected={selectedIds.has(project.id)}/></button>}
         <button className="asset-thumbnail" onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenPromptOverview(project.id)} title={selectionMode ? '选择作品' : '打开 Prompt 总览'}><img src={mediaUrl(project.thumbnail_path)} alt=""/><span><Icon name="layers" size={13}/></span></button>
         <button className="asset-select" onClick={() => selectionMode ? onToggleSelected(project.id) : setActiveId(project.id)}><span className="asset-copy"><strong>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.collection_ids || []).length} 组 · {(project.series_ids || []).length} 系列 · {(project.experiment_ids || []).length} 实验 · {relativeTime(project.updated_at)}</small></span></button>
-        {libraryView !== 'trash' && <button className={`asset-favorite ${project.is_favorite ? 'active' : ''}`} onClick={() => onSetFavorite(!project.is_favorite, [project.id])} aria-label={`${project.is_favorite ? '取消收藏' : '收藏'} ${project.name}`}><Icon name="star" size={13}/></button>}
+        {libraryView !== 'trash' && <LobeActionIcon active={Boolean(project.is_favorite)} className="asset-favorite" icon={<Icon name="star" size={13}/>} onClick={() => onSetFavorite(!project.is_favorite, [project.id])} size="small" title={`${project.is_favorite ? '取消收藏' : '收藏'} ${project.name}`} variant="borderless"/>}
       </div>)}
       {!projects.length && <div className="list-empty">{query ? '没有匹配的作品' : `「${currentLabel}」还是空的`}</div>}
     </div>
