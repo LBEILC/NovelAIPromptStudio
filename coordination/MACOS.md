@@ -62,3 +62,12 @@
 - Action: On an unlocked macOS session, import a NovelAI PNG whose embedded Vibe encoding is not already in the library. Confirm the app does not create a `.naiv4vibe` automatically and instead offers “上传后重试” and “从 PNG 提取”. Test both paths. For an encoded Vibe, move Information Extracted between cached marker positions and an uncached position, then use “恢复原编码” when available.
 - Expected: Uploading the original `.naiv4vibe` links it without extraction; explicit PNG extraction creates an encoding-only file without network use or Anlas cost. Cached positions remain visually marked and clickable, uncached positions disable the file-reveal action, returning to a cached/original position re-enables it, and Finder/file-dialog behavior follows macOS conventions.
 - Observed: Awaiting macOS UI verification; Windows passed clean install, 29 tests after merging the macOS grouping tests, production build, database migration, and real-window slider/file-state checks.
+
+## Verify filtered Prompt copying and syntax diagnostics
+
+- Status: Pending
+- Date/source: 2026-07-19, Windows
+- Related commit: `5edbaa5`
+- Action: On an unlocked macOS session, open Prompt overview and test category, Prompt/Undesired, Base/Character, and translated-text filters. Confirm the top copy button follows the visible count, multi-select switches copying to the selected tags, original/translated/bilingual display modes render without clipping, hover reveals the opposite language, and the two-step bulk-delete control is clear. Import a prompt containing `::year2025 ::` and a standalone `::`; verify both remain lossless in copied Prompt text while showing syntax warnings.
+- Expected: Filtering and selection use the same copy context on macOS; translated views remain display-only and copying always uses original NovelAI syntax. The toolbar fits the default window, native title/menu behavior is unchanged, and irregular closer syntax persists through the SQLite migration until the user edits or deletes it.
+- Observed: Windows passed a clean install, 33 tests, production build, and real-window checks for visible-count copying, translated display, multi-select copying, toolbar layout, and both syntax warnings. Awaiting macOS UI verification.
