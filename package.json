@@ -12,17 +12,20 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@atlaskit/pragmatic-drag-and-drop": "2.0.1",
     "@vitejs/plugin-react": "6.0.3",
-    "vite": "8.1.5",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "sharp": "0.35.3",
-    "sql.js": "1.14.1"
+    "sql.js": "1.14.1",
+    "vite": "8.1.5",
+    "yauzl": "3.4.0"
   },
   "devDependencies": {
     "concurrently": "9.2.4",
     "electron": "43.1.1",
     "vitest": "4.1.10",
-    "wait-on": "9.0.3"
+    "wait-on": "9.0.3",
+    "yazl": "3.3.1"
   }
 }

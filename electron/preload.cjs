@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('studio', {
   loadLibrary: () => ipcRenderer.invoke('library:load'),
@@ -10,7 +10,17 @@ contextBridge.exposeInMainWorld('studio', {
   removeProjectsFromCollection: (collectionId, projectIds) => ipcRenderer.invoke('library:collection:remove-projects', collectionId, projectIds),
   setProjectsFavorite: (projectIds, favorite) => ipcRenderer.invoke('library:projects:favorite', projectIds, favorite),
   setProjectsDeleted: (projectIds, deleted) => ipcRenderer.invoke('library:projects:trash', projectIds, deleted),
-  importImages: () => ipcRenderer.invoke('library:import-images'),
+  importImages: (options = {}) => ipcRenderer.invoke('library:import-images', options),
+  importDroppedFiles: (files, options = {}) => ipcRenderer.invoke('library:import-images', {
+    ...options,
+    filePaths: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean),
+  }),
+  cancelImport: (batchId) => ipcRenderer.invoke('library:import-cancel', batchId),
+  onImportProgress: (callback) => {
+    ipcRenderer.removeAllListeners('library:import-progress');
+    ipcRenderer.on('library:import-progress', (_event, progress) => callback(progress));
+  },
+  offImportProgress: () => ipcRenderer.removeAllListeners('library:import-progress'),
   updateProject: (project) => ipcRenderer.invoke('project:update', project),
   deleteProject: (id) => ipcRenderer.invoke('project:delete', id),
   loadVibeLibrary: () => ipcRenderer.invoke('vibe:library:load'),

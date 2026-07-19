@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { dropTargetForExternal, monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
+import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
+import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, inferCategory, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import {
   addPromptCharacter,
@@ -31,7 +34,11 @@ const studio = window.studio || {
   removeProjectsFromCollection: async () => ({ ok: true, collections: [], projects: [] }),
   setProjectsFavorite: async () => ({ ok: true, collections: [], projects: [] }),
   setProjectsDeleted: async () => ({ ok: true, collections: [], projects: [] }),
-  importImages: async () => [],
+  importImages: async () => ({ ok: true, canceled: true, imported: [], duplicates: [], errors: [], summary: null }),
+  importDroppedFiles: async () => ({ ok: false, imported: [], duplicates: [], errors: [{ file: '拖拽文件', error: '请在桌面应用中导入' }], summary: { total: 0, processed: 0, imported: 0, duplicates: 0, failed: 1, skipped: 0, remaining: 0, cancelled: false } }),
+  cancelImport: async () => ({ ok: false }),
+  onImportProgress: () => {},
+  offImportProgress: () => {},
   updateProject: async () => ({ ok: true }),
   deleteProject: async () => ({ ok: true }),
   loadVibeLibrary: async () => [],
@@ -68,6 +75,8 @@ function Icon({ name, size = 17 }) {
     refresh: <><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 8a7 7 0 0 1 11.7-2.1L20 8M4 16l2.2 2.1A7 7 0 0 0 17.9 16"/></>,
     star: <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/>,
     edit: <><path d="m4 20 4.2-1 10.6-10.6-3.2-3.2L5 15.8 4 20Z"/><path d="m13.8 7 3.2 3.2"/></>,
+    archive: <><path d="M4 7h16v13H4z"/><path d="M3 3h18v4H3zM9 11h6"/></>,
+    upload: <><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></>,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
@@ -93,6 +102,45 @@ function EmptyState({ onImport, hasProjects = false }) {
     <button className="primary large" onClick={onImport}><Icon name="plus"/>{hasProjects ? '继续导入作品' : '导入第一批作品'}</button>
     <div className="empty-hint">PNG · JPG · WEBP　支持批量导入</div>
   </main>;
+}
+
+function droppedFileAssessment(files) {
+  const names = Array.from(files || [], (file) => String(file?.name || ''));
+  const supported = names.filter((name) => /\.(png|jpe?g|webp|zip)$/i.test(name));
+  return {
+    count: names.length,
+    valid: names.length > 0 && supported.length === names.length,
+    label: supported.some((name) => /\.zip$/i.test(name)) ? '图片或 NovelAI ZIP' : '图片',
+  };
+}
+
+function ImportExperience({ dragState, progress, result, onCancel, onDismiss }) {
+  const summary = result?.summary;
+  const importing = progress && ['preparing', 'importing'].includes(progress.phase);
+  const percent = progress?.total ? Math.min(100, Math.round((progress.processed || 0) / progress.total * 100)) : 0;
+  return <>
+    {dragState?.active && <div className={`file-drop-overlay ${dragState.valid ? 'accept' : 'reject'}`} aria-live="assertive">
+      <div className="file-drop-target">
+        <div className="drop-glyph"><Icon name={dragState.valid ? 'upload' : 'close'} size={28}/></div>
+        <strong>{dragState.valid ? `松手导入 ${dragState.label}` : '这些文件暂不支持'}</strong>
+        <span>{dragState.valid ? `${dragState.count} 个文件 · PNG / JPG / WEBP / ZIP` : '请拖入图片或 NovelAI 导出的标准 ZIP'}</span>
+        <small>ZIP 会先安全检查，再逐张读取 PNG</small>
+      </div>
+    </div>}
+    {(importing || summary) && <aside className={`import-status ${summary ? 'complete' : ''}`} role="status" aria-live="polite">
+      <header>
+        <span className="import-status-icon"><Icon name={summary ? (summary.failed ? 'info' : 'check') : 'archive'} size={15}/></span>
+        <div><strong>{summary ? (summary.cancelled ? '导入已停止' : '导入完成') : progress.phase === 'preparing' ? '正在检查文件' : '正在导入作品'}</strong><small>{summary ? `处理 ${summary.processed} / ${summary.total}` : progress.current || '准备导入…'}</small></div>
+        {summary ? <button onClick={onDismiss} aria-label="关闭导入摘要"><Icon name="close" size={14}/></button> : <button className="cancel-import" onClick={onCancel} disabled={!progress.batchId}>停止</button>}
+      </header>
+      {!summary && <><div className="import-progress-track"><i style={{ transform: `scaleX(${progress.total ? percent / 100 : .08})` }}/></div><div className="import-counters"><span>已导入 <b>{progress.imported || 0}</b></span><span>重复 <b>{progress.duplicates || 0}</b></span><span>异常 <b>{progress.failed || 0}</b></span><em>{progress.total ? `${percent}%` : `${progress.prepared || 0} / ${progress.sourceCount || '—'}`}</em></div></>}
+      {summary && <>
+        <div className="import-summary-grid"><span><b>{summary.imported}</b>新增</span><span><b>{summary.duplicates}</b>重复</span><span><b>{summary.failed}</b>失败</span><span><b>{summary.skipped}</b>忽略</span></div>
+        {result.errors?.length > 0 && <div className="import-errors">{result.errors.slice(0, 3).map((item, index) => <div key={`${item.file}-${index}`}><strong>{item.file}</strong><span>{item.error}</span></div>)}{result.errors.length > 3 && <small>另有 {result.errors.length - 3} 项异常</small>}</div>}
+        {result.duplicates?.length > 0 && !result.errors?.length && <div className="import-note">相同图片已存在，已按内容指纹跳过，不会创建重复作品。</div>}
+      </>}
+    </aside>}
+  </>;
 }
 
 function LibraryPanel({
@@ -736,6 +784,9 @@ export default function App() {
   const [libraryView, setLibraryView] = useState('all');
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [dragState, setDragState] = useState({ active: false, valid: false, count: 0, label: '图片' });
+  const [importProgress, setImportProgress] = useState(null);
+  const [importResult, setImportResult] = useState(null);
   const [tab, setTab] = useState('tags');
   const [toast, setToast] = useState('');
   const [loading, setLoading] = useState(true);
@@ -745,6 +796,8 @@ export default function App() {
   const [promptScopeKey, setPromptScopeKey] = useState('base:prompt');
   const [focusTagId, setFocusTagId] = useState(null);
   const saveTimers = useRef(new Map());
+  const appShellRef = useRef(null);
+  const dropFilesHandlerRef = useRef(null);
   const shortcutModifier = useMemo(() => navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl', []);
 
   useEffect(() => {
@@ -763,6 +816,34 @@ export default function App() {
       setActiveId(repairedItems.find((project) => !project.deleted_at)?.id || null);
     }).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    studio.onImportProgress((progress) => setImportProgress(progress));
+    return () => studio.offImportProgress();
+  }, []);
+
+  useEffect(() => {
+    if (loading || !appShellRef.current) return undefined;
+    const element = appShellRef.current;
+    const cleanupMonitor = monitorForExternal({
+      canMonitor: containsFiles,
+      onDragStart: () => preventUnhandled.start(),
+      onDrop: () => setDragState((current) => ({ ...current, active: false })),
+    });
+    const cleanupTarget = dropTargetForExternal({
+      element,
+      canDrop: containsFiles,
+      onDragEnter: ({ source }) => setDragState({ active: true, ...droppedFileAssessment(getFiles({ source })) }),
+      onDrag: ({ source }) => setDragState({ active: true, ...droppedFileAssessment(getFiles({ source })) }),
+      onDragLeave: () => setDragState((current) => ({ ...current, active: false })),
+      onDrop: ({ source }) => {
+        const files = getFiles({ source });
+        setDragState((current) => ({ ...current, active: false }));
+        if (files.length) dropFilesHandlerRef.current?.(files);
+      },
+    });
+    return () => { cleanupTarget(); cleanupMonitor(); };
+  }, [loading]);
 
   useEffect(() => {
     const keydown = (event) => {
@@ -895,18 +976,57 @@ export default function App() {
     return success;
   };
 
-  const importImages = async () => {
-    const imported = await studio.importImages();
-    if (!imported.length) return;
-    setProjects((current) => [...imported, ...current]);
+  const currentImportCollectionId = libraryView.startsWith('collection:') ? libraryView.slice('collection:'.length) : '';
+  const importing = importProgress && ['preparing', 'importing'].includes(importProgress.phase);
+
+  const finishImport = (result, collectionId = '') => {
+    if (result?.canceled) {
+      setImportProgress(null);
+      return;
+    }
+    const imported = result?.imported || [];
+    setImportResult(result);
+    setImportProgress(null);
+    if (!imported.length) {
+      if (result?.summary?.cancelled) showToast('导入已停止，已完成的作品会保留');
+      else if (result?.errors?.length) showToast('没有导入作品，请查看导入摘要');
+      else if (result?.duplicates?.length) showToast('图片已经在作品库中');
+      return;
+    }
+    setProjects((current) => {
+      const importedIds = new Set(imported.map((project) => project.id));
+      return [...imported, ...current.filter((project) => !importedIds.has(project.id))];
+    });
     setActiveId(imported[0].id);
-    setLibraryView('all');
+    if (!collectionId) setLibraryView('all');
     setSelectedIds(new Set());
     setWorkspaceMode('image');
     setPromptScopeKey('base:prompt');
     const limitedCount = imported.filter((project) => hasLimitedReproduction(project.metadata)).length;
-    showToast(limitedCount ? `已导入 ${imported.length} 个作品 · ${limitedCount} 张局部重绘已标记` : `已导入 ${imported.length} 个作品`);
+    const duplicateText = result.duplicates?.length ? ` · 跳过 ${result.duplicates.length} 个重复` : '';
+    showToast(limitedCount ? `已导入 ${imported.length} 个作品 · ${limitedCount} 张局部重绘已标记${duplicateText}` : `已导入 ${imported.length} 个作品${duplicateText}`);
   };
+
+  const runImport = async (action, collectionId = currentImportCollectionId) => {
+    if (importing) { showToast('当前导入尚未完成'); return; }
+    setImportResult(null);
+    setImportProgress({ phase: 'preparing', prepared: 0, sourceCount: 0, current: '读取文件…' });
+    try {
+      finishImport(await action({ collectionId }), collectionId);
+    } catch (error) {
+      finishImport({
+        ok: false,
+        imported: [],
+        duplicates: [],
+        errors: [{ file: '导入批次', error: error instanceof Error ? error.message : String(error) }],
+        summary: { total: 0, processed: 0, imported: 0, duplicates: 0, failed: 1, skipped: 0, remaining: 0, cancelled: false },
+      }, collectionId);
+    }
+  };
+
+  const importImages = () => runImport((options) => studio.importImages(options));
+  const importDroppedFiles = (files) => runImport((options) => studio.importDroppedFiles(files, options));
+  dropFilesHandlerRef.current = importDroppedFiles;
 
   const updateProject = (nextProject) => {
     const updated = {
@@ -985,7 +1105,7 @@ export default function App() {
 
   if (loading) return <div className="loading-screen"><div className="brand-symbol">N<span>4</span></div><span>正在打开本地资料库…</span></div>;
 
-  return <div className="app-shell">
+  return <div className="app-shell" ref={appShellRef}>
     <LibraryPanel
       projects={filteredProjects}
       allProjects={projects}
@@ -1017,6 +1137,13 @@ export default function App() {
       <PreviewStage project={activeProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} updateProject={updateProject} saveVersion={saveVersion} restoreVersion={restoreVersion} activeVersion={activeVersion} setActiveVersion={setActiveVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
       <Inspector tab={tab} setTab={setTab} project={activeProject} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId}/>
     </> : <EmptyState onImport={importImages} hasProjects={projects.length > 0}/>}
+    <ImportExperience
+      dragState={dragState}
+      progress={importProgress}
+      result={importResult}
+      onCancel={() => importProgress?.batchId && studio.cancelImport(importProgress.batchId)}
+      onDismiss={() => setImportResult(null)}
+    />
     {toast && <div className="toast"><Icon name="check"/>{toast}</div>}
   </div>;
 }

@@ -7,6 +7,17 @@ import { parsePrompt } from '../src/lib/prompt.js';
 import { createPromptStructure } from '../src/lib/promptStructure.js';
 import { extractEmbeddedVibes, importEmbeddedVibe, toProjectVibe } from './vibes.js';
 
+export async function hashFile(filePath) {
+  const hash = crypto.createHash('sha256');
+  await new Promise((resolve, reject) => {
+    const stream = fs.createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', resolve);
+  });
+  return hash.digest('hex');
+}
+
 function safeName(filePath) {
   return path.basename(filePath, path.extname(filePath)).replace(/[^\p{L}\p{N}._-]+/gu, ' ').trim() || 'Untitled';
 }
@@ -20,33 +31,46 @@ async function copyWithThumbnail(sourcePath, assetsDirectory, kind = 'images') {
   fs.mkdirSync(thumbnailDirectory, { recursive: true });
   const targetPath = path.join(targetDirectory, `${id}${extension}`);
   const thumbnailPath = path.join(thumbnailDirectory, `${id}.webp`);
-  fs.copyFileSync(sourcePath, targetPath);
-  await sharp(sourcePath).rotate().resize(480, 480, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toFile(thumbnailPath);
-  return { targetPath, thumbnailPath };
+  try {
+    fs.copyFileSync(sourcePath, targetPath);
+    await sharp(sourcePath).rotate().resize(480, 480, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toFile(thumbnailPath);
+    return { targetPath, thumbnailPath };
+  } catch (error) {
+    fs.rmSync(targetPath, { force: true });
+    fs.rmSync(thumbnailPath, { force: true });
+    throw error;
+  }
 }
 
-export async function importImage(sourcePath, assetsDirectory) {
+export async function importImage(sourcePath, assetsDirectory, options = {}) {
   const id = crypto.randomUUID();
   const { targetPath, thumbnailPath } = await copyWithThumbnail(sourcePath, assetsDirectory);
-  const metadata = readNovelAIMetadata(sourcePath);
-  delete metadata.embedded_vibes;
-  const now = new Date().toISOString();
-  return {
-    id,
-    name: safeName(sourcePath),
-    image_path: targetPath,
-    thumbnail_path: thumbnailPath,
-    created_at: now,
-    updated_at: now,
-    is_favorite: 0,
-    deleted_at: '',
-    collection_ids: [],
-    metadata,
-    tags: parsePrompt(metadata.prompt_raw, () => crypto.randomUUID()),
-    prompt_structure: createPromptStructure(metadata, () => crypto.randomUUID()),
-    vibes: [],
-    versions: [],
-  };
+  try {
+    const metadata = readNovelAIMetadata(sourcePath);
+    delete metadata.embedded_vibes;
+    const now = new Date().toISOString();
+    return {
+      id,
+      name: safeName(options.name || sourcePath),
+      image_path: targetPath,
+      thumbnail_path: thumbnailPath,
+      content_hash: options.contentHash || await hashFile(sourcePath),
+      created_at: now,
+      updated_at: now,
+      is_favorite: 0,
+      deleted_at: '',
+      collection_ids: [],
+      metadata,
+      tags: parsePrompt(metadata.prompt_raw, () => crypto.randomUUID()),
+      prompt_structure: createPromptStructure(metadata, () => crypto.randomUUID()),
+      vibes: [],
+      versions: [],
+    };
+  } catch (error) {
+    fs.rmSync(targetPath, { force: true });
+    fs.rmSync(thumbnailPath, { force: true });
+    throw error;
+  }
 }
 
 export async function importVibeImage(sourcePath, assetsDirectory) {

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS projects (
   name TEXT NOT NULL,
   image_path TEXT NOT NULL,
   thumbnail_path TEXT NOT NULL,
+  content_hash TEXT NOT NULL DEFAULT '',
   is_favorite INTEGER NOT NULL DEFAULT 0,
   deleted_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
@@ -176,6 +177,10 @@ export async function openDatabase(dataDirectory) {
   if (!projectColumns.includes('deleted_at')) {
     database.run("ALTER TABLE projects ADD COLUMN deleted_at TEXT NOT NULL DEFAULT ''");
   }
+  if (!projectColumns.includes('content_hash')) {
+    database.run("ALTER TABLE projects ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''");
+  }
+  database.run("CREATE INDEX IF NOT EXISTS idx_projects_content_hash ON projects(content_hash) WHERE content_hash != ''");
   const versionColumns = database.exec('PRAGMA table_info(prompt_versions)')[0]?.values.map((row) => row[1]) || [];
   if (!versionColumns.includes('change_summary')) {
     database.run("ALTER TABLE prompt_versions ADD COLUMN change_summary TEXT NOT NULL DEFAULT ''");
@@ -372,6 +377,32 @@ export async function openDatabase(dataDirectory) {
 
   const loadVibeLibrary = () => query('SELECT * FROM vibe_library ORDER BY created_at DESC');
 
+  const findProjectByContentHash = (contentHash) => query(
+    "SELECT id, name, image_path, thumbnail_path, deleted_at FROM projects WHERE content_hash = $content_hash LIMIT 1",
+    { $content_hash: String(contentHash || '') },
+  )[0] || null;
+
+  const setProjectContentHashes = (items = []) => {
+    database.run('BEGIN');
+    try {
+      for (const item of items) {
+        database.run(
+          "UPDATE projects SET content_hash = $content_hash WHERE id = $id AND content_hash = ''",
+          { $id: String(item.id || ''), $content_hash: String(item.content_hash || '') },
+        );
+      }
+      database.run('COMMIT');
+      persist();
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+  };
+
+  const projectHashCandidates = () => query(
+    "SELECT id, image_path FROM projects WHERE content_hash = ''",
+  );
+
   const runOrganizationMutation = (mutate) => {
     database.run('BEGIN');
     try {
@@ -542,9 +573,17 @@ export async function openDatabase(dataDirectory) {
     database.run('BEGIN');
     try {
       database.run(
-        `INSERT INTO projects (id, name, image_path, thumbnail_path, created_at, updated_at)
-         VALUES ($id, $name, $image_path, $thumbnail_path, $created_at, $updated_at)`,
-        Object.fromEntries(Object.entries(project).filter(([key]) => ['id', 'name', 'image_path', 'thumbnail_path', 'created_at', 'updated_at'].includes(key)).map(([key, value]) => [`$${key}`, value])),
+        `INSERT INTO projects (id, name, image_path, thumbnail_path, content_hash, created_at, updated_at)
+         VALUES ($id, $name, $image_path, $thumbnail_path, $content_hash, $created_at, $updated_at)`,
+        {
+          $id: project.id,
+          $name: project.name,
+          $image_path: project.image_path,
+          $thumbnail_path: project.thumbnail_path,
+          $content_hash: project.content_hash || '',
+          $created_at: project.created_at,
+          $updated_at: project.updated_at,
+        },
       );
       saveProjectRelations(project);
       database.run('COMMIT');
@@ -689,6 +728,9 @@ export async function openDatabase(dataDirectory) {
     removeProjectsFromCollection,
     setProjectsFavorite,
     setProjectsDeleted,
+    findProjectByContentHash,
+    setProjectContentHashes,
+    projectHashCandidates,
     loadVibeLibrary,
     upsertVibeLibrary,
     resolveVibeLibraryId,

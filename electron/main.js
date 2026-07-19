@@ -1,8 +1,10 @@
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, safeStorage, screen, shell } from 'electron';
 import { openDatabase } from './database.js';
-import { importImage, importVibeImage, projectEmbeddedVibes } from './assets.js';
+import { importVibeImage, projectEmbeddedVibes } from './assets.js';
+import { backfillProjectContentHashes, importLibraryFiles } from './importer.js';
 import { fingerprintVibe, importEmbeddedVibe, importVibeFile, toProjectVibe } from './vibes.js';
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
@@ -16,6 +18,8 @@ protocol.registerSchemesAsPrivileged([
 let database;
 let assetsDirectory;
 let preferences;
+let contentHashBackfill = Promise.resolve();
+const activeImports = new Map();
 
 function libraryOrganizationResult(action) {
   try {
@@ -102,6 +106,9 @@ app.whenReady().then(async () => {
   assetsDirectory = path.join(app.getPath('userData'), 'assets');
   database = await openDatabase(dataDirectory);
   preferences = openPreferences(dataDirectory, safeStorage);
+  contentHashBackfill = backfillProjectContentHashes(database).catch((error) => {
+    console.error('Unable to backfill legacy image fingerprints', error);
+  });
 
   for (const storedProject of database.loadLibrary()) {
     const linked = linkAvailableEmbeddedVibes(storedProject);
@@ -124,22 +131,55 @@ app.whenReady().then(async () => {
   ipcMain.handle('library:collection:remove-projects', (_event, collectionId, projectIds) => libraryOrganizationResult(() => database.removeProjectsFromCollection(collectionId, projectIds)));
   ipcMain.handle('library:projects:favorite', (_event, projectIds, favorite) => libraryOrganizationResult(() => database.setProjectsFavorite(projectIds, favorite)));
   ipcMain.handle('library:projects:trash', (_event, projectIds, deleted) => libraryOrganizationResult(() => database.setProjectsDeleted(projectIds, deleted)));
-  ipcMain.handle('library:import-images', async () => {
-    const result = await dialog.showOpenDialog({
-      title: '导入 NovelAI 图片',
-      properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
-    });
-    if (result.canceled) return [];
-    const projects = [];
-    for (const filePath of result.filePaths) {
-      let project = await importImage(filePath, assetsDirectory);
-      project = linkAvailableEmbeddedVibes(project).project;
-      project = database.enrichProjectTags(project);
-      database.insertProject(project);
-      projects.push(project);
+  ipcMain.handle('library:import-images', async (event, request = {}) => {
+    await contentHashBackfill;
+    let filePaths = Array.isArray(request.filePaths) ? request.filePaths : [];
+    if (!filePaths.length) {
+      const result = await dialog.showOpenDialog({
+        title: '导入 NovelAI 图片或 ZIP',
+        properties: ['openFile', 'multiSelections'],
+        filters: [
+          { name: 'NovelAI 图片与 ZIP', extensions: ['png', 'jpg', 'jpeg', 'webp', 'zip'] },
+          { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] },
+          { name: 'ZIP archives', extensions: ['zip'] },
+        ],
+      });
+      if (result.canceled) return { ok: true, canceled: true, imported: [], duplicates: [], errors: [], summary: null };
+      filePaths = result.filePaths;
     }
-    return projects;
+
+    const batchId = crypto.randomUUID();
+    const controller = new AbortController();
+    activeImports.set(batchId, controller);
+    const notify = (progress) => {
+      if (!event.sender.isDestroyed()) event.sender.send('library:import-progress', { batchId, ...progress });
+    };
+    try {
+      return {
+        batchId,
+        ...(await importLibraryFiles({
+          filePaths,
+          assetsDirectory,
+          database,
+          collectionId: String(request.collectionId || ''),
+          signal: controller.signal,
+          onProgress: notify,
+          prepareProject: async (project) => database.enrichProjectTags(linkAvailableEmbeddedVibes(project).project),
+        })),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      notify({ phase: 'complete', total: 0, processed: 0, imported: 0, duplicates: 0, failed: 1, skipped: 0, remaining: 0, cancelled: false });
+      return { ok: false, batchId, imported: [], duplicates: [], errors: [{ file: '导入批次', error: message }], summary: { total: 0, processed: 0, imported: 0, duplicates: 0, failed: 1, skipped: 0, remaining: 0, cancelled: false } };
+    } finally {
+      activeImports.delete(batchId);
+    }
+  });
+  ipcMain.handle('library:import-cancel', (_event, batchId) => {
+    const controller = activeImports.get(String(batchId || ''));
+    if (!controller) return { ok: false };
+    controller.abort();
+    return { ok: true };
   });
   ipcMain.handle('project:update', (_event, project) => {
     database.updateProject(project);
