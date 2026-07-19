@@ -89,3 +89,12 @@
 - Action: On an unlocked macOS session, drag one PNG, several images, and a standard NovelAI ZIP from Finder onto the application window. Repeat while viewing a collection. Also use the native import dialog and cancel one multi-file import between entries.
 - Expected: The full-window drop preview appears without hiding native window controls; supported files show the accept state and unsupported files show the reject state. Images and ZIP entries use the same importer, imports started from a collection join that collection, duplicate image bytes are skipped, cancellation keeps completed items, and the final summary reports imported, duplicate, failed, ignored, and remaining counts. Finder paths containing CJK characters, spaces, and parentheses work normally.
 - Observed: Windows passed 44 automated tests and the production build. The provided 80-image NovelAI ZIP passed security preflight and imported 80/80 images into a disposable database with zero failures. Windows real-window checks confirmed the updated native file dialog and layout; Finder drag behavior awaits macOS verification.
+
+## Verify deferred drag details and immutable generation branches
+
+- Status: Pending
+- Date/source: 2026-07-19, Windows
+- Related commit: `9d1fb2a`
+- Action: On an unlocked macOS session, drag a PNG and a NovelAI ZIP from Finder into the window. Confirm the first drag frame says it is reading file information or shows an accept state, never the unsupported state for a supported file. Then edit a source result's Prompt, Vibe, and Seed separately; confirm the first actual value change creates a branch draft, the source result remains unchanged after restart, draft edits persist, drafts can be discarded, and a draft marked as waiting can no longer be edited or discarded directly.
+- Expected: Finder's delayed file-detail delivery does not cause a false rejection. Result metadata remains immutable, edits are isolated in branch recipes, legacy Prompt versions can be opened as new branches, and the branch rail plus inspector status fit the macOS window without disturbing the native menu/title bar.
+- Observed: Windows completed a clean `npm ci`, 49 automated tests, and the production build. The user will verify the drag overlay and live branch interaction on Windows; macOS Finder timing and native-window layout still require verification.
