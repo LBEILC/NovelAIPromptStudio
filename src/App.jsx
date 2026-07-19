@@ -109,7 +109,7 @@ function EmptyState({ onImport, hasProjects = false }) {
     <div className="empty-mark"><Icon name="image" size={32}/><span>NAI / 01</span></div>
     <h1>{hasProjects ? <>当前视图<br/>还没有作品</> : <>把生成图变成<br/>可继续创作的资产</>}</h1>
     <p>{hasProjects ? '可以切换到“全部作品”查看现有资产，或继续导入新的 NovelAI 图片。' : '导入 NovelAI 图片，自动恢复 Prompt 与生成参数。Vibe 参考图和权重会独立保存，不再随页面关闭而丢失。'}</p>
-    <button className="primary large" onClick={onImport}><Icon name="plus"/>{hasProjects ? '继续导入作品' : '导入第一批作品'}</button>
+    <LobeButton className="primary large" icon={<Icon name="plus"/>} onClick={onImport} size="large" type="primary">{hasProjects ? '继续导入作品' : '导入第一批作品'}</LobeButton>
     <div className="empty-hint">PNG · JPG · WEBP　支持批量导入</div>
   </main>;
 }
@@ -148,7 +148,7 @@ function ImportExperience({ dragState, progress, result, onCancel, onDismiss }) 
       <header>
         <span className="import-status-icon"><Icon name={summary ? (summary.failed ? 'info' : 'check') : 'archive'} size={15}/></span>
         <div><strong>{summary ? (summary.cancelled ? '导入已停止' : '导入完成') : progress.phase === 'preparing' ? '正在检查文件' : '正在导入作品'}</strong><small>{summary ? `处理 ${summary.processed} / ${summary.total}` : progress.current || '准备导入…'}</small></div>
-        {summary ? <button onClick={onDismiss} aria-label="关闭导入摘要"><Icon name="close" size={14}/></button> : <button className="cancel-import" onClick={onCancel} disabled={!progress.batchId}>停止</button>}
+        {summary ? <LobeActionIcon icon={<Icon name="close" size={14}/>} onClick={onDismiss} size="small" title="关闭导入摘要" variant="borderless"/> : <LobeButton danger className="cancel-import" disabled={!progress.batchId} onClick={onCancel} size="small" type="text">停止</LobeButton>}
       </header>
       {!summary && <><div className="import-progress-track"><i style={{ transform: `scaleX(${progress.total ? percent / 100 : .08})` }}/></div><div className="import-counters"><span>已导入 <b>{progress.imported || 0}</b></span><span>重复 <b>{progress.duplicates || 0}</b></span><span>异常 <b>{progress.failed || 0}</b></span><em>{progress.total ? `${percent}%` : `${progress.prepared || 0} / ${progress.sourceCount || '—'}`}</em></div></>}
       {summary && <>
@@ -389,8 +389,8 @@ function ExperimentCompare({ experiment, projects, selectedIds }) {
     <header>
       <div><span>CONTROLLED COMPARISON</span><strong>{experiment.name}</strong><small>基准：{experiment.baseline_name || baseline?.name || '未知'} · {selected.length} 个视图</small></div>
       <div className="compare-header-actions">
-        {view === 'visual' && <div className="compare-zoom-controls" aria-label="同步缩放"><button onClick={() => setViewport((current) => zoomCompareViewport(current, -.25))}>缩小</button><b>{Math.round(viewport.scale * 100)}%</b><button onClick={() => setViewport((current) => zoomCompareViewport(current, .25))}>放大</button><button onClick={() => setViewport({ scale: 1, x: 0, y: 0 })}>适配</button></div>}
-        <div className="compare-view-switch"><button className={view === 'visual' ? 'active' : ''} onClick={() => setView('visual')}><Icon name="image" size={14}/>视觉对比</button><button className={view === 'parameters' ? 'active' : ''} onClick={() => setView('parameters')}><Icon name="layers" size={14}/>参数差异</button></div>
+        {view === 'visual' && <div className="compare-zoom-controls" aria-label="同步缩放"><LobeButton onClick={() => setViewport((current) => zoomCompareViewport(current, -.25))} size="small">缩小</LobeButton><b>{Math.round(viewport.scale * 100)}%</b><LobeButton onClick={() => setViewport((current) => zoomCompareViewport(current, .25))} size="small">放大</LobeButton><LobeButton onClick={() => setViewport({ scale: 1, x: 0, y: 0 })} size="small" type="text">适配</LobeButton></div>}
+        <LobeSegmented className="compare-view-switch" onChange={setView} options={[{ label: <span><Icon name="image" size={14}/>视觉对比</span>, value: 'visual' }, { label: <span><Icon name="layers" size={14}/>参数差异</span>, value: 'parameters' }]} value={view}/>
       </div>
     </header>
     {experiment.analysis_status === 'mixed' && <div className="compare-causality-warning"><Icon name="warning" size={14}/>当前实验有多个变化字段，只适合视觉筛选，不能归因于单个参数。</div>}
