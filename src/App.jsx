@@ -986,56 +986,56 @@ function VibePanel({ project, updateProject, showToast }) {
     if (action === 'vibe-library:archive') setLibraryArchived(entry);
   };
   return <div className="panel-scroll vibe-panel">
-    <div className="panel-intro"><div><strong>Vibe Library</strong><small>跨作品复用已编码的 NovelAI Vibe</small></div><button className="small-primary" onClick={() => importVibes(false)} disabled={importing}><Icon name="plus"/>{importing ? '导入中' : '导入'}</button></div>
+    <div className="panel-intro"><div><strong>Vibe Library</strong><small>跨作品复用已编码的 NovelAI Vibe</small></div><LobeButton className="small-primary" disabled={importing} icon={<Icon name="plus"/>} onClick={() => importVibes(false)} size="small" type="primary">{importing ? '导入中' : '导入'}</LobeButton></div>
     <div className="vibe-note safe"><span>ENCODING SAFE</span>滑杆可自由预览参数；只有标记过的缓存位置能继续使用当前 `.naiv4vibe`。</div>
     {embeddedStatus?.missing?.length > 0 && <section className="embedded-vibe-recovery">
       <div className="recovery-heading"><Icon name="spark"/><span><strong>PNG 中发现 {embeddedStatus.missing.length} 个未匹配 Vibe</strong><small>库中没有对应编码，是否提取由你决定。</small></span></div>
       <p>优先上传 NovelAI 保存的原始 `.naiv4vibe`；也可以从当前 PNG metadata 提取 encoding-only 文件。提取不会联网或消耗 Anlas，但通常不含源参考图。</p>
-      <div><button className="outline" onClick={() => importVibes(true)} disabled={importing || Boolean(resolving)}><Icon name="plus"/>上传后重试</button><button className="extract-action" onClick={() => resolveEmbedded('extract')} disabled={importing || Boolean(resolving)}><Icon name="spark"/>{resolving === 'extract' ? '提取中…' : '从 PNG 提取'}</button></div>
+      <div><LobeButton disabled={importing || Boolean(resolving)} icon={<Icon name="plus"/>} onClick={() => importVibes(true)} size="small">上传后重试</LobeButton><LobeButton disabled={importing || Boolean(resolving)} icon={<Icon name="spark"/>} onClick={() => resolveEmbedded('extract')} size="small" type="primary">{resolving === 'extract' ? '提取中…' : '从 PNG 提取'}</LobeButton></div>
     </section>}
     <div className="vibe-section-heading"><span>当前作品</span><b>{project.vibes.length}</b></div>
     <div className="vibe-stack">
       {project.vibes.map((vibe, index) => {
         const informationState = informationExtractedState(vibe);
         return <article className={`vibe-card ${!vibe.enabled ? 'disabled' : ''}`} key={vibe.id} onContextMenu={(event) => currentVibeContextMenu(event, vibe, index, informationState)}>
-        <div className="vibe-image"><img src={mediaUrl(vibe.thumbnail_path)} alt="Vibe reference"/><label><input type="checkbox" checked={Boolean(vibe.enabled)} onChange={(event) => updateVibe(index, { enabled: event.target.checked })}/><span>{vibe.enabled ? '启用' : '停用'}</span></label></div>
+        <div className="vibe-image"><img src={mediaUrl(vibe.thumbnail_path)} alt="Vibe reference"/><label><LobeCheckbox checked={Boolean(vibe.enabled)} onChange={(event) => updateVibe(index, { enabled: event.target.checked })} size={16}/><span>{vibe.enabled ? '启用' : '停用'}</span></label></div>
         <div className="vibe-controls">
           <div className="vibe-card-title"><strong>{vibe.name || 'Vibe reference'}</strong><span className={`vibe-source ${vibe.source_kind}`}>{vibe.source_kind === 'image' ? '待编码' : '已编码'}</span></div>
           <label><span>Reference Strength <b>{Number(vibe.strength).toFixed(2)}</b></span><input type="range" min="0" max="1" step="0.01" value={vibe.strength} onChange={(event) => updateVibe(index, { strength: Number(event.target.value) })}/></label>
           <InformationExtractedControl vibe={vibe} onChange={(patch) => updateVibe(index, patch)}/>
           {vibe.reference_image
-            ? <button className="vibe-file-action source-image" onClick={() => studio.revealFile(vibe.reference_image)}><Icon name="image" size={13}/>打开源图所在文件夹</button>
+            ? <LobeButton block className="vibe-file-action source-image" icon={<Icon name="image" size={13}/>} onClick={() => studio.revealFile(vibe.reference_image)} size="small" type="text">打开源图所在文件夹</LobeButton>
             : <div className="vibe-source-warning"><Icon name="info" size={13}/><span>缺少源 PNG；编码仍可复用，但无法查看图源</span></div>}
-          {vibe.vibe_file && <button className={`vibe-file-action ${informationState.fileUsable ? '' : 'unavailable'}`} disabled={!informationState.fileUsable} title={informationState.fileUsable ? '在文件夹中显示当前 Vibe 文件' : '当前 Information Extracted 尚未计算，此文件与所选参数不匹配'} onClick={() => studio.revealFile(vibe.vibe_file)}><Icon name="folder" size={13}/>{informationState.fileUsable ? '显示 .naiv4vibe 文件' : '.naiv4vibe 当前参数不可用'}</button>}
-          <button className="text-danger" onClick={() => updateProject({ ...project, vibes: project.vibes.filter((_, itemIndex) => itemIndex !== index) })}><Icon name="trash"/>移除参考图</button>
+          {vibe.vibe_file && <LobeButton block className={`vibe-file-action ${informationState.fileUsable ? '' : 'unavailable'}`} disabled={!informationState.fileUsable} icon={<Icon name="folder" size={13}/>} onClick={() => studio.revealFile(vibe.vibe_file)} size="small" title={informationState.fileUsable ? '在文件夹中显示当前 Vibe 文件' : '当前 Information Extracted 尚未计算，此文件与所选参数不匹配'} type="text">{informationState.fileUsable ? '显示 .naiv4vibe 文件' : '.naiv4vibe 当前参数不可用'}</LobeButton>}
+          <LobeButton block danger icon={<Icon name="trash"/>} onClick={() => updateProject({ ...project, vibes: project.vibes.filter((_, itemIndex) => itemIndex !== index) })} size="small" type="text">移除参考图</LobeButton>
         </div>
       </article>;})}
       {!project.vibes.length && <div className="panel-empty"><Icon name="image"/><strong>当前作品还没有 Vibe</strong><span>从下面的 Vibe 库加入，或导入 `.naiv4vibe` 与参考图。</span></div>}
     </div>
-    <div className="vibe-section-heading library-heading"><span>Vibe 库</span><b>{visibleLibrary.length}</b><small>{libraryGroups.length} 个图源组</small>{archivedCount > 0 && <button className={showArchived ? 'active' : ''} onClick={() => setShowArchived((value) => !value)}>{showArchived ? '返回可用' : `归档 ${archivedCount}`}</button>}</div>
+    <div className="vibe-section-heading library-heading"><span>Vibe 库</span><b>{visibleLibrary.length}</b><small>{libraryGroups.length} 个图源组</small>{archivedCount > 0 && <LobeButton className={showArchived ? 'active' : ''} onClick={() => setShowArchived((value) => !value)} size="small" type="text">{showArchived ? '返回可用' : `归档 ${archivedCount}`}</LobeButton>}</div>
     <div className="vibe-library-list">
       {libraryGroups.map((group) => <section className={`vibe-source-group ${group.source.reference_image ? '' : 'missing-source'}`} key={group.key}>
         <header>
           <img src={mediaUrl(group.source.thumbnail_path)} alt="Vibe 源图"/>
           <div><strong>{group.source.name}</strong><small>{group.entries.length} 个参数版本 · {group.source.reference_image ? '已绑定源图' : '缺少源 PNG'}</small></div>
-          {group.source.reference_image && <button onClick={() => studio.revealFile(group.source.reference_image)} title="打开源图所在文件夹"><Icon name="folder" size={14}/></button>}
+          {group.source.reference_image && <LobeActionIcon icon={<Icon name="folder" size={14}/>} onClick={() => studio.revealFile(group.source.reference_image)} size="small" title="打开源图所在文件夹" variant="borderless"/>}
         </header>
         {!group.source.reference_image && <div className="vibe-group-warning"><Icon name="info" size={13}/>导入原始 PNG 或带内嵌图片的 `.naiv4vibe` 后可建立可视绑定</div>}
         <div className="vibe-variant-list">
           {group.entries.map((entry) => <article className={`vibe-library-card ${entry.archived_at ? 'archived' : ''} ${editingLibraryId === entry.id ? 'editing' : ''}`} key={entry.id} onContextMenu={(event) => libraryVibeContextMenu(event, entry)}>
             {editingLibraryId === entry.id ? <div className="vibe-library-editor">
-              <label><span>显示名称</span><input autoFocus maxLength={120} value={libraryDraft.name} onChange={(event) => setLibraryDraft((current) => ({ ...current, name: event.target.value }))}/></label>
+              <label><span>显示名称</span><LobeInput autoFocus maxLength={120} value={libraryDraft.name} onChange={(event) => setLibraryDraft((current) => ({ ...current, name: event.target.value }))}/></label>
               <label><span>Information Extracted <b>{Number(libraryDraft.information_extracted).toFixed(2)}</b></span><input type="range" min="0" max="1" step="0.01" value={libraryDraft.information_extracted} onChange={(event) => setLibraryDraft((current) => ({ ...current, information_extracted: Number(event.target.value) }))}/></label>
               <small><Icon name="info" size={12}/>调整 Information 后，只在这个位置标记编码可用，并注明“用户设置、未验证”；不会重新计算或修改文件。只改名称不会改变验证状态。</small>
-              <div><button onClick={() => setEditingLibraryId('')}>取消</button><button className="save" onClick={() => saveLibraryEdit(entry)} disabled={!libraryDraft.name.trim()}>保存资料</button></div>
+              <div><LobeButton onClick={() => setEditingLibraryId('')} size="small">取消</LobeButton><LobeButton disabled={!libraryDraft.name.trim()} onClick={() => saveLibraryEdit(entry)} size="small" type="primary">保存资料</LobeButton></div>
             </div> : <>
               <div><strong>{entry.source_kind === 'image' ? '原始参考图' : entry.name}</strong><small>{entry.source_kind === 'image' ? '尚未编码' : `${entry.encoding_count || 1} 个缓存编码 · ${entry.model || 'NovelAI V4'}`}</small><span>{entry.information_extracted_source === 'user' ? `Information ${Number(entry.information_extracted).toFixed(2)} · 用户设置、未验证` : entry.information_extracted_known ? `Information ${Number(entry.information_extracted).toFixed(2)} · 已验证` : 'Information 未知 · 固定编码'}</span></div>
-              <div className="vibe-library-actions"><button onClick={() => beginLibraryEdit(entry)} aria-label={`编辑 ${entry.name}`}><Icon name="edit" size={12}/></button>{entry.archived_at ? <button onClick={() => setLibraryArchived(entry, false)}>恢复</button> : <button onClick={() => useLibraryVibe(entry)} disabled={project.vibes.some((vibe) => vibe.library_id === entry.id)}>{project.vibes.some((vibe) => vibe.library_id === entry.id) ? '已用' : '使用'}</button>}</div>
+              <div className="vibe-library-actions"><LobeActionIcon icon={<Icon name="edit" size={12}/>} onClick={() => beginLibraryEdit(entry)} size="small" title={`编辑 ${entry.name}`} variant="borderless"/>{entry.archived_at ? <LobeButton onClick={() => setLibraryArchived(entry, false)} size="small">恢复</LobeButton> : <LobeButton disabled={project.vibes.some((vibe) => vibe.library_id === entry.id)} onClick={() => useLibraryVibe(entry)} size="small" type="primary">{project.vibes.some((vibe) => vibe.library_id === entry.id) ? '已用' : '使用'}</LobeButton>}</div>
             </>}
           </article>)}
         </div>
       </section>)}
-      {!visibleLibrary.length && (showArchived ? <div className="panel-empty compact"><Icon name="archive"/><strong>没有已归档 Vibe</strong><span>归档项目会保留已有作品引用。</span></div> : <button className="vibe-library-empty" onClick={() => importVibes(false)}><Icon name="plus"/><span><strong>建立 Vibe 库</strong><small>导入 `.naiv4vibe` 可直接复用缓存编码，不必重新计算。</small></span></button>)}
+      {!visibleLibrary.length && (showArchived ? <div className="panel-empty compact"><Icon name="archive"/><strong>没有已归档 Vibe</strong><span>归档项目会保留已有作品引用。</span></div> : <LobeButton block className="vibe-library-empty" icon={<Icon name="plus"/>} onClick={() => importVibes(false)} type="dashed"><span><strong>建立 Vibe 库</strong><small>导入 `.naiv4vibe` 可直接复用缓存编码，不必重新计算。</small></span></LobeButton>)}
     </div>
   </div>;
 }
@@ -1051,15 +1051,15 @@ function MetadataPanel({ project, updateProject }) {
       <div><strong>局部重绘 · 无法精确复现</strong><p>Metadata 包含最终 Prompt 和部分生成参数，但不包含完整的原始底图与蒙版。你仍然可以复制 Prompt，或基于现有参数创建近似方案。</p></div>
     </div>}
     <div className="metadata-grid">
-      <label className="wide"><span>Model</span><input value={metadata.model || ''} onChange={(event) => update({ model: event.target.value })} placeholder="NovelAI Diffusion V4.5"/></label>
-      <label><span>Seed</span><input value={metadata.seed || ''} onChange={(event) => update({ seed: event.target.value })} placeholder="—"/></label>
-      <label><span>Steps</span><input type="number" value={metadata.steps ?? ''} onChange={(event) => update({ steps: event.target.value })} placeholder="—"/></label>
-      <label><span>Sampler</span><input value={metadata.sampler || ''} onChange={(event) => update({ sampler: event.target.value })} placeholder="—"/></label>
-      <label><span>Guidance / CFG</span><input type="number" step="0.1" value={metadata.guidance ?? ''} onChange={(event) => update({ guidance: event.target.value })} placeholder="—"/></label>
-      <label><span>Width</span><input type="number" min="0" step="64" value={metadata.width || ''} onChange={(event) => update({ width: event.target.value })} placeholder="—"/></label>
-      <label><span>Height</span><input type="number" min="0" step="64" value={metadata.height || ''} onChange={(event) => update({ height: event.target.value })} placeholder="—"/></label>
+      <label className="wide"><span>Model</span><LobeInput value={metadata.model || ''} onChange={(event) => update({ model: event.target.value })} placeholder="NovelAI Diffusion V4.5"/></label>
+      <label><span>Seed</span><LobeInput value={metadata.seed || ''} onChange={(event) => update({ seed: event.target.value })} placeholder="—"/></label>
+      <label><span>Steps</span><LobeInputNumber controls={false} onChange={(value) => update({ steps: value ?? '' })} value={metadata.steps ?? null}/></label>
+      <label><span>Sampler</span><LobeInput value={metadata.sampler || ''} onChange={(event) => update({ sampler: event.target.value })} placeholder="—"/></label>
+      <label><span>Guidance / CFG</span><LobeInputNumber controls={false} onChange={(value) => update({ guidance: value ?? '' })} step={0.1} value={metadata.guidance ?? null}/></label>
+      <label><span>Width</span><LobeInputNumber controls={false} min={0} onChange={(value) => update({ width: value ?? '' })} step={64} value={metadata.width || null}/></label>
+      <label><span>Height</span><LobeInputNumber controls={false} min={0} onChange={(value) => update({ height: value ?? '' })} step={64} value={metadata.height || null}/></label>
     </div>
-    <label className="textarea-label"><span>Base Undesired Content · 在 Prompt 面板编辑</span><textarea value={formatPrompt(project.prompt_structure.base_undesired_tags)} readOnly placeholder="未检测到 Undesired Content"/></label>
+    <label className="textarea-label"><span>Base Undesired Content · 在 Prompt 面板编辑</span><LobeTextArea autoSize={{ minRows: 3, maxRows: 7 }} value={formatPrompt(project.prompt_structure.base_undesired_tags)} readOnly placeholder="未检测到 Undesired Content"/></label>
     <details className="raw-metadata"><summary>查看原始 metadata</summary><pre>{metadata.extra_json || '{}'}</pre></details>
   </div>;
 }
