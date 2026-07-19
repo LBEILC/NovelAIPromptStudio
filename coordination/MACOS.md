@@ -71,3 +71,12 @@
 - Action: On an unlocked macOS session, open Prompt overview and test category, Prompt/Undesired, Base/Character, and translated-text filters. Confirm the top copy button follows the visible count, multi-select switches copying to the selected tags, original/translated/bilingual display modes render without clipping, hover reveals the opposite language, and the two-step bulk-delete control is clear. Import a prompt containing `::year2025 ::` and a standalone `::`; verify both remain lossless in copied Prompt text while showing syntax warnings.
 - Expected: Filtering and selection use the same copy context on macOS; translated views remain display-only and copying always uses original NovelAI syntax. The toolbar fits the default window, native title/menu behavior is unchanged, and irregular closer syntax persists through the SQLite migration until the user edits or deletes it.
 - Observed: Windows passed a clean install, 33 tests, production build, and real-window checks for visible-count copying, translated display, multi-select copying, toolbar layout, and both syntax warnings. Awaiting macOS UI verification.
+
+## Verify category-grouped Prompt overview and compact copying
+
+- Status: Pending
+- Date/source: 2026-07-19, Windows
+- Related commit: `3033e80`
+- Action: On an unlocked macOS session, switch Prompt overview between 按结构 and 按分类. In category view, enable multi-select, select the full Clothing group and one other category group, then copy. Confirm every category is presented as one group, group selection toggles all visible members, and the copied Prompt uses comma-space separators inside a category with exactly one newline between selected categories.
+- Expected: Default copying keeps each Prompt scope compact, for example `1.3::shirt dress ::, 1.2::button up ::, 1.1::collared dress ::`. Selecting multiple categories produces one line per category without changing tag weights or original NovelAI syntax. The additional grouping control and category headers fit the default macOS window without clipping.
+- Observed: Windows passed a clean install, 35 tests, production build, and real-window checks. Selecting Clothing plus Character produced 15 selected tags across 2 categories, with both copy controls updating correctly. Awaiting macOS UI verification.
