@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import { extractV4PromptData } from '../src/lib/promptStructure.js';
+import { detectGenerationMode } from '../src/lib/generationMetadata.js';
 import { extractEmbeddedVibes } from './vibes.js';
 
 function parsePngText(buffer) {
@@ -70,6 +71,7 @@ export function readNovelAIMetadata(filePath) {
     steps: first(raw, ['steps'], ''),
     sampler: String(first(raw, ['sampler'], '')),
     guidance: first(raw, ['scale', 'cfg_scale', 'guidance'], ''),
+    generation_mode: detectGenerationMode(raw),
     embedded_vibes: extractEmbeddedVibes(raw, model),
     extra_json: JSON.stringify({ pngText: text, parsed: raw }),
   };

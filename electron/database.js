@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import initSqlJs from 'sql.js';
 import { inferCategory } from '../src/lib/prompt.js';
+import { normalizeGenerationMode } from '../src/lib/generationMetadata.js';
 
 const require = createRequire(import.meta.url);
 
@@ -41,6 +42,7 @@ CREATE TABLE IF NOT EXISTS generation_metadata (
   steps INTEGER,
   sampler TEXT NOT NULL DEFAULT '',
   guidance REAL,
+  generation_mode TEXT NOT NULL DEFAULT 'unknown',
   extra_json TEXT NOT NULL DEFAULT '{}'
 );
 CREATE TABLE IF NOT EXISTS vibe_transfers (
@@ -157,6 +159,9 @@ export async function openDatabase(dataDirectory) {
   const metadataColumns = database.exec('PRAGMA table_info(generation_metadata)')[0]?.values.map((row) => row[1]) || [];
   if (!metadataColumns.includes('prompt_structure_json')) {
     database.run("ALTER TABLE generation_metadata ADD COLUMN prompt_structure_json TEXT NOT NULL DEFAULT '{}'");
+  }
+  if (!metadataColumns.includes('generation_mode')) {
+    database.run("ALTER TABLE generation_metadata ADD COLUMN generation_mode TEXT NOT NULL DEFAULT 'unknown'");
   }
   const promptTagColumns = database.exec('PRAGMA table_info(prompt_tags)')[0]?.values.map((row) => row[1]) || [];
   if (!promptTagColumns.includes('raw_segment')) {
@@ -304,7 +309,8 @@ export async function openDatabase(dataDirectory) {
   const loadLibrary = () => {
     const projects = query('SELECT * FROM projects ORDER BY updated_at DESC');
     return projects.map((project) => {
-      const metadata = query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] || {};
+      const storedMetadata = query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] || {};
+      const metadata = { ...storedMetadata, generation_mode: normalizeGenerationMode(storedMetadata) };
       return enrichProjectTags({
         ...project,
         tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', { $id: project.id }),
@@ -440,12 +446,12 @@ export async function openDatabase(dataDirectory) {
 
     const metadata = project.metadata || {};
     database.run(
-      `INSERT INTO generation_metadata (project_id, prompt_raw, negative_prompt, prompt_structure_json, model, seed, steps, sampler, guidance, extra_json)
-       VALUES ($project_id, $prompt_raw, $negative_prompt, $prompt_structure_json, $model, $seed, $steps, $sampler, $guidance, $extra_json)
+      `INSERT INTO generation_metadata (project_id, prompt_raw, negative_prompt, prompt_structure_json, model, seed, steps, sampler, guidance, generation_mode, extra_json)
+       VALUES ($project_id, $prompt_raw, $negative_prompt, $prompt_structure_json, $model, $seed, $steps, $sampler, $guidance, $generation_mode, $extra_json)
        ON CONFLICT(project_id) DO UPDATE SET prompt_raw = excluded.prompt_raw, negative_prompt = excluded.negative_prompt,
        prompt_structure_json = excluded.prompt_structure_json,
        model = excluded.model, seed = excluded.seed, steps = excluded.steps, sampler = excluded.sampler,
-       guidance = excluded.guidance, extra_json = excluded.extra_json`,
+       guidance = excluded.guidance, generation_mode = excluded.generation_mode, extra_json = excluded.extra_json`,
       {
         $project_id: project.id,
         $prompt_raw: metadata.prompt_raw || '',
@@ -456,6 +462,7 @@ export async function openDatabase(dataDirectory) {
         $steps: metadata.steps === '' || metadata.steps == null ? null : Number(metadata.steps),
         $sampler: metadata.sampler || '',
         $guidance: metadata.guidance === '' || metadata.guidance == null ? null : Number(metadata.guidance),
+        $generation_mode: normalizeGenerationMode(metadata),
         $extra_json: typeof metadata.extra_json === 'string' ? metadata.extra_json : JSON.stringify(metadata.extra_json || {}),
       },
     );

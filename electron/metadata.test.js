@@ -119,4 +119,31 @@ describe('NovelAI PNG metadata', () => {
       expect.objectContaining({ strength: 0.4, information_extracted: null, model: 'nai-diffusion-4-5-full' }),
     ]);
   });
+
+  it('recognizes NativeInfillingRequest images without discarding their generation fields', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
+    temporaryDirectories.push(directory);
+    const filePath = path.join(directory, 'inpainting.png');
+    const description = JSON.stringify({
+      prompt: '1girl, white background',
+      uc: 'lowres',
+      seed: 1658537204,
+      steps: 23,
+      request_type: 'NativeInfillingRequest',
+      img2img: null,
+    });
+    const png = Buffer.concat([
+      Buffer.from('89504e470d0a1a0a', 'hex'),
+      chunk('tEXt', Buffer.concat([Buffer.from('Description'), Buffer.from([0]), Buffer.from(description)])),
+      chunk('IEND'),
+    ]);
+    fs.writeFileSync(filePath, png);
+
+    expect(readNovelAIMetadata(filePath)).toMatchObject({
+      generation_mode: 'inpainting',
+      prompt_raw: '1girl, white background',
+      seed: '1658537204',
+      steps: 23,
+    });
+  });
 });

@@ -45,7 +45,7 @@ export function inferCategory(tag) {
 }
 
 function promptSegments(prompt) {
-  const source = String(prompt || '');
+  const source = String(prompt || '').replace(/\r\n?/g, '\n').replace(/，/g, ',');
   const segments = [];
   let cursor = 0;
   while (cursor < source.length) {
@@ -58,7 +58,7 @@ function promptSegments(prompt) {
       const contentEnd = source.indexOf('::', contentStart);
       if (contentEnd !== -1) {
         const weight = Number(weighted[1]);
-        source.slice(contentStart, contentEnd).split(',').map((tag) => tag.trim()).filter(Boolean)
+        source.slice(contentStart, contentEnd).split(/[,\n]/).map((tag) => tag.trim()).filter(Boolean)
           .forEach((tag) => segments.push({ tag, weight }));
         cursor = contentEnd + 2;
         continue;
@@ -143,6 +143,22 @@ export function formatTag(tag) {
 
 export function formatPrompt(tags = []) {
   return tags.filter((tag) => tag.tag.trim()).map(formatTag).join(',\n');
+}
+
+export function analyzePromptBatch(prompt = '', existingTags = [], createId = () => crypto.randomUUID()) {
+  const tags = parsePrompt(prompt, createId);
+  const seen = new Set(existingTags.map((item) => String(item?.tag ?? item).trim().toLocaleLowerCase('en-US')).filter(Boolean));
+  let duplicateCount = 0;
+  for (const tag of tags) {
+    const key = tag.tag.trim().toLocaleLowerCase('en-US');
+    if (seen.has(key)) duplicateCount += 1;
+    seen.add(key);
+  }
+  return {
+    tags,
+    duplicateCount,
+    syntaxIssueCount: tags.filter((tag) => tag.syntax_issue).length,
+  };
 }
 
 export function formatPromptInline(tags = []) {

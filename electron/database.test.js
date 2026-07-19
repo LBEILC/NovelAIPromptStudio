@@ -36,7 +36,12 @@ describe('prompt structure persistence', () => {
           center: { x: 0.3, y: 0.5 },
         }],
       },
-      metadata: { prompt_raw: '2girls', negative_prompt: 'lowres', extra_json: '{}' },
+      metadata: {
+        prompt_raw: '2girls',
+        negative_prompt: 'lowres',
+        generation_mode: 'inpainting',
+        extra_json: JSON.stringify({ parsed: { request_type: 'NativeInfillingRequest' } }),
+      },
       vibes: [],
       versions: [],
     };
@@ -48,6 +53,7 @@ describe('prompt structure persistence', () => {
       characters: [{ center: { x: 0.3, y: 0.5 }, prompt_tags: [{ tag: 'girl' }], undesired_tags: [{ tag: 'blue hair' }] }],
     });
     expect(loaded.tags[0]).toMatchObject({ raw_segment: '::year2025 ::', syntax_issue: 'emphasis_closer' });
+    expect(loaded.metadata.generation_mode).toBe('inpainting');
   });
 
   it('stores reusable encoded Vibes and project links', async () => {

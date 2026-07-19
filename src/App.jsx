@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, inferCategory, normalizeSearch, parsePrompt, repairLegacyPromptTags } from './lib/prompt.js';
+import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, inferCategory, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import {
   addPromptCharacter,
   allPromptTags,
@@ -19,6 +19,7 @@ import {
 import PromptOverview from './PromptOverview.jsx';
 import { groupVibeLibraryBySource } from './lib/vibeLibrary.js';
 import { informationExtractedPatch, informationExtractedState, restoreOriginalInformationPatch } from './lib/vibes.js';
+import { hasLimitedReproduction } from './lib/generationMetadata.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
@@ -106,6 +107,7 @@ function LibraryPanel({ projects, activeId, setActiveId, query, setQuery, onImpo
 }
 
 function PreviewStage({ project, mode, setMode, onCopy, onReveal, onEditTag, updateProject, saveVersion, restoreVersion, activeVersion, setActiveVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
+  const limitedReproduction = hasLimitedReproduction(project.metadata);
   const copyLabel = mode === 'prompt'
     ? overviewCopy.selected ? `复制已选 ${overviewCopy.count}` : `复制可见 ${overviewCopy.count}`
     : '复制 Prompt';
@@ -132,6 +134,7 @@ function PreviewStage({ project, mode, setMode, onCopy, onReveal, onEditTag, upd
         <span>SEED {project.metadata.seed || '—'}</span>
         <i/>
         <span>{project.metadata.steps || '—'} STEPS</span>
+        {limitedReproduction && <><i/><span className="reproduction-status" title="局部重绘 metadata 不包含完整底图与蒙版">INPAINT · 无法精确复现</span></>}
       </div>
     </div> : <PromptOverview project={project} updateProject={updateProject} onEditTag={onEditTag} onCopyContextChange={onOverviewCopyChange} onCopyText={onCopyText} onNotify={onNotify}/>}
     <footer className="version-rail">
@@ -224,6 +227,7 @@ function PositionEditor({ project, character, updateProject }) {
 
 function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, focusTagId }) {
   const [newTag, setNewTag] = useState('');
+  const [lastBatch, setLastBatch] = useState(null);
   const [showAISettings, setShowAISettings] = useState(false);
   const [aiSettings, setAISettings] = useState({ baseUrl: 'https://api.openai.com/v1', model: '', apiKey: '', hasApiKey: false, encryptionAvailable: true });
   const [models, setModels] = useState([]);
@@ -238,10 +242,16 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
   const scope = useMemo(() => getPromptScope(project, scopeKey), [project, scopeKey]);
   const tags = scope.tags;
   const structure = project.prompt_structure;
+  const pendingBatch = useMemo(() => analyzePromptBatch(newTag, tags), [newTag, tags]);
 
   useEffect(() => {
     if (!scopes.some((item) => item.key === scopeKey)) setScopeKey('base:prompt');
   }, [scopeKey, scopes, setScopeKey]);
+
+  useEffect(() => {
+    setNewTag('');
+    setLastBatch(null);
+  }, [project.id, scope.key]);
 
   useEffect(() => {
     if (!focusTagId) return;
@@ -315,12 +325,24 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
   };
 
   const missingTranslationIds = tags.filter((tag) => !tag.translation?.trim() || !['ai', 'manual', 'cache'].includes(tag.category_source)).map((tag) => tag.id);
-  const addTag = () => {
-    if (!newTag.trim()) return;
-    const created = parsePrompt(newTag)[0];
-    if (!created) return;
-    updateProject(updatePromptScope(project, scope.key, [...tags, created]));
+  const addTags = () => {
+    const created = pendingBatch.tags;
+    if (!created.length) return;
+    updateProject(updatePromptScope(project, scope.key, [...tags, ...created]));
+    setLastBatch({ projectId: project.id, scopeKey: scope.key, ids: created.map((tag) => tag.id) });
     setNewTag('');
+    const notes = [pendingBatch.duplicateCount && `${pendingBatch.duplicateCount} 个重复`, pendingBatch.syntaxIssueCount && `${pendingBatch.syntaxIssueCount} 个语法提示`].filter(Boolean);
+    showToast(`已添加 ${created.length} 个 Tag${notes.length ? ` · ${notes.join(' · ')}` : ''}`);
+  };
+  const undoLastBatch = () => {
+    if (!lastBatch || lastBatch.projectId !== project.id || lastBatch.scopeKey !== scope.key) return;
+    const ids = new Set(lastBatch.ids);
+    const remaining = tags.filter((tag) => !ids.has(tag.id));
+    const removed = tags.length - remaining.length;
+    if (!removed) { setLastBatch(null); return; }
+    updateProject(updatePromptScope(project, scope.key, remaining));
+    setLastBatch(null);
+    showToast(`已撤销添加 ${removed} 个 Tag`);
   };
   const updateTag = (index, patch) => updateProject(updatePromptScope(project, scope.key, tags.map((tag, itemIndex) => itemIndex === index ? { ...tag, ...patch } : tag)));
   const moveTag = (sourceIndex, targetIndex) => {
@@ -395,7 +417,20 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
       <div className="character-scope-heading"><input value={scope.character.label} onChange={(event) => updateProject(updatePromptCharacter(project, scope.characterId, { label: event.target.value }))} aria-label="角色名称"/><button onClick={deleteCharacter}><Icon name="trash" size={13}/>移除角色</button></div>
       <PositionEditor project={project} character={scope.character} updateProject={updateProject}/>
     </>}
-    <div className="add-tag"><input value={newTag} onChange={(event) => setNewTag(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && addTag()} placeholder="输入 tag，按 Enter 添加"/><button onClick={addTag}><Icon name="plus"/></button></div>
+    <div className="tag-entry">
+      <div className="add-tag">
+        <textarea rows="1" value={newTag} onChange={(event) => setNewTag(event.target.value)} onKeyDown={(event) => {
+          if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+          event.preventDefault();
+          addTags();
+        }} placeholder="输入多个 Tag，用中英文逗号分隔" aria-label="添加一个或多个 Tag" aria-describedby={newTag || lastBatch ? 'tag-entry-status' : undefined}/>
+        <button onClick={addTags} disabled={!pendingBatch.tags.length} aria-label={`添加 ${pendingBatch.tags.length || 0} 个 Tag`}><Icon name="plus"/><span>{pendingBatch.tags.length > 1 ? pendingBatch.tags.length : ''}</span></button>
+      </div>
+      {(newTag || lastBatch) && <div className="tag-entry-status" id="tag-entry-status" aria-live="polite">
+        {newTag && <span>{pendingBatch.tags.length ? `将添加 ${pendingBatch.tags.length} 个到「${scope.label}」` : '没有可添加的 Tag'}{pendingBatch.duplicateCount ? ` · ${pendingBatch.duplicateCount} 个重复` : ''}{pendingBatch.syntaxIssueCount ? ` · ${pendingBatch.syntaxIssueCount} 个语法提示` : ''}</span>}
+        {lastBatch && lastBatch.projectId === project.id && lastBatch.scopeKey === scope.key && <button onClick={undoLastBatch}>撤销上次添加</button>}
+      </div>}
+    </div>
     <section className={`ai-channel ${showAISettings ? 'expanded' : ''}`}>
       <div className="ai-channel-bar">
         <span className="ai-signal"><Icon name="spark"/><i/></span>
@@ -557,9 +592,14 @@ function VibePanel({ project, updateProject, showToast }) {
 
 function MetadataPanel({ project, updateProject }) {
   const metadata = project.metadata;
+  const limitedReproduction = hasLimitedReproduction(metadata);
   const update = (patch) => updateProject({ ...project, metadata: { ...metadata, ...patch } });
   return <div className="panel-scroll metadata-panel">
-    <div className="panel-intro"><div><strong>Generation Metadata</strong><small>从原图读取，可手动修正</small></div><span className="metadata-badge">PNG</span></div>
+    <div className="panel-intro"><div><strong>Generation Metadata</strong><small>从原图读取，可手动修正</small></div><span className={`metadata-badge ${limitedReproduction ? 'limited' : ''}`}>{limitedReproduction ? 'INPAINT' : 'PNG'}</span></div>
+    {limitedReproduction && <div className="reproduction-notice" role="status">
+      <Icon name="info" size={15}/>
+      <div><strong>局部重绘 · 无法精确复现</strong><p>Metadata 包含最终 Prompt 和部分生成参数，但不包含完整的原始底图与蒙版。你仍然可以复制 Prompt，或基于现有参数创建近似方案。</p></div>
+    </div>}
     <div className="metadata-grid">
       <label className="wide"><span>Model</span><input value={metadata.model || ''} onChange={(event) => update({ model: event.target.value })} placeholder="NovelAI Diffusion V4.5"/></label>
       <label><span>Seed</span><input value={metadata.seed || ''} onChange={(event) => update({ seed: event.target.value })} placeholder="—"/></label>
@@ -649,7 +689,8 @@ export default function App() {
     setActiveId(imported[0].id);
     setWorkspaceMode('image');
     setPromptScopeKey('base:prompt');
-    showToast(`已导入 ${imported.length} 个作品`);
+    const limitedCount = imported.filter((project) => hasLimitedReproduction(project.metadata)).length;
+    showToast(limitedCount ? `已导入 ${imported.length} 个作品 · ${limitedCount} 张局部重绘已标记` : `已导入 ${imported.length} 个作品`);
   };
 
   const updateProject = (nextProject) => {

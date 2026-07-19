@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expandSearch, formatPrompt, formatPromptInline, inferCategory, parsePrompt, repairLegacyPromptTags } from './prompt.js';
+import { analyzePromptBatch, expandSearch, formatPrompt, formatPromptInline, inferCategory, parsePrompt, repairLegacyPromptTags } from './prompt.js';
 
 describe('NovelAI prompt codec', () => {
   it('parses numeric weights and exports the same NovelAI syntax', () => {
@@ -49,6 +49,25 @@ describe('NovelAI prompt codec', () => {
     expect(tags[1]).toMatchObject({ tag: 'year2025', weight: 1, raw_segment: '::year2025 ::', syntax_issue: 'emphasis_closer' });
     expect(tags[2]).toMatchObject({ tag: '::', syntax_issue: 'control_only' });
     expect(formatPrompt(tags)).toBe('masterpiece,\n::year2025 ::,\n::');
+  });
+
+  it('parses batch input with fullwidth commas, newlines, and empty segments', () => {
+    let id = 0;
+    const batch = analyzePromptBatch(',akakura,ciloranko，white background\n\n', [], () => `batch-${id++}`);
+    expect(batch.tags.map((tag) => tag.tag)).toEqual(['akakura', 'ciloranko', 'white background']);
+    expect(batch).toMatchObject({ duplicateCount: 0, syntaxIssueCount: 0 });
+  });
+
+  it('preserves weighted groups and reports duplicates without removing them', () => {
+    let id = 0;
+    const batch = analyzePromptBatch('1.3::shirt dress，button up ::, solo, SOLO', [{ tag: 'solo' }], () => `batch-${id++}`);
+    expect(batch.tags.map(({ tag, weight }) => ({ tag, weight }))).toEqual([
+      { tag: 'shirt dress', weight: 1.3 },
+      { tag: 'button up', weight: 1.3 },
+      { tag: 'solo', weight: 1 },
+      { tag: 'SOLO', weight: 1 },
+    ]);
+    expect(batch.duplicateCount).toBe(2);
   });
 
   it('classifies common prompt concepts', () => {
