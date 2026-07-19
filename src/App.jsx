@@ -73,6 +73,8 @@ const studio = window.studio || {
   revealFile: async () => {},
   getAISettings: async () => ({ baseUrl: 'https://api.openai.com/v1', model: '', hasApiKey: false, encryptionAvailable: true }),
   saveAISettings: async (settings) => ({ ...settings, hasApiKey: Boolean(settings.apiKey) }),
+  getAppearanceSettings: async () => ({ fontScale: 'large', density: 'comfortable', motion: 'full' }),
+  saveAppearanceSettings: async (settings) => settings,
   listAIModels: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
   testAIModel: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
   translateTags: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
@@ -186,6 +188,8 @@ function LibraryPanel({
   onSetFavorite,
   onSetDeleted,
   onProjectContextMenu,
+  settingsOpen,
+  onOpenSettings,
 }) {
   const [creatingCollection, setCreatingCollection] = useState(false);
   const [collectionName, setCollectionName] = useState('');
@@ -343,7 +347,7 @@ function LibraryPanel({
       </div>)}
       {!projects.length && <div className="list-empty">{query ? '没有匹配的作品' : `「${currentLabel}」还是空的`}</div>}
     </div>
-    <div className="library-footer"><Icon name="folder"/><span>本地资料库</span><i>SQLite</i></div>
+    <div className="library-footer"><span><Icon name="folder"/>本地资料库</span><i>SQLite</i><button className={settingsOpen ? 'active' : ''} onClick={onOpenSettings} aria-label="打开软件设置"><Icon name="settings" size={14}/>设置</button></div>
   </aside>;
 }
 
@@ -1068,6 +1072,92 @@ function Inspector({ tab, setTab, project, branch, updateProject, showToast, pro
   </aside>;
 }
 
+function SettingsPage({ appearance, onAppearanceChange, onClose, showToast }) {
+  const [section, setSection] = useState('appearance');
+  const [aiSettings, setAISettings] = useState({ baseUrl: 'https://api.openai.com/v1', model: '', apiKey: '', hasApiKey: false, encryptionAvailable: true });
+  const [models, setModels] = useState([]);
+  const [busy, setBusy] = useState('');
+
+  useEffect(() => {
+    studio.getAISettings().then((settings) => setAISettings((current) => ({ ...current, ...settings, apiKey: '' })));
+  }, []);
+
+  const saveAI = async () => {
+    setBusy('save');
+    try {
+      const saved = await studio.saveAISettings({
+        baseUrl: aiSettings.baseUrl,
+        model: aiSettings.model,
+        apiKey: aiSettings.apiKey,
+      });
+      setAISettings((current) => ({ ...current, ...saved, apiKey: '' }));
+      showToast('AI 服务设置已安全保存');
+      return true;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+      return false;
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const loadModels = async () => {
+    if (!(await saveAI())) return;
+    setBusy('models');
+    const result = await studio.listAIModels();
+    setBusy('');
+    if (!result?.ok) { showToast(result?.error || '无法读取模型列表'); return; }
+    setModels(result.models || []);
+    showToast(`已读取 ${result.models?.length || 0} 个模型`);
+  };
+
+  const testConnection = async () => {
+    if (!(await saveAI())) return;
+    setBusy('test');
+    const result = await studio.testAIModel();
+    setBusy('');
+    showToast(result?.ok ? `连接成功 · ${result.model || aiSettings.model}` : result?.error || '连接测试失败');
+  };
+
+  const platform = navigator.platform.startsWith('Mac') ? 'macOS' : navigator.platform.startsWith('Win') ? 'Windows' : 'Desktop';
+  return <main className="settings-page">
+    <aside className="settings-nav">
+      <header><span>SETTINGS / 01</span><h1>软件设置</h1><p>设置保存在当前设备，不会写入作品 metadata。</p></header>
+      <nav aria-label="设置分类">
+        <button className={section === 'appearance' ? 'active' : ''} onClick={() => setSection('appearance')}><Icon name="settings"/><span><strong>外观与可读性</strong><small>字号、密度、动效</small></span></button>
+        <button className={section === 'ai' ? 'active' : ''} onClick={() => setSection('ai')}><Icon name="spark"/><span><strong>AI 服务</strong><small>接口、模型、安全存储</small></span></button>
+      </nav>
+      <button className="settings-back" onClick={onClose}><Icon name="close" size={14}/>返回作品库</button>
+    </aside>
+    <section className="settings-content">
+      {section === 'appearance' ? <>
+        <header className="settings-heading"><span>APPEARANCE</span><h2>让高密度工作台保持清楚</h2><p>字号会按固定档位缩放语义排版；密度只改变留白和控件高度，不会隐藏功能。</p></header>
+        <div className="settings-group">
+          <div className="settings-row"><div><strong>界面字号</strong><small>默认使用“较大”，改善中文与长时间阅读。</small></div><div className="settings-segment" role="group" aria-label="界面字号">{[
+            ['default', '标准'], ['large', '较大'], ['larger', '特大'],
+          ].map(([value, label]) => <button key={value} className={appearance.fontScale === value ? 'active' : ''} onClick={() => onAppearanceChange({ fontScale: value })}>{label}</button>)}</div></div>
+          <div className="settings-row"><div><strong>界面密度</strong><small>窗口较窄时建议紧凑；大屏长期整理建议舒适。</small></div><div className="settings-segment" role="group" aria-label="界面密度">{[
+            ['compact', '紧凑'], ['comfortable', '舒适'],
+          ].map(([value, label]) => <button key={value} className={appearance.density === value ? 'active' : ''} onClick={() => onAppearanceChange({ density: value })}>{label}</button>)}</div></div>
+          <div className="settings-row"><div><strong>界面动效</strong><small>“跟随系统”尊重系统的减少动态效果设置；关闭后只保留必要状态变化。</small></div><div className="settings-segment" role="group" aria-label="界面动效">{[
+            ['full', '完整'], ['reduced', '跟随系统'], ['off', '关闭'],
+          ].map(([value, label]) => <button key={value} className={appearance.motion === value ? 'active' : ''} onClick={() => onAppearanceChange({ motion: value })}>{label}</button>)}</div></div>
+        </div>
+        <aside className="settings-platform-note"><Icon name="info"/><div><strong>{platform} 当前生效</strong><span>字体优先使用平台原生中文无衬线字体；Windows 保持隐藏应用菜单，macOS 保留原生菜单与窗口习惯。</span></div></aside>
+      </> : <>
+        <header className="settings-heading"><span>AI SERVICE</span><h2>翻译与分类使用同一安全连接</h2><p>API Key 由操作系统安全存储加密，不进入 SQLite、日志、导出文件或跨平台协调文档。</p></header>
+        <div className="settings-group ai-settings-group">
+          <label><span><strong>API Base URL</strong><small>兼容 OpenAI API 格式的服务地址</small></span><input value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
+          <label><span><strong>API Key</strong><small>{aiSettings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}</small></span><input type="password" value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '已安全保存' : '输入 API Key'}/></label>
+          <label><span><strong>默认模型</strong><small>翻译与分类任务暂时共用；后续可分别配置</small></span><div className="settings-model-input"><input list="settings-model-list" value={aiSettings.model} onChange={(event) => setAISettings((current) => ({ ...current, model: event.target.value }))} placeholder="输入或读取模型 ID"/><datalist id="settings-model-list">{models.map((model) => <option key={model} value={model}/>)}</datalist><button onClick={loadModels} disabled={Boolean(busy)}><Icon name="refresh" size={14}/>{busy === 'models' ? '读取中' : '读取模型'}</button></div></label>
+        </div>
+        <div className="settings-actions"><button onClick={testConnection} disabled={Boolean(busy)}>测试连接</button><button className="primary" onClick={saveAI} disabled={Boolean(busy)}>{busy === 'save' ? '保存中…' : '保存 AI 设置'}</button></div>
+        {!aiSettings.encryptionAvailable && <aside className="settings-warning"><Icon name="warning"/><span>当前系统安全存储不可用，应用不会以明文保存 API Key。</span></aside>}
+      </>}
+    </section>
+  </main>;
+}
+
 export default function App() {
   const [projects, setProjects] = useState([]);
   const [collections, setCollections] = useState([]);
@@ -1091,12 +1181,25 @@ export default function App() {
   const [focusTagId, setFocusTagId] = useState(null);
   const [branchResultImporting, setBranchResultImporting] = useState('');
   const [comparisonIds, setComparisonIds] = useState(new Set());
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [appearance, setAppearance] = useState({ fontScale: 'large', density: 'comfortable', motion: 'full' });
   const saveTimers = useRef(new Map());
   const branchSaveTimers = useRef(new Map());
   const branchCreatePromises = useRef(new Map());
   const appShellRef = useRef(null);
   const dropFilesHandlerRef = useRef(null);
   const shortcutModifier = useMemo(() => navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl', []);
+
+  useEffect(() => {
+    studio.getAppearanceSettings().then(setAppearance).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.fontScale = appearance.fontScale;
+    root.dataset.density = appearance.density;
+    root.dataset.motion = appearance.motion;
+  }, [appearance]);
 
   useEffect(() => {
     Promise.all([studio.loadLibrary(), studio.loadLibraryOrganization()]).then(([items, organization]) => {
@@ -1255,6 +1358,7 @@ export default function App() {
   };
 
   const changeLibraryView = (view) => {
+    setSettingsOpen(false);
     setLibraryView(view);
     setSelectedIds(new Set());
     setWorkspaceMode(view.startsWith('experiment:') ? 'compare' : workspaceMode === 'compare' ? 'image' : workspaceMode);
@@ -1765,12 +1869,14 @@ export default function App() {
   };
 
   const openPromptOverview = (projectId) => {
+    setSettingsOpen(false);
     setActiveId(projectId);
     setActiveBranchId('');
     setWorkspaceMode('prompt');
   };
 
   const openTagEditor = (scopeKey, tagId) => {
+    setSettingsOpen(false);
     setWorkspaceMode('prompt');
     setTab('tags');
     if (scopeKey) setPromptScopeKey(scopeKey);
@@ -1778,9 +1884,23 @@ export default function App() {
     if (tagId) requestAnimationFrame(() => setFocusTagId(tagId));
   };
 
+  const updateAppearance = async (patch) => {
+    const previous = appearance;
+    const next = { ...appearance, ...patch };
+    setAppearance(next);
+    try {
+      const saved = await studio.saveAppearanceSettings(next);
+      setAppearance(saved);
+      showToast('外观设置已保存');
+    } catch (error) {
+      setAppearance(previous);
+      showToast(error instanceof Error ? error.message : String(error));
+    }
+  };
+
   if (loading) return <div className="loading-screen"><div className="brand-symbol">N<span>4</span></div><span>正在打开本地资料库…</span></div>;
 
-  return <div className="app-shell" ref={appShellRef}>
+  return <div className={`app-shell ${settingsOpen ? 'settings-open' : ''}`} ref={appShellRef}>
     <LibraryPanel
       projects={filteredProjects}
       allProjects={projects}
@@ -1788,7 +1908,7 @@ export default function App() {
       series={series}
       experiments={experiments}
       activeId={activeId}
-      setActiveId={(id) => { setActiveId(id); setActiveBranchId(''); setPromptScopeKey('base:prompt'); }}
+      setActiveId={(id) => { setSettingsOpen(false); setActiveId(id); setActiveBranchId(''); setPromptScopeKey('base:prompt'); }}
       query={query}
       setQuery={setQuery}
       onImport={importImages}
@@ -1820,8 +1940,10 @@ export default function App() {
       onSetFavorite={setFavorite}
       onSetDeleted={setDeleted}
       onProjectContextMenu={projectContextMenu}
+      settingsOpen={settingsOpen}
+      onOpenSettings={() => setSettingsOpen(true)}
     />
-    {activeProject ? <>
+    {settingsOpen ? <SettingsPage appearance={appearance} onAppearanceChange={updateAppearance} onClose={() => setSettingsOpen(false)} showToast={showToast}/> : activeProject ? <>
       <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} experiment={activeExperiment} experimentProjects={experimentProjects} comparisonIds={comparisonIds} onToggleComparison={toggleComparison} onReorderExperiment={reorderExperiment} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} onTagContextMenu={tagContextMenu} onProjectContextMenu={projectContextMenu} onBranchContextMenu={branchContextMenu} onOpenResult={openResultProject} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onImportBranchResult={importBranchResult} branchResultImporting={branchResultImporting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
       <Inspector tab={tab} setTab={setTab} project={activeProject} branch={activeBranch} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId} onTagContextMenu={tagContextMenu}/>
     </> : <EmptyState onImport={importImages} hasProjects={projects.length > 0}/>}

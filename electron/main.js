@@ -324,6 +324,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('file:reveal', (_event, filePath) => shell.showItemInFolder(filePath));
   ipcMain.handle('ai:settings:get', () => preferences.publicSettings());
   ipcMain.handle('ai:settings:save', (_event, settings) => preferences.saveAISettings(settings));
+  ipcMain.handle('appearance:settings:get', () => preferences.appearanceSettings());
+  ipcMain.handle('appearance:settings:save', (_event, settings) => preferences.saveAppearanceSettings(settings));
   ipcMain.handle('ai:models:list', async () => {
     try {
       return { ok: true, models: await listModels(preferences.credentials(), net.fetch) };

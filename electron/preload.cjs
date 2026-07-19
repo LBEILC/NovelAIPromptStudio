@@ -48,6 +48,8 @@ contextBridge.exposeInMainWorld('studio', {
   revealFile: (path) => ipcRenderer.invoke('file:reveal', path),
   getAISettings: () => ipcRenderer.invoke('ai:settings:get'),
   saveAISettings: (settings) => ipcRenderer.invoke('ai:settings:save', settings),
+  getAppearanceSettings: () => ipcRenderer.invoke('appearance:settings:get'),
+  saveAppearanceSettings: (settings) => ipcRenderer.invoke('appearance:settings:save', settings),
   listAIModels: () => ipcRenderer.invoke('ai:models:list'),
   testAIModel: () => ipcRenderer.invoke('ai:model:test'),
   translateTags: (tags) => ipcRenderer.invoke('translation:tags', tags),

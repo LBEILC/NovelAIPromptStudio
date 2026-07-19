@@ -2,6 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_BASE_URL, normalizeBaseUrl } from './translation.js';
 
+const APPEARANCE_DEFAULTS = Object.freeze({ fontScale: 'large', density: 'comfortable', motion: 'full' });
+const APPEARANCE_VALUES = {
+  fontScale: new Set(['default', 'large', 'larger']),
+  density: new Set(['compact', 'comfortable']),
+  motion: new Set(['full', 'reduced', 'off']),
+};
+
 export function openPreferences(dataDirectory, safeStorage) {
   const filePath = path.join(dataDirectory, 'preferences.json');
 
@@ -40,6 +47,28 @@ export function openPreferences(dataDirectory, safeStorage) {
 
   const credentials = () => ({ ...publicSettings(), apiKey: decryptKey(read()) });
 
+  const appearanceSettings = () => {
+    const stored = read().appearance || {};
+    return Object.fromEntries(Object.entries(APPEARANCE_DEFAULTS).map(([key, fallback]) => [
+      key,
+      APPEARANCE_VALUES[key].has(stored[key]) ? stored[key] : fallback,
+    ]));
+  };
+
+  const saveAppearanceSettings = (next = {}) => {
+    const current = appearanceSettings();
+    const appearance = { ...current };
+    for (const key of Object.keys(APPEARANCE_DEFAULTS)) {
+      if (next[key] === undefined) continue;
+      if (!APPEARANCE_VALUES[key].has(next[key])) throw new Error(`不支持的外观设置：${key}`);
+      appearance[key] = next[key];
+    }
+    const stored = read();
+    stored.appearance = appearance;
+    write(stored);
+    return appearanceSettings();
+  };
+
   const saveAISettings = ({ baseUrl, model, apiKey, clearApiKey = false }) => {
     const preferences = read();
     preferences.aiBaseUrl = normalizeBaseUrl(baseUrl);
@@ -55,5 +84,5 @@ export function openPreferences(dataDirectory, safeStorage) {
     return publicSettings();
   };
 
-  return { publicSettings, credentials, saveAISettings, filePath };
+  return { publicSettings, credentials, saveAISettings, appearanceSettings, saveAppearanceSettings, filePath };
 }
