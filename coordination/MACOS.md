@@ -98,3 +98,12 @@
 - Action: On an unlocked macOS session, drag a PNG and a NovelAI ZIP from Finder into the window. Confirm the first drag frame says it is reading file information or shows an accept state, never the unsupported state for a supported file. Then edit a source result's Prompt, Vibe, and Seed separately; confirm the first actual value change creates a branch draft, the source result remains unchanged after restart, draft edits persist, drafts can be discarded, and a draft marked as waiting can no longer be edited or discarded directly.
 - Expected: Finder's delayed file-detail delivery does not cause a false rejection. Result metadata remains immutable, edits are isolated in branch recipes, legacy Prompt versions can be opened as new branches, and the branch rail plus inspector status fit the macOS window without disturbing the native menu/title bar.
 - Observed: Windows completed a clean `npm ci`, 49 automated tests, and the production build. The user will verify the drag overlay and live branch interaction on Windows; macOS Finder timing and native-window layout still require verification.
+
+## Verify shared selection controls and branch result upload
+
+- Status: Pending
+- Date/source: 2026-07-19, Windows
+- Related commit: `8b48e2e`
+- Action: On an unlocked macOS session, enable multi-select in the library and Prompt overview. Confirm both places use the same 18px selection mark and Lucide SVG check without a text/Emoji glyph. Create a branch, mark it waiting, upload a matching NovelAI PNG, and repeat with a PNG whose Prompt or Seed differs. Restart the app and inspect both branch cards.
+- Expected: Selection controls have identical geometry, stroke and focus feedback on macOS. A matching PNG changes the branch to “结果匹配” and displays its thumbnail; a mismatch is imported without overwriting the recipe, records the differing fields, and displays “结果不匹配”. Existing native menu, title bar, Finder dialog and CJK fallback remain unchanged.
+- Observed: Windows completed a clean `npm ci`, 55 automated tests and the production build. Static checks confirm all former text checkmarks were removed and shared Lucide components are used. Live macOS control rendering and Finder upload still require verification.
