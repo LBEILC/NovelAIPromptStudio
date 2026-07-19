@@ -494,7 +494,7 @@ function PreviewStage({ project, sourceProject, mode, setMode, experiment, exper
           {(mismatchResult.details || []).map((detail) => <div key={detail.field}><b>{detail.field}</b><span><em>方案</em>{detail.expected || '—'}</span><span><em>结果</em>{detail.actual || '—'}</span></div>)}
           {!(mismatchResult.details || []).length && <div className="match-detail-empty">差异：{mismatchResult.differences?.join('、') || 'metadata 不一致'}</div>}
         </div>
-        <footer>{mismatchResult.actual_branch_id && <button onClick={() => onSelectBranch(mismatchResult.actual_branch_id)}>打开实际结果分支</button>}<button onClick={() => onOpenResult(mismatchResult.project_id)}>查看结果图</button></footer>
+        <footer>{mismatchResult.actual_branch_id && <LobeButton onClick={() => onSelectBranch(mismatchResult.actual_branch_id)} size="small" type="primary">打开实际结果分支</LobeButton>}<LobeButton onClick={() => onOpenResult(mismatchResult.project_id)} size="small">查看结果图</LobeButton></footer>
       </aside>}
     </div> : <PromptOverview project={project} updateProject={updateProject} onEditTag={onEditTag} onTagContextMenu={onTagContextMenu} onCopyContextChange={onOverviewCopyChange} onCopyText={onCopyText} onNotify={onNotify}/>}
     {mode === 'compare' && experiment ? <footer className="version-rail experiment-rail">
@@ -504,8 +504,8 @@ function PreviewStage({ project, sourceProject, mode, setMode, experiment, exper
       </div>
     </footer> : <footer className="version-rail branch-rail">
       <div className="rail-title"><span><Icon name="history"/>生成分支</span><div className="rail-actions">
-        {activeBranch?.status === 'draft' && <><button className="restore-action danger" onClick={() => onDiscardBranch(activeBranch.id)}>放弃草稿</button><button onClick={() => onMarkBranchWaiting(activeBranch.id)}><Icon name="check"/>标记待生成</button></>}
-        {activeBranch && ['waiting', 'result', 'mismatch'].includes(activeBranch.status) && <button onClick={() => onImportBranchResult(activeBranch.id)} disabled={branchResultImporting === activeBranch.id}><Icon name="upload"/>{branchResultImporting === activeBranch.id ? '正在核对…' : '上传结果图'}</button>}
+        {activeBranch?.status === 'draft' && <><LobeButton danger onClick={() => onDiscardBranch(activeBranch.id)} size="small" type="text">放弃草稿</LobeButton><LobeButton icon={<Icon name="check"/>} onClick={() => onMarkBranchWaiting(activeBranch.id)} size="small" type="text">标记待生成</LobeButton></>}
+        {activeBranch && ['waiting', 'result', 'mismatch'].includes(activeBranch.status) && <LobeButton disabled={branchResultImporting === activeBranch.id} icon={<Icon name="upload"/>} onClick={() => onImportBranchResult(activeBranch.id)} size="small" type="text">{branchResultImporting === activeBranch.id ? '正在核对…' : '上传结果图'}</LobeButton>}
       </div></div>
       <div className="version-strip">
         <button className={`version-card current result-card ${!activeBranchId ? 'selected' : ''}`} onClick={() => onSelectBranch('')} onContextMenu={(event) => onProjectContextMenu(event, sourceProject)}>
