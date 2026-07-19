@@ -536,7 +536,7 @@ function WeightControl({ value, onChange }) {
 }
 
 function TagCard({ tag, index, translating, onTranslate, onChange, onDelete, onContextMenu }) {
-  return <article data-tag-index={index} data-tag-id={tag.id} className="tag-card" onContextMenu={onContextMenu}>
+  return <article data-tag-index={index} data-tag-id={tag.id} className={`tag-card cat-${String(tag.category || 'Unsorted').toLowerCase()}`} onContextMenu={onContextMenu}>
     <div className="tag-line">
       <LobeSortableList.DragHandle className="drag-handle" style={{ cursor: 'grab' }} title={`拖动 ${tag.tag} 排序`}/>
       <div className="tag-fields">
@@ -981,7 +981,7 @@ function VibePanel({ project, updateProject, showToast }) {
               <small><Icon name="info" size={12}/>调整 Information 后，只在这个位置标记编码可用，并注明“用户设置、未验证”；不会重新计算或修改文件。只改名称不会改变验证状态。</small>
               <div><LobeButton onClick={() => setEditingLibraryId('')} size="small">取消</LobeButton><LobeButton disabled={!libraryDraft.name.trim()} onClick={() => saveLibraryEdit(entry)} size="small" type="primary">保存资料</LobeButton></div>
             </div> : <>
-              <div><strong>{entry.source_kind === 'image' ? '原始参考图' : entry.name}</strong><small>{entry.source_kind === 'image' ? '尚未编码' : `${entry.encoding_count || 1} 个缓存编码 · ${entry.model || 'NovelAI V4'}`}</small><span>{entry.information_extracted_source === 'user' ? `Information ${Number(entry.information_extracted).toFixed(2)} · 用户设置、未验证` : entry.information_extracted_known ? `Information ${Number(entry.information_extracted).toFixed(2)} · 已验证` : 'Information 未知 · 固定编码'}</span></div>
+              <div><strong>{entry.source_kind === 'image' ? '原始参考图' : entry.name}</strong><small>{entry.source_kind === 'image' ? '尚未编码' : `${entry.encoding_count || 1} 个缓存编码 · ${entry.model || 'NovelAI V4'}`}</small><span className={`vibe-library-information ${entry.information_extracted_source === 'user' ? 'user' : entry.information_extracted_known ? 'verified' : 'unknown'}`}>{entry.information_extracted_source === 'user' ? `Information ${Number(entry.information_extracted).toFixed(2)} · 用户设置、未验证` : entry.information_extracted_known ? `Information ${Number(entry.information_extracted).toFixed(2)} · 已验证` : 'Information 未知 · 固定编码'}</span></div>
               <div className="vibe-library-actions"><LobeActionIcon icon={<Icon name="edit" size={12}/>} onClick={() => beginLibraryEdit(entry)} size="small" title={`编辑 ${entry.name}`} variant="borderless"/>{entry.archived_at ? <LobeButton onClick={() => setLibraryArchived(entry, false)} size="small">恢复</LobeButton> : <LobeButton disabled={project.vibes.some((vibe) => vibe.library_id === entry.id)} onClick={() => useLibraryVibe(entry)} size="small" type="primary">{project.vibes.some((vibe) => vibe.library_id === entry.id) ? '已用' : '使用'}</LobeButton>}</div>
             </>}
           </article>)}
@@ -1168,6 +1168,12 @@ export default function App({ appearance, setAppearance }) {
     '--red': lobeTheme.colorError,
     '--danger': lobeTheme.colorError,
     '--warning': lobeTheme.colorWarning,
+    '--category-artist': lobeTheme.magenta,
+    '--category-character': lobeTheme.cyan,
+    '--category-clothing': lobeTheme.purple,
+    '--category-scene': lobeTheme.green,
+    '--category-style': lobeTheme.gold,
+    '--category-unsorted': lobeTheme.colorTextTertiary,
   };
 
   useEffect(() => {
