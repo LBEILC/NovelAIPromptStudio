@@ -23,6 +23,14 @@ import { hasLimitedReproduction } from './lib/generationMetadata.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
+  loadLibraryOrganization: async () => ({ collections: [], projects: [] }),
+  createCollection: async () => ({ ok: true, collections: [], projects: [] }),
+  renameCollection: async () => ({ ok: true, collections: [], projects: [] }),
+  deleteCollection: async () => ({ ok: true, collections: [], projects: [] }),
+  addProjectsToCollection: async () => ({ ok: true, collections: [], projects: [] }),
+  removeProjectsFromCollection: async () => ({ ok: true, collections: [], projects: [] }),
+  setProjectsFavorite: async () => ({ ok: true, collections: [], projects: [] }),
+  setProjectsDeleted: async () => ({ ok: true, collections: [], projects: [] }),
   importImages: async () => [],
   updateProject: async () => ({ ok: true }),
   deleteProject: async () => ({ ok: true }),
@@ -58,6 +66,8 @@ function Icon({ name, size = 17 }) {
     spark: <><path d="m12 3 1.4 4.6L18 9l-4.6 1.4L12 15l-1.4-4.6L6 9l4.6-1.4L12 3Z"/><path d="m18.5 14 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z"/></>,
     settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></>,
     refresh: <><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 8a7 7 0 0 1 11.7-2.1L20 8M4 16l2.2 2.1A7 7 0 0 0 17.9 16"/></>,
+    star: <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/>,
+    edit: <><path d="m4 20 4.2-1 10.6-10.6-3.2-3.2L5 15.8 4 20Z"/><path d="m13.8 7 3.2 3.2"/></>,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
@@ -75,32 +85,125 @@ function relativeTime(value) {
   return new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(new Date(value));
 }
 
-function EmptyState({ onImport }) {
+function EmptyState({ onImport, hasProjects = false }) {
   return <main className="empty-state">
     <div className="empty-mark"><Icon name="image" size={32}/><span>NAI / 01</span></div>
-    <h1>把生成图变成<br/>可继续创作的资产</h1>
-    <p>导入 NovelAI 图片，自动恢复 Prompt 与生成参数。Vibe 参考图和权重会独立保存，不再随页面关闭而丢失。</p>
-    <button className="primary large" onClick={onImport}><Icon name="plus"/>导入第一批作品</button>
+    <h1>{hasProjects ? <>当前视图<br/>还没有作品</> : <>把生成图变成<br/>可继续创作的资产</>}</h1>
+    <p>{hasProjects ? '可以切换到“全部作品”查看现有资产，或继续导入新的 NovelAI 图片。' : '导入 NovelAI 图片，自动恢复 Prompt 与生成参数。Vibe 参考图和权重会独立保存，不再随页面关闭而丢失。'}</p>
+    <button className="primary large" onClick={onImport}><Icon name="plus"/>{hasProjects ? '继续导入作品' : '导入第一批作品'}</button>
     <div className="empty-hint">PNG · JPG · WEBP　支持批量导入</div>
   </main>;
 }
 
-function LibraryPanel({ projects, activeId, setActiveId, query, setQuery, onImport, onOpenPromptOverview, shortcutModifier }) {
+function LibraryPanel({
+  projects,
+  allProjects,
+  collections,
+  activeId,
+  setActiveId,
+  query,
+  setQuery,
+  onImport,
+  onOpenPromptOverview,
+  shortcutModifier,
+  libraryView,
+  onViewChange,
+  selectionMode,
+  setSelectionMode,
+  selectedIds,
+  onToggleSelected,
+  onSelectAll,
+  onClearSelection,
+  onCreateCollection,
+  onRenameCollection,
+  onDeleteCollection,
+  onAddToCollection,
+  onRemoveFromCollection,
+  onSetFavorite,
+  onSetDeleted,
+}) {
+  const [creatingCollection, setCreatingCollection] = useState(false);
+  const [collectionName, setCollectionName] = useState('');
+  const [editingCollectionId, setEditingCollectionId] = useState('');
+  const [editingCollectionName, setEditingCollectionName] = useState('');
+  const [deleteArmedId, setDeleteArmedId] = useState('');
+  const [batchCollectionId, setBatchCollectionId] = useState('');
+  const activeProjects = allProjects.filter((project) => !project.deleted_at);
+  const counts = {
+    all: activeProjects.length,
+    favorites: activeProjects.filter((project) => project.is_favorite).length,
+    ungrouped: activeProjects.filter((project) => !(project.collection_ids || []).length).length,
+    trash: allProjects.filter((project) => project.deleted_at).length,
+  };
+  const viewItems = [
+    { id: 'all', label: '全部作品', icon: 'library', count: counts.all },
+    { id: 'favorites', label: '收藏', icon: 'star', count: counts.favorites },
+    { id: 'ungrouped', label: '未分组', icon: 'layers', count: counts.ungrouped },
+    { id: 'trash', label: '回收站', icon: 'trash', count: counts.trash },
+  ];
+  const currentCollection = libraryView.startsWith('collection:') ? collections.find((collection) => `collection:${collection.id}` === libraryView) : null;
+  const currentLabel = currentCollection?.name || viewItems.find((item) => item.id === libraryView)?.label || '作品库';
+  const selectedProjects = allProjects.filter((project) => selectedIds.has(project.id));
+  const allSelectedAreFavorite = selectedProjects.length > 0 && selectedProjects.every((project) => project.is_favorite);
+
+  const submitCollection = async () => {
+    if (!(await onCreateCollection(collectionName))) return;
+    setCollectionName('');
+    setCreatingCollection(false);
+  };
+  const submitRename = async (id) => {
+    if (!(await onRenameCollection(id, editingCollectionName))) return;
+    setEditingCollectionId('');
+    setEditingCollectionName('');
+  };
+
   return <aside className="library-panel">
     <div className="brand-row">
       <div className="brand-symbol">N<span>4</span></div>
       <div><strong>Prompt Studio</strong><small>NovelAI asset desk</small></div>
     </div>
     <button className="primary import-button" onClick={onImport}><Icon name="plus"/>导入图片 <kbd>{shortcutModifier} I</kbd></button>
-    <label className="search-box"><Icon name="search"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索标签、译名或文件…"/><span>{shortcutModifier} K</span></label>
-    <div className="section-heading"><span>作品库</span><b>{projects.length}</b></div>
-    <div className="asset-list">
-      {projects.map((project) => <div key={project.id} className={`asset-row ${project.id === activeId ? 'active' : ''}`}>
-        <button className="asset-thumbnail" onClick={() => onOpenPromptOverview(project.id)} title="打开 Prompt 总览"><img src={mediaUrl(project.thumbnail_path)} alt=""/><span><Icon name="layers" size={13}/></span></button>
-        <button className="asset-select" onClick={() => setActiveId(project.id)}><span className="asset-copy"><strong>{project.name}</strong><small>{countPromptTags(project)} tags · {relativeTime(project.updated_at)}</small></span></button>
-        <span className="asset-status" title="已保存在本地"/>
+    <label className="search-box"><Icon name="search"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索当前视图…"/><span>{shortcutModifier} K</span></label>
+    <nav className="library-views" aria-label="作品库视图">
+      {viewItems.map((item) => <button key={item.id} className={libraryView === item.id ? 'active' : ''} onClick={() => onViewChange(item.id)}><Icon name={item.icon} size={14}/><span>{item.label}</span><b>{item.count}</b></button>)}
+    </nav>
+    <div className="collection-heading"><span>收藏集</span><button onClick={() => { setCreatingCollection(true); setDeleteArmedId(''); }} aria-label="新建收藏集"><Icon name="plus" size={14}/></button></div>
+    <div className="collection-list">
+      {creatingCollection && <div className="collection-editor"><input autoFocus maxLength={80} value={collectionName} onChange={(event) => setCollectionName(event.target.value)} onKeyDown={(event) => {
+        if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitCollection();
+        if (event.key === 'Escape') { setCreatingCollection(false); setCollectionName(''); }
+      }} placeholder="收藏集名称"/><button onClick={submitCollection} disabled={!collectionName.trim()}><Icon name="check" size={13}/></button><button onClick={() => { setCreatingCollection(false); setCollectionName(''); }}><Icon name="close" size={13}/></button></div>}
+      {collections.map((collection) => <div className={`collection-row ${libraryView === `collection:${collection.id}` ? 'active' : ''}`} key={collection.id}>
+        {editingCollectionId === collection.id
+          ? <div className="collection-editor"><input autoFocus maxLength={80} value={editingCollectionName} onChange={(event) => setEditingCollectionName(event.target.value)} onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitRename(collection.id);
+            if (event.key === 'Escape') setEditingCollectionId('');
+          }}/><button onClick={() => submitRename(collection.id)} disabled={!editingCollectionName.trim()}><Icon name="check" size={13}/></button><button onClick={() => setEditingCollectionId('')}><Icon name="close" size={13}/></button></div>
+          : <><button className="collection-open" onClick={() => onViewChange(`collection:${collection.id}`)}><Icon name="folder" size={13}/><span>{collection.name}</span><b>{collection.project_count}</b></button><button className="collection-action" onClick={() => { setEditingCollectionId(collection.id); setEditingCollectionName(collection.name); setDeleteArmedId(''); }} aria-label={`重命名 ${collection.name}`}><Icon name="edit" size={12}/></button><button className={`collection-action delete ${deleteArmedId === collection.id ? 'armed' : ''}`} onClick={async () => {
+            if (deleteArmedId !== collection.id) { setDeleteArmedId(collection.id); return; }
+            if (await onDeleteCollection(collection.id)) setDeleteArmedId('');
+          }} aria-label={deleteArmedId === collection.id ? `确认删除 ${collection.name}` : `删除 ${collection.name}`}>{deleteArmedId === collection.id ? '确认' : <Icon name="close" size={12}/>}</button></>}
       </div>)}
-      {!projects.length && <div className="list-empty">没有匹配的作品</div>}
+      {!collections.length && !creatingCollection && <div className="collection-empty">创建收藏集来手动整理作品</div>}
+    </div>
+    <div className="section-heading library-result-heading"><span>{currentLabel}</span><b>{projects.length}</b><button className={selectionMode ? 'active' : ''} onClick={() => { setSelectionMode(!selectionMode); onClearSelection(); }}>{selectionMode ? '完成' : '多选'}</button></div>
+    {selectionMode && <div className="library-batch-toolbar">
+      <div><button onClick={onSelectAll}>{selectedIds.size === projects.length && projects.length ? '取消全选' : '全选'}</button><span>已选 <b>{selectedIds.size}</b></span><button onClick={onClearSelection} disabled={!selectedIds.size}>清除</button></div>
+      {libraryView !== 'trash' && <div><select value={batchCollectionId} onChange={(event) => setBatchCollectionId(event.target.value)} aria-label="目标收藏集"><option value="">加入收藏集…</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select><button onClick={() => onAddToCollection(batchCollectionId)} disabled={!selectedIds.size || !batchCollectionId}>加入</button></div>}
+      <div className="batch-actions">
+        {currentCollection && <button onClick={() => onRemoveFromCollection(currentCollection.id)} disabled={!selectedIds.size}>移出当前组</button>}
+        {libraryView !== 'trash' && <button onClick={() => onSetFavorite(!allSelectedAreFavorite)} disabled={!selectedIds.size}><Icon name="star" size={13}/>{allSelectedAreFavorite ? '取消收藏' : '收藏'}</button>}
+        <button className={libraryView === 'trash' ? 'restore' : 'danger'} onClick={() => onSetDeleted(libraryView !== 'trash')} disabled={!selectedIds.size}><Icon name={libraryView === 'trash' ? 'refresh' : 'trash'} size={13}/>{libraryView === 'trash' ? '恢复' : '回收站'}</button>
+      </div>
+    </div>}
+    <div className="asset-list">
+      {projects.map((project) => <div key={project.id} className={`asset-row ${project.id === activeId ? 'active' : ''} ${selectedIds.has(project.id) ? 'selected' : ''}`}>
+        {selectionMode && <button className={`asset-check ${selectedIds.has(project.id) ? 'selected' : ''}`} onClick={() => onToggleSelected(project.id)} aria-pressed={selectedIds.has(project.id)} aria-label={`${selectedIds.has(project.id) ? '取消选择' : '选择'} ${project.name}`}>{selectedIds.has(project.id) ? '✓' : ''}</button>}
+        <button className="asset-thumbnail" onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenPromptOverview(project.id)} title={selectionMode ? '选择作品' : '打开 Prompt 总览'}><img src={mediaUrl(project.thumbnail_path)} alt=""/><span><Icon name="layers" size={13}/></span></button>
+        <button className="asset-select" onClick={() => selectionMode ? onToggleSelected(project.id) : setActiveId(project.id)}><span className="asset-copy"><strong>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.collection_ids || []).length} 组 · {relativeTime(project.updated_at)}</small></span></button>
+        {libraryView !== 'trash' && <button className={`asset-favorite ${project.is_favorite ? 'active' : ''}`} onClick={() => onSetFavorite(!project.is_favorite, [project.id])} aria-label={`${project.is_favorite ? '取消收藏' : '收藏'} ${project.name}`}><Icon name="star" size={13}/></button>}
+      </div>)}
+      {!projects.length && <div className="list-empty">{query ? '没有匹配的作品' : `「${currentLabel}」还是空的`}</div>}
     </div>
     <div className="library-footer"><Icon name="folder"/><span>本地资料库</span><i>SQLite</i></div>
   </aside>;
@@ -627,8 +730,12 @@ function Inspector({ tab, setTab, project, updateProject, showToast, promptScope
 
 export default function App() {
   const [projects, setProjects] = useState([]);
+  const [collections, setCollections] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [query, setQuery] = useState('');
+  const [libraryView, setLibraryView] = useState('all');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [tab, setTab] = useState('tags');
   const [toast, setToast] = useState('');
   const [loading, setLoading] = useState(true);
@@ -641,17 +748,19 @@ export default function App() {
   const shortcutModifier = useMemo(() => navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl', []);
 
   useEffect(() => {
-    studio.loadLibrary().then((items) => {
+    Promise.all([studio.loadLibrary(), studio.loadLibraryOrganization()]).then(([items, organization]) => {
+      const organizationByProject = new Map((organization.projects || []).map((project) => [project.id, project]));
       const repairedItems = items.map((project) => {
         const tags = repairLegacyPromptTags(project.tags, project.metadata.prompt_raw);
         const promptStructure = normalizePromptStructure(project.prompt_structure, project.metadata);
-        const repaired = syncProjectPromptMetadata({ ...project, tags, prompt_structure: promptStructure });
+        const repaired = syncProjectPromptMetadata({ ...project, ...organizationByProject.get(project.id), tags, prompt_structure: promptStructure });
         const needsMigration = tags !== project.tags || !project.prompt_structure?.base_undesired_tags;
         if (needsMigration) studio.updateProject(repaired);
         return repaired;
       });
       setProjects(repairedItems);
-      setActiveId(repairedItems[0]?.id || null);
+      setCollections(organization.collections || []);
+      setActiveId(repairedItems.find((project) => !project.deleted_at)?.id || null);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -671,10 +780,31 @@ export default function App() {
     if (workspaceMode !== 'prompt') setOverviewCopy({ text: '', count: 0, selected: false, categoryCount: 0 });
   }, [activeId, workspaceMode]);
   const filteredProjects = useMemo(() => {
+    const viewProjects = projects.filter((project) => {
+      if (libraryView === 'trash') return Boolean(project.deleted_at);
+      if (project.deleted_at) return false;
+      if (libraryView === 'favorites') return Boolean(project.is_favorite);
+      if (libraryView === 'ungrouped') return !(project.collection_ids || []).length;
+      if (libraryView.startsWith('collection:')) return (project.collection_ids || []).includes(libraryView.slice('collection:'.length));
+      return true;
+    });
     const needles = expandSearch(query);
-    if (!needles.length) return projects;
-    return projects.filter((project) => [project.name, ...allPromptTags(project).flatMap((tag) => [tag.tag, tag.translation, tag.category, CATEGORY_LABELS[tag.category]])].some((value) => needles.some((needle) => normalizeSearch(value).includes(needle))));
-  }, [projects, query]);
+    if (!needles.length) return viewProjects;
+    return viewProjects.filter((project) => [project.name, ...allPromptTags(project).flatMap((tag) => [tag.tag, tag.translation, tag.category, CATEGORY_LABELS[tag.category]])].some((value) => needles.some((needle) => normalizeSearch(value).includes(needle))));
+  }, [projects, query, libraryView]);
+
+  useEffect(() => {
+    if (activeId && filteredProjects.some((project) => project.id === activeId)) return;
+    setActiveId(filteredProjects[0]?.id || null);
+  }, [activeId, filteredProjects]);
+
+  useEffect(() => {
+    const visibleIds = new Set(filteredProjects.map((project) => project.id));
+    setSelectedIds((current) => {
+      const next = new Set([...current].filter((id) => visibleIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [filteredProjects]);
 
   const showToast = (message) => {
     setToast(message);
@@ -682,11 +812,96 @@ export default function App() {
     showToast.timer = window.setTimeout(() => setToast(''), 2200);
   };
 
+  const applyLibraryOrganization = (organization) => {
+    const byProject = new Map((organization.projects || []).map((project) => [project.id, project]));
+    setProjects((current) => current.map((project) => byProject.has(project.id) ? { ...project, ...byProject.get(project.id) } : project));
+    setCollections(organization.collections || []);
+  };
+
+  const runLibraryOrganization = async (action, successMessage) => {
+    try {
+      const result = await action();
+      if (!result?.ok) { showToast(result?.error || '操作没有完成'); return false; }
+      applyLibraryOrganization(result);
+      if (successMessage) showToast(successMessage);
+      return true;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+      return false;
+    }
+  };
+
+  const changeLibraryView = (view) => {
+    setLibraryView(view);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelected = (projectId) => setSelectedIds((current) => {
+    const next = new Set(current);
+    if (next.has(projectId)) next.delete(projectId);
+    else next.add(projectId);
+    return next;
+  });
+
+  const toggleSelectAll = () => setSelectedIds((current) => {
+    const visibleIds = filteredProjects.map((project) => project.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => current.has(id));
+    if (allSelected) return new Set([...current].filter((id) => !visibleIds.includes(id)));
+    return new Set([...current, ...visibleIds]);
+  });
+
+  const createCollection = (name) => runLibraryOrganization(() => studio.createCollection(name), `已创建收藏集「${name.trim()}」`);
+  const renameCollection = (id, name) => runLibraryOrganization(() => studio.renameCollection(id, name), '收藏集已重命名');
+  const deleteCollection = async (id) => {
+    const success = await runLibraryOrganization(() => studio.deleteCollection(id), '收藏集已删除，作品仍保留在库中');
+    if (success && libraryView === `collection:${id}`) changeLibraryView('all');
+    return success;
+  };
+  const addSelectedToCollection = async (collectionId) => {
+    if (!collectionId || !selectedIds.size) return false;
+    const success = await runLibraryOrganization(
+      () => studio.addProjectsToCollection(collectionId, [...selectedIds]),
+      `已把 ${selectedIds.size} 个作品加入收藏集`,
+    );
+    if (success) setSelectedIds(new Set());
+    return success;
+  };
+  const removeSelectedFromCollection = async (collectionId) => {
+    if (!collectionId || !selectedIds.size) return false;
+    const success = await runLibraryOrganization(
+      () => studio.removeProjectsFromCollection(collectionId, [...selectedIds]),
+      `已从当前收藏集移出 ${selectedIds.size} 个作品`,
+    );
+    if (success) setSelectedIds(new Set());
+    return success;
+  };
+  const setFavorite = async (favorite, projectIds = [...selectedIds]) => {
+    if (!projectIds.length) return false;
+    const success = await runLibraryOrganization(
+      () => studio.setProjectsFavorite(projectIds, favorite),
+      favorite ? `已收藏 ${projectIds.length} 个作品` : `已取消收藏 ${projectIds.length} 个作品`,
+    );
+    if (success && projectIds.length > 1) setSelectedIds(new Set());
+    return success;
+  };
+  const setDeleted = async (deleted) => {
+    const projectIds = [...selectedIds];
+    if (!projectIds.length) return false;
+    const success = await runLibraryOrganization(
+      () => studio.setProjectsDeleted(projectIds, deleted),
+      deleted ? `已将 ${projectIds.length} 个作品移入回收站` : `已恢复 ${projectIds.length} 个作品`,
+    );
+    if (success) setSelectedIds(new Set());
+    return success;
+  };
+
   const importImages = async () => {
     const imported = await studio.importImages();
     if (!imported.length) return;
     setProjects((current) => [...imported, ...current]);
     setActiveId(imported[0].id);
+    setLibraryView('all');
+    setSelectedIds(new Set());
     setWorkspaceMode('image');
     setPromptScopeKey('base:prompt');
     const limitedCount = imported.filter((project) => hasLimitedReproduction(project.metadata)).length;
@@ -771,11 +986,37 @@ export default function App() {
   if (loading) return <div className="loading-screen"><div className="brand-symbol">N<span>4</span></div><span>正在打开本地资料库…</span></div>;
 
   return <div className="app-shell">
-    <LibraryPanel projects={filteredProjects} activeId={activeId} setActiveId={(id) => { setActiveId(id); setActiveVersion('current'); setPromptScopeKey('base:prompt'); }} query={query} setQuery={setQuery} onImport={importImages} onOpenPromptOverview={openPromptOverview} shortcutModifier={shortcutModifier}/>
+    <LibraryPanel
+      projects={filteredProjects}
+      allProjects={projects}
+      collections={collections}
+      activeId={activeId}
+      setActiveId={(id) => { setActiveId(id); setActiveVersion('current'); setPromptScopeKey('base:prompt'); }}
+      query={query}
+      setQuery={setQuery}
+      onImport={importImages}
+      onOpenPromptOverview={openPromptOverview}
+      shortcutModifier={shortcutModifier}
+      libraryView={libraryView}
+      onViewChange={changeLibraryView}
+      selectionMode={selectionMode}
+      setSelectionMode={setSelectionMode}
+      selectedIds={selectedIds}
+      onToggleSelected={toggleSelected}
+      onSelectAll={toggleSelectAll}
+      onClearSelection={() => setSelectedIds(new Set())}
+      onCreateCollection={createCollection}
+      onRenameCollection={renameCollection}
+      onDeleteCollection={deleteCollection}
+      onAddToCollection={addSelectedToCollection}
+      onRemoveFromCollection={removeSelectedFromCollection}
+      onSetFavorite={setFavorite}
+      onSetDeleted={setDeleted}
+    />
     {activeProject ? <>
       <PreviewStage project={activeProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} updateProject={updateProject} saveVersion={saveVersion} restoreVersion={restoreVersion} activeVersion={activeVersion} setActiveVersion={setActiveVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
       <Inspector tab={tab} setTab={setTab} project={activeProject} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId}/>
-    </> : <EmptyState onImport={importImages}/>}
+    </> : <EmptyState onImport={importImages} hasProjects={projects.length > 0}/>}
     {toast && <div className="toast"><Icon name="check"/>{toast}</div>}
   </div>;
 }

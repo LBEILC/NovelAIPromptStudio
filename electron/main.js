@@ -17,6 +17,14 @@ let database;
 let assetsDirectory;
 let preferences;
 
+function libraryOrganizationResult(action) {
+  try {
+    return { ok: true, ...action() };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 function embeddedVibeState(project) {
   const items = projectEmbeddedVibes(project);
   const library = new Map(database.loadVibeLibrary().map((entry) => [entry.id, entry]));
@@ -108,6 +116,14 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('library:load', () => database.loadLibrary());
+  ipcMain.handle('library:organization:load', () => database.loadLibraryOrganization());
+  ipcMain.handle('library:collection:create', (_event, name) => libraryOrganizationResult(() => database.createCollection(name)));
+  ipcMain.handle('library:collection:rename', (_event, id, name) => libraryOrganizationResult(() => database.renameCollection(id, name)));
+  ipcMain.handle('library:collection:delete', (_event, id) => libraryOrganizationResult(() => database.deleteCollection(id)));
+  ipcMain.handle('library:collection:add-projects', (_event, collectionId, projectIds) => libraryOrganizationResult(() => database.addProjectsToCollection(collectionId, projectIds)));
+  ipcMain.handle('library:collection:remove-projects', (_event, collectionId, projectIds) => libraryOrganizationResult(() => database.removeProjectsFromCollection(collectionId, projectIds)));
+  ipcMain.handle('library:projects:favorite', (_event, projectIds, favorite) => libraryOrganizationResult(() => database.setProjectsFavorite(projectIds, favorite)));
+  ipcMain.handle('library:projects:trash', (_event, projectIds, deleted) => libraryOrganizationResult(() => database.setProjectsDeleted(projectIds, deleted)));
   ipcMain.handle('library:import-images', async () => {
     const result = await dialog.showOpenDialog({
       title: '导入 NovelAI 图片',

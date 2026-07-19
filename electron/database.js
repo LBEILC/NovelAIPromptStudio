@@ -15,9 +15,26 @@ CREATE TABLE IF NOT EXISTS projects (
   name TEXT NOT NULL,
   image_path TEXT NOT NULL,
   thumbnail_path TEXT NOT NULL,
+  is_favorite INTEGER NOT NULL DEFAULT 0,
+  deleted_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS collections (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT 'amber',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS collection_members (
+  collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL DEFAULT 0,
+  added_at TEXT NOT NULL,
+  PRIMARY KEY (collection_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS idx_collection_members_project ON collection_members(project_id);
 CREATE TABLE IF NOT EXISTS prompt_tags (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -152,6 +169,13 @@ export async function openDatabase(dataDirectory) {
     ? new SQL.Database(fs.readFileSync(filePath))
     : new SQL.Database();
   database.run(schema);
+  const projectColumns = database.exec('PRAGMA table_info(projects)')[0]?.values.map((row) => row[1]) || [];
+  if (!projectColumns.includes('is_favorite')) {
+    database.run('ALTER TABLE projects ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!projectColumns.includes('deleted_at')) {
+    database.run("ALTER TABLE projects ADD COLUMN deleted_at TEXT NOT NULL DEFAULT ''");
+  }
   const versionColumns = database.exec('PRAGMA table_info(prompt_versions)')[0]?.values.map((row) => row[1]) || [];
   if (!versionColumns.includes('change_summary')) {
     database.run("ALTER TABLE prompt_versions ADD COLUMN change_summary TEXT NOT NULL DEFAULT ''");
@@ -306,6 +330,29 @@ export async function openDatabase(dataDirectory) {
     };
   };
 
+  const projectCollectionIds = (projectId) => query(
+    'SELECT collection_id FROM collection_members WHERE project_id = $project_id ORDER BY added_at, collection_id',
+    { $project_id: projectId },
+  ).map((row) => row.collection_id);
+
+  const loadCollections = () => query(
+    `SELECT collections.*,
+      COUNT(CASE WHEN projects.deleted_at = '' THEN collection_members.project_id END) AS project_count
+     FROM collections
+     LEFT JOIN collection_members ON collection_members.collection_id = collections.id
+     LEFT JOIN projects ON projects.id = collection_members.project_id
+     GROUP BY collections.id
+     ORDER BY collections.created_at, collections.name COLLATE NOCASE`,
+  );
+
+  const loadLibraryOrganization = () => ({
+    collections: loadCollections(),
+    projects: query('SELECT id, is_favorite, deleted_at FROM projects').map((project) => ({
+      ...project,
+      collection_ids: projectCollectionIds(project.id),
+    })),
+  });
+
   const loadLibrary = () => {
     const projects = query('SELECT * FROM projects ORDER BY updated_at DESC');
     return projects.map((project) => {
@@ -316,6 +363,7 @@ export async function openDatabase(dataDirectory) {
         tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', { $id: project.id }),
         metadata,
         prompt_structure: safeJson(metadata.prompt_structure_json),
+        collection_ids: projectCollectionIds(project.id),
         vibes: query('SELECT * FROM vibe_transfers WHERE project_id = $id ORDER BY position', { $id: project.id }),
         versions: query('SELECT * FROM prompt_versions WHERE project_id = $id ORDER BY created_at DESC', { $id: project.id }),
       });
@@ -323,6 +371,98 @@ export async function openDatabase(dataDirectory) {
   };
 
   const loadVibeLibrary = () => query('SELECT * FROM vibe_library ORDER BY created_at DESC');
+
+  const runOrganizationMutation = (mutate) => {
+    database.run('BEGIN');
+    try {
+      mutate();
+      database.run('COMMIT');
+      persist();
+      return loadLibraryOrganization();
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+  };
+
+  const cleanCollectionName = (name) => {
+    const cleaned = String(name || '').trim();
+    if (!cleaned) throw new Error('收藏集名称不能为空');
+    if (cleaned.length > 80) throw new Error('收藏集名称不能超过 80 个字符');
+    return cleaned;
+  };
+
+  const createCollection = (name) => runOrganizationMutation(() => {
+    const cleaned = cleanCollectionName(name);
+    const duplicate = query('SELECT id FROM collections WHERE LOWER(name) = LOWER($name)', { $name: cleaned })[0];
+    if (duplicate) throw new Error('已经存在同名收藏集');
+    const now = new Date().toISOString();
+    database.run(
+      'INSERT INTO collections (id, name, color, created_at, updated_at) VALUES ($id, $name, $color, $created_at, $updated_at)',
+      { $id: crypto.randomUUID(), $name: cleaned, $color: 'amber', $created_at: now, $updated_at: now },
+    );
+  });
+
+  const renameCollection = (id, name) => runOrganizationMutation(() => {
+    const cleaned = cleanCollectionName(name);
+    const duplicate = query('SELECT id FROM collections WHERE LOWER(name) = LOWER($name) AND id != $id', { $name: cleaned, $id: id })[0];
+    if (duplicate) throw new Error('已经存在同名收藏集');
+    database.run(
+      'UPDATE collections SET name = $name, updated_at = $updated_at WHERE id = $id',
+      { $id: String(id || ''), $name: cleaned, $updated_at: new Date().toISOString() },
+    );
+  });
+
+  const deleteCollection = (id) => runOrganizationMutation(() => {
+    database.run('DELETE FROM collections WHERE id = $id', { $id: String(id || '') });
+  });
+
+  const uniqueProjectIds = (projectIds) => [...new Set((projectIds || []).map((id) => String(id || '')).filter(Boolean))];
+
+  const addProjectsToCollection = (collectionId, projectIds) => runOrganizationMutation(() => {
+    const collection = query('SELECT id FROM collections WHERE id = $id', { $id: String(collectionId || '') })[0];
+    if (!collection) throw new Error('收藏集不存在或已被删除');
+    let position = Number(query('SELECT MAX(position) AS position FROM collection_members WHERE collection_id = $id', { $id: collection.id })[0]?.position ?? -1) + 1;
+    const now = new Date().toISOString();
+    for (const projectId of uniqueProjectIds(projectIds)) {
+      const project = query("SELECT id FROM projects WHERE id = $id AND deleted_at = ''", { $id: projectId })[0];
+      if (!project) continue;
+      database.run(
+        `INSERT OR IGNORE INTO collection_members (collection_id, project_id, position, added_at)
+         VALUES ($collection_id, $project_id, $position, $added_at)`,
+        { $collection_id: collection.id, $project_id: project.id, $position: position, $added_at: now },
+      );
+      position += 1;
+    }
+  });
+
+  const removeProjectsFromCollection = (collectionId, projectIds) => runOrganizationMutation(() => {
+    for (const projectId of uniqueProjectIds(projectIds)) {
+      database.run(
+        'DELETE FROM collection_members WHERE collection_id = $collection_id AND project_id = $project_id',
+        { $collection_id: String(collectionId || ''), $project_id: projectId },
+      );
+    }
+  });
+
+  const setProjectsFavorite = (projectIds, favorite) => runOrganizationMutation(() => {
+    for (const projectId of uniqueProjectIds(projectIds)) {
+      database.run(
+        'UPDATE projects SET is_favorite = $favorite, updated_at = $updated_at WHERE id = $id',
+        { $id: projectId, $favorite: favorite ? 1 : 0, $updated_at: new Date().toISOString() },
+      );
+    }
+  });
+
+  const setProjectsDeleted = (projectIds, deleted) => runOrganizationMutation(() => {
+    const now = new Date().toISOString();
+    for (const projectId of uniqueProjectIds(projectIds)) {
+      database.run(
+        'UPDATE projects SET deleted_at = $deleted_at, updated_at = $updated_at WHERE id = $id',
+        { $id: projectId, $deleted_at: deleted ? now : '', $updated_at: now },
+      );
+    }
+  });
 
   const upsertVibeLibrary = (entries = []) => {
     for (const entry of entries) {
@@ -538,5 +678,27 @@ export async function openDatabase(dataDirectory) {
     persist();
   };
 
-  return { loadLibrary, loadVibeLibrary, upsertVibeLibrary, resolveVibeLibraryId, lookupTagDictionary, upsertTagDictionary, enrichProjectTags, insertProject, updateProject, deleteProject, persist, filePath };
+  return {
+    loadLibrary,
+    loadCollections,
+    loadLibraryOrganization,
+    createCollection,
+    renameCollection,
+    deleteCollection,
+    addProjectsToCollection,
+    removeProjectsFromCollection,
+    setProjectsFavorite,
+    setProjectsDeleted,
+    loadVibeLibrary,
+    upsertVibeLibrary,
+    resolveVibeLibraryId,
+    lookupTagDictionary,
+    upsertTagDictionary,
+    enrichProjectTags,
+    insertProject,
+    updateProject,
+    deleteProject,
+    persist,
+    filePath,
+  };
 }

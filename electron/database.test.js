@@ -133,4 +133,52 @@ describe('prompt structure persistence', () => {
     const target = database.loadLibrary().find((project) => project.id === 'dictionary-target');
     expect(target.tags[0]).toMatchObject({ translation: '画师 Ciloranko', translation_source: 'cache', category: 'Artist', category_source: 'cache' });
   });
+
+  it('keeps collection membership through trash and restore operations', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-database-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    const now = new Date().toISOString();
+    const project = (id) => ({
+      id,
+      name: id,
+      image_path: `${id}.png`,
+      thumbnail_path: `${id}.webp`,
+      created_at: now,
+      updated_at: now,
+      tags: [],
+      prompt_structure: { base_undesired_tags: [], use_coords: false, use_order: true, characters: [] },
+      metadata: { extra_json: '{}' },
+      vibes: [],
+      versions: [],
+    });
+    database.insertProject(project('project-a'));
+    database.insertProject(project('project-b'));
+
+    let organization = database.createCollection('角色测试');
+    const collectionId = organization.collections[0].id;
+    organization = database.addProjectsToCollection(collectionId, ['project-a', 'project-b', 'project-b']);
+    expect(organization.collections[0].project_count).toBe(2);
+    expect(organization.projects.find((item) => item.id === 'project-a').collection_ids).toEqual([collectionId]);
+
+    organization = database.setProjectsFavorite(['project-a'], true);
+    expect(organization.projects.find((item) => item.id === 'project-a').is_favorite).toBe(1);
+
+    organization = database.setProjectsDeleted(['project-b'], true);
+    expect(organization.collections[0].project_count).toBe(1);
+    expect(organization.projects.find((item) => item.id === 'project-b').deleted_at).not.toBe('');
+    expect(organization.projects.find((item) => item.id === 'project-b').collection_ids).toEqual([collectionId]);
+
+    organization = database.setProjectsDeleted(['project-b'], false);
+    expect(organization.collections[0].project_count).toBe(2);
+    expect(organization.projects.find((item) => item.id === 'project-b').collection_ids).toEqual([collectionId]);
+
+    organization = database.removeProjectsFromCollection(collectionId, ['project-a']);
+    expect(organization.collections[0].project_count).toBe(1);
+    expect(organization.projects.find((item) => item.id === 'project-a').collection_ids).toEqual([]);
+
+    organization = database.deleteCollection(collectionId);
+    expect(organization.collections).toEqual([]);
+    expect(database.loadLibrary()).toHaveLength(2);
+  });
 });
