@@ -270,7 +270,7 @@ function LibraryPanel({
       <div><strong>Prompt Studio</strong><small>NovelAI asset desk</small></div>
     </div>
     <LobeButton block className="import-button" icon={<Icon name="plus"/>} onClick={onImport} type="primary">导入图片 <kbd>{shortcutModifier} I</kbd></LobeButton>
-    <LobeSearchBar className="search-box" enableShortKey onInputChange={setQuery} placeholder="搜索当前视图…" value={query}/>
+    <LobeSearchBar className="search-box" enableShortKey onInputChange={setQuery} placeholder="搜索当前视图…" styles={{ input: { width: '100%' } }} value={query} variant="outlined"/>
     <nav className="library-views" aria-label="作品库视图">
       {viewItems.map((item) => <LobeButton block key={item.id} className={libraryView === item.id ? 'active' : ''} icon={<Icon name={item.icon} size={14}/>} onClick={() => onViewChange(item.id)} type="text"><span>{item.label}</span><b>{item.count}</b></LobeButton>)}
     </nav>
