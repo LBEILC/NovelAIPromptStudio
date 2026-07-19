@@ -24,7 +24,7 @@ import { groupVibeLibraryBySource } from './lib/vibeLibrary.js';
 import { informationExtractedPatch, informationExtractedState, restoreOriginalInformationPatch } from './lib/vibes.js';
 import { hasLimitedReproduction } from './lib/generationMetadata.js';
 import { assessDroppedFiles } from './lib/importDrop.js';
-import { applyGenerationSnapshot, branchChangeSummary, generationSnapshot, hasGenerationChanges } from './lib/branches.js';
+import { applyGenerationSnapshot, branchChangeFields, branchChangeSummary, generationSnapshot, hasGenerationChanges } from './lib/branches.js';
 import { contextMenuPosition, isTextEditingTarget } from './lib/contextMenu.js';
 
 const studio = window.studio || {
@@ -348,7 +348,39 @@ const BRANCH_STATUS_LABELS = {
   mismatch: '结果不匹配',
 };
 
-function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal, onEditTag, onTagContextMenu, onProjectContextMenu, onBranchContextMenu, onOpenResult, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, branchResultImporting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
+function experimentFieldValue(project, field) {
+  if (field === 'Prompt') return formatPositivePromptForCopy(project) || '空 Prompt';
+  if (field === 'Vibe') return (project.vibes || []).filter((vibe) => vibe.enabled).map((vibe) => `${vibe.name || 'Vibe'} ${Number(vibe.strength ?? .6).toFixed(2)}`).join(' + ') || '无';
+  const key = { Seed: 'seed', Model: 'model', Sampler: 'sampler', Steps: 'steps', CFG: 'guidance' }[field];
+  return String(project.metadata?.[key] ?? '') || '—';
+}
+
+function ExperimentCompare({ experiment, projects, selectedIds }) {
+  const [view, setView] = useState('visual');
+  const selected = projects.filter((project) => selectedIds.has(project.id)).slice(0, 4);
+  const baseline = projects.find((project) => project.id === experiment.baseline_project_id) || selected[0];
+  const fields = experiment.variable_fields || [];
+  const tableColumns = { gridTemplateColumns: `88px repeat(${Math.max(1, selected.length)}, minmax(125px, 1fr))` };
+  return <div className="experiment-compare">
+    <header>
+      <div><span>CONTROLLED COMPARISON</span><strong>{experiment.name}</strong><small>基准：{experiment.baseline_name || baseline?.name || '未知'} · {selected.length} 个视图</small></div>
+      <div className="compare-view-switch"><button className={view === 'visual' ? 'active' : ''} onClick={() => setView('visual')}><Icon name="image" size={14}/>视觉对比</button><button className={view === 'parameters' ? 'active' : ''} onClick={() => setView('parameters')}><Icon name="layers" size={14}/>参数差异</button></div>
+    </header>
+    {experiment.analysis_status === 'mixed' && <div className="compare-causality-warning"><Icon name="warning" size={14}/>当前实验有多个变化字段，只适合视觉筛选，不能归因于单个参数。</div>}
+    {view === 'visual' ? <div className={`compare-grid count-${selected.length}`}>
+      {selected.map((project) => <figure key={project.id} className={project.id === experiment.baseline_project_id ? 'baseline' : ''}>
+        <div><img src={mediaUrl(project.image_path)} alt={project.name}/><span>{project.id === experiment.baseline_project_id ? 'BASELINE' : branchChangeFields(baseline, project).join(' · ') || 'SAME'}</span></div>
+        <figcaption><strong>{project.name}</strong><small>Seed {project.metadata?.seed || '—'} · {project.metadata?.model || 'Model unknown'}</small></figcaption>
+      </figure>)}
+    </div> : <div className="compare-parameter-table">
+      <div className="compare-table-row heading" style={tableColumns}><b>变化字段</b>{selected.map((project) => <strong key={project.id}>{project.id === experiment.baseline_project_id ? '基准 · ' : ''}{project.name}</strong>)}</div>
+      {fields.map((field) => <div className="compare-table-row" style={tableColumns} key={field}><b>{field}</b>{selected.map((project) => { const value = experimentFieldValue(project, field); return <span key={project.id} title={value}>{value}</span>; })}</div>)}
+      {!fields.length && <div className="compare-table-empty">成员的可比较生成参数相同</div>}
+    </div>}
+  </div>;
+}
+
+function PreviewStage({ project, sourceProject, mode, setMode, experiment, experimentProjects, comparisonIds, onToggleComparison, onCopy, onReveal, onEditTag, onTagContextMenu, onProjectContextMenu, onBranchContextMenu, onOpenResult, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, branchResultImporting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
   const limitedReproduction = hasLimitedReproduction(project.metadata);
   const activeBranch = (sourceProject.branches || []).find((branch) => branch.id === activeBranchId);
   const mismatchResult = activeBranch?.results?.find((result) => result.match_status === 'mismatch');
@@ -362,12 +394,13 @@ function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal,
         <div className="workspace-switch" aria-label="工作区视图">
           <button className={mode === 'image' ? 'active' : ''} onClick={() => setMode('image')}><Icon name="image"/>图像</button>
           <button className={mode === 'prompt' ? 'active' : ''} onClick={() => setMode('prompt')}><Icon name="layers"/>Prompt</button>
+          {experiment && <button className={mode === 'compare' ? 'active' : ''} onClick={() => setMode('compare')}><Icon name="library"/>对比</button>}
         </div>
         <button className="ghost" onClick={() => onReveal(sourceProject.image_path)} title="在文件夹中显示原图"><Icon name="folder"/></button>
         <button className="copy-button" onClick={onCopy} disabled={mode === 'prompt' && !overviewCopy.count}><Icon name="copy"/>{copyLabel}</button>
       </div>
     </header>
-    {mode === 'image' ? <div className="stage">
+    {mode === 'compare' && experiment ? <ExperimentCompare experiment={experiment} projects={experimentProjects} selectedIds={comparisonIds}/> : mode === 'image' ? <div className="stage">
       <div className="image-mat">
         <img src={mediaUrl(sourceProject.image_path)} alt={sourceProject.name}/>
         <div className="image-index">ASSET<br/><b>{String(countPromptTags(project)).padStart(2, '0')}</b></div>
@@ -389,7 +422,19 @@ function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal,
         <footer>{mismatchResult.actual_branch_id && <button onClick={() => onSelectBranch(mismatchResult.actual_branch_id)}>打开实际结果分支</button>}<button onClick={() => onOpenResult(mismatchResult.project_id)}>查看结果图</button></footer>
       </aside>}
     </div> : <PromptOverview project={project} updateProject={updateProject} onEditTag={onEditTag} onTagContextMenu={onTagContextMenu} onCopyContextChange={onOverviewCopyChange} onCopyText={onCopyText} onNotify={onNotify}/>}
-    <footer className="version-rail branch-rail">
+    {mode === 'compare' && experiment ? <footer className="version-rail experiment-rail">
+      <div className="rail-title"><span><Icon name="history"/>实验胶片</span><small>选择 2–4 个成员；基准固定保留</small></div>
+      <div className="version-strip experiment-strip">
+        {experimentProjects.map((member) => {
+          const selected = comparisonIds.has(member.id);
+          const baseline = member.id === experiment.baseline_project_id;
+          const differences = baseline ? [] : branchChangeFields(experimentProjects.find((item) => item.id === experiment.baseline_project_id), member);
+          return <button key={member.id} className={`version-card experiment-card ${selected ? 'selected' : ''} ${baseline ? 'baseline' : ''}`} onClick={() => onToggleComparison(member.id)} onContextMenu={(event) => onProjectContextMenu(event, member)} aria-pressed={selected}>
+            <img src={mediaUrl(member.thumbnail_path)} alt=""/><span><b>{member.name}</b><small>{baseline ? '基准结果' : differences.join(' · ') || '参数相同'}</small></span><em>{baseline ? 'BASE' : selected ? '对比中' : '加入'}</em>
+          </button>;
+        })}
+      </div>
+    </footer> : <footer className="version-rail branch-rail">
       <div className="rail-title"><span><Icon name="history"/>生成分支</span><div className="rail-actions">
         {activeBranch?.status === 'draft' && <><button className="restore-action danger" onClick={() => onDiscardBranch(activeBranch.id)}>放弃草稿</button><button onClick={() => onMarkBranchWaiting(activeBranch.id)}><Icon name="check"/>标记待生成</button></>}
         {activeBranch && ['waiting', 'result', 'mismatch'].includes(activeBranch.status) && <button onClick={() => onImportBranchResult(activeBranch.id)} disabled={branchResultImporting === activeBranch.id}><Icon name="upload"/>{branchResultImporting === activeBranch.id ? '正在核对…' : '上传结果图'}</button>}
@@ -406,7 +451,7 @@ function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal,
         </button>)}
         {!(sourceProject.branches || []).length && !(sourceProject.versions || []).length && <div className="version-empty">修改 Prompt、Vibe 或生成参数时，会自动创建分支草稿</div>}
       </div>
-    </footer>
+    </footer>}
   </section>;
 }
 
@@ -936,6 +981,7 @@ export default function App() {
   const [promptScopeKey, setPromptScopeKey] = useState('base:prompt');
   const [focusTagId, setFocusTagId] = useState(null);
   const [branchResultImporting, setBranchResultImporting] = useState('');
+  const [comparisonIds, setComparisonIds] = useState(new Set());
   const saveTimers = useRef(new Map());
   const branchSaveTimers = useRef(new Map());
   const branchCreatePromises = useRef(new Map());
@@ -1009,6 +1055,8 @@ export default function App() {
   });
 
   const sourceProject = projects.find((project) => project.id === activeId) || null;
+  const activeExperiment = libraryView.startsWith('experiment:') ? experiments.find((entry) => `experiment:${entry.id}` === libraryView) : null;
+  const experimentProjects = (activeExperiment?.member_ids || []).map((id) => projects.find((project) => project.id === id)).filter(Boolean);
   const activeBranch = sourceProject?.branches?.find((branch) => branch.id === activeBranchId) || null;
   const activeProject = sourceProject && activeBranch
     ? applyGenerationSnapshot(sourceProject, parseBranchSnapshot(activeBranch))
@@ -1018,6 +1066,20 @@ export default function App() {
     if (!activeBranchId || sourceProject?.branches?.some((branch) => branch.id === activeBranchId)) return;
     setActiveBranchId('');
   }, [activeBranchId, sourceProject]);
+
+  useEffect(() => {
+    if (!activeExperiment) { setComparisonIds(new Set()); return; }
+    const memberIds = activeExperiment.member_ids || [];
+    setComparisonIds((current) => {
+      const next = new Set([...current].filter((id) => memberIds.includes(id) && id !== activeExperiment.baseline_project_id).slice(0, 3));
+      if (activeExperiment.baseline_project_id) next.add(activeExperiment.baseline_project_id);
+      for (const id of memberIds) {
+        if (next.size >= 2) break;
+        next.add(id);
+      }
+      return next;
+    });
+  }, [activeExperiment?.id, activeExperiment?.baseline_project_id, activeExperiment?.member_ids?.join('|')]);
 
   useEffect(() => {
     if (workspaceMode !== 'prompt') setOverviewCopy({ text: '', count: 0, selected: false, categoryCount: 0 });
@@ -1086,6 +1148,7 @@ export default function App() {
   const changeLibraryView = (view) => {
     setLibraryView(view);
     setSelectedIds(new Set());
+    setWorkspaceMode(view.startsWith('experiment:') ? 'compare' : workspaceMode === 'compare' ? 'image' : workspaceMode);
   };
 
   const toggleSelected = (projectId) => setSelectedIds((current) => {
@@ -1101,6 +1164,22 @@ export default function App() {
     if (allSelected) return new Set([...current].filter((id) => !visibleIds.includes(id)));
     return new Set([...current, ...visibleIds]);
   });
+
+  const toggleComparison = (projectId) => {
+    if (!activeExperiment) return;
+    if (projectId === activeExperiment.baseline_project_id) { showToast('基准作品固定保留在对比中'); return; }
+    setComparisonIds((current) => {
+      const next = new Set(current);
+      if (next.has(projectId)) {
+        if (next.size <= 2) { showToast('对比模式至少保留 2 个成员'); return current; }
+        next.delete(projectId);
+      } else {
+        if (next.size >= 4) { showToast('一次最多对比 4 个成员'); return current; }
+        next.add(projectId);
+      }
+      return next;
+    });
+  };
 
   const createCollection = (name) => runLibraryOrganization(() => studio.createCollection(name), `已创建收藏集「${name.trim()}」`);
   const renameCollection = (id, name) => runLibraryOrganization(() => studio.renameCollection(id, name), '收藏集已重命名');
@@ -1615,7 +1694,7 @@ export default function App() {
       onProjectContextMenu={projectContextMenu}
     />
     {activeProject ? <>
-      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} onTagContextMenu={tagContextMenu} onProjectContextMenu={projectContextMenu} onBranchContextMenu={branchContextMenu} onOpenResult={openResultProject} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onImportBranchResult={importBranchResult} branchResultImporting={branchResultImporting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
+      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} experiment={activeExperiment} experimentProjects={experimentProjects} comparisonIds={comparisonIds} onToggleComparison={toggleComparison} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} onTagContextMenu={tagContextMenu} onProjectContextMenu={projectContextMenu} onBranchContextMenu={branchContextMenu} onOpenResult={openResultProject} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onImportBranchResult={importBranchResult} branchResultImporting={branchResultImporting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
       <Inspector tab={tab} setTab={setTab} project={activeProject} branch={activeBranch} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId} onTagContextMenu={tagContextMenu}/>
     </> : <EmptyState onImport={importImages} hasProjects={projects.length > 0}/>}
     <ImportExperience
