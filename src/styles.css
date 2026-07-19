@@ -163,8 +163,11 @@ button { border: 0; }
 .asset-copy strong, .asset-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .asset-copy strong { font-size: 12px; font-weight: 600; color: #dbe2e7; }
 .asset-copy small { margin-top: 5px; color: #6f7c87; font-size: 9px; }
-.asset-check { width: 18px; height: 18px; flex: 0 0 auto; display: grid; place-items: center; color: #11171d; background: #111820; border: 1px solid #4a5964; border-radius: 3px; font: 800 10px/1 var(--font-ui); }
-.asset-check.selected { color: #24190b; background: var(--accent); border-color: var(--accent); }
+.asset-check { width: 22px; height: 30px; flex: 0 0 auto; display: grid; place-items: center; padding: 0; color: inherit; background: transparent; }
+.selection-mark { width: 18px; height: 18px; flex: 0 0 auto; display: grid; place-items: center; color: #24190b; background: #111820; border: 1px solid #4a5964; border-radius: 4px; transition: border-color .14s ease-out, background .14s ease-out, transform .14s ease-out; }
+.selection-mark.selected { background: var(--accent); border-color: var(--accent); box-shadow: inset 0 0 0 1px #f5c57942; }
+.asset-check:hover .selection-mark, .overview-tag:hover .selection-mark { border-color: #748590; }
+.asset-check:focus-visible .selection-mark, .overview-tag:focus-visible .selection-mark { outline: 2px solid #e9a84b66; outline-offset: 2px; }
 .asset-favorite { width: 23px; height: 27px; flex: 0 0 auto; display: grid; place-items: center; color: #53626d; background: transparent; border-radius: 4px; }
 .asset-favorite:hover { color: #d5aa6b; background: #272117; }
 .asset-favorite.active { color: var(--accent); }
@@ -216,6 +219,8 @@ button { border: 0; }
 .version-card.branch-card .branch-status { padding: 2px 4px; border: 1px solid #45515a; border-radius: 3px; color: #a9b6be; background: #1d262e; }
 .version-card.branch-card .branch-status.draft { color: #d5ad70; border-color: #665035; background: #2b2217; }
 .version-card.branch-card .branch-status.waiting { color: #86aebf; border-color: #3c5a67; background: #17272e; }
+.version-card.branch-card .branch-status.result { color: #8fc1a2; border-color: #41634e; background: #17271d; }
+.version-card.branch-card .branch-status.mismatch { color: #d5968d; border-color: #69433f; background: #2b1918; }
 .version-card.legacy-version { opacity: .72; }
 .version-number { width: 51px; height: 70px; flex: 0 0 auto; display: grid; place-items: center; background: #10161c; border: 1px dashed #35424c; color: #768692; border-radius: 3px; font: 700 16px var(--font-mono); }
 .version-empty { min-width: 240px; display: grid; place-items: center; padding: 0 14px; color: #53616d; border: 1px dashed #29343e; border-radius: 5px; font-size: 9px; }
@@ -631,14 +636,12 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; heigh
 .overview-tag.selecting { cursor: pointer; }
 .overview-tag.selecting:active { cursor: pointer; }
 .overview-tag.selected { color: #f4dfbe !important; background: #302516 !important; border-color: #c88a3d !important; box-shadow: 0 0 0 1px #e9a84b22; }
-.overview-select-mark { width: 15px; height: 15px; display: grid; place-items: center; color: #11171c; background: #11191f; border: 1px solid #4b5a65; border-radius: 3px; font: 800 10px/1 var(--font-sans); font-style: normal; }
-.overview-tag.selected .overview-select-mark { background: var(--accent); border-color: var(--accent); }
 .overview-tag-copy { min-width: 0; display: grid; gap: 1px; }
 .overview-tag-copy > span { overflow-wrap: anywhere; }
 .overview-tag-copy small { color: #82919a; font: var(--text-micro)/1.25 var(--font-sans); }
 .overview-tag.translation-fallback .overview-tag-copy > span { color: #788791; font-style: italic; }
 .overview-tag.syntax-warning { border-style: dashed; border-color: #a17a43; }
-.overview-syntax-mark { width: 15px; height: 15px; display: grid; place-items: center; color: #20170b; background: #dca44e; border-radius: 50%; font: 800 10px/1 var(--font-sans); font-style: normal; }
+.overview-syntax-mark { flex: 0 0 auto; color: #dca44e; }
 .overview-tag em { color: var(--accent); font-size: var(--text-micro); font-style: normal; font-variant-numeric: tabular-nums; }
 .overview-scope.undesired .overview-tag { color: #d0b5b2; background: #211a1c; border-color: #463033; }
 .overview-empty-tag { color: #687782; background: transparent; border-style: dashed; cursor: pointer; }

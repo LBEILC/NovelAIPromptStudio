@@ -1,6 +1,5 @@
 import { getPromptScopes, normalizePromptStructure } from './promptStructure.js';
 
-const METADATA_FIELDS = ['model', 'seed', 'steps', 'sampler', 'guidance', 'generation_mode'];
 const ANNOTATION_FIELDS = ['translation', 'translation_source', 'category', 'category_source', 'note'];
 
 function clone(value) {
@@ -16,6 +15,18 @@ function generationTag(tag) {
   };
 }
 
+function generationMetadata(project) {
+  const metadata = project.metadata || {};
+  return {
+    model: String(metadata.model || '').trim(),
+    seed: String(metadata.seed ?? '').trim(),
+    steps: metadata.steps === '' || metadata.steps == null ? '' : Number(metadata.steps),
+    sampler: String(metadata.sampler || '').trim(),
+    guidance: metadata.guidance === '' || metadata.guidance == null ? '' : Number(metadata.guidance),
+    generation_mode: String(metadata.generation_mode || '').trim(),
+  };
+}
+
 function generationStructure(project) {
   const structure = normalizePromptStructure(project.prompt_structure, project.metadata);
   return {
@@ -25,7 +36,7 @@ function generationStructure(project) {
     characters: structure.characters.map((character) => ({
       prompt_tags: character.prompt_tags.map(generationTag),
       undesired_tags: character.undesired_tags.map(generationTag),
-      position: clone(character.position),
+      center: clone(character.center ?? character.position ?? null),
     })),
   };
 }
@@ -35,7 +46,7 @@ export function generationSnapshot(project) {
     tags: clone(project.tags || []),
     prompt_structure: clone(normalizePromptStructure(project.prompt_structure, project.metadata)),
     vibes: clone(project.vibes || []),
-    metadata: Object.fromEntries(METADATA_FIELDS.map((field) => [field, project.metadata?.[field] ?? ''])),
+    metadata: generationMetadata(project),
   };
 }
 
@@ -51,7 +62,7 @@ export function generationSignature(project) {
       information_extracted: Number(vibe.information_extracted ?? 0.7),
       enabled: Boolean(vibe.enabled),
     })),
-    metadata: Object.fromEntries(METADATA_FIELDS.map((field) => [field, project.metadata?.[field] ?? ''])),
+    metadata: generationMetadata(project),
   });
 }
 
@@ -78,8 +89,10 @@ export function branchChangeFields(source, candidate) {
   const sourceVibes = generationSignature({ ...source, tags: [], prompt_structure: {}, metadata: {} });
   const candidateVibes = generationSignature({ ...candidate, tags: [], prompt_structure: {}, metadata: {} });
   if (sourceVibes !== candidateVibes) fields.push('Vibe');
+  const sourceMetadata = generationMetadata(source);
+  const candidateMetadata = generationMetadata(candidate);
   for (const [field, label] of [['seed', 'Seed'], ['model', 'Model'], ['sampler', 'Sampler'], ['steps', 'Steps'], ['guidance', 'CFG']]) {
-    if ((source.metadata?.[field] ?? '') !== (candidate.metadata?.[field] ?? '')) fields.push(label);
+    if (sourceMetadata[field] !== candidateMetadata[field]) fields.push(label);
   }
   return [...new Set(fields)];
 }

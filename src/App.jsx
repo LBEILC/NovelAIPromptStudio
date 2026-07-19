@@ -18,6 +18,8 @@ import {
   updatePromptScope,
 } from './lib/promptStructure.js';
 import PromptOverview from './PromptOverview.jsx';
+import Icon from './components/Icon.jsx';
+import SelectionMark from './components/SelectionMark.jsx';
 import { groupVibeLibraryBySource } from './lib/vibeLibrary.js';
 import { informationExtractedPatch, informationExtractedState, restoreOriginalInformationPatch } from './lib/vibes.js';
 import { hasLimitedReproduction } from './lib/generationMetadata.js';
@@ -43,6 +45,7 @@ const studio = window.studio || {
   createBranch: async (branch) => ({ ok: true, branch }),
   updateBranch: async (branch) => ({ ok: true, branch }),
   deleteBranch: async () => ({ ok: true }),
+  importBranchResult: async () => ({ ok: false, error: '请在桌面应用中上传结果图' }),
   deleteProject: async () => ({ ok: true }),
   loadVibeLibrary: async () => [],
   importVibeLibrary: async () => ({ ok: true, library: [], imported: [], errors: [] }),
@@ -56,34 +59,6 @@ const studio = window.studio || {
   testAIModel: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
   translateTags: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
 };
-
-function Icon({ name, size = 17 }) {
-  const paths = {
-    library: <><rect x="3" y="3" width="7" height="8" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="15" width="7" height="6" rx="1"/></>,
-    plus: <><path d="M12 5v14M5 12h14"/></>,
-    search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
-    copy: <><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></>,
-    image: <><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m3 17 5-4 4 3 3-2 6 5"/></>,
-    layers: <><path d="m12 3-9 5 9 5 9-5-9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></>,
-    info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></>,
-    dots: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
-    grip: <><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></>,
-    trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></>,
-    check: <><path d="m5 12 4 4L19 6"/></>,
-    folder: <><path d="M3 6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z"/></>,
-    history: <><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></>,
-    close: <><path d="m6 6 12 12M18 6 6 18"/></>,
-    spark: <><path d="m12 3 1.4 4.6L18 9l-4.6 1.4L12 15l-1.4-4.6L6 9l4.6-1.4L12 3Z"/><path d="m18.5 14 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z"/></>,
-    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></>,
-    refresh: <><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 8a7 7 0 0 1 11.7-2.1L20 8M4 16l2.2 2.1A7 7 0 0 0 17.9 16"/></>,
-    star: <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/>,
-    edit: <><path d="m4 20 4.2-1 10.6-10.6-3.2-3.2L5 15.8 4 20Z"/><path d="m13.8 7 3.2 3.2"/></>,
-    archive: <><path d="M4 7h16v13H4z"/><path d="M3 3h18v4H3zM9 11h6"/></>,
-    upload: <><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></>,
-    lock: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></>,
-  };
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
-}
 
 function mediaUrl(filePath) {
   return filePath ? `novelai-media://file?path=${encodeURIComponent(filePath)}` : '';
@@ -250,7 +225,7 @@ function LibraryPanel({
     </div>}
     <div className="asset-list">
       {projects.map((project) => <div key={project.id} className={`asset-row ${project.id === activeId ? 'active' : ''} ${selectedIds.has(project.id) ? 'selected' : ''}`}>
-        {selectionMode && <button className={`asset-check ${selectedIds.has(project.id) ? 'selected' : ''}`} onClick={() => onToggleSelected(project.id)} aria-pressed={selectedIds.has(project.id)} aria-label={`${selectedIds.has(project.id) ? '取消选择' : '选择'} ${project.name}`}>{selectedIds.has(project.id) ? '✓' : ''}</button>}
+        {selectionMode && <button className="asset-check" onClick={() => onToggleSelected(project.id)} aria-pressed={selectedIds.has(project.id)} aria-label={`${selectedIds.has(project.id) ? '取消选择' : '选择'} ${project.name}`}><SelectionMark selected={selectedIds.has(project.id)}/></button>}
         <button className="asset-thumbnail" onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenPromptOverview(project.id)} title={selectionMode ? '选择作品' : '打开 Prompt 总览'}><img src={mediaUrl(project.thumbnail_path)} alt=""/><span><Icon name="layers" size={13}/></span></button>
         <button className="asset-select" onClick={() => selectionMode ? onToggleSelected(project.id) : setActiveId(project.id)}><span className="asset-copy"><strong>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.collection_ids || []).length} 组 · {relativeTime(project.updated_at)}</small></span></button>
         {libraryView !== 'trash' && <button className={`asset-favorite ${project.is_favorite ? 'active' : ''}`} onClick={() => onSetFavorite(!project.is_favorite, [project.id])} aria-label={`${project.is_favorite ? '取消收藏' : '收藏'} ${project.name}`}><Icon name="star" size={13}/></button>}
@@ -264,11 +239,11 @@ function LibraryPanel({
 const BRANCH_STATUS_LABELS = {
   draft: '草稿',
   waiting: '待生成',
-  result: '已有结果',
-  mismatch: '结果待确认',
+  result: '结果匹配',
+  mismatch: '结果不匹配',
 };
 
-function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal, onEditTag, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
+function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal, onEditTag, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, branchResultImporting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
   const limitedReproduction = hasLimitedReproduction(project.metadata);
   const activeBranch = (sourceProject.branches || []).find((branch) => branch.id === activeBranchId);
   const copyLabel = mode === 'prompt'
@@ -301,13 +276,16 @@ function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal,
       </div>
     </div> : <PromptOverview project={project} updateProject={updateProject} onEditTag={onEditTag} onCopyContextChange={onOverviewCopyChange} onCopyText={onCopyText} onNotify={onNotify}/>}
     <footer className="version-rail branch-rail">
-      <div className="rail-title"><span><Icon name="history"/>生成分支</span><div className="rail-actions">{activeBranch?.status === 'draft' && <><button className="restore-action danger" onClick={() => onDiscardBranch(activeBranch.id)}>放弃草稿</button><button onClick={() => onMarkBranchWaiting(activeBranch.id)}><Icon name="check"/>标记待生成</button></>}</div></div>
+      <div className="rail-title"><span><Icon name="history"/>生成分支</span><div className="rail-actions">
+        {activeBranch?.status === 'draft' && <><button className="restore-action danger" onClick={() => onDiscardBranch(activeBranch.id)}>放弃草稿</button><button onClick={() => onMarkBranchWaiting(activeBranch.id)}><Icon name="check"/>标记待生成</button></>}
+        {activeBranch && ['waiting', 'result', 'mismatch'].includes(activeBranch.status) && <button onClick={() => onImportBranchResult(activeBranch.id)} disabled={branchResultImporting === activeBranch.id}><Icon name="upload"/>{branchResultImporting === activeBranch.id ? '正在核对…' : '上传结果图'}</button>}
+      </div></div>
       <div className="version-strip">
         <button className={`version-card current result-card ${!activeBranchId ? 'selected' : ''}`} onClick={() => onSelectBranch('')}>
           <img src={mediaUrl(sourceProject.thumbnail_path)} alt=""/><span><b>原图结果</b><small>生成信息只读 · {relativeTime(sourceProject.updated_at)}</small></span><em><Icon name="lock" size={11}/>RESULT</em>
         </button>
         {(sourceProject.branches || []).map((branch, index) => <button key={branch.id} className={`version-card branch-card ${activeBranchId === branch.id ? 'selected' : ''}`} onClick={() => onSelectBranch(branch.id)}>
-          <div className="version-number">B{(sourceProject.branches || []).length - index}</div><span><b>{branch.name}</b><small>{branch.change_summary || relativeTime(branch.updated_at)}</small></span><em className={`branch-status ${branch.status}`}>{BRANCH_STATUS_LABELS[branch.status] || branch.status}</em>
+          {branch.results?.[0] ? <img src={mediaUrl(branch.results[0].thumbnail_path)} alt=""/> : <div className="version-number">B{(sourceProject.branches || []).length - index}</div>}<span><b>{branch.name}</b><small>{branch.results?.length ? `${branch.results.length} 张结果 · ${branch.results[0].match_status === 'matched' ? 'metadata 匹配' : `${branch.results[0].differences?.join(' / ') || 'metadata 不匹配'}`}` : branch.change_summary || relativeTime(branch.updated_at)}</small></span><em className={`branch-status ${branch.status}`}>{BRANCH_STATUS_LABELS[branch.status] || branch.status}</em>
         </button>)}
         {(sourceProject.versions || []).map((version, index) => <button key={version.id} className="version-card legacy-version" onClick={() => onUseLegacyVersion(version)} title="把旧版 Prompt 作为新的分支草稿打开">
           <div className="version-number">V{(sourceProject.versions || []).length - index}</div><span><b>{version.label}</b><small>旧版本 · 点击转为分支</small></span>
@@ -814,6 +792,7 @@ export default function App() {
   const [overviewCopy, setOverviewCopy] = useState({ text: '', count: 0, selected: false, categoryCount: 0 });
   const [promptScopeKey, setPromptScopeKey] = useState('base:prompt');
   const [focusTagId, setFocusTagId] = useState(null);
+  const [branchResultImporting, setBranchResultImporting] = useState('');
   const saveTimers = useRef(new Map());
   const branchSaveTimers = useRef(new Map());
   const branchCreatePromises = useRef(new Map());
@@ -1180,6 +1159,35 @@ export default function App() {
     showToast('已标记为待生成；可在 NovelAI 出图后回到这里关联结果');
   };
 
+  const importBranchResult = async (branchId) => {
+    setBranchResultImporting(branchId);
+    try {
+      const result = await studio.importBranchResult(branchId);
+      if (result?.canceled) return;
+      if (!result?.ok) { showToast(result?.error || '结果图没有导入'); return; }
+      setProjects((current) => {
+        let foundResult = false;
+        const next = current.map((item) => {
+          if (item.id === result.project.id) {
+            foundResult = true;
+            return result.project;
+          }
+          if (item.id === result.branch.source_project_id) {
+            return { ...item, branches: (item.branches || []).map((branch) => branch.id === result.branch.id ? result.branch : branch) };
+          }
+          return item;
+        });
+        return foundResult ? next : [result.project, ...next];
+      });
+      if (result.match.status === 'matched') showToast(`结果图已匹配并绑定 · Seed ${result.match.actualSeed || '—'}`);
+      else showToast(`结果图已导入，但 ${result.match.differences.join('、') || 'metadata'} 与分支不一致`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBranchResultImporting('');
+    }
+  };
+
   const copyOverviewText = async (text, count, selected = false) => {
     if (!text || !count) {
       showToast('当前没有可复制的 Tag');
@@ -1251,7 +1259,7 @@ export default function App() {
       onSetDeleted={setDeleted}
     />
     {activeProject ? <>
-      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
+      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onImportBranchResult={importBranchResult} branchResultImporting={branchResultImporting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
       <Inspector tab={tab} setTab={setTab} project={activeProject} branch={activeBranch} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId}/>
     </> : <EmptyState onImport={importImages} hasProjects={projects.length > 0}/>}
     <ImportExperience

@@ -129,6 +129,15 @@ CREATE TABLE IF NOT EXISTS branch_recipes (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_branch_recipes_source ON branch_recipes(source_project_id, updated_at DESC);
+CREATE TABLE IF NOT EXISTS branch_results (
+  branch_id TEXT NOT NULL REFERENCES branch_recipes(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  match_status TEXT NOT NULL,
+  differences_json TEXT NOT NULL DEFAULT '[]',
+  linked_at TEXT NOT NULL,
+  PRIMARY KEY (branch_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS idx_branch_results_project ON branch_results(project_id);
 CREATE TABLE IF NOT EXISTS tag_dictionary (
   tag TEXT PRIMARY KEY,
   translation TEXT NOT NULL,
@@ -371,6 +380,16 @@ export async function openDatabase(dataDirectory) {
     })),
   });
 
+  const hydrateBranch = (branch) => branch ? {
+    ...branch,
+    results: query(
+      `SELECT branch_results.*, projects.name, projects.image_path, projects.thumbnail_path
+       FROM branch_results JOIN projects ON projects.id = branch_results.project_id
+       WHERE branch_results.branch_id = $id ORDER BY branch_results.linked_at DESC`,
+      { $id: branch.id },
+    ).map((result) => ({ ...result, differences: safeJson(result.differences_json, []) })),
+  } : null;
+
   const hydrateProject = (project) => {
     if (!project) return null;
     const storedMetadata = query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] || {};
@@ -383,11 +402,12 @@ export async function openDatabase(dataDirectory) {
       collection_ids: projectCollectionIds(project.id),
       vibes: query('SELECT * FROM vibe_transfers WHERE project_id = $id ORDER BY position', { $id: project.id }),
       versions: query('SELECT * FROM prompt_versions WHERE project_id = $id ORDER BY created_at DESC', { $id: project.id }),
-      branches: query('SELECT * FROM branch_recipes WHERE source_project_id = $id ORDER BY created_at DESC', { $id: project.id }),
+      branches: query('SELECT * FROM branch_recipes WHERE source_project_id = $id ORDER BY created_at DESC', { $id: project.id }).map(hydrateBranch),
     });
   };
 
   const loadProject = (projectId) => hydrateProject(query('SELECT * FROM projects WHERE id = $id', { $id: String(projectId || '') })[0]);
+  const loadBranch = (branchId) => hydrateBranch(query('SELECT * FROM branch_recipes WHERE id = $id', { $id: String(branchId || '') })[0]);
   const loadLibrary = () => query('SELECT * FROM projects ORDER BY updated_at DESC').map(hydrateProject);
 
   const cleanBranchSnapshot = (value) => {
@@ -466,6 +486,47 @@ export async function openDatabase(dataDirectory) {
     if (branch && branch.status !== 'draft') throw new Error('只有草稿分支可以放弃');
     database.run('DELETE FROM branch_recipes WHERE id = $id', { $id: String(branchId || '') });
     persist();
+  };
+
+  const attachBranchResult = (branchId, projectId, match) => {
+    const branch = query('SELECT * FROM branch_recipes WHERE id = $id', { $id: String(branchId || '') })[0];
+    if (!branch) throw new Error('分支不存在或已被删除');
+    if (!['waiting', 'result', 'mismatch'].includes(branch.status)) throw new Error('请先把分支标记为待生成');
+    const project = query('SELECT id FROM projects WHERE id = $id', { $id: String(projectId || '') })[0];
+    if (!project) throw new Error('结果图不存在或导入失败');
+    if (project.id === branch.source_project_id) throw new Error('来源原图不能作为这个分支的新结果');
+    const matchStatus = match?.status === 'matched' ? 'matched' : 'mismatch';
+    const differences = Array.isArray(match?.differences) ? match.differences.map(String).slice(0, 20) : [];
+    const now = new Date().toISOString();
+    database.run('BEGIN');
+    try {
+      database.run(
+        `INSERT INTO branch_results (branch_id, project_id, match_status, differences_json, linked_at)
+         VALUES ($branch_id, $project_id, $match_status, $differences_json, $linked_at)
+         ON CONFLICT(branch_id, project_id) DO UPDATE SET
+          match_status = excluded.match_status,
+          differences_json = excluded.differences_json,
+          linked_at = excluded.linked_at`,
+        {
+          $branch_id: branch.id,
+          $project_id: project.id,
+          $match_status: matchStatus,
+          $differences_json: JSON.stringify(differences),
+          $linked_at: now,
+        },
+      );
+      const matched = query("SELECT COUNT(*) AS count FROM branch_results WHERE branch_id = $id AND match_status = 'matched'", { $id: branch.id })[0]?.count || 0;
+      database.run(
+        'UPDATE branch_recipes SET status = $status, updated_at = $updated_at WHERE id = $id',
+        { $id: branch.id, $status: matched ? 'result' : 'mismatch', $updated_at: now },
+      );
+      database.run('COMMIT');
+      persist();
+      return loadBranch(branch.id);
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
   };
 
   const loadVibeLibrary = () => query('SELECT * FROM vibe_library ORDER BY created_at DESC');
@@ -813,6 +874,7 @@ export async function openDatabase(dataDirectory) {
   return {
     loadLibrary,
     loadProject,
+    loadBranch,
     loadCollections,
     loadLibraryOrganization,
     createCollection,
@@ -828,6 +890,7 @@ export async function openDatabase(dataDirectory) {
     createBranch,
     updateBranch,
     deleteBranch,
+    attachBranchResult,
     loadVibeLibrary,
     upsertVibeLibrary,
     resolveVibeLibraryId,

@@ -9,6 +9,7 @@ import { fingerprintVibe, importEmbeddedVibe, importVibeFile, toProjectVibe } fr
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
 import { hasGenerationChanges, mergeResultAnnotations } from '../src/lib/branches.js';
+import { compareBranchResult } from '../src/lib/branchMatching.js';
 
 app.setName('NovelAI Prompt Studio');
 
@@ -197,6 +198,36 @@ app.whenReady().then(async () => {
   ipcMain.handle('branch:create', (_event, branch) => libraryOrganizationResult(() => ({ branch: database.createBranch(branch) })));
   ipcMain.handle('branch:update', (_event, branch) => libraryOrganizationResult(() => ({ branch: database.updateBranch(branch) })));
   ipcMain.handle('branch:delete', (_event, branchId) => libraryOrganizationResult(() => { database.deleteBranch(branchId); return {}; }));
+  ipcMain.handle('branch:result:import', async (_event, branchId) => {
+    try {
+      await contentHashBackfill;
+      const branch = database.loadBranch(branchId);
+      if (!branch) return { ok: false, error: '分支不存在或已被删除' };
+      if (!['waiting', 'result', 'mismatch'].includes(branch.status)) return { ok: false, error: '请先把分支标记为待生成' };
+      const selection = await dialog.showOpenDialog({
+        title: '上传分支生成结果',
+        properties: ['openFile'],
+        filters: [{ name: 'NovelAI PNG', extensions: ['png'] }],
+      });
+      if (selection.canceled) return { ok: true, canceled: true };
+      const imported = await importLibraryFiles({
+        filePaths: selection.filePaths,
+        assetsDirectory,
+        database,
+        prepareProject: async (project) => database.enrichProjectTags(linkAvailableEmbeddedVibes(project).project),
+      });
+      const project = imported.imported[0]
+        || (imported.duplicates[0]?.projectId ? database.loadProject(imported.duplicates[0].projectId) : null);
+      if (!project) return { ...imported, ok: false, error: imported.errors[0]?.error || '没有读取到可用的结果图' };
+      let snapshot;
+      try { snapshot = JSON.parse(branch.snapshot_json); } catch { return { ok: false, error: '分支方案损坏，无法核对结果' }; }
+      const match = compareBranchResult(snapshot, project);
+      const updatedBranch = database.attachBranchResult(branch.id, project.id, match);
+      return { ok: true, canceled: false, branch: updatedBranch, project, match, imported: imported.imported.length > 0 };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle('project:delete', (_event, id) => {
     database.deleteProject(id);
     return { ok: true };

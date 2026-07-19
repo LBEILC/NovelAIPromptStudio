@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CATEGORY_LABELS, CATEGORY_OPTIONS } from './lib/prompt.js';
 import { countPromptTags, updatePromptScope } from './lib/promptStructure.js';
+import SelectionMark from './components/SelectionMark.jsx';
+import Icon from './components/Icon.jsx';
 import {
   DEFAULT_OVERVIEW_FILTERS,
   deleteOverviewTags,
@@ -92,10 +94,10 @@ function ScopeTags({
           aria-pressed={selecting ? selected : undefined}
           title={`${display.title}${warning ? `\n语法提醒：${warning}` : ''}${selecting ? '\n点击选择' : '\n点击编辑，拖动排序'}`}
         >
-          {selecting && <i className="overview-select-mark" aria-hidden="true">{selected ? '✓' : ''}</i>}
+          {selecting && <SelectionMark selected={selected}/>}
           <span className="overview-tag-copy"><span>{display.primary}</span>{display.secondary && <small>{display.secondary}</small>}</span>
           {Math.abs(Number(tag.weight) - 1) >= 0.001 && <em>{Number(tag.weight).toFixed(2)}</em>}
-          {warning && <i className="overview-syntax-mark" aria-hidden="true">!</i>}
+          {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}
         </button>;
       })}
       {!scope.tags.length && (filtered
@@ -129,10 +131,10 @@ function CategoryGroup({ group, language, selecting, selectedKeys, onToggleSelec
             aria-pressed={selecting ? selected : undefined}
             title={`${display.title}\n区域：${entry.scopeLabel}${warning ? `\n语法提醒：${warning}` : ''}${selecting ? '\n点击选择' : '\n点击编辑'}`}
           >
-            {selecting && <i className="overview-select-mark" aria-hidden="true">{selected ? '✓' : ''}</i>}
+            {selecting && <SelectionMark selected={selected}/>}
             <span className="overview-tag-copy"><span>{display.primary}</span>{display.secondary && <small>{display.secondary}</small>}</span>
             {Math.abs(Number(entry.tag.weight) - 1) >= 0.001 && <em>{Number(entry.tag.weight).toFixed(2)}</em>}
-            {warning && <i className="overview-syntax-mark" aria-hidden="true">!</i>}
+            {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}
           </button>;
         })}
       </div>

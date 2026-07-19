@@ -216,9 +216,27 @@ describe('prompt structure persistence', () => {
     database.updateBranch({ ...created, status: 'waiting', updated_at: new Date().toISOString() });
     expect(() => database.deleteBranch('branch-1')).toThrow('只有草稿分支可以放弃');
     expect(() => database.updateBranch({ ...created, status: 'draft', updated_at: new Date().toISOString() })).toThrow('只有草稿分支可以修改');
+    database.insertProject({
+      id: 'branch-result',
+      name: 'Branch result',
+      image_path: 'branch-result.png',
+      thumbnail_path: 'branch-result.webp',
+      created_at: now,
+      updated_at: now,
+      tags: [],
+      prompt_structure: { base_undesired_tags: [], use_coords: false, use_order: true, characters: [] },
+      metadata: { seed: '20', extra_json: '{}' },
+      vibes: [],
+      versions: [],
+    });
+    expect(database.attachBranchResult('branch-1', 'branch-result', { status: 'mismatch', differences: ['Prompt'] })).toMatchObject({
+      status: 'mismatch',
+      results: [{ project_id: 'branch-result', match_status: 'mismatch', differences: ['Prompt'] }],
+    });
+    expect(database.attachBranchResult('branch-1', 'branch-result', { status: 'matched', differences: [] })).toMatchObject({ status: 'result', results: [{ match_status: 'matched' }] });
     const disposable = database.createBranch({ ...created, id: 'branch-2', name: '可放弃草稿' });
     database.deleteBranch(disposable.id);
-    expect(database.loadProject('immutable-result').branches).toMatchObject([{ id: 'branch-1', status: 'waiting' }]);
+    expect(database.loadProject('immutable-result').branches).toMatchObject([{ id: 'branch-1', status: 'result', results: [{ project_id: 'branch-result' }] }]);
     expect(database.loadProject('immutable-result').metadata.seed).toBe('10');
   });
 });

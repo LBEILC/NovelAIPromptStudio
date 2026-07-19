@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('studio', {
   createBranch: (branch) => ipcRenderer.invoke('branch:create', branch),
   updateBranch: (branch) => ipcRenderer.invoke('branch:update', branch),
   deleteBranch: (branchId) => ipcRenderer.invoke('branch:delete', branchId),
+  importBranchResult: (branchId) => ipcRenderer.invoke('branch:result:import', branchId),
   deleteProject: (id) => ipcRenderer.invoke('project:delete', id),
   loadVibeLibrary: () => ipcRenderer.invoke('vibe:library:load'),
   importVibeLibrary: () => ipcRenderer.invoke('vibe:library:import'),
