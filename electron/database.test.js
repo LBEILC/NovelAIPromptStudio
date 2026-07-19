@@ -101,6 +101,25 @@ describe('prompt structure persistence', () => {
     expect(database.loadVibeLibrary()).toHaveLength(1);
     expect(database.resolveVibeLibraryId('second-information-encoding')).toBe('encoding-fingerprint');
     expect(database.loadLibrary()[0].vibes[0]).toMatchObject({ library_id: 'encoding-fingerprint', vibe_file: 'style.naiv4vibe', source_kind: 'naiv4vibe' });
+
+    let updatedLibrary = database.updateVibeLibrary('encoding-fingerprint', {
+      name: '手动整理的风格',
+      information_extracted: 0.55,
+      archived: true,
+    });
+    expect(updatedLibrary[0]).toMatchObject({
+      name: '手动整理的风格',
+      information_extracted: 0.55,
+      information_extracted_known: 1,
+      information_extracted_source: 'user',
+    });
+    expect(updatedLibrary[0].archived_at).not.toBe('');
+    expect(JSON.parse(updatedLibrary[0].encoded_values_json)).toEqual([0.55, 0.7, 1]);
+    expect(database.loadLibrary()[0].vibes[0].name).toBe('Reusable style');
+
+    updatedLibrary = database.updateVibeLibrary('encoding-fingerprint', { archived: false });
+    expect(updatedLibrary[0].archived_at).toBe('');
+    expect(() => database.updateVibeLibrary('encoding-fingerprint', { information_extracted: 1.5 })).toThrow('0 到 1');
   });
 
   it('reuses AI and manual tag knowledge across prompt scopes and projects', async () => {

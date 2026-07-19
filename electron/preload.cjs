@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('studio', {
   importBranchResult: (branchId) => ipcRenderer.invoke('branch:result:import', branchId),
   deleteProject: (id) => ipcRenderer.invoke('project:delete', id),
   loadVibeLibrary: () => ipcRenderer.invoke('vibe:library:load'),
+  updateVibeLibrary: (id, patch) => ipcRenderer.invoke('vibe:library:update', id, patch),
   importVibeLibrary: () => ipcRenderer.invoke('vibe:library:import'),
   useVibeFromLibrary: (entry) => ipcRenderer.invoke('vibe:library:use', entry),
   inspectEmbeddedVibes: (project) => ipcRenderer.invoke('vibe:project:embedded-status', project),

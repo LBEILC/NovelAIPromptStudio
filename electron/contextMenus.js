@@ -106,6 +106,9 @@ export function buildContextMenuTemplate(request = {}, select = () => {}) {
     actionItem(request.inUse ? '已在当前分支中' : '加入当前分支', 'vibe-library:use', select, { enabled: !request.inUse }),
     actionItem('打开源图所在文件夹', 'vibe-library:reveal-source', select, { enabled: Boolean(request.hasSource) }),
     actionItem('显示 .naiv4vibe 文件', 'vibe-library:reveal-file', select, { enabled: Boolean(request.hasFile) }),
+    { type: 'separator' },
+    actionItem('编辑资料', 'vibe-library:edit', select),
+    actionItem(request.archived ? '恢复到 Vibe 库' : '归档', 'vibe-library:archive', select),
   ];
 
   if (request.kind === 'branch') {

@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS vibe_transfers (
   strength REAL NOT NULL DEFAULT 0.6,
   information_extracted REAL NOT NULL DEFAULT 0.7,
   information_extracted_known INTEGER NOT NULL DEFAULT 1,
+  information_extracted_source TEXT NOT NULL DEFAULT 'verified',
   information_extracted_dirty INTEGER NOT NULL DEFAULT 0,
   information_extracted_origin REAL NOT NULL DEFAULT 0.7,
   encoded_values_json TEXT NOT NULL DEFAULT '[]',
@@ -133,11 +134,13 @@ CREATE TABLE IF NOT EXISTS vibe_library (
   strength REAL NOT NULL DEFAULT 0.6,
   information_extracted REAL NOT NULL DEFAULT 0.7,
   information_extracted_known INTEGER NOT NULL DEFAULT 1,
+  information_extracted_source TEXT NOT NULL DEFAULT 'verified',
   encoded_values_json TEXT NOT NULL DEFAULT '[]',
   encoding_variants_json TEXT NOT NULL DEFAULT '[]',
   encoding_count INTEGER NOT NULL DEFAULT 0,
   has_source_image INTEGER NOT NULL DEFAULT 0,
   source_image_hash TEXT NOT NULL DEFAULT '',
+  archived_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS vibe_encoding_index (
@@ -281,6 +284,7 @@ export async function openDatabase(dataDirectory) {
     ['vibe_file', "TEXT NOT NULL DEFAULT ''"],
     ['model', "TEXT NOT NULL DEFAULT ''"],
     ['information_extracted_known', 'INTEGER NOT NULL DEFAULT 1'],
+    ['information_extracted_source', "TEXT NOT NULL DEFAULT 'verified'"],
     ['information_extracted_dirty', 'INTEGER NOT NULL DEFAULT 0'],
     ['information_extracted_origin', 'REAL NOT NULL DEFAULT 0.7'],
     ['encoded_values_json', "TEXT NOT NULL DEFAULT '[]'"],
@@ -293,6 +297,16 @@ export async function openDatabase(dataDirectory) {
   const vibeLibraryColumns = database.exec('PRAGMA table_info(vibe_library)')[0]?.values.map((row) => row[1]) || [];
   if (!vibeLibraryColumns.includes('source_image_hash')) {
     database.run("ALTER TABLE vibe_library ADD COLUMN source_image_hash TEXT NOT NULL DEFAULT ''");
+  }
+  if (!vibeLibraryColumns.includes('information_extracted_source')) {
+    database.run("ALTER TABLE vibe_library ADD COLUMN information_extracted_source TEXT NOT NULL DEFAULT 'verified'");
+    database.run("UPDATE vibe_library SET information_extracted_source = CASE WHEN information_extracted_known = 1 THEN 'verified' ELSE 'unknown' END");
+  }
+  if (!vibeLibraryColumns.includes('archived_at')) {
+    database.run("ALTER TABLE vibe_library ADD COLUMN archived_at TEXT NOT NULL DEFAULT ''");
+  }
+  if (!vibeColumns.includes('information_extracted_source')) {
+    database.run("UPDATE vibe_transfers SET information_extracted_source = CASE WHEN information_extracted_known = 1 THEN 'verified' ELSE 'unknown' END");
   }
   const dictionaryColumns = database.exec('PRAGMA table_info(tag_dictionary)')[0]?.values.map((row) => row[1]) || [];
   if (!dictionaryColumns.includes('has_translation')) {
@@ -708,7 +722,46 @@ export async function openDatabase(dataDirectory) {
     }
   };
 
-  const loadVibeLibrary = () => query('SELECT * FROM vibe_library ORDER BY created_at DESC');
+  const loadVibeLibrary = () => query('SELECT * FROM vibe_library ORDER BY archived_at ASC, created_at DESC');
+
+  const updateVibeLibrary = (id, patch = {}) => {
+    const entry = query('SELECT * FROM vibe_library WHERE id = $id', { $id: String(id || '') })[0];
+    if (!entry) throw new Error('Vibe 不存在或已被移除');
+    const name = patch.name === undefined ? entry.name : String(patch.name || '').trim();
+    if (!name) throw new Error('Vibe 名称不能为空');
+    if (name.length > 120) throw new Error('Vibe 名称不能超过 120 个字符');
+    let information = Number(entry.information_extracted);
+    let informationKnown = Number(entry.information_extracted_known);
+    let informationSource = entry.information_extracted_source || (informationKnown ? 'verified' : 'unknown');
+    let encodedValues = entry.encoded_values_json || '[]';
+    if (patch.information_extracted !== undefined) {
+      information = Number(patch.information_extracted);
+      if (!Number.isFinite(information) || information < 0 || information > 1) throw new Error('Information Extracted 必须在 0 到 1 之间');
+      information = Math.round(information * 100) / 100;
+      informationKnown = 1;
+      informationSource = 'user';
+      let values = [];
+      try { values = JSON.parse(encodedValues || '[]'); } catch { values = []; }
+      encodedValues = JSON.stringify([...new Set([...values.map(Number).filter(Number.isFinite), information])].sort((left, right) => left - right));
+    }
+    const archivedAt = patch.archived === undefined ? entry.archived_at : patch.archived ? new Date().toISOString() : '';
+    database.run(
+      `UPDATE vibe_library SET name = $name, information_extracted = $information_extracted,
+       information_extracted_known = $information_extracted_known, information_extracted_source = $information_extracted_source,
+       encoded_values_json = $encoded_values_json, archived_at = $archived_at WHERE id = $id`,
+      {
+        $id: entry.id,
+        $name: name,
+        $information_extracted: information,
+        $information_extracted_known: informationKnown,
+        $information_extracted_source: informationSource,
+        $encoded_values_json: encodedValues,
+        $archived_at: archivedAt,
+      },
+    );
+    persist();
+    return loadVibeLibrary();
+  };
 
   const findProjectByContentHash = (contentHash) => query(
     "SELECT id, name, image_path, thumbnail_path, deleted_at FROM projects WHERE content_hash = $content_hash LIMIT 1",
@@ -1046,10 +1099,10 @@ export async function openDatabase(dataDirectory) {
       }
       database.run(
         `INSERT INTO vibe_library (id, name, source_kind, original_vibe_id, reference_image, vibe_file, thumbnail_path, model,
-          strength, information_extracted, information_extracted_known, encoded_values_json, encoding_variants_json,
+          strength, information_extracted, information_extracted_known, information_extracted_source, encoded_values_json, encoding_variants_json,
           encoding_count, has_source_image, source_image_hash, created_at)
          VALUES ($id, $name, $source_kind, $original_vibe_id, $reference_image, $vibe_file, $thumbnail_path, $model,
-          $strength, $information_extracted, $information_extracted_known, $encoded_values_json, $encoding_variants_json,
+          $strength, $information_extracted, $information_extracted_known, $information_extracted_source, $encoded_values_json, $encoding_variants_json,
           $encoding_count, $has_source_image, $source_image_hash, $created_at)
          ON CONFLICT(id) DO UPDATE SET
           name = CASE WHEN (excluded.has_source_image = 1 AND vibe_library.has_source_image = 0)
@@ -1063,6 +1116,7 @@ export async function openDatabase(dataDirectory) {
           strength = excluded.strength,
           information_extracted = CASE WHEN excluded.information_extracted_known = 1 THEN excluded.information_extracted ELSE vibe_library.information_extracted END,
           information_extracted_known = MAX(vibe_library.information_extracted_known, excluded.information_extracted_known),
+          information_extracted_source = CASE WHEN excluded.information_extracted_known = 1 THEN 'verified' ELSE vibe_library.information_extracted_source END,
           encoded_values_json = CASE WHEN excluded.encoding_count >= vibe_library.encoding_count THEN excluded.encoded_values_json ELSE vibe_library.encoded_values_json END,
           encoding_variants_json = CASE WHEN excluded.encoding_count >= vibe_library.encoding_count THEN excluded.encoding_variants_json ELSE vibe_library.encoding_variants_json END,
           encoding_count = MAX(vibe_library.encoding_count, excluded.encoding_count),
@@ -1080,6 +1134,7 @@ export async function openDatabase(dataDirectory) {
           $strength: Number(entry.strength ?? 0.6),
           $information_extracted: Number(entry.information_extracted ?? 0.7),
           $information_extracted_known: entry.information_extracted_known ? 1 : 0,
+          $information_extracted_source: entry.information_extracted_source || (entry.information_extracted_known ? 'verified' : 'unknown'),
           $encoded_values_json: entry.encoded_values_json || '[]',
           $encoding_variants_json: entry.encoding_variants_json || '[]',
           $encoding_count: Number(entry.encoding_count || 0),
@@ -1189,9 +1244,9 @@ export async function openDatabase(dataDirectory) {
     for (const [position, vibe] of (project.vibes || []).entries()) {
       database.run(
         `INSERT INTO vibe_transfers (id, project_id, library_id, name, source_kind, reference_image, vibe_file, thumbnail_path,
-          model, strength, information_extracted, information_extracted_known, information_extracted_dirty, information_extracted_origin, encoded_values_json, source_image_hash, has_source_image, enabled, position)
+          model, strength, information_extracted, information_extracted_known, information_extracted_source, information_extracted_dirty, information_extracted_origin, encoded_values_json, source_image_hash, has_source_image, enabled, position)
          VALUES ($id, $project_id, $library_id, $name, $source_kind, $reference_image, $vibe_file, $thumbnail_path,
-          $model, $strength, $information_extracted, $information_extracted_known, $information_extracted_dirty, $information_extracted_origin, $encoded_values_json, $source_image_hash, $has_source_image, $enabled, $position)`,
+          $model, $strength, $information_extracted, $information_extracted_known, $information_extracted_source, $information_extracted_dirty, $information_extracted_origin, $encoded_values_json, $source_image_hash, $has_source_image, $enabled, $position)`,
         {
           $id: vibe.id,
           $project_id: project.id,
@@ -1205,6 +1260,7 @@ export async function openDatabase(dataDirectory) {
           $strength: Number(vibe.strength),
           $information_extracted: Number(vibe.information_extracted),
           $information_extracted_known: vibe.information_extracted_known ? 1 : 0,
+          $information_extracted_source: vibe.information_extracted_source || (vibe.information_extracted_known ? 'verified' : 'unknown'),
           $information_extracted_dirty: vibe.information_extracted_dirty ? 1 : 0,
           $information_extracted_origin: Number(vibe.information_extracted_origin ?? vibe.information_extracted ?? 0.7),
           $encoded_values_json: vibe.encoded_values_json || '[]',
@@ -1293,6 +1349,7 @@ export async function openDatabase(dataDirectory) {
     attachBranchResult,
     attachMismatchedBranchResult,
     loadVibeLibrary,
+    updateVibeLibrary,
     upsertVibeLibrary,
     resolveVibeLibraryId,
     lookupTagDictionary,

@@ -6,6 +6,8 @@
 > 关联文档：[图片系列、对比实验与生成分支设计](./experiment-and-branch-design.md)
 >
 > 导入补充：[导入流程、Inpainting 提示与批量 Tag 输入设计](./import-workflow-and-metadata-warnings.md)
+>
+> 2026-07-19 实施进度：作品收藏集、多选、回收站、创作系列、对比实验与安全导入已落地。Vibe 库现支持重命名、手动声明 Information Extracted、归档和恢复；手动数值会标记为“用户设置、未验证”，归档不会破坏已有作品引用。Vibe 收藏集、引用检查后的彻底删除，以及独立设置页仍按后续阶段实施。
 
 ## 1. 目标
 

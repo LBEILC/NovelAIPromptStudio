@@ -96,6 +96,7 @@ export async function importVibeImage(sourcePath, assetsDirectory) {
     strength: 0.6,
     information_extracted: 0.7,
     information_extracted_known: 1,
+    information_extracted_source: 'verified',
     encoded_values_json: '[]',
     encoding_variants_json: '[]',
     encoding_count: 0,

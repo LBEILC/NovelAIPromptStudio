@@ -65,6 +65,7 @@ const studio = window.studio || {
   importBranchResult: async () => ({ ok: false, error: '请在桌面应用中上传结果图' }),
   deleteProject: async () => ({ ok: true }),
   loadVibeLibrary: async () => [],
+  updateVibeLibrary: async (_id, _patch) => ({ ok: true, library: [] }),
   importVibeLibrary: async () => ({ ok: true, library: [], imported: [], errors: [] }),
   useVibeFromLibrary: async (entry) => ({ ...entry, id: crypto.randomUUID(), library_id: entry.id, enabled: true }),
   inspectEmbeddedVibes: async () => ({ total: 0, linked: 0, available: 0, missing: [] }),
@@ -814,13 +815,18 @@ function VibePanel({ project, updateProject, showToast }) {
   const [importing, setImporting] = useState(false);
   const [embeddedStatus, setEmbeddedStatus] = useState(null);
   const [resolving, setResolving] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+  const [editingLibraryId, setEditingLibraryId] = useState('');
+  const [libraryDraft, setLibraryDraft] = useState({ name: '', information_extracted: 0.7, original_information_extracted: 0.7 });
   useEffect(() => { studio.loadVibeLibrary().then(setLibrary); }, []);
   useEffect(() => {
     let active = true;
     studio.inspectEmbeddedVibes(project).then((status) => { if (active) setEmbeddedStatus(status); });
     return () => { active = false; };
   }, [project.id]);
-  const libraryGroups = useMemo(() => groupVibeLibraryBySource(library), [library]);
+  const archivedCount = library.filter((entry) => entry.archived_at).length;
+  const visibleLibrary = useMemo(() => library.filter((entry) => showArchived ? Boolean(entry.archived_at) : !entry.archived_at), [library, showArchived]);
+  const libraryGroups = useMemo(() => groupVibeLibraryBySource(visibleLibrary), [visibleLibrary]);
 
   const importVibes = async (retryEmbedded = false) => {
     setImporting(true);
@@ -839,6 +845,7 @@ function VibePanel({ project, updateProject, showToast }) {
           strength: vibe.strength,
           information_extracted: vibe.information_extracted,
           information_extracted_known: vibe.information_extracted_known,
+          information_extracted_source: vibe.information_extracted_source,
           information_extracted_dirty: vibe.information_extracted_dirty,
           information_extracted_origin: vibe.information_extracted_origin,
           enabled: vibe.enabled,
@@ -888,6 +895,10 @@ function VibePanel({ project, updateProject, showToast }) {
   };
 
   const useLibraryVibe = async (entry) => {
+    if (entry.archived_at) {
+      showToast('请先恢复这个已归档 Vibe');
+      return;
+    }
     if (project.vibes.some((vibe) => vibe.library_id === entry.id)) {
       showToast('这个 Vibe 已在当前作品中');
       return;
@@ -895,6 +906,40 @@ function VibePanel({ project, updateProject, showToast }) {
     const vibe = await studio.useVibeFromLibrary(entry);
     updateProject({ ...project, vibes: [...project.vibes, vibe] });
     showToast(`${entry.name} 已加入当前作品`);
+  };
+  const beginLibraryEdit = (entry) => {
+    setEditingLibraryId(entry.id);
+    setLibraryDraft({
+      name: entry.name || '',
+      information_extracted: Number(entry.information_extracted ?? 0.7),
+      original_information_extracted: Number(entry.information_extracted ?? 0.7),
+    });
+  };
+  const saveLibraryEdit = async (entry) => {
+    try {
+      const informationChanged = Math.abs(Number(libraryDraft.information_extracted) - Number(libraryDraft.original_information_extracted)) > 0.0001;
+      const result = await studio.updateVibeLibrary(entry.id, {
+        name: libraryDraft.name,
+        ...(informationChanged ? { information_extracted: libraryDraft.information_extracted } : {}),
+      });
+      if (!result?.ok) throw new Error(result?.error || 'Vibe 资料没有保存');
+      setLibrary(result.library || []);
+      setEditingLibraryId('');
+      showToast(informationChanged ? 'Vibe 资料已保存；Information 标记为用户设置、未验证' : 'Vibe 名称已保存');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    }
+  };
+  const setLibraryArchived = async (entry, archived = !entry.archived_at) => {
+    try {
+      const result = await studio.updateVibeLibrary(entry.id, { archived });
+      if (!result?.ok) throw new Error(result?.error || 'Vibe 状态没有保存');
+      setLibrary(result.library || []);
+      if (editingLibraryId === entry.id) setEditingLibraryId('');
+      showToast(archived ? 'Vibe 已归档；现有作品引用保持可用' : 'Vibe 已恢复到资料库');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    }
   };
   const updateVibe = (index, patch) => updateProject({ ...project, vibes: project.vibes.map((vibe, itemIndex) => itemIndex === index ? { ...vibe, ...patch } : vibe) });
   const currentVibeContextMenu = async (event, vibe, index, informationState) => {
@@ -919,10 +964,13 @@ function VibePanel({ project, updateProject, showToast }) {
       inUse,
       hasSource: Boolean(entry.reference_image),
       hasFile: Boolean(entry.vibe_file),
+      archived: Boolean(entry.archived_at),
     });
     if (action === 'vibe-library:use') useLibraryVibe(entry);
     if (action === 'vibe-library:reveal-source') studio.revealFile(entry.reference_image);
     if (action === 'vibe-library:reveal-file') studio.revealFile(entry.vibe_file);
+    if (action === 'vibe-library:edit') beginLibraryEdit(entry);
+    if (action === 'vibe-library:archive') setLibraryArchived(entry);
   };
   return <div className="panel-scroll vibe-panel">
     <div className="panel-intro"><div><strong>Vibe Library</strong><small>跨作品复用已编码的 NovelAI Vibe</small></div><button className="small-primary" onClick={() => importVibes(false)} disabled={importing}><Icon name="plus"/>{importing ? '导入中' : '导入'}</button></div>
@@ -951,7 +999,7 @@ function VibePanel({ project, updateProject, showToast }) {
       </article>;})}
       {!project.vibes.length && <div className="panel-empty"><Icon name="image"/><strong>当前作品还没有 Vibe</strong><span>从下面的 Vibe 库加入，或导入 `.naiv4vibe` 与参考图。</span></div>}
     </div>
-    <div className="vibe-section-heading library-heading"><span>Vibe 库</span><b>{library.length}</b><small>{libraryGroups.length} 个图源组</small></div>
+    <div className="vibe-section-heading library-heading"><span>Vibe 库</span><b>{visibleLibrary.length}</b><small>{libraryGroups.length} 个图源组</small>{archivedCount > 0 && <button className={showArchived ? 'active' : ''} onClick={() => setShowArchived((value) => !value)}>{showArchived ? '返回可用' : `归档 ${archivedCount}`}</button>}</div>
     <div className="vibe-library-list">
       {libraryGroups.map((group) => <section className={`vibe-source-group ${group.source.reference_image ? '' : 'missing-source'}`} key={group.key}>
         <header>
@@ -961,13 +1009,20 @@ function VibePanel({ project, updateProject, showToast }) {
         </header>
         {!group.source.reference_image && <div className="vibe-group-warning"><Icon name="info" size={13}/>导入原始 PNG 或带内嵌图片的 `.naiv4vibe` 后可建立可视绑定</div>}
         <div className="vibe-variant-list">
-          {group.entries.map((entry) => <article className="vibe-library-card" key={entry.id} onContextMenu={(event) => libraryVibeContextMenu(event, entry)}>
-            <div><strong>{entry.source_kind === 'image' ? '原始参考图' : entry.name}</strong><small>{entry.source_kind === 'image' ? '尚未编码' : `${entry.encoding_count || 1} 个缓存编码 · ${entry.model || 'NovelAI V4'}`}</small><span>{entry.information_extracted_known ? `Information ${Number(entry.information_extracted).toFixed(2)} · Strength ${Number(entry.strength).toFixed(2)}` : '来自 PNG metadata · 固定编码'}</span></div>
-            <button onClick={() => useLibraryVibe(entry)} disabled={project.vibes.some((vibe) => vibe.library_id === entry.id)}>{project.vibes.some((vibe) => vibe.library_id === entry.id) ? '已用' : '使用'}</button>
+          {group.entries.map((entry) => <article className={`vibe-library-card ${entry.archived_at ? 'archived' : ''} ${editingLibraryId === entry.id ? 'editing' : ''}`} key={entry.id} onContextMenu={(event) => libraryVibeContextMenu(event, entry)}>
+            {editingLibraryId === entry.id ? <div className="vibe-library-editor">
+              <label><span>显示名称</span><input autoFocus maxLength={120} value={libraryDraft.name} onChange={(event) => setLibraryDraft((current) => ({ ...current, name: event.target.value }))}/></label>
+              <label><span>Information Extracted <b>{Number(libraryDraft.information_extracted).toFixed(2)}</b></span><input type="range" min="0" max="1" step="0.01" value={libraryDraft.information_extracted} onChange={(event) => setLibraryDraft((current) => ({ ...current, information_extracted: Number(event.target.value) }))}/></label>
+              <small><Icon name="info" size={12}/>调整 Information 后，只在这个位置标记编码可用，并注明“用户设置、未验证”；不会重新计算或修改文件。只改名称不会改变验证状态。</small>
+              <div><button onClick={() => setEditingLibraryId('')}>取消</button><button className="save" onClick={() => saveLibraryEdit(entry)} disabled={!libraryDraft.name.trim()}>保存资料</button></div>
+            </div> : <>
+              <div><strong>{entry.source_kind === 'image' ? '原始参考图' : entry.name}</strong><small>{entry.source_kind === 'image' ? '尚未编码' : `${entry.encoding_count || 1} 个缓存编码 · ${entry.model || 'NovelAI V4'}`}</small><span>{entry.information_extracted_source === 'user' ? `Information ${Number(entry.information_extracted).toFixed(2)} · 用户设置、未验证` : entry.information_extracted_known ? `Information ${Number(entry.information_extracted).toFixed(2)} · 已验证` : 'Information 未知 · 固定编码'}</span></div>
+              <div className="vibe-library-actions"><button onClick={() => beginLibraryEdit(entry)} aria-label={`编辑 ${entry.name}`}><Icon name="edit" size={12}/></button>{entry.archived_at ? <button onClick={() => setLibraryArchived(entry, false)}>恢复</button> : <button onClick={() => useLibraryVibe(entry)} disabled={project.vibes.some((vibe) => vibe.library_id === entry.id)}>{project.vibes.some((vibe) => vibe.library_id === entry.id) ? '已用' : '使用'}</button>}</div>
+            </>}
           </article>)}
         </div>
       </section>)}
-      {!library.length && <button className="vibe-library-empty" onClick={() => importVibes(false)}><Icon name="plus"/><span><strong>建立 Vibe 库</strong><small>导入 `.naiv4vibe` 可直接复用缓存编码，不必重新计算。</small></span></button>}
+      {!visibleLibrary.length && (showArchived ? <div className="panel-empty compact"><Icon name="archive"/><strong>没有已归档 Vibe</strong><span>归档项目会保留已有作品引用。</span></div> : <button className="vibe-library-empty" onClick={() => importVibes(false)}><Icon name="plus"/><span><strong>建立 Vibe 库</strong><small>导入 `.naiv4vibe` 可直接复用缓存编码，不必重新计算。</small></span></button>)}
     </div>
   </div>;
 }
