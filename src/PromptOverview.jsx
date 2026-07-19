@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import LobeButton from '@lobehub/ui/es/Button/index';
+import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
+import LobeSegmented from '@lobehub/ui/es/Segmented/index';
 import { CATEGORY_LABELS, CATEGORY_OPTIONS } from './lib/prompt.js';
 import { countPromptTags, updatePromptScope } from './lib/promptStructure.js';
 import SelectionMark from './components/SelectionMark.jsx';
@@ -104,7 +107,7 @@ function ScopeTags({
       })}
       {!scope.tags.length && (filtered
         ? <span className="overview-filter-empty">当前筛选无 Tag</span>
-        : <button className="overview-empty-tag" onClick={() => onEditTag(scope.key, null)}>+ 在右侧添加 Tag</button>)}
+        : <LobeButton className="overview-empty-tag" onClick={() => onEditTag(scope.key, null)} size="small" type="dashed">+ 在右侧添加 Tag</LobeButton>)}
     </div>
   </div>;
 }
@@ -118,7 +121,7 @@ function CategoryGroup({ group, language, selecting, selectedKeys, onToggleSelec
     <div className="overview-category-body">
       <div className="overview-category-heading">
         <div><strong>{CATEGORY_LABELS[group.category] || group.category}</strong><small>{group.category.toUpperCase()} · {group.entries.length} TAGS</small></div>
-        {selecting && <button className={allSelected ? 'active' : ''} onClick={() => onToggleGroup(group.entries)}>{allSelected ? '取消整组' : `选择整组 ${group.entries.length}`}</button>}
+        {selecting && <LobeButton className={allSelected ? 'active' : ''} onClick={() => onToggleGroup(group.entries)} size="small">{allSelected ? '取消整组' : `选择整组 ${group.entries.length}`}</LobeButton>}
       </div>
       <div className="overview-tags" role="list" aria-label={`${CATEGORY_LABELS[group.category] || group.category} Tag`}>
         {group.entries.map((entry) => {
@@ -146,9 +149,7 @@ function CategoryGroup({ group, language, selecting, selectedKeys, onToggleSelec
 }
 
 function Segment({ value, options, onChange, label }) {
-  return <div className="overview-segment" aria-label={label}>
-    {options.map(([option, text]) => <button key={option} className={value === option ? 'active' : ''} onClick={() => onChange(option)}>{text}</button>)}
-  </div>;
+  return <LobeSegmented aria-label={label} className="overview-segment" onChange={onChange} options={options.map(([option, text]) => ({ label: text, value: option }))} value={value}/>;
 }
 
 export default function PromptOverview({ project, updateProject, onEditTag, onTagContextMenu, onCopyContextChange, onCopyText, onNotify }) {
@@ -305,25 +306,25 @@ export default function PromptOverview({ project, updateProject, onEditTag, onTa
       </div>
 
       <div className="overview-toolbar">
-        <label className="overview-search"><Icon name="search" size={13}/><input value={filters.query} onChange={(event) => changeFilter({ query: event.target.value })} placeholder="筛选 Tag 或译名"/></label>
+        <LobeSearchBar className="overview-search" onInputChange={(query) => changeFilter({ query })} placeholder="筛选 Tag 或译名" value={filters.query}/>
         <Segment value={filters.polarity} options={[["all", '全部'], ['prompt', 'Prompt'], ['undesired', 'Undesired']]} onChange={(polarity) => changeFilter({ polarity })} label="Prompt 类型"/>
         <Segment value={filters.domain} options={[["all", '全部区域'], ['base', 'Base'], ['character', 'Character']]} onChange={(domain) => changeFilter({ domain })} label="Prompt 区域"/>
         <Segment value={viewMode} options={[["structure", '按结构'], ['category', '按分类']]} onChange={setViewMode} label="总览分组方式"/>
         <Segment value={language} options={LANGUAGE_OPTIONS} onChange={setLanguage} label="显示语言"/>
-        <button className={`overview-select-toggle ${selecting ? 'active' : ''}`} onClick={toggleSelecting}>{selecting ? `退出多选 · ${selectedKeys.length}` : '多选'}</button>
+        <LobeButton className={`overview-select-toggle ${selecting ? 'active' : ''}`} onClick={toggleSelecting} size="small" type={selecting ? 'primary' : 'default'}>{selecting ? `退出多选 · ${selectedKeys.length}` : '多选'}</LobeButton>
       </div>
 
       <div className="overview-category-row" aria-label="Tag 分类筛选">
-        <button className={filters.category === 'All' ? 'active' : ''} onClick={() => changeFilter({ category: 'All' })}>全部 <b>{overviewEntries(categorySourceScopes).length}</b></button>
-        {CATEGORY_OPTIONS.map((category) => <button key={category} className={`${filters.category === category ? 'active' : ''} cat-${category.toLowerCase()}`} onClick={() => changeFilter({ category })}>{CATEGORY_LABELS[category]} <b>{categoryCounts[category] || 0}</b></button>)}
+        <LobeButton className={filters.category === 'All' ? 'active' : ''} onClick={() => changeFilter({ category: 'All' })} size="small">全部 <b>{overviewEntries(categorySourceScopes).length}</b></LobeButton>
+        {CATEGORY_OPTIONS.map((category) => <LobeButton key={category} className={`${filters.category === category ? 'active' : ''} cat-${category.toLowerCase()}`} onClick={() => changeFilter({ category })} size="small">{CATEGORY_LABELS[category]} <b>{categoryCounts[category] || 0}</b></LobeButton>)}
       </div>
 
       {selecting && <div className="overview-selection-bar">
         <span>已选 <b>{selectedKeys.length}</b> 个{copyContext.categoryCount ? ` · ${copyContext.categoryCount} 个分类` : ''}；不同分类复制时自动换行。</span>
-        <button onClick={selectAllVisible} disabled={!visibleEntries.length}>全选可见</button>
-        <button onClick={() => setSelectedKeys([])} disabled={!selectedKeys.length}>取消选择</button>
-        <button className="primary" onClick={copyVisibleOrSelected} disabled={!copyContext.count}>{copyContext.selected ? `复制已选 ${copyContext.count}` : `复制可见 ${copyContext.count}`}</button>
-        <button className={`danger ${deleteArmed ? 'armed' : ''}`} onClick={deleteSelected} disabled={!selectedKeys.length}>{deleteArmed ? `再次点击删除 ${selectedKeys.length}` : `删除已选 ${selectedKeys.length}`}</button>
+        <LobeButton disabled={!visibleEntries.length} onClick={selectAllVisible} size="small">全选可见</LobeButton>
+        <LobeButton disabled={!selectedKeys.length} onClick={() => setSelectedKeys([])} size="small">取消选择</LobeButton>
+        <LobeButton disabled={!copyContext.count} onClick={copyVisibleOrSelected} size="small" type="primary">{copyContext.selected ? `复制已选 ${copyContext.count}` : `复制可见 ${copyContext.count}`}</LobeButton>
+        <LobeButton danger className={deleteArmed ? 'armed' : ''} disabled={!selectedKeys.length} onClick={deleteSelected} size="small" type={deleteArmed ? 'primary' : 'default'}>{deleteArmed ? `再次点击删除 ${selectedKeys.length}` : `删除已选 ${selectedKeys.length}`}</LobeButton>
       </div>}
     </header>
 
@@ -356,7 +357,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onTa
           <div className="overview-layer-body">
             <div className="overview-layer-heading">
               <div><strong>{character.label}</strong><small>独立角色描述与排除内容</small></div>
-              <button onClick={() => onEditTag(sections[0]?.key, null)}>{structure.use_coords ? `POSITION ${compactPosition(character.center)}` : 'AI POSITION'}</button>
+              <LobeButton onClick={() => onEditTag(sections[0]?.key, null)} size="small" type="text">{structure.use_coords ? `POSITION ${compactPosition(character.center)}` : 'AI POSITION'}</LobeButton>
             </div>
             {sections.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
           </div>
@@ -364,9 +365,9 @@ export default function PromptOverview({ project, updateProject, onEditTag, onTa
       })}
 
       {!visibleEntries.length && filtered && <div className="overview-no-results"><strong>没有符合条件的 Tag</strong><span>调整分类、区域或搜索词后，顶部复制内容会同步更新。</span></div>}
-      {viewMode === 'structure' && !structure.characters.length && filters.domain !== 'base' && <button className="overview-add-character" onClick={() => onEditTag('base:prompt', null)}>
+      {viewMode === 'structure' && !structure.characters.length && filters.domain !== 'base' && <LobeButton className="overview-add-character" onClick={() => onEditTag('base:prompt', null)} type="dashed">
         <Icon name="plus" size={20}/><div><strong>还没有 Character Prompt</strong><small>在右侧 Prompt 面板添加角色，最多支持 6 个。</small></div>
-      </button>}
+      </LobeButton>}
     </div>
   </div>;
 }

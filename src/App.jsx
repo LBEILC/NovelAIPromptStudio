@@ -1217,6 +1217,8 @@ export default function App({ appearance, setAppearance }) {
     '--green': lobeTheme.colorSuccess,
     '--purple': lobeTheme.purple,
     '--red': lobeTheme.colorError,
+    '--danger': lobeTheme.colorError,
+    '--warning': lobeTheme.colorWarning,
   };
 
   useEffect(() => {

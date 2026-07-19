@@ -102,3 +102,10 @@
 继续把该分支作为正式迁移线。下一批先完成通用 Select、Tooltip、批量操作工具栏和作品管理表面，然后进入 Prompt/Vibe 工作区。旧视觉规范应在对应区域迁移完成后同步删除，避免长期保留两套样式系统。
 
 参考：<https://ui.lobehub.com/>、<https://www.npmjs.com/package/@lobehub/ui>
+
+## 2026-07-19 迁移进度
+
+- Prompt 总览已迁移 SearchBar、Segmented、Button 和多选工具栏。
+- Tag 多选统一使用 Lobe Checkbox，分类筛选和选中状态改用 slate + blue 主题语义。
+- 已在 Windows Electron 生产构建中验证深色、浅色、多选和复制计数状态。
+- 下一步迁移右侧 Prompt 编辑器；浅色验证已确认其原生 Select、输入框和卡片仍需清理硬编码暗色。
