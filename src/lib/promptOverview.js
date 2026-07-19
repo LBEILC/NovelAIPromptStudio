@@ -1,4 +1,4 @@
-import { formatTag, normalizeSearch } from './prompt.js';
+import { CATEGORY_OPTIONS, formatTag, normalizeSearch } from './prompt.js';
 import { getPromptScopes, updatePromptScope } from './promptStructure.js';
 
 export const DEFAULT_OVERVIEW_FILTERS = {
@@ -32,8 +32,26 @@ export function overviewEntries(scopes) {
     key: overviewTagKey(scope.key, tag.id),
     scopeKey: scope.key,
     scopeLabel: scope.label,
+    scopeKind: scope.kind,
+    scopePolarity: scope.polarity,
     tag,
   })));
+}
+
+export function overviewCategoryGroups(entries) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const category = entry.tag.category || 'Unsorted';
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(entry);
+  }
+  const known = CATEGORY_OPTIONS
+    .filter((category) => groups.has(category))
+    .map((category) => ({ category, entries: groups.get(category) }));
+  const other = [...groups.entries()]
+    .filter(([category]) => !CATEGORY_OPTIONS.includes(category))
+    .map(([category, categoryEntries]) => ({ category, entries: categoryEntries }));
+  return [...known, ...other];
 }
 
 export function overviewCopyContext(project, visibleScopes, selectedKeys = []) {
@@ -41,10 +59,14 @@ export function overviewCopyContext(project, visibleScopes, selectedKeys = []) {
   const source = selected.size
     ? overviewEntries(getPromptScopes(project)).filter((entry) => selected.has(entry.key))
     : overviewEntries(visibleScopes);
+  const groups = selected.size ? overviewCategoryGroups(source) : [];
   return {
-    text: source.map((entry) => formatTag(entry.tag)).join(',\n'),
+    text: selected.size
+      ? groups.map((group) => group.entries.map((entry) => formatTag(entry.tag)).join(', ')).join('\n')
+      : source.map((entry) => formatTag(entry.tag)).join(', '),
     count: source.length,
     selected: selected.size > 0,
+    categoryCount: selected.size ? groups.length : 0,
     entries: source,
   };
 }

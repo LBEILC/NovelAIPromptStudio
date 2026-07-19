@@ -5,6 +5,7 @@ import {
   allPromptTags,
   countPromptTags,
   formatPositivePrompt,
+  formatPositivePromptForCopy,
   getPromptScope,
   getPromptScopes,
   normalizePromptStructure,
@@ -593,7 +594,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeVersion, setActiveVersion] = useState('current');
   const [workspaceMode, setWorkspaceMode] = useState('image');
-  const [overviewCopy, setOverviewCopy] = useState({ text: '', count: 0, selected: false });
+  const [overviewCopy, setOverviewCopy] = useState({ text: '', count: 0, selected: false, categoryCount: 0 });
   const [promptScopeKey, setPromptScopeKey] = useState('base:prompt');
   const [focusTagId, setFocusTagId] = useState(null);
   const saveTimers = useRef(new Map());
@@ -627,7 +628,7 @@ export default function App() {
   const activeProject = projects.find((project) => project.id === activeId) || null;
 
   useEffect(() => {
-    if (workspaceMode !== 'prompt') setOverviewCopy({ text: '', count: 0, selected: false });
+    if (workspaceMode !== 'prompt') setOverviewCopy({ text: '', count: 0, selected: false, categoryCount: 0 });
   }, [activeId, workspaceMode]);
   const filteredProjects = useMemo(() => {
     const needles = expandSearch(query);
@@ -678,7 +679,7 @@ export default function App() {
       await copyOverviewText(overviewCopy.text, overviewCopy.count, overviewCopy.selected);
       return;
     }
-    await navigator.clipboard.writeText(formatPositivePrompt(activeProject));
+    await navigator.clipboard.writeText(formatPositivePromptForCopy(activeProject));
     showToast('Prompt 已复制，可直接粘贴到 NovelAI');
   };
 

@@ -5,6 +5,7 @@ import {
   DEFAULT_OVERVIEW_FILTERS,
   deleteOverviewTags,
   filterOverviewScopes,
+  overviewCategoryGroups,
   overviewCopyContext,
   overviewEntries,
   overviewTagKey,
@@ -65,6 +66,7 @@ function ScopeTags({
   onKeyboardMove,
   onToggleSelect,
 }) {
+  const selectedSet = new Set(selectedKeys);
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
       <span>{scope.polarity === 'undesired' ? 'UNDESIRED CONTENT' : 'PROMPT'}</span>
@@ -73,7 +75,7 @@ function ScopeTags({
     <div className="overview-tags" role="list" aria-label={scope.label}>
       {scope.tags.map((tag, index) => {
         const key = overviewTagKey(scope.key, tag.id);
-        const selected = selectedKeys.includes(key);
+        const selected = selectedSet.has(key);
         const display = tagPresentation(tag, language);
         const warning = syntaxMessage(tag);
         return <button
@@ -103,6 +105,41 @@ function ScopeTags({
   </div>;
 }
 
+function CategoryGroup({ group, language, selecting, selectedKeys, onToggleSelect, onToggleGroup, onEditTag }) {
+  const selectedSet = new Set(selectedKeys);
+  const groupKeys = group.entries.map((entry) => entry.key);
+  const allSelected = groupKeys.length > 0 && groupKeys.every((key) => selectedSet.has(key));
+  return <section className={`overview-category-group cat-${String(group.category).toLowerCase()}`}>
+    <div className="overview-category-marker"><span>{CATEGORY_LABELS[group.category] || group.category}</span><i/></div>
+    <div className="overview-category-body">
+      <div className="overview-category-heading">
+        <div><strong>{CATEGORY_LABELS[group.category] || group.category}</strong><small>{group.category.toUpperCase()} · {group.entries.length} TAGS</small></div>
+        {selecting && <button className={allSelected ? 'active' : ''} onClick={() => onToggleGroup(group.entries)}>{allSelected ? '取消整组' : `选择整组 ${group.entries.length}`}</button>}
+      </div>
+      <div className="overview-tags" role="list" aria-label={`${CATEGORY_LABELS[group.category] || group.category} Tag`}>
+        {group.entries.map((entry) => {
+          const selected = selectedSet.has(entry.key);
+          const display = tagPresentation(entry.tag, language);
+          const warning = syntaxMessage(entry.tag);
+          return <button
+            key={entry.key}
+            className={`overview-tag cat-${String(group.category).toLowerCase()} ${entry.scopePolarity === 'undesired' ? 'undesired-tag' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''}`}
+            onClick={() => selecting ? onToggleSelect(entry.key) : onEditTag(entry.scopeKey, entry.tag.id)}
+            role="listitem"
+            aria-pressed={selecting ? selected : undefined}
+            title={`${display.title}\n区域：${entry.scopeLabel}${warning ? `\n语法提醒：${warning}` : ''}${selecting ? '\n点击选择' : '\n点击编辑'}`}
+          >
+            {selecting && <i className="overview-select-mark" aria-hidden="true">{selected ? '✓' : ''}</i>}
+            <span className="overview-tag-copy"><span>{display.primary}</span>{display.secondary && <small>{display.secondary}</small>}</span>
+            {Math.abs(Number(entry.tag.weight) - 1) >= 0.001 && <em>{Number(entry.tag.weight).toFixed(2)}</em>}
+            {warning && <i className="overview-syntax-mark" aria-hidden="true">!</i>}
+          </button>;
+        })}
+      </div>
+    </div>
+  </section>;
+}
+
 function Segment({ value, options, onChange, label }) {
   return <div className="overview-segment" aria-label={label}>
     {options.map(([option, text]) => <button key={option} className={value === option ? 'active' : ''} onClick={() => onChange(option)}>{text}</button>)}
@@ -113,6 +150,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
   const [dragging, setDragging] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_OVERVIEW_FILTERS);
   const [language, setLanguage] = useState('original');
+  const [viewMode, setViewMode] = useState('structure');
   const [selecting, setSelecting] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [deleteArmed, setDeleteArmed] = useState(false);
@@ -120,6 +158,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
 
   useEffect(() => {
     setFilters(DEFAULT_OVERVIEW_FILTERS);
+    setViewMode('structure');
     setSelecting(false);
     setSelectedKeys([]);
     setDeleteArmed(false);
@@ -133,6 +172,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
 
   const visibleScopes = useMemo(() => filterOverviewScopes(project, filters), [project, filters]);
   const visibleEntries = useMemo(() => overviewEntries(visibleScopes), [visibleScopes]);
+  const categoryGroups = useMemo(() => overviewCategoryGroups(visibleEntries), [visibleEntries]);
   const copyContext = useMemo(() => overviewCopyContext(project, visibleScopes, selectedKeys), [project, visibleScopes, selectedKeys]);
   const categorySourceScopes = useMemo(() => filterOverviewScopes(project, { ...filters, category: 'All' }), [project, filters]);
   const categoryCounts = useMemo(() => overviewEntries(categorySourceScopes).reduce((counts, entry) => {
@@ -144,8 +184,8 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
   const filtered = filters.category !== 'All' || filters.polarity !== 'all' || filters.domain !== 'all' || Boolean(filters.query.trim());
 
   useEffect(() => {
-    onCopyContextChange?.({ text: copyContext.text, count: copyContext.count, selected: copyContext.selected });
-  }, [copyContext.text, copyContext.count, copyContext.selected, onCopyContextChange]);
+    onCopyContextChange?.({ text: copyContext.text, count: copyContext.count, selected: copyContext.selected, categoryCount: copyContext.categoryCount });
+  }, [copyContext.text, copyContext.count, copyContext.selected, copyContext.categoryCount, onCopyContextChange]);
 
   const changeFilter = (patch) => {
     setFilters((current) => ({ ...current, ...patch }));
@@ -190,6 +230,17 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
   const toggleSelection = (key) => {
     setDeleteArmed(false);
     setSelectedKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+  };
+
+  const toggleCategoryGroup = (entries) => {
+    const keys = entries.map((entry) => entry.key);
+    setDeleteArmed(false);
+    setSelectedKeys((current) => {
+      const selected = new Set(current);
+      const allSelected = keys.length > 0 && keys.every((key) => selected.has(key));
+      if (allSelected) return current.filter((key) => !keys.includes(key));
+      return [...new Set([...current, ...keys])];
+    });
   };
 
   const toggleSelecting = () => {
@@ -238,7 +289,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
         <div>
           <span className="overview-kicker">PROMPT MAP / V4</span>
           <h2>Prompt 总览</h2>
-          <p>筛选、选择和整理 Tag；复制始终使用可直接生成的原始 Tag。</p>
+          <p>默认同行复制；多选时同类同行，不同分类换行。</p>
         </div>
         <div className="overview-stats">
           <span><b>{visibleEntries.length}</b> VISIBLE</span>
@@ -251,6 +302,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
         <label className="overview-search"><span>⌕</span><input value={filters.query} onChange={(event) => changeFilter({ query: event.target.value })} placeholder="筛选 Tag 或译名"/></label>
         <Segment value={filters.polarity} options={[["all", '全部'], ['prompt', 'Prompt'], ['undesired', 'Undesired']]} onChange={(polarity) => changeFilter({ polarity })} label="Prompt 类型"/>
         <Segment value={filters.domain} options={[["all", '全部区域'], ['base', 'Base'], ['character', 'Character']]} onChange={(domain) => changeFilter({ domain })} label="Prompt 区域"/>
+        <Segment value={viewMode} options={[["structure", '按结构'], ['category', '按分类']]} onChange={setViewMode} label="总览分组方式"/>
         <Segment value={language} options={LANGUAGE_OPTIONS} onChange={setLanguage} label="显示语言"/>
         <button className={`overview-select-toggle ${selecting ? 'active' : ''}`} onClick={toggleSelecting}>{selecting ? `退出多选 · ${selectedKeys.length}` : '多选'}</button>
       </div>
@@ -261,7 +313,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
       </div>
 
       {selecting && <div className="overview-selection-bar">
-        <span>已选 <b>{selectedKeys.length}</b> 个；没有选择时复制当前筛选结果。</span>
+        <span>已选 <b>{selectedKeys.length}</b> 个{copyContext.categoryCount ? ` · ${copyContext.categoryCount} 个分类` : ''}；不同分类复制时自动换行。</span>
         <button onClick={selectAllVisible} disabled={!visibleEntries.length}>全选可见</button>
         <button onClick={() => setSelectedKeys([])} disabled={!selectedKeys.length}>取消选择</button>
         <button className="primary" onClick={copyVisibleOrSelected} disabled={!copyContext.count}>{copyContext.selected ? `复制已选 ${copyContext.count}` : `复制可见 ${copyContext.count}`}</button>
@@ -269,8 +321,19 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
       </div>}
     </header>
 
-    <div className="overview-content">
-      {baseScopes.length > 0 && <section className="overview-layer base-layer">
+    <div className={`overview-content ${viewMode === 'category' ? 'category-view' : ''}`}>
+      {viewMode === 'category' && categoryGroups.map((group) => <CategoryGroup
+        key={group.category}
+        group={group}
+        language={language}
+        selecting={selecting}
+        selectedKeys={selectedKeys}
+        onToggleSelect={toggleSelection}
+        onToggleGroup={toggleCategoryGroup}
+        onEditTag={onEditTag}
+      />)}
+
+      {viewMode === 'structure' && baseScopes.length > 0 && <section className="overview-layer base-layer">
         <div className="overview-layer-marker"><span>BASE</span><i/></div>
         <div className="overview-layer-body">
           <div className="overview-layer-heading"><div><strong>Base Prompt</strong><small>场景、构图、风格与全局排除内容</small></div><span>GLOBAL</span></div>
@@ -278,7 +341,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
         </div>
       </section>}
 
-      {filters.domain !== 'base' && structure.characters.map((character, index) => {
+      {viewMode === 'structure' && filters.domain !== 'base' && structure.characters.map((character, index) => {
         const sections = characterScopes.filter((scope) => scope.characterId === character.id);
         if (!sections.length) return null;
         return <section className="overview-layer character-layer" key={character.id}>
@@ -294,7 +357,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
       })}
 
       {!visibleEntries.length && filtered && <div className="overview-no-results"><strong>没有符合条件的 Tag</strong><span>调整分类、区域或搜索词后，顶部复制内容会同步更新。</span></div>}
-      {!structure.characters.length && filters.domain !== 'base' && <button className="overview-add-character" onClick={() => onEditTag('base:prompt', null)}>
+      {viewMode === 'structure' && !structure.characters.length && filters.domain !== 'base' && <button className="overview-add-character" onClick={() => onEditTag('base:prompt', null)}>
         <span>＋</span><div><strong>还没有 Character Prompt</strong><small>在右侧 Prompt 面板添加角色，最多支持 6 个。</small></div>
       </button>}
     </div>

@@ -145,6 +145,10 @@ export function formatPrompt(tags = []) {
   return tags.filter((tag) => tag.tag.trim()).map(formatTag).join(',\n');
 }
 
+export function formatPromptInline(tags = []) {
+  return tags.filter((tag) => tag.tag.trim()).map(formatTag).join(', ');
+}
+
 export function normalizeSearch(value = '') {
   return value.trim().toLocaleLowerCase();
 }

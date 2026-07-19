@@ -3,6 +3,7 @@ import {
   createPromptStructure,
   extractV4PromptData,
   formatPositivePrompt,
+  formatPositivePromptForCopy,
   getPromptScopes,
   updatePromptScope,
 } from './promptStructure.js';
@@ -67,5 +68,6 @@ describe('NovelAI V4 prompt structure', () => {
     const updated = updatePromptScope(project, characterScope.key, [...characterScope.tags].reverse());
     expect(getPromptScopes(updated)[2].tags.map((tag) => tag.tag)).toEqual(['red hair', 'girl']);
     expect(formatPositivePrompt(project)).toContain('|');
+    expect(formatPositivePromptForCopy(project)).toBe('2girls\n|\ngirl, red hair');
   });
 });

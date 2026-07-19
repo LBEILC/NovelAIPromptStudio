@@ -1,4 +1,4 @@
-import { formatPrompt, parsePrompt } from './prompt.js';
+import { formatPrompt, formatPromptInline, parsePrompt } from './prompt.js';
 
 const createId = () => crypto.randomUUID();
 
@@ -187,6 +187,11 @@ export function countPromptTags(project) {
 export function formatPositivePrompt(project) {
   const scopes = getPromptScopes(project).filter((scope) => scope.polarity === 'prompt');
   return scopes.map((scope) => formatPrompt(scope.tags)).filter(Boolean).join('\n|\n');
+}
+
+export function formatPositivePromptForCopy(project) {
+  const scopes = getPromptScopes(project).filter((scope) => scope.polarity === 'prompt');
+  return scopes.map((scope) => formatPromptInline(scope.tags)).filter(Boolean).join('\n|\n');
 }
 
 export function syncProjectPromptMetadata(project) {

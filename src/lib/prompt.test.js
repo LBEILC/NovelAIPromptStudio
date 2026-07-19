@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expandSearch, formatPrompt, inferCategory, parsePrompt, repairLegacyPromptTags } from './prompt.js';
+import { expandSearch, formatPrompt, formatPromptInline, inferCategory, parsePrompt, repairLegacyPromptTags } from './prompt.js';
 
 describe('NovelAI prompt codec', () => {
   it('parses numeric weights and exports the same NovelAI syntax', () => {
@@ -8,6 +8,7 @@ describe('NovelAI prompt codec', () => {
     expect(tags).toHaveLength(3);
     expect(tags[1]).toMatchObject({ tag: 'silver hair', weight: 1.3, translation: '银色头发', category: 'Character' });
     expect(formatPrompt(tags)).toBe('1girl,\n1.3::silver hair ::,\nfuturistic city');
+    expect(formatPromptInline(tags)).toBe('1girl, 1.3::silver hair ::, futuristic city');
   });
 
   it('expands comma-separated weighted groups and preserves negative weights', () => {
