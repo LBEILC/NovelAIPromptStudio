@@ -104,7 +104,10 @@ function LibraryPanel({ projects, activeId, setActiveId, query, setQuery, onImpo
   </aside>;
 }
 
-function PreviewStage({ project, mode, setMode, onCopy, onReveal, onEditTag, updateProject, saveVersion, restoreVersion, activeVersion, setActiveVersion }) {
+function PreviewStage({ project, mode, setMode, onCopy, onReveal, onEditTag, updateProject, saveVersion, restoreVersion, activeVersion, setActiveVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
+  const copyLabel = mode === 'prompt'
+    ? overviewCopy.selected ? `复制已选 ${overviewCopy.count}` : `复制可见 ${overviewCopy.count}`
+    : '复制 Prompt';
   return <section className="preview-column">
     <header className="topbar">
       <div className="breadcrumb"><span>作品库</span><b>/</b><strong>{project.name}</strong></div>
@@ -114,7 +117,7 @@ function PreviewStage({ project, mode, setMode, onCopy, onReveal, onEditTag, upd
           <button className={mode === 'prompt' ? 'active' : ''} onClick={() => setMode('prompt')}><Icon name="layers"/>Prompt</button>
         </div>
         <button className="ghost" onClick={() => onReveal(project.image_path)} title="在文件夹中显示"><Icon name="folder"/></button>
-        <button className="copy-button" onClick={onCopy}><Icon name="copy"/>复制 Prompt</button>
+        <button className="copy-button" onClick={onCopy} disabled={mode === 'prompt' && !overviewCopy.count}><Icon name="copy"/>{copyLabel}</button>
       </div>
     </header>
     {mode === 'image' ? <div className="stage">
@@ -129,7 +132,7 @@ function PreviewStage({ project, mode, setMode, onCopy, onReveal, onEditTag, upd
         <i/>
         <span>{project.metadata.steps || '—'} STEPS</span>
       </div>
-    </div> : <PromptOverview project={project} updateProject={updateProject} onEditTag={onEditTag}/>}
+    </div> : <PromptOverview project={project} updateProject={updateProject} onEditTag={onEditTag} onCopyContextChange={onOverviewCopyChange} onCopyText={onCopyText} onNotify={onNotify}/>}
     <footer className="version-rail">
       <div className="rail-title"><span><Icon name="history"/>版本胶片</span><div className="rail-actions">{activeVersion !== 'current' && <button className="restore-action" onClick={() => restoreVersion(activeVersion)}>恢复此版本</button>}<button onClick={saveVersion}><Icon name="plus"/>保存版本</button></div></div>
       <div className="version-strip">
@@ -157,7 +160,7 @@ function TagCard({ tag, index, translating, dragging, dropTarget, onTranslate, o
     <div className="tag-line">
       <button className="drag-handle" onPointerDown={(event) => onPointerStart(index, event)} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} onKeyDown={(event) => onKeyboardMove(index, event)} title="按住拖动排序；Option + 方向键微调" aria-label={`拖动 ${tag.tag} 排序`}><Icon name="grip"/></button>
       <div className="tag-fields">
-        <input className="tag-name" value={tag.tag} onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic' })} aria-label="Tag"/>
+        <input className="tag-name" value={tag.tag} onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic', raw_segment: '', syntax_issue: '' })} aria-label="Tag"/>
         <input className="translation" value={tag.translation || ''} onChange={(event) => onChange({ translation: event.target.value, translation_source: 'manual' })} placeholder="添加中文翻译" aria-label="中文翻译"/>
       </div>
       <button className={`translate-tag ${translating ? 'working' : ''}`} onClick={onTranslate} disabled={translating} aria-label={`翻译 ${tag.tag}`}>{translating ? '···' : '译'}</button>
@@ -167,6 +170,7 @@ function TagCard({ tag, index, translating, dragging, dropTarget, onTranslate, o
       <select value={tag.category} onChange={(event) => onChange({ category: event.target.value, category_source: 'manual' })}>{CATEGORY_OPTIONS.map((option) => <option key={option} value={option}>{CATEGORY_LABELS[option]}</option>)}</select>
       <WeightControl value={tag.weight} onChange={(weight) => onChange({ weight })}/>
     </div>
+    {tag.syntax_issue && <div className={`tag-syntax-warning ${tag.syntax_issue}`}><Icon name="info" size={13}/><span>{tag.syntax_issue === 'control_only' ? '单独的 :: 是结束控制符，不是 Tag。建议删除。' : '这里包含可能多余的 :: 结束符；编辑 Tag 后会规范化。'}</span></div>}
     <input className="tag-note" value={tag.note || ''} onChange={(event) => onChange({ note: event.target.value })} placeholder="备注（可选）"/>
   </article>;
 }
@@ -589,6 +593,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeVersion, setActiveVersion] = useState('current');
   const [workspaceMode, setWorkspaceMode] = useState('image');
+  const [overviewCopy, setOverviewCopy] = useState({ text: '', count: 0, selected: false });
   const [promptScopeKey, setPromptScopeKey] = useState('base:prompt');
   const [focusTagId, setFocusTagId] = useState(null);
   const saveTimers = useRef(new Map());
@@ -620,6 +625,10 @@ export default function App() {
   });
 
   const activeProject = projects.find((project) => project.id === activeId) || null;
+
+  useEffect(() => {
+    if (workspaceMode !== 'prompt') setOverviewCopy({ text: '', count: 0, selected: false });
+  }, [activeId, workspaceMode]);
   const filteredProjects = useMemo(() => {
     const needles = expandSearch(query);
     if (!needles.length) return projects;
@@ -655,7 +664,20 @@ export default function App() {
     }, 450));
   };
 
+  const copyOverviewText = async (text, count, selected = false) => {
+    if (!text || !count) {
+      showToast('当前没有可复制的 Tag');
+      return;
+    }
+    await navigator.clipboard.writeText(text);
+    showToast(selected ? `已复制 ${count} 个已选 Tag` : `已复制 ${count} 个可见 Tag`);
+  };
+
   const copyPrompt = async () => {
+    if (workspaceMode === 'prompt') {
+      await copyOverviewText(overviewCopy.text, overviewCopy.count, overviewCopy.selected);
+      return;
+    }
     await navigator.clipboard.writeText(formatPositivePrompt(activeProject));
     showToast('Prompt 已复制，可直接粘贴到 NovelAI');
   };
@@ -709,7 +731,7 @@ export default function App() {
   return <div className="app-shell">
     <LibraryPanel projects={filteredProjects} activeId={activeId} setActiveId={(id) => { setActiveId(id); setActiveVersion('current'); setPromptScopeKey('base:prompt'); }} query={query} setQuery={setQuery} onImport={importImages} onOpenPromptOverview={openPromptOverview} shortcutModifier={shortcutModifier}/>
     {activeProject ? <>
-      <PreviewStage project={activeProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} updateProject={updateProject} saveVersion={saveVersion} restoreVersion={restoreVersion} activeVersion={activeVersion} setActiveVersion={setActiveVersion}/>
+      <PreviewStage project={activeProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} updateProject={updateProject} saveVersion={saveVersion} restoreVersion={restoreVersion} activeVersion={activeVersion} setActiveVersion={setActiveVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
       <Inspector tab={tab} setTab={setTab} project={activeProject} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId}/>
     </> : <EmptyState onImport={importImages}/>}
     {toast && <div className="toast"><Icon name="check"/>{toast}</div>}

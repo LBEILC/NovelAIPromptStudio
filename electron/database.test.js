@@ -23,7 +23,7 @@ describe('prompt structure persistence', () => {
       thumbnail_path: 'thumb.webp',
       created_at: now,
       updated_at: now,
-      tags: [{ id: 'base-tag', tag: '2girls', translation: '', category: 'Character', weight: 1, note: '' }],
+      tags: [{ id: 'base-tag', tag: 'year2025', translation: '', category: 'Character', weight: 1, note: '', raw_segment: '::year2025 ::', syntax_issue: 'emphasis_closer' }],
       prompt_structure: {
         base_undesired_tags: [{ id: 'base-uc', tag: 'lowres', translation: '', category: 'Unsorted', weight: 1, note: '' }],
         use_coords: true,
@@ -47,6 +47,7 @@ describe('prompt structure persistence', () => {
       use_coords: true,
       characters: [{ center: { x: 0.3, y: 0.5 }, prompt_tags: [{ tag: 'girl' }], undesired_tags: [{ tag: 'blue hair' }] }],
     });
+    expect(loaded.tags[0]).toMatchObject({ raw_segment: '::year2025 ::', syntax_issue: 'emphasis_closer' });
   });
 
   it('stores reusable encoded Vibes and project links', async () => {

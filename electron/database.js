@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS prompt_tags (
   category TEXT NOT NULL DEFAULT 'Unsorted',
   weight REAL NOT NULL DEFAULT 1,
   position INTEGER NOT NULL,
-  note TEXT NOT NULL DEFAULT ''
+  note TEXT NOT NULL DEFAULT '',
+  raw_segment TEXT NOT NULL DEFAULT '',
+  syntax_issue TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_prompt_tags_project ON prompt_tags(project_id, position);
 CREATE INDEX IF NOT EXISTS idx_prompt_tags_search ON prompt_tags(tag, translation, category);
@@ -155,6 +157,13 @@ export async function openDatabase(dataDirectory) {
   const metadataColumns = database.exec('PRAGMA table_info(generation_metadata)')[0]?.values.map((row) => row[1]) || [];
   if (!metadataColumns.includes('prompt_structure_json')) {
     database.run("ALTER TABLE generation_metadata ADD COLUMN prompt_structure_json TEXT NOT NULL DEFAULT '{}'");
+  }
+  const promptTagColumns = database.exec('PRAGMA table_info(prompt_tags)')[0]?.values.map((row) => row[1]) || [];
+  if (!promptTagColumns.includes('raw_segment')) {
+    database.run("ALTER TABLE prompt_tags ADD COLUMN raw_segment TEXT NOT NULL DEFAULT ''");
+  }
+  if (!promptTagColumns.includes('syntax_issue')) {
+    database.run("ALTER TABLE prompt_tags ADD COLUMN syntax_issue TEXT NOT NULL DEFAULT ''");
   }
   const vibeColumns = database.exec('PRAGMA table_info(vibe_transfers)')[0]?.values.map((row) => row[1]) || [];
   const vibeMigrations = [
@@ -404,8 +413,8 @@ export async function openDatabase(dataDirectory) {
     database.run('DELETE FROM prompt_tags WHERE project_id = $id', { $id: project.id });
     for (const [position, tag] of (project.tags || []).entries()) {
       database.run(
-        `INSERT INTO prompt_tags (id, project_id, tag, translation, category, weight, position, note)
-         VALUES ($id, $project_id, $tag, $translation, $category, $weight, $position, $note)`,
+        `INSERT INTO prompt_tags (id, project_id, tag, translation, category, weight, position, note, raw_segment, syntax_issue)
+         VALUES ($id, $project_id, $tag, $translation, $category, $weight, $position, $note, $raw_segment, $syntax_issue)`,
         {
           $id: tag.id,
           $project_id: project.id,
@@ -415,6 +424,8 @@ export async function openDatabase(dataDirectory) {
           $weight: Number.isFinite(Number(tag.weight)) ? Number(tag.weight) : 1,
           $position: position,
           $note: tag.note || '',
+          $raw_segment: tag.raw_segment || '',
+          $syntax_issue: tag.syntax_issue || '',
         },
       );
     }

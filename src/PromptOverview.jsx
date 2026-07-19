@@ -1,47 +1,160 @@
-import { useState } from 'react';
-import { countPromptTags, getPromptScopes, updatePromptScope } from './lib/promptStructure.js';
+import { useEffect, useMemo, useState } from 'react';
+import { CATEGORY_LABELS, CATEGORY_OPTIONS } from './lib/prompt.js';
+import { countPromptTags, updatePromptScope } from './lib/promptStructure.js';
+import {
+  DEFAULT_OVERVIEW_FILTERS,
+  deleteOverviewTags,
+  filterOverviewScopes,
+  overviewCopyContext,
+  overviewEntries,
+  overviewTagKey,
+} from './lib/promptOverview.js';
+
+const LANGUAGE_OPTIONS = [
+  ['original', '原文'],
+  ['translated', '翻译'],
+  ['bilingual', '对照'],
+];
 
 function compactPosition(center) {
   return `${Math.round(Number(center?.x ?? 0.5) * 100)} / ${Math.round(Number(center?.y ?? 0.5) * 100)}`;
 }
 
-function ScopeTags({ scope, dragging, onDragStart, onDragEnd, onDrop, onEditTag, onKeyboardMove }) {
+function syntaxMessage(tag) {
+  if (tag.syntax_issue === 'control_only') return '单独的 :: 是结束控制符，不是 Tag，建议删除。';
+  if (tag.syntax_issue === 'emphasis_closer') return '包含可能多余的 :: 结束符；没有前置强调时相当于普通权重 1。';
+  return '';
+}
+
+function tagPresentation(tag, language) {
+  if (language === 'translated') {
+    return {
+      primary: tag.translation || tag.tag,
+      secondary: '',
+      title: tag.translation ? `原文：${tag.tag}` : `暂无翻译 · 原文：${tag.tag}`,
+      fallback: !tag.translation,
+    };
+  }
+  if (language === 'bilingual') {
+    return {
+      primary: tag.tag,
+      secondary: tag.translation || '暂无翻译',
+      title: tag.translation ? `原文：${tag.tag}\n翻译：${tag.translation}` : `原文：${tag.tag}\n暂无翻译`,
+      fallback: !tag.translation,
+    };
+  }
+  return {
+    primary: tag.tag,
+    secondary: '',
+    title: tag.translation ? `翻译：${tag.translation}` : '暂无翻译',
+    fallback: false,
+  };
+}
+
+function ScopeTags({
+  scope,
+  dragging,
+  language,
+  selecting,
+  selectedKeys,
+  filtered,
+  onDragStart,
+  onDragEnd,
+  onDrop,
+  onEditTag,
+  onKeyboardMove,
+  onToggleSelect,
+}) {
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
       <span>{scope.polarity === 'undesired' ? 'UNDESIRED CONTENT' : 'PROMPT'}</span>
       <b>{scope.tags.length}</b>
     </div>
     <div className="overview-tags" role="list" aria-label={scope.label}>
-      {scope.tags.map((tag, index) => <button
-        key={tag.id}
-        className={`overview-tag cat-${String(tag.category || 'Unsorted').toLowerCase()} ${dragging?.scopeKey === scope.key && dragging.index === index ? 'dragging' : ''}`}
-        draggable
-        onDragStart={(event) => onDragStart(scope.key, index, event)}
-        onDragEnd={onDragEnd}
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => onDrop(scope, index, event)}
-        onClick={() => onEditTag(scope.key, tag.id)}
-        onKeyDown={(event) => onKeyboardMove(scope, index, event)}
-        role="listitem"
-        title={`${tag.translation || tag.tag} · 点击编辑，拖动排序`}
-      >
-        <span>{tag.tag}</span>
-        {Math.abs(Number(tag.weight) - 1) >= 0.001 && <em>{Number(tag.weight).toFixed(2)}</em>}
-      </button>)}
-      {!scope.tags.length && <button className="overview-empty-tag" onClick={() => onEditTag(scope.key, null)}>+ 在右侧添加 Tag</button>}
+      {scope.tags.map((tag, index) => {
+        const key = overviewTagKey(scope.key, tag.id);
+        const selected = selectedKeys.includes(key);
+        const display = tagPresentation(tag, language);
+        const warning = syntaxMessage(tag);
+        return <button
+          key={tag.id}
+          className={`overview-tag cat-${String(tag.category || 'Unsorted').toLowerCase()} ${dragging?.scopeKey === scope.key && dragging.index === index ? 'dragging' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''}`}
+          draggable={!selecting && !filtered}
+          onDragStart={(event) => !selecting && !filtered && onDragStart(scope.key, index, event)}
+          onDragEnd={onDragEnd}
+          onDragOver={(event) => !selecting && !filtered && event.preventDefault()}
+          onDrop={(event) => !selecting && !filtered && onDrop(scope, index, event)}
+          onClick={() => selecting ? onToggleSelect(key) : onEditTag(scope.key, tag.id)}
+          onKeyDown={(event) => selecting ? undefined : onKeyboardMove(scope, index, event)}
+          role="listitem"
+          aria-pressed={selecting ? selected : undefined}
+          title={`${display.title}${warning ? `\n语法提醒：${warning}` : ''}${selecting ? '\n点击选择' : '\n点击编辑，拖动排序'}`}
+        >
+          {selecting && <i className="overview-select-mark" aria-hidden="true">{selected ? '✓' : ''}</i>}
+          <span className="overview-tag-copy"><span>{display.primary}</span>{display.secondary && <small>{display.secondary}</small>}</span>
+          {Math.abs(Number(tag.weight) - 1) >= 0.001 && <em>{Number(tag.weight).toFixed(2)}</em>}
+          {warning && <i className="overview-syntax-mark" aria-hidden="true">!</i>}
+        </button>;
+      })}
+      {!scope.tags.length && (filtered
+        ? <span className="overview-filter-empty">当前筛选无 Tag</span>
+        : <button className="overview-empty-tag" onClick={() => onEditTag(scope.key, null)}>+ 在右侧添加 Tag</button>)}
     </div>
   </div>;
 }
 
-export default function PromptOverview({ project, updateProject, onEditTag }) {
+function Segment({ value, options, onChange, label }) {
+  return <div className="overview-segment" aria-label={label}>
+    {options.map(([option, text]) => <button key={option} className={value === option ? 'active' : ''} onClick={() => onChange(option)}>{text}</button>)}
+  </div>;
+}
+
+export default function PromptOverview({ project, updateProject, onEditTag, onCopyContextChange, onCopyText, onNotify }) {
   const [dragging, setDragging] = useState(null);
-  const scopes = getPromptScopes(project);
-  const baseScopes = scopes.filter((scope) => scope.kind === 'base');
-  const characterScopes = scopes.filter((scope) => scope.kind === 'character');
+  const [filters, setFilters] = useState(DEFAULT_OVERVIEW_FILTERS);
+  const [language, setLanguage] = useState('original');
+  const [selecting, setSelecting] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState([]);
+  const [deleteArmed, setDeleteArmed] = useState(false);
   const structure = project.prompt_structure;
 
+  useEffect(() => {
+    setFilters(DEFAULT_OVERVIEW_FILTERS);
+    setSelecting(false);
+    setSelectedKeys([]);
+    setDeleteArmed(false);
+  }, [project.id]);
+
+  useEffect(() => {
+    if (!deleteArmed) return undefined;
+    const timer = window.setTimeout(() => setDeleteArmed(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [deleteArmed]);
+
+  const visibleScopes = useMemo(() => filterOverviewScopes(project, filters), [project, filters]);
+  const visibleEntries = useMemo(() => overviewEntries(visibleScopes), [visibleScopes]);
+  const copyContext = useMemo(() => overviewCopyContext(project, visibleScopes, selectedKeys), [project, visibleScopes, selectedKeys]);
+  const categorySourceScopes = useMemo(() => filterOverviewScopes(project, { ...filters, category: 'All' }), [project, filters]);
+  const categoryCounts = useMemo(() => overviewEntries(categorySourceScopes).reduce((counts, entry) => {
+    counts[entry.tag.category || 'Unsorted'] = (counts[entry.tag.category || 'Unsorted'] || 0) + 1;
+    return counts;
+  }, {}), [categorySourceScopes]);
+  const baseScopes = visibleScopes.filter((scope) => scope.kind === 'base');
+  const characterScopes = visibleScopes.filter((scope) => scope.kind === 'character');
+  const filtered = filters.category !== 'All' || filters.polarity !== 'all' || filters.domain !== 'all' || Boolean(filters.query.trim());
+
+  useEffect(() => {
+    onCopyContextChange?.({ text: copyContext.text, count: copyContext.count, selected: copyContext.selected });
+  }, [copyContext.text, copyContext.count, copyContext.selected, onCopyContextChange]);
+
+  const changeFilter = (patch) => {
+    setFilters((current) => ({ ...current, ...patch }));
+    setSelectedKeys([]);
+    setDeleteArmed(false);
+  };
+
   const moveTag = (scope, sourceIndex, targetIndex) => {
-    if (sourceIndex === targetIndex || sourceIndex < 0 || targetIndex < 0 || targetIndex >= scope.tags.length) return;
+    if (filtered || sourceIndex === targetIndex || sourceIndex < 0 || targetIndex < 0 || targetIndex >= scope.tags.length) return;
     const tags = [...scope.tags];
     const [moved] = tags.splice(sourceIndex, 1);
     tags.splice(targetIndex, 0, moved);
@@ -49,6 +162,7 @@ export default function PromptOverview({ project, updateProject, onEditTag }) {
   };
 
   const beginDrag = (scopeKey, index, event) => {
+    if (filtered) return;
     setDragging({ scopeKey, index });
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('application/json', JSON.stringify({ scopeKey, index }));
@@ -73,30 +187,100 @@ export default function PromptOverview({ project, updateProject, onEditTag }) {
     moveTag(scope, index, index + direction);
   };
 
+  const toggleSelection = (key) => {
+    setDeleteArmed(false);
+    setSelectedKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+  };
+
+  const toggleSelecting = () => {
+    setSelecting((current) => !current);
+    setSelectedKeys([]);
+    setDeleteArmed(false);
+  };
+
+  const selectAllVisible = () => {
+    setSelectedKeys(visibleEntries.map((entry) => entry.key));
+    setDeleteArmed(false);
+  };
+
+  const copyVisibleOrSelected = () => onCopyText?.(copyContext.text, copyContext.count, copyContext.selected);
+
+  const deleteSelected = () => {
+    if (!selectedKeys.length) return;
+    if (!deleteArmed) {
+      setDeleteArmed(true);
+      return;
+    }
+    const count = selectedKeys.length;
+    updateProject(deleteOverviewTags(project, selectedKeys));
+    setSelectedKeys([]);
+    setDeleteArmed(false);
+    onNotify?.(`已删除 ${count} 个 Tag`);
+  };
+
+  const scopeProps = {
+    dragging,
+    language,
+    selecting,
+    selectedKeys,
+    filtered,
+    onDragStart: beginDrag,
+    onDragEnd: () => setDragging(null),
+    onDrop: dropTag,
+    onEditTag,
+    onKeyboardMove: keyboardMove,
+    onToggleSelect: toggleSelection,
+  };
+
   return <div className="prompt-overview">
     <header className="overview-header">
-      <div>
-        <span className="overview-kicker">PROMPT MAP / V4</span>
-        <h2>Prompt 总览</h2>
-        <p>拖动 Tag 调整顺序，点击任意 Tag 在右侧打开详细编辑。</p>
+      <div className="overview-title-row">
+        <div>
+          <span className="overview-kicker">PROMPT MAP / V4</span>
+          <h2>Prompt 总览</h2>
+          <p>筛选、选择和整理 Tag；复制始终使用可直接生成的原始 Tag。</p>
+        </div>
+        <div className="overview-stats">
+          <span><b>{visibleEntries.length}</b> VISIBLE</span>
+          <span><b>{countPromptTags(project)}</b> TOTAL</span>
+          <span><b>{structure.characters.length}</b> CHARACTERS</span>
+        </div>
       </div>
-      <div className="overview-stats">
-        <span><b>{countPromptTags(project)}</b> TAGS</span>
-        <span><b>{structure.characters.length}</b> CHARACTERS</span>
+
+      <div className="overview-toolbar">
+        <label className="overview-search"><span>⌕</span><input value={filters.query} onChange={(event) => changeFilter({ query: event.target.value })} placeholder="筛选 Tag 或译名"/></label>
+        <Segment value={filters.polarity} options={[["all", '全部'], ['prompt', 'Prompt'], ['undesired', 'Undesired']]} onChange={(polarity) => changeFilter({ polarity })} label="Prompt 类型"/>
+        <Segment value={filters.domain} options={[["all", '全部区域'], ['base', 'Base'], ['character', 'Character']]} onChange={(domain) => changeFilter({ domain })} label="Prompt 区域"/>
+        <Segment value={language} options={LANGUAGE_OPTIONS} onChange={setLanguage} label="显示语言"/>
+        <button className={`overview-select-toggle ${selecting ? 'active' : ''}`} onClick={toggleSelecting}>{selecting ? `退出多选 · ${selectedKeys.length}` : '多选'}</button>
       </div>
+
+      <div className="overview-category-row" aria-label="Tag 分类筛选">
+        <button className={filters.category === 'All' ? 'active' : ''} onClick={() => changeFilter({ category: 'All' })}>全部 <b>{overviewEntries(categorySourceScopes).length}</b></button>
+        {CATEGORY_OPTIONS.map((category) => <button key={category} className={`${filters.category === category ? 'active' : ''} cat-${category.toLowerCase()}`} onClick={() => changeFilter({ category })}>{CATEGORY_LABELS[category]} <b>{categoryCounts[category] || 0}</b></button>)}
+      </div>
+
+      {selecting && <div className="overview-selection-bar">
+        <span>已选 <b>{selectedKeys.length}</b> 个；没有选择时复制当前筛选结果。</span>
+        <button onClick={selectAllVisible} disabled={!visibleEntries.length}>全选可见</button>
+        <button onClick={() => setSelectedKeys([])} disabled={!selectedKeys.length}>取消选择</button>
+        <button className="primary" onClick={copyVisibleOrSelected} disabled={!copyContext.count}>{copyContext.selected ? `复制已选 ${copyContext.count}` : `复制可见 ${copyContext.count}`}</button>
+        <button className={`danger ${deleteArmed ? 'armed' : ''}`} onClick={deleteSelected} disabled={!selectedKeys.length}>{deleteArmed ? `再次点击删除 ${selectedKeys.length}` : `删除已选 ${selectedKeys.length}`}</button>
+      </div>}
     </header>
 
     <div className="overview-content">
-      <section className="overview-layer base-layer">
+      {baseScopes.length > 0 && <section className="overview-layer base-layer">
         <div className="overview-layer-marker"><span>BASE</span><i/></div>
         <div className="overview-layer-body">
-          <div className="overview-layer-heading"><div><strong>Base Prompt</strong><small>场景、构图、风格与角色数量</small></div><span>GLOBAL</span></div>
-          {baseScopes.map((scope) => <ScopeTags key={scope.key} scope={scope} dragging={dragging} onDragStart={beginDrag} onDragEnd={() => setDragging(null)} onDrop={dropTag} onEditTag={onEditTag} onKeyboardMove={keyboardMove}/>) }
+          <div className="overview-layer-heading"><div><strong>Base Prompt</strong><small>场景、构图、风格与全局排除内容</small></div><span>GLOBAL</span></div>
+          {baseScopes.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
         </div>
-      </section>
+      </section>}
 
-      {structure.characters.map((character, index) => {
+      {filters.domain !== 'base' && structure.characters.map((character, index) => {
         const sections = characterScopes.filter((scope) => scope.characterId === character.id);
+        if (!sections.length) return null;
         return <section className="overview-layer character-layer" key={character.id}>
           <div className="overview-layer-marker"><span>{String(index + 1).padStart(2, '0')}</span><i/></div>
           <div className="overview-layer-body">
@@ -104,12 +288,13 @@ export default function PromptOverview({ project, updateProject, onEditTag }) {
               <div><strong>{character.label}</strong><small>独立角色描述与排除内容</small></div>
               <button onClick={() => onEditTag(sections[0]?.key, null)}>{structure.use_coords ? `POSITION ${compactPosition(character.center)}` : 'AI POSITION'}</button>
             </div>
-            {sections.map((scope) => <ScopeTags key={scope.key} scope={scope} dragging={dragging} onDragStart={beginDrag} onDragEnd={() => setDragging(null)} onDrop={dropTag} onEditTag={onEditTag} onKeyboardMove={keyboardMove}/>) }
+            {sections.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
           </div>
         </section>;
       })}
 
-      {!structure.characters.length && <button className="overview-add-character" onClick={() => onEditTag('base:prompt', null)}>
+      {!visibleEntries.length && filtered && <div className="overview-no-results"><strong>没有符合条件的 Tag</strong><span>调整分类、区域或搜索词后，顶部复制内容会同步更新。</span></div>}
+      {!structure.characters.length && filters.domain !== 'base' && <button className="overview-add-character" onClick={() => onEditTag('base:prompt', null)}>
         <span>＋</span><div><strong>还没有 Character Prompt</strong><small>在右侧 Prompt 面板添加角色，最多支持 6 个。</small></div>
       </button>}
     </div>

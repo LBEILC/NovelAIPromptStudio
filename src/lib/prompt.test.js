@@ -41,6 +41,15 @@ describe('NovelAI prompt codec', () => {
     expect(repaired[0]).toMatchObject({ id: 'girl', translation: '自定义女孩', note: '保留备注', category: 'Character' });
   });
 
+  it('keeps emphasis closers visible as diagnostics without treating them as numeric weight', () => {
+    let id = 0;
+    const tags = parsePrompt('masterpiece, ::year2025 ::, ::', () => `syntax-${id++}`);
+    expect(tags).toHaveLength(3);
+    expect(tags[1]).toMatchObject({ tag: 'year2025', weight: 1, raw_segment: '::year2025 ::', syntax_issue: 'emphasis_closer' });
+    expect(tags[2]).toMatchObject({ tag: '::', syntax_issue: 'control_only' });
+    expect(formatPrompt(tags)).toBe('masterpiece,\n::year2025 ::,\n::');
+  });
+
   it('classifies common prompt concepts', () => {
     expect(inferCategory('artist:ciloranko')).toBe('Artist');
     expect(inferCategory('artist_shion')).toBe('Artist');

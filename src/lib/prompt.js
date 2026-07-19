@@ -69,8 +69,24 @@ function promptSegments(prompt) {
     const newline = source.indexOf('\n', cursor);
     const boundaries = [comma, newline].filter((value) => value !== -1);
     const end = boundaries.length ? Math.min(...boundaries) : source.length;
-    const tag = source.slice(cursor, end).trim();
-    if (tag) segments.push({ tag, weight: 1 });
+    const rawSegment = source.slice(cursor, end).trim();
+    if (rawSegment) {
+      if (rawSegment === '::') {
+        segments.push({ tag: '::', weight: 1, raw_segment: rawSegment, syntax_issue: 'control_only' });
+      } else {
+        const leadingCloser = rawSegment.startsWith('::');
+        const trailingCloser = rawSegment.endsWith('::');
+        const tag = rawSegment
+          .replace(/^::\s*/, '')
+          .replace(/\s*::$/, '')
+          .trim();
+        if (tag) segments.push({
+          tag,
+          weight: 1,
+          ...(leadingCloser || trailingCloser ? { raw_segment: rawSegment, syntax_issue: 'emphasis_closer' } : {}),
+        });
+      }
+    }
     cursor = end + 1;
   }
   return segments;
@@ -78,7 +94,7 @@ function promptSegments(prompt) {
 
 export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
   return promptSegments(prompt)
-    .map(({ tag, weight }, position) => {
+    .map(({ tag, weight, raw_segment = '', syntax_issue = '' }, position) => {
       return {
         id: createId(),
         tag,
@@ -87,6 +103,8 @@ export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
         category: inferCategory(tag),
         category_source: 'heuristic',
         weight,
+        raw_segment,
+        syntax_issue,
         position,
         note: '',
       };
@@ -104,7 +122,8 @@ export function repairLegacyPromptTags(tags = [], prompt = '', createId = () => 
     existingByTag.get(key).push(item);
   }
   return parsePrompt(prompt, createId).map((parsed) => {
-    const existing = existingByTag.get(parsed.tag.toLowerCase())?.shift();
+    const existing = existingByTag.get(String(parsed.raw_segment || parsed.tag).toLowerCase())?.shift()
+      || existingByTag.get(parsed.tag.toLowerCase())?.shift();
     if (!existing) return parsed;
     return {
       ...parsed,
@@ -117,6 +136,7 @@ export function repairLegacyPromptTags(tags = [], prompt = '', createId = () => 
 }
 
 export function formatTag(tag) {
+  if (tag.syntax_issue && tag.raw_segment) return tag.raw_segment.trim();
   const value = Number(tag.weight);
   return Math.abs(value - 1) < 0.001 ? tag.tag.trim() : `${Number(value.toFixed(2))}::${tag.tag.trim()} ::`;
 }
