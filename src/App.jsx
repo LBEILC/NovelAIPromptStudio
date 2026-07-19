@@ -276,39 +276,39 @@ function LibraryPanel({
     </nav>
     <div className="collection-heading"><span>收藏集</span><LobeActionIcon icon={<Icon name="plus" size={14}/>} onClick={() => { setCreatingCollection(true); setDeleteArmedId(''); }} size="small" title="新建收藏集" variant="borderless"/></div>
     <div className="collection-list">
-      {creatingCollection && <div className="collection-editor"><input autoFocus maxLength={80} value={collectionName} onChange={(event) => setCollectionName(event.target.value)} onKeyDown={(event) => {
+      {creatingCollection && <div className="collection-editor"><LobeInput autoFocus maxLength={80} value={collectionName} onChange={(event) => setCollectionName(event.target.value)} onKeyDown={(event) => {
         if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitCollection();
         if (event.key === 'Escape') { setCreatingCollection(false); setCollectionName(''); }
-      }} placeholder="收藏集名称"/><button onClick={submitCollection} disabled={!collectionName.trim()}><Icon name="check" size={13}/></button><button onClick={() => { setCreatingCollection(false); setCollectionName(''); }}><Icon name="close" size={13}/></button></div>}
+      }} placeholder="收藏集名称" size="small"/><LobeActionIcon disabled={!collectionName.trim()} icon={<Icon name="check" size={13}/>} onClick={submitCollection} size="small" title="保存收藏集" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => { setCreatingCollection(false); setCollectionName(''); }} size="small" title="取消" variant="borderless"/></div>}
       {collections.map((collection) => <div className={`collection-row ${libraryView === `collection:${collection.id}` ? 'active' : ''}`} key={collection.id}>
         {editingCollectionId === collection.id
-          ? <div className="collection-editor"><input autoFocus maxLength={80} value={editingCollectionName} onChange={(event) => setEditingCollectionName(event.target.value)} onKeyDown={(event) => {
+          ? <div className="collection-editor"><LobeInput autoFocus maxLength={80} value={editingCollectionName} onChange={(event) => setEditingCollectionName(event.target.value)} onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitRename(collection.id);
             if (event.key === 'Escape') setEditingCollectionId('');
-          }}/><button onClick={() => submitRename(collection.id)} disabled={!editingCollectionName.trim()}><Icon name="check" size={13}/></button><button onClick={() => setEditingCollectionId('')}><Icon name="close" size={13}/></button></div>
-          : <><button className="collection-open" onClick={() => onViewChange(`collection:${collection.id}`)}><Icon name="folder" size={13}/><span>{collection.name}</span><b>{collection.project_count}</b></button><button className="collection-action" onClick={() => { setEditingCollectionId(collection.id); setEditingCollectionName(collection.name); setDeleteArmedId(''); }} aria-label={`重命名 ${collection.name}`}><Icon name="edit" size={12}/></button><button className={`collection-action delete ${deleteArmedId === collection.id ? 'armed' : ''}`} onClick={async () => {
+          }} size="small"/><LobeActionIcon disabled={!editingCollectionName.trim()} icon={<Icon name="check" size={13}/>} onClick={() => submitRename(collection.id)} size="small" title="保存名称" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => setEditingCollectionId('')} size="small" title="取消" variant="borderless"/></div>
+          : <><button className="collection-open" onClick={() => onViewChange(`collection:${collection.id}`)}><Icon name="folder" size={13}/><span>{collection.name}</span><b>{collection.project_count}</b></button><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingCollectionId(collection.id); setEditingCollectionName(collection.name); setDeleteArmedId(''); }} size="small" title={`重命名 ${collection.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedId === collection.id ? 'armed' : ''}`} onClick={async () => {
             if (deleteArmedId !== collection.id) { setDeleteArmedId(collection.id); return; }
             if (await onDeleteCollection(collection.id)) setDeleteArmedId('');
-          }} aria-label={deleteArmedId === collection.id ? `确认删除 ${collection.name}` : `删除 ${collection.name}`}>{deleteArmedId === collection.id ? '确认' : <Icon name="close" size={12}/>}</button></>}
+          }} size="small" title={deleteArmedId === collection.id ? `确认删除 ${collection.name}` : `删除 ${collection.name}`} type="text">{deleteArmedId === collection.id ? '确认' : <Icon name="close" size={12}/>}</LobeButton></>}
       </div>)}
       {!collections.length && !creatingCollection && <div className="collection-empty">创建收藏集来手动整理作品</div>}
     </div>
     <div className="collection-heading series-heading"><span>创作系列</span><LobeActionIcon icon={<Icon name="plus" size={14}/>} onClick={() => { setCreatingSeries(true); setDeleteArmedSeriesId(''); }} size="small" title="新建创作系列" variant="borderless"/></div>
     <div className="collection-list series-list">
-      {creatingSeries && <div className="collection-editor"><input autoFocus maxLength={80} value={seriesName} onChange={(event) => setSeriesName(event.target.value)} onKeyDown={(event) => {
+      {creatingSeries && <div className="collection-editor"><LobeInput autoFocus maxLength={80} value={seriesName} onChange={(event) => setSeriesName(event.target.value)} onKeyDown={(event) => {
         if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitSeries();
         if (event.key === 'Escape') { setCreatingSeries(false); setSeriesName(''); }
-      }} placeholder="系列名称"/><button onClick={submitSeries} disabled={!seriesName.trim()}><Icon name="check" size={13}/></button><button onClick={() => { setCreatingSeries(false); setSeriesName(''); }}><Icon name="close" size={13}/></button></div>}
+      }} placeholder="系列名称" size="small"/><LobeActionIcon disabled={!seriesName.trim()} icon={<Icon name="check" size={13}/>} onClick={submitSeries} size="small" title="保存系列" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => { setCreatingSeries(false); setSeriesName(''); }} size="small" title="取消" variant="borderless"/></div>}
       {series.map((entry) => <div className={`collection-row series-row ${libraryView === `series:${entry.id}` ? 'active' : ''}`} key={entry.id}>
         {editingSeriesId === entry.id
-          ? <div className="collection-editor"><input autoFocus maxLength={80} value={editingSeriesName} onChange={(event) => setEditingSeriesName(event.target.value)} onKeyDown={(event) => {
+          ? <div className="collection-editor"><LobeInput autoFocus maxLength={80} value={editingSeriesName} onChange={(event) => setEditingSeriesName(event.target.value)} onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitSeriesRename(entry.id);
             if (event.key === 'Escape') setEditingSeriesId('');
-          }}/><button onClick={() => submitSeriesRename(entry.id)} disabled={!editingSeriesName.trim()}><Icon name="check" size={13}/></button><button onClick={() => setEditingSeriesId('')}><Icon name="close" size={13}/></button></div>
-          : <><button className="collection-open" onClick={() => onViewChange(`series:${entry.id}`)}><Icon name="layers" size={13}/><span>{entry.name}</span><b>{entry.project_count}</b></button><button className="collection-action" onClick={() => { setEditingSeriesId(entry.id); setEditingSeriesName(entry.name); setDeleteArmedSeriesId(''); }} aria-label={`重命名 ${entry.name}`}><Icon name="edit" size={12}/></button><button className={`collection-action delete ${deleteArmedSeriesId === entry.id ? 'armed' : ''}`} onClick={async () => {
+          }} size="small"/><LobeActionIcon disabled={!editingSeriesName.trim()} icon={<Icon name="check" size={13}/>} onClick={() => submitSeriesRename(entry.id)} size="small" title="保存名称" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => setEditingSeriesId('')} size="small" title="取消" variant="borderless"/></div>
+          : <><button className="collection-open" onClick={() => onViewChange(`series:${entry.id}`)}><Icon name="layers" size={13}/><span>{entry.name}</span><b>{entry.project_count}</b></button><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingSeriesId(entry.id); setEditingSeriesName(entry.name); setDeleteArmedSeriesId(''); }} size="small" title={`重命名 ${entry.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedSeriesId === entry.id ? 'armed' : ''}`} onClick={async () => {
             if (deleteArmedSeriesId !== entry.id) { setDeleteArmedSeriesId(entry.id); return; }
             if (await onDeleteSeries(entry.id)) setDeleteArmedSeriesId('');
-          }} aria-label={deleteArmedSeriesId === entry.id ? `确认删除 ${entry.name}` : `删除 ${entry.name}`}>{deleteArmedSeriesId === entry.id ? '确认' : <Icon name="close" size={12}/>}</button></>}
+          }} size="small" title={deleteArmedSeriesId === entry.id ? `确认删除 ${entry.name}` : `删除 ${entry.name}`} type="text">{deleteArmedSeriesId === entry.id ? '确认' : <Icon name="close" size={12}/>}</LobeButton></>}
       </div>)}
       {!series.length && !creatingSeries && <div className="collection-empty">把同一创作脉络的结果放进系列</div>}
     </div>
@@ -316,14 +316,14 @@ function LibraryPanel({
     <div className="collection-list experiment-list">
       {experiments.map((experiment) => <div className={`collection-row experiment-row ${libraryView === `experiment:${experiment.id}` ? 'active' : ''}`} key={experiment.id}>
         {editingExperimentId === experiment.id
-          ? <div className="collection-editor"><input autoFocus maxLength={80} value={editingExperimentName} onChange={(event) => setEditingExperimentName(event.target.value)} onKeyDown={(event) => {
+          ? <div className="collection-editor"><LobeInput autoFocus maxLength={80} value={editingExperimentName} onChange={(event) => setEditingExperimentName(event.target.value)} onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitExperimentRename(experiment.id);
             if (event.key === 'Escape') setEditingExperimentId('');
-          }}/><button onClick={() => submitExperimentRename(experiment.id)} disabled={!editingExperimentName.trim()}><Icon name="check" size={13}/></button><button onClick={() => setEditingExperimentId('')}><Icon name="close" size={13}/></button></div>
-          : <><button className="collection-open" onClick={() => onViewChange(`experiment:${experiment.id}`)} title={`基准：${experiment.baseline_name || '未知'} · 变化：${experiment.variable_fields?.join(' / ') || '无'}`}><Icon name="spark" size={13}/><span>{experiment.name}</span><em className={`experiment-state ${experiment.analysis_status}`}>{({ identical: '相同', single: '单变量', mixed: '混合', incomplete: '待补全' })[experiment.analysis_status] || '待分析'}</em><b>{experiment.project_count}</b></button><button className="collection-action" onClick={() => { setEditingExperimentId(experiment.id); setEditingExperimentName(experiment.name); setDeleteArmedExperimentId(''); }} aria-label={`重命名 ${experiment.name}`}><Icon name="edit" size={12}/></button><button className={`collection-action delete ${deleteArmedExperimentId === experiment.id ? 'armed' : ''}`} onClick={async () => {
+          }} size="small"/><LobeActionIcon disabled={!editingExperimentName.trim()} icon={<Icon name="check" size={13}/>} onClick={() => submitExperimentRename(experiment.id)} size="small" title="保存名称" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => setEditingExperimentId('')} size="small" title="取消" variant="borderless"/></div>
+          : <><button className="collection-open" onClick={() => onViewChange(`experiment:${experiment.id}`)} title={`基准：${experiment.baseline_name || '未知'} · 变化：${experiment.variable_fields?.join(' / ') || '无'}`}><Icon name="spark" size={13}/><span>{experiment.name}</span><em className={`experiment-state ${experiment.analysis_status}`}>{({ identical: '相同', single: '单变量', mixed: '混合', incomplete: '待补全' })[experiment.analysis_status] || '待分析'}</em><b>{experiment.project_count}</b></button><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingExperimentId(experiment.id); setEditingExperimentName(experiment.name); setDeleteArmedExperimentId(''); }} size="small" title={`重命名 ${experiment.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedExperimentId === experiment.id ? 'armed' : ''}`} onClick={async () => {
             if (deleteArmedExperimentId !== experiment.id) { setDeleteArmedExperimentId(experiment.id); return; }
             if (await onDeleteExperiment(experiment.id)) setDeleteArmedExperimentId('');
-          }} aria-label={deleteArmedExperimentId === experiment.id ? `确认删除 ${experiment.name}` : `删除 ${experiment.name}`}>{deleteArmedExperimentId === experiment.id ? '确认' : <Icon name="close" size={12}/>}</button></>}
+          }} size="small" title={deleteArmedExperimentId === experiment.id ? `确认删除 ${experiment.name}` : `删除 ${experiment.name}`} type="text">{deleteArmedExperimentId === experiment.id ? '确认' : <Icon name="close" size={12}/>}</LobeButton></>}
       </div>)}
       {!experiments.length && <div className="collection-empty">多选至少 2 张作品，建立控制变量实验</div>}
     </div>
