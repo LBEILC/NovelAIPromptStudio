@@ -7,8 +7,11 @@ import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { theme as antdTheme } from 'antd';
 import LobeActionIcon from '@lobehub/ui/es/ActionIcon/index';
 import LobeButton from '@lobehub/ui/es/Button/index';
+import LobeCheckbox from '@lobehub/ui/es/Checkbox/index';
 import LobeInput from '@lobehub/ui/es/Input/Input';
+import LobeInputNumber from '@lobehub/ui/es/Input/InputNumber';
 import LobeInputPassword from '@lobehub/ui/es/Input/InputPassword';
+import LobeTextArea from '@lobehub/ui/es/Input/TextArea';
 import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
 import LobeSelect from '@lobehub/ui/es/Select/index';
 import LobeSegmented from '@lobehub/ui/es/Segmented/index';
@@ -523,7 +526,7 @@ function PreviewStage({ project, sourceProject, mode, setMode, experiment, exper
 function WeightControl({ value, onChange }) {
   return <div className="weight-control">
     <input type="range" min="-3" max="3" step="0.05" value={Math.max(-3, Math.min(3, Number(value)))} onChange={(event) => onChange(Number(event.target.value))}/>
-    <input className="weight-number" type="number" min="-10" max="10" step="0.05" value={value} onChange={(event) => onChange(Math.max(-10, Math.min(10, Number(event.target.value))))}/>
+    <LobeInputNumber className="weight-number" controls={false} max={10} min={-10} onChange={(nextValue) => onChange(Math.max(-10, Math.min(10, Number(nextValue ?? 0))))} size="small" step={0.05} value={value}/>
   </div>;
 }
 
@@ -532,18 +535,18 @@ function TagCard({ tag, index, translating, dragging, dropTarget, onTranslate, o
     <div className="tag-line">
       <button className="drag-handle" onPointerDown={(event) => onPointerStart(index, event)} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} onKeyDown={(event) => onKeyboardMove(index, event)} title="按住拖动排序；Option + 方向键微调" aria-label={`拖动 ${tag.tag} 排序`}><Icon name="grip"/></button>
       <div className="tag-fields">
-        <input className="tag-name" value={tag.tag} onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic', raw_segment: '', syntax_issue: '' })} aria-label="Tag"/>
-        <input className="translation" value={tag.translation || ''} onChange={(event) => onChange({ translation: event.target.value, translation_source: 'manual' })} placeholder="添加中文翻译" aria-label="中文翻译"/>
+        <LobeInput className="tag-name" value={tag.tag} onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic', raw_segment: '', syntax_issue: '' })} aria-label="Tag" size="small" variant="borderless"/>
+        <LobeInput className="translation" value={tag.translation || ''} onChange={(event) => onChange({ translation: event.target.value, translation_source: 'manual' })} placeholder="添加中文翻译" aria-label="中文翻译" size="small" variant="borderless"/>
       </div>
-      <button className={`translate-tag ${translating ? 'working' : ''}`} onClick={onTranslate} disabled={translating} aria-label={`翻译 ${tag.tag}`}>{translating ? '···' : '译'}</button>
-      <button className="icon-button danger" onClick={onDelete} aria-label="删除标签"><Icon name="close" size={14}/></button>
+      <LobeButton className={`translate-tag ${translating ? 'working' : ''}`} onClick={onTranslate} disabled={translating} aria-label={`翻译 ${tag.tag}`} size="small" type="text">{translating ? '···' : '译'}</LobeButton>
+      <LobeActionIcon className="tag-delete" icon={<Icon name="close" size={14}/>} onClick={onDelete} size="small" title="删除标签" variant="borderless"/>
     </div>
     <div className="tag-options">
-      <select value={tag.category} onChange={(event) => onChange({ category: event.target.value, category_source: 'manual' })}>{CATEGORY_OPTIONS.map((option) => <option key={option} value={option}>{CATEGORY_LABELS[option]}</option>)}</select>
+      <LobeSelect aria-label="Tag 分类" onChange={(category) => onChange({ category, category_source: 'manual' })} options={CATEGORY_OPTIONS.map((option) => ({ label: CATEGORY_LABELS[option], value: option }))} size="small" value={tag.category}/>
       <WeightControl value={tag.weight} onChange={(weight) => onChange({ weight })}/>
     </div>
     {tag.syntax_issue && <div className={`tag-syntax-warning ${tag.syntax_issue}`}><Icon name="info" size={13}/><span>{tag.syntax_issue === 'control_only' ? '单独的 :: 是结束控制符，不是 Tag。建议删除。' : '这里包含可能多余的 :: 结束符；编辑 Tag 后会规范化。'}</span></div>}
-    <input className="tag-note" value={tag.note || ''} onChange={(event) => onChange({ note: event.target.value })} placeholder="备注（可选）"/>
+    <LobeInput className="tag-note" value={tag.note || ''} onChange={(event) => onChange({ note: event.target.value })} placeholder="备注（可选）" size="small" variant="borderless"/>
   </article>;
 }
 
@@ -580,7 +583,7 @@ function PositionEditor({ project, character, updateProject }) {
   return <section className="position-editor">
     <div className="position-heading">
       <div><strong>Character Position</strong><small>5 × 5 粗略位置引导</small></div>
-      <label><input type="checkbox" checked={Boolean(structure.use_coords)} onChange={(event) => updateStructure({ use_coords: event.target.checked })}/><span>{structure.use_coords ? '自定义位置' : 'AI 选择'}</span></label>
+      <label><LobeCheckbox checked={Boolean(structure.use_coords)} onChange={(event) => updateStructure({ use_coords: event.target.checked })} size={16}/><span>{structure.use_coords ? '自定义位置' : 'AI 选择'}</span></label>
     </div>
     <div className={`position-grid ${structure.use_coords ? '' : 'disabled'}`} aria-label={`${character.label} 位置`}>
       {Array.from({ length: 25 }, (_, index) => {
@@ -589,7 +592,7 @@ function PositionEditor({ project, character, updateProject }) {
         return <button key={index} className={activeColumn === column && activeRow === row ? 'active' : ''} disabled={!structure.use_coords} onClick={() => choosePosition(column, row)} aria-label={`第 ${row + 1} 行，第 ${column + 1} 列`}><i/></button>;
       })}
     </div>
-    <div className="position-coordinates"><span>X {Number(character.center?.x ?? 0.5).toFixed(2)}</span><span>Y {Number(character.center?.y ?? 0.5).toFixed(2)}</span><label><input type="checkbox" checked={Boolean(structure.use_order)} onChange={(event) => updateStructure({ use_order: event.target.checked })}/><em>遵循角色顺序</em></label></div>
+    <div className="position-coordinates"><span>X {Number(character.center?.x ?? 0.5).toFixed(2)}</span><span>Y {Number(character.center?.y ?? 0.5).toFixed(2)}</span><label><LobeCheckbox checked={Boolean(structure.use_order)} onChange={(event) => updateStructure({ use_order: event.target.checked })} size={16}/><em>遵循角色顺序</em></label></div>
   </section>;
 }
 
@@ -776,23 +779,21 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
   return <div className="panel-scroll">
     <div className="panel-intro"><div><strong>{scope.label}</strong><small>{tags.length} 个结构化标签</small></div><span className="saved-dot"><Icon name="check"/>自动保存</span></div>
     <div className="prompt-scope-toolbar">
-      <select value={scope.key} onChange={(event) => setScopeKey(event.target.value)} aria-label="Prompt 区域">
-        {scopes.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
-      </select>
-      <button onClick={addCharacter} disabled={structure.characters.length >= 6}><Icon name="plus"/>角色</button>
+      <LobeSelect aria-label="Prompt 区域" onChange={setScopeKey} options={scopes.map((item) => ({ label: item.label, value: item.key }))} value={scope.key}/>
+      <LobeButton disabled={structure.characters.length >= 6} icon={<Icon name="plus"/>} onClick={addCharacter}>角色</LobeButton>
     </div>
     {scope.kind === 'character' && <>
-      <div className="character-scope-heading"><input value={scope.character.label} onChange={(event) => updateProject(updatePromptCharacter(project, scope.characterId, { label: event.target.value }))} aria-label="角色名称"/><button onClick={deleteCharacter}><Icon name="trash" size={13}/>移除角色</button></div>
+      <div className="character-scope-heading"><LobeInput value={scope.character.label} onChange={(event) => updateProject(updatePromptCharacter(project, scope.characterId, { label: event.target.value }))} aria-label="角色名称" variant="borderless"/><LobeButton danger icon={<Icon name="trash" size={13}/>} onClick={deleteCharacter} size="small" type="text">移除角色</LobeButton></div>
       <PositionEditor project={project} character={scope.character} updateProject={updateProject}/>
     </>}
     <div className="tag-entry">
       <div className="add-tag">
-        <textarea rows="1" value={newTag} onChange={(event) => setNewTag(event.target.value)} onKeyDown={(event) => {
+        <LobeTextArea autoSize={{ minRows: 1, maxRows: 3 }} value={newTag} onChange={(event) => setNewTag(event.target.value)} onKeyDown={(event) => {
           if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
           event.preventDefault();
           addTags();
-        }} placeholder="输入多个 Tag，用中英文逗号分隔" aria-label="添加一个或多个 Tag" aria-describedby={newTag || lastBatch ? 'tag-entry-status' : undefined}/>
-        <button onClick={addTags} disabled={!pendingBatch.tags.length} aria-label={`添加 ${pendingBatch.tags.length || 0} 个 Tag`}><Icon name="plus"/><span>{pendingBatch.tags.length > 1 ? pendingBatch.tags.length : ''}</span></button>
+        }} placeholder="输入多个 Tag，用中英文逗号分隔" aria-label="添加一个或多个 Tag" aria-describedby={newTag || lastBatch ? 'tag-entry-status' : undefined} variant="borderless"/>
+        <LobeButton className="add-tag-button" disabled={!pendingBatch.tags.length} icon={<Icon name="plus"/>} onClick={addTags} type="text"><span>{pendingBatch.tags.length > 1 ? pendingBatch.tags.length : ''}</span></LobeButton>
       </div>
       {(newTag || lastBatch) && <div className="tag-entry-status" id="tag-entry-status" aria-live="polite">
         {newTag && <span>{pendingBatch.tags.length ? `将添加 ${pendingBatch.tags.length} 个到「${scope.label}」` : '没有可添加的 Tag'}{pendingBatch.duplicateCount ? ` · ${pendingBatch.duplicateCount} 个重复` : ''}{pendingBatch.syntaxIssueCount ? ` · ${pendingBatch.syntaxIssueCount} 个语法提示` : ''}</span>}
@@ -803,14 +804,14 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
       <div className="ai-channel-bar">
         <span className="ai-signal"><Icon name="spark"/><i/></span>
         <span className="ai-channel-copy"><b>{aiSettings.model || 'AI 整理未配置'}</b><small>{aiSettings.model ? '翻译 · 分类 · 本地复用' : '配置 API 后可翻译并分类'}</small></span>
-        <button className="translate-missing" disabled={!missingTranslationIds.length || translatingIds.size > 0} onClick={() => translateTagIds(missingTranslationIds)}>{translatingIds.size ? '整理中' : `AI 整理 ${missingTranslationIds.length}`}</button>
-        <button className="ai-settings-toggle" onClick={() => setShowAISettings((value) => !value)} aria-label="AI 整理设置"><Icon name="settings"/></button>
+        <LobeButton className="translate-missing" disabled={!missingTranslationIds.length || translatingIds.size > 0} onClick={() => translateTagIds(missingTranslationIds)} size="small">{translatingIds.size ? '整理中' : `AI 整理 ${missingTranslationIds.length}`}</LobeButton>
+        <LobeActionIcon className="ai-settings-toggle" icon={<Icon name="settings"/>} onClick={() => setShowAISettings((value) => !value)} size="small" title="AI 整理设置" variant="borderless"/>
       </div>
       {showAISettings && <div className="ai-config">
-        <label><span>API Base URL</span><input value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
-        <label><span>API Key <em>{aiSettings.hasApiKey ? '已加密保存' : '未保存'}</em></span><div className="secret-input"><input type="password" value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '留空则保留现有 Key' : 'sk-…'}/><button onClick={saveAISettings}>保存</button></div></label>
-        <label><span>Model</span><div className="model-input"><input list="ai-model-list" value={aiSettings.model} onChange={(event) => setAISettings((current) => ({ ...current, model: event.target.value }))} placeholder="读取或输入模型 ID"/><datalist id="ai-model-list">{models.map((model) => <option key={model} value={model}/>)}</datalist><button onClick={loadModels} disabled={aiBusy === 'models'} title="读取模型列表"><Icon name="refresh"/></button></div></label>
-        <div className="ai-config-actions"><button className="outline" onClick={testAIModel} disabled={Boolean(aiBusy)}>{aiBusy === 'test' ? '测试中…' : '测试模型'}</button><small>仅未缓存的 Tag 会发送到此 Base URL</small></div>
+        <label><span>API Base URL</span><LobeInput value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
+        <label><span>API Key <em>{aiSettings.hasApiKey ? '已加密保存' : '未保存'}</em></span><div className="secret-input"><LobeInputPassword value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '留空则保留现有 Key' : 'sk-…'}/><LobeButton onClick={saveAISettings}>保存</LobeButton></div></label>
+        <label><span>Model</span><div className="model-input"><LobeInput list="ai-model-list" value={aiSettings.model} onChange={(event) => setAISettings((current) => ({ ...current, model: event.target.value }))} placeholder="读取或输入模型 ID"/><datalist id="ai-model-list">{models.map((model) => <option key={model} value={model}/>)}</datalist><LobeActionIcon disabled={aiBusy === 'models'} icon={<Icon name="refresh"/>} onClick={loadModels} title="读取模型列表" variant="outlined"/></div></label>
+        <div className="ai-config-actions"><LobeButton onClick={testAIModel} disabled={Boolean(aiBusy)}>{aiBusy === 'test' ? '测试中…' : '测试模型'}</LobeButton><small>仅未缓存的 Tag 会发送到此 Base URL</small></div>
       </div>}
       {aiStatus && <div className={`ai-status ${aiStatus.type}`}>{aiStatus.text}</div>}
     </section>
@@ -1065,11 +1066,11 @@ function MetadataPanel({ project, updateProject }) {
 
 function Inspector({ tab, setTab, project, branch, updateProject, showToast, promptScopeKey, setPromptScopeKey, focusTagId, onTagContextMenu }) {
   return <aside className="inspector">
-    <nav className="inspector-tabs">
-      <button className={tab === 'tags' ? 'active' : ''} onClick={() => setTab('tags')}><Icon name="layers"/>Prompt</button>
-      <button className={tab === 'vibe' ? 'active' : ''} onClick={() => setTab('vibe')}><Icon name="image"/>Vibe <i>{project.vibes.length || ''}</i></button>
-      <button className={tab === 'metadata' ? 'active' : ''} onClick={() => setTab('metadata')}><Icon name="info"/>参数</button>
-    </nav>
+    <LobeSegmented block className="inspector-tabs" onChange={setTab} options={[
+      { label: <span><Icon name="layers"/>Prompt</span>, value: 'tags' },
+      { label: <span><Icon name="image"/>Vibe {project.vibes.length > 0 && <i>{project.vibes.length}</i>}</span>, value: 'vibe' },
+      { label: <span><Icon name="info"/>参数</span>, value: 'metadata' },
+    ]} value={tab}/>
     <div className={`generation-context ${branch ? 'branch' : 'result'}`}>
       <Icon name={branch ? 'spark' : 'lock'} size={14}/>
       <div><strong>{branch ? branch.name : '原图生成结果'}</strong><small>{branch ? `${BRANCH_STATUS_LABELS[branch.status] || branch.status} · 改动保存在这个分支中` : '生成事实已锁定；修改 Prompt、Vibe 或参数会新建分支'}</small></div>

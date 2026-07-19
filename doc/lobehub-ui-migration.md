@@ -108,4 +108,5 @@
 - Prompt 总览已迁移 SearchBar、Segmented、Button 和多选工具栏。
 - Tag 多选统一使用 Lobe Checkbox，分类筛选和选中状态改用 slate + blue 主题语义。
 - 已在 Windows Electron 生产构建中验证深色、浅色、多选和复制计数状态。
-- 下一步迁移右侧 Prompt 编辑器；浅色验证已确认其原生 Select、输入框和卡片仍需清理硬编码暗色。
+- 右侧 Prompt 编辑器已迁移页签、作用域选择、批量输入、Tag 卡片、权重数值和 AI 配置控件，并清理浅色主题下的硬编码暗色。
+- 下一步进入 Vibe 与生成参数面板，再处理版本分支工作流的卡片和操作表面。
