@@ -21,24 +21,20 @@ import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
 import LobeSelect from '@lobehub/ui/es/Select/index';
 import LobeSideNav from '@lobehub/ui/es/SideNav/index';
 import LobeSliderWithInput from '@lobehub/ui/es/SliderWithInput/index';
-import LobeSortableList from '@lobehub/ui/es/SortableList/index';
 import LobeTabs from '@lobehub/ui/es/Tabs/index';
 import LobeGrid from '@lobehub/ui/es/Grid/index';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
 import { toast as lobeToast } from '@lobehub/ui/es/Toast/index';
-import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, inferCategory, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
+import { CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import {
-  addPromptCharacter,
   allPromptTags,
   countPromptTags,
   formatPositivePromptForCopy,
   getPromptScope,
   getPromptScopes,
   normalizePromptStructure,
-  removePromptCharacter,
   restorePromptSnapshot,
   syncProjectPromptMetadata,
-  updatePromptCharacter,
   updatePromptScope,
 } from './lib/promptStructure.js';
 import PromptOverview from './PromptOverview.jsx';
@@ -53,6 +49,7 @@ import { contextMenuPosition, isTextEditingTarget } from './lib/contextMenu.js';
 import { panCompareViewport, zoomCompareViewport } from './lib/compareViewport.js';
 import { moveExperimentMember } from './lib/experiments.js';
 import { buildRelationshipGroups } from './lib/relationships.js';
+import { overviewTagKey } from './lib/promptOverview.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
@@ -268,30 +265,6 @@ function ExperimentMemberCard({ member, baselineProject, selected, baseline, onT
   </button>;
 }
 
-function WeightControl({ value, onChange }) {
-  return <LobeSliderWithInput className="weight-control" controls={false} gap={7} max={10} min={-10} onChange={onChange} size="small" step={0.05} value={Number(value)}/>;
-}
-
-function TagCard({ tag, index, translating, onTranslate, onChange, onDelete, onContextMenu }) {
-  return <article data-tag-index={index} data-tag-id={tag.id} className={`tag-card cat-${String(tag.category || 'Unsorted').toLowerCase()}`} onContextMenu={onContextMenu}>
-    <div className="tag-line">
-      <LobeSortableList.DragHandle className="drag-handle" style={{ cursor: 'grab' }} title={`拖动 ${tag.tag} 排序`}/>
-      <div className="tag-fields">
-        <LobeInput className="tag-name" value={tag.tag} onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic', raw_segment: '', syntax_issue: '' })} aria-label="Tag" size="small" variant="borderless"/>
-        <LobeInput className="translation" value={tag.translation || ''} onChange={(event) => onChange({ translation: event.target.value, translation_source: 'manual' })} placeholder="添加中文翻译" aria-label="中文翻译" size="small" variant="borderless"/>
-      </div>
-      <LobeButton className={`translate-tag ${translating ? 'working' : ''}`} onClick={onTranslate} disabled={translating} aria-label={`翻译 ${tag.tag}`} size="small" type="text">{translating ? '···' : '译'}</LobeButton>
-      <LobeActionIcon className="tag-delete" icon={<Icon name="close" size={14}/>} onClick={onDelete} size="small" title="删除标签" variant="borderless"/>
-    </div>
-    <div className="tag-options">
-      <LobeSelect aria-label="Tag 分类" onChange={(category) => onChange({ category, category_source: 'manual' })} options={CATEGORY_OPTIONS.map((option) => ({ label: CATEGORY_LABELS[option], value: option }))} size="small" value={tag.category}/>
-      <WeightControl value={tag.weight} onChange={(weight) => onChange({ weight })}/>
-    </div>
-    {tag.syntax_issue && <LobeAlert className={`tag-syntax-warning ${tag.syntax_issue}`} message={tag.syntax_issue === 'control_only' ? '单独的 :: 是结束控制符，不是 Tag。建议删除。' : '这里包含可能多余的 :: 结束符；编辑 Tag 后会规范化。'} type="warning" variant="outlined"/>}
-    <LobeInput className="tag-note" value={tag.note || ''} onChange={(event) => onChange({ note: event.target.value })} placeholder="备注（可选）" size="small" variant="borderless"/>
-  </article>;
-}
-
 function InformationExtractedControl({ vibe, onChange }) {
   const state = informationExtractedState(vibe);
   const value = Number(vibe.information_extracted ?? 0.7);
@@ -306,209 +279,6 @@ function InformationExtractedControl({ vibe, onChange }) {
     <div className="information-heading"><span>Information Extracted</span></div>
     <LobeSliderWithInput aria-label="Information Extracted" className="information-range" controls={false} gap={8} marks={marks} max={1} min={0} onChange={(nextValue) => onChange(informationExtractedPatch(vibe, nextValue))} size="small" step={0.01} value={value}/>
     <small><Icon name={status.icon} size={12}/><span>{status.text}</span>{state.kind === 'uncached' && !state.cachedValues.length && <LobeButton onClick={() => onChange(restoreOriginalInformationPatch(vibe))} size="small" type="text">恢复原编码</LobeButton>}</small>
-  </div>;
-}
-
-function PositionEditor({ project, character, updateProject }) {
-  const structure = project.prompt_structure;
-  const activeColumn = Math.max(0, Math.min(4, Math.round(Number(character.center?.x ?? 0.5) * 5 - 0.5)));
-  const activeRow = Math.max(0, Math.min(4, Math.round(Number(character.center?.y ?? 0.5) * 5 - 0.5)));
-  const updateStructure = (patch) => updateProject({ ...project, prompt_structure: { ...structure, ...patch } });
-  const choosePosition = (column, row) => updateProject(updatePromptCharacter(project, character.id, {
-    center: { x: (column + 0.5) / 5, y: (row + 0.5) / 5 },
-  }));
-
-  return <section className="position-editor">
-    <div className="position-heading">
-      <div><strong>Character Position</strong><small>5 × 5 粗略位置引导</small></div>
-      <label><LobeCheckbox checked={Boolean(structure.use_coords)} onChange={(event) => updateStructure({ use_coords: event.target.checked })} size={16}/><span>{structure.use_coords ? '自定义位置' : 'AI 选择'}</span></label>
-    </div>
-    <div className={`position-grid ${structure.use_coords ? '' : 'disabled'}`} aria-label={`${character.label} 位置`}>
-      {Array.from({ length: 25 }, (_, index) => {
-        const column = index % 5;
-        const row = Math.floor(index / 5);
-        return <button key={index} className={activeColumn === column && activeRow === row ? 'active' : ''} disabled={!structure.use_coords} onClick={() => choosePosition(column, row)} aria-label={`第 ${row + 1} 行，第 ${column + 1} 列`}><i/></button>;
-      })}
-    </div>
-    <div className="position-coordinates"><span>X {Number(character.center?.x ?? 0.5).toFixed(2)}</span><span>Y {Number(character.center?.y ?? 0.5).toFixed(2)}</span><label><LobeCheckbox checked={Boolean(structure.use_order)} onChange={(event) => updateStructure({ use_order: event.target.checked })} size={16}/><em>遵循角色顺序</em></label></div>
-  </section>;
-}
-
-function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, focusTagId, onTagContextMenu }) {
-  const [newTag, setNewTag] = useState('');
-  const [lastBatch, setLastBatch] = useState(null);
-  const [showAISettings, setShowAISettings] = useState(false);
-  const [aiSettings, setAISettings] = useState({ baseUrl: 'https://api.openai.com/v1', model: '', apiKey: '', hasApiKey: false, encryptionAvailable: true });
-  const [models, setModels] = useState([]);
-  const [aiStatus, setAIStatus] = useState(null);
-  const [aiBusy, setAIBusy] = useState('');
-  const [translatingIds, setTranslatingIds] = useState(new Set());
-  const scopes = useMemo(() => getPromptScopes(project), [project]);
-  const scope = useMemo(() => getPromptScope(project, scopeKey), [project, scopeKey]);
-  const tags = scope.tags;
-  const structure = project.prompt_structure;
-  const pendingBatch = useMemo(() => analyzePromptBatch(newTag, tags), [newTag, tags]);
-
-  useEffect(() => {
-    if (!scopes.some((item) => item.key === scopeKey)) setScopeKey('base:prompt');
-  }, [scopeKey, scopes, setScopeKey]);
-
-  useEffect(() => {
-    setNewTag('');
-    setLastBatch(null);
-  }, [project.id, scope.key]);
-
-  useEffect(() => {
-    if (!focusTagId) return;
-    const frame = requestAnimationFrame(() => {
-      const card = [...document.querySelectorAll('[data-tag-id]')].find((element) => element.dataset.tagId === focusTagId);
-      card?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      card?.querySelector('.tag-name')?.focus({ preventScroll: true });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [focusTagId, scope.key]);
-
-  useEffect(() => {
-    studio.getAISettings().then((settings) => setAISettings((current) => ({ ...current, ...settings, apiKey: '' })));
-  }, []);
-
-  const saveAISettings = async () => {
-    try {
-      const saved = await studio.saveAISettings({
-        baseUrl: aiSettings.baseUrl,
-        model: aiSettings.model,
-        apiKey: aiSettings.apiKey,
-      });
-      setAISettings((current) => ({ ...current, ...saved, apiKey: '' }));
-      setAIStatus({ type: 'success', text: 'API 配置已安全保存' });
-      return true;
-    } catch (error) {
-      setAIStatus({ type: 'error', text: error instanceof Error ? error.message : String(error) });
-      return false;
-    }
-  };
-
-  const loadModels = async () => {
-    setAIBusy('models');
-    setAIStatus({ type: 'progress', text: '正在读取模型列表…' });
-    if (!(await saveAISettings())) { setAIBusy(''); return; }
-    const result = await studio.listAIModels();
-    setAIBusy('');
-    if (!result.ok) { setAIStatus({ type: 'error', text: result.error }); return; }
-    setModels(result.models);
-    setAIStatus({ type: 'success', text: `已读取 ${result.models.length} 个模型` });
-  };
-
-  const testAIModel = async () => {
-    setAIBusy('test');
-    setAIStatus({ type: 'progress', text: '正在发送最小测试请求…' });
-    if (!(await saveAISettings())) { setAIBusy(''); return; }
-    const result = await studio.testAIModel();
-    setAIBusy('');
-    setAIStatus(result.ok
-      ? { type: 'success', text: `${result.model} 可用 · ${result.latencyMs} ms · ${result.response}` }
-      : { type: 'error', text: result.error });
-  };
-
-  const translateTagIds = async (ids) => {
-    const targets = tags.filter((tag) => ids.includes(tag.id)).slice(0, 50);
-    if (!targets.length) return;
-    setTranslatingIds((current) => new Set([...current, ...targets.map((tag) => tag.id)]));
-    setAIStatus({ type: 'progress', text: `正在整理 ${targets.length} 个 Tag：先查本地词典，再补翻译与分类…` });
-    const result = await studio.translateTags(targets.map((tag) => tag.tag));
-    setTranslatingIds((current) => {
-      const next = new Set(current);
-      targets.forEach((tag) => next.delete(tag.id));
-      return next;
-    });
-    if (!result.ok) { setAIStatus({ type: 'error', text: result.error }); return; }
-    const organized = new Map(targets.map((tag, index) => [tag.id, result.items?.[index] || { translation: result.translations[index], category: result.categories?.[index] || tag.category }]));
-    updateProject(updatePromptScope(project, scope.key, tags.map((tag) => organized.has(tag.id) ? { ...tag, ...organized.get(tag.id) } : tag)));
-    const cacheText = result.cache_hits ? `，${result.cache_hits} 个命中本地词典` : '';
-    setAIStatus({ type: 'success', text: `${result.model} 已完成翻译与分类${cacheText}` });
-    showToast(`已整理 ${targets.length} 个 Tag${cacheText}`);
-  };
-
-  const missingTranslationIds = tags.filter((tag) => !tag.translation?.trim() || !['ai', 'manual', 'cache'].includes(tag.category_source)).map((tag) => tag.id);
-  const addTags = () => {
-    const created = pendingBatch.tags;
-    if (!created.length) return;
-    updateProject(updatePromptScope(project, scope.key, [...tags, ...created]));
-    setLastBatch({ projectId: project.id, scopeKey: scope.key, ids: created.map((tag) => tag.id) });
-    setNewTag('');
-    const notes = [pendingBatch.duplicateCount && `${pendingBatch.duplicateCount} 个重复`, pendingBatch.syntaxIssueCount && `${pendingBatch.syntaxIssueCount} 个语法提示`].filter(Boolean);
-    showToast(`已添加 ${created.length} 个 Tag${notes.length ? ` · ${notes.join(' · ')}` : ''}`);
-  };
-  const undoLastBatch = () => {
-    if (!lastBatch || lastBatch.projectId !== project.id || lastBatch.scopeKey !== scope.key) return;
-    const ids = new Set(lastBatch.ids);
-    const remaining = tags.filter((tag) => !ids.has(tag.id));
-    const removed = tags.length - remaining.length;
-    if (!removed) { setLastBatch(null); return; }
-    updateProject(updatePromptScope(project, scope.key, remaining));
-    setLastBatch(null);
-    showToast(`已撤销添加 ${removed} 个 Tag`);
-  };
-  const updateTag = (index, patch) => updateProject(updatePromptScope(project, scope.key, tags.map((tag, itemIndex) => itemIndex === index ? { ...tag, ...patch } : tag)));
-  const addCharacter = () => {
-    const next = addPromptCharacter(project);
-    if (next === project) { showToast('最多支持 6 个 Character Prompt'); return; }
-    const character = next.prompt_structure.characters.at(-1);
-    updateProject(next);
-    setScopeKey(`character:${character.id}:prompt`);
-    showToast(`${character.label} 已添加`);
-  };
-  const deleteCharacter = () => {
-    if (!scope.characterId) return;
-    setScopeKey('base:prompt');
-    updateProject(removePromptCharacter(project, scope.characterId));
-    showToast(`${scope.character.label} 已移除`);
-  };
-  return <div className="panel-scroll">
-    <div className="panel-intro"><div><strong>{scope.label}</strong><small>{tags.length} 个结构化标签</small></div><span className="saved-dot"><Icon name="check"/>自动保存</span></div>
-    <div className="prompt-scope-toolbar">
-      <LobeSelect aria-label="Prompt 区域" onChange={setScopeKey} options={scopes.map((item) => ({ label: item.label, value: item.key }))} value={scope.key}/>
-      <LobeButton disabled={structure.characters.length >= 6} icon={<Icon name="plus"/>} onClick={addCharacter}>角色</LobeButton>
-    </div>
-    {scope.kind === 'character' && <>
-      <div className="character-scope-heading"><LobeInput value={scope.character.label} onChange={(event) => updateProject(updatePromptCharacter(project, scope.characterId, { label: event.target.value }))} aria-label="角色名称" variant="borderless"/><LobeButton danger icon={<Icon name="trash" size={13}/>} onClick={deleteCharacter} size="small" type="text">移除角色</LobeButton></div>
-      <PositionEditor project={project} character={scope.character} updateProject={updateProject}/>
-    </>}
-    <div className="tag-entry">
-      <div className="add-tag">
-        <LobeTextArea autoSize={{ minRows: 1, maxRows: 3 }} value={newTag} onChange={(event) => setNewTag(event.target.value)} onKeyDown={(event) => {
-          if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
-          event.preventDefault();
-          addTags();
-        }} placeholder="输入多个 Tag，用中英文逗号分隔" aria-label="添加一个或多个 Tag" aria-describedby={newTag || lastBatch ? 'tag-entry-status' : undefined} variant="borderless"/>
-        <LobeButton className="add-tag-button" disabled={!pendingBatch.tags.length} icon={<Icon name="plus"/>} onClick={addTags} type="text"><span>{pendingBatch.tags.length > 1 ? pendingBatch.tags.length : ''}</span></LobeButton>
-      </div>
-      {(newTag || lastBatch) && <div className="tag-entry-status" id="tag-entry-status" aria-live="polite">
-        {newTag && <span>{pendingBatch.tags.length ? `将添加 ${pendingBatch.tags.length} 个到「${scope.label}」` : '没有可添加的 Tag'}{pendingBatch.duplicateCount ? ` · ${pendingBatch.duplicateCount} 个重复` : ''}{pendingBatch.syntaxIssueCount ? ` · ${pendingBatch.syntaxIssueCount} 个语法提示` : ''}</span>}
-        {lastBatch && lastBatch.projectId === project.id && lastBatch.scopeKey === scope.key && <LobeButton onClick={undoLastBatch} size="small" type="text">撤销上次添加</LobeButton>}
-      </div>}
-    </div>
-    <section className={`ai-channel ${showAISettings ? 'expanded' : ''}`}>
-      <div className="ai-channel-bar">
-        <span className="ai-signal"><Icon name="spark"/><i/></span>
-        <span className="ai-channel-copy"><b>{aiSettings.model || 'AI 整理未配置'}</b><small>{aiSettings.model ? '翻译 · 分类 · 本地复用' : '配置 API 后可翻译并分类'}</small></span>
-        <LobeButton className="translate-missing" disabled={!missingTranslationIds.length || translatingIds.size > 0} onClick={() => translateTagIds(missingTranslationIds)} size="small">{translatingIds.size ? '整理中' : `AI 整理 ${missingTranslationIds.length}`}</LobeButton>
-        <LobeActionIcon className="ai-settings-toggle" icon={<Icon name="settings"/>} onClick={() => setShowAISettings((value) => !value)} size="small" title="AI 整理设置" variant="borderless"/>
-      </div>
-      {showAISettings && <div className="ai-config">
-        <label><span>API Base URL</span><LobeInput value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
-        <label><span>API Key <em>{aiSettings.hasApiKey ? '已加密保存' : '未保存'}</em></span><div className="secret-input"><LobeInputPassword value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '留空则保留现有 Key' : 'sk-…'}/><LobeButton onClick={saveAISettings}>保存</LobeButton></div></label>
-        <label><span>Model</span><div className="model-input"><LobeAutoComplete options={models.map((model) => ({ value: model }))} value={aiSettings.model} onChange={(value) => setAISettings((current) => ({ ...current, model: value }))} placeholder="读取或输入模型 ID"/><LobeActionIcon disabled={aiBusy === 'models'} icon={<Icon name="refresh"/>} onClick={loadModels} title="读取模型列表" variant="outlined"/></div></label>
-        <div className="ai-config-actions"><LobeButton onClick={testAIModel} disabled={Boolean(aiBusy)}>{aiBusy === 'test' ? '测试中…' : '测试模型'}</LobeButton><small>仅未缓存的 Tag 会发送到此 Base URL</small></div>
-      </div>}
-      {aiStatus && <div className={`ai-status ${aiStatus.type}`}>{aiStatus.text}</div>}
-    </section>
-    <div className="category-legend">{CATEGORY_OPTIONS.filter((category) => category !== 'Unsorted').map((category) => <span key={category} className={`cat-${category.toLowerCase()}`}>{CATEGORY_LABELS[category]}<b>{tags.filter((tag) => tag.category === category).length}</b></span>)}</div>
-    {tags.length ? <LobeSortableList className="tag-stack" gap={9} items={tags} onChange={(reordered) => updateProject(updatePromptScope(project, scope.key, reordered))} renderOverlay={(tag) => <div className="tag-drag-preview"><Icon name="grip"/><span><strong>{tag.tag}</strong><small>{tag.translation || CATEGORY_LABELS[tag.category] || '未分类'}</small></span></div>} renderItem={(tag) => {
-      const index = tags.findIndex((item) => item.id === tag.id);
-      return <LobeSortableList.Item className="tag-sortable-item" id={tag.id} variant="borderless"><TagCard tag={tag} index={index} translating={translatingIds.has(tag.id)} onTranslate={() => translateTagIds([tag.id])} onChange={(patch) => updateTag(index, patch)} onDelete={() => updateProject(updatePromptScope(project, scope.key, tags.filter((_, itemIndex) => itemIndex !== index)))} onContextMenu={(event) => onTagContextMenu(event, scope.key, tag)}/></LobeSortableList.Item>;
-    }}/>
-    : <LobeEmpty className="panel-empty" description="从含 NovelAI V4 metadata 的图片自动恢复，或在上方逐个添加。" image={<Icon name="layers" size={24}/>} title="这里还没有 Tag"/>}
   </div>;
 }
 
@@ -1085,13 +855,30 @@ function RelationsPanel({ project, projects, relationshipGroups, activeBranchId,
   </div>;
 }
 
-function ImageDetailPage({ project, projects, relationshipGroups, sourceProject, activeBranch, detailTab, experiments, series, promptScopeKey, focusTagId, branchResultImporting, onBack, onTabChange, onCopy, onReveal, onCreateRecipe, updateProject, onTagContextMenu, onPrepareTagEditor, setPromptScopeKey, onCopyContextChange, onCopyText, onNotify, onSelectBranch, onBranchContextMenu, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, onOpenResult, onUseLegacyVersion, onOpenExperiment, onOpenSeries, onOpenComparison, onOpenTagResource, onOpenVibeResource }) {
-  const [promptMode, setPromptMode] = useState('overview');
+function ImageDetailPage({ project, projects, relationshipGroups, sourceProject, activeBranch, detailTab, experiments, series, promptScopeKey, focusTagId, branchResultImporting, onBack, onTabChange, onCopy, onReveal, onCreateRecipe, updateProject, onTagContextMenu, onCopyContextChange, onCopyText, onNotify, onSelectBranch, onBranchContextMenu, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, onOpenResult, onUseLegacyVersion, onOpenExperiment, onOpenSeries, onOpenComparison, onOpenTagResource, onOpenVibeResource }) {
   const tabs = [
     { key: 'overview', label: '概览' }, { key: 'prompt', label: 'Prompt' }, { key: 'vibe', label: `Vibe${project.vibes?.length ? ` ${project.vibes.length}` : ''}` }, { key: 'metadata', label: '元数据' }, { key: 'relations', label: `关系${sourceProject.branches?.length ? ` ${sourceProject.branches.length}` : ''}` },
   ];
-  const editTag = (scopeKey, tagId) => { setPromptMode('edit'); onPrepareTagEditor(scopeKey, tagId); };
-  useEffect(() => setPromptMode('overview'), [project.id]);
+  const translatePromptTags = async (entries) => {
+    const targets = entries.slice(0, 50);
+    if (!targets.length) return;
+    const result = await studio.translateTags(targets.map((entry) => entry.tag.tag));
+    if (!result?.ok) { onNotify(result?.error || 'AI 翻译没有完成'); return; }
+    const replacements = new Map(targets.map((entry, index) => [overviewTagKey(entry.scopeKey, entry.tag.id), result.items?.[index] || {
+      translation: result.translations?.[index] || '',
+      category: result.categories?.[index] || entry.tag.category,
+    }]));
+    let nextProject = project;
+    for (const scopeKey of [...new Set(targets.map((entry) => entry.scopeKey))]) {
+      const scope = getPromptScope(nextProject, scopeKey);
+      nextProject = updatePromptScope(nextProject, scopeKey, scope.tags.map((tag) => {
+        const patch = replacements.get(overviewTagKey(scopeKey, tag.id));
+        return patch ? { ...tag, ...patch, translation_source: patch.translation_source || 'ai', category_source: patch.category_source || 'ai' } : tag;
+      }));
+    }
+    updateProject(nextProject);
+    onNotify(`已翻译并分类 ${targets.length} 个 Tag`);
+  };
   return <main className="image-detail-page">
     <header className="detail-header">
       <div className="detail-title-row"><LobeActionIcon icon={<Icon name="close" size={18}/>} onClick={onBack} size="large" title="返回图库" variant="borderless"/><div><span>图库 / 图片详情</span><h1 title={sourceProject.name}>{sourceProject.name}</h1><small>{activeBranch ? `${activeBranch.name} · ${BRANCH_STATUS_LABELS[activeBranch.status] || activeBranch.status}` : '原图结果'}</small></div></div>
@@ -1100,7 +887,7 @@ function ImageDetailPage({ project, projects, relationshipGroups, sourceProject,
     <LobeTabs activeKey={detailTab} className="detail-tabs" items={tabs} onChange={onTabChange} variant="point"/>
     <section className={`detail-content detail-tab-${detailTab}`}>
       {detailTab === 'overview' && <ProjectOverviewPanel activeBranch={activeBranch} onCopy={onCopy} onCreateRecipe={onCreateRecipe} onReveal={onReveal} project={project} sourceProject={sourceProject}/>}
-      {detailTab === 'prompt' && <div className={`detail-prompt-workspace ${promptMode === 'edit' ? 'editing' : ''}`}>{promptMode === 'overview' ? <PromptOverview onCopyContextChange={onCopyContextChange} onCopyText={onCopyText} onEditTag={editTag} onNotify={onNotify} onOpenTagResource={onOpenTagResource} onTagContextMenu={onTagContextMenu} project={project} updateProject={updateProject}/> : <><div className="prompt-editor-return"><LobeButton onClick={() => setPromptMode('overview')} size="small">返回 Prompt 总览</LobeButton><span>批量添加、角色与位置设置</span></div><TagsPanel focusTagId={focusTagId} onTagContextMenu={onTagContextMenu} project={project} scopeKey={promptScopeKey} setScopeKey={setPromptScopeKey} showToast={onNotify} updateProject={updateProject}/></>}</div>}
+      {detailTab === 'prompt' && <div className="detail-prompt-workspace"><PromptOverview focusScopeKey={promptScopeKey} focusTagId={focusTagId} onCopyContextChange={onCopyContextChange} onCopyText={onCopyText} onNotify={onNotify} onOpenTagResource={onOpenTagResource} onTagContextMenu={onTagContextMenu} onTranslateTags={translatePromptTags} project={project} updateProject={updateProject}/></div>}
       {detailTab === 'vibe' && <div className="detail-vibe-workspace"><div className="resource-jump-bar"><span>在 Vibe 库中反向查看</span><LobeSelect allowClear disabled={!project.vibes?.length} onChange={(value) => value && onOpenVibeResource(project.vibes.find((vibe) => vibe.id === value))} options={(project.vibes || []).map((vibe, index) => ({ label: vibe.name || `Vibe ${index + 1}`, value: vibe.id }))} placeholder={project.vibes?.length ? '选择当前图片中的 Vibe' : '当前图片没有 Vibe'} value={undefined}/></div><VibePanel project={project} showToast={onNotify} updateProject={updateProject}/></div>}
       {detailTab === 'metadata' && (activeBranch ? <MetadataPanel project={project} updateProject={updateProject}/> : <ReadOnlyMetadataPanel project={project}/>)}
       {detailTab === 'relations' && <RelationsPanel activeBranchId={activeBranch?.id || ''} branchResultImporting={branchResultImporting} experiments={experiments} onBranchContextMenu={onBranchContextMenu} onDiscardBranch={onDiscardBranch} onImportBranchResult={onImportBranchResult} onMarkBranchWaiting={onMarkBranchWaiting} onOpenComparison={onOpenComparison} onOpenExperiment={onOpenExperiment} onOpenResult={onOpenResult} onOpenSeries={onOpenSeries} onSelectBranch={onSelectBranch} onUseLegacyVersion={onUseLegacyVersion} project={sourceProject} projects={projects} relationshipGroups={relationshipGroups} series={series}/>}
@@ -2345,7 +2132,6 @@ export default function App({ appearance, setAppearance }) {
         onOpenSeries={(seriesId) => changeLibraryView(`series:${seriesId}`)}
         onOpenTagResource={openTagResource}
         onOpenVibeResource={openVibeResource}
-        onPrepareTagEditor={openTagEditor}
         onReveal={studio.revealFile}
         onSelectBranch={setActiveBranchId}
         onTabChange={setDetailTab}
@@ -2353,7 +2139,6 @@ export default function App({ appearance, setAppearance }) {
         onUseLegacyVersion={useLegacyVersion}
         project={activeProject}
         promptScopeKey={promptScopeKey}
-        setPromptScopeKey={setPromptScopeKey}
         sourceProject={sourceProject}
         updateProject={updateProject}
       />}

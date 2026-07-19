@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import LobeButton from '@lobehub/ui/es/Button/index';
+import LobeCheckbox from '@lobehub/ui/es/Checkbox/index';
 import LobeInput from '@lobehub/ui/es/Input/Input';
+import LobeTextArea from '@lobehub/ui/es/Input/TextArea';
 import LobePopover from '@lobehub/ui/es/Popover/index';
 import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
 import LobeSelect from '@lobehub/ui/es/Select/index';
 import LobeSliderWithInput from '@lobehub/ui/es/SliderWithInput/index';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
-import { CATEGORY_LABELS, CATEGORY_OPTIONS, inferCategory } from './lib/prompt.js';
-import { countPromptTags, getPromptScope, updatePromptScope } from './lib/promptStructure.js';
+import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, inferCategory } from './lib/prompt.js';
+import { addPromptCharacter, countPromptTags, getPromptScope, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
 import SelectionMark from './components/SelectionMark.jsx';
 import Icon from './components/Icon.jsx';
 import {
@@ -61,7 +63,7 @@ function tagPresentation(tag, language) {
   };
 }
 
-function TagQuickEditor({ tag, onChange, onClose, onOpenDetail }) {
+function TagQuickEditor({ tag, translating, onChange, onClose, onOpenDetail, onTranslate }) {
   return <div className="tag-quick-editor" onClick={(event) => event.stopPropagation()}>
     <div className="tag-quick-editor-heading">
       <div><strong>编辑 Tag</strong><small>修改会自动创建或更新生成方案</small></div>
@@ -75,16 +77,17 @@ function TagQuickEditor({ tag, onChange, onClose, onOpenDetail }) {
     </div>
     <label><span>备注</span><LobeInput onChange={(event) => onChange({ note: event.target.value })} placeholder="可选" size="small" value={tag.note || ''}/></label>
     <div className="tag-quick-editor-footer">
-      <LobeButton icon={<Icon name="library" size={14}/>} onClick={onOpenDetail} size="small">查看 Tag 详情</LobeButton>
+      <LobeButton disabled={translating} icon={<Icon name="spark" size={14}/>} onClick={onTranslate} size="small">{translating ? '翻译中…' : 'AI 翻译'}</LobeButton>
+      <LobeButton icon={<Icon name="library" size={14}/>} onClick={onOpenDetail} size="small" type="primary">Tag 详情</LobeButton>
     </div>
   </div>;
 }
 
-function EditableTag({ children, disabled, editKey, editingKey, onEditingChange, onOpenDetail, onUpdate, tag }) {
+function EditableTag({ children, disabled, editKey, editingKey, onEditingChange, onOpenDetail, onTranslate, onUpdate, tag, translating }) {
   return <LobePopover
     arrow
     className="tag-quick-popover"
-    content={<TagQuickEditor tag={tag} onChange={onUpdate} onClose={() => onEditingChange('')} onOpenDetail={onOpenDetail}/>}
+    content={<TagQuickEditor tag={tag} translating={translating} onChange={onUpdate} onClose={() => onEditingChange('')} onOpenDetail={onOpenDetail} onTranslate={onTranslate}/>}
     disabled={disabled}
     onOpenChange={(open) => onEditingChange(open ? editKey : '')}
     open={editingKey === editKey}
@@ -95,8 +98,58 @@ function EditableTag({ children, disabled, editKey, editingKey, onEditingChange,
   </LobePopover>;
 }
 
+function AddTagEditor({ draft, pending, scope, onAdd, onChange, onClose }) {
+  return <div className="add-tag-popover" onClick={(event) => event.stopPropagation()}>
+    <div className="tag-quick-editor-heading">
+      <div><strong>添加到 {scope.label}</strong><small>支持中英文逗号与换行，可一次添加多个 Tag</small></div>
+      <LobeButton onClick={onClose} size="small" type="text">取消</LobeButton>
+    </div>
+    <LobeTextArea autoFocus autoSize={{ minRows: 3, maxRows: 7 }} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => {
+      if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+      event.preventDefault();
+      onAdd();
+    }} placeholder="例如：akakura, ciloranko, white background" value={draft}/>
+    <div className="add-tag-popover-footer">
+      <span>{pending.tags.length ? `将添加 ${pending.tags.length} 个` : '等待输入'}{pending.duplicateCount ? ` · ${pending.duplicateCount} 个重复` : ''}{pending.syntaxIssueCount ? ` · ${pending.syntaxIssueCount} 个语法提示` : ''}</span>
+      <LobeButton disabled={!pending.tags.length} icon={<Icon name="plus" size={14}/>} onClick={onAdd} size="small" type="primary">添加</LobeButton>
+    </div>
+  </div>;
+}
+
+function CharacterEditor({ character, project, onChange, onClose, onDelete }) {
+  const structure = project.prompt_structure;
+  const activeColumn = Math.max(0, Math.min(4, Math.round(Number(character.center?.x ?? 0.5) * 5 - 0.5)));
+  const activeRow = Math.max(0, Math.min(4, Math.round(Number(character.center?.y ?? 0.5) * 5 - 0.5)));
+  const updateStructure = (patch) => onChange({ ...project, prompt_structure: { ...structure, ...patch } });
+  const choosePosition = (column, row) => onChange(updatePromptCharacter(project, character.id, {
+    center: { x: (column + 0.5) / 5, y: (row + 0.5) / 5 },
+  }));
+  return <div className="character-quick-editor" onClick={(event) => event.stopPropagation()}>
+    <div className="tag-quick-editor-heading">
+      <div><strong>角色设置</strong><small>名称、位置与生成顺序</small></div>
+      <LobeButton onClick={onClose} size="small" type="text">完成</LobeButton>
+    </div>
+    <label><span>角色名称</span><LobeInput autoFocus onChange={(event) => onChange(updatePromptCharacter(project, character.id, { label: event.target.value }))} value={character.label}/></label>
+    <div className="character-position-heading">
+      <div><strong>Character Position</strong><small>5 × 5 粗略位置引导</small></div>
+      <label><LobeCheckbox checked={Boolean(structure.use_coords)} onChange={(event) => updateStructure({ use_coords: event.target.checked })} size={16}/><span>{structure.use_coords ? '自定义位置' : 'AI 选择'}</span></label>
+    </div>
+    <div className={`character-position-grid ${structure.use_coords ? '' : 'disabled'}`} aria-label={`${character.label} 位置`}>
+      {Array.from({ length: 25 }, (_, index) => {
+        const column = index % 5;
+        const row = Math.floor(index / 5);
+        return <button aria-label={`第 ${row + 1} 行，第 ${column + 1} 列`} className={activeColumn === column && activeRow === row ? 'active' : ''} disabled={!structure.use_coords} key={index} onClick={() => choosePosition(column, row)}><i/></button>;
+      })}
+    </div>
+    <div className="character-position-footer"><code>X {Number(character.center?.x ?? 0.5).toFixed(2)} · Y {Number(character.center?.y ?? 0.5).toFixed(2)}</code><label><LobeCheckbox checked={Boolean(structure.use_order)} onChange={(event) => updateStructure({ use_order: event.target.checked })} size={16}/><span>遵循角色顺序</span></label></div>
+    <div className="character-quick-editor-actions"><LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={onDelete} size="small">移除角色</LobeButton></div>
+  </div>;
+}
+
 function ScopeTags({
   scope,
+  addDraft,
+  addingScopeKey,
   dragging,
   language,
   selecting,
@@ -105,20 +158,35 @@ function ScopeTags({
   onDragStart,
   onDragEnd,
   onDrop,
-  onEditTag,
   editingKey,
+  onAddScope,
+  onAddDraftChange,
+  onAddingScopeChange,
   onEditingChange,
   onOpenTagResource,
+  onTranslateTag,
   onUpdateTag,
   onKeyboardMove,
   onToggleSelect,
   onTagContextMenu,
+  translatingKeys,
 }) {
   const selectedSet = new Set(selectedKeys);
+  const pendingAdd = analyzePromptBatch(addDraft, scope.tags);
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
       <span>{scope.polarity === 'undesired' ? 'UNDESIRED CONTENT' : 'PROMPT'}</span>
       <b>{scope.tags.length}</b>
+      <LobePopover
+        arrow
+        className="add-tag-popover-shell"
+        content={<AddTagEditor draft={addDraft} pending={pendingAdd} scope={scope} onAdd={() => onAddScope(scope.key)} onChange={onAddDraftChange} onClose={() => onAddingScopeChange('')}/>}
+        disabled={selecting}
+        onOpenChange={(open) => onAddingScopeChange(open ? scope.key : '')}
+        open={addingScopeKey === scope.key}
+        placement="bottomLeft"
+        trigger="click"
+      ><LobeButton aria-label={`添加到 ${scope.label}`} icon={<Icon name="plus" size={13}/>} size="small" type="text"/></LobePopover>
     </div>
     <div className="overview-tags" role="list" aria-label={scope.label}>
       {scope.tags.map((tag, index) => {
@@ -153,20 +221,22 @@ function ScopeTags({
           key={tag.id}
           onEditingChange={onEditingChange}
           onOpenDetail={() => { onEditingChange(''); onOpenTagResource(tag.tag); }}
+          onTranslate={() => onTranslateTag(scope.key, tag)}
           onUpdate={(patch) => onUpdateTag(scope.key, tag.id, patch)}
           tag={tag}
+          translating={translatingKeys.has(key)}
         >
           {tagButton}
         </EditableTag>;
       })}
       {!scope.tags.length && (filtered
         ? <span className="overview-filter-empty">当前筛选无 Tag</span>
-        : <LobeButton className="overview-empty-tag" onClick={() => onEditTag(scope.key, null)} size="small" type="dashed">+ 添加 Tag</LobeButton>)}
+        : <span className="overview-filter-empty">暂无 Tag，使用左侧加号添加</span>)}
     </div>
   </div>;
 }
 
-function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, onEditingChange, onOpenTagResource, onToggleSelect, onToggleGroup, onUpdateTag, onTagContextMenu }) {
+function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, onEditingChange, onOpenTagResource, onToggleSelect, onToggleGroup, onTranslateTag, onUpdateTag, onTagContextMenu, translatingKeys }) {
   const selectedSet = new Set(selectedKeys);
   const groupKeys = group.entries.map((entry) => entry.key);
   const allSelected = groupKeys.length > 0 && groupKeys.every((key) => selectedSet.has(key));
@@ -203,8 +273,10 @@ function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, o
             key={entry.key}
             onEditingChange={onEditingChange}
             onOpenDetail={() => { onEditingChange(''); onOpenTagResource(entry.tag.tag); }}
+            onTranslate={() => onTranslateTag(entry.scopeKey, entry.tag)}
             onUpdate={(patch) => onUpdateTag(entry.scopeKey, entry.tag.id, patch)}
             tag={entry.tag}
+            translating={translatingKeys.has(entry.key)}
           >
             {tagButton}
           </EditableTag>;
@@ -218,7 +290,7 @@ function Segment({ value, options, onChange, label }) {
   return <LobeSegmented aria-label={label} className="overview-segment" onChange={onChange} options={options.map(([option, text]) => ({ label: text, value: option }))} size="small" value={value}/>;
 }
 
-export default function PromptOverview({ project, updateProject, onEditTag, onOpenTagResource, onTagContextMenu, onCopyContextChange, onCopyText, onNotify }) {
+export default function PromptOverview({ project, updateProject, focusScopeKey, focusTagId, onOpenTagResource, onTagContextMenu, onCopyContextChange, onCopyText, onNotify, onTranslateTags }) {
   const [dragging, setDragging] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_OVERVIEW_FILTERS);
   const [language, setLanguage] = useState('original');
@@ -227,6 +299,10 @@ export default function PromptOverview({ project, updateProject, onEditTag, onOp
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [editingKey, setEditingKey] = useState('');
+  const [addingScopeKey, setAddingScopeKey] = useState('');
+  const [addDraft, setAddDraft] = useState('');
+  const [editingCharacterId, setEditingCharacterId] = useState('');
+  const [translatingKeys, setTranslatingKeys] = useState(new Set());
   const structure = project.prompt_structure;
 
   useEffect(() => {
@@ -236,7 +312,18 @@ export default function PromptOverview({ project, updateProject, onEditTag, onOp
     setSelectedKeys([]);
     setDeleteArmed(false);
     setEditingKey('');
+    setAddingScopeKey('');
+    setAddDraft('');
+    setEditingCharacterId('');
+    setTranslatingKeys(new Set());
   }, [project.id]);
+
+  useEffect(() => {
+    if (!focusTagId || !focusScopeKey) return;
+    setFilters(DEFAULT_OVERVIEW_FILTERS);
+    setViewMode('structure');
+    setEditingKey(overviewTagKey(focusScopeKey, focusTagId));
+  }, [focusScopeKey, focusTagId]);
 
   useEffect(() => {
     if (!deleteArmed) return undefined;
@@ -348,23 +435,74 @@ export default function PromptOverview({ project, updateProject, onEditTag, onOp
     updateProject(updatePromptScope(project, scopeKey, scope.tags.map((tag) => tag.id === tagId ? { ...tag, ...patch } : tag)));
   };
 
+  const changeAddingScope = (scopeKey) => {
+    setAddingScopeKey(scopeKey);
+    if (scopeKey) setAddDraft('');
+  };
+
+  const addTags = (scopeKey) => {
+    const scope = getPromptScope(project, scopeKey);
+    const pending = analyzePromptBatch(addDraft, scope.tags);
+    if (!pending.tags.length) return;
+    updateProject(updatePromptScope(project, scopeKey, [...scope.tags, ...pending.tags]));
+    setAddingScopeKey('');
+    setAddDraft('');
+    onNotify?.(`已添加 ${pending.tags.length} 个 Tag`);
+  };
+
+  const translateEntries = async (entries) => {
+    if (!entries.length || !onTranslateTags) return;
+    const keys = entries.map((entry) => overviewTagKey(entry.scopeKey, entry.tag.id));
+    setTranslatingKeys((current) => new Set([...current, ...keys]));
+    try {
+      await onTranslateTags(entries);
+    } finally {
+      setTranslatingKeys((current) => {
+        const next = new Set(current);
+        keys.forEach((key) => next.delete(key));
+        return next;
+      });
+    }
+  };
+
+  const addCharacter = () => {
+    const next = addPromptCharacter(project);
+    if (next === project) { onNotify?.('最多支持 6 个 Character Prompt'); return; }
+    const character = next.prompt_structure.characters.at(-1);
+    updateProject(next);
+    setEditingCharacterId(character.id);
+    onNotify?.(`${character.label} 已添加`);
+  };
+
+  const deleteCharacter = (character) => {
+    setEditingCharacterId('');
+    updateProject(removePromptCharacter(project, character.id));
+    onNotify?.(`${character.label} 已移除`);
+  };
+
   const scopeProps = {
     dragging,
     language,
     selecting,
     selectedKeys,
+    addDraft,
+    addingScopeKey,
     filtered,
     onDragStart: beginDrag,
     onDragEnd: () => setDragging(null),
     onDrop: dropTag,
-    onEditTag,
     editingKey,
+    onAddScope: addTags,
+    onAddDraftChange: setAddDraft,
+    onAddingScopeChange: changeAddingScope,
     onEditingChange: setEditingKey,
     onOpenTagResource,
+    onTranslateTag: (scopeKey, tag) => translateEntries([{ scopeKey, tag }]),
     onUpdateTag: updateTag,
     onKeyboardMove: keyboardMove,
     onToggleSelect: toggleSelection,
     onTagContextMenu,
+    translatingKeys,
   };
 
   return <div className="prompt-overview">
@@ -389,6 +527,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onOp
           <Segment value={filters.domain} options={[["all", '全部区域'], ['base', 'Base'], ['character', 'Character']]} onChange={(domain) => changeFilter({ domain })} label="Prompt 区域"/>
           <Segment value={viewMode} options={[["structure", '按结构'], ['category', '按分类']]} onChange={setViewMode} label="总览分组方式"/>
           <Segment value={language} options={LANGUAGE_OPTIONS} onChange={setLanguage} label="显示语言"/>
+          <LobeButton disabled={structure.characters.length >= 6} icon={<Icon name="plus" size={14}/>} onClick={addCharacter} size="small">角色</LobeButton>
           <LobeButton className={`overview-select-toggle ${selecting ? 'active' : ''}`} onClick={toggleSelecting} size="small" type={selecting ? 'primary' : 'default'}>{selecting ? `退出多选 · ${selectedKeys.length}` : '多选'}</LobeButton>
         </div>
       </div>
@@ -402,6 +541,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onOp
         <span>已选 <b>{selectedKeys.length}</b> 个{copyContext.categoryCount ? ` · ${copyContext.categoryCount} 个分类` : ''}；不同分类复制时自动换行。</span>
         <LobeButton disabled={!visibleEntries.length} onClick={selectAllVisible} size="small">全选可见</LobeButton>
         <LobeButton disabled={!selectedKeys.length} onClick={() => setSelectedKeys([])} size="small">取消选择</LobeButton>
+        <LobeButton disabled={!selectedKeys.length || translatingKeys.size > 0} icon={<Icon name="spark" size={13}/>} onClick={() => translateEntries(copyContext.entries)} size="small">{translatingKeys.size ? '翻译中…' : `AI 翻译 ${selectedKeys.length}`}</LobeButton>
         <LobeButton disabled={!copyContext.count} onClick={copyVisibleOrSelected} size="small" type="primary">{copyContext.selected ? `复制已选 ${copyContext.count}` : `复制可见 ${copyContext.count}`}</LobeButton>
         <LobeButton danger className={deleteArmed ? 'armed' : ''} disabled={!selectedKeys.length} onClick={deleteSelected} size="small" type={deleteArmed ? 'primary' : 'default'}>{deleteArmed ? `再次点击删除 ${selectedKeys.length}` : `删除已选 ${selectedKeys.length}`}</LobeButton>
       </div>}
@@ -419,8 +559,10 @@ export default function PromptOverview({ project, updateProject, onEditTag, onOp
         onOpenTagResource={onOpenTagResource}
         onToggleSelect={toggleSelection}
         onToggleGroup={toggleCategoryGroup}
+        onTranslateTag={(scopeKey, tag) => translateEntries([{ scopeKey, tag }])}
         onUpdateTag={updateTag}
         onTagContextMenu={onTagContextMenu}
+        translatingKeys={translatingKeys}
       />)}
 
       {viewMode === 'structure' && baseScopes.length > 0 && <section className="overview-layer base-layer">
@@ -439,7 +581,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onOp
           <div className="overview-layer-body">
             <div className="overview-layer-heading">
               <div><strong>{character.label}</strong><small>独立角色描述与排除内容</small></div>
-              <LobeButton onClick={() => onEditTag(sections[0]?.key, null)} size="small" type="text">{structure.use_coords ? `POSITION ${compactPosition(character.center)}` : 'AI POSITION'}</LobeButton>
+              <LobePopover arrow className="character-quick-popover" content={<CharacterEditor character={character} project={project} onChange={updateProject} onClose={() => setEditingCharacterId('')} onDelete={() => deleteCharacter(character)}/>} onOpenChange={(open) => setEditingCharacterId(open ? character.id : '')} open={editingCharacterId === character.id} placement="bottomRight" trigger="click"><LobeButton size="small" type="text">{structure.use_coords ? `POSITION ${compactPosition(character.center)}` : 'AI POSITION'}</LobeButton></LobePopover>
             </div>
             {sections.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
           </div>
@@ -447,8 +589,8 @@ export default function PromptOverview({ project, updateProject, onEditTag, onOp
       })}
 
       {!visibleEntries.length && filtered && <div className="overview-no-results"><strong>没有符合条件的 Tag</strong><span>调整分类、区域或搜索词后，顶部复制内容会同步更新。</span></div>}
-      {viewMode === 'structure' && !structure.characters.length && filters.domain !== 'base' && <LobeButton className="overview-add-character" onClick={() => onEditTag('base:prompt', null)} type="dashed">
-        <Icon name="plus" size={20}/><div><strong>还没有 Character Prompt</strong><small>打开完整编辑添加角色，最多支持 6 个。</small></div>
+      {viewMode === 'structure' && !structure.characters.length && filters.domain !== 'base' && <LobeButton className="overview-add-character" onClick={addCharacter} type="dashed">
+        <Icon name="plus" size={20}/><div><strong>还没有 Character Prompt</strong><small>添加后可在这里设置角色名称、位置和独立 Prompt。</small></div>
       </LobeButton>}
     </div>
   </div>;
