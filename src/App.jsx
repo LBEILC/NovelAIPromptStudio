@@ -30,12 +30,17 @@ import { contextMenuPosition, isTextEditingTarget } from './lib/contextMenu.js';
 const studio = window.studio || {
   loadLibrary: async () => [],
   showContextMenu: async () => null,
-  loadLibraryOrganization: async () => ({ collections: [], projects: [] }),
+  loadLibraryOrganization: async () => ({ collections: [], series: [], projects: [] }),
   createCollection: async () => ({ ok: true, collections: [], projects: [] }),
   renameCollection: async () => ({ ok: true, collections: [], projects: [] }),
   deleteCollection: async () => ({ ok: true, collections: [], projects: [] }),
   addProjectsToCollection: async () => ({ ok: true, collections: [], projects: [] }),
   removeProjectsFromCollection: async () => ({ ok: true, collections: [], projects: [] }),
+  createSeries: async () => ({ ok: true, collections: [], series: [], projects: [] }),
+  renameSeries: async () => ({ ok: true, collections: [], series: [], projects: [] }),
+  deleteSeries: async () => ({ ok: true, collections: [], series: [], projects: [] }),
+  addProjectsToSeries: async () => ({ ok: true, collections: [], series: [], projects: [] }),
+  removeProjectsFromSeries: async () => ({ ok: true, collections: [], series: [], projects: [] }),
   setProjectsFavorite: async () => ({ ok: true, collections: [], projects: [] }),
   setProjectsDeleted: async () => ({ ok: true, collections: [], projects: [] }),
   importImages: async () => ({ ok: true, canceled: true, imported: [], duplicates: [], errors: [], summary: null }),
@@ -135,6 +140,7 @@ function LibraryPanel({
   projects,
   allProjects,
   collections,
+  series,
   activeId,
   setActiveId,
   query,
@@ -155,6 +161,11 @@ function LibraryPanel({
   onDeleteCollection,
   onAddToCollection,
   onRemoveFromCollection,
+  onCreateSeries,
+  onRenameSeries,
+  onDeleteSeries,
+  onAddToSeries,
+  onRemoveFromSeries,
   onSetFavorite,
   onSetDeleted,
   onProjectContextMenu,
@@ -165,6 +176,12 @@ function LibraryPanel({
   const [editingCollectionName, setEditingCollectionName] = useState('');
   const [deleteArmedId, setDeleteArmedId] = useState('');
   const [batchCollectionId, setBatchCollectionId] = useState('');
+  const [creatingSeries, setCreatingSeries] = useState(false);
+  const [seriesName, setSeriesName] = useState('');
+  const [editingSeriesId, setEditingSeriesId] = useState('');
+  const [editingSeriesName, setEditingSeriesName] = useState('');
+  const [deleteArmedSeriesId, setDeleteArmedSeriesId] = useState('');
+  const [batchSeriesId, setBatchSeriesId] = useState('');
   const activeProjects = allProjects.filter((project) => !project.deleted_at);
   const counts = {
     all: activeProjects.length,
@@ -179,7 +196,8 @@ function LibraryPanel({
     { id: 'trash', label: '回收站', icon: 'trash', count: counts.trash },
   ];
   const currentCollection = libraryView.startsWith('collection:') ? collections.find((collection) => `collection:${collection.id}` === libraryView) : null;
-  const currentLabel = currentCollection?.name || viewItems.find((item) => item.id === libraryView)?.label || '作品库';
+  const currentSeries = libraryView.startsWith('series:') ? series.find((entry) => `series:${entry.id}` === libraryView) : null;
+  const currentLabel = currentCollection?.name || currentSeries?.name || viewItems.find((item) => item.id === libraryView)?.label || '作品库';
   const selectedProjects = allProjects.filter((project) => selectedIds.has(project.id));
   const allSelectedAreFavorite = selectedProjects.length > 0 && selectedProjects.every((project) => project.is_favorite);
 
@@ -192,6 +210,16 @@ function LibraryPanel({
     if (!(await onRenameCollection(id, editingCollectionName))) return;
     setEditingCollectionId('');
     setEditingCollectionName('');
+  };
+  const submitSeries = async () => {
+    if (!(await onCreateSeries(seriesName))) return;
+    setSeriesName('');
+    setCreatingSeries(false);
+  };
+  const submitSeriesRename = async (id) => {
+    if (!(await onRenameSeries(id, editingSeriesName))) return;
+    setEditingSeriesId('');
+    setEditingSeriesName('');
   };
 
   return <aside className="library-panel">
@@ -223,12 +251,33 @@ function LibraryPanel({
       </div>)}
       {!collections.length && !creatingCollection && <div className="collection-empty">创建收藏集来手动整理作品</div>}
     </div>
+    <div className="collection-heading series-heading"><span>创作系列</span><button onClick={() => { setCreatingSeries(true); setDeleteArmedSeriesId(''); }} aria-label="新建创作系列"><Icon name="plus" size={14}/></button></div>
+    <div className="collection-list series-list">
+      {creatingSeries && <div className="collection-editor"><input autoFocus maxLength={80} value={seriesName} onChange={(event) => setSeriesName(event.target.value)} onKeyDown={(event) => {
+        if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitSeries();
+        if (event.key === 'Escape') { setCreatingSeries(false); setSeriesName(''); }
+      }} placeholder="系列名称"/><button onClick={submitSeries} disabled={!seriesName.trim()}><Icon name="check" size={13}/></button><button onClick={() => { setCreatingSeries(false); setSeriesName(''); }}><Icon name="close" size={13}/></button></div>}
+      {series.map((entry) => <div className={`collection-row series-row ${libraryView === `series:${entry.id}` ? 'active' : ''}`} key={entry.id}>
+        {editingSeriesId === entry.id
+          ? <div className="collection-editor"><input autoFocus maxLength={80} value={editingSeriesName} onChange={(event) => setEditingSeriesName(event.target.value)} onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitSeriesRename(entry.id);
+            if (event.key === 'Escape') setEditingSeriesId('');
+          }}/><button onClick={() => submitSeriesRename(entry.id)} disabled={!editingSeriesName.trim()}><Icon name="check" size={13}/></button><button onClick={() => setEditingSeriesId('')}><Icon name="close" size={13}/></button></div>
+          : <><button className="collection-open" onClick={() => onViewChange(`series:${entry.id}`)}><Icon name="layers" size={13}/><span>{entry.name}</span><b>{entry.project_count}</b></button><button className="collection-action" onClick={() => { setEditingSeriesId(entry.id); setEditingSeriesName(entry.name); setDeleteArmedSeriesId(''); }} aria-label={`重命名 ${entry.name}`}><Icon name="edit" size={12}/></button><button className={`collection-action delete ${deleteArmedSeriesId === entry.id ? 'armed' : ''}`} onClick={async () => {
+            if (deleteArmedSeriesId !== entry.id) { setDeleteArmedSeriesId(entry.id); return; }
+            if (await onDeleteSeries(entry.id)) setDeleteArmedSeriesId('');
+          }} aria-label={deleteArmedSeriesId === entry.id ? `确认删除 ${entry.name}` : `删除 ${entry.name}`}>{deleteArmedSeriesId === entry.id ? '确认' : <Icon name="close" size={12}/>}</button></>}
+      </div>)}
+      {!series.length && !creatingSeries && <div className="collection-empty">把同一创作脉络的结果放进系列</div>}
+    </div>
     <div className="section-heading library-result-heading"><span>{currentLabel}</span><b>{projects.length}</b><button className={selectionMode ? 'active' : ''} onClick={() => { setSelectionMode(!selectionMode); onClearSelection(); }}>{selectionMode ? '完成' : '多选'}</button></div>
     {selectionMode && <div className="library-batch-toolbar">
       <div><button onClick={onSelectAll}>{selectedIds.size === projects.length && projects.length ? '取消全选' : '全选'}</button><span>已选 <b>{selectedIds.size}</b></span><button onClick={onClearSelection} disabled={!selectedIds.size}>清除</button></div>
       {libraryView !== 'trash' && <div><select value={batchCollectionId} onChange={(event) => setBatchCollectionId(event.target.value)} aria-label="目标收藏集"><option value="">加入收藏集…</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select><button onClick={() => onAddToCollection(batchCollectionId)} disabled={!selectedIds.size || !batchCollectionId}>加入</button></div>}
+      {libraryView !== 'trash' && <div><select value={batchSeriesId} onChange={(event) => setBatchSeriesId(event.target.value)} aria-label="目标创作系列"><option value="">加入创作系列…</option>{series.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select><button onClick={() => onAddToSeries(batchSeriesId)} disabled={!selectedIds.size || !batchSeriesId}>加入</button></div>}
       <div className="batch-actions">
         {currentCollection && <button onClick={() => onRemoveFromCollection(currentCollection.id)} disabled={!selectedIds.size}>移出当前组</button>}
+        {currentSeries && <button onClick={() => onRemoveFromSeries(currentSeries.id)} disabled={!selectedIds.size}>移出当前系列</button>}
         {libraryView !== 'trash' && <button onClick={() => onSetFavorite(!allSelectedAreFavorite)} disabled={!selectedIds.size}><Icon name="star" size={13}/>{allSelectedAreFavorite ? '取消收藏' : '收藏'}</button>}
         <button className={libraryView === 'trash' ? 'restore' : 'danger'} onClick={() => onSetDeleted(libraryView !== 'trash')} disabled={!selectedIds.size}><Icon name={libraryView === 'trash' ? 'refresh' : 'trash'} size={13}/>{libraryView === 'trash' ? '恢复' : '回收站'}</button>
       </div>
@@ -237,7 +286,7 @@ function LibraryPanel({
       {projects.map((project) => <div key={project.id} className={`asset-row ${project.id === activeId ? 'active' : ''} ${selectedIds.has(project.id) ? 'selected' : ''}`} onContextMenu={(event) => onProjectContextMenu(event, project)}>
         {selectionMode && <button className="asset-check" onClick={() => onToggleSelected(project.id)} aria-pressed={selectedIds.has(project.id)} aria-label={`${selectedIds.has(project.id) ? '取消选择' : '选择'} ${project.name}`}><SelectionMark selected={selectedIds.has(project.id)}/></button>}
         <button className="asset-thumbnail" onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenPromptOverview(project.id)} title={selectionMode ? '选择作品' : '打开 Prompt 总览'}><img src={mediaUrl(project.thumbnail_path)} alt=""/><span><Icon name="layers" size={13}/></span></button>
-        <button className="asset-select" onClick={() => selectionMode ? onToggleSelected(project.id) : setActiveId(project.id)}><span className="asset-copy"><strong>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.collection_ids || []).length} 组 · {relativeTime(project.updated_at)}</small></span></button>
+        <button className="asset-select" onClick={() => selectionMode ? onToggleSelected(project.id) : setActiveId(project.id)}><span className="asset-copy"><strong>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.collection_ids || []).length} 组 · {(project.series_ids || []).length} 系列 · {relativeTime(project.updated_at)}</small></span></button>
         {libraryView !== 'trash' && <button className={`asset-favorite ${project.is_favorite ? 'active' : ''}`} onClick={() => onSetFavorite(!project.is_favorite, [project.id])} aria-label={`${project.is_favorite ? '取消收藏' : '收藏'} ${project.name}`}><Icon name="star" size={13}/></button>}
       </div>)}
       {!projects.length && <div className="list-empty">{query ? '没有匹配的作品' : `「${currentLabel}」还是空的`}</div>}
@@ -822,6 +871,7 @@ function Inspector({ tab, setTab, project, branch, updateProject, showToast, pro
 export default function App() {
   const [projects, setProjects] = useState([]);
   const [collections, setCollections] = useState([]);
+  const [series, setSeries] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [query, setQuery] = useState('');
   const [libraryView, setLibraryView] = useState('all');
@@ -857,6 +907,7 @@ export default function App() {
       });
       setProjects(repairedItems);
       setCollections(organization.collections || []);
+      setSeries(organization.series || []);
       setActiveId(repairedItems.find((project) => !project.deleted_at)?.id || null);
     }).finally(() => setLoading(false));
   }, []);
@@ -930,6 +981,7 @@ export default function App() {
       if (libraryView === 'favorites') return Boolean(project.is_favorite);
       if (libraryView === 'ungrouped') return !(project.collection_ids || []).length;
       if (libraryView.startsWith('collection:')) return (project.collection_ids || []).includes(libraryView.slice('collection:'.length));
+      if (libraryView.startsWith('series:')) return (project.series_ids || []).includes(libraryView.slice('series:'.length));
       return true;
     });
     const needles = expandSearch(query);
@@ -960,6 +1012,7 @@ export default function App() {
     const byProject = new Map((organization.projects || []).map((project) => [project.id, project]));
     setProjects((current) => current.map((project) => byProject.has(project.id) ? { ...project, ...byProject.get(project.id) } : project));
     setCollections(organization.collections || []);
+    setSeries(organization.series || []);
   };
 
   const runLibraryOrganization = async (action, successMessage) => {
@@ -1019,6 +1072,31 @@ export default function App() {
     if (success) setSelectedIds(new Set());
     return success;
   };
+  const createSeries = (name) => runLibraryOrganization(() => studio.createSeries(name), `已创建创作系列「${name.trim()}」`);
+  const renameSeries = (id, name) => runLibraryOrganization(() => studio.renameSeries(id, name), '创作系列已重命名');
+  const deleteSeries = async (id) => {
+    const success = await runLibraryOrganization(() => studio.deleteSeries(id), '创作系列已删除，作品仍保留在库中');
+    if (success && libraryView === `series:${id}`) changeLibraryView('all');
+    return success;
+  };
+  const addSelectedToSeries = async (seriesId) => {
+    if (!seriesId || !selectedIds.size) return false;
+    const success = await runLibraryOrganization(
+      () => studio.addProjectsToSeries(seriesId, [...selectedIds]),
+      `已把 ${selectedIds.size} 个作品加入创作系列`,
+    );
+    if (success) setSelectedIds(new Set());
+    return success;
+  };
+  const removeSelectedFromSeries = async (seriesId) => {
+    if (!seriesId || !selectedIds.size) return false;
+    const success = await runLibraryOrganization(
+      () => studio.removeProjectsFromSeries(seriesId, [...selectedIds]),
+      `已从当前系列移出 ${selectedIds.size} 个作品`,
+    );
+    if (success) setSelectedIds(new Set());
+    return success;
+  };
   const setFavorite = async (favorite, projectIds = [...selectedIds]) => {
     if (!projectIds.length) return false;
     const success = await runLibraryOrganization(
@@ -1045,6 +1123,7 @@ export default function App() {
       favorite: Boolean(project.is_favorite),
       deleted: Boolean(project.deleted_at),
       collections,
+      series,
     });
     if (!action) return;
     if (action === 'project:open-prompt') openPromptOverview(project.id);
@@ -1061,6 +1140,10 @@ export default function App() {
     if (action.startsWith('project:add-collection:')) {
       const collectionId = action.slice('project:add-collection:'.length);
       runLibraryOrganization(() => studio.addProjectsToCollection(collectionId, [project.id]), '作品已加入收藏集');
+    }
+    if (action.startsWith('project:add-series:')) {
+      const seriesId = action.slice('project:add-series:'.length);
+      runLibraryOrganization(() => studio.addProjectsToSeries(seriesId, [project.id]), '作品已加入创作系列');
     }
   };
 
@@ -1398,6 +1481,7 @@ export default function App() {
       projects={filteredProjects}
       allProjects={projects}
       collections={collections}
+      series={series}
       activeId={activeId}
       setActiveId={(id) => { setActiveId(id); setActiveBranchId(''); setPromptScopeKey('base:prompt'); }}
       query={query}
@@ -1418,6 +1502,11 @@ export default function App() {
       onDeleteCollection={deleteCollection}
       onAddToCollection={addSelectedToCollection}
       onRemoveFromCollection={removeSelectedFromCollection}
+      onCreateSeries={createSeries}
+      onRenameSeries={renameSeries}
+      onDeleteSeries={deleteSeries}
+      onAddToSeries={addSelectedToSeries}
+      onRemoveFromSeries={removeSelectedFromSeries}
       onSetFavorite={setFavorite}
       onSetDeleted={setDeleted}
       onProjectContextMenu={projectContextMenu}

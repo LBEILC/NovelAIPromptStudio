@@ -117,6 +117,10 @@ button { border: 0; }
 .collection-heading button { width: 26px; height: 26px; margin-inline-start: auto; display: grid; place-items: center; color: #7f8e99; background: transparent; border-radius: 4px; }
 .collection-heading button:hover { color: var(--accent); background: #1d2730; }
 .collection-list { max-height: 140px; margin: 0 8px 7px; overflow-y: auto; display: grid; gap: 2px; }
+.series-heading { color: #8f806f; }
+.series-list { max-height: 105px; }
+.series-row.active { box-shadow: inset 2px 0 #b87845; }
+.series-row.active .collection-open { color: #e1d5ca; }
 .collection-row { min-width: 0; min-height: 29px; display: flex; align-items: center; border-radius: 5px; position: relative; }
 .collection-row:hover, .collection-row.active { background: #182129; }
 .collection-row.active { box-shadow: inset 2px 0 #8a6b40; }

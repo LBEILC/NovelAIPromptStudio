@@ -10,14 +10,17 @@ describe('native context menu templates', () => {
     expect(buildContextMenuTemplate({ kind: 'text' }).map((item) => item.role).filter(Boolean)).toEqual(['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll']);
   });
 
-  it('sanitizes collections and returns a stable project action', () => {
+  it('sanitizes collections and series and returns stable project actions', () => {
     const select = vi.fn();
-    const template = buildContextMenuTemplate({ kind: 'project', favorite: false, collections: [{ id: 'one', name: '测试组' }, { id: '', name: 'bad' }] }, select);
+    const template = buildContextMenuTemplate({ kind: 'project', favorite: false, collections: [{ id: 'one', name: '测试组' }, { id: '', name: 'bad' }], series: [{ id: 'series-one', name: '服装演进' }] }, select);
     expect(labels(template)).toContain('收藏');
     const submenu = template.find((item) => item.label === '加入收藏集').submenu;
     expect(submenu).toHaveLength(1);
     submenu[0].click();
     expect(select).toHaveBeenCalledWith('project:add-collection:one');
+    const seriesSubmenu = template.find((item) => item.label === '加入创作系列').submenu;
+    seriesSubmenu[0].click();
+    expect(select).toHaveBeenCalledWith('project:add-series:series-one');
   });
 
   it('only exposes valid branch actions for the current state', () => {

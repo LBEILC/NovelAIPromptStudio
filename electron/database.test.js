@@ -182,6 +182,45 @@ describe('prompt structure persistence', () => {
     expect(database.loadLibrary()).toHaveLength(2);
   });
 
+  it('manages many-to-many creation series without changing project ownership', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-database-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    const now = new Date().toISOString();
+    const project = (id) => ({
+      id,
+      name: id,
+      image_path: `${id}.png`,
+      thumbnail_path: `${id}.webp`,
+      created_at: now,
+      updated_at: now,
+      tags: [],
+      prompt_structure: { base_undesired_tags: [], use_coords: false, use_order: true, characters: [] },
+      metadata: { extra_json: '{}' },
+      vibes: [],
+      versions: [],
+    });
+    database.insertProject(project('result-a'));
+    database.insertProject(project('result-b'));
+
+    let organization = database.createSeries('服装演进');
+    const firstSeriesId = organization.series[0].id;
+    organization = database.createSeries('同种子对照');
+    const secondSeriesId = organization.series.find((entry) => entry.name === '同种子对照').id;
+    organization = database.addProjectsToSeries(firstSeriesId, ['result-a', 'result-b', 'result-b']);
+    organization = database.addProjectsToSeries(secondSeriesId, ['result-a']);
+
+    expect(organization.series.find((entry) => entry.id === firstSeriesId).project_count).toBe(2);
+    expect(organization.projects.find((entry) => entry.id === 'result-a').series_ids).toEqual(expect.arrayContaining([firstSeriesId, secondSeriesId]));
+    expect(database.loadProject('result-a').series_ids).toEqual(expect.arrayContaining([firstSeriesId, secondSeriesId]));
+
+    organization = database.removeProjectsFromSeries(firstSeriesId, ['result-a']);
+    expect(organization.projects.find((entry) => entry.id === 'result-a').series_ids).toEqual([secondSeriesId]);
+    organization = database.deleteSeries(secondSeriesId);
+    expect(organization.projects.find((entry) => entry.id === 'result-a').series_ids).toEqual([]);
+    expect(database.loadLibrary()).toHaveLength(2);
+  });
+
   it('stores branch recipes separately from immutable result metadata', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-database-'));
     temporaryDirectories.push(directory);

@@ -60,6 +60,7 @@ export async function importImage(sourcePath, assetsDirectory, options = {}) {
       is_favorite: 0,
       deleted_at: '',
       collection_ids: [],
+      series_ids: [],
       metadata,
       tags: parsePrompt(metadata.prompt_raw, () => crypto.randomUUID()),
       prompt_structure: createPromptStructure(metadata, () => crypto.randomUUID()),

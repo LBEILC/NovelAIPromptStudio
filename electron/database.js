@@ -36,6 +36,21 @@ CREATE TABLE IF NOT EXISTS collection_members (
   PRIMARY KEY (collection_id, project_id)
 );
 CREATE INDEX IF NOT EXISTS idx_collection_members_project ON collection_members(project_id);
+CREATE TABLE IF NOT EXISTS series (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT 'copper',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS series_members (
+  series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL DEFAULT 0,
+  added_at TEXT NOT NULL,
+  PRIMARY KEY (series_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS idx_series_members_project ON series_members(project_id);
 CREATE TABLE IF NOT EXISTS prompt_tags (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -371,6 +386,11 @@ export async function openDatabase(dataDirectory) {
     { $project_id: projectId },
   ).map((row) => row.collection_id);
 
+  const projectSeriesIds = (projectId) => query(
+    'SELECT series_id FROM series_members WHERE project_id = $project_id ORDER BY added_at, series_id',
+    { $project_id: projectId },
+  ).map((row) => row.series_id);
+
   const loadCollections = () => query(
     `SELECT collections.*,
       COUNT(CASE WHEN projects.deleted_at = '' THEN collection_members.project_id END) AS project_count
@@ -381,11 +401,23 @@ export async function openDatabase(dataDirectory) {
      ORDER BY collections.created_at, collections.name COLLATE NOCASE`,
   );
 
+  const loadSeries = () => query(
+    `SELECT series.*,
+      COUNT(CASE WHEN projects.deleted_at = '' THEN series_members.project_id END) AS project_count
+     FROM series
+     LEFT JOIN series_members ON series_members.series_id = series.id
+     LEFT JOIN projects ON projects.id = series_members.project_id
+     GROUP BY series.id
+     ORDER BY series.created_at, series.name COLLATE NOCASE`,
+  );
+
   const loadLibraryOrganization = () => ({
     collections: loadCollections(),
+    series: loadSeries(),
     projects: query('SELECT id, is_favorite, deleted_at FROM projects').map((project) => ({
       ...project,
       collection_ids: projectCollectionIds(project.id),
+      series_ids: projectSeriesIds(project.id),
     })),
   });
 
@@ -413,6 +445,7 @@ export async function openDatabase(dataDirectory) {
       metadata,
       prompt_structure: safeJson(metadata.prompt_structure_json),
       collection_ids: projectCollectionIds(project.id),
+      series_ids: projectSeriesIds(project.id),
       vibes: query('SELECT * FROM vibe_transfers WHERE project_id = $id ORDER BY position', { $id: project.id }),
       versions: query('SELECT * FROM prompt_versions WHERE project_id = $id ORDER BY created_at DESC', { $id: project.id }),
       branches: query('SELECT * FROM branch_recipes WHERE source_project_id = $id ORDER BY created_at DESC', { $id: project.id }).map(hydrateBranch),
@@ -720,6 +753,68 @@ export async function openDatabase(dataDirectory) {
     }
   });
 
+  const cleanSeriesName = (name) => {
+    const cleaned = String(name || '').trim();
+    if (!cleaned) throw new Error('系列名称不能为空');
+    if (cleaned.length > 80) throw new Error('系列名称不能超过 80 个字符');
+    return cleaned;
+  };
+
+  const createSeries = (name) => runOrganizationMutation(() => {
+    const cleaned = cleanSeriesName(name);
+    const duplicate = query('SELECT id FROM series WHERE LOWER(name) = LOWER($name)', { $name: cleaned })[0];
+    if (duplicate) throw new Error('已经存在同名系列');
+    const now = new Date().toISOString();
+    database.run(
+      'INSERT INTO series (id, name, color, created_at, updated_at) VALUES ($id, $name, $color, $created_at, $updated_at)',
+      { $id: crypto.randomUUID(), $name: cleaned, $color: 'copper', $created_at: now, $updated_at: now },
+    );
+  });
+
+  const renameSeries = (id, name) => runOrganizationMutation(() => {
+    const cleaned = cleanSeriesName(name);
+    const duplicate = query('SELECT id FROM series WHERE LOWER(name) = LOWER($name) AND id != $id', { $name: cleaned, $id: String(id || '') })[0];
+    if (duplicate) throw new Error('已经存在同名系列');
+    const existing = query('SELECT id FROM series WHERE id = $id', { $id: String(id || '') })[0];
+    if (!existing) throw new Error('系列不存在或已被删除');
+    database.run(
+      'UPDATE series SET name = $name, updated_at = $updated_at WHERE id = $id',
+      { $id: existing.id, $name: cleaned, $updated_at: new Date().toISOString() },
+    );
+  });
+
+  const deleteSeries = (id) => runOrganizationMutation(() => {
+    const seriesId = String(id || '');
+    database.run('DELETE FROM series_members WHERE series_id = $id', { $id: seriesId });
+    database.run('DELETE FROM series WHERE id = $id', { $id: seriesId });
+  });
+
+  const addProjectsToSeries = (seriesId, projectIds) => runOrganizationMutation(() => {
+    const target = query('SELECT id FROM series WHERE id = $id', { $id: String(seriesId || '') })[0];
+    if (!target) throw new Error('系列不存在或已被删除');
+    let position = Number(query('SELECT MAX(position) AS position FROM series_members WHERE series_id = $id', { $id: target.id })[0]?.position ?? -1) + 1;
+    const now = new Date().toISOString();
+    for (const projectId of uniqueProjectIds(projectIds)) {
+      const project = query("SELECT id FROM projects WHERE id = $id AND deleted_at = ''", { $id: projectId })[0];
+      if (!project) continue;
+      database.run(
+        `INSERT OR IGNORE INTO series_members (series_id, project_id, position, added_at)
+         VALUES ($series_id, $project_id, $position, $added_at)`,
+        { $series_id: target.id, $project_id: project.id, $position: position, $added_at: now },
+      );
+      position += 1;
+    }
+  });
+
+  const removeProjectsFromSeries = (seriesId, projectIds) => runOrganizationMutation(() => {
+    for (const projectId of uniqueProjectIds(projectIds)) {
+      database.run(
+        'DELETE FROM series_members WHERE series_id = $series_id AND project_id = $project_id',
+        { $series_id: String(seriesId || ''), $project_id: projectId },
+      );
+    }
+  });
+
   const setProjectsFavorite = (projectIds, favorite) => runOrganizationMutation(() => {
     for (const projectId of uniqueProjectIds(projectIds)) {
       database.run(
@@ -966,12 +1061,18 @@ export async function openDatabase(dataDirectory) {
     loadProject,
     loadBranch,
     loadCollections,
+    loadSeries,
     loadLibraryOrganization,
     createCollection,
     renameCollection,
     deleteCollection,
     addProjectsToCollection,
     removeProjectsFromCollection,
+    createSeries,
+    renameSeries,
+    deleteSeries,
+    addProjectsToSeries,
+    removeProjectsFromSeries,
     setProjectsFavorite,
     setProjectsDeleted,
     findProjectByContentHash,
