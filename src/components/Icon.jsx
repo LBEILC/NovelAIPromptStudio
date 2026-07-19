@@ -24,6 +24,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
+import LobeIcon from '@lobehub/ui/es/Icon/index';
 
 const ICONS = {
   archive: Archive,
@@ -53,5 +54,5 @@ const ICONS = {
 
 export default function Icon({ name, size = 17, strokeWidth = 1.8, ...props }) {
   const Component = ICONS[name] || CircleHelp;
-  return <Component aria-hidden="true" focusable="false" size={size} strokeWidth={strokeWidth} {...props}/>;
+  return <LobeIcon aria-hidden="true" focusable="false" icon={Component} size={size} strokeWidth={strokeWidth} {...props}/>;
 }

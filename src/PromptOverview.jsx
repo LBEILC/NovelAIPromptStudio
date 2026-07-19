@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import LobeButton from '@lobehub/ui/es/Button/index';
 import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
-import LobeSegmented from '@lobehub/ui/es/Segmented/index';
+import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
 import { CATEGORY_LABELS, CATEGORY_OPTIONS } from './lib/prompt.js';
 import { countPromptTags, updatePromptScope } from './lib/promptStructure.js';
 import SelectionMark from './components/SelectionMark.jsx';
@@ -149,7 +149,7 @@ function CategoryGroup({ group, language, selecting, selectedKeys, onToggleSelec
 }
 
 function Segment({ value, options, onChange, label }) {
-  return <LobeSegmented aria-label={label} className="overview-segment" onChange={onChange} options={options.map(([option, text]) => ({ label: text, value: option }))} value={value}/>;
+  return <LobeSegmented aria-label={label} className="overview-segment" onChange={onChange} options={options.map(([option, text]) => ({ label: text, value: option }))} size="small" value={value}/>;
 }
 
 export default function PromptOverview({ project, updateProject, onEditTag, onTagContextMenu, onCopyContextChange, onCopyText, onNotify }) {

@@ -6,15 +6,23 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { theme as antdTheme } from 'antd';
 import LobeActionIcon from '@lobehub/ui/es/ActionIcon/index';
+import LobeAlert from '@lobehub/ui/es/Alert/index';
+import LobeAutoComplete from '@lobehub/ui/es/AutoComplete/index';
 import LobeButton from '@lobehub/ui/es/Button/index';
 import LobeCheckbox from '@lobehub/ui/es/Checkbox/index';
+import LobeCollapse from '@lobehub/ui/es/Collapse/index';
+import LobeEmpty from '@lobehub/ui/es/Empty/index';
+import LobeHighlighter from '@lobehub/ui/es/Highlighter/index';
 import LobeInput from '@lobehub/ui/es/Input/Input';
 import LobeInputNumber from '@lobehub/ui/es/Input/InputNumber';
 import LobeInputPassword from '@lobehub/ui/es/Input/InputPassword';
 import LobeTextArea from '@lobehub/ui/es/Input/TextArea';
 import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
 import LobeSelect from '@lobehub/ui/es/Select/index';
-import LobeSegmented from '@lobehub/ui/es/Segmented/index';
+import LobeSliderWithInput from '@lobehub/ui/es/SliderWithInput/index';
+import LobeSortableList from '@lobehub/ui/es/SortableList/index';
+import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
+import { toast as lobeToast } from '@lobehub/ui/es/Toast/index';
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, inferCategory, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import {
   addPromptCharacter,
@@ -32,7 +40,6 @@ import {
 } from './lib/promptStructure.js';
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
-import SelectionMark from './components/SelectionMark.jsx';
 import { groupVibeLibraryBySource } from './lib/vibeLibrary.js';
 import { informationExtractedPatch, informationExtractedState, restoreOriginalInformationPatch } from './lib/vibes.js';
 import { hasLimitedReproduction } from './lib/generationMetadata.js';
@@ -286,7 +293,7 @@ function LibraryPanel({
             if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitRename(collection.id);
             if (event.key === 'Escape') setEditingCollectionId('');
           }} size="small"/><LobeActionIcon disabled={!editingCollectionName.trim()} icon={<Icon name="check" size={13}/>} onClick={() => submitRename(collection.id)} size="small" title="保存名称" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => setEditingCollectionId('')} size="small" title="取消" variant="borderless"/></div>
-          : <><button className="collection-open" onClick={() => onViewChange(`collection:${collection.id}`)}><Icon name="folder" size={13}/><span>{collection.name}</span><b>{collection.project_count}</b></button><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingCollectionId(collection.id); setEditingCollectionName(collection.name); setDeleteArmedId(''); }} size="small" title={`重命名 ${collection.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedId === collection.id ? 'armed' : ''}`} onClick={async () => {
+          : <><LobeButton className="collection-open" icon={<Icon name="folder" size={13}/>} onClick={() => onViewChange(`collection:${collection.id}`)} type="text"><span>{collection.name}</span><b>{collection.project_count}</b></LobeButton><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingCollectionId(collection.id); setEditingCollectionName(collection.name); setDeleteArmedId(''); }} size="small" title={`重命名 ${collection.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedId === collection.id ? 'armed' : ''}`} onClick={async () => {
             if (deleteArmedId !== collection.id) { setDeleteArmedId(collection.id); return; }
             if (await onDeleteCollection(collection.id)) setDeleteArmedId('');
           }} size="small" title={deleteArmedId === collection.id ? `确认删除 ${collection.name}` : `删除 ${collection.name}`} type="text">{deleteArmedId === collection.id ? '确认' : <Icon name="close" size={12}/>}</LobeButton></>}
@@ -305,7 +312,7 @@ function LibraryPanel({
             if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitSeriesRename(entry.id);
             if (event.key === 'Escape') setEditingSeriesId('');
           }} size="small"/><LobeActionIcon disabled={!editingSeriesName.trim()} icon={<Icon name="check" size={13}/>} onClick={() => submitSeriesRename(entry.id)} size="small" title="保存名称" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => setEditingSeriesId('')} size="small" title="取消" variant="borderless"/></div>
-          : <><button className="collection-open" onClick={() => onViewChange(`series:${entry.id}`)}><Icon name="layers" size={13}/><span>{entry.name}</span><b>{entry.project_count}</b></button><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingSeriesId(entry.id); setEditingSeriesName(entry.name); setDeleteArmedSeriesId(''); }} size="small" title={`重命名 ${entry.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedSeriesId === entry.id ? 'armed' : ''}`} onClick={async () => {
+          : <><LobeButton className="collection-open" icon={<Icon name="layers" size={13}/>} onClick={() => onViewChange(`series:${entry.id}`)} type="text"><span>{entry.name}</span><b>{entry.project_count}</b></LobeButton><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingSeriesId(entry.id); setEditingSeriesName(entry.name); setDeleteArmedSeriesId(''); }} size="small" title={`重命名 ${entry.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedSeriesId === entry.id ? 'armed' : ''}`} onClick={async () => {
             if (deleteArmedSeriesId !== entry.id) { setDeleteArmedSeriesId(entry.id); return; }
             if (await onDeleteSeries(entry.id)) setDeleteArmedSeriesId('');
           }} size="small" title={deleteArmedSeriesId === entry.id ? `确认删除 ${entry.name}` : `删除 ${entry.name}`} type="text">{deleteArmedSeriesId === entry.id ? '确认' : <Icon name="close" size={12}/>}</LobeButton></>}
@@ -320,7 +327,7 @@ function LibraryPanel({
             if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitExperimentRename(experiment.id);
             if (event.key === 'Escape') setEditingExperimentId('');
           }} size="small"/><LobeActionIcon disabled={!editingExperimentName.trim()} icon={<Icon name="check" size={13}/>} onClick={() => submitExperimentRename(experiment.id)} size="small" title="保存名称" variant="borderless"/><LobeActionIcon icon={<Icon name="close" size={13}/>} onClick={() => setEditingExperimentId('')} size="small" title="取消" variant="borderless"/></div>
-          : <><button className="collection-open" onClick={() => onViewChange(`experiment:${experiment.id}`)} title={`基准：${experiment.baseline_name || '未知'} · 变化：${experiment.variable_fields?.join(' / ') || '无'}`}><Icon name="spark" size={13}/><span>{experiment.name}</span><em className={`experiment-state ${experiment.analysis_status}`}>{({ identical: '相同', single: '单变量', mixed: '混合', incomplete: '待补全' })[experiment.analysis_status] || '待分析'}</em><b>{experiment.project_count}</b></button><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingExperimentId(experiment.id); setEditingExperimentName(experiment.name); setDeleteArmedExperimentId(''); }} size="small" title={`重命名 ${experiment.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedExperimentId === experiment.id ? 'armed' : ''}`} onClick={async () => {
+          : <><LobeButton className="collection-open" icon={<Icon name="spark" size={13}/>} onClick={() => onViewChange(`experiment:${experiment.id}`)} title={`基准：${experiment.baseline_name || '未知'} · 变化：${experiment.variable_fields?.join(' / ') || '无'}`} type="text"><span>{experiment.name}</span><em className={`experiment-state ${experiment.analysis_status}`}>{({ identical: '相同', single: '单变量', mixed: '混合', incomplete: '待补全' })[experiment.analysis_status] || '待分析'}</em><b>{experiment.project_count}</b></LobeButton><LobeActionIcon className="collection-action" icon={<Icon name="edit" size={12}/>} onClick={() => { setEditingExperimentId(experiment.id); setEditingExperimentName(experiment.name); setDeleteArmedExperimentId(''); }} size="small" title={`重命名 ${experiment.name}`} variant="borderless"/><LobeButton danger className={`collection-action delete ${deleteArmedExperimentId === experiment.id ? 'armed' : ''}`} onClick={async () => {
             if (deleteArmedExperimentId !== experiment.id) { setDeleteArmedExperimentId(experiment.id); return; }
             if (await onDeleteExperiment(experiment.id)) setDeleteArmedExperimentId('');
           }} size="small" title={deleteArmedExperimentId === experiment.id ? `确认删除 ${experiment.name}` : `删除 ${experiment.name}`} type="text">{deleteArmedExperimentId === experiment.id ? '确认' : <Icon name="close" size={12}/>}</LobeButton></>}
@@ -351,7 +358,7 @@ function LibraryPanel({
     </div>}
     <div className="asset-list">
       {projects.map((project) => <div key={project.id} className={`asset-row ${project.id === activeId ? 'active' : ''} ${selectedIds.has(project.id) ? 'selected' : ''}`} onContextMenu={(event) => onProjectContextMenu(event, project)}>
-        {selectionMode && <button className="asset-check" onClick={() => onToggleSelected(project.id)} aria-pressed={selectedIds.has(project.id)} aria-label={`${selectedIds.has(project.id) ? '取消选择' : '选择'} ${project.name}`}><SelectionMark selected={selectedIds.has(project.id)}/></button>}
+        {selectionMode && <LobeCheckbox checked={selectedIds.has(project.id)} className="asset-check" onChange={() => onToggleSelected(project.id)} aria-label={`${selectedIds.has(project.id) ? '取消选择' : '选择'} ${project.name}`} size={18}/>}
         <button className="asset-thumbnail" onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenPromptOverview(project.id)} title={selectionMode ? '选择作品' : '打开 Prompt 总览'}><img src={mediaUrl(project.thumbnail_path)} alt=""/><span><Icon name="layers" size={13}/></span></button>
         <button className="asset-select" onClick={() => selectionMode ? onToggleSelected(project.id) : setActiveId(project.id)}><span className="asset-copy"><strong>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.collection_ids || []).length} 组 · {(project.series_ids || []).length} 系列 · {(project.experiment_ids || []).length} 实验 · {relativeTime(project.updated_at)}</small></span></button>
         {libraryView !== 'trash' && <LobeActionIcon active={Boolean(project.is_favorite)} className="asset-favorite" icon={<Icon name="star" size={13}/>} onClick={() => onSetFavorite(!project.is_favorite, [project.id])} size="small" title={`${project.is_favorite ? '取消收藏' : '收藏'} ${project.name}`} variant="borderless"/>}
@@ -390,10 +397,10 @@ function ExperimentCompare({ experiment, projects, selectedIds }) {
       <div><span>CONTROLLED COMPARISON</span><strong>{experiment.name}</strong><small>基准：{experiment.baseline_name || baseline?.name || '未知'} · {selected.length} 个视图</small></div>
       <div className="compare-header-actions">
         {view === 'visual' && <div className="compare-zoom-controls" aria-label="同步缩放"><LobeButton onClick={() => setViewport((current) => zoomCompareViewport(current, -.25))} size="small">缩小</LobeButton><b>{Math.round(viewport.scale * 100)}%</b><LobeButton onClick={() => setViewport((current) => zoomCompareViewport(current, .25))} size="small">放大</LobeButton><LobeButton onClick={() => setViewport({ scale: 1, x: 0, y: 0 })} size="small" type="text">适配</LobeButton></div>}
-        <LobeSegmented className="compare-view-switch" onChange={setView} options={[{ label: <span><Icon name="image" size={14}/>视觉对比</span>, value: 'visual' }, { label: <span><Icon name="layers" size={14}/>参数差异</span>, value: 'parameters' }]} value={view}/>
+        <LobeSegmented className="compare-view-switch" onChange={setView} options={[{ icon: <Icon name="image" size={14}/>, label: '视觉对比', value: 'visual' }, { icon: <Icon name="layers" size={14}/>, label: '参数差异', value: 'parameters' }]} value={view}/>
       </div>
     </header>
-    {experiment.analysis_status === 'mixed' && <div className="compare-causality-warning"><Icon name="warning" size={14}/>当前实验有多个变化字段，只适合视觉筛选，不能归因于单个参数。</div>}
+    {experiment.analysis_status === 'mixed' && <LobeAlert className="compare-causality-warning" message="当前实验有多个变化字段，只适合视觉筛选，不能归因于单个参数。" type="warning" variant="outlined"/>}
     {view === 'visual' ? <div className={`compare-grid count-${selected.length}`}>
       {selected.map((project) => <figure key={project.id} className={project.id === experiment.baseline_project_id ? 'baseline' : ''}>
         <div className={`compare-image-viewport ${viewport.scale > 1 ? 'zoomed' : ''}`} onWheel={(event) => { event.preventDefault(); setViewport((current) => zoomCompareViewport(current, event.deltaY < 0 ? .25 : -.25)); }} onPointerDown={(event) => {
@@ -524,16 +531,13 @@ function PreviewStage({ project, sourceProject, mode, setMode, experiment, exper
 }
 
 function WeightControl({ value, onChange }) {
-  return <div className="weight-control">
-    <input type="range" min="-3" max="3" step="0.05" value={Math.max(-3, Math.min(3, Number(value)))} onChange={(event) => onChange(Number(event.target.value))}/>
-    <LobeInputNumber className="weight-number" controls={false} max={10} min={-10} onChange={(nextValue) => onChange(Math.max(-10, Math.min(10, Number(nextValue ?? 0))))} size="small" step={0.05} value={value}/>
-  </div>;
+  return <LobeSliderWithInput className="weight-control" controls={false} gap={7} max={10} min={-10} onChange={onChange} size="small" step={0.05} value={Number(value)}/>;
 }
 
-function TagCard({ tag, index, translating, dragging, dropTarget, onTranslate, onChange, onDelete, onContextMenu, onPointerStart, onPointerMove, onPointerEnd, onKeyboardMove }) {
-  return <article data-tag-index={index} data-tag-id={tag.id} className={`tag-card ${dragging ? 'dragging' : ''} ${dropTarget ? 'drop-target' : ''}`} onContextMenu={onContextMenu}>
+function TagCard({ tag, index, translating, onTranslate, onChange, onDelete, onContextMenu }) {
+  return <article data-tag-index={index} data-tag-id={tag.id} className="tag-card" onContextMenu={onContextMenu}>
     <div className="tag-line">
-      <button className="drag-handle" onPointerDown={(event) => onPointerStart(index, event)} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} onKeyDown={(event) => onKeyboardMove(index, event)} title="按住拖动排序；Option + 方向键微调" aria-label={`拖动 ${tag.tag} 排序`}><Icon name="grip"/></button>
+      <LobeSortableList.DragHandle className="drag-handle" style={{ cursor: 'grab' }} title={`拖动 ${tag.tag} 排序`}/>
       <div className="tag-fields">
         <LobeInput className="tag-name" value={tag.tag} onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic', raw_segment: '', syntax_issue: '' })} aria-label="Tag" size="small" variant="borderless"/>
         <LobeInput className="translation" value={tag.translation || ''} onChange={(event) => onChange({ translation: event.target.value, translation_source: 'manual' })} placeholder="添加中文翻译" aria-label="中文翻译" size="small" variant="borderless"/>
@@ -545,7 +549,7 @@ function TagCard({ tag, index, translating, dragging, dropTarget, onTranslate, o
       <LobeSelect aria-label="Tag 分类" onChange={(category) => onChange({ category, category_source: 'manual' })} options={CATEGORY_OPTIONS.map((option) => ({ label: CATEGORY_LABELS[option], value: option }))} size="small" value={tag.category}/>
       <WeightControl value={tag.weight} onChange={(weight) => onChange({ weight })}/>
     </div>
-    {tag.syntax_issue && <div className={`tag-syntax-warning ${tag.syntax_issue}`}><Icon name="info" size={13}/><span>{tag.syntax_issue === 'control_only' ? '单独的 :: 是结束控制符，不是 Tag。建议删除。' : '这里包含可能多余的 :: 结束符；编辑 Tag 后会规范化。'}</span></div>}
+    {tag.syntax_issue && <LobeAlert className={`tag-syntax-warning ${tag.syntax_issue}`} message={tag.syntax_issue === 'control_only' ? '单独的 :: 是结束控制符，不是 Tag。建议删除。' : '这里包含可能多余的 :: 结束符；编辑 Tag 后会规范化。'} type="warning" variant="outlined"/>}
     <LobeInput className="tag-note" value={tag.note || ''} onChange={(event) => onChange({ note: event.target.value })} placeholder="备注（可选）" size="small" variant="borderless"/>
   </article>;
 }
@@ -559,15 +563,11 @@ function InformationExtractedControl({ vibe, onChange }) {
     unknown: { icon: 'check', text: '原编码位置未知；未改动时文件仍可用' },
     uncached: { icon: 'info', text: '这个位置尚未计算，需要重新提取 Vibe' },
   }[state.kind];
+  const marks = Object.fromEntries(state.cachedValues.map((cached) => [cached, { label: cached.toFixed(2) }]));
   return <div className={`information-control ${state.kind}`}>
     <div className="information-heading"><span>Information Extracted</span><b>{value.toFixed(2)}</b></div>
-    <div className="information-range">
-      <input type="range" min="0" max="1" step="0.01" value={value} aria-label="Information Extracted" onChange={(event) => onChange(informationExtractedPatch(vibe, event.target.value))}/>
-      <div className="information-marks" aria-label="已计算位置">
-        {state.cachedValues.map((cached) => <button key={cached} style={{ insetInlineStart: `${cached * 100}%`, transform: cached <= 0.05 ? 'translateX(0)' : cached >= 0.95 ? 'translateX(-100%)' : 'translateX(-50%)' }} onClick={() => onChange(informationExtractedPatch(vibe, cached))} title={`使用已缓存位置 ${cached.toFixed(2)}`} aria-label={`使用已缓存位置 ${cached.toFixed(2)}`}><i/><span>{cached.toFixed(2)}</span></button>)}
-      </div>
-    </div>
-    <small><Icon name={status.icon} size={12}/><span>{status.text}</span>{state.kind === 'uncached' && !state.cachedValues.length && <button onClick={() => onChange(restoreOriginalInformationPatch(vibe))}>恢复原编码</button>}</small>
+    <LobeSliderWithInput aria-label="Information Extracted" className="information-range" controls={false} gap={8} marks={marks} max={1} min={0} onChange={(nextValue) => onChange(informationExtractedPatch(vibe, nextValue))} size="small" step={0.01} value={value}/>
+    <small><Icon name={status.icon} size={12}/><span>{status.text}</span>{state.kind === 'uncached' && !state.cachedValues.length && <LobeButton onClick={() => onChange(restoreOriginalInformationPatch(vibe))} size="small" type="text">恢复原编码</LobeButton>}</small>
   </div>;
 }
 
@@ -605,10 +605,6 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
   const [aiStatus, setAIStatus] = useState(null);
   const [aiBusy, setAIBusy] = useState('');
   const [translatingIds, setTranslatingIds] = useState(new Set());
-  const [draggingIndex, setDraggingIndex] = useState(null);
-  const [dropIndex, setDropIndex] = useState(null);
-  const dragIndex = useRef(null);
-  const dropIndexRef = useRef(null);
   const scopes = useMemo(() => getPromptScopes(project), [project]);
   const scope = useMemo(() => getPromptScope(project, scopeKey), [project, scopeKey]);
   const tags = scope.tags;
@@ -716,52 +712,6 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
     showToast(`已撤销添加 ${removed} 个 Tag`);
   };
   const updateTag = (index, patch) => updateProject(updatePromptScope(project, scope.key, tags.map((tag, itemIndex) => itemIndex === index ? { ...tag, ...patch } : tag)));
-  const moveTag = (sourceIndex, targetIndex) => {
-    if (sourceIndex == null || sourceIndex === targetIndex || targetIndex < 0 || targetIndex >= tags.length) return;
-    const reordered = [...tags];
-    const [moved] = reordered.splice(sourceIndex, 1);
-    reordered.splice(targetIndex, 0, moved);
-    updateProject(updatePromptScope(project, scope.key, reordered));
-  };
-  const reorder = (targetIndex) => {
-    moveTag(dragIndex.current, targetIndex);
-    dragIndex.current = null;
-    setDraggingIndex(null);
-    setDropIndex(null);
-  };
-  const beginPointerDrag = (index, event) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.currentTarget.focus();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    dragIndex.current = index;
-    dropIndexRef.current = index;
-    setDraggingIndex(index);
-  };
-  const movePointerDrag = (event) => {
-    if (dragIndex.current == null) return;
-    const targetCard = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-tag-index]');
-    if (targetCard) {
-      const nextIndex = Number(targetCard.dataset.tagIndex);
-      dropIndexRef.current = nextIndex;
-      setDropIndex(nextIndex);
-    }
-    const scrollPanel = event.currentTarget.closest('.panel-scroll');
-    const bounds = scrollPanel?.getBoundingClientRect();
-    if (bounds && event.clientY < bounds.top + 48) scrollPanel.scrollBy({ top: -18 });
-    if (bounds && event.clientY > bounds.bottom - 48) scrollPanel.scrollBy({ top: 18 });
-  };
-  const endPointerDrag = (event) => {
-    if (dragIndex.current == null) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    reorder(dropIndexRef.current);
-    dropIndexRef.current = null;
-  };
-  const keyboardMove = (index, event) => {
-    if (!event.altKey || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
-    event.preventDefault();
-    moveTag(index, index + (event.key === 'ArrowUp' ? -1 : 1));
-  };
   const addCharacter = () => {
     const next = addPromptCharacter(project);
     if (next === project) { showToast('最多支持 6 个 Character Prompt'); return; }
@@ -797,7 +747,7 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
       </div>
       {(newTag || lastBatch) && <div className="tag-entry-status" id="tag-entry-status" aria-live="polite">
         {newTag && <span>{pendingBatch.tags.length ? `将添加 ${pendingBatch.tags.length} 个到「${scope.label}」` : '没有可添加的 Tag'}{pendingBatch.duplicateCount ? ` · ${pendingBatch.duplicateCount} 个重复` : ''}{pendingBatch.syntaxIssueCount ? ` · ${pendingBatch.syntaxIssueCount} 个语法提示` : ''}</span>}
-        {lastBatch && lastBatch.projectId === project.id && lastBatch.scopeKey === scope.key && <button onClick={undoLastBatch}>撤销上次添加</button>}
+        {lastBatch && lastBatch.projectId === project.id && lastBatch.scopeKey === scope.key && <LobeButton onClick={undoLastBatch} size="small" type="text">撤销上次添加</LobeButton>}
       </div>}
     </div>
     <section className={`ai-channel ${showAISettings ? 'expanded' : ''}`}>
@@ -810,16 +760,17 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
       {showAISettings && <div className="ai-config">
         <label><span>API Base URL</span><LobeInput value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
         <label><span>API Key <em>{aiSettings.hasApiKey ? '已加密保存' : '未保存'}</em></span><div className="secret-input"><LobeInputPassword value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '留空则保留现有 Key' : 'sk-…'}/><LobeButton onClick={saveAISettings}>保存</LobeButton></div></label>
-        <label><span>Model</span><div className="model-input"><LobeInput list="ai-model-list" value={aiSettings.model} onChange={(event) => setAISettings((current) => ({ ...current, model: event.target.value }))} placeholder="读取或输入模型 ID"/><datalist id="ai-model-list">{models.map((model) => <option key={model} value={model}/>)}</datalist><LobeActionIcon disabled={aiBusy === 'models'} icon={<Icon name="refresh"/>} onClick={loadModels} title="读取模型列表" variant="outlined"/></div></label>
+        <label><span>Model</span><div className="model-input"><LobeAutoComplete options={models.map((model) => ({ value: model }))} value={aiSettings.model} onChange={(value) => setAISettings((current) => ({ ...current, model: value }))} placeholder="读取或输入模型 ID"/><LobeActionIcon disabled={aiBusy === 'models'} icon={<Icon name="refresh"/>} onClick={loadModels} title="读取模型列表" variant="outlined"/></div></label>
         <div className="ai-config-actions"><LobeButton onClick={testAIModel} disabled={Boolean(aiBusy)}>{aiBusy === 'test' ? '测试中…' : '测试模型'}</LobeButton><small>仅未缓存的 Tag 会发送到此 Base URL</small></div>
       </div>}
       {aiStatus && <div className={`ai-status ${aiStatus.type}`}>{aiStatus.text}</div>}
     </section>
     <div className="category-legend">{CATEGORY_OPTIONS.filter((category) => category !== 'Unsorted').map((category) => <span key={category} className={`cat-${category.toLowerCase()}`}>{CATEGORY_LABELS[category]}<b>{tags.filter((tag) => tag.category === category).length}</b></span>)}</div>
-    <div className="tag-stack">
-      {tags.map((tag, index) => <TagCard key={tag.id} tag={tag} index={index} translating={translatingIds.has(tag.id)} dragging={draggingIndex === index} dropTarget={dropIndex === index && draggingIndex !== index} onTranslate={() => translateTagIds([tag.id])} onChange={(patch) => updateTag(index, patch)} onDelete={() => updateProject(updatePromptScope(project, scope.key, tags.filter((_, itemIndex) => itemIndex !== index)))} onContextMenu={(event) => onTagContextMenu(event, scope.key, tag)} onPointerStart={beginPointerDrag} onPointerMove={movePointerDrag} onPointerEnd={endPointerDrag} onKeyboardMove={keyboardMove}/>)}
-      {!tags.length && <div className="panel-empty"><Icon name="layers"/><strong>这里还没有 Tag</strong><span>从含 NovelAI V4 metadata 的图片自动恢复，或在上方逐个添加。</span></div>}
-    </div>
+    {tags.length ? <LobeSortableList className="tag-stack" gap={9} items={tags} onChange={(reordered) => updateProject(updatePromptScope(project, scope.key, reordered))} renderOverlay={(tag) => <div className="tag-drag-preview"><Icon name="grip"/><span><strong>{tag.tag}</strong><small>{tag.translation || CATEGORY_LABELS[tag.category] || '未分类'}</small></span></div>} renderItem={(tag) => {
+      const index = tags.findIndex((item) => item.id === tag.id);
+      return <LobeSortableList.Item className="tag-sortable-item" id={tag.id} variant="borderless"><TagCard tag={tag} index={index} translating={translatingIds.has(tag.id)} onTranslate={() => translateTagIds([tag.id])} onChange={(patch) => updateTag(index, patch)} onDelete={() => updateProject(updatePromptScope(project, scope.key, tags.filter((_, itemIndex) => itemIndex !== index)))} onContextMenu={(event) => onTagContextMenu(event, scope.key, tag)}/></LobeSortableList.Item>;
+    }}/>
+    : <LobeEmpty className="panel-empty" description="从含 NovelAI V4 metadata 的图片自动恢复，或在上方逐个添加。" image={<Icon name="layers" size={24}/>} title="这里还没有 Tag"/>}
   </div>;
 }
 
@@ -1001,16 +952,16 @@ function VibePanel({ project, updateProject, showToast }) {
         <div className="vibe-image"><img src={mediaUrl(vibe.thumbnail_path)} alt="Vibe reference"/><label><LobeCheckbox checked={Boolean(vibe.enabled)} onChange={(event) => updateVibe(index, { enabled: event.target.checked })} size={16}/><span>{vibe.enabled ? '启用' : '停用'}</span></label></div>
         <div className="vibe-controls">
           <div className="vibe-card-title"><strong>{vibe.name || 'Vibe reference'}</strong><span className={`vibe-source ${vibe.source_kind}`}>{vibe.source_kind === 'image' ? '待编码' : '已编码'}</span></div>
-          <label><span>Reference Strength <b>{Number(vibe.strength).toFixed(2)}</b></span><input type="range" min="0" max="1" step="0.01" value={vibe.strength} onChange={(event) => updateVibe(index, { strength: Number(event.target.value) })}/></label>
+          <label><span>Reference Strength <b>{Number(vibe.strength).toFixed(2)}</b></span><LobeSliderWithInput controls={false} gap={8} max={1} min={0} onChange={(strength) => updateVibe(index, { strength })} size="small" step={0.01} value={Number(vibe.strength)}/></label>
           <InformationExtractedControl vibe={vibe} onChange={(patch) => updateVibe(index, patch)}/>
           {vibe.reference_image
             ? <LobeButton block className="vibe-file-action source-image" icon={<Icon name="image" size={13}/>} onClick={() => studio.revealFile(vibe.reference_image)} size="small" type="text">打开源图所在文件夹</LobeButton>
-            : <div className="vibe-source-warning"><Icon name="info" size={13}/><span>缺少源 PNG；编码仍可复用，但无法查看图源</span></div>}
+            : <LobeAlert className="vibe-source-warning" message="缺少源 PNG；编码仍可复用，但无法查看图源" type="warning" variant="outlined"/>}
           {vibe.vibe_file && <LobeButton block className={`vibe-file-action ${informationState.fileUsable ? '' : 'unavailable'}`} disabled={!informationState.fileUsable} icon={<Icon name="folder" size={13}/>} onClick={() => studio.revealFile(vibe.vibe_file)} size="small" title={informationState.fileUsable ? '在文件夹中显示当前 Vibe 文件' : '当前 Information Extracted 尚未计算，此文件与所选参数不匹配'} type="text">{informationState.fileUsable ? '显示 .naiv4vibe 文件' : '.naiv4vibe 当前参数不可用'}</LobeButton>}
           <LobeButton block danger icon={<Icon name="trash"/>} onClick={() => updateProject({ ...project, vibes: project.vibes.filter((_, itemIndex) => itemIndex !== index) })} size="small" type="text">移除参考图</LobeButton>
         </div>
       </article>;})}
-      {!project.vibes.length && <div className="panel-empty"><Icon name="image"/><strong>当前作品还没有 Vibe</strong><span>从下面的 Vibe 库加入，或导入 `.naiv4vibe` 与参考图。</span></div>}
+      {!project.vibes.length && <LobeEmpty className="panel-empty" description="从下面的 Vibe 库加入，或导入 .naiv4vibe 与参考图。" image={<Icon name="image" size={24}/>} title="当前作品还没有 Vibe"/>}
     </div>
     <div className="vibe-section-heading library-heading"><span>Vibe 库</span><b>{visibleLibrary.length}</b><small>{libraryGroups.length} 个图源组</small>{archivedCount > 0 && <LobeButton className={showArchived ? 'active' : ''} onClick={() => setShowArchived((value) => !value)} size="small" type="text">{showArchived ? '返回可用' : `归档 ${archivedCount}`}</LobeButton>}</div>
     <div className="vibe-library-list">
@@ -1020,12 +971,12 @@ function VibePanel({ project, updateProject, showToast }) {
           <div><strong>{group.source.name}</strong><small>{group.entries.length} 个参数版本 · {group.source.reference_image ? '已绑定源图' : '缺少源 PNG'}</small></div>
           {group.source.reference_image && <LobeActionIcon icon={<Icon name="folder" size={14}/>} onClick={() => studio.revealFile(group.source.reference_image)} size="small" title="打开源图所在文件夹" variant="borderless"/>}
         </header>
-        {!group.source.reference_image && <div className="vibe-group-warning"><Icon name="info" size={13}/>导入原始 PNG 或带内嵌图片的 `.naiv4vibe` 后可建立可视绑定</div>}
+        {!group.source.reference_image && <LobeAlert className="vibe-group-warning" message="导入原始 PNG 或带内嵌图片的 .naiv4vibe 后可建立可视绑定" type="warning" variant="borderless"/>}
         <div className="vibe-variant-list">
           {group.entries.map((entry) => <article className={`vibe-library-card ${entry.archived_at ? 'archived' : ''} ${editingLibraryId === entry.id ? 'editing' : ''}`} key={entry.id} onContextMenu={(event) => libraryVibeContextMenu(event, entry)}>
             {editingLibraryId === entry.id ? <div className="vibe-library-editor">
               <label><span>显示名称</span><LobeInput autoFocus maxLength={120} value={libraryDraft.name} onChange={(event) => setLibraryDraft((current) => ({ ...current, name: event.target.value }))}/></label>
-              <label><span>Information Extracted <b>{Number(libraryDraft.information_extracted).toFixed(2)}</b></span><input type="range" min="0" max="1" step="0.01" value={libraryDraft.information_extracted} onChange={(event) => setLibraryDraft((current) => ({ ...current, information_extracted: Number(event.target.value) }))}/></label>
+              <label><span>Information Extracted <b>{Number(libraryDraft.information_extracted).toFixed(2)}</b></span><LobeSliderWithInput controls={false} gap={8} max={1} min={0} onChange={(information_extracted) => setLibraryDraft((current) => ({ ...current, information_extracted }))} size="small" step={0.01} value={Number(libraryDraft.information_extracted)}/></label>
               <small><Icon name="info" size={12}/>调整 Information 后，只在这个位置标记编码可用，并注明“用户设置、未验证”；不会重新计算或修改文件。只改名称不会改变验证状态。</small>
               <div><LobeButton onClick={() => setEditingLibraryId('')} size="small">取消</LobeButton><LobeButton disabled={!libraryDraft.name.trim()} onClick={() => saveLibraryEdit(entry)} size="small" type="primary">保存资料</LobeButton></div>
             </div> : <>
@@ -1035,7 +986,7 @@ function VibePanel({ project, updateProject, showToast }) {
           </article>)}
         </div>
       </section>)}
-      {!visibleLibrary.length && (showArchived ? <div className="panel-empty compact"><Icon name="archive"/><strong>没有已归档 Vibe</strong><span>归档项目会保留已有作品引用。</span></div> : <LobeButton block className="vibe-library-empty" icon={<Icon name="plus"/>} onClick={() => importVibes(false)} type="dashed"><span><strong>建立 Vibe 库</strong><small>导入 `.naiv4vibe` 可直接复用缓存编码，不必重新计算。</small></span></LobeButton>)}
+      {!visibleLibrary.length && (showArchived ? <LobeEmpty className="panel-empty compact" description="归档项目会保留已有作品引用。" image={<Icon name="archive" size={22}/>} title="没有已归档 Vibe"/> : <LobeButton block className="vibe-library-empty" icon={<Icon name="plus"/>} onClick={() => importVibes(false)} type="dashed"><span><strong>建立 Vibe 库</strong><small>导入 `.naiv4vibe` 可直接复用缓存编码，不必重新计算。</small></span></LobeButton>)}
     </div>
   </div>;
 }
@@ -1046,10 +997,7 @@ function MetadataPanel({ project, updateProject }) {
   const update = (patch) => updateProject({ ...project, metadata: { ...metadata, ...patch } });
   return <div className="panel-scroll metadata-panel">
     <div className="panel-intro"><div><strong>Generation Metadata</strong><small>从原图读取；修改后会自动创建分支</small></div><span className={`metadata-badge ${limitedReproduction ? 'limited' : ''}`}>{limitedReproduction ? 'INPAINT' : 'PNG'}</span></div>
-    {limitedReproduction && <div className="reproduction-notice" role="status">
-      <Icon name="info" size={15}/>
-      <div><strong>局部重绘 · 无法精确复现</strong><p>Metadata 包含最终 Prompt 和部分生成参数，但不包含完整的原始底图与蒙版。你仍然可以复制 Prompt，或基于现有参数创建近似方案。</p></div>
-    </div>}
+    {limitedReproduction && <LobeAlert className="reproduction-notice" description="Metadata 包含最终 Prompt 和部分生成参数，但不包含完整的原始底图与蒙版。你仍然可以复制 Prompt，或基于现有参数创建近似方案。" message="局部重绘 · 无法精确复现" role="status" type="warning" variant="outlined"/>}
     <div className="metadata-grid">
       <label className="wide"><span>Model</span><LobeInput value={metadata.model || ''} onChange={(event) => update({ model: event.target.value })} placeholder="NovelAI Diffusion V4.5"/></label>
       <label><span>Seed</span><LobeInput value={metadata.seed || ''} onChange={(event) => update({ seed: event.target.value })} placeholder="—"/></label>
@@ -1060,7 +1008,7 @@ function MetadataPanel({ project, updateProject }) {
       <label><span>Height</span><LobeInputNumber controls={false} min={0} onChange={(value) => update({ height: value ?? '' })} step={64} value={metadata.height || null}/></label>
     </div>
     <label className="textarea-label"><span>Base Undesired Content · 在 Prompt 面板编辑</span><LobeTextArea autoSize={{ minRows: 3, maxRows: 7 }} value={formatPrompt(project.prompt_structure.base_undesired_tags)} readOnly placeholder="未检测到 Undesired Content"/></label>
-    <details className="raw-metadata"><summary>查看原始 metadata</summary><pre>{metadata.extra_json || '{}'}</pre></details>
+    <LobeCollapse className="raw-metadata" items={[{ key: 'raw-metadata', label: '查看原始 metadata', children: <LobeHighlighter copyable language="json" showLanguage={false} variant="borderless" wrap>{metadata.extra_json || '{}'}</LobeHighlighter> }]} variant="borderless"/>
   </div>;
 }
 
@@ -1153,10 +1101,10 @@ function SettingsPage({ appearance, onAppearanceChange, onClose, showToast }) {
         <div className="settings-group ai-settings-group">
           <label><span><strong>API Base URL</strong><small>兼容 OpenAI API 格式的服务地址</small></span><LobeInput value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
           <label><span><strong>API Key</strong><small>{aiSettings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}</small></span><LobeInputPassword value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '已安全保存' : '输入 API Key'}/></label>
-          <label><span><strong>默认模型</strong><small>翻译与分类任务暂时共用；后续可分别配置</small></span><div className="settings-model-input"><LobeInput list="settings-model-list" value={aiSettings.model} onChange={(event) => setAISettings((current) => ({ ...current, model: event.target.value }))} placeholder="输入或读取模型 ID"/><datalist id="settings-model-list">{models.map((model) => <option key={model} value={model}/>)}</datalist><LobeButton onClick={loadModels} disabled={Boolean(busy)}><Icon name="refresh" size={14}/>{busy === 'models' ? '读取中' : '读取模型'}</LobeButton></div></label>
+          <label><span><strong>默认模型</strong><small>翻译与分类任务暂时共用；后续可分别配置</small></span><div className="settings-model-input"><LobeAutoComplete options={models.map((model) => ({ value: model }))} value={aiSettings.model} onChange={(value) => setAISettings((current) => ({ ...current, model: value }))} placeholder="输入或读取模型 ID"/><LobeButton onClick={loadModels} disabled={Boolean(busy)}><Icon name="refresh" size={14}/>{busy === 'models' ? '读取中' : '读取模型'}</LobeButton></div></label>
         </div>
         <div className="settings-actions"><LobeButton onClick={testConnection} disabled={Boolean(busy)}>测试连接</LobeButton><LobeButton type="primary" onClick={saveAI} disabled={Boolean(busy)}>{busy === 'save' ? '保存中…' : '保存 AI 设置'}</LobeButton></div>
-        {!aiSettings.encryptionAvailable && <aside className="settings-warning"><Icon name="warning"/><span>当前系统安全存储不可用，应用不会以明文保存 API Key。</span></aside>}
+        {!aiSettings.encryptionAvailable && <LobeAlert className="settings-warning" message="当前系统安全存储不可用，应用不会以明文保存 API Key。" type="warning" variant="outlined"/>}
       </>}
     </section>
   </main>;
@@ -1177,7 +1125,6 @@ export default function App({ appearance, setAppearance }) {
   const [importProgress, setImportProgress] = useState(null);
   const [importResult, setImportResult] = useState(null);
   const [tab, setTab] = useState('tags');
-  const [toast, setToast] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeBranchId, setActiveBranchId] = useState('');
   const [workspaceMode, setWorkspaceMode] = useState('image');
@@ -1352,9 +1299,7 @@ export default function App({ appearance, setAppearance }) {
   }, [filteredProjects]);
 
   const showToast = (message) => {
-    setToast(message);
-    window.clearTimeout(showToast.timer);
-    showToast.timer = window.setTimeout(() => setToast(''), 2200);
+    lobeToast.success({ description: message, duration: 2200, placement: 'bottom' });
   };
 
   const applyLibraryOrganization = (organization) => {
@@ -1975,6 +1920,5 @@ export default function App({ appearance, setAppearance }) {
       onCancel={() => importProgress?.batchId && studio.cancelImport(importProgress.batchId)}
       onDismiss={() => setImportResult(null)}
     />
-    {toast && <div className="toast"><Icon name="check"/>{toast}</div>}
   </div>;
 }

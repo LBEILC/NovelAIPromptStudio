@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import LobeProvider from './LobeProvider.jsx';
+import { ToastHost } from '@lobehub/ui/es/Toast/index';
 import './fonts.css';
 import './styles.css';
 
@@ -16,6 +17,7 @@ function StudioRoot() {
 
   return <LobeProvider themeMode={appearance.themeMode}>
     <App appearance={appearance} setAppearance={setAppearance}/>
+    <ToastHost duration={2200} position="bottom"/>
   </LobeProvider>;
 }
 

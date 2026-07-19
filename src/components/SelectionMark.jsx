@@ -1,5 +1,5 @@
-import LobeCheckbox from '@lobehub/ui/es/Checkbox/index';
+import Icon from './Icon.jsx';
 
 export default function SelectionMark({ selected, className = '' }) {
-  return <LobeCheckbox checked={selected} className={`selection-mark ${className}`.trim()} size={18}/>;
+  return <span aria-hidden="true" className={`selection-mark ${selected ? 'checked' : ''} ${className}`.trim()}>{selected && <Icon name="check" size={13} strokeWidth={2.4}/>}</span>;
 }
