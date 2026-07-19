@@ -44,6 +44,7 @@ import {
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
 import { groupVibeLibraryBySource } from './lib/vibeLibrary.js';
+import { buildTagLibrary, parseVibeValues, parseVibeVariants, vibeGroupUsages } from './lib/resourceIndexes.js';
 import { informationExtractedPatch, informationExtractedState, restoreOriginalInformationPatch } from './lib/vibes.js';
 import { hasLimitedReproduction } from './lib/generationMetadata.js';
 import { assessDroppedFiles } from './lib/importDrop.js';
@@ -87,6 +88,8 @@ const studio = window.studio || {
   deleteProject: async () => ({ ok: true }),
   loadVibeLibrary: async () => [],
   updateVibeLibrary: async (_id, _patch) => ({ ok: true, library: [] }),
+  loadTagDictionary: async () => [],
+  updateTagDictionary: async (_tag, _patch) => ({ ok: true, dictionary: [] }),
   importVibeLibrary: async () => ({ ok: true, library: [], imported: [], errors: [] }),
   useVibeFromLibrary: async (entry) => ({ ...entry, id: crypto.randomUUID(), library_id: entry.id, enabled: true }),
   inspectEmbeddedVibes: async () => ({ total: 0, linked: 0, available: 0, missing: [] }),
@@ -1313,7 +1316,7 @@ function RelationsPanel({ project, activeBranchId, experiments, onSelectBranch, 
   </div>;
 }
 
-function ImageDetailPage({ project, sourceProject, activeBranch, detailTab, experiments, promptScopeKey, focusTagId, branchResultImporting, onBack, onTabChange, onCopy, onReveal, onCreateRecipe, updateProject, onTagContextMenu, onPrepareTagEditor, setPromptScopeKey, onCopyContextChange, onCopyText, onNotify, onSelectBranch, onBranchContextMenu, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, onOpenResult, onUseLegacyVersion, onOpenExperiment }) {
+function ImageDetailPage({ project, sourceProject, activeBranch, detailTab, experiments, promptScopeKey, focusTagId, branchResultImporting, onBack, onTabChange, onCopy, onReveal, onCreateRecipe, updateProject, onTagContextMenu, onPrepareTagEditor, setPromptScopeKey, onCopyContextChange, onCopyText, onNotify, onSelectBranch, onBranchContextMenu, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, onOpenResult, onUseLegacyVersion, onOpenExperiment, onOpenTagResource, onOpenVibeResource }) {
   const [promptMode, setPromptMode] = useState('overview');
   const tabs = [
     { key: 'overview', label: '概览' }, { key: 'prompt', label: 'Prompt' }, { key: 'vibe', label: `Vibe${project.vibes?.length ? ` ${project.vibes.length}` : ''}` }, { key: 'metadata', label: '元数据' }, { key: 'relations', label: `关系${sourceProject.branches?.length ? ` ${sourceProject.branches.length}` : ''}` },
@@ -1327,18 +1330,136 @@ function ImageDetailPage({ project, sourceProject, activeBranch, detailTab, expe
     <LobeTabs activeKey={detailTab} className="detail-tabs" items={tabs} onChange={onTabChange} variant="point"/>
     <section className={`detail-content detail-tab-${detailTab}`}>
       {detailTab === 'overview' && <ProjectOverviewPanel activeBranch={activeBranch} onCopy={onCopy} onCreateRecipe={onCreateRecipe} onReveal={onReveal} project={project} sourceProject={sourceProject}/>}
-      {detailTab === 'prompt' && <div className="detail-prompt-workspace"><div className="detail-prompt-mode"><LobeSegmented onChange={setPromptMode} options={[{ label: '总览', value: 'overview' }, { label: '编辑', value: 'edit' }]} value={promptMode}/><span>{activeBranch ? `正在编辑 ${activeBranch.name}` : '编辑时自动创建生成方案'}</span></div>{promptMode === 'overview' ? <PromptOverview onCopyContextChange={onCopyContextChange} onCopyText={onCopyText} onEditTag={editTag} onNotify={onNotify} onTagContextMenu={onTagContextMenu} project={project} updateProject={updateProject}/> : <TagsPanel focusTagId={focusTagId} onTagContextMenu={onTagContextMenu} project={project} scopeKey={promptScopeKey} setScopeKey={setPromptScopeKey} showToast={onNotify} updateProject={updateProject}/>}</div>}
-      {detailTab === 'vibe' && <VibePanel project={project} showToast={onNotify} updateProject={updateProject}/>}
+      {detailTab === 'prompt' && <div className="detail-prompt-workspace"><div className="resource-jump-bar"><span>在 Tag 库中反向查看</span><LobeSelect allowClear onChange={(value) => value && onOpenTagResource(value)} options={[...new Map(allPromptTags(project).map((tag) => [normalizeSearch(tag.tag), { label: tag.translation ? `${tag.tag} · ${tag.translation}` : tag.tag, value: tag.tag }])).values()]} placeholder="选择当前图片中的 Tag" showSearch value={undefined}/></div><div className="detail-prompt-mode"><LobeSegmented onChange={setPromptMode} options={[{ label: '总览', value: 'overview' }, { label: '编辑', value: 'edit' }]} value={promptMode}/><span>{activeBranch ? `正在编辑 ${activeBranch.name}` : '编辑时自动创建生成方案'}</span></div>{promptMode === 'overview' ? <PromptOverview onCopyContextChange={onCopyContextChange} onCopyText={onCopyText} onEditTag={editTag} onNotify={onNotify} onTagContextMenu={onTagContextMenu} project={project} updateProject={updateProject}/> : <TagsPanel focusTagId={focusTagId} onTagContextMenu={onTagContextMenu} project={project} scopeKey={promptScopeKey} setScopeKey={setPromptScopeKey} showToast={onNotify} updateProject={updateProject}/>}</div>}
+      {detailTab === 'vibe' && <div className="detail-vibe-workspace"><div className="resource-jump-bar"><span>在 Vibe 库中反向查看</span><LobeSelect allowClear disabled={!project.vibes?.length} onChange={(value) => value && onOpenVibeResource(project.vibes.find((vibe) => vibe.id === value))} options={(project.vibes || []).map((vibe, index) => ({ label: vibe.name || `Vibe ${index + 1}`, value: vibe.id }))} placeholder={project.vibes?.length ? '选择当前图片中的 Vibe' : '当前图片没有 Vibe'} value={undefined}/></div><VibePanel project={project} showToast={onNotify} updateProject={updateProject}/></div>}
       {detailTab === 'metadata' && (activeBranch ? <MetadataPanel project={project} updateProject={updateProject}/> : <ReadOnlyMetadataPanel project={project}/>)}
       {detailTab === 'relations' && <RelationsPanel activeBranchId={activeBranch?.id || ''} branchResultImporting={branchResultImporting} experiments={experiments} onBranchContextMenu={onBranchContextMenu} onDiscardBranch={onDiscardBranch} onImportBranchResult={onImportBranchResult} onMarkBranchWaiting={onMarkBranchWaiting} onOpenExperiment={onOpenExperiment} onOpenResult={onOpenResult} onSelectBranch={onSelectBranch} onUseLegacyVersion={onUseLegacyVersion} project={sourceProject}/>}
     </section>
   </main>;
 }
 
-function LibraryPlaceholderPage({ kind, projects, onGoGallery }) {
-  const isVibe = kind === 'vibes';
-  const count = isVibe ? projects.reduce((total, project) => total + (project.vibes || []).length, 0) : new Set(projects.flatMap((project) => allPromptTags(project).map((tag) => normalizeSearch(tag.tag)))).size;
-  return <main className="resource-placeholder-page"><header className="workspace-page-header"><div><span>{isVibe ? 'VIBE LIBRARY / 02' : 'TAG LIBRARY / 03'}</span><h1>{isVibe ? 'Vibe 库' : 'Tag 库'}</h1><p>{isVibe ? `${count} 个作品 Vibe 引用` : `${count} 个唯一 Tag`}</p></div></header><section><div className="resource-placeholder-mark"><Icon name={isVibe ? 'image' : 'layers'} size={28}/></div><h2>{isVibe ? 'Vibe 资产页将在第二阶段迁入' : 'Tag 资产页将在第二阶段迁入'}</h2><p>{isVibe ? '当前可以从任意图片详情的 Vibe 页签继续使用完整的 Vibe 库、参数标记与源图绑定能力。' : '当前可以从任意图片详情的 Prompt 页签查看、筛选、翻译和分类 Tag。'}</p><LobeButton onClick={onGoGallery} type="primary">返回图库选择图片</LobeButton></section></main>;
+function RelatedProjectGrid({ projects, projectIds, onOpenProject, emptyDescription = '还没有图片引用这个资源。' }) {
+  const related = projectIds.map((id) => projects.find((project) => project.id === id)).filter(Boolean);
+  return related.length ? <LobeGrid className="resource-related-grid" gap={14} maxItemWidth={210} rows={5}>
+    {related.map((project) => <button className="resource-project-card" key={project.id} onClick={() => onOpenProject(project.id)}>
+      <img alt="" loading="lazy" src={mediaUrl(project.thumbnail_path)}/>
+      <span><strong title={project.name}>{project.name}</strong><small>{countPromptTags(project)} Tags · {(project.vibes || []).length} Vibe</small></span>
+    </button>)}
+  </LobeGrid> : <LobeEmpty className="resource-empty" description={emptyDescription} image={<Icon name="image" size={24}/>} title="暂无关联图片"/>;
+}
+
+function ResourceDetailHeader({ eyebrow, title, subtitle, onBack, actions }) {
+  return <header className="detail-header resource-detail-header">
+    <div className="detail-title-row"><LobeActionIcon icon={<Icon name="close" size={18}/>} onClick={onBack} size="large" title="返回资源库" variant="borderless"/><div><span>{eyebrow}</span><h1 title={title}>{title}</h1><small>{subtitle}</small></div></div>
+    {actions && <div className="detail-header-actions">{actions}</div>}
+  </header>;
+}
+
+const informationLabel = (entry) => entry.information_extracted_source === 'user' ? '用户标记' : entry.information_extracted_known ? '已验证' : '未知';
+const knowledgeSourceLabel = (source) => ({ manual: '人工校正', ai: 'AI 生成', cache: '本地缓存', builtin: '内置词典', heuristic: '规则推断' }[source] || '未记录');
+
+function VibeCategoryEditor({ value, options, onSave }) {
+  const [draft, setDraft] = useState(value || '');
+  useEffect(() => setDraft(value || ''), [value]);
+  return <div className="vibe-category-editor"><LobeAutoComplete allowClear onChange={setDraft} options={options.map((item) => ({ value: item }))} placeholder="输入自定义分类" value={draft}/><LobeButton disabled={draft.trim() === String(value || '').trim()} onClick={() => onSave(draft.trim())} size="small">应用</LobeButton></div>;
+}
+
+function VibeLibraryPage({ library, projects, activeKey, onBackToList, onOpenGroup, onOpenProject, onImport, onUpdate }) {
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [informationFilter, setInformationFilter] = useState('all');
+  const [archiveFilter, setArchiveFilter] = useState('active');
+  const groups = useMemo(() => groupVibeLibraryBySource(library).map((group) => {
+    const usages = vibeGroupUsages(group, projects);
+    return { ...group, usages, projectIds: [...new Set(usages.map(({ project }) => project.id))] };
+  }), [library, projects]);
+  const activeGroup = groups.find((group) => group.key === activeKey);
+  const categories = [...new Set(library.map((entry) => String(entry.category || '').trim()).filter(Boolean))].sort();
+  const filteredGroups = groups.filter((group) => {
+    const text = normalizeSearch(`${group.source.name} ${group.source.category} ${group.source.model} ${group.source.reference_image}`);
+    const hasSource = group.entries.some((entry) => entry.has_source_image && entry.reference_image);
+    const isArchived = group.entries.every((entry) => entry.archived_at);
+    const hasKnownInformation = group.entries.some((entry) => entry.information_extracted_known);
+    return (!query || text.includes(normalizeSearch(query)))
+      && (category === 'all' || group.entries.some((entry) => entry.category === category))
+      && (sourceFilter === 'all' || (sourceFilter === 'missing' ? !hasSource : hasSource))
+      && (informationFilter === 'all' || (informationFilter === 'unknown' ? !hasKnownInformation : hasKnownInformation))
+      && (archiveFilter === 'all' || (archiveFilter === 'archived' ? isArchived : !isArchived));
+  });
+  if (activeGroup) {
+    const source = activeGroup.source;
+    const groupCategory = activeGroup.entries.find((entry) => entry.category)?.category || '';
+    const values = [...new Set(activeGroup.entries.flatMap(parseVibeValues))].sort((a, b) => a - b);
+    const variants = activeGroup.entries.flatMap((entry) => {
+      const parsed = parseVibeVariants(entry);
+      return parsed.length ? parsed.map((variant) => ({ ...variant, parent: entry })) : [{ fingerprint: entry.id, information_extracted: entry.information_extracted, model: entry.model, parent: entry }];
+    });
+    return <main className="resource-detail-page">
+      <ResourceDetailHeader eyebrow="Vibe 库 / 来源详情" title={source.name || '未命名 Vibe'} subtitle={`${variants.length} 个编码记录 · ${activeGroup.projectIds.length} 张关联图片`} onBack={onBackToList} actions={<><LobeButton icon={<Icon name="folder" size={14}/>} disabled={!source.reference_image} onClick={() => studio.revealFile(source.reference_image)}>源图文件夹</LobeButton><LobeButton onClick={() => Promise.all(activeGroup.entries.map((entry) => onUpdate(entry.id, { archived: !entry.archived_at })))}>{activeGroup.entries.every((entry) => entry.archived_at) ? '恢复归档' : '归档来源'}</LobeButton></>}/>
+      <div className="resource-detail-scroll">
+        <section className="vibe-source-overview">
+          <div className={`vibe-source-media ${source.reference_image ? '' : 'missing'}`}>{source.reference_image ? <img alt="Vibe 来源" src={mediaUrl(source.thumbnail_path || source.reference_image)}/> : <><Icon name="warning" size={28}/><strong>缺少来源 PNG</strong><small>编码仍可复用，但无法建立可视绑定。</small></>}</div>
+          <div className="resource-fact-panel"><div><span>来源路径</span><strong title={source.reference_image}>{source.reference_image || '未绑定'}</strong></div><div><span>来源指纹</span><strong title={source.source_image_hash}>{source.source_image_hash ? source.source_image_hash.slice(0, 18) : '不可用'}</strong></div><div><span>缓存 Information</span><strong>{values.length ? values.map((value) => value.toFixed(2)).join(' · ') : '未知'}</strong></div><label><span>手动分类</span><VibeCategoryEditor onSave={(value) => Promise.all(activeGroup.entries.map((entry) => onUpdate(entry.id, { category: value })))} options={categories} value={groupCategory}/></label></div>
+        </section>
+        {!source.reference_image && <LobeAlert description="请导入原始 PNG，或导入包含该源图指纹的 .naiv4vibe 后再建立可视关联。现有编码文件不会被修改。" message="此 Vibe 没有来源图片" type="warning" variant="outlined"/>}
+        <section className="resource-section"><header><div><span>ENCODINGS</span><h2>.naiv4vibe 编码记录</h2><p>Information Extracted 属于编码位置；Reference Strength 属于图片中的使用配置。</p></div><b>{variants.length}</b></header><div className="vibe-variant-list">{variants.map((variant, index) => <article key={`${variant.fingerprint || variant.parent.id}:${index}`}><div><strong>{variant.fingerprint ? String(variant.fingerprint).slice(0, 18) : `编码 ${index + 1}`}</strong><small>{variant.model || variant.parent.model || 'NovelAI V4'}</small></div><span><small>Information</small><strong>{Number.isFinite(Number(variant.information_extracted)) ? Number(variant.information_extracted).toFixed(2) : '未知'}</strong></span><span className={`resource-status ${variant.parent.information_extracted_known ? 'known' : 'unknown'}`}>{informationLabel(variant.parent)}</span>{variant.parent.vibe_file && <LobeActionIcon icon={<Icon name="folder" size={15}/>} onClick={() => studio.revealFile(variant.parent.vibe_file)} title="显示 .naiv4vibe 文件" variant="borderless"/>}</article>)}</div></section>
+        <section className="resource-section"><header><div><span>USAGE CONFIGURATIONS</span><h2>图片中的使用参数</h2><p>同一编码可以在不同图片中使用不同 Reference Strength。</p></div><b>{activeGroup.usages.length}</b></header><div className="vibe-usage-list">{activeGroup.usages.map(({ project, vibe }) => <button key={`${project.id}:${vibe.id}`} onClick={() => onOpenProject(project.id)}><img alt="" src={mediaUrl(project.thumbnail_path)}/><span><strong>{project.name}</strong><small>{vibe.enabled === false ? '已停用' : '已启用'} · {vibe.name || source.name}</small></span><span><small>Strength</small><strong>{Number(vibe.strength ?? 0.6).toFixed(2)}</strong></span><span><small>Information</small><strong>{vibe.information_extracted_known ? Number(vibe.information_extracted).toFixed(2) : '未知'}</strong></span></button>)}</div></section>
+        <section className="resource-section"><header><div><span>RELATED IMAGES</span><h2>关联图片</h2><p>打开图片后，返回会回到当前 Vibe 来源。</p></div><b>{activeGroup.projectIds.length}</b></header><RelatedProjectGrid onOpenProject={onOpenProject} projectIds={activeGroup.projectIds} projects={projects}/></section>
+      </div>
+    </main>;
+  }
+  return <main className="resource-library-page">
+    <header className="workspace-page-header"><div><span>VIBE LIBRARY / 02</span><h1>Vibe 库</h1><p>{groups.length} 个来源 · {library.length} 个编码资产 · {projects.reduce((sum, project) => sum + (project.vibes || []).length, 0)} 次使用</p></div><div className="workspace-page-actions"><LobeButton icon={<Icon name="plus"/>} onClick={onImport} type="primary">导入 Vibe</LobeButton></div></header>
+    <section className="resource-toolbar"><LobeSearchBar allowClear onChange={setQuery} placeholder="搜索名称、分类、模型或路径" value={query}/><LobeSelect onChange={setCategory} options={[{ label: '全部分类', value: 'all' }, ...categories.map((value) => ({ label: value, value }))]} value={category}/><LobeSelect onChange={setSourceFilter} options={[{ label: '全部来源状态', value: 'all' }, { label: '来源 PNG 完整', value: 'ready' }, { label: '缺少来源 PNG', value: 'missing' }]} value={sourceFilter}/><LobeSelect onChange={setInformationFilter} options={[{ label: '全部 Information', value: 'all' }, { label: '已有缓存位置', value: 'known' }, { label: 'Information 未知', value: 'unknown' }]} value={informationFilter}/><LobeSelect onChange={setArchiveFilter} options={[{ label: '未归档', value: 'active' }, { label: '已归档', value: 'archived' }, { label: '全部归档状态', value: 'all' }]} value={archiveFilter}/></section>
+    <section className="resource-library-scroll">{filteredGroups.length ? <LobeGrid className="vibe-library-grid" gap={16} maxItemWidth={310} rows={4}>{filteredGroups.map((group) => { const source = group.source; const values = [...new Set(group.entries.flatMap(parseVibeValues))]; const hasSource = group.entries.some((entry) => entry.has_source_image && entry.reference_image); return <button className="vibe-library-card" key={group.key} onClick={() => onOpenGroup(group.key)}><div className={`vibe-library-cover ${hasSource ? '' : 'missing'}`}>{hasSource ? <img alt="" loading="lazy" src={mediaUrl(source.thumbnail_path || source.reference_image)}/> : <><Icon name="warning" size={23}/><span>缺少来源 PNG</span></>}</div><div className="vibe-library-card-body"><div><strong title={source.name}>{source.name || '未命名 Vibe'}</strong>{source.category && <span>{source.category}</span>}</div><small>{group.entries.reduce((sum, entry) => sum + Math.max(1, Number(entry.encoding_count || 0)), 0)} 个编码 · {group.projectIds.length} 张图片</small><div className="vibe-value-row">{values.length ? values.slice(0, 5).map((value) => <span key={value}>{Number(value).toFixed(2)}</span>) : <span className="unknown">Information 未知</span>}</div></div></button>; })}</LobeGrid> : <LobeEmpty className="resource-empty" description="调整筛选条件，或导入 PNG / .naiv4vibe。" image={<Icon name="image" size={28}/>} title="没有匹配的 Vibe 来源"/>}</section>
+  </main>;
+}
+
+const SYNTAX_ISSUE_LABELS = { emphasis_closer: '强调语法只有结束符', empty_tag: '空 Tag', raw_syntax: '包含非标准原始语法' };
+
+function TagLibraryPage({ dictionary, projects, activeKey, onBackToList, onOpenTag, onOpenProject, onSaveTag, onTranslateTag }) {
+  const tags = useMemo(() => buildTagLibrary(projects, dictionary), [projects, dictionary]);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('all');
+  const [usage, setUsage] = useState('all');
+  const [translation, setTranslation] = useState('all');
+  const [source, setSource] = useState('all');
+  const [visibility, setVisibility] = useState('visible');
+  const [limit, setLimit] = useState(200);
+  const activeTag = tags.find((tag) => tag.key === activeKey);
+  const categories = [...new Set(tags.map((tag) => tag.category).filter(Boolean))].sort();
+  const filtered = tags.filter((tag) => {
+    const text = normalizeSearch(`${tag.tag} ${tag.translation} ${tag.aliases}`);
+    return (!query || text.includes(normalizeSearch(query)))
+      && (category === 'all' || tag.category === category)
+      && (usage === 'all' || (usage === 'unused' ? tag.usage_count === 0 : usage === 'high' ? tag.usage_count >= 10 : tag.usage_count > 0 && tag.usage_count < 10))
+      && (translation === 'all' || (translation === 'translated' ? Boolean(tag.translation) : !tag.translation))
+      && (source === 'all' || tag.translation_source === source || tag.category_source === source)
+      && (visibility === 'all' || tag.effective_visibility === visibility);
+  });
+  useEffect(() => setLimit(200), [query, category, usage, translation, source, visibility]);
+  if (activeTag) return <TagDetailPage key={activeTag.key} onBack={onBackToList} onOpenProject={onOpenProject} onSaveTag={onSaveTag} onTranslateTag={onTranslateTag} projects={projects} tag={activeTag}/>;
+  return <main className="resource-library-page tag-library-page">
+    <header className="workspace-page-header"><div><span>TAG LIBRARY / 03</span><h1>Tag 库</h1><p>{tags.length} 个唯一 Tag · {tags.reduce((sum, tag) => sum + tag.usage_count, 0)} 次使用</p></div></header>
+    <section className="resource-toolbar tag-library-toolbar"><LobeSearchBar allowClear onChange={setQuery} placeholder="搜索原文、翻译或别名" value={query}/><LobeSelect onChange={setCategory} options={[{ label: '全部分类', value: 'all' }, ...categories.map((value) => ({ label: CATEGORY_LABELS[value] || value, value }))]} value={category}/><LobeSelect onChange={setUsage} options={[{ label: '全部使用次数', value: 'all' }, { label: '低频 1–9', value: 'low' }, { label: '高频 10+', value: 'high' }, { label: '词典中未使用', value: 'unused' }]} value={usage}/><LobeSelect onChange={setTranslation} options={[{ label: '全部翻译状态', value: 'all' }, { label: '已有翻译', value: 'translated' }, { label: '等待翻译', value: 'missing' }]} value={translation}/><LobeSelect onChange={setSource} options={[{ label: '全部知识来源', value: 'all' }, { label: '人工校正', value: 'manual' }, { label: 'AI 生成', value: 'ai' }, { label: '缓存', value: 'cache' }]} value={source}/><LobeSelect onChange={setVisibility} options={[{ label: '默认可见', value: 'visible' }, { label: '语法异常', value: 'problematic' }, { label: '手动隐藏', value: 'hidden' }, { label: '全部状态', value: 'all' }]} value={visibility}/></section>
+    <section className="tag-table-shell"><div className="tag-library-header"><span>原始 Tag</span><span>翻译</span><span>分类</span><span>使用</span><span>图片</span><span>状态</span></div><div className="tag-library-rows">{filtered.slice(0, limit).map((tag) => <button className="tag-library-row" key={tag.key} onClick={() => onOpenTag(tag.key)}><span><strong title={tag.tag}>{tag.tag}</strong><small>{knowledgeSourceLabel(tag.translation_source)}</small></span><span title={tag.translation}>{tag.translation || '等待翻译'}</span><span><em className={`tag-category-dot cat-${String(tag.category).toLowerCase()}`}/>{CATEGORY_LABELS[tag.category] || tag.category}</span><span>{tag.usage_count}</span><span>{tag.image_count}</span><span className={`resource-status ${tag.effective_visibility}`}>{tag.effective_visibility === 'visible' ? '正常' : tag.effective_visibility === 'hidden' ? '已隐藏' : '语法异常'}</span></button>)}</div>{!filtered.length && <LobeEmpty className="resource-empty" description="异常和手动隐藏的 Tag 默认不在“可见”筛选中。" image={<Icon name="layers" size={26}/>} title="没有匹配的 Tag"/>}{filtered.length > limit && <div className="resource-load-more"><LobeButton onClick={() => setLimit((current) => current + 200)}>继续加载 · 还剩 {filtered.length - limit}</LobeButton></div>}</section>
+  </main>;
+}
+
+function TagDetailPage({ tag, projects, onBack, onOpenProject, onSaveTag, onTranslateTag }) {
+  const [draft, setDraft] = useState({ translation: tag.translation, category: tag.category, note: tag.note, aliases: tag.aliases, visibility: tag.visibility });
+  const [busy, setBusy] = useState('');
+  const save = async () => { setBusy('save'); try { await onSaveTag(tag.tag, draft); } finally { setBusy(''); } };
+  const translate = async () => { setBusy('translate'); try { await onTranslateTag(tag.tag); } finally { setBusy(''); } };
+  return <main className="resource-detail-page">
+    <ResourceDetailHeader eyebrow="Tag 库 / 词典详情" title={tag.tag} subtitle={`${tag.usage_count} 次使用 · ${tag.image_count} 张关联图片`} onBack={onBack} actions={<><LobeButton disabled={Boolean(busy)} icon={<Icon name="spark" size={14}/>} onClick={translate}>{busy === 'translate' ? '处理中…' : 'AI 翻译与分类'}</LobeButton><LobeButton disabled={Boolean(busy)} onClick={save} type="primary">{busy === 'save' ? '保存中…' : '保存词典设置'}</LobeButton></>}/>
+    <div className="resource-detail-scroll tag-detail-scroll"><section className="tag-editor-layout"><div className="tag-readonly-panel"><span>ORIGINAL TAG · READ ONLY</span><strong>{tag.tag}</strong><p>原始 Tag 来自图片 metadata。这里的设置只改变词典展示，不会重命名、删除或写回图片 Prompt。</p><div className="tag-source-strip"><span>翻译来源 <b>{knowledgeSourceLabel(tag.translation_source)}</b></span><span>分类来源 <b>{knowledgeSourceLabel(tag.category_source)}</b></span></div></div><div className="tag-dictionary-form"><label><span>中文翻译</span><LobeInput onChange={(event) => setDraft((current) => ({ ...current, translation: event.target.value }))} placeholder="添加中文翻译" value={draft.translation}/></label><label><span>分类</span><LobeSelect onChange={(value) => setDraft((current) => ({ ...current, category: value }))} options={CATEGORY_OPTIONS.map((value) => ({ label: CATEGORY_LABELS[value], value }))} value={draft.category}/></label><label><span>搜索别名</span><LobeInput onChange={(event) => setDraft((current) => ({ ...current, aliases: event.target.value }))} placeholder="用逗号分隔，仅用于搜索" value={draft.aliases}/></label><label><span>显示状态</span><LobeSelect onChange={(value) => setDraft((current) => ({ ...current, visibility: value }))} options={[{ label: '自动 · 异常时隐藏', value: 'auto' }, { label: '始终显示', value: 'visible' }, { label: '手动隐藏', value: 'hidden' }]} value={draft.visibility}/></label><label className="wide"><span>备注</span><LobeTextArea autoSize={{ minRows: 3, maxRows: 6 }} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} placeholder="记录用法、歧义或分类依据" value={draft.note}/></label></div></section>
+      <section className="resource-section"><header><div><span>USAGE SCOPE</span><h2>使用范围</h2><p>同一个 Tag 在 Base、Character、Prompt 与 Undesired 中分别统计。</p></div><b>{tag.usage_count}</b></header><div className="tag-scope-stats">{[['Base', tag.scope_counts.base], ['Character', tag.scope_counts.character], ['Prompt', tag.scope_counts.prompt], ['Undesired', tag.scope_counts.undesired]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></section>
+      {tag.problematic && <section className="resource-section tag-issue-section"><header><div><span>SYNTAX DIAGNOSTICS</span><h2>原始语法提示</h2><p>只提供诊断，不会自动修复图片中的 Prompt。</p></div><b>{tag.issues.length}</b></header><LobeAlert description="这个 Tag 在自动显示状态下会从 Tag 库默认列表隐藏，但复制原始 Prompt 时仍会完整保留。" message="检测到非标准 Tag 语法" type="warning" variant="outlined"/><div className="tag-issue-list">{tag.issues.map((issue, index) => <div key={`${issue.project_id}:${index}`}><span>{SYNTAX_ISSUE_LABELS[issue.reason] || issue.reason}</span><code>{issue.sample}</code></div>)}</div></section>}
+      <section className="resource-section"><header><div><span>RELATED IMAGES</span><h2>关联图片</h2><p>打开图片后，返回会回到当前 Tag 词典项。</p></div><b>{tag.image_count}</b></header><RelatedProjectGrid onOpenProject={onOpenProject} projectIds={tag.project_ids} projects={projects}/></section>
+    </div>
+  </main>;
 }
 
 function ExperimentWorkspace({ experiment, projects, comparisonIds, onBack, onToggleComparison, onOpenProject }) {
@@ -1432,6 +1553,8 @@ export default function App({ appearance, setAppearance }) {
   const [collections, setCollections] = useState([]);
   const [series, setSeries] = useState([]);
   const [experiments, setExperiments] = useState([]);
+  const [vibeLibrary, setVibeLibrary] = useState([]);
+  const [tagDictionary, setTagDictionary] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [query, setQuery] = useState('');
   const [gallerySort, setGallerySort] = useState('recent');
@@ -1454,6 +1577,10 @@ export default function App({ appearance, setAppearance }) {
   const [appPage, setAppPage] = useState('gallery');
   const [galleryScreen, setGalleryScreen] = useState('list');
   const [detailTab, setDetailTab] = useState('overview');
+  const [activeVibeKey, setActiveVibeKey] = useState('');
+  const [activeTagKey, setActiveTagKey] = useState('');
+  const [resourceReturn, setResourceReturn] = useState(null);
+  const [resourceOrigin, setResourceOrigin] = useState(null);
   const saveTimers = useRef(new Map());
   const branchSaveTimers = useRef(new Map());
   const branchCreatePromises = useRef(new Map());
@@ -1498,7 +1625,7 @@ export default function App({ appearance, setAppearance }) {
   };
 
   useEffect(() => {
-    Promise.all([studio.loadLibrary(), studio.loadLibraryOrganization()]).then(([items, organization]) => {
+    Promise.all([studio.loadLibrary(), studio.loadLibraryOrganization(), studio.loadVibeLibrary(), studio.loadTagDictionary()]).then(([items, organization, vibes, dictionary]) => {
       const organizationByProject = new Map((organization.projects || []).map((project) => [project.id, project]));
       const repairedItems = items.map((project) => {
         const tags = repairLegacyPromptTags(project.tags, project.metadata.prompt_raw);
@@ -1510,6 +1637,8 @@ export default function App({ appearance, setAppearance }) {
       setCollections(organization.collections || []);
       setSeries(organization.series || []);
       setExperiments(organization.experiments || []);
+      setVibeLibrary(vibes || []);
+      setTagDictionary(dictionary || []);
       setActiveId(repairedItems.find((project) => !project.deleted_at)?.id || null);
     }).finally(() => setLoading(false));
   }, []);
@@ -1897,6 +2026,9 @@ export default function App({ appearance, setAppearance }) {
     setImportProgress({ phase: 'preparing', prepared: 0, sourceCount: 0, current: '读取文件…' });
     try {
       finishImport(await action({ collectionId }), collectionId);
+      const [nextVibes, nextDictionary] = await Promise.all([studio.loadVibeLibrary(), studio.loadTagDictionary()]);
+      setVibeLibrary(nextVibes || []);
+      setTagDictionary(nextDictionary || []);
     } catch (error) {
       finishImport({
         ok: false,
@@ -2125,6 +2257,8 @@ export default function App({ appearance, setAppearance }) {
   const openProjectDetail = (projectId, nextTab = 'overview') => {
     galleryScrollTop.current = galleryScrollRef.current?.scrollTop || galleryScrollTop.current;
     setAppPage('gallery');
+    setResourceReturn(null);
+    setResourceOrigin(null);
     setActiveId(projectId);
     setActiveBranchId('');
     setPromptScopeKey('base:prompt');
@@ -2133,6 +2267,15 @@ export default function App({ appearance, setAppearance }) {
   };
 
   const returnToGallery = () => {
+    if (resourceReturn) {
+      setAppPage(resourceReturn.page);
+      if (resourceReturn.page === 'vibes') setActiveVibeKey(resourceReturn.key);
+      if (resourceReturn.page === 'tags') setActiveTagKey(resourceReturn.key);
+      setResourceReturn(null);
+      setGalleryScreen('list');
+      setActiveBranchId('');
+      return;
+    }
     setGalleryScreen('list');
     setActiveBranchId('');
   };
@@ -2227,10 +2370,99 @@ export default function App({ appearance, setAppearance }) {
     }
   };
 
+  const updateVibeAsset = async (id, patch) => {
+    try {
+      const result = await studio.updateVibeLibrary(id, patch);
+      if (!result?.ok) throw new Error(result?.error || 'Vibe 资料没有保存');
+      setVibeLibrary(result.library || []);
+      return result.library || [];
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  };
+
+  const importVibeAssets = async () => {
+    try {
+      const result = await studio.importVibeLibrary();
+      if (result?.canceled) return;
+      setVibeLibrary(result.library || []);
+      if (result.errors?.length) showToast(`已导入 ${result.imported?.length || 0} 个，${result.errors.length} 个文件失败`);
+      else showToast(`已导入 ${result.imported?.length || 0} 个 Vibe`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const saveTagDictionaryEntry = async (tag, patch) => {
+    try {
+      const result = await studio.updateTagDictionary(tag, patch);
+      if (!result?.ok) throw new Error(result?.error || 'Tag 词典没有保存');
+      setTagDictionary(result.dictionary || []);
+      showToast('Tag 词典设置已保存；图片 metadata 未修改');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  };
+
+  const translateTagDictionaryEntry = async (tag) => {
+    const result = await studio.translateTags([tag]);
+    if (!result?.ok) {
+      showToast(result?.error || 'AI 翻译失败');
+      return;
+    }
+    setTagDictionary(await studio.loadTagDictionary());
+    showToast(result.ai_count ? 'AI 翻译与分类已写入本地词典' : '已复用本地词典结果');
+  };
+
+  const openProjectFromResource = (projectId, page, key) => {
+    setResourceReturn({ page, key });
+    setResourceOrigin(null);
+    setAppPage('gallery');
+    setActiveId(projectId);
+    setActiveBranchId('');
+    setDetailTab('overview');
+    setGalleryScreen('detail');
+  };
+
+  const openTagResource = (tag) => {
+    setResourceOrigin({ projectId: sourceProject?.id || activeId, tab: 'prompt' });
+    setActiveTagKey(normalizeSearch(tag));
+    setAppPage('tags');
+  };
+
+  const openVibeResource = (vibe) => {
+    if (!vibe) return;
+    const group = groupVibeLibraryBySource(vibeLibrary).find((candidate) => candidate.entries.some((entry) => entry.id === vibe.library_id)
+      || (vibe.source_image_hash && candidate.source.source_image_hash === vibe.source_image_hash));
+    if (!group) { showToast('Vibe 库中还没有对应编码；请先导入或提取 Vibe'); return; }
+    setResourceOrigin({ projectId: sourceProject?.id || activeId, tab: 'vibe' });
+    setActiveVibeKey(group.key);
+    setAppPage('vibes');
+  };
+
+  const closeResourceDetail = (page) => {
+    if (resourceOrigin?.projectId) {
+      setAppPage('gallery');
+      setActiveId(resourceOrigin.projectId);
+      setGalleryScreen('detail');
+      setDetailTab(resourceOrigin.tab || 'overview');
+      setResourceOrigin(null);
+      return;
+    }
+    if (page === 'vibes') setActiveVibeKey('');
+    if (page === 'tags') setActiveTagKey('');
+  };
+
   const navigatePage = (nextPage) => {
+    setResourceReturn(null);
+    setResourceOrigin(null);
     setAppPage(nextPage);
     setSettingsOpen(nextPage === 'settings');
     if (nextPage === 'gallery') setGalleryScreen('list');
+    if (nextPage === 'vibes') studio.loadVibeLibrary().then((items) => setVibeLibrary(items || []));
+    if (nextPage === 'tags') studio.loadTagDictionary().then((items) => setTagDictionary(items || []));
   };
 
   if (loading) return <div className="loading-screen" style={studioThemeStyle}><div className="brand-symbol">N<span>4</span></div><span>正在打开本地资料库…</span></div>;
@@ -2239,8 +2471,8 @@ export default function App({ appearance, setAppearance }) {
     <StudioSideNav onNavigate={navigatePage} page={appPage}/>
     <div className="studio-workspace">
       {appPage === 'settings' && <SettingsPage appearance={appearance} onAppearanceChange={updateAppearance} onClose={() => navigatePage('gallery')} showToast={showToast}/>}
-      {appPage === 'vibes' && <LibraryPlaceholderPage kind="vibes" onGoGallery={() => navigatePage('gallery')} projects={projects}/>}
-      {appPage === 'tags' && <LibraryPlaceholderPage kind="tags" onGoGallery={() => navigatePage('gallery')} projects={projects}/>}
+      {appPage === 'vibes' && <VibeLibraryPage activeKey={activeVibeKey} library={vibeLibrary} onBackToList={() => closeResourceDetail('vibes')} onImport={importVibeAssets} onOpenGroup={setActiveVibeKey} onOpenProject={(projectId) => openProjectFromResource(projectId, 'vibes', activeVibeKey)} onUpdate={updateVibeAsset} projects={projects}/>}
+      {appPage === 'tags' && <TagLibraryPage activeKey={activeTagKey} dictionary={tagDictionary} onBackToList={() => closeResourceDetail('tags')} onOpenProject={(projectId) => openProjectFromResource(projectId, 'tags', activeTagKey)} onOpenTag={setActiveTagKey} onSaveTag={saveTagDictionaryEntry} onTranslateTag={translateTagDictionaryEntry} projects={projects}/>}
       {appPage === 'gallery' && galleryScreen === 'list' && <GalleryPage
         allProjects={projects}
         collections={collections}
@@ -2301,6 +2533,8 @@ export default function App({ appearance, setAppearance }) {
         onNotify={showToast}
         onOpenExperiment={openExperimentWorkspace}
         onOpenResult={openResultProject}
+        onOpenTagResource={openTagResource}
+        onOpenVibeResource={openVibeResource}
         onPrepareTagEditor={openTagEditor}
         onReveal={studio.revealFile}
         onSelectBranch={setActiveBranchId}

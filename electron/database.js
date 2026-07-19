@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS vibe_library (
   encoding_count INTEGER NOT NULL DEFAULT 0,
   has_source_image INTEGER NOT NULL DEFAULT 0,
   source_image_hash TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT '',
   archived_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
@@ -182,10 +183,16 @@ CREATE TABLE IF NOT EXISTS branch_results (
 CREATE INDEX IF NOT EXISTS idx_branch_results_project ON branch_results(project_id);
 CREATE TABLE IF NOT EXISTS tag_dictionary (
   tag TEXT PRIMARY KEY,
+  display_tag TEXT NOT NULL DEFAULT '',
   translation TEXT NOT NULL,
   category TEXT NOT NULL,
   has_translation INTEGER NOT NULL DEFAULT 0,
   has_classification INTEGER NOT NULL DEFAULT 0,
+  translation_source TEXT NOT NULL DEFAULT '',
+  category_source TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  aliases TEXT NOT NULL DEFAULT '',
+  visibility TEXT NOT NULL DEFAULT 'auto',
   updated_at TEXT NOT NULL
 );
 `;
@@ -305,6 +312,9 @@ export async function openDatabase(dataDirectory) {
   if (!vibeLibraryColumns.includes('archived_at')) {
     database.run("ALTER TABLE vibe_library ADD COLUMN archived_at TEXT NOT NULL DEFAULT ''");
   }
+  if (!vibeLibraryColumns.includes('category')) {
+    database.run("ALTER TABLE vibe_library ADD COLUMN category TEXT NOT NULL DEFAULT ''");
+  }
   if (!vibeColumns.includes('information_extracted_source')) {
     database.run("UPDATE vibe_transfers SET information_extracted_source = CASE WHEN information_extracted_known = 1 THEN 'verified' ELSE 'unknown' END");
   }
@@ -317,6 +327,22 @@ export async function openDatabase(dataDirectory) {
     database.run('ALTER TABLE tag_dictionary ADD COLUMN has_classification INTEGER NOT NULL DEFAULT 0');
     database.run("UPDATE tag_dictionary SET has_classification = CASE WHEN TRIM(category) != '' THEN 1 ELSE 0 END");
   }
+  const dictionaryMigrations = [
+    ['display_tag', "TEXT NOT NULL DEFAULT ''"],
+    ['translation_source', "TEXT NOT NULL DEFAULT ''"],
+    ['category_source', "TEXT NOT NULL DEFAULT ''"],
+    ['note', "TEXT NOT NULL DEFAULT ''"],
+    ['aliases', "TEXT NOT NULL DEFAULT ''"],
+    ['visibility', "TEXT NOT NULL DEFAULT 'auto'"],
+  ];
+  for (const [column, definition] of dictionaryMigrations) {
+    if (!dictionaryColumns.includes(column)) database.run(`ALTER TABLE tag_dictionary ADD COLUMN ${column} ${definition}`);
+  }
+  database.run('CREATE INDEX IF NOT EXISTS idx_vibe_transfers_library ON vibe_transfers(library_id)');
+  database.run('CREATE INDEX IF NOT EXISTS idx_vibe_transfers_source ON vibe_transfers(source_image_hash)');
+  database.run('CREATE INDEX IF NOT EXISTS idx_vibe_library_source ON vibe_library(source_image_hash)');
+  database.run('CREATE INDEX IF NOT EXISTS idx_vibe_library_category ON vibe_library(category, archived_at)');
+  database.run('CREATE INDEX IF NOT EXISTS idx_tag_dictionary_category ON tag_dictionary(category, visibility)');
 
   const persist = () => {
     const temporaryPath = `${filePath}.tmp`;
@@ -362,34 +388,114 @@ export async function openDatabase(dataDirectory) {
     return found;
   };
 
+  const loadTagDictionary = () => query('SELECT * FROM tag_dictionary ORDER BY tag ASC');
+
+  const knowledgePriority = (source) => ({ manual: 3, ai: 2, cache: 1, builtin: 0, heuristic: 0 }[source] || 0);
+
   const upsertTagDictionary = (entries = [], updatedAt = new Date().toISOString()) => {
     for (const entry of entries) {
       const key = dictionaryKey(entry.tag);
       if (!key) continue;
-      const translation = String(entry.translation || '').trim();
-      const category = TAG_CATEGORIES.has(entry.category) ? entry.category : 'Unsorted';
-      const hasTranslation = entry.has_translation ?? Boolean(translation);
-      const hasClassification = entry.has_classification ?? Boolean(entry.category);
+      const current = query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0] || {};
+      const incomingTranslation = String(entry.translation || '').trim();
+      const incomingCategory = TAG_CATEGORIES.has(entry.category) ? entry.category : 'Unsorted';
+      const incomingTranslationSource = String(entry.translation_source || (entry.has_translation ? 'ai' : ''));
+      const incomingCategorySource = String(entry.category_source || (entry.has_classification ? 'ai' : ''));
+      const hasIncomingTranslation = entry.has_translation ?? Boolean(incomingTranslation);
+      const hasIncomingClassification = entry.has_classification ?? Boolean(entry.category);
+      const replaceTranslation = hasIncomingTranslation && (!current.has_translation || knowledgePriority(incomingTranslationSource) >= knowledgePriority(current.translation_source));
+      const replaceClassification = hasIncomingClassification && (!current.has_classification || knowledgePriority(incomingCategorySource) >= knowledgePriority(current.category_source));
+      const translation = replaceTranslation ? incomingTranslation : String(current.translation || '');
+      const category = replaceClassification ? incomingCategory : (TAG_CATEGORIES.has(current.category) ? current.category : 'Unsorted');
+      const translationSource = replaceTranslation ? incomingTranslationSource : String(current.translation_source || '');
+      const categorySource = replaceClassification ? incomingCategorySource : String(current.category_source || '');
+      const hasTranslation = Boolean(current.has_translation || hasIncomingTranslation);
+      const hasClassification = Boolean(current.has_classification || hasIncomingClassification);
       if (!hasTranslation && !hasClassification) continue;
       database.run(
-        `INSERT INTO tag_dictionary (tag, translation, category, has_translation, has_classification, updated_at)
-         VALUES ($tag, $translation, $category, $has_translation, $has_classification, $updated_at)
+        `INSERT INTO tag_dictionary (tag, display_tag, translation, category, has_translation, has_classification,
+          translation_source, category_source, note, aliases, visibility, updated_at)
+         VALUES ($tag, $display_tag, $translation, $category, $has_translation, $has_classification,
+          $translation_source, $category_source, $note, $aliases, $visibility, $updated_at)
          ON CONFLICT(tag) DO UPDATE SET
-          translation = CASE WHEN excluded.has_translation = 1 THEN excluded.translation ELSE tag_dictionary.translation END,
-          category = CASE WHEN excluded.has_classification = 1 THEN excluded.category ELSE tag_dictionary.category END,
-          has_translation = MAX(tag_dictionary.has_translation, excluded.has_translation),
-          has_classification = MAX(tag_dictionary.has_classification, excluded.has_classification),
+          display_tag = CASE WHEN tag_dictionary.display_tag = '' THEN excluded.display_tag ELSE tag_dictionary.display_tag END,
+          translation = excluded.translation,
+          category = excluded.category,
+          has_translation = excluded.has_translation,
+          has_classification = excluded.has_classification,
+          translation_source = excluded.translation_source,
+          category_source = excluded.category_source,
           updated_at = excluded.updated_at`,
         {
           $tag: key,
+          $display_tag: String(current.display_tag || entry.tag || '').trim(),
           $translation: translation,
           $category: category,
           $has_translation: hasTranslation ? 1 : 0,
           $has_classification: hasClassification ? 1 : 0,
+          $translation_source: translationSource,
+          $category_source: categorySource,
+          $note: String(current.note || ''),
+          $aliases: String(current.aliases || ''),
+          $visibility: String(current.visibility || 'auto'),
           $updated_at: updatedAt,
         },
       );
     }
+  };
+
+  const updateTagDictionary = (tag, patch = {}) => {
+    const key = dictionaryKey(tag);
+    if (!key) throw new Error('Tag 不能为空');
+    const now = new Date().toISOString();
+    const current = query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0] || {
+      tag: key,
+      display_tag: String(tag || '').trim(),
+      translation: '',
+      category: 'Unsorted',
+      has_translation: 0,
+      has_classification: 0,
+      translation_source: '',
+      category_source: '',
+      note: '',
+      aliases: '',
+      visibility: 'auto',
+    };
+    const translation = patch.translation === undefined ? current.translation : String(patch.translation || '').trim();
+    const category = patch.category === undefined ? current.category : String(patch.category || 'Unsorted');
+    if (!TAG_CATEGORIES.has(category)) throw new Error('Tag 分类无效');
+    const note = patch.note === undefined ? current.note : String(patch.note || '').trim();
+    const aliases = patch.aliases === undefined ? current.aliases : String(patch.aliases || '').trim();
+    const visibility = patch.visibility === undefined ? current.visibility : String(patch.visibility || 'auto');
+    if (!['auto', 'visible', 'hidden'].includes(visibility)) throw new Error('Tag 显示状态无效');
+    if (translation.length > 240) throw new Error('Tag 翻译不能超过 240 个字符');
+    if (note.length > 600) throw new Error('Tag 备注不能超过 600 个字符');
+    if (aliases.length > 600) throw new Error('Tag 搜索别名不能超过 600 个字符');
+    database.run(
+      `INSERT INTO tag_dictionary (tag, display_tag, translation, category, has_translation, has_classification,
+        translation_source, category_source, note, aliases, visibility, updated_at)
+       VALUES ($tag, $display_tag, $translation, $category, $has_translation, 1,
+        $translation_source, $category_source, $note, $aliases, $visibility, $updated_at)
+       ON CONFLICT(tag) DO UPDATE SET translation = excluded.translation, category = excluded.category,
+        has_translation = excluded.has_translation, has_classification = 1,
+        translation_source = excluded.translation_source, category_source = excluded.category_source,
+        note = excluded.note, aliases = excluded.aliases, visibility = excluded.visibility, updated_at = excluded.updated_at`,
+      {
+        $tag: key,
+        $display_tag: current.display_tag || String(tag || '').trim(),
+        $translation: translation,
+        $category: category,
+        $has_translation: translation ? 1 : 0,
+        $translation_source: patch.translation === undefined ? current.translation_source : translation ? 'manual' : '',
+        $category_source: patch.category === undefined ? current.category_source : 'manual',
+        $note: note,
+        $aliases: aliases,
+        $visibility: visibility,
+        $updated_at: now,
+      },
+    );
+    persist();
+    return loadTagDictionary();
   };
 
   const enrichProjectTags = (project) => {
@@ -403,8 +509,8 @@ export async function openDatabase(dataDirectory) {
       if (!entry) return migrated;
       return {
         ...migrated,
-        ...(entry.has_translation ? { translation: entry.translation, translation_source: 'cache' } : {}),
-        ...(entry.has_classification ? { category: entry.category, category_source: 'cache' } : {}),
+        ...(entry.has_translation ? { translation: entry.translation, translation_source: entry.translation_source || 'cache' } : {}),
+        ...(entry.has_classification ? { category: entry.category, category_source: entry.category_source || 'cache' } : {}),
       };
     };
     const structure = project.prompt_structure || {};
@@ -722,14 +828,24 @@ export async function openDatabase(dataDirectory) {
     }
   };
 
-  const loadVibeLibrary = () => query('SELECT * FROM vibe_library ORDER BY archived_at ASC, created_at DESC');
+  const loadVibeLibrary = () => query('SELECT * FROM vibe_library ORDER BY archived_at ASC, created_at DESC').map((entry) => {
+    const referenceAvailable = Boolean(entry.reference_image && fs.existsSync(entry.reference_image));
+    const thumbnailAvailable = Boolean(entry.thumbnail_path && fs.existsSync(entry.thumbnail_path));
+    return {
+      ...entry,
+      has_source_image: referenceAvailable ? 1 : 0,
+      thumbnail_path: thumbnailAvailable ? entry.thumbnail_path : referenceAvailable ? entry.reference_image : '',
+    };
+  });
 
   const updateVibeLibrary = (id, patch = {}) => {
     const entry = query('SELECT * FROM vibe_library WHERE id = $id', { $id: String(id || '') })[0];
     if (!entry) throw new Error('Vibe 不存在或已被移除');
     const name = patch.name === undefined ? entry.name : String(patch.name || '').trim();
+    const category = patch.category === undefined ? String(entry.category || '') : String(patch.category || '').trim();
     if (!name) throw new Error('Vibe 名称不能为空');
     if (name.length > 120) throw new Error('Vibe 名称不能超过 120 个字符');
+    if (category.length > 80) throw new Error('Vibe 分类不能超过 80 个字符');
     let information = Number(entry.information_extracted);
     let informationKnown = Number(entry.information_extracted_known);
     let informationSource = entry.information_extracted_source || (informationKnown ? 'verified' : 'unknown');
@@ -746,12 +862,13 @@ export async function openDatabase(dataDirectory) {
     }
     const archivedAt = patch.archived === undefined ? entry.archived_at : patch.archived ? new Date().toISOString() : '';
     database.run(
-      `UPDATE vibe_library SET name = $name, information_extracted = $information_extracted,
+      `UPDATE vibe_library SET name = $name, category = $category, information_extracted = $information_extracted,
        information_extracted_known = $information_extracted_known, information_extracted_source = $information_extracted_source,
        encoded_values_json = $encoded_values_json, archived_at = $archived_at WHERE id = $id`,
       {
         $id: entry.id,
         $name: name,
+        $category: category,
         $information_extracted: information,
         $information_extracted_known: informationKnown,
         $information_extracted_source: informationSource,
@@ -1098,15 +1215,16 @@ export async function openDatabase(dataDirectory) {
         }
       }
       database.run(
-        `INSERT INTO vibe_library (id, name, source_kind, original_vibe_id, reference_image, vibe_file, thumbnail_path, model,
+        `INSERT INTO vibe_library (id, name, category, source_kind, original_vibe_id, reference_image, vibe_file, thumbnail_path, model,
           strength, information_extracted, information_extracted_known, information_extracted_source, encoded_values_json, encoding_variants_json,
           encoding_count, has_source_image, source_image_hash, created_at)
-         VALUES ($id, $name, $source_kind, $original_vibe_id, $reference_image, $vibe_file, $thumbnail_path, $model,
+         VALUES ($id, $name, $category, $source_kind, $original_vibe_id, $reference_image, $vibe_file, $thumbnail_path, $model,
           $strength, $information_extracted, $information_extracted_known, $information_extracted_source, $encoded_values_json, $encoding_variants_json,
           $encoding_count, $has_source_image, $source_image_hash, $created_at)
          ON CONFLICT(id) DO UPDATE SET
           name = CASE WHEN (excluded.has_source_image = 1 AND vibe_library.has_source_image = 0)
             OR (vibe_library.source_kind = 'metadata' AND excluded.source_kind = 'metadata') THEN excluded.name ELSE vibe_library.name END,
+          category = COALESCE(NULLIF(vibe_library.category, ''), excluded.category),
           source_kind = CASE WHEN vibe_library.source_kind = 'metadata' AND excluded.source_kind != 'metadata' THEN excluded.source_kind ELSE vibe_library.source_kind END,
           original_vibe_id = COALESCE(NULLIF(excluded.original_vibe_id, ''), vibe_library.original_vibe_id),
           reference_image = COALESCE(NULLIF(excluded.reference_image, ''), vibe_library.reference_image),
@@ -1125,6 +1243,7 @@ export async function openDatabase(dataDirectory) {
         {
           $id: libraryId,
           $name: entry.name || libraryId.slice(0, 12),
+          $category: String(entry.category || ''),
           $source_kind: entry.source_kind || 'metadata',
           $original_vibe_id: entry.original_vibe_id || '',
           $reference_image: entry.reference_image || '',
@@ -1209,6 +1328,8 @@ export async function openDatabase(dataDirectory) {
       tag: tag.tag,
       translation: tag.translation,
       category: tag.category,
+      translation_source: tag.translation_source,
+      category_source: tag.category_source,
       has_translation: Boolean(tag.translation?.trim()) && tag.translation_source !== 'builtin',
       has_classification: ['ai', 'manual', 'cache'].includes(tag.category_source)
         || (!tag.category_source && Boolean(tag.translation?.trim())),
@@ -1352,8 +1473,10 @@ export async function openDatabase(dataDirectory) {
     updateVibeLibrary,
     upsertVibeLibrary,
     resolveVibeLibraryId,
+    loadTagDictionary,
     lookupTagDictionary,
     upsertTagDictionary,
+    updateTagDictionary,
     enrichProjectTags,
     insertProject,
     updateProject,

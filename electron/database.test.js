@@ -104,11 +104,13 @@ describe('prompt structure persistence', () => {
 
     let updatedLibrary = database.updateVibeLibrary('encoding-fingerprint', {
       name: '手动整理的风格',
+      category: '画风参考',
       information_extracted: 0.55,
       archived: true,
     });
     expect(updatedLibrary[0]).toMatchObject({
       name: '手动整理的风格',
+      category: '画风参考',
       information_extracted: 0.55,
       information_extracted_known: 1,
       information_extracted_source: 'user',
@@ -150,7 +152,15 @@ describe('prompt structure persistence', () => {
     });
 
     const target = database.loadLibrary().find((project) => project.id === 'dictionary-target');
-    expect(target.tags[0]).toMatchObject({ translation: '画师 Ciloranko', translation_source: 'cache', category: 'Artist', category_source: 'cache' });
+    expect(target.tags[0]).toMatchObject({ translation: '画师 Ciloranko', translation_source: 'manual', category: 'Artist', category_source: 'manual' });
+
+    database.upsertTagDictionary([{ tag: 'artist:ciloranko', translation: 'AI 结果', translation_source: 'ai', category: 'Style', category_source: 'ai', has_translation: true, has_classification: true }]);
+    let dictionary = database.updateTagDictionary('artist:ciloranko', { note: '常用画师', aliases: 'ciloranko,西罗兰子', visibility: 'visible' });
+    expect(dictionary[0]).toMatchObject({ translation: '画师 Ciloranko', category: 'Artist', note: '常用画师', visibility: 'visible' });
+
+    dictionary = database.updateTagDictionary('artist:ciloranko', { translation: 'Ciloranko 画师', category: 'Artist' });
+    expect(dictionary[0]).toMatchObject({ translation: 'Ciloranko 画师', translation_source: 'manual', category_source: 'manual' });
+    expect(database.loadLibrary().find((project) => project.id === 'dictionary-source').metadata.extra_json).toBe('{}');
   });
 
   it('keeps collection membership through trash and restore operations', async () => {

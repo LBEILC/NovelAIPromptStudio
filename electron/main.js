@@ -267,6 +267,8 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle('vibe:library:load', () => database.loadVibeLibrary());
   ipcMain.handle('vibe:library:update', (_event, id, patch) => ({ ok: true, library: database.updateVibeLibrary(id, patch) }));
+  ipcMain.handle('tag:dictionary:load', () => database.loadTagDictionary());
+  ipcMain.handle('tag:dictionary:update', (_event, tag, patch) => ({ ok: true, dictionary: database.updateTagDictionary(tag, patch) }));
   ipcMain.handle('vibe:library:import', async () => {
     const result = await dialog.showOpenDialog({
       title: '导入 Vibe 或参考图',
