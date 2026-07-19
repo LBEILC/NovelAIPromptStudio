@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import initSqlJs from 'sql.js';
 import { inferCategory } from '../src/lib/prompt.js';
 import { normalizeGenerationMode } from '../src/lib/generationMetadata.js';
+import { analyzeExperiment } from '../src/lib/experiments.js';
 
 const require = createRequire(import.meta.url);
 
@@ -51,6 +52,25 @@ CREATE TABLE IF NOT EXISTS series_members (
   PRIMARY KEY (series_id, project_id)
 );
 CREATE INDEX IF NOT EXISTS idx_series_members_project ON series_members(project_id);
+CREATE TABLE IF NOT EXISTS experiments (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  baseline_project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  analysis_status TEXT NOT NULL DEFAULT 'incomplete',
+  fixed_fields_json TEXT NOT NULL DEFAULT '[]',
+  variable_fields_json TEXT NOT NULL DEFAULT '[]',
+  incomplete_fields_json TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS experiment_members (
+  experiment_id TEXT NOT NULL REFERENCES experiments(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL DEFAULT 0,
+  added_at TEXT NOT NULL,
+  PRIMARY KEY (experiment_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS idx_experiment_members_project ON experiment_members(project_id);
 CREATE TABLE IF NOT EXISTS prompt_tags (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -391,6 +411,11 @@ export async function openDatabase(dataDirectory) {
     { $project_id: projectId },
   ).map((row) => row.series_id);
 
+  const projectExperimentIds = (projectId) => query(
+    'SELECT experiment_id FROM experiment_members WHERE project_id = $project_id ORDER BY added_at, experiment_id',
+    { $project_id: projectId },
+  ).map((row) => row.experiment_id);
+
   const loadCollections = () => query(
     `SELECT collections.*,
       COUNT(CASE WHEN projects.deleted_at = '' THEN collection_members.project_id END) AS project_count
@@ -411,13 +436,35 @@ export async function openDatabase(dataDirectory) {
      ORDER BY series.created_at, series.name COLLATE NOCASE`,
   );
 
+  const loadExperiments = () => query(
+    `SELECT experiments.*, projects.name AS baseline_name,
+      COUNT(CASE WHEN members.deleted_at = '' THEN experiment_members.project_id END) AS project_count
+     FROM experiments
+     LEFT JOIN projects ON projects.id = experiments.baseline_project_id
+     LEFT JOIN experiment_members ON experiment_members.experiment_id = experiments.id
+     LEFT JOIN projects AS members ON members.id = experiment_members.project_id
+     GROUP BY experiments.id
+     ORDER BY experiments.created_at, experiments.name COLLATE NOCASE`,
+  ).map((experiment) => ({
+    ...experiment,
+    fixed_fields: safeJson(experiment.fixed_fields_json, []),
+    variable_fields: safeJson(experiment.variable_fields_json, []),
+    incomplete_fields: safeJson(experiment.incomplete_fields_json, []),
+    member_ids: query(
+      'SELECT project_id FROM experiment_members WHERE experiment_id = $id ORDER BY position, added_at',
+      { $id: experiment.id },
+    ).map((row) => row.project_id),
+  }));
+
   const loadLibraryOrganization = () => ({
     collections: loadCollections(),
     series: loadSeries(),
+    experiments: loadExperiments(),
     projects: query('SELECT id, is_favorite, deleted_at FROM projects').map((project) => ({
       ...project,
       collection_ids: projectCollectionIds(project.id),
       series_ids: projectSeriesIds(project.id),
+      experiment_ids: projectExperimentIds(project.id),
     })),
   });
 
@@ -446,6 +493,7 @@ export async function openDatabase(dataDirectory) {
       prompt_structure: safeJson(metadata.prompt_structure_json),
       collection_ids: projectCollectionIds(project.id),
       series_ids: projectSeriesIds(project.id),
+      experiment_ids: projectExperimentIds(project.id),
       vibes: query('SELECT * FROM vibe_transfers WHERE project_id = $id ORDER BY position', { $id: project.id }),
       versions: query('SELECT * FROM prompt_versions WHERE project_id = $id ORDER BY created_at DESC', { $id: project.id }),
       branches: query('SELECT * FROM branch_recipes WHERE source_project_id = $id ORDER BY created_at DESC', { $id: project.id }).map(hydrateBranch),
@@ -815,6 +863,107 @@ export async function openDatabase(dataDirectory) {
     }
   });
 
+  const cleanExperimentName = (name) => {
+    const cleaned = String(name || '').trim();
+    if (!cleaned) throw new Error('实验名称不能为空');
+    if (cleaned.length > 80) throw new Error('实验名称不能超过 80 个字符');
+    return cleaned;
+  };
+
+  const recalculateExperiment = (experimentId) => {
+    const experiment = query('SELECT * FROM experiments WHERE id = $id', { $id: experimentId })[0];
+    if (!experiment) throw new Error('对比实验不存在或已被删除');
+    const memberIds = query(
+      'SELECT project_id FROM experiment_members WHERE experiment_id = $id ORDER BY position, added_at',
+      { $id: experiment.id },
+    ).map((row) => row.project_id);
+    const baseline = hydrateProject(query('SELECT * FROM projects WHERE id = $id', { $id: experiment.baseline_project_id })[0]);
+    const members = memberIds.map((id) => hydrateProject(query('SELECT * FROM projects WHERE id = $id', { $id: id })[0])).filter(Boolean);
+    const analysis = analyzeExperiment(baseline, members);
+    database.run(
+      `UPDATE experiments SET analysis_status = $analysis_status, fixed_fields_json = $fixed_fields_json,
+       variable_fields_json = $variable_fields_json, incomplete_fields_json = $incomplete_fields_json, updated_at = $updated_at
+       WHERE id = $id`,
+      {
+        $id: experiment.id,
+        $analysis_status: analysis.status,
+        $fixed_fields_json: JSON.stringify(analysis.fixedFields),
+        $variable_fields_json: JSON.stringify(analysis.variableFields),
+        $incomplete_fields_json: JSON.stringify(analysis.incompleteFields),
+        $updated_at: new Date().toISOString(),
+      },
+    );
+  };
+
+  const createExperiment = (name, baselineProjectId, projectIds) => runOrganizationMutation(() => {
+    const cleaned = cleanExperimentName(name);
+    const baselineId = String(baselineProjectId || '');
+    const ids = [baselineId, ...uniqueProjectIds(projectIds).filter((id) => id !== baselineId)];
+    const validProjects = ids.map((id) => query("SELECT id FROM projects WHERE id = $id AND deleted_at = ''", { $id: id })[0]).filter(Boolean);
+    if (validProjects.length < 2) throw new Error('至少选择 2 个有效作品才能建立对比实验');
+    if (!validProjects.some((project) => project.id === baselineId)) throw new Error('基准作品不存在或已在回收站');
+    const experimentId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    database.run(
+      `INSERT INTO experiments (id, name, baseline_project_id, created_at, updated_at)
+       VALUES ($id, $name, $baseline_project_id, $created_at, $updated_at)`,
+      { $id: experimentId, $name: cleaned, $baseline_project_id: baselineId, $created_at: now, $updated_at: now },
+    );
+    validProjects.forEach((project, position) => database.run(
+      `INSERT INTO experiment_members (experiment_id, project_id, position, added_at)
+       VALUES ($experiment_id, $project_id, $position, $added_at)`,
+      { $experiment_id: experimentId, $project_id: project.id, $position: position, $added_at: now },
+    ));
+    recalculateExperiment(experimentId);
+  });
+
+  const renameExperiment = (id, name) => runOrganizationMutation(() => {
+    const experimentId = String(id || '');
+    if (!query('SELECT id FROM experiments WHERE id = $id', { $id: experimentId })[0]) throw new Error('对比实验不存在或已被删除');
+    database.run(
+      'UPDATE experiments SET name = $name, updated_at = $updated_at WHERE id = $id',
+      { $id: experimentId, $name: cleanExperimentName(name), $updated_at: new Date().toISOString() },
+    );
+  });
+
+  const deleteExperiment = (id) => runOrganizationMutation(() => {
+    const experimentId = String(id || '');
+    database.run('DELETE FROM experiment_members WHERE experiment_id = $id', { $id: experimentId });
+    database.run('DELETE FROM experiments WHERE id = $id', { $id: experimentId });
+  });
+
+  const addProjectsToExperiment = (experimentId, projectIds) => runOrganizationMutation(() => {
+    const experiment = query('SELECT id FROM experiments WHERE id = $id', { $id: String(experimentId || '') })[0];
+    if (!experiment) throw new Error('对比实验不存在或已被删除');
+    let position = Number(query('SELECT MAX(position) AS position FROM experiment_members WHERE experiment_id = $id', { $id: experiment.id })[0]?.position ?? -1) + 1;
+    const now = new Date().toISOString();
+    for (const projectId of uniqueProjectIds(projectIds)) {
+      const project = query("SELECT id FROM projects WHERE id = $id AND deleted_at = ''", { $id: projectId })[0];
+      if (!project) continue;
+      database.run(
+        `INSERT OR IGNORE INTO experiment_members (experiment_id, project_id, position, added_at)
+         VALUES ($experiment_id, $project_id, $position, $added_at)`,
+        { $experiment_id: experiment.id, $project_id: project.id, $position: position, $added_at: now },
+      );
+      position += 1;
+    }
+    recalculateExperiment(experiment.id);
+  });
+
+  const removeProjectsFromExperiment = (experimentId, projectIds) => runOrganizationMutation(() => {
+    const experiment = query('SELECT baseline_project_id FROM experiments WHERE id = $id', { $id: String(experimentId || '') })[0];
+    if (!experiment) throw new Error('对比实验不存在或已被删除');
+    const ids = uniqueProjectIds(projectIds);
+    if (ids.includes(experiment.baseline_project_id)) throw new Error('基准作品不能直接移出实验；可以删除实验后重新建立');
+    for (const projectId of ids) {
+      database.run(
+        'DELETE FROM experiment_members WHERE experiment_id = $experiment_id AND project_id = $project_id',
+        { $experiment_id: String(experimentId || ''), $project_id: projectId },
+      );
+    }
+    recalculateExperiment(String(experimentId || ''));
+  });
+
   const setProjectsFavorite = (projectIds, favorite) => runOrganizationMutation(() => {
     for (const projectId of uniqueProjectIds(projectIds)) {
       database.run(
@@ -1062,6 +1211,7 @@ export async function openDatabase(dataDirectory) {
     loadBranch,
     loadCollections,
     loadSeries,
+    loadExperiments,
     loadLibraryOrganization,
     createCollection,
     renameCollection,
@@ -1073,6 +1223,11 @@ export async function openDatabase(dataDirectory) {
     deleteSeries,
     addProjectsToSeries,
     removeProjectsFromSeries,
+    createExperiment,
+    renameExperiment,
+    deleteExperiment,
+    addProjectsToExperiment,
+    removeProjectsFromExperiment,
     setProjectsFavorite,
     setProjectsDeleted,
     findProjectByContentHash,

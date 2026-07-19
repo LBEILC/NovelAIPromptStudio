@@ -121,6 +121,15 @@ button { border: 0; }
 .series-list { max-height: 105px; }
 .series-row.active { box-shadow: inset 2px 0 #b87845; }
 .series-row.active .collection-open { color: #e1d5ca; }
+.experiment-heading { color: #8a829d; }
+.experiment-heading small { margin-inline-start: auto; color: #5f6875; font: var(--text-micro) var(--font-mono); letter-spacing: 0; text-transform: none; }
+.experiment-list { max-height: 105px; }
+.experiment-row.active { box-shadow: inset 2px 0 var(--purple); }
+.experiment-row.active .collection-open { color: #ded8ed; }
+.experiment-state { flex: 0 0 auto; padding: 1px 4px; color: #8f9aa2; background: #222c34; border-radius: 3px; font: normal 9px var(--font-mono); }
+.experiment-state.single { color: #8ec5a9; background: #17271f; }
+.experiment-state.mixed { color: #d4a09b; background: #2a1d1e; }
+.experiment-state.identical { color: #91afc0; background: #17242c; }
 .collection-row { min-width: 0; min-height: 29px; display: flex; align-items: center; border-radius: 5px; position: relative; }
 .collection-row:hover, .collection-row.active { background: #182129; }
 .collection-row.active { box-shadow: inset 2px 0 #8a6b40; }
@@ -145,6 +154,14 @@ button { border: 0; }
 .library-result-heading > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .library-result-heading > button { height: 23px; margin-inline-start: auto; padding: 0 6px; color: #80909b; background: transparent; border-radius: 3px; font-size: var(--text-micro); letter-spacing: 0; text-transform: none; }
 .library-result-heading > button:hover, .library-result-heading > button.active { color: var(--accent); background: #231d15; }
+.experiment-summary { margin: 0 8px 6px; padding: 7px 8px; display: grid; gap: 4px; color: #85929b; background: #121a21; border: 1px solid #303a45; border-left: 2px solid var(--purple); border-radius: 4px; font-size: var(--text-micro); }
+.experiment-summary > div { min-width: 0; display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 5px; }
+.experiment-summary span { color: #65747e; }
+.experiment-summary strong { overflow: hidden; color: #aeb9c0; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.experiment-summary p { margin: 2px 0 0; padding-top: 5px; display: flex; align-items: flex-start; gap: 5px; color: #b98f8c; border-top: 1px solid #2a333c; line-height: 1.4; }
+.experiment-summary p svg { flex: 0 0 auto; margin-top: 1px; }
+.experiment-summary.single { border-left-color: var(--green); }
+.experiment-summary.mixed { border-left-color: var(--red); }
 .library-batch-toolbar { margin: 1px 8px 6px; padding: 7px; display: grid; gap: 6px; color: #87959e; background: #121b22; border: 1px solid #30404b; border-radius: 5px; font-size: var(--text-micro); }
 .library-batch-toolbar > div { min-width: 0; display: flex; align-items: center; gap: 5px; }
 .library-batch-toolbar > div:first-child span { margin-inline: auto; }

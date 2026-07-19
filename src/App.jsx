@@ -41,6 +41,11 @@ const studio = window.studio || {
   deleteSeries: async () => ({ ok: true, collections: [], series: [], projects: [] }),
   addProjectsToSeries: async () => ({ ok: true, collections: [], series: [], projects: [] }),
   removeProjectsFromSeries: async () => ({ ok: true, collections: [], series: [], projects: [] }),
+  createExperiment: async () => ({ ok: true, collections: [], series: [], experiments: [], projects: [] }),
+  renameExperiment: async () => ({ ok: true, collections: [], series: [], experiments: [], projects: [] }),
+  deleteExperiment: async () => ({ ok: true, collections: [], series: [], experiments: [], projects: [] }),
+  addProjectsToExperiment: async () => ({ ok: true, collections: [], series: [], experiments: [], projects: [] }),
+  removeProjectsFromExperiment: async () => ({ ok: true, collections: [], series: [], experiments: [], projects: [] }),
   setProjectsFavorite: async () => ({ ok: true, collections: [], projects: [] }),
   setProjectsDeleted: async () => ({ ok: true, collections: [], projects: [] }),
   importImages: async () => ({ ok: true, canceled: true, imported: [], duplicates: [], errors: [], summary: null }),
@@ -141,6 +146,7 @@ function LibraryPanel({
   allProjects,
   collections,
   series,
+  experiments,
   activeId,
   setActiveId,
   query,
@@ -166,6 +172,11 @@ function LibraryPanel({
   onDeleteSeries,
   onAddToSeries,
   onRemoveFromSeries,
+  onCreateExperiment,
+  onRenameExperiment,
+  onDeleteExperiment,
+  onAddToExperiment,
+  onRemoveFromExperiment,
   onSetFavorite,
   onSetDeleted,
   onProjectContextMenu,
@@ -182,6 +193,10 @@ function LibraryPanel({
   const [editingSeriesName, setEditingSeriesName] = useState('');
   const [deleteArmedSeriesId, setDeleteArmedSeriesId] = useState('');
   const [batchSeriesId, setBatchSeriesId] = useState('');
+  const [editingExperimentId, setEditingExperimentId] = useState('');
+  const [editingExperimentName, setEditingExperimentName] = useState('');
+  const [deleteArmedExperimentId, setDeleteArmedExperimentId] = useState('');
+  const [batchExperimentId, setBatchExperimentId] = useState('');
   const activeProjects = allProjects.filter((project) => !project.deleted_at);
   const counts = {
     all: activeProjects.length,
@@ -197,7 +212,8 @@ function LibraryPanel({
   ];
   const currentCollection = libraryView.startsWith('collection:') ? collections.find((collection) => `collection:${collection.id}` === libraryView) : null;
   const currentSeries = libraryView.startsWith('series:') ? series.find((entry) => `series:${entry.id}` === libraryView) : null;
-  const currentLabel = currentCollection?.name || currentSeries?.name || viewItems.find((item) => item.id === libraryView)?.label || '作品库';
+  const currentExperiment = libraryView.startsWith('experiment:') ? experiments.find((entry) => `experiment:${entry.id}` === libraryView) : null;
+  const currentLabel = currentCollection?.name || currentSeries?.name || currentExperiment?.name || viewItems.find((item) => item.id === libraryView)?.label || '作品库';
   const selectedProjects = allProjects.filter((project) => selectedIds.has(project.id));
   const allSelectedAreFavorite = selectedProjects.length > 0 && selectedProjects.every((project) => project.is_favorite);
 
@@ -220,6 +236,11 @@ function LibraryPanel({
     if (!(await onRenameSeries(id, editingSeriesName))) return;
     setEditingSeriesId('');
     setEditingSeriesName('');
+  };
+  const submitExperimentRename = async (id) => {
+    if (!(await onRenameExperiment(id, editingExperimentName))) return;
+    setEditingExperimentId('');
+    setEditingExperimentName('');
   };
 
   return <aside className="library-panel">
@@ -270,14 +291,39 @@ function LibraryPanel({
       </div>)}
       {!series.length && !creatingSeries && <div className="collection-empty">把同一创作脉络的结果放进系列</div>}
     </div>
+    <div className="collection-heading experiment-heading"><span>对比实验</span><small>控制变量</small></div>
+    <div className="collection-list experiment-list">
+      {experiments.map((experiment) => <div className={`collection-row experiment-row ${libraryView === `experiment:${experiment.id}` ? 'active' : ''}`} key={experiment.id}>
+        {editingExperimentId === experiment.id
+          ? <div className="collection-editor"><input autoFocus maxLength={80} value={editingExperimentName} onChange={(event) => setEditingExperimentName(event.target.value)} onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitExperimentRename(experiment.id);
+            if (event.key === 'Escape') setEditingExperimentId('');
+          }}/><button onClick={() => submitExperimentRename(experiment.id)} disabled={!editingExperimentName.trim()}><Icon name="check" size={13}/></button><button onClick={() => setEditingExperimentId('')}><Icon name="close" size={13}/></button></div>
+          : <><button className="collection-open" onClick={() => onViewChange(`experiment:${experiment.id}`)} title={`基准：${experiment.baseline_name || '未知'} · 变化：${experiment.variable_fields?.join(' / ') || '无'}`}><Icon name="spark" size={13}/><span>{experiment.name}</span><em className={`experiment-state ${experiment.analysis_status}`}>{({ identical: '相同', single: '单变量', mixed: '混合', incomplete: '待补全' })[experiment.analysis_status] || '待分析'}</em><b>{experiment.project_count}</b></button><button className="collection-action" onClick={() => { setEditingExperimentId(experiment.id); setEditingExperimentName(experiment.name); setDeleteArmedExperimentId(''); }} aria-label={`重命名 ${experiment.name}`}><Icon name="edit" size={12}/></button><button className={`collection-action delete ${deleteArmedExperimentId === experiment.id ? 'armed' : ''}`} onClick={async () => {
+            if (deleteArmedExperimentId !== experiment.id) { setDeleteArmedExperimentId(experiment.id); return; }
+            if (await onDeleteExperiment(experiment.id)) setDeleteArmedExperimentId('');
+          }} aria-label={deleteArmedExperimentId === experiment.id ? `确认删除 ${experiment.name}` : `删除 ${experiment.name}`}>{deleteArmedExperimentId === experiment.id ? '确认' : <Icon name="close" size={12}/>}</button></>}
+      </div>)}
+      {!experiments.length && <div className="collection-empty">多选至少 2 张作品，建立控制变量实验</div>}
+    </div>
     <div className="section-heading library-result-heading"><span>{currentLabel}</span><b>{projects.length}</b><button className={selectionMode ? 'active' : ''} onClick={() => { setSelectionMode(!selectionMode); onClearSelection(); }}>{selectionMode ? '完成' : '多选'}</button></div>
+    {currentExperiment && <div className={`experiment-summary ${currentExperiment.analysis_status}`}>
+      <div><span>基准</span><strong>{currentExperiment.baseline_name || '未知作品'}</strong></div>
+      <div><span>固定</span><strong>{currentExperiment.fixed_fields?.join(' · ') || '暂无可靠字段'}</strong></div>
+      <div><span>变化</span><strong>{currentExperiment.variable_fields?.join(' · ') || '参数相同'}</strong></div>
+      {currentExperiment.analysis_status === 'mixed' && <p><Icon name="warning" size={13}/>混合变量只能用于视觉筛选，不能判断单一参数影响。</p>}
+      {currentExperiment.incomplete_fields?.length > 0 && <p><Icon name="info" size={13}/>缺少 {currentExperiment.incomplete_fields.join('、')}，未把这些字段计为固定条件。</p>}
+    </div>}
     {selectionMode && <div className="library-batch-toolbar">
       <div><button onClick={onSelectAll}>{selectedIds.size === projects.length && projects.length ? '取消全选' : '全选'}</button><span>已选 <b>{selectedIds.size}</b></span><button onClick={onClearSelection} disabled={!selectedIds.size}>清除</button></div>
       {libraryView !== 'trash' && <div><select value={batchCollectionId} onChange={(event) => setBatchCollectionId(event.target.value)} aria-label="目标收藏集"><option value="">加入收藏集…</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select><button onClick={() => onAddToCollection(batchCollectionId)} disabled={!selectedIds.size || !batchCollectionId}>加入</button></div>}
       {libraryView !== 'trash' && <div><select value={batchSeriesId} onChange={(event) => setBatchSeriesId(event.target.value)} aria-label="目标创作系列"><option value="">加入创作系列…</option>{series.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select><button onClick={() => onAddToSeries(batchSeriesId)} disabled={!selectedIds.size || !batchSeriesId}>加入</button></div>}
+      {libraryView !== 'trash' && experiments.length > 0 && <div><select value={batchExperimentId} onChange={(event) => setBatchExperimentId(event.target.value)} aria-label="目标对比实验"><option value="">加入已有实验…</option>{experiments.map((experiment) => <option key={experiment.id} value={experiment.id}>{experiment.name}</option>)}</select><button onClick={() => onAddToExperiment(batchExperimentId)} disabled={!selectedIds.size || !batchExperimentId}>加入</button></div>}
       <div className="batch-actions">
         {currentCollection && <button onClick={() => onRemoveFromCollection(currentCollection.id)} disabled={!selectedIds.size}>移出当前组</button>}
         {currentSeries && <button onClick={() => onRemoveFromSeries(currentSeries.id)} disabled={!selectedIds.size}>移出当前系列</button>}
+        {currentExperiment && <button onClick={() => onRemoveFromExperiment(currentExperiment.id)} disabled={!selectedIds.size}>移出当前实验</button>}
+        {libraryView !== 'trash' && <button onClick={onCreateExperiment} disabled={selectedIds.size < 2}><Icon name="spark" size={13}/>建立实验</button>}
         {libraryView !== 'trash' && <button onClick={() => onSetFavorite(!allSelectedAreFavorite)} disabled={!selectedIds.size}><Icon name="star" size={13}/>{allSelectedAreFavorite ? '取消收藏' : '收藏'}</button>}
         <button className={libraryView === 'trash' ? 'restore' : 'danger'} onClick={() => onSetDeleted(libraryView !== 'trash')} disabled={!selectedIds.size}><Icon name={libraryView === 'trash' ? 'refresh' : 'trash'} size={13}/>{libraryView === 'trash' ? '恢复' : '回收站'}</button>
       </div>
@@ -286,7 +332,7 @@ function LibraryPanel({
       {projects.map((project) => <div key={project.id} className={`asset-row ${project.id === activeId ? 'active' : ''} ${selectedIds.has(project.id) ? 'selected' : ''}`} onContextMenu={(event) => onProjectContextMenu(event, project)}>
         {selectionMode && <button className="asset-check" onClick={() => onToggleSelected(project.id)} aria-pressed={selectedIds.has(project.id)} aria-label={`${selectedIds.has(project.id) ? '取消选择' : '选择'} ${project.name}`}><SelectionMark selected={selectedIds.has(project.id)}/></button>}
         <button className="asset-thumbnail" onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenPromptOverview(project.id)} title={selectionMode ? '选择作品' : '打开 Prompt 总览'}><img src={mediaUrl(project.thumbnail_path)} alt=""/><span><Icon name="layers" size={13}/></span></button>
-        <button className="asset-select" onClick={() => selectionMode ? onToggleSelected(project.id) : setActiveId(project.id)}><span className="asset-copy"><strong>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.collection_ids || []).length} 组 · {(project.series_ids || []).length} 系列 · {relativeTime(project.updated_at)}</small></span></button>
+        <button className="asset-select" onClick={() => selectionMode ? onToggleSelected(project.id) : setActiveId(project.id)}><span className="asset-copy"><strong>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.collection_ids || []).length} 组 · {(project.series_ids || []).length} 系列 · {(project.experiment_ids || []).length} 实验 · {relativeTime(project.updated_at)}</small></span></button>
         {libraryView !== 'trash' && <button className={`asset-favorite ${project.is_favorite ? 'active' : ''}`} onClick={() => onSetFavorite(!project.is_favorite, [project.id])} aria-label={`${project.is_favorite ? '取消收藏' : '收藏'} ${project.name}`}><Icon name="star" size={13}/></button>}
       </div>)}
       {!projects.length && <div className="list-empty">{query ? '没有匹配的作品' : `「${currentLabel}」还是空的`}</div>}
@@ -872,6 +918,7 @@ export default function App() {
   const [projects, setProjects] = useState([]);
   const [collections, setCollections] = useState([]);
   const [series, setSeries] = useState([]);
+  const [experiments, setExperiments] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [query, setQuery] = useState('');
   const [libraryView, setLibraryView] = useState('all');
@@ -908,6 +955,7 @@ export default function App() {
       setProjects(repairedItems);
       setCollections(organization.collections || []);
       setSeries(organization.series || []);
+      setExperiments(organization.experiments || []);
       setActiveId(repairedItems.find((project) => !project.deleted_at)?.id || null);
     }).finally(() => setLoading(false));
   }, []);
@@ -975,19 +1023,25 @@ export default function App() {
     if (workspaceMode !== 'prompt') setOverviewCopy({ text: '', count: 0, selected: false, categoryCount: 0 });
   }, [activeId, workspaceMode]);
   const filteredProjects = useMemo(() => {
-    const viewProjects = projects.filter((project) => {
+    let viewProjects = projects.filter((project) => {
       if (libraryView === 'trash') return Boolean(project.deleted_at);
       if (project.deleted_at) return false;
       if (libraryView === 'favorites') return Boolean(project.is_favorite);
       if (libraryView === 'ungrouped') return !(project.collection_ids || []).length;
       if (libraryView.startsWith('collection:')) return (project.collection_ids || []).includes(libraryView.slice('collection:'.length));
       if (libraryView.startsWith('series:')) return (project.series_ids || []).includes(libraryView.slice('series:'.length));
+      if (libraryView.startsWith('experiment:')) return (project.experiment_ids || []).includes(libraryView.slice('experiment:'.length));
       return true;
     });
+    if (libraryView.startsWith('experiment:')) {
+      const experiment = experiments.find((entry) => `experiment:${entry.id}` === libraryView);
+      const positions = new Map((experiment?.member_ids || []).map((id, index) => [id, index]));
+      viewProjects = [...viewProjects].sort((left, right) => (positions.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (positions.get(right.id) ?? Number.MAX_SAFE_INTEGER));
+    }
     const needles = expandSearch(query);
     if (!needles.length) return viewProjects;
     return viewProjects.filter((project) => [project.name, ...allPromptTags(project).flatMap((tag) => [tag.tag, tag.translation, tag.category, CATEGORY_LABELS[tag.category]])].some((value) => needles.some((needle) => normalizeSearch(value).includes(needle))));
-  }, [projects, query, libraryView]);
+  }, [projects, query, libraryView, experiments]);
 
   useEffect(() => {
     if (activeId && filteredProjects.some((project) => project.id === activeId)) return;
@@ -1013,6 +1067,7 @@ export default function App() {
     setProjects((current) => current.map((project) => byProject.has(project.id) ? { ...project, ...byProject.get(project.id) } : project));
     setCollections(organization.collections || []);
     setSeries(organization.series || []);
+    setExperiments(organization.experiments || []);
   };
 
   const runLibraryOrganization = async (action, successMessage) => {
@@ -1097,6 +1152,43 @@ export default function App() {
     if (success) setSelectedIds(new Set());
     return success;
   };
+  const createExperiment = async () => {
+    const projectIds = [...selectedIds];
+    if (projectIds.length < 2) return false;
+    const baselineId = projectIds.includes(activeId) ? activeId : projectIds[0];
+    const baseline = projects.find((project) => project.id === baselineId);
+    const name = `对比 · ${String(baseline?.name || '未命名').replace(/\.[^.]+$/, '').slice(0, 48)}`;
+    const success = await runLibraryOrganization(
+      () => studio.createExperiment(name, baselineId, projectIds),
+      `已建立对比实验，基准为「${baseline?.name || '当前作品'}」`,
+    );
+    if (success) setSelectedIds(new Set());
+    return success;
+  };
+  const renameExperiment = (id, name) => runLibraryOrganization(() => studio.renameExperiment(id, name), '对比实验已重命名');
+  const deleteExperiment = async (id) => {
+    const success = await runLibraryOrganization(() => studio.deleteExperiment(id), '对比实验已删除，成员作品仍保留');
+    if (success && libraryView === `experiment:${id}`) changeLibraryView('all');
+    return success;
+  };
+  const addSelectedToExperiment = async (experimentId) => {
+    if (!experimentId || !selectedIds.size) return false;
+    const success = await runLibraryOrganization(
+      () => studio.addProjectsToExperiment(experimentId, [...selectedIds]),
+      `已加入实验并重新分析 ${selectedIds.size} 个作品`,
+    );
+    if (success) setSelectedIds(new Set());
+    return success;
+  };
+  const removeSelectedFromExperiment = async (experimentId) => {
+    if (!experimentId || !selectedIds.size) return false;
+    const success = await runLibraryOrganization(
+      () => studio.removeProjectsFromExperiment(experimentId, [...selectedIds]),
+      `已移出实验并重新计算变量`,
+    );
+    if (success) setSelectedIds(new Set());
+    return success;
+  };
   const setFavorite = async (favorite, projectIds = [...selectedIds]) => {
     if (!projectIds.length) return false;
     const success = await runLibraryOrganization(
@@ -1124,6 +1216,7 @@ export default function App() {
       deleted: Boolean(project.deleted_at),
       collections,
       series,
+      experiments,
     });
     if (!action) return;
     if (action === 'project:open-prompt') openPromptOverview(project.id);
@@ -1144,6 +1237,10 @@ export default function App() {
     if (action.startsWith('project:add-series:')) {
       const seriesId = action.slice('project:add-series:'.length);
       runLibraryOrganization(() => studio.addProjectsToSeries(seriesId, [project.id]), '作品已加入创作系列');
+    }
+    if (action.startsWith('project:add-experiment:')) {
+      const experimentId = action.slice('project:add-experiment:'.length);
+      runLibraryOrganization(() => studio.addProjectsToExperiment(experimentId, [project.id]), '作品已加入对比实验，变量已重新计算');
     }
   };
 
@@ -1482,6 +1579,7 @@ export default function App() {
       allProjects={projects}
       collections={collections}
       series={series}
+      experiments={experiments}
       activeId={activeId}
       setActiveId={(id) => { setActiveId(id); setActiveBranchId(''); setPromptScopeKey('base:prompt'); }}
       query={query}
@@ -1507,6 +1605,11 @@ export default function App() {
       onDeleteSeries={deleteSeries}
       onAddToSeries={addSelectedToSeries}
       onRemoveFromSeries={removeSelectedFromSeries}
+      onCreateExperiment={createExperiment}
+      onRenameExperiment={renameExperiment}
+      onDeleteExperiment={deleteExperiment}
+      onAddToExperiment={addSelectedToExperiment}
+      onRemoveFromExperiment={removeSelectedFromExperiment}
       onSetFavorite={setFavorite}
       onSetDeleted={setDeleted}
       onProjectContextMenu={projectContextMenu}

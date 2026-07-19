@@ -25,6 +25,13 @@ function safeSeries(series) {
   })).filter((entry) => entry.id && entry.name);
 }
 
+function safeExperiments(experiments) {
+  return (Array.isArray(experiments) ? experiments : []).slice(0, 100).map((entry) => ({
+    id: String(entry?.id || ''),
+    name: String(entry?.name || '').trim().slice(0, 80),
+  })).filter((entry) => entry.id && entry.name);
+}
+
 function safeResults(results) {
   return (Array.isArray(results) ? results : []).slice(0, 20).map((result) => ({
     id: String(result?.project_id || ''),
@@ -47,6 +54,7 @@ export function buildContextMenuTemplate(request = {}, select = () => {}) {
   if (request.kind === 'project') {
     const collections = safeCollections(request.collections);
     const series = safeSeries(request.series);
+    const experiments = safeExperiments(request.experiments);
     return [
       actionItem('打开 Prompt 总览', 'project:open-prompt', select),
       actionItem('复制 Prompt', 'project:copy-prompt', select),
@@ -62,6 +70,11 @@ export function buildContextMenuTemplate(request = {}, select = () => {}) {
         label: '加入创作系列',
         enabled: series.length > 0,
         submenu: series.map((entry) => actionItem(entry.name, `project:add-series:${entry.id}`, select)),
+      },
+      {
+        label: '加入对比实验',
+        enabled: experiments.length > 0,
+        submenu: experiments.map((entry) => actionItem(entry.name, `project:add-experiment:${entry.id}`, select)),
       },
       { type: 'separator' },
       actionItem(request.deleted ? '恢复到作品库' : '移入回收站', 'project:toggle-trash', select),

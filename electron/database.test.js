@@ -221,6 +221,45 @@ describe('prompt structure persistence', () => {
     expect(database.loadLibrary()).toHaveLength(2);
   });
 
+  it('recalculates controlled experiment variables when membership changes', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-database-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    const now = new Date().toISOString();
+    const insertResult = (id, seed, tag = '1girl') => database.insertProject({
+      id,
+      name: id,
+      image_path: `${id}.png`,
+      thumbnail_path: `${id}.webp`,
+      created_at: now,
+      updated_at: now,
+      tags: [{ id: `${id}-tag`, tag, weight: 1 }],
+      prompt_structure: { base_undesired_tags: [], use_coords: false, use_order: true, characters: [] },
+      metadata: { seed, model: 'nai-v4', sampler: 'k_euler', steps: 28, guidance: 5, extra_json: '{}' },
+      vibes: [],
+      versions: [],
+    });
+    insertResult('base', '42');
+    insertResult('seed-variant', '99');
+    insertResult('mixed-variant', '42', '2girls');
+
+    let organization = database.createExperiment('Seed 对照', 'base', ['base', 'seed-variant']);
+    const experimentId = organization.experiments[0].id;
+    expect(organization.experiments[0]).toMatchObject({ analysis_status: 'single', variable_fields: ['Seed'], project_count: 2, member_ids: ['base', 'seed-variant'] });
+    expect(organization.projects.find((entry) => entry.id === 'base').experiment_ids).toEqual([experimentId]);
+
+    organization = database.addProjectsToExperiment(experimentId, ['mixed-variant']);
+    expect(organization.experiments[0]).toMatchObject({ analysis_status: 'mixed', project_count: 3 });
+    expect(organization.experiments[0].variable_fields).toEqual(expect.arrayContaining(['Seed', 'Prompt']));
+    expect(() => database.removeProjectsFromExperiment(experimentId, ['base'])).toThrow('基准作品不能直接移出实验');
+
+    organization = database.removeProjectsFromExperiment(experimentId, ['mixed-variant']);
+    expect(organization.experiments[0]).toMatchObject({ analysis_status: 'single', variable_fields: ['Seed'], project_count: 2 });
+    organization = database.deleteExperiment(experimentId);
+    expect(organization.experiments).toEqual([]);
+    expect(database.loadLibrary()).toHaveLength(3);
+  });
+
   it('stores branch recipes separately from immutable result metadata', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-database-'));
     temporaryDirectories.push(directory);
