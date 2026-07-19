@@ -1,10 +1,15 @@
 # 图库、Vibe 库与 Tag 库三阶段开发计划
 
-> 状态：已确认方案，待实施  
-> 日期：2026-07-19  
-> 适用平台：Windows / macOS  
-> 关联文档：[资源库管理、Tag 分类、设置与交互设计](./library-management-taxonomy-settings-design.md)  
-> 关联文档：[图片系列、对比实验与生成分支设计](./experiment-and-branch-design.md)  
+> 状态：已确认方案，待实施
+>
+> 日期：2026-07-19
+>
+> 适用平台：Windows / macOS
+>
+> 关联文档：[资源库管理、Tag 分类、设置与交互设计](./library-management-taxonomy-settings-design.md)
+>
+> 关联文档：[图片系列、对比实验与生成分支设计](./experiment-and-branch-design.md)
+>
 > 视觉规范：[Lobe 视觉层级与颜色语义规范](./lobe-visual-language.md)
 
 ## 1. 文档目标
