@@ -468,6 +468,7 @@ function PreviewStage({ project, sourceProject, mode, setMode, experiment, exper
   const copyLabel = mode === 'prompt'
     ? overviewCopy.selected ? `复制已选 ${overviewCopy.count}` : `复制可见 ${overviewCopy.count}`
     : '复制 Prompt';
+  const compactCopyLabel = mode === 'prompt' ? `复制 ${overviewCopy.count}` : '复制';
   return <section className="preview-column">
     <header className="topbar">
       <div className="breadcrumb branch-breadcrumb"><span>作品库</span><b>/</b><strong>{sourceProject.name}</strong>{activeBranch && <em>{activeBranch.name}</em>}</div>
@@ -478,7 +479,7 @@ function PreviewStage({ project, sourceProject, mode, setMode, experiment, exper
           ...(experiment ? [{ label: <span><Icon name="library"/>对比</span>, value: 'compare' }] : []),
         ]} value={mode}/>
         <LobeActionIcon className="ghost" icon={<Icon name="folder"/>} onClick={() => onReveal(sourceProject.image_path)} size="small" title="在文件夹中显示原图" variant="outlined"/>
-        <LobeButton className="copy-button" disabled={mode === 'prompt' && !overviewCopy.count} icon={<Icon name="copy"/>} onClick={onCopy} type="primary">{copyLabel}</LobeButton>
+        <LobeButton className="copy-button" disabled={mode === 'prompt' && !overviewCopy.count} icon={<Icon name="copy"/>} onClick={onCopy} title={copyLabel} type="primary"><span className="copy-label-full">{copyLabel}</span><span className="copy-label-compact">{compactCopyLabel}</span></LobeButton>
       </div>
     </header>
     {mode === 'compare' && experiment ? <ExperimentCompare experiment={experiment} projects={experimentProjects} selectedIds={comparisonIds}/> : mode === 'image' ? <div className="stage">
@@ -565,7 +566,7 @@ function InformationExtractedControl({ vibe, onChange }) {
   }[state.kind];
   const marks = Object.fromEntries(state.cachedValues.map((cached) => [cached, { label: cached.toFixed(2) }]));
   return <div className={`information-control ${state.kind}`}>
-    <div className="information-heading"><span>Information Extracted</span><b>{value.toFixed(2)}</b></div>
+    <div className="information-heading"><span>Information Extracted</span></div>
     <LobeSliderWithInput aria-label="Information Extracted" className="information-range" controls={false} gap={8} marks={marks} max={1} min={0} onChange={(nextValue) => onChange(informationExtractedPatch(vibe, nextValue))} size="small" step={0.01} value={value}/>
     <small><Icon name={status.icon} size={12}/><span>{status.text}</span>{state.kind === 'uncached' && !state.cachedValues.length && <LobeButton onClick={() => onChange(restoreOriginalInformationPatch(vibe))} size="small" type="text">恢复原编码</LobeButton>}</small>
   </div>;
@@ -952,13 +953,13 @@ function VibePanel({ project, updateProject, showToast }) {
         <div className="vibe-image"><img src={mediaUrl(vibe.thumbnail_path)} alt="Vibe reference"/><label><LobeCheckbox checked={Boolean(vibe.enabled)} onChange={(event) => updateVibe(index, { enabled: event.target.checked })} size={16}/><span>{vibe.enabled ? '启用' : '停用'}</span></label></div>
         <div className="vibe-controls">
           <div className="vibe-card-title"><strong>{vibe.name || 'Vibe reference'}</strong><span className={`vibe-source ${vibe.source_kind}`}>{vibe.source_kind === 'image' ? '待编码' : '已编码'}</span></div>
-          <label><span>Reference Strength <b>{Number(vibe.strength).toFixed(2)}</b></span><LobeSliderWithInput controls={false} gap={8} max={1} min={0} onChange={(strength) => updateVibe(index, { strength })} size="small" step={0.01} value={Number(vibe.strength)}/></label>
+          <label><span>Reference Strength</span><LobeSliderWithInput className="vibe-range" controls={false} gap={8} max={1} min={0} onChange={(strength) => updateVibe(index, { strength })} size="small" step={0.01} value={Number(vibe.strength)}/></label>
           <InformationExtractedControl vibe={vibe} onChange={(patch) => updateVibe(index, patch)}/>
           {vibe.reference_image
             ? <LobeButton block className="vibe-file-action source-image" icon={<Icon name="image" size={13}/>} onClick={() => studio.revealFile(vibe.reference_image)} size="small" type="text">打开源图所在文件夹</LobeButton>
             : <LobeAlert className="vibe-source-warning" message="缺少源 PNG；编码仍可复用，但无法查看图源" type="warning" variant="outlined"/>}
           {vibe.vibe_file && <LobeButton block className={`vibe-file-action ${informationState.fileUsable ? '' : 'unavailable'}`} disabled={!informationState.fileUsable} icon={<Icon name="folder" size={13}/>} onClick={() => studio.revealFile(vibe.vibe_file)} size="small" title={informationState.fileUsable ? '在文件夹中显示当前 Vibe 文件' : '当前 Information Extracted 尚未计算，此文件与所选参数不匹配'} type="text">{informationState.fileUsable ? '显示 .naiv4vibe 文件' : '.naiv4vibe 当前参数不可用'}</LobeButton>}
-          <LobeButton block danger icon={<Icon name="trash"/>} onClick={() => updateProject({ ...project, vibes: project.vibes.filter((_, itemIndex) => itemIndex !== index) })} size="small" type="text">移除参考图</LobeButton>
+          <LobeButton block className="vibe-file-action vibe-remove-action" danger icon={<Icon name="trash"/>} onClick={() => updateProject({ ...project, vibes: project.vibes.filter((_, itemIndex) => itemIndex !== index) })} size="small" type="text">移除参考图</LobeButton>
         </div>
       </article>;})}
       {!project.vibes.length && <LobeEmpty className="panel-empty" description="从下面的 Vibe 库加入，或导入 .naiv4vibe 与参考图。" image={<Icon name="image" size={24}/>} title="当前作品还没有 Vibe"/>}
@@ -976,7 +977,7 @@ function VibePanel({ project, updateProject, showToast }) {
           {group.entries.map((entry) => <article className={`vibe-library-card ${entry.archived_at ? 'archived' : ''} ${editingLibraryId === entry.id ? 'editing' : ''}`} key={entry.id} onContextMenu={(event) => libraryVibeContextMenu(event, entry)}>
             {editingLibraryId === entry.id ? <div className="vibe-library-editor">
               <label><span>显示名称</span><LobeInput autoFocus maxLength={120} value={libraryDraft.name} onChange={(event) => setLibraryDraft((current) => ({ ...current, name: event.target.value }))}/></label>
-              <label><span>Information Extracted <b>{Number(libraryDraft.information_extracted).toFixed(2)}</b></span><LobeSliderWithInput controls={false} gap={8} max={1} min={0} onChange={(information_extracted) => setLibraryDraft((current) => ({ ...current, information_extracted }))} size="small" step={0.01} value={Number(libraryDraft.information_extracted)}/></label>
+              <label><span>Information Extracted</span><LobeSliderWithInput controls={false} gap={8} max={1} min={0} onChange={(information_extracted) => setLibraryDraft((current) => ({ ...current, information_extracted }))} size="small" step={0.01} value={Number(libraryDraft.information_extracted)}/></label>
               <small><Icon name="info" size={12}/>调整 Information 后，只在这个位置标记编码可用，并注明“用户设置、未验证”；不会重新计算或修改文件。只改名称不会改变验证状态。</small>
               <div><LobeButton onClick={() => setEditingLibraryId('')} size="small">取消</LobeButton><LobeButton disabled={!libraryDraft.name.trim()} onClick={() => saveLibraryEdit(entry)} size="small" type="primary">保存资料</LobeButton></div>
             </div> : <>
