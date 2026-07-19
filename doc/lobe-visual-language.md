@@ -1,5 +1,7 @@
 # Lobe 视觉层级与颜色语义规范
 
+> 信息架构更新：永久右侧检查器和底部胶片属于迁移前结构，将按[图库、Vibe 库与 Tag 库三阶段开发计划](./three-library-information-architecture-development-plan.md)迁移为资源详情页、关系分组和标准网格；本文的表面与颜色语义继续适用于新页面。
+
 ## 目标
 
 NovelAI Prompt Studio 使用 Lobe UI 的 `slate + blue` 主题，但应用的视觉气质不能只依赖组件外观。布局表面、按钮层级、状态色与 Tag 分类色必须遵循同一套规则，确保 Windows 与 macOS 上都保持安静、清晰、适合长时间工作的创作台体验。

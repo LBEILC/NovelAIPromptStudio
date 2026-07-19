@@ -5,6 +5,8 @@
 > 适用平台：Windows / macOS  
 > 关联文档：[图片系列、对比实验与生成分支设计](./experiment-and-branch-design.md)
 >
+> 信息架构实施：[图库、Vibe 库与 Tag 库三阶段开发计划](./three-library-information-architecture-development-plan.md)
+>
 > 导入补充：[导入流程、Inpainting 提示与批量 Tag 输入设计](./import-workflow-and-metadata-warnings.md)
 >
 > 2026-07-19 实施进度：作品收藏集、多选、回收站、创作系列、对比实验与安全导入已落地。Vibe 库现支持重命名、手动声明 Information Extracted、归档和恢复；手动数值会标记为“用户设置、未验证”，归档不会破坏已有作品引用。独立设置页已建立，统一承载界面字号、密度、动效和 AI 安全连接配置。Vibe 收藏集、引用检查后的彻底删除、明暗主题与高级 AI 任务配置仍按后续阶段实施。
