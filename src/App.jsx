@@ -26,6 +26,7 @@ import { hasLimitedReproduction } from './lib/generationMetadata.js';
 import { assessDroppedFiles } from './lib/importDrop.js';
 import { applyGenerationSnapshot, branchChangeFields, branchChangeSummary, generationSnapshot, hasGenerationChanges } from './lib/branches.js';
 import { contextMenuPosition, isTextEditingTarget } from './lib/contextMenu.js';
+import { panCompareViewport, zoomCompareViewport } from './lib/compareViewport.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
@@ -358,6 +359,8 @@ function experimentFieldValue(project, field) {
 
 function ExperimentCompare({ experiment, projects, selectedIds }) {
   const [view, setView] = useState('visual');
+  const [viewport, setViewport] = useState({ scale: 1, x: 0, y: 0 });
+  const viewportDrag = useRef(null);
   const selected = projects.filter((project) => selectedIds.has(project.id)).slice(0, 4);
   const baseline = projects.find((project) => project.id === experiment.baseline_project_id) || selected[0];
   const fields = experiment.variable_fields || [];
@@ -365,12 +368,24 @@ function ExperimentCompare({ experiment, projects, selectedIds }) {
   return <div className="experiment-compare">
     <header>
       <div><span>CONTROLLED COMPARISON</span><strong>{experiment.name}</strong><small>基准：{experiment.baseline_name || baseline?.name || '未知'} · {selected.length} 个视图</small></div>
-      <div className="compare-view-switch"><button className={view === 'visual' ? 'active' : ''} onClick={() => setView('visual')}><Icon name="image" size={14}/>视觉对比</button><button className={view === 'parameters' ? 'active' : ''} onClick={() => setView('parameters')}><Icon name="layers" size={14}/>参数差异</button></div>
+      <div className="compare-header-actions">
+        {view === 'visual' && <div className="compare-zoom-controls" aria-label="同步缩放"><button onClick={() => setViewport((current) => zoomCompareViewport(current, -.25))}>缩小</button><b>{Math.round(viewport.scale * 100)}%</b><button onClick={() => setViewport((current) => zoomCompareViewport(current, .25))}>放大</button><button onClick={() => setViewport({ scale: 1, x: 0, y: 0 })}>适配</button></div>}
+        <div className="compare-view-switch"><button className={view === 'visual' ? 'active' : ''} onClick={() => setView('visual')}><Icon name="image" size={14}/>视觉对比</button><button className={view === 'parameters' ? 'active' : ''} onClick={() => setView('parameters')}><Icon name="layers" size={14}/>参数差异</button></div>
+      </div>
     </header>
     {experiment.analysis_status === 'mixed' && <div className="compare-causality-warning"><Icon name="warning" size={14}/>当前实验有多个变化字段，只适合视觉筛选，不能归因于单个参数。</div>}
     {view === 'visual' ? <div className={`compare-grid count-${selected.length}`}>
       {selected.map((project) => <figure key={project.id} className={project.id === experiment.baseline_project_id ? 'baseline' : ''}>
-        <div><img src={mediaUrl(project.image_path)} alt={project.name}/><span>{project.id === experiment.baseline_project_id ? 'BASELINE' : branchChangeFields(baseline, project).join(' · ') || 'SAME'}</span></div>
+        <div className={`compare-image-viewport ${viewport.scale > 1 ? 'zoomed' : ''}`} onWheel={(event) => { event.preventDefault(); setViewport((current) => zoomCompareViewport(current, event.deltaY < 0 ? .25 : -.25)); }} onPointerDown={(event) => {
+          if (viewport.scale <= 1) return;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          viewportDrag.current = { scale: viewport.scale, x: viewport.x, y: viewport.y, pointerX: event.clientX, pointerY: event.clientY };
+        }} onPointerMove={(event) => {
+          if (!viewportDrag.current) return;
+          setViewport(panCompareViewport(viewportDrag.current, { x: event.clientX, y: event.clientY }));
+        }} onPointerUp={(event) => { viewportDrag.current = null; event.currentTarget.releasePointerCapture?.(event.pointerId); }} onPointerCancel={() => { viewportDrag.current = null; }}>
+          <img src={mediaUrl(project.image_path)} alt={project.name} draggable="false" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})` }}/><span>{project.id === experiment.baseline_project_id ? 'BASELINE' : branchChangeFields(baseline, project).join(' · ') || 'SAME'}</span>
+        </div>
         <figcaption><strong>{project.name}</strong><small>Seed {project.metadata?.seed || '—'} · {project.metadata?.model || 'Model unknown'}</small></figcaption>
       </figure>)}
     </div> : <div className="compare-parameter-table">
