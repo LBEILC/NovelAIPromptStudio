@@ -4,6 +4,10 @@ import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/exter
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import LobeButton from '@lobehub/ui/es/Button/index';
+import LobeInput from '@lobehub/ui/es/Input/Input';
+import LobeInputPassword from '@lobehub/ui/es/Input/InputPassword';
+import LobeSegmented from '@lobehub/ui/es/Segmented/index';
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, inferCategory, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import {
   addPromptCharacter,
@@ -1127,31 +1131,25 @@ function SettingsPage({ appearance, onAppearanceChange, onClose, showToast }) {
         <button className={section === 'appearance' ? 'active' : ''} onClick={() => setSection('appearance')}><Icon name="settings"/><span><strong>外观与可读性</strong><small>字号、密度、动效</small></span></button>
         <button className={section === 'ai' ? 'active' : ''} onClick={() => setSection('ai')}><Icon name="spark"/><span><strong>AI 服务</strong><small>接口、模型、安全存储</small></span></button>
       </nav>
-      <button className="settings-back" onClick={onClose}><Icon name="close" size={14}/>返回作品库</button>
+      <LobeButton className="settings-back" onClick={onClose}><Icon name="close" size={14}/>返回作品库</LobeButton>
     </aside>
     <section className="settings-content">
       {section === 'appearance' ? <>
         <header className="settings-heading"><span>APPEARANCE</span><h2>让高密度工作台保持清楚</h2><p>字号会按固定档位缩放语义排版；密度只改变留白和控件高度，不会隐藏功能。</p></header>
         <div className="settings-group">
-          <div className="settings-row"><div><strong>界面字号</strong><small>默认使用“较大”，改善中文与长时间阅读。</small></div><div className="settings-segment" role="group" aria-label="界面字号">{[
-            ['default', '标准'], ['large', '较大'], ['larger', '特大'],
-          ].map(([value, label]) => <button key={value} className={appearance.fontScale === value ? 'active' : ''} onClick={() => onAppearanceChange({ fontScale: value })}>{label}</button>)}</div></div>
-          <div className="settings-row"><div><strong>界面密度</strong><small>窗口较窄时建议紧凑；大屏长期整理建议舒适。</small></div><div className="settings-segment" role="group" aria-label="界面密度">{[
-            ['compact', '紧凑'], ['comfortable', '舒适'],
-          ].map(([value, label]) => <button key={value} className={appearance.density === value ? 'active' : ''} onClick={() => onAppearanceChange({ density: value })}>{label}</button>)}</div></div>
-          <div className="settings-row"><div><strong>界面动效</strong><small>“跟随系统”尊重系统的减少动态效果设置；关闭后只保留必要状态变化。</small></div><div className="settings-segment" role="group" aria-label="界面动效">{[
-            ['full', '完整'], ['reduced', '跟随系统'], ['off', '关闭'],
-          ].map(([value, label]) => <button key={value} className={appearance.motion === value ? 'active' : ''} onClick={() => onAppearanceChange({ motion: value })}>{label}</button>)}</div></div>
+          <div className="settings-row"><div><strong>界面字号</strong><small>默认使用“较大”，改善中文与长时间阅读。</small></div><LobeSegmented aria-label="界面字号" className="settings-segment" options={[{ label: '标准', value: 'default' }, { label: '较大', value: 'large' }, { label: '特大', value: 'larger' }]} value={appearance.fontScale} onChange={(value) => onAppearanceChange({ fontScale: value })}/></div>
+          <div className="settings-row"><div><strong>界面密度</strong><small>窗口较窄时建议紧凑；大屏长期整理建议舒适。</small></div><LobeSegmented aria-label="界面密度" className="settings-segment" options={[{ label: '紧凑', value: 'compact' }, { label: '舒适', value: 'comfortable' }]} value={appearance.density} onChange={(value) => onAppearanceChange({ density: value })}/></div>
+          <div className="settings-row"><div><strong>界面动效</strong><small>“跟随系统”尊重系统的减少动态效果设置；关闭后只保留必要状态变化。</small></div><LobeSegmented aria-label="界面动效" className="settings-segment" options={[{ label: '完整', value: 'full' }, { label: '跟随系统', value: 'reduced' }, { label: '关闭', value: 'off' }]} value={appearance.motion} onChange={(value) => onAppearanceChange({ motion: value })}/></div>
         </div>
         <aside className="settings-platform-note"><Icon name="info"/><div><strong>{platform} 当前生效</strong><span>字体优先使用平台原生中文无衬线字体；Windows 保持隐藏应用菜单，macOS 保留原生菜单与窗口习惯。</span></div></aside>
       </> : <>
         <header className="settings-heading"><span>AI SERVICE</span><h2>翻译与分类使用同一安全连接</h2><p>API Key 由操作系统安全存储加密，不进入 SQLite、日志、导出文件或跨平台协调文档。</p></header>
         <div className="settings-group ai-settings-group">
-          <label><span><strong>API Base URL</strong><small>兼容 OpenAI API 格式的服务地址</small></span><input value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
-          <label><span><strong>API Key</strong><small>{aiSettings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}</small></span><input type="password" value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '已安全保存' : '输入 API Key'}/></label>
-          <label><span><strong>默认模型</strong><small>翻译与分类任务暂时共用；后续可分别配置</small></span><div className="settings-model-input"><input list="settings-model-list" value={aiSettings.model} onChange={(event) => setAISettings((current) => ({ ...current, model: event.target.value }))} placeholder="输入或读取模型 ID"/><datalist id="settings-model-list">{models.map((model) => <option key={model} value={model}/>)}</datalist><button onClick={loadModels} disabled={Boolean(busy)}><Icon name="refresh" size={14}/>{busy === 'models' ? '读取中' : '读取模型'}</button></div></label>
+          <label><span><strong>API Base URL</strong><small>兼容 OpenAI API 格式的服务地址</small></span><LobeInput value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
+          <label><span><strong>API Key</strong><small>{aiSettings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}</small></span><LobeInputPassword value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '已安全保存' : '输入 API Key'}/></label>
+          <label><span><strong>默认模型</strong><small>翻译与分类任务暂时共用；后续可分别配置</small></span><div className="settings-model-input"><LobeInput list="settings-model-list" value={aiSettings.model} onChange={(event) => setAISettings((current) => ({ ...current, model: event.target.value }))} placeholder="输入或读取模型 ID"/><datalist id="settings-model-list">{models.map((model) => <option key={model} value={model}/>)}</datalist><LobeButton onClick={loadModels} disabled={Boolean(busy)}><Icon name="refresh" size={14}/>{busy === 'models' ? '读取中' : '读取模型'}</LobeButton></div></label>
         </div>
-        <div className="settings-actions"><button onClick={testConnection} disabled={Boolean(busy)}>测试连接</button><button className="primary" onClick={saveAI} disabled={Boolean(busy)}>{busy === 'save' ? '保存中…' : '保存 AI 设置'}</button></div>
+        <div className="settings-actions"><LobeButton onClick={testConnection} disabled={Boolean(busy)}>测试连接</LobeButton><LobeButton type="primary" onClick={saveAI} disabled={Boolean(busy)}>{busy === 'save' ? '保存中…' : '保存 AI 设置'}</LobeButton></div>
         {!aiSettings.encryptionAvailable && <aside className="settings-warning"><Icon name="warning"/><span>当前系统安全存储不可用，应用不会以明文保存 API Key。</span></aside>}
       </>}
     </section>

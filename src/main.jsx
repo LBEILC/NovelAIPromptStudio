@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import LobeProvider from './LobeProvider.jsx';
 import './styles.css';
 
 document.documentElement.dataset.platform = navigator.platform.startsWith('Win')
@@ -9,6 +10,6 @@ document.documentElement.dataset.platform = navigator.platform.startsWith('Win')
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <LobeProvider><App /></LobeProvider>
   </React.StrictMode>,
 );
