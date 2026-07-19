@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('studio', {
   loadLibrary: () => ipcRenderer.invoke('library:load'),
+  showContextMenu: (request) => ipcRenderer.invoke('context-menu:show', request),
   loadLibraryOrganization: () => ipcRenderer.invoke('library:organization:load'),
   createCollection: (name) => ipcRenderer.invoke('library:collection:create', name),
   renameCollection: (id, name) => ipcRenderer.invoke('library:collection:rename', id, name),

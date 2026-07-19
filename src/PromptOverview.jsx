@@ -67,6 +67,7 @@ function ScopeTags({
   onEditTag,
   onKeyboardMove,
   onToggleSelect,
+  onTagContextMenu,
 }) {
   const selectedSet = new Set(selectedKeys);
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
@@ -89,6 +90,7 @@ function ScopeTags({
           onDragOver={(event) => !selecting && !filtered && event.preventDefault()}
           onDrop={(event) => !selecting && !filtered && onDrop(scope, index, event)}
           onClick={() => selecting ? onToggleSelect(key) : onEditTag(scope.key, tag.id)}
+          onContextMenu={(event) => onTagContextMenu(event, scope.key, tag)}
           onKeyDown={(event) => selecting ? undefined : onKeyboardMove(scope, index, event)}
           role="listitem"
           aria-pressed={selecting ? selected : undefined}
@@ -107,7 +109,7 @@ function ScopeTags({
   </div>;
 }
 
-function CategoryGroup({ group, language, selecting, selectedKeys, onToggleSelect, onToggleGroup, onEditTag }) {
+function CategoryGroup({ group, language, selecting, selectedKeys, onToggleSelect, onToggleGroup, onEditTag, onTagContextMenu }) {
   const selectedSet = new Set(selectedKeys);
   const groupKeys = group.entries.map((entry) => entry.key);
   const allSelected = groupKeys.length > 0 && groupKeys.every((key) => selectedSet.has(key));
@@ -127,6 +129,7 @@ function CategoryGroup({ group, language, selecting, selectedKeys, onToggleSelec
             key={entry.key}
             className={`overview-tag cat-${String(group.category).toLowerCase()} ${entry.scopePolarity === 'undesired' ? 'undesired-tag' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''}`}
             onClick={() => selecting ? onToggleSelect(entry.key) : onEditTag(entry.scopeKey, entry.tag.id)}
+            onContextMenu={(event) => onTagContextMenu(event, entry.scopeKey, entry.tag)}
             role="listitem"
             aria-pressed={selecting ? selected : undefined}
             title={`${display.title}\n区域：${entry.scopeLabel}${warning ? `\n语法提醒：${warning}` : ''}${selecting ? '\n点击选择' : '\n点击编辑'}`}
@@ -148,7 +151,7 @@ function Segment({ value, options, onChange, label }) {
   </div>;
 }
 
-export default function PromptOverview({ project, updateProject, onEditTag, onCopyContextChange, onCopyText, onNotify }) {
+export default function PromptOverview({ project, updateProject, onEditTag, onTagContextMenu, onCopyContextChange, onCopyText, onNotify }) {
   const [dragging, setDragging] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_OVERVIEW_FILTERS);
   const [language, setLanguage] = useState('original');
@@ -283,6 +286,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
     onEditTag,
     onKeyboardMove: keyboardMove,
     onToggleSelect: toggleSelection,
+    onTagContextMenu,
   };
 
   return <div className="prompt-overview">
@@ -301,7 +305,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
       </div>
 
       <div className="overview-toolbar">
-        <label className="overview-search"><span>⌕</span><input value={filters.query} onChange={(event) => changeFilter({ query: event.target.value })} placeholder="筛选 Tag 或译名"/></label>
+        <label className="overview-search"><Icon name="search" size={13}/><input value={filters.query} onChange={(event) => changeFilter({ query: event.target.value })} placeholder="筛选 Tag 或译名"/></label>
         <Segment value={filters.polarity} options={[["all", '全部'], ['prompt', 'Prompt'], ['undesired', 'Undesired']]} onChange={(polarity) => changeFilter({ polarity })} label="Prompt 类型"/>
         <Segment value={filters.domain} options={[["all", '全部区域'], ['base', 'Base'], ['character', 'Character']]} onChange={(domain) => changeFilter({ domain })} label="Prompt 区域"/>
         <Segment value={viewMode} options={[["structure", '按结构'], ['category', '按分类']]} onChange={setViewMode} label="总览分组方式"/>
@@ -333,6 +337,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
         onToggleSelect={toggleSelection}
         onToggleGroup={toggleCategoryGroup}
         onEditTag={onEditTag}
+        onTagContextMenu={onTagContextMenu}
       />)}
 
       {viewMode === 'structure' && baseScopes.length > 0 && <section className="overview-layer base-layer">
@@ -360,7 +365,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onCo
 
       {!visibleEntries.length && filtered && <div className="overview-no-results"><strong>没有符合条件的 Tag</strong><span>调整分类、区域或搜索词后，顶部复制内容会同步更新。</span></div>}
       {viewMode === 'structure' && !structure.characters.length && filters.domain !== 'base' && <button className="overview-add-character" onClick={() => onEditTag('base:prompt', null)}>
-        <span>＋</span><div><strong>还没有 Character Prompt</strong><small>在右侧 Prompt 面板添加角色，最多支持 6 个。</small></div>
+        <Icon name="plus" size={20}/><div><strong>还没有 Character Prompt</strong><small>在右侧 Prompt 面板添加角色，最多支持 6 个。</small></div>
       </button>}
     </div>
   </div>;

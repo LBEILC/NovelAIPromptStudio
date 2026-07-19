@@ -10,6 +10,7 @@ import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
 import { hasGenerationChanges, mergeResultAnnotations } from '../src/lib/branches.js';
 import { compareBranchResult } from '../src/lib/branchMatching.js';
+import { buildContextMenuTemplate } from './contextMenus.js';
 
 app.setName('NovelAI Prompt Studio');
 
@@ -125,6 +126,21 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('library:load', () => database.loadLibrary());
+  ipcMain.handle('context-menu:show', (event, request = {}) => new Promise((resolve) => {
+    const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!ownerWindow || ownerWindow.isDestroyed()) { resolve(null); return; }
+    let settled = false;
+    const finish = (action) => {
+      if (settled) return;
+      settled = true;
+      resolve(action);
+    };
+    const template = buildContextMenuTemplate(request, finish);
+    if (!template.length) { finish(null); return; }
+    const x = Number.isFinite(Number(request.x)) ? Math.max(0, Math.round(Number(request.x))) : undefined;
+    const y = Number.isFinite(Number(request.y)) ? Math.max(0, Math.round(Number(request.y))) : undefined;
+    Menu.buildFromTemplate(template).popup({ window: ownerWindow, x, y, callback: () => finish(null) });
+  }));
   ipcMain.handle('library:organization:load', () => database.loadLibraryOrganization());
   ipcMain.handle('library:collection:create', (_event, name) => libraryOrganizationResult(() => database.createCollection(name)));
   ipcMain.handle('library:collection:rename', (_event, id, name) => libraryOrganizationResult(() => database.renameCollection(id, name)));

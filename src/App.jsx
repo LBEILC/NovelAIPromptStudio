@@ -25,9 +25,11 @@ import { informationExtractedPatch, informationExtractedState, restoreOriginalIn
 import { hasLimitedReproduction } from './lib/generationMetadata.js';
 import { assessDroppedFiles } from './lib/importDrop.js';
 import { applyGenerationSnapshot, branchChangeSummary, generationSnapshot, hasGenerationChanges } from './lib/branches.js';
+import { contextMenuPosition, isTextEditingTarget } from './lib/contextMenu.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
+  showContextMenu: async () => null,
   loadLibraryOrganization: async () => ({ collections: [], projects: [] }),
   createCollection: async () => ({ ok: true, collections: [], projects: [] }),
   renameCollection: async () => ({ ok: true, collections: [], projects: [] }),
@@ -93,6 +95,13 @@ function parseBranchSnapshot(branch) {
   }
 }
 
+async function showNativeContextMenu(event, request) {
+  if (isTextEditingTarget(event.target)) return null;
+  event.preventDefault();
+  event.stopPropagation();
+  return studio.showContextMenu({ ...request, ...contextMenuPosition(event) });
+}
+
 function ImportExperience({ dragState, progress, result, onCancel, onDismiss }) {
   const summary = result?.summary;
   const importing = progress && ['preparing', 'importing'].includes(progress.phase);
@@ -148,6 +157,7 @@ function LibraryPanel({
   onRemoveFromCollection,
   onSetFavorite,
   onSetDeleted,
+  onProjectContextMenu,
 }) {
   const [creatingCollection, setCreatingCollection] = useState(false);
   const [collectionName, setCollectionName] = useState('');
@@ -224,7 +234,7 @@ function LibraryPanel({
       </div>
     </div>}
     <div className="asset-list">
-      {projects.map((project) => <div key={project.id} className={`asset-row ${project.id === activeId ? 'active' : ''} ${selectedIds.has(project.id) ? 'selected' : ''}`}>
+      {projects.map((project) => <div key={project.id} className={`asset-row ${project.id === activeId ? 'active' : ''} ${selectedIds.has(project.id) ? 'selected' : ''}`} onContextMenu={(event) => onProjectContextMenu(event, project)}>
         {selectionMode && <button className="asset-check" onClick={() => onToggleSelected(project.id)} aria-pressed={selectedIds.has(project.id)} aria-label={`${selectedIds.has(project.id) ? '取消选择' : '选择'} ${project.name}`}><SelectionMark selected={selectedIds.has(project.id)}/></button>}
         <button className="asset-thumbnail" onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenPromptOverview(project.id)} title={selectionMode ? '选择作品' : '打开 Prompt 总览'}><img src={mediaUrl(project.thumbnail_path)} alt=""/><span><Icon name="layers" size={13}/></span></button>
         <button className="asset-select" onClick={() => selectionMode ? onToggleSelected(project.id) : setActiveId(project.id)}><span className="asset-copy"><strong>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.collection_ids || []).length} 组 · {relativeTime(project.updated_at)}</small></span></button>
@@ -243,7 +253,7 @@ const BRANCH_STATUS_LABELS = {
   mismatch: '结果不匹配',
 };
 
-function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal, onEditTag, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, branchResultImporting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
+function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal, onEditTag, onTagContextMenu, onProjectContextMenu, onBranchContextMenu, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, branchResultImporting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
   const limitedReproduction = hasLimitedReproduction(project.metadata);
   const activeBranch = (sourceProject.branches || []).find((branch) => branch.id === activeBranchId);
   const copyLabel = mode === 'prompt'
@@ -274,17 +284,17 @@ function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal,
         <span>{project.metadata.steps || '—'} STEPS</span>
         {limitedReproduction && <><i/><span className="reproduction-status" title="局部重绘 metadata 不包含完整底图与蒙版">INPAINT · 无法精确复现</span></>}
       </div>
-    </div> : <PromptOverview project={project} updateProject={updateProject} onEditTag={onEditTag} onCopyContextChange={onOverviewCopyChange} onCopyText={onCopyText} onNotify={onNotify}/>}
+    </div> : <PromptOverview project={project} updateProject={updateProject} onEditTag={onEditTag} onTagContextMenu={onTagContextMenu} onCopyContextChange={onOverviewCopyChange} onCopyText={onCopyText} onNotify={onNotify}/>}
     <footer className="version-rail branch-rail">
       <div className="rail-title"><span><Icon name="history"/>生成分支</span><div className="rail-actions">
         {activeBranch?.status === 'draft' && <><button className="restore-action danger" onClick={() => onDiscardBranch(activeBranch.id)}>放弃草稿</button><button onClick={() => onMarkBranchWaiting(activeBranch.id)}><Icon name="check"/>标记待生成</button></>}
         {activeBranch && ['waiting', 'result', 'mismatch'].includes(activeBranch.status) && <button onClick={() => onImportBranchResult(activeBranch.id)} disabled={branchResultImporting === activeBranch.id}><Icon name="upload"/>{branchResultImporting === activeBranch.id ? '正在核对…' : '上传结果图'}</button>}
       </div></div>
       <div className="version-strip">
-        <button className={`version-card current result-card ${!activeBranchId ? 'selected' : ''}`} onClick={() => onSelectBranch('')}>
+        <button className={`version-card current result-card ${!activeBranchId ? 'selected' : ''}`} onClick={() => onSelectBranch('')} onContextMenu={(event) => onProjectContextMenu(event, sourceProject)}>
           <img src={mediaUrl(sourceProject.thumbnail_path)} alt=""/><span><b>原图结果</b><small>生成信息只读 · {relativeTime(sourceProject.updated_at)}</small></span><em><Icon name="lock" size={11}/>RESULT</em>
         </button>
-        {(sourceProject.branches || []).map((branch, index) => <button key={branch.id} className={`version-card branch-card ${activeBranchId === branch.id ? 'selected' : ''}`} onClick={() => onSelectBranch(branch.id)}>
+        {(sourceProject.branches || []).map((branch, index) => <button key={branch.id} className={`version-card branch-card ${activeBranchId === branch.id ? 'selected' : ''}`} onClick={() => onSelectBranch(branch.id)} onContextMenu={(event) => onBranchContextMenu(event, branch)}>
           {branch.results?.[0] ? <img src={mediaUrl(branch.results[0].thumbnail_path)} alt=""/> : <div className="version-number">B{(sourceProject.branches || []).length - index}</div>}<span><b>{branch.name}</b><small>{branch.results?.length ? `${branch.results.length} 张结果 · ${branch.results[0].match_status === 'matched' ? 'metadata 匹配' : `${branch.results[0].differences?.join(' / ') || 'metadata 不匹配'}`}` : branch.change_summary || relativeTime(branch.updated_at)}</small></span><em className={`branch-status ${branch.status}`}>{BRANCH_STATUS_LABELS[branch.status] || branch.status}</em>
         </button>)}
         {(sourceProject.versions || []).map((version, index) => <button key={version.id} className="version-card legacy-version" onClick={() => onUseLegacyVersion(version)} title="把旧版 Prompt 作为新的分支草稿打开">
@@ -303,8 +313,8 @@ function WeightControl({ value, onChange }) {
   </div>;
 }
 
-function TagCard({ tag, index, translating, dragging, dropTarget, onTranslate, onChange, onDelete, onPointerStart, onPointerMove, onPointerEnd, onKeyboardMove }) {
-  return <article data-tag-index={index} data-tag-id={tag.id} className={`tag-card ${dragging ? 'dragging' : ''} ${dropTarget ? 'drop-target' : ''}`}>
+function TagCard({ tag, index, translating, dragging, dropTarget, onTranslate, onChange, onDelete, onContextMenu, onPointerStart, onPointerMove, onPointerEnd, onKeyboardMove }) {
+  return <article data-tag-index={index} data-tag-id={tag.id} className={`tag-card ${dragging ? 'dragging' : ''} ${dropTarget ? 'drop-target' : ''}`} onContextMenu={onContextMenu}>
     <div className="tag-line">
       <button className="drag-handle" onPointerDown={(event) => onPointerStart(index, event)} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} onKeyDown={(event) => onKeyboardMove(index, event)} title="按住拖动排序；Option + 方向键微调" aria-label={`拖动 ${tag.tag} 排序`}><Icon name="grip"/></button>
       <div className="tag-fields">
@@ -369,7 +379,7 @@ function PositionEditor({ project, character, updateProject }) {
   </section>;
 }
 
-function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, focusTagId }) {
+function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, focusTagId, onTagContextMenu }) {
   const [newTag, setNewTag] = useState('');
   const [lastBatch, setLastBatch] = useState(null);
   const [showAISettings, setShowAISettings] = useState(false);
@@ -592,7 +602,7 @@ function TagsPanel({ project, updateProject, showToast, scopeKey, setScopeKey, f
     </section>
     <div className="category-legend">{CATEGORY_OPTIONS.filter((category) => category !== 'Unsorted').map((category) => <span key={category} className={`cat-${category.toLowerCase()}`}>{CATEGORY_LABELS[category]}<b>{tags.filter((tag) => tag.category === category).length}</b></span>)}</div>
     <div className="tag-stack">
-      {tags.map((tag, index) => <TagCard key={tag.id} tag={tag} index={index} translating={translatingIds.has(tag.id)} dragging={draggingIndex === index} dropTarget={dropIndex === index && draggingIndex !== index} onTranslate={() => translateTagIds([tag.id])} onChange={(patch) => updateTag(index, patch)} onDelete={() => updateProject(updatePromptScope(project, scope.key, tags.filter((_, itemIndex) => itemIndex !== index)))} onPointerStart={beginPointerDrag} onPointerMove={movePointerDrag} onPointerEnd={endPointerDrag} onKeyboardMove={keyboardMove}/>)}
+      {tags.map((tag, index) => <TagCard key={tag.id} tag={tag} index={index} translating={translatingIds.has(tag.id)} dragging={draggingIndex === index} dropTarget={dropIndex === index && draggingIndex !== index} onTranslate={() => translateTagIds([tag.id])} onChange={(patch) => updateTag(index, patch)} onDelete={() => updateProject(updatePromptScope(project, scope.key, tags.filter((_, itemIndex) => itemIndex !== index)))} onContextMenu={(event) => onTagContextMenu(event, scope.key, tag)} onPointerStart={beginPointerDrag} onPointerMove={movePointerDrag} onPointerEnd={endPointerDrag} onKeyboardMove={keyboardMove}/>)}
       {!tags.length && <div className="panel-empty"><Icon name="layers"/><strong>这里还没有 Tag</strong><span>从含 NovelAI V4 metadata 的图片自动恢复，或在上方逐个添加。</span></div>}
     </div>
   </div>;
@@ -686,6 +696,33 @@ function VibePanel({ project, updateProject, showToast }) {
     showToast(`${entry.name} 已加入当前作品`);
   };
   const updateVibe = (index, patch) => updateProject({ ...project, vibes: project.vibes.map((vibe, itemIndex) => itemIndex === index ? { ...vibe, ...patch } : vibe) });
+  const currentVibeContextMenu = async (event, vibe, index, informationState) => {
+    const action = await showNativeContextMenu(event, {
+      kind: 'vibe-current',
+      enabled: Boolean(vibe.enabled),
+      hasSource: Boolean(vibe.reference_image),
+      fileUsable: Boolean(vibe.vibe_file && informationState.fileUsable),
+    });
+    if (action === 'vibe:toggle') updateVibe(index, { enabled: !vibe.enabled });
+    if (action === 'vibe:reveal-source') studio.revealFile(vibe.reference_image);
+    if (action === 'vibe:reveal-file') studio.revealFile(vibe.vibe_file);
+    if (action === 'vibe:remove') {
+      updateProject({ ...project, vibes: project.vibes.filter((_, itemIndex) => itemIndex !== index) });
+      showToast('Vibe 已从当前分支移除');
+    }
+  };
+  const libraryVibeContextMenu = async (event, entry) => {
+    const inUse = project.vibes.some((vibe) => vibe.library_id === entry.id);
+    const action = await showNativeContextMenu(event, {
+      kind: 'vibe-library',
+      inUse,
+      hasSource: Boolean(entry.reference_image),
+      hasFile: Boolean(entry.vibe_file),
+    });
+    if (action === 'vibe-library:use') useLibraryVibe(entry);
+    if (action === 'vibe-library:reveal-source') studio.revealFile(entry.reference_image);
+    if (action === 'vibe-library:reveal-file') studio.revealFile(entry.vibe_file);
+  };
   return <div className="panel-scroll vibe-panel">
     <div className="panel-intro"><div><strong>Vibe Library</strong><small>跨作品复用已编码的 NovelAI Vibe</small></div><button className="small-primary" onClick={() => importVibes(false)} disabled={importing}><Icon name="plus"/>{importing ? '导入中' : '导入'}</button></div>
     <div className="vibe-note safe"><span>ENCODING SAFE</span>滑杆可自由预览参数；只有标记过的缓存位置能继续使用当前 `.naiv4vibe`。</div>
@@ -698,7 +735,7 @@ function VibePanel({ project, updateProject, showToast }) {
     <div className="vibe-stack">
       {project.vibes.map((vibe, index) => {
         const informationState = informationExtractedState(vibe);
-        return <article className={`vibe-card ${!vibe.enabled ? 'disabled' : ''}`} key={vibe.id}>
+        return <article className={`vibe-card ${!vibe.enabled ? 'disabled' : ''}`} key={vibe.id} onContextMenu={(event) => currentVibeContextMenu(event, vibe, index, informationState)}>
         <div className="vibe-image"><img src={mediaUrl(vibe.thumbnail_path)} alt="Vibe reference"/><label><input type="checkbox" checked={Boolean(vibe.enabled)} onChange={(event) => updateVibe(index, { enabled: event.target.checked })}/><span>{vibe.enabled ? '启用' : '停用'}</span></label></div>
         <div className="vibe-controls">
           <div className="vibe-card-title"><strong>{vibe.name || 'Vibe reference'}</strong><span className={`vibe-source ${vibe.source_kind}`}>{vibe.source_kind === 'image' ? '待编码' : '已编码'}</span></div>
@@ -723,7 +760,7 @@ function VibePanel({ project, updateProject, showToast }) {
         </header>
         {!group.source.reference_image && <div className="vibe-group-warning"><Icon name="info" size={13}/>导入原始 PNG 或带内嵌图片的 `.naiv4vibe` 后可建立可视绑定</div>}
         <div className="vibe-variant-list">
-          {group.entries.map((entry) => <article className="vibe-library-card" key={entry.id}>
+          {group.entries.map((entry) => <article className="vibe-library-card" key={entry.id} onContextMenu={(event) => libraryVibeContextMenu(event, entry)}>
             <div><strong>{entry.source_kind === 'image' ? '原始参考图' : entry.name}</strong><small>{entry.source_kind === 'image' ? '尚未编码' : `${entry.encoding_count || 1} 个缓存编码 · ${entry.model || 'NovelAI V4'}`}</small><span>{entry.information_extracted_known ? `Information ${Number(entry.information_extracted).toFixed(2)} · Strength ${Number(entry.strength).toFixed(2)}` : '来自 PNG metadata · 固定编码'}</span></div>
             <button onClick={() => useLibraryVibe(entry)} disabled={project.vibes.some((vibe) => vibe.library_id === entry.id)}>{project.vibes.some((vibe) => vibe.library_id === entry.id) ? '已用' : '使用'}</button>
           </article>)}
@@ -756,7 +793,7 @@ function MetadataPanel({ project, updateProject }) {
   </div>;
 }
 
-function Inspector({ tab, setTab, project, branch, updateProject, showToast, promptScopeKey, setPromptScopeKey, focusTagId }) {
+function Inspector({ tab, setTab, project, branch, updateProject, showToast, promptScopeKey, setPromptScopeKey, focusTagId, onTagContextMenu }) {
   return <aside className="inspector">
     <nav className="inspector-tabs">
       <button className={tab === 'tags' ? 'active' : ''} onClick={() => setTab('tags')}><Icon name="layers"/>Prompt</button>
@@ -767,7 +804,7 @@ function Inspector({ tab, setTab, project, branch, updateProject, showToast, pro
       <Icon name={branch ? 'spark' : 'lock'} size={14}/>
       <div><strong>{branch ? branch.name : '原图生成结果'}</strong><small>{branch ? `${BRANCH_STATUS_LABELS[branch.status] || branch.status} · 改动保存在这个分支中` : '生成事实已锁定；修改 Prompt、Vibe 或参数会新建分支'}</small></div>
     </div>
-    {tab === 'tags' && <TagsPanel project={project} updateProject={updateProject} showToast={showToast} scopeKey={promptScopeKey} setScopeKey={setPromptScopeKey} focusTagId={focusTagId}/>}
+    {tab === 'tags' && <TagsPanel project={project} updateProject={updateProject} showToast={showToast} scopeKey={promptScopeKey} setScopeKey={setPromptScopeKey} focusTagId={focusTagId} onTagContextMenu={onTagContextMenu}/>}
     {tab === 'vibe' && <VibePanel project={project} updateProject={updateProject} showToast={showToast}/>}
     {tab === 'metadata' && <MetadataPanel project={project} updateProject={updateProject}/>}
   </aside>;
@@ -818,6 +855,16 @@ export default function App() {
   useEffect(() => {
     studio.onImportProgress((progress) => setImportProgress(progress));
     return () => studio.offImportProgress();
+  }, []);
+
+  useEffect(() => {
+    const handleTextContextMenu = (event) => {
+      if (event.defaultPrevented || !isTextEditingTarget(event.target)) return;
+      event.preventDefault();
+      studio.showContextMenu({ kind: 'text', ...contextMenuPosition(event) });
+    };
+    document.addEventListener('contextmenu', handleTextContextMenu);
+    return () => document.removeEventListener('contextmenu', handleTextContextMenu);
   }, []);
 
   useEffect(() => {
@@ -983,6 +1030,31 @@ export default function App() {
     return success;
   };
 
+  const projectContextMenu = async (event, project) => {
+    const action = await showNativeContextMenu(event, {
+      kind: 'project',
+      favorite: Boolean(project.is_favorite),
+      deleted: Boolean(project.deleted_at),
+      collections,
+    });
+    if (!action) return;
+    if (action === 'project:open-prompt') openPromptOverview(project.id);
+    if (action === 'project:copy-prompt') {
+      await navigator.clipboard.writeText(formatPositivePromptForCopy(project));
+      showToast('Prompt 已复制');
+    }
+    if (action === 'project:reveal') studio.revealFile(project.image_path);
+    if (action === 'project:toggle-favorite') setFavorite(!project.is_favorite, [project.id]);
+    if (action === 'project:toggle-trash') runLibraryOrganization(
+      () => studio.setProjectsDeleted([project.id], !project.deleted_at),
+      project.deleted_at ? '作品已恢复' : '作品已移入回收站',
+    );
+    if (action.startsWith('project:add-collection:')) {
+      const collectionId = action.slice('project:add-collection:'.length);
+      runLibraryOrganization(() => studio.addProjectsToCollection(collectionId, [project.id]), '作品已加入收藏集');
+    }
+  };
+
   const currentImportCollectionId = libraryView.startsWith('collection:') ? libraryView.slice('collection:'.length) : '';
   const importing = importProgress && ['preparing', 'importing'].includes(importProgress.phase);
 
@@ -1131,6 +1203,49 @@ export default function App() {
     persistBranchSoon(branch);
   };
 
+  const tagContextMenu = async (event, scopeKey, tag) => {
+    if (!activeProject || !tag) return;
+    const action = await showNativeContextMenu(event, {
+      kind: 'tag',
+      hasTranslation: Boolean(tag.translation?.trim()),
+      category: tag.category || 'Unsorted',
+    });
+    if (!action) return;
+    if (action === 'tag:copy') {
+      await navigator.clipboard.writeText(tag.tag);
+      showToast('Tag 已复制');
+      return;
+    }
+    if (action === 'tag:copy-translation') {
+      await navigator.clipboard.writeText(tag.translation || '');
+      showToast('翻译已复制');
+      return;
+    }
+    if (action === 'tag:edit') {
+      openTagEditor(scopeKey, tag.id);
+      return;
+    }
+    const scope = getPromptScope(activeProject, scopeKey);
+    const replaceTag = (patch) => updateProject(updatePromptScope(activeProject, scope.key, scope.tags.map((item) => item.id === tag.id ? { ...item, ...patch } : item)));
+    if (action === 'tag:delete') {
+      updateProject(updatePromptScope(activeProject, scope.key, scope.tags.filter((item) => item.id !== tag.id)));
+      showToast('Tag 已删除');
+      return;
+    }
+    if (action.startsWith('tag:category:')) {
+      replaceTag({ category: action.slice('tag:category:'.length), category_source: 'manual' });
+      showToast('Tag 分类已更新');
+      return;
+    }
+    if (action === 'tag:translate') {
+      const result = await studio.translateTags([tag.tag]);
+      if (!result?.ok) { showToast(result?.error || 'AI 翻译没有完成'); return; }
+      const item = result.items?.[0] || { translation: result.translations?.[0] || '', category: result.categories?.[0] || tag.category };
+      replaceTag({ ...item, translation_source: item.translation_source || 'ai', category_source: item.category_source || 'ai' });
+      showToast('Tag 已翻译并分类');
+    }
+  };
+
   const discardBranch = async (branchId) => {
     const branch = sourceProject?.branches?.find((item) => item.id === branchId);
     if (!branch || branch.status !== 'draft') return;
@@ -1185,6 +1300,35 @@ export default function App() {
       showToast(error instanceof Error ? error.message : String(error));
     } finally {
       setBranchResultImporting('');
+    }
+  };
+
+  const branchContextMenu = async (event, branch) => {
+    const action = await showNativeContextMenu(event, {
+      kind: 'branch',
+      status: branch.status,
+      results: branch.results || [],
+    });
+    if (!action || !sourceProject) return;
+    if (action === 'branch:open') setActiveBranchId(branch.id);
+    if (action === 'branch:copy-prompt') {
+      const branchProject = applyGenerationSnapshot(sourceProject, parseBranchSnapshot(branch));
+      await navigator.clipboard.writeText(formatPositivePromptForCopy(branchProject));
+      showToast('分支 Prompt 已复制');
+    }
+    if (action === 'branch:mark-waiting') markBranchWaiting(branch.id);
+    if (action === 'branch:upload-result') importBranchResult(branch.id);
+    if (action === 'branch:discard') discardBranch(branch.id);
+    if (action.startsWith('branch:open-result:')) {
+      setLibraryView('all');
+      setActiveBranchId('');
+      setActiveId(action.slice('branch:open-result:'.length));
+      setWorkspaceMode('image');
+    }
+    if (action.startsWith('branch:reveal-result:')) {
+      const projectId = action.slice('branch:reveal-result:'.length);
+      const result = (branch.results || []).find((item) => item.project_id === projectId);
+      if (result?.image_path) studio.revealFile(result.image_path);
     }
   };
 
@@ -1257,10 +1401,11 @@ export default function App() {
       onRemoveFromCollection={removeSelectedFromCollection}
       onSetFavorite={setFavorite}
       onSetDeleted={setDeleted}
+      onProjectContextMenu={projectContextMenu}
     />
     {activeProject ? <>
-      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onImportBranchResult={importBranchResult} branchResultImporting={branchResultImporting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
-      <Inspector tab={tab} setTab={setTab} project={activeProject} branch={activeBranch} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId}/>
+      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} onTagContextMenu={tagContextMenu} onProjectContextMenu={projectContextMenu} onBranchContextMenu={branchContextMenu} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onImportBranchResult={importBranchResult} branchResultImporting={branchResultImporting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
+      <Inspector tab={tab} setTab={setTab} project={activeProject} branch={activeBranch} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId} onTagContextMenu={tagContextMenu}/>
     </> : <EmptyState onImport={importImages} hasProjects={projects.length > 0}/>}
     <ImportExperience
       dragState={dragState}
