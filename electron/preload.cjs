@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('studio', {
   deleteExperiment: (id) => ipcRenderer.invoke('library:experiment:delete', id),
   addProjectsToExperiment: (experimentId, projectIds) => ipcRenderer.invoke('library:experiment:add-projects', experimentId, projectIds),
   removeProjectsFromExperiment: (experimentId, projectIds) => ipcRenderer.invoke('library:experiment:remove-projects', experimentId, projectIds),
+  reorderExperimentMembers: (experimentId, projectIds) => ipcRenderer.invoke('library:experiment:reorder-projects', experimentId, projectIds),
   setProjectsFavorite: (projectIds, favorite) => ipcRenderer.invoke('library:projects:favorite', projectIds, favorite),
   setProjectsDeleted: (projectIds, deleted) => ipcRenderer.invoke('library:projects:trash', projectIds, deleted),
   importImages: (options = {}) => ipcRenderer.invoke('library:import-images', options),

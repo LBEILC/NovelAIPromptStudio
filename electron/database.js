@@ -996,6 +996,22 @@ export async function openDatabase(dataDirectory) {
     recalculateExperiment(String(experimentId || ''));
   });
 
+  const reorderExperimentMembers = (experimentId, projectIds) => runOrganizationMutation(() => {
+    const experiment = query('SELECT baseline_project_id FROM experiments WHERE id = $id', { $id: String(experimentId || '') })[0];
+    if (!experiment) throw new Error('对比实验不存在或已被删除');
+    const currentIds = query(
+      'SELECT project_id FROM experiment_members WHERE experiment_id = $id ORDER BY position, added_at',
+      { $id: String(experimentId || '') },
+    ).map((row) => row.project_id);
+    const orderedIds = uniqueProjectIds(projectIds);
+    if (orderedIds.length !== currentIds.length || orderedIds.some((id) => !currentIds.includes(id))) throw new Error('实验成员顺序不完整，请刷新后重试');
+    if (orderedIds[0] !== experiment.baseline_project_id) throw new Error('基准作品必须固定在实验首位');
+    orderedIds.forEach((projectId, position) => database.run(
+      'UPDATE experiment_members SET position = $position WHERE experiment_id = $experiment_id AND project_id = $project_id',
+      { $experiment_id: String(experimentId || ''), $project_id: projectId, $position: position },
+    ));
+  });
+
   const setProjectsFavorite = (projectIds, favorite) => runOrganizationMutation(() => {
     for (const projectId of uniqueProjectIds(projectIds)) {
       database.run(
@@ -1263,6 +1279,7 @@ export async function openDatabase(dataDirectory) {
     deleteExperiment,
     addProjectsToExperiment,
     removeProjectsFromExperiment,
+    reorderExperimentMembers,
     setProjectsFavorite,
     setProjectsDeleted,
     findProjectByContentHash,

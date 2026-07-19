@@ -27,3 +27,13 @@ export function analyzeExperiment(baseline, members = []) {
   const status = variableFields.length === 0 ? 'identical' : variableFields.length === 1 ? 'single' : 'mixed';
   return { status, fixedFields, variableFields, incompleteFields };
 }
+
+export function moveExperimentMember(memberIds, sourceId, targetId, baselineId) {
+  const ids = [...(memberIds || [])];
+  if (sourceId === baselineId || sourceId === targetId || !ids.includes(sourceId) || !ids.includes(targetId)) return ids;
+  const withoutSource = ids.filter((id) => id !== sourceId);
+  const targetIndex = Math.max(1, withoutSource.indexOf(targetId));
+  withoutSource.splice(targetIndex, 0, sourceId);
+  if (withoutSource[0] !== baselineId) return ids;
+  return withoutSource;
+}

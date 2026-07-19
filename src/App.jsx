@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { dropTargetForExternal, monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
 import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
+import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, inferCategory, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import {
   addPromptCharacter,
@@ -27,6 +29,7 @@ import { assessDroppedFiles } from './lib/importDrop.js';
 import { applyGenerationSnapshot, branchChangeFields, branchChangeSummary, generationSnapshot, hasGenerationChanges } from './lib/branches.js';
 import { contextMenuPosition, isTextEditingTarget } from './lib/contextMenu.js';
 import { panCompareViewport, zoomCompareViewport } from './lib/compareViewport.js';
+import { moveExperimentMember } from './lib/experiments.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
@@ -47,6 +50,7 @@ const studio = window.studio || {
   deleteExperiment: async () => ({ ok: true, collections: [], series: [], experiments: [], projects: [] }),
   addProjectsToExperiment: async () => ({ ok: true, collections: [], series: [], experiments: [], projects: [] }),
   removeProjectsFromExperiment: async () => ({ ok: true, collections: [], series: [], experiments: [], projects: [] }),
+  reorderExperimentMembers: async () => ({ ok: true, collections: [], series: [], experiments: [], projects: [] }),
   setProjectsFavorite: async () => ({ ok: true, collections: [], projects: [] }),
   setProjectsDeleted: async () => ({ ok: true, collections: [], projects: [] }),
   importImages: async () => ({ ok: true, canceled: true, imported: [], duplicates: [], errors: [], summary: null }),
@@ -396,7 +400,45 @@ function ExperimentCompare({ experiment, projects, selectedIds }) {
   </div>;
 }
 
-function PreviewStage({ project, sourceProject, mode, setMode, experiment, experimentProjects, comparisonIds, onToggleComparison, onCopy, onReveal, onEditTag, onTagContextMenu, onProjectContextMenu, onBranchContextMenu, onOpenResult, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, branchResultImporting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
+function ExperimentFilmCard({ member, baselineProject, selected, baseline, onToggle, onMove, onContextMenu }) {
+  const cardRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const [dropTarget, setDropTarget] = useState(false);
+  const differences = baseline ? [] : branchChangeFields(baselineProject, member);
+
+  useEffect(() => {
+    const element = cardRef.current;
+    if (!element) return undefined;
+    const cleanup = [dropTargetForElements({
+      element,
+      getData: () => ({ type: 'experiment-member', projectId: member.id }),
+      canDrop: ({ source }) => source.data.type === 'experiment-member' && source.data.projectId !== member.id,
+      onDragEnter: () => setDropTarget(true),
+      onDragLeave: () => setDropTarget(false),
+      onDrop: ({ source }) => {
+        setDropTarget(false);
+        onMove(String(source.data.projectId || ''), member.id);
+      },
+    })];
+    if (!baseline) cleanup.push(draggable({
+      element,
+      getInitialData: () => ({ type: 'experiment-member', projectId: member.id }),
+      onDragStart: () => setDragging(true),
+      onDrop: () => setDragging(false),
+    }));
+    return combine(...cleanup);
+  }, [baseline, member.id, onMove]);
+
+  return <button ref={cardRef} className={`version-card experiment-card ${selected ? 'selected' : ''} ${baseline ? 'baseline' : ''} ${dragging ? 'dragging' : ''} ${dropTarget ? 'drop-target' : ''}`} onClick={() => onToggle(member.id)} onContextMenu={(event) => onContextMenu(event, member)} onKeyDown={(event) => {
+    if (!event.altKey || baseline || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    onMove(member.id, event.key === 'ArrowLeft' ? 'keyboard:previous' : 'keyboard:next');
+  }} aria-pressed={selected} title={baseline ? '基准结果固定在首位' : '拖动排序；Alt/Option + 左右键微调'}>
+    <img src={mediaUrl(member.thumbnail_path)} alt=""/><span><b>{member.name}</b><small>{baseline ? '基准结果' : differences.join(' · ') || '参数相同'}</small></span><em>{baseline ? 'BASE' : selected ? '对比中' : '加入'}</em>
+  </button>;
+}
+
+function PreviewStage({ project, sourceProject, mode, setMode, experiment, experimentProjects, comparisonIds, onToggleComparison, onReorderExperiment, onCopy, onReveal, onEditTag, onTagContextMenu, onProjectContextMenu, onBranchContextMenu, onOpenResult, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, branchResultImporting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
   const limitedReproduction = hasLimitedReproduction(project.metadata);
   const activeBranch = (sourceProject.branches || []).find((branch) => branch.id === activeBranchId);
   const mismatchResult = activeBranch?.results?.find((result) => result.match_status === 'mismatch');
@@ -442,14 +484,7 @@ function PreviewStage({ project, sourceProject, mode, setMode, experiment, exper
     {mode === 'compare' && experiment ? <footer className="version-rail experiment-rail">
       <div className="rail-title"><span><Icon name="history"/>实验胶片</span><small>选择 2–4 个成员；基准固定保留</small></div>
       <div className="version-strip experiment-strip">
-        {experimentProjects.map((member) => {
-          const selected = comparisonIds.has(member.id);
-          const baseline = member.id === experiment.baseline_project_id;
-          const differences = baseline ? [] : branchChangeFields(experimentProjects.find((item) => item.id === experiment.baseline_project_id), member);
-          return <button key={member.id} className={`version-card experiment-card ${selected ? 'selected' : ''} ${baseline ? 'baseline' : ''}`} onClick={() => onToggleComparison(member.id)} onContextMenu={(event) => onProjectContextMenu(event, member)} aria-pressed={selected}>
-            <img src={mediaUrl(member.thumbnail_path)} alt=""/><span><b>{member.name}</b><small>{baseline ? '基准结果' : differences.join(' · ') || '参数相同'}</small></span><em>{baseline ? 'BASE' : selected ? '对比中' : '加入'}</em>
-          </button>;
-        })}
+        {experimentProjects.map((member) => <ExperimentFilmCard key={member.id} member={member} baselineProject={experimentProjects.find((item) => item.id === experiment.baseline_project_id)} selected={comparisonIds.has(member.id)} baseline={member.id === experiment.baseline_project_id} onToggle={onToggleComparison} onMove={onReorderExperiment} onContextMenu={onProjectContextMenu}/>)}
       </div>
     </footer> : <footer className="version-rail branch-rail">
       <div className="rail-title"><span><Icon name="history"/>生成分支</span><div className="rail-actions">
@@ -1287,6 +1322,25 @@ export default function App() {
     if (success) setSelectedIds(new Set());
     return success;
   };
+  const reorderExperiment = async (sourceId, targetId) => {
+    if (!activeExperiment || !sourceId) return false;
+    const currentIds = activeExperiment.member_ids || [];
+    let nextIds;
+    if (targetId === 'keyboard:previous' || targetId === 'keyboard:next') {
+      const sourceIndex = currentIds.indexOf(sourceId);
+      if (sourceIndex < 1) return false;
+      const targetIndex = targetId === 'keyboard:previous' ? Math.max(1, sourceIndex - 1) : Math.min(currentIds.length - 1, sourceIndex + 1);
+      nextIds = [...currentIds];
+      [nextIds[sourceIndex], nextIds[targetIndex]] = [nextIds[targetIndex], nextIds[sourceIndex]];
+    } else {
+      nextIds = moveExperimentMember(currentIds, sourceId, targetId, activeExperiment.baseline_project_id);
+    }
+    if (nextIds.every((id, index) => id === currentIds[index])) return false;
+    return runLibraryOrganization(
+      () => studio.reorderExperimentMembers(activeExperiment.id, nextIds),
+      '实验胶片顺序已保存',
+    );
+  };
   const setFavorite = async (favorite, projectIds = [...selectedIds]) => {
     if (!projectIds.length) return false;
     const success = await runLibraryOrganization(
@@ -1713,7 +1767,7 @@ export default function App() {
       onProjectContextMenu={projectContextMenu}
     />
     {activeProject ? <>
-      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} experiment={activeExperiment} experimentProjects={experimentProjects} comparisonIds={comparisonIds} onToggleComparison={toggleComparison} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} onTagContextMenu={tagContextMenu} onProjectContextMenu={projectContextMenu} onBranchContextMenu={branchContextMenu} onOpenResult={openResultProject} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onImportBranchResult={importBranchResult} branchResultImporting={branchResultImporting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
+      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} experiment={activeExperiment} experimentProjects={experimentProjects} comparisonIds={comparisonIds} onToggleComparison={toggleComparison} onReorderExperiment={reorderExperiment} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} onTagContextMenu={tagContextMenu} onProjectContextMenu={projectContextMenu} onBranchContextMenu={branchContextMenu} onOpenResult={openResultProject} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onImportBranchResult={importBranchResult} branchResultImporting={branchResultImporting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
       <Inspector tab={tab} setTab={setTab} project={activeProject} branch={activeBranch} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId} onTagContextMenu={tagContextMenu}/>
     </> : <EmptyState onImport={importImages} hasProjects={projects.length > 0}/>}
     <ImportExperience

@@ -251,6 +251,9 @@ describe('prompt structure persistence', () => {
     organization = database.addProjectsToExperiment(experimentId, ['mixed-variant']);
     expect(organization.experiments[0]).toMatchObject({ analysis_status: 'mixed', project_count: 3 });
     expect(organization.experiments[0].variable_fields).toEqual(expect.arrayContaining(['Seed', 'Prompt']));
+    organization = database.reorderExperimentMembers(experimentId, ['base', 'mixed-variant', 'seed-variant']);
+    expect(organization.experiments[0].member_ids).toEqual(['base', 'mixed-variant', 'seed-variant']);
+    expect(() => database.reorderExperimentMembers(experimentId, ['seed-variant', 'base', 'mixed-variant'])).toThrow('基准作品必须固定在实验首位');
     expect(() => database.removeProjectsFromExperiment(experimentId, ['base'])).toThrow('基准作品不能直接移出实验');
 
     organization = database.removeProjectsFromExperiment(experimentId, ['mixed-variant']);

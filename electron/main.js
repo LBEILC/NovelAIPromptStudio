@@ -161,6 +161,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('library:experiment:delete', (_event, id) => libraryOrganizationResult(() => database.deleteExperiment(id)));
   ipcMain.handle('library:experiment:add-projects', (_event, experimentId, projectIds) => libraryOrganizationResult(() => database.addProjectsToExperiment(experimentId, projectIds)));
   ipcMain.handle('library:experiment:remove-projects', (_event, experimentId, projectIds) => libraryOrganizationResult(() => database.removeProjectsFromExperiment(experimentId, projectIds)));
+  ipcMain.handle('library:experiment:reorder-projects', (_event, experimentId, projectIds) => libraryOrganizationResult(() => database.reorderExperimentMembers(experimentId, projectIds)));
   ipcMain.handle('library:projects:favorite', (_event, projectIds, favorite) => libraryOrganizationResult(() => database.setProjectsFavorite(projectIds, favorite)));
   ipcMain.handle('library:projects:trash', (_event, projectIds, deleted) => libraryOrganizationResult(() => database.setProjectsDeleted(projectIds, deleted)));
   ipcMain.handle('library:import-images', async (event, request = {}) => {

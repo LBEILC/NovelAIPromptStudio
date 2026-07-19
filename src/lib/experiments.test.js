@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeExperiment } from './experiments.js';
+import { analyzeExperiment, moveExperimentMember } from './experiments.js';
 
 function result(id, patch = {}) {
   return {
@@ -18,6 +18,12 @@ describe('experiment analysis', () => {
     const analysis = analyzeExperiment(result('base'), [result('base'), result('variant', { metadata: { seed: '99' } })]);
     expect(analysis).toMatchObject({ status: 'single', variableFields: ['Seed'], incompleteFields: [] });
     expect(analysis.fixedFields).toEqual(expect.arrayContaining(['Prompt', 'Vibe', 'Model', 'Sampler', 'Steps', 'CFG']));
+  });
+
+  it('reorders non-baseline members while keeping the baseline first', () => {
+    expect(moveExperimentMember(['base', 'a', 'b', 'c'], 'c', 'a', 'base')).toEqual(['base', 'c', 'a', 'b']);
+    expect(moveExperimentMember(['base', 'a', 'b'], 'a', 'base', 'base')).toEqual(['base', 'a', 'b']);
+    expect(moveExperimentMember(['base', 'a', 'b'], 'base', 'b', 'base')).toEqual(['base', 'a', 'b']);
   });
 
   it('marks mixed variables and does not claim empty metadata is fixed', () => {
