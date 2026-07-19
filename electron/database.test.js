@@ -181,4 +181,44 @@ describe('prompt structure persistence', () => {
     expect(organization.collections).toEqual([]);
     expect(database.loadLibrary()).toHaveLength(2);
   });
+
+  it('stores branch recipes separately from immutable result metadata', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-database-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    const now = new Date().toISOString();
+    database.insertProject({
+      id: 'immutable-result',
+      name: 'Result',
+      image_path: 'result.png',
+      thumbnail_path: 'result.webp',
+      created_at: now,
+      updated_at: now,
+      tags: [],
+      prompt_structure: { base_undesired_tags: [], use_coords: false, use_order: true, characters: [] },
+      metadata: { seed: '10', extra_json: '{}' },
+      vibes: [],
+      versions: [],
+    });
+    const created = database.createBranch({
+      id: 'branch-1',
+      source_project_id: 'immutable-result',
+      name: '分支 1',
+      status: 'draft',
+      snapshot_json: JSON.stringify({ metadata: { seed: '20' } }),
+      change_summary: 'Seed',
+      created_at: now,
+      updated_at: now,
+    });
+    expect(created).toMatchObject({ id: 'branch-1', source_project_id: 'immutable-result', status: 'draft' });
+    expect(database.loadProject('immutable-result')).toMatchObject({ metadata: { seed: '10' }, branches: [{ id: 'branch-1' }] });
+
+    database.updateBranch({ ...created, status: 'waiting', updated_at: new Date().toISOString() });
+    expect(() => database.deleteBranch('branch-1')).toThrow('只有草稿分支可以放弃');
+    expect(() => database.updateBranch({ ...created, status: 'draft', updated_at: new Date().toISOString() })).toThrow('只有草稿分支可以修改');
+    const disposable = database.createBranch({ ...created, id: 'branch-2', name: '可放弃草稿' });
+    database.deleteBranch(disposable.id);
+    expect(database.loadProject('immutable-result').branches).toMatchObject([{ id: 'branch-1', status: 'waiting' }]);
+    expect(database.loadProject('immutable-result').metadata.seed).toBe('10');
+  });
 });

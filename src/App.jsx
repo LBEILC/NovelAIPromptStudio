@@ -7,12 +7,10 @@ import {
   addPromptCharacter,
   allPromptTags,
   countPromptTags,
-  formatPositivePrompt,
   formatPositivePromptForCopy,
   getPromptScope,
   getPromptScopes,
   normalizePromptStructure,
-  promptSnapshot,
   removePromptCharacter,
   restorePromptSnapshot,
   syncProjectPromptMetadata,
@@ -23,6 +21,8 @@ import PromptOverview from './PromptOverview.jsx';
 import { groupVibeLibraryBySource } from './lib/vibeLibrary.js';
 import { informationExtractedPatch, informationExtractedState, restoreOriginalInformationPatch } from './lib/vibes.js';
 import { hasLimitedReproduction } from './lib/generationMetadata.js';
+import { assessDroppedFiles } from './lib/importDrop.js';
+import { applyGenerationSnapshot, branchChangeSummary, generationSnapshot, hasGenerationChanges } from './lib/branches.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
@@ -40,6 +40,9 @@ const studio = window.studio || {
   onImportProgress: () => {},
   offImportProgress: () => {},
   updateProject: async () => ({ ok: true }),
+  createBranch: async (branch) => ({ ok: true, branch }),
+  updateBranch: async (branch) => ({ ok: true, branch }),
+  deleteBranch: async () => ({ ok: true }),
   deleteProject: async () => ({ ok: true }),
   loadVibeLibrary: async () => [],
   importVibeLibrary: async () => ({ ok: true, library: [], imported: [], errors: [] }),
@@ -77,6 +80,7 @@ function Icon({ name, size = 17 }) {
     edit: <><path d="m4 20 4.2-1 10.6-10.6-3.2-3.2L5 15.8 4 20Z"/><path d="m13.8 7 3.2 3.2"/></>,
     archive: <><path d="M4 7h16v13H4z"/><path d="M3 3h18v4H3zM9 11h6"/></>,
     upload: <><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></>,
+    lock: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></>,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
@@ -104,14 +108,14 @@ function EmptyState({ onImport, hasProjects = false }) {
   </main>;
 }
 
-function droppedFileAssessment(files) {
-  const names = Array.from(files || [], (file) => String(file?.name || ''));
-  const supported = names.filter((name) => /\.(png|jpe?g|webp|zip)$/i.test(name));
-  return {
-    count: names.length,
-    valid: names.length > 0 && supported.length === names.length,
-    label: supported.some((name) => /\.zip$/i.test(name)) ? '图片或 NovelAI ZIP' : '图片',
-  };
+function parseBranchSnapshot(branch) {
+  if (!branch?.snapshot_json) return null;
+  try {
+    const snapshot = JSON.parse(branch.snapshot_json);
+    return snapshot && typeof snapshot === 'object' ? snapshot : null;
+  } catch {
+    return null;
+  }
 }
 
 function ImportExperience({ dragState, progress, result, onCancel, onDismiss }) {
@@ -123,7 +127,7 @@ function ImportExperience({ dragState, progress, result, onCancel, onDismiss }) 
       <div className="file-drop-target">
         <div className="drop-glyph"><Icon name={dragState.valid ? 'upload' : 'close'} size={28}/></div>
         <strong>{dragState.valid ? `松手导入 ${dragState.label}` : '这些文件暂不支持'}</strong>
-        <span>{dragState.valid ? `${dragState.count} 个文件 · PNG / JPG / WEBP / ZIP` : '请拖入图片或 NovelAI 导出的标准 ZIP'}</span>
+        <span>{dragState.valid ? `${dragState.count == null ? '正在读取文件信息' : `${dragState.count} 个文件`} · PNG / JPG / WEBP / ZIP` : '请拖入图片或 NovelAI 导出的标准 ZIP'}</span>
         <small>ZIP 会先安全检查，再逐张读取 PNG</small>
       </div>
     </div>}
@@ -257,26 +261,34 @@ function LibraryPanel({
   </aside>;
 }
 
-function PreviewStage({ project, mode, setMode, onCopy, onReveal, onEditTag, updateProject, saveVersion, restoreVersion, activeVersion, setActiveVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
+const BRANCH_STATUS_LABELS = {
+  draft: '草稿',
+  waiting: '待生成',
+  result: '已有结果',
+  mismatch: '结果待确认',
+};
+
+function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal, onEditTag, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
   const limitedReproduction = hasLimitedReproduction(project.metadata);
+  const activeBranch = (sourceProject.branches || []).find((branch) => branch.id === activeBranchId);
   const copyLabel = mode === 'prompt'
     ? overviewCopy.selected ? `复制已选 ${overviewCopy.count}` : `复制可见 ${overviewCopy.count}`
     : '复制 Prompt';
   return <section className="preview-column">
     <header className="topbar">
-      <div className="breadcrumb"><span>作品库</span><b>/</b><strong>{project.name}</strong></div>
+      <div className="breadcrumb branch-breadcrumb"><span>作品库</span><b>/</b><strong>{sourceProject.name}</strong>{activeBranch && <em>{activeBranch.name}</em>}</div>
       <div className="top-actions">
         <div className="workspace-switch" aria-label="工作区视图">
           <button className={mode === 'image' ? 'active' : ''} onClick={() => setMode('image')}><Icon name="image"/>图像</button>
           <button className={mode === 'prompt' ? 'active' : ''} onClick={() => setMode('prompt')}><Icon name="layers"/>Prompt</button>
         </div>
-        <button className="ghost" onClick={() => onReveal(project.image_path)} title="在文件夹中显示"><Icon name="folder"/></button>
+        <button className="ghost" onClick={() => onReveal(sourceProject.image_path)} title="在文件夹中显示原图"><Icon name="folder"/></button>
         <button className="copy-button" onClick={onCopy} disabled={mode === 'prompt' && !overviewCopy.count}><Icon name="copy"/>{copyLabel}</button>
       </div>
     </header>
     {mode === 'image' ? <div className="stage">
       <div className="image-mat">
-        <img src={mediaUrl(project.image_path)} alt={project.name}/>
+        <img src={mediaUrl(sourceProject.image_path)} alt={sourceProject.name}/>
         <div className="image-index">ASSET<br/><b>{String(countPromptTags(project)).padStart(2, '0')}</b></div>
       </div>
       <div className="stage-meta">
@@ -288,16 +300,19 @@ function PreviewStage({ project, mode, setMode, onCopy, onReveal, onEditTag, upd
         {limitedReproduction && <><i/><span className="reproduction-status" title="局部重绘 metadata 不包含完整底图与蒙版">INPAINT · 无法精确复现</span></>}
       </div>
     </div> : <PromptOverview project={project} updateProject={updateProject} onEditTag={onEditTag} onCopyContextChange={onOverviewCopyChange} onCopyText={onCopyText} onNotify={onNotify}/>}
-    <footer className="version-rail">
-      <div className="rail-title"><span><Icon name="history"/>版本胶片</span><div className="rail-actions">{activeVersion !== 'current' && <button className="restore-action" onClick={() => restoreVersion(activeVersion)}>恢复此版本</button>}<button onClick={saveVersion}><Icon name="plus"/>保存版本</button></div></div>
+    <footer className="version-rail branch-rail">
+      <div className="rail-title"><span><Icon name="history"/>生成分支</span><div className="rail-actions">{activeBranch?.status === 'draft' && <><button className="restore-action danger" onClick={() => onDiscardBranch(activeBranch.id)}>放弃草稿</button><button onClick={() => onMarkBranchWaiting(activeBranch.id)}><Icon name="check"/>标记待生成</button></>}</div></div>
       <div className="version-strip">
-        <button className={`version-card current ${activeVersion === 'current' ? 'selected' : ''}`} onClick={() => setActiveVersion('current')}>
-          <img src={mediaUrl(project.thumbnail_path)} alt=""/><span><b>当前工作稿</b><small>{relativeTime(project.updated_at)}</small></span><em>LIVE</em>
+        <button className={`version-card current result-card ${!activeBranchId ? 'selected' : ''}`} onClick={() => onSelectBranch('')}>
+          <img src={mediaUrl(sourceProject.thumbnail_path)} alt=""/><span><b>原图结果</b><small>生成信息只读 · {relativeTime(sourceProject.updated_at)}</small></span><em><Icon name="lock" size={11}/>RESULT</em>
         </button>
-        {project.versions.map((version, index) => <button key={version.id} className={`version-card ${activeVersion === version.id ? 'selected' : ''}`} onClick={() => setActiveVersion(version.id)}>
-          <div className="version-number">V{project.versions.length - index}</div><span><b>{version.label}</b><small>{version.change_summary || relativeTime(version.created_at)}</small></span>
+        {(sourceProject.branches || []).map((branch, index) => <button key={branch.id} className={`version-card branch-card ${activeBranchId === branch.id ? 'selected' : ''}`} onClick={() => onSelectBranch(branch.id)}>
+          <div className="version-number">B{(sourceProject.branches || []).length - index}</div><span><b>{branch.name}</b><small>{branch.change_summary || relativeTime(branch.updated_at)}</small></span><em className={`branch-status ${branch.status}`}>{BRANCH_STATUS_LABELS[branch.status] || branch.status}</em>
         </button>)}
-        {!project.versions.length && <div className="version-empty">保存版本后，可随时比较和恢复 Prompt 快照</div>}
+        {(sourceProject.versions || []).map((version, index) => <button key={version.id} className="version-card legacy-version" onClick={() => onUseLegacyVersion(version)} title="把旧版 Prompt 作为新的分支草稿打开">
+          <div className="version-number">V{(sourceProject.versions || []).length - index}</div><span><b>{version.label}</b><small>旧版本 · 点击转为分支</small></span>
+        </button>)}
+        {!(sourceProject.branches || []).length && !(sourceProject.versions || []).length && <div className="version-empty">修改 Prompt、Vibe 或生成参数时，会自动创建分支草稿</div>}
       </div>
     </footer>
   </section>;
@@ -746,7 +761,7 @@ function MetadataPanel({ project, updateProject }) {
   const limitedReproduction = hasLimitedReproduction(metadata);
   const update = (patch) => updateProject({ ...project, metadata: { ...metadata, ...patch } });
   return <div className="panel-scroll metadata-panel">
-    <div className="panel-intro"><div><strong>Generation Metadata</strong><small>从原图读取，可手动修正</small></div><span className={`metadata-badge ${limitedReproduction ? 'limited' : ''}`}>{limitedReproduction ? 'INPAINT' : 'PNG'}</span></div>
+    <div className="panel-intro"><div><strong>Generation Metadata</strong><small>从原图读取；修改后会自动创建分支</small></div><span className={`metadata-badge ${limitedReproduction ? 'limited' : ''}`}>{limitedReproduction ? 'INPAINT' : 'PNG'}</span></div>
     {limitedReproduction && <div className="reproduction-notice" role="status">
       <Icon name="info" size={15}/>
       <div><strong>局部重绘 · 无法精确复现</strong><p>Metadata 包含最终 Prompt 和部分生成参数，但不包含完整的原始底图与蒙版。你仍然可以复制 Prompt，或基于现有参数创建近似方案。</p></div>
@@ -763,13 +778,17 @@ function MetadataPanel({ project, updateProject }) {
   </div>;
 }
 
-function Inspector({ tab, setTab, project, updateProject, showToast, promptScopeKey, setPromptScopeKey, focusTagId }) {
+function Inspector({ tab, setTab, project, branch, updateProject, showToast, promptScopeKey, setPromptScopeKey, focusTagId }) {
   return <aside className="inspector">
     <nav className="inspector-tabs">
       <button className={tab === 'tags' ? 'active' : ''} onClick={() => setTab('tags')}><Icon name="layers"/>Prompt</button>
       <button className={tab === 'vibe' ? 'active' : ''} onClick={() => setTab('vibe')}><Icon name="image"/>Vibe <i>{project.vibes.length || ''}</i></button>
       <button className={tab === 'metadata' ? 'active' : ''} onClick={() => setTab('metadata')}><Icon name="info"/>参数</button>
     </nav>
+    <div className={`generation-context ${branch ? 'branch' : 'result'}`}>
+      <Icon name={branch ? 'spark' : 'lock'} size={14}/>
+      <div><strong>{branch ? branch.name : '原图生成结果'}</strong><small>{branch ? `${BRANCH_STATUS_LABELS[branch.status] || branch.status} · 改动保存在这个分支中` : '生成事实已锁定；修改 Prompt、Vibe 或参数会新建分支'}</small></div>
+    </div>
     {tab === 'tags' && <TagsPanel project={project} updateProject={updateProject} showToast={showToast} scopeKey={promptScopeKey} setScopeKey={setPromptScopeKey} focusTagId={focusTagId}/>}
     {tab === 'vibe' && <VibePanel project={project} updateProject={updateProject} showToast={showToast}/>}
     {tab === 'metadata' && <MetadataPanel project={project} updateProject={updateProject}/>}
@@ -790,12 +809,14 @@ export default function App() {
   const [tab, setTab] = useState('tags');
   const [toast, setToast] = useState('');
   const [loading, setLoading] = useState(true);
-  const [activeVersion, setActiveVersion] = useState('current');
+  const [activeBranchId, setActiveBranchId] = useState('');
   const [workspaceMode, setWorkspaceMode] = useState('image');
   const [overviewCopy, setOverviewCopy] = useState({ text: '', count: 0, selected: false, categoryCount: 0 });
   const [promptScopeKey, setPromptScopeKey] = useState('base:prompt');
   const [focusTagId, setFocusTagId] = useState(null);
   const saveTimers = useRef(new Map());
+  const branchSaveTimers = useRef(new Map());
+  const branchCreatePromises = useRef(new Map());
   const appShellRef = useRef(null);
   const dropFilesHandlerRef = useRef(null);
   const shortcutModifier = useMemo(() => navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl', []);
@@ -807,8 +828,6 @@ export default function App() {
         const tags = repairLegacyPromptTags(project.tags, project.metadata.prompt_raw);
         const promptStructure = normalizePromptStructure(project.prompt_structure, project.metadata);
         const repaired = syncProjectPromptMetadata({ ...project, ...organizationByProject.get(project.id), tags, prompt_structure: promptStructure });
-        const needsMigration = tags !== project.tags || !project.prompt_structure?.base_undesired_tags;
-        if (needsMigration) studio.updateProject(repaired);
         return repaired;
       });
       setProjects(repairedItems);
@@ -833,8 +852,8 @@ export default function App() {
     const cleanupTarget = dropTargetForExternal({
       element,
       canDrop: containsFiles,
-      onDragEnter: ({ source }) => setDragState({ active: true, ...droppedFileAssessment(getFiles({ source })) }),
-      onDrag: ({ source }) => setDragState({ active: true, ...droppedFileAssessment(getFiles({ source })) }),
+      onDragEnter: ({ source }) => setDragState({ active: true, ...assessDroppedFiles(getFiles({ source })) }),
+      onDrag: ({ source }) => setDragState({ active: true, ...assessDroppedFiles(getFiles({ source })) }),
       onDragLeave: () => setDragState((current) => ({ ...current, active: false })),
       onDrop: ({ source }) => {
         const files = getFiles({ source });
@@ -855,7 +874,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', keydown);
   });
 
-  const activeProject = projects.find((project) => project.id === activeId) || null;
+  const sourceProject = projects.find((project) => project.id === activeId) || null;
+  const activeBranch = sourceProject?.branches?.find((branch) => branch.id === activeBranchId) || null;
+  const activeProject = sourceProject && activeBranch
+    ? applyGenerationSnapshot(sourceProject, parseBranchSnapshot(activeBranch))
+    : sourceProject;
+
+  useEffect(() => {
+    if (!activeBranchId || sourceProject?.branches?.some((branch) => branch.id === activeBranchId)) return;
+    setActiveBranchId('');
+  }, [activeBranchId, sourceProject]);
 
   useEffect(() => {
     if (workspaceMode !== 'prompt') setOverviewCopy({ text: '', count: 0, selected: false, categoryCount: 0 });
@@ -998,6 +1026,7 @@ export default function App() {
       return [...imported, ...current.filter((project) => !importedIds.has(project.id))];
     });
     setActiveId(imported[0].id);
+    setActiveBranchId('');
     if (!collectionId) setLibraryView('all');
     setSelectedIds(new Set());
     setWorkspaceMode('image');
@@ -1028,17 +1057,127 @@ export default function App() {
   const importDroppedFiles = (files) => runImport((options) => studio.importDroppedFiles(files, options));
   dropFilesHandlerRef.current = importDroppedFiles;
 
+  const replaceBranch = (branch) => setProjects((current) => current.map((project) => project.id === branch.source_project_id
+    ? { ...project, branches: (project.branches || []).map((item) => item.id === branch.id ? branch : item) }
+    : project));
+
+  const persistBranchSoon = (branch) => {
+    window.clearTimeout(branchSaveTimers.current.get(branch.id));
+    branchSaveTimers.current.set(branch.id, window.setTimeout(async () => {
+      const creation = branchCreatePromises.current.get(branch.id);
+      if (creation && !(await creation)?.ok) return;
+      const result = await studio.updateBranch(branch);
+      if (!result?.ok) showToast(result?.error || '分支草稿保存失败');
+      branchSaveTimers.current.delete(branch.id);
+    }, 450));
+  };
+
+  const createDraftBranch = (candidate, parentBranchId = null) => {
+    if (!sourceProject) return;
+    const now = new Date().toISOString();
+    const branch = {
+      id: crypto.randomUUID(),
+      source_project_id: sourceProject.id,
+      parent_branch_id: parentBranchId,
+      name: `分支 ${(sourceProject.branches || []).length + 1}`,
+      status: 'draft',
+      snapshot_json: JSON.stringify(generationSnapshot(syncProjectPromptMetadata(candidate))),
+      change_summary: branchChangeSummary(sourceProject, candidate),
+      created_at: now,
+      updated_at: now,
+    };
+    setProjects((current) => current.map((project) => project.id === sourceProject.id
+      ? { ...project, branches: [branch, ...(project.branches || [])] }
+      : project));
+    setActiveBranchId(branch.id);
+    const creation = studio.createBranch(branch).then((result) => {
+      if (result?.ok) return result;
+      window.clearTimeout(branchSaveTimers.current.get(branch.id));
+      branchSaveTimers.current.delete(branch.id);
+      setProjects((current) => current.map((project) => project.id === sourceProject.id
+        ? { ...project, branches: (project.branches || []).filter((item) => item.id !== branch.id) }
+        : project));
+      setActiveBranchId('');
+      showToast(result?.error || '分支草稿创建失败');
+      return result;
+    }).catch((error) => {
+      window.clearTimeout(branchSaveTimers.current.get(branch.id));
+      branchSaveTimers.current.delete(branch.id);
+      setProjects((current) => current.map((project) => project.id === sourceProject.id
+        ? { ...project, branches: (project.branches || []).filter((item) => item.id !== branch.id) }
+        : project));
+      setActiveBranchId('');
+      showToast(error instanceof Error ? error.message : String(error));
+      return { ok: false };
+    });
+    branchCreatePromises.current.set(branch.id, creation);
+    creation.finally(() => branchCreatePromises.current.delete(branch.id));
+    showToast('已创建分支草稿；原图信息保持不变');
+  };
+
   const updateProject = (nextProject) => {
+    if (!sourceProject) return;
     const updated = {
       ...syncProjectPromptMetadata(nextProject),
       updated_at: new Date().toISOString(),
     };
-    setProjects((current) => current.map((project) => project.id === updated.id ? updated : project));
-    window.clearTimeout(saveTimers.current.get(updated.id));
-    saveTimers.current.set(updated.id, window.setTimeout(async () => {
-      await studio.updateProject(updated);
-      saveTimers.current.delete(updated.id);
-    }, 450));
+
+    if (!activeBranch) {
+      if (hasGenerationChanges(sourceProject, updated)) {
+        createDraftBranch(updated);
+        return;
+      }
+      const sourceUpdate = { ...updated, branches: sourceProject.branches || [] };
+      setProjects((current) => current.map((project) => project.id === sourceUpdate.id ? sourceUpdate : project));
+      window.clearTimeout(saveTimers.current.get(sourceUpdate.id));
+      saveTimers.current.set(sourceUpdate.id, window.setTimeout(async () => {
+        const result = await studio.updateProject(sourceUpdate);
+        if (!result?.ok) showToast(result?.error || '作品注释保存失败');
+        saveTimers.current.delete(sourceUpdate.id);
+      }, 450));
+      return;
+    }
+
+    if (activeBranch.status !== 'draft') {
+      createDraftBranch(updated, activeBranch.id);
+      return;
+    }
+    const branch = {
+      ...activeBranch,
+      snapshot_json: JSON.stringify(generationSnapshot(updated)),
+      change_summary: branchChangeSummary(sourceProject, updated),
+      updated_at: updated.updated_at,
+    };
+    replaceBranch(branch);
+    persistBranchSoon(branch);
+  };
+
+  const discardBranch = async (branchId) => {
+    const branch = sourceProject?.branches?.find((item) => item.id === branchId);
+    if (!branch || branch.status !== 'draft') return;
+    window.clearTimeout(branchSaveTimers.current.get(branch.id));
+    const creation = branchCreatePromises.current.get(branch.id);
+    if (creation && !(await creation)?.ok) return;
+    const result = await studio.deleteBranch(branch.id);
+    if (!result?.ok) { showToast(result?.error || '无法放弃这个分支'); return; }
+    setProjects((current) => current.map((project) => project.id === branch.source_project_id
+      ? { ...project, branches: (project.branches || []).filter((item) => item.id !== branch.id) }
+      : project));
+    setActiveBranchId('');
+    showToast('分支草稿已放弃，原图未受影响');
+  };
+
+  const markBranchWaiting = async (branchId) => {
+    const branch = sourceProject?.branches?.find((item) => item.id === branchId);
+    if (!branch || branch.status !== 'draft') return;
+    window.clearTimeout(branchSaveTimers.current.get(branch.id));
+    const nextBranch = { ...branch, status: 'waiting', updated_at: new Date().toISOString() };
+    const creation = branchCreatePromises.current.get(branch.id);
+    if (creation && !(await creation)?.ok) return;
+    const result = await studio.updateBranch(nextBranch);
+    if (!result?.ok) { showToast(result?.error || '分支状态保存失败'); return; }
+    replaceBranch(nextBranch);
+    showToast('已标记为待生成；可在 NovelAI 出图后回到这里关联结果');
   };
 
   const copyOverviewText = async (text, count, selected = false) => {
@@ -1059,39 +1198,17 @@ export default function App() {
     showToast('Prompt 已复制，可直接粘贴到 NovelAI');
   };
 
-  const saveVersion = () => {
-    const versionNumber = activeProject.versions.length + 1;
-    const previousSnapshot = activeProject.versions[0] ? JSON.parse(activeProject.versions[0].snapshot_json) : { tags: [], prompt_structure: { base_undesired_tags: [], characters: [] } };
-    const previousNames = new Set(allPromptTags(restorePromptSnapshot(activeProject, previousSnapshot)).map((tag) => tag.tag));
-    const currentNames = new Set(allPromptTags(activeProject).map((tag) => tag.tag));
-    const added = [...currentNames].filter((tag) => !previousNames.has(tag));
-    const removed = [...previousNames].filter((tag) => !currentNames.has(tag));
-    const summaryParts = [added.length && `+${added.length} tag`, removed.length && `−${removed.length} tag`].filter(Boolean);
-    const version = {
-      id: crypto.randomUUID(),
-      label: `Version ${versionNumber}`,
-      prompt_text: formatPositivePrompt(activeProject),
-      snapshot_json: JSON.stringify(promptSnapshot(activeProject)),
-      change_summary: summaryParts.join(' · ') || '参数或顺序调整',
-      image_path: activeProject.image_path,
-      created_at: new Date().toISOString(),
-    };
-    updateProject({ ...activeProject, versions: [version, ...activeProject.versions] });
-    setActiveVersion(version.id);
-    showToast(`Version ${versionNumber} 已保存`);
-  };
-
-  const restoreVersion = (versionId) => {
-    const version = activeProject.versions.find((item) => item.id === versionId);
-    if (!version) return;
-    updateProject(restorePromptSnapshot(activeProject, JSON.parse(version.snapshot_json)));
-    setActiveVersion('current');
-    showToast(`${version.label} 已恢复为当前工作稿`);
+  const useLegacyVersion = (version) => {
+    try {
+      createDraftBranch(restorePromptSnapshot(sourceProject, JSON.parse(version.snapshot_json)));
+    } catch {
+      showToast('这个旧版本无法读取');
+    }
   };
 
   const openPromptOverview = (projectId) => {
     setActiveId(projectId);
-    setActiveVersion('current');
+    setActiveBranchId('');
     setWorkspaceMode('prompt');
   };
 
@@ -1111,7 +1228,7 @@ export default function App() {
       allProjects={projects}
       collections={collections}
       activeId={activeId}
-      setActiveId={(id) => { setActiveId(id); setActiveVersion('current'); setPromptScopeKey('base:prompt'); }}
+      setActiveId={(id) => { setActiveId(id); setActiveBranchId(''); setPromptScopeKey('base:prompt'); }}
       query={query}
       setQuery={setQuery}
       onImport={importImages}
@@ -1134,8 +1251,8 @@ export default function App() {
       onSetDeleted={setDeleted}
     />
     {activeProject ? <>
-      <PreviewStage project={activeProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} updateProject={updateProject} saveVersion={saveVersion} restoreVersion={restoreVersion} activeVersion={activeVersion} setActiveVersion={setActiveVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
-      <Inspector tab={tab} setTab={setTab} project={activeProject} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId}/>
+      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
+      <Inspector tab={tab} setTab={setTab} project={activeProject} branch={activeBranch} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId}/>
     </> : <EmptyState onImport={importImages} hasProjects={projects.length > 0}/>}
     <ImportExperience
       dragState={dragState}

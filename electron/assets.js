@@ -65,6 +65,7 @@ export async function importImage(sourcePath, assetsDirectory, options = {}) {
       prompt_structure: createPromptStructure(metadata, () => crypto.randomUUID()),
       vibes: [],
       versions: [],
+      branches: [],
     };
   } catch (error) {
     fs.rmSync(targetPath, { force: true });

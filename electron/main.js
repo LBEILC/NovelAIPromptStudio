@@ -8,6 +8,7 @@ import { backfillProjectContentHashes, importLibraryFiles } from './importer.js'
 import { fingerprintVibe, importEmbeddedVibe, importVibeFile, toProjectVibe } from './vibes.js';
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
+import { hasGenerationChanges, mergeResultAnnotations } from '../src/lib/branches.js';
 
 app.setName('NovelAI Prompt Studio');
 
@@ -182,9 +183,20 @@ app.whenReady().then(async () => {
     return { ok: true };
   });
   ipcMain.handle('project:update', (_event, project) => {
-    database.updateProject(project);
-    return { ok: true, updated_at: project.updated_at };
+    try {
+      const stored = database.loadProject(project.id);
+      if (!stored) return { ok: false, error: '结果图不存在或已被删除' };
+      if (hasGenerationChanges(stored, project)) return { ok: false, immutable: true, error: '结果图的生成事实不可修改，请创建分支方案' };
+      const merged = mergeResultAnnotations(stored, project);
+      database.updateProject(merged);
+      return { ok: true, updated_at: merged.updated_at };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
   });
+  ipcMain.handle('branch:create', (_event, branch) => libraryOrganizationResult(() => ({ branch: database.createBranch(branch) })));
+  ipcMain.handle('branch:update', (_event, branch) => libraryOrganizationResult(() => ({ branch: database.updateBranch(branch) })));
+  ipcMain.handle('branch:delete', (_event, branchId) => libraryOrganizationResult(() => { database.deleteBranch(branchId); return {}; }));
   ipcMain.handle('project:delete', (_event, id) => {
     database.deleteProject(id);
     return { ok: true };
@@ -232,7 +244,6 @@ app.whenReady().then(async () => {
         }
       }
       const linked = linkAvailableEmbeddedVibes(project);
-      if (linked.additions.length) database.updateProject(linked.project);
       return {
         ok: true,
         project: linked.project,

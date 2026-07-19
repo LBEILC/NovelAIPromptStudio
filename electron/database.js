@@ -117,6 +117,18 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
   image_path TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS branch_recipes (
+  id TEXT PRIMARY KEY,
+  source_project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  parent_branch_id TEXT REFERENCES branch_recipes(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft',
+  snapshot_json TEXT NOT NULL,
+  change_summary TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_branch_recipes_source ON branch_recipes(source_project_id, updated_at DESC);
 CREATE TABLE IF NOT EXISTS tag_dictionary (
   tag TEXT PRIMARY KEY,
   translation TEXT NOT NULL,
@@ -128,6 +140,7 @@ CREATE TABLE IF NOT EXISTS tag_dictionary (
 `;
 
 const TAG_CATEGORIES = new Set(['Artist', 'Character', 'Clothing', 'Scene', 'Style', 'Unsorted']);
+const BRANCH_STATUSES = new Set(['draft', 'waiting', 'result', 'mismatch']);
 
 function dictionaryKey(value) {
   return String(value || '').trim().toLocaleLowerCase('en-US');
@@ -358,21 +371,101 @@ export async function openDatabase(dataDirectory) {
     })),
   });
 
-  const loadLibrary = () => {
-    const projects = query('SELECT * FROM projects ORDER BY updated_at DESC');
-    return projects.map((project) => {
-      const storedMetadata = query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] || {};
-      const metadata = { ...storedMetadata, generation_mode: normalizeGenerationMode(storedMetadata) };
-      return enrichProjectTags({
-        ...project,
-        tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', { $id: project.id }),
-        metadata,
-        prompt_structure: safeJson(metadata.prompt_structure_json),
-        collection_ids: projectCollectionIds(project.id),
-        vibes: query('SELECT * FROM vibe_transfers WHERE project_id = $id ORDER BY position', { $id: project.id }),
-        versions: query('SELECT * FROM prompt_versions WHERE project_id = $id ORDER BY created_at DESC', { $id: project.id }),
-      });
+  const hydrateProject = (project) => {
+    if (!project) return null;
+    const storedMetadata = query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] || {};
+    const metadata = { ...storedMetadata, generation_mode: normalizeGenerationMode(storedMetadata) };
+    return enrichProjectTags({
+      ...project,
+      tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', { $id: project.id }),
+      metadata,
+      prompt_structure: safeJson(metadata.prompt_structure_json),
+      collection_ids: projectCollectionIds(project.id),
+      vibes: query('SELECT * FROM vibe_transfers WHERE project_id = $id ORDER BY position', { $id: project.id }),
+      versions: query('SELECT * FROM prompt_versions WHERE project_id = $id ORDER BY created_at DESC', { $id: project.id }),
+      branches: query('SELECT * FROM branch_recipes WHERE source_project_id = $id ORDER BY created_at DESC', { $id: project.id }),
     });
+  };
+
+  const loadProject = (projectId) => hydrateProject(query('SELECT * FROM projects WHERE id = $id', { $id: String(projectId || '') })[0]);
+  const loadLibrary = () => query('SELECT * FROM projects ORDER BY updated_at DESC').map(hydrateProject);
+
+  const cleanBranchSnapshot = (value) => {
+    const snapshot = String(value || '{}');
+    if (snapshot.length > 5_000_000) throw new Error('分支内容过大，无法保存');
+    const parsed = safeJson(snapshot, null);
+    if (!parsed || Array.isArray(parsed)) throw new Error('分支内容格式无效');
+    return JSON.stringify(parsed);
+  };
+
+  const cleanBranchName = (value) => {
+    const name = String(value || '').trim() || '未命名分支';
+    if (name.length > 80) throw new Error('分支名称不能超过 80 个字符');
+    return name;
+  };
+
+  const cleanBranchStatus = (value) => {
+    const status = String(value || 'draft');
+    if (!BRANCH_STATUSES.has(status)) throw new Error('分支状态无效');
+    return status;
+  };
+
+  const createBranch = (branch) => {
+    const sourceProjectId = String(branch.source_project_id || '');
+    if (!query('SELECT id FROM projects WHERE id = $id', { $id: sourceProjectId })[0]) throw new Error('来源结果图不存在');
+    if (cleanBranchStatus(branch.status) !== 'draft') throw new Error('新分支必须从草稿开始');
+    if (branch.parent_branch_id) {
+      const parent = query('SELECT source_project_id FROM branch_recipes WHERE id = $id', { $id: String(branch.parent_branch_id) })[0];
+      if (!parent || parent.source_project_id !== sourceProjectId) throw new Error('父分支不存在或不属于同一结果图');
+    }
+    const branchId = String(branch.id || crypto.randomUUID());
+    database.run(
+      `INSERT INTO branch_recipes (id, source_project_id, parent_branch_id, name, status, snapshot_json, change_summary, created_at, updated_at)
+       VALUES ($id, $source_project_id, $parent_branch_id, $name, $status, $snapshot_json, $change_summary, $created_at, $updated_at)`,
+      {
+        $id: branchId,
+        $source_project_id: sourceProjectId,
+        $parent_branch_id: branch.parent_branch_id || null,
+        $name: cleanBranchName(branch.name),
+        $status: 'draft',
+        $snapshot_json: cleanBranchSnapshot(branch.snapshot_json),
+        $change_summary: String(branch.change_summary || '').slice(0, 240),
+        $created_at: branch.created_at || new Date().toISOString(),
+        $updated_at: branch.updated_at || new Date().toISOString(),
+      },
+    );
+    persist();
+    return query('SELECT * FROM branch_recipes WHERE id = $id', { $id: branchId })[0];
+  };
+
+  const updateBranch = (branch) => {
+    const branchId = String(branch.id || '');
+    const stored = query('SELECT * FROM branch_recipes WHERE id = $id', { $id: branchId })[0];
+    if (!stored) throw new Error('分支不存在或已被删除');
+    if (stored.status !== 'draft') throw new Error('只有草稿分支可以修改');
+    const status = cleanBranchStatus(branch.status);
+    if (!['draft', 'waiting'].includes(status)) throw new Error('草稿目前只能标记为待生成');
+    database.run(
+      `UPDATE branch_recipes SET name = $name, status = $status, snapshot_json = $snapshot_json,
+       change_summary = $change_summary, updated_at = $updated_at WHERE id = $id`,
+      {
+        $id: branchId,
+        $name: cleanBranchName(branch.name),
+        $status: status,
+        $snapshot_json: cleanBranchSnapshot(branch.snapshot_json),
+        $change_summary: String(branch.change_summary || '').slice(0, 240),
+        $updated_at: branch.updated_at || new Date().toISOString(),
+      },
+    );
+    persist();
+    return query('SELECT * FROM branch_recipes WHERE id = $id', { $id: branchId })[0] || null;
+  };
+
+  const deleteBranch = (branchId) => {
+    const branch = query('SELECT status FROM branch_recipes WHERE id = $id', { $id: String(branchId || '') })[0];
+    if (branch && branch.status !== 'draft') throw new Error('只有草稿分支可以放弃');
+    database.run('DELETE FROM branch_recipes WHERE id = $id', { $id: String(branchId || '') });
+    persist();
   };
 
   const loadVibeLibrary = () => query('SELECT * FROM vibe_library ORDER BY created_at DESC');
@@ -719,6 +812,7 @@ export async function openDatabase(dataDirectory) {
 
   return {
     loadLibrary,
+    loadProject,
     loadCollections,
     loadLibraryOrganization,
     createCollection,
@@ -731,6 +825,9 @@ export async function openDatabase(dataDirectory) {
     findProjectByContentHash,
     setProjectContentHashes,
     projectHashCandidates,
+    createBranch,
+    updateBranch,
+    deleteBranch,
     loadVibeLibrary,
     upsertVibeLibrary,
     resolveVibeLibraryId,
