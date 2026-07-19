@@ -109,7 +109,7 @@ function EmptyState({ onImport, hasProjects = false }) {
     <div className="empty-mark"><Icon name="image" size={32}/><span>NAI / 01</span></div>
     <h1>{hasProjects ? <>当前视图<br/>还没有作品</> : <>把生成图变成<br/>可继续创作的资产</>}</h1>
     <p>{hasProjects ? '可以切换到“全部作品”查看现有资产，或继续导入新的 NovelAI 图片。' : '导入 NovelAI 图片，自动恢复 Prompt 与生成参数。Vibe 参考图和权重会独立保存，不再随页面关闭而丢失。'}</p>
-    <LobeButton className="primary large" icon={<Icon name="plus"/>} onClick={onImport} size="large" type="primary">{hasProjects ? '继续导入作品' : '导入第一批作品'}</LobeButton>
+    <LobeButton className="empty-import-action" icon={<Icon name="plus"/>} onClick={onImport} size="large" type="primary">{hasProjects ? '继续导入作品' : '导入第一批作品'}</LobeButton>
     <div className="empty-hint">PNG · JPG · WEBP　支持批量导入</div>
   </main>;
 }
