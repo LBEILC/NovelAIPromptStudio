@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, safeStorage, screen, shell } from 'electron';
 import { openDatabase } from './database.js';
 import { importVibeImage, projectEmbeddedVibes } from './assets.js';
-import { backfillProjectContentHashes, importLibraryFiles } from './importer.js';
+import { backfillProjectContentHashes, backfillProjectDimensions, importLibraryFiles } from './importer.js';
 import { fingerprintVibe, importEmbeddedVibe, importVibeFile, toProjectVibe } from './vibes.js';
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
@@ -109,9 +109,10 @@ app.whenReady().then(async () => {
   assetsDirectory = path.join(app.getPath('userData'), 'assets');
   database = await openDatabase(dataDirectory);
   preferences = openPreferences(dataDirectory, safeStorage);
-  contentHashBackfill = backfillProjectContentHashes(database).catch((error) => {
-    console.error('Unable to backfill legacy image fingerprints', error);
-  });
+  contentHashBackfill = Promise.all([
+    backfillProjectContentHashes(database).catch((error) => console.error('Unable to backfill legacy image fingerprints', error)),
+    backfillProjectDimensions(database).catch((error) => console.error('Unable to backfill legacy image dimensions', error)),
+  ]);
 
   for (const storedProject of database.loadLibrary()) {
     const linked = linkAvailableEmbeddedVibes(storedProject);
@@ -125,7 +126,10 @@ app.whenReady().then(async () => {
     return net.fetch(pathToFileURL(filePath).toString());
   });
 
-  ipcMain.handle('library:load', () => database.loadLibrary());
+  ipcMain.handle('library:load', async () => {
+    await contentHashBackfill;
+    return database.loadLibrary();
+  });
   ipcMain.handle('context-menu:show', (event, request = {}) => new Promise((resolve) => {
     const ownerWindow = BrowserWindow.fromWebContents(event.sender);
     if (!ownerWindow || ownerWindow.isDestroyed()) { resolve(null); return; }

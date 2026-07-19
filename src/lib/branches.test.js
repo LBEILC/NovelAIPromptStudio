@@ -8,7 +8,7 @@ function project() {
     tags: [{ id: 'tag-1', tag: '1girl', weight: 1, translation: '一名女孩', category: 'Character', note: '' }],
     prompt_structure: { base_undesired_tags: [], use_coords: false, use_order: true, characters: [] },
     vibes: [],
-    metadata: { model: 'nai-v4', seed: '12', steps: 28, sampler: 'k_euler', guidance: 5 },
+    metadata: { model: 'nai-v4', seed: '12', steps: 28, sampler: 'k_euler', guidance: 5, width: 832, height: 1216 },
   };
 }
 
@@ -42,5 +42,12 @@ describe('immutable result and branch helpers', () => {
     moved.prompt_structure.characters[0].center = { x: 0.7, y: 0.5 };
     expect(hasGenerationChanges(source, moved)).toBe(true);
     expect(branchChangeFields(source, moved)).toContain('Prompt');
+  });
+
+  it('treats output dimensions as one generation field', () => {
+    const source = project();
+    const resized = { ...source, metadata: { ...source.metadata, width: 1216, height: 832 } };
+    expect(branchChangeFields(source, resized)).toEqual(['Size']);
+    expect(hasGenerationChanges(source, resized)).toBe(true);
   });
 });

@@ -49,6 +49,23 @@ describe('NovelAI PNG metadata', () => {
     });
   });
 
+  it('reads the generated image dimensions from the PNG IHDR chunk', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
+    temporaryDirectories.push(directory);
+    const filePath = path.join(directory, 'dimensions.png');
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(1024, 0);
+    ihdr.writeUInt32BE(1536, 4);
+    const png = Buffer.concat([
+      Buffer.from('89504e470d0a1a0a', 'hex'),
+      chunk('IHDR', ihdr),
+      chunk('IEND'),
+    ]);
+    fs.writeFileSync(filePath, png);
+
+    expect(readNovelAIMetadata(filePath)).toMatchObject({ width: 1024, height: 1536 });
+  });
+
   it('separates V4 base and character prompts with undesired content and positions', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
     temporaryDirectories.push(directory);

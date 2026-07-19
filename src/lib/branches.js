@@ -23,6 +23,8 @@ function generationMetadata(project) {
     steps: metadata.steps === '' || metadata.steps == null ? '' : Number(metadata.steps),
     sampler: String(metadata.sampler || '').trim(),
     guidance: metadata.guidance === '' || metadata.guidance == null ? '' : Number(metadata.guidance),
+    width: Math.max(0, Math.round(Number(metadata.width || 0))),
+    height: Math.max(0, Math.round(Number(metadata.height || 0))),
     generation_mode: String(metadata.generation_mode || '').trim(),
   };
 }
@@ -94,6 +96,7 @@ export function branchChangeFields(source, candidate) {
   for (const [field, label] of [['seed', 'Seed'], ['model', 'Model'], ['sampler', 'Sampler'], ['steps', 'Steps'], ['guidance', 'CFG']]) {
     if (sourceMetadata[field] !== candidateMetadata[field]) fields.push(label);
   }
+  if (sourceMetadata.width !== candidateMetadata.width || sourceMetadata.height !== candidateMetadata.height) fields.push('Size');
   return [...new Set(fields)];
 }
 

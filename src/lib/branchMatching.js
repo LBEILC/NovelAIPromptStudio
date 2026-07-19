@@ -40,6 +40,7 @@ function differenceDetails(differences, expected, actual) {
   return differences.map((field) => {
     if (field === 'Prompt') return { field, expected: promptSummary(expected), actual: promptSummary(actual) };
     if (field === 'Vibe') return { field, expected: vibeSummary(expected), actual: vibeSummary(actual) };
+    if (field === 'Size') return { field, expected: `${expected.metadata?.width || '—'} × ${expected.metadata?.height || '—'}`, actual: `${actual.metadata?.width || '—'} × ${actual.metadata?.height || '—'}` };
     const metadataField = metadataFields[field];
     return { field, expected: String(expected.metadata?.[metadataField] ?? '—'), actual: String(actual.metadata?.[metadataField] ?? '—') };
   });

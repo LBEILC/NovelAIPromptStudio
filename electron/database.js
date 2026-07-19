@@ -95,6 +95,8 @@ CREATE TABLE IF NOT EXISTS generation_metadata (
   steps INTEGER,
   sampler TEXT NOT NULL DEFAULT '',
   guidance REAL,
+  width INTEGER NOT NULL DEFAULT 0,
+  height INTEGER NOT NULL DEFAULT 0,
   generation_mode TEXT NOT NULL DEFAULT 'unknown',
   extra_json TEXT NOT NULL DEFAULT '{}'
 );
@@ -257,6 +259,12 @@ export async function openDatabase(dataDirectory) {
   }
   if (!metadataColumns.includes('generation_mode')) {
     database.run("ALTER TABLE generation_metadata ADD COLUMN generation_mode TEXT NOT NULL DEFAULT 'unknown'");
+  }
+  if (!metadataColumns.includes('width')) {
+    database.run('ALTER TABLE generation_metadata ADD COLUMN width INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!metadataColumns.includes('height')) {
+    database.run('ALTER TABLE generation_metadata ADD COLUMN height INTEGER NOT NULL DEFAULT 0');
   }
   const promptTagColumns = database.exec('PRAGMA table_info(prompt_tags)')[0]?.values.map((row) => row[1]) || [];
   if (!promptTagColumns.includes('raw_segment')) {
@@ -728,6 +736,30 @@ export async function openDatabase(dataDirectory) {
     "SELECT id, image_path FROM projects WHERE content_hash = ''",
   );
 
+  const projectDimensionCandidates = () => query(
+    `SELECT projects.id, projects.image_path FROM projects
+     JOIN generation_metadata ON generation_metadata.project_id = projects.id
+     WHERE generation_metadata.width <= 0 OR generation_metadata.height <= 0`,
+  );
+
+  const setProjectDimensions = (items = []) => {
+    database.run('BEGIN');
+    try {
+      for (const item of items) {
+        database.run(
+          `UPDATE generation_metadata SET width = $width, height = $height
+           WHERE project_id = $id AND (width <= 0 OR height <= 0)`,
+          { $id: String(item.id || ''), $width: Math.max(0, Math.round(Number(item.width || 0))), $height: Math.max(0, Math.round(Number(item.height || 0))) },
+        );
+      }
+      database.run('COMMIT');
+      persist();
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+  };
+
   const runOrganizationMutation = (mutate) => {
     database.run('BEGIN');
     try {
@@ -1113,12 +1145,13 @@ export async function openDatabase(dataDirectory) {
 
     const metadata = project.metadata || {};
     database.run(
-      `INSERT INTO generation_metadata (project_id, prompt_raw, negative_prompt, prompt_structure_json, model, seed, steps, sampler, guidance, generation_mode, extra_json)
-       VALUES ($project_id, $prompt_raw, $negative_prompt, $prompt_structure_json, $model, $seed, $steps, $sampler, $guidance, $generation_mode, $extra_json)
+      `INSERT INTO generation_metadata (project_id, prompt_raw, negative_prompt, prompt_structure_json, model, seed, steps, sampler, guidance, width, height, generation_mode, extra_json)
+       VALUES ($project_id, $prompt_raw, $negative_prompt, $prompt_structure_json, $model, $seed, $steps, $sampler, $guidance, $width, $height, $generation_mode, $extra_json)
        ON CONFLICT(project_id) DO UPDATE SET prompt_raw = excluded.prompt_raw, negative_prompt = excluded.negative_prompt,
        prompt_structure_json = excluded.prompt_structure_json,
        model = excluded.model, seed = excluded.seed, steps = excluded.steps, sampler = excluded.sampler,
-       guidance = excluded.guidance, generation_mode = excluded.generation_mode, extra_json = excluded.extra_json`,
+       guidance = excluded.guidance, width = excluded.width, height = excluded.height,
+       generation_mode = excluded.generation_mode, extra_json = excluded.extra_json`,
       {
         $project_id: project.id,
         $prompt_raw: metadata.prompt_raw || '',
@@ -1129,6 +1162,8 @@ export async function openDatabase(dataDirectory) {
         $steps: metadata.steps === '' || metadata.steps == null ? null : Number(metadata.steps),
         $sampler: metadata.sampler || '',
         $guidance: metadata.guidance === '' || metadata.guidance == null ? null : Number(metadata.guidance),
+        $width: Math.max(0, Math.round(Number(metadata.width || 0))),
+        $height: Math.max(0, Math.round(Number(metadata.height || 0))),
         $generation_mode: normalizeGenerationMode(metadata),
         $extra_json: typeof metadata.extra_json === 'string' ? metadata.extra_json : JSON.stringify(metadata.extra_json || {}),
       },
@@ -1233,6 +1268,8 @@ export async function openDatabase(dataDirectory) {
     findProjectByContentHash,
     setProjectContentHashes,
     projectHashCandidates,
+    projectDimensionCandidates,
+    setProjectDimensions,
     createBranch,
     updateBranch,
     deleteBranch,

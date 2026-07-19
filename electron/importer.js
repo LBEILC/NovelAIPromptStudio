@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
 import yauzl from 'yauzl';
+import sharp from 'sharp';
 import { hashFile, importImage } from './assets.js';
 
 export const IMPORT_LIMITS = Object.freeze({
@@ -187,6 +188,20 @@ export async function backfillProjectContentHashes(database) {
     }
   }
   if (repaired.length) database.setProjectContentHashes(repaired);
+}
+
+export async function backfillProjectDimensions(database) {
+  const repaired = [];
+  for (const project of database.projectDimensionCandidates()) {
+    try {
+      if (!fs.existsSync(project.image_path)) continue;
+      const metadata = await sharp(project.image_path).metadata();
+      if (metadata.width && metadata.height) repaired.push({ id: project.id, width: metadata.width, height: metadata.height });
+    } catch {
+      // Missing or unreadable legacy assets remain available with unknown dimensions.
+    }
+  }
+  if (repaired.length) database.setProjectDimensions(repaired);
 }
 
 export async function importLibraryFiles({

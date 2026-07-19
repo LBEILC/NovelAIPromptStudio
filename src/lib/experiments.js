@@ -1,6 +1,6 @@
 import { branchChangeFields } from './branches.js';
 
-export const EXPERIMENT_FIELDS = ['Prompt', 'Vibe', 'Seed', 'Model', 'Sampler', 'Steps', 'CFG'];
+export const EXPERIMENT_FIELDS = ['Prompt', 'Vibe', 'Seed', 'Model', 'Sampler', 'Steps', 'CFG', 'Size'];
 
 function metadataValue(project, field) {
   const metadata = project?.metadata || {};
@@ -10,6 +10,7 @@ function metadataValue(project, field) {
 
 function hasComparableValue(project, field) {
   if (field === 'Prompt' || field === 'Vibe') return true;
+  if (field === 'Size') return Number(project?.metadata?.width) > 0 && Number(project?.metadata?.height) > 0;
   const value = metadataValue(project, field);
   return value !== '' && value != null;
 }

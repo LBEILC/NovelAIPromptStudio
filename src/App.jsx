@@ -351,6 +351,7 @@ const BRANCH_STATUS_LABELS = {
 function experimentFieldValue(project, field) {
   if (field === 'Prompt') return formatPositivePromptForCopy(project) || '空 Prompt';
   if (field === 'Vibe') return (project.vibes || []).filter((vibe) => vibe.enabled).map((vibe) => `${vibe.name || 'Vibe'} ${Number(vibe.strength ?? .6).toFixed(2)}`).join(' + ') || '无';
+  if (field === 'Size') return `${project.metadata?.width || '—'} × ${project.metadata?.height || '—'}`;
   const key = { Seed: 'seed', Model: 'model', Sampler: 'sampler', Steps: 'steps', CFG: 'guidance' }[field];
   return String(project.metadata?.[key] ?? '') || '—';
 }
@@ -411,6 +412,7 @@ function PreviewStage({ project, sourceProject, mode, setMode, experiment, exper
         <span>SEED {project.metadata.seed || '—'}</span>
         <i/>
         <span>{project.metadata.steps || '—'} STEPS</span>
+        <i/><span>{project.metadata.width || '—'} × {project.metadata.height || '—'}</span>
         {limitedReproduction && <><i/><span className="reproduction-status" title="局部重绘 metadata 不包含完整底图与蒙版">INPAINT · 无法精确复现</span></>}
       </div>
       {mismatchResult && <aside className="branch-match-panel" role="status">
@@ -936,6 +938,8 @@ function MetadataPanel({ project, updateProject }) {
       <label><span>Steps</span><input type="number" value={metadata.steps ?? ''} onChange={(event) => update({ steps: event.target.value })} placeholder="—"/></label>
       <label><span>Sampler</span><input value={metadata.sampler || ''} onChange={(event) => update({ sampler: event.target.value })} placeholder="—"/></label>
       <label><span>Guidance / CFG</span><input type="number" step="0.1" value={metadata.guidance ?? ''} onChange={(event) => update({ guidance: event.target.value })} placeholder="—"/></label>
+      <label><span>Width</span><input type="number" min="0" step="64" value={metadata.width || ''} onChange={(event) => update({ width: event.target.value })} placeholder="—"/></label>
+      <label><span>Height</span><input type="number" min="0" step="64" value={metadata.height || ''} onChange={(event) => update({ height: event.target.value })} placeholder="—"/></label>
     </div>
     <label className="textarea-label"><span>Base Undesired Content · 在 Prompt 面板编辑</span><textarea value={formatPrompt(project.prompt_structure.base_undesired_tags)} readOnly placeholder="未检测到 Undesired Content"/></label>
     <details className="raw-metadata"><summary>查看原始 metadata</summary><pre>{metadata.extra_json || '{}'}</pre></details>

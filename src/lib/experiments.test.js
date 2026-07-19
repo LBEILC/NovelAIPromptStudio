@@ -9,7 +9,7 @@ function result(id, patch = {}) {
     prompt_structure: { base_undesired_tags: [], use_coords: false, use_order: true, characters: [] },
     vibes: [],
     ...(patch.tags ? { tags: patch.tags } : {}),
-    metadata: { seed: '42', model: 'nai-v4', sampler: 'k_euler', steps: 28, guidance: 5, ...patch.metadata },
+    metadata: { seed: '42', model: 'nai-v4', sampler: 'k_euler', steps: 28, guidance: 5, width: 832, height: 1216, ...patch.metadata },
   };
 }
 

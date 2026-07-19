@@ -39,6 +39,12 @@ function parsePngText(buffer) {
   return text;
 }
 
+function parsePngDimensions(buffer) {
+  if (buffer.length < 24 || buffer.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') return { width: 0, height: 0 };
+  if (buffer.subarray(12, 16).toString('ascii') !== 'IHDR') return { width: 0, height: 0 };
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
+
 function safeJson(value) {
   try {
     return JSON.parse(value);
@@ -55,7 +61,9 @@ function first(source, keys, fallback = '') {
 }
 
 export function readNovelAIMetadata(filePath) {
-  const text = parsePngText(fs.readFileSync(filePath));
+  const buffer = fs.readFileSync(filePath);
+  const text = parsePngText(buffer);
+  const dimensions = parsePngDimensions(buffer);
   const candidates = Object.values(text).map(safeJson).filter((value) => value && typeof value === 'object');
   const raw = candidates.reduce((merged, item) => ({ ...merged, ...item }), {});
   const legacyPrompt = first(raw, ['prompt', 'description'], text.Description || '');
@@ -71,6 +79,8 @@ export function readNovelAIMetadata(filePath) {
     steps: first(raw, ['steps'], ''),
     sampler: String(first(raw, ['sampler'], '')),
     guidance: first(raw, ['scale', 'cfg_scale', 'guidance'], ''),
+    width: dimensions.width,
+    height: dimensions.height,
     generation_mode: detectGenerationMode(raw),
     embedded_vibes: extractEmbeddedVibes(raw, model),
     extra_json: JSON.stringify({ pngText: text, parsed: raw }),

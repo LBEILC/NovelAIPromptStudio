@@ -8,7 +8,7 @@ function result(seed = '42') {
     tags: [{ id: 'tag', tag: '1girl', weight: 1 }],
     prompt_structure: { base_undesired_tags: [], use_coords: false, use_order: true, characters: [] },
     vibes: [],
-    metadata: { model: 'nai-v4', seed, steps: 28, sampler: 'k_euler', guidance: 5 },
+    metadata: { model: 'nai-v4', seed, steps: 28, sampler: 'k_euler', guidance: 5, width: 832, height: 1216 },
   };
 }
 
@@ -38,5 +38,15 @@ describe('branch result matching', () => {
     const actual = result();
     actual.tags[0].raw_segment = '1::1girl::';
     expect(compareBranchResult(generationSnapshot(recipe), actual)).toMatchObject({ status: 'matched', differences: [] });
+  });
+
+  it('reports output size differences with readable dimensions', () => {
+    const actual = result();
+    actual.metadata = { ...actual.metadata, width: 1216, height: 832 };
+    expect(compareBranchResult(generationSnapshot(result()), actual)).toMatchObject({
+      status: 'mismatch',
+      differences: ['Size'],
+      details: [{ field: 'Size', expected: '832 × 1216', actual: '1216 × 832' }],
+    });
   });
 });

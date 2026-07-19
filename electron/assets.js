@@ -47,6 +47,11 @@ export async function importImage(sourcePath, assetsDirectory, options = {}) {
   const { targetPath, thumbnailPath } = await copyWithThumbnail(sourcePath, assetsDirectory);
   try {
     const metadata = readNovelAIMetadata(sourcePath);
+    if (!metadata.width || !metadata.height) {
+      const imageMetadata = await sharp(sourcePath).metadata();
+      metadata.width = Number(imageMetadata.width || 0);
+      metadata.height = Number(imageMetadata.height || 0);
+    }
     delete metadata.embedded_vibes;
     const now = new Date().toISOString();
     return {
