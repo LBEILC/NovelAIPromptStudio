@@ -134,6 +134,8 @@ CREATE TABLE IF NOT EXISTS branch_results (
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   match_status TEXT NOT NULL,
   differences_json TEXT NOT NULL DEFAULT '[]',
+  details_json TEXT NOT NULL DEFAULT '[]',
+  actual_branch_id TEXT NOT NULL DEFAULT '',
   linked_at TEXT NOT NULL,
   PRIMARY KEY (branch_id, project_id)
 );
@@ -210,6 +212,13 @@ export async function openDatabase(dataDirectory) {
   const metadataColumns = database.exec('PRAGMA table_info(generation_metadata)')[0]?.values.map((row) => row[1]) || [];
   if (!metadataColumns.includes('prompt_structure_json')) {
     database.run("ALTER TABLE generation_metadata ADD COLUMN prompt_structure_json TEXT NOT NULL DEFAULT '{}'");
+  }
+  const branchResultColumns = database.exec('PRAGMA table_info(branch_results)')[0]?.values.map((row) => row[1]) || [];
+  if (!branchResultColumns.includes('details_json')) {
+    database.run("ALTER TABLE branch_results ADD COLUMN details_json TEXT NOT NULL DEFAULT '[]'");
+  }
+  if (!branchResultColumns.includes('actual_branch_id')) {
+    database.run("ALTER TABLE branch_results ADD COLUMN actual_branch_id TEXT NOT NULL DEFAULT ''");
   }
   if (!metadataColumns.includes('generation_mode')) {
     database.run("ALTER TABLE generation_metadata ADD COLUMN generation_mode TEXT NOT NULL DEFAULT 'unknown'");
@@ -387,7 +396,11 @@ export async function openDatabase(dataDirectory) {
        FROM branch_results JOIN projects ON projects.id = branch_results.project_id
        WHERE branch_results.branch_id = $id ORDER BY branch_results.linked_at DESC`,
       { $id: branch.id },
-    ).map((result) => ({ ...result, differences: safeJson(result.differences_json, []) })),
+    ).map((result) => ({
+      ...result,
+      differences: safeJson(result.differences_json, []),
+      details: safeJson(result.details_json, []),
+    })),
   } : null;
 
   const hydrateProject = (project) => {
@@ -497,21 +510,28 @@ export async function openDatabase(dataDirectory) {
     if (project.id === branch.source_project_id) throw new Error('来源原图不能作为这个分支的新结果');
     const matchStatus = match?.status === 'matched' ? 'matched' : 'mismatch';
     const differences = Array.isArray(match?.differences) ? match.differences.map(String).slice(0, 20) : [];
+    const details = Array.isArray(match?.details) ? match.details.slice(0, 20).map((detail) => ({
+      field: String(detail?.field || '').slice(0, 40),
+      expected: String(detail?.expected ?? '').slice(0, 500),
+      actual: String(detail?.actual ?? '').slice(0, 500),
+    })) : [];
     const now = new Date().toISOString();
     database.run('BEGIN');
     try {
       database.run(
-        `INSERT INTO branch_results (branch_id, project_id, match_status, differences_json, linked_at)
-         VALUES ($branch_id, $project_id, $match_status, $differences_json, $linked_at)
+        `INSERT INTO branch_results (branch_id, project_id, match_status, differences_json, details_json, actual_branch_id, linked_at)
+         VALUES ($branch_id, $project_id, $match_status, $differences_json, $details_json, '', $linked_at)
          ON CONFLICT(branch_id, project_id) DO UPDATE SET
           match_status = excluded.match_status,
           differences_json = excluded.differences_json,
+          details_json = excluded.details_json,
           linked_at = excluded.linked_at`,
         {
           $branch_id: branch.id,
           $project_id: project.id,
           $match_status: matchStatus,
           $differences_json: JSON.stringify(differences),
+          $details_json: JSON.stringify(details),
           $linked_at: now,
         },
       );
@@ -523,6 +543,76 @@ export async function openDatabase(dataDirectory) {
       database.run('COMMIT');
       persist();
       return loadBranch(branch.id);
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+  };
+
+  const attachMismatchedBranchResult = (branchId, projectId, snapshotJson, match) => {
+    const branch = query('SELECT * FROM branch_recipes WHERE id = $id', { $id: String(branchId || '') })[0];
+    if (!branch) throw new Error('分支不存在或已被删除');
+    if (!['waiting', 'result', 'mismatch'].includes(branch.status)) throw new Error('请先把分支标记为待生成');
+    const project = query('SELECT id FROM projects WHERE id = $id', { $id: String(projectId || '') })[0];
+    if (!project) throw new Error('结果图不存在或导入失败');
+    if (project.id === branch.source_project_id) throw new Error('来源原图不能作为这个分支的新结果');
+    const existing = query(
+      "SELECT actual_branch_id FROM branch_results WHERE branch_id = $branch_id AND project_id = $project_id AND actual_branch_id != ''",
+      { $branch_id: branch.id, $project_id: project.id },
+    )[0];
+    if (existing?.actual_branch_id) return { branch: loadBranch(branch.id), actualBranch: loadBranch(existing.actual_branch_id) };
+
+    const differences = Array.isArray(match?.differences) ? match.differences.map(String).slice(0, 20) : [];
+    const details = Array.isArray(match?.details) ? match.details.slice(0, 20).map((detail) => ({
+      field: String(detail?.field || '').slice(0, 40),
+      expected: String(detail?.expected ?? '').slice(0, 500),
+      actual: String(detail?.actual ?? '').slice(0, 500),
+    })) : [];
+    const actualBranchId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    database.run('BEGIN');
+    try {
+      database.run(
+        `INSERT INTO branch_recipes (id, source_project_id, parent_branch_id, name, status, snapshot_json, change_summary, created_at, updated_at)
+         VALUES ($id, $source_project_id, $parent_branch_id, $name, 'result', $snapshot_json, $change_summary, $created_at, $updated_at)`,
+        {
+          $id: actualBranchId,
+          $source_project_id: branch.source_project_id,
+          $parent_branch_id: branch.id,
+          $name: cleanBranchName(`${String(branch.name || '').slice(0, 68)} · 实际结果`),
+          $snapshot_json: cleanBranchSnapshot(snapshotJson),
+          $change_summary: differences.join(' · ').slice(0, 240) || '实际结果参数',
+          $created_at: now,
+          $updated_at: now,
+        },
+      );
+      database.run(
+        `INSERT INTO branch_results (branch_id, project_id, match_status, differences_json, details_json, actual_branch_id, linked_at)
+         VALUES ($branch_id, $project_id, 'mismatch', $differences_json, $details_json, $actual_branch_id, $linked_at)
+         ON CONFLICT(branch_id, project_id) DO UPDATE SET
+          match_status = 'mismatch', differences_json = excluded.differences_json,
+          details_json = excluded.details_json, actual_branch_id = excluded.actual_branch_id, linked_at = excluded.linked_at`,
+        {
+          $branch_id: branch.id,
+          $project_id: project.id,
+          $differences_json: JSON.stringify(differences),
+          $details_json: JSON.stringify(details),
+          $actual_branch_id: actualBranchId,
+          $linked_at: now,
+        },
+      );
+      database.run(
+        `INSERT INTO branch_results (branch_id, project_id, match_status, differences_json, details_json, actual_branch_id, linked_at)
+         VALUES ($branch_id, $project_id, 'matched', '[]', '[]', '', $linked_at)`,
+        { $branch_id: actualBranchId, $project_id: project.id, $linked_at: now },
+      );
+      database.run(
+        "UPDATE branch_recipes SET status = 'mismatch', updated_at = $updated_at WHERE id = $id",
+        { $id: branch.id, $updated_at: now },
+      );
+      database.run('COMMIT');
+      persist();
+      return { branch: loadBranch(branch.id), actualBranch: loadBranch(actualBranchId) };
     } catch (error) {
       database.run('ROLLBACK');
       throw error;
@@ -891,6 +981,7 @@ export async function openDatabase(dataDirectory) {
     updateBranch,
     deleteBranch,
     attachBranchResult,
+    attachMismatchedBranchResult,
     loadVibeLibrary,
     upsertVibeLibrary,
     resolveVibeLibraryId,

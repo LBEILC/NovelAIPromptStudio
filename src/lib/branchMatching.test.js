@@ -14,13 +14,17 @@ function result(seed = '42') {
 
 describe('branch result matching', () => {
   it('recognizes an exact generation recipe match', () => {
-    expect(compareBranchResult(generationSnapshot(result()), result())).toEqual({ status: 'matched', differences: [], actualSeed: '42' });
+    expect(compareBranchResult(generationSnapshot(result()), result())).toEqual({ status: 'matched', differences: [], details: [], actualSeed: '42' });
   });
 
   it('reports differing generation fields', () => {
     const actual = result('99');
     actual.tags = [{ ...actual.tags[0], weight: 1.2 }];
-    expect(compareBranchResult(generationSnapshot(result()), actual)).toMatchObject({ status: 'mismatch', differences: ['Prompt', 'Seed'] });
+    expect(compareBranchResult(generationSnapshot(result()), actual)).toMatchObject({
+      status: 'mismatch',
+      differences: ['Prompt', 'Seed'],
+      details: [{ field: 'Prompt' }, { field: 'Seed', expected: '42', actual: '99' }],
+    });
   });
 
   it('treats an empty recipe seed as random', () => {

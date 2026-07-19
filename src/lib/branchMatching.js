@@ -1,4 +1,5 @@
 import { applyGenerationSnapshot, branchChangeFields } from './branches.js';
+import { getPromptScopes } from './promptStructure.js';
 
 function isRandomSeed(value) {
   return ['', '-1', 'random', '随机'].includes(String(value ?? '').trim().toLocaleLowerCase('en-US'));
@@ -22,6 +23,28 @@ function withoutRawSyntax(project) {
   };
 }
 
+function promptSummary(project) {
+  const tags = getPromptScopes(project).flatMap((scope) => scope.tags);
+  const sample = tags.slice(0, 3).map((tag) => `${Number(tag.weight ?? 1).toFixed(2)}× ${tag.tag}`).join(', ');
+  return `${tags.length} Tags${sample ? ` · ${sample}${tags.length > 3 ? '…' : ''}` : ''}`;
+}
+
+function vibeSummary(project) {
+  const vibes = (project.vibes || []).filter((vibe) => vibe.enabled);
+  const sample = vibes.slice(0, 2).map((vibe) => vibe.name || vibe.library_id || 'Vibe').join(', ');
+  return `${vibes.length} Vibe${sample ? ` · ${sample}${vibes.length > 2 ? '…' : ''}` : ''}`;
+}
+
+function differenceDetails(differences, expected, actual) {
+  const metadataFields = { Seed: 'seed', Model: 'model', Sampler: 'sampler', Steps: 'steps', CFG: 'guidance' };
+  return differences.map((field) => {
+    if (field === 'Prompt') return { field, expected: promptSummary(expected), actual: promptSummary(actual) };
+    if (field === 'Vibe') return { field, expected: vibeSummary(expected), actual: vibeSummary(actual) };
+    const metadataField = metadataFields[field];
+    return { field, expected: String(expected.metadata?.[metadataField] ?? '—'), actual: String(actual.metadata?.[metadataField] ?? '—') };
+  });
+}
+
 export function compareBranchResult(snapshot, resultProject) {
   const expected = applyGenerationSnapshot(resultProject, snapshot);
   if (isRandomSeed(snapshot?.metadata?.seed)) {
@@ -31,6 +54,7 @@ export function compareBranchResult(snapshot, resultProject) {
   return {
     status: differences.length ? 'mismatch' : 'matched',
     differences,
+    details: differenceDetails(differences, expected, resultProject),
     actualSeed: String(resultProject.metadata?.seed ?? ''),
   };
 }

@@ -8,7 +8,7 @@ import { backfillProjectContentHashes, importLibraryFiles } from './importer.js'
 import { fingerprintVibe, importEmbeddedVibe, importVibeFile, toProjectVibe } from './vibes.js';
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
-import { hasGenerationChanges, mergeResultAnnotations } from '../src/lib/branches.js';
+import { generationSnapshot, hasGenerationChanges, mergeResultAnnotations } from '../src/lib/branches.js';
 import { compareBranchResult } from '../src/lib/branchMatching.js';
 import { buildContextMenuTemplate } from './contextMenus.js';
 
@@ -238,8 +238,10 @@ app.whenReady().then(async () => {
       let snapshot;
       try { snapshot = JSON.parse(branch.snapshot_json); } catch { return { ok: false, error: '分支方案损坏，无法核对结果' }; }
       const match = compareBranchResult(snapshot, project);
-      const updatedBranch = database.attachBranchResult(branch.id, project.id, match);
-      return { ok: true, canceled: false, branch: updatedBranch, project, match, imported: imported.imported.length > 0 };
+      const attached = match.status === 'matched'
+        ? { branch: database.attachBranchResult(branch.id, project.id, match), actualBranch: null }
+        : database.attachMismatchedBranchResult(branch.id, project.id, JSON.stringify(generationSnapshot(project)), match);
+      return { ok: true, canceled: false, ...attached, project, match, imported: imported.imported.length > 0 };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }

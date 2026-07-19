@@ -195,6 +195,22 @@ button { border: 0; }
 .stage-meta { position: relative; z-index: 1; display: flex; justify-content: center; align-items: end; gap: 9px; color: #60707d; font: 8px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
 .stage-meta i { width: 2px; height: 2px; background: #4d5b66; border-radius: 50%; }
 .stage-meta .reproduction-status { color: #d7aa69; }
+.branch-match-panel { width: min(460px, calc(100% - 36px)); max-height: calc(100% - 48px); position: absolute; inset-inline-end: 18px; bottom: 38px; z-index: 3; overflow: hidden; color: #ccd4d9; background: #171719f2; border: 1px solid #63433e; border-radius: 6px; box-shadow: 0 16px 38px #05070a99; }
+.branch-match-panel > header { min-height: 52px; padding: 10px 12px; display: flex; align-items: center; gap: 9px; background: #251918; border-bottom: 1px solid #513531; }
+.branch-match-panel > header svg { flex: 0 0 auto; color: #d39589; }
+.branch-match-panel > header strong, .branch-match-panel > header small { display: block; }
+.branch-match-panel > header strong { color: #e4c0ba; font-size: var(--text-caption); }
+.branch-match-panel > header small { margin-top: 3px; color: #9d7d79; font-size: var(--text-micro); }
+.branch-match-details { max-height: 196px; overflow-y: auto; padding: 5px 12px; }
+.branch-match-details > div { min-width: 0; padding: 8px 0; display: grid; grid-template-columns: 62px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; border-bottom: 1px solid #2b2929; font-size: var(--text-micro); }
+.branch-match-details > div:last-child { border-bottom: 0; }
+.branch-match-details b { color: #d6a097; }
+.branch-match-details span { min-width: 0; overflow: hidden; color: #aeb8be; text-overflow: ellipsis; white-space: nowrap; }
+.branch-match-details em { margin-inline-end: 5px; color: #6f7b83; font-style: normal; }
+.branch-match-details .match-detail-empty { display: block; color: #9b8884; }
+.branch-match-panel > footer { padding: 8px 12px 10px; display: flex; justify-content: flex-end; gap: 7px; border-top: 1px solid #332d2c; }
+.branch-match-panel > footer button { min-height: 29px; padding: 0 9px; color: #d6dfe4; background: #20282e; border: 1px solid #3a4750; border-radius: 4px; font-size: var(--text-micro); }
+.branch-match-panel > footer button:first-child { color: #2a1c0d; background: var(--accent); border-color: var(--accent); }
 .version-rail { min-width: 0; background: #11171e; border-top: 1px solid var(--line); padding: 12px 18px 13px; }
 .rail-title { height: 23px; display: flex; align-items: start; }
 .rail-title > span { display: flex; align-items: center; gap: 6px; color: #aeb9c1; font-size: 10px; font-weight: 700; letter-spacing: .05em; }

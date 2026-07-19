@@ -234,9 +234,19 @@ describe('prompt structure persistence', () => {
       results: [{ project_id: 'branch-result', match_status: 'mismatch', differences: ['Prompt'] }],
     });
     expect(database.attachBranchResult('branch-1', 'branch-result', { status: 'matched', differences: [] })).toMatchObject({ status: 'result', results: [{ match_status: 'matched' }] });
+    const mismatchParent = database.createBranch({ ...created, id: 'branch-mismatch', name: '预期方案' });
+    database.updateBranch({ ...mismatchParent, status: 'waiting', updated_at: new Date().toISOString() });
+    const mismatch = database.attachMismatchedBranchResult(
+      mismatchParent.id,
+      'branch-result',
+      JSON.stringify({ metadata: { seed: '20' }, tags: [], prompt_structure: {}, vibes: [] }),
+      { status: 'mismatch', differences: ['Seed'], details: [{ field: 'Seed', expected: '10', actual: '20' }] },
+    );
+    expect(mismatch.branch).toMatchObject({ status: 'mismatch', results: [{ actual_branch_id: mismatch.actualBranch.id, details: [{ field: 'Seed' }] }] });
+    expect(mismatch.actualBranch).toMatchObject({ parent_branch_id: mismatchParent.id, status: 'result', results: [{ project_id: 'branch-result', match_status: 'matched' }] });
     const disposable = database.createBranch({ ...created, id: 'branch-2', name: '可放弃草稿' });
     database.deleteBranch(disposable.id);
-    expect(database.loadProject('immutable-result').branches).toMatchObject([{ id: 'branch-1', status: 'result', results: [{ project_id: 'branch-result' }] }]);
+    expect(database.loadProject('immutable-result').branches.find((branch) => branch.id === 'branch-1')).toMatchObject({ id: 'branch-1', status: 'result', results: [{ project_id: 'branch-result' }] });
     expect(database.loadProject('immutable-result').metadata.seed).toBe('10');
   });
 });

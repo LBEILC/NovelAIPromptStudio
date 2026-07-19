@@ -253,9 +253,10 @@ const BRANCH_STATUS_LABELS = {
   mismatch: '结果不匹配',
 };
 
-function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal, onEditTag, onTagContextMenu, onProjectContextMenu, onBranchContextMenu, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, branchResultImporting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
+function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal, onEditTag, onTagContextMenu, onProjectContextMenu, onBranchContextMenu, onOpenResult, updateProject, activeBranchId, onSelectBranch, onDiscardBranch, onMarkBranchWaiting, onImportBranchResult, branchResultImporting, onUseLegacyVersion, overviewCopy, onOverviewCopyChange, onCopyText, onNotify }) {
   const limitedReproduction = hasLimitedReproduction(project.metadata);
   const activeBranch = (sourceProject.branches || []).find((branch) => branch.id === activeBranchId);
+  const mismatchResult = activeBranch?.results?.find((result) => result.match_status === 'mismatch');
   const copyLabel = mode === 'prompt'
     ? overviewCopy.selected ? `复制已选 ${overviewCopy.count}` : `复制可见 ${overviewCopy.count}`
     : '复制 Prompt';
@@ -284,6 +285,14 @@ function PreviewStage({ project, sourceProject, mode, setMode, onCopy, onReveal,
         <span>{project.metadata.steps || '—'} STEPS</span>
         {limitedReproduction && <><i/><span className="reproduction-status" title="局部重绘 metadata 不包含完整底图与蒙版">INPAINT · 无法精确复现</span></>}
       </div>
+      {mismatchResult && <aside className="branch-match-panel" role="status">
+        <header><Icon name="warning" size={16}/><div><strong>上传结果与方案不一致</strong><small>原方案已保留，并按图片实际 metadata 创建子分支</small></div></header>
+        <div className="branch-match-details">
+          {(mismatchResult.details || []).map((detail) => <div key={detail.field}><b>{detail.field}</b><span><em>方案</em>{detail.expected || '—'}</span><span><em>结果</em>{detail.actual || '—'}</span></div>)}
+          {!(mismatchResult.details || []).length && <div className="match-detail-empty">差异：{mismatchResult.differences?.join('、') || 'metadata 不一致'}</div>}
+        </div>
+        <footer>{mismatchResult.actual_branch_id && <button onClick={() => onSelectBranch(mismatchResult.actual_branch_id)}>打开实际结果分支</button>}<button onClick={() => onOpenResult(mismatchResult.project_id)}>查看结果图</button></footer>
+      </aside>}
     </div> : <PromptOverview project={project} updateProject={updateProject} onEditTag={onEditTag} onTagContextMenu={onTagContextMenu} onCopyContextChange={onOverviewCopyChange} onCopyText={onCopyText} onNotify={onNotify}/>}
     <footer className="version-rail branch-rail">
       <div className="rail-title"><span><Icon name="history"/>生成分支</span><div className="rail-actions">
@@ -1288,19 +1297,32 @@ export default function App() {
             return result.project;
           }
           if (item.id === result.branch.source_project_id) {
-            return { ...item, branches: (item.branches || []).map((branch) => branch.id === result.branch.id ? result.branch : branch) };
+            let branches = (item.branches || []).map((branch) => branch.id === result.branch.id ? result.branch : branch);
+            if (result.actualBranch) {
+              branches = branches.some((branch) => branch.id === result.actualBranch.id)
+                ? branches.map((branch) => branch.id === result.actualBranch.id ? result.actualBranch : branch)
+                : [result.actualBranch, ...branches];
+            }
+            return { ...item, branches };
           }
           return item;
         });
         return foundResult ? next : [result.project, ...next];
       });
       if (result.match.status === 'matched') showToast(`结果图已匹配并绑定 · Seed ${result.match.actualSeed || '—'}`);
-      else showToast(`结果图已导入，但 ${result.match.differences.join('、') || 'metadata'} 与分支不一致`);
+      else showToast(`结果图与方案不一致；已保留原方案并创建“实际结果”子分支`);
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error));
     } finally {
       setBranchResultImporting('');
     }
+  };
+
+  const openResultProject = (projectId) => {
+    setLibraryView('all');
+    setActiveBranchId('');
+    setActiveId(projectId);
+    setWorkspaceMode('image');
   };
 
   const branchContextMenu = async (event, branch) => {
@@ -1320,10 +1342,7 @@ export default function App() {
     if (action === 'branch:upload-result') importBranchResult(branch.id);
     if (action === 'branch:discard') discardBranch(branch.id);
     if (action.startsWith('branch:open-result:')) {
-      setLibraryView('all');
-      setActiveBranchId('');
-      setActiveId(action.slice('branch:open-result:'.length));
-      setWorkspaceMode('image');
+      openResultProject(action.slice('branch:open-result:'.length));
     }
     if (action.startsWith('branch:reveal-result:')) {
       const projectId = action.slice('branch:reveal-result:'.length);
@@ -1404,7 +1423,7 @@ export default function App() {
       onProjectContextMenu={projectContextMenu}
     />
     {activeProject ? <>
-      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} onTagContextMenu={tagContextMenu} onProjectContextMenu={projectContextMenu} onBranchContextMenu={branchContextMenu} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onImportBranchResult={importBranchResult} branchResultImporting={branchResultImporting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
+      <PreviewStage project={activeProject} sourceProject={sourceProject} mode={workspaceMode} setMode={setWorkspaceMode} onCopy={copyPrompt} onReveal={studio.revealFile} onEditTag={openTagEditor} onTagContextMenu={tagContextMenu} onProjectContextMenu={projectContextMenu} onBranchContextMenu={branchContextMenu} onOpenResult={openResultProject} updateProject={updateProject} activeBranchId={activeBranchId} onSelectBranch={setActiveBranchId} onDiscardBranch={discardBranch} onMarkBranchWaiting={markBranchWaiting} onImportBranchResult={importBranchResult} branchResultImporting={branchResultImporting} onUseLegacyVersion={useLegacyVersion} overviewCopy={overviewCopy} onOverviewCopyChange={setOverviewCopy} onCopyText={copyOverviewText} onNotify={showToast}/>
       <Inspector tab={tab} setTab={setTab} project={activeProject} branch={activeBranch} updateProject={updateProject} showToast={showToast} promptScopeKey={promptScopeKey} setPromptScopeKey={setPromptScopeKey} focusTagId={focusTagId} onTagContextMenu={tagContextMenu}/>
     </> : <EmptyState onImport={importImages} hasProjects={projects.length > 0}/>}
     <ImportExperience
