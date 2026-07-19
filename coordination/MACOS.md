@@ -53,3 +53,12 @@
 - Action: On macOS, import two projects containing the same NovelAI tags, run AI 整理 on the first, manually edit one translation/category, then confirm the second project reuses both results without another model request. Confirm artist attribution tags appear under 画师. Import two `.naiv4vibe` files derived from the same embedded source image and verify they appear as parameter versions in one source-image group; test the source-image folder action and an encoding-only Vibe with no embedded PNG.
 - Expected: The local dictionary reuses normalized tags across Base/Undesired/Character scopes and persists AI/manual edits; macOS paths remain valid. Vibes with identical source-image bytes share one visual group, the source folder opens in Finder, and missing-PNG entries show a clear warning while remaining reusable.
 - Observed: macOS passed dictionary reuse, artist classification, source-hash grouping, database migration, and raw Vibe import checks in 25 tests. Source grouping is now isolated in a tested renderer helper. The locked session prevented live AI request-count, manual-edit, Finder, and visual missing-PNG checks.
+
+## Verify explicit PNG Vibe extraction and cache markers
+
+- Status: Pending
+- Date/source: 2026-07-19, Windows
+- Related commit: `8399a21`
+- Action: On an unlocked macOS session, import a NovelAI PNG whose embedded Vibe encoding is not already in the library. Confirm the app does not create a `.naiv4vibe` automatically and instead offers “上传后重试” and “从 PNG 提取”. Test both paths. For an encoded Vibe, move Information Extracted between cached marker positions and an uncached position, then use “恢复原编码” when available.
+- Expected: Uploading the original `.naiv4vibe` links it without extraction; explicit PNG extraction creates an encoding-only file without network use or Anlas cost. Cached positions remain visually marked and clickable, uncached positions disable the file-reveal action, returning to a cached/original position re-enables it, and Finder/file-dialog behavior follows macOS conventions.
+- Observed: Awaiting macOS UI verification; Windows passed clean install, 29 tests after merging the macOS grouping tests, production build, database migration, and real-window slider/file-state checks.
