@@ -4,9 +4,12 @@ import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/exter
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { theme as antdTheme } from 'antd';
+import LobeActionIcon from '@lobehub/ui/es/ActionIcon/index';
 import LobeButton from '@lobehub/ui/es/Button/index';
 import LobeInput from '@lobehub/ui/es/Input/Input';
 import LobeInputPassword from '@lobehub/ui/es/Input/InputPassword';
+import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
 import LobeSegmented from '@lobehub/ui/es/Segmented/index';
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatPrompt, inferCategory, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import {
@@ -77,7 +80,7 @@ const studio = window.studio || {
   revealFile: async () => {},
   getAISettings: async () => ({ baseUrl: 'https://api.openai.com/v1', model: '', hasApiKey: false, encryptionAvailable: true }),
   saveAISettings: async (settings) => ({ ...settings, hasApiKey: Boolean(settings.apiKey) }),
-  getAppearanceSettings: async () => ({ fontScale: 'large', density: 'comfortable', motion: 'full' }),
+  getAppearanceSettings: async () => ({ themeMode: 'dark', fontScale: 'large', density: 'comfortable', motion: 'full' }),
   saveAppearanceSettings: async (settings) => settings,
   listAIModels: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
   testAIModel: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
@@ -262,12 +265,12 @@ function LibraryPanel({
       <div className="brand-symbol">N<span>4</span></div>
       <div><strong>Prompt Studio</strong><small>NovelAI asset desk</small></div>
     </div>
-    <button className="primary import-button" onClick={onImport}><Icon name="plus"/>导入图片 <kbd>{shortcutModifier} I</kbd></button>
-    <label className="search-box"><Icon name="search"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索当前视图…"/><span>{shortcutModifier} K</span></label>
+    <LobeButton block className="import-button" icon={<Icon name="plus"/>} onClick={onImport} type="primary">导入图片 <kbd>{shortcutModifier} I</kbd></LobeButton>
+    <LobeSearchBar className="search-box" enableShortKey onInputChange={setQuery} placeholder="搜索当前视图…" value={query}/>
     <nav className="library-views" aria-label="作品库视图">
-      {viewItems.map((item) => <button key={item.id} className={libraryView === item.id ? 'active' : ''} onClick={() => onViewChange(item.id)}><Icon name={item.icon} size={14}/><span>{item.label}</span><b>{item.count}</b></button>)}
+      {viewItems.map((item) => <LobeButton block key={item.id} className={libraryView === item.id ? 'active' : ''} icon={<Icon name={item.icon} size={14}/>} onClick={() => onViewChange(item.id)} type="text"><span>{item.label}</span><b>{item.count}</b></LobeButton>)}
     </nav>
-    <div className="collection-heading"><span>收藏集</span><button onClick={() => { setCreatingCollection(true); setDeleteArmedId(''); }} aria-label="新建收藏集"><Icon name="plus" size={14}/></button></div>
+    <div className="collection-heading"><span>收藏集</span><LobeActionIcon icon={<Icon name="plus" size={14}/>} onClick={() => { setCreatingCollection(true); setDeleteArmedId(''); }} size="small" title="新建收藏集" variant="borderless"/></div>
     <div className="collection-list">
       {creatingCollection && <div className="collection-editor"><input autoFocus maxLength={80} value={collectionName} onChange={(event) => setCollectionName(event.target.value)} onKeyDown={(event) => {
         if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitCollection();
@@ -286,7 +289,7 @@ function LibraryPanel({
       </div>)}
       {!collections.length && !creatingCollection && <div className="collection-empty">创建收藏集来手动整理作品</div>}
     </div>
-    <div className="collection-heading series-heading"><span>创作系列</span><button onClick={() => { setCreatingSeries(true); setDeleteArmedSeriesId(''); }} aria-label="新建创作系列"><Icon name="plus" size={14}/></button></div>
+    <div className="collection-heading series-heading"><span>创作系列</span><LobeActionIcon icon={<Icon name="plus" size={14}/>} onClick={() => { setCreatingSeries(true); setDeleteArmedSeriesId(''); }} size="small" title="新建创作系列" variant="borderless"/></div>
     <div className="collection-list series-list">
       {creatingSeries && <div className="collection-editor"><input autoFocus maxLength={80} value={seriesName} onChange={(event) => setSeriesName(event.target.value)} onKeyDown={(event) => {
         if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitSeries();
@@ -320,7 +323,7 @@ function LibraryPanel({
       </div>)}
       {!experiments.length && <div className="collection-empty">多选至少 2 张作品，建立控制变量实验</div>}
     </div>
-    <div className="section-heading library-result-heading"><span>{currentLabel}</span><b>{projects.length}</b><button className={selectionMode ? 'active' : ''} onClick={() => { setSelectionMode(!selectionMode); onClearSelection(); }}>{selectionMode ? '完成' : '多选'}</button></div>
+    <div className="section-heading library-result-heading"><span>{currentLabel}</span><b>{projects.length}</b><LobeButton className={selectionMode ? 'active' : ''} onClick={() => { setSelectionMode(!selectionMode); onClearSelection(); }} size="small" type="text">{selectionMode ? '完成' : '多选'}</LobeButton></div>
     {currentExperiment && <div className={`experiment-summary ${currentExperiment.analysis_status}`}>
       <div><span>基准</span><strong>{currentExperiment.baseline_name || '未知作品'}</strong></div>
       <div><span>固定</span><strong>{currentExperiment.fixed_fields?.join(' · ') || '暂无可靠字段'}</strong></div>
@@ -351,7 +354,7 @@ function LibraryPanel({
       </div>)}
       {!projects.length && <div className="list-empty">{query ? '没有匹配的作品' : `「${currentLabel}」还是空的`}</div>}
     </div>
-    <div className="library-footer"><span><Icon name="folder"/>本地资料库</span><i>SQLite</i><button className={settingsOpen ? 'active' : ''} onClick={onOpenSettings} aria-label="打开软件设置"><Icon name="settings" size={14}/>设置</button></div>
+    <div className="library-footer"><span><Icon name="folder"/>本地资料库</span><i>SQLite</i><LobeButton className={settingsOpen ? 'active' : ''} icon={<Icon name="settings" size={14}/>} onClick={onOpenSettings} size="small" type="text">设置</LobeButton></div>
   </aside>;
 }
 
@@ -458,13 +461,13 @@ function PreviewStage({ project, sourceProject, mode, setMode, experiment, exper
     <header className="topbar">
       <div className="breadcrumb branch-breadcrumb"><span>作品库</span><b>/</b><strong>{sourceProject.name}</strong>{activeBranch && <em>{activeBranch.name}</em>}</div>
       <div className="top-actions">
-        <div className="workspace-switch" aria-label="工作区视图">
-          <button className={mode === 'image' ? 'active' : ''} onClick={() => setMode('image')}><Icon name="image"/>图像</button>
-          <button className={mode === 'prompt' ? 'active' : ''} onClick={() => setMode('prompt')}><Icon name="layers"/>Prompt</button>
-          {experiment && <button className={mode === 'compare' ? 'active' : ''} onClick={() => setMode('compare')}><Icon name="library"/>对比</button>}
-        </div>
-        <button className="ghost" onClick={() => onReveal(sourceProject.image_path)} title="在文件夹中显示原图"><Icon name="folder"/></button>
-        <button className="copy-button" onClick={onCopy} disabled={mode === 'prompt' && !overviewCopy.count}><Icon name="copy"/>{copyLabel}</button>
+        <LobeSegmented aria-label="工作区视图" className="workspace-switch" onChange={setMode} options={[
+          { label: <span><Icon name="image"/>图像</span>, value: 'image' },
+          { label: <span><Icon name="layers"/>Prompt</span>, value: 'prompt' },
+          ...(experiment ? [{ label: <span><Icon name="library"/>对比</span>, value: 'compare' }] : []),
+        ]} value={mode}/>
+        <LobeActionIcon className="ghost" icon={<Icon name="folder"/>} onClick={() => onReveal(sourceProject.image_path)} size="small" title="在文件夹中显示原图" variant="outlined"/>
+        <LobeButton className="copy-button" disabled={mode === 'prompt' && !overviewCopy.count} icon={<Icon name="copy"/>} onClick={onCopy} type="primary">{copyLabel}</LobeButton>
       </div>
     </header>
     {mode === 'compare' && experiment ? <ExperimentCompare experiment={experiment} projects={experimentProjects} selectedIds={comparisonIds}/> : mode === 'image' ? <div className="stage">
@@ -1128,8 +1131,8 @@ function SettingsPage({ appearance, onAppearanceChange, onClose, showToast }) {
     <aside className="settings-nav">
       <header><span>SETTINGS / 01</span><h1>软件设置</h1><p>设置保存在当前设备，不会写入作品 metadata。</p></header>
       <nav aria-label="设置分类">
-        <button className={section === 'appearance' ? 'active' : ''} onClick={() => setSection('appearance')}><Icon name="settings"/><span><strong>外观与可读性</strong><small>字号、密度、动效</small></span></button>
-        <button className={section === 'ai' ? 'active' : ''} onClick={() => setSection('ai')}><Icon name="spark"/><span><strong>AI 服务</strong><small>接口、模型、安全存储</small></span></button>
+        <LobeButton block className={section === 'appearance' ? 'active' : ''} icon={<Icon name="settings"/>} onClick={() => setSection('appearance')} type="text"><span><strong>外观与可读性</strong><small>主题、字号、密度、动效</small></span></LobeButton>
+        <LobeButton block className={section === 'ai' ? 'active' : ''} icon={<Icon name="spark"/>} onClick={() => setSection('ai')} type="text"><span><strong>AI 服务</strong><small>接口、模型、安全存储</small></span></LobeButton>
       </nav>
       <LobeButton className="settings-back" onClick={onClose}><Icon name="close" size={14}/>返回作品库</LobeButton>
     </aside>
@@ -1137,11 +1140,12 @@ function SettingsPage({ appearance, onAppearanceChange, onClose, showToast }) {
       {section === 'appearance' ? <>
         <header className="settings-heading"><span>APPEARANCE</span><h2>让高密度工作台保持清楚</h2><p>字号会按固定档位缩放语义排版；密度只改变留白和控件高度，不会隐藏功能。</p></header>
         <div className="settings-group">
+          <div className="settings-row"><div><strong>界面主题</strong><small>默认使用深色；跟随系统会响应 Windows 或 macOS 的外观设置。</small></div><LobeSegmented aria-label="界面主题" className="settings-segment" options={[{ label: '跟随系统', value: 'auto' }, { label: '浅色', value: 'light' }, { label: '深色', value: 'dark' }]} value={appearance.themeMode} onChange={(value) => onAppearanceChange({ themeMode: value })}/></div>
           <div className="settings-row"><div><strong>界面字号</strong><small>默认使用“较大”，改善中文与长时间阅读。</small></div><LobeSegmented aria-label="界面字号" className="settings-segment" options={[{ label: '标准', value: 'default' }, { label: '较大', value: 'large' }, { label: '特大', value: 'larger' }]} value={appearance.fontScale} onChange={(value) => onAppearanceChange({ fontScale: value })}/></div>
           <div className="settings-row"><div><strong>界面密度</strong><small>窗口较窄时建议紧凑；大屏长期整理建议舒适。</small></div><LobeSegmented aria-label="界面密度" className="settings-segment" options={[{ label: '紧凑', value: 'compact' }, { label: '舒适', value: 'comfortable' }]} value={appearance.density} onChange={(value) => onAppearanceChange({ density: value })}/></div>
           <div className="settings-row"><div><strong>界面动效</strong><small>“跟随系统”尊重系统的减少动态效果设置；关闭后只保留必要状态变化。</small></div><LobeSegmented aria-label="界面动效" className="settings-segment" options={[{ label: '完整', value: 'full' }, { label: '跟随系统', value: 'reduced' }, { label: '关闭', value: 'off' }]} value={appearance.motion} onChange={(value) => onAppearanceChange({ motion: value })}/></div>
         </div>
-        <aside className="settings-platform-note"><Icon name="info"/><div><strong>{platform} 当前生效</strong><span>字体优先使用平台原生中文无衬线字体；Windows 保持隐藏应用菜单，macOS 保留原生菜单与窗口习惯。</span></div></aside>
+        <aside className="settings-platform-note"><Icon name="info"/><div><strong>{platform} 当前生效</strong><span>Geist、Geist Mono 与 HarmonyOS Sans SC 已随应用打包；Windows 保持隐藏应用菜单，macOS 保留原生菜单与窗口习惯。</span></div></aside>
       </> : <>
         <header className="settings-heading"><span>AI SERVICE</span><h2>翻译与分类使用同一安全连接</h2><p>API Key 由操作系统安全存储加密，不进入 SQLite、日志、导出文件或跨平台协调文档。</p></header>
         <div className="settings-group ai-settings-group">
@@ -1156,7 +1160,8 @@ function SettingsPage({ appearance, onAppearanceChange, onClose, showToast }) {
   </main>;
 }
 
-export default function App() {
+export default function App({ appearance, setAppearance }) {
+  const { token: lobeTheme } = antdTheme.useToken();
   const [projects, setProjects] = useState([]);
   const [collections, setCollections] = useState([]);
   const [series, setSeries] = useState([]);
@@ -1180,7 +1185,6 @@ export default function App() {
   const [branchResultImporting, setBranchResultImporting] = useState('');
   const [comparisonIds, setComparisonIds] = useState(new Set());
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [appearance, setAppearance] = useState({ fontScale: 'large', density: 'comfortable', motion: 'full' });
   const saveTimers = useRef(new Map());
   const branchSaveTimers = useRef(new Map());
   const branchCreatePromises = useRef(new Map());
@@ -1189,15 +1193,30 @@ export default function App() {
   const shortcutModifier = useMemo(() => navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl', []);
 
   useEffect(() => {
-    studio.getAppearanceSettings().then(setAppearance).catch(() => {});
-  }, []);
-
-  useEffect(() => {
     const root = document.documentElement;
+    root.dataset.themeMode = appearance.themeMode;
     root.dataset.fontScale = appearance.fontScale;
     root.dataset.density = appearance.density;
     root.dataset.motion = appearance.motion;
   }, [appearance]);
+
+  const studioThemeStyle = {
+    '--ink': lobeTheme.colorBgLayout,
+    '--panel': lobeTheme.colorBgContainer,
+    '--panel-2': lobeTheme.colorBgElevated,
+    '--raised': lobeTheme.colorFillSecondary,
+    '--line': lobeTheme.colorBorder,
+    '--line-soft': lobeTheme.colorBorderSecondary,
+    '--text': lobeTheme.colorText,
+    '--muted': lobeTheme.colorTextSecondary,
+    '--faint': lobeTheme.colorTextTertiary,
+    '--accent': lobeTheme.colorPrimary,
+    '--accent-strong': lobeTheme.colorPrimaryHover,
+    '--blue': lobeTheme.colorInfo,
+    '--green': lobeTheme.colorSuccess,
+    '--purple': lobeTheme.purple,
+    '--red': lobeTheme.colorError,
+  };
 
   useEffect(() => {
     Promise.all([studio.loadLibrary(), studio.loadLibraryOrganization()]).then(([items, organization]) => {
@@ -1896,9 +1915,9 @@ export default function App() {
     }
   };
 
-  if (loading) return <div className="loading-screen"><div className="brand-symbol">N<span>4</span></div><span>正在打开本地资料库…</span></div>;
+  if (loading) return <div className="loading-screen" style={studioThemeStyle}><div className="brand-symbol">N<span>4</span></div><span>正在打开本地资料库…</span></div>;
 
-  return <div className={`app-shell ${settingsOpen ? 'settings-open' : ''}`} ref={appShellRef}>
+  return <div className={`app-shell ${settingsOpen ? 'settings-open' : ''}`} ref={appShellRef} style={studioThemeStyle}>
     <LibraryPanel
       projects={filteredProjects}
       allProjects={projects}

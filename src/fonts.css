@@ -1,0 +1,63 @@
+@font-face {
+  font-family: "Geist";
+  src: url("@lobehub/webfont-geist/fonts/Geist-Regular.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Geist";
+  src: url("@lobehub/webfont-geist/fonts/Geist-Medium.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: "Geist";
+  src: url("@lobehub/webfont-geist/fonts/Geist-Bold.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "HarmonyOS Sans SC";
+  src: url("@lobehub/webfont-harmony-sans-sc/fonts/HarmonyOS_Sans_SC_Regular.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "HarmonyOS Sans SC";
+  src: url("@lobehub/webfont-harmony-sans-sc/fonts/HarmonyOS_Sans_SC_Medium.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: "HarmonyOS Sans SC";
+  src: url("@lobehub/webfont-harmony-sans-sc/fonts/HarmonyOS_Sans_SC_Bold.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("@lobehub/webfont-geist-mono/fonts/GeistMono-Regular.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("@lobehub/webfont-geist-mono/fonts/GeistMono-Bold.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 700;
+}

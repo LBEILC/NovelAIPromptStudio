@@ -37,9 +37,9 @@ describe('AI preferences', () => {
     temporaryDirectories.push(directory);
     const preferences = openPreferences(directory, safeStorage);
 
-    expect(preferences.appearanceSettings()).toEqual({ fontScale: 'large', density: 'comfortable', motion: 'full' });
-    expect(preferences.saveAppearanceSettings({ fontScale: 'larger', motion: 'reduced' }))
-      .toEqual({ fontScale: 'larger', density: 'comfortable', motion: 'reduced' });
+    expect(preferences.appearanceSettings()).toEqual({ themeMode: 'dark', fontScale: 'large', density: 'comfortable', motion: 'full' });
+    expect(preferences.saveAppearanceSettings({ themeMode: 'auto', fontScale: 'larger', motion: 'reduced' }))
+      .toEqual({ themeMode: 'auto', fontScale: 'larger', density: 'comfortable', motion: 'reduced' });
     expect(() => preferences.saveAppearanceSettings({ density: 'tiny' })).toThrow('不支持');
   });
 });

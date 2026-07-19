@@ -2,15 +2,14 @@ import ConfigProvider from '@lobehub/ui/es/ConfigProvider/index';
 import ThemeProvider from '@lobehub/ui/es/ThemeProvider/index';
 import { motion } from 'motion/react';
 
-export default function LobeProvider({ children }) {
+export default function LobeProvider({ children, themeMode = 'dark' }) {
   return <ConfigProvider locale="zh-CN" motion={motion}>
     <ThemeProvider
-      appearance="dark"
       className="lobe-root"
-      customTheme={{ neutralColor: 'slate', primaryColor: 'gold' }}
+      customTheme={{ neutralColor: 'slate', primaryColor: 'blue' }}
       enableCustomFonts={false}
-      enableGlobalStyle={false}
-      themeMode="dark"
+      enableGlobalStyle
+      themeMode={themeMode}
     >
       {children}
     </ThemeProvider>
