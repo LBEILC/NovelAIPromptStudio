@@ -1091,6 +1091,7 @@ function ImageDetailPage({ project, projects, relationshipGroups, sourceProject,
     { key: 'overview', label: '概览' }, { key: 'prompt', label: 'Prompt' }, { key: 'vibe', label: `Vibe${project.vibes?.length ? ` ${project.vibes.length}` : ''}` }, { key: 'metadata', label: '元数据' }, { key: 'relations', label: `关系${sourceProject.branches?.length ? ` ${sourceProject.branches.length}` : ''}` },
   ];
   const editTag = (scopeKey, tagId) => { setPromptMode('edit'); onPrepareTagEditor(scopeKey, tagId); };
+  useEffect(() => setPromptMode('overview'), [project.id]);
   return <main className="image-detail-page">
     <header className="detail-header">
       <div className="detail-title-row"><LobeActionIcon icon={<Icon name="close" size={18}/>} onClick={onBack} size="large" title="返回图库" variant="borderless"/><div><span>图库 / 图片详情</span><h1 title={sourceProject.name}>{sourceProject.name}</h1><small>{activeBranch ? `${activeBranch.name} · ${BRANCH_STATUS_LABELS[activeBranch.status] || activeBranch.status}` : '原图结果'}</small></div></div>
@@ -1099,7 +1100,7 @@ function ImageDetailPage({ project, projects, relationshipGroups, sourceProject,
     <LobeTabs activeKey={detailTab} className="detail-tabs" items={tabs} onChange={onTabChange} variant="point"/>
     <section className={`detail-content detail-tab-${detailTab}`}>
       {detailTab === 'overview' && <ProjectOverviewPanel activeBranch={activeBranch} onCopy={onCopy} onCreateRecipe={onCreateRecipe} onReveal={onReveal} project={project} sourceProject={sourceProject}/>}
-      {detailTab === 'prompt' && <div className="detail-prompt-workspace"><div className="detail-prompt-toolbar"><div className="detail-prompt-mode"><LobeSegmented onChange={setPromptMode} options={[{ label: '总览', value: 'overview' }, { label: '编辑', value: 'edit' }]} value={promptMode}/><span>{activeBranch ? `正在编辑 ${activeBranch.name}` : '原图只读 · 编辑会创建方案'}</span></div><div className="detail-prompt-resource"><span>Tag 库</span><LobeSelect allowClear aria-label="在 Tag 库中查看当前图片的 Tag" onChange={(value) => value && onOpenTagResource(value)} options={[...new Map(allPromptTags(project).map((tag) => [normalizeSearch(tag.tag), { label: tag.translation ? `${tag.tag} · ${tag.translation}` : tag.tag, value: tag.tag }])).values()]} placeholder="查看当前图片中的 Tag" showSearch value={undefined}/></div></div>{promptMode === 'overview' ? <PromptOverview onCopyContextChange={onCopyContextChange} onCopyText={onCopyText} onEditTag={editTag} onNotify={onNotify} onTagContextMenu={onTagContextMenu} project={project} updateProject={updateProject}/> : <TagsPanel focusTagId={focusTagId} onTagContextMenu={onTagContextMenu} project={project} scopeKey={promptScopeKey} setScopeKey={setPromptScopeKey} showToast={onNotify} updateProject={updateProject}/>}</div>}
+      {detailTab === 'prompt' && <div className={`detail-prompt-workspace ${promptMode === 'edit' ? 'editing' : ''}`}>{promptMode === 'overview' ? <PromptOverview onCopyContextChange={onCopyContextChange} onCopyText={onCopyText} onEditTag={editTag} onNotify={onNotify} onOpenTagResource={onOpenTagResource} onTagContextMenu={onTagContextMenu} project={project} updateProject={updateProject}/> : <><div className="prompt-editor-return"><LobeButton onClick={() => setPromptMode('overview')} size="small">返回 Prompt 总览</LobeButton><span>批量添加、角色与位置设置</span></div><TagsPanel focusTagId={focusTagId} onTagContextMenu={onTagContextMenu} project={project} scopeKey={promptScopeKey} setScopeKey={setPromptScopeKey} showToast={onNotify} updateProject={updateProject}/></>}</div>}
       {detailTab === 'vibe' && <div className="detail-vibe-workspace"><div className="resource-jump-bar"><span>在 Vibe 库中反向查看</span><LobeSelect allowClear disabled={!project.vibes?.length} onChange={(value) => value && onOpenVibeResource(project.vibes.find((vibe) => vibe.id === value))} options={(project.vibes || []).map((vibe, index) => ({ label: vibe.name || `Vibe ${index + 1}`, value: vibe.id }))} placeholder={project.vibes?.length ? '选择当前图片中的 Vibe' : '当前图片没有 Vibe'} value={undefined}/></div><VibePanel project={project} showToast={onNotify} updateProject={updateProject}/></div>}
       {detailTab === 'metadata' && (activeBranch ? <MetadataPanel project={project} updateProject={updateProject}/> : <ReadOnlyMetadataPanel project={project}/>)}
       {detailTab === 'relations' && <RelationsPanel activeBranchId={activeBranch?.id || ''} branchResultImporting={branchResultImporting} experiments={experiments} onBranchContextMenu={onBranchContextMenu} onDiscardBranch={onDiscardBranch} onImportBranchResult={onImportBranchResult} onMarkBranchWaiting={onMarkBranchWaiting} onOpenComparison={onOpenComparison} onOpenExperiment={onOpenExperiment} onOpenResult={onOpenResult} onOpenSeries={onOpenSeries} onSelectBranch={onSelectBranch} onUseLegacyVersion={onUseLegacyVersion} project={sourceProject} projects={projects} relationshipGroups={relationshipGroups} series={series}/>}
@@ -1374,8 +1375,10 @@ export default function App({ appearance, setAppearance }) {
     root.dataset.motion = appearance.motion;
   }, [appearance]);
 
+  const darkCanvas = appearance.themeMode === 'dark'
+    || (appearance.themeMode === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
   const studioThemeStyle = {
-    '--ink': lobeTheme.colorBgLayout,
+    '--ink': darkCanvas ? '#0d0d0f' : lobeTheme.colorBgLayout,
     '--panel': lobeTheme.colorBgContainer,
     '--panel-2': lobeTheme.colorBgElevated,
     '--raised': lobeTheme.colorFillSecondary,

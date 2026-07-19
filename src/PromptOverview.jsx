@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import LobeButton from '@lobehub/ui/es/Button/index';
+import LobeInput from '@lobehub/ui/es/Input/Input';
+import LobePopover from '@lobehub/ui/es/Popover/index';
 import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
+import LobeSelect from '@lobehub/ui/es/Select/index';
+import LobeSliderWithInput from '@lobehub/ui/es/SliderWithInput/index';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
-import { CATEGORY_LABELS, CATEGORY_OPTIONS } from './lib/prompt.js';
-import { countPromptTags, updatePromptScope } from './lib/promptStructure.js';
+import { CATEGORY_LABELS, CATEGORY_OPTIONS, inferCategory } from './lib/prompt.js';
+import { countPromptTags, getPromptScope, updatePromptScope } from './lib/promptStructure.js';
 import SelectionMark from './components/SelectionMark.jsx';
 import Icon from './components/Icon.jsx';
 import {
@@ -57,6 +61,40 @@ function tagPresentation(tag, language) {
   };
 }
 
+function TagQuickEditor({ tag, onChange, onClose, onOpenDetail }) {
+  return <div className="tag-quick-editor" onClick={(event) => event.stopPropagation()}>
+    <div className="tag-quick-editor-heading">
+      <div><strong>编辑 Tag</strong><small>修改会自动创建或更新生成方案</small></div>
+      <LobeButton onClick={onClose} size="small" type="text">完成</LobeButton>
+    </div>
+    <label><span>原文</span><LobeInput autoFocus onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic', raw_segment: '', syntax_issue: '' })} size="small" value={tag.tag}/></label>
+    <label><span>翻译</span><LobeInput onChange={(event) => onChange({ translation: event.target.value, translation_source: 'manual' })} placeholder="添加中文翻译" size="small" value={tag.translation || ''}/></label>
+    <div className="tag-quick-editor-row">
+      <label><span>分类</span><LobeSelect onChange={(category) => onChange({ category, category_source: 'manual' })} options={CATEGORY_OPTIONS.map((value) => ({ label: CATEGORY_LABELS[value], value }))} size="small" value={tag.category || 'Unsorted'}/></label>
+      <label><span>权重</span><LobeSliderWithInput controls={false} gap={6} max={10} min={-10} onChange={(weight) => onChange({ weight: Number(weight) })} size="small" step={0.05} value={Number(tag.weight)}/></label>
+    </div>
+    <label><span>备注</span><LobeInput onChange={(event) => onChange({ note: event.target.value })} placeholder="可选" size="small" value={tag.note || ''}/></label>
+    <div className="tag-quick-editor-footer">
+      <LobeButton icon={<Icon name="library" size={14}/>} onClick={onOpenDetail} size="small">查看 Tag 详情</LobeButton>
+    </div>
+  </div>;
+}
+
+function EditableTag({ children, disabled, editKey, editingKey, onEditingChange, onOpenDetail, onUpdate, tag }) {
+  return <LobePopover
+    arrow
+    className="tag-quick-popover"
+    content={<TagQuickEditor tag={tag} onChange={onUpdate} onClose={() => onEditingChange('')} onOpenDetail={onOpenDetail}/>}
+    disabled={disabled}
+    onOpenChange={(open) => onEditingChange(open ? editKey : '')}
+    open={editingKey === editKey}
+    placement="bottomLeft"
+    trigger="click"
+  >
+    {children}
+  </LobePopover>;
+}
+
 function ScopeTags({
   scope,
   dragging,
@@ -68,6 +106,10 @@ function ScopeTags({
   onDragEnd,
   onDrop,
   onEditTag,
+  editingKey,
+  onEditingChange,
+  onOpenTagResource,
+  onUpdateTag,
   onKeyboardMove,
   onToggleSelect,
   onTagContextMenu,
@@ -84,7 +126,7 @@ function ScopeTags({
         const selected = selectedSet.has(key);
         const display = tagPresentation(tag, language);
         const warning = syntaxMessage(tag);
-        return <button
+        const tagButton = <button
           key={tag.id}
           className={`overview-tag cat-${String(tag.category || 'Unsorted').toLowerCase()} ${dragging?.scopeKey === scope.key && dragging.index === index ? 'dragging' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''}`}
           draggable={!selecting && !filtered}
@@ -92,7 +134,7 @@ function ScopeTags({
           onDragEnd={onDragEnd}
           onDragOver={(event) => !selecting && !filtered && event.preventDefault()}
           onDrop={(event) => !selecting && !filtered && onDrop(scope, index, event)}
-          onClick={() => selecting ? onToggleSelect(key) : onEditTag(scope.key, tag.id)}
+          onClick={() => selecting && onToggleSelect(key)}
           onContextMenu={(event) => onTagContextMenu(event, scope.key, tag)}
           onKeyDown={(event) => selecting ? undefined : onKeyboardMove(scope, index, event)}
           role="listitem"
@@ -104,15 +146,27 @@ function ScopeTags({
           {Math.abs(Number(tag.weight) - 1) >= 0.001 && <em>{Number(tag.weight).toFixed(2)}</em>}
           {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}
         </button>;
+        return <EditableTag
+          disabled={selecting}
+          editKey={key}
+          editingKey={editingKey}
+          key={tag.id}
+          onEditingChange={onEditingChange}
+          onOpenDetail={() => { onEditingChange(''); onOpenTagResource(tag.tag); }}
+          onUpdate={(patch) => onUpdateTag(scope.key, tag.id, patch)}
+          tag={tag}
+        >
+          {tagButton}
+        </EditableTag>;
       })}
       {!scope.tags.length && (filtered
         ? <span className="overview-filter-empty">当前筛选无 Tag</span>
-        : <LobeButton className="overview-empty-tag" onClick={() => onEditTag(scope.key, null)} size="small" type="dashed">+ 在右侧添加 Tag</LobeButton>)}
+        : <LobeButton className="overview-empty-tag" onClick={() => onEditTag(scope.key, null)} size="small" type="dashed">+ 添加 Tag</LobeButton>)}
     </div>
   </div>;
 }
 
-function CategoryGroup({ group, language, selecting, selectedKeys, onToggleSelect, onToggleGroup, onEditTag, onTagContextMenu }) {
+function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, onEditingChange, onOpenTagResource, onToggleSelect, onToggleGroup, onUpdateTag, onTagContextMenu }) {
   const selectedSet = new Set(selectedKeys);
   const groupKeys = group.entries.map((entry) => entry.key);
   const allSelected = groupKeys.length > 0 && groupKeys.every((key) => selectedSet.has(key));
@@ -128,10 +182,10 @@ function CategoryGroup({ group, language, selecting, selectedKeys, onToggleSelec
           const selected = selectedSet.has(entry.key);
           const display = tagPresentation(entry.tag, language);
           const warning = syntaxMessage(entry.tag);
-          return <button
+          const tagButton = <button
             key={entry.key}
             className={`overview-tag cat-${String(group.category).toLowerCase()} ${entry.scopePolarity === 'undesired' ? 'undesired-tag' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''}`}
-            onClick={() => selecting ? onToggleSelect(entry.key) : onEditTag(entry.scopeKey, entry.tag.id)}
+            onClick={() => selecting && onToggleSelect(entry.key)}
             onContextMenu={(event) => onTagContextMenu(event, entry.scopeKey, entry.tag)}
             role="listitem"
             aria-pressed={selecting ? selected : undefined}
@@ -142,6 +196,18 @@ function CategoryGroup({ group, language, selecting, selectedKeys, onToggleSelec
             {Math.abs(Number(entry.tag.weight) - 1) >= 0.001 && <em>{Number(entry.tag.weight).toFixed(2)}</em>}
             {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}
           </button>;
+          return <EditableTag
+            disabled={selecting}
+            editKey={entry.key}
+            editingKey={editingKey}
+            key={entry.key}
+            onEditingChange={onEditingChange}
+            onOpenDetail={() => { onEditingChange(''); onOpenTagResource(entry.tag.tag); }}
+            onUpdate={(patch) => onUpdateTag(entry.scopeKey, entry.tag.id, patch)}
+            tag={entry.tag}
+          >
+            {tagButton}
+          </EditableTag>;
         })}
       </div>
     </div>
@@ -152,7 +218,7 @@ function Segment({ value, options, onChange, label }) {
   return <LobeSegmented aria-label={label} className="overview-segment" onChange={onChange} options={options.map(([option, text]) => ({ label: text, value: option }))} size="small" value={value}/>;
 }
 
-export default function PromptOverview({ project, updateProject, onEditTag, onTagContextMenu, onCopyContextChange, onCopyText, onNotify }) {
+export default function PromptOverview({ project, updateProject, onEditTag, onOpenTagResource, onTagContextMenu, onCopyContextChange, onCopyText, onNotify }) {
   const [dragging, setDragging] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_OVERVIEW_FILTERS);
   const [language, setLanguage] = useState('original');
@@ -160,6 +226,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onTa
   const [selecting, setSelecting] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [deleteArmed, setDeleteArmed] = useState(false);
+  const [editingKey, setEditingKey] = useState('');
   const structure = project.prompt_structure;
 
   useEffect(() => {
@@ -168,6 +235,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onTa
     setSelecting(false);
     setSelectedKeys([]);
     setDeleteArmed(false);
+    setEditingKey('');
   }, [project.id]);
 
   useEffect(() => {
@@ -275,6 +343,11 @@ export default function PromptOverview({ project, updateProject, onEditTag, onTa
     onNotify?.(`已删除 ${count} 个 Tag`);
   };
 
+  const updateTag = (scopeKey, tagId, patch) => {
+    const scope = getPromptScope(project, scopeKey);
+    updateProject(updatePromptScope(project, scopeKey, scope.tags.map((tag) => tag.id === tagId ? { ...tag, ...patch } : tag)));
+  };
+
   const scopeProps = {
     dragging,
     language,
@@ -285,6 +358,10 @@ export default function PromptOverview({ project, updateProject, onEditTag, onTa
     onDragEnd: () => setDragging(null),
     onDrop: dropTag,
     onEditTag,
+    editingKey,
+    onEditingChange: setEditingKey,
+    onOpenTagResource,
+    onUpdateTag: updateTag,
     onKeyboardMove: keyboardMove,
     onToggleSelect: toggleSelection,
     onTagContextMenu,
@@ -337,9 +414,12 @@ export default function PromptOverview({ project, updateProject, onEditTag, onTa
         language={language}
         selecting={selecting}
         selectedKeys={selectedKeys}
+        editingKey={editingKey}
+        onEditingChange={setEditingKey}
+        onOpenTagResource={onOpenTagResource}
         onToggleSelect={toggleSelection}
         onToggleGroup={toggleCategoryGroup}
-        onEditTag={onEditTag}
+        onUpdateTag={updateTag}
         onTagContextMenu={onTagContextMenu}
       />)}
 
@@ -368,7 +448,7 @@ export default function PromptOverview({ project, updateProject, onEditTag, onTa
 
       {!visibleEntries.length && filtered && <div className="overview-no-results"><strong>没有符合条件的 Tag</strong><span>调整分类、区域或搜索词后，顶部复制内容会同步更新。</span></div>}
       {viewMode === 'structure' && !structure.characters.length && filters.domain !== 'base' && <LobeButton className="overview-add-character" onClick={() => onEditTag('base:prompt', null)} type="dashed">
-        <Icon name="plus" size={20}/><div><strong>还没有 Character Prompt</strong><small>在右侧 Prompt 面板添加角色，最多支持 6 个。</small></div>
+        <Icon name="plus" size={20}/><div><strong>还没有 Character Prompt</strong><small>打开完整编辑添加角色，最多支持 6 个。</small></div>
       </LobeButton>}
     </div>
   </div>;
