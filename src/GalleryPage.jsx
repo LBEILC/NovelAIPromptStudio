@@ -3,6 +3,7 @@ import LobeDraggablePanel from '@lobehub/ui/es/DraggablePanel/index';
 import LobeEmpty from '@lobehub/ui/es/Empty/index';
 import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
 import LobeSelect from '@lobehub/ui/es/Select/index';
+import { useEffect, useState } from 'react';
 import Icon from './components/Icon.jsx';
 import { countPromptTags, formatPositivePromptForCopy } from './lib/promptStructure.js';
 
@@ -24,13 +25,18 @@ export default function GalleryPage({
   onImport,
   onOpenWorkbench,
   onPreview,
-  onClosePreview,
   onQueryChange,
   onSortChange,
   onProjectContextMenu,
   onReveal,
   onRemove,
 }) {
+  const [previewExpanded, setPreviewExpanded] = useState(Boolean(preview));
+
+  useEffect(() => {
+    setPreviewExpanded(Boolean(preview));
+  }, [preview?.id]);
+
   return <main className="gallery-page">
     <header className="workspace-page-header">
       <h1>图片库</h1>
@@ -59,18 +65,19 @@ export default function GalleryPage({
           </button>)}
         </div> : <LobeEmpty className="gallery-empty" description={query ? '换一个关键词试试。' : '拖入图片，或点击右上角导入。'} image={<Icon name="image" size={30}/>} title={query ? '没有匹配的图片' : '图片库还是空的'}/>} 
       </section>
-      {preview && <LobeDraggablePanel
+      <LobeDraggablePanel
         className="gallery-preview-shell"
         defaultSize={{ width: '28vw' }}
-        expandable={false}
+        expand={previewExpanded}
         maxWidth={520}
         minWidth={320}
+        onExpandChange={setPreviewExpanded}
         placement="right"
         showHandleHighlight
         stableLayout
       >
-        <LobeDraggablePanel.Body className="gallery-preview">
-          <header><h2 title={preview.name}>{preview.name}</h2><LobeButton aria-label="关闭预览" icon={<Icon name="close" size={15}/>} onClick={onClosePreview} size="small" type="text"/></header>
+        {preview && <LobeDraggablePanel.Body className="gallery-preview">
+          <header><h2 title={preview.name}>{preview.name}</h2></header>
           <figure><img alt={preview.name} src={mediaUrl(preview.image_path)}/></figure>
           <div className="gallery-preview-meta"><span>{preview.metadata?.width || '—'} × {preview.metadata?.height || '—'}</span><span>{countPromptTags(preview)} Tags</span><span>{formatDate(preview.created_at)}</span></div>
           <div className="gallery-preview-prompt"><span>原始 Prompt</span><p>{formatPositivePromptForCopy(preview) || '没有检测到 Prompt'}</p></div>
@@ -79,8 +86,8 @@ export default function GalleryPage({
             <LobeButton icon={<Icon name="folder" size={14}/>} onClick={() => onReveal(preview)}>在文件夹中显示</LobeButton>
             <LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={() => onRemove(preview)}>从图片库移除</LobeButton>
           </div>
-        </LobeDraggablePanel.Body>
-      </LobeDraggablePanel>}
+        </LobeDraggablePanel.Body>}
+      </LobeDraggablePanel>
     </div>
   </main>;
 }

@@ -64,7 +64,6 @@ export default function WorkbenchPage({
       <LobeDraggablePanel
         className="workbench-source-shell"
         defaultSize={{ width: '34vw' }}
-        expandable={false}
         maxWidth={560}
         minWidth={280}
         placement="left"

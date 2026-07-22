@@ -451,7 +451,6 @@ export default function App({ appearance, setAppearance }) {
         session={workbenchSession}
       /> : page === 'gallery' ? <GalleryPage
         importing={Boolean(importProgress)}
-        onClosePreview={() => setPreviewId('')}
         onImport={() => importImages()}
         onOpenWorkbench={(project) => openWorkbenchPath(project.image_path)}
         onPreview={(project) => setPreviewId(project.id)}
