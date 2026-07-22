@@ -8,14 +8,14 @@ function mediaUrl(filePath) {
   return filePath ? `novelai-media://file?path=${encodeURIComponent(filePath)}` : '';
 }
 
-function WorkbenchVibes({ vibes, onCopy }) {
+function WorkbenchVibes({ vibes, onReveal }) {
   if (!vibes?.length) return <div className="workbench-vibe-empty"><Icon name="info" size={15}/><span>没有检测到 Vibe</span></div>;
   return <section className="workbench-vibes" aria-label="图片中的 Vibe">
     <header><strong>Vibe</strong><small>{vibes.length} 个</small></header>
     <div className="workbench-vibe-list">
       {vibes.map((vibe, index) => <div className="workbench-vibe-row" key={vibe.id || index}>
         <div><strong>{vibe.name || `Vibe ${index + 1}`}</strong><small>原图强度 {Number(vibe.strength ?? .6).toFixed(2)} · Information {vibe.information_extracted == null ? '未知' : Number(vibe.information_extracted).toFixed(2)}</small></div>
-        <LobeButton icon={<Icon name="copy" size={13}/>} onClick={() => onCopy(vibe)} size="small">复制编码</LobeButton>
+        <LobeButton icon={<Icon name="folder" size={13}/>} onClick={() => onReveal(vibe)} size="small">在文件夹中显示</LobeButton>
       </div>)}
     </div>
   </section>;
@@ -29,7 +29,7 @@ export default function WorkbenchPage({
   onChooseImage,
   onCopyPrompt,
   onCopyText,
-  onCopyVibe,
+  onRevealVibe,
   onNotify,
   onReset,
   onTagContextMenu,
@@ -62,7 +62,7 @@ export default function WorkbenchPage({
     <div className="workbench-body">
       <aside className="workbench-source-panel">
         <figure><img src={mediaUrl(project.image_path)} alt={project.name}/><figcaption><strong>{project.name}</strong><span>{project.metadata?.width || '—'} × {project.metadata?.height || '—'}</span></figcaption></figure>
-        <WorkbenchVibes onCopy={onCopyVibe} vibes={project.vibes || []}/>
+        <WorkbenchVibes onReveal={onRevealVibe} vibes={project.vibes || []}/>
       </aside>
       <section className="workbench-editor-panel">
         <PromptOverview

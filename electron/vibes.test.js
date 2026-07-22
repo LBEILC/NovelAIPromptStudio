@@ -1,6 +1,15 @@
 import crypto from 'node:crypto';
-import { describe, expect, it } from 'vitest';
-import { extractEmbeddedVibes, fingerprintVibe } from './vibes.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { exportEmbeddedVibeFile, extractEmbeddedVibes, fingerprintVibe } from './vibes.js';
+
+const temporaryDirectories = [];
+
+afterEach(() => {
+  for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
+});
 
 describe('embedded Vibe parsing', () => {
   it('fingerprints the copied encoding deterministically', () => {
@@ -19,5 +28,33 @@ describe('embedded Vibe parsing', () => {
       information_extracted: 0.8,
       model: 'nai-diffusion-4-5-curated',
     }]);
+  });
+
+  it('exports an embedded encoding as a reusable .naiv4vibe file', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'novelai-vibe-export-'));
+    temporaryDirectories.push(directory);
+    const encoding = 'v'.repeat(240);
+    const filePath = exportEmbeddedVibeFile({
+      encoding,
+      information_extracted: 0.72,
+      model: 'nai-diffusion-4-5-curated',
+      name: 'Vibe 1',
+      strength: 0.45,
+    }, directory);
+    const document = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+    expect(path.extname(filePath)).toBe('.naiv4vibe');
+    expect(document).toMatchObject({
+      identifier: 'novelai-vibe-transfer',
+      version: 1,
+      type: 'encoding',
+      importInfo: {
+        model: 'nai-diffusion-4-5-curated',
+        information_extracted: 0.72,
+        strength: 0.45,
+      },
+    });
+    expect(document.encodings['v4-5curated'].unknown.encoding).toBe(encoding);
+    expect(document.encodings['v4-5curated'].unknown.params.information_extracted).toBe(0.72);
   });
 });

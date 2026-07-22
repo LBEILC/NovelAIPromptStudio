@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('studio', {
   offImportProgress: () => ipcRenderer.removeAllListeners('library:import-progress'),
   deleteProject: (id) => ipcRenderer.invoke('project:delete', id),
   saveTagAnnotations: (entries) => ipcRenderer.invoke('tag:annotations:save', entries),
+  revealEmbeddedVibe: (vibe) => ipcRenderer.invoke('vibe:embedded:reveal', vibe),
   revealFile: (filePath) => ipcRenderer.invoke('file:reveal', filePath),
   getAISettings: () => ipcRenderer.invoke('ai:settings:get'),
   saveAISettings: (settings) => ipcRenderer.invoke('ai:settings:save', settings),

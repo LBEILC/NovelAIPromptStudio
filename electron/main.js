@@ -7,6 +7,7 @@ import { openDatabase } from './database.js';
 import { backfillProjectContentHashes, backfillProjectDimensions, importLibraryFiles } from './importer.js';
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
+import { exportEmbeddedVibeFile } from './vibes.js';
 import { readWorkbenchImage } from './workbench.js';
 
 app.setName('NovelAI Prompt Studio');
@@ -156,6 +157,15 @@ app.whenReady().then(async () => {
         if (Object.keys(patch).length) database.updateTagDictionary(String(entry?.tag || ''), patch);
       }
       return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('vibe:embedded:reveal', (_event, vibe = {}) => {
+    try {
+      const filePath = exportEmbeddedVibeFile(vibe, assetsDirectory);
+      shell.showItemInFolder(filePath);
+      return { ok: true, filePath };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }

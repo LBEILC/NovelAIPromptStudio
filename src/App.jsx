@@ -23,6 +23,7 @@ const studio = window.studio || {
   loadLibrary: async () => [],
   openWorkbenchImage: async () => ({ ok: false, error: '请在桌面应用中打开图片' }),
   openDroppedWorkbenchImage: async () => ({ ok: false, error: '请在桌面应用中打开图片' }),
+  revealEmbeddedVibe: async () => ({ ok: false, error: '请在桌面应用中导出 Vibe' }),
   importImages: async () => ({ ok: true, canceled: true, imported: [], duplicates: [], errors: [], summary: null }),
   importDroppedFiles: async () => ({ ok: false, imported: [], duplicates: [], errors: [{ error: '请在桌面应用中导入' }] }),
   cancelImport: async () => ({ ok: false }),
@@ -438,7 +439,10 @@ export default function App({ appearance, setAppearance }) {
         onChooseImage={() => openWorkbenchPath()}
         onCopyPrompt={async () => { await navigator.clipboard.writeText(formatPositivePromptForCopy(workbenchSession.project)); showToast('Prompt 已复制，可直接粘贴到 NovelAI'); }}
         onCopyText={async (text, count, selected) => { if (!text) return; await navigator.clipboard.writeText(text); showToast(selected ? `已复制 ${count} 个已选 Tag` : `已复制 ${count} 个可见 Tag`); }}
-        onCopyVibe={async (vibe) => { if (!vibe.encoding) return; await navigator.clipboard.writeText(vibe.encoding); showToast('Vibe 编码已复制'); }}
+        onRevealVibe={async (vibe) => {
+          const result = await studio.revealEmbeddedVibe(vibe);
+          showToast(result?.ok ? '已在文件夹中显示 Vibe 文件' : result?.error || 'Vibe 文件没有生成');
+        }}
         onNotify={showToast}
         onReset={resetWorkbench}
         onTagContextMenu={tagContextMenu}
