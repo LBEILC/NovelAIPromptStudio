@@ -7,7 +7,7 @@
 - Related commit: `005d362`
 - Action: Download both macOS DMGs produced by the `v0.1.2` GitHub Release. On an Intel Mac, install and launch `NovelAI-Prompt-Studio-0.1.2-macOS-x64.dmg`; on Apple Silicon, install and launch `NovelAI-Prompt-Studio-0.1.2-macOS-arm64.dmg`. Confirm the app icon, hidden-inset title bar, native menu, font discovery, image picker, database startup, and one NovelAI image import work normally. Record the expected unsigned-app warning and use the standard macOS override flow to open the app.
 - Expected: Both architecture-specific DMGs mount and install, the app starts without a missing native module or ASAR error, and core window/file/database behavior matches development builds. The unsigned warning is expected until Apple signing and notarization credentials are configured.
-- Observed: GitHub Actions produced all three `v0.1.1` packages, but Windows installation exposed a missing packaged `src/lib/prompt.js` dependency at main-process startup. The packaging fix is pending `v0.1.2`; live macOS startup remains to be verified after that release.
+- Observed: GitHub Actions produced both `v0.1.2` macOS DMGs after the `v0.1.1` Windows installation exposed a missing packaged `src/lib/prompt.js`. Windows verified the corrected ASAR contains every shared module and the unpacked app starts normally. Live macOS startup remains to be verified.
 
 ## Verify system font discovery and previews
 
