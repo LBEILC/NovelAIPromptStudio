@@ -1,6 +1,5 @@
 import LobeAlert from '@lobehub/ui/es/Alert/index';
 import LobeButton from '@lobehub/ui/es/Button/index';
-import LobeEmpty from '@lobehub/ui/es/Empty/index';
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
 import { countPromptTags } from './lib/promptStructure.js';
@@ -70,7 +69,6 @@ export default function WorkbenchPage({
         <PromptOverview
           focusScopeKey={focusScopeKey}
           focusTagId={focusTagId}
-          mode="workbench"
           onCopyText={onCopyText}
           onNotify={onNotify}
           onTagContextMenu={onTagContextMenu}
@@ -82,4 +80,3 @@ export default function WorkbenchPage({
     </div>
   </main>;
 }
-

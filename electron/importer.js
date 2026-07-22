@@ -209,7 +209,6 @@ export async function importLibraryFiles({
   assetsDirectory,
   database,
   prepareProject = async (project) => project,
-  collectionId = '',
   signal,
   onProgress,
 }) {
@@ -275,12 +274,6 @@ export async function importLibraryFiles({
           report({ current: path.basename(item.filePath) });
         }
       }
-    }
-
-    if (collectionId && imported.length) {
-      const organization = database.addProjectsToCollection(collectionId, imported.map((project) => project.id));
-      const organizationById = new Map(organization.projects.map((project) => [project.id, project]));
-      for (const project of imported) Object.assign(project, organizationById.get(project.id));
     }
 
     const summary = {

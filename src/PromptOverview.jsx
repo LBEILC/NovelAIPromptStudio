@@ -63,10 +63,10 @@ function tagPresentation(tag, language) {
   };
 }
 
-function TagQuickEditor({ tag, translating, onChange, onClose, onOpenDetail, onTranslate, workbench }) {
+function TagQuickEditor({ tag, translating, onChange, onClose, onTranslate }) {
   return <div className="tag-quick-editor" onClick={(event) => event.stopPropagation()}>
     <div className="tag-quick-editor-heading">
-      <div><strong>编辑 Tag</strong><small>{workbench ? '修改只保存在当前工作台草稿' : '修改会自动创建或更新生成方案'}</small></div>
+      <div><strong>编辑 Tag</strong><small>修改只保存在当前工作台草稿</small></div>
       <LobeButton onClick={onClose} size="small" type="text">完成</LobeButton>
     </div>
     <label><span>原文</span><LobeInput autoFocus onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic', raw_segment: '', syntax_issue: '' })} size="small" value={tag.tag}/></label>
@@ -75,19 +75,17 @@ function TagQuickEditor({ tag, translating, onChange, onClose, onOpenDetail, onT
       <label><span>分类</span><LobeSelect onChange={(category) => onChange({ category, category_source: 'manual' })} options={CATEGORY_OPTIONS.map((value) => ({ label: CATEGORY_LABELS[value], value }))} size="small" value={tag.category || 'Unsorted'}/></label>
       <label><span>权重</span><LobeSliderWithInput controls={false} gap={6} max={10} min={-10} onChange={(weight) => onChange({ weight: Number(weight) })} size="small" step={0.05} value={Number(tag.weight)}/></label>
     </div>
-    {!workbench && <label><span>备注</span><LobeInput onChange={(event) => onChange({ note: event.target.value })} placeholder="可选" size="small" value={tag.note || ''}/></label>}
     <div className="tag-quick-editor-footer">
       <LobeButton disabled={translating} icon={<Icon name="spark" size={14}/>} onClick={onTranslate} size="small">{translating ? '翻译中…' : 'AI 翻译'}</LobeButton>
-      {onOpenDetail && <LobeButton icon={<Icon name="library" size={14}/>} onClick={onOpenDetail} size="small" type="primary">Tag 详情</LobeButton>}
     </div>
   </div>;
 }
 
-function EditableTag({ children, disabled, editKey, editingKey, onEditingChange, onOpenDetail, onTranslate, onUpdate, tag, translating, workbench }) {
+function EditableTag({ children, disabled, editKey, editingKey, onEditingChange, onTranslate, onUpdate, tag, translating }) {
   return <LobePopover
     arrow
     className="tag-quick-popover"
-    content={<TagQuickEditor tag={tag} translating={translating} onChange={onUpdate} onClose={() => onEditingChange('')} onOpenDetail={onOpenDetail} onTranslate={onTranslate} workbench={workbench}/>}
+    content={<TagQuickEditor tag={tag} translating={translating} onChange={onUpdate} onClose={() => onEditingChange('')} onTranslate={onTranslate}/>}
     disabled={disabled}
     onOpenChange={(open) => onEditingChange(open ? editKey : '')}
     open={editingKey === editKey}
@@ -163,14 +161,12 @@ function ScopeTags({
   onAddDraftChange,
   onAddingScopeChange,
   onEditingChange,
-  onOpenTagResource,
   onTranslateTag,
   onUpdateTag,
   onKeyboardMove,
   onToggleSelect,
   onTagContextMenu,
   translatingKeys,
-  workbench,
 }) {
   const selectedSet = new Set(selectedKeys);
   const pendingAdd = analyzePromptBatch(addDraft, scope.tags);
@@ -221,12 +217,10 @@ function ScopeTags({
           editingKey={editingKey}
           key={tag.id}
           onEditingChange={onEditingChange}
-          onOpenDetail={onOpenTagResource ? () => { onEditingChange(''); onOpenTagResource(tag.tag); } : undefined}
           onTranslate={() => onTranslateTag(scope.key, tag)}
           onUpdate={(patch) => onUpdateTag(scope.key, tag.id, patch)}
           tag={tag}
           translating={translatingKeys.has(key)}
-          workbench={workbench}
         >
           {tagButton}
         </EditableTag>;
@@ -238,7 +232,7 @@ function ScopeTags({
   </div>;
 }
 
-function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, onEditingChange, onOpenTagResource, onToggleSelect, onToggleGroup, onTranslateTag, onUpdateTag, onTagContextMenu, translatingKeys, workbench }) {
+function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, onEditingChange, onToggleSelect, onToggleGroup, onTranslateTag, onUpdateTag, onTagContextMenu, translatingKeys }) {
   const selectedSet = new Set(selectedKeys);
   const groupKeys = group.entries.map((entry) => entry.key);
   const allSelected = groupKeys.length > 0 && groupKeys.every((key) => selectedSet.has(key));
@@ -274,12 +268,10 @@ function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, o
             editingKey={editingKey}
             key={entry.key}
             onEditingChange={onEditingChange}
-            onOpenDetail={onOpenTagResource ? () => { onEditingChange(''); onOpenTagResource(entry.tag.tag); } : undefined}
             onTranslate={() => onTranslateTag(entry.scopeKey, entry.tag)}
             onUpdate={(patch) => onUpdateTag(entry.scopeKey, entry.tag.id, patch)}
             tag={entry.tag}
             translating={translatingKeys.has(entry.key)}
-            workbench={workbench}
           >
             {tagButton}
           </EditableTag>;
@@ -293,7 +285,7 @@ function Segment({ value, options, onChange, label }) {
   return <LobeSegmented aria-label={label} className="overview-segment" onChange={onChange} options={options.map(([option, text]) => ({ label: text, value: option }))} size="small" value={value}/>;
 }
 
-export default function PromptOverview({ project, updateProject, focusScopeKey, focusTagId, mode = 'project', onOpenTagResource, onTagContextMenu, onCopyContextChange, onCopyText, onNotify, onTranslateTags }) {
+export default function PromptOverview({ project, updateProject, focusScopeKey, focusTagId, onTagContextMenu, onCopyText, onNotify, onTranslateTags }) {
   const [dragging, setDragging] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_OVERVIEW_FILTERS);
   const [language, setLanguage] = useState('original');
@@ -307,7 +299,6 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
   const [editingCharacterId, setEditingCharacterId] = useState('');
   const [translatingKeys, setTranslatingKeys] = useState(new Set());
   const structure = project.prompt_structure;
-  const workbench = mode === 'workbench';
 
   useEffect(() => {
     setFilters(DEFAULT_OVERVIEW_FILTERS);
@@ -347,10 +338,6 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
   const baseScopes = visibleScopes.filter((scope) => scope.kind === 'base');
   const characterScopes = visibleScopes.filter((scope) => scope.kind === 'character');
   const filtered = filters.category !== 'All' || filters.polarity !== 'all' || filters.domain !== 'all' || Boolean(filters.query.trim());
-
-  useEffect(() => {
-    onCopyContextChange?.({ text: copyContext.text, count: copyContext.count, selected: copyContext.selected, categoryCount: copyContext.categoryCount });
-  }, [copyContext.text, copyContext.count, copyContext.selected, copyContext.categoryCount, onCopyContextChange]);
 
   const changeFilter = (patch) => {
     setFilters((current) => ({ ...current, ...patch }));
@@ -500,23 +487,21 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     onAddDraftChange: setAddDraft,
     onAddingScopeChange: changeAddingScope,
     onEditingChange: setEditingKey,
-    onOpenTagResource,
     onTranslateTag: (scopeKey, tag) => translateEntries([{ scopeKey, tag }]),
     onUpdateTag: updateTag,
     onKeyboardMove: keyboardMove,
     onToggleSelect: toggleSelection,
     onTagContextMenu,
     translatingKeys,
-    workbench,
   };
 
   return <div className="prompt-overview">
     <header className="overview-header">
       <div className="overview-title-row">
         <div>
-          <span className="overview-kicker">{workbench ? 'TAG WORKBENCH / V4' : 'PROMPT MAP / V4'}</span>
-          <h2>{workbench ? 'Tag 编辑' : 'Prompt 总览'}</h2>
-          <p>{workbench ? '点击 Tag 编辑原文、翻译、分类和权重；拖动可调整顺序。' : '默认同行复制；多选时同类同行，不同分类换行。'}</p>
+          <span className="overview-kicker">TAG WORKBENCH / V4</span>
+          <h2>Tag 编辑</h2>
+          <p>点击 Tag 编辑原文、翻译、分类和权重；拖动可调整顺序。</p>
         </div>
         <div className="overview-stats">
           <span><b>{visibleEntries.length}</b> VISIBLE</span>
@@ -561,14 +546,12 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
         selectedKeys={selectedKeys}
         editingKey={editingKey}
         onEditingChange={setEditingKey}
-        onOpenTagResource={onOpenTagResource}
         onToggleSelect={toggleSelection}
         onToggleGroup={toggleCategoryGroup}
         onTranslateTag={(scopeKey, tag) => translateEntries([{ scopeKey, tag }])}
         onUpdateTag={updateTag}
         onTagContextMenu={onTagContextMenu}
         translatingKeys={translatingKeys}
-        workbench={workbench}
       />)}
 
       {viewMode === 'structure' && baseScopes.length > 0 && <section className="overview-layer base-layer">
