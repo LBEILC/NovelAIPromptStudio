@@ -1,5 +1,6 @@
 import LobeAlert from '@lobehub/ui/es/Alert/index';
 import LobeButton from '@lobehub/ui/es/Button/index';
+import LobeDraggablePanel from '@lobehub/ui/es/DraggablePanel/index';
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
 import { countPromptTags } from './lib/promptStructure.js';
@@ -60,10 +61,21 @@ export default function WorkbenchPage({
     </header>
     {error && <LobeAlert className="workbench-inline-error" message={error} type="error" variant="outlined"/>}
     <div className="workbench-body">
-      <aside className="workbench-source-panel">
-        <figure><img src={mediaUrl(project.image_path)} alt={project.name}/><figcaption><strong>{project.name}</strong><span>{project.metadata?.width || '—'} × {project.metadata?.height || '—'}</span></figcaption></figure>
-        <WorkbenchVibes onReveal={onRevealVibe} vibes={project.vibes || []}/>
-      </aside>
+      <LobeDraggablePanel
+        className="workbench-source-shell"
+        defaultSize={{ width: '34vw' }}
+        expandable={false}
+        maxWidth={560}
+        minWidth={280}
+        placement="left"
+        showHandleHighlight
+        stableLayout
+      >
+        <LobeDraggablePanel.Body className="workbench-source-panel">
+          <figure><img src={mediaUrl(project.image_path)} alt={project.name}/><figcaption><strong>{project.name}</strong><span>{project.metadata?.width || '—'} × {project.metadata?.height || '—'}</span></figcaption></figure>
+          <WorkbenchVibes onReveal={onRevealVibe} vibes={project.vibes || []}/>
+        </LobeDraggablePanel.Body>
+      </LobeDraggablePanel>
       <section className="workbench-editor-panel">
         <PromptOverview
           focusScopeKey={focusScopeKey}
