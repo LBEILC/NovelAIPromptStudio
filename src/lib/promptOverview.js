@@ -54,6 +54,16 @@ export function overviewCategoryGroups(entries) {
   return [...known, ...other];
 }
 
+export function toggleOverviewSelectionGroup(selectedKeys = [], entries = []) {
+  const keys = entries.map((entry) => entry.key);
+  if (!keys.length) return selectedKeys;
+  const groupKeys = new Set(keys);
+  const selected = new Set(selectedKeys);
+  const allSelected = keys.every((key) => selected.has(key));
+  if (allSelected) return selectedKeys.filter((key) => !groupKeys.has(key));
+  return [...new Set([...selectedKeys, ...keys])];
+}
+
 export function overviewCopyContext(project, visibleScopes, selectedKeys = []) {
   const selected = new Set(selectedKeys);
   const source = selected.size

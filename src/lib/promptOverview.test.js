@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deleteOverviewTags, filterOverviewScopes, overviewCategoryGroups, overviewCopyContext, overviewEntries } from './promptOverview.js';
+import { deleteOverviewTags, filterOverviewScopes, overviewCategoryGroups, overviewCopyContext, overviewEntries, toggleOverviewSelectionGroup } from './promptOverview.js';
 
 function projectFixture() {
   const tag = (id, value, category, translation = '', weight = 1) => ({ id, tag: value, category, translation, weight, note: '' });
@@ -55,6 +55,16 @@ describe('Prompt overview operations', () => {
       ['Scene', 1],
       ['Style', 1],
     ]);
+  });
+
+  it('toggles a visible structure group without changing unrelated selections', () => {
+    const entries = overviewEntries(filterOverviewScopes(projectFixture()));
+    const unrelated = entries.find((entry) => entry.tag.id === 'lowres');
+    const characterEntries = entries.filter((entry) => entry.scopeKind === 'character');
+    const selected = toggleOverviewSelectionGroup([unrelated.key], characterEntries);
+
+    expect(selected).toEqual([unrelated.key, ...characterEntries.map((entry) => entry.key)]);
+    expect(toggleOverviewSelectionGroup(selected, characterEntries)).toEqual([unrelated.key]);
   });
 
   it('deletes selected tags across prompt scopes without touching others', () => {

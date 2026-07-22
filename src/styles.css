@@ -191,6 +191,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .overview-layer-heading strong, .overview-layer-heading small, .overview-category-heading strong, .overview-category-heading small { display: block; }
 .overview-layer-heading small, .overview-category-heading small { color: var(--muted); font-size: var(--text-micro); }
 .overview-layer-heading > span, .overview-layer-heading > button, .overview-category-heading > button { margin-inline-start: auto; }
+.overview-layer-heading-actions { min-width: 0; margin-inline-start: auto; display: flex; align-items: center; gap: 6px; }
 .overview-scope { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 12px 0; }
 .overview-scope + .overview-scope { border-top: 1px dashed var(--line-soft); }
 .overview-scope-heading { display: flex; align-items: start; gap: 8px; color: var(--muted); font: var(--text-micro) var(--font-mono); }

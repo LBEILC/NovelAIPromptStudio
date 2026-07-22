@@ -20,6 +20,7 @@ import {
   overviewCopyContext,
   overviewEntries,
   overviewTagKey,
+  toggleOverviewSelectionGroup,
 } from './lib/promptOverview.js';
 
 const LANGUAGE_OPTIONS = [
@@ -274,15 +275,20 @@ function ScopeTags({
   </div>;
 }
 
-function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, onEditingChange, onToggleSelect, onToggleGroup, onTranslateTag, onUpdateTag, onTagContextMenu, translatingKeys }) {
+function SelectionGroupButton({ entries, selectedKeys, onToggle }) {
   const selectedSet = new Set(selectedKeys);
-  const groupKeys = group.entries.map((entry) => entry.key);
+  const groupKeys = entries.map((entry) => entry.key);
   const allSelected = groupKeys.length > 0 && groupKeys.every((key) => selectedSet.has(key));
+  if (!groupKeys.length) return null;
+  return <LobeButton onClick={() => onToggle(entries)} size="small" type={allSelected ? 'primary' : 'default'}>{allSelected ? '取消整组' : `选择整组 ${entries.length}`}</LobeButton>;
+}
+
+function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, onEditingChange, onToggleSelect, onToggleGroup, onTranslateTag, onUpdateTag, onTagContextMenu, translatingKeys }) {
   return <section className={`overview-category-group cat-${String(group.category).toLowerCase()}`}>
     <div className="overview-category-body">
       <div className="overview-category-heading">
         <div><strong>{CATEGORY_LABELS[group.category] || group.category}</strong><small>{group.entries.length} 个 Tag</small></div>
-        {selecting && <LobeButton className={allSelected ? 'active' : ''} onClick={() => onToggleGroup(group.entries)} size="small">{allSelected ? '取消整组' : `选择整组 ${group.entries.length}`}</LobeButton>}
+        {selecting && <SelectionGroupButton entries={group.entries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/>}
       </div>
       <div className="overview-tags" role="list" aria-label={`${CATEGORY_LABELS[group.category] || group.category} Tag`}>
         {group.entries.map((entry) => {
@@ -430,15 +436,9 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     setSelectedKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
   };
 
-  const toggleCategoryGroup = (entries) => {
-    const keys = entries.map((entry) => entry.key);
+  const toggleEntryGroup = (entries) => {
     setDeleteArmed(false);
-    setSelectedKeys((current) => {
-      const selected = new Set(current);
-      const allSelected = keys.length > 0 && keys.every((key) => selected.has(key));
-      if (allSelected) return current.filter((key) => !keys.includes(key));
-      return [...new Set([...current, ...keys])];
-    });
+    setSelectedKeys((current) => toggleOverviewSelectionGroup(current, entries));
   };
 
   const toggleSelecting = () => {
@@ -586,7 +586,7 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
         editingKey={editingKey}
         onEditingChange={setEditingKey}
         onToggleSelect={toggleSelection}
-        onToggleGroup={toggleCategoryGroup}
+        onToggleGroup={toggleEntryGroup}
         onTranslateTag={(scopeKey, tag) => translateEntries([{ scopeKey, tag }])}
         onUpdateTag={updateTag}
         onTagContextMenu={onTagContextMenu}
@@ -595,7 +595,10 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
 
       {viewMode === 'structure' && baseScopes.length > 0 && <section className="overview-layer base-layer">
         <div className="overview-layer-body">
-          <div className="overview-layer-heading"><strong>基础 Prompt</strong></div>
+          <div className="overview-layer-heading">
+            <strong>基础 Prompt</strong>
+            {selecting && <div className="overview-layer-heading-actions"><SelectionGroupButton entries={overviewEntries(baseScopes)} selectedKeys={selectedKeys} onToggle={toggleEntryGroup}/></div>}
+          </div>
           {baseScopes.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
         </div>
       </section>}
@@ -607,7 +610,10 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
           <div className="overview-layer-body">
             <div className="overview-layer-heading">
               <strong>{character.label}</strong>
-              <LobePopover arrow className="character-quick-popover" content={<CharacterEditor character={character} project={project} onChange={updateProject} onClose={() => setEditingCharacterId('')} onDelete={() => deleteCharacter(character)}/>} onOpenChange={(open) => setEditingCharacterId(open ? character.id : '')} open={editingCharacterId === character.id} placement="bottomRight" trigger="click"><LobeButton size="small" type="text">{structure.use_coords ? `位置 ${compactPosition(character.center)}` : 'AI 位置'}</LobeButton></LobePopover>
+              <div className="overview-layer-heading-actions">
+                {selecting && <SelectionGroupButton entries={overviewEntries(sections)} selectedKeys={selectedKeys} onToggle={toggleEntryGroup}/>}
+                <LobePopover arrow className="character-quick-popover" content={<CharacterEditor character={character} project={project} onChange={updateProject} onClose={() => setEditingCharacterId('')} onDelete={() => deleteCharacter(character)}/>} onOpenChange={(open) => setEditingCharacterId(open ? character.id : '')} open={editingCharacterId === character.id} placement="bottomRight" trigger="click"><LobeButton size="small" type="text">{structure.use_coords ? `位置 ${compactPosition(character.center)}` : 'AI 位置'}</LobeButton></LobePopover>
+              </div>
             </div>
             {sections.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
           </div>
