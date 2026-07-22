@@ -42,6 +42,27 @@ describe('OpenAI-compatible AI translation', () => {
     });
   });
 
+  it('automatically translates more than 50 tags in ordered batches', async () => {
+    const fetcher = vi.fn(async (_url, options) => {
+      const tags = JSON.parse(JSON.parse(options.body).messages[1].content).tags;
+      return jsonResponse({
+        choices: [{ message: { content: JSON.stringify({ items: tags.map((tag) => ({ translation: `译-${tag}`, category: 'Unsorted' })) }) } }],
+      });
+    });
+    const tags = Array.from({ length: 121 }, (_, index) => `tag-${index}`);
+    const result = await translateTags(tags, {
+      baseUrl: 'https://api.example.com/v1',
+      apiKey: 'secret',
+      model: 'translator-model',
+    }, fetcher);
+
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher.mock.calls.map(([, options]) => JSON.parse(JSON.parse(options.body).messages[1].content).tags.length)).toEqual([50, 50, 21]);
+    expect(result.items).toHaveLength(121);
+    expect(result.items[0].translation).toBe('译-tag-0');
+    expect(result.items[120].translation).toBe('译-tag-120');
+  });
+
   it('only permits insecure HTTP for local model servers', () => {
     expect(normalizeBaseUrl('http://127.0.0.1:11434/v1')).toBe('http://127.0.0.1:11434/v1');
     expect(() => normalizeBaseUrl('http://api.example.com/v1')).toThrow('必须使用 HTTPS');

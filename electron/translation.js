@@ -96,6 +96,7 @@ export async function testModel(settings, fetcher = globalThis.fetch) {
 }
 
 const TAG_CATEGORIES = new Set(['Artist', 'Character', 'Clothing', 'Scene', 'Style', 'Unsorted']);
+const TAG_TRANSLATION_BATCH_SIZE = 50;
 
 function parseTranslationJson(content, expectedLength) {
   const withoutFence = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
@@ -124,14 +125,7 @@ function parseTranslationJson(content, expectedLength) {
   return cleaned;
 }
 
-export async function translateTags(texts, settings, fetcher = globalThis.fetch) {
-  if (!Array.isArray(texts)) throw new Error('翻译内容格式无效');
-  const cleaned = texts.map((text) => String(text || '').trim());
-  if (!cleaned.length || cleaned.some((text) => !text)) throw new Error('没有可翻译的 Tag');
-  if (cleaned.length > 50) throw new Error('每次最多翻译 50 个 Tag');
-
-  const baseUrl = normalizeBaseUrl(settings.baseUrl);
-  const model = requireModel(settings);
+async function translateTagBatch(cleaned, baseUrl, model, settings, fetcher) {
   const body = await requestJson(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: requestHeaders(settings.apiKey),
@@ -150,7 +144,21 @@ export async function translateTags(texts, settings, fetcher = globalThis.fetch)
       { role: 'user', content: JSON.stringify({ tags: cleaned }) },
     ])),
   }, fetcher, 60000);
-  const items = parseTranslationJson(chatContent(body), cleaned.length);
+  return parseTranslationJson(chatContent(body), cleaned.length);
+}
+
+export async function translateTags(texts, settings, fetcher = globalThis.fetch) {
+  if (!Array.isArray(texts)) throw new Error('翻译内容格式无效');
+  const cleaned = texts.map((text) => String(text || '').trim());
+  if (!cleaned.length || cleaned.some((text) => !text)) throw new Error('没有可翻译的 Tag');
+
+  const baseUrl = normalizeBaseUrl(settings.baseUrl);
+  const model = requireModel(settings);
+  const items = [];
+  for (let offset = 0; offset < cleaned.length; offset += TAG_TRANSLATION_BATCH_SIZE) {
+    const batch = cleaned.slice(offset, offset + TAG_TRANSLATION_BATCH_SIZE);
+    items.push(...await translateTagBatch(batch, baseUrl, model, settings, fetcher));
+  }
   return { model, items, translations: items.map((item) => item.translation), categories: items.map((item) => item.category) };
 }
 
