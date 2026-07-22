@@ -6,6 +6,7 @@ import LobeCollapse from '@lobehub/ui/es/Collapse/index';
 import LobeColorSwatches from '@lobehub/ui/es/ColorSwatches/index';
 import LobeInput from '@lobehub/ui/es/Input/Input';
 import LobeInputPassword from '@lobehub/ui/es/Input/InputPassword';
+import LobeSelect from '@lobehub/ui/es/Select/index';
 import LobeTextArea from '@lobehub/ui/es/Input/TextArea';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
 import { findCustomThemeName, primaryColors } from '@lobehub/ui/es/styles/index';
@@ -16,6 +17,17 @@ const PRIMARY_COLOR_OPTIONS = [
   ['yellow', '黄色'], ['lime', '青柠'], ['green', '绿色'], ['cyan', '青色'],
   ['blue', '蓝色'], ['geekblue', '靛蓝'], ['purple', '紫色'], ['magenta', '洋红'],
 ].map(([key, title]) => ({ color: primaryColors[key], key, title }));
+
+const SANS_FONT_OPTIONS = [
+  { label: 'Geist', value: 'geist' },
+  { label: 'HarmonyOS Sans SC', value: 'harmony' },
+  { label: '系统非衬线字体', value: 'system' },
+];
+
+const MONO_FONT_OPTIONS = [
+  { label: 'Geist Mono', value: 'geist-mono' },
+  { label: '系统等宽字体', value: 'system-mono' },
+];
 
 export default function SettingsPage({ appearance, onAppearanceChange, onClose, showToast, studio }) {
   const [section, setSection] = useState('appearance');
@@ -102,7 +114,8 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
               value={primaryColors[appearance.primaryColor] || primaryColors.blue}
             />
           </div>
-          <div className="settings-row"><span><strong>字体</strong><small>统一应用到界面与 Prompt</small></span><LobeSegmented aria-label="界面字体" className="settings-segment" options={[{ label: '非衬线', value: 'sans' }, { label: '等宽', value: 'mono' }]} value={appearance.fontFamily} onChange={(value) => onAppearanceChange({ fontFamily: value })}/></div>
+          <div className="settings-row"><span><strong>非衬线字体</strong><small>用于界面、按钮与说明文字</small></span><LobeSelect aria-label="非衬线字体" className="settings-font-select" options={SANS_FONT_OPTIONS} value={appearance.sansFont} onChange={(value) => onAppearanceChange({ sansFont: value })}/></div>
+          <div className="settings-row"><span><strong>等宽字体</strong><small>用于 Tag、Prompt 与参数</small></span><LobeSelect aria-label="等宽字体" className="settings-font-select" options={MONO_FONT_OPTIONS} value={appearance.monoFont} onChange={(value) => onAppearanceChange({ monoFont: value })}/></div>
           <div className="settings-row"><strong>动效</strong><LobeSegmented aria-label="界面动效" className="settings-segment" options={[{ label: '完整', value: 'full' }, { label: '跟随系统', value: 'reduced' }, { label: '关闭', value: 'off' }]} value={appearance.motion} onChange={(value) => onAppearanceChange({ motion: value })}/></div>
         </div>
       </> : <>

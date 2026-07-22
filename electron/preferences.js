@@ -2,11 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_BASE_URL, DEFAULT_CLASSIFICATION_PROMPT, DEFAULT_TRANSLATION_PROMPT, normalizeBaseUrl } from './translation.js';
 
-const APPEARANCE_DEFAULTS = Object.freeze({ themeMode: 'dark', primaryColor: 'blue', fontFamily: 'sans', motion: 'full' });
+const APPEARANCE_DEFAULTS = Object.freeze({ themeMode: 'dark', primaryColor: 'blue', sansFont: 'geist', monoFont: 'geist-mono', motion: 'full' });
 const APPEARANCE_VALUES = {
   themeMode: new Set(['auto', 'dark', 'light']),
   primaryColor: new Set(['blue', 'cyan', 'geekblue', 'gold', 'green', 'lime', 'magenta', 'orange', 'purple', 'red', 'volcano', 'yellow']),
-  fontFamily: new Set(['sans', 'mono']),
+  sansFont: new Set(['geist', 'harmony', 'system']),
+  monoFont: new Set(['geist-mono', 'system-mono']),
   motion: new Set(['full', 'reduced', 'off']),
 };
 

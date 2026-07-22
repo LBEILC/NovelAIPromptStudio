@@ -8,7 +8,7 @@ import { colorScales } from '@lobehub/ui/es/color/index';
 import './fonts.css';
 import './styles.css';
 
-const DEFAULT_APPEARANCE = { themeMode: 'dark', primaryColor: 'blue', fontFamily: 'sans', motion: 'full' };
+const DEFAULT_APPEARANCE = { themeMode: 'dark', primaryColor: 'blue', sansFont: 'geist', monoFont: 'geist-mono', motion: 'full' };
 
 function StudioRoot() {
   const [appearance, setAppearance] = useState(DEFAULT_APPEARANCE);
@@ -33,7 +33,7 @@ function StudioRoot() {
     return () => systemTheme.removeEventListener('change', applyTheme);
   }, [appearance.primaryColor, appearance.themeMode]);
 
-  return <LobeProvider fontFamily={appearance.fontFamily} primaryColor={appearance.primaryColor} themeMode={appearance.themeMode}>
+  return <LobeProvider monoFont={appearance.monoFont} primaryColor={appearance.primaryColor} sansFont={appearance.sansFont} themeMode={appearance.themeMode}>
     <App appearance={appearance} setAppearance={setAppearance}/>
     <ContextMenuHost/>
     <ToastHost duration={2200} position="bottom"/>

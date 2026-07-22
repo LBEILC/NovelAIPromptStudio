@@ -1,10 +1,10 @@
 :root {
   color-scheme: dark;
   font-size: 17px;
-  --font-sans: "Geist", "HarmonyOS Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-monospace: "Geist Mono", "HarmonyOS Sans SC", "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
-  --font-ui: var(--font-sans);
-  --font-mono: var(--font-sans);
+  --font-system-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-system-mono: "SFMono-Regular", "Cascadia Mono", Consolas, Menlo, monospace;
+  --font-ui: "Geist", "HarmonyOS Sans SC", var(--font-system-sans);
+  --font-mono: "Geist Mono", "HarmonyOS Sans SC", var(--font-system-mono);
   --text-micro: .6875rem;
   --text-caption: .75rem;
   --text-secondary: .8125rem;
@@ -54,10 +54,13 @@ html[data-theme-mode="light"] {
 html[data-theme-mode="dark"] { color-scheme: dark; --ink: #0d0d0f; }
 html[data-theme-mode="light"], html[data-theme-mode="light"] body, html[data-theme-mode="light"] #root, html[data-theme-mode="light"] .lobe-root { background: var(--ink) !important; }
 html[data-theme-mode="dark"], html[data-theme-mode="dark"] body, html[data-theme-mode="dark"] #root, html[data-theme-mode="dark"] .lobe-root { background: #0d0d0f !important; }
-html[data-platform="windows"] { --font-sans: "Geist", "HarmonyOS Sans SC", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif; --font-monospace: "Geist Mono", "HarmonyOS Sans SC", "Cascadia Mono", Consolas, monospace; }
-html[data-platform="macos"] { --font-sans: "Geist", "HarmonyOS Sans SC", "PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif; --font-monospace: "Geist Mono", "HarmonyOS Sans SC", "SFMono-Regular", Menlo, monospace; }
-html[data-font-family="sans"] { --font-ui: var(--font-sans); --font-mono: var(--font-sans); }
-html[data-font-family="mono"] { --font-ui: var(--font-monospace); --font-mono: var(--font-monospace); }
+html[data-platform="windows"] { --font-system-sans: "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif; --font-system-mono: "Cascadia Mono", Consolas, monospace; }
+html[data-platform="macos"] { --font-system-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; --font-system-mono: "SFMono-Regular", Menlo, monospace; }
+html[data-sans-font="geist"] { --font-ui: "Geist", "HarmonyOS Sans SC", var(--font-system-sans); }
+html[data-sans-font="harmony"] { --font-ui: "HarmonyOS Sans SC", "Geist", var(--font-system-sans); }
+html[data-sans-font="system"] { --font-ui: var(--font-system-sans); }
+html[data-mono-font="geist-mono"] { --font-mono: "Geist Mono", "HarmonyOS Sans SC", var(--font-system-mono); }
+html[data-mono-font="system-mono"] { --font-mono: var(--font-system-mono); }
 
 * { box-sizing: border-box; }
 html, body, #root, .lobe-root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
@@ -268,6 +271,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .settings-row:last-child, .ai-settings-group > label:last-child { border-bottom: 0; }
 .settings-row strong, .settings-row small, .ai-settings-group strong, .ai-settings-group small { display: block; }
 .settings-row small, .ai-settings-group small { margin-top: 5px; color: var(--muted); font-size: var(--text-secondary); }
+.settings-font-select { min-width: 210px; }
 .settings-color-row > div { max-width: 378px; justify-content: flex-end; }
 .ai-settings-group > label { grid-template-columns: minmax(220px, .7fr) minmax(280px, 1fr); }
 .settings-model-input { display: flex; gap: 7px; }
@@ -294,6 +298,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @media (max-width: 1120px) {
   .settings-page { grid-template-columns: 200px minmax(0, 1fr); }
   .settings-row, .ai-settings-group > label { grid-template-columns: 1fr; gap: 13px; }
+  .settings-font-select { width: 100%; }
   .settings-color-row > div { justify-content: flex-start; }
   .ai-prompt-settings > label { grid-template-columns: 1fr; }
 }
