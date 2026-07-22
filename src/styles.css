@@ -171,8 +171,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .overview-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) auto; align-items: center; gap: 12px; }
 .overview-primary-actions, .overview-filter-controls, .overview-category-row { min-width: 0; display: flex; align-items: center; gap: 6px; }
 .overview-primary-actions { justify-content: flex-end; }
-.overview-filter-strip { min-width: 0; display: grid; grid-template-columns: auto minmax(180px, 1fr); align-items: center; gap: 12px; }
-.overview-category-row { padding-inline-start: 12px; overflow-x: auto; border-inline-start: 1px solid var(--line-soft); }
+.overview-filter-strip { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.overview-category-row { flex-wrap: wrap; }
 .overview-category-row button { height: 27px; flex: 0 0 auto; font-size: var(--text-micro); }
 .overview-category-row button.active { background: color-mix(in srgb, var(--tag-color, var(--accent)) 10%, transparent); border-color: color-mix(in srgb, var(--tag-color, var(--accent)) 35%, var(--line)); }
 .overview-category-row b { color: var(--muted); font: var(--text-micro) var(--font-mono); }
@@ -263,9 +263,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .settings-warning { margin-top: 18px; }
 
 @container prompt-overview (max-width: 980px) {
-  .overview-filter-strip { grid-template-columns: 1fr; gap: 8px; }
   .overview-filter-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .overview-category-row { padding-inline-start: 0; border-inline-start: 0; }
 }
 @container prompt-overview (max-width: 720px) {
   .overview-toolbar { grid-template-columns: 1fr; }
