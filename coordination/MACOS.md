@@ -1,5 +1,14 @@
 # macOS handoffs
 
+## Verify phase 2 gallery, migration backup, and Finder behavior
+
+- Status: Pending
+- Date/source: 2026-07-22, Windows
+- Related commit: `18386b7`
+- Action: On an unlocked macOS session, run `npm ci`, `npm test`, `npm run build`, and launch the production app with an existing pre-phase2 user database. Confirm `data/studio.pre-phase2.sqlite` is created once and is not overwritten on the next launch. Drag images and a ZIP from Finder into 图片库, preview an image, use its context menu to open it in 工作台, reveal it in Finder, and remove one imported copy after confirmation. Also drag a single image into 工作台 and verify it is parsed without being added to 图片库.
+- Expected: The app exposes only 工作台 and 图片库 as business pages; AI translation/classification and read-only Vibe copying remain available. Gallery import persists assets, Workbench import stays transient, removal only deletes application-owned copies, and the native menu, hidden-inset title bar, Finder paths, dialogs, and drag overlay behave normally. Old Tag/Vibe library, branch, version, series, experiment, relationship, and comparison handoffs below are superseded and no longer require product verification.
+- Observed: Windows completed a clean `npm ci`, 49 automated tests, Electron syntax checks, and the production build. Per user request, live desktop verification was left to the user; macOS native behavior remains to be verified.
+
 ## Verify cross-platform development startup
 
 - Status: Blocked
