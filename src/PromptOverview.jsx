@@ -115,7 +115,7 @@ function TagQuickEditor({ tag, translating, onChange, onClose, onTranslate }) {
       <label><span>分类</span><LobeSelect onChange={(category) => onChange({ category, category_source: 'manual' })} options={CATEGORY_OPTIONS.map((value) => ({ label: CATEGORY_LABELS[value], value }))} size="small" value={tag.category || 'Unsorted'}/></label>
       {braceDepth
         ? <label><span>强调结构</span><LobeInput disabled size="small" value={`${braceDepth} 层花括号`}/></label>
-        : <label><span>权重</span><WeightEditor onCommit={(weight) => onChange({ weight })} value={tag.weight}/></label>}
+        : <label><span>权重</span><WeightEditor onCommit={(weight) => onChange({ weight, raw_segment: '', syntax_issue: '' })} value={tag.weight}/></label>}
     </div>
     <div className="tag-quick-editor-footer">
       <LobeButton disabled={translating} icon={<Icon name="spark" size={14}/>} onClick={onTranslate} size="small">{translating ? '翻译中…' : 'AI 翻译'}</LobeButton>

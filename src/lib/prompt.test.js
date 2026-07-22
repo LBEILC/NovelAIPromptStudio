@@ -74,6 +74,15 @@ describe('NovelAI prompt codec', () => {
     expect(formatPrompt(tags)).toBe('masterpiece,\n::year2025 ::,\n::');
   });
 
+  it('normalizes a closer-only tag after the user assigns a numeric weight', () => {
+    let id = 0;
+    const [tag] = parsePrompt('::artist:imamura ryoi::', () => `closer-${id++}`);
+    const weighted = { ...tag, weight: 1.25 };
+
+    expect(tag).toMatchObject({ tag: 'artist:imamura ryoi', weight: 1, syntax_issue: 'emphasis_closer' });
+    expect(formatTag(weighted)).toBe('1.25::artist:imamura ryoi ::');
+  });
+
   it('parses batch input with fullwidth commas, newlines, and empty segments', () => {
     let id = 0;
     const batch = analyzePromptBatch(',akakura,ciloranko，white background\n\n', [], () => `batch-${id++}`);

@@ -206,8 +206,10 @@ export function repairLegacyPromptTags(tags = [], prompt = '', createId = () => 
 }
 
 function formatTagContent(tag) {
-  if (tag.syntax_issue && tag.raw_segment) return tag.raw_segment.trim();
-  const value = Number(tag.weight);
+  const parsedWeight = Number(tag.weight);
+  const value = Number.isFinite(parsedWeight) ? parsedWeight : 1;
+  const hasNumericWeight = Math.abs(value - 1) >= 0.001;
+  if (tag.syntax_issue && tag.raw_segment && !(tag.syntax_issue === 'emphasis_closer' && hasNumericWeight)) return tag.raw_segment.trim();
   return Math.abs(value - 1) < 0.001 ? tag.tag.trim() : `${Number(value.toFixed(2))}::${tag.tag.trim()} ::`;
 }
 
