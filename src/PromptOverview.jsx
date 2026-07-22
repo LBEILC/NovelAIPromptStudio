@@ -286,6 +286,7 @@ function SelectionGroupButton({ className, compact = false, entries, selectedKey
 }
 
 function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, onEditingChange, onToggleSelect, onToggleGroup, onTranslateTag, onUpdateTag, onTagContextMenu, translatingKeys }) {
+  const selectedSet = new Set(selectedKeys);
   return <section className={`overview-category-group cat-${String(group.category).toLowerCase()}`}>
     <div className="overview-category-body">
       <div className="overview-category-heading">
