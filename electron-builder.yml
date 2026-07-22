@@ -9,6 +9,8 @@ files:
   - dist/**/*
   - electron/**/*
   - "!electron/**/*.test.js"
+  - src/lib/**/*.js
+  - "!src/lib/**/*.test.js"
   - build/icons/icon.ico
   - build/icons/icon.png
   - package.json
