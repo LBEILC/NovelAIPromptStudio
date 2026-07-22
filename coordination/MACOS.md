@@ -1,5 +1,14 @@
 # macOS handoffs
 
+## Verify system font discovery and previews
+
+- Status: Pending
+- Date/source: 2026-07-22, Windows
+- Related commit: `f49d13e`
+- Action: On an unlocked macOS session, run `npm ci`, `npm test`, `npm run build`, launch the production app, and open 设置 → 外观. Confirm the non-monospace and monospace selectors finish loading installed macOS font families, searching works, every option previews itself, and selecting one font in each role persists after restart. Open an image whose prompt uses trailing-comma brace groups such as `{artist:a, artist:b, } {best quality, masterpiece, }` and confirm four clean Tags appear without braces.
+- Expected: Font discovery falls back from the bundled macOS helper to `system_profiler` if needed; the UI remains responsive, Tag/Prompt text uses only the chosen monospace family, other UI text uses only the chosen interface family, and existing Geist/HarmonyOS choices migrate cleanly. Legacy single-brace groups flatten while `{{tag}}` emphasis remains intact.
+- Observed: Windows clean-installed 700 packages with zero vulnerabilities, discovered 92 installed font families, passed 58 automated tests and the production build. macOS font discovery, Finder-installed fonts, and restart persistence remain to be verified.
+
 ## Verify phase 2 gallery, migration backup, and Finder behavior
 
 - Status: Pending
