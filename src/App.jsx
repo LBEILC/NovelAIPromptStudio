@@ -359,7 +359,8 @@ export default function App({ appearance, setAppearance }) {
     const scope = getPromptScope(workbenchSession.project, scopeKey);
     const setCategory = (category) => updateWorkbenchProject(updatePromptScope(workbenchSession.project, scope.key, scope.tags.map((item) => item.id === tag.id ? { ...item, category, category_source: 'manual' } : item)));
     openContextMenu(event, [
-      { key: 'copy-tag', label: '复制 Tag（含权重）', icon: Copy, onClick: async () => { await navigator.clipboard.writeText(formatTag(tag)); showToast('Tag 已复制（含权重）'); } },
+      { key: 'copy-tag', label: '复制 Tag', icon: Copy, onClick: async () => { await navigator.clipboard.writeText(tag.tag); showToast('Tag 已复制'); } },
+      { key: 'copy-weighted-tag', label: '复制 Tag（含权重）', icon: Copy, onClick: async () => { await navigator.clipboard.writeText(formatTag(tag)); showToast('Tag 已复制（含权重）'); } },
       { key: 'copy-translation', label: '复制翻译', icon: Copy, disabled: !tag.translation?.trim(), onClick: async () => { await navigator.clipboard.writeText(tag.translation || ''); showToast('翻译已复制'); } },
       { key: 'edit-tag', label: '编辑', icon: Pencil, onClick: () => { setWorkbenchFocus({ scopeKey, tagId: null }); requestAnimationFrame(() => setWorkbenchFocus({ scopeKey, tagId: tag.id })); } },
       { key: 'translate-tag', label: 'AI 翻译与分类', icon: Sparkles, onClick: () => translateWorkbenchTags([{ scopeKey, tag }]) },
