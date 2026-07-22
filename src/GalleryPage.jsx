@@ -81,8 +81,9 @@ export default function GalleryPage({
         onExpandChange={setPreviewExpanded}
         onSizeChange={(_delta, size) => setPreviewPanelWidth(size?.width)}
         placement="right"
-        showHandleHighlight
+        showHandleWideArea={false}
         size={previewPanelWidth ? { width: previewPanelWidth } : undefined}
+        styles={{ handle: { transform: 'translateX(16px)' } }}
       >
         {preview && <LobeDraggablePanel.Body className="gallery-preview">
           <header><h2 title={preview.name}>{preview.name}</h2></header>
