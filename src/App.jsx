@@ -34,7 +34,7 @@ const studio = window.studio || {
   revealFile: async () => {},
   getAISettings: async () => ({ baseUrl: 'https://api.openai.com/v1', model: '', hasApiKey: false, encryptionAvailable: true }),
   saveAISettings: async (settings) => settings,
-  getAppearanceSettings: async () => ({ themeMode: 'dark', fontScale: 'large', density: 'comfortable', motion: 'full' }),
+  getAppearanceSettings: async () => ({ themeMode: 'dark', primaryColor: 'blue', fontFamily: 'sans', motion: 'full' }),
   saveAppearanceSettings: async (settings) => settings,
   listAIModels: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
   testAIModel: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
@@ -188,8 +188,7 @@ export default function App({ appearance, setAppearance }) {
   }, [workbenchSession]);
 
   useEffect(() => {
-    document.documentElement.dataset.fontScale = appearance.fontScale;
-    document.documentElement.dataset.density = appearance.density;
+    document.documentElement.dataset.fontFamily = appearance.fontFamily;
     document.documentElement.dataset.motion = appearance.motion;
   }, [appearance]);
 

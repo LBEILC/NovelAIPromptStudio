@@ -1,4 +1,6 @@
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
+const DEFAULT_TRANSLATION_PROMPT = 'Translate every NovelAI Diffusion prompt tag into concise Simplified Chinese. Preserve anatomy, clothing, camera terminology, character names, and artist names. Do not add explanations.';
+const DEFAULT_CLASSIFICATION_PROMPT = 'Classify every tag as exactly one of Artist, Character, Clothing, Scene, Style, or Unsorted. Artist is only for artist attribution or artist-name tags. Character covers identity, anatomy, expression, and pose. Clothing covers apparel and accessories. Scene covers environments and backgrounds. Style covers visual style, quality, camera, lighting, and rendering terms, but never artist attribution.';
 
 function normalizeBaseUrl(value) {
   const candidate = String(value || DEFAULT_BASE_URL).trim().replace(/\/+$/, '');
@@ -126,6 +128,8 @@ function parseTranslationJson(content, expectedLength) {
 }
 
 async function translateTagBatch(cleaned, baseUrl, model, settings, fetcher) {
+  const translationPrompt = String(settings.translationPrompt || DEFAULT_TRANSLATION_PROMPT).trim() || DEFAULT_TRANSLATION_PROMPT;
+  const classificationPrompt = String(settings.classificationPrompt || DEFAULT_CLASSIFICATION_PROMPT).trim() || DEFAULT_CLASSIFICATION_PROMPT;
   const body = await requestJson(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: requestHeaders(settings.apiKey),
@@ -134,9 +138,8 @@ async function translateTagBatch(cleaned, baseUrl, model, settings, fetcher) {
         role: 'system',
         content: [
           'You translate and classify NovelAI Diffusion prompt tags.',
-          'Translate each tag into concise Simplified Chinese while preserving anatomy, clothing, camera, and artist names.',
-          'Classify each tag as exactly one of: Artist, Character, Clothing, Scene, Style, Unsorted.',
-          'Artist is for artist attribution or artist-name tags. Character is for identity, anatomy, expression, or pose. Clothing is for apparel and accessories. Scene is for environment or background. Style is for visual style, quality, camera, lighting, or rendering terms, but never artist attribution.',
+          translationPrompt,
+          classificationPrompt,
           'Do not add explanations. Return only valid JSON in this exact shape: {"items":[{"translation":"译文","category":"Character"}]}.',
           'Keep the array length and order identical to the input tags.',
         ].join(' '),
@@ -162,4 +165,4 @@ export async function translateTags(texts, settings, fetcher = globalThis.fetch)
   return { model, items, translations: items.map((item) => item.translation), categories: items.map((item) => item.category) };
 }
 
-export { DEFAULT_BASE_URL, normalizeBaseUrl };
+export { DEFAULT_BASE_URL, DEFAULT_CLASSIFICATION_PROMPT, DEFAULT_TRANSLATION_PROMPT, normalizeBaseUrl };

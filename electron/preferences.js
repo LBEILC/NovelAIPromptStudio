@@ -1,13 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_BASE_URL, normalizeBaseUrl } from './translation.js';
+import { DEFAULT_BASE_URL, DEFAULT_CLASSIFICATION_PROMPT, DEFAULT_TRANSLATION_PROMPT, normalizeBaseUrl } from './translation.js';
 
-const APPEARANCE_DEFAULTS = Object.freeze({ themeMode: 'dark', primaryColor: 'blue', fontScale: 'large', density: 'comfortable', motion: 'full' });
+const APPEARANCE_DEFAULTS = Object.freeze({ themeMode: 'dark', primaryColor: 'blue', fontFamily: 'sans', motion: 'full' });
 const APPEARANCE_VALUES = {
   themeMode: new Set(['auto', 'dark', 'light']),
   primaryColor: new Set(['blue', 'cyan', 'geekblue', 'gold', 'green', 'lime', 'magenta', 'orange', 'purple', 'red', 'volcano', 'yellow']),
-  fontScale: new Set(['default', 'large', 'larger']),
-  density: new Set(['compact', 'comfortable']),
+  fontFamily: new Set(['sans', 'mono']),
   motion: new Set(['full', 'reduced', 'off']),
 };
 
@@ -42,6 +41,12 @@ export function openPreferences(dataDirectory, safeStorage) {
     return {
       baseUrl: preferences.aiBaseUrl || DEFAULT_BASE_URL,
       model: preferences.aiModel || '',
+      translationPrompt: preferences.aiTranslationPrompt || DEFAULT_TRANSLATION_PROMPT,
+      classificationPrompt: preferences.aiClassificationPrompt || DEFAULT_CLASSIFICATION_PROMPT,
+      defaultPrompts: {
+        translation: DEFAULT_TRANSLATION_PROMPT,
+        classification: DEFAULT_CLASSIFICATION_PROMPT,
+      },
       hasApiKey: Boolean(preferences.aiApiKeyEncrypted),
       encryptionAvailable: safeStorage.isEncryptionAvailable(),
     };
@@ -71,10 +76,16 @@ export function openPreferences(dataDirectory, safeStorage) {
     return appearanceSettings();
   };
 
-  const saveAISettings = ({ baseUrl, model, apiKey, clearApiKey = false }) => {
+  const saveAISettings = ({ baseUrl, model, apiKey, translationPrompt, classificationPrompt, clearApiKey = false }) => {
     const preferences = read();
     preferences.aiBaseUrl = normalizeBaseUrl(baseUrl);
     preferences.aiModel = String(model || '').trim();
+    const nextTranslationPrompt = String(translationPrompt || '').trim() || DEFAULT_TRANSLATION_PROMPT;
+    const nextClassificationPrompt = String(classificationPrompt || '').trim() || DEFAULT_CLASSIFICATION_PROMPT;
+    if (nextTranslationPrompt === DEFAULT_TRANSLATION_PROMPT) delete preferences.aiTranslationPrompt;
+    else preferences.aiTranslationPrompt = nextTranslationPrompt;
+    if (nextClassificationPrompt === DEFAULT_CLASSIFICATION_PROMPT) delete preferences.aiClassificationPrompt;
+    else preferences.aiClassificationPrompt = nextClassificationPrompt;
     if (clearApiKey) delete preferences.aiApiKeyEncrypted;
     if (typeof apiKey === 'string' && apiKey.trim()) {
       if (!safeStorage.isEncryptionAvailable()) throw new Error('当前系统无法安全加密 API Key');

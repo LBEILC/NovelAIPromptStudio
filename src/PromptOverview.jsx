@@ -8,7 +8,7 @@ import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
 import LobeSelect from '@lobehub/ui/es/Select/index';
 import LobeSliderWithInput from '@lobehub/ui/es/SliderWithInput/index';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
-import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, formatPrompt, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
+import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, formatPromptInline, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
 import { addPromptCharacter, getPromptScope, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
 import SelectionMark from './components/SelectionMark.jsx';
 import Icon from './components/Icon.jsx';
@@ -529,7 +529,7 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     setAddingScopeKey('');
     setRawEditingScopeKey(scopeKey);
     if (!scopeKey) return;
-    setRawDraft(formatPrompt(getPromptScope(project, scopeKey).tags));
+    setRawDraft(formatPromptInline(getPromptScope(project, scopeKey).tags));
   };
 
   const saveRawScope = (scopeKey) => {

@@ -32,15 +32,40 @@ describe('AI preferences', () => {
     expect(fs.readFileSync(preferences.filePath, 'utf8')).not.toContain('top-secret');
   });
 
+  it('persists editable translation and classification prompts', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
+    temporaryDirectories.push(directory);
+    const preferences = openPreferences(directory, safeStorage);
+
+    const defaults = preferences.publicSettings().defaultPrompts;
+    expect(defaults.translation).toBeTruthy();
+    expect(defaults.classification).toBeTruthy();
+    expect(preferences.saveAISettings({
+      baseUrl: 'https://api.example.com/v1',
+      model: 'qwen-plus',
+      translationPrompt: 'Translate with my glossary.',
+      classificationPrompt: 'Classify using my taxonomy.',
+    })).toEqual(expect.objectContaining({
+      translationPrompt: 'Translate with my glossary.',
+      classificationPrompt: 'Classify using my taxonomy.',
+    }));
+
+    const stored = JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'));
+    expect(stored).toMatchObject({
+      aiTranslationPrompt: 'Translate with my glossary.',
+      aiClassificationPrompt: 'Classify using my taxonomy.',
+    });
+  });
+
   it('persists validated cross-platform appearance preferences', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
     temporaryDirectories.push(directory);
     const preferences = openPreferences(directory, safeStorage);
 
-    expect(preferences.appearanceSettings()).toEqual({ themeMode: 'dark', primaryColor: 'blue', fontScale: 'large', density: 'comfortable', motion: 'full' });
-    expect(preferences.saveAppearanceSettings({ themeMode: 'auto', primaryColor: 'purple', fontScale: 'larger', motion: 'reduced' }))
-      .toEqual({ themeMode: 'auto', primaryColor: 'purple', fontScale: 'larger', density: 'comfortable', motion: 'reduced' });
-    expect(() => preferences.saveAppearanceSettings({ density: 'tiny' })).toThrow('不支持');
+    expect(preferences.appearanceSettings()).toEqual({ themeMode: 'dark', primaryColor: 'blue', fontFamily: 'sans', motion: 'full' });
+    expect(preferences.saveAppearanceSettings({ themeMode: 'auto', primaryColor: 'purple', fontFamily: 'mono', motion: 'reduced' }))
+      .toEqual({ themeMode: 'auto', primaryColor: 'purple', fontFamily: 'mono', motion: 'reduced' });
+    expect(() => preferences.saveAppearanceSettings({ fontFamily: 'serif' })).toThrow('不支持');
     expect(() => preferences.saveAppearanceSettings({ primaryColor: 'pink' })).toThrow('不支持');
   });
 });

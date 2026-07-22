@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import LobeAlert from '@lobehub/ui/es/Alert/index';
 import LobeAutoComplete from '@lobehub/ui/es/AutoComplete/index';
 import LobeButton from '@lobehub/ui/es/Button/index';
+import LobeCollapse from '@lobehub/ui/es/Collapse/index';
 import LobeColorSwatches from '@lobehub/ui/es/ColorSwatches/index';
 import LobeInput from '@lobehub/ui/es/Input/Input';
 import LobeInputPassword from '@lobehub/ui/es/Input/InputPassword';
+import LobeTextArea from '@lobehub/ui/es/Input/TextArea';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
 import { findCustomThemeName, primaryColors } from '@lobehub/ui/es/styles/index';
 import Icon from './components/Icon.jsx';
@@ -17,7 +19,16 @@ const PRIMARY_COLOR_OPTIONS = [
 
 export default function SettingsPage({ appearance, onAppearanceChange, onClose, showToast, studio }) {
   const [section, setSection] = useState('appearance');
-  const [aiSettings, setAISettings] = useState({ baseUrl: 'https://api.openai.com/v1', model: '', apiKey: '', hasApiKey: false, encryptionAvailable: true });
+  const [aiSettings, setAISettings] = useState({
+    baseUrl: 'https://api.openai.com/v1',
+    model: '',
+    apiKey: '',
+    translationPrompt: '',
+    classificationPrompt: '',
+    defaultPrompts: { translation: '', classification: '' },
+    hasApiKey: false,
+    encryptionAvailable: true,
+  });
   const [models, setModels] = useState([]);
   const [busy, setBusy] = useState('');
 
@@ -28,7 +39,13 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
   const saveAI = async () => {
     setBusy('save');
     try {
-      const saved = await studio.saveAISettings({ baseUrl: aiSettings.baseUrl, model: aiSettings.model, apiKey: aiSettings.apiKey });
+      const saved = await studio.saveAISettings({
+        baseUrl: aiSettings.baseUrl,
+        model: aiSettings.model,
+        apiKey: aiSettings.apiKey,
+        translationPrompt: aiSettings.translationPrompt,
+        classificationPrompt: aiSettings.classificationPrompt,
+      });
       setAISettings((current) => ({ ...current, ...saved, apiKey: '' }));
       showToast('AI 服务设置已安全保存');
       return true;
@@ -85,8 +102,7 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
               value={primaryColors[appearance.primaryColor] || primaryColors.blue}
             />
           </div>
-          <div className="settings-row"><strong>字号</strong><LobeSegmented aria-label="界面字号" className="settings-segment" options={[{ label: '标准', value: 'default' }, { label: '较大', value: 'large' }, { label: '特大', value: 'larger' }]} value={appearance.fontScale} onChange={(value) => onAppearanceChange({ fontScale: value })}/></div>
-          <div className="settings-row"><strong>密度</strong><LobeSegmented aria-label="界面密度" className="settings-segment" options={[{ label: '紧凑', value: 'compact' }, { label: '舒适', value: 'comfortable' }]} value={appearance.density} onChange={(value) => onAppearanceChange({ density: value })}/></div>
+          <div className="settings-row"><span><strong>字体</strong><small>统一应用到界面与 Prompt</small></span><LobeSegmented aria-label="界面字体" className="settings-segment" options={[{ label: '非衬线', value: 'sans' }, { label: '等宽', value: 'mono' }]} value={appearance.fontFamily} onChange={(value) => onAppearanceChange({ fontFamily: value })}/></div>
           <div className="settings-row"><strong>动效</strong><LobeSegmented aria-label="界面动效" className="settings-segment" options={[{ label: '完整', value: 'full' }, { label: '跟随系统', value: 'reduced' }, { label: '关闭', value: 'off' }]} value={appearance.motion} onChange={(value) => onAppearanceChange({ motion: value })}/></div>
         </div>
       </> : <>
@@ -96,6 +112,28 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
           <label><span><strong>API Key</strong><small>{aiSettings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}</small></span><LobeInputPassword value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '已安全保存' : '输入 API Key'}/></label>
           <label><span><strong>默认模型</strong><small>翻译与分类任务共用</small></span><div className="settings-model-input"><LobeAutoComplete options={models.map((model) => ({ value: model }))} value={aiSettings.model} onChange={(value) => setAISettings((current) => ({ ...current, model: value }))} placeholder="输入或读取模型 ID"/><LobeButton onClick={loadModels} disabled={Boolean(busy)}><Icon name="refresh" size={14}/>{busy === 'models' ? '读取中' : '读取模型'}</LobeButton></div></label>
         </div>
+        <LobeCollapse
+          className="ai-advanced-settings"
+          items={[{
+            key: 'prompts',
+            label: '高级设置',
+            desc: '自定义翻译与分类 Prompt',
+            children: <div className="ai-prompt-settings">
+              <label>
+                <span><strong>翻译 Prompt</strong><small>定义 Tag 的翻译语言、风格和术语处理</small></span>
+                <LobeTextArea autoSize={{ minRows: 5, maxRows: 12 }} onChange={(event) => setAISettings((current) => ({ ...current, translationPrompt: event.target.value }))} value={aiSettings.translationPrompt}/>
+                <LobeButton onClick={() => setAISettings((current) => ({ ...current, translationPrompt: current.defaultPrompts.translation }))} size="small" type="text">恢复默认</LobeButton>
+              </label>
+              <label>
+                <span><strong>分类 Prompt</strong><small>定义 Artist、Character、Clothing、Scene、Style 与 Unsorted 的边界</small></span>
+                <LobeTextArea autoSize={{ minRows: 6, maxRows: 14 }} onChange={(event) => setAISettings((current) => ({ ...current, classificationPrompt: event.target.value }))} value={aiSettings.classificationPrompt}/>
+                <LobeButton onClick={() => setAISettings((current) => ({ ...current, classificationPrompt: current.defaultPrompts.classification }))} size="small" type="text">恢复默认</LobeButton>
+              </label>
+              <small className="ai-prompt-contract">程序会固定附加 JSON 格式、数量和顺序约束。</small>
+            </div>,
+          }]}
+          variant="outlined"
+        />
         <div className="settings-actions"><LobeButton onClick={testConnection} disabled={Boolean(busy)}>测试连接</LobeButton><LobeButton type="primary" onClick={saveAI} disabled={Boolean(busy)}>{busy === 'save' ? '保存中…' : '保存 AI 设置'}</LobeButton></div>
         {!aiSettings.encryptionAvailable && <LobeAlert className="settings-warning" message="当前系统安全存储不可用，应用不会以明文保存 API Key。" type="warning" variant="outlined"/>}
       </>}

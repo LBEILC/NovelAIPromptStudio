@@ -1,8 +1,10 @@
 :root {
   color-scheme: dark;
-  font-family: "Geist", "HarmonyOS Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-ui: "Geist", "HarmonyOS Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "Geist Mono", "HarmonyOS Sans SC", "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+  font-size: 17px;
+  --font-sans: "Geist", "HarmonyOS Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-monospace: "Geist Mono", "HarmonyOS Sans SC", "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+  --font-ui: var(--font-sans);
+  --font-mono: var(--font-sans);
   --text-micro: .6875rem;
   --text-caption: .75rem;
   --text-secondary: .8125rem;
@@ -52,11 +54,10 @@ html[data-theme-mode="light"] {
 html[data-theme-mode="dark"] { color-scheme: dark; --ink: #0d0d0f; }
 html[data-theme-mode="light"], html[data-theme-mode="light"] body, html[data-theme-mode="light"] #root, html[data-theme-mode="light"] .lobe-root { background: var(--ink) !important; }
 html[data-theme-mode="dark"], html[data-theme-mode="dark"] body, html[data-theme-mode="dark"] #root, html[data-theme-mode="dark"] .lobe-root { background: #0d0d0f !important; }
-html[data-font-scale="default"] { font-size: 16px; }
-html[data-font-scale="large"] { font-size: 17px; }
-html[data-font-scale="larger"] { font-size: 18px; }
-html[data-platform="windows"] { --font-ui: "Geist", "HarmonyOS Sans SC", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif; }
-html[data-platform="macos"] { --font-ui: "Geist", "HarmonyOS Sans SC", "PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif; }
+html[data-platform="windows"] { --font-sans: "Geist", "HarmonyOS Sans SC", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif; --font-monospace: "Geist Mono", "HarmonyOS Sans SC", "Cascadia Mono", Consolas, monospace; }
+html[data-platform="macos"] { --font-sans: "Geist", "HarmonyOS Sans SC", "PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif; --font-monospace: "Geist Mono", "HarmonyOS Sans SC", "SFMono-Regular", Menlo, monospace; }
+html[data-font-family="sans"] { --font-ui: var(--font-sans); --font-mono: var(--font-sans); }
+html[data-font-family="mono"] { --font-ui: var(--font-monospace); --font-mono: var(--font-monospace); }
 
 * { box-sizing: border-box; }
 html, body, #root, .lobe-root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
@@ -271,6 +272,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .ai-settings-group > label { grid-template-columns: minmax(220px, .7fr) minmax(280px, 1fr); }
 .settings-model-input { display: flex; gap: 7px; }
 .settings-model-input > *:first-child { flex: 1; }
+.ai-advanced-settings { margin-top: 16px; }
+.ai-prompt-settings { display: grid; gap: 20px; }
+.ai-prompt-settings > label { display: grid; grid-template-columns: minmax(190px, .65fr) minmax(280px, 1fr) auto; align-items: start; gap: 12px; }
+.ai-prompt-settings strong, .ai-prompt-settings small { display: block; }
+.ai-prompt-settings label small, .ai-prompt-contract { margin-top: 4px; color: var(--muted); font-size: var(--text-secondary); }
+.ai-prompt-settings textarea { font: var(--text-caption)/1.6 var(--font-mono); }
+.ai-prompt-settings > label > button { align-self: start; }
+.ai-prompt-contract { padding-top: 12px; border-top: 1px solid var(--line-soft); }
 .settings-actions { margin-top: 18px; display: flex; justify-content: flex-end; gap: 8px; }
 .settings-warning { margin-top: 18px; }
 
@@ -286,6 +295,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .settings-page { grid-template-columns: 200px minmax(0, 1fr); }
   .settings-row, .ai-settings-group > label { grid-template-columns: 1fr; gap: 13px; }
   .settings-color-row > div { justify-content: flex-start; }
+  .ai-prompt-settings > label { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   html:not([data-motion="full"]) *, html:not([data-motion="full"]) *::before, html:not([data-motion="full"]) *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }

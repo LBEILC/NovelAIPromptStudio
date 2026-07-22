@@ -31,6 +31,8 @@ describe('OpenAI-compatible AI translation', () => {
       baseUrl: 'https://api.example.com/v1',
       apiKey: 'secret',
       model: 'translator-model',
+      translationPrompt: 'Use the studio translation glossary.',
+      classificationPrompt: 'Use the studio classification rules.',
     }, fetcher)).resolves.toEqual({
       model: 'translator-model',
       items: [
@@ -40,6 +42,10 @@ describe('OpenAI-compatible AI translation', () => {
       translations: ['银色头发', '电影感光照'],
       categories: ['Character', 'Style'],
     });
+    const systemPrompt = JSON.parse(fetcher.mock.calls[0][1].body).messages[0].content;
+    expect(systemPrompt).toContain('Use the studio translation glossary.');
+    expect(systemPrompt).toContain('Use the studio classification rules.');
+    expect(systemPrompt).toContain('Return only valid JSON');
   });
 
   it('automatically translates more than 50 tags in ordered batches', async () => {
