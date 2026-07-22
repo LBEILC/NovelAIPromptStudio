@@ -63,6 +63,43 @@ function tagPresentation(tag, language) {
   };
 }
 
+function WeightEditor({ value, onCommit }) {
+  const parsedValue = Number(value);
+  const normalizedValue = Number.isFinite(parsedValue) ? parsedValue : 1;
+  const [draft, setDraft] = useState(normalizedValue);
+
+  useEffect(() => setDraft(normalizedValue), [normalizedValue]);
+
+  const commit = (nextValue = draft) => {
+    const numericValue = Number(nextValue);
+    if (!Number.isFinite(numericValue) || numericValue === normalizedValue) return;
+    onCommit(numericValue);
+  };
+
+  return <div
+    className="tag-weight-editor"
+    onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) commit();
+    }}
+    onKeyDown={(event) => {
+      if (event.key === 'Enter') commit();
+    }}
+  >
+    <LobeSliderWithInput
+      controls={false}
+      gap={8}
+      max={10}
+      min={-10}
+      onChange={(weight) => setDraft(Number(weight))}
+      onChangeComplete={(weight) => commit(weight)}
+      size="small"
+      step={0.05}
+      styles={{ input: { flex: '0 0 68px', maxWidth: 68, minWidth: 68 }, slider: { minWidth: 0 } }}
+      value={draft}
+    />
+  </div>;
+}
+
 function TagQuickEditor({ tag, translating, onChange, onClose, onTranslate }) {
   return <div className="tag-quick-editor" onClick={(event) => event.stopPropagation()}>
     <div className="tag-quick-editor-heading">
@@ -73,7 +110,7 @@ function TagQuickEditor({ tag, translating, onChange, onClose, onTranslate }) {
     <label><span>翻译</span><LobeInput onChange={(event) => onChange({ translation: event.target.value, translation_source: 'manual' })} placeholder="添加中文翻译" size="small" value={tag.translation || ''}/></label>
     <div className="tag-quick-editor-row">
       <label><span>分类</span><LobeSelect onChange={(category) => onChange({ category, category_source: 'manual' })} options={CATEGORY_OPTIONS.map((value) => ({ label: CATEGORY_LABELS[value], value }))} size="small" value={tag.category || 'Unsorted'}/></label>
-      <label><span>权重</span><LobeSliderWithInput controls={false} gap={6} max={10} min={-10} onChange={(weight) => onChange({ weight: Number(weight) })} size="small" step={0.05} value={Number(tag.weight)}/></label>
+      <label><span>权重</span><WeightEditor onCommit={(weight) => onChange({ weight })} value={tag.weight}/></label>
     </div>
     <div className="tag-quick-editor-footer">
       <LobeButton disabled={translating} icon={<Icon name="spark" size={14}/>} onClick={onTranslate} size="small">{translating ? '翻译中…' : 'AI 翻译'}</LobeButton>

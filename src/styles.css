@@ -217,6 +217,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .tag-quick-editor-heading > div, .tag-quick-editor label { display: grid; gap: 4px; }
 .tag-quick-editor-heading small, .tag-quick-editor label > span, .character-quick-editor > label > span { color: var(--muted); font-size: var(--text-caption); }
 .tag-quick-editor-row { display: grid; grid-template-columns: 124px minmax(0, 1fr); gap: 10px; }
+.tag-weight-editor { min-width: 0; }
 .tag-quick-editor-footer, .character-quick-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .add-tag-popover-shell { width: min(420px, calc(100vw - 32px)); }
 .add-tag-popover { width: 390px; max-width: 100%; padding: 4px; display: grid; gap: 12px; }
