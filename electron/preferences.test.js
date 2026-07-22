@@ -77,4 +77,21 @@ describe('AI preferences', () => {
 
     expect(openPreferences(directory, safeStorage).appearanceSettings()).toMatchObject({ sansFont: 'HarmonyOS Sans SC', monoFont: 'monospace' });
   });
+
+  it('stores an absolute custom asset directory without moving the preferences database', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
+    temporaryDirectories.push(directory);
+    const defaultAssetsDirectory = path.join(directory, 'default-assets');
+    const customAssetsDirectory = path.join(directory, 'library on another drive');
+    const preferences = openPreferences(directory, safeStorage, { defaultAssetsDirectory });
+
+    expect(preferences.librarySettings()).toEqual({ assetsDirectory: defaultAssetsDirectory, defaultAssetsDirectory, isDefault: true });
+    expect(preferences.saveLibrarySettings({ assetsDirectory: customAssetsDirectory })).toEqual({
+      assetsDirectory: customAssetsDirectory,
+      defaultAssetsDirectory,
+      isDefault: false,
+    });
+    expect(JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'))).toMatchObject({ library: { assetsDirectory: customAssetsDirectory } });
+    expect(() => preferences.saveLibrarySettings({ assetsDirectory: 'relative/assets' })).toThrow('绝对路径');
+  });
 });

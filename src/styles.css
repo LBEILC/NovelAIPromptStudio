@@ -20,10 +20,14 @@
   --accent: #3b82f6;
   --danger: #df7e79;
   --warning: #d6a85f;
-  --category-artist: #c97f9d;
-  --category-character: #64b5c7;
+  --category-artist-era: #c97f9d;
+  --category-subject: #64b5c7;
+  --category-identity: #7d9ed1;
+  --category-body: #62a9a5;
   --category-clothing: #9b8bc7;
-  --category-scene: #72aa8d;
+  --category-action: #d38a72;
+  --category-environment: #72aa8d;
+  --category-composition: #c59a67;
   --category-style: #c6a15b;
   --category-unsorted: #737d8a;
 }
@@ -42,10 +46,14 @@ html[data-theme-mode="light"] {
   --accent: #2563d9;
   --danger: #b54d4a;
   --warning: #9b6a1d;
-  --category-artist: #a84f78;
-  --category-character: #287d91;
+  --category-artist-era: #a84f78;
+  --category-subject: #287d91;
+  --category-identity: #4d6fa5;
+  --category-body: #357f7a;
   --category-clothing: #6f5ca7;
-  --category-scene: #3e8061;
+  --category-action: #a85c43;
+  --category-environment: #3e8061;
+  --category-composition: #8d6334;
   --category-style: #8a641e;
   --category-unsorted: #6c7785;
 }
@@ -211,7 +219,7 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .overview-add-character { width: calc(100% - 60px); display: flex; align-items: center; gap: 12px; text-align: start; }
 .overview-add-character strong, .overview-add-character small { display: block; }
 .overview-no-results { display: grid; place-content: center; text-align: center; }
-.cat-artist { --tag-color: var(--category-artist); }.cat-character { --tag-color: var(--category-character); }.cat-clothing { --tag-color: var(--category-clothing); }.cat-scene { --tag-color: var(--category-scene); }.cat-style { --tag-color: var(--category-style); }.cat-unsorted { --tag-color: var(--category-unsorted); }
+.cat-artistera { --tag-color: var(--category-artist-era); }.cat-subject { --tag-color: var(--category-subject); }.cat-identity { --tag-color: var(--category-identity); }.cat-body { --tag-color: var(--category-body); }.cat-clothing { --tag-color: var(--category-clothing); }.cat-action { --tag-color: var(--category-action); }.cat-environment { --tag-color: var(--category-environment); }.cat-composition { --tag-color: var(--category-composition); }.cat-stylequality { --tag-color: var(--category-style); }.cat-unsorted { --tag-color: var(--category-unsorted); }
 .selection-mark { width: 18px; height: 18px; flex: 0 0 auto; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
 .selection-mark.checked { color: white; background: var(--accent); border-color: var(--accent); }
 
@@ -267,6 +275,9 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .settings-row strong, .settings-row small, .ai-settings-group strong, .ai-settings-group small { display: block; }
 .settings-row small, .ai-settings-group small { margin-top: 5px; color: var(--muted); font-size: var(--text-secondary); }
 .settings-font-select { width: 260px; }
+.settings-storage-copy { min-width: 0; }
+.settings-storage-path { max-width: min(470px, 55vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+.settings-storage-actions { display: flex; gap: 8px; }
 .font-option { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 16px; }
 .font-option > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .font-option small { color: var(--muted); font: inherit; font-size: var(--text-caption); white-space: nowrap; }
@@ -297,6 +308,8 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
   .settings-page { grid-template-columns: 200px minmax(0, 1fr); }
   .settings-row, .ai-settings-group > label { grid-template-columns: 1fr; gap: 13px; }
   .settings-font-select { width: 100%; }
+  .settings-storage-path { max-width: 100%; }
+  .settings-storage-actions { justify-content: flex-start; }
   .settings-color-row > div { justify-content: flex-start; }
   .ai-prompt-settings > label { grid-template-columns: 1fr; }
 }

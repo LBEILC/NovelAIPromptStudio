@@ -2,6 +2,14 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('studio', {
   loadLibrary: () => ipcRenderer.invoke('library:load'),
+  getLibraryStorage: () => ipcRenderer.invoke('library:storage:get'),
+  changeLibraryStorage: () => ipcRenderer.invoke('library:storage:change'),
+  revealLibraryStorage: () => ipcRenderer.invoke('library:storage:reveal'),
+  onLibraryStorageProgress: (callback) => {
+    ipcRenderer.removeAllListeners('library:storage-progress');
+    ipcRenderer.on('library:storage-progress', (_event, progress) => callback(progress));
+  },
+  offLibraryStorageProgress: () => ipcRenderer.removeAllListeners('library:storage-progress'),
   openWorkbenchImage: (filePath = '') => ipcRenderer.invoke('workbench:image:open', { filePath }),
   openDroppedWorkbenchImage: (files) => ipcRenderer.invoke('workbench:image:open', {
     filePath: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean)[0] || '',

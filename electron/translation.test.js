@@ -25,7 +25,7 @@ describe('OpenAI-compatible AI translation', () => {
 
   it('translates and classifies tags while tolerating fenced JSON model output', async () => {
     const fetcher = vi.fn(async () => jsonResponse({
-      choices: [{ message: { content: '```json\n{"items":[{"translation":"银色头发","category":"Character"},{"translation":"电影感光照","category":"Style"}]}\n```' } }],
+      choices: [{ message: { content: '```json\n{"items":[{"translation":"银色头发","category":"Body"},{"translation":"电影感光照","category":"Composition"}]}\n```' } }],
     }));
     await expect(translateTags(['silver hair', 'cinematic lighting'], {
       baseUrl: 'https://api.example.com/v1',
@@ -36,11 +36,11 @@ describe('OpenAI-compatible AI translation', () => {
     }, fetcher)).resolves.toEqual({
       model: 'translator-model',
       items: [
-        { translation: '银色头发', category: 'Character' },
-        { translation: '电影感光照', category: 'Style' },
+        { translation: '银色头发', category: 'Body' },
+        { translation: '电影感光照', category: 'Composition' },
       ],
       translations: ['银色头发', '电影感光照'],
-      categories: ['Character', 'Style'],
+      categories: ['Body', 'Composition'],
     });
     const systemPrompt = JSON.parse(fetcher.mock.calls[0][1].body).messages[0].content;
     expect(systemPrompt).toContain('Use the studio translation glossary.');

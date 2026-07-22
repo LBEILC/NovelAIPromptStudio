@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import initSqlJs from 'sql.js';
-import { inferCategory } from '../src/lib/prompt.js';
+import { CATEGORY_OPTIONS, normalizeCategory } from '../src/lib/prompt.js';
 
 const require = createRequire(import.meta.url);
-const TAG_CATEGORIES = new Set(['Artist', 'Character', 'Clothing', 'Scene', 'Style', 'Unsorted']);
+const TAG_CATEGORIES = new Set(CATEGORY_OPTIONS);
 
 const CORE_SCHEMA = `
 PRAGMA foreign_keys = ON;
@@ -159,7 +159,7 @@ export async function openDatabase(dataDirectory) {
       const key = dictionaryKey(tag);
       if (!key || found.has(key)) continue;
       const row = query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0];
-      if (row) found.set(key, row);
+      if (row) found.set(key, { ...row, category: normalizeCategory(row.category, tag) });
     }
     return found;
   };
@@ -171,7 +171,7 @@ export async function openDatabase(dataDirectory) {
       if (!key) continue;
       const current = query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0] || {};
       const incomingTranslation = String(entry.translation || '').trim();
-      const incomingCategory = TAG_CATEGORIES.has(entry.category) ? entry.category : 'Unsorted';
+      const incomingCategory = normalizeCategory(entry.category, entry.tag);
       const incomingTranslationSource = String(entry.translation_source || (entry.has_translation ? 'ai' : ''));
       const incomingCategorySource = String(entry.category_source || (entry.has_classification ? 'ai' : ''));
       const hasIncomingTranslation = entry.has_translation ?? Boolean(incomingTranslation);
@@ -179,7 +179,7 @@ export async function openDatabase(dataDirectory) {
       const replaceTranslation = hasIncomingTranslation && (!current.has_translation || knowledgePriority(incomingTranslationSource) >= knowledgePriority(current.translation_source));
       const replaceClassification = hasIncomingClassification && (!current.has_classification || knowledgePriority(incomingCategorySource) >= knowledgePriority(current.category_source));
       const translation = replaceTranslation ? incomingTranslation : String(current.translation || '');
-      const category = replaceClassification ? incomingCategory : (TAG_CATEGORIES.has(current.category) ? current.category : 'Unsorted');
+      const category = replaceClassification ? incomingCategory : normalizeCategory(current.category, entry.tag);
       const hasTranslation = Boolean(current.has_translation || hasIncomingTranslation);
       const hasClassification = Boolean(current.has_classification || hasIncomingClassification);
       if (!hasTranslation && !hasClassification) continue;
@@ -210,8 +210,8 @@ export async function openDatabase(dataDirectory) {
     if (!key) throw new Error('Tag 不能为空');
     const current = query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0] || {};
     const translation = patch.translation === undefined ? String(current.translation || '') : String(patch.translation || '').trim();
-    const category = patch.category === undefined ? String(current.category || 'Unsorted') : String(patch.category || 'Unsorted');
-    if (!TAG_CATEGORIES.has(category)) throw new Error('Tag 分类无效');
+    const category = patch.category === undefined ? normalizeCategory(current.category, tag) : String(patch.category || 'Unsorted');
+    if (patch.category !== undefined && !TAG_CATEGORIES.has(category)) throw new Error('Tag 分类无效');
     if (translation.length > 240) throw new Error('Tag 翻译不能超过 240 个字符');
     database.run(
       `INSERT INTO tag_dictionary (tag, display_tag, translation, category, has_translation, has_classification, translation_source, category_source, updated_at)
@@ -239,13 +239,13 @@ export async function openDatabase(dataDirectory) {
     const cached = lookupTagDictionary(projectTags(project).map((tag) => tag.tag));
     const enrich = (tag) => {
       const entry = cached.get(dictionaryKey(tag.tag));
-      const inferred = inferCategory(tag.tag);
-      const migrated = inferred === 'Artist' && tag.category === 'Style' ? { ...tag, category: 'Artist', category_source: 'heuristic' } : tag;
+      const category = normalizeCategory(tag.category, tag.tag);
+      const migrated = category === tag.category ? tag : { ...tag, category, category_source: tag.category_source || 'migration' };
       if (!entry) return migrated;
       return {
         ...migrated,
         ...(entry.has_translation ? { translation: entry.translation, translation_source: entry.translation_source || 'cache' } : {}),
-        ...(entry.has_classification ? { category: entry.category, category_source: entry.category_source || 'cache' } : {}),
+        ...(entry.has_classification ? { category: normalizeCategory(entry.category, tag.tag), category_source: entry.category_source || 'cache' } : {}),
       };
     };
     const structure = project.prompt_structure || {};
@@ -303,7 +303,7 @@ export async function openDatabase(dataDirectory) {
             $project_id: project.id,
             $tag: String(tag.tag || ''),
             $translation: String(tag.translation || ''),
-            $category: TAG_CATEGORIES.has(tag.category) ? tag.category : 'Unsorted',
+            $category: normalizeCategory(tag.category, tag.tag),
             $weight: Number(tag.weight ?? 1),
             $position: position,
             $raw_segment: String(tag.raw_segment || ''),
@@ -372,6 +372,36 @@ export async function openDatabase(dataDirectory) {
       persist();
     } catch (error) { database.run('ROLLBACK'); throw error; }
   };
+  const relocateAssetPaths = (sourceDirectory, targetDirectory) => {
+    const source = path.resolve(String(sourceDirectory || ''));
+    const target = path.resolve(String(targetDirectory || ''));
+    const relocate = (filePath) => {
+      const absolutePath = path.resolve(String(filePath || ''));
+      const relative = path.relative(source, absolutePath);
+      if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return String(filePath || '');
+      return path.join(target, relative);
+    };
+    let updated = 0;
+    database.run('BEGIN');
+    try {
+      for (const project of query('SELECT id, image_path, thumbnail_path FROM projects')) {
+        const imagePath = relocate(project.image_path);
+        const thumbnailPath = relocate(project.thumbnail_path);
+        if (imagePath === project.image_path && thumbnailPath === project.thumbnail_path) continue;
+        database.run(
+          'UPDATE projects SET image_path = $image_path, thumbnail_path = $thumbnail_path WHERE id = $id',
+          { $id: project.id, $image_path: imagePath, $thumbnail_path: thumbnailPath },
+        );
+        updated += 1;
+      }
+      database.run('COMMIT');
+      persist();
+      return updated;
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+  };
   const deleteProject = (id) => {
     database.run('DELETE FROM projects WHERE id = $id', { $id: String(id || '') });
     persist();
@@ -386,6 +416,7 @@ export async function openDatabase(dataDirectory) {
     projectDimensionCandidates,
     setProjectContentHashes,
     setProjectDimensions,
+    relocateAssetPaths,
     lookupTagDictionary,
     upsertTagDictionary,
     updateTagDictionary,

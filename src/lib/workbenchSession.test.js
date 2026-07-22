@@ -7,7 +7,7 @@ function fixture() {
     name: 'source',
     image_path: 'C:\\images\\source.png',
     metadata: { prompt_raw: '1girl', negative_prompt: '' },
-    tags: [{ id: 'tag-1', tag: '1girl', weight: 1, category: 'Character' }],
+    tags: [{ id: 'tag-1', tag: '1girl', weight: 1, category: 'Subject' }],
     prompt_structure: { base_undesired_tags: [], characters: [], use_coords: false, use_order: true },
     vibes: [],
   };
@@ -32,4 +32,3 @@ describe('workbench session', () => {
     expect(workbenchHasChanges(session)).toBe(true);
   });
 });
-

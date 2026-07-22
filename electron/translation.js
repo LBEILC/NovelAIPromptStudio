@@ -1,6 +1,8 @@
+import { CATEGORY_OPTIONS, normalizeCategory } from '../src/lib/prompt.js';
+
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_TRANSLATION_PROMPT = 'Translate every NovelAI Diffusion prompt tag into concise Simplified Chinese. Preserve anatomy, clothing, camera terminology, character names, and artist names. Do not add explanations.';
-const DEFAULT_CLASSIFICATION_PROMPT = 'Classify every tag as exactly one of Artist, Character, Clothing, Scene, Style, or Unsorted. Artist is only for artist attribution or artist-name tags. Character covers identity, anatomy, expression, and pose. Clothing covers apparel and accessories. Scene covers environments and backgrounds. Style covers visual style, quality, camera, lighting, and rendering terms, but never artist attribution.';
+const DEFAULT_CLASSIFICATION_PROMPT = 'Classify every tag as exactly one of ArtistEra, Subject, Identity, Body, Clothing, Action, Environment, Composition, StyleQuality, or Unsorted. ArtistEra covers artist attribution and year or era tags. Subject covers character count and gender. Identity covers character identity, species, role, and archetype. Body covers appearance, anatomy, hair, eyes, and physical traits. Clothing covers apparel and accessories. Action covers pose, movement, gaze, and expression. Environment covers locations, background, weather, and scene objects. Composition covers framing, camera angle, perspective, focus, and lighting. StyleQuality covers visual style, medium, rendering, quality, and artifact terms. Use Unsorted only when none applies.';
 
 function normalizeBaseUrl(value) {
   const candidate = String(value || DEFAULT_BASE_URL).trim().replace(/\/+$/, '');
@@ -97,7 +99,6 @@ export async function testModel(settings, fetcher = globalThis.fetch) {
   return { model, latencyMs: Date.now() - startedAt, response: chatContent(body) };
 }
 
-const TAG_CATEGORIES = new Set(['Artist', 'Character', 'Clothing', 'Scene', 'Style', 'Unsorted']);
 const TAG_TRANSLATION_BATCH_SIZE = 50;
 
 function parseTranslationJson(content, expectedLength) {
@@ -121,7 +122,7 @@ function parseTranslationJson(content, expectedLength) {
   }
   const cleaned = rawItems.map((item) => ({
     translation: String(item?.translation || '').trim(),
-    category: TAG_CATEGORIES.has(item?.category) ? item.category : 'Unsorted',
+    category: CATEGORY_OPTIONS.includes(item?.category) ? item.category : normalizeCategory(item?.category),
   }));
   if (cleaned.some((item) => !item.translation)) throw new Error('模型返回了空译文');
   return cleaned;
@@ -140,7 +141,7 @@ async function translateTagBatch(cleaned, baseUrl, model, settings, fetcher) {
           'You translate and classify NovelAI Diffusion prompt tags.',
           translationPrompt,
           classificationPrompt,
-          'Do not add explanations. Return only valid JSON in this exact shape: {"items":[{"translation":"译文","category":"Character"}]}.',
+          'Do not add explanations. Return only valid JSON in this exact shape: {"items":[{"translation":"译文","category":"Subject"}]}.',
           'Keep the array length and order identical to the input tags.',
         ].join(' '),
       },

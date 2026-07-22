@@ -26,8 +26,19 @@ function normalizeFontFamily(value, fallback, strict = false) {
   return candidate;
 }
 
-export function openPreferences(dataDirectory, safeStorage) {
+function normalizeAssetsDirectory(value, fallback, strict = false) {
+  const candidate = String(value || '').trim();
+  if (!candidate) return fallback;
+  if (candidate.length > 4096 || candidate.includes('\u0000') || !path.isAbsolute(candidate)) {
+    if (strict) throw new Error('资源库位置必须是有效的绝对路径');
+    return fallback;
+  }
+  return path.resolve(candidate);
+}
+
+export function openPreferences(dataDirectory, safeStorage, options = {}) {
   const filePath = path.join(dataDirectory, 'preferences.json');
+  const defaultAssetsDirectory = path.resolve(options.defaultAssetsDirectory || path.join(dataDirectory, '..', 'assets'));
 
   const read = () => {
     try {
@@ -119,5 +130,20 @@ export function openPreferences(dataDirectory, safeStorage) {
     return publicSettings();
   };
 
-  return { publicSettings, credentials, saveAISettings, appearanceSettings, saveAppearanceSettings, filePath };
+  const librarySettings = () => {
+    const stored = read().library || {};
+    const assetsDirectory = normalizeAssetsDirectory(stored.assetsDirectory, defaultAssetsDirectory);
+    return { assetsDirectory, defaultAssetsDirectory, isDefault: assetsDirectory === defaultAssetsDirectory };
+  };
+
+  const saveLibrarySettings = ({ assetsDirectory } = {}) => {
+    const nextDirectory = normalizeAssetsDirectory(assetsDirectory, defaultAssetsDirectory, true);
+    const stored = read();
+    if (nextDirectory === defaultAssetsDirectory) delete stored.library;
+    else stored.library = { assetsDirectory: nextDirectory };
+    write(stored);
+    return librarySettings();
+  };
+
+  return { publicSettings, credentials, saveAISettings, appearanceSettings, saveAppearanceSettings, librarySettings, saveLibrarySettings, filePath };
 }

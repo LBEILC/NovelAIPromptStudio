@@ -1,4 +1,4 @@
-import { formatPrompt, formatPromptGroupedInline, formatPromptInline, parsePrompt, repairLegacyPromptTags } from './prompt.js';
+import { formatPrompt, formatPromptGroupedInline, formatPromptInline, normalizeCategory, parsePrompt, repairLegacyPromptTags } from './prompt.js';
 
 const createId = () => crypto.randomUUID();
 
@@ -69,7 +69,7 @@ function normalizeTag(tag, idFactory) {
     id: tag?.id || idFactory(),
     tag: String(tag?.tag || ''),
     translation: String(tag?.translation || ''),
-    category: tag?.category || 'Unsorted',
+    category: normalizeCategory(tag?.category, tag?.tag),
     weight: Number.isFinite(Number(tag?.weight)) ? Number(tag.weight) : 1,
     brace_depth: Math.max(0, Math.trunc(Number(tag?.brace_depth) || 0)),
     brace_group: String(tag?.brace_group || ''),
@@ -216,8 +216,10 @@ export function formatPositivePromptForCopy(project) {
 
 export function syncProjectPromptMetadata(project) {
   const structure = normalizePromptStructure(project.prompt_structure, project.metadata);
+  const tags = (project.tags || []).map((tag) => ({ ...tag, category: normalizeCategory(tag.category, tag.tag) }));
   return {
     ...project,
+    tags,
     prompt_structure: structure,
     metadata: {
       ...project.metadata,

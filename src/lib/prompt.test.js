@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { analyzePromptBatch, expandSearch, formatPrompt, formatPromptGroupedInline, formatPromptInline, formatTag, inferCategory, parsePrompt, parsePromptPreservingEdits, repairLegacyPromptTags } from './prompt.js';
+import { analyzePromptBatch, expandSearch, formatPrompt, formatPromptGroupedInline, formatPromptInline, formatTag, inferCategory, normalizeCategory, parsePrompt, parsePromptPreservingEdits, repairLegacyPromptTags } from './prompt.js';
 
 describe('NovelAI prompt codec', () => {
   it('parses numeric weights and exports the same NovelAI syntax', () => {
     let id = 0;
     const tags = parsePrompt('1girl, 1.3::silver hair ::, futuristic city', () => `tag-${id++}`);
     expect(tags).toHaveLength(3);
-    expect(tags[1]).toMatchObject({ tag: 'silver hair', weight: 1.3, translation: '银色头发', category: 'Character' });
+    expect(tags[1]).toMatchObject({ tag: 'silver hair', weight: 1.3, translation: '银色头发', category: 'Body' });
     expect(formatPrompt(tags)).toBe('1girl,\n1.3::silver hair ::,\nfuturistic city');
     expect(formatPromptInline(tags)).toBe('1girl, 1.3::silver hair ::, futuristic city');
   });
@@ -21,8 +21,8 @@ describe('NovelAI prompt codec', () => {
       { tag: 'thick lineart', weight: 1.3 },
       { tag: 'censored', weight: -2 },
     ]);
-    expect(tags[1]).toMatchObject({ translation: 'Q版', category: 'Style' });
-    expect(tags[0].category).toBe('Character');
+    expect(tags[1]).toMatchObject({ translation: 'Q版', category: 'StyleQuality' });
+    expect(tags[0].category).toBe('Subject');
   });
 
   it('repairs tags created by the legacy comma splitter without losing edits', () => {
@@ -39,7 +39,7 @@ describe('NovelAI prompt codec', () => {
       { tag: 'chibi only', weight: 1.3 },
       { tag: 'thick lineart', weight: 1.3 },
     ]);
-    expect(repaired[0]).toMatchObject({ id: 'girl', translation: '自定义女孩', note: '保留备注', category: 'Character' });
+    expect(repaired[0]).toMatchObject({ id: 'girl', translation: '自定义女孩', note: '保留备注', category: 'Subject' });
   });
 
   it('reparses raw prompt text while preserving metadata for unchanged tags', () => {
@@ -155,11 +155,29 @@ describe('NovelAI prompt codec', () => {
   });
 
   it('classifies common prompt concepts', () => {
-    expect(inferCategory('artist:ciloranko')).toBe('Artist');
-    expect(inferCategory('artist_shion')).toBe('Artist');
+    expect(inferCategory('artist:ciloranko')).toBe('ArtistEra');
+    expect(inferCategory('artist_shion')).toBe('ArtistEra');
+    expect(inferCategory('year 2025')).toBe('ArtistEra');
+    expect(inferCategory('2girls')).toBe('Subject');
+    expect(inferCategory('elf')).toBe('Identity');
+    expect(inferCategory('silver hair')).toBe('Body');
     expect(inferCategory('black military uniform')).toBe('Clothing');
-    expect(inferCategory('cinematic lighting')).toBe('Style');
-    expect(inferCategory('rainy city street')).toBe('Scene');
+    expect(inferCategory('smile')).toBe('Action');
+    expect(inferCategory('hand up')).toBe('Action');
+    expect(inferCategory('upper body')).toBe('Composition');
+    expect(inferCategory('cinematic lighting')).toBe('Composition');
+    expect(inferCategory('rainy city street')).toBe('Environment');
+    expect(inferCategory('best quality')).toBe('StyleQuality');
+  });
+
+  it('maps legacy categories into the expanded taxonomy', () => {
+    expect(normalizeCategory('Artist', 'artist:foo')).toBe('ArtistEra');
+    expect(normalizeCategory('Character', '2girls')).toBe('Subject');
+    expect(normalizeCategory('Character', 'silver hair')).toBe('Body');
+    expect(normalizeCategory('Character', 'gawr gura')).toBe('Identity');
+    expect(normalizeCategory('Scene', 'beach')).toBe('Environment');
+    expect(normalizeCategory('Style', 'cinematic lighting')).toBe('Composition');
+    expect(normalizeCategory('Style', 'best quality')).toBe('StyleQuality');
   });
 
   it('expands common Chinese search aliases', () => {

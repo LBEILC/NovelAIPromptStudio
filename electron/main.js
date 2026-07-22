@@ -10,6 +10,7 @@ import { listModels, testModel, translateTags } from './translation.js';
 import { exportEmbeddedVibeFile } from './vibes.js';
 import { readWorkbenchImage } from './workbench.js';
 import { listSystemFonts } from './fonts.js';
+import { describeAssetDirectory, migrateAssetDirectory } from './libraryStorage.js';
 
 app.setName('NovelAI Prompt Studio');
 if (process.platform === 'win32') app.setAppUserModelId('studio.novelai.prompt');
@@ -19,6 +20,7 @@ let database;
 let assetsDirectory;
 let preferences;
 let contentBackfill = Promise.resolve();
+let storageMigrationActive = false;
 const activeImports = new Map();
 const appIconPath = path.join(import.meta.dirname, '..', 'build', 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 
@@ -54,7 +56,7 @@ app.whenReady().then(async () => {
   if (process.platform === 'win32') Menu.setApplicationMenu(null);
   if (process.platform === 'darwin' && app.dock) app.dock.setIcon(appIconPath);
   const dataDirectory = path.join(app.getPath('userData'), 'data');
-  assetsDirectory = path.join(app.getPath('userData'), 'assets');
+  const defaultAssetsDirectory = path.join(app.getPath('userData'), 'assets');
   try {
     database = await openDatabase(dataDirectory);
   } catch (error) {
@@ -65,7 +67,13 @@ app.whenReady().then(async () => {
     app.quit();
     return;
   }
-  preferences = openPreferences(dataDirectory, safeStorage);
+  preferences = openPreferences(dataDirectory, safeStorage, { defaultAssetsDirectory });
+  assetsDirectory = preferences.librarySettings().assetsDirectory;
+  try {
+    fs.mkdirSync(assetsDirectory, { recursive: true });
+  } catch (error) {
+    dialog.showErrorBox('资源库位置不可用', `无法访问：${assetsDirectory}\n\n请检查磁盘或文件夹权限，然后在设置中更改位置。\n\n${error instanceof Error ? error.message : String(error)}`);
+  }
   contentBackfill = Promise.all([
     backfillProjectContentHashes(database).catch((error) => console.error('Unable to backfill image fingerprints', error)),
     backfillProjectDimensions(database).catch((error) => console.error('Unable to backfill image dimensions', error)),
@@ -78,6 +86,76 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('library:load', async () => { await contentBackfill; return database.loadLibrary(); });
+  ipcMain.handle('library:storage:get', async () => {
+    try {
+      const details = await describeAssetDirectory(assetsDirectory);
+      return { ok: true, ...details, ...preferences.librarySettings() };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('library:storage:reveal', async () => {
+    try {
+      fs.mkdirSync(assetsDirectory, { recursive: true });
+      const error = await shell.openPath(assetsDirectory);
+      return error ? { ok: false, error } : { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('library:storage:change', async (event) => {
+    if (storageMigrationActive) return { ok: false, error: '资源库正在迁移，请稍候' };
+    if (activeImports.size) return { ok: false, error: '请等待当前图片导入完成后再更改资源库位置' };
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const selection = await dialog.showOpenDialog(owner, {
+      title: '选择新的资源库位置',
+      defaultPath: path.dirname(assetsDirectory),
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (selection.canceled || !selection.filePaths[0]) return { ok: true, canceled: true };
+    const targetDirectory = path.resolve(selection.filePaths[0]);
+    if (targetDirectory === path.resolve(assetsDirectory)) return { ok: true, canceled: true, noChange: true };
+    try {
+      const current = await describeAssetDirectory(assetsDirectory);
+      const size = current.totalBytes < 1024 * 1024
+        ? `${Math.max(0.1, current.totalBytes / 1024).toFixed(1)} KB`
+        : `${(current.totalBytes / 1024 / 1024).toFixed(1)} MB`;
+      const confirmation = await dialog.showMessageBox(owner, {
+        type: 'question',
+        title: '更改资源库位置',
+        message: `移动 ${current.fileCount} 个资源文件（${size}）并切换到新位置？`,
+        detail: `当前位置：${assetsDirectory}\n新位置：${targetDirectory}\n\n迁移完成前不会删除旧资源。`,
+        buttons: ['移动并切换', '取消'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      });
+      if (confirmation.response !== 0) return { ok: true, canceled: true };
+
+      storageMigrationActive = true;
+      const previousDirectory = assetsDirectory;
+      const result = await migrateAssetDirectory({
+        sourceDirectory: previousDirectory,
+        targetDirectory,
+        onProgress: (progress) => { if (!event.sender.isDestroyed()) event.sender.send('library:storage-progress', progress); },
+        commit: async ({ sourceDirectory, targetDirectory: nextDirectory }) => {
+          database.relocateAssetPaths(sourceDirectory, nextDirectory);
+          try {
+            preferences.saveLibrarySettings({ assetsDirectory: nextDirectory });
+          } catch (error) {
+            database.relocateAssetPaths(nextDirectory, sourceDirectory);
+            throw error;
+          }
+          assetsDirectory = nextDirectory;
+        },
+      });
+      return { ok: true, ...result, ...preferences.librarySettings() };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      storageMigrationActive = false;
+    }
+  });
   ipcMain.handle('workbench:image:open', async (_event, request = {}) => {
     let filePath = String(request.filePath || '');
     if (request.fromDrop && !filePath) return { ok: false, project: null, error: '无法读取拖入文件的本地路径' };
@@ -97,6 +175,7 @@ app.whenReady().then(async () => {
     }
   });
   ipcMain.handle('library:import-images', async (event, request = {}) => {
+    if (storageMigrationActive) return { ok: false, imported: [], duplicates: [], errors: [], error: '资源库正在迁移，请稍候' };
     await contentBackfill;
     let filePaths = Array.isArray(request.filePaths) ? request.filePaths : [];
     if (!filePaths.length) {

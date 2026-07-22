@@ -57,7 +57,7 @@ describe('NovelAI V4 prompt structure', () => {
       },
     };
     const project = {
-      tags: [{ id: 'base', tag: '2girls', translation: '', category: 'Character', weight: 1, note: '' }],
+      tags: [{ id: 'base', tag: '2girls', translation: '', category: 'Subject', weight: 1, note: '' }],
       metadata,
       prompt_structure: createPromptStructure(metadata, idFactory),
     };

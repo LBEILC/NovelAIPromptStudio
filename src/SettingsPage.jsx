@@ -20,6 +20,13 @@ const PRIMARY_COLOR_OPTIONS = [
 ].map(([key, title]) => ({ color: primaryColors[key], key, title }));
 
 const fontLabel = (family) => family === 'system-ui' ? '系统界面字体' : family === 'monospace' ? '系统等宽字体' : family;
+const formatBytes = (bytes) => {
+  const value = Math.max(0, Number(bytes) || 0);
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  if (value < 1024 * 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
+  return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
+};
 
 function FontOption({ family, role }) {
   return <span className="font-option" style={{ fontFamily: fontStack(family, role) }}>
@@ -28,7 +35,7 @@ function FontOption({ family, role }) {
   </span>;
 }
 
-export default function SettingsPage({ appearance, onAppearanceChange, onClose, showToast, studio }) {
+export default function SettingsPage({ appearance, onAppearanceChange, onClose, onLibraryChange, showToast, studio }) {
   const [section, setSection] = useState('appearance');
   const [aiSettings, setAISettings] = useState({
     baseUrl: 'https://api.openai.com/v1',
@@ -43,9 +50,29 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
   const [models, setModels] = useState([]);
   const [busy, setBusy] = useState('');
   const [systemFonts, setSystemFonts] = useState({ fonts: [], loading: true, error: '' });
+  const [libraryStorage, setLibraryStorage] = useState({ assetsDirectory: '', fileCount: 0, totalBytes: 0, loading: true, migrating: false, progress: null });
 
   useEffect(() => {
     studio.getAISettings().then((settings) => setAISettings((current) => ({ ...current, ...settings, apiKey: '' }))).catch(() => {});
+  }, [studio]);
+
+  useEffect(() => {
+    let active = true;
+    studio.getLibraryStorage().then((result) => {
+      if (!active) return;
+      setLibraryStorage((current) => result?.ok
+        ? { ...current, ...result, loading: false }
+        : { ...current, loading: false, error: result?.error || '无法读取资源库位置' });
+    }).catch((error) => {
+      if (active) setLibraryStorage((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : String(error) }));
+    });
+    studio.onLibraryStorageProgress((progress) => {
+      if (active) setLibraryStorage((current) => ({ ...current, migrating: progress?.phase !== 'complete', progress }));
+    });
+    return () => {
+      active = false;
+      studio.offLibraryStorageProgress();
+    };
   }, [studio]);
 
   useEffect(() => {
@@ -124,11 +151,36 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
     showToast(result?.ok ? `连接成功 · ${result.model || aiSettings.model}` : result?.error || '连接测试失败');
   };
 
+  const changeLibraryStorage = async () => {
+    setLibraryStorage((current) => ({ ...current, migrating: true, progress: null }));
+    try {
+      const result = await studio.changeLibraryStorage();
+      if (!result?.ok) {
+        showToast(result?.error || '资源库位置没有更改');
+        return;
+      }
+      if (result.canceled) return;
+      setLibraryStorage((current) => ({ ...current, ...result, loading: false, migrating: false, progress: null, error: '' }));
+      await Promise.resolve(onLibraryChange?.()).catch(() => showToast('资源库已移动；图片列表将在下次打开时刷新'));
+      showToast(result.cleanupWarning || `资源库已移动，共 ${result.fileCount || 0} 个文件`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLibraryStorage((current) => ({ ...current, migrating: false }));
+    }
+  };
+
+  const revealLibraryStorage = async () => {
+    const result = await studio.revealLibraryStorage();
+    if (!result?.ok) showToast(result?.error || '无法打开资源库文件夹');
+  };
+
   return <main className="settings-page">
     <aside className="settings-nav">
       <header><h1>设置</h1></header>
       <nav aria-label="设置分类">
         <LobeButton block className={section === 'appearance' ? 'active' : ''} icon={<Icon name="settings"/>} onClick={() => setSection('appearance')} type="text"><strong>外观</strong></LobeButton>
+        <LobeButton block className={section === 'storage' ? 'active' : ''} icon={<Icon name="folder"/>} onClick={() => setSection('storage')} type="text"><strong>资源库</strong></LobeButton>
         <LobeButton block className={section === 'ai' ? 'active' : ''} icon={<Icon name="spark"/>} onClick={() => setSection('ai')} type="text"><strong>AI 服务</strong></LobeButton>
       </nav>
       <LobeButton className="settings-back" onClick={onClose}><Icon name="close" size={14}/>返回</LobeButton>
@@ -155,6 +207,27 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
           <div className="settings-row"><span><strong>等宽字体</strong><small>{systemFonts.loading ? '正在识别等宽字体…' : `用于 Tag、Prompt 与参数 · ${fontFamilies.monospace.length} 款`}</small></span><LobeSelect {...fontSelectProps('mono')} aria-label="等宽字体" className="settings-font-select" loading={systemFonts.loading} options={monoFontOptions} value={appearance.monoFont} onChange={(value) => onAppearanceChange({ monoFont: value })}/></div>
           <div className="settings-row"><strong>动效</strong><LobeSegmented aria-label="界面动效" className="settings-segment" options={[{ label: '完整', value: 'full' }, { label: '跟随系统', value: 'reduced' }, { label: '关闭', value: 'off' }]} value={appearance.motion} onChange={(value) => onAppearanceChange({ motion: value })}/></div>
         </div>
+      </> : section === 'storage' ? <>
+        <header className="settings-heading"><h2>资源库</h2><p>管理图片、缩略图和导出的 Vibe 文件。</p></header>
+        <div className="settings-group">
+          <div className="settings-row settings-storage-row">
+            <span className="settings-storage-copy">
+              <strong>图片资源位置</strong>
+              <small className="settings-storage-path" title={libraryStorage.assetsDirectory}>{libraryStorage.loading ? '正在读取…' : libraryStorage.assetsDirectory || '位置不可用'}</small>
+              {!libraryStorage.loading && <small>{libraryStorage.fileCount} 个文件 · {formatBytes(libraryStorage.totalBytes)}</small>}
+            </span>
+            <div className="settings-storage-actions">
+              <LobeButton disabled={libraryStorage.loading || libraryStorage.migrating} icon={<Icon name="folder" size={14}/>} onClick={revealLibraryStorage}>打开文件夹</LobeButton>
+              <LobeButton disabled={libraryStorage.loading || libraryStorage.migrating} onClick={changeLibraryStorage} type="primary">
+                {libraryStorage.migrating
+                  ? libraryStorage.progress?.total ? `正在移动 ${libraryStorage.progress.completed}/${libraryStorage.progress.total}` : '准备迁移…'
+                  : '更改位置'}
+              </LobeButton>
+            </div>
+          </div>
+        </div>
+        <LobeAlert className="settings-warning" message="更改位置会自动移动现有资源；复制和校验完成前，旧文件不会被删除。" type="info" variant="outlined"/>
+        {libraryStorage.error && <LobeAlert className="settings-warning" message={libraryStorage.error} type="error" variant="outlined"/>}
       </> : <>
         <header className="settings-heading"><h2>AI 服务</h2><p>用于 Tag 翻译和分类。</p></header>
         <div className="settings-group ai-settings-group">
@@ -175,7 +248,7 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
                 <LobeButton onClick={() => setAISettings((current) => ({ ...current, translationPrompt: current.defaultPrompts.translation }))} size="small" type="text">恢复默认</LobeButton>
               </label>
               <label>
-                <span><strong>分类 Prompt</strong><small>定义 Artist、Character、Clothing、Scene、Style 与 Unsorted 的边界</small></span>
+                <span><strong>分类 Prompt</strong><small>定义画师年代、角色组成、身份物种、外貌身体等 10 类边界</small></span>
                 <LobeTextArea autoSize={{ minRows: 6, maxRows: 14 }} onChange={(event) => setAISettings((current) => ({ ...current, classificationPrompt: event.target.value }))} value={aiSettings.classificationPrompt}/>
                 <LobeButton onClick={() => setAISettings((current) => ({ ...current, classificationPrompt: current.defaultPrompts.classification }))} size="small" type="text">恢复默认</LobeButton>
               </label>

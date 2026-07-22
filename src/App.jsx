@@ -14,7 +14,7 @@ import SettingsPage from './SettingsPage.jsx';
 import WorkbenchPage from './WorkbenchPage.jsx';
 import Icon from './components/Icon.jsx';
 import { allPromptTags, formatPositivePromptForCopy, getPromptScope, normalizePromptStructure, syncProjectPromptMetadata, updatePromptScope } from './lib/promptStructure.js';
-import { expandSearch, formatTag, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
+import { CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatTag, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT, fontStack } from './lib/fonts.js';
 import { assessDroppedFiles, assessWorkbenchDroppedFiles } from './lib/importDrop.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
@@ -22,6 +22,11 @@ import { createWorkbenchSession, parseWorkbenchSession, serializeWorkbenchSessio
 
 const studio = window.studio || {
   loadLibrary: async () => [],
+  getLibraryStorage: async () => ({ ok: true, assetsDirectory: '', fileCount: 0, totalBytes: 0, isDefault: true }),
+  changeLibraryStorage: async () => ({ ok: false, error: '请在桌面应用中更改资源库位置' }),
+  revealLibraryStorage: async () => ({ ok: false, error: '请在桌面应用中打开资源库文件夹' }),
+  onLibraryStorageProgress: () => {},
+  offLibraryStorageProgress: () => {},
   openWorkbenchImage: async () => ({ ok: false, error: '请在桌面应用中打开图片' }),
   openDroppedWorkbenchImage: async () => ({ ok: false, error: '请在桌面应用中打开图片' }),
   revealEmbeddedVibe: async () => ({ ok: false, error: '请在桌面应用中导出 Vibe' }),
@@ -43,14 +48,7 @@ const studio = window.studio || {
   translateTags: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
 };
 
-const TAG_CONTEXT_CATEGORIES = [
-  ['Artist', '画师'],
-  ['Character', '角色'],
-  ['Clothing', '服装'],
-  ['Scene', '场景'],
-  ['Style', '风格'],
-  ['Unsorted', '未分类'],
-];
+const TAG_CONTEXT_CATEGORIES = CATEGORY_OPTIONS.map((category) => [category, CATEGORY_LABELS[category]]);
 
 function openContextMenu(event, items) {
   event.preventDefault();
@@ -466,7 +464,7 @@ export default function App({ appearance, setAppearance }) {
         projects={visibleProjects}
         query={query}
         sort={sort}
-      /> : <SettingsPage appearance={appearance} onAppearanceChange={changeAppearance} onClose={() => setPage(settingsReturnPage)} showToast={showToast} studio={studio}/>}
+      /> : <SettingsPage appearance={appearance} onAppearanceChange={changeAppearance} onClose={() => setPage(settingsReturnPage)} onLibraryChange={reloadLibrary} showToast={showToast} studio={studio}/>}
     </div>
     <ImportExperience dragState={dragState} onCancel={() => importProgress?.batchId && studio.cancelImport(importProgress.batchId)} onDismiss={() => setImportResult(null)} progress={importProgress} result={importResult} target={page}/>
     <LobeModal

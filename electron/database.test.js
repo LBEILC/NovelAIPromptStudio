@@ -19,12 +19,12 @@ function project(id = 'project-1') {
     content_hash: `hash-${id}`,
     created_at: now,
     updated_at: now,
-    tags: [{ id: `${id}-tag`, tag: 'artist:ciloranko', translation: '', category: 'Artist', weight: 1.1, raw_segment: '', syntax_issue: '', brace_depth: 2, brace_group: 'artists', brace_trailing_comma: true }],
+    tags: [{ id: `${id}-tag`, tag: 'artist:ciloranko', translation: '', category: 'ArtistEra', weight: 1.1, raw_segment: '', syntax_issue: '', brace_depth: 2, brace_group: 'artists', brace_trailing_comma: true }],
     prompt_structure: {
       base_undesired_tags: [{ id: `${id}-uc`, tag: 'lowres', translation: '', category: 'Unsorted', weight: 1 }],
       use_coords: true,
       use_order: true,
-      characters: [{ id: `${id}-character`, label: 'Character 1', prompt_tags: [{ id: `${id}-char-tag`, tag: 'girl', translation: '', category: 'Character', weight: 1 }], undesired_tags: [], center: { x: 0.3, y: 0.5 } }],
+      characters: [{ id: `${id}-character`, label: 'Character 1', prompt_tags: [{ id: `${id}-char-tag`, tag: 'girl', translation: '', category: 'Subject', weight: 1 }], undesired_tags: [], center: { x: 0.3, y: 0.5 } }],
     },
     metadata: { prompt_raw: 'artist:ciloranko', negative_prompt: 'lowres', model: 'nai-v4.5', seed: '42', width: 832, height: 1216, extra_json: '{"source":"test"}' },
   };
@@ -49,9 +49,9 @@ describe('phase 2 core database', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
     temporaryDirectories.push(directory);
     const database = await openDatabase(directory);
-    database.updateTagDictionary('artist:ciloranko', { translation: '画师 Ciloranko', category: 'Artist' });
+    database.updateTagDictionary('artist:ciloranko', { translation: '画师 Ciloranko', category: 'ArtistEra' });
     const enriched = database.enrichProjectTags(project('fresh'));
-    expect(enriched.tags[0]).toMatchObject({ translation: '画师 Ciloranko', category: 'Artist', translation_source: 'manual', category_source: 'manual' });
+    expect(enriched.tags[0]).toMatchObject({ translation: '画师 Ciloranko', category: 'ArtistEra', translation_source: 'manual', category_source: 'manual' });
   });
 
   it('creates one immutable pre-phase2 backup before reopening an existing database', async () => {
@@ -80,5 +80,24 @@ describe('phase 2 core database', () => {
     expect(database.loadProject('project-1')).toMatchObject({ content_hash: 'repaired', metadata: { width: 640, height: 960 } });
     database.deleteProject('project-1');
     expect(database.loadLibrary()).toEqual([]);
+  });
+
+  it('relocates only project asset paths inside the previous asset directory', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
+    temporaryDirectories.push(directory);
+    const oldAssets = path.join(directory, 'old-assets');
+    const newAssets = path.join(directory, 'new-assets');
+    const database = await openDatabase(directory);
+    database.insertProject({
+      ...project(),
+      image_path: path.join(oldAssets, 'images', 'project-1.png'),
+      thumbnail_path: path.join(oldAssets, 'thumbnails', 'project-1.webp'),
+    });
+
+    expect(database.relocateAssetPaths(oldAssets, newAssets)).toBe(1);
+    expect(database.loadProject('project-1')).toMatchObject({
+      image_path: path.join(newAssets, 'images', 'project-1.png'),
+      thumbnail_path: path.join(newAssets, 'thumbnails', 'project-1.webp'),
+    });
   });
 });

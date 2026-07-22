@@ -1,20 +1,34 @@
-export const CATEGORY_OPTIONS = ['Artist', 'Character', 'Clothing', 'Scene', 'Style', 'Unsorted'];
+export const CATEGORY_OPTIONS = ['ArtistEra', 'Subject', 'Identity', 'Body', 'Clothing', 'Action', 'Environment', 'Composition', 'StyleQuality', 'Unsorted'];
 export const CATEGORY_LABELS = {
-  Artist: '画师',
-  Character: '角色',
-  Clothing: '服装',
-  Scene: '场景',
-  Style: '风格',
+  ArtistEra: '画师年代',
+  Subject: '角色组成',
+  Identity: '身份物种',
+  Body: '外貌身体',
+  Clothing: '服装配饰',
+  Action: '动作表情',
+  Environment: '环境背景',
+  Composition: '镜头光影',
+  StyleQuality: '风格质量',
   Unsorted: '未分类',
 };
 
 const categoryRules = [
-  ['Artist', /(?:^|[\s{[(,:])(?:artist\s*[:_]|by\s+artist\b|artist\b)/i],
-  ['Character', /(?:\b\d+girls?\b|\b\d+boys?\b|\b(?:girl|boy|woman|man|solo|hair|eyes?|face|smile|expression|pose|looking|standing|sitting|hands?|body)\b)/i],
+  ['ArtistEra', /(?:^|[\s{[(,:])(?:artist\s*[:_]|by\s+artist\b|artist\b)|\byear\s*\d{4}\b|\b(?:19|20)\d0s\s*\(style\)/i],
+  ['Subject', /\b(?:\d+girls?|\d+boys?|\d+others?|girl|boy|woman|man|male|female|other|solo|multiple girls|multiple boys)\b/i],
+  ['Identity', /\b(?:elf|demon|angel|human|android|robot|catgirl|doggirl|kemonomimi|witch|magical girl|maid|nurse|knight|warrior|student|original character)\b/i],
   ['Clothing', /\b(dress|shirt|sweater|jacket|uniform|skirt|pants|shorts|shoes|boots|hat|gloves|armor|necklace|earrings?)\b/i],
-  ['Scene', /\b(city|street|room|forest|beach|sky|background|location|indoors|outdoors|weather|rain|snow|night|day|sunset|ocean)\b/i],
-  ['Style', /\b(chibi|lineart|line art|lighting|camera|lens|angle|style|illustration|anime|cinematic|detailed|masterpiece|quality|aesthetic|highres|absurdres|depth of field|bokeh)\b/i],
+  ['Action', /\b(?:smile|frown|crying|laughing|blush|expression|pose|looking|standing|sitting|lying|kneeling|walking|running|jumping|dancing|holding|pointing|hugging|kissing|hand up|arms crossed|open mouth|closed mouth)\b/i],
+  ['Environment', /\b(?:city|street|room|forest|beach|sky|background|location|indoors|outdoors|weather|rain|snow|night|day|sunset|ocean|sea|mountain|building|furniture|vehicle|weapon|tree|flower|water|wave)\b/i],
+  ['Composition', /\b(?:lighting|camera|lens|angle|perspective|pov|view|from above|from below|from behind|from side|close-up|portrait|landscape|full body|upper body|cowboy shot|depth of field|bokeh|focus|backlighting|rim light|light rays?|foreshortening|dutch angle|fisheye)\b/i],
+  ['Body', /\b(?:hair|eyes?|face|skin|body|hands?|fingers?|arms?|legs?|feet|breasts?|hips?|waist|navel|anatomy|proportions?|muscles?|fangs?|horns?|wings?|tail|detailed face|detailed hands?)\b/i],
+  ['StyleQuality', /\b(?:chibi|lineart|line art|style|illustration|anime|cinematic|rendering|medium|watercolor|oil painting|graphite|3d|2d|flat color|masterpiece|quality|aesthetic|highres|absurdres|lowres|artifact|error|blurry|detailed)\b/i],
 ];
+
+const legacyCategoryMap = {
+  Artist: 'ArtistEra',
+  Clothing: 'Clothing',
+  Scene: 'Environment',
+};
 
 const dictionary = {
   '1girl': '1名女孩',
@@ -42,6 +56,19 @@ const dictionary = {
 
 export function inferCategory(tag) {
   return categoryRules.find(([, expression]) => expression.test(tag))?.[0] || 'Unsorted';
+}
+
+export function normalizeCategory(category, tag = '') {
+  if (CATEGORY_OPTIONS.includes(category)) return category;
+  if (category === 'Character') {
+    const inferred = inferCategory(tag);
+    return inferred === 'Unsorted' ? 'Identity' : inferred;
+  }
+  if (category === 'Style') {
+    const inferred = inferCategory(tag);
+    return inferred === 'Unsorted' ? 'StyleQuality' : inferred;
+  }
+  return legacyCategoryMap[category] || 'Unsorted';
 }
 
 function braceGroupAt(source, cursor) {
@@ -173,7 +200,7 @@ export function parsePromptPreservingEdits(prompt = '', existingTags = [], creat
       id: existing.id || parsed.id,
       translation: Object.hasOwn(existing, 'translation') ? existing.translation : parsed.translation,
       translation_source: Object.hasOwn(existing, 'translation_source') ? existing.translation_source : parsed.translation_source,
-      category: existing.category || parsed.category,
+      category: normalizeCategory(existing.category, parsed.tag) || parsed.category,
       category_source: Object.hasOwn(existing, 'category_source') ? existing.category_source : parsed.category_source,
       note: Object.hasOwn(existing, 'note') ? existing.note : parsed.note,
     };
@@ -199,7 +226,7 @@ export function repairLegacyPromptTags(tags = [], prompt = '', createId = () => 
       ...parsed,
       id: existing.id,
       translation: existing.translation || parsed.translation,
-      category: existing.category && existing.category !== 'Unsorted' ? existing.category : parsed.category,
+      category: existing.category && existing.category !== 'Unsorted' ? normalizeCategory(existing.category, parsed.tag) : parsed.category,
       note: existing.note || '',
     };
   });
