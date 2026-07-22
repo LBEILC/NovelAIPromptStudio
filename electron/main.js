@@ -7,7 +7,6 @@ import { openDatabase } from './database.js';
 import { backfillProjectContentHashes, backfillProjectDimensions, importLibraryFiles } from './importer.js';
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
-import { buildContextMenuTemplate } from './contextMenus.js';
 import { readWorkbenchImage } from './workbench.js';
 
 app.setName('NovelAI Prompt Studio');
@@ -91,17 +90,6 @@ app.whenReady().then(async () => {
       return { ok: false, project: null, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('context-menu:show', (event, request = {}) => new Promise((resolve) => {
-    const ownerWindow = BrowserWindow.fromWebContents(event.sender);
-    if (!ownerWindow || ownerWindow.isDestroyed()) { resolve(null); return; }
-    let settled = false;
-    const finish = (action) => { if (settled) return; settled = true; resolve(action); };
-    const template = buildContextMenuTemplate(request, finish);
-    if (!template.length) { finish(null); return; }
-    const x = Number.isFinite(Number(request.x)) ? Math.max(0, Math.round(Number(request.x))) : undefined;
-    const y = Number.isFinite(Number(request.y)) ? Math.max(0, Math.round(Number(request.y))) : undefined;
-    Menu.buildFromTemplate(template).popup({ window: ownerWindow, x, y, callback: () => finish(null) });
-  }));
   ipcMain.handle('library:import-images', async (event, request = {}) => {
     await contentBackfill;
     let filePaths = Array.isArray(request.filePaths) ? request.filePaths : [];

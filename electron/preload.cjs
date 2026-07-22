@@ -7,7 +7,6 @@ contextBridge.exposeInMainWorld('studio', {
     filePath: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean)[0] || '',
     fromDrop: true,
   }),
-  showContextMenu: (request) => ipcRenderer.invoke('context-menu:show', request),
   importImages: () => ipcRenderer.invoke('library:import-images'),
   importDroppedFiles: (files) => ipcRenderer.invoke('library:import-images', {
     filePaths: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean),

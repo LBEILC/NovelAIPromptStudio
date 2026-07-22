@@ -4,8 +4,11 @@ import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/exter
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import LobeActionIcon from '@lobehub/ui/es/ActionIcon/index';
 import LobeButton from '@lobehub/ui/es/Button/index';
+import { showContextMenu as showLobeContextMenu } from '@lobehub/ui/es/ContextMenu/index';
+import LobeModal from '@lobehub/ui/es/Modal/index';
 import LobeSideNav from '@lobehub/ui/es/SideNav/index';
 import { toast as lobeToast } from '@lobehub/ui/es/Toast/index';
+import { Check, ClipboardPaste, Copy, FolderOpen, Pencil, Redo2, Scissors, Sparkles, Tags, Trash2, Undo2 } from 'lucide-react';
 import GalleryPage from './GalleryPage.jsx';
 import SettingsPage from './SettingsPage.jsx';
 import WorkbenchPage from './WorkbenchPage.jsx';
@@ -13,14 +16,13 @@ import Icon from './components/Icon.jsx';
 import { allPromptTags, formatPositivePromptForCopy, getPromptScope, normalizePromptStructure, syncProjectPromptMetadata, updatePromptScope } from './lib/promptStructure.js';
 import { expandSearch, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import { assessDroppedFiles, assessWorkbenchDroppedFiles } from './lib/importDrop.js';
-import { contextMenuPosition, isTextEditingTarget } from './lib/contextMenu.js';
+import { isTextEditingTarget } from './lib/contextMenu.js';
 import { createWorkbenchSession, parseWorkbenchSession, serializeWorkbenchSession, WORKBENCH_SESSION_KEY, workbenchHasChanges } from './lib/workbenchSession.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
   openWorkbenchImage: async () => ({ ok: false, error: '请在桌面应用中打开图片' }),
   openDroppedWorkbenchImage: async () => ({ ok: false, error: '请在桌面应用中打开图片' }),
-  showContextMenu: async () => null,
   importImages: async () => ({ ok: true, canceled: true, imported: [], duplicates: [], errors: [], summary: null }),
   importDroppedFiles: async () => ({ ok: false, imported: [], duplicates: [], errors: [{ error: '请在桌面应用中导入' }] }),
   cancelImport: async () => ({ ok: false }),
@@ -38,11 +40,62 @@ const studio = window.studio || {
   translateTags: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
 };
 
-function showNativeContextMenu(event, request) {
-  if (isTextEditingTarget(event.target)) return null;
+const TAG_CONTEXT_CATEGORIES = [
+  ['Artist', '画师'],
+  ['Character', '角色'],
+  ['Clothing', '服装'],
+  ['Scene', '场景'],
+  ['Style', '风格'],
+  ['Unsorted', '未分类'],
+];
+
+function openContextMenu(event, items) {
   event.preventDefault();
   event.stopPropagation();
-  return studio.showContextMenu({ ...request, ...contextMenuPosition(event) });
+  showLobeContextMenu(items, { iconSpaceMode: 'global' });
+}
+
+function dispatchInput(editable, inputType, data = null) {
+  const event = typeof InputEvent === 'function'
+    ? new InputEvent('input', { bubbles: true, data, inputType })
+    : new Event('input', { bubbles: true });
+  editable.dispatchEvent(event);
+}
+
+function captureTextSelection(editable) {
+  const start = typeof editable.selectionStart === 'number' ? editable.selectionStart : null;
+  const end = typeof editable.selectionEnd === 'number' ? editable.selectionEnd : null;
+  return { editable, start, end, hasSelection: start == null || end == null ? true : start !== end };
+}
+
+async function runTextEditAction(selection, action) {
+  const { editable, start, end } = selection;
+  editable.focus({ preventScroll: true });
+  if (start != null && end != null && typeof editable.setSelectionRange === 'function') editable.setSelectionRange(start, end);
+
+  if (start != null && end != null && typeof editable.setRangeText === 'function') {
+    if (action === 'copy' || action === 'cut') {
+      await navigator.clipboard.writeText(String(editable.value || '').slice(start, end));
+      if (action === 'cut') {
+        editable.setRangeText('', start, end, 'end');
+        dispatchInput(editable, 'deleteByCut');
+      }
+      return;
+    }
+    if (action === 'paste') {
+      const text = await navigator.clipboard.readText();
+      editable.setRangeText(text, start, end, 'end');
+      dispatchInput(editable, 'insertFromPaste', text);
+      return;
+    }
+    if (action === 'select-all') {
+      editable.setSelectionRange(0, String(editable.value || '').length);
+      return;
+    }
+  }
+
+  const command = { undo: 'undo', redo: 'redo', cut: 'cut', copy: 'copy', paste: 'paste', 'select-all': 'selectAll' }[action];
+  if (command) document.execCommand(command);
 }
 
 function SideNav({ page, onNavigate }) {
@@ -81,11 +134,25 @@ export default function App({ appearance, setAppearance }) {
   const [dragState, setDragState] = useState({ active: false, valid: false });
   const [importProgress, setImportProgress] = useState(null);
   const [importResult, setImportResult] = useState(null);
+  const [confirmation, setConfirmation] = useState(null);
   const appShellRef = useRef(null);
   const dropHandlerRef = useRef(null);
   const annotationTimer = useRef(null);
+  const confirmationResolverRef = useRef(null);
 
   const showToast = (message) => lobeToast.success({ description: message, duration: 2200, placement: 'bottom' });
+
+  const requestConfirmation = (options) => new Promise((resolve) => {
+    confirmationResolverRef.current = resolve;
+    setConfirmation(options);
+  });
+
+  const resolveConfirmation = (confirmed) => {
+    const resolve = confirmationResolverRef.current;
+    confirmationResolverRef.current = null;
+    setConfirmation(null);
+    resolve?.(confirmed);
+  };
 
   const hydrateProject = (project) => syncProjectPromptMetadata({
     ...project,
@@ -133,8 +200,19 @@ export default function App({ appearance, setAppearance }) {
   useEffect(() => {
     const handler = (event) => {
       if (event.defaultPrevented || !isTextEditingTarget(event.target)) return;
-      event.preventDefault();
-      studio.showContextMenu({ kind: 'text', ...contextMenuPosition(event) });
+      const editable = event.target.closest('textarea, input, [contenteditable="true"]');
+      const selection = captureTextSelection(editable);
+      const invoke = (action) => runTextEditAction(selection, action).catch(() => showToast('文本操作没有完成'));
+      openContextMenu(event, [
+        { key: 'undo', label: '撤销', icon: Undo2, onClick: () => invoke('undo') },
+        { key: 'redo', label: '重做', icon: Redo2, onClick: () => invoke('redo') },
+        { key: 'edit-divider', type: 'divider' },
+        { key: 'cut', label: '剪切', icon: Scissors, disabled: !selection.hasSelection, onClick: () => invoke('cut') },
+        { key: 'copy', label: '复制', icon: Copy, disabled: !selection.hasSelection, onClick: () => invoke('copy') },
+        { key: 'paste', label: '粘贴', icon: ClipboardPaste, onClick: () => invoke('paste') },
+        { key: 'selection-divider', type: 'divider' },
+        { key: 'select-all', label: '全选', onClick: () => invoke('select-all') },
+      ]);
     };
     document.addEventListener('contextmenu', handler);
     return () => document.removeEventListener('contextmenu', handler);
@@ -154,7 +232,13 @@ export default function App({ appearance, setAppearance }) {
     return () => { cleanupTarget(); cleanupMonitor(); };
   }, [page]);
 
-  const canReplaceWorkbench = () => !workbenchHasChanges(workbenchSession) || window.confirm('当前工作台包含尚未复制的修改。仍要更换图片吗？');
+  const canReplaceWorkbench = async () => !workbenchHasChanges(workbenchSession) || requestConfirmation({
+    title: '替换当前图片？',
+    message: '当前工作台包含尚未复制的修改。',
+    detail: '继续后，这些修改将被丢弃。',
+    okText: '继续更换',
+    danger: true,
+  });
   const acceptWorkbenchProject = (project, saved = null) => {
     setWorkbenchSession(createWorkbenchSession(project, saved));
     setWorkbenchFocus({ scopeKey: 'base:prompt', tagId: null });
@@ -163,7 +247,7 @@ export default function App({ appearance, setAppearance }) {
   };
 
   const openWorkbenchPath = async (filePath = '') => {
-    if (!canReplaceWorkbench()) return false;
+    if (!(await canReplaceWorkbench())) return false;
     setWorkbenchLoading(true);
     setWorkbenchError('');
     try {
@@ -183,7 +267,7 @@ export default function App({ appearance, setAppearance }) {
 
   const openDroppedWorkbenchImage = async (files) => {
     if (!assessWorkbenchDroppedFiles(files).valid) { setWorkbenchError('工作台一次只支持一张 PNG、JPG 或 WEBP 图片'); return; }
-    if (!canReplaceWorkbench()) return;
+    if (!(await canReplaceWorkbench())) return;
     setWorkbenchLoading(true);
     try {
       const result = await studio.openDroppedWorkbenchImage(files);
@@ -267,28 +351,51 @@ export default function App({ appearance, setAppearance }) {
     showToast(result.ai_count ? `已翻译并分类 ${entries.length} 个 Tag` : '已复用本地翻译与分类');
   };
 
-  const tagContextMenu = async (event, scopeKey, tag) => {
-    const action = await showNativeContextMenu(event, { kind: 'tag', hasTranslation: Boolean(tag.translation?.trim()), category: tag.category || 'Unsorted' });
-    if (!action || !workbenchSession?.project) return;
-    if (action === 'tag:copy') { await navigator.clipboard.writeText(tag.tag); showToast('Tag 已复制'); return; }
-    if (action === 'tag:copy-translation') { await navigator.clipboard.writeText(tag.translation || ''); showToast('翻译已复制'); return; }
-    if (action === 'tag:edit') { setWorkbenchFocus({ scopeKey, tagId: null }); requestAnimationFrame(() => setWorkbenchFocus({ scopeKey, tagId: tag.id })); return; }
+  const tagContextMenu = (event, scopeKey, tag) => {
+    if (!workbenchSession?.project) return;
     const scope = getPromptScope(workbenchSession.project, scopeKey);
-    if (action === 'tag:delete') { updateWorkbenchProject(updatePromptScope(workbenchSession.project, scope.key, scope.tags.filter((item) => item.id !== tag.id))); return; }
-    if (action.startsWith('tag:category:')) { updateWorkbenchProject(updatePromptScope(workbenchSession.project, scope.key, scope.tags.map((item) => item.id === tag.id ? { ...item, category: action.slice(13), category_source: 'manual' } : item))); return; }
-    if (action === 'tag:translate') await translateWorkbenchTags([{ scopeKey, tag }]);
+    const setCategory = (category) => updateWorkbenchProject(updatePromptScope(workbenchSession.project, scope.key, scope.tags.map((item) => item.id === tag.id ? { ...item, category, category_source: 'manual' } : item)));
+    openContextMenu(event, [
+      { key: 'copy-tag', label: '复制 Tag', icon: Copy, onClick: async () => { await navigator.clipboard.writeText(tag.tag); showToast('Tag 已复制'); } },
+      { key: 'copy-translation', label: '复制翻译', icon: Copy, disabled: !tag.translation?.trim(), onClick: async () => { await navigator.clipboard.writeText(tag.translation || ''); showToast('翻译已复制'); } },
+      { key: 'edit-tag', label: '编辑', icon: Pencil, onClick: () => { setWorkbenchFocus({ scopeKey, tagId: null }); requestAnimationFrame(() => setWorkbenchFocus({ scopeKey, tagId: tag.id })); } },
+      { key: 'translate-tag', label: 'AI 翻译与分类', icon: Sparkles, onClick: () => translateWorkbenchTags([{ scopeKey, tag }]) },
+      {
+        key: 'set-category',
+        label: '设置分类',
+        icon: Tags,
+        type: 'submenu',
+        openOnHover: true,
+        children: TAG_CONTEXT_CATEGORIES.map(([category, label]) => ({
+          key: `category-${category}`,
+          label,
+          icon: (tag.category || 'Unsorted') === category ? Check : undefined,
+          onClick: () => setCategory(category),
+        })),
+      },
+      { key: 'tag-divider', type: 'divider' },
+      { key: 'delete-tag', label: '删除 Tag', icon: Trash2, danger: true, onClick: () => updateWorkbenchProject(updatePromptScope(workbenchSession.project, scope.key, scope.tags.filter((item) => item.id !== tag.id))) },
+    ]);
   };
 
-  const projectContextMenu = async (event, project) => {
-    const action = await showNativeContextMenu(event, { kind: 'project-simple' });
-    if (action === 'project:open-workbench') await openWorkbenchPath(project.image_path);
-    if (action === 'project:copy-prompt') { await navigator.clipboard.writeText(formatPositivePromptForCopy(project)); showToast('原始 Prompt 已复制'); }
-    if (action === 'project:reveal') await studio.revealFile(project.image_path);
-    if (action === 'project:delete') await removeProject(project);
+  const projectContextMenu = (event, project) => {
+    openContextMenu(event, [
+      { key: 'open-workbench', label: '在工作台中打开', icon: Pencil, onClick: () => openWorkbenchPath(project.image_path) },
+      { key: 'copy-prompt', label: '复制原始 Prompt', icon: Copy, onClick: async () => { await navigator.clipboard.writeText(formatPositivePromptForCopy(project)); showToast('原始 Prompt 已复制'); } },
+      { key: 'reveal-project', label: '在文件夹中显示', icon: FolderOpen, onClick: () => studio.revealFile(project.image_path) },
+      { key: 'project-divider', type: 'divider' },
+      { key: 'delete-project', label: '从图片库移除', icon: Trash2, danger: true, onClick: () => removeProject(project) },
+    ]);
   };
 
   const removeProject = async (project) => {
-    if (!window.confirm(`从图片库移除“${project.name}”？\n\n应用保存的图片与缩略图会被删除，此操作无法撤销。`)) return;
+    if (!(await requestConfirmation({
+      title: '从图片库移除？',
+      message: `“${project.name}”`,
+      detail: '应用保存的图片与缩略图会被删除，此操作无法撤销。',
+      okText: '移除',
+      danger: true,
+    }))) return;
     const result = await studio.deleteProject(project.id);
     if (!result?.ok) { showToast(result?.error || '图片没有移除'); return; }
     setProjects((current) => current.filter((item) => item.id !== project.id));
@@ -307,9 +414,15 @@ export default function App({ appearance, setAppearance }) {
     setAppearance(saved);
   };
 
-  const resetWorkbench = () => {
+  const resetWorkbench = async () => {
     if (!workbenchSession) return;
-    if (workbenchHasChanges(workbenchSession) && !window.confirm('恢复图片中的原始 Prompt？当前工作台修改会被清除。')) return;
+    if (workbenchHasChanges(workbenchSession) && !(await requestConfirmation({
+      title: '恢复图片中的 Prompt？',
+      message: '当前工作台中的修改将被清除。',
+      detail: '图片文件本身不会被修改。',
+      okText: '恢复',
+      danger: true,
+    }))) return;
     setWorkbenchSession((current) => current ? { ...current, project: structuredClone(current.originalProject), updatedAt: new Date().toISOString() } : current);
     showToast('已恢复图片中的原始 Prompt');
   };
@@ -350,5 +463,21 @@ export default function App({ appearance, setAppearance }) {
       /> : <SettingsPage appearance={appearance} onAppearanceChange={changeAppearance} onClose={() => setPage(settingsReturnPage)} showToast={showToast} studio={studio}/>}
     </div>
     <ImportExperience dragState={dragState} onCancel={() => importProgress?.batchId && studio.cancelImport(importProgress.batchId)} onDismiss={() => setImportResult(null)} progress={importProgress} result={importResult} target={page}/>
+    <LobeModal
+      cancelText="取消"
+      destroyOnHidden
+      okButtonProps={{ danger: Boolean(confirmation?.danger) }}
+      okText={confirmation?.okText || '确定'}
+      open={Boolean(confirmation)}
+      title={confirmation?.title}
+      width={420}
+      onCancel={() => resolveConfirmation(false)}
+      onOk={() => resolveConfirmation(true)}
+    >
+      <div className="confirmation-copy">
+        <p>{confirmation?.message}</p>
+        {confirmation?.detail && <span>{confirmation.detail}</span>}
+      </div>
+    </LobeModal>
   </div>;
 }

@@ -94,6 +94,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .import-status progress { width: 100px; accent-color: var(--accent); }
 .import-result { padding: 9px 10px; }
 .import-result > span { color: var(--text); }
+.confirmation-copy { min-width: 0; padding-block: 8px 4px; }
+.confirmation-copy p { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.confirmation-copy span { display: block; margin-top: 7px; color: var(--muted); font-size: var(--text-secondary); line-height: 1.6; }
 
 .workbench-page { color: var(--text); background: var(--ink); }
 .workbench-empty-page { overflow: auto; padding: 32px; display: grid; grid-template-rows: auto 160px; align-content: center; justify-items: center; gap: 20px; }
