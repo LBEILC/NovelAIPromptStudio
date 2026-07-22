@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzePromptBatch, expandSearch, formatPrompt, formatPromptInline, inferCategory, parsePrompt, parsePromptPreservingEdits, repairLegacyPromptTags } from './prompt.js';
+import { analyzePromptBatch, expandSearch, formatPrompt, formatPromptGroupedInline, formatPromptInline, formatTag, inferCategory, parsePrompt, parsePromptPreservingEdits, repairLegacyPromptTags } from './prompt.js';
 
 describe('NovelAI prompt codec', () => {
   it('parses numeric weights and exports the same NovelAI syntax', () => {
@@ -81,7 +81,7 @@ describe('NovelAI prompt codec', () => {
     expect(batch).toMatchObject({ duplicateCount: 0, syntaxIssueCount: 0 });
   });
 
-  it('flattens legacy brace groups without changing double-brace emphasis tags', () => {
+  it('splits brace groups into editable inner tags while retaining their emphasis structure', () => {
     let id = 0;
     const prompt = '{artist:terasu mc, artist:shirabe shiki, artist:meme50, year 2024, year 2025, } {uncensored, no watermark, best quality, amazing quality, very aesthetic, absurdres, highres, masterpiece, } {3d, 3d background, realistic, beach, wave, splashing, } {from forward, }';
     const tags = parsePrompt(prompt, () => `brace-${id++}`);
@@ -92,8 +92,31 @@ describe('NovelAI prompt codec', () => {
       'uncensored', 'no watermark', 'best quality', 'amazing quality', 'very aesthetic', 'absurdres', 'highres', 'masterpiece',
       '3d', '3d background', 'realistic', 'beach', 'wave', 'splashing', 'from forward',
     ]);
-    expect(parsePrompt('{{bad hands}}, {artist:a, artist:b, }', () => `emphasis-${id++}`).map((tag) => tag.tag))
-      .toEqual(['{{bad hands}}', 'artist:a', 'artist:b']);
+    expect(tags.slice(0, 5).every((tag) => tag.brace_depth === 1 && tag.brace_group === tags[0].brace_group)).toBe(true);
+    expect(tags[5].brace_group).not.toBe(tags[0].brace_group);
+    expect(formatTag(tags[0])).toBe('{artist:terasu mc}');
+    expect(formatPromptGroupedInline(tags).split('}, {')).toHaveLength(4);
+
+    const emphasized = parsePrompt('{{bad hands}}, {artist:a, artist:b, }', () => `emphasis-${id++}`);
+    expect(emphasized.map((tag) => tag.tag)).toEqual(['bad hands', 'artist:a', 'artist:b']);
+    expect(emphasized.map(formatTag)).toEqual(['{{bad hands}}', '{artist:a}', '{artist:b}']);
+  });
+
+  it('keeps triple-brace source text groupable while showing each member with the same braces', () => {
+    let id = 0;
+    const prompt = '{{{best quality, amazing quality, very aesthetic, highres, incredibly absurdres}}},';
+    const tags = parsePrompt(prompt, () => `triple-${id++}`);
+
+    expect(tags.map((tag) => tag.tag)).toEqual(['best quality', 'amazing quality', 'very aesthetic', 'highres', 'incredibly absurdres']);
+    expect(tags.every((tag) => tag.brace_depth === 3 && tag.brace_group === tags[0].brace_group)).toBe(true);
+    expect(tags.map(formatTag)).toEqual([
+      '{{{best quality}}}',
+      '{{{amazing quality}}}',
+      '{{{very aesthetic}}}',
+      '{{{highres}}}',
+      '{{{incredibly absurdres}}}',
+    ]);
+    expect(formatPromptGroupedInline(tags)).toBe('{{{best quality, amazing quality, very aesthetic, highres, incredibly absurdres}}}');
   });
 
   it('repairs previously imported tags that were split before legacy brace groups were supported', () => {

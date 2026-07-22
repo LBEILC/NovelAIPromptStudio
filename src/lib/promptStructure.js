@@ -1,4 +1,4 @@
-import { formatPrompt, formatPromptInline, parsePrompt } from './prompt.js';
+import { formatPrompt, formatPromptGroupedInline, formatPromptInline, parsePrompt, repairLegacyPromptTags } from './prompt.js';
 
 const createId = () => crypto.randomUUID();
 
@@ -71,12 +71,15 @@ function normalizeTag(tag, idFactory) {
     translation: String(tag?.translation || ''),
     category: tag?.category || 'Unsorted',
     weight: Number.isFinite(Number(tag?.weight)) ? Number(tag.weight) : 1,
+    brace_depth: Math.max(0, Math.trunc(Number(tag?.brace_depth) || 0)),
+    brace_group: String(tag?.brace_group || ''),
+    brace_trailing_comma: Boolean(tag?.brace_trailing_comma),
     note: String(tag?.note || ''),
   };
 }
 
 function normalizeTags(tags, rawPrompt, idFactory) {
-  const source = Array.isArray(tags) ? tags : parsePrompt(rawPrompt || '', idFactory);
+  const source = Array.isArray(tags) ? repairLegacyPromptTags(tags, rawPrompt || '', idFactory) : parsePrompt(rawPrompt || '', idFactory);
   return source.map((tag) => normalizeTag(tag, idFactory));
 }
 
@@ -89,6 +92,12 @@ export function normalizePromptStructure(structure, metadata = {}, idFactory = c
     : metadataStructure.characters;
 
   return {
+    base_prompt_raw: Object.prototype.hasOwnProperty.call(parsedStructure, 'base_prompt_raw')
+      ? String(parsedStructure.base_prompt_raw || '')
+      : String(metadataStructure.base_prompt_raw || metadata.prompt_raw || ''),
+    base_undesired_raw: Object.prototype.hasOwnProperty.call(parsedStructure, 'base_undesired_raw')
+      ? String(parsedStructure.base_undesired_raw || '')
+      : String(metadataStructure.base_undesired_raw || metadata.negative_prompt || ''),
     base_undesired_tags: normalizeTags(
       parsedStructure.base_undesired_tags,
       metadataStructure.base_undesired_raw || metadata.negative_prompt,
@@ -100,13 +109,20 @@ export function normalizePromptStructure(structure, metadata = {}, idFactory = c
     use_order: Object.prototype.hasOwnProperty.call(parsedStructure, 'use_order')
       ? Boolean(parsedStructure.use_order)
       : metadataStructure.use_order !== false,
-    characters: (sourceCharacters || []).slice(0, 6).map((character, index) => ({
-      id: character.id || idFactory(),
-      label: String(character.label || `Character ${index + 1}`),
-      prompt_tags: normalizeTags(character.prompt_tags, character.prompt_raw, idFactory),
-      undesired_tags: normalizeTags(character.undesired_tags, character.undesired_raw, idFactory),
-      center: firstCenter(character.center, character.centers),
-    })),
+    characters: (sourceCharacters || []).slice(0, 6).map((character, index) => {
+      const metadataCharacter = metadataStructure.characters[index] || {};
+      const promptRaw = Object.prototype.hasOwnProperty.call(character, 'prompt_raw') ? character.prompt_raw : metadataCharacter.prompt_raw;
+      const undesiredRaw = Object.prototype.hasOwnProperty.call(character, 'undesired_raw') ? character.undesired_raw : metadataCharacter.undesired_raw;
+      return {
+        id: character.id || idFactory(),
+        label: String(character.label || `Character ${index + 1}`),
+        prompt_raw: String(promptRaw || ''),
+        undesired_raw: String(undesiredRaw || ''),
+        prompt_tags: normalizeTags(character.prompt_tags, promptRaw, idFactory),
+        undesired_tags: normalizeTags(character.undesired_tags, undesiredRaw, idFactory),
+        center: firstCenter(character.center, character.centers),
+      };
+    }),
   };
 }
 
@@ -117,11 +133,11 @@ export function createPromptStructure(metadata = {}, idFactory = createId) {
 export function getPromptScopes(project) {
   const structure = project.prompt_structure || normalizePromptStructure(null, project.metadata);
   return [
-    { key: 'base:prompt', kind: 'base', polarity: 'prompt', label: 'Base Prompt', tags: project.tags || [] },
-    { key: 'base:undesired', kind: 'base', polarity: 'undesired', label: 'Base Undesired Content', tags: structure.base_undesired_tags || [] },
+    { key: 'base:prompt', kind: 'base', polarity: 'prompt', label: 'Base Prompt', raw_prompt: structure.base_prompt_raw ?? project.metadata?.prompt_raw ?? '', tags: project.tags || [] },
+    { key: 'base:undesired', kind: 'base', polarity: 'undesired', label: 'Base Undesired Content', raw_prompt: structure.base_undesired_raw ?? project.metadata?.negative_prompt ?? '', tags: structure.base_undesired_tags || [] },
     ...structure.characters.flatMap((character, index) => [
-      { key: `character:${character.id}:prompt`, kind: 'character', polarity: 'prompt', characterId: character.id, characterIndex: index, character, label: `${character.label} Prompt`, tags: character.prompt_tags },
-      { key: `character:${character.id}:undesired`, kind: 'character', polarity: 'undesired', characterId: character.id, characterIndex: index, character, label: `${character.label} Undesired Content`, tags: character.undesired_tags },
+      { key: `character:${character.id}:prompt`, kind: 'character', polarity: 'prompt', characterId: character.id, characterIndex: index, character, label: `${character.label} Prompt`, raw_prompt: character.prompt_raw || '', tags: character.prompt_tags },
+      { key: `character:${character.id}:undesired`, kind: 'character', polarity: 'undesired', characterId: character.id, characterIndex: index, character, label: `${character.label} Undesired Content`, raw_prompt: character.undesired_raw || '', tags: character.undesired_tags },
     ]),
   ];
 }
@@ -130,19 +146,23 @@ export function getPromptScope(project, scopeKey = 'base:prompt') {
   return getPromptScopes(project).find((scope) => scope.key === scopeKey) || getPromptScopes(project)[0];
 }
 
-export function updatePromptScope(project, scopeKey, tags) {
-  if (scopeKey === 'base:prompt') return { ...project, tags };
+export function updatePromptScope(project, scopeKey, tags, rawPrompt) {
   const structure = normalizePromptStructure(project.prompt_structure, project.metadata);
+  const nextRawPrompt = rawPrompt === undefined ? formatPromptGroupedInline(tags) : String(rawPrompt || '');
+  if (scopeKey === 'base:prompt') {
+    return { ...project, tags, prompt_structure: { ...structure, base_prompt_raw: nextRawPrompt } };
+  }
   if (scopeKey === 'base:undesired') {
-    return { ...project, prompt_structure: { ...structure, base_undesired_tags: tags } };
+    return { ...project, prompt_structure: { ...structure, base_undesired_raw: nextRawPrompt, base_undesired_tags: tags } };
   }
   const [, characterId, polarity] = scopeKey.split(':');
   const field = polarity === 'undesired' ? 'undesired_tags' : 'prompt_tags';
+  const rawField = polarity === 'undesired' ? 'undesired_raw' : 'prompt_raw';
   return {
     ...project,
     prompt_structure: {
       ...structure,
-      characters: structure.characters.map((character) => character.id === characterId ? { ...character, [field]: tags } : character),
+      characters: structure.characters.map((character) => character.id === characterId ? { ...character, [field]: tags, [rawField]: nextRawPrompt } : character),
     },
   };
 }
@@ -201,8 +221,8 @@ export function syncProjectPromptMetadata(project) {
     prompt_structure: structure,
     metadata: {
       ...project.metadata,
-      prompt_raw: formatPrompt(project.tags || []),
-      negative_prompt: formatPrompt(structure.base_undesired_tags),
+      prompt_raw: structure.base_prompt_raw,
+      negative_prompt: structure.base_undesired_raw,
     },
   };
 }

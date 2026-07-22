@@ -44,37 +44,22 @@ export function inferCategory(tag) {
   return categoryRules.find(([, expression]) => expression.test(tag))?.[0] || 'Unsorted';
 }
 
-function flattenLegacyBraceGroups(value) {
-  const source = String(value || '');
-  let output = '';
-  let cursor = 0;
-  while (cursor < source.length) {
-    const isSingleBrace = source[cursor] === '{' && source[cursor - 1] !== '{' && source[cursor + 1] !== '{';
-    if (!isSingleBrace) {
-      output += source[cursor];
-      cursor += 1;
-      continue;
-    }
-    const close = source.indexOf('}', cursor + 1);
-    const content = close === -1 ? '' : source.slice(cursor + 1, close);
-    const isLegacyGroup = close !== -1 && !content.includes('{') && /,\s*$/.test(content);
-    if (!isLegacyGroup) {
-      output += source[cursor];
-      cursor += 1;
-      continue;
-    }
-    output += `${content.replace(/,\s*$/, '').trim()},`;
-    cursor = close + 1;
-  }
-  return output;
+function braceGroupAt(source, cursor) {
+  if (source[cursor] !== '{') return null;
+  let depth = 0;
+  while (source[cursor + depth] === '{') depth += 1;
+  const closing = '}'.repeat(depth);
+  const close = source.indexOf(closing, cursor + depth);
+  if (close === -1) return null;
+  return {
+    depth,
+    close,
+    end: close + depth,
+    content: source.slice(cursor + depth, close),
+  };
 }
 
-function hasLegacyBraceGroups(value) {
-  return flattenLegacyBraceGroups(value) !== String(value || '');
-}
-
-function promptSegments(prompt) {
-  const source = flattenLegacyBraceGroups(prompt).replace(/\r\n?/g, '\n').replace(/，/g, ',');
+function scanPromptSegments(source, state) {
   const segments = [];
   let cursor = 0;
   while (cursor < source.length) {
@@ -87,11 +72,25 @@ function promptSegments(prompt) {
       const contentEnd = source.indexOf('::', contentStart);
       if (contentEnd !== -1) {
         const weight = Number(weighted[1]);
-        source.slice(contentStart, contentEnd).split(/[,\n]/).map((tag) => tag.trim()).filter(Boolean)
-          .forEach((tag) => segments.push({ tag, weight }));
+        scanPromptSegments(source.slice(contentStart, contentEnd), state)
+          .forEach((segment) => segments.push({ ...segment, weight }));
         cursor = contentEnd + 2;
         continue;
       }
+    }
+
+    const braceGroup = braceGroupAt(source, cursor);
+    if (braceGroup) {
+      const group = `brace-${state.nextGroup++}`;
+      const trailingComma = /,\s*$/.test(braceGroup.content);
+      scanPromptSegments(braceGroup.content, state).forEach((segment) => segments.push({
+        ...segment,
+        brace_depth: braceGroup.depth + Number(segment.brace_depth || 0),
+        brace_group: group,
+        brace_trailing_comma: trailingComma,
+      }));
+      cursor = braceGroup.end;
+      continue;
     }
 
     const comma = source.indexOf(',', cursor);
@@ -121,9 +120,22 @@ function promptSegments(prompt) {
   return segments;
 }
 
+function promptSegments(prompt) {
+  const source = String(prompt || '').replace(/\r\n?/g, '\n').replace(/，/g, ',');
+  return scanPromptSegments(source, { nextGroup: 0 });
+}
+
+function hasBraceGroups(value) {
+  const source = String(value || '');
+  for (let cursor = 0; cursor < source.length; cursor += 1) {
+    if (braceGroupAt(source, cursor)) return true;
+  }
+  return false;
+}
+
 export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
   return promptSegments(prompt)
-    .map(({ tag, weight, raw_segment = '', syntax_issue = '' }, position) => {
+    .map(({ tag, weight, raw_segment = '', syntax_issue = '', brace_depth = 0, brace_group = '', brace_trailing_comma = false }, position) => {
       return {
         id: createId(),
         tag,
@@ -134,6 +146,9 @@ export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
         weight,
         raw_segment,
         syntax_issue,
+        brace_depth,
+        brace_group,
+        brace_trailing_comma,
         position,
         note: '',
       };
@@ -167,12 +182,12 @@ export function parsePromptPreservingEdits(prompt = '', existingTags = [], creat
 
 export function repairLegacyPromptTags(tags = [], prompt = '', createId = () => crypto.randomUUID()) {
   const hasLegacyFragments = tags.some((item) => /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)::/.test(item.tag) || /::$/.test(item.tag) || /[{}]/.test(item.tag))
-    || hasLegacyBraceGroups(prompt);
+    || (hasBraceGroups(prompt) && !tags.some((item) => Number(item.brace_depth) > 0));
   if (!hasLegacyFragments || !prompt.trim()) return tags;
 
   const existingByTag = new Map();
   for (const item of tags) {
-    const key = item.tag.trim().replace(/^\{\s*/, '').replace(/\s*\}$/, '').toLowerCase();
+    const key = item.tag.trim().replace(/^\{+\s*/, '').replace(/\s*\}+$/, '').toLowerCase();
     if (!existingByTag.has(key)) existingByTag.set(key, []);
     existingByTag.get(key).push(item);
   }
@@ -190,10 +205,20 @@ export function repairLegacyPromptTags(tags = [], prompt = '', createId = () => 
   });
 }
 
-export function formatTag(tag) {
+function formatTagContent(tag) {
   if (tag.syntax_issue && tag.raw_segment) return tag.raw_segment.trim();
   const value = Number(tag.weight);
   return Math.abs(value - 1) < 0.001 ? tag.tag.trim() : `${Number(value.toFixed(2))}::${tag.tag.trim()} ::`;
+}
+
+export function formatTagLabel(tag, value = tag.tag) {
+  const depth = Math.max(0, Math.trunc(Number(tag.brace_depth) || 0));
+  const content = String(value || '').trim();
+  return depth ? `${'{'.repeat(depth)}${content}${'}'.repeat(depth)}` : content;
+}
+
+export function formatTag(tag) {
+  return formatTagLabel(tag, formatTagContent(tag));
 }
 
 export function formatPrompt(tags = []) {
@@ -218,6 +243,33 @@ export function analyzePromptBatch(prompt = '', existingTags = [], createId = ()
 
 export function formatPromptInline(tags = []) {
   return tags.filter((tag) => tag.tag.trim()).map(formatTag).join(', ');
+}
+
+export function formatPromptGroupedInline(tags = []) {
+  const values = [];
+  for (let index = 0; index < tags.length;) {
+    const tag = tags[index];
+    if (!tag.tag.trim()) {
+      index += 1;
+      continue;
+    }
+    const depth = Math.max(0, Math.trunc(Number(tag.brace_depth) || 0));
+    if (!depth || !tag.brace_group) {
+      values.push(formatTag(tag));
+      index += 1;
+      continue;
+    }
+    const members = [];
+    let cursor = index;
+    while (cursor < tags.length && tags[cursor].brace_group === tag.brace_group && Number(tags[cursor].brace_depth) === depth) {
+      if (tags[cursor].tag.trim()) members.push(formatTagContent(tags[cursor]));
+      cursor += 1;
+    }
+    const trailing = tag.brace_trailing_comma && members.length ? ', ' : '';
+    values.push(`${'{'.repeat(depth)}${members.join(', ')}${trailing}${'}'.repeat(depth)}`);
+    index = cursor;
+  }
+  return values.join(', ');
 }
 
 export function normalizeSearch(value = '') {

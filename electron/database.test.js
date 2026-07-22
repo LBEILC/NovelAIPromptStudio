@@ -19,7 +19,7 @@ function project(id = 'project-1') {
     content_hash: `hash-${id}`,
     created_at: now,
     updated_at: now,
-    tags: [{ id: `${id}-tag`, tag: 'artist:ciloranko', translation: '', category: 'Artist', weight: 1.1, raw_segment: '', syntax_issue: '' }],
+    tags: [{ id: `${id}-tag`, tag: 'artist:ciloranko', translation: '', category: 'Artist', weight: 1.1, raw_segment: '', syntax_issue: '', brace_depth: 2, brace_group: 'artists', brace_trailing_comma: true }],
     prompt_structure: {
       base_undesired_tags: [{ id: `${id}-uc`, tag: 'lowres', translation: '', category: 'Unsorted', weight: 1 }],
       use_coords: true,
@@ -38,7 +38,7 @@ describe('phase 2 core database', () => {
     database.insertProject(project());
     const loaded = database.loadLibrary()[0];
     expect(loaded).toMatchObject({ name: 'Structured prompt', content_hash: 'hash-project-1' });
-    expect(loaded.tags[0]).toMatchObject({ tag: 'artist:ciloranko', weight: 1.1 });
+    expect(loaded.tags[0]).toMatchObject({ tag: 'artist:ciloranko', weight: 1.1, brace_depth: 2, brace_group: 'artists', brace_trailing_comma: 1 });
     expect(loaded.prompt_structure.characters[0]).toMatchObject({ center: { x: 0.3, y: 0.5 }, prompt_tags: [{ tag: 'girl' }] });
     expect(loaded.metadata).toMatchObject({ seed: '42', width: 832, height: 1216 });
     expect(database.loadVibeLibrary).toBeUndefined();

@@ -30,7 +30,10 @@ CREATE TABLE IF NOT EXISTS prompt_tags (
   position INTEGER NOT NULL,
   note TEXT NOT NULL DEFAULT '',
   raw_segment TEXT NOT NULL DEFAULT '',
-  syntax_issue TEXT NOT NULL DEFAULT ''
+  syntax_issue TEXT NOT NULL DEFAULT '',
+  brace_depth INTEGER NOT NULL DEFAULT 0,
+  brace_group TEXT NOT NULL DEFAULT '',
+  brace_trailing_comma INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_prompt_tags_project ON prompt_tags(project_id, position);
 CREATE INDEX IF NOT EXISTS idx_prompt_tags_search ON prompt_tags(tag, translation, category);
@@ -123,6 +126,9 @@ export async function openDatabase(dataDirectory) {
   const tagColumns = tableColumns(database, 'prompt_tags');
   ensureColumn(database, 'prompt_tags', tagColumns, 'raw_segment', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(database, 'prompt_tags', tagColumns, 'syntax_issue', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(database, 'prompt_tags', tagColumns, 'brace_depth', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(database, 'prompt_tags', tagColumns, 'brace_group', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(database, 'prompt_tags', tagColumns, 'brace_trailing_comma', 'INTEGER NOT NULL DEFAULT 0');
   const metadataColumns = tableColumns(database, 'generation_metadata');
   ensureColumn(database, 'generation_metadata', metadataColumns, 'prompt_structure_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(database, 'generation_metadata', metadataColumns, 'width', 'INTEGER NOT NULL DEFAULT 0');
@@ -290,8 +296,8 @@ export async function openDatabase(dataDirectory) {
       );
       for (const [position, tag] of (project.tags || []).entries()) {
         database.run(
-          `INSERT INTO prompt_tags (id, project_id, tag, translation, category, weight, position, note, raw_segment, syntax_issue)
-           VALUES ($id, $project_id, $tag, $translation, $category, $weight, $position, '', $raw_segment, $syntax_issue)`,
+          `INSERT INTO prompt_tags (id, project_id, tag, translation, category, weight, position, note, raw_segment, syntax_issue, brace_depth, brace_group, brace_trailing_comma)
+           VALUES ($id, $project_id, $tag, $translation, $category, $weight, $position, '', $raw_segment, $syntax_issue, $brace_depth, $brace_group, $brace_trailing_comma)`,
           {
             $id: tag.id,
             $project_id: project.id,
@@ -302,6 +308,9 @@ export async function openDatabase(dataDirectory) {
             $position: position,
             $raw_segment: String(tag.raw_segment || ''),
             $syntax_issue: String(tag.syntax_issue || ''),
+            $brace_depth: Math.max(0, Math.trunc(Number(tag.brace_depth) || 0)),
+            $brace_group: String(tag.brace_group || ''),
+            $brace_trailing_comma: tag.brace_trailing_comma ? 1 : 0,
           },
         );
       }

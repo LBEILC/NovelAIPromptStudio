@@ -8,7 +8,7 @@ import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
 import LobeSelect from '@lobehub/ui/es/Select/index';
 import LobeSliderWithInput from '@lobehub/ui/es/SliderWithInput/index';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
-import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, formatPromptInline, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
+import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, formatTagLabel, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
 import { addPromptCharacter, getPromptScope, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
 import SelectionMark from './components/SelectionMark.jsx';
 import Icon from './components/Icon.jsx';
@@ -40,24 +40,25 @@ function syntaxMessage(tag) {
 }
 
 function tagPresentation(tag, language) {
+  const original = formatTagLabel(tag);
   if (language === 'translated') {
     return {
       primary: tag.translation || tag.tag,
       secondary: '',
-      title: tag.translation ? `原文：${tag.tag}` : `暂无翻译 · 原文：${tag.tag}`,
+      title: tag.translation ? `原文：${original}` : `暂无翻译 · 原文：${original}`,
       fallback: !tag.translation,
     };
   }
   if (language === 'bilingual') {
     return {
-      primary: tag.tag,
+      primary: original,
       secondary: tag.translation || '暂无翻译',
-      title: tag.translation ? `原文：${tag.tag}\n翻译：${tag.translation}` : `原文：${tag.tag}\n暂无翻译`,
+      title: tag.translation ? `原文：${original}\n翻译：${tag.translation}` : `原文：${original}\n暂无翻译`,
       fallback: !tag.translation,
     };
   }
   return {
-    primary: tag.tag,
+    primary: original,
     secondary: '',
     title: tag.translation ? `翻译：${tag.translation}` : '暂无翻译',
     fallback: false,
@@ -102,16 +103,19 @@ function WeightEditor({ value, onCommit }) {
 }
 
 function TagQuickEditor({ tag, translating, onChange, onClose, onTranslate }) {
+  const braceDepth = Math.max(0, Math.trunc(Number(tag.brace_depth) || 0));
   return <div className="tag-quick-editor" onClick={(event) => event.stopPropagation()}>
     <div className="tag-quick-editor-heading">
       <div><strong>编辑 Tag</strong><small>修改只保存在当前工作台草稿</small></div>
       <LobeButton onClick={onClose} size="small" type="text">完成</LobeButton>
     </div>
-    <label><span>原文</span><LobeInput autoFocus onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic', raw_segment: '', syntax_issue: '' })} size="small" value={tag.tag}/></label>
+    <label><span>{braceDepth ? '括号内原文' : '原文'}</span><LobeInput autoFocus onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic', raw_segment: '', syntax_issue: '' })} size="small" value={tag.tag}/></label>
     <label><span>翻译</span><LobeInput onChange={(event) => onChange({ translation: event.target.value, translation_source: 'manual' })} placeholder="添加中文翻译" size="small" value={tag.translation || ''}/></label>
     <div className="tag-quick-editor-row">
       <label><span>分类</span><LobeSelect onChange={(category) => onChange({ category, category_source: 'manual' })} options={CATEGORY_OPTIONS.map((value) => ({ label: CATEGORY_LABELS[value], value }))} size="small" value={tag.category || 'Unsorted'}/></label>
-      <label><span>权重</span><WeightEditor onCommit={(weight) => onChange({ weight })} value={tag.weight}/></label>
+      {braceDepth
+        ? <label><span>强调结构</span><LobeInput disabled size="small" value={`${braceDepth} 层花括号`}/></label>
+        : <label><span>权重</span><WeightEditor onCommit={(weight) => onChange({ weight })} value={tag.weight}/></label>}
     </div>
     <div className="tag-quick-editor-footer">
       <LobeButton disabled={translating} icon={<Icon name="spark" size={14}/>} onClick={onTranslate} size="small">{translating ? '翻译中…' : 'AI 翻译'}</LobeButton>
@@ -529,13 +533,13 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     setAddingScopeKey('');
     setRawEditingScopeKey(scopeKey);
     if (!scopeKey) return;
-    setRawDraft(formatPromptInline(getPromptScope(project, scopeKey).tags));
+    setRawDraft(getPromptScope(project, scopeKey).raw_prompt || '');
   };
 
   const saveRawScope = (scopeKey) => {
     const scope = getPromptScope(project, scopeKey);
     const tags = parsePromptPreservingEdits(rawDraft, scope.tags);
-    updateProject(updatePromptScope(project, scopeKey, tags));
+    updateProject(updatePromptScope(project, scopeKey, tags, rawDraft));
     setRawEditingScopeKey('');
     setRawDraft('');
     onNotify?.(`已从原始文本更新 ${tags.length} 个 Tag`);

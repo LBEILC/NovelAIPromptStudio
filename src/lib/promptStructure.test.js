@@ -4,9 +4,12 @@ import {
   extractV4PromptData,
   formatPositivePrompt,
   formatPositivePromptForCopy,
+  getPromptScope,
   getPromptScopes,
+  syncProjectPromptMetadata,
   updatePromptScope,
 } from './promptStructure.js';
+import { parsePrompt } from './prompt.js';
 
 describe('NovelAI V4 prompt structure', () => {
   it('extracts base, character, undesired, order, and position data', () => {
@@ -69,5 +72,25 @@ describe('NovelAI V4 prompt structure', () => {
     expect(getPromptScopes(updated)[2].tags.map((tag) => tag.tag)).toEqual(['red hair', 'girl']);
     expect(formatPositivePrompt(project)).toContain('|');
     expect(formatPositivePromptForCopy(project)).toBe('2girls\n|\ngirl, red hair');
+  });
+
+  it('preserves exact raw prompt text until a structured tag is edited', () => {
+    let id = 0;
+    const raw = '{{{best quality, amazing quality}}}, 1girl,';
+    const project = {
+      tags: parsePrompt(raw, () => `brace-${id++}`),
+      metadata: { prompt_raw: raw, negative_prompt: '' },
+    };
+    const hydrated = syncProjectPromptMetadata(project);
+
+    expect(hydrated.metadata.prompt_raw).toBe(raw);
+    expect(getPromptScope(hydrated, 'base:prompt').raw_prompt).toBe(raw);
+
+    const editedTags = hydrated.tags.map((tag) => tag.tag === 'amazing quality' ? { ...tag, tag: 'very aesthetic' } : tag);
+    const edited = syncProjectPromptMetadata(updatePromptScope(hydrated, 'base:prompt', editedTags));
+    expect(edited.metadata.prompt_raw).toBe('{{{best quality, very aesthetic}}}, 1girl');
+
+    const rawEdited = syncProjectPromptMetadata(updatePromptScope(edited, 'base:prompt', editedTags, `${raw}\n`));
+    expect(rawEdited.metadata.prompt_raw).toBe(`${raw}\n`);
   });
 });
