@@ -9,7 +9,7 @@ import LobeSelect from '@lobehub/ui/es/Select/index';
 import LobeSliderWithInput from '@lobehub/ui/es/SliderWithInput/index';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, inferCategory } from './lib/prompt.js';
-import { addPromptCharacter, countPromptTags, getPromptScope, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
+import { addPromptCharacter, getPromptScope, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
 import SelectionMark from './components/SelectionMark.jsx';
 import Icon from './components/Icon.jsx';
 import {
@@ -172,7 +172,7 @@ function ScopeTags({
   const pendingAdd = analyzePromptBatch(addDraft, scope.tags);
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
-      <span>{scope.polarity === 'undesired' ? 'UNDESIRED CONTENT' : 'PROMPT'}</span>
+      <span>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</span>
       <b>{scope.tags.length}</b>
       <LobePopover
         arrow
@@ -242,10 +242,9 @@ function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, o
   const groupKeys = group.entries.map((entry) => entry.key);
   const allSelected = groupKeys.length > 0 && groupKeys.every((key) => selectedSet.has(key));
   return <section className={`overview-category-group cat-${String(group.category).toLowerCase()}`}>
-    <div className="overview-category-marker"><span>{CATEGORY_LABELS[group.category] || group.category}</span><i/></div>
     <div className="overview-category-body">
       <div className="overview-category-heading">
-        <div><strong>{CATEGORY_LABELS[group.category] || group.category}</strong><small>{group.category.toUpperCase()} · {group.entries.length} TAGS</small></div>
+        <div><strong>{CATEGORY_LABELS[group.category] || group.category}</strong><small>{group.entries.length} 个 Tag</small></div>
         {selecting && <LobeButton className={allSelected ? 'active' : ''} onClick={() => onToggleGroup(group.entries)} size="small">{allSelected ? '取消整组' : `选择整组 ${group.entries.length}`}</LobeButton>}
       </div>
       <div className="overview-tags" role="list" aria-label={`${CATEGORY_LABELS[group.category] || group.category} Tag`}>
@@ -509,19 +508,6 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
 
   return <div className="prompt-overview">
     <header className="overview-header">
-      <div className="overview-title-row">
-        <div>
-          <span className="overview-kicker">TAG WORKBENCH / V4</span>
-          <h2>Tag 编辑</h2>
-          <p>点击 Tag 编辑原文、翻译、分类和权重；拖动可调整顺序。</p>
-        </div>
-        <div className="overview-stats">
-          <span><b>{visibleEntries.length}</b> VISIBLE</span>
-          <span><b>{countPromptTags(project)}</b> TOTAL</span>
-          <span><b>{structure.characters.length}</b> CHARACTERS</span>
-        </div>
-      </div>
-
       <div className="overview-toolbar">
         <LobeSearchBar className="overview-search" onInputChange={(query) => changeFilter({ query })} placeholder="筛选 Tag 或译名" value={filters.query}/>
         <div className="overview-filter-controls">
@@ -567,22 +553,20 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
       />)}
 
       {viewMode === 'structure' && baseScopes.length > 0 && <section className="overview-layer base-layer">
-        <div className="overview-layer-marker"><span>BASE</span><i/></div>
         <div className="overview-layer-body">
-          <div className="overview-layer-heading"><div><strong>Base Prompt</strong><small>场景、构图、风格与全局排除内容</small></div><span>GLOBAL</span></div>
+          <div className="overview-layer-heading"><strong>基础 Prompt</strong></div>
           {baseScopes.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
         </div>
       </section>}
 
-      {viewMode === 'structure' && filters.domain !== 'base' && structure.characters.map((character, index) => {
+      {viewMode === 'structure' && filters.domain !== 'base' && structure.characters.map((character) => {
         const sections = characterScopes.filter((scope) => scope.characterId === character.id);
         if (!sections.length) return null;
         return <section className="overview-layer character-layer" key={character.id}>
-          <div className="overview-layer-marker"><span>{String(index + 1).padStart(2, '0')}</span><i/></div>
           <div className="overview-layer-body">
             <div className="overview-layer-heading">
-              <div><strong>{character.label}</strong><small>独立角色描述与排除内容</small></div>
-              <LobePopover arrow className="character-quick-popover" content={<CharacterEditor character={character} project={project} onChange={updateProject} onClose={() => setEditingCharacterId('')} onDelete={() => deleteCharacter(character)}/>} onOpenChange={(open) => setEditingCharacterId(open ? character.id : '')} open={editingCharacterId === character.id} placement="bottomRight" trigger="click"><LobeButton size="small" type="text">{structure.use_coords ? `POSITION ${compactPosition(character.center)}` : 'AI POSITION'}</LobeButton></LobePopover>
+              <strong>{character.label}</strong>
+              <LobePopover arrow className="character-quick-popover" content={<CharacterEditor character={character} project={project} onChange={updateProject} onClose={() => setEditingCharacterId('')} onDelete={() => deleteCharacter(character)}/>} onOpenChange={(open) => setEditingCharacterId(open ? character.id : '')} open={editingCharacterId === character.id} placement="bottomRight" trigger="click"><LobeButton size="small" type="text">{structure.use_coords ? `位置 ${compactPosition(character.center)}` : 'AI 位置'}</LobeButton></LobePopover>
             </div>
             {sections.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
           </div>

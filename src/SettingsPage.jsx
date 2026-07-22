@@ -50,28 +50,26 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
     showToast(result?.ok ? `连接成功 · ${result.model || aiSettings.model}` : result?.error || '连接测试失败');
   };
 
-  const platform = navigator.platform.startsWith('Mac') ? 'macOS' : navigator.platform.startsWith('Win') ? 'Windows' : 'Desktop';
   return <main className="settings-page">
     <aside className="settings-nav">
-      <header><span>SETTINGS / 01</span><h1>软件设置</h1><p>设置保存在当前设备，不会写入图片 metadata。</p></header>
+      <header><h1>设置</h1></header>
       <nav aria-label="设置分类">
-        <LobeButton block className={section === 'appearance' ? 'active' : ''} icon={<Icon name="settings"/>} onClick={() => setSection('appearance')} type="text"><span><strong>外观与可读性</strong><small>主题、字号、密度、动效</small></span></LobeButton>
-        <LobeButton block className={section === 'ai' ? 'active' : ''} icon={<Icon name="spark"/>} onClick={() => setSection('ai')} type="text"><span><strong>AI 服务</strong><small>翻译、分类与安全存储</small></span></LobeButton>
+        <LobeButton block className={section === 'appearance' ? 'active' : ''} icon={<Icon name="settings"/>} onClick={() => setSection('appearance')} type="text"><strong>外观</strong></LobeButton>
+        <LobeButton block className={section === 'ai' ? 'active' : ''} icon={<Icon name="spark"/>} onClick={() => setSection('ai')} type="text"><strong>AI 服务</strong></LobeButton>
       </nav>
       <LobeButton className="settings-back" onClick={onClose}><Icon name="close" size={14}/>返回</LobeButton>
     </aside>
     <section className="settings-content">
       {section === 'appearance' ? <>
-        <header className="settings-heading"><span>APPEARANCE</span><h2>保持工作台清楚、安静</h2><p>沿用现有 Lobe UI 规范，只调整阅读密度，不增加新的视觉系统。</p></header>
+        <header className="settings-heading"><h2>外观</h2></header>
         <div className="settings-group">
-          <div className="settings-row"><div><strong>界面主题</strong><small>跟随系统可响应 Windows 或 macOS 的外观设置。</small></div><LobeSegmented aria-label="界面主题" className="settings-segment" options={[{ label: '跟随系统', value: 'auto' }, { label: '浅色', value: 'light' }, { label: '深色', value: 'dark' }]} value={appearance.themeMode} onChange={(value) => onAppearanceChange({ themeMode: value })}/></div>
-          <div className="settings-row"><div><strong>界面字号</strong><small>默认使用“较大”，改善中文与长时间阅读。</small></div><LobeSegmented aria-label="界面字号" className="settings-segment" options={[{ label: '标准', value: 'default' }, { label: '较大', value: 'large' }, { label: '特大', value: 'larger' }]} value={appearance.fontScale} onChange={(value) => onAppearanceChange({ fontScale: value })}/></div>
-          <div className="settings-row"><div><strong>界面密度</strong><small>只改变留白和控件高度，不隐藏功能。</small></div><LobeSegmented aria-label="界面密度" className="settings-segment" options={[{ label: '紧凑', value: 'compact' }, { label: '舒适', value: 'comfortable' }]} value={appearance.density} onChange={(value) => onAppearanceChange({ density: value })}/></div>
-          <div className="settings-row"><div><strong>界面动效</strong><small>关闭后只保留必要的状态变化。</small></div><LobeSegmented aria-label="界面动效" className="settings-segment" options={[{ label: '完整', value: 'full' }, { label: '跟随系统', value: 'reduced' }, { label: '关闭', value: 'off' }]} value={appearance.motion} onChange={(value) => onAppearanceChange({ motion: value })}/></div>
+          <div className="settings-row"><strong>主题</strong><LobeSegmented aria-label="界面主题" className="settings-segment" options={[{ label: '跟随系统', value: 'auto' }, { label: '浅色', value: 'light' }, { label: '深色', value: 'dark' }]} value={appearance.themeMode} onChange={(value) => onAppearanceChange({ themeMode: value })}/></div>
+          <div className="settings-row"><strong>字号</strong><LobeSegmented aria-label="界面字号" className="settings-segment" options={[{ label: '标准', value: 'default' }, { label: '较大', value: 'large' }, { label: '特大', value: 'larger' }]} value={appearance.fontScale} onChange={(value) => onAppearanceChange({ fontScale: value })}/></div>
+          <div className="settings-row"><strong>密度</strong><LobeSegmented aria-label="界面密度" className="settings-segment" options={[{ label: '紧凑', value: 'compact' }, { label: '舒适', value: 'comfortable' }]} value={appearance.density} onChange={(value) => onAppearanceChange({ density: value })}/></div>
+          <div className="settings-row"><strong>动效</strong><LobeSegmented aria-label="界面动效" className="settings-segment" options={[{ label: '完整', value: 'full' }, { label: '跟随系统', value: 'reduced' }, { label: '关闭', value: 'off' }]} value={appearance.motion} onChange={(value) => onAppearanceChange({ motion: value })}/></div>
         </div>
-        <aside className="settings-platform-note"><Icon name="info"/><div><strong>{platform} 当前生效</strong><span>字体与窗口行为继续遵循现有跨平台设置。</span></div></aside>
       </> : <>
-        <header className="settings-heading"><span>AI SERVICE</span><h2>翻译与分类使用同一安全连接</h2><p>API Key 由操作系统安全存储加密，不进入 SQLite、日志或图片文件。</p></header>
+        <header className="settings-heading"><h2>AI 服务</h2><p>用于 Tag 翻译和分类。</p></header>
         <div className="settings-group ai-settings-group">
           <label><span><strong>API Base URL</strong><small>兼容 OpenAI API 格式的服务地址</small></span><LobeInput value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
           <label><span><strong>API Key</strong><small>{aiSettings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}</small></span><LobeInputPassword value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '已安全保存' : '输入 API Key'}/></label>

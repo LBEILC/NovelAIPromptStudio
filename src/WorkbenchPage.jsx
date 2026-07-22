@@ -9,9 +9,9 @@ function mediaUrl(filePath) {
 }
 
 function WorkbenchVibes({ vibes, onCopy }) {
-  if (!vibes?.length) return <div className="workbench-vibe-empty"><Icon name="info" size={15}/><span>图片中没有可恢复的 Vibe 编码</span></div>;
+  if (!vibes?.length) return <div className="workbench-vibe-empty"><Icon name="info" size={15}/><span>没有检测到 Vibe</span></div>;
   return <section className="workbench-vibes" aria-label="图片中的 Vibe">
-    <header><div><span>VIBE METADATA</span><strong>检测到 {vibes.length} 个 Vibe</strong></div><small>只读解析，不在这里调整强度</small></header>
+    <header><strong>Vibe</strong><small>{vibes.length} 个</small></header>
     <div className="workbench-vibe-list">
       {vibes.map((vibe, index) => <div className="workbench-vibe-row" key={vibe.id || index}>
         <div><strong>{vibe.name || `Vibe ${index + 1}`}</strong><small>原图强度 {Number(vibe.strength ?? .6).toFixed(2)} · Information {vibe.information_extracted == null ? '未知' : Number(vibe.information_extracted).toFixed(2)}</small></div>
@@ -39,20 +39,19 @@ export default function WorkbenchPage({
 }) {
   if (!session) return <main className="workbench-page workbench-empty-page">
     <div className="workbench-empty-copy">
-      <span className="workbench-kicker">WORKBENCH / 01</span>
-      <h1>拖入图片，<br/>直接编辑 Tag</h1>
-      <p>读取 NovelAI 图片中的 Prompt 与 Vibe。图片只用于当前工作台，不会保存到图片库。</p>
-      <LobeButton disabled={loading} icon={<Icon name="image"/>} onClick={onChooseImage} size="large" type="primary">{loading ? '正在读取…' : '选择 NovelAI 图片'}</LobeButton>
-      <small>PNG · JPG · WEBP　一次处理一张图片</small>
+      <h1>编辑图片中的 Tag</h1>
+      <p>拖入 NovelAI 图片，或从本地选择一张图片。</p>
+      <LobeButton disabled={loading} icon={<Icon name="image"/>} onClick={onChooseImage} size="large" type="primary">{loading ? '正在读取…' : '选择图片'}</LobeButton>
+      <small>PNG、JPG、WEBP</small>
       {error && <LobeAlert className="workbench-empty-error" message={error} type="error" variant="outlined"/>}
     </div>
-    <div className="workbench-empty-visual" aria-hidden="true"><div className="workbench-drop-frame"><Icon name="upload" size={34}/><span>DROP IMAGE</span><i/></div></div>
+    <div className="workbench-empty-visual" aria-hidden="true"><div className="workbench-drop-frame"><Icon name="upload" size={30}/><span>拖放图片到这里</span></div></div>
   </main>;
 
   const project = session.project;
   return <main className="workbench-page workbench-active-page">
     <header className="workbench-header">
-      <div><span className="workbench-kicker">WORKBENCH / 01</span><h1>{project.name}</h1><p>{countPromptTags(project)} 个 Tag · 工作台草稿不会修改原图或图片库</p></div>
+      <div className="workbench-header-copy"><h1>工作台</h1><p title={project.name}>{project.name}<span> · {countPromptTags(project)} 个 Tag</span></p></div>
       <div className="workbench-header-actions">
         <LobeButton disabled={loading} icon={<Icon name="image" size={14}/>} onClick={onChooseImage}>{loading ? '读取中…' : '更换图片'}</LobeButton>
         <LobeButton icon={<Icon name="refresh" size={14}/>} onClick={onReset}>恢复原图</LobeButton>
