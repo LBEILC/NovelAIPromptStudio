@@ -11,6 +11,7 @@ import { listModels, testModel, translateTags } from './translation.js';
 import { generationSnapshot, hasGenerationChanges, mergeResultAnnotations } from '../src/lib/branches.js';
 import { compareBranchResult } from '../src/lib/branchMatching.js';
 import { buildContextMenuTemplate } from './contextMenus.js';
+import { readWorkbenchImage } from './workbench.js';
 
 app.setName('NovelAI Prompt Studio');
 
@@ -129,6 +130,24 @@ app.whenReady().then(async () => {
   ipcMain.handle('library:load', async () => {
     await contentHashBackfill;
     return database.loadLibrary();
+  });
+  ipcMain.handle('workbench:image:open', async (_event, request = {}) => {
+    let filePath = String(request.filePath || '');
+    if (request.fromDrop && !filePath) return { ok: false, project: null, error: '无法读取拖入文件的本地路径' };
+    if (!filePath) {
+      const result = await dialog.showOpenDialog({
+        title: '在工作台中打开 NovelAI 图片',
+        properties: ['openFile'],
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+      });
+      if (result.canceled) return { ok: true, canceled: true, project: null };
+      [filePath] = result.filePaths;
+    }
+    try {
+      return { ok: true, project: await readWorkbenchImage(filePath, { enrichProjectTags: database.enrichProjectTags }) };
+    } catch (error) {
+      return { ok: false, project: null, error: error instanceof Error ? error.message : String(error) };
+    }
   });
   ipcMain.handle('context-menu:show', (event, request = {}) => new Promise((resolve) => {
     const ownerWindow = BrowserWindow.fromWebContents(event.sender);
@@ -269,6 +288,19 @@ app.whenReady().then(async () => {
   ipcMain.handle('vibe:library:update', (_event, id, patch) => ({ ok: true, library: database.updateVibeLibrary(id, patch) }));
   ipcMain.handle('tag:dictionary:load', () => database.loadTagDictionary());
   ipcMain.handle('tag:dictionary:update', (_event, tag, patch) => ({ ok: true, dictionary: database.updateTagDictionary(tag, patch) }));
+  ipcMain.handle('tag:annotations:save', (_event, entries = []) => {
+    try {
+      for (const entry of entries || []) {
+        const patch = {};
+        if (entry?.translation_source === 'manual') patch.translation = String(entry.translation || '');
+        if (entry?.category_source === 'manual') patch.category = String(entry.category || 'Unsorted');
+        if (Object.keys(patch).length) database.updateTagDictionary(String(entry?.tag || ''), patch);
+      }
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle('vibe:library:import', async () => {
     const result = await dialog.showOpenDialog({
       title: '导入 Vibe 或参考图',

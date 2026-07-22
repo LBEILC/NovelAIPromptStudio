@@ -38,21 +38,25 @@ import {
   updatePromptScope,
 } from './lib/promptStructure.js';
 import PromptOverview from './PromptOverview.jsx';
+import WorkbenchPage from './WorkbenchPage.jsx';
 import Icon from './components/Icon.jsx';
 import { groupVibeLibraryBySource } from './lib/vibeLibrary.js';
 import { buildTagLibrary, parseVibeValues, parseVibeVariants, vibeGroupUsages } from './lib/resourceIndexes.js';
 import { informationExtractedPatch, informationExtractedState, restoreOriginalInformationPatch } from './lib/vibes.js';
 import { hasLimitedReproduction } from './lib/generationMetadata.js';
-import { assessDroppedFiles } from './lib/importDrop.js';
+import { assessDroppedFiles, assessWorkbenchDroppedFiles } from './lib/importDrop.js';
 import { applyGenerationSnapshot, branchChangeFields, branchChangeSummary, generationSnapshot, hasGenerationChanges } from './lib/branches.js';
 import { contextMenuPosition, isTextEditingTarget } from './lib/contextMenu.js';
 import { panCompareViewport, zoomCompareViewport } from './lib/compareViewport.js';
 import { moveExperimentMember } from './lib/experiments.js';
 import { buildRelationshipGroups } from './lib/relationships.js';
 import { overviewTagKey } from './lib/promptOverview.js';
+import { createWorkbenchSession, parseWorkbenchSession, serializeWorkbenchSession, WORKBENCH_SESSION_KEY, workbenchHasChanges } from './lib/workbenchSession.js';
 
 const studio = window.studio || {
   loadLibrary: async () => [],
+  openWorkbenchImage: async () => ({ ok: false, error: '请在桌面应用中打开图片' }),
+  openDroppedWorkbenchImage: async () => ({ ok: false, error: '请在桌面应用中打开图片' }),
   showContextMenu: async () => null,
   loadLibraryOrganization: async () => ({ collections: [], series: [], projects: [] }),
   createCollection: async () => ({ ok: true, collections: [], projects: [] }),
@@ -88,6 +92,7 @@ const studio = window.studio || {
   updateVibeLibrary: async (_id, _patch) => ({ ok: true, library: [] }),
   loadTagDictionary: async () => [],
   updateTagDictionary: async (_tag, _patch) => ({ ok: true, dictionary: [] }),
+  saveTagAnnotations: async () => ({ ok: true }),
   importVibeLibrary: async () => ({ ok: true, library: [], imported: [], errors: [] }),
   useVibeFromLibrary: async (entry) => ({ ...entry, id: crypto.randomUUID(), library_id: entry.id, enabled: true }),
   inspectEmbeddedVibes: async () => ({ total: 0, linked: 0, available: 0, missing: [] }),
@@ -142,17 +147,18 @@ async function showNativeContextMenu(event, request) {
   return studio.showContextMenu({ ...request, ...contextMenuPosition(event) });
 }
 
-function ImportExperience({ dragState, progress, result, onCancel, onDismiss }) {
+function ImportExperience({ dragState, progress, result, onCancel, onDismiss, target = 'gallery' }) {
   const summary = result?.summary;
   const importing = progress && ['preparing', 'importing'].includes(progress.phase);
   const percent = progress?.total ? Math.min(100, Math.round((progress.processed || 0) / progress.total * 100)) : 0;
+  const workbench = target === 'workbench';
   return <>
     {dragState?.active && <div className={`file-drop-overlay ${dragState.valid ? 'accept' : 'reject'}`} aria-live="assertive">
       <div className="file-drop-target">
         <div className="drop-glyph"><Icon name={dragState.valid ? 'upload' : 'close'} size={28}/></div>
-        <strong>{dragState.valid ? `松手导入 ${dragState.label}` : '这些文件暂不支持'}</strong>
-        <span>{dragState.valid ? `${dragState.count == null ? '正在读取文件信息' : `${dragState.count} 个文件`} · PNG / JPG / WEBP / ZIP` : '请拖入图片或 NovelAI 导出的标准 ZIP'}</span>
-        <small>ZIP 会先安全检查，再逐张读取 PNG</small>
+        <strong>{dragState.valid ? (workbench ? '松开以解析并编辑' : `松手导入 ${dragState.label}`) : (workbench ? '工作台一次只读取一张图片' : '这些文件暂不支持')}</strong>
+        <span>{dragState.valid ? (workbench ? '不会保存到图片库 · PNG / JPG / WEBP' : `${dragState.count == null ? '正在读取文件信息' : `${dragState.count} 个文件`} · PNG / JPG / WEBP / ZIP`) : (workbench ? '请拖入单张 PNG、JPG 或 WEBP 图片' : '请拖入图片或 NovelAI 导出的标准 ZIP')}</span>
+        <small>{workbench ? '读取完成后直接进入 Tag 编辑' : 'ZIP 会先安全检查，再逐张读取 PNG'}</small>
       </div>
     </div>}
     {(importing || summary) && <aside className={`import-status ${summary ? 'complete' : ''}`} role="status" aria-live="polite">
@@ -522,13 +528,12 @@ function MetadataPanel({ project, updateProject }) {
 
 function StudioSideNav({ page, onNavigate }) {
   const navigation = [
-    { key: 'gallery', icon: 'library', label: '图库' },
-    { key: 'vibes', icon: 'image', label: 'Vibe 库' },
-    { key: 'tags', icon: 'layers', label: 'Tag 库' },
+    { key: 'workbench', icon: 'edit', label: '工作台' },
+    { key: 'gallery', icon: 'library', label: '图片库' },
   ];
   return <LobeSideNav
     className="studio-side-nav"
-    avatar={<button className="studio-brand" onClick={() => onNavigate('gallery')} title="NovelAI Prompt Studio">N<span>4</span></button>}
+    avatar={<button className="studio-brand" onClick={() => onNavigate('workbench')} title="NovelAI Prompt Studio">N<span>4</span></button>}
     topActions={<>{navigation.map((item) => <LobeActionIcon active={page === item.key} icon={<Icon name={item.icon} size={19}/>} key={item.key} onClick={() => onNavigate(item.key)} placement="right" size="large" title={item.label} variant="borderless"/>)}</>}
     bottomActions={<LobeActionIcon active={page === 'settings'} icon={<Icon name="settings" size={19}/>} onClick={() => onNavigate('settings')} placement="right" size="large" title="设置" variant="borderless"/>}
   />;
@@ -659,6 +664,7 @@ function GalleryPage({
   onAddToExperiment,
   onRemoveFromExperiment,
   onOpenExperiment,
+  simplified = false,
 }) {
   const [batchTarget, setBatchTarget] = useState('');
   const selectedProjects = allProjects.filter((project) => selectedIds.has(project.id));
@@ -681,17 +687,17 @@ function GalleryPage({
   };
   return <main className="gallery-page">
     <header className="workspace-page-header">
-      <div><span>LIBRARY / 01</span><h1>{currentLibraryLabel(libraryView, collections, series, experiments)}</h1><p>{projects.length} 张可见图片 · 本地资料库</p></div>
+      <div><span>IMAGE LIBRARY / 02</span><h1>{simplified ? '图片库' : currentLibraryLabel(libraryView, collections, series, experiments)}</h1><p>{projects.length} 张图片 · 拖入此页会保存到本地资料库</p></div>
       <div className="workspace-page-actions"><LobeButton icon={<Icon name="plus"/>} onClick={onImport} type="primary">导入图片</LobeButton></div>
     </header>
     <section className="gallery-toolbar">
       <div className="gallery-primary-tools">
         <LobeSearchBar allowClear className="gallery-search search-box" onChange={(value) => onQueryChange(value)} placeholder="搜索名称、Tag 或翻译" value={query}/>
         <LobeSelect className="gallery-sort" onChange={onSortChange} options={[{ label: '最近更新', value: 'recent' }, { label: '最早更新', value: 'oldest' }, { label: '名称', value: 'name' }, { label: 'Tag 数量', value: 'tags' }]} value={sort}/>
-        <LobeButton icon={<Icon name={selectionMode ? 'check' : 'library'} size={15}/>} onClick={onToggleSelectionMode} type={selectionMode ? 'primary' : 'default'}>{selectionMode ? '完成多选' : '多选'}</LobeButton>
-        {activeExperiment && <LobeButton icon={<Icon name="spark" size={15}/>} onClick={() => onOpenExperiment(activeExperiment.id)}>打开对比</LobeButton>}
+        {!simplified && <LobeButton icon={<Icon name={selectionMode ? 'check' : 'library'} size={15}/>} onClick={onToggleSelectionMode} type={selectionMode ? 'primary' : 'default'}>{selectionMode ? '完成多选' : '多选'}</LobeButton>}
+        {!simplified && activeExperiment && <LobeButton icon={<Icon name="spark" size={15}/>} onClick={() => onOpenExperiment(activeExperiment.id)}>打开对比</LobeButton>}
       </div>
-      <GalleryGroupControls
+      {!simplified && <GalleryGroupControls
         collections={collections}
         experiments={experiments}
         libraryView={libraryView}
@@ -707,8 +713,8 @@ function GalleryPage({
         onViewChange={onViewChange}
         selectedCount={selectedIds.size}
         series={series}
-      />
-      {selectionMode && <div className="gallery-batch-bar">
+      />}
+      {!simplified && selectionMode && <div className="gallery-batch-bar">
         <div><LobeButton onClick={onSelectAll} size="small">全选可见</LobeButton><span>已选 {selectedIds.size}</span><LobeButton onClick={onClearSelection} size="small" type="text">清除</LobeButton></div>
         <div className="gallery-batch-actions">
           <LobeSelect disabled={!selectedIds.size} onChange={setBatchTarget} options={targetOptions} placeholder="加入分组…" value={batchTarget || undefined}/>
@@ -725,15 +731,15 @@ function GalleryPage({
     <section className="gallery-scroll" ref={scrollRef}>
       {projects.length ? <LobeGrid className="gallery-grid" gap={16} maxItemWidth={235} rows={5}>
         {projects.map((project) => <article className={`gallery-card ${selectedIds.has(project.id) ? 'selected' : ''}`} key={project.id} onContextMenu={(event) => onProjectContextMenu(event, project)}>
-          <button className="gallery-card-open" onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenProject(project.id)} aria-label={`打开 ${project.name}`}>
+          <button className="gallery-card-open" onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenProject(project.id)} aria-label={`在工作台中打开 ${project.name}`}>
             <img src={mediaUrl(project.thumbnail_path)} alt="" loading="lazy"/>
             {hasLimitedReproduction(project.metadata) && <span className="gallery-warning-badge"><Icon name="warning" size={12}/>INPAINT</span>}
-            {(project.branches || []).length > 0 && <span className="gallery-branch-badge">{project.branches.length} 方案</span>}
+            {!simplified && (project.branches || []).length > 0 && <span className="gallery-branch-badge">{project.branches.length} 方案</span>}
           </button>
           {selectionMode && <div className="gallery-card-check" onClick={(event) => event.stopPropagation()}><LobeCheckbox checked={selectedIds.has(project.id)} onChange={() => onToggleSelected(project.id)} size={19}/></div>}
-          <footer><button onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenProject(project.id)}><strong title={project.name}>{project.name}</strong><small>{countPromptTags(project)} tags · {(project.vibes || []).length} vibe · {relativeTime(project.updated_at)}</small></button>{libraryView !== 'trash' && <LobeActionIcon active={Boolean(project.is_favorite)} icon={<Icon name="star" size={14}/>} onClick={() => onSetFavorite(!project.is_favorite, [project.id])} size="small" title={project.is_favorite ? '取消收藏' : '收藏'} variant="borderless"/>}</footer>
+          <footer><button onClick={() => selectionMode ? onToggleSelected(project.id) : onOpenProject(project.id)}><strong title={project.name}>{project.name}</strong><small>{countPromptTags(project)} tags · {relativeTime(project.updated_at)}</small></button>{!simplified && libraryView !== 'trash' && <LobeActionIcon active={Boolean(project.is_favorite)} icon={<Icon name="star" size={14}/>} onClick={() => onSetFavorite(!project.is_favorite, [project.id])} size="small" title={project.is_favorite ? '取消收藏' : '收藏'} variant="borderless"/>}</footer>
         </article>)}
-      </LobeGrid> : <LobeEmpty className="gallery-empty" description={query ? '换个关键词，或清除当前分组筛选。' : '可以导入图片，或切换到其他分组。'} image={<Icon name="image" size={28}/>} title={query ? '没有匹配的图片' : '这个视图还是空的'}/>}
+      </LobeGrid> : <LobeEmpty className="gallery-empty" description={query ? '换个关键词，或清除搜索。' : '拖入图片，或使用右上角按钮选择文件。'} image={<Icon name="image" size={28}/>} title={query ? '没有匹配的图片' : '图片库还是空的'}/>}
     </section>
   </main>;
 }
@@ -1087,7 +1093,7 @@ function SettingsPage({ appearance, onAppearanceChange, onClose, showToast }) {
         <LobeButton block className={section === 'appearance' ? 'active' : ''} icon={<Icon name="settings"/>} onClick={() => setSection('appearance')} type="text"><span><strong>外观与可读性</strong><small>主题、字号、密度、动效</small></span></LobeButton>
         <LobeButton block className={section === 'ai' ? 'active' : ''} icon={<Icon name="spark"/>} onClick={() => setSection('ai')} type="text"><span><strong>AI 服务</strong><small>接口、模型、安全存储</small></span></LobeButton>
       </nav>
-      <LobeButton className="settings-back" onClick={onClose}><Icon name="close" size={14}/>返回作品库</LobeButton>
+      <LobeButton className="settings-back" onClick={onClose}><Icon name="close" size={14}/>返回</LobeButton>
     </aside>
     <section className="settings-content">
       {section === 'appearance' ? <>
@@ -1138,7 +1144,12 @@ export default function App({ appearance, setAppearance }) {
   const [branchResultImporting, setBranchResultImporting] = useState('');
   const [comparisonIds, setComparisonIds] = useState(new Set());
   const [relationshipComparison, setRelationshipComparison] = useState(null);
-  const [appPage, setAppPage] = useState('gallery');
+  const [appPage, setAppPage] = useState('workbench');
+  const [settingsReturnPage, setSettingsReturnPage] = useState('workbench');
+  const [workbenchSession, setWorkbenchSession] = useState(null);
+  const [workbenchLoading, setWorkbenchLoading] = useState(false);
+  const [workbenchError, setWorkbenchError] = useState('');
+  const [workbenchFocus, setWorkbenchFocus] = useState({ scopeKey: 'base:prompt', tagId: null });
   const [galleryScreen, setGalleryScreen] = useState('list');
   const [detailTab, setDetailTab] = useState('overview');
   const [activeVibeKey, setActiveVibeKey] = useState('');
@@ -1148,6 +1159,7 @@ export default function App({ appearance, setAppearance }) {
   const saveTimers = useRef(new Map());
   const branchSaveTimers = useRef(new Map());
   const branchCreatePromises = useRef(new Map());
+  const annotationSaveTimer = useRef(null);
   const appShellRef = useRef(null);
   const galleryScrollRef = useRef(null);
   const galleryScrollTop = useRef(0);
@@ -1210,6 +1222,25 @@ export default function App({ appearance, setAppearance }) {
   }, []);
 
   useEffect(() => {
+    const saved = parseWorkbenchSession(window.localStorage.getItem(WORKBENCH_SESSION_KEY));
+    if (!saved?.sourcePath) return;
+    setWorkbenchLoading(true);
+    studio.openWorkbenchImage(saved.sourcePath).then((result) => {
+      if (!result?.ok || !result.project) {
+        window.localStorage.removeItem(WORKBENCH_SESSION_KEY);
+        setWorkbenchError(result?.error || '上次工作台图片已不可用');
+        return;
+      }
+      setWorkbenchSession(createWorkbenchSession(result.project, saved));
+    }).finally(() => setWorkbenchLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!workbenchSession) return;
+    window.localStorage.setItem(WORKBENCH_SESSION_KEY, serializeWorkbenchSession(workbenchSession));
+  }, [workbenchSession]);
+
+  useEffect(() => {
     studio.onImportProgress((progress) => setImportProgress(progress));
     return () => studio.offImportProgress();
   }, []);
@@ -1225,7 +1256,7 @@ export default function App({ appearance, setAppearance }) {
   }, []);
 
   useEffect(() => {
-    if (loading || !appShellRef.current) return undefined;
+    if (loading || !appShellRef.current || !['workbench', 'gallery'].includes(appPage)) return undefined;
     const element = appShellRef.current;
     const cleanupMonitor = monitorForExternal({
       canMonitor: containsFiles,
@@ -1235,8 +1266,8 @@ export default function App({ appearance, setAppearance }) {
     const cleanupTarget = dropTargetForExternal({
       element,
       canDrop: containsFiles,
-      onDragEnter: ({ source }) => setDragState({ active: true, ...assessDroppedFiles(getFiles({ source })) }),
-      onDrag: ({ source }) => setDragState({ active: true, ...assessDroppedFiles(getFiles({ source })) }),
+      onDragEnter: ({ source }) => setDragState({ active: true, ...(appPage === 'workbench' ? assessWorkbenchDroppedFiles(getFiles({ source })) : assessDroppedFiles(getFiles({ source }))) }),
+      onDrag: ({ source }) => setDragState({ active: true, ...(appPage === 'workbench' ? assessWorkbenchDroppedFiles(getFiles({ source })) : assessDroppedFiles(getFiles({ source }))) }),
       onDragLeave: () => setDragState((current) => ({ ...current, active: false })),
       onDrop: ({ source }) => {
         const files = getFiles({ source });
@@ -1245,12 +1276,12 @@ export default function App({ appearance, setAppearance }) {
       },
     });
     return () => { cleanupTarget(); cleanupMonitor(); };
-  }, [loading]);
+  }, [appPage, loading]);
 
   useEffect(() => {
     const keydown = (event) => {
       const commandKey = event.metaKey || event.ctrlKey;
-      if (commandKey && event.key.toLowerCase() === 'i') { event.preventDefault(); importImages(); }
+      if (commandKey && event.key.toLowerCase() === 'i') { event.preventDefault(); if (appPage === 'workbench') chooseWorkbenchImage(); else if (appPage === 'gallery') importImages(); }
       if (commandKey && event.key.toLowerCase() === 'k') { event.preventDefault(); document.querySelector('.search-box input')?.focus(); }
     };
     window.addEventListener('keydown', keydown);
@@ -1333,6 +1364,144 @@ export default function App({ appearance, setAppearance }) {
 
   const showToast = (message) => {
     lobeToast.success({ description: message, duration: 2200, placement: 'bottom' });
+  };
+
+  const canReplaceWorkbench = () => !workbenchHasChanges(workbenchSession)
+    || window.confirm('当前工作台包含尚未复制的修改。仍要更换图片吗？');
+
+  const acceptWorkbenchProject = (project, saved = null) => {
+    setWorkbenchSession(createWorkbenchSession(project, saved));
+    setWorkbenchFocus({ scopeKey: 'base:prompt', tagId: null });
+    setWorkbenchError('');
+    setAppPage('workbench');
+  };
+
+  const openWorkbenchPath = async (filePath = '') => {
+    if (!canReplaceWorkbench()) return false;
+    setWorkbenchLoading(true);
+    setWorkbenchError('');
+    try {
+      const result = await studio.openWorkbenchImage(filePath);
+      if (result?.canceled) return false;
+      if (!result?.ok || !result.project) throw new Error(result?.error || '图片没有打开');
+      acceptWorkbenchProject(result.project);
+      showToast('图片已在工作台中打开，不会保存到图片库');
+      return true;
+    } catch (error) {
+      setWorkbenchError(error instanceof Error ? error.message : String(error));
+      return false;
+    } finally {
+      setWorkbenchLoading(false);
+    }
+  };
+
+  const chooseWorkbenchImage = () => openWorkbenchPath('');
+
+  const openDroppedWorkbenchImage = async (files) => {
+    const assessment = assessWorkbenchDroppedFiles(files);
+    if (!assessment.valid) { setWorkbenchError('工作台一次只支持一张 PNG、JPG 或 WEBP 图片'); return; }
+    if (!canReplaceWorkbench()) return;
+    setWorkbenchLoading(true);
+    setWorkbenchError('');
+    try {
+      const result = await studio.openDroppedWorkbenchImage(files);
+      if (!result?.ok || !result.project) throw new Error(result?.error || '图片没有打开');
+      acceptWorkbenchProject(result.project);
+      showToast('图片已解析，可以直接编辑 Tag');
+    } catch (error) {
+      setWorkbenchError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setWorkbenchLoading(false);
+    }
+  };
+
+  const scheduleWorkbenchAnnotations = (project) => {
+    window.clearTimeout(annotationSaveTimer.current);
+    const entries = allPromptTags(project).filter((tag) => tag.translation_source === 'manual' || tag.category_source === 'manual');
+    if (!entries.length) return;
+    annotationSaveTimer.current = window.setTimeout(async () => {
+      const result = await studio.saveTagAnnotations(entries);
+      if (!result?.ok) showToast(result?.error || 'Tag 翻译与分类没有保存');
+    }, 500);
+  };
+
+  const updateWorkbenchProject = (nextProject) => {
+    const updated = { ...syncProjectPromptMetadata(nextProject), updated_at: new Date().toISOString() };
+    setWorkbenchSession((current) => current ? { ...current, project: updated, updatedAt: updated.updated_at } : current);
+    scheduleWorkbenchAnnotations(updated);
+  };
+
+  const resetWorkbench = () => {
+    if (!workbenchSession) return;
+    if (workbenchHasChanges(workbenchSession) && !window.confirm('恢复图片中的原始 Prompt？当前工作台修改会被清除。')) return;
+    setWorkbenchSession((current) => current ? {
+      ...current,
+      project: structuredClone(current.originalProject),
+      updatedAt: new Date().toISOString(),
+    } : current);
+    showToast('已恢复图片中的原始 Prompt');
+  };
+
+  const copyWorkbenchPrompt = async () => {
+    if (!workbenchSession?.project) return;
+    await navigator.clipboard.writeText(formatPositivePromptForCopy(workbenchSession.project));
+    showToast('Prompt 已复制，可直接粘贴到 NovelAI');
+  };
+
+  const copyWorkbenchText = async (text, count, selected = false) => {
+    if (!text || !count) { showToast('当前没有可复制的 Tag'); return; }
+    await navigator.clipboard.writeText(text);
+    showToast(selected ? `已复制 ${count} 个已选 Tag` : `已复制 ${count} 个可见 Tag`);
+  };
+
+  const copyWorkbenchVibe = async (vibe) => {
+    if (!vibe?.encoding) { showToast('这个 Vibe 没有可复制的编码'); return; }
+    await navigator.clipboard.writeText(vibe.encoding);
+    showToast('Vibe 编码已复制');
+  };
+
+  const translateWorkbenchTags = async (entries) => {
+    const result = await studio.translateTags(entries.map((entry) => entry.tag.tag));
+    if (!result?.ok) { showToast(result?.error || 'AI 翻译没有完成'); return; }
+    setWorkbenchSession((current) => {
+      if (!current?.project) return current;
+      let nextProject = current.project;
+      entries.forEach((entry, index) => {
+        const scope = getPromptScope(nextProject, entry.scopeKey);
+        const item = result.items?.[index] || {};
+        nextProject = updatePromptScope(nextProject, entry.scopeKey, scope.tags.map((tag) => tag.id === entry.tag.id ? {
+          ...tag,
+          ...item,
+          translation_source: item.translation_source || 'ai',
+          category_source: item.category_source || 'ai',
+        } : tag));
+      });
+      const updated = { ...syncProjectPromptMetadata(nextProject), updated_at: new Date().toISOString() };
+      return { ...current, project: updated, updatedAt: updated.updated_at };
+    });
+    showToast(result.ai_count ? `已翻译并分类 ${entries.length} 个 Tag` : '已复用本地翻译与分类');
+  };
+
+  const workbenchTagContextMenu = async (event, scopeKey, tag) => {
+    if (!workbenchSession?.project || !tag) return;
+    const action = await showNativeContextMenu(event, {
+      kind: 'tag',
+      hasTranslation: Boolean(tag.translation?.trim()),
+      category: tag.category || 'Unsorted',
+    });
+    if (!action) return;
+    if (action === 'tag:copy') { await navigator.clipboard.writeText(tag.tag); showToast('Tag 已复制'); return; }
+    if (action === 'tag:copy-translation') { await navigator.clipboard.writeText(tag.translation || ''); showToast('翻译已复制'); return; }
+    if (action === 'tag:edit') {
+      setWorkbenchFocus({ scopeKey, tagId: null });
+      requestAnimationFrame(() => setWorkbenchFocus({ scopeKey, tagId: tag.id }));
+      return;
+    }
+    const scope = getPromptScope(workbenchSession.project, scopeKey);
+    const replaceTag = (patch) => updateWorkbenchProject(updatePromptScope(workbenchSession.project, scope.key, scope.tags.map((item) => item.id === tag.id ? { ...item, ...patch } : item)));
+    if (action === 'tag:delete') { updateWorkbenchProject(updatePromptScope(workbenchSession.project, scope.key, scope.tags.filter((item) => item.id !== tag.id))); showToast('Tag 已删除'); return; }
+    if (action.startsWith('tag:category:')) { replaceTag({ category: action.slice('tag:category:'.length), category_source: 'manual' }); showToast('Tag 分类已更新'); return; }
+    if (action === 'tag:translate') await translateWorkbenchTags([{ scopeKey, tag }]);
   };
 
   const applyLibraryOrganization = (organization) => {
@@ -1522,7 +1691,7 @@ export default function App({ appearance, setAppearance }) {
 
   const projectContextMenu = async (event, project) => {
     const action = await showNativeContextMenu(event, {
-      kind: 'project',
+      kind: 'project-simple',
       favorite: Boolean(project.is_favorite),
       deleted: Boolean(project.deleted_at),
       collections,
@@ -1530,6 +1699,7 @@ export default function App({ appearance, setAppearance }) {
       experiments,
     });
     if (!action) return;
+    if (action === 'project:open-workbench') openWorkbenchPath(project.image_path);
     if (action === 'project:open-prompt') openPromptOverview(project.id);
     if (action === 'project:copy-prompt') {
       await navigator.clipboard.writeText(formatPositivePromptForCopy(project));
@@ -1608,7 +1778,11 @@ export default function App({ appearance, setAppearance }) {
 
   const importImages = () => runImport((options) => studio.importImages(options));
   const importDroppedFiles = (files) => runImport((options) => studio.importDroppedFiles(files, options));
-  dropFilesHandlerRef.current = importDroppedFiles;
+  dropFilesHandlerRef.current = appPage === 'workbench'
+    ? openDroppedWorkbenchImage
+    : appPage === 'gallery'
+      ? importDroppedFiles
+      : null;
 
   const replaceBranch = (branch) => setProjects((current) => current.map((project) => project.id === branch.source_project_id
     ? { ...project, branches: (project.branches || []).map((item) => item.id === branch.id ? branch : item) }
@@ -2051,10 +2225,9 @@ export default function App({ appearance, setAppearance }) {
   const navigatePage = (nextPage) => {
     setResourceReturn(null);
     setResourceOrigin(null);
+    if (nextPage === 'settings' && ['workbench', 'gallery'].includes(appPage)) setSettingsReturnPage(appPage);
     setAppPage(nextPage);
     if (nextPage === 'gallery') setGalleryScreen('list');
-    if (nextPage === 'vibes') studio.loadVibeLibrary().then((items) => setVibeLibrary(items || []));
-    if (nextPage === 'tags') studio.loadTagDictionary().then((items) => setTagDictionary(items || []));
   };
 
   if (loading) return <div className="loading-screen" style={studioThemeStyle}><div className="brand-symbol">N<span>4</span></div><span>正在打开本地资料库…</span></div>;
@@ -2062,9 +2235,23 @@ export default function App({ appearance, setAppearance }) {
   return <div className="app-shell studio-app" ref={appShellRef} style={studioThemeStyle}>
     <StudioSideNav onNavigate={navigatePage} page={appPage}/>
     <div className="studio-workspace">
-      {appPage === 'settings' && <SettingsPage appearance={appearance} onAppearanceChange={updateAppearance} onClose={() => navigatePage('gallery')} showToast={showToast}/>}
-      {appPage === 'vibes' && <VibeLibraryPage activeKey={activeVibeKey} library={vibeLibrary} onBackToList={() => closeResourceDetail('vibes')} onImport={importVibeAssets} onOpenGroup={setActiveVibeKey} onOpenProject={(projectId) => openProjectFromResource(projectId, 'vibes', activeVibeKey)} onUpdate={updateVibeAsset} projects={projects}/>}
-      {appPage === 'tags' && <TagLibraryPage activeKey={activeTagKey} dictionary={tagDictionary} onBackToList={() => closeResourceDetail('tags')} onOpenProject={(projectId) => openProjectFromResource(projectId, 'tags', activeTagKey)} onOpenTag={setActiveTagKey} onSaveTag={saveTagDictionaryEntry} onTranslateTag={translateTagDictionaryEntry} projects={projects}/>}
+      {appPage === 'settings' && <SettingsPage appearance={appearance} onAppearanceChange={updateAppearance} onClose={() => navigatePage(settingsReturnPage)} showToast={showToast}/>}
+      {appPage === 'workbench' && <WorkbenchPage
+        error={workbenchError}
+        focusScopeKey={workbenchFocus.scopeKey}
+        focusTagId={workbenchFocus.tagId}
+        loading={workbenchLoading}
+        onChooseImage={chooseWorkbenchImage}
+        onCopyPrompt={copyWorkbenchPrompt}
+        onCopyText={copyWorkbenchText}
+        onCopyVibe={copyWorkbenchVibe}
+        onNotify={showToast}
+        onReset={resetWorkbench}
+        onTagContextMenu={workbenchTagContextMenu}
+        onTranslateTags={translateWorkbenchTags}
+        onUpdateProject={updateWorkbenchProject}
+        session={workbenchSession}
+      />}
       {appPage === 'gallery' && galleryScreen === 'list' && <GalleryPage
         allProjects={projects}
         collections={collections}
@@ -2082,7 +2269,10 @@ export default function App({ appearance, setAppearance }) {
         onDeleteSeries={deleteSeries}
         onImport={importImages}
         onOpenExperiment={openExperimentWorkspace}
-        onOpenProject={openProjectDetail}
+        onOpenProject={(projectId) => {
+          const project = projects.find((item) => item.id === projectId);
+          if (project) openWorkbenchPath(project.image_path);
+        }}
         onProjectContextMenu={projectContextMenu}
         onQueryChange={setQuery}
         onSortChange={setGallerySort}
@@ -2106,44 +2296,8 @@ export default function App({ appearance, setAppearance }) {
         selectedIds={selectedIds}
         selectionMode={selectionMode}
         series={series}
+        simplified
       />}
-      {appPage === 'gallery' && galleryScreen === 'detail' && activeProject && <ImageDetailPage
-        activeBranch={activeBranch}
-        branchResultImporting={branchResultImporting}
-        detailTab={detailTab}
-        experiments={experiments}
-        series={series}
-        projects={projects}
-        relationshipGroups={relationshipGroups}
-        focusTagId={focusTagId}
-        onBack={returnToGallery}
-        onBranchContextMenu={branchContextMenu}
-        onCopy={copyPrompt}
-        onCopyContextChange={setOverviewCopy}
-        onCopyText={copyOverviewText}
-        onCreateRecipe={() => createDraftBranch(activeProject, activeBranch?.id || null)}
-        onDiscardBranch={discardBranch}
-        onImportBranchResult={importBranchResult}
-        onMarkBranchWaiting={markBranchWaiting}
-        onNotify={showToast}
-        onOpenExperiment={openExperimentWorkspace}
-        onOpenComparison={openRelationshipComparison}
-        onOpenResult={openResultProject}
-        onOpenSeries={(seriesId) => changeLibraryView(`series:${seriesId}`)}
-        onOpenTagResource={openTagResource}
-        onOpenVibeResource={openVibeResource}
-        onReveal={studio.revealFile}
-        onSelectBranch={setActiveBranchId}
-        onTabChange={setDetailTab}
-        onTagContextMenu={tagContextMenu}
-        onUseLegacyVersion={useLegacyVersion}
-        project={activeProject}
-        promptScopeKey={promptScopeKey}
-        sourceProject={sourceProject}
-        updateProject={updateProject}
-      />}
-      {appPage === 'gallery' && galleryScreen === 'compare' && activeComparison && <ExperimentWorkspace comparisonIds={comparisonIds} experiment={activeComparison} onBack={returnToGallery} onOpenProject={openProjectDetail} onProjectContextMenu={projectContextMenu} onReorderExperiment={reorderExperiment} onToggleComparison={toggleComparison} projects={experimentProjects}/>}
-      {appPage === 'gallery' && galleryScreen !== 'list' && !activeProject && <EmptyState hasProjects={projects.length > 0} onImport={importImages}/>}
     </div>
     <ImportExperience
       dragState={dragState}
@@ -2151,6 +2305,7 @@ export default function App({ appearance, setAppearance }) {
       result={importResult}
       onCancel={() => importProgress?.batchId && studio.cancelImport(importProgress.batchId)}
       onDismiss={() => setImportResult(null)}
+      target={appPage === 'workbench' ? 'workbench' : 'gallery'}
     />
   </div>;
 }

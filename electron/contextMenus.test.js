@@ -26,6 +26,11 @@ describe('native context menu templates', () => {
     expect(select).toHaveBeenCalledWith('project:add-experiment:experiment-one');
   });
 
+  it('keeps the simplified image library menu focused on the workbench', () => {
+    const template = buildContextMenuTemplate({ kind: 'project-simple' });
+    expect(labels(template)).toEqual(['在工作台中打开', '复制原始 Prompt', '在文件夹中显示']);
+  });
+
   it('only exposes valid branch actions for the current state', () => {
     expect(labels(buildContextMenuTemplate({ kind: 'branch', status: 'draft' }))).toContain('标记为待生成');
     expect(labels(buildContextMenuTemplate({ kind: 'branch', status: 'draft' }))).not.toContain('上传结果图');

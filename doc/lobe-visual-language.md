@@ -1,6 +1,6 @@
 # Lobe 视觉层级与颜色语义规范
 
-> 信息架构更新：永久右侧检查器和底部胶片属于迁移前结构，将按[图库、Vibe 库与 Tag 库三阶段开发计划](./three-library-information-architecture-development-plan.md)迁移为资源详情页、关系分组和标准网格；本文的表面与颜色语义继续适用于新页面。
+> 2026-07-22 信息架构更新：应用将按[工作台与图片库两阶段重构计划](./two-page-workbench-gallery-refactor-plan.md)收敛为两个业务页面。本文的 Lobe UI 表面、按钮、状态色、选择态和跨平台原则继续适用；涉及 Tag/Vibe 资源库、分支、实验或关系页面的业务示例不再适用。
 
 ## 目标
 

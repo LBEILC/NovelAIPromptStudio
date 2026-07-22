@@ -5,6 +5,8 @@
 > 适用平台：Windows / macOS  
 > 关联文档：[图片系列、对比实验与生成分支设计](./experiment-and-branch-design.md)
 >
+> 2026-07-22 产品方向更新：本设计已由[工作台与图片库两阶段重构计划](./two-page-workbench-gallery-refactor-plan.md)取代，仅保留为历史记录。
+>
 > 信息架构实施：[图库、Vibe 库与 Tag 库三阶段开发计划](./three-library-information-architecture-development-plan.md)
 >
 > 导入补充：[导入流程、Inpainting 提示与批量 Tag 输入设计](./import-workflow-and-metadata-warnings.md)

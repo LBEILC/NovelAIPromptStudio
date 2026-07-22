@@ -81,6 +81,12 @@ export function buildContextMenuTemplate(request = {}, select = () => {}) {
     ];
   }
 
+  if (request.kind === 'project-simple') return [
+    actionItem('在工作台中打开', 'project:open-workbench', select),
+    actionItem('复制原始 Prompt', 'project:copy-prompt', select),
+    actionItem('在文件夹中显示', 'project:reveal', select),
+  ];
+
   if (request.kind === 'tag') return [
     actionItem('复制 Tag', 'tag:copy', select),
     actionItem('复制翻译', 'tag:copy-translation', select, { enabled: Boolean(request.hasTranslation) }),

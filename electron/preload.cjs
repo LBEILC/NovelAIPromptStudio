@@ -2,6 +2,11 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('studio', {
   loadLibrary: () => ipcRenderer.invoke('library:load'),
+  openWorkbenchImage: (filePath = '') => ipcRenderer.invoke('workbench:image:open', { filePath }),
+  openDroppedWorkbenchImage: (files) => ipcRenderer.invoke('workbench:image:open', {
+    filePath: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean)[0] || '',
+    fromDrop: true,
+  }),
   showContextMenu: (request) => ipcRenderer.invoke('context-menu:show', request),
   loadLibraryOrganization: () => ipcRenderer.invoke('library:organization:load'),
   createCollection: (name) => ipcRenderer.invoke('library:collection:create', name),
@@ -43,6 +48,7 @@ contextBridge.exposeInMainWorld('studio', {
   updateVibeLibrary: (id, patch) => ipcRenderer.invoke('vibe:library:update', id, patch),
   loadTagDictionary: () => ipcRenderer.invoke('tag:dictionary:load'),
   updateTagDictionary: (tag, patch) => ipcRenderer.invoke('tag:dictionary:update', tag, patch),
+  saveTagAnnotations: (entries) => ipcRenderer.invoke('tag:annotations:save', entries),
   importVibeLibrary: () => ipcRenderer.invoke('vibe:library:import'),
   useVibeFromLibrary: (entry) => ipcRenderer.invoke('vibe:library:use', entry),
   inspectEmbeddedVibes: (project) => ipcRenderer.invoke('vibe:project:embedded-status', project),

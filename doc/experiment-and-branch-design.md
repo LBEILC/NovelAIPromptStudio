@@ -3,6 +3,8 @@
 > 状态：讨论稿  
 > 日期：2026-07-19  
 > 适用平台：Windows / macOS
+>
+> 2026-07-22 产品方向更新：分支、系列、实验、关系和对比能力将按[工作台与图片库两阶段重构计划](./two-page-workbench-gallery-refactor-plan.md)移除；本文仅保留为历史记录。
 
 > 2026-07-19 信息架构更新：本文定义的结果图、系列、实验和分支数据模型继续有效；底部“实验胶片”展示将由关系分组、实验成员网格和独立对比页面替代。实施顺序以[图库、Vibe 库与 Tag 库三阶段开发计划](./three-library-information-architecture-development-plan.md)为准。
 
