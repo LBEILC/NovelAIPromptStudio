@@ -529,6 +529,7 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
           <Segment value={filters.domain} options={[["all", '全部区域'], ['base', 'Base'], ['character', 'Character']]} onChange={(domain) => changeFilter({ domain })} label="Prompt 区域"/>
           <Segment value={viewMode} options={[["structure", '按结构'], ['category', '按分类']]} onChange={setViewMode} label="总览分组方式"/>
           <Segment value={language} options={LANGUAGE_OPTIONS} onChange={setLanguage} label="显示语言"/>
+          <LobeButton disabled={!visibleEntries.length || translatingKeys.size > 0} icon={<Icon name="spark" size={13}/>} onClick={() => translateEntries(visibleEntries)} size="small">{translatingKeys.size ? '翻译中…' : `AI 翻译 ${visibleEntries.length}`}</LobeButton>
           <LobeButton disabled={structure.characters.length >= 6} icon={<Icon name="plus" size={14}/>} onClick={addCharacter} size="small">角色</LobeButton>
           <LobeButton className={`overview-select-toggle ${selecting ? 'active' : ''}`} onClick={toggleSelecting} size="small" type={selecting ? 'primary' : 'default'}>{selecting ? `退出多选 · ${selectedKeys.length}` : '多选'}</LobeButton>
         </div>
@@ -543,7 +544,6 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
         <span>已选 <b>{selectedKeys.length}</b> 个{copyContext.categoryCount ? ` · ${copyContext.categoryCount} 个分类` : ''}；不同分类复制时自动换行。</span>
         <LobeButton disabled={!visibleEntries.length} onClick={selectAllVisible} size="small">全选可见</LobeButton>
         <LobeButton disabled={!selectedKeys.length} onClick={() => setSelectedKeys([])} size="small">取消选择</LobeButton>
-        <LobeButton disabled={!selectedKeys.length || translatingKeys.size > 0} icon={<Icon name="spark" size={13}/>} onClick={() => translateEntries(copyContext.entries)} size="small">{translatingKeys.size ? '翻译中…' : `AI 翻译 ${selectedKeys.length}`}</LobeButton>
         <LobeButton disabled={!copyContext.count} onClick={copyVisibleOrSelected} size="small" type="primary">{copyContext.selected ? `复制已选 ${copyContext.count}` : `复制可见 ${copyContext.count}`}</LobeButton>
         <LobeButton danger className={deleteArmed ? 'armed' : ''} disabled={!selectedKeys.length} onClick={deleteSelected} size="small" type={deleteArmed ? 'primary' : 'default'}>{deleteArmed ? `再次点击删除 ${selectedKeys.length}` : `删除已选 ${selectedKeys.length}`}</LobeButton>
       </div>}
