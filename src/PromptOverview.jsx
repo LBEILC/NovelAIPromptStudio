@@ -212,16 +212,15 @@ function ScopeTags({
   const pendingAdd = analyzePromptBatch(addDraft, scope.tags);
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
-      <span>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</span>
-      <b>{scope.tags.length}</b>
-      {selecting ? <SelectionGroupButton className="overview-scope-select" compact entries={scopeEntries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : <LobePopover
+      <div><strong>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</strong><small>{scope.tags.length} 个 Tag</small></div>
+      {selecting ? <SelectionGroupButton entries={scopeEntries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : <LobePopover
         arrow
         className="add-tag-popover-shell"
         content={<AddTagEditor draft={addDraft} pending={pendingAdd} scope={scope} onAdd={() => onAddScope(scope.key)} onChange={onAddDraftChange} onClose={() => onAddingScopeChange('')}/>}
         disabled={selecting}
         onOpenChange={(open) => onAddingScopeChange(open ? scope.key : '')}
         open={addingScopeKey === scope.key}
-        placement="bottomLeft"
+        placement="bottomRight"
         trigger="click"
       ><LobeButton aria-label={`添加到 ${scope.label}`} icon={<Icon name="plus" size={13}/>} size="small" type="text"/></LobePopover>}
     </div>
@@ -277,12 +276,12 @@ function ScopeTags({
   </div>;
 }
 
-function SelectionGroupButton({ className, compact = false, entries, selectedKeys, onToggle }) {
+function SelectionGroupButton({ entries, selectedKeys, onToggle }) {
   const selectedSet = new Set(selectedKeys);
   const groupKeys = entries.map((entry) => entry.key);
   const allSelected = groupKeys.length > 0 && groupKeys.every((key) => selectedSet.has(key));
   if (!groupKeys.length) return null;
-  return <LobeButton className={className} onClick={() => onToggle(entries)} size="small" type={allSelected ? 'primary' : 'default'}>{allSelected ? '取消整组' : compact ? '选择整组' : `选择整组 ${entries.length}`}</LobeButton>;
+  return <LobeButton onClick={() => onToggle(entries)} size="small" type={allSelected ? 'primary' : 'default'}>{allSelected ? '取消整组' : `选择整组 ${entries.length}`}</LobeButton>;
 }
 
 function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, onEditingChange, onToggleSelect, onToggleGroup, onTranslateTag, onUpdateTag, onTagContextMenu, translatingKeys }) {
