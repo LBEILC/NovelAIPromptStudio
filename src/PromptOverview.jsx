@@ -82,11 +82,11 @@ function TagQuickEditor({ tag, translating, onChange, onClose, onTranslate }) {
 }
 
 function EditableTag({ children, disabled, editKey, editingKey, onEditingChange, onTranslate, onUpdate, tag, translating }) {
+  if (disabled) return children;
   return <LobePopover
     arrow
     className="tag-quick-popover"
     content={<TagQuickEditor tag={tag} translating={translating} onChange={onUpdate} onClose={() => onEditingChange('')} onTranslate={onTranslate}/>}
-    disabled={disabled}
     onOpenChange={(open) => onEditingChange(open ? editKey : '')}
     open={editingKey === editKey}
     placement="bottomLeft"
@@ -199,7 +199,12 @@ function ScopeTags({
           onDragEnd={onDragEnd}
           onDragOver={(event) => !selecting && !filtered && event.preventDefault()}
           onDrop={(event) => !selecting && !filtered && onDrop(scope, index, event)}
-          onClick={() => selecting && onToggleSelect(key)}
+          onClick={(event) => {
+            if (!selecting) return;
+            event.preventDefault();
+            event.stopPropagation();
+            onToggleSelect(key);
+          }}
           onContextMenu={(event) => onTagContextMenu(event, scope.key, tag)}
           onKeyDown={(event) => selecting ? undefined : onKeyboardMove(scope, index, event)}
           role="listitem"
@@ -251,7 +256,12 @@ function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, o
           const tagButton = <button
             key={entry.key}
             className={`overview-tag cat-${String(group.category).toLowerCase()} ${entry.scopePolarity === 'undesired' ? 'undesired-tag' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''}`}
-            onClick={() => selecting && onToggleSelect(entry.key)}
+            onClick={(event) => {
+              if (!selecting) return;
+              event.preventDefault();
+              event.stopPropagation();
+              onToggleSelect(entry.key);
+            }}
             onContextMenu={(event) => onTagContextMenu(event, entry.scopeKey, entry.tag)}
             role="listitem"
             aria-pressed={selecting ? selected : undefined}
@@ -399,6 +409,8 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     setSelecting((current) => !current);
     setSelectedKeys([]);
     setDeleteArmed(false);
+    setEditingKey('');
+    setAddingScopeKey('');
   };
 
   const selectAllVisible = () => {
