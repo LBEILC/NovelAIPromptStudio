@@ -1,5 +1,14 @@
 # macOS handoffs
 
+## Verify packaged macOS release artifacts
+
+- Status: Pending
+- Date/source: 2026-07-22, Windows
+- Related commit: `005d362`
+- Action: Download both macOS DMGs produced by the `v0.1.0` GitHub Release. On an Intel Mac, install and launch `NovelAI-Prompt-Studio-0.1.0-macOS-x64.dmg`; on Apple Silicon, install and launch `NovelAI-Prompt-Studio-0.1.0-macOS-arm64.dmg`. Confirm the app icon, hidden-inset title bar, native menu, font discovery, image picker, database startup, and one NovelAI image import work normally. Record the expected unsigned-app warning and use the standard macOS override flow to open the app.
+- Expected: Both architecture-specific DMGs mount and install, the app starts without a missing native module or ASAR error, and core window/file/database behavior matches development builds. The unsigned warning is expected until Apple signing and notarization credentials are configured.
+- Observed: Windows completed a clean `npm ci`, 61 tests, a production build, a 123 MB NSIS installer build, packaged-app startup, ASAR content checks, and Sharp native-module checks. GitHub-hosted macOS packaging and live macOS startup remain to be verified.
+
 ## Verify system font discovery and previews
 
 - Status: Pending
