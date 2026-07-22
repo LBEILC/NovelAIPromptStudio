@@ -203,16 +203,18 @@ function ScopeTags({
   onUpdateTag,
   onKeyboardMove,
   onToggleSelect,
+  onToggleGroup,
   onTagContextMenu,
   translatingKeys,
 }) {
   const selectedSet = new Set(selectedKeys);
+  const scopeEntries = scope.tags.map((tag) => ({ key: overviewTagKey(scope.key, tag.id) }));
   const pendingAdd = analyzePromptBatch(addDraft, scope.tags);
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
       <span>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</span>
       <b>{scope.tags.length}</b>
-      <LobePopover
+      {selecting ? <SelectionGroupButton className="overview-scope-select" compact entries={scopeEntries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : <LobePopover
         arrow
         className="add-tag-popover-shell"
         content={<AddTagEditor draft={addDraft} pending={pendingAdd} scope={scope} onAdd={() => onAddScope(scope.key)} onChange={onAddDraftChange} onClose={() => onAddingScopeChange('')}/>}
@@ -221,7 +223,7 @@ function ScopeTags({
         open={addingScopeKey === scope.key}
         placement="bottomLeft"
         trigger="click"
-      ><LobeButton aria-label={`添加到 ${scope.label}`} icon={<Icon name="plus" size={13}/>} size="small" type="text"/></LobePopover>
+      ><LobeButton aria-label={`添加到 ${scope.label}`} icon={<Icon name="plus" size={13}/>} size="small" type="text"/></LobePopover>}
     </div>
     <div className="overview-tags" role="list" aria-label={scope.label}>
       {scope.tags.map((tag, index) => {
@@ -275,12 +277,12 @@ function ScopeTags({
   </div>;
 }
 
-function SelectionGroupButton({ entries, selectedKeys, onToggle }) {
+function SelectionGroupButton({ className, compact = false, entries, selectedKeys, onToggle }) {
   const selectedSet = new Set(selectedKeys);
   const groupKeys = entries.map((entry) => entry.key);
   const allSelected = groupKeys.length > 0 && groupKeys.every((key) => selectedSet.has(key));
   if (!groupKeys.length) return null;
-  return <LobeButton onClick={() => onToggle(entries)} size="small" type={allSelected ? 'primary' : 'default'}>{allSelected ? '取消整组' : `选择整组 ${entries.length}`}</LobeButton>;
+  return <LobeButton className={className} onClick={() => onToggle(entries)} size="small" type={allSelected ? 'primary' : 'default'}>{allSelected ? '取消整组' : compact ? '选择整组' : `选择整组 ${entries.length}`}</LobeButton>;
 }
 
 function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, onEditingChange, onToggleSelect, onToggleGroup, onTranslateTag, onUpdateTag, onTagContextMenu, translatingKeys }) {
@@ -539,6 +541,7 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     onUpdateTag: updateTag,
     onKeyboardMove: keyboardMove,
     onToggleSelect: toggleSelection,
+    onToggleGroup: toggleEntryGroup,
     onTagContextMenu,
     translatingKeys,
   };
@@ -595,10 +598,7 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
 
       {viewMode === 'structure' && baseScopes.length > 0 && <section className="overview-layer base-layer">
         <div className="overview-layer-body">
-          <div className="overview-layer-heading">
-            <strong>基础 Prompt</strong>
-            {selecting && <div className="overview-layer-heading-actions"><SelectionGroupButton entries={overviewEntries(baseScopes)} selectedKeys={selectedKeys} onToggle={toggleEntryGroup}/></div>}
-          </div>
+          <div className="overview-layer-heading"><strong>基础 Prompt</strong></div>
           {baseScopes.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
         </div>
       </section>}
@@ -610,10 +610,7 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
           <div className="overview-layer-body">
             <div className="overview-layer-heading">
               <strong>{character.label}</strong>
-              <div className="overview-layer-heading-actions">
-                {selecting && <SelectionGroupButton entries={overviewEntries(sections)} selectedKeys={selectedKeys} onToggle={toggleEntryGroup}/>}
-                <LobePopover arrow className="character-quick-popover" content={<CharacterEditor character={character} project={project} onChange={updateProject} onClose={() => setEditingCharacterId('')} onDelete={() => deleteCharacter(character)}/>} onOpenChange={(open) => setEditingCharacterId(open ? character.id : '')} open={editingCharacterId === character.id} placement="bottomRight" trigger="click"><LobeButton size="small" type="text">{structure.use_coords ? `位置 ${compactPosition(character.center)}` : 'AI 位置'}</LobeButton></LobePopover>
-              </div>
+              <LobePopover arrow className="character-quick-popover" content={<CharacterEditor character={character} project={project} onChange={updateProject} onClose={() => setEditingCharacterId('')} onDelete={() => deleteCharacter(character)}/>} onOpenChange={(open) => setEditingCharacterId(open ? character.id : '')} open={editingCharacterId === character.id} placement="bottomRight" trigger="click"><LobeButton size="small" type="text">{structure.use_coords ? `位置 ${compactPosition(character.center)}` : 'AI 位置'}</LobeButton></LobePopover>
             </div>
             {sections.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
           </div>

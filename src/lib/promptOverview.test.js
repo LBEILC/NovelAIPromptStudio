@@ -57,14 +57,16 @@ describe('Prompt overview operations', () => {
     ]);
   });
 
-  it('toggles a visible structure group without changing unrelated selections', () => {
+  it('toggles one prompt scope without changing another scope selection', () => {
     const entries = overviewEntries(filterOverviewScopes(projectFixture()));
     const unrelated = entries.find((entry) => entry.tag.id === 'lowres');
-    const characterEntries = entries.filter((entry) => entry.scopeKind === 'character');
-    const selected = toggleOverviewSelectionGroup([unrelated.key], characterEntries);
+    const characterPrompt = entries.find((entry) => entry.tag.id === 'shirt');
+    const scopeEntries = entries.filter((entry) => entry.scopeKey === characterPrompt.scopeKey);
+    const selected = toggleOverviewSelectionGroup([unrelated.key], scopeEntries);
 
-    expect(selected).toEqual([unrelated.key, ...characterEntries.map((entry) => entry.key)]);
-    expect(toggleOverviewSelectionGroup(selected, characterEntries)).toEqual([unrelated.key]);
+    expect(scopeEntries.every((entry) => entry.scopePolarity === 'prompt')).toBe(true);
+    expect(selected).toEqual([unrelated.key, ...scopeEntries.map((entry) => entry.key)]);
+    expect(toggleOverviewSelectionGroup(selected, scopeEntries)).toEqual([unrelated.key]);
   });
 
   it('deletes selected tags across prompt scopes without touching others', () => {
