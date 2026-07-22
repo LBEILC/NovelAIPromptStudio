@@ -4,10 +4,11 @@ import App from './App.jsx';
 import LobeProvider from './LobeProvider.jsx';
 import { ContextMenuHost } from '@lobehub/ui/es/ContextMenu/index';
 import { ToastHost } from '@lobehub/ui/es/Toast/index';
+import { colorScales } from '@lobehub/ui/es/color/index';
 import './fonts.css';
 import './styles.css';
 
-const DEFAULT_APPEARANCE = { themeMode: 'dark', fontScale: 'large', density: 'comfortable', motion: 'full' };
+const DEFAULT_APPEARANCE = { themeMode: 'dark', primaryColor: 'blue', fontScale: 'large', density: 'comfortable', motion: 'full' };
 
 function StudioRoot() {
   const [appearance, setAppearance] = useState(DEFAULT_APPEARANCE);
@@ -19,17 +20,20 @@ function StudioRoot() {
   useEffect(() => {
     const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
     const applyTheme = () => {
-      document.documentElement.dataset.themeMode = appearance.themeMode === 'auto'
+      const resolvedTheme = appearance.themeMode === 'auto'
         ? (systemTheme.matches ? 'dark' : 'light')
         : appearance.themeMode;
+      const scale = colorScales[appearance.primaryColor] || colorScales.blue;
+      document.documentElement.dataset.themeMode = resolvedTheme;
+      document.documentElement.style.setProperty('--accent', scale[resolvedTheme][9]);
     };
     applyTheme();
     if (appearance.themeMode !== 'auto') return undefined;
     systemTheme.addEventListener('change', applyTheme);
     return () => systemTheme.removeEventListener('change', applyTheme);
-  }, [appearance.themeMode]);
+  }, [appearance.primaryColor, appearance.themeMode]);
 
-  return <LobeProvider themeMode={appearance.themeMode}>
+  return <LobeProvider primaryColor={appearance.primaryColor} themeMode={appearance.themeMode}>
     <App appearance={appearance} setAppearance={setAppearance}/>
     <ContextMenuHost/>
     <ToastHost duration={2200} position="bottom"/>

@@ -37,9 +37,10 @@ describe('AI preferences', () => {
     temporaryDirectories.push(directory);
     const preferences = openPreferences(directory, safeStorage);
 
-    expect(preferences.appearanceSettings()).toEqual({ themeMode: 'dark', fontScale: 'large', density: 'comfortable', motion: 'full' });
-    expect(preferences.saveAppearanceSettings({ themeMode: 'auto', fontScale: 'larger', motion: 'reduced' }))
-      .toEqual({ themeMode: 'auto', fontScale: 'larger', density: 'comfortable', motion: 'reduced' });
+    expect(preferences.appearanceSettings()).toEqual({ themeMode: 'dark', primaryColor: 'blue', fontScale: 'large', density: 'comfortable', motion: 'full' });
+    expect(preferences.saveAppearanceSettings({ themeMode: 'auto', primaryColor: 'purple', fontScale: 'larger', motion: 'reduced' }))
+      .toEqual({ themeMode: 'auto', primaryColor: 'purple', fontScale: 'larger', density: 'comfortable', motion: 'reduced' });
     expect(() => preferences.saveAppearanceSettings({ density: 'tiny' })).toThrow('不支持');
+    expect(() => preferences.saveAppearanceSettings({ primaryColor: 'pink' })).toThrow('不支持');
   });
 });

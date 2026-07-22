@@ -2,9 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_BASE_URL, normalizeBaseUrl } from './translation.js';
 
-const APPEARANCE_DEFAULTS = Object.freeze({ themeMode: 'dark', fontScale: 'large', density: 'comfortable', motion: 'full' });
+const APPEARANCE_DEFAULTS = Object.freeze({ themeMode: 'dark', primaryColor: 'blue', fontScale: 'large', density: 'comfortable', motion: 'full' });
 const APPEARANCE_VALUES = {
   themeMode: new Set(['auto', 'dark', 'light']),
+  primaryColor: new Set(['blue', 'cyan', 'geekblue', 'gold', 'green', 'lime', 'magenta', 'orange', 'purple', 'red', 'volcano', 'yellow']),
   fontScale: new Set(['default', 'large', 'larger']),
   density: new Set(['compact', 'comfortable']),
   motion: new Set(['full', 'reduced', 'off']),

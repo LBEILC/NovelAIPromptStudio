@@ -261,6 +261,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .settings-row:last-child, .ai-settings-group > label:last-child { border-bottom: 0; }
 .settings-row strong, .settings-row small, .ai-settings-group strong, .ai-settings-group small { display: block; }
 .settings-row small, .ai-settings-group small { margin-top: 5px; color: var(--muted); font-size: var(--text-secondary); }
+.settings-color-row > div { max-width: 378px; justify-content: flex-end; }
 .ai-settings-group > label { grid-template-columns: minmax(220px, .7fr) minmax(280px, 1fr); }
 .settings-model-input { display: flex; gap: 7px; }
 .settings-model-input > *:first-child { flex: 1; }
@@ -278,6 +279,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @media (max-width: 1120px) {
   .settings-page { grid-template-columns: 200px minmax(0, 1fr); }
   .settings-row, .ai-settings-group > label { grid-template-columns: 1fr; gap: 13px; }
+  .settings-color-row > div { justify-content: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) {
   html:not([data-motion="full"]) *, html:not([data-motion="full"]) *::before, html:not([data-motion="full"]) *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }

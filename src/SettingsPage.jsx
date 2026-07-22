@@ -2,10 +2,18 @@ import { useEffect, useState } from 'react';
 import LobeAlert from '@lobehub/ui/es/Alert/index';
 import LobeAutoComplete from '@lobehub/ui/es/AutoComplete/index';
 import LobeButton from '@lobehub/ui/es/Button/index';
+import LobeColorSwatches from '@lobehub/ui/es/ColorSwatches/index';
 import LobeInput from '@lobehub/ui/es/Input/Input';
 import LobeInputPassword from '@lobehub/ui/es/Input/InputPassword';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
+import { findCustomThemeName, primaryColors } from '@lobehub/ui/es/styles/index';
 import Icon from './components/Icon.jsx';
+
+const PRIMARY_COLOR_OPTIONS = [
+  ['red', '红色'], ['volcano', '火山橙'], ['orange', '橙色'], ['gold', '金色'],
+  ['yellow', '黄色'], ['lime', '青柠'], ['green', '绿色'], ['cyan', '青色'],
+  ['blue', '蓝色'], ['geekblue', '靛蓝'], ['purple', '紫色'], ['magenta', '洋红'],
+].map(([key, title]) => ({ color: primaryColors[key], key, title }));
 
 export default function SettingsPage({ appearance, onAppearanceChange, onClose, showToast, studio }) {
   const [section, setSection] = useState('appearance');
@@ -64,6 +72,19 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
         <header className="settings-heading"><h2>外观</h2></header>
         <div className="settings-group">
           <div className="settings-row"><strong>主题</strong><LobeSegmented aria-label="界面主题" className="settings-segment" options={[{ label: '跟随系统', value: 'auto' }, { label: '浅色', value: 'light' }, { label: '深色', value: 'dark' }]} value={appearance.themeMode} onChange={(value) => onAppearanceChange({ themeMode: value })}/></div>
+          <div className="settings-row settings-color-row">
+            <span><strong>主题色</strong><small>用于主要操作与选中状态</small></span>
+            <LobeColorSwatches
+              aria-label="界面主题色"
+              colors={PRIMARY_COLOR_OPTIONS}
+              onChange={(color) => {
+                const primaryColor = findCustomThemeName('primary', color);
+                if (primaryColor) onAppearanceChange({ primaryColor });
+              }}
+              size={26}
+              value={primaryColors[appearance.primaryColor] || primaryColors.blue}
+            />
+          </div>
           <div className="settings-row"><strong>字号</strong><LobeSegmented aria-label="界面字号" className="settings-segment" options={[{ label: '标准', value: 'default' }, { label: '较大', value: 'large' }, { label: '特大', value: 'larger' }]} value={appearance.fontScale} onChange={(value) => onAppearanceChange({ fontScale: value })}/></div>
           <div className="settings-row"><strong>密度</strong><LobeSegmented aria-label="界面密度" className="settings-segment" options={[{ label: '紧凑', value: 'compact' }, { label: '舒适', value: 'comfortable' }]} value={appearance.density} onChange={(value) => onAppearanceChange({ density: value })}/></div>
           <div className="settings-row"><strong>动效</strong><LobeSegmented aria-label="界面动效" className="settings-segment" options={[{ label: '完整', value: 'full' }, { label: '跟随系统', value: 'reduced' }, { label: '关闭', value: 'off' }]} value={appearance.motion} onChange={(value) => onAppearanceChange({ motion: value })}/></div>
