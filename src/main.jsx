@@ -15,6 +15,19 @@ function StudioRoot() {
     window.studio?.getAppearanceSettings?.().then(setAppearance).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+    const applyTheme = () => {
+      document.documentElement.dataset.themeMode = appearance.themeMode === 'auto'
+        ? (systemTheme.matches ? 'dark' : 'light')
+        : appearance.themeMode;
+    };
+    applyTheme();
+    if (appearance.themeMode !== 'auto') return undefined;
+    systemTheme.addEventListener('change', applyTheme);
+    return () => systemTheme.removeEventListener('change', applyTheme);
+  }, [appearance.themeMode]);
+
   return <LobeProvider themeMode={appearance.themeMode}>
     <App appearance={appearance} setAppearance={setAppearance}/>
     <ToastHost duration={2200} position="bottom"/>

@@ -510,20 +510,24 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     <header className="overview-header">
       <div className="overview-toolbar">
         <LobeSearchBar className="overview-search" onInputChange={(query) => changeFilter({ query })} placeholder="筛选 Tag 或译名" value={filters.query}/>
-        <div className="overview-filter-controls">
-          <Segment value={filters.polarity} options={[["all", '全部'], ['prompt', 'Prompt'], ['undesired', 'Undesired']]} onChange={(polarity) => changeFilter({ polarity })} label="Prompt 类型"/>
-          <Segment value={filters.domain} options={[["all", '全部区域'], ['base', 'Base'], ['character', 'Character']]} onChange={(domain) => changeFilter({ domain })} label="Prompt 区域"/>
-          <Segment value={viewMode} options={[["structure", '按结构'], ['category', '按分类']]} onChange={setViewMode} label="总览分组方式"/>
-          <Segment value={language} options={LANGUAGE_OPTIONS} onChange={setLanguage} label="显示语言"/>
+        <div className="overview-primary-actions">
           <LobeButton disabled={!visibleEntries.length || translatingKeys.size > 0} icon={<Icon name="spark" size={13}/>} onClick={() => translateEntries(visibleEntries)} size="small">{translatingKeys.size ? '翻译中…' : `AI 翻译 ${visibleEntries.length}`}</LobeButton>
           <LobeButton disabled={structure.characters.length >= 6} icon={<Icon name="plus" size={14}/>} onClick={addCharacter} size="small">角色</LobeButton>
           <LobeButton className={`overview-select-toggle ${selecting ? 'active' : ''}`} onClick={toggleSelecting} size="small" type={selecting ? 'primary' : 'default'}>{selecting ? `退出多选 · ${selectedKeys.length}` : '多选'}</LobeButton>
         </div>
       </div>
 
-      <div className="overview-category-row" aria-label="Tag 分类筛选">
-        <LobeButton className={filters.category === 'All' ? 'active' : ''} onClick={() => changeFilter({ category: 'All' })} size="small">全部 <b>{overviewEntries(categorySourceScopes).length}</b></LobeButton>
-        {CATEGORY_OPTIONS.map((category) => <LobeButton key={category} className={`${filters.category === category ? 'active' : ''} cat-${category.toLowerCase()}`} onClick={() => changeFilter({ category })} size="small">{CATEGORY_LABELS[category]} <b>{categoryCounts[category] || 0}</b></LobeButton>)}
+      <div className="overview-filter-strip">
+        <div className="overview-filter-controls">
+          <Segment value={filters.polarity} options={[["all", '全部'], ['prompt', 'Prompt'], ['undesired', 'Undesired']]} onChange={(polarity) => changeFilter({ polarity })} label="Prompt 类型"/>
+          <Segment value={filters.domain} options={[["all", '全部区域'], ['base', 'Base'], ['character', 'Character']]} onChange={(domain) => changeFilter({ domain })} label="Prompt 区域"/>
+          <Segment value={viewMode} options={[["structure", '按结构'], ['category', '按分类']]} onChange={setViewMode} label="总览分组方式"/>
+          <Segment value={language} options={LANGUAGE_OPTIONS} onChange={setLanguage} label="显示语言"/>
+        </div>
+        <div className="overview-category-row" aria-label="Tag 分类筛选">
+          <LobeButton className={filters.category === 'All' ? 'active' : ''} onClick={() => changeFilter({ category: 'All' })} size="small">全部 <b>{overviewEntries(categorySourceScopes).length}</b></LobeButton>
+          {CATEGORY_OPTIONS.map((category) => <LobeButton key={category} className={`${filters.category === category ? 'active' : ''} cat-${category.toLowerCase()}`} onClick={() => changeFilter({ category })} size="small">{CATEGORY_LABELS[category]} <b>{categoryCounts[category] || 0}</b></LobeButton>)}
+        </div>
       </div>
 
       {selecting && <div className="overview-selection-bar">
