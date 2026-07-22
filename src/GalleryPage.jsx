@@ -59,7 +59,7 @@ export default function GalleryPage({
         </div> : <LobeEmpty className="gallery-empty" description={query ? '换一个关键词试试。' : '拖入图片，或点击右上角导入。'} image={<Icon name="image" size={30}/>} title={query ? '没有匹配的图片' : '图片库还是空的'}/>} 
       </section>
       {preview && <aside className="gallery-preview">
-        <header><div><span>PREVIEW</span><h2>{preview.name}</h2></div><LobeButton aria-label="关闭预览" icon={<Icon name="close" size={15}/>} onClick={onClosePreview} size="small" type="text"/></header>
+        <header><div><span>PREVIEW</span><h2 title={preview.name}>{preview.name}</h2></div><LobeButton aria-label="关闭预览" icon={<Icon name="close" size={15}/>} onClick={onClosePreview} size="small" type="text"/></header>
         <figure><img alt={preview.name} src={mediaUrl(preview.image_path)}/></figure>
         <div className="gallery-preview-meta"><span>{preview.metadata?.width || '—'} × {preview.metadata?.height || '—'}</span><span>{countPromptTags(preview)} Tags</span><span>{formatDate(preview.created_at)}</span></div>
         <div className="gallery-preview-prompt"><span>原始 Prompt</span><p>{formatPositivePromptForCopy(preview) || '没有检测到 Prompt'}</p></div>
