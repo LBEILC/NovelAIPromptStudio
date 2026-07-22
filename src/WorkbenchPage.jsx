@@ -73,7 +73,7 @@ export default function WorkbenchPage({
         onSizeChange={(_delta, size) => setSourcePanelWidth(size?.width)}
         placement="left"
         showHandleHighlight
-        size={sourcePanelWidth ? { width: sourcePanelWidth } : undefined}
+        size={sourcePanelWidth ? { height: '100%', width: sourcePanelWidth } : undefined}
       >
         <LobeDraggablePanel.Body className="workbench-source-panel">
           <figure><img src={mediaUrl(project.image_path)} alt={project.name}/><figcaption><strong>{project.name}</strong><span>{project.metadata?.width || '—'} × {project.metadata?.height || '—'}</span></figcaption></figure>
