@@ -1,0 +1,40 @@
+appId: studio.novelai.prompt
+productName: NovelAI Prompt Studio
+
+directories:
+  output: release
+  buildResources: build/icons
+
+files:
+  - dist/**/*
+  - electron/**/*
+  - "!electron/**/*.test.js"
+  - build/icons/icon.ico
+  - build/icons/icon.png
+  - package.json
+
+asar: true
+asarUnpack:
+  - node_modules/sharp/**/*
+  - node_modules/@img/**/*
+
+win:
+  target: nsis
+  icon: build/icons/icon.ico
+  artifactName: NovelAI-Prompt-Studio-${version}-Windows-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: NovelAI Prompt Studio
+
+mac:
+  target: dmg
+  icon: build/icons/icon.icns
+  category: public.app-category.graphics-design
+  artifactName: NovelAI-Prompt-Studio-${version}-macOS-${arch}.${ext}
+
+dmg:
+  title: NovelAI Prompt Studio ${version}

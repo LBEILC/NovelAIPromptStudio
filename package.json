@@ -4,35 +4,38 @@
   "private": true,
   "type": "module",
   "description": "A local-first asset and prompt manager for NovelAI Diffusion V4/V4.5.",
+  "author": "LBEILC",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
     "build": "vite build",
     "icons:generate": "node scripts/generate-app-icons.mjs",
+    "package": "npm run build && electron-builder --publish never",
     "start": "electron .",
     "test": "vitest run"
   },
   "dependencies": {
+    "font-list": "2.1.0",
+    "sharp": "0.35.3",
+    "sql.js": "1.14.1",
+    "yauzl": "3.4.0"
+  },
+  "devDependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "2.0.1",
     "@lobehub/ui": "5.20.3",
     "@lobehub/webfont-geist": "1.0.0",
     "@lobehub/webfont-geist-mono": "1.0.0",
     "@lobehub/webfont-harmony-sans-sc": "1.0.0",
     "@vitejs/plugin-react": "6.0.3",
-    "font-list": "2.1.0",
+    "concurrently": "9.2.4",
+    "electron": "43.1.1",
+    "electron-builder": "26.15.3",
     "lucide-react": "1.24.0",
     "motion": "12.40.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "sharp": "0.35.3",
-    "sql.js": "1.14.1",
-    "vite": "8.1.5",
-    "yauzl": "3.4.0"
-  },
-  "devDependencies": {
-    "concurrently": "9.2.4",
-    "electron": "43.1.1",
     "vitest": "4.1.10",
+    "vite": "8.1.5",
     "wait-on": "9.0.3",
     "yazl": "3.3.1"
   }
