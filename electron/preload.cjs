@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('studio', {
   saveAISettings: (settings) => ipcRenderer.invoke('ai:settings:save', settings),
   getAppearanceSettings: () => ipcRenderer.invoke('appearance:settings:get'),
   saveAppearanceSettings: (settings) => ipcRenderer.invoke('appearance:settings:save', settings),
+  listSystemFonts: () => ipcRenderer.invoke('fonts:list'),
   listAIModels: () => ipcRenderer.invoke('ai:models:list'),
   testAIModel: () => ipcRenderer.invoke('ai:model:test'),
   translateTags: (tags) => ipcRenderer.invoke('translation:tags', tags),

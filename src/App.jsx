@@ -15,6 +15,7 @@ import WorkbenchPage from './WorkbenchPage.jsx';
 import Icon from './components/Icon.jsx';
 import { allPromptTags, formatPositivePromptForCopy, getPromptScope, normalizePromptStructure, syncProjectPromptMetadata, updatePromptScope } from './lib/promptStructure.js';
 import { expandSearch, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
+import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT, fontStack } from './lib/fonts.js';
 import { assessDroppedFiles, assessWorkbenchDroppedFiles } from './lib/importDrop.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
 import { createWorkbenchSession, parseWorkbenchSession, serializeWorkbenchSession, WORKBENCH_SESSION_KEY, workbenchHasChanges } from './lib/workbenchSession.js';
@@ -34,8 +35,9 @@ const studio = window.studio || {
   revealFile: async () => {},
   getAISettings: async () => ({ baseUrl: 'https://api.openai.com/v1', model: '', hasApiKey: false, encryptionAvailable: true }),
   saveAISettings: async (settings) => settings,
-  getAppearanceSettings: async () => ({ themeMode: 'dark', primaryColor: 'blue', sansFont: 'geist', monoFont: 'geist-mono', motion: 'full' }),
+  getAppearanceSettings: async () => ({ themeMode: 'dark', primaryColor: 'blue', sansFont: DEFAULT_SANS_FONT, monoFont: DEFAULT_MONO_FONT, motion: 'full' }),
   saveAppearanceSettings: async (settings) => settings,
+  listSystemFonts: async () => ({ ok: true, fonts: [] }),
   listAIModels: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
   testAIModel: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
   translateTags: async () => ({ ok: false, error: '请在桌面应用中配置 API' }),
@@ -188,8 +190,8 @@ export default function App({ appearance, setAppearance }) {
   }, [workbenchSession]);
 
   useEffect(() => {
-    document.documentElement.dataset.sansFont = appearance.sansFont;
-    document.documentElement.dataset.monoFont = appearance.monoFont;
+    document.documentElement.style.setProperty('--font-ui', fontStack(appearance.sansFont, 'sans'));
+    document.documentElement.style.setProperty('--font-mono', fontStack(appearance.monoFont, 'mono'));
     document.documentElement.dataset.motion = appearance.motion;
   }, [appearance]);
 

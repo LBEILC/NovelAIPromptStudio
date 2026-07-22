@@ -44,8 +44,37 @@ export function inferCategory(tag) {
   return categoryRules.find(([, expression]) => expression.test(tag))?.[0] || 'Unsorted';
 }
 
+function flattenLegacyBraceGroups(value) {
+  const source = String(value || '');
+  let output = '';
+  let cursor = 0;
+  while (cursor < source.length) {
+    const isSingleBrace = source[cursor] === '{' && source[cursor - 1] !== '{' && source[cursor + 1] !== '{';
+    if (!isSingleBrace) {
+      output += source[cursor];
+      cursor += 1;
+      continue;
+    }
+    const close = source.indexOf('}', cursor + 1);
+    const content = close === -1 ? '' : source.slice(cursor + 1, close);
+    const isLegacyGroup = close !== -1 && !content.includes('{') && /,\s*$/.test(content);
+    if (!isLegacyGroup) {
+      output += source[cursor];
+      cursor += 1;
+      continue;
+    }
+    output += `${content.replace(/,\s*$/, '').trim()},`;
+    cursor = close + 1;
+  }
+  return output;
+}
+
+function hasLegacyBraceGroups(value) {
+  return flattenLegacyBraceGroups(value) !== String(value || '');
+}
+
 function promptSegments(prompt) {
-  const source = String(prompt || '').replace(/\r\n?/g, '\n').replace(/，/g, ',');
+  const source = flattenLegacyBraceGroups(prompt).replace(/\r\n?/g, '\n').replace(/，/g, ',');
   const segments = [];
   let cursor = 0;
   while (cursor < source.length) {
@@ -137,12 +166,13 @@ export function parsePromptPreservingEdits(prompt = '', existingTags = [], creat
 }
 
 export function repairLegacyPromptTags(tags = [], prompt = '', createId = () => crypto.randomUUID()) {
-  const hasLegacyFragments = tags.some((item) => /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)::/.test(item.tag) || /::$/.test(item.tag));
+  const hasLegacyFragments = tags.some((item) => /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)::/.test(item.tag) || /::$/.test(item.tag) || /[{}]/.test(item.tag))
+    || hasLegacyBraceGroups(prompt);
   if (!hasLegacyFragments || !prompt.trim()) return tags;
 
   const existingByTag = new Map();
   for (const item of tags) {
-    const key = item.tag.trim().toLowerCase();
+    const key = item.tag.trim().replace(/^\{\s*/, '').replace(/\s*\}$/, '').toLowerCase();
     if (!existingByTag.has(key)) existingByTag.set(key, []);
     existingByTag.get(key).push(item);
   }

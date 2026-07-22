@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import LobeAlert from '@lobehub/ui/es/Alert/index';
 import LobeAutoComplete from '@lobehub/ui/es/AutoComplete/index';
 import LobeButton from '@lobehub/ui/es/Button/index';
@@ -11,6 +11,7 @@ import LobeTextArea from '@lobehub/ui/es/Input/TextArea';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
 import { findCustomThemeName, primaryColors } from '@lobehub/ui/es/styles/index';
 import Icon from './components/Icon.jsx';
+import { fontStack, partitionFontFamilies, quoteFontFamily } from './lib/fonts.js';
 
 const PRIMARY_COLOR_OPTIONS = [
   ['red', '红色'], ['volcano', '火山橙'], ['orange', '橙色'], ['gold', '金色'],
@@ -18,16 +19,14 @@ const PRIMARY_COLOR_OPTIONS = [
   ['blue', '蓝色'], ['geekblue', '靛蓝'], ['purple', '紫色'], ['magenta', '洋红'],
 ].map(([key, title]) => ({ color: primaryColors[key], key, title }));
 
-const SANS_FONT_OPTIONS = [
-  { label: 'Geist', value: 'geist' },
-  { label: 'HarmonyOS Sans SC', value: 'harmony' },
-  { label: '系统非衬线字体', value: 'system' },
-];
+const fontLabel = (family) => family === 'system-ui' ? '系统界面字体' : family === 'monospace' ? '系统等宽字体' : family;
 
-const MONO_FONT_OPTIONS = [
-  { label: 'Geist Mono', value: 'geist-mono' },
-  { label: '系统等宽字体', value: 'system-mono' },
-];
+function FontOption({ family, role }) {
+  return <span className="font-option" style={{ fontFamily: fontStack(family, role) }}>
+    <span>{fontLabel(family)}</span>
+    <small>Aa 中文 0123</small>
+  </span>;
+}
 
 export default function SettingsPage({ appearance, onAppearanceChange, onClose, showToast, studio }) {
   const [section, setSection] = useState('appearance');
@@ -43,10 +42,48 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
   });
   const [models, setModels] = useState([]);
   const [busy, setBusy] = useState('');
+  const [systemFonts, setSystemFonts] = useState({ fonts: [], loading: true, error: '' });
 
   useEffect(() => {
     studio.getAISettings().then((settings) => setAISettings((current) => ({ ...current, ...settings, apiKey: '' }))).catch(() => {});
   }, [studio]);
+
+  useEffect(() => {
+    let active = true;
+    studio.listSystemFonts().then((result) => {
+      if (!active) return;
+      setSystemFonts(result?.ok
+        ? { fonts: result.fonts || [], loading: false, error: '' }
+        : { fonts: [], loading: false, error: result?.error || '无法读取系统字体' });
+    }).catch((error) => {
+      if (active) setSystemFonts({ fonts: [], loading: false, error: error instanceof Error ? error.message : String(error) });
+    });
+    return () => { active = false; };
+  }, [studio]);
+
+  const fontFamilies = useMemo(() => {
+    const context = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+    const measureText = context ? (family, sample) => {
+      context.font = `24px ${quoteFontFamily(family)}, sans-serif`;
+      return context.measureText(sample).width;
+    } : undefined;
+    return partitionFontFamilies([
+      ...systemFonts.fonts,
+      { family: appearance.sansFont, monospace: false },
+      { family: appearance.monoFont, monospace: true },
+    ], measureText);
+  }, [appearance.monoFont, appearance.sansFont, systemFonts.fonts]);
+
+  const sansFontOptions = useMemo(() => fontFamilies.proportional.map((family) => ({ label: fontLabel(family), value: family })), [fontFamilies.proportional]);
+  const monoFontOptions = useMemo(() => fontFamilies.monospace.map((family) => ({ label: fontLabel(family), value: family })), [fontFamilies.monospace]);
+  const fontSelectProps = (role) => ({
+    filterOption: (input, option) => String(option?.value || '').toLocaleLowerCase().includes(input.toLocaleLowerCase()),
+    labelRender: ({ value }) => <span style={{ fontFamily: fontStack(value, role) }}>{fontLabel(value)}</span>,
+    listHeight: 360,
+    optionRender: (option) => <FontOption family={option.data.value} role={role}/>,
+    popupMatchSelectWidth: 360,
+    showSearch: true,
+  });
 
   const saveAI = async () => {
     setBusy('save');
@@ -114,8 +151,8 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
               value={primaryColors[appearance.primaryColor] || primaryColors.blue}
             />
           </div>
-          <div className="settings-row"><span><strong>非衬线字体</strong><small>用于界面、按钮与说明文字</small></span><LobeSelect aria-label="非衬线字体" className="settings-font-select" options={SANS_FONT_OPTIONS} value={appearance.sansFont} onChange={(value) => onAppearanceChange({ sansFont: value })}/></div>
-          <div className="settings-row"><span><strong>等宽字体</strong><small>用于 Tag、Prompt 与参数</small></span><LobeSelect aria-label="等宽字体" className="settings-font-select" options={MONO_FONT_OPTIONS} value={appearance.monoFont} onChange={(value) => onAppearanceChange({ monoFont: value })}/></div>
+          <div className="settings-row"><span><strong>非衬线字体</strong><small>{systemFonts.loading ? '正在读取系统字体…' : systemFonts.error ? '用于界面与说明文字 · 仅显示内置字体' : `用于界面与说明文字 · ${fontFamilies.proportional.length} 款`}</small></span><LobeSelect {...fontSelectProps('sans')} aria-label="非衬线字体" className="settings-font-select" loading={systemFonts.loading} options={sansFontOptions} value={appearance.sansFont} onChange={(value) => onAppearanceChange({ sansFont: value })}/></div>
+          <div className="settings-row"><span><strong>等宽字体</strong><small>{systemFonts.loading ? '正在识别等宽字体…' : `用于 Tag、Prompt 与参数 · ${fontFamilies.monospace.length} 款`}</small></span><LobeSelect {...fontSelectProps('mono')} aria-label="等宽字体" className="settings-font-select" loading={systemFonts.loading} options={monoFontOptions} value={appearance.monoFont} onChange={(value) => onAppearanceChange({ monoFont: value })}/></div>
           <div className="settings-row"><strong>动效</strong><LobeSegmented aria-label="界面动效" className="settings-segment" options={[{ label: '完整', value: 'full' }, { label: '跟随系统', value: 'reduced' }, { label: '关闭', value: 'off' }]} value={appearance.motion} onChange={(value) => onAppearanceChange({ motion: value })}/></div>
         </div>
       </> : <>

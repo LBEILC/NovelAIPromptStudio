@@ -9,6 +9,7 @@ import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
 import { exportEmbeddedVibeFile } from './vibes.js';
 import { readWorkbenchImage } from './workbench.js';
+import { listSystemFonts } from './fonts.js';
 
 app.setName('NovelAI Prompt Studio');
 protocol.registerSchemesAsPrivileged([{ scheme: 'novelai-media', privileges: { secure: true, standard: true, supportFetchAPI: true, stream: true } }]);
@@ -175,6 +176,13 @@ app.whenReady().then(async () => {
   ipcMain.handle('ai:settings:save', (_event, settings) => preferences.saveAISettings(settings));
   ipcMain.handle('appearance:settings:get', () => preferences.appearanceSettings());
   ipcMain.handle('appearance:settings:save', (_event, settings) => preferences.saveAppearanceSettings(settings));
+  ipcMain.handle('fonts:list', async () => {
+    try {
+      return { ok: true, fonts: await listSystemFonts() };
+    } catch (error) {
+      return { ok: false, fonts: [], error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle('ai:models:list', async () => {
     try { return { ok: true, models: await listModels(preferences.credentials(), net.fetch) }; }
     catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error) }; }

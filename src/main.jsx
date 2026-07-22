@@ -5,10 +5,11 @@ import LobeProvider from './LobeProvider.jsx';
 import { ContextMenuHost } from '@lobehub/ui/es/ContextMenu/index';
 import { ToastHost } from '@lobehub/ui/es/Toast/index';
 import { colorScales } from '@lobehub/ui/es/color/index';
+import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT } from './lib/fonts.js';
 import './fonts.css';
 import './styles.css';
 
-const DEFAULT_APPEARANCE = { themeMode: 'dark', primaryColor: 'blue', sansFont: 'geist', monoFont: 'geist-mono', motion: 'full' };
+const DEFAULT_APPEARANCE = { themeMode: 'dark', primaryColor: 'blue', sansFont: DEFAULT_SANS_FONT, monoFont: DEFAULT_MONO_FONT, motion: 'full' };
 
 function StudioRoot() {
   const [appearance, setAppearance] = useState(DEFAULT_APPEARANCE);

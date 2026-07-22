@@ -62,11 +62,19 @@ describe('AI preferences', () => {
     temporaryDirectories.push(directory);
     const preferences = openPreferences(directory, safeStorage);
 
-    expect(preferences.appearanceSettings()).toEqual({ themeMode: 'dark', primaryColor: 'blue', sansFont: 'geist', monoFont: 'geist-mono', motion: 'full' });
-    expect(preferences.saveAppearanceSettings({ themeMode: 'auto', primaryColor: 'purple', sansFont: 'harmony', monoFont: 'system-mono', motion: 'reduced' }))
-      .toEqual({ themeMode: 'auto', primaryColor: 'purple', sansFont: 'harmony', monoFont: 'system-mono', motion: 'reduced' });
-    expect(() => preferences.saveAppearanceSettings({ sansFont: 'serif' })).toThrow('不支持');
-    expect(() => preferences.saveAppearanceSettings({ monoFont: 'comic-sans' })).toThrow('不支持');
+    expect(preferences.appearanceSettings()).toEqual({ themeMode: 'dark', primaryColor: 'blue', sansFont: 'Geist', monoFont: 'Geist Mono', motion: 'full' });
+    expect(preferences.saveAppearanceSettings({ themeMode: 'auto', primaryColor: 'purple', sansFont: 'Microsoft YaHei UI', monoFont: 'Cascadia Mono', motion: 'reduced' }))
+      .toEqual({ themeMode: 'auto', primaryColor: 'purple', sansFont: 'Microsoft YaHei UI', monoFont: 'Cascadia Mono', motion: 'reduced' });
+    expect(() => preferences.saveAppearanceSettings({ sansFont: 'Bad; Font' })).toThrow('不支持');
+    expect(() => preferences.saveAppearanceSettings({ monoFont: 'Bad "Font"' })).toThrow('不支持');
     expect(() => preferences.saveAppearanceSettings({ primaryColor: 'pink' })).toThrow('不支持');
+  });
+
+  it('migrates the previous fixed font option values', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
+    temporaryDirectories.push(directory);
+    fs.writeFileSync(path.join(directory, 'preferences.json'), JSON.stringify({ appearance: { sansFont: 'harmony', monoFont: 'system-mono' } }));
+
+    expect(openPreferences(directory, safeStorage).appearanceSettings()).toMatchObject({ sansFont: 'HarmonyOS Sans SC', monoFont: 'monospace' });
   });
 });

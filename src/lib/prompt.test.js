@@ -81,6 +81,35 @@ describe('NovelAI prompt codec', () => {
     expect(batch).toMatchObject({ duplicateCount: 0, syntaxIssueCount: 0 });
   });
 
+  it('flattens legacy brace groups without changing double-brace emphasis tags', () => {
+    let id = 0;
+    const prompt = '{artist:terasu mc, artist:shirabe shiki, artist:meme50, year 2024, year 2025, } {uncensored, no watermark, best quality, amazing quality, very aesthetic, absurdres, highres, masterpiece, } {3d, 3d background, realistic, beach, wave, splashing, } {from forward, }';
+    const tags = parsePrompt(prompt, () => `brace-${id++}`);
+
+    expect(tags).toHaveLength(20);
+    expect(tags.map((tag) => tag.tag)).toEqual([
+      'artist:terasu mc', 'artist:shirabe shiki', 'artist:meme50', 'year 2024', 'year 2025',
+      'uncensored', 'no watermark', 'best quality', 'amazing quality', 'very aesthetic', 'absurdres', 'highres', 'masterpiece',
+      '3d', '3d background', 'realistic', 'beach', 'wave', 'splashing', 'from forward',
+    ]);
+    expect(parsePrompt('{{bad hands}}, {artist:a, artist:b, }', () => `emphasis-${id++}`).map((tag) => tag.tag))
+      .toEqual(['{{bad hands}}', 'artist:a', 'artist:b']);
+  });
+
+  it('repairs previously imported tags that were split before legacy brace groups were supported', () => {
+    let id = 0;
+    const prompt = '{artist:terasu mc, artist:meme50, } {best quality, masterpiece, }';
+    const repaired = repairLegacyPromptTags([
+      { id: 'old-1', tag: '{artist:terasu mc', translation: '', category: 'Unsorted', weight: 1, note: '' },
+      { id: 'old-2', tag: 'artist:meme50', translation: '', category: 'Artist', weight: 1, note: '' },
+      { id: 'old-3', tag: '} {best quality', translation: '', category: 'Style', weight: 1, note: '' },
+      { id: 'old-4', tag: 'masterpiece', translation: '', category: 'Style', weight: 1, note: '' },
+    ], prompt, () => `repaired-${id++}`);
+
+    expect(repaired.map((tag) => tag.tag)).toEqual(['artist:terasu mc', 'artist:meme50', 'best quality', 'masterpiece']);
+    expect(repaired.every((tag) => !/[{}]/.test(tag.tag))).toBe(true);
+  });
+
   it('preserves weighted groups and reports duplicates without removing them', () => {
     let id = 0;
     const batch = analyzePromptBatch('1.3::shirt dress，button up ::, solo, SOLO', [{ tag: 'solo' }], () => `batch-${id++}`);

@@ -2,14 +2,29 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_BASE_URL, DEFAULT_CLASSIFICATION_PROMPT, DEFAULT_TRANSLATION_PROMPT, normalizeBaseUrl } from './translation.js';
 
-const APPEARANCE_DEFAULTS = Object.freeze({ themeMode: 'dark', primaryColor: 'blue', sansFont: 'geist', monoFont: 'geist-mono', motion: 'full' });
+const APPEARANCE_DEFAULTS = Object.freeze({ themeMode: 'dark', primaryColor: 'blue', sansFont: 'Geist', monoFont: 'Geist Mono', motion: 'full' });
 const APPEARANCE_VALUES = {
   themeMode: new Set(['auto', 'dark', 'light']),
   primaryColor: new Set(['blue', 'cyan', 'geekblue', 'gold', 'green', 'lime', 'magenta', 'orange', 'purple', 'red', 'volcano', 'yellow']),
-  sansFont: new Set(['geist', 'harmony', 'system']),
-  monoFont: new Set(['geist-mono', 'system-mono']),
   motion: new Set(['full', 'reduced', 'off']),
 };
+const LEGACY_FONT_FAMILIES = new Map([
+  ['geist', 'Geist'],
+  ['harmony', 'HarmonyOS Sans SC'],
+  ['system', 'system-ui'],
+  ['geist-mono', 'Geist Mono'],
+  ['system-mono', 'monospace'],
+]);
+
+function normalizeFontFamily(value, fallback, strict = false) {
+  const candidate = LEGACY_FONT_FAMILIES.get(String(value || '').trim()) || String(value || '').trim();
+  if (!candidate) return fallback;
+  if (candidate.length > 128 || /[\u0000-\u001f\u007f"\\;{}]/.test(candidate)) {
+    if (strict) throw new Error('不支持的字体名称');
+    return fallback;
+  }
+  return candidate;
+}
 
 export function openPreferences(dataDirectory, safeStorage) {
   const filePath = path.join(dataDirectory, 'preferences.json');
@@ -57,10 +72,13 @@ export function openPreferences(dataDirectory, safeStorage) {
 
   const appearanceSettings = () => {
     const stored = read().appearance || {};
-    return Object.fromEntries(Object.entries(APPEARANCE_DEFAULTS).map(([key, fallback]) => [
-      key,
-      APPEARANCE_VALUES[key].has(stored[key]) ? stored[key] : fallback,
-    ]));
+    return {
+      themeMode: APPEARANCE_VALUES.themeMode.has(stored.themeMode) ? stored.themeMode : APPEARANCE_DEFAULTS.themeMode,
+      primaryColor: APPEARANCE_VALUES.primaryColor.has(stored.primaryColor) ? stored.primaryColor : APPEARANCE_DEFAULTS.primaryColor,
+      sansFont: normalizeFontFamily(stored.sansFont, APPEARANCE_DEFAULTS.sansFont),
+      monoFont: normalizeFontFamily(stored.monoFont, APPEARANCE_DEFAULTS.monoFont),
+      motion: APPEARANCE_VALUES.motion.has(stored.motion) ? stored.motion : APPEARANCE_DEFAULTS.motion,
+    };
   };
 
   const saveAppearanceSettings = (next = {}) => {
@@ -68,8 +86,11 @@ export function openPreferences(dataDirectory, safeStorage) {
     const appearance = { ...current };
     for (const key of Object.keys(APPEARANCE_DEFAULTS)) {
       if (next[key] === undefined) continue;
-      if (!APPEARANCE_VALUES[key].has(next[key])) throw new Error(`不支持的外观设置：${key}`);
-      appearance[key] = next[key];
+      if (key === 'sansFont' || key === 'monoFont') appearance[key] = normalizeFontFamily(next[key], current[key], true);
+      else {
+        if (!APPEARANCE_VALUES[key].has(next[key])) throw new Error(`不支持的外观设置：${key}`);
+        appearance[key] = next[key];
+      }
     }
     const stored = read();
     stored.appearance = appearance;
