@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">NovelAI Prompt Studio</title>
+  <desc id="desc">A blue N framed by prompt braces on a deep slate tile.</desc>
+  <rect x="32" y="32" width="960" height="960" rx="232" fill="#141c27"/>
+  <rect x="50" y="50" width="924" height="924" rx="214" fill="none" stroke="#2b394b" stroke-width="36"/>
+  <path d="M398 244h-34c-72 0-110 41-110 112v70c0 51-23 76-70 86 47 10 70 35 70 86v70c0 71 38 112 110 112h34"
+        fill="none" stroke="#edf3fa" stroke-width="68" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M626 244h34c72 0 110 41 110 112v70c0 51 23 76 70 86-47 10-70 35-70 86v70c0 71-38 112-110 112h-34"
+        fill="none" stroke="#edf3fa" stroke-width="68" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M434 660V364l156 296V364" fill="none" stroke="#5b8ff5" stroke-width="70" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

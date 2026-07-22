@@ -12,6 +12,7 @@ import { readWorkbenchImage } from './workbench.js';
 import { listSystemFonts } from './fonts.js';
 
 app.setName('NovelAI Prompt Studio');
+if (process.platform === 'win32') app.setAppUserModelId('studio.novelai.prompt');
 protocol.registerSchemesAsPrivileged([{ scheme: 'novelai-media', privileges: { secure: true, standard: true, supportFetchAPI: true, stream: true } }]);
 
 let database;
@@ -19,6 +20,7 @@ let assetsDirectory;
 let preferences;
 let contentBackfill = Promise.resolve();
 const activeImports = new Map();
+const appIconPath = path.join(import.meta.dirname, '..', 'build', 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 
 function createWindow() {
   const { width: workAreaWidth, height: workAreaHeight } = screen.getPrimaryDisplay().workAreaSize;
@@ -31,6 +33,7 @@ function createWindow() {
     minHeight: Math.min(700, defaultHeight),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     autoHideMenuBar: process.platform === 'win32',
+    icon: appIconPath,
     backgroundColor: '#10151b',
     webPreferences: { preload: path.join(import.meta.dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
@@ -49,6 +52,7 @@ function safeRemoveAsset(filePath) {
 
 app.whenReady().then(async () => {
   if (process.platform === 'win32') Menu.setApplicationMenu(null);
+  if (process.platform === 'darwin' && app.dock) app.dock.setIcon(appIconPath);
   const dataDirectory = path.join(app.getPath('userData'), 'data');
   assetsDirectory = path.join(app.getPath('userData'), 'assets');
   try {
