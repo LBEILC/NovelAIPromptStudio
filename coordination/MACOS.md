@@ -170,3 +170,12 @@
 - Action: On an unlocked macOS session, open a NovelAI image containing embedded Vibe metadata in 工作台 and click “在文件夹中显示”. Confirm Finder selects a generated `.naiv4vibe` file, then import that file into NovelAI and verify the Vibe is accepted with the embedded model, Reference Strength, and Information Extracted values.
 - Expected: The app creates or updates one hash-named `.naiv4vibe` under its Vibe asset directory, reveals it through the existing cross-platform shell action, and does not add a Vibe library or expose encoding-copy controls.
 - Observed: Windows passed 47 automated tests, Electron syntax checks, and the production build. The export unit test verifies the NovelAI Vibe transfer identifier, version, encoding, model, strength, and Information Extracted fields; live Finder selection and NovelAI import remain to be verified on macOS.
+
+## Verify custom resource library migration and expanded tag categories
+
+- Status: Pending
+- Date/source: 2026-07-22, Windows
+- Related commit: `697ef72`
+- Action: On an unlocked macOS session, open Settings > 资源库, confirm the current Application Support assets path, choose a new empty folder on another volume if available, confirm the native folder picker and confirmation dialog, migrate assets, observe progress, verify images, thumbnails, and Vibe exports remain accessible, and confirm Finder opens the new location. Restart the app and confirm the path persists. Also inspect the 10 category filters and right-click categories in light and dark themes, and run AI classification if configured.
+- Expected: Native folder dialogs and Finder behavior follow macOS conventions; migration copies and verifies files before deleting the old folder, rewrites gallery paths, persists across restart, rejects non-empty or nested folders, and category labels fit without clipping. Legacy Artist, Character, Scene, and Style tags load into the expanded taxonomy.
+- Observed: Windows clean `npm ci`, 67 tests, Electron syntax checks, and the production build passed. Live macOS volume migration, native dialogs, Finder reveal, and label layout await verification.
