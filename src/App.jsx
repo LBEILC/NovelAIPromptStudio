@@ -105,7 +105,7 @@ function SideNav({ page, onNavigate }) {
   const items = [{ key: 'workbench', icon: 'edit', label: '工作台' }, { key: 'gallery', icon: 'library', label: '图片库' }];
   return <LobeSideNav
     className="studio-side-nav"
-    avatar={<button aria-label="NovelAI Prompt Studio · 返回工作台" className="studio-brand" onClick={() => onNavigate('workbench')} title="NovelAI Prompt Studio"><img alt="" src="./app-icon.svg"/></button>}
+    avatar={<button aria-label="NovelAI Prompt Studio · 返回工作台" className="studio-brand" onClick={() => onNavigate('workbench')} title="NovelAI Prompt Studio"><img alt="" className="studio-brand-logo-dark" src="./app-icon.svg"/><img alt="" className="studio-brand-logo-light" src="./app-icon-light.svg"/></button>}
     topActions={<>{items.map((item) => <LobeActionIcon active={page === item.key} icon={<Icon name={item.icon} size={19}/>} key={item.key} onClick={() => onNavigate(item.key)} placement="right" size="large" title={item.label} variant="borderless"/>)}</>}
     bottomActions={<LobeActionIcon active={page === 'settings'} icon={<Icon name="settings" size={19}/>} onClick={() => onNavigate('settings')} placement="right" size="large" title="设置" variant="borderless"/>}
   />;
