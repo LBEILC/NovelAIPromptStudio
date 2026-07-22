@@ -1,6 +1,7 @@
 import LobeButton from '@lobehub/ui/es/Button/index';
 import LobeDraggablePanel from '@lobehub/ui/es/DraggablePanel/index';
 import LobeEmpty from '@lobehub/ui/es/Empty/index';
+import LobeImage from '@lobehub/ui/es/Image/index';
 import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
 import LobeSelect from '@lobehub/ui/es/Select/index';
 import { useEffect, useState } from 'react';
@@ -86,7 +87,7 @@ export default function GalleryPage({
       >
         {preview && <LobeDraggablePanel.Body className="gallery-preview">
           <header><h2 title={preview.name}>{preview.name}</h2></header>
-          <figure><img alt={preview.name} src={mediaUrl(preview.image_path)}/></figure>
+          <figure><LobeImage alt={preview.name} className="gallery-preview-image" maxHeight="46vh" objectFit="contain" src={mediaUrl(preview.image_path)} variant="borderless" width="100%"/></figure>
           <div className="gallery-preview-meta"><span>{preview.metadata?.width || '—'} × {preview.metadata?.height || '—'}</span><span>{countPromptTags(preview)} Tags</span><span>{formatDate(preview.created_at)}</span></div>
           <div className="gallery-preview-prompt"><span>原始 Prompt</span><p>{formatPositivePromptForCopy(preview) || '没有检测到 Prompt'}</p></div>
           <div className="gallery-preview-actions">

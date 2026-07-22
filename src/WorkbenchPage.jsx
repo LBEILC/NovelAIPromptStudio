@@ -1,6 +1,7 @@
 import LobeAlert from '@lobehub/ui/es/Alert/index';
 import LobeButton from '@lobehub/ui/es/Button/index';
 import LobeDraggablePanel from '@lobehub/ui/es/DraggablePanel/index';
+import LobeImage from '@lobehub/ui/es/Image/index';
 import { useState } from 'react';
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
@@ -76,7 +77,7 @@ export default function WorkbenchPage({
         size={sourcePanelWidth ? { height: '100%', width: sourcePanelWidth } : undefined}
       >
         <LobeDraggablePanel.Body className="workbench-source-panel">
-          <figure><img src={mediaUrl(project.image_path)} alt={project.name}/><figcaption><strong>{project.name}</strong><span>{project.metadata?.width || '—'} × {project.metadata?.height || '—'}</span></figcaption></figure>
+          <figure><LobeImage alt={project.name} className="workbench-source-image" maxHeight="min(60vh, 720px)" objectFit="contain" src={mediaUrl(project.image_path)} variant="outlined" width="100%"/><figcaption><strong>{project.name}</strong><span>{project.metadata?.width || '—'} × {project.metadata?.height || '—'}</span></figcaption></figure>
           <WorkbenchVibes onReveal={onRevealVibe} vibes={project.vibes || []}/>
         </LobeDraggablePanel.Body>
       </LobeDraggablePanel>
