@@ -32,10 +32,16 @@ export default function GalleryPage({
   onRemove,
 }) {
   const [previewExpanded, setPreviewExpanded] = useState(Boolean(preview));
+  const [previewPanelWidth, setPreviewPanelWidth] = useState();
 
   useEffect(() => {
     setPreviewExpanded(Boolean(preview));
   }, [preview?.id]);
+
+  const handlePreview = (project) => {
+    setPreviewExpanded(true);
+    onPreview(project);
+  };
 
   return <main className="gallery-page">
     <header className="workspace-page-header">
@@ -57,7 +63,7 @@ export default function GalleryPage({
           {projects.map((project) => <button
             className={`gallery-card ${preview?.id === project.id ? 'active' : ''}`}
             key={project.id}
-            onClick={() => onPreview(project)}
+            onClick={() => handlePreview(project)}
             onContextMenu={(event) => onProjectContextMenu(event, project)}
           >
             <span className="gallery-card-image"><img alt="" loading="lazy" src={mediaUrl(project.thumbnail_path || project.image_path)}/></span>
@@ -67,14 +73,16 @@ export default function GalleryPage({
       </section>
       <LobeDraggablePanel
         className="gallery-preview-shell"
+        classNames={{ content: 'workspace-side-panel-content' }}
         defaultSize={{ width: '28vw' }}
         expand={previewExpanded}
         maxWidth={520}
         minWidth={320}
         onExpandChange={setPreviewExpanded}
+        onSizeChange={(_delta, size) => setPreviewPanelWidth(size?.width)}
         placement="right"
         showHandleHighlight
-        stableLayout
+        size={previewPanelWidth ? { width: previewPanelWidth } : undefined}
       >
         {preview && <LobeDraggablePanel.Body className="gallery-preview">
           <header><h2 title={preview.name}>{preview.name}</h2></header>

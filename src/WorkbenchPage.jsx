@@ -1,6 +1,7 @@
 import LobeAlert from '@lobehub/ui/es/Alert/index';
 import LobeButton from '@lobehub/ui/es/Button/index';
 import LobeDraggablePanel from '@lobehub/ui/es/DraggablePanel/index';
+import { useState } from 'react';
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
 import { countPromptTags } from './lib/promptStructure.js';
@@ -38,6 +39,8 @@ export default function WorkbenchPage({
   onUpdateProject,
   session,
 }) {
+  const [sourcePanelWidth, setSourcePanelWidth] = useState();
+
   if (!session) return <main className="workbench-page workbench-empty-page">
     <div className="workbench-empty-copy">
       <h1>编辑图片中的 Tag</h1>
@@ -63,12 +66,14 @@ export default function WorkbenchPage({
     <div className="workbench-body">
       <LobeDraggablePanel
         className="workbench-source-shell"
+        classNames={{ content: 'workspace-side-panel-content' }}
         defaultSize={{ width: '34vw' }}
         maxWidth={560}
         minWidth={280}
+        onSizeChange={(_delta, size) => setSourcePanelWidth(size?.width)}
         placement="left"
         showHandleHighlight
-        stableLayout
+        size={sourcePanelWidth ? { width: sourcePanelWidth } : undefined}
       >
         <LobeDraggablePanel.Body className="workbench-source-panel">
           <figure><img src={mediaUrl(project.image_path)} alt={project.name}/><figcaption><strong>{project.name}</strong><span>{project.metadata?.width || '—'} × {project.metadata?.height || '—'}</span></figcaption></figure>
