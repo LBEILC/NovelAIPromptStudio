@@ -190,7 +190,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .overview-layer-heading, .overview-category-heading, .overview-scope-heading { min-height: 38px; display: flex; align-items: start; gap: 12px; }
 .overview-layer-heading strong, .overview-layer-heading small, .overview-category-heading strong, .overview-category-heading small, .overview-scope-heading strong, .overview-scope-heading small { display: block; }
 .overview-layer-heading small, .overview-category-heading small, .overview-scope-heading small { color: var(--muted); font-size: var(--text-micro); }
-.overview-layer-heading > span, .overview-layer-heading > button, .overview-category-heading > button, .overview-scope-heading > button { margin-inline-start: auto; }
+.overview-layer-heading > span, .overview-layer-heading > button, .overview-category-heading > button, .overview-scope-heading > button, .overview-scope-actions { margin-inline-start: auto; }
+.overview-scope-actions { display: flex; align-items: center; gap: 4px; }
 .overview-scope { min-width: 0; padding: 12px 0 18px; }
 .overview-scope + .overview-scope { border-top: 1px dashed var(--line-soft); }
 .overview-scope-heading > div { min-width: 0; }
@@ -227,6 +228,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .add-tag-popover { width: 390px; max-width: 100%; padding: 4px; display: grid; gap: 12px; }
 .add-tag-popover-footer { display: flex; align-items: center; gap: 12px; }
 .add-tag-popover-footer > span { flex: 1; color: var(--muted); font-size: var(--text-micro); }
+.raw-prompt-popover-shell { width: min(560px, calc(100vw - 32px)); }
+.raw-prompt-editor { width: 530px; max-width: 100%; padding: 4px; display: grid; gap: 12px; }
+.raw-prompt-textarea textarea { font: var(--text-caption)/1.6 var(--font-mono); }
+.raw-prompt-editor-footer { display: flex; align-items: center; gap: 12px; }
+.raw-prompt-editor-footer > span { min-width: 0; flex: 1; color: var(--muted); font-size: var(--text-micro); }
 .character-quick-popover { width: min(440px, calc(100vw - 32px)); }
 .character-quick-editor { width: 410px; max-width: 100%; padding: 4px; display: grid; gap: 14px; }
 .character-quick-editor > label { display: grid; gap: 6px; }

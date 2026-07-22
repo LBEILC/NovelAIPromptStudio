@@ -111,6 +111,31 @@ export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
     });
 }
 
+export function parsePromptPreservingEdits(prompt = '', existingTags = [], createId = () => crypto.randomUUID()) {
+  const existingByTag = new Map();
+  for (const existing of existingTags) {
+    const key = String(existing.tag || '').trim().toLocaleLowerCase('en-US');
+    if (!key) continue;
+    if (!existingByTag.has(key)) existingByTag.set(key, []);
+    existingByTag.get(key).push(existing);
+  }
+
+  return parsePrompt(prompt, createId).map((parsed) => {
+    const key = parsed.tag.trim().toLocaleLowerCase('en-US');
+    const existing = existingByTag.get(key)?.shift();
+    if (!existing) return parsed;
+    return {
+      ...parsed,
+      id: existing.id || parsed.id,
+      translation: Object.hasOwn(existing, 'translation') ? existing.translation : parsed.translation,
+      translation_source: Object.hasOwn(existing, 'translation_source') ? existing.translation_source : parsed.translation_source,
+      category: existing.category || parsed.category,
+      category_source: Object.hasOwn(existing, 'category_source') ? existing.category_source : parsed.category_source,
+      note: Object.hasOwn(existing, 'note') ? existing.note : parsed.note,
+    };
+  });
+}
+
 export function repairLegacyPromptTags(tags = [], prompt = '', createId = () => crypto.randomUUID()) {
   const hasLegacyFragments = tags.some((item) => /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)::/.test(item.tag) || /::$/.test(item.tag));
   if (!hasLegacyFragments || !prompt.trim()) return tags;

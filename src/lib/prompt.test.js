@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzePromptBatch, expandSearch, formatPrompt, formatPromptInline, inferCategory, parsePrompt, repairLegacyPromptTags } from './prompt.js';
+import { analyzePromptBatch, expandSearch, formatPrompt, formatPromptInline, inferCategory, parsePrompt, parsePromptPreservingEdits, repairLegacyPromptTags } from './prompt.js';
 
 describe('NovelAI prompt codec', () => {
   it('parses numeric weights and exports the same NovelAI syntax', () => {
@@ -40,6 +40,29 @@ describe('NovelAI prompt codec', () => {
       { tag: 'thick lineart', weight: 1.3 },
     ]);
     expect(repaired[0]).toMatchObject({ id: 'girl', translation: '自定义女孩', note: '保留备注', category: 'Character' });
+  });
+
+  it('reparses raw prompt text while preserving metadata for unchanged tags', () => {
+    let id = 0;
+    const existing = [
+      { id: 'silver', tag: 'silver hair', translation: '自定义银发', translation_source: 'manual', category: 'Clothing', category_source: 'manual', weight: 1, note: '保留备注' },
+      { id: 'removed', tag: 'old tag', translation: '旧标签', category: 'Unsorted', weight: 1, note: '' },
+    ];
+    const replaced = parsePromptPreservingEdits('1.5::silver hair ::, new tag', existing, () => `raw-${id++}`);
+
+    expect(replaced).toHaveLength(2);
+    expect(replaced[0]).toMatchObject({
+      id: 'silver',
+      tag: 'silver hair',
+      weight: 1.5,
+      translation: '自定义银发',
+      translation_source: 'manual',
+      category: 'Clothing',
+      category_source: 'manual',
+      note: '保留备注',
+    });
+    expect(replaced[1]).toMatchObject({ id: 'raw-1', tag: 'new tag' });
+    expect(replaced.some((tag) => tag.id === 'removed')).toBe(false);
   });
 
   it('keeps emphasis closers visible as diagnostics without treating them as numeric weight', () => {

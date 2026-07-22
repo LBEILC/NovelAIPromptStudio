@@ -8,7 +8,7 @@ import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
 import LobeSelect from '@lobehub/ui/es/Select/index';
 import LobeSliderWithInput from '@lobehub/ui/es/SliderWithInput/index';
 import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
-import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, inferCategory } from './lib/prompt.js';
+import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, formatPrompt, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
 import { addPromptCharacter, getPromptScope, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
 import SelectionMark from './components/SelectionMark.jsx';
 import Icon from './components/Icon.jsx';
@@ -152,6 +152,28 @@ function AddTagEditor({ draft, pending, scope, onAdd, onChange, onClose }) {
   </div>;
 }
 
+function RawPromptEditor({ draft, pending, scope, onChange, onClose, onSave }) {
+  const label = scope.polarity === 'undesired' ? '排除内容' : 'Prompt';
+  return <div className="raw-prompt-editor" onClick={(event) => event.stopPropagation()}>
+    <div className="tag-quick-editor-heading">
+      <div><strong>编辑原始 {label}</strong><small>自由编辑文本，保存后重新解析为 Tag</small></div>
+      <LobeButton onClick={onClose} size="small" type="text">取消</LobeButton>
+    </div>
+    <LobeTextArea
+      autoFocus
+      autoSize={{ minRows: 8, maxRows: 16 }}
+      className="raw-prompt-textarea"
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={scope.polarity === 'undesired' ? '输入排除内容，使用逗号或换行分隔' : '输入 Prompt，使用逗号或换行分隔'}
+      value={draft}
+    />
+    <div className="raw-prompt-editor-footer">
+      <span>将解析为 {pending.tags.length} 个 Tag{pending.syntaxIssueCount ? ` · ${pending.syntaxIssueCount} 个语法提示` : ''}</span>
+      <LobeButton onClick={onSave} size="small" type="primary">保存并解析</LobeButton>
+    </div>
+  </div>;
+}
+
 function CharacterEditor({ character, project, onChange, onClose, onDelete }) {
   const structure = project.prompt_structure;
   const activeColumn = Math.max(0, Math.min(4, Math.round(Number(character.center?.x ?? 0.5) * 5 - 0.5)));
@@ -199,6 +221,9 @@ function ScopeTags({
   onAddDraftChange,
   onAddingScopeChange,
   onEditingChange,
+  onRawDraftChange,
+  onRawEditingScopeChange,
+  onSaveRawScope,
   onTranslateTag,
   onUpdateTag,
   onKeyboardMove,
@@ -206,23 +231,36 @@ function ScopeTags({
   onToggleGroup,
   onTagContextMenu,
   translatingKeys,
+  rawDraft,
+  rawEditingScopeKey,
 }) {
   const selectedSet = new Set(selectedKeys);
   const scopeEntries = scope.tags.map((tag) => ({ key: overviewTagKey(scope.key, tag.id) }));
   const pendingAdd = analyzePromptBatch(addDraft, scope.tags);
+  const pendingRaw = analyzePromptBatch(rawDraft);
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
       <div><strong>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</strong><small>{scope.tags.length} 个 Tag</small></div>
-      {selecting ? <SelectionGroupButton entries={scopeEntries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : <LobePopover
-        arrow
-        className="add-tag-popover-shell"
-        content={<AddTagEditor draft={addDraft} pending={pendingAdd} scope={scope} onAdd={() => onAddScope(scope.key)} onChange={onAddDraftChange} onClose={() => onAddingScopeChange('')}/>}
-        disabled={selecting}
-        onOpenChange={(open) => onAddingScopeChange(open ? scope.key : '')}
-        open={addingScopeKey === scope.key}
-        placement="bottomRight"
-        trigger="click"
-      ><LobeButton aria-label={`添加到 ${scope.label}`} icon={<Icon name="plus" size={13}/>} size="small" type="text"/></LobePopover>}
+      {selecting ? <SelectionGroupButton entries={scopeEntries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : <div className="overview-scope-actions">
+        <LobePopover
+          arrow
+          className="raw-prompt-popover-shell"
+          content={<RawPromptEditor draft={rawDraft} pending={pendingRaw} scope={scope} onChange={onRawDraftChange} onClose={() => onRawEditingScopeChange('')} onSave={() => onSaveRawScope(scope.key)}/>}
+          onOpenChange={(open) => onRawEditingScopeChange(open ? scope.key : '')}
+          open={rawEditingScopeKey === scope.key}
+          placement="bottomRight"
+          trigger="click"
+        ><LobeButton icon={<Icon name="edit" size={13}/>} size="small" type="text">{scope.polarity === 'undesired' ? '原始排除' : '原始 Prompt'}</LobeButton></LobePopover>
+        <LobePopover
+          arrow
+          className="add-tag-popover-shell"
+          content={<AddTagEditor draft={addDraft} pending={pendingAdd} scope={scope} onAdd={() => onAddScope(scope.key)} onChange={onAddDraftChange} onClose={() => onAddingScopeChange('')}/>}
+          onOpenChange={(open) => onAddingScopeChange(open ? scope.key : '')}
+          open={addingScopeKey === scope.key}
+          placement="bottomRight"
+          trigger="click"
+        ><LobeButton aria-label={`添加到 ${scope.label}`} icon={<Icon name="plus" size={13}/>} size="small" type="text"/></LobePopover>
+      </div>}
     </div>
     <div className="overview-tags" role="list" aria-label={scope.label}>
       {scope.tags.map((tag, index) => {
@@ -350,6 +388,8 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
   const [editingKey, setEditingKey] = useState('');
   const [addingScopeKey, setAddingScopeKey] = useState('');
   const [addDraft, setAddDraft] = useState('');
+  const [rawEditingScopeKey, setRawEditingScopeKey] = useState('');
+  const [rawDraft, setRawDraft] = useState('');
   const [editingCharacterId, setEditingCharacterId] = useState('');
   const [translatingKeys, setTranslatingKeys] = useState(new Set());
   const structure = project.prompt_structure;
@@ -363,6 +403,8 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     setEditingKey('');
     setAddingScopeKey('');
     setAddDraft('');
+    setRawEditingScopeKey('');
+    setRawDraft('');
     setEditingCharacterId('');
     setTranslatingKeys(new Set());
   }, [project.id]);
@@ -449,6 +491,7 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     setDeleteArmed(false);
     setEditingKey('');
     setAddingScopeKey('');
+    setRawEditingScopeKey('');
   };
 
   const selectAllVisible = () => {
@@ -477,8 +520,25 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
   };
 
   const changeAddingScope = (scopeKey) => {
+    setRawEditingScopeKey('');
     setAddingScopeKey(scopeKey);
     if (scopeKey) setAddDraft('');
+  };
+
+  const changeRawEditingScope = (scopeKey) => {
+    setAddingScopeKey('');
+    setRawEditingScopeKey(scopeKey);
+    if (!scopeKey) return;
+    setRawDraft(formatPrompt(getPromptScope(project, scopeKey).tags));
+  };
+
+  const saveRawScope = (scopeKey) => {
+    const scope = getPromptScope(project, scopeKey);
+    const tags = parsePromptPreservingEdits(rawDraft, scope.tags);
+    updateProject(updatePromptScope(project, scopeKey, tags));
+    setRawEditingScopeKey('');
+    setRawDraft('');
+    onNotify?.(`已从原始文本更新 ${tags.length} 个 Tag`);
   };
 
   const addTags = (scopeKey) => {
@@ -537,6 +597,9 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     onAddDraftChange: setAddDraft,
     onAddingScopeChange: changeAddingScope,
     onEditingChange: setEditingKey,
+    onRawDraftChange: setRawDraft,
+    onRawEditingScopeChange: changeRawEditingScope,
+    onSaveRawScope: saveRawScope,
     onTranslateTag: (scopeKey, tag) => translateEntries([{ scopeKey, tag }]),
     onUpdateTag: updateTag,
     onKeyboardMove: keyboardMove,
@@ -544,6 +607,8 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     onToggleGroup: toggleEntryGroup,
     onTagContextMenu,
     translatingKeys,
+    rawDraft,
+    rawEditingScopeKey,
   };
 
   return <div className="prompt-overview">
