@@ -43,6 +43,7 @@ function BatchToolbar({ view, selectedGroups, selectedImages, onFavorite, onTras
 
 function GalleryCard({ active, group, selected, onPreview, onSelect, onContextMenu }) {
   const project = group.cover;
+  const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
   return <article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
     <button
       className="gallery-card-main"
@@ -51,7 +52,14 @@ function GalleryCard({ active, group, selected, onPreview, onSelect, onContextMe
       type="button"
     >
       <span className="gallery-card-image">
-        {group.count > 1 && <span className="gallery-card-stack" aria-hidden="true"/>}
+        {stackMembers.map((member, index) => <img
+          alt=""
+          aria-hidden="true"
+          className={`gallery-card-stack gallery-card-stack-${index + 1}`}
+          key={member.id}
+          loading="lazy"
+          src={mediaUrl(member.thumbnail_path || member.image_path)}
+        />)}
         <img alt="" loading="lazy" src={mediaUrl(project.thumbnail_path || project.image_path)}/>
         {group.count > 1 && <span className="gallery-group-count">{group.count} 张</span>}
       </span>
@@ -228,14 +236,14 @@ export default function GalleryPage({
           <div className="gallery-preview-meta"><span>{preview.metadata?.width || '—'} × {preview.metadata?.height || '—'}</span><span>{countPromptTags(preview)} Tags</span><span>{formatDate(preview.created_at)}</span></div>
           <div className="gallery-preview-prompt"><span>原始 Prompt</span><p>{formatPositivePromptForCopy(preview) || '没有检测到 Prompt'}</p></div>
           <div className="gallery-preview-actions">
-            {view !== 'trash' && <LobeButton icon={<Icon name="edit" size={14}/>} onClick={() => onOpenWorkbench(preview)} type="primary">在工作台编辑</LobeButton>}
+            {view !== 'trash' && <LobeButton className="gallery-preview-action-wide" icon={<Icon name="edit" size={14}/>} onClick={() => onOpenWorkbench(preview)} type="primary">在工作台编辑</LobeButton>}
             <LobeButton icon={<Icon name="star" size={14}/>} onClick={() => onFavorite(!preview.is_favorite, [preview.id])}>{preview.is_favorite ? '取消收藏' : '收藏'}</LobeButton>
             <LobeButton icon={<Icon name="folder" size={14}/>} onClick={() => onReveal(preview)}>在文件夹中显示</LobeButton>
             {view !== 'trash' && <LobeButton onClick={() => setRenaming(true)}>重命名</LobeButton>}
             {previewGroup?.count > 1 && previewGroup.cover.id !== preview.id && view !== 'trash' && <LobeButton onClick={() => onSetCover(previewGroup, preview)}>设为头图</LobeButton>}
             {view === 'trash'
               ? <><LobeButton icon={<Icon name="restore" size={14}/>} onClick={() => onRestore([preview.id])}>恢复当前图片</LobeButton><LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={() => onPermanentDelete([preview.id])}>永久删除当前图片</LobeButton></>
-              : <LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={() => onTrash([preview.id], 'detail')} type="fill">删除当前图片</LobeButton>}
+              : <LobeButton className="gallery-preview-action-wide" danger icon={<Icon name="trash" size={14}/>} onClick={() => onTrash([preview.id], 'detail')} type="fill">删除当前图片</LobeButton>}
           </div>
         </LobeDraggablePanel.Body>}
       </LobeDraggablePanel>

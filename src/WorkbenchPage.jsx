@@ -46,7 +46,7 @@ function tabLabel(tab, onClose) {
     title={tab.displayName}
   >
     {dirty && <span aria-label="有未处理修改" className="workbench-tab-dirty"/>}
-    <span>{tab.displayName || tab.project?.name || '未命名图片'}</span>
+    <span className="workbench-tab-title">{tab.displayName || tab.project?.name || '未命名图片'}</span>
     <span
       aria-label={`关闭 ${tab.displayName || '标签'}`}
       className="workbench-tab-close"
@@ -128,6 +128,11 @@ export default function WorkbenchPage({
       <Tabs
         activeKey={session.activeTabId}
         className="workbench-tabs"
+        classNames={{
+          indicator: 'workbench-tabs-indicator',
+          list: 'workbench-tabs-list',
+          tab: 'workbench-tab',
+        }}
         items={session.tabs.map((item) => ({ key: item.id, label: tabLabel(item, onCloseTab) }))}
         onChange={onActivateTab}
         size="small"
