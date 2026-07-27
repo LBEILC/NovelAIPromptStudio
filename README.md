@@ -96,8 +96,8 @@ AI 功能完全可选。启用翻译或分类时，只有相关 Tag 文本会发
 | 平台 | 安装包 |
 | --- | --- |
 | Windows x64 | `NovelAI Prompt Studio-Setup-*-x64.exe` |
-| macOS Apple Silicon | `NovelAI Prompt Studio-*-arm64.dmg` |
-| macOS Intel | `NovelAI Prompt Studio-*-x64.dmg` |
+| macOS Apple Silicon | `NovelAI-Prompt-Studio-*-arm64.dmg` |
+| macOS Intel | `NovelAI-Prompt-Studio-*-x64.dmg` |
 
 > [!NOTE]
 > 当前安装包尚未进行代码签名，Windows 或 macOS 可能显示安全提示。请只从本仓库的 Releases 页面下载。

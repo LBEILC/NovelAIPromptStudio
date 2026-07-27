@@ -12,9 +12,20 @@ function candidateClipboardPaths() {
     const fileName = clipboard.readBuffer('FileNameW').toString('ucs2').replace(/\0+$/g, '').trim();
     if (fileName) candidates.push(fileName);
   }
-  for (const format of ['public.file-url', 'text/uri-list']) {
-    const value = clipboard.read(format).trim();
+  const formats = new Set(['public.file-url', 'text/uri-list', 'NSFilenamesPboardType']);
+  for (const format of clipboard.availableFormats?.() || []) {
+    if (/file.?url|filename/i.test(format)) formats.add(format);
+  }
+  for (const format of formats) {
+    const text = clipboard.read(format).trim();
+    const bufferText = clipboard.readBuffer(format).toString('utf8').replace(/\0+$/g, '').trim();
+    const value = text || bufferText;
     if (!value) continue;
+    const plistPaths = [...value.matchAll(/<string>([^<]+)<\/string>/g)].map((match) => match[1]);
+    if (plistPaths.length) {
+      candidates.push(...plistPaths);
+      continue;
+    }
     for (const line of value.split(/\r?\n/)) {
       if (!line || line.startsWith('#')) continue;
       try {

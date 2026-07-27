@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const clipboardMock = vi.hoisted(() => ({
+  availableFormats: vi.fn(() => []),
   read: vi.fn(() => ''),
   readBuffer: vi.fn(() => Buffer.alloc(0)),
   readImage: vi.fn(),
@@ -15,6 +16,7 @@ const { cleanupWorkbenchTemporaryImages, readClipboardImageSource } = await impo
 const temporaryDirectories = [];
 
 afterEach(() => {
+  clipboardMock.availableFormats.mockReset().mockReturnValue([]);
   clipboardMock.read.mockReset().mockReturnValue('');
   clipboardMock.readBuffer.mockReset().mockReturnValue(Buffer.alloc(0));
   clipboardMock.readImage.mockReset();
@@ -34,6 +36,23 @@ describe('clipboard image reading', () => {
       fromBitmap: false,
       temporaryId: '',
       fingerprint: '',
+    });
+    expect(clipboardMock.readImage).not.toHaveBeenCalled();
+  });
+
+  it('reads Finder file URLs from platform buffers when text conversion is unavailable', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-clipboard-'));
+    temporaryDirectories.push(directory);
+    const imagePath = path.join(directory, 'Finder image.png');
+    fs.writeFileSync(imagePath, 'png bytes');
+    clipboardMock.availableFormats.mockReturnValue(['public.file-url']);
+    clipboardMock.readBuffer.mockImplementation((format) => format === 'public.file-url'
+      ? Buffer.from(pathToFileURL(imagePath).toString())
+      : Buffer.alloc(0));
+
+    expect(readClipboardImageSource(path.join(directory, 'temporary'))).toMatchObject({
+      filePath: imagePath,
+      fromBitmap: false,
     });
     expect(clipboardMock.readImage).not.toHaveBeenCalled();
   });

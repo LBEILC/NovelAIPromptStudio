@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { isUtf8 } from 'node:buffer';
 import { pipeline } from 'node:stream/promises';
 import yauzl from 'yauzl';
 import sharp from 'sharp';
@@ -17,6 +18,8 @@ export const IMPORT_LIMITS = Object.freeze({
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const DIRECT_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+const ZIP_UTF8_FLAG = 0x800;
+const ZIP_UNICODE_PATH_EXTRA_FIELD = 0x7075;
 
 function readableBytes(value) {
   if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
@@ -39,8 +42,27 @@ export function isPngSignature(buffer) {
     && buffer.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE);
 }
 
+export function decodeZipEntryFileName(entry) {
+  if (!Buffer.isBuffer(entry?.fileNameRaw)) return String(entry?.fileName || '');
+  const rawName = entry.fileNameRaw;
+  const hasUnicodePath = entry.extraFields?.some((field) => field.id === ZIP_UNICODE_PATH_EXTRA_FIELD);
+  const standardName = yauzl.getFileNameLowLevel(
+    entry.generalPurposeBitFlag,
+    rawName,
+    entry.extraFields || [],
+    false,
+  );
+  if ((entry.generalPurposeBitFlag & ZIP_UTF8_FLAG) || hasUnicodePath) return standardName;
+
+  // Finder/ditto and some NovelAI ZIP exporters write UTF-8 bytes without setting
+  // the language flag. CP437 decoding turns those valid bytes into mojibake.
+  return rawName.some((byte) => byte >= 0x80) && isUtf8(rawName)
+    ? rawName.toString('utf8').replaceAll('\\', '/')
+    : standardName;
+}
+
 export function validateZipImageEntry(entry, totals = { expandedBytes: 0, imageCount: 0 }) {
-  const fileName = String(entry.fileName || '').replaceAll('\\', '/');
+  const fileName = decodeZipEntryFileName(entry).replaceAll('\\', '/');
   const parts = fileName.split('/');
   if (!fileName || fileName.startsWith('/') || /^[a-zA-Z]:\//.test(fileName) || parts.includes('..')) {
     return { action: 'reject', reason: `ZIP 包含不安全路径：${fileName || '(空路径)'}` };
@@ -70,7 +92,11 @@ export function validateZipImageEntry(entry, totals = { expandedBytes: 0, imageC
 }
 
 export async function inspectZipArchive(zipPath, { signal } = {}) {
-  const zipfile = await yauzl.openPromise(zipPath, { validateEntrySizes: true, strictFileNames: false });
+  const zipfile = await yauzl.openPromise(zipPath, {
+    decodeStrings: false,
+    validateEntrySizes: true,
+    strictFileNames: false,
+  });
   const accepted = [];
   const totals = { entryCount: 0, imageCount: 0, expandedBytes: 0, skipped: 0 };
   try {
@@ -150,13 +176,18 @@ async function firstBytes(filePath, length) {
 async function processZipPlan(plan, temporaryDirectory, processSource, recordFailure, signal) {
   const wanted = new Map();
   for (const entry of plan.entries) wanted.set(entry.fileName, (wanted.get(entry.fileName) || 0) + 1);
-  const zipfile = await yauzl.openPromise(plan.filePath, { validateEntrySizes: true, strictFileNames: false });
+  const zipfile = await yauzl.openPromise(plan.filePath, {
+    decodeStrings: false,
+    validateEntrySizes: true,
+    strictFileNames: false,
+  });
   try {
     for await (const entry of zipfile.eachEntry()) {
       if (signal?.aborted) break;
-      const remaining = wanted.get(entry.fileName) || 0;
+      const fileName = decodeZipEntryFileName(entry);
+      const remaining = wanted.get(fileName) || 0;
       if (!remaining) continue;
-      wanted.set(entry.fileName, remaining - 1);
+      wanted.set(fileName, remaining - 1);
       const temporaryPath = path.join(temporaryDirectory, `${crypto.randomUUID()}.png`);
       try {
         try {
@@ -165,9 +196,9 @@ async function processZipPlan(plan, temporaryDirectory, processSource, recordFai
           if (!isPngSignature(await firstBytes(temporaryPath, PNG_SIGNATURE.length))) {
             throw new Error('扩展名是 PNG，但文件签名不匹配');
           }
-          await processSource(temporaryPath, `${path.basename(plan.filePath)} / ${entry.fileName}`, path.basename(entry.fileName));
+          await processSource(temporaryPath, `${path.basename(plan.filePath)} / ${fileName}`, path.basename(fileName));
         } catch (error) {
-          recordFailure(`${path.basename(plan.filePath)} / ${entry.fileName}`, error);
+          recordFailure(`${path.basename(plan.filePath)} / ${fileName}`, error);
         }
       } finally {
         fs.rmSync(temporaryPath, { force: true });

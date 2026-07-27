@@ -6,7 +6,13 @@ import sharp from 'sharp';
 import yazl from 'yazl';
 import { afterEach, describe, expect, it } from 'vitest';
 import { openDatabase } from './database.js';
-import { importLibraryFiles, inspectZipArchive, isPngSignature, validateZipImageEntry } from './importer.js';
+import {
+  decodeZipEntryFileName,
+  importLibraryFiles,
+  inspectZipArchive,
+  isPngSignature,
+  validateZipImageEntry,
+} from './importer.js';
 
 const temporaryDirectories = [];
 
@@ -23,6 +29,16 @@ async function writeZip(filePath, entries) {
   for (const entry of entries) zip.addBuffer(entry.buffer, entry.name);
   zip.end();
   await pipeline(zip.outputStream, fs.createWriteStream(filePath));
+}
+
+function clearZipUtf8Flags(buffer) {
+  const patched = Buffer.from(buffer);
+  for (let offset = 0; offset <= patched.length - 10; offset += 1) {
+    const signature = patched.readUInt32LE(offset);
+    const flagOffset = signature === 0x04034b50 ? offset + 6 : signature === 0x02014b50 ? offset + 8 : -1;
+    if (flagOffset >= 0) patched.writeUInt16LE(patched.readUInt16LE(flagOffset) & ~0x800, flagOffset);
+  }
+  return patched;
 }
 
 function temporaryWorkspace() {
@@ -64,6 +80,27 @@ describe('safe ZIP import', () => {
     expect(result.duplicates[0]).toMatchObject({ file: 'export.zip / renamed-inside-zip.png', projectId: result.imported[0].id });
     expect(database.loadLibrary()).toHaveLength(1);
     expect(database.loadLibrary()[0].content_hash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('recovers UTF-8 names from macOS ZIPs that omit the language flag', async () => {
+    const directory = temporaryWorkspace();
+    const zipPath = path.join(directory, 'NovelAI 图片合集.zip');
+    const png = await pngBuffer();
+    await writeZip(zipPath, [{ name: '作品/第三张 (同组).png', buffer: png }]);
+    fs.writeFileSync(zipPath, clearZipUtf8Flags(fs.readFileSync(zipPath)));
+
+    const inspection = await inspectZipArchive(zipPath);
+    expect(inspection.entries).toEqual([
+      expect.objectContaining({ fileName: '作品/第三张 (同组).png' }),
+    ]);
+
+    const database = await openDatabase(path.join(directory, 'data'));
+    const result = await importLibraryFiles({
+      filePaths: [zipPath],
+      assetsDirectory: path.join(directory, 'assets'),
+      database,
+    });
+    expect(result.imported[0].name).toBe('第三张 同组');
   });
 
   it('reports a fake PNG without blocking the rest of a batch', async () => {
@@ -113,5 +150,15 @@ describe('import validation helpers', () => {
       compressedSize: 10,
       uncompressedSize: 20,
     }).action).toBe('reject');
+  });
+
+  it('keeps standard CP437 decoding for non-UTF-8 entry bytes', () => {
+    const fileNameRaw = Buffer.from([0x82, 0x2e, 0x70, 0x6e, 0x67]);
+    expect(decodeZipEntryFileName({
+      fileName: fileNameRaw,
+      fileNameRaw,
+      extraFields: [],
+      generalPurposeBitFlag: 0,
+    })).toBe('é.png');
   });
 });

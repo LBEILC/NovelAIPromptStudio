@@ -75,7 +75,7 @@
         "dmg",
         "zip"
       ],
-      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "artifactName": "NovelAI-Prompt-Studio-${version}-${arch}.${ext}",
       "category": "public.app-category.graphics-design"
     },
     "nsis": {
