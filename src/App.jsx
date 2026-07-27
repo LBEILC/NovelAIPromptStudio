@@ -30,6 +30,7 @@ import {
 import {
   adjacentGallerySelection,
   filterAndSortGalleryGroups,
+  galleryGroupMenuLabels,
   gallerySelectionProjectIds,
   groupGalleryProjects,
   reconcileGallerySelection,
@@ -727,20 +728,28 @@ export default function App({ appearance, setAppearance }) {
     setPreviewProjectId(previewGroup.members[next].id);
   }, [preview, previewGroup]);
 
-  const galleryContextMenu = (event, group) => {
+  const galleryContextMenu = (event, group, onRenameRequest) => {
     const project = group.cover;
     const ids = group.members.map((item) => item.id);
+    const labels = galleryGroupMenuLabels(group);
     openContextMenu(event, [
       ...(galleryView === 'trash' ? [
         { key: 'restore-group', label: group.count > 1 ? '恢复整个图片组' : '恢复图片', onClick: () => restoreProjects(ids, 'group') },
         { key: 'permanent-group', label: group.count > 1 ? '永久删除整个图片组' : '永久删除图片', icon: Trash2, danger: true, onClick: () => permanentDelete(ids, null, 'group') },
       ] : [
         { key: 'open-workbench', label: '在工作台中打开', icon: Pencil, onClick: () => openWorkbenchPath(project.image_path, { type: 'library', projectId: project.id, path: project.image_path }) },
-        { key: 'favorite-group', label: group.members.every((item) => item.is_favorite) ? '取消收藏整个图片组' : '收藏整个图片组', icon: Star, onClick: () => setFavorite(!group.members.every((item) => item.is_favorite), ids, 'group') },
+        { key: 'favorite-group', label: labels.favorite, icon: Star, onClick: () => setFavorite(!group.members.every((item) => item.is_favorite), ids, 'group') },
+        { key: 'rename-project', label: labels.rename, icon: Pencil, onClick: onRenameRequest },
         { key: 'reveal-project', label: '在文件夹中显示', icon: FolderOpen, onClick: () => studio.revealFile(project.image_path) },
         { key: 'project-divider', type: 'divider' },
         { key: 'delete-project', label: group.count > 1 ? '删除整个图片组' : '删除图片', icon: Trash2, danger: true, onClick: () => moveToTrash(ids, 'group') },
       ]),
+    ]);
+  };
+
+  const galleryWorkspaceContextMenu = (event) => {
+    openContextMenu(event, [
+      { key: 'import-clipboard', label: '从剪贴板导入', icon: ClipboardPaste, onClick: () => importImages(null, true) },
     ]);
   };
 
@@ -833,6 +842,7 @@ export default function App({ appearance, setAppearance }) {
         onPermanentDelete={permanentDelete}
         onPreview={previewGalleryGroup}
         onProjectContextMenu={galleryContextMenu}
+        onWorkspaceContextMenu={galleryWorkspaceContextMenu}
         onQueryChange={setQuery}
         onRename={renameProject}
         onRestore={restoreProjects}

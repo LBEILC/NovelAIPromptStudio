@@ -245,7 +245,7 @@ function ScopeTags({
   const pendingRaw = analyzePromptBatch(rawDraft);
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
-      <div><strong>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</strong><small>{scope.tags.length} 个 Tag</small></div>
+      <div><strong>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</strong>{scope.tags.length > 0 && <small>{scope.tags.length} 个 Tag</small>}</div>
       {selecting ? <SelectionGroupButton entries={scopeEntries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : <div className="overview-scope-actions">
         <LobePopover
           arrow
@@ -314,7 +314,7 @@ function ScopeTags({
       })}
       {!scope.tags.length && (filtered
         ? <span className="overview-filter-empty">当前筛选无 Tag</span>
-        : <span className="overview-filter-empty">暂无 Tag，使用左侧加号添加</span>)}
+        : <span className="overview-filter-empty">暂无 Tag，使用右上角 + 添加</span>)}
     </div>
   </div>;
 }

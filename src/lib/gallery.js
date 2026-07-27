@@ -48,6 +48,17 @@ export function reconcileGallerySelection(groups = [], selectedGroupIds = []) {
   return selectedGroupIds.filter((id) => visible.has(id));
 }
 
+export function galleryGroupMenuLabels(group) {
+  const grouped = Number(group?.count || group?.members?.length || 0) > 1;
+  const allFavorite = Boolean(group?.members?.length) && group.members.every((project) => project.is_favorite);
+  return {
+    favorite: grouped
+      ? `${allFavorite ? '取消收藏' : '收藏'}整个图片组`
+      : allFavorite ? '取消收藏图片' : '收藏图片',
+    rename: grouped ? '重命名头图' : '重命名',
+  };
+}
+
 export function adjacentGallerySelection(groups = [], currentGroupId, removedProjectId) {
   const groupIndex = groups.findIndex((group) => group.id === currentGroupId);
   const group = groups[groupIndex];

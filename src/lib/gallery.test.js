@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adjacentGallerySelection, gallerySelectionProjectIds, groupGalleryProjects, reconcileGallerySelection } from './gallery.js';
+import { adjacentGallerySelection, galleryGroupMenuLabels, gallerySelectionProjectIds, groupGalleryProjects, reconcileGallerySelection } from './gallery.js';
 
 const item = (id, fingerprint, createdAt, cover = '') => ({
   id,
@@ -42,5 +42,16 @@ describe('gallery grouping and selection', () => {
     const groups = groupGalleryProjects([item('a', 'same', '2026-01-01'), item('b', 'same', '2026-02-01'), item('c', 'other', '2026-03-01')]);
     const same = groups.find((group) => group.fingerprint === 'same');
     expect(adjacentGallerySelection(groups, same.id, 'b')).toEqual({ groupId: same.id, projectId: 'a' });
+  });
+
+  it('uses single-image wording unless the card represents a real group', () => {
+    expect(galleryGroupMenuLabels({ count: 1, members: [{ is_favorite: 0 }] })).toEqual({
+      favorite: '收藏图片',
+      rename: '重命名',
+    });
+    expect(galleryGroupMenuLabels({ count: 2, members: [{ is_favorite: 1 }, { is_favorite: 1 }] })).toEqual({
+      favorite: '取消收藏整个图片组',
+      rename: '重命名头图',
+    });
   });
 });

@@ -1,6 +1,6 @@
 import { ActionIcon, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, SearchBar as LobeSearchBar } from '@lobehub/ui';
 import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, SplitButton } from '@lobehub/ui/base-ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Icon from './components/Icon.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
@@ -96,6 +96,7 @@ export default function GalleryPage({
   onOpenWorkbench,
   onPreview,
   onProjectContextMenu,
+  onWorkspaceContextMenu,
   onQueryChange,
   onRename,
   onRestore,
@@ -114,10 +115,13 @@ export default function GalleryPage({
   const [previewPanelWidth, setPreviewPanelWidth] = useState();
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
+  const renameTargetRef = useRef('');
 
   useEffect(() => {
     setPreviewExpanded(Boolean(preview));
-    setRenaming(false);
+    const requestedRename = Boolean(preview && renameTargetRef.current === preview.id);
+    renameTargetRef.current = '';
+    setRenaming(requestedRename);
     setNameDraft(preview?.name || '');
   }, [preview?.id]);
 
@@ -134,6 +138,17 @@ export default function GalleryPage({
   const memberIndex = previewGroup?.members.findIndex((project) => project.id === preview?.id) ?? -1;
   const saveName = async () => {
     if (await onRename(preview, nameDraft)) setRenaming(false);
+  };
+  const requestRename = (group) => {
+    const project = group.cover;
+    setPreviewExpanded(true);
+    if (preview?.id === project.id) {
+      setNameDraft(project.name || '');
+      setRenaming(true);
+      return;
+    }
+    renameTargetRef.current = project.id;
+    onPreview(group);
   };
 
   return <main className="gallery-page">
@@ -170,13 +185,19 @@ export default function GalleryPage({
       view={view}
     />
     <div className="gallery-workspace">
-      <section className="gallery-grid-scroll">
+      <section
+        className="gallery-grid-scroll"
+        onContextMenu={(event) => {
+          if (event.target.closest('.gallery-card')) return;
+          onWorkspaceContextMenu(event);
+        }}
+      >
         {groups.length ? <div className="gallery-grid">
           {groups.map((group) => <GalleryCard
             active={previewGroup?.id === group.id}
             group={group}
             key={group.id}
-            onContextMenu={(event) => onProjectContextMenu(event, group)}
+            onContextMenu={(event) => onProjectContextMenu(event, group, () => requestRename(group))}
             onPreview={() => { setPreviewExpanded(true); onPreview(group); }}
             onSelect={(event) => onToggleSelect(group, event)}
             selected={selectedGroupIds.includes(group.id)}
@@ -212,6 +233,7 @@ export default function GalleryPage({
                   if (event.key === 'Enter') saveName();
                   if (event.key === 'Escape') setRenaming(false);
                 }}
+                size="small"
                 value={nameDraft}
               />
               <LobeButton onClick={saveName} size="small" type="primary">保存</LobeButton>
