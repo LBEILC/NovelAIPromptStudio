@@ -1,9 +1,10 @@
 import { ActionIcon, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, SearchBar as LobeSearchBar } from '@lobehub/ui';
 import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, SplitButton } from '@lobehub/ui/base-ui';
 import { useEffect, useRef, useState } from 'react';
-import Icon from './components/Icon.jsx';
+import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
+import { galleryEmptyState } from './lib/gallery.js';
 import { countPromptTags, formatPositivePromptForCopy } from './lib/promptStructure.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
 
@@ -136,6 +137,7 @@ export default function GalleryPage({
   }, [onNavigatePreview, previewGroup]);
 
   const memberIndex = previewGroup?.members.findIndex((project) => project.id === preview?.id) ?? -1;
+  const emptyState = galleryEmptyState(view, query);
   const saveName = async () => {
     if (await onRename(preview, nameDraft)) setRenaming(false);
   };
@@ -204,9 +206,12 @@ export default function GalleryPage({
           />)}
         </div> : <LobeEmpty
           className="gallery-empty"
-          description={query ? '换一个关键词试试。' : view === 'trash' ? '移入回收站的图片会显示在这里。' : '拖入图片，或点击右上角导入。'}
-          image={<Icon name="image" size={30}/>}
-          title={query ? '没有匹配的图片' : view === 'favorites' ? '还没有收藏图片' : view === 'trash' ? '回收站为空' : '图片库还是空的'}
+          description={emptyState.description}
+          gap={6}
+          icon={getIconComponent(emptyState.icon)}
+          imageSize={38}
+          justify="center"
+          title={emptyState.title}
         />}
       </section>
       <LobeDraggablePanel

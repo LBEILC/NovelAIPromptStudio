@@ -48,7 +48,11 @@ const ICONS = {
   warning: CircleAlert,
 };
 
+export function getIconComponent(name) {
+  return ICONS[name] || CircleHelp;
+}
+
 export default function Icon({ name, size = 17, strokeWidth = 1.8, ...props }) {
-  const Component = ICONS[name] || CircleHelp;
+  const Component = getIconComponent(name);
   return <LobeIcon aria-hidden="true" focusable="false" icon={Component} size={size} strokeWidth={strokeWidth} {...props}/>;
 }

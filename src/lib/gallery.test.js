@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adjacentGallerySelection, galleryGroupMenuLabels, gallerySelectionProjectIds, groupGalleryProjects, reconcileGallerySelection } from './gallery.js';
+import { adjacentGallerySelection, galleryEmptyState, galleryGroupMenuLabels, gallerySelectionProjectIds, groupGalleryProjects, reconcileGallerySelection } from './gallery.js';
 
 const item = (id, fingerprint, createdAt, cover = '') => ({
   id,
@@ -53,5 +53,12 @@ describe('gallery grouping and selection', () => {
       favorite: '取消收藏整个图片组',
       rename: '重命名头图',
     });
+  });
+
+  it('gives every empty gallery view an accurate next step', () => {
+    expect(galleryEmptyState('favorites')).toMatchObject({ title: '暂无收藏', icon: 'star' });
+    expect(galleryEmptyState('trash')).toMatchObject({ title: '回收站为空', icon: 'trash' });
+    expect(galleryEmptyState('all', 'artist')).toMatchObject({ title: '没有匹配的图片', icon: 'search' });
+    expect(galleryEmptyState('all').description).toContain('导入图片');
   });
 });

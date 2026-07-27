@@ -693,8 +693,8 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
       })}
 
       {!visibleEntries.length && filtered && <div className="overview-no-results"><strong>没有符合条件的 Tag</strong><span>调整分类、区域或搜索词后，顶部复制内容会同步更新。</span></div>}
-      {viewMode === 'structure' && !structure.characters.length && filters.domain !== 'base' && <LobeButton className="overview-add-character" onClick={addCharacter} type="dashed">
-        <Icon name="plus" size={20}/><div><strong>还没有 Character Prompt</strong><small>添加后可在这里设置角色名称、位置和独立 Prompt。</small></div>
+      {viewMode === 'structure' && !structure.characters.length && filters.domain !== 'base' && <LobeButton className="overview-add-character" icon={<Icon name="plus" size={20}/>} onClick={addCharacter} type="dashed">
+        <div><strong>暂无角色 Prompt</strong><small>添加后可设置角色名称、位置和独立 Prompt。</small></div>
       </LobeButton>}
     </div>
   </div>;

@@ -59,6 +59,35 @@ export function galleryGroupMenuLabels(group) {
   };
 }
 
+export function galleryEmptyState(view = 'all', query = '') {
+  if (String(query).trim()) {
+    return {
+      description: '尝试其他关键词，或清除搜索条件。',
+      icon: 'search',
+      title: '没有匹配的图片',
+    };
+  }
+  if (view === 'favorites') {
+    return {
+      description: '在“全部”中收藏图片后，会显示在这里。',
+      icon: 'star',
+      title: '暂无收藏',
+    };
+  }
+  if (view === 'trash') {
+    return {
+      description: '移入回收站的图片会显示在这里。',
+      icon: 'trash',
+      title: '回收站为空',
+    };
+  }
+  return {
+    description: '拖入图片，或点击右上角“导入图片”。',
+    icon: 'image',
+    title: '图片库为空',
+  };
+}
+
 export function adjacentGallerySelection(groups = [], currentGroupId, removedProjectId) {
   const groupIndex = groups.findIndex((group) => group.id === currentGroupId);
   const group = groups[groupIndex];
