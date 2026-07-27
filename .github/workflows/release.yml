@@ -94,6 +94,6 @@ jobs:
           gh release create "${{ github.ref_name }}"
           release-artifacts/*
           --verify-tag
-          --generate-notes
-          --notes "Windows and macOS packages in this release are currently unsigned. Your operating system may display a security warning."
+          --notes-from-tag
+          --fail-on-no-commits
           --title "NovelAI Prompt Studio ${{ github.ref_name }}"
