@@ -9,7 +9,7 @@ export default function ImageStage({
   className = '',
   filePath,
   preview = true,
-  previewActions,
+  previewToolbar,
   toolbarAddon,
   children,
 }) {
@@ -20,7 +20,7 @@ export default function ImageStage({
       maxHeight="100%"
       maxWidth="100%"
       objectFit="contain"
-      preview={preview ? { actionsRender: previewActions, toolbarAddon } : false}
+      preview={preview ? { toolbarAddon, toolbarRender: previewToolbar } : false}
       src={mediaUrl(filePath)}
       variant="borderless"
     /> : <div className="image-stage-empty">没有可显示的图片</div>}

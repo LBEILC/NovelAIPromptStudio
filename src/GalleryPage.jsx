@@ -262,7 +262,7 @@ export default function GalleryPage({
             alt={preview.name}
             className="gallery-preview-stage"
             filePath={preview.image_path}
-            previewActions={(_originalNode, info) => <GalleryPreviewToolbar
+            previewToolbar={(_originalNode, info) => <GalleryPreviewToolbar
               info={info}
               onCopy={() => onCopyImage(preview)}
               onDownload={() => onDownloadImage(preview)}
