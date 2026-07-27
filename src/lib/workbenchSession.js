@@ -138,6 +138,14 @@ export function workbenchTabHasChanges(tab) {
   return JSON.stringify(promptSnapshot(tab.project)) !== JSON.stringify(promptSnapshot(tab.originalProject));
 }
 
+export function scopeWorkbenchCopyContext(context = {}, tabId = '') {
+  return { ...context, tabId };
+}
+
+export function activeWorkbenchCopyContext(context = {}, tabId = '') {
+  return context.tabId === tabId ? context : { text: '', count: 0 };
+}
+
 export function workbenchHasChanges(session) {
   return Boolean(session?.tabs?.some(workbenchTabHasChanges));
 }

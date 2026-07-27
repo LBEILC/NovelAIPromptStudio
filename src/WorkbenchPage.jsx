@@ -1,11 +1,11 @@
 import { Alert as LobeAlert, DraggablePanel as LobeDraggablePanel } from '@lobehub/ui';
 import { Button as LobeButton, showContextMenu, SplitButton, Tabs } from '@lobehub/ui/base-ui';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
 import ImageStage from './components/ImageStage.jsx';
 import { countPromptTags, formatPositivePromptForCopy, positivePromptCopyOptions } from './lib/promptStructure.js';
-import { activeWorkbenchTab, workbenchTabHasChanges } from './lib/workbenchSession.js';
+import { activeWorkbenchCopyContext, activeWorkbenchTab, scopeWorkbenchCopyContext, workbenchTabHasChanges } from './lib/workbenchSession.js';
 
 function WorkbenchVibes({ vibes, onReveal }) {
   if (!vibes?.length) return <div className="workbench-vibe-empty"><Icon name="info" size={15}/><span>没有检测到 Vibe</span></div>;
@@ -76,11 +76,14 @@ export default function WorkbenchPage({
   session,
 }) {
   const [sourcePanelWidth, setSourcePanelWidth] = useState();
-  const [copyContext, setCopyContext] = useState({ text: '', count: 0 });
+  const [copyContextState, setCopyContextState] = useState({ tabId: '', text: '', count: 0 });
   const tab = activeWorkbenchTab(session);
   const project = tab?.project;
-
-  useEffect(() => setCopyContext({ text: '', count: 0 }), [tab?.id]);
+  const activeTabId = tab?.id || '';
+  const copyContext = activeWorkbenchCopyContext(copyContextState, activeTabId);
+  const updateCopyContext = useCallback((context) => {
+    setCopyContextState(scopeWorkbenchCopyContext(context, activeTabId));
+  }, [activeTabId]);
 
   const copyOptions = useMemo(() => project ? positivePromptCopyOptions(project) : [], [project]);
   const copyItems = useMemo(() => project ? [
@@ -164,7 +167,7 @@ export default function WorkbenchPage({
         <PromptOverview
           focusScopeKey={focusScopeKey}
           focusTagId={focusTagId}
-          onCopyContextChange={setCopyContext}
+          onCopyContextChange={updateCopyContext}
           onCopyText={onCopyText}
           onNotify={onNotify}
           onTagContextMenu={onTagContextMenu}

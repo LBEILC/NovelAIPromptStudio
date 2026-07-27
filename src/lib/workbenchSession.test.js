@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activeWorkbenchCopyContext,
   activeWorkbenchTab,
   addWorkbenchTab,
   closeWorkbenchTab,
   createWorkbenchSession,
   createWorkbenchTab,
   parseWorkbenchSession,
+  scopeWorkbenchCopyContext,
   serializeWorkbenchSession,
   workbenchHasChanges,
 } from './workbenchSession.js';
@@ -23,6 +25,12 @@ function fixture(id = 'workbench-1', imagePath = 'C:\\images\\source.png') {
 }
 
 describe('workbench session v2', () => {
+  it('only exposes copy context reported by the active tab', () => {
+    const first = scopeWorkbenchCopyContext({ text: 'prompt', count: 1 }, 'tab-a');
+    expect(activeWorkbenchCopyContext(first, 'tab-a')).toMatchObject({ text: 'prompt', count: 1 });
+    expect(activeWorkbenchCopyContext(first, 'tab-b')).toEqual({ text: '', count: 0 });
+  });
+
   it('serializes all tab drafts and restores a draft onto a freshly parsed image', () => {
     const session = createWorkbenchSession(fixture());
     activeWorkbenchTab(session).project.tags[0].translation = '一名女孩';
