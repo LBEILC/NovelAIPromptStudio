@@ -1,5 +1,14 @@
 # macOS handoffs
 
+## Verify workbench and gallery productivity release flows
+
+- Status: Pending
+- Date/source: 2026-07-27, Windows
+- Related commit: `8e1fef5`
+- Action: On an unlocked macOS session, run `npm ci`, `npm test`, `npm run build`, and `npm run package -- --mac`. Launch the packaged app and verify the shared recent-directory behavior with image and ZIP file dialogs (including CJK, spaces, and parentheses), clipboard file/bitmap opening and import, multi-tab restore, `Cmd+W`, `Cmd+Tab`, `Cmd+Shift+Tab`, and ordinary text-field paste. Exercise group selection versus current-image deletion, restore, permanent deletion, and empty-trash behavior while matching library images are open in clean and dirty workbench tabs. In Settings, verify delayed update checking, download progress, session persistence before restart/install, the fixed 220px collapsible panel, and light/dark danger states. With Apple signing and notarization credentials configured, confirm the release contains DMG, ZIP, `latest-mac.yml`, and that a signed update can download and install.
+- Expected: Native Finder dialogs, clipboard behavior, keyboard conventions, hidden-inset title bar, asset-path validation, ZIP updater artifacts, and signed update installation match the development specification. Workbench drafts survive restart/install, permanent deletion never touches files outside the managed asset directory, and text paste is not intercepted.
+- Observed: Windows completed a clean `npm ci`, 89 automated tests, production and unpacked electron-builder builds, runtime dependency audit with zero findings, packaged startup smoke testing, and light/dark/narrow visual checks. macOS native dialogs, clipboard, shortcuts, file cleanup, signing/notarization, and live update installation remain to be verified.
+
 ## Verify packaged macOS release artifacts
 
 - Status: Pending
