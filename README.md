@@ -103,6 +103,8 @@ AI 功能完全可选。启用翻译或分类时，只有相关 Tag 文本会发
 
 需要 [Node.js 22](https://nodejs.org/) 及 npm。
 
+开始修改前，请先阅读[项目文档索引](./doc/README.md)和[项目协作约束](./AGENTS.md)。
+
 ```bash
 git clone https://github.com/LBEILC/NovelAIPromptStudio.git
 cd NovelAIPromptStudio
