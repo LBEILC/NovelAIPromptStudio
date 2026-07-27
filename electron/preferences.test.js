@@ -94,4 +94,18 @@ describe('AI preferences', () => {
     expect(JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'))).toMatchObject({ library: { assetsDirectory: customAssetsDirectory } });
     expect(() => preferences.saveLibrarySettings({ assetsDirectory: 'relative/assets' })).toThrow('绝对路径');
   });
+
+  it('persists an existing absolute recent image directory and update preference', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
+    temporaryDirectories.push(directory);
+    const recent = path.join(directory, '图片 (NovelAI)');
+    fs.mkdirSync(recent);
+    const preferences = openPreferences(directory, safeStorage);
+
+    expect(preferences.saveProductivitySettings({ recentImageDirectory: recent, autoCheckUpdates: false }))
+      .toEqual({ recentImageDirectory: recent, autoCheckUpdates: false });
+    fs.rmSync(recent, { recursive: true });
+    expect(preferences.productivitySettings()).toEqual({ recentImageDirectory: '', autoCheckUpdates: false });
+    expect(() => preferences.saveProductivitySettings({ recentImageDirectory: 'relative' })).toThrow('绝对路径');
+  });
 });

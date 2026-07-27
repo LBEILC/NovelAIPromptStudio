@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import LobeAlert from '@lobehub/ui/es/Alert/index';
-import LobeAutoComplete from '@lobehub/ui/es/AutoComplete/index';
-import LobeButton from '@lobehub/ui/es/Button/index';
-import LobeCollapse from '@lobehub/ui/es/Collapse/index';
-import LobeColorSwatches from '@lobehub/ui/es/ColorSwatches/index';
-import LobeInput from '@lobehub/ui/es/Input/Input';
-import LobeInputPassword from '@lobehub/ui/es/Input/InputPassword';
-import LobeSelect from '@lobehub/ui/es/Select/index';
-import LobeTextArea from '@lobehub/ui/es/Input/TextArea';
-import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
+import { Alert as LobeAlert, Collapse as LobeCollapse, ColorSwatches as LobeColorSwatches, DraggablePanel as LobeDraggablePanel } from '@lobehub/ui';
+import {
+  AutoComplete as LobeAutoComplete,
+  Button as LobeButton,
+  Input as LobeInput,
+  InputPassword as LobeInputPassword,
+  Segmented as LobeSegmented,
+  Select as LobeSelect,
+  Switch as LobeSwitch,
+  TextArea as LobeTextArea,
+} from '@lobehub/ui/base-ui';
 import { findCustomThemeName, primaryColors } from '@lobehub/ui/es/styles/index';
 import Icon from './components/Icon.jsx';
 import { fontStack, partitionFontFamilies, quoteFontFamily } from './lib/fonts.js';
@@ -27,6 +28,9 @@ const formatBytes = (bytes) => {
   if (value < 1024 * 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
   return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
 };
+const formatDate = (value) => value
+  ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium' }).format(new Date(value))
+  : '';
 
 function FontOption({ family, role }) {
   return <span className="font-option" style={{ fontFamily: fontStack(family, role) }}>
@@ -35,8 +39,10 @@ function FontOption({ family, role }) {
   </span>;
 }
 
-export default function SettingsPage({ appearance, onAppearanceChange, onClose, onLibraryChange, showToast, studio }) {
+export default function SettingsPage({ appearance, onAppearanceChange, onInstallUpdate, onLibraryChange, showToast, studio }) {
   const [section, setSection] = useState('appearance');
+  const [navExpanded, setNavExpanded] = useState(() => typeof window === 'undefined' || window.innerWidth >= 900);
+  const [navTouched, setNavTouched] = useState(false);
   const [aiSettings, setAISettings] = useState({
     baseUrl: 'https://api.openai.com/v1',
     model: '',
@@ -51,6 +57,39 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
   const [busy, setBusy] = useState('');
   const [systemFonts, setSystemFonts] = useState({ fonts: [], loading: true, error: '' });
   const [libraryStorage, setLibraryStorage] = useState({ assetsDirectory: '', fileCount: 0, totalBytes: 0, loading: true, migrating: false, progress: null });
+  const [updateState, setUpdateState] = useState({ currentVersion: '—', latestVersion: '', loading: false, error: '', notes: '', releaseUrl: '', hasUpdate: false, autoCheckUpdates: true });
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 899px)');
+    const handleChange = (event) => {
+      if (!navTouched || event.matches) setNavExpanded(!event.matches);
+    };
+    media.addEventListener('change', handleChange);
+    return () => media.removeEventListener('change', handleChange);
+  }, [navTouched]);
+
+  useEffect(() => {
+    Promise.all([studio.getUpdateStatus(), studio.getProductivitySettings()]).then(([status, settings]) => {
+      setUpdateState((current) => ({
+        ...current,
+        currentVersion: status?.currentVersion || '—',
+        packaged: Boolean(status?.packaged),
+        autoCheckUpdates: settings?.autoCheckUpdates !== false,
+      }));
+    }).catch(() => {});
+  }, [studio]);
+
+  useEffect(() => {
+    studio.onUpdateState((state) => {
+      setUpdateState((current) => ({
+        ...current,
+        ...state,
+        hasUpdate: ['available', 'downloading', 'downloaded'].includes(state.phase),
+        loading: state.phase === 'checking',
+      }));
+    });
+    return () => studio.offUpdateState();
+  }, [studio]);
 
   useEffect(() => {
     studio.getAISettings().then((settings) => setAISettings((current) => ({ ...current, ...settings, apiKey: '' }))).catch(() => {});
@@ -107,7 +146,7 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
     filterOption: (input, option) => String(option?.value || '').toLocaleLowerCase().includes(input.toLocaleLowerCase()),
     labelRender: ({ value }) => <span style={{ fontFamily: fontStack(value, role) }}>{fontLabel(value)}</span>,
     listHeight: 360,
-    optionRender: (option) => <FontOption family={option.data.value} role={role}/>,
+    optionRender: (option) => <FontOption family={option.value} role={role}/>,
     popupMatchSelectWidth: 360,
     showSearch: true,
   });
@@ -175,16 +214,53 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
     if (!result?.ok) showToast(result?.error || '无法打开资源库文件夹');
   };
 
+  const runUpdateCheck = async () => {
+    setUpdateState((current) => ({ ...current, loading: true, error: '' }));
+    const result = await studio.checkForUpdates();
+    setUpdateState((current) => result?.ok
+      ? { ...current, ...result, loading: false, error: '' }
+      : { ...current, loading: false, error: result?.error || '无法检查更新' });
+  };
+
+  const changeAutoCheck = async (checked) => {
+    setUpdateState((current) => ({ ...current, autoCheckUpdates: checked }));
+    try {
+      const saved = await studio.saveProductivitySettings({ autoCheckUpdates: checked });
+      setUpdateState((current) => ({ ...current, autoCheckUpdates: saved.autoCheckUpdates }));
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const downloadUpdate = async () => {
+    const result = await studio.downloadUpdate();
+    if (!result?.ok) showToast(result?.error || '更新没有开始下载');
+  };
+
   return <main className="settings-page">
-    <aside className="settings-nav">
-      <header><h1>设置</h1></header>
-      <nav aria-label="设置分类">
-        <LobeButton block className={section === 'appearance' ? 'active' : ''} icon={<Icon name="settings"/>} onClick={() => setSection('appearance')} type="text"><strong>外观</strong></LobeButton>
-        <LobeButton block className={section === 'storage' ? 'active' : ''} icon={<Icon name="folder"/>} onClick={() => setSection('storage')} type="text"><strong>资源库</strong></LobeButton>
-        <LobeButton block className={section === 'ai' ? 'active' : ''} icon={<Icon name="spark"/>} onClick={() => setSection('ai')} type="text"><strong>AI 服务</strong></LobeButton>
-      </nav>
-      <LobeButton className="settings-back" onClick={onClose}><Icon name="close" size={14}/>返回</LobeButton>
-    </aside>
+    <LobeDraggablePanel
+      className="settings-nav-shell"
+      defaultSize={{ width: 220 }}
+      expand={navExpanded}
+      expandable
+      mode="fixed"
+      onExpandChange={(expanded) => { setNavTouched(true); setNavExpanded(expanded); }}
+      placement="left"
+      resize={false}
+      showHandleWhenCollapsed
+      size={{ height: '100%', width: 220 }}
+      stableLayout
+    >
+      <LobeDraggablePanel.Body className="settings-nav">
+        <header><h1>设置</h1></header>
+        <nav aria-label="设置分类">
+          <LobeButton block className={section === 'appearance' ? 'active' : ''} icon={<Icon name="settings"/>} onClick={() => setSection('appearance')} type="text"><strong>外观</strong></LobeButton>
+          <LobeButton block className={section === 'storage' ? 'active' : ''} icon={<Icon name="folder"/>} onClick={() => setSection('storage')} type="text"><strong>资源库</strong></LobeButton>
+          <LobeButton block className={section === 'ai' ? 'active' : ''} icon={<Icon name="spark"/>} onClick={() => setSection('ai')} type="text"><strong>AI 服务</strong></LobeButton>
+          <LobeButton block className={section === 'updates' ? 'active' : ''} icon={<Icon name="refresh"/>} onClick={() => setSection('updates')} type="text"><strong>关于与更新</strong></LobeButton>
+        </nav>
+      </LobeDraggablePanel.Body>
+    </LobeDraggablePanel>
     <section className="settings-content">
       {section === 'appearance' ? <>
         <header className="settings-heading"><h2>外观</h2></header>
@@ -228,7 +304,7 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
         </div>
         <LobeAlert className="settings-warning" message="更改位置会自动移动现有资源；复制和校验完成前，旧文件不会被删除。" type="info" variant="outlined"/>
         {libraryStorage.error && <LobeAlert className="settings-warning" message={libraryStorage.error} type="error" variant="outlined"/>}
-      </> : <>
+      </> : section === 'ai' ? <>
         <header className="settings-heading"><h2>AI 服务</h2><p>用于 Tag 翻译和分类。</p></header>
         <div className="settings-group ai-settings-group">
           <label><span><strong>API Base URL</strong><small>兼容 OpenAI API 格式的服务地址</small></span><LobeInput value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
@@ -259,6 +335,37 @@ export default function SettingsPage({ appearance, onAppearanceChange, onClose, 
         />
         <div className="settings-actions"><LobeButton onClick={testConnection} disabled={Boolean(busy)}>测试连接</LobeButton><LobeButton type="primary" onClick={saveAI} disabled={Boolean(busy)}>{busy === 'save' ? '保存中…' : '保存 AI 设置'}</LobeButton></div>
         {!aiSettings.encryptionAvailable && <LobeAlert className="settings-warning" message="当前系统安全存储不可用，应用不会以明文保存 API Key。" type="warning" variant="outlined"/>}
+      </> : <>
+        <header className="settings-heading"><h2>关于与更新</h2><p>检查 NovelAI Prompt Studio 的官方稳定版本。</p></header>
+        <div className="settings-group update-settings-group">
+          <div className="settings-row">
+            <span><strong>当前版本</strong><small>{updateState.packaged ? '已打包版本' : '开发模式'}</small></span>
+            <code>v{updateState.currentVersion}</code>
+          </div>
+          <div className="settings-row">
+            <span><strong>自动检查更新</strong><small>应用启动稳定后检查一次，不会强制安装。</small></span>
+            <LobeSwitch checked={updateState.autoCheckUpdates} onChange={changeAutoCheck}/>
+          </div>
+          <div className="settings-row settings-update-row">
+            <span>
+              <strong>{updateState.hasUpdate ? `发现 v${updateState.latestVersion}` : updateState.latestVersion ? `已是最新版本 · v${updateState.latestVersion}` : '官方稳定版本'}</strong>
+              <small>{updateState.publishedAt ? formatDate(updateState.publishedAt) : '从 GitHub Release 获取'}</small>
+            </span>
+            <div className="settings-storage-actions">
+              <LobeButton loading={updateState.loading} onClick={runUpdateCheck}>{updateState.loading ? '正在检查…' : '检查更新'}</LobeButton>
+              {updateState.hasUpdate && updateState.packaged && !['downloading', 'downloaded'].includes(updateState.phase) && <LobeButton onClick={downloadUpdate} type="primary">下载更新</LobeButton>}
+              {updateState.phase === 'downloaded' && <LobeButton onClick={onInstallUpdate} type="primary">重启并安装</LobeButton>}
+              {updateState.hasUpdate && <LobeButton onClick={() => studio.openReleasePage(updateState.releaseUrl)}>打开官方 Release</LobeButton>}
+            </div>
+          </div>
+          {updateState.phase === 'downloading' && <div className="settings-update-progress">
+            <span><strong>正在下载更新</strong><small>{Math.round(updateState.progress || 0)}%{updateState.total ? ` · ${formatBytes(updateState.transferred)} / ${formatBytes(updateState.total)}` : ''}</small></span>
+            <progress max="100" value={updateState.progress || 0}/>
+          </div>}
+          {updateState.notes && <div className="settings-release-notes"><strong>更新说明</strong><p>{updateState.notes}</p></div>}
+        </div>
+        {updateState.error && <LobeAlert className="settings-warning" message={`${updateState.error}。本地功能不受影响，可以稍后重试。`} type="warning" variant="outlined"/>}
+        {!updateState.packaged && <LobeAlert className="settings-warning" message="开发模式不会下载或安装更新；当前未签名发布使用官方 Release 页面完成更新。" type="info" variant="outlined"/>}
       </>}
     </section>
   </main>;

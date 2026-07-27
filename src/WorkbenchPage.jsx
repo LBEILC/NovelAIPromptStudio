@@ -1,15 +1,11 @@
-import LobeAlert from '@lobehub/ui/es/Alert/index';
-import LobeButton from '@lobehub/ui/es/Button/index';
-import LobeDraggablePanel from '@lobehub/ui/es/DraggablePanel/index';
-import LobeImage from '@lobehub/ui/es/Image/index';
-import { useState } from 'react';
+import { Alert as LobeAlert, DraggablePanel as LobeDraggablePanel } from '@lobehub/ui';
+import { Button as LobeButton, showContextMenu, SplitButton, Tabs } from '@lobehub/ui/base-ui';
+import { useEffect, useMemo, useState } from 'react';
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
-import { countPromptTags } from './lib/promptStructure.js';
-
-function mediaUrl(filePath) {
-  return filePath ? `novelai-media://file?path=${encodeURIComponent(filePath)}` : '';
-}
+import ImageStage from './components/ImageStage.jsx';
+import { countPromptTags, formatPositivePromptForCopy, positivePromptCopyOptions } from './lib/promptStructure.js';
+import { activeWorkbenchTab, workbenchTabHasChanges } from './lib/workbenchSession.js';
 
 function WorkbenchVibes({ vibes, onReveal }) {
   if (!vibes?.length) return <div className="workbench-vibe-empty"><Icon name="info" size={15}/><span>没有检测到 Vibe</span></div>;
@@ -24,13 +20,52 @@ function WorkbenchVibes({ vibes, onReveal }) {
   </section>;
 }
 
+function ImageOpenButton({ loading, onChooseImage, onClipboardImage, primary = false, large = false }) {
+  return <SplitButton loading={loading} size={large ? 'large' : 'middle'} type={primary ? 'primary' : 'default'}>
+    <SplitButton.Main icon={<Icon name="image" size={14}/>} onClick={onChooseImage}>
+      {loading ? '正在读取…' : '打开图片'}
+    </SplitButton.Main>
+    <SplitButton.Menu
+      aria-label="其他打开方式"
+      items={[{ key: 'clipboard', label: '从剪贴板打开', onClick: onClipboardImage }]}
+      placement="bottomRight"
+    />
+  </SplitButton>;
+}
+
+function tabLabel(tab, onClose) {
+  const dirty = workbenchTabHasChanges(tab);
+  return <span
+    className="workbench-tab-label"
+    onAuxClick={(event) => { if (event.button === 1) onClose(tab.id); }}
+    onContextMenu={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showContextMenu([{ key: 'close-tab', label: '关闭标签', onClick: () => onClose(tab.id) }]);
+    }}
+    title={tab.displayName}
+  >
+    {dirty && <span aria-label="有未处理修改" className="workbench-tab-dirty"/>}
+    <span>{tab.displayName || tab.project?.name || '未命名图片'}</span>
+    <span
+      aria-label={`关闭 ${tab.displayName || '标签'}`}
+      className="workbench-tab-close"
+      onClick={(event) => { event.preventDefault(); event.stopPropagation(); onClose(tab.id); }}
+      onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
+      role="button"
+    >×</span>
+  </span>;
+}
+
 export default function WorkbenchPage({
   error,
   focusScopeKey,
   focusTagId,
   loading,
+  onActivateTab,
   onChooseImage,
-  onCopyPrompt,
+  onClipboardImage,
+  onCloseTab,
   onCopyText,
   onRevealVibe,
   onNotify,
@@ -41,30 +76,66 @@ export default function WorkbenchPage({
   session,
 }) {
   const [sourcePanelWidth, setSourcePanelWidth] = useState();
+  const [copyContext, setCopyContext] = useState({ text: '', count: 0 });
+  const tab = activeWorkbenchTab(session);
+  const project = tab?.project;
 
-  if (!session) return <main className="workbench-page workbench-empty-page">
+  useEffect(() => setCopyContext({ text: '', count: 0 }), [tab?.id]);
+
+  const copyOptions = useMemo(() => project ? positivePromptCopyOptions(project) : [], [project]);
+  const copyItems = useMemo(() => project ? [
+    {
+      key: 'all',
+      label: '复制全部 Prompt',
+      disabled: !formatPositivePromptForCopy(project),
+      onClick: () => onCopyText(formatPositivePromptForCopy(project), copyOptions.reduce((count, item) => count + item.count, 0), false, 0, '全部 Prompt'),
+    },
+    { key: 'copy-divider', type: 'divider' },
+    ...copyOptions.map((option) => ({
+      key: option.key,
+      label: option.label,
+      disabled: !option.text,
+      onClick: () => onCopyText(option.text, option.count, false, 0, option.label.replace(/^复制/, '')),
+    })),
+  ] : [], [copyOptions, onCopyText, project]);
+
+  if (!tab) return <main className="workbench-page workbench-empty-page">
     <div className="workbench-empty-copy">
       <h1>编辑图片中的 Tag</h1>
-      <p>拖入 NovelAI 图片，或从本地选择一张图片。</p>
-      <LobeButton disabled={loading} icon={<Icon name="image"/>} onClick={onChooseImage} size="large" type="primary">{loading ? '正在读取…' : '选择图片'}</LobeButton>
+      <p>拖入 NovelAI 图片，或从本地与剪贴板打开图片。</p>
+      <ImageOpenButton large loading={loading} onChooseImage={onChooseImage} onClipboardImage={onClipboardImage} primary/>
       <small>PNG、JPG、WEBP</small>
       {error && <LobeAlert className="workbench-empty-error" message={error} type="error" variant="outlined"/>}
     </div>
     <div className="workbench-empty-visual" aria-hidden="true"><div className="workbench-drop-frame"><Icon name="upload" size={30}/><span>拖放图片到这里</span></div></div>
   </main>;
 
-  const project = session.project;
   return <main className="workbench-page workbench-active-page">
     <header className="workbench-header">
-      <div className="workbench-header-copy"><h1>工作台</h1><p title={project.name}>{project.name}<span> · {countPromptTags(project)} 个 Tag</span></p></div>
+      <div className="workbench-header-copy"><h1>工作台</h1><p title={project?.name || tab.displayName}>{project ? `${project.name} · ${countPromptTags(project)} 个 Tag` : tab.displayName}</p></div>
       <div className="workbench-header-actions">
-        <LobeButton disabled={loading} icon={<Icon name="image" size={14}/>} onClick={onChooseImage}>{loading ? '读取中…' : '更换图片'}</LobeButton>
-        <LobeButton icon={<Icon name="refresh" size={14}/>} onClick={onReset}>恢复原图</LobeButton>
-        <LobeButton icon={<Icon name="copy" size={14}/>} onClick={onCopyPrompt} type="primary">复制 Prompt</LobeButton>
+        <ImageOpenButton loading={loading} onChooseImage={onChooseImage} onClipboardImage={onClipboardImage}/>
+        {project && <LobeButton icon={<Icon name="refresh" size={14}/>} onClick={onReset}>恢复原图</LobeButton>}
+        {project && <SplitButton type="primary">
+          <SplitButton.Main disabled={!copyContext.count} icon={<Icon name="copy" size={14}/>} onClick={() => onCopyText(copyContext.text, copyContext.count, false, 0, '可见 Prompt')}>
+            复制可见 Prompt{copyContext.count ? ` · ${copyContext.count}` : ''}
+          </SplitButton.Main>
+          <SplitButton.Menu aria-label="其他 Prompt 复制方式" items={copyItems} placement="bottomRight"/>
+        </SplitButton>}
       </div>
     </header>
-    {error && <LobeAlert className="workbench-inline-error" message={error} type="error" variant="outlined"/>}
-    <div className="workbench-body">
+    <div className="workbench-tabs-scroll">
+      <Tabs
+        activeKey={session.activeTabId}
+        className="workbench-tabs"
+        items={session.tabs.map((item) => ({ key: item.id, label: tabLabel(item, onCloseTab) }))}
+        onChange={onActivateTab}
+        size="small"
+        variant="rounded"
+      />
+    </div>
+    {(error || tab.error) && <LobeAlert className="workbench-inline-error" message={tab.error || error} type="error" variant="outlined"/>}
+    {project ? <div className="workbench-body">
       <LobeDraggablePanel
         className="workbench-source-shell"
         classNames={{ content: 'workspace-side-panel-content' }}
@@ -77,7 +148,10 @@ export default function WorkbenchPage({
         size={sourcePanelWidth ? { height: '100%', width: sourcePanelWidth } : undefined}
       >
         <LobeDraggablePanel.Body className="workbench-source-panel">
-          <figure><LobeImage alt={project.name} className="workbench-source-image" maxHeight="min(60vh, 720px)" objectFit="contain" src={mediaUrl(project.image_path)} variant="outlined" width="100%"/><figcaption><strong>{project.name}</strong><span>{project.metadata?.width || '—'} × {project.metadata?.height || '—'}</span></figcaption></figure>
+          <figure>
+            <ImageStage alt={project.name} className="workbench-image-stage" filePath={project.image_path}/>
+            <figcaption><strong>{project.name}</strong><span>{project.metadata?.width || '—'} × {project.metadata?.height || '—'}</span></figcaption>
+          </figure>
           <WorkbenchVibes onReveal={onRevealVibe} vibes={project.vibes || []}/>
         </LobeDraggablePanel.Body>
       </LobeDraggablePanel>
@@ -85,6 +159,7 @@ export default function WorkbenchPage({
         <PromptOverview
           focusScopeKey={focusScopeKey}
           focusTagId={focusTagId}
+          onCopyContextChange={setCopyContext}
           onCopyText={onCopyText}
           onNotify={onNotify}
           onTagContextMenu={onTagContextMenu}
@@ -93,6 +168,6 @@ export default function WorkbenchPage({
           updateProject={onUpdateProject}
         />
       </section>
-    </div>
+    </div> : <div className="workbench-tab-error"><strong>图片源不可用</strong><span>{tab.error || '该图片已被移动或删除，可以关闭此标签后继续使用其他标签。'}</span></div>}
   </main>;
 }

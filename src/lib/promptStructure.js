@@ -214,6 +214,21 @@ export function formatPositivePromptForCopy(project) {
   return scopes.map((scope) => formatPromptInline(scope.tags)).filter(Boolean).join('\n|\n');
 }
 
+export function formatPositiveScopeForCopy(project, scopeKey) {
+  const scope = getPromptScope(project, scopeKey);
+  return scope.polarity === 'prompt' ? formatPromptInline(scope.tags) : '';
+}
+
+export function positivePromptCopyOptions(project) {
+  const scopes = getPromptScopes(project).filter((scope) => scope.polarity === 'prompt');
+  return scopes.map((scope) => ({
+    key: scope.key,
+    label: scope.kind === 'base' ? '复制完整 Base Prompt' : `复制角色 ${(scope.characterIndex ?? 0) + 1} Prompt`,
+    text: formatPromptInline(scope.tags),
+    count: scope.tags.length,
+  }));
+}
+
 export function syncProjectPromptMetadata(project) {
   const structure = normalizePromptStructure(project.prompt_structure, project.metadata);
   const tags = (project.tags || []).map((tag) => ({ ...tag, category: normalizeCategory(tag.category, tag.tag) }));

@@ -2,7 +2,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, safeStorage, screen, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, net, protocol, safeStorage, screen, shell } from 'electron';
+import electronUpdater from 'electron-updater';
 import { openDatabase } from './database.js';
 import { backfillProjectContentHashes, backfillProjectDimensions, importLibraryFiles } from './importer.js';
 import { openPreferences } from './preferences.js';
@@ -11,6 +12,11 @@ import { exportEmbeddedVibeFile } from './vibes.js';
 import { readWorkbenchImage } from './workbench.js';
 import { listSystemFonts } from './fonts.js';
 import { describeAssetDirectory, migrateAssetDirectory } from './libraryStorage.js';
+import { cleanupWorkbenchTemporaryImages, readClipboardImageSource } from './clipboardImages.js';
+import { checkForUpdates as checkReleaseUpdates } from './updates.js';
+import { copyManagedImageToClipboard, copyOriginalAsset, removeManagedAsset, resolveManagedAsset } from './assetFiles.js';
+
+const { autoUpdater } = electronUpdater;
 
 app.setName('NovelAI Prompt Studio');
 if (process.platform === 'win32') app.setAppUserModelId('studio.novelai.prompt');
@@ -21,6 +27,9 @@ let assetsDirectory;
 let preferences;
 let contentBackfill = Promise.resolve();
 let storageMigrationActive = false;
+let permanentDeletionActive = false;
+let workbenchTemporaryDirectory;
+let updateState = { phase: 'idle', progress: 0, currentVersion: '', latestVersion: '', error: '', releaseUrl: '' };
 const activeImports = new Map();
 const appIconPath = path.join(import.meta.dirname, '..', 'build', 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 
@@ -44,12 +53,74 @@ function createWindow() {
   else window.loadFile(path.join(import.meta.dirname, '..', 'dist', 'index.html'));
 }
 
-function safeRemoveAsset(filePath) {
-  const target = path.resolve(String(filePath || ''));
-  const root = path.resolve(assetsDirectory);
-  const relative = path.relative(root, target);
-  if (!target || !relative || relative.startsWith('..') || path.isAbsolute(relative)) return;
-  fs.rmSync(target, { force: true });
+function notifyUpdateState(patch = {}) {
+  updateState = { ...updateState, ...patch, currentVersion: app.getVersion(), packaged: app.isPackaged };
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send('updates:state', updateState);
+  }
+}
+
+function releaseNotesText(notes) {
+  if (Array.isArray(notes)) return notes.map((item) => `${item.version || ''}\n${item.note || ''}`.trim()).filter(Boolean).join('\n\n');
+  return String(notes || '').trim();
+}
+
+function configureAutoUpdater() {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.on('checking-for-update', () => notifyUpdateState({ phase: 'checking', error: '', progress: 0 }));
+  autoUpdater.on('update-available', (info) => notifyUpdateState({
+    phase: 'available',
+    latestVersion: info.version,
+    publishedAt: info.releaseDate || '',
+    notes: releaseNotesText(info.releaseNotes).slice(0, 4_000),
+    progress: 0,
+    error: '',
+  }));
+  autoUpdater.on('update-not-available', (info) => notifyUpdateState({
+    phase: 'current',
+    latestVersion: info.version || app.getVersion(),
+    publishedAt: info.releaseDate || '',
+    notes: '',
+    progress: 0,
+    error: '',
+  }));
+  autoUpdater.on('download-progress', (progress) => notifyUpdateState({
+    phase: 'downloading',
+    progress: Math.max(0, Math.min(100, Number(progress.percent) || 0)),
+    transferred: Number(progress.transferred) || 0,
+    total: Number(progress.total) || 0,
+    bytesPerSecond: Number(progress.bytesPerSecond) || 0,
+    error: '',
+  }));
+  autoUpdater.on('update-downloaded', (info) => notifyUpdateState({
+    phase: 'downloaded',
+    latestVersion: info.version,
+    progress: 100,
+    error: '',
+  }));
+  autoUpdater.on('error', (error) => notifyUpdateState({
+    phase: 'error',
+    error: error instanceof Error ? error.message : String(error),
+  }));
+}
+
+function imageDialogDefaultPath() {
+  const recent = preferences.productivitySettings().recentImageDirectory;
+  return recent || undefined;
+}
+
+function rememberImageDirectory(filePaths = []) {
+  if (filePaths[0]) preferences.saveProductivitySettings({ recentImageDirectory: path.dirname(filePaths[0]) });
+}
+
+function batchSummary(results = {}) {
+  return {
+    success: results.success?.length || 0,
+    skipped: results.skipped?.length || 0,
+    failed: results.failed?.length || 0,
+  };
 }
 
 app.whenReady().then(async () => {
@@ -68,6 +139,8 @@ app.whenReady().then(async () => {
     return;
   }
   preferences = openPreferences(dataDirectory, safeStorage, { defaultAssetsDirectory });
+  configureAutoUpdater();
+  workbenchTemporaryDirectory = path.join(app.getPath('userData'), 'workbench-temp');
   assetsDirectory = preferences.librarySettings().assetsDirectory;
   try {
     fs.mkdirSync(assetsDirectory, { recursive: true });
@@ -85,7 +158,7 @@ app.whenReady().then(async () => {
     return net.fetch(pathToFileURL(filePath).toString());
   });
 
-  ipcMain.handle('library:load', async () => { await contentBackfill; return database.loadLibrary(); });
+  ipcMain.handle('library:load', async (_event, request = {}) => { await contentBackfill; return database.loadLibrary(request.view); });
   ipcMain.handle('library:storage:get', async () => {
     try {
       const details = await describeAssetDirectory(assetsDirectory);
@@ -162,25 +235,84 @@ app.whenReady().then(async () => {
     if (!filePath) {
       const result = await dialog.showOpenDialog({
         title: '在工作台中打开 NovelAI 图片',
+        defaultPath: imageDialogDefaultPath(),
         properties: ['openFile'],
         filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
       });
       if (result.canceled) return { ok: true, canceled: true, project: null };
       [filePath] = result.filePaths;
+      rememberImageDirectory(result.filePaths);
     }
     try {
-      return { ok: true, project: await readWorkbenchImage(filePath, { enrichProjectTags: database.enrichProjectTags }) };
+      return {
+        ok: true,
+        project: await readWorkbenchImage(filePath, { enrichProjectTags: database.enrichProjectTags }),
+        source: request.source || { type: 'file', path: filePath },
+      };
     } catch (error) {
       return { ok: false, project: null, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('workbench:images:open-dropped', async (_event, request = {}) => {
+    const filePaths = Array.isArray(request.filePaths) ? request.filePaths.map(String).filter(Boolean) : [];
+    if (!filePaths.length) return { ok: false, items: [], error: '无法读取拖入文件的本地路径' };
+    const items = [];
+    for (const filePath of filePaths) {
+      try {
+        items.push({
+          ok: true,
+          project: await readWorkbenchImage(filePath, { enrichProjectTags: database.enrichProjectTags }),
+          source: { type: 'file', path: filePath },
+        });
+      } catch (error) {
+        items.push({ ok: false, filePath, error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return { ok: items.some((item) => item.ok), items, error: items.every((item) => !item.ok) ? items[0]?.error : '' };
+  });
+  ipcMain.handle('workbench:image:clipboard', async () => {
+    try {
+      const source = readClipboardImageSource(workbenchTemporaryDirectory);
+      const project = await readWorkbenchImage(source.filePath, { enrichProjectTags: database.enrichProjectTags });
+      return {
+        ok: true,
+        project,
+        metadataMissing: source.fromBitmap && !project.metadata?.prompt_raw && !project.metadata?.negative_prompt,
+        source: {
+          type: 'clipboard',
+          path: source.filePath,
+          temporaryId: source.temporaryId,
+          fingerprint: source.fingerprint,
+        },
+      };
+    } catch (error) {
+      return { ok: false, project: null, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('workbench:temp:sync', (_event, referencedPaths = []) => {
+    try {
+      return { ok: true, removed: cleanupWorkbenchTemporaryImages(workbenchTemporaryDirectory, referencedPaths) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
   ipcMain.handle('library:import-images', async (event, request = {}) => {
     if (storageMigrationActive) return { ok: false, imported: [], duplicates: [], errors: [], error: '资源库正在迁移，请稍候' };
     await contentBackfill;
+    let clipboardSource = null;
     let filePaths = Array.isArray(request.filePaths) ? request.filePaths : [];
+    if (request.fromClipboard) {
+      try {
+        clipboardSource = readClipboardImageSource(workbenchTemporaryDirectory);
+        filePaths = [clipboardSource.filePath];
+      } catch (error) {
+        return { ok: false, imported: [], duplicates: [], errors: [{ file: '剪贴板', error: error instanceof Error ? error.message : String(error) }], error: error instanceof Error ? error.message : String(error) };
+      }
+    }
     if (!filePaths.length) {
       const result = await dialog.showOpenDialog({
         title: '导入 NovelAI 图片或 ZIP',
+        defaultPath: imageDialogDefaultPath(),
         properties: ['openFile', 'multiSelections'],
         filters: [
           { name: 'NovelAI 图片与 ZIP', extensions: ['png', 'jpg', 'jpeg', 'webp', 'zip'] },
@@ -190,20 +322,26 @@ app.whenReady().then(async () => {
       });
       if (result.canceled) return { ok: true, canceled: true, imported: [], duplicates: [], errors: [], summary: null };
       filePaths = result.filePaths;
+      rememberImageDirectory(result.filePaths);
     }
     const batchId = crypto.randomUUID();
     const controller = new AbortController();
     activeImports.set(batchId, controller);
     const notify = (progress) => { if (!event.sender.isDestroyed()) event.sender.send('library:import-progress', { batchId, ...progress }); };
     try {
-      return { batchId, ...(await importLibraryFiles({
+      const imported = await importLibraryFiles({
         filePaths,
         assetsDirectory,
         database,
         signal: controller.signal,
         onProgress: notify,
         prepareProject: async (project) => database.enrichProjectTags(project),
-      })) };
+      });
+      return {
+        batchId,
+        ...imported,
+        metadataMissing: Boolean(request.fromClipboard && clipboardSource?.fromBitmap && imported.imported?.some((project) => !project.metadata?.prompt_raw && !project.metadata?.negative_prompt)),
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, batchId, imported: [], duplicates: [], errors: [{ file: '导入批次', error: message }], summary: { total: 0, processed: 0, imported: 0, duplicates: 0, failed: 1, skipped: 0, remaining: 0, cancelled: false } };
@@ -217,17 +355,121 @@ app.whenReady().then(async () => {
     controller.abort();
     return { ok: true };
   });
-  ipcMain.handle('project:delete', (_event, id) => {
+  ipcMain.handle('project:update-name', (_event, id, name) => {
     try {
-      const project = database.loadProject(id);
-      if (!project) return { ok: false, error: '图片不存在或已被移除' };
-      database.deleteProject(id);
-      const cleanupErrors = [];
-      for (const filePath of [project.image_path, project.thumbnail_path]) {
-        try { safeRemoveAsset(filePath); }
-        catch (error) { cleanupErrors.push(error instanceof Error ? error.message : String(error)); }
+      return { ok: true, project: database.updateProjectName(id, name) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('project:set-favorite', (_event, ids, isFavorite) => {
+    try {
+      const results = database.updateProjects(ids, { isFavorite });
+      return { ok: true, results, summary: batchSummary(results) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('project:move-to-trash', (_event, ids) => {
+    try {
+      const results = database.updateProjects(ids, { deleted: true });
+      return { ok: true, results, summary: batchSummary(results) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('project:restore', (_event, ids) => {
+    try {
+      const results = database.updateProjects(ids, { deleted: false });
+      return { ok: true, results, summary: batchSummary(results) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('project:group-cover:set', (_event, fingerprint, projectId) => {
+    try {
+      return { ok: true, ...database.setGroupCover(fingerprint, projectId) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('project:permanent-delete', async (_event, ids = []) => {
+    if (storageMigrationActive) return { ok: false, error: '资源库正在迁移，请稍候' };
+    if (activeImports.size) return { ok: false, error: '请等待当前图片导入完成后再永久删除' };
+    if (permanentDeletionActive) return { ok: false, error: '永久删除正在进行，请稍候' };
+    permanentDeletionActive = true;
+    const results = { success: [], skipped: [], failed: [] };
+    try {
+      for (const id of [...new Set(ids.map(String).filter(Boolean))]) {
+        const project = database.loadProject(id);
+        if (!project) {
+          results.skipped.push(id);
+          continue;
+        }
+        if (!project.deleted_at) {
+          results.failed.push({ id, error: '图片尚未进入回收站' });
+          continue;
+        }
+        try {
+          for (const filePath of [project.thumbnail_path, project.image_path]) removeManagedAsset(assetsDirectory, filePath);
+          database.deleteProject(id);
+          results.success.push(id);
+        } catch (error) {
+          const remainingFiles = [project.thumbnail_path, project.image_path].filter((filePath) => {
+            try {
+              return fs.existsSync(filePath);
+            } catch {
+              return false;
+            }
+          });
+          results.failed.push({ id, error: error instanceof Error ? error.message : String(error), remainingFiles });
+        }
       }
-      return { ok: true, cleanupWarning: cleanupErrors.join('\n') };
+      return { ok: true, results, summary: batchSummary(results) };
+    } finally {
+      permanentDeletionActive = false;
+    }
+  });
+  ipcMain.handle('project:trash-summary', () => {
+    try {
+      const projects = database.loadTrashSummary();
+      let totalBytes = 0;
+      let sizeKnown = true;
+      for (const project of projects) {
+        for (const filePath of [project.image_path, project.thumbnail_path]) {
+          try { totalBytes += fs.statSync(filePath).size; } catch { sizeKnown = false; }
+        }
+      }
+      return { ok: true, projects, count: projects.length, totalBytes: sizeKnown ? totalBytes : null };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('image:copy', (_event, projectId) => {
+    try {
+      const project = database.loadProject(projectId);
+      if (!project) throw new Error('图片不存在');
+      copyManagedImageToClipboard(assetsDirectory, project.image_path, { nativeImage, clipboard });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('image:download', async (event, projectId) => {
+    try {
+      const project = database.loadProject(projectId);
+      if (!project) throw new Error('图片不存在');
+      const extension = path.extname(project.image_path).toLowerCase() || '.png';
+      const safeBaseName = String(project.name || 'NovelAI image').replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').trim() || 'NovelAI image';
+      const owner = BrowserWindow.fromWebContents(event.sender);
+      const result = await dialog.showSaveDialog(owner, {
+        title: '下载图片',
+        defaultPath: `${safeBaseName}${extension}`,
+        filters: [{ name: 'Image', extensions: [extension.slice(1)] }],
+      });
+      if (result.canceled || !result.filePath) return { ok: true, canceled: true };
+      copyOriginalAsset(assetsDirectory, project.image_path, result.filePath);
+      return { ok: true, filePath: result.filePath };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
@@ -259,6 +501,53 @@ app.whenReady().then(async () => {
   ipcMain.handle('ai:settings:save', (_event, settings) => preferences.saveAISettings(settings));
   ipcMain.handle('appearance:settings:get', () => preferences.appearanceSettings());
   ipcMain.handle('appearance:settings:save', (_event, settings) => preferences.saveAppearanceSettings(settings));
+  ipcMain.handle('productivity:settings:get', () => preferences.productivitySettings());
+  ipcMain.handle('productivity:settings:save', (_event, settings) => preferences.saveProductivitySettings(settings));
+  ipcMain.handle('updates:status', () => ({ ok: true, ...updateState, currentVersion: app.getVersion(), packaged: app.isPackaged }));
+  ipcMain.handle('updates:check', async () => {
+    try {
+      if (!app.isPackaged) return { ok: true, phase: 'current', packaged: false, ...(await checkReleaseUpdates(app.getVersion(), net.fetch)) };
+      const result = await autoUpdater.checkForUpdates();
+      const info = result?.updateInfo;
+      return {
+        ok: true,
+        ...updateState,
+        currentVersion: app.getVersion(),
+        latestVersion: info?.version || updateState.latestVersion,
+        hasUpdate: updateState.phase === 'available',
+        packaged: true,
+      };
+    } catch (error) {
+      return { ok: false, currentVersion: app.getVersion(), error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('updates:download', async () => {
+    if (!app.isPackaged) return { ok: false, error: '开发模式不会下载或安装更新' };
+    if (storageMigrationActive || activeImports.size || permanentDeletionActive) return { ok: false, error: '请等待导入、迁移或删除操作完成后再下载更新' };
+    if (updateState.phase !== 'available' && updateState.phase !== 'error') return { ok: false, error: '请先检查并确认有可用更新' };
+    try {
+      notifyUpdateState({ phase: 'downloading', progress: 0, error: '' });
+      await autoUpdater.downloadUpdate();
+      return { ok: true };
+    } catch (error) {
+      notifyUpdateState({ phase: 'error', error: error instanceof Error ? error.message : String(error) });
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('updates:install', () => {
+    if (!app.isPackaged) return { ok: false, error: '开发模式不会安装更新' };
+    if (storageMigrationActive || activeImports.size || permanentDeletionActive) return { ok: false, error: '请等待导入、迁移或删除操作完成后再安装更新' };
+    if (updateState.phase !== 'downloaded') return { ok: false, error: '更新尚未下载完成' };
+    setImmediate(() => autoUpdater.quitAndInstall(false, true));
+    return { ok: true };
+  });
+  ipcMain.handle('updates:open-release', async (_event, releaseUrl) => {
+    const fallback = 'https://github.com/LBEILC/NovelAIPromptStudio/releases/latest';
+    const candidate = String(releaseUrl || fallback);
+    const url = candidate.startsWith('https://github.com/LBEILC/NovelAIPromptStudio/') ? candidate : fallback;
+    await shell.openExternal(url);
+    return { ok: true };
+  });
   ipcMain.handle('fonts:list', async () => {
     try {
       return { ok: true, fonts: await listSystemFonts() };

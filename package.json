@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "A local-first asset and prompt manager for NovelAI Diffusion V4/V4.5.",
+  "productName": "NovelAI Prompt Studio",
   "author": "LBEILC",
   "main": "electron/main.js",
   "scripts": {
@@ -15,6 +16,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "electron-updater": "6.8.9",
     "font-list": "2.1.0",
     "sharp": "0.35.3",
     "sql.js": "1.14.1",
@@ -34,9 +36,53 @@
     "motion": "12.40.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "vitest": "4.1.10",
     "vite": "8.1.5",
+    "vitest": "4.1.10",
     "wait-on": "9.0.3",
     "yazl": "3.3.1"
+  },
+  "build": {
+    "appId": "studio.novelai.prompt",
+    "directories": {
+      "output": "release"
+    },
+    "electronUpdaterCompatibility": ">=2.16",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "src/lib/**/*",
+      "!electron/**/*.test.js",
+      "!src/lib/**/*.test.js",
+      "build/**/*",
+      "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "LBEILC",
+        "repo": "NovelAIPromptStudio",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "category": "public.app-category.graphics-design"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

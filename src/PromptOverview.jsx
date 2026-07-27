@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import LobeButton from '@lobehub/ui/es/Button/index';
-import LobeCheckbox from '@lobehub/ui/es/Checkbox/index';
-import LobeInput from '@lobehub/ui/es/Input/Input';
-import LobeTextArea from '@lobehub/ui/es/Input/TextArea';
-import LobePopover from '@lobehub/ui/es/Popover/index';
-import LobeSearchBar from '@lobehub/ui/es/SearchBar/index';
-import LobeSelect from '@lobehub/ui/es/Select/index';
-import LobeSliderWithInput from '@lobehub/ui/es/SliderWithInput/index';
-import LobeSegmented from '@lobehub/ui/es/base-ui/Segmented/Segmented';
+import { Popover as LobePopover, SearchBar as LobeSearchBar } from '@lobehub/ui';
+import {
+  Button as LobeButton,
+  Checkbox as LobeCheckbox,
+  Input as LobeInput,
+  Segmented as LobeSegmented,
+  Select as LobeSelect,
+  SliderWithInput as LobeSliderWithInput,
+  TextArea as LobeTextArea,
+} from '@lobehub/ui/base-ui';
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, formatTagLabel, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
 import { addPromptCharacter, getPromptScope, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
 import SelectionMark from './components/SelectionMark.jsx';
@@ -194,7 +195,7 @@ function CharacterEditor({ character, project, onChange, onClose, onDelete }) {
     <label><span>角色名称</span><LobeInput autoFocus onChange={(event) => onChange(updatePromptCharacter(project, character.id, { label: event.target.value }))} value={character.label}/></label>
     <div className="character-position-heading">
       <div><strong>Character Position</strong><small>5 × 5 粗略位置引导</small></div>
-      <label><LobeCheckbox checked={Boolean(structure.use_coords)} onChange={(event) => updateStructure({ use_coords: event.target.checked })} size={16}/><span>{structure.use_coords ? '自定义位置' : 'AI 选择'}</span></label>
+      <label><LobeCheckbox checked={Boolean(structure.use_coords)} onChange={(checked) => updateStructure({ use_coords: checked })} size={16}/><span>{structure.use_coords ? '自定义位置' : 'AI 选择'}</span></label>
     </div>
     <div className={`character-position-grid ${structure.use_coords ? '' : 'disabled'}`} aria-label={`${character.label} 位置`}>
       {Array.from({ length: 25 }, (_, index) => {
@@ -203,7 +204,7 @@ function CharacterEditor({ character, project, onChange, onClose, onDelete }) {
         return <button aria-label={`第 ${row + 1} 行，第 ${column + 1} 列`} className={activeColumn === column && activeRow === row ? 'active' : ''} disabled={!structure.use_coords} key={index} onClick={() => choosePosition(column, row)}><i/></button>;
       })}
     </div>
-    <div className="character-position-footer"><code>X {Number(character.center?.x ?? 0.5).toFixed(2)} · Y {Number(character.center?.y ?? 0.5).toFixed(2)}</code><label><LobeCheckbox checked={Boolean(structure.use_order)} onChange={(event) => updateStructure({ use_order: event.target.checked })} size={16}/><span>遵循角色顺序</span></label></div>
+    <div className="character-position-footer"><code>X {Number(character.center?.x ?? 0.5).toFixed(2)} · Y {Number(character.center?.y ?? 0.5).toFixed(2)}</code><label><LobeCheckbox checked={Boolean(structure.use_order)} onChange={(checked) => updateStructure({ use_order: checked })} size={16}/><span>遵循角色顺序</span></label></div>
     <div className="character-quick-editor-actions"><LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={onDelete} size="small">移除角色</LobeButton></div>
   </div>;
 }
@@ -381,7 +382,7 @@ function Segment({ value, options, onChange, label }) {
   return <LobeSegmented aria-label={label} className="overview-segment" onChange={onChange} options={options.map(([option, text]) => ({ label: text, value: option }))} size="small" value={value}/>;
 }
 
-export default function PromptOverview({ project, updateProject, focusScopeKey, focusTagId, onTagContextMenu, onCopyText, onNotify, onTranslateTags }) {
+export default function PromptOverview({ project, updateProject, focusScopeKey, focusTagId, onTagContextMenu, onCopyContextChange, onCopyText, onNotify, onTranslateTags }) {
   const [dragging, setDragging] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_OVERVIEW_FILTERS);
   const [language, setLanguage] = useState('original');
@@ -430,6 +431,7 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
   const visibleEntries = useMemo(() => overviewEntries(visibleScopes), [visibleScopes]);
   const categoryGroups = useMemo(() => overviewCategoryGroups(visibleEntries), [visibleEntries]);
   const copyContext = useMemo(() => overviewCopyContext(project, visibleScopes, selectedKeys), [project, visibleScopes, selectedKeys]);
+  const visibleCopyContext = useMemo(() => overviewCopyContext(project, visibleScopes, []), [project, visibleScopes]);
   const categorySourceScopes = useMemo(() => filterOverviewScopes(project, { ...filters, category: 'All' }), [project, filters]);
   const categoryCounts = useMemo(() => overviewEntries(categorySourceScopes).reduce((counts, entry) => {
     counts[entry.tag.category || 'Unsorted'] = (counts[entry.tag.category || 'Unsorted'] || 0) + 1;
@@ -438,6 +440,10 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
   const baseScopes = visibleScopes.filter((scope) => scope.kind === 'base');
   const characterScopes = visibleScopes.filter((scope) => scope.kind === 'character');
   const filtered = filters.category !== 'All' || filters.polarity !== 'all' || filters.domain !== 'all' || Boolean(filters.query.trim());
+
+  useEffect(() => {
+    onCopyContextChange?.(visibleCopyContext);
+  }, [onCopyContextChange, visibleCopyContext]);
 
   const changeFilter = (patch) => {
     setFilters((current) => ({ ...current, ...patch }));
@@ -503,7 +509,7 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     setDeleteArmed(false);
   };
 
-  const copyVisibleOrSelected = () => onCopyText?.(copyContext.text, copyContext.count, copyContext.selected);
+  const copyVisibleOrSelected = () => onCopyText?.(copyContext.text, copyContext.count, copyContext.selected, copyContext.ignored);
 
   const deleteSelected = () => {
     if (!selectedKeys.length) return;
@@ -640,7 +646,7 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
       </div>
 
       {selecting && <div className="overview-selection-bar">
-        <span>已选 <b>{selectedKeys.length}</b> 个{copyContext.categoryCount ? ` · ${copyContext.categoryCount} 个分类` : ''}；不同分类复制时自动换行。</span>
+        <span>已选 <b>{selectedKeys.length}</b> 个{copyContext.categoryCount ? ` · ${copyContext.categoryCount} 个分类` : ''}{copyContext.ignored ? ` · ${copyContext.ignored} 个排除 Tag 不会复制` : ''}。</span>
         <LobeButton disabled={!visibleEntries.length} onClick={selectAllVisible} size="small">全选可见</LobeButton>
         <LobeButton disabled={!selectedKeys.length} onClick={() => setSelectedKeys([])} size="small">取消选择</LobeButton>
         <LobeButton disabled={!copyContext.count} onClick={copyVisibleOrSelected} size="small" type="primary">{copyContext.selected ? `复制已选 ${copyContext.count}` : `复制可见 ${copyContext.count}`}</LobeButton>

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import initSqlJs from 'sql.js';
 import { CATEGORY_OPTIONS, normalizeCategory } from '../src/lib/prompt.js';
+import { promptFingerprint } from '../src/lib/promptFingerprint.js';
 
 const require = createRequire(import.meta.url);
 const TAG_CATEGORIES = new Set(CATEGORY_OPTIONS);
@@ -15,6 +16,7 @@ CREATE TABLE IF NOT EXISTS projects (
   image_path TEXT NOT NULL,
   thumbnail_path TEXT NOT NULL,
   content_hash TEXT NOT NULL DEFAULT '',
+  prompt_fingerprint TEXT NOT NULL DEFAULT '',
   is_favorite INTEGER NOT NULL DEFAULT 0,
   deleted_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
@@ -68,6 +70,10 @@ CREATE TABLE IF NOT EXISTS app_meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS prompt_group_covers (
+  prompt_fingerprint TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE
+);
 `;
 
 function rows(statement) {
@@ -120,9 +126,11 @@ export async function openDatabase(dataDirectory) {
 
   const projectColumns = tableColumns(database, 'projects');
   ensureColumn(database, 'projects', projectColumns, 'content_hash', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(database, 'projects', projectColumns, 'prompt_fingerprint', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(database, 'projects', projectColumns, 'is_favorite', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn(database, 'projects', projectColumns, 'deleted_at', "TEXT NOT NULL DEFAULT ''");
   database.run("CREATE INDEX IF NOT EXISTS idx_projects_content_hash ON projects(content_hash) WHERE content_hash != ''");
+  database.run("CREATE INDEX IF NOT EXISTS idx_projects_prompt_fingerprint ON projects(prompt_fingerprint) WHERE prompt_fingerprint != ''");
   const tagColumns = tableColumns(database, 'prompt_tags');
   ensureColumn(database, 'prompt_tags', tagColumns, 'raw_segment', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(database, 'prompt_tags', tagColumns, 'syntax_issue', "TEXT NOT NULL DEFAULT ''");
@@ -267,29 +275,39 @@ export async function openDatabase(dataDirectory) {
   const hydrateProject = (project) => {
     if (!project) return null;
     const metadata = query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] || {};
-    return enrichProjectTags({
+    const hydrated = enrichProjectTags({
       ...project,
       tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', { $id: project.id }),
       metadata,
       prompt_structure: safeJson(metadata.prompt_structure_json),
     });
+    const cover = project.prompt_fingerprint
+      ? query('SELECT project_id FROM prompt_group_covers WHERE prompt_fingerprint = $fingerprint', { $fingerprint: project.prompt_fingerprint })[0]
+      : null;
+    return { ...hydrated, group_cover_id: cover?.project_id || '' };
   };
 
   const loadProject = (projectId) => hydrateProject(query('SELECT * FROM projects WHERE id = $id', { $id: String(projectId || '') })[0]);
-  const loadLibrary = () => query("SELECT * FROM projects WHERE deleted_at = '' ORDER BY created_at DESC").map(hydrateProject);
+  const loadLibrary = (view = 'all') => {
+    const where = view === 'trash'
+      ? "deleted_at != ''"
+      : view === 'favorites' ? "deleted_at = '' AND is_favorite = 1" : "deleted_at = ''";
+    return query(`SELECT * FROM projects WHERE ${where} ORDER BY created_at DESC`).map(hydrateProject);
+  };
 
   const insertProject = (project) => {
     database.run('BEGIN');
     try {
       database.run(
-        `INSERT INTO projects (id, name, image_path, thumbnail_path, content_hash, is_favorite, deleted_at, created_at, updated_at)
-         VALUES ($id, $name, $image_path, $thumbnail_path, $content_hash, 0, '', $created_at, $updated_at)`,
+        `INSERT INTO projects (id, name, image_path, thumbnail_path, content_hash, prompt_fingerprint, is_favorite, deleted_at, created_at, updated_at)
+         VALUES ($id, $name, $image_path, $thumbnail_path, $content_hash, $prompt_fingerprint, 0, '', $created_at, $updated_at)`,
         {
           $id: project.id,
           $name: String(project.name || 'Untitled'),
           $image_path: String(project.image_path || ''),
           $thumbnail_path: String(project.thumbnail_path || ''),
           $content_hash: String(project.content_hash || ''),
+          $prompt_fingerprint: promptFingerprint(project),
           $created_at: String(project.created_at || new Date().toISOString()),
           $updated_at: String(project.updated_at || project.created_at || new Date().toISOString()),
         },
@@ -345,7 +363,7 @@ export async function openDatabase(dataDirectory) {
   };
 
   const findProjectByContentHash = (contentHash) => query(
-    "SELECT id, name, image_path, thumbnail_path FROM projects WHERE content_hash = $content_hash AND deleted_at = '' LIMIT 1",
+    "SELECT id, name, image_path, thumbnail_path, deleted_at FROM projects WHERE content_hash = $content_hash LIMIT 1",
     { $content_hash: String(contentHash || '') },
   )[0] || null;
   const projectHashCandidates = () => query("SELECT id, image_path FROM projects WHERE content_hash = '' AND deleted_at = ''");
@@ -403,10 +421,110 @@ export async function openDatabase(dataDirectory) {
     }
   };
   const deleteProject = (id) => {
-    database.run('DELETE FROM projects WHERE id = $id', { $id: String(id || '') });
+    const projectId = String(id || '');
+    database.run('DELETE FROM prompt_group_covers WHERE project_id = $id', { $id: projectId });
+    database.run('DELETE FROM projects WHERE id = $id', { $id: projectId });
     persist();
   };
 
+  const updateProjectName = (id, name) => {
+    const cleaned = String(name || '').trim();
+    if (!cleaned) throw new Error('图片名称不能为空');
+    if (cleaned.length > 160) throw new Error('图片名称不能超过 160 个字符');
+    const project = query('SELECT id, deleted_at FROM projects WHERE id = $id', { $id: String(id || '') })[0];
+    if (!project) throw new Error('图片不存在');
+    if (project.deleted_at) throw new Error('请先从回收站恢复图片');
+    database.run(
+      'UPDATE projects SET name = $name, updated_at = $updated_at WHERE id = $id',
+      { $id: project.id, $name: cleaned, $updated_at: new Date().toISOString() },
+    );
+    persist();
+    return loadProject(project.id);
+  };
+
+  const updateProjects = (ids = [], patch = {}) => {
+    const uniqueIds = [...new Set(ids.map(String).filter(Boolean))];
+    const results = { success: [], skipped: [], failed: [] };
+    const nowValue = new Date().toISOString();
+    database.run('BEGIN');
+    try {
+      for (const id of uniqueIds) {
+        const project = query('SELECT id, is_favorite, deleted_at FROM projects WHERE id = $id', { $id: id })[0];
+        if (!project) {
+          results.failed.push({ id, error: '图片不存在' });
+          continue;
+        }
+        const favorite = patch.isFavorite === undefined ? Number(project.is_favorite) : patch.isFavorite ? 1 : 0;
+        const deletedAt = patch.deleted === undefined ? String(project.deleted_at || '') : patch.deleted ? nowValue : '';
+        if (favorite === Number(project.is_favorite) && deletedAt === String(project.deleted_at || '')) {
+          results.skipped.push(id);
+          continue;
+        }
+        database.run(
+          'UPDATE projects SET is_favorite = $favorite, deleted_at = $deleted_at, updated_at = $updated_at WHERE id = $id',
+          { $id: id, $favorite: favorite, $deleted_at: deletedAt, $updated_at: nowValue },
+        );
+        results.success.push(id);
+      }
+      database.run('COMMIT');
+      persist();
+      return results;
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+  };
+
+  const setGroupCover = (fingerprint, projectId) => {
+    const normalizedFingerprint = String(fingerprint || '');
+    const id = String(projectId || '');
+    const project = query(
+      'SELECT id FROM projects WHERE id = $id AND prompt_fingerprint = $fingerprint',
+      { $id: id, $fingerprint: normalizedFingerprint },
+    )[0];
+    if (!normalizedFingerprint || !project) throw new Error('图片不属于当前图片组');
+    database.run(
+      `INSERT INTO prompt_group_covers (prompt_fingerprint, project_id) VALUES ($fingerprint, $project_id)
+       ON CONFLICT(prompt_fingerprint) DO UPDATE SET project_id = excluded.project_id`,
+      { $fingerprint: normalizedFingerprint, $project_id: id },
+    );
+    persist();
+    return { promptFingerprint: normalizedFingerprint, projectId: id };
+  };
+
+  const clearInvalidGroupCovers = () => {
+    database.run(
+      `DELETE FROM prompt_group_covers
+       WHERE NOT EXISTS (
+         SELECT 1 FROM projects
+         WHERE projects.id = prompt_group_covers.project_id
+           AND projects.prompt_fingerprint = prompt_group_covers.prompt_fingerprint
+       )`,
+    );
+  };
+
+  const backfillPromptFingerprints = () => {
+    let changed = 0;
+    for (const row of query('SELECT id, prompt_fingerprint FROM projects')) {
+      const fingerprint = promptFingerprint(hydrateProject(row));
+      if (fingerprint === row.prompt_fingerprint) continue;
+      database.run('UPDATE projects SET prompt_fingerprint = $fingerprint WHERE id = $id', {
+        $id: row.id,
+        $fingerprint: fingerprint,
+      });
+      changed += 1;
+    }
+    clearInvalidGroupCovers();
+    if (changed) persist();
+    return changed;
+  };
+
+  const loadTrashSummary = () => query(
+    `SELECT id, name, image_path, thumbnail_path, is_favorite, deleted_at
+     FROM projects WHERE deleted_at != '' ORDER BY deleted_at DESC`,
+  );
+
+  backfillPromptFingerprints();
   persist();
   return {
     loadLibrary,
@@ -423,6 +541,11 @@ export async function openDatabase(dataDirectory) {
     enrichProjectTags,
     insertProject,
     deleteProject,
+    updateProjectName,
+    updateProjects,
+    setGroupCover,
+    loadTrashSummary,
+    backfillPromptFingerprints,
     persist,
     filePath,
     backupPath,

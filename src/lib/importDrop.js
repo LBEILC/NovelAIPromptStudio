@@ -18,7 +18,7 @@ export function assessWorkbenchDroppedFiles(files) {
   const supported = names.filter((name) => /\.(png|jpe?g|webp)$/i.test(name));
   return {
     count: names.length,
-    valid: names.length === 1 && supported.length === 1,
+    valid: supported.length === names.length,
     label: '图片',
     pendingDetails: false,
   };

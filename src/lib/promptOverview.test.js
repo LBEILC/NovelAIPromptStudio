@@ -29,6 +29,14 @@ describe('Prompt overview operations', () => {
     expect(overviewCopyContext(project, visible, [selectedKey])).toMatchObject({ text: 'night', count: 1, selected: true });
   });
 
+  it('never copies selected or visible Undesired tags and reports ignored selection', () => {
+    const project = projectFixture();
+    const visible = filterOverviewScopes(project, { category: 'All', polarity: 'undesired', domain: 'all', query: '' });
+    expect(overviewCopyContext(project, visible, [])).toMatchObject({ text: '', count: 0, ignored: 1 });
+    const undesired = overviewEntries(visible)[0];
+    expect(overviewCopyContext(project, visible, [undesired.key])).toMatchObject({ text: '', count: 0, ignored: 1, selected: true });
+  });
+
   it('copies visible tags on one line and separates selected categories with newlines', () => {
     const project = projectFixture();
     const visible = filterOverviewScopes(project, { category: 'All', polarity: 'prompt', domain: 'character', query: '' });

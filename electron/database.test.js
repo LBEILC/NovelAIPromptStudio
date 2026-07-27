@@ -100,4 +100,36 @@ describe('phase 2 core database', () => {
       thumbnail_path: path.join(newAssets, 'thumbnails', 'project-1.webp'),
     });
   });
+
+  it('supports favorites, rename, soft deletion, restoration, and view queries', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    database.insertProject(project());
+    expect(database.updateProjectName('project-1', '  新名称  ')).toMatchObject({ name: '新名称' });
+    expect(database.updateProjects(['project-1'], { isFavorite: true }).success).toEqual(['project-1']);
+    expect(database.loadLibrary('favorites')).toHaveLength(1);
+    expect(database.updateProjects(['project-1'], { deleted: true }).success).toEqual(['project-1']);
+    expect(database.loadLibrary('all')).toEqual([]);
+    expect(database.loadLibrary('favorites')).toEqual([]);
+    expect(database.loadLibrary('trash')[0]).toMatchObject({ id: 'project-1', is_favorite: 1 });
+    expect(() => database.updateProjectName('project-1', 'trashed')).toThrow('恢复');
+    database.updateProjects(['project-1'], { deleted: false });
+    expect(database.loadLibrary('favorites')).toHaveLength(1);
+  });
+
+  it('groups seed variants with a stable Prompt fingerprint and persists a valid cover', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    database.insertProject(project('project-1'));
+    database.insertProject({ ...project('project-2'), metadata: { ...project('project-2').metadata, seed: '999' } });
+    const loaded = database.loadLibrary();
+    expect(loaded[0].prompt_fingerprint).toBeTruthy();
+    expect(loaded[0].prompt_fingerprint).toBe(loaded[1].prompt_fingerprint);
+    database.setGroupCover(loaded[0].prompt_fingerprint, 'project-1');
+    expect(database.loadLibrary().every((entry) => entry.group_cover_id === 'project-1')).toBe(true);
+    database.deleteProject('project-1');
+    expect(database.loadLibrary()[0].group_cover_id).toBe('');
+  });
 });

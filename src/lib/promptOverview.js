@@ -69,15 +69,18 @@ export function overviewCopyContext(project, visibleScopes, selectedKeys = []) {
   const source = selected.size
     ? overviewEntries(getPromptScopes(project)).filter((entry) => selected.has(entry.key))
     : overviewEntries(visibleScopes);
-  const groups = selected.size ? overviewCategoryGroups(source) : [];
+  const positive = source.filter((entry) => entry.scopePolarity === 'prompt');
+  const ignored = source.length - positive.length;
+  const groups = selected.size ? overviewCategoryGroups(positive) : [];
   return {
     text: selected.size
       ? groups.map((group) => group.entries.map((entry) => formatTag(entry.tag)).join(', ')).join('\n')
-      : source.map((entry) => formatTag(entry.tag)).join(', '),
-    count: source.length,
+      : positive.map((entry) => formatTag(entry.tag)).join(', '),
+    count: positive.length,
+    ignored,
     selected: selected.size > 0,
     categoryCount: selected.size ? groups.length : 0,
-    entries: source,
+    entries: positive,
   };
 }
 

@@ -1,0 +1,46 @@
+import { describe, expect, it } from 'vitest';
+import { adjacentGallerySelection, gallerySelectionProjectIds, groupGalleryProjects, reconcileGallerySelection } from './gallery.js';
+
+const item = (id, fingerprint, createdAt, cover = '') => ({
+  id,
+  name: id,
+  prompt_fingerprint: fingerprint,
+  created_at: createdAt,
+  group_cover_id: cover,
+  tags: [],
+  metadata: {},
+  prompt_structure: { base_undesired_tags: [], characters: [] },
+});
+
+describe('gallery grouping and selection', () => {
+  it('groups only non-empty matching fingerprints and honors a valid persisted cover', () => {
+    const groups = groupGalleryProjects([
+      item('older', 'same', '2026-01-01', 'older'),
+      item('newer', 'same', '2026-02-01', 'older'),
+      item('plain-a', '', '2026-03-01'),
+      item('plain-b', '', '2026-03-02'),
+    ]);
+    expect(groups).toHaveLength(3);
+    expect(groups.find((group) => group.fingerprint === 'same')).toMatchObject({ count: 2, cover: { id: 'older' } });
+  });
+
+  it('falls back to the newest remaining member when a persisted cover is invalid', () => {
+    const [group] = groupGalleryProjects([
+      item('older', 'same', '2026-01-01', 'deleted-cover'),
+      item('newer', 'same', '2026-02-01', 'deleted-cover'),
+    ]);
+    expect(group.cover.id).toBe('newer');
+  });
+
+  it('expands selected groups to current-view project ids and drops hidden selection', () => {
+    const groups = groupGalleryProjects([item('a', 'same', '2026-01-01'), item('b', 'same', '2026-02-01'), item('c', 'other', '2026-03-01')]);
+    expect(gallerySelectionProjectIds(groups, [groups[0].id])).toEqual(['b', 'a']);
+    expect(reconcileGallerySelection(groups.slice(1), groups.map((group) => group.id))).toEqual([groups[1].id]);
+  });
+
+  it('chooses the next member after detail deletion and then an adjacent group', () => {
+    const groups = groupGalleryProjects([item('a', 'same', '2026-01-01'), item('b', 'same', '2026-02-01'), item('c', 'other', '2026-03-01')]);
+    const same = groups.find((group) => group.fingerprint === 'same');
+    expect(adjacentGallerySelection(groups, same.id, 'b')).toEqual({ groupId: same.id, projectId: 'a' });
+  });
+});

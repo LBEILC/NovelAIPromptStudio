@@ -36,6 +36,21 @@ function normalizeAssetsDirectory(value, fallback, strict = false) {
   return path.resolve(candidate);
 }
 
+function normalizeRecentImageDirectory(value, strict = false) {
+  const candidate = String(value || '').trim();
+  if (!candidate) return '';
+  if (candidate.length > 4096 || candidate.includes('\u0000') || !path.isAbsolute(candidate)) {
+    if (strict) throw new Error('最近图片目录必须是有效的绝对路径');
+    return '';
+  }
+  const resolved = path.resolve(candidate);
+  try {
+    return fs.statSync(resolved).isDirectory() ? resolved : '';
+  } catch {
+    return '';
+  }
+}
+
 export function openPreferences(dataDirectory, safeStorage, options = {}) {
   const filePath = path.join(dataDirectory, 'preferences.json');
   const defaultAssetsDirectory = path.resolve(options.defaultAssetsDirectory || path.join(dataDirectory, '..', 'assets'));
@@ -145,5 +160,37 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     return librarySettings();
   };
 
-  return { publicSettings, credentials, saveAISettings, appearanceSettings, saveAppearanceSettings, librarySettings, saveLibrarySettings, filePath };
+  const productivitySettings = () => {
+    const stored = read().productivity || {};
+    return {
+      recentImageDirectory: normalizeRecentImageDirectory(stored.recentImageDirectory),
+      autoCheckUpdates: stored.autoCheckUpdates !== false,
+    };
+  };
+
+  const saveProductivitySettings = (next = {}) => {
+    const current = productivitySettings();
+    const productivity = { ...current };
+    if (next.recentImageDirectory !== undefined) {
+      productivity.recentImageDirectory = normalizeRecentImageDirectory(next.recentImageDirectory, Boolean(next.recentImageDirectory));
+    }
+    if (next.autoCheckUpdates !== undefined) productivity.autoCheckUpdates = Boolean(next.autoCheckUpdates);
+    const stored = read();
+    stored.productivity = productivity;
+    write(stored);
+    return productivitySettings();
+  };
+
+  return {
+    publicSettings,
+    credentials,
+    saveAISettings,
+    appearanceSettings,
+    saveAppearanceSettings,
+    librarySettings,
+    saveLibrarySettings,
+    productivitySettings,
+    saveProductivitySettings,
+    filePath,
+  };
 }
