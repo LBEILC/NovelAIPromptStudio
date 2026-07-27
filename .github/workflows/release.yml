@@ -76,6 +76,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check out release tag
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Download installers
         uses: actions/download-artifact@v8
         with:
