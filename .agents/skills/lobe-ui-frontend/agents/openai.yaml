@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lobe UI 前端开发"
+  short_description: "版本感知的 Lobe UI 前端开发、迁移、审查与质量验证"
+  default_prompt: "使用 $lobe-ui-frontend 按项目安装版本和设计规范实现这个前端需求。"
