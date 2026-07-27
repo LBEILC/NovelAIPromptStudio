@@ -5,12 +5,15 @@ import {
   Copy,
   Download,
   FolderOpen,
+  FlipHorizontal,
+  FlipVertical,
   Image as ImageIcon,
   Info,
   LayoutGrid,
   Pencil,
   Plus,
   RotateCcw,
+  RotateCw,
   Star,
   ChevronLeft,
   ChevronRight,
@@ -21,6 +24,8 @@ import {
   Trash2,
   Upload,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { Icon as LobeIcon } from '@lobehub/ui';
 
@@ -31,6 +36,8 @@ const ICONS = {
   download: Download,
   edit: Pencil,
   folder: FolderOpen,
+  flipHorizontal: FlipHorizontal,
+  flipVertical: FlipVertical,
   image: ImageIcon,
   info: Info,
   library: LayoutGrid,
@@ -43,9 +50,13 @@ const ICONS = {
   spark: Sparkles,
   star: Star,
   restore: RotateCcw,
+  rotateLeft: RotateCcw,
+  rotateRight: RotateCw,
   trash: Trash2,
   upload: Upload,
   warning: CircleAlert,
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
 };
 
 export function getIconComponent(name) {

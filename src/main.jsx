@@ -36,7 +36,7 @@ function StudioRoot() {
   return <LobeProvider monoFont={appearance.monoFont} primaryColor={appearance.primaryColor} sansFont={appearance.sansFont} themeMode={appearance.themeMode}>
     <App appearance={appearance} setAppearance={setAppearance}/>
     <ContextMenuHost/>
-    <ToastHost duration={2200} position="bottom"/>
+    <ToastHost duration={2200} position="bottom" root={document.body}/>
   </LobeProvider>;
 }
 

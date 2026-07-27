@@ -5,12 +5,25 @@ import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
 import { galleryEmptyState } from './lib/gallery.js';
+import { galleryPreviewActions } from './lib/imagePreview.js';
 import { countPromptTags, formatPositivePromptForCopy } from './lib/promptStructure.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
 
 function formatDate(value) {
   if (!value) return '未知时间';
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(value));
+}
+
+function GalleryPreviewToolbar({ info, onCopy, onDownload }) {
+  return <div className="gallery-image-preview-toolbar">
+    {galleryPreviewActions(info, { onCopy, onDownload }).map((action) => <ActionIcon
+      disabled={action.disabled}
+      icon={<Icon name={action.icon} size={16}/>}
+      key={action.key}
+      onClick={action.onClick}
+      title={action.title}
+    />)}
+  </div>;
 }
 
 function ImportButton({ importing, onImport, onImportClipboard }) {
@@ -249,10 +262,11 @@ export default function GalleryPage({
             alt={preview.name}
             className="gallery-preview-stage"
             filePath={preview.image_path}
-            toolbarAddon={<>
-              <ActionIcon icon={<Icon name="copy" size={16}/>} onClick={() => onCopyImage(preview)} title="复制图片"/>
-              <ActionIcon icon={<Icon name="download" size={16}/>} onClick={() => onDownloadImage(preview)} title="下载图片"/>
-            </>}
+            previewActions={(_originalNode, info) => <GalleryPreviewToolbar
+              info={info}
+              onCopy={() => onCopyImage(preview)}
+              onDownload={() => onDownloadImage(preview)}
+            />}
           >
             {previewGroup?.count > 1 && <>
               <ActionIcon className="gallery-stage-nav previous" icon={<Icon name="previous"/>} onClick={() => onNavigatePreview(-1)} title="上一张"/>
