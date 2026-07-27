@@ -1,18 +1,18 @@
 # 图库、Vibe 库与 Tag 库三阶段开发计划
 
-> 状态：三个阶段均已实施
+> 状态：已归档（三资源库方案已被两页面结构取代）
 >
 > 日期：2026-07-19
 >
 > 适用平台：Windows / macOS
 >
-> 2026-07-22 产品方向更新：本计划已由[工作台与图片库两阶段重构计划](./two-page-workbench-gallery-refactor-plan.md)取代，仅保留为历史记录。Tag 库、Vibe 库、分支、实验、系列和关系能力将退出产品。
+> 2026-07-22 产品方向更新：本计划已由[工作台与图片库两阶段重构计划](../two-page-workbench-gallery-refactor-plan.md)取代，仅保留为历史记录。Tag 库、Vibe 库、分支、实验、系列和关系能力将退出产品。
 >
 > 关联文档：[资源库管理、Tag 分类、设置与交互设计](./library-management-taxonomy-settings-design.md)
 >
 > 关联文档：[图片系列、对比实验与生成分支设计](./experiment-and-branch-design.md)
 >
-> 视觉规范：[Lobe 视觉层级与颜色语义规范](./lobe-visual-language.md)
+> 视觉规范：[Lobe 视觉层级与颜色语义规范](../lobe-visual-language.md)
 
 ## 1. 文档目标
 

@@ -18,9 +18,9 @@ NovelAI Prompt Studio 回到最初目标：方便地从 NovelAI 图片中读取�
 
 本计划取代以下旧产品方向；旧文档只保留为历史记录：
 
-- [图库、Vibe 库与 Tag 库三阶段开发计划](./three-library-information-architecture-development-plan.md)
-- [资源库管理、Tag 分类、设置与交互设计](./library-management-taxonomy-settings-design.md)
-- [图片系列、对比实验与生成分支设计](./experiment-and-branch-design.md)
+- [图库、Vibe 库与 Tag 库三阶段开发计划](./archive/three-library-information-architecture-development-plan.md)
+- [资源库管理、Tag 分类、设置与交互设计](./archive/library-management-taxonomy-settings-design.md)
+- [图片系列、对比实验与生成分支设计](./archive/experiment-and-branch-design.md)
 
 ## 2. 产品定位
 

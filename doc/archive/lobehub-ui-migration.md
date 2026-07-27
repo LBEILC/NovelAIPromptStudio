@@ -1,6 +1,6 @@
 # Lobe UI 完整迁移试验
 
-> 状态：主题接管与应用外壳第一批迁移完成
+> 状态：已归档（Lobe UI 迁移已完成）
 >
 > 分支：`codex/lobe-ui-migration-spike`
 >
