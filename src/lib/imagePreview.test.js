@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { galleryPreviewActions } from './imagePreview.js';
+import { imagePreviewActions } from './imagePreview.js';
 
-describe('gallery image preview actions', () => {
+describe('image preview actions', () => {
   it('provides one application-owned copy and download action', () => {
     const onCopy = vi.fn();
     const onDownload = vi.fn();
-    const actions = galleryPreviewActions({}, { onCopy, onDownload });
+    const actions = imagePreviewActions({}, { onCopy, onDownload });
 
     expect(actions.map((action) => action.key)).toEqual([
       'flip-horizontal',
@@ -22,7 +22,7 @@ describe('gallery image preview actions', () => {
   });
 
   it('disables zoom actions at the supported preview bounds', () => {
-    expect(galleryPreviewActions({ transform: { scale: 0.32 } })[4].disabled).toBe(true);
-    expect(galleryPreviewActions({ transform: { scale: 32 } })[5].disabled).toBe(true);
+    expect(imagePreviewActions({ transform: { scale: 0.32 } })[4].disabled).toBe(true);
+    expect(imagePreviewActions({ transform: { scale: 32 } })[5].disabled).toBe(true);
   });
 });

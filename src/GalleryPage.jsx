@@ -2,28 +2,16 @@ import { ActionIcon, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, S
 import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, SplitButton } from '@lobehub/ui/base-ui';
 import { useEffect, useRef, useState } from 'react';
 import Icon, { getIconComponent } from './components/Icon.jsx';
+import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
 import { galleryEmptyState } from './lib/gallery.js';
-import { galleryPreviewActions } from './lib/imagePreview.js';
 import { countPromptTags, formatPositivePromptForCopy } from './lib/promptStructure.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
 
 function formatDate(value) {
   if (!value) return '未知时间';
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(value));
-}
-
-function GalleryPreviewToolbar({ info, onCopy, onDownload }) {
-  return <div className="gallery-image-preview-toolbar">
-    {galleryPreviewActions(info, { onCopy, onDownload }).map((action) => <ActionIcon
-      disabled={action.disabled}
-      icon={<Icon name={action.icon} size={16}/>}
-      key={action.key}
-      onClick={action.onClick}
-      title={action.title}
-    />)}
-  </div>;
 }
 
 function ImportButton({ importing, onImport, onImportClipboard }) {
@@ -262,7 +250,7 @@ export default function GalleryPage({
             alt={preview.name}
             className="gallery-preview-stage"
             filePath={preview.image_path}
-            previewToolbar={(_originalNode, info) => <GalleryPreviewToolbar
+            previewToolbar={(_originalNode, info) => <ImagePreviewToolbar
               info={info}
               onCopy={() => onCopyImage(preview)}
               onDownload={() => onDownloadImage(preview)}

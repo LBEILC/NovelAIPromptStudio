@@ -2,7 +2,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { copyManagedImageToClipboard, copyOriginalAsset, removeManagedAsset, resolveManagedAsset } from './assetFiles.js';
+import {
+  copyImageToClipboard,
+  copyManagedImageToClipboard,
+  copyOriginalAsset,
+  copyOriginalImage,
+  removeManagedAsset,
+  resolveImageFile,
+  resolveManagedAsset,
+} from './assetFiles.js';
 
 const temporaryDirectories = [];
 
@@ -17,6 +25,16 @@ afterEach(() => {
 });
 
 describe('managed asset file operations', () => {
+  it('accepts existing workbench images and rejects unsupported files', () => {
+    const root = makeTemporaryDirectory();
+    const image = path.join(root, 'workbench.webp');
+    const text = path.join(root, 'notes.txt');
+    fs.writeFileSync(image, 'webp');
+    fs.writeFileSync(text, 'text');
+    expect(resolveImageFile(image)).toBe(image);
+    expect(() => resolveImageFile(text)).toThrow(/PNG、JPG 或 WEBP/);
+  });
+
   it('rejects external paths and the asset root itself', () => {
     const root = makeTemporaryDirectory();
     expect(() => resolveManagedAsset(root, root)).toThrow(/资源路径/);
@@ -57,6 +75,28 @@ describe('managed asset file operations', () => {
     let writtenImage = null;
     copyManagedImageToClipboard(root, asset, {
       nativeImage: { createFromPath: (filePath) => filePath === asset ? image : null },
+      clipboard: { writeImage: (value) => { writtenImage = value; } },
+    });
+    expect(writtenImage).toBe(image);
+  });
+
+  it('copies an external workbench image without re-encoding', () => {
+    const root = makeTemporaryDirectory();
+    const source = path.join(root, 'workbench.png');
+    const destination = path.join(root, 'saved.png');
+    fs.writeFileSync(source, Buffer.from('original image'));
+    copyOriginalImage(source, destination);
+    expect(fs.readFileSync(destination)).toEqual(fs.readFileSync(source));
+  });
+
+  it('writes an external workbench image to the clipboard adapter', () => {
+    const root = makeTemporaryDirectory();
+    const source = path.join(root, 'workbench.jpg');
+    fs.writeFileSync(source, 'jpg');
+    const image = { isEmpty: () => false };
+    let writtenImage = null;
+    copyImageToClipboard(source, {
+      nativeImage: { createFromPath: (filePath) => filePath === source ? image : null },
       clipboard: { writeImage: (value) => { writtenImage = value; } },
     });
     expect(writtenImage).toBe(image);

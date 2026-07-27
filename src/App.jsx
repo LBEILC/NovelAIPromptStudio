@@ -64,6 +64,8 @@ const studio = window.studio || {
   setGroupCover: unavailable('请在桌面应用中设置头图'),
   copyProjectImage: unavailable('请在桌面应用中复制图片'),
   downloadProjectImage: unavailable('请在桌面应用中下载图片'),
+  copyWorkbenchImage: unavailable('请在桌面应用中复制图片'),
+  downloadWorkbenchImage: unavailable('请在桌面应用中下载图片'),
   saveTagAnnotations: async () => ({ ok: true }),
   revealFile: async () => {},
   getAISettings: async () => ({ baseUrl: 'https://api.openai.com/v1', model: '', hasApiKey: false, encryptionAvailable: true }),
@@ -805,11 +807,19 @@ export default function App({ appearance, setAppearance }) {
         onChooseImage={() => openWorkbenchPath()}
         onClipboardImage={openClipboardWorkbenchImage}
         onCloseTab={closeTab}
+        onCopyImage={async (project) => {
+          const result = await studio.copyWorkbenchImage(project.image_path);
+          showToast(result?.ok ? '图片已复制到系统剪贴板' : result?.error || '图片复制失败', result?.ok ? 'success' : 'error');
+        }}
         onCopyText={async (text, count, selected, ignored = 0, label = '') => {
           if (!text) return;
           await navigator.clipboard.writeText(text);
           if (selected && ignored) showToast(`已复制 ${count} 个 Prompt Tag，忽略 ${ignored} 个排除 Tag`);
           else showToast(`已复制 ${count} 个${label ? ` ${label}` : selected ? '已选 Prompt Tag' : '可见 Prompt Tag'}`);
+        }}
+        onDownloadImage={async (project) => {
+          const result = await studio.downloadWorkbenchImage(project.image_path, project.name);
+          if (!result?.canceled) showToast(result?.ok ? '图片已下载，原始格式与元数据已保留' : result?.error || '图片下载失败', result?.ok ? 'success' : 'error');
         }}
         onNotify={showToast}
         onReset={resetWorkbench}

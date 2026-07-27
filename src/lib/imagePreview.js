@@ -1,4 +1,4 @@
-export function galleryPreviewActions(info = {}, handlers = {}) {
+export function imagePreviewActions(info = {}, handlers = {}) {
   const actions = info.actions || {};
   const scale = Number(info.transform?.scale) || 1;
   return [

@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('studio', {
   setGroupCover: (fingerprint, projectId) => ipcRenderer.invoke('project:group-cover:set', fingerprint, projectId),
   copyProjectImage: (id) => ipcRenderer.invoke('image:copy', id),
   downloadProjectImage: (id) => ipcRenderer.invoke('image:download', id),
+  copyWorkbenchImage: (filePath) => ipcRenderer.invoke('workbench:image:copy-current', filePath),
+  downloadWorkbenchImage: (filePath, name) => ipcRenderer.invoke('workbench:image:download-current', { filePath, name }),
   saveTagAnnotations: (entries) => ipcRenderer.invoke('tag:annotations:save', entries),
   revealEmbeddedVibe: (vibe) => ipcRenderer.invoke('vibe:embedded:reveal', vibe),
   revealFile: (filePath) => ipcRenderer.invoke('file:reveal', filePath),

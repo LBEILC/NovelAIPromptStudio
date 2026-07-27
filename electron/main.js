@@ -14,7 +14,15 @@ import { listSystemFonts } from './fonts.js';
 import { describeAssetDirectory, migrateAssetDirectory } from './libraryStorage.js';
 import { cleanupWorkbenchTemporaryImages, readClipboardImageSource } from './clipboardImages.js';
 import { checkForUpdates as checkReleaseUpdates } from './updates.js';
-import { copyManagedImageToClipboard, copyOriginalAsset, removeManagedAsset, resolveManagedAsset } from './assetFiles.js';
+import {
+  copyImageToClipboard,
+  copyManagedImageToClipboard,
+  copyOriginalAsset,
+  copyOriginalImage,
+  removeManagedAsset,
+  resolveImageFile,
+  resolveManagedAsset,
+} from './assetFiles.js';
 
 const { autoUpdater } = electronUpdater;
 
@@ -469,6 +477,34 @@ app.whenReady().then(async () => {
       });
       if (result.canceled || !result.filePath) return { ok: true, canceled: true };
       copyOriginalAsset(assetsDirectory, project.image_path, result.filePath);
+      return { ok: true, filePath: result.filePath };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('workbench:image:copy-current', (_event, filePath) => {
+    try {
+      copyImageToClipboard(filePath, { nativeImage, clipboard });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('workbench:image:download-current', async (event, request = {}) => {
+    try {
+      const sourcePath = resolveImageFile(request.filePath);
+      const extension = path.extname(sourcePath).toLowerCase() || '.png';
+      const safeBaseName = String(request.name || path.basename(sourcePath, extension) || 'NovelAI image')
+        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
+        .trim() || 'NovelAI image';
+      const owner = BrowserWindow.fromWebContents(event.sender);
+      const result = await dialog.showSaveDialog(owner, {
+        title: '下载图片',
+        defaultPath: `${safeBaseName}${extension}`,
+        filters: [{ name: 'Image', extensions: [extension.slice(1)] }],
+      });
+      if (result.canceled || !result.filePath) return { ok: true, canceled: true };
+      copyOriginalImage(sourcePath, result.filePath);
       return { ok: true, filePath: result.filePath };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };

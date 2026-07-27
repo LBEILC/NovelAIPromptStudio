@@ -3,6 +3,7 @@ import { Button as LobeButton, showContextMenu, SplitButton, Tabs } from '@lobeh
 import { useCallback, useMemo, useState } from 'react';
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
+import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage from './components/ImageStage.jsx';
 import { countPromptTags, formatPositivePromptForCopy, positivePromptCopyOptions } from './lib/promptStructure.js';
 import { activeWorkbenchCopyContext, activeWorkbenchTab, scopeWorkbenchCopyContext, workbenchTabHasChanges } from './lib/workbenchSession.js';
@@ -66,7 +67,9 @@ export default function WorkbenchPage({
   onChooseImage,
   onClipboardImage,
   onCloseTab,
+  onCopyImage,
   onCopyText,
+  onDownloadImage,
   onRevealVibe,
   onNotify,
   onReset,
@@ -157,7 +160,16 @@ export default function WorkbenchPage({
       >
         <LobeDraggablePanel.Body className="workbench-source-panel">
           <figure>
-            <ImageStage alt={project.name} className="workbench-image-stage" filePath={project.image_path}/>
+            <ImageStage
+              alt={project.name}
+              className="workbench-image-stage"
+              filePath={project.image_path}
+              previewToolbar={(_originalNode, info) => <ImagePreviewToolbar
+                info={info}
+                onCopy={() => onCopyImage(project)}
+                onDownload={() => onDownloadImage(project)}
+              />}
+            />
             <figcaption><strong>{project.name}</strong><span>{project.metadata?.width || '—'} × {project.metadata?.height || '—'}</span></figcaption>
           </figure>
           <WorkbenchVibes onReveal={onRevealVibe} vibes={project.vibes || []}/>
