@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { createPortal } from 'react-dom';
 import App from './App.jsx';
 import LobeProvider from './LobeProvider.jsx';
 import { ContextMenuHost, ToastHost } from '@lobehub/ui/base-ui';
@@ -21,20 +22,18 @@ function ThemedToastHost({ appearance }) {
     return () => root.remove();
   }, []);
 
-  useEffect(() => {
-    if (!portalRoot) return;
-    const source = document.querySelector('.lobe-root');
-    if (!source) return;
-    const computed = window.getComputedStyle(source);
-    for (let index = 0; index < computed.length; index += 1) {
-      const property = computed[index];
-      if (property.startsWith('--')) portalRoot.style.setProperty(property, computed.getPropertyValue(property));
-    }
-    portalRoot.style.color = computed.color;
-    portalRoot.style.fontFamily = computed.fontFamily;
-  }, [appearance, portalRoot]);
-
-  return portalRoot ? <ToastHost duration={2200} position="top" root={portalRoot}/> : null;
+  if (!portalRoot) return null;
+  return createPortal(
+    <LobeProvider
+      monoFont={appearance.monoFont}
+      primaryColor={appearance.primaryColor}
+      sansFont={appearance.sansFont}
+      themeMode={appearance.themeMode}
+    >
+      <ToastHost duration={2200} position="top"/>
+    </LobeProvider>,
+    portalRoot,
+  );
 }
 
 function StudioRoot() {
