@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { closestCenter, DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, DragOverlay, getFirstCollision, pointerWithin, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -26,6 +26,7 @@ import {
   overviewCopyContext,
   overviewEntries,
   reorderOverviewTags,
+  shouldReorderOverviewTags,
   overviewTagKey,
   toggleOverviewSelectionGroup,
 } from './lib/promptOverview.js';
@@ -365,7 +366,7 @@ function ScopeTags({
     </div>
     <DndContext
       accessibility={TAG_SORT_ACCESSIBILITY}
-      collisionDetection={closestCenter}
+      collisionDetection={pointerWithin}
       sensors={sensors}
       onDragCancel={() => {
         dragTagsRef.current = null;
@@ -379,10 +380,15 @@ function ScopeTags({
         setActiveTagId(null);
         if (over && nextTags) onReorderTags(scope, nextTags);
       }}
-      onDragOver={({ active, over }) => {
-        if (!over || active.id === over.id) return;
+      onDragMove={({ active, activatorEvent, collisions, delta }) => {
+        // Reordering from onDragOver can create a feedback loop when flex reflow changes overId.
+        const collision = getFirstCollision(collisions);
+        const overId = collision?.id;
+        const targetRect = collision?.data?.droppableContainer?.rect?.current;
+        const pointerX = Number(activatorEvent?.clientX) + Number(delta?.x);
+        if (!shouldReorderOverviewTags(dragTagsRef.current || scope.tags, active.id, overId, pointerX, targetRect)) return;
         const current = dragTagsRef.current || scope.tags;
-        const nextTags = reorderOverviewTags(current, active.id, over.id);
+        const nextTags = reorderOverviewTags(current, active.id, overId);
         if (nextTags === current) return;
         dragTagsRef.current = nextTags;
         setDragTags(nextTags);

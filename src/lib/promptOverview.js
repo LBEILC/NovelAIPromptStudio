@@ -22,6 +22,16 @@ export function reorderOverviewTags(tags = [], activeId, overId) {
   return nextTags;
 }
 
+export function shouldReorderOverviewTags(tags = [], activeId, overId, pointerX, targetRect) {
+  if (!overId || activeId === overId || !Number.isFinite(pointerX) || !targetRect) return false;
+  const sourceIndex = tags.findIndex((tag) => tag.id === activeId);
+  const targetIndex = tags.findIndex((tag) => tag.id === overId);
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return false;
+  const targetCenterX = Number(targetRect.left) + Number(targetRect.width) / 2;
+  if (!Number.isFinite(targetCenterX)) return false;
+  return sourceIndex < targetIndex ? pointerX >= targetCenterX : pointerX <= targetCenterX;
+}
+
 export function filterOverviewScopes(project, filters = DEFAULT_OVERVIEW_FILTERS) {
   const query = normalizeSearch(filters.query || '');
   return getPromptScopes(project)

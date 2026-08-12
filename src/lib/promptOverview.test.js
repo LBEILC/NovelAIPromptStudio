@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deleteOverviewTags, filterOverviewScopes, overviewCategoryGroups, overviewCopyContext, overviewEntries, reorderOverviewTags, toggleOverviewSelectionGroup } from './promptOverview.js';
+import { deleteOverviewTags, filterOverviewScopes, overviewCategoryGroups, overviewCopyContext, overviewEntries, reorderOverviewTags, shouldReorderOverviewTags, toggleOverviewSelectionGroup } from './promptOverview.js';
 
 function projectFixture() {
   const tag = (id, value, category, translation = '', weight = 1) => ({ id, tag: value, category, translation, weight, note: '' });
@@ -22,6 +22,17 @@ describe('Prompt overview operations', () => {
     expect(reordered.map((tag) => tag.id)).toEqual(['button', 'hair', 'shirt']);
     expect(tags.map((tag) => tag.id)).toEqual(['shirt', 'button', 'hair']);
     expect(reorderOverviewTags(tags, 'missing', 'hair')).toBe(tags);
+  });
+
+  it('only previews a reorder after the pointer crosses the target midpoint', () => {
+    const tags = projectFixture().prompt_structure.characters[0].prompt_tags;
+    const targetRect = { left: 100, width: 80 };
+    expect(shouldReorderOverviewTags(tags, 'shirt', 'button', 120, targetRect)).toBe(false);
+    expect(shouldReorderOverviewTags(tags, 'shirt', 'button', 141, targetRect)).toBe(true);
+
+    const reordered = reorderOverviewTags(tags, 'shirt', 'button');
+    expect(shouldReorderOverviewTags(reordered, 'shirt', 'button', 141, { left: 80, width: 80 })).toBe(false);
+    expect(shouldReorderOverviewTags(tags, 'shirt', 'missing', 141, targetRect)).toBe(false);
   });
 
   it('filters by category, polarity, domain, and translated search text', () => {
