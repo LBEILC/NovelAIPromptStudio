@@ -3,8 +3,8 @@
 
   <h1>NovelAI Prompt Studio</h1>
 
-  <p><strong>把 NovelAI 图片里的 Prompt，变成真正好用的可视化工作流。</strong></p>
-  <p>本地优先的 NovelAI Diffusion V4 / V4.5 Prompt 编辑工作台与图片库。</p>
+  <p><strong>把藏在 NovelAI 图片里的 Prompt，变成清晰、可编辑、可复用的创作资产。</strong></p>
+  <p>面向 NovelAI Diffusion V4 / V4.5 的本地 Prompt 工作台与图片库。</p>
 
   <p>
     <a href="https://github.com/LBEILC/NovelAIPromptStudio/releases/latest"><img src="https://img.shields.io/github/v/release/LBEILC/NovelAIPromptStudio?display_name=tag&style=flat-square&label=Release" alt="最新版本"></a>
@@ -16,112 +16,141 @@
   <p>
     <a href="https://github.com/LBEILC/NovelAIPromptStudio/releases/latest"><strong>下载最新版</strong></a>
     ·
-    <a href="#近期更新">近期更新</a>
+    <a href="#工作台">工作台</a>
+    ·
+    <a href="#图片库">图片库</a>
     ·
     <a href="#快速开始">快速开始</a>
-    ·
-    <a href="#参与开发">参与开发</a>
   </p>
 </div>
 
----
+![NovelAI Prompt Studio 工作台](./doc/screenshots/hero-v042.webp)
 
-## 近期更新
+## 从一张图片开始，而不是从一整段文本开始
 
-NovelAI Prompt Studio 的 `0.2` 系列把高频的多图处理和图库管理能力带进了桌面应用：
+把 NovelAI 图片拖进应用，Prompt Studio 会读取其中的生成信息，并将 Base Prompt、Character Prompt 与 Undesired Content 拆解为可视化 Tag。你可以搜索、翻译、分类、排序、调整权重，再按需要复制回 NovelAI。
 
-- **多标签工作台**：一次打开多张图片，独立保留每张图的 Prompt 草稿；关闭应用后可恢复标签顺序、当前标签和编辑进度。
-- **文件、拖放与剪贴板统一入口**：从文件打开、一次拖入多张图片，或直接读取剪贴板；工作台只打开，图片库才执行持久导入。
-- **更精确的 Prompt 复制**：主按钮复制当前筛选后可见的正向 Prompt，下拉菜单可复制全部、完整 Base 或指定 Character Prompt，始终排除 Undesired Content。
-- **同 Prompt 图片自动分组**：完整 Prompt 相同、仅 Seed 等结果属性不同的图片会折叠成图片组，可逐张浏览并指定头图。
-- **完整的图片库管理**：新增收藏、重命名、范围多选、批量操作和回收站；普通删除可恢复，永久删除前会明确提示影响。
-- **更实用的图片操作**：工作台和图片库均可复制可见图片、下载保留原格式与 metadata 的原图，并在文件夹中定位文件。
-- **平台化更新**：Windows 可在“设置 → 关于与更新”检查、下载并安装 GitHub Release；未签名的 macOS 版本会检查新版本并引导到官方 Release 手动更新。两端均可关闭启动时自动检查。
-- **更顺手的桌面体验**：记住最近使用的图片目录，统一大图预览与中文工具栏，并补充常用键盘快捷键。
-
-## 不再被一整段 Prompt 淹没
-
-NovelAI Prompt Studio 可以直接读取图片中的生成信息，把 Base Prompt、Character Prompt 和 Undesired Content 拆解成清晰的 Tag。你可以按区域、分类和关键词筛选，调整权重与顺序，编辑原始文本，再一键复制需要的 Prompt。
-
-![NovelAI Prompt Studio 工作台：解析、分类和编辑图片中的 Prompt](./doc/screenshots/workbench.png)
-
-### 为 Prompt 编辑而设计
-
-- **结构化拆解**：识别 Base / Character Prompt 与 Undesired Content，保留权重、顺序和原始语法。
-- **多图并行处理**：用标签页在多张图片之间切换，每个标签独立保存草稿、来源与修改状态。
-- **高效整理**：搜索、分类筛选、拖拽排序、多选操作、批量添加与删除，一屏处理上百个 Tag。
-- **AI 辅助理解**：通过你自己的 OpenAI-compatible 服务翻译并分类 Tag，结果缓存在本地，可继续手动修正。
-- **所见即所得地复制**：复制当前可见 Prompt、全部 Prompt、完整 Base Prompt，或单独复制某个 Character Prompt。
-- **Vibe 信息可见**：只读解析图片内嵌的 Vibe 信息，并可定位导出的 Vibe 文件。
-- **随时回到起点**：编辑草稿自动保留，也可以一键恢复到原图中的 Prompt。
-
-## 让生成记录变成可检索的图片库
-
-批量导入散落的生成图片或 NovelAI 导出 ZIP，按文件名、Tag 或译名搜索。相同完整 Prompt 的结果会自动组成图片组，既保留每一张生成结果，又避免图库被相似卡片淹没。
-
-![NovelAI Prompt Studio 图片库：浏览、搜索和预览 NovelAI 生成图片](./doc/screenshots/gallery.png)
-
-- 支持拖放、文件选择或剪贴板导入 `PNG`、`JPG`、`JPEG`、`WEBP`，图片库还支持批量导入 `ZIP`。
-- 按内容识别重复图片，避免图库越整理越乱。
-- 自动生成缩略图，提供网格浏览、排序、详情预览、组内切换和原始 Prompt 查看。
-- 支持收藏、重命名、`Ctrl/Cmd` 增减选择、`Shift` 范围选择及批量收藏或删除。
-- 删除先进入应用内回收站，可恢复、永久删除或主动清空；不会删除最初导入的源文件。
-- 大图预览支持缩放、旋转、翻转、复制和下载；下载会保留原始格式与 NovelAI metadata。
-
-## 键盘快捷键
-
-| 快捷键 | 工作台 | 图片库 |
+| 读取 | 整理 | 复用 |
 | --- | --- | --- |
-| `Ctrl/Cmd + I` | 打开图片 | 导入图片 |
-| `Ctrl/Cmd + V` | 从剪贴板打开图片 | 从剪贴板导入图片 |
-| `Ctrl/Cmd + W` | 关闭当前标签 | — |
-| `Ctrl/Cmd + Tab` | 切换到下一个标签 | — |
-| `Ctrl/Cmd + Shift + Tab` | 切换到上一个标签 | — |
-| `Ctrl/Cmd + K` | — | 聚焦搜索框 |
+| 从图片 metadata 恢复 Prompt 结构 | 按作用域、分类和语言查看 Tag | 复制可见、全部、Base 或 Character Prompt |
+| 支持文件、拖放和剪贴板 | 编辑原始文本、权重与顺序 | 将值得保留的图片收入本地图片库 |
+| 识别 V4 / V4.5 与内嵌 Vibe | 可选的 AI 翻译与分类 | 不改写原图，不锁定你的工作流 |
 
-在文本输入框中，`Ctrl/Cmd + V` 仍然执行普通文本粘贴。
+## 工作台
 
-## 本地优先，原图优先
+![按分类与双语对照整理 Prompt](./doc/screenshots/workbench-v042.webp)
 
-你的图片、Prompt、Tag 字典和设置都保存在本机。工作台以只读方式打开源图，不会覆盖图片，也不会改写原始 metadata；只有主动导入图片库时，应用才会保存独立副本与缩略图。
+- **结构化 Prompt**：完整保留 Tag 顺序、权重、作用域和可识别的原始语法。
+- **多标签编辑**：同时处理多张图片；每个标签拥有独立草稿、来源和修改状态，重启后继续工作。
+- **灵活浏览**：在 Prompt / Undesired、Base / Character、按结构 / 按分类以及原文 / 翻译 / 对照之间切换。
+- **快速整理**：搜索、拖拽排序、多选、批量添加与删除，并对异常 Prompt 语法给出提示。
+- **精确复制**：主按钮复制当前筛选后可见的正向 Prompt；菜单可复制全部、完整 Base 或指定 Character Prompt。
+- **AI 辅助**：连接你自己的 OpenAI-compatible 服务翻译和分类 Tag，结果缓存在本地并允许手动修正。
+- **Vibe 恢复**：只读识别图片内嵌 Vibe，并按需导出 `.naiv4vibe` 文件。
 
-AI 功能完全可选。启用翻译或分类时，只有相关 Tag 文本会发送到你配置的 OpenAI-compatible API；API Key 通过操作系统安全存储加密，前端页面无法读取明文。
+工作台只读取源图片并保存本地草稿：不会自动加入图片库，也不会覆盖图片或改写 metadata。
+
+## 图片库
+
+![可检索的本地 NovelAI 图片库](./doc/screenshots/gallery-v042.webp)
+
+把散落的生成结果整理成真正可回访的本地图库：
+
+- 导入 `PNG`、`JPG`、`JPEG`、`WEBP` 或 NovelAI 导出 `ZIP`，支持多选、拖放和剪贴板。
+- 按文件名、Tag 或译名搜索，并按最近或最早导入排序。
+- 根据图片内容识别重复项，避免反复保存同一张图片。
+- 收藏与重命名图片，在详情栏查看尺寸、日期和完整 Prompt。
+- 从图库直接送入工作台，或在系统文件夹中定位资源。
+- 大图预览支持缩放、旋转、翻转和复制；下载原图时保留格式与 NovelAI metadata。
+
+### 同 Prompt 图片自动成组
+
+![同 Prompt 图片组与组内浏览](./doc/screenshots/gallery-groups-v042.webp)
+
+完整 Prompt 相同、仅 Seed 等结果属性不同的图片会折叠为一组。你仍可以逐张浏览、选择头图和操作当前图片，而图库不会被大量相似卡片淹没。
+
+### 批量整理，也能放心撤回
+
+![图片库批量选择与操作](./doc/screenshots/gallery-batch-v042.webp)
+
+支持 `Ctrl/Cmd` 增减选择、`Shift` 范围选择和全选当前结果。可批量收藏、取消收藏或移入回收站；普通删除不会立刻清理文件，恢复、永久删除与清空回收站都有明确的作用范围和确认提示。
+
+## 为桌面创作流程打磨
+
+<table>
+  <tr>
+    <td width="50%"><img src="./doc/screenshots/settings-appearance-v042.webp" alt="主题、颜色、字体与动效设置"></td>
+    <td width="50%"><img src="./doc/screenshots/settings-updates-v042.webp" alt="NovelAI Prompt Studio 应用内更新"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>让界面适应你的桌面</strong></td>
+    <td align="center"><strong>保持在稳定版本</strong></td>
+  </tr>
+</table>
+
+- 跟随系统、浅色和深色主题，12 种主题色。
+- 分别选择界面非衬线字体与 Prompt 等宽字体，并控制动效偏好。
+- 记住最近使用的图片目录，可迁移图片库资源位置。
+- Windows 支持应用内检查、下载和安装更新；未签名 macOS 构建会检查版本并引导至官方 Release。
+- `v0.4` 系列进一步优化了大图居中、图库详情侧栏、原始 Prompt 操作、Tag 拖拽动画与更新说明展示。
+
+## 本地优先
+
+图片、Prompt 草稿、Tag 字典和设置默认保存在本机。只有在你主动使用 AI 翻译或分类时，相关 Tag 文本才会发送到所配置的 OpenAI-compatible API。
+
+- API Key 由 Electron 主进程通过操作系统安全存储加密，渲染页面无法读取明文。
+- 工作台不复制源图；图片库只保存主动导入的独立副本和缩略图。
+- 从图片库移除内容不会删除最初导入的外部源文件。
+- 应用不生成图片，也不是 NovelAI 官方客户端；它专注于整理生成结果与 Prompt。
 
 ## 快速开始
 
 1. 前往 [Releases](https://github.com/LBEILC/NovelAIPromptStudio/releases/latest) 下载适合系统的安装包。
 2. 启动应用，将一张 NovelAI 图片拖入工作台。
-3. 筛选、翻译、分类或调整 Tag，然后点击 **复制 Prompt**。
+3. 筛选、翻译、分类或调整 Tag，然后点击 **复制可见 Prompt**。
 
 | 平台 | 安装包 |
 | --- | --- |
-| Windows x64 | `NovelAI Prompt Studio-Setup-*-x64.exe` |
+| Windows x64 | `NovelAI-Prompt-Studio-Setup-*-x64.exe` |
 | macOS Apple Silicon | `NovelAI-Prompt-Studio-*-arm64.dmg` |
 | macOS Intel | `NovelAI-Prompt-Studio-*-x64.dmg` |
 
 > [!NOTE]
 > 当前安装包尚未进行代码签名，Windows 或 macOS 可能显示安全提示。请只从本仓库的 Releases 页面下载。
 
-如果图片不包含可识别的 NovelAI metadata，仍可在应用中查看图片，但不会自动获得完整的 Prompt 信息。应用主要面向 NovelAI Diffusion V4 / V4.5 图片。
+没有可识别 NovelAI metadata 的图片仍可查看和收藏，但无法自动恢复完整 Prompt。应用主要面向 NovelAI Diffusion V4 / V4.5 图片。
 
-## 你可能关心
+## 常用快捷键
+
+| 快捷键 | 工作台 | 图片库 |
+| --- | --- | --- |
+| `Ctrl/Cmd + I` | 打开图片 | 导入图片 |
+| `Ctrl/Cmd + V` | 从剪贴板打开图片 | 从剪贴板导入图片 |
+| `Ctrl/Cmd + W` | 关闭当前标签 | — |
+| `Ctrl/Cmd + Tab` | 下一个标签 | — |
+| `Ctrl/Cmd + Shift + Tab` | 上一个标签 | — |
+| `Ctrl/Cmd + K` | — | 聚焦搜索框 |
+
+在文本输入区域中，`Ctrl/Cmd + V` 仍执行普通文本粘贴。
+
+## 常见问题
 
 <details>
 <summary><strong>会修改我的原图吗？</strong></summary>
 
-不会。工作台只读取源图；图片库保存的是独立副本。从图片库移除项目也不会删除原始文件。
+不会。工作台只读取源图并保存独立草稿；图片库保存的是应用管理副本。从图片库移除项目也不会删除最初导入的源文件。
 </details>
 
 <details>
 <summary><strong>必须配置 AI 服务才能使用吗？</strong></summary>
 
-不需要。Prompt 解析、筛选、编辑、复制和图片库都可以独立使用。AI 服务仅用于可选的 Tag 翻译与分类。
+不需要。Prompt 解析、筛选、编辑、复制和图片库均可离线使用。AI 服务只用于可选的 Tag 翻译与分类。
 </details>
 
 <details>
 <summary><strong>为什么从剪贴板打开后没有 Prompt？</strong></summary>
 
-应用会优先读取剪贴板中的原始本地图片文件，以保留 metadata；但网页“复制图片”、截图工具和许多位图复制操作通常只提供像素，NovelAI Prompt metadata 已经丢失。这类图片仍可正常打开或导入。
+应用会优先读取剪贴板中的原始图片数据以保留 metadata；但网页“复制图片”、截图工具和部分软件只提供像素，此时 NovelAI Prompt metadata 已经丢失。图片仍可正常打开或导入。
 </details>
 
 <details>
@@ -140,8 +169,6 @@ AI 功能完全可选。启用翻译或分类时，只有相关 Tag 文本会发
 
 需要 [Node.js 22](https://nodejs.org/) 及 npm。
 
-开始修改前，请先阅读[项目文档索引](./doc/README.md)和[项目协作约束](./AGENTS.md)。
-
 ```bash
 git clone https://github.com/LBEILC/NovelAIPromptStudio.git
 cd NovelAIPromptStudio
@@ -149,19 +176,15 @@ npm ci
 npm run dev
 ```
 
-常用命令：
-
 ```bash
 npm test          # 运行测试
 npm run build     # 构建前端
 npm run package   # 生成当前平台安装包
 ```
 
-Windows 与 macOS 是一等支持平台，并尽量保持 Linux 兼容。提交改动前请运行测试和生产构建；涉及窗口、快捷键、文件对话框、安全存储或打包的改动，还需要在对应操作系统上验证。
+提交改动前，请阅读[项目文档索引](./doc/README.md)与[协作约束](./AGENTS.md)。Windows 和 macOS 是一等支持平台；涉及窗口、快捷键、文件对话框、安全存储、安装或更新的改动需要在受影响的平台验证。
 
-维护者发布新版本前请阅读[发版指南](./doc/release-guide.md)，其中包含版本号、更新说明、标签、GitHub Actions 和失败处理流程。
-
-欢迎通过 [Issues](https://github.com/LBEILC/NovelAIPromptStudio/issues) 反馈问题或提出建议。
+维护者发布新版本前请阅读[发版指南](./doc/release-guide.md)。欢迎通过 [Issues](https://github.com/LBEILC/NovelAIPromptStudio/issues) 反馈问题或提出建议。
 
 ---
 
