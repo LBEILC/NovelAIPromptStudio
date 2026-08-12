@@ -13,6 +13,7 @@ import { allPromptTags, getPromptScope, normalizePromptStructure, syncProjectPro
 import { CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatTag, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT, fontStack } from './lib/fonts.js';
 import { assessDroppedFiles, assessWorkbenchDroppedFiles } from './lib/importDrop.js';
+import { isImportActive } from './lib/importProgress.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
 import {
   activeWorkbenchTab,
@@ -147,7 +148,7 @@ function SideNav({ page, onNavigate }) {
 }
 
 function ImportExperience({ dragState, progress, result, target, onCancel, onDismiss }) {
-  const importing = progress && ['preparing', 'importing'].includes(progress.phase);
+  const importing = isImportActive(progress);
   const percent = progress?.total ? Math.min(100, Math.round((progress.processed || 0) / progress.total * 100)) : 0;
   const workbench = target === 'workbench';
   return <>
@@ -287,7 +288,7 @@ export default function App({ appearance, setAppearance }) {
   }, [appearance]);
 
   useEffect(() => {
-    studio.onImportProgress(setImportProgress);
+    studio.onImportProgress((progress) => setImportProgress(isImportActive(progress) ? progress : null));
     return () => studio.offImportProgress();
   }, []);
 
@@ -398,19 +399,24 @@ export default function App({ appearance, setAppearance }) {
     setPage('gallery');
     setImportResult(null);
     setImportProgress({ phase: 'preparing', processed: 0, total: 0, current: '准备中' });
-    const result = fromClipboard
-      ? await studio.importClipboardImage()
-      : files ? await studio.importDroppedFiles(files) : await studio.importImages();
-    setImportProgress(null);
-    if (result?.canceled) return;
-    setImportResult(result);
-    if (!result?.ok && result?.error) showToast(result.error, 'error');
-    await reloadLibrary(galleryView);
-    if (result?.imported?.length) {
-      const id = result.imported.at(-1).id;
-      setPreviewProjectId(id);
+    try {
+      const result = fromClipboard
+        ? await studio.importClipboardImage()
+        : files ? await studio.importDroppedFiles(files) : await studio.importImages();
+      if (result?.canceled) return;
+      setImportResult(result);
+      if (!result?.ok && result?.error) showToast(result.error, 'error');
+      await reloadLibrary(galleryView);
+      if (result?.imported?.length) {
+        const id = result.imported.at(-1).id;
+        setPreviewProjectId(id);
+      }
+      if (result?.metadataMissing) showToast('已读取剪贴板图片，但只包含像素，未检测到 NovelAI Prompt 元数据', 'warning');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      setImportProgress(null);
     }
-    if (result?.metadataMissing) showToast('已读取剪贴板图片，但只包含像素，未检测到 NovelAI Prompt 元数据', 'warning');
   }, [galleryView, reloadLibrary, showToast]);
 
   useEffect(() => {
@@ -833,7 +839,7 @@ export default function App({ appearance, setAppearance }) {
         session={workbenchSession}
       /> : page === 'gallery' ? <GalleryPage
         groups={visibleGroups}
-        importing={Boolean(importProgress)}
+        importing={isImportActive(importProgress)}
         onClearSelection={() => setSelectedGroupIds([])}
         onCopyImage={async (project) => {
           const result = await studio.copyProjectImage(project.id);
