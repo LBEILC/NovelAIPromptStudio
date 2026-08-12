@@ -13,7 +13,7 @@ import { readWorkbenchImage } from './workbench.js';
 import { listSystemFonts } from './fonts.js';
 import { describeAssetDirectory, migrateAssetDirectory } from './libraryStorage.js';
 import { cleanupWorkbenchTemporaryImages, readClipboardImageSource } from './clipboardImages.js';
-import { checkForUpdates as checkReleaseUpdates } from './updates.js';
+import { checkForUpdates as checkReleaseUpdates, getUpdateCapabilities } from './updates.js';
 import {
   copyImageToClipboard,
   copyManagedImageToClipboard,
@@ -62,7 +62,13 @@ function createWindow() {
 }
 
 function notifyUpdateState(patch = {}) {
-  updateState = { ...updateState, ...patch, currentVersion: app.getVersion(), packaged: app.isPackaged };
+  updateState = {
+    ...updateState,
+    ...patch,
+    currentVersion: app.getVersion(),
+    packaged: app.isPackaged,
+    ...getUpdateCapabilities(process.platform, app.isPackaged),
+  };
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send('updates:state', updateState);
   }
@@ -74,12 +80,14 @@ function releaseNotesText(notes) {
 }
 
 function configureAutoUpdater() {
+  if (!getUpdateCapabilities(process.platform, app.isPackaged).canDownloadUpdate) return;
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
   autoUpdater.on('checking-for-update', () => notifyUpdateState({ phase: 'checking', error: '', progress: 0 }));
   autoUpdater.on('update-available', (info) => notifyUpdateState({
     phase: 'available',
+    hasUpdate: true,
     latestVersion: info.version,
     publishedAt: info.releaseDate || '',
     notes: releaseNotesText(info.releaseNotes).slice(0, 4_000),
@@ -88,6 +96,7 @@ function configureAutoUpdater() {
   }));
   autoUpdater.on('update-not-available', (info) => notifyUpdateState({
     phase: 'current',
+    hasUpdate: false,
     latestVersion: info.version || app.getVersion(),
     publishedAt: info.releaseDate || '',
     notes: '',
@@ -104,6 +113,7 @@ function configureAutoUpdater() {
   }));
   autoUpdater.on('update-downloaded', (info) => notifyUpdateState({
     phase: 'downloaded',
+    hasUpdate: true,
     latestVersion: info.version,
     progress: 100,
     error: '',
@@ -539,10 +549,27 @@ app.whenReady().then(async () => {
   ipcMain.handle('appearance:settings:save', (_event, settings) => preferences.saveAppearanceSettings(settings));
   ipcMain.handle('productivity:settings:get', () => preferences.productivitySettings());
   ipcMain.handle('productivity:settings:save', (_event, settings) => preferences.saveProductivitySettings(settings));
-  ipcMain.handle('updates:status', () => ({ ok: true, ...updateState, currentVersion: app.getVersion(), packaged: app.isPackaged }));
+  ipcMain.handle('updates:status', () => ({
+    ok: true,
+    ...updateState,
+    currentVersion: app.getVersion(),
+    packaged: app.isPackaged,
+    ...getUpdateCapabilities(process.platform, app.isPackaged),
+  }));
   ipcMain.handle('updates:check', async () => {
+    const capabilities = getUpdateCapabilities(process.platform, app.isPackaged);
     try {
-      if (!app.isPackaged) return { ok: true, phase: 'current', packaged: false, ...(await checkReleaseUpdates(app.getVersion(), net.fetch)) };
+      if (!capabilities.canDownloadUpdate) {
+        notifyUpdateState({ phase: 'checking', error: '', progress: 0 });
+        const release = await checkReleaseUpdates(app.getVersion(), net.fetch);
+        notifyUpdateState({
+          ...release,
+          phase: release.hasUpdate ? 'available' : 'current',
+          progress: 0,
+          error: '',
+        });
+        return { ok: true, ...updateState };
+      }
       const result = await autoUpdater.checkForUpdates();
       const info = result?.updateInfo;
       return {
@@ -552,13 +579,22 @@ app.whenReady().then(async () => {
         latestVersion: info?.version || updateState.latestVersion,
         hasUpdate: updateState.phase === 'available',
         packaged: true,
+        ...capabilities,
       };
     } catch (error) {
-      return { ok: false, currentVersion: app.getVersion(), error: error instanceof Error ? error.message : String(error) };
+      const message = error instanceof Error ? error.message : String(error);
+      notifyUpdateState({ phase: 'error', error: message });
+      return { ok: false, currentVersion: app.getVersion(), ...capabilities, error: message };
     }
   });
   ipcMain.handle('updates:download', async () => {
-    if (!app.isPackaged) return { ok: false, error: '开发模式不会下载或安装更新' };
+    const capabilities = getUpdateCapabilities(process.platform, app.isPackaged);
+    if (!capabilities.canDownloadUpdate) {
+      const error = capabilities.manualUpdateReason === 'unsigned-macos'
+        ? '当前 macOS 版本未签名，请从官方 Release 手动更新'
+        : '当前环境不支持应用内下载更新';
+      return { ok: false, error };
+    }
     if (storageMigrationActive || activeImports.size || permanentDeletionActive) return { ok: false, error: '请等待导入、迁移或删除操作完成后再下载更新' };
     if (updateState.phase !== 'available' && updateState.phase !== 'error') return { ok: false, error: '请先检查并确认有可用更新' };
     try {
@@ -571,7 +607,13 @@ app.whenReady().then(async () => {
     }
   });
   ipcMain.handle('updates:install', () => {
-    if (!app.isPackaged) return { ok: false, error: '开发模式不会安装更新' };
+    const capabilities = getUpdateCapabilities(process.platform, app.isPackaged);
+    if (!capabilities.canInstallUpdate) {
+      const error = capabilities.manualUpdateReason === 'unsigned-macos'
+        ? '当前 macOS 版本未签名，请从官方 Release 手动更新'
+        : '当前环境不支持应用内安装更新';
+      return { ok: false, error };
+    }
     if (storageMigrationActive || activeImports.size || permanentDeletionActive) return { ok: false, error: '请等待导入、迁移或删除操作完成后再安装更新' };
     if (updateState.phase !== 'downloaded') return { ok: false, error: '更新尚未下载完成' };
     setImmediate(() => autoUpdater.quitAndInstall(false, true));

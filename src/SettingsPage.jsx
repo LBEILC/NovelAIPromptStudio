@@ -57,7 +57,20 @@ export default function SettingsPage({ appearance, onAppearanceChange, onInstall
   const [busy, setBusy] = useState('');
   const [systemFonts, setSystemFonts] = useState({ fonts: [], loading: true, error: '' });
   const [libraryStorage, setLibraryStorage] = useState({ assetsDirectory: '', fileCount: 0, totalBytes: 0, loading: true, migrating: false, progress: null });
-  const [updateState, setUpdateState] = useState({ currentVersion: '—', latestVersion: '', loading: false, error: '', notes: '', releaseUrl: '', hasUpdate: false, autoCheckUpdates: true });
+  const [updateState, setUpdateState] = useState({
+    currentVersion: '—',
+    latestVersion: '',
+    loading: false,
+    error: '',
+    notes: '',
+    releaseUrl: '',
+    hasUpdate: false,
+    autoCheckUpdates: true,
+    platform: '',
+    updateMode: 'manual',
+    canDownloadUpdate: false,
+    canInstallUpdate: false,
+  });
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 899px)');
@@ -72,6 +85,7 @@ export default function SettingsPage({ appearance, onAppearanceChange, onInstall
     Promise.all([studio.getUpdateStatus(), studio.getProductivitySettings()]).then(([status, settings]) => {
       setUpdateState((current) => ({
         ...current,
+        ...(status?.ok ? status : {}),
         currentVersion: status?.currentVersion || '—',
         packaged: Boolean(status?.packaged),
         autoCheckUpdates: settings?.autoCheckUpdates !== false,
@@ -237,6 +251,17 @@ export default function SettingsPage({ appearance, onAppearanceChange, onInstall
     if (!result?.ok) showToast(result?.error || '更新没有开始下载');
   };
 
+  const isManualMacUpdate = updateState.packaged
+    && updateState.platform === 'darwin'
+    && updateState.updateMode === 'manual';
+  const buildDescription = !updateState.packaged
+    ? '开发模式'
+    : isManualMacUpdate
+      ? 'macOS · 手动更新'
+      : updateState.updateMode === 'automatic'
+        ? '支持应用内更新'
+        : '手动更新';
+
   return <main className="settings-page">
     <LobeDraggablePanel
       className="settings-nav-shell"
@@ -339,7 +364,7 @@ export default function SettingsPage({ appearance, onAppearanceChange, onInstall
         <header className="settings-heading"><h2>关于与更新</h2><p>检查 NovelAI Prompt Studio 的官方稳定版本。</p></header>
         <div className="settings-group update-settings-group">
           <div className="settings-row">
-            <span><strong>当前版本</strong><small>{updateState.packaged ? '已打包版本' : '开发模式'}</small></span>
+            <span><strong>当前版本</strong><small>{buildDescription}</small></span>
             <code>v{updateState.currentVersion}</code>
           </div>
           <div className="settings-row">
@@ -353,9 +378,9 @@ export default function SettingsPage({ appearance, onAppearanceChange, onInstall
             </span>
             <div className="settings-storage-actions">
               <LobeButton loading={updateState.loading} onClick={runUpdateCheck}>{updateState.loading ? '正在检查…' : '检查更新'}</LobeButton>
-              {updateState.hasUpdate && updateState.packaged && !['downloading', 'downloaded'].includes(updateState.phase) && <LobeButton onClick={downloadUpdate} type="primary">下载更新</LobeButton>}
-              {updateState.phase === 'downloaded' && <LobeButton onClick={onInstallUpdate} type="primary">重启并安装</LobeButton>}
-              {updateState.hasUpdate && <LobeButton onClick={() => studio.openReleasePage(updateState.releaseUrl)}>打开官方 Release</LobeButton>}
+              {updateState.hasUpdate && updateState.canDownloadUpdate && !['downloading', 'downloaded'].includes(updateState.phase) && <LobeButton onClick={downloadUpdate} type="primary">下载更新</LobeButton>}
+              {updateState.phase === 'downloaded' && updateState.canInstallUpdate && <LobeButton onClick={onInstallUpdate} type="primary">重启并安装</LobeButton>}
+              {updateState.hasUpdate && <LobeButton onClick={() => studio.openReleasePage(updateState.releaseUrl)} type={isManualMacUpdate ? 'primary' : 'default'}>{isManualMacUpdate ? '下载 macOS 安装包' : '打开官方 Release'}</LobeButton>}
             </div>
           </div>
           {updateState.phase === 'downloading' && <div className="settings-update-progress">
@@ -365,7 +390,8 @@ export default function SettingsPage({ appearance, onAppearanceChange, onInstall
           {updateState.notes && <div className="settings-release-notes"><strong>更新说明</strong><p>{updateState.notes}</p></div>}
         </div>
         {updateState.error && <LobeAlert className="settings-warning" message={`${updateState.error}。本地功能不受影响，可以稍后重试。`} type="warning" variant="outlined"/>}
-        {!updateState.packaged && <LobeAlert className="settings-warning" message="开发模式不会下载或安装更新；当前未签名发布使用官方 Release 页面完成更新。" type="info" variant="outlined"/>}
+        {isManualMacUpdate && <LobeAlert className="settings-warning" message="当前 macOS 版本未签名，无法在应用内直接安装更新。发现新版本后，请从官方 Release 下载对应安装包并手动替换应用。" type="info" variant="outlined"/>}
+        {!updateState.packaged && <LobeAlert className="settings-warning" message="开发模式只检查官方稳定版本，不会下载或安装更新。" type="info" variant="outlined"/>}
       </>}
     </section>
   </main>;

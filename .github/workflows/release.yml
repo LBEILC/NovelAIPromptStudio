@@ -21,7 +21,10 @@ jobs:
             os: windows-latest
             package_args: --win --x64
             artifact: windows-x64
-            artifact_glob: release/*.exe
+            artifact_glob: |
+              release/*.exe
+              release/*.exe.blockmap
+              release/latest.yml
           - name: macOS Intel and Apple Silicon
             os: macos-15-intel
             package_args: --mac --x64 --arm64

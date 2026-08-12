@@ -153,7 +153,7 @@ git push origin refs/tags/v0.3.0
 
 当前发布产物包括：
 
-- Windows x64 NSIS 安装程序。
+- Windows x64 NSIS 安装程序、blockmap 和 `latest.yml`。
 - macOS Intel 与 Apple Silicon 的 DMG。
 - macOS Intel 与 Apple Silicon 的 ZIP、blockmap 和 `latest-mac.yml`。
 - 所有上传文件的 SHA-256 校验清单。
@@ -170,7 +170,7 @@ git push origin refs/tags/v0.3.0
 - `APPLE_APP_SPECIFIC_PASSWORD`
 - `APPLE_TEAM_ID`
 
-未配置这些凭据时可以生成未签名安装包，但 macOS 会显示安全警告，应用内自动更新也不应视为完整可用。配置凭据后，需要在真实 macOS 环境验证签名、公证、Gatekeeper 和更新安装。
+未配置这些凭据时可以生成未签名安装包，但 macOS 会显示安全警告，并只在应用内检查新版本、引导用户前往官方 Release 手动更新。配置凭据后，需要启用 macOS 自动更新能力，并在真实 macOS 环境验证签名、公证、Gatekeeper 和更新安装。
 
 ## 失败处理
 

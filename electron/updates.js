@@ -1,3 +1,19 @@
+export function getUpdateCapabilities(platform, packaged, macAutomaticUpdates = false) {
+  const automaticUpdates = Boolean(packaged) && (platform === 'win32' || (platform === 'darwin' && macAutomaticUpdates));
+  let manualUpdateReason = '';
+  if (!packaged) manualUpdateReason = 'development';
+  else if (platform === 'darwin') manualUpdateReason = 'unsigned-macos';
+  else if (!automaticUpdates) manualUpdateReason = 'unsupported-platform';
+
+  return {
+    platform,
+    updateMode: automaticUpdates ? 'automatic' : 'manual',
+    canDownloadUpdate: automaticUpdates,
+    canInstallUpdate: automaticUpdates,
+    manualUpdateReason,
+  };
+}
+
 export function compareVersions(left, right) {
   const parse = (value) => String(value || '').replace(/^v/i, '').split(/[.+-]/).slice(0, 3).map((part) => Number(part) || 0);
   const a = parse(left);
