@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { DndContext, DragOverlay, getFirstCollision, pointerWithin, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { SortableContext, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { Popover as LobePopover, SearchBar as LobeSearchBar } from '@lobehub/ui';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   Button as LobeButton,
   Checkbox as LobeCheckbox,
@@ -44,6 +44,7 @@ const TAG_SORT_ACCESSIBILITY = {
 };
 
 const LIVE_TAG_SORTING_STRATEGY = () => null;
+const TAG_LAYOUT_TRANSITION = { duration: 0.18, ease: [0.22, 1, 0.36, 1] };
 
 function compactPosition(center) {
   return `${Math.round(Number(center?.x ?? 0.5) * 100)} / ${Math.round(Number(center?.y ?? 0.5) * 100)}`;
@@ -171,19 +172,17 @@ function TagButton({ buttonRef, className = '', display, dragging = false, overl
   </button>;
 }
 
-function SortableTag({ disabled, display, editKey, editingKey, index, onEditingChange, onKeyboardMove, onTagContextMenu, onToggleSelect, onTranslateTag, onUpdateTag, scope, selected, selecting, tag, translating, warning }) {
+function SortableTag({ animateLayout, disabled, display, editKey, editingKey, index, onEditingChange, onKeyboardMove, onTagContextMenu, onToggleSelect, onTranslateTag, onUpdateTag, scope, selected, selecting, tag, translating, warning }) {
   const {
     attributes,
     isDragging,
     listeners,
     setActivatorNodeRef,
     setNodeRef,
-    transform,
-    transition,
   } = useSortable({
+    animateLayoutChanges: () => false,
     disabled,
     id: tag.id,
-    transition: { duration: 180, easing: 'cubic-bezier(.22, 1, .36, 1)' },
   });
   const tagButton = <TagButton
     {...(disabled ? {} : attributes)}
@@ -206,14 +205,12 @@ function SortableTag({ disabled, display, editKey, editingKey, index, onEditingC
     warning={warning}
   />;
 
-  return <div
+  return <motion.div
     className={`overview-tag-shell ${isDragging ? 'dragging' : ''}`}
+    layout={animateLayout ? 'position' : false}
     ref={setNodeRef}
     role="listitem"
-    style={{
-      transform: CSS.Translate.toString(transform),
-      transition,
-    }}
+    transition={animateLayout ? { layout: TAG_LAYOUT_TRANSITION } : undefined}
   >
     <EditableTag
       disabled={selecting}
@@ -227,7 +224,7 @@ function SortableTag({ disabled, display, editKey, editingKey, index, onEditingC
     >
       {tagButton}
     </EditableTag>
-  </div>;
+  </motion.div>;
 }
 
 function AddTagEditor({ draft, pending, scope, onAdd, onChange, onClose }) {
@@ -331,7 +328,10 @@ function ScopeTags({
   const [activeTagId, setActiveTagId] = useState(null);
   const [dragTags, setDragTags] = useState(null);
   const dragTagsRef = useRef(null);
+  const systemReducedMotion = useReducedMotion();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const motionMode = document.documentElement.dataset.motion || 'full';
+  const animateLayout = motionMode === 'full' || (motionMode !== 'off' && !systemReducedMotion);
   const renderedTags = dragTags || scope.tags;
   const selectedSet = new Set(selectedKeys);
   const scopeEntries = scope.tags.map((tag) => ({ key: overviewTagKey(scope.key, tag.id) }));
@@ -405,6 +405,7 @@ function ScopeTags({
           {renderedTags.map((tag, index) => {
             const key = overviewTagKey(scope.key, tag.id);
             return <SortableTag
+              animateLayout={animateLayout}
               disabled={selecting || filtered}
               display={tagPresentation(tag, language)}
               editKey={key}
