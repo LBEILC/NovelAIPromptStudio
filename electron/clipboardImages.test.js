@@ -79,7 +79,9 @@ describe('clipboard image reading', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-clipboard-'));
     temporaryDirectories.push(directory);
     const original = Buffer.from('89504e470d0a1a0a744558744e6f76656c41493a70726f6d7074', 'hex');
-    clipboardMock.readBuffer.mockImplementation((format) => format === 'PNG' ? original : Buffer.alloc(0));
+    // Each platform exposes a different raw PNG format name (PNG / public.png / image/png).
+    const rawImageFormats = ['PNG', 'JFIF', 'WebP', 'public.png', 'public.jpeg', 'public.webp', 'image/png', 'image/jpeg', 'image/webp'];
+    clipboardMock.readBuffer.mockImplementation((format) => rawImageFormats.includes(format) ? original : Buffer.alloc(0));
 
     const source = readClipboardImageSource(directory);
     expect(source).toMatchObject({ fromBitmap: false, temporaryId: source.fingerprint });
