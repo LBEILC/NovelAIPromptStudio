@@ -5,9 +5,9 @@
 - Status: Pending
 - Date/source: 2026-08-12, Windows
 - Related commit: `d6d4d01`
-- Action: On an unlocked macOS session, follow `doc/manual-verification-20260812-workbench-tag-sort-motion-stability.md`. Pay particular attention to visible horizontal and cross-row displacement, reversals between adjacent Tags, 30–60 second drags, original Tag styles and spacing, and Full/Follow System/Off motion settings.
+- Action: On an unlocked macOS session, follow the archived Windows checklist at `doc/archive/manual-verification-20260812-workbench-tag-sort-motion-stability.md`, extending it with visible cross-row displacement, reversals between adjacent Tags, 30–60 second drags, original Tag styles and spacing, and Full/Follow System/Off motion settings.
 - Expected: Motion animates only the actual x/y position change for real flex reordering; Tags do not stretch or leave synthetic gaps. Reordering still occurs only from pointer movement after crossing a target midpoint, so flex reflow cannot restart the previous feedback loop.
-- Observed: Windows confirmed `7411a49` no longer freezes but reported that horizontal displacement had become instantaneous. `d6d4d01` keeps the stable pointer collision model and delegates only layout-position FLIP animation to the existing `motion/react` dependency, with reduced/off-motion handling. Windows automated verification passed 107 tests, the production build, and a Lobe UI 5.20.3 audit with zero findings. Interactive verification of the combined motion and stability behavior is pending.
+- Observed: Windows interactive verification passed: prolonged dragging no longer freezes and the restored horizontal layout motion was accepted by the user. Windows also passed 107 tests, the production build, and a Lobe UI 5.20.3 audit with zero findings. macOS interactive verification remains pending.
 
 ## Verify manual update mode for unsigned macOS builds
 
