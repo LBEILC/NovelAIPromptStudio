@@ -4,7 +4,7 @@
 
 - Status: Pending
 - Date/source: 2026-08-12, Windows
-- Related commit: `fix: unset empty signing secrets before macOS packaging` (see below)
+- Related commit: `869a947`
 - Action: The `v0.2.3` release workflow passed macOS tests but failed the packaging step with `⨯ /Users/runner/work/NovelAIPromptStudio/NovelAIPromptStudio not a file`. Cause: `env: CSC_LINK: ${{ secrets.MAC_CSC_LINK }}` sets an empty string when the secret is unconfigured; electron-builder treats the defined-but-empty `CSC_LINK` as a relative file path and resolves it against the project root (`builder-util` `loadCscLink`, cscLink.js). The first attempt to gate this with `if: secrets.MAC_CSC_LINK != ''` made the workflow invalid (GitHub Actions does not allow the `secrets` context in `if:` conditionals, so `v0.2.4` runs failed with zero jobs). Final fix: the macOS packaging step keeps the secrets in its `env:` mapping and unsets them in the run script when `CSC_LINK` is empty, with `CSC_IDENTITY_AUTO_DISCOVERY: "false"` restored (the v0.2.1 configuration). The next tag (`v0.2.5`) re-runs macOS CI. With no credentials configured, the runner must produce unsigned DMG/ZIP/blockmaps/`latest-mac.yml`; with credentials configured, it must sign and notarize.
 - Expected: `v0.2.5` macOS job completes and uploads DMG, ZIP, blockmaps, and `latest-mac.yml`; `SHA256SUMS.txt` is generated; GitHub Release is created with the annotated tag notes. Unsigned builds do not attempt to load an empty `CSC_LINK`.
 - Observed: Awaiting macOS CI verification.
