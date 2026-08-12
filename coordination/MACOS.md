@@ -1,13 +1,13 @@
 # macOS handoffs
 
-## Verify wrapped Workbench Tag drag animation
+## Verify wrapped Workbench Tag drag layout fix
 
 - Status: Pending
 - Date/source: 2026-08-12, Windows
-- Related commit: `d9c662b`
-- Action: On an unlocked macOS session, follow `doc/manual-verification-20260812-workbench-tag-sort-animation.md`. Pay particular attention to click-versus-drag activation, horizontal and cross-row sorting, the floating drag preview, scope isolation, `Option + Arrow` keyboard sorting, light/dark themes, and Motion Off behavior.
-- Expected: Differently sized wrapped Tags preview their two-dimensional destination with smooth displacement and a short drop animation; ordinary click editing and context menus do not accidentally drag; sorting remains disabled during filtering and multi-select; Base, Undesired, and Character scopes never exchange Tags; reduced/off motion settings remain usable.
-- Observed: Awaiting macOS verification. Windows completed a clean `npm ci`, 105 automated tests, the production build, and a Lobe UI 5.20.3 audit with zero findings. Interactive behavior has not been claimed as verified.
+- Related commit: `bd673c2`
+- Action: On an unlocked macOS session, follow `doc/manual-verification-20260812-workbench-tag-sort-layout-fix.md`. Pay particular attention to preservation of the original Tag styles, horizontal and cross-row spacing for variable-width Tags, the floating drag preview, scope isolation, `Option + Arrow` keyboard sorting, light/dark themes, and Motion Off behavior.
+- Expected: Differently sized wrapped Tags retain the compact Workbench appearance and animate through their real flex positions with consistent 7px gaps; ordinary click editing and context menus do not accidentally drag; sorting remains disabled during filtering and multi-select; Base, Undesired, and Character scopes never exchange Tags.
+- Observed: The first Windows attempt on `d9c662b` failed because a Lobe Popover class replaced the Tag classes and rectangle transforms left incorrect gaps after wrapped moves. `bd673c2` merges injected classes and previews the real reordered flex array. Windows automated verification passed 106 tests, the production build, and a Lobe UI 5.20.3 audit with zero findings. Interactive verification of the fix is pending.
 
 ## Verify manual update mode for unsigned macOS builds
 
