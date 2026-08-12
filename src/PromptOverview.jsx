@@ -168,6 +168,7 @@ function RawPromptEditor({ draft, pending, scope, onChange, onClose, onSave }) {
       autoFocus
       autoSize={{ minRows: 8, maxRows: 16 }}
       className="raw-prompt-textarea"
+      classNames={{ input: 'raw-prompt-textarea-input' }}
       onChange={(event) => onChange(event.target.value)}
       placeholder={scope.polarity === 'undesired' ? '输入排除内容，使用逗号或换行分隔' : '输入 Prompt，使用逗号或换行分隔'}
       value={draft}

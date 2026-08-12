@@ -268,7 +268,9 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 
 .tag-quick-popover { width: min(380px, calc(100vw - 32px)); }
 .tag-quick-editor { width: 350px; max-width: 100%; padding: 4px; display: grid; gap: 12px; }
-.tag-quick-editor-heading { display: flex; justify-content: space-between; gap: 12px; }
+.tag-quick-editor-heading { min-width: 0; display: flex; justify-content: space-between; gap: 12px; }
+.tag-quick-editor-heading > div { min-width: 0; flex: 1; }
+.tag-quick-editor-heading > button { flex: 0 0 auto; }
 .tag-quick-editor-heading > div, .tag-quick-editor label { display: grid; gap: 4px; }
 .tag-quick-editor-heading small, .tag-quick-editor label > span, .character-quick-editor > label > span { color: var(--muted); font-size: var(--text-caption); }
 .tag-quick-editor-row { display: grid; grid-template-columns: 124px minmax(0, 1fr); gap: 10px; }
@@ -279,10 +281,13 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .add-tag-popover-footer { display: flex; align-items: center; gap: 12px; }
 .add-tag-popover-footer > span { flex: 1; color: var(--muted); font-size: var(--text-micro); }
 .raw-prompt-popover-shell { width: min(560px, calc(100vw - 32px)); }
-.raw-prompt-editor { width: 530px; max-width: 100%; padding: 4px; display: grid; gap: 12px; }
-.raw-prompt-textarea textarea { font: var(--text-caption)/1.6 var(--font-mono); }
+.raw-prompt-editor { width: 530px; min-width: 0; max-width: 100%; padding: 4px; display: grid; gap: 12px; }
+.raw-prompt-editor > * { min-width: 0; }
+.raw-prompt-textarea { min-width: 0; max-width: 100%; }
+.raw-prompt-textarea-input { width: 100%; min-width: 0; max-width: 100%; font: var(--text-caption)/1.6 var(--font-mono); }
 .raw-prompt-editor-footer { display: flex; align-items: center; gap: 12px; }
 .raw-prompt-editor-footer > span { min-width: 0; flex: 1; color: var(--muted); font-size: var(--text-micro); }
+.raw-prompt-editor-footer > button { flex: 0 0 auto; }
 .character-quick-popover { width: min(440px, calc(100vw - 32px)); }
 .character-quick-editor { width: 410px; max-width: 100%; padding: 4px; display: grid; gap: 14px; }
 .character-quick-editor > label { display: grid; gap: 6px; }
