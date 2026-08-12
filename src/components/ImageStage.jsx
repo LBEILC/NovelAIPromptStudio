@@ -23,8 +23,21 @@ export default function ImageStage({
       preview={preview ? { toolbarAddon, toolbarRender: previewToolbar } : false}
       src={mediaUrl(filePath)}
       styles={{
-        image: { height: '100%', width: '100%' },
-        wrapper: { height: '100%', width: '100%' },
+        image: {
+          display: 'block',
+          height: 'auto',
+          maxHeight: '100%',
+          maxWidth: '100%',
+          objectPosition: 'center',
+          width: 'auto',
+        },
+        wrapper: {
+          alignItems: 'center',
+          display: 'flex',
+          height: '100%',
+          justifyContent: 'center',
+          width: '100%',
+        },
       }}
       variant="borderless"
     /> : <div className="image-stage-empty">没有可显示的图片</div>}
