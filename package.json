@@ -12,6 +12,7 @@
     "build": "vite build",
     "icons:generate": "node scripts/generate-app-icons.mjs",
     "package": "npm run build && electron-builder --publish never",
+    "verify:update-artifacts": "node scripts/verify-update-artifacts.mjs release",
     "start": "electron .",
     "test": "vitest run"
   },
@@ -72,7 +73,7 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+      "artifactName": "NovelAI-Prompt-Studio-Setup-${version}-${arch}.${ext}"
     },
     "mac": {
       "target": [

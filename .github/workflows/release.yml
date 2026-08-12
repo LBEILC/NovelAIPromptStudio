@@ -77,6 +77,9 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
+      - name: Verify updater metadata matches packaged artifacts
+        run: npm run verify:update-artifacts
+
       - name: Upload installer
         uses: actions/upload-artifact@v7
         with:
