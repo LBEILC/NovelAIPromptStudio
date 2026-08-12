@@ -15,6 +15,7 @@ NovelAI Prompt Studio is a cross-platform desktop application. Windows and macOS
 - Do not use computer use, GUI automation, or simulated mouse and keyboard input for verification unless the user explicitly requests it in the current task.
 - Continue to run applicable non-GUI checks such as linting, unit tests, integration tests, and production builds. This restriction applies to interactive application verification, not command-line checks.
 - When a change needs interactive verification, create `doc/manual-verification-YYYYMMDD-<topic>.md` before handing the change back to the user. Do not claim that the interactive behavior has been verified.
+- Write all manual verification documents in Chinese.
 - The manual verification document must include the change or commit under test, target operating system, prerequisites, numbered verification steps, the expected result for every step, and empty fields for the observed result, overall result, and discovered issues.
 - Tell the user which manual verification document to follow and wait for their result. Do not perform the listed steps automatically unless they subsequently request computer use.
 - After the user reports that manual verification is complete, record the result they provide and move the document into `doc/archive/`. Preserve the filename unless it would collide with an existing archived document.
