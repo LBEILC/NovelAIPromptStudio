@@ -7,16 +7,16 @@
 - Related commit: `869a947`
 - Action: The `v0.2.3` release workflow passed macOS tests but failed the packaging step with `⨯ /Users/runner/work/NovelAIPromptStudio/NovelAIPromptStudio not a file`. Cause: `env: CSC_LINK: ${{ secrets.MAC_CSC_LINK }}` sets an empty string when the secret is unconfigured; electron-builder treats the defined-but-empty `CSC_LINK` as a relative file path and resolves it against the project root (`builder-util` `loadCscLink`, cscLink.js). The first attempt to gate this with `if: secrets.MAC_CSC_LINK != ''` made the workflow invalid (GitHub Actions does not allow the `secrets` context in `if:` conditionals, so `v0.2.4` runs failed with zero jobs). Final fix: the macOS packaging step keeps the secrets in its `env:` mapping and unsets them in the run script when `CSC_LINK` is empty, with `CSC_IDENTITY_AUTO_DISCOVERY: "false"` restored (the v0.2.1 configuration). The next tag (`v0.2.5`) re-runs macOS CI. With no credentials configured, the runner must produce unsigned DMG/ZIP/blockmaps/`latest-mac.yml`; with credentials configured, it must sign and notarize.
 - Expected: `v0.2.5` macOS job completes and uploads DMG, ZIP, blockmaps, and `latest-mac.yml`; `SHA256SUMS.txt` is generated; GitHub Release is created with the annotated tag notes. Unsigned builds do not attempt to load an empty `CSC_LINK`.
-- Observed: Awaiting macOS CI verification.
+- Observed: `v0.2.5` macOS job succeeded with all three jobs green (package + publish). The unsigned build produced arm64/x64 DMG, ZIP, blockmaps, `latest-mac.yml`, and `SHA256SUMS.txt`; the GitHub Release was created from the annotated tag. Windows installer checksum was verified against `SHA256SUMS.txt`. Signed/notarized builds remain unverified until credentials are configured on a real macOS session.
 
 ## Verify raw clipboard PNG format test on macOS
 
-- Status: Pending
+- Status: Completed
 - Date/source: 2026-08-12, Windows
 - Related commit: `c4763ed`
 - Action: The `v0.2.2` release workflow failed its macOS `npm test` job: `electron/clipboardImages.test.js` "persists raw PNG clipboard bytes" mocked `readBuffer` only for the win32 format name `PNG`, so on darwin `readOriginalClipboardImage()` returned null and the code fell through to `clipboard.readImage()`, throwing `TypeError: Cannot read properties of undefined (reading 'isEmpty')` at `clipboardImages.js:91`. The mock was changed to return raw bytes for every platform's image format names (`PNG`/`public.png`/`image/png`, etc.). The next tag (`v0.2.3`) re-runs macOS CI; on an unlocked macOS session confirm `npm test` passes and the packaged app preserves original PNG/JPEG/WebP clipboard bytes so NovelAI metadata survives copy → paste round-trips.
 - Expected: macOS CI `npm test` passes on `v0.2.3`; darwin raw formats (`public.png`/`public.jpeg`/`public.webp`) are read without falling back to a bitmap re-encode.
-- Observed: Awaiting macOS verification.
+- Observed: macOS CI `npm test` passed on `v0.2.3`, `v0.2.4`, and `v0.2.5`; the cross-platform mock fix resolved the darwin-only failure.
 
 ## Verify workbench and gallery productivity release flows
 
