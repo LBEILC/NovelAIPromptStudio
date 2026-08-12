@@ -1,5 +1,14 @@
 # macOS handoffs
 
+## Verify wrapped Workbench Tag drag animation
+
+- Status: Pending
+- Date/source: 2026-08-12, Windows
+- Related commit: `d9c662b`
+- Action: On an unlocked macOS session, follow `doc/manual-verification-20260812-workbench-tag-sort-animation.md`. Pay particular attention to click-versus-drag activation, horizontal and cross-row sorting, the floating drag preview, scope isolation, `Option + Arrow` keyboard sorting, light/dark themes, and Motion Off behavior.
+- Expected: Differently sized wrapped Tags preview their two-dimensional destination with smooth displacement and a short drop animation; ordinary click editing and context menus do not accidentally drag; sorting remains disabled during filtering and multi-select; Base, Undesired, and Character scopes never exchange Tags; reduced/off motion settings remain usable.
+- Observed: Awaiting macOS verification. Windows completed a clean `npm ci`, 105 automated tests, the production build, and a Lobe UI 5.20.3 audit with zero findings. Interactive behavior has not been claimed as verified.
+
 ## Verify manual update mode for unsigned macOS builds
 
 - Status: Pending
