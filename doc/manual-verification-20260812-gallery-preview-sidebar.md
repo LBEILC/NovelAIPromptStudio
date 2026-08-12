@@ -5,6 +5,11 @@
 - Change under test: 图片库预览侧栏重构为上、中、下三层；原始 Prompt 按基础与角色分组折叠，并使用 Lobe UI 代码块显示。
 - Target operating system: Windows 11
 
+## 已发现并修复的问题
+
+- Commit `66f1152`: Lobe UI `DraggablePanel.Body` 的 Flexbox 与滚动样式覆盖了三层网格，长 Prompt 会把底部操作区推到视口外。
+- Current fix: 强制 Body 使用受可视高度约束的三层网格；顶部与底部使用固定高度，中间 Prompt 区使用剩余高度并独立滚动。
+
 ## 前置条件
 
 - 已完成 `npm ci`、`npm test` 和 `npm run build`。
@@ -17,7 +22,7 @@
 ## 验证步骤
 
 1. 启动应用并进入“图片库”，选中同时包含 Base Prompt 和 Character Prompt 的图片。
-   - Expected: 右侧预览栏自上而下分为图片信息区、原始 Prompt 区和操作区；图片位置和预览尺寸与改动前一致。
+   - Expected: 右侧预览栏自上而下分为固定图片信息区、可滚动原始 Prompt 区和固定操作区；三个区域均完全位于侧栏可视范围内。
    - Observed:
 
 2. 检查原始 Prompt 区的初始状态。
@@ -29,7 +34,7 @@
    - Observed:
 
 4. 检查长 Prompt、复制按钮以及中间区域滚动。
-   - Expected: Prompt 在 Lobe UI 代码块内自动换行；悬停后可复制完整 Prompt；只有中间 Prompt 区纵向滚动，代码块本身和整个侧栏不产生额外纵向滚动条。
+   - Expected: Prompt 在 Lobe UI 代码块内自动换行；悬停后可复制完整 Prompt；只有中间 Prompt 区纵向滚动，代码块本身和整个侧栏不产生额外纵向滚动条；滚动到任意位置时底部按钮均保持可见且位置不变。
    - Observed:
 
 5. 将预览侧栏分别拖到最窄和最宽，并切换图片组内的上一张、下一张。

@@ -265,7 +265,10 @@ export default function GalleryPage({
         showHandleHighlight
         size={previewPanelWidth ? { height: '100%', width: previewPanelWidth } : undefined}
       >
-        {preview && <LobeDraggablePanel.Body className="gallery-preview">
+        {preview && <LobeDraggablePanel.Body
+          className={`gallery-preview ${view === 'trash' ? 'is-trash' : ''}`}
+          style={{ display: 'grid', height: '100%', minHeight: 0, overflow: 'hidden', padding: 0 }}
+        >
           <section className="gallery-preview-primary">
             <header>
               {renaming ? <div className="gallery-rename">
