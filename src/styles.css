@@ -161,8 +161,8 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .workspace-page-header h1 { margin: 0; font-size: 1.25rem; line-height: 1.2; }
 .gallery-toolbar { padding: 12px clamp(20px, 3vw, 44px); display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line-soft); }
 .gallery-search { width: min(520px, 55vw); }
-.gallery-sort { width: 130px; }
-.gallery-count { margin-inline-start: auto; color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.gallery-sort { min-width: 0; flex: 0 0 130px; }
+.gallery-count { flex: 0 0 auto; margin-inline-start: auto; color: var(--muted); font: var(--text-micro) var(--font-mono); white-space: nowrap; }
 .gallery-selection-bar { min-height: 44px; flex: 0 0 auto; padding: 7px clamp(20px, 3vw, 44px); display: flex; align-items: center; gap: 8px; background: color-mix(in srgb, var(--accent) 6%, var(--panel)); border-bottom: 1px solid var(--line-soft); }
 .gallery-selection-bar > span { margin-inline-end: auto; color: var(--muted); font-size: var(--text-secondary); }
 .gallery-workspace { min-width: 0; min-height: 0; flex: 1; display: flex; }

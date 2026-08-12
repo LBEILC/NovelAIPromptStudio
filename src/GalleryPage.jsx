@@ -205,11 +205,13 @@ export default function GalleryPage({
         value={view}
       />
       <LobeSearchBar className="gallery-search" onInputChange={onQueryChange} placeholder="搜索文件名、Tag 或译名" value={query}/>
-      <LobeSelect aria-label="图片排序" className="gallery-sort" onChange={onSortChange} options={[
-        { label: '最近导入', value: 'recent' },
-        { label: '最早导入', value: 'oldest' },
-        { label: '按名称', value: 'name' },
-      ]} value={sort}/>
+      <div className="gallery-sort">
+        <LobeSelect aria-label="图片排序" onChange={onSortChange} options={[
+          { label: '最近导入', value: 'recent' },
+          { label: '最早导入', value: 'oldest' },
+          { label: '按名称', value: 'name' },
+        ]} value={sort}/>
+      </div>
       <span className="gallery-count">{groups.length} 组 · {groups.reduce((count, group) => count + group.count, 0)} 张</span>
       <LobeButton disabled={!groups.length} onClick={onSelectAll} size="small" type="text">全选当前结果</LobeButton>
       {view === 'trash' && <LobeButton danger disabled={!groups.length} onClick={onEmptyTrash} size="small">清空回收站</LobeButton>}
