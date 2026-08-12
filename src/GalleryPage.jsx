@@ -263,6 +263,7 @@ export default function GalleryPage({
         onSizeChange={(_delta, size) => setPreviewPanelWidth(size?.width)}
         placement="right"
         showHandleHighlight
+        stableLayout
         size={previewPanelWidth ? { height: '100%', width: previewPanelWidth } : undefined}
       >
         {preview && <LobeDraggablePanel.Body
