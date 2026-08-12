@@ -5,6 +5,35 @@ import { fileURLToPath } from 'node:url';
 import { clipboard } from 'electron';
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+const RAW_IMAGE_FORMATS = {
+  darwin: ['public.png', 'public.jpeg', 'public.webp'],
+  linux: ['image/png', 'image/jpeg', 'image/webp'],
+  win32: ['PNG', 'JFIF', 'WebP'],
+};
+
+function imageExtensionFromBytes(bytes) {
+  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) return '.png';
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return '.jpg';
+  if (bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') return '.webp';
+  return '';
+}
+
+function readOriginalClipboardImage() {
+  for (const format of RAW_IMAGE_FORMATS[process.platform] || RAW_IMAGE_FORMATS.linux) {
+    const bytes = clipboard.readBuffer(format);
+    const extension = imageExtensionFromBytes(bytes);
+    if (extension) return { bytes, extension };
+  }
+  return null;
+}
+
+function persistTemporaryImage(temporaryDirectory, bytes, extension, fromBitmap) {
+  const fingerprint = crypto.createHash('sha256').update(bytes).digest('hex');
+  fs.mkdirSync(temporaryDirectory, { recursive: true });
+  const targetPath = path.join(temporaryDirectory, `${fingerprint}${extension}`);
+  if (!fs.existsSync(targetPath)) fs.writeFileSync(targetPath, bytes);
+  return { filePath: targetPath, fromBitmap, temporaryId: fingerprint, fingerprint };
+}
 
 function candidateClipboardPaths() {
   const candidates = [];
@@ -55,17 +84,16 @@ export function readClipboardImageSource(temporaryDirectory) {
   const filePath = firstReadableImagePath();
   if (filePath) return { filePath, fromBitmap: false, temporaryId: '', fingerprint: '' };
 
+  const original = readOriginalClipboardImage();
+  if (original) return persistTemporaryImage(temporaryDirectory, original.bytes, original.extension, false);
+
   const image = clipboard.readImage();
   if (image.isEmpty()) throw new Error('剪贴板中没有可导入的图片');
   const size = image.getSize();
   if (!size.width || !size.height || size.width > 65_535 || size.height > 65_535) throw new Error('剪贴板图片尺寸无效');
   const png = image.toPNG();
   if (!png.length) throw new Error('剪贴板图片为空或已损坏');
-  const fingerprint = crypto.createHash('sha256').update(png).digest('hex');
-  fs.mkdirSync(temporaryDirectory, { recursive: true });
-  const targetPath = path.join(temporaryDirectory, `${fingerprint}.png`);
-  if (!fs.existsSync(targetPath)) fs.writeFileSync(targetPath, png);
-  return { filePath: targetPath, fromBitmap: true, temporaryId: fingerprint, fingerprint };
+  return persistTemporaryImage(temporaryDirectory, png, '.png', true);
 }
 
 export function cleanupWorkbenchTemporaryImages(temporaryDirectory, referencedPaths = []) {

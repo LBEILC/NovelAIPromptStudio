@@ -7,6 +7,7 @@ import {
   copyManagedImageToClipboard,
   copyOriginalAsset,
   copyOriginalImage,
+  rawClipboardFormatForImage,
   removeManagedAsset,
   resolveImageFile,
   resolveManagedAsset,
@@ -66,18 +67,20 @@ describe('managed asset file operations', () => {
     expect(fs.existsSync(asset)).toBe(false);
   });
 
-  it('writes a validated visible image to the system clipboard adapter', () => {
+  it('writes original PNG bytes to the native clipboard format so metadata is retained', () => {
     const root = makeTemporaryDirectory();
     const asset = path.join(root, 'images', 'image.png');
     fs.mkdirSync(path.dirname(asset), { recursive: true });
-    fs.writeFileSync(asset, 'png');
+    const original = Buffer.from('89504e470d0a1a0a744558744e6f76656c41493a70726f6d7074', 'hex');
+    fs.writeFileSync(asset, original);
     const image = { isEmpty: () => false };
-    let writtenImage = null;
+    let written = null;
     copyManagedImageToClipboard(root, asset, {
       nativeImage: { createFromPath: (filePath) => filePath === asset ? image : null },
-      clipboard: { writeImage: (value) => { writtenImage = value; } },
+      clipboard: { writeBuffer: (format, bytes) => { written = { format, bytes }; } },
+      platform: 'win32',
     });
-    expect(writtenImage).toBe(image);
+    expect(written).toEqual({ format: 'PNG', bytes: original });
   });
 
   it('copies an external workbench image without re-encoding', () => {
@@ -89,7 +92,7 @@ describe('managed asset file operations', () => {
     expect(fs.readFileSync(destination)).toEqual(fs.readFileSync(source));
   });
 
-  it('writes an external workbench image to the clipboard adapter', () => {
+  it('falls back to the decoded bitmap when raw clipboard formats are unavailable', () => {
     const root = makeTemporaryDirectory();
     const source = path.join(root, 'workbench.jpg');
     fs.writeFileSync(source, 'jpg');
@@ -100,5 +103,11 @@ describe('managed asset file operations', () => {
       clipboard: { writeImage: (value) => { writtenImage = value; } },
     });
     expect(writtenImage).toBe(image);
+  });
+
+  it('selects platform-native raw image clipboard formats', () => {
+    expect(rawClipboardFormatForImage('metadata.png', 'win32')).toBe('PNG');
+    expect(rawClipboardFormatForImage('metadata.jpg', 'darwin')).toBe('public.jpeg');
+    expect(rawClipboardFormatForImage('metadata.webp', 'linux')).toBe('image/webp');
   });
 });

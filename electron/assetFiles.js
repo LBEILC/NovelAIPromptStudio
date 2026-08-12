@@ -2,6 +2,31 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+const RAW_CLIPBOARD_FORMATS = {
+  darwin: {
+    '.jpeg': 'public.jpeg',
+    '.jpg': 'public.jpeg',
+    '.png': 'public.png',
+    '.webp': 'public.webp',
+  },
+  linux: {
+    '.jpeg': 'image/jpeg',
+    '.jpg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+  },
+  win32: {
+    '.jpeg': 'JFIF',
+    '.jpg': 'JFIF',
+    '.png': 'PNG',
+    '.webp': 'WebP',
+  },
+};
+
+export function rawClipboardFormatForImage(filePath, platform = process.platform) {
+  const extension = path.extname(String(filePath || '')).toLowerCase();
+  return (RAW_CLIPBOARD_FORMATS[platform] || RAW_CLIPBOARD_FORMATS.linux)[extension] || '';
+}
 
 export function resolveImageFile(filePath) {
   const target = path.resolve(String(filePath || ''));
@@ -39,13 +64,19 @@ export function copyOriginalAsset(assetsDirectory, sourcePath, destinationPath) 
   return copyOriginalImage(resolveManagedAsset(assetsDirectory, sourcePath), destinationPath);
 }
 
-export function copyImageToClipboard(filePath, { nativeImage, clipboard }) {
-  const image = nativeImage.createFromPath(resolveImageFile(filePath));
+export function copyImageToClipboard(filePath, { nativeImage, clipboard, platform = process.platform }) {
+  const source = resolveImageFile(filePath);
+  const image = nativeImage.createFromPath(source);
   if (image.isEmpty()) throw new Error('图片无法读取');
-  clipboard.writeImage(image);
+  const format = rawClipboardFormatForImage(source, platform);
+  if (format && typeof clipboard.writeBuffer === 'function') {
+    clipboard.writeBuffer(format, fs.readFileSync(source));
+  } else {
+    clipboard.writeImage(image);
+  }
   return image;
 }
 
-export function copyManagedImageToClipboard(assetsDirectory, filePath, { nativeImage, clipboard }) {
-  return copyImageToClipboard(resolveManagedAsset(assetsDirectory, filePath), { nativeImage, clipboard });
+export function copyManagedImageToClipboard(assetsDirectory, filePath, adapters) {
+  return copyImageToClipboard(resolveManagedAsset(assetsDirectory, filePath), adapters);
 }

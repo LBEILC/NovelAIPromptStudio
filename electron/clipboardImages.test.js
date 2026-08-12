@@ -75,6 +75,19 @@ describe('clipboard image reading', () => {
     expect(fs.existsSync(source.filePath)).toBe(false);
   });
 
+  it('persists raw PNG clipboard bytes without re-encoding or dropping metadata', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-clipboard-'));
+    temporaryDirectories.push(directory);
+    const original = Buffer.from('89504e470d0a1a0a744558744e6f76656c41493a70726f6d7074', 'hex');
+    clipboardMock.readBuffer.mockImplementation((format) => format === 'PNG' ? original : Buffer.alloc(0));
+
+    const source = readClipboardImageSource(directory);
+    expect(source).toMatchObject({ fromBitmap: false, temporaryId: source.fingerprint });
+    expect(path.extname(source.filePath)).toBe('.png');
+    expect(fs.readFileSync(source.filePath)).toEqual(original);
+    expect(clipboardMock.readImage).not.toHaveBeenCalled();
+  });
+
   it('reports an empty clipboard without creating a temporary image', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-clipboard-'));
     temporaryDirectories.push(directory);
