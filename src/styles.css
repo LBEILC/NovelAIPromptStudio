@@ -248,10 +248,12 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .overview-scope-heading > div { min-width: 0; }
 .overview-scope.undesired .overview-scope-heading strong { color: var(--danger); }
 .overview-tags { min-width: 0; display: flex; flex-wrap: wrap; gap: 7px; }
-.overview-tag { min-height: 32px; padding: 5px 9px; display: flex; align-items: center; gap: 7px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; font: .75rem/1.3 var(--font-mono); text-align: start; cursor: grab; }
+.overview-tag-shell { flex: 0 0 auto; display: flex; will-change: transform; }
+.overview-tag { min-height: 32px; padding: 5px 9px; display: flex; align-items: center; gap: 7px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; font: .75rem/1.3 var(--font-mono); text-align: start; touch-action: none; cursor: grab; }
 .overview-tag::before { width: 5px; height: 5px; flex: 0 0 auto; content: ""; background: var(--tag-color, var(--muted)); border-radius: 50%; }
 .overview-tag:hover { background: var(--panel-2); border-color: var(--faint); }
-.overview-tag.dragging { opacity: .42; }
+.overview-tag.dragging { opacity: .3; cursor: grabbing; }
+.overview-tag.drag-overlay { pointer-events: none; opacity: .98; background: var(--panel-2); border-color: var(--faint); box-shadow: 0 10px 28px rgb(0 0 0 / 28%); cursor: grabbing; transform: scale(1.02); }
 .overview-tag.selected { background: color-mix(in srgb, var(--accent) 10%, transparent); border-color: var(--accent); }
 .overview-tag-copy { min-width: 0; display: grid; }
 .overview-tag-copy small, .overview-filter-empty { color: var(--muted); font-size: var(--text-micro); }

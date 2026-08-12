@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { closestCenter, DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { restrictToWindowEdges } from '@dnd-kit/modifiers';
+import { rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Popover as LobePopover, SearchBar as LobeSearchBar } from '@lobehub/ui';
 import {
   Button as LobeButton,
@@ -29,6 +34,12 @@ const LANGUAGE_OPTIONS = [
   ['translated', '翻译'],
   ['bilingual', '对照'],
 ];
+
+const TAG_SORT_ACCESSIBILITY = {
+  screenReaderInstructions: {
+    draggable: '拖动可调整 Tag 顺序；也可以按 Alt 加方向键移动当前 Tag。',
+  },
+};
 
 function compactPosition(center) {
   return `${Math.round(Number(center?.x ?? 0.5) * 100)} / ${Math.round(Number(center?.y ?? 0.5) * 100)}`;
@@ -139,6 +150,82 @@ function EditableTag({ children, disabled, editKey, editingKey, onEditingChange,
   </LobePopover>;
 }
 
+function TagButton({ buttonRef, display, dragging = false, overlay = false, selected, selecting, tag, warning, ...rest }) {
+  return <button
+    aria-hidden={overlay || undefined}
+    aria-pressed={selecting ? selected : undefined}
+    className={`overview-tag cat-${String(tag.category || 'Unsorted').toLowerCase()} ${dragging ? 'dragging' : ''} ${overlay ? 'drag-overlay' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''}`}
+    ref={buttonRef}
+    tabIndex={overlay ? -1 : undefined}
+    type="button"
+    {...rest}
+  >
+    {selecting && <SelectionMark selected={selected}/>}
+    <span className="overview-tag-copy"><span>{display.primary}</span>{display.secondary && <small>{display.secondary}</small>}</span>
+    {Math.abs(Number(tag.weight) - 1) >= 0.001 && <em>{Number(tag.weight).toFixed(2)}</em>}
+    {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}
+  </button>;
+}
+
+function SortableTag({ disabled, display, editKey, editingKey, index, onEditingChange, onKeyboardMove, onTagContextMenu, onToggleSelect, onTranslateTag, onUpdateTag, scope, selected, selecting, tag, translating, warning }) {
+  const {
+    attributes,
+    isDragging,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({
+    disabled,
+    id: tag.id,
+    transition: { duration: 180, easing: 'cubic-bezier(.22, 1, .36, 1)' },
+  });
+  const tagButton = <TagButton
+    {...(disabled ? {} : attributes)}
+    {...listeners}
+    buttonRef={setActivatorNodeRef}
+    display={display}
+    dragging={isDragging}
+    onClick={(event) => {
+      if (!selecting) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onToggleSelect(editKey);
+    }}
+    onContextMenu={(event) => onTagContextMenu(event, scope.key, tag)}
+    onKeyDown={(event) => selecting ? undefined : onKeyboardMove(scope, index, event)}
+    selected={selected}
+    selecting={selecting}
+    tag={tag}
+    title={`${display.title}${warning ? `\n语法提醒：${warning}` : ''}${selecting ? '\n点击选择' : disabled ? '\n清除筛选后可拖动排序' : '\n点击编辑，拖动排序；Alt + 方向键可键盘排序'}`}
+    warning={warning}
+  />;
+
+  return <div
+    className={`overview-tag-shell ${isDragging ? 'dragging' : ''}`}
+    ref={setNodeRef}
+    role="listitem"
+    style={{
+      transform: CSS.Translate.toString(transform),
+      transition,
+    }}
+  >
+    <EditableTag
+      disabled={selecting}
+      editKey={editKey}
+      editingKey={editingKey}
+      onEditingChange={onEditingChange}
+      onTranslate={() => onTranslateTag(scope.key, tag)}
+      onUpdate={(patch) => onUpdateTag(scope.key, tag.id, patch)}
+      tag={tag}
+      translating={translating}
+    >
+      {tagButton}
+    </EditableTag>
+  </div>;
+}
+
 function AddTagEditor({ draft, pending, scope, onAdd, onChange, onClose }) {
   return <div className="add-tag-popover" onClick={(event) => event.stopPropagation()}>
     <div className="tag-quick-editor-heading">
@@ -214,14 +301,11 @@ function ScopeTags({
   scope,
   addDraft,
   addingScopeKey,
-  dragging,
   language,
   selecting,
   selectedKeys,
   filtered,
-  onDragStart,
-  onDragEnd,
-  onDrop,
+  onMoveTag,
   editingKey,
   onAddScope,
   onAddDraftChange,
@@ -240,10 +324,15 @@ function ScopeTags({
   rawDraft,
   rawEditingScopeKey,
 }) {
+  const [activeTagId, setActiveTagId] = useState(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const selectedSet = new Set(selectedKeys);
   const scopeEntries = scope.tags.map((tag) => ({ key: overviewTagKey(scope.key, tag.id) }));
   const pendingAdd = analyzePromptBatch(addDraft, scope.tags);
   const pendingRaw = analyzePromptBatch(rawDraft);
+  const activeTag = scope.tags.find((tag) => tag.id === activeTagId);
+  const activeDisplay = activeTag ? tagPresentation(activeTag, language) : null;
+  const activeWarning = activeTag ? syntaxMessage(activeTag) : '';
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
       <div><strong>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</strong>{scope.tags.length > 0 && <small>{scope.tags.length} 个 Tag</small>}</div>
@@ -268,55 +357,68 @@ function ScopeTags({
         ><LobeButton aria-label={`添加到 ${scope.label}`} icon={<Icon name="plus" size={13}/>} size="small" type="text"/></LobePopover>
       </div>}
     </div>
-    <div className="overview-tags" role="list" aria-label={scope.label}>
-      {scope.tags.map((tag, index) => {
-        const key = overviewTagKey(scope.key, tag.id);
-        const selected = selectedSet.has(key);
-        const display = tagPresentation(tag, language);
-        const warning = syntaxMessage(tag);
-        const tagButton = <button
-          key={tag.id}
-          className={`overview-tag cat-${String(tag.category || 'Unsorted').toLowerCase()} ${dragging?.scopeKey === scope.key && dragging.index === index ? 'dragging' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''}`}
-          draggable={!selecting && !filtered}
-          onDragStart={(event) => !selecting && !filtered && onDragStart(scope.key, index, event)}
-          onDragEnd={onDragEnd}
-          onDragOver={(event) => !selecting && !filtered && event.preventDefault()}
-          onDrop={(event) => !selecting && !filtered && onDrop(scope, index, event)}
-          onClick={(event) => {
-            if (!selecting) return;
-            event.preventDefault();
-            event.stopPropagation();
-            onToggleSelect(key);
-          }}
-          onContextMenu={(event) => onTagContextMenu(event, scope.key, tag)}
-          onKeyDown={(event) => selecting ? undefined : onKeyboardMove(scope, index, event)}
-          role="listitem"
-          aria-pressed={selecting ? selected : undefined}
-          title={`${display.title}${warning ? `\n语法提醒：${warning}` : ''}${selecting ? '\n点击选择' : '\n点击编辑，拖动排序'}`}
-        >
-          {selecting && <SelectionMark selected={selected}/>}
-          <span className="overview-tag-copy"><span>{display.primary}</span>{display.secondary && <small>{display.secondary}</small>}</span>
-          {Math.abs(Number(tag.weight) - 1) >= 0.001 && <em>{Number(tag.weight).toFixed(2)}</em>}
-          {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}
-        </button>;
-        return <EditableTag
-          disabled={selecting}
-          editKey={key}
-          editingKey={editingKey}
-          key={tag.id}
-          onEditingChange={onEditingChange}
-          onTranslate={() => onTranslateTag(scope.key, tag)}
-          onUpdate={(patch) => onUpdateTag(scope.key, tag.id, patch)}
-          tag={tag}
-          translating={translatingKeys.has(key)}
-        >
-          {tagButton}
-        </EditableTag>;
-      })}
-      {!scope.tags.length && (filtered
-        ? <span className="overview-filter-empty">当前筛选无 Tag</span>
-        : <span className="overview-filter-empty">暂无 Tag，使用右上角 + 添加</span>)}
-    </div>
+    <DndContext
+      accessibility={TAG_SORT_ACCESSIBILITY}
+      collisionDetection={closestCenter}
+      sensors={sensors}
+      onDragCancel={() => setActiveTagId(null)}
+      onDragEnd={({ active, over }) => {
+        setActiveTagId(null);
+        if (!over || active.id === over.id) return;
+        const sourceIndex = scope.tags.findIndex((tag) => tag.id === active.id);
+        const targetIndex = scope.tags.findIndex((tag) => tag.id === over.id);
+        onMoveTag(scope, sourceIndex, targetIndex);
+      }}
+      onDragStart={({ active }) => {
+        onEditingChange('');
+        setActiveTagId(active.id);
+      }}
+    >
+      <SortableContext items={scope.tags.map((tag) => tag.id)} strategy={rectSortingStrategy}>
+        <div className="overview-tags" role="list" aria-label={scope.label}>
+          {scope.tags.map((tag, index) => {
+            const key = overviewTagKey(scope.key, tag.id);
+            return <SortableTag
+              disabled={selecting || filtered}
+              display={tagPresentation(tag, language)}
+              editKey={key}
+              editingKey={editingKey}
+              index={index}
+              key={tag.id}
+              onEditingChange={onEditingChange}
+              onKeyboardMove={onKeyboardMove}
+              onTagContextMenu={onTagContextMenu}
+              onToggleSelect={onToggleSelect}
+              onTranslateTag={onTranslateTag}
+              onUpdateTag={onUpdateTag}
+              scope={scope}
+              selected={selectedSet.has(key)}
+              selecting={selecting}
+              tag={tag}
+              translating={translatingKeys.has(key)}
+              warning={syntaxMessage(tag)}
+            />;
+          })}
+          {!scope.tags.length && (filtered
+            ? <span className="overview-filter-empty">当前筛选无 Tag</span>
+            : <span className="overview-filter-empty">暂无 Tag，使用右上角 + 添加</span>)}
+        </div>
+      </SortableContext>
+      {createPortal(<DragOverlay
+        adjustScale={false}
+        dropAnimation={{ duration: 180, easing: 'cubic-bezier(.22, 1, .36, 1)' }}
+        modifiers={[restrictToWindowEdges]}
+      >
+        {activeTag && activeDisplay ? <TagButton
+          display={activeDisplay}
+          overlay
+          selected={false}
+          selecting={false}
+          tag={activeTag}
+          warning={activeWarning}
+        /> : null}
+      </DragOverlay>, document.body)}
+    </DndContext>
   </div>;
 }
 
@@ -384,7 +486,6 @@ function Segment({ value, options, onChange, label }) {
 }
 
 export default function PromptOverview({ project, updateProject, focusScopeKey, focusTagId, onTagContextMenu, onCopyContextChange, onCopyText, onNotify, onTranslateTags }) {
-  const [dragging, setDragging] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_OVERVIEW_FILTERS);
   const [language, setLanguage] = useState('original');
   const [viewMode, setViewMode] = useState('structure');
@@ -458,25 +559,6 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     const [moved] = tags.splice(sourceIndex, 1);
     tags.splice(targetIndex, 0, moved);
     updateProject(updatePromptScope(project, scope.key, tags));
-  };
-
-  const beginDrag = (scopeKey, index, event) => {
-    if (filtered) return;
-    setDragging({ scopeKey, index });
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('application/json', JSON.stringify({ scopeKey, index }));
-  };
-
-  const dropTag = (scope, targetIndex, event) => {
-    event.preventDefault();
-    let source = dragging;
-    try {
-      source = JSON.parse(event.dataTransfer.getData('application/json')) || source;
-    } catch {
-      // Some desktop drag implementations only preserve the in-memory fallback.
-    }
-    if (source?.scopeKey === scope.key) moveTag(scope, Number(source.index), targetIndex);
-    setDragging(null);
   };
 
   const keyboardMove = (scope, index, event) => {
@@ -593,16 +675,13 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
   };
 
   const scopeProps = {
-    dragging,
     language,
     selecting,
     selectedKeys,
     addDraft,
     addingScopeKey,
     filtered,
-    onDragStart: beginDrag,
-    onDragEnd: () => setDragging(null),
-    onDrop: dropTag,
+    onMoveTag: moveTag,
     editingKey,
     onAddScope: addTags,
     onAddDraftChange: setAddDraft,
