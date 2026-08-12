@@ -4,7 +4,7 @@
 
 - Status: Pending
 - Date/source: 2026-08-12, Windows
-- Related commit: `fix: make raw clipboard PNG test cross-platform` (see below)
+- Related commit: `c4763ed`
 - Action: The `v0.2.2` release workflow failed its macOS `npm test` job: `electron/clipboardImages.test.js` "persists raw PNG clipboard bytes" mocked `readBuffer` only for the win32 format name `PNG`, so on darwin `readOriginalClipboardImage()` returned null and the code fell through to `clipboard.readImage()`, throwing `TypeError: Cannot read properties of undefined (reading 'isEmpty')` at `clipboardImages.js:91`. The mock was changed to return raw bytes for every platform's image format names (`PNG`/`public.png`/`image/png`, etc.). The next tag (`v0.2.3`) re-runs macOS CI; on an unlocked macOS session confirm `npm test` passes and the packaged app preserves original PNG/JPEG/WebP clipboard bytes so NovelAI metadata survives copy → paste round-trips.
 - Expected: macOS CI `npm test` passes on `v0.2.3`; darwin raw formats (`public.png`/`public.jpeg`/`public.webp`) are read without falling back to a bitmap re-encode.
 - Observed: Awaiting macOS verification.
