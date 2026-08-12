@@ -255,7 +255,7 @@ export default function GalleryPage({
       <LobeDraggablePanel
         className="gallery-preview-shell"
         classNames={{ content: 'workspace-side-panel-content' }}
-        defaultSize={{ width: '28vw' }}
+        defaultSize={{ width: 'clamp(340px, 28vw, 560px)' }}
         expand={previewExpanded}
         maxWidth={560}
         minWidth={340}
