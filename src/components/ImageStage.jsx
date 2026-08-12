@@ -22,6 +22,10 @@ export default function ImageStage({
       objectFit="contain"
       preview={preview ? { toolbarAddon, toolbarRender: previewToolbar } : false}
       src={mediaUrl(filePath)}
+      styles={{
+        image: { height: '100%', width: '100%' },
+        wrapper: { height: '100%', width: '100%' },
+      }}
       variant="borderless"
     /> : <div className="image-stage-empty">没有可显示的图片</div>}
     {children}
