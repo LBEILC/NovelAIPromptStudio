@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Alert as LobeAlert, Collapse as LobeCollapse, ColorSwatches as LobeColorSwatches, DraggablePanel as LobeDraggablePanel } from '@lobehub/ui';
 import {
   AutoComplete as LobeAutoComplete,
@@ -13,6 +13,8 @@ import {
 import { findCustomThemeName, primaryColors } from '@lobehub/ui/es/styles/index';
 import Icon from './components/Icon.jsx';
 import { fontStack, partitionFontFamilies, quoteFontFamily } from './lib/fonts.js';
+
+const ReleaseNotes = lazy(() => import('./components/ReleaseNotes.jsx'));
 
 const PRIMARY_COLOR_OPTIONS = [
   ['red', '红色'], ['volcano', '火山橙'], ['orange', '橙色'], ['gold', '金色'],
@@ -387,7 +389,12 @@ export default function SettingsPage({ appearance, onAppearanceChange, onInstall
             <span><strong>正在下载更新</strong><small>{Math.round(updateState.progress || 0)}%{updateState.total ? ` · ${formatBytes(updateState.transferred)} / ${formatBytes(updateState.total)}` : ''}</small></span>
             <progress max="100" value={updateState.progress || 0}/>
           </div>}
-          {updateState.notes && <div className="settings-release-notes"><strong>更新说明</strong><p>{updateState.notes}</p></div>}
+          {updateState.notes && <div className="settings-release-notes">
+            <strong>更新说明</strong>
+            <Suspense fallback={null}>
+              <ReleaseNotes onOpenLink={studio.openReleasePage}>{updateState.notes}</ReleaseNotes>
+            </Suspense>
+          </div>}
         </div>
         {updateState.error && <LobeAlert className="settings-warning" message={`${updateState.error}。本地功能不受影响，可以稍后重试。`} type="warning" variant="outlined"/>}
         {isManualMacUpdate && <LobeAlert className="settings-warning" message="当前 macOS 版本未签名，无法在应用内直接安装更新。发现新版本后，请从官方 Release 下载对应安装包并手动替换应用。" type="info" variant="outlined"/>}
