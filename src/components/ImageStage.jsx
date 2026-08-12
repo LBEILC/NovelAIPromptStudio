@@ -17,28 +17,15 @@ export default function ImageStage({
     {filePath ? <LobeImage
       alt={alt || ''}
       className="image-stage-image"
+      classNames={{
+        image: 'image-stage-media',
+        wrapper: 'image-stage-media-wrapper',
+      }}
       maxHeight="100%"
       maxWidth="100%"
       objectFit="contain"
       preview={preview ? { toolbarAddon, toolbarRender: previewToolbar } : false}
       src={mediaUrl(filePath)}
-      styles={{
-        image: {
-          display: 'block',
-          height: 'auto',
-          maxHeight: '100%',
-          maxWidth: '100%',
-          objectPosition: 'center',
-          width: 'auto',
-        },
-        wrapper: {
-          alignItems: 'center',
-          display: 'flex',
-          height: '100%',
-          justifyContent: 'center',
-          width: '100%',
-        },
-      }}
       variant="borderless"
     /> : <div className="image-stage-empty">没有可显示的图片</div>}
     {children}
