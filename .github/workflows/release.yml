@@ -57,19 +57,21 @@ jobs:
         if: runner.os != 'macOS'
         run: npm run package -- ${{ matrix.package_args }}
 
-      - name: Configure signing and notarization secrets
-        if: runner.os == 'macOS' && secrets.MAC_CSC_LINK != ''
-        run: |
-          echo "CSC_LINK=${{ secrets.MAC_CSC_LINK }}" >> "$GITHUB_ENV"
-          echo "CSC_KEY_PASSWORD=${{ secrets.MAC_CSC_KEY_PASSWORD }}" >> "$GITHUB_ENV"
-          echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> "$GITHUB_ENV"
-          echo "APPLE_APP_SPECIFIC_PASSWORD=${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" >> "$GITHUB_ENV"
-          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> "$GITHUB_ENV"
-
       - name: Package, sign, and notarize macOS application
         if: runner.os == 'macOS'
-        run: npm run package -- ${{ matrix.package_args }}
+        run: |
+          # Unset signing/notarization secrets when unconfigured: electron-builder
+          # treats a defined-but-empty CSC_LINK as a relative file path and fails.
+          if [ -z "$CSC_LINK" ]; then
+            unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          fi
+          npm run package -- ${{ matrix.package_args }}
         env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
       - name: Upload installer
