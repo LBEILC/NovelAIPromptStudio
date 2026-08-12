@@ -38,5 +38,6 @@
 ## 结果
 
 - Overall result: 通过。原问题已复现，并确认 `stableLayout` 修复后，侧栏高度约束在实际 Electron 窗口中生效。
+- User acceptance: 2026-08-12 用户完成实际验证并反馈“没啥问题”，确认归档。
 - Discovered issues: 修复前 `DraggablePanel` 的非稳定布局模式会让 Body 的百分比高度按溢出内容计算，导致底部操作区被推出视口；已由提交 `65a6d40` 修复。
 - Not exercised: 未触发收藏、重命名、打开文件夹、删除等会改变应用或外部状态的业务操作；本次验证聚焦布局、滚动、折叠和主题表现。
