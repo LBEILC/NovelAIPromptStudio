@@ -6,6 +6,7 @@ import {
   formatPositivePromptForCopy,
   getPromptScope,
   getPromptScopes,
+  positiveRawPromptScopes,
   syncProjectPromptMetadata,
   updatePromptScope,
 } from './promptStructure.js';
@@ -92,5 +93,26 @@ describe('NovelAI V4 prompt structure', () => {
 
     const rawEdited = syncProjectPromptMetadata(updatePromptScope(edited, 'base:prompt', editedTags, `${raw}\n`));
     expect(rawEdited.metadata.prompt_raw).toBe(`${raw}\n`);
+  });
+
+  it('keeps raw base and character prompts separate and omits empty sections', () => {
+    const project = {
+      tags: parsePrompt('2girls, outdoors'),
+      metadata: { prompt_raw: '2girls, outdoors', negative_prompt: '' },
+      prompt_structure: {
+        base_prompt_raw: '2girls, outdoors',
+        base_undesired_raw: '',
+        base_undesired_tags: [],
+        characters: [
+          { id: 'character-1', label: 'Alice', prompt_raw: 'red hair, smile', prompt_tags: parsePrompt('red hair, smile'), undesired_raw: '', undesired_tags: [], center: { x: 0.5, y: 0.5 } },
+          { id: 'character-2', label: 'Bob', prompt_raw: '   ', prompt_tags: [], undesired_raw: '', undesired_tags: [], center: { x: 0.5, y: 0.5 } },
+        ],
+      },
+    };
+
+    expect(positiveRawPromptScopes(project).map((scope) => ({ key: scope.key, raw: scope.raw_prompt }))).toEqual([
+      { key: 'base:prompt', raw: '2girls, outdoors' },
+      { key: 'character:character-1:prompt', raw: 'red hair, smile' },
+    ]);
   });
 });

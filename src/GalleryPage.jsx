@@ -1,4 +1,4 @@
-import { ActionIcon, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, SearchBar as LobeSearchBar } from '@lobehub/ui';
+import { Accordion, AccordionItem, ActionIcon, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, Highlighter, SearchBar as LobeSearchBar } from '@lobehub/ui';
 import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, SplitButton } from '@lobehub/ui/base-ui';
 import { useEffect, useRef, useState } from 'react';
 import Icon, { getIconComponent } from './components/Icon.jsx';
@@ -6,12 +6,49 @@ import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
 import { galleryEmptyState } from './lib/gallery.js';
-import { countPromptTags, formatPositivePromptForCopy } from './lib/promptStructure.js';
+import { countPromptTags, positiveRawPromptScopes } from './lib/promptStructure.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
 
 function formatDate(value) {
   if (!value) return '未知时间';
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(value));
+}
+
+function promptScopeTitle(scope) {
+  if (scope.kind === 'base') return '基础 Prompt';
+  const fallback = `角色 ${(scope.characterIndex ?? 0) + 1}`;
+  const label = String(scope.character?.label || '').trim();
+  return `${/^Character \d+$/i.test(label) || !label ? fallback : label} Prompt`;
+}
+
+function RawPromptSections({ project }) {
+  const scopes = positiveRawPromptScopes(project);
+  if (!scopes.length) return <div className="gallery-preview-prompt-empty">没有检测到 Prompt</div>;
+  const baseScope = scopes.find((scope) => scope.kind === 'base');
+  return <Accordion
+    className="gallery-preview-prompt-accordion"
+    defaultExpandedKeys={baseScope ? [baseScope.key] : [scopes[0].key]}
+    gap={8}
+    keepContentMounted={false}
+  >
+    {scopes.map((scope) => <AccordionItem
+      classNames={{ content: 'gallery-preview-prompt-content', header: 'gallery-preview-prompt-header' }}
+      itemKey={scope.key}
+      key={scope.key}
+      padding={0}
+      title={<span className="gallery-preview-prompt-title"><strong>{promptScopeTitle(scope)}</strong><small>{scope.tags.length} Tags</small></span>}
+      variant="outlined"
+    >
+      <Highlighter
+        className="gallery-preview-prompt-code"
+        copyable
+        language="plaintext"
+        showLanguage={false}
+        variant="filled"
+        wrap
+      >{scope.raw_prompt}</Highlighter>
+    </AccordionItem>)}
+  </Accordion>;
 }
 
 function ImportButton({ importing, onImport, onImportClipboard }) {
@@ -229,42 +266,47 @@ export default function GalleryPage({
         size={previewPanelWidth ? { height: '100%', width: previewPanelWidth } : undefined}
       >
         {preview && <LobeDraggablePanel.Body className="gallery-preview">
-          <header>
-            {renaming ? <div className="gallery-rename">
-              <LobeInput
-                autoFocus
-                maxLength={160}
-                onChange={(event) => setNameDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') saveName();
-                  if (event.key === 'Escape') setRenaming(false);
-                }}
-                size="small"
-                value={nameDraft}
-              />
-              <LobeButton onClick={saveName} size="small" type="primary">保存</LobeButton>
-              <LobeButton onClick={() => setRenaming(false)} size="small" type="text">取消</LobeButton>
-            </div> : <h2 onDoubleClick={() => view !== 'trash' && setRenaming(true)} title={preview.name}>{preview.name}</h2>}
-          </header>
-          <ImageStage
-            alt={preview.name}
-            className="gallery-preview-stage"
-            filePath={preview.image_path}
-            previewToolbar={(_originalNode, info) => <ImagePreviewToolbar
-              info={info}
-              onCopy={() => onCopyImage(preview)}
-              onDownload={() => onDownloadImage(preview)}
-            />}
-          >
-            {previewGroup?.count > 1 && <>
-              <ActionIcon className="gallery-stage-nav previous" icon={<Icon name="previous"/>} onClick={() => onNavigatePreview(-1)} title="上一张"/>
-              <span className="gallery-stage-position">{memberIndex + 1} / {previewGroup.count}</span>
-              <ActionIcon className="gallery-stage-nav next" icon={<Icon name="next"/>} onClick={() => onNavigatePreview(1)} title="下一张"/>
-            </>}
-          </ImageStage>
-          <div className="gallery-preview-meta"><span>{preview.metadata?.width || '—'} × {preview.metadata?.height || '—'}</span><span>{countPromptTags(preview)} Tags</span><span>{formatDate(preview.created_at)}</span></div>
-          <div className="gallery-preview-prompt"><span>原始 Prompt</span><p>{formatPositivePromptForCopy(preview) || '没有检测到 Prompt'}</p></div>
-          <div className="gallery-preview-actions">
+          <section className="gallery-preview-primary">
+            <header>
+              {renaming ? <div className="gallery-rename">
+                <LobeInput
+                  autoFocus
+                  maxLength={160}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') saveName();
+                    if (event.key === 'Escape') setRenaming(false);
+                  }}
+                  size="small"
+                  value={nameDraft}
+                />
+                <LobeButton onClick={saveName} size="small" type="primary">保存</LobeButton>
+                <LobeButton onClick={() => setRenaming(false)} size="small" type="text">取消</LobeButton>
+              </div> : <h2 onDoubleClick={() => view !== 'trash' && setRenaming(true)} title={preview.name}>{preview.name}</h2>}
+            </header>
+            <ImageStage
+              alt={preview.name}
+              className="gallery-preview-stage"
+              filePath={preview.image_path}
+              previewToolbar={(_originalNode, info) => <ImagePreviewToolbar
+                info={info}
+                onCopy={() => onCopyImage(preview)}
+                onDownload={() => onDownloadImage(preview)}
+              />}
+            >
+              {previewGroup?.count > 1 && <>
+                <ActionIcon className="gallery-stage-nav previous" icon={<Icon name="previous"/>} onClick={() => onNavigatePreview(-1)} title="上一张"/>
+                <span className="gallery-stage-position">{memberIndex + 1} / {previewGroup.count}</span>
+                <ActionIcon className="gallery-stage-nav next" icon={<Icon name="next"/>} onClick={() => onNavigatePreview(1)} title="下一张"/>
+              </>}
+            </ImageStage>
+            <div className="gallery-preview-meta"><span>{preview.metadata?.width || '—'} × {preview.metadata?.height || '—'}</span><span>{countPromptTags(preview)} Tags</span><span>{formatDate(preview.created_at)}</span></div>
+          </section>
+          <section className="gallery-preview-prompt" aria-label="原始 Prompt">
+            <header><h3>原始 Prompt</h3></header>
+            <RawPromptSections key={preview.id} project={preview}/>
+          </section>
+          <footer className="gallery-preview-actions">
             {view !== 'trash' && <LobeButton className="gallery-preview-action-wide" icon={<Icon name="edit" size={14}/>} onClick={() => onOpenWorkbench(preview)} type="primary">在工作台编辑</LobeButton>}
             <LobeButton icon={<Icon name="star" size={14}/>} onClick={() => onFavorite(!preview.is_favorite, [preview.id])}>{preview.is_favorite ? '取消收藏' : '收藏'}</LobeButton>
             <LobeButton icon={<Icon name="folder" size={14}/>} onClick={() => onReveal(preview)}>在文件夹中显示</LobeButton>
@@ -273,7 +315,7 @@ export default function GalleryPage({
             {view === 'trash'
               ? <><LobeButton icon={<Icon name="restore" size={14}/>} onClick={() => onRestore([preview.id])}>恢复当前图片</LobeButton><LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={() => onPermanentDelete([preview.id])}>永久删除当前图片</LobeButton></>
               : <LobeButton className="gallery-preview-action-wide" danger icon={<Icon name="trash" size={14}/>} onClick={() => onTrash([preview.id], 'detail')} type="fill">删除当前图片</LobeButton>}
-          </div>
+          </footer>
         </LobeDraggablePanel.Body>}
       </LobeDraggablePanel>
     </div>

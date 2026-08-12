@@ -214,6 +214,12 @@ export function formatPositivePromptForCopy(project) {
   return scopes.map((scope) => formatPromptInline(scope.tags)).filter(Boolean).join('\n|\n');
 }
 
+export function positiveRawPromptScopes(project) {
+  return getPromptScopes(project).filter((scope) => (
+    scope.polarity === 'prompt' && String(scope.raw_prompt || '').trim()
+  ));
+}
+
 export function formatPositiveScopeForCopy(project, scopeKey) {
   const scope = getPromptScope(project, scopeKey);
   return scope.polarity === 'prompt' ? formatPromptInline(scope.tags) : '';
