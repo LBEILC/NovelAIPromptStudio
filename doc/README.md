@@ -1,6 +1,6 @@
 # 项目文档索引
 
-> 最后核对：2026-07-27
+> 最后核对：2026-08-12
 
 这里仅保留当前仍会指导产品与开发的文档。已经完成、被取代或只用于追溯决策的内容统一进入 [`archive/`](./archive/)。
 
@@ -11,6 +11,7 @@
 | [当前产品边界](./two-page-workbench-gallery-refactor-plan.md) | 说明应用现在是什么、保留什么、明确不做什么 | 当前有效 |
 | [工作台与图片库效率功能开发规格](./workbench-gallery-productivity-development-spec.md) | 定义下一阶段已经确认、尚待实施的效率功能 | 待开发 |
 | [Lobe 视觉层级与颜色语义规范](./lobe-visual-language.md) | 约束页面层级、组件语义、主题与 Tag 配色 | 当前有效 |
+| [发版指南](./release-guide.md) | 说明版本号、验证、Release Note、标签、Action 与失败处理流程 | 当前有效 |
 | [Lobe UI 前端开发 Skill](../.agents/skills/lobe-ui-frontend/SKILL.md) | 约束组件选型、版本核对、迁移与验证流程 | 当前有效 |
 | [`screenshots/`](./screenshots/) | 展示产品外观，不作为精确实现依据 | 参考 |
 

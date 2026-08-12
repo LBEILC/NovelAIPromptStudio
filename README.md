@@ -159,6 +159,8 @@ npm run package   # 生成当前平台安装包
 
 Windows 与 macOS 是一等支持平台，并尽量保持 Linux 兼容。提交改动前请运行测试和生产构建；涉及窗口、快捷键、文件对话框、安全存储或打包的改动，还需要在对应操作系统上验证。
 
+维护者发布新版本前请阅读[发版指南](./doc/release-guide.md)，其中包含版本号、更新说明、标签、GitHub Actions 和失败处理流程。
+
 欢迎通过 [Issues](https://github.com/LBEILC/NovelAIPromptStudio/issues) 反馈问题或提出建议。
 
 ---
