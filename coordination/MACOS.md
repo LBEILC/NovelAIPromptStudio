@@ -1,5 +1,14 @@
 # macOS handoffs
 
+## Verify manual update mode for unsigned macOS builds
+
+- Status: Pending
+- Date/source: 2026-08-12, Windows
+- Related commit: `cf3dcc9`
+- Action: On an unlocked macOS session, run `npm ci`, `npm test`, `npm run build`, and `npm run package -- --mac`. Launch the unsigned packaged app, open Settings → About & Updates, and confirm it identifies the build as `macOS · 手动更新`. Check for updates and verify the app reads the latest stable GitHub Release without initializing `electron-updater`, never exposes in-app download or restart/install actions, and offers `下载 macOS 安装包` when a newer release exists. Confirm the button opens only the official `LBEILC/NovelAIPromptStudio` GitHub Release URL.
+- Expected: Unsigned macOS builds can check versions and show release notes, but all download/install IPC remains disabled with a manual-update response. The UI explains that the official DMG must be downloaded and installed manually; Windows automatic-update behavior is unaffected.
+- Observed: Awaiting macOS verification. Windows passed 104 automated tests, the production build, and a live GitHub Release API check against `v0.2.5`. A local Windows packaging attempt was blocked while electron-builder renamed its Electron extraction directory because the host kept `resources/default_app.asar` open (`EPERM`); no generated files were committed.
+
 ## Verify signed/unsigned macOS packaging after empty CSC_LINK fix
 
 - Status: Pending
