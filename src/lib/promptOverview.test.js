@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deleteOverviewTags, filterOverviewScopes, overviewCategoryGroups, overviewCopyContext, overviewEntries, toggleOverviewSelectionGroup } from './promptOverview.js';
+import { deleteOverviewTags, filterOverviewScopes, overviewCategoryGroups, overviewCopyContext, overviewEntries, reorderOverviewTags, toggleOverviewSelectionGroup } from './promptOverview.js';
 
 function projectFixture() {
   const tag = (id, value, category, translation = '', weight = 1) => ({ id, tag: value, category, translation, weight, note: '' });
@@ -16,6 +16,14 @@ function projectFixture() {
 }
 
 describe('Prompt overview operations', () => {
+  it('reorders the real tag array used by wrapped drag previews', () => {
+    const tags = projectFixture().prompt_structure.characters[0].prompt_tags;
+    const reordered = reorderOverviewTags(tags, 'shirt', 'hair');
+    expect(reordered.map((tag) => tag.id)).toEqual(['button', 'hair', 'shirt']);
+    expect(tags.map((tag) => tag.id)).toEqual(['shirt', 'button', 'hair']);
+    expect(reorderOverviewTags(tags, 'missing', 'hair')).toBe(tags);
+  });
+
   it('filters by category, polarity, domain, and translated search text', () => {
     const scopes = filterOverviewScopes(projectFixture(), { category: 'Body', polarity: 'prompt', domain: 'character', query: '蓝发' });
     expect(overviewEntries(scopes).map((entry) => entry.tag.tag)).toEqual(['blue hair']);

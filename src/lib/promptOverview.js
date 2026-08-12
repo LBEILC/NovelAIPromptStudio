@@ -12,6 +12,16 @@ export function overviewTagKey(scopeKey, tagId) {
   return `${scopeKey}\u0000${tagId}`;
 }
 
+export function reorderOverviewTags(tags = [], activeId, overId) {
+  const sourceIndex = tags.findIndex((tag) => tag.id === activeId);
+  const targetIndex = tags.findIndex((tag) => tag.id === overId);
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return tags;
+  const nextTags = [...tags];
+  const [activeTag] = nextTags.splice(sourceIndex, 1);
+  nextTags.splice(targetIndex, 0, activeTag);
+  return nextTags;
+}
+
 export function filterOverviewScopes(project, filters = DEFAULT_OVERVIEW_FILTERS) {
   const query = normalizeSearch(filters.query || '');
   return getPromptScopes(project)

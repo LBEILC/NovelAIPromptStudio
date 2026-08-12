@@ -248,7 +248,9 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .overview-scope-heading > div { min-width: 0; }
 .overview-scope.undesired .overview-scope-heading strong { color: var(--danger); }
 .overview-tags { min-width: 0; display: flex; flex-wrap: wrap; gap: 7px; }
-.overview-tag-shell { flex: 0 0 auto; display: flex; will-change: transform; }
+.overview-tag-shell { width: fit-content; max-width: 100%; flex: 0 0 auto; display: flex; }
+.overview-tags.sorting .overview-tag-shell { will-change: transform; }
+.overview-tag-shell .overview-tag { max-width: 100%; flex: 0 0 auto; }
 .overview-tag { min-height: 32px; padding: 5px 9px; display: flex; align-items: center; gap: 7px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; font: .75rem/1.3 var(--font-mono); text-align: start; touch-action: none; cursor: grab; }
 .overview-tag::before { width: 5px; height: 5px; flex: 0 0 auto; content: ""; background: var(--tag-color, var(--muted)); border-radius: 50%; }
 .overview-tag:hover { background: var(--panel-2); border-color: var(--faint); }

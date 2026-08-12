@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { closestCenter, DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
-import { rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
+import { SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Popover as LobePopover, SearchBar as LobeSearchBar } from '@lobehub/ui';
 import {
@@ -25,6 +25,7 @@ import {
   overviewCategoryGroups,
   overviewCopyContext,
   overviewEntries,
+  reorderOverviewTags,
   overviewTagKey,
   toggleOverviewSelectionGroup,
 } from './lib/promptOverview.js';
@@ -40,6 +41,8 @@ const TAG_SORT_ACCESSIBILITY = {
     draggable: '拖动可调整 Tag 顺序；也可以按 Alt 加方向键移动当前 Tag。',
   },
 };
+
+const LIVE_TAG_SORTING_STRATEGY = () => null;
 
 function compactPosition(center) {
   return `${Math.round(Number(center?.x ?? 0.5) * 100)} / ${Math.round(Number(center?.y ?? 0.5) * 100)}`;
@@ -150,11 +153,11 @@ function EditableTag({ children, disabled, editKey, editingKey, onEditingChange,
   </LobePopover>;
 }
 
-function TagButton({ buttonRef, display, dragging = false, overlay = false, selected, selecting, tag, warning, ...rest }) {
+function TagButton({ buttonRef, className = '', display, dragging = false, overlay = false, selected, selecting, tag, warning, ...rest }) {
   return <button
     aria-hidden={overlay || undefined}
     aria-pressed={selecting ? selected : undefined}
-    className={`overview-tag cat-${String(tag.category || 'Unsorted').toLowerCase()} ${dragging ? 'dragging' : ''} ${overlay ? 'drag-overlay' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''}`}
+    className={`overview-tag cat-${String(tag.category || 'Unsorted').toLowerCase()} ${dragging ? 'dragging' : ''} ${overlay ? 'drag-overlay' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''} ${className}`.trim()}
     ref={buttonRef}
     tabIndex={overlay ? -1 : undefined}
     type="button"
@@ -305,7 +308,7 @@ function ScopeTags({
   selecting,
   selectedKeys,
   filtered,
-  onMoveTag,
+  onReorderTags,
   editingKey,
   onAddScope,
   onAddDraftChange,
@@ -325,7 +328,10 @@ function ScopeTags({
   rawEditingScopeKey,
 }) {
   const [activeTagId, setActiveTagId] = useState(null);
+  const [dragTags, setDragTags] = useState(null);
+  const dragTagsRef = useRef(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const renderedTags = dragTags || scope.tags;
   const selectedSet = new Set(selectedKeys);
   const scopeEntries = scope.tags.map((tag) => ({ key: overviewTagKey(scope.key, tag.id) }));
   const pendingAdd = analyzePromptBatch(addDraft, scope.tags);
@@ -361,22 +367,36 @@ function ScopeTags({
       accessibility={TAG_SORT_ACCESSIBILITY}
       collisionDetection={closestCenter}
       sensors={sensors}
-      onDragCancel={() => setActiveTagId(null)}
-      onDragEnd={({ active, over }) => {
+      onDragCancel={() => {
+        dragTagsRef.current = null;
+        setDragTags(null);
         setActiveTagId(null);
+      }}
+      onDragEnd={({ over }) => {
+        const nextTags = dragTagsRef.current;
+        dragTagsRef.current = null;
+        setDragTags(null);
+        setActiveTagId(null);
+        if (over && nextTags) onReorderTags(scope, nextTags);
+      }}
+      onDragOver={({ active, over }) => {
         if (!over || active.id === over.id) return;
-        const sourceIndex = scope.tags.findIndex((tag) => tag.id === active.id);
-        const targetIndex = scope.tags.findIndex((tag) => tag.id === over.id);
-        onMoveTag(scope, sourceIndex, targetIndex);
+        const current = dragTagsRef.current || scope.tags;
+        const nextTags = reorderOverviewTags(current, active.id, over.id);
+        if (nextTags === current) return;
+        dragTagsRef.current = nextTags;
+        setDragTags(nextTags);
       }}
       onDragStart={({ active }) => {
         onEditingChange('');
+        dragTagsRef.current = scope.tags;
+        setDragTags(scope.tags);
         setActiveTagId(active.id);
       }}
     >
-      <SortableContext items={scope.tags.map((tag) => tag.id)} strategy={rectSortingStrategy}>
-        <div className="overview-tags" role="list" aria-label={scope.label}>
-          {scope.tags.map((tag, index) => {
+      <SortableContext items={renderedTags.map((tag) => tag.id)} strategy={LIVE_TAG_SORTING_STRATEGY}>
+        <div className={`overview-tags ${activeTagId ? 'sorting' : ''}`} role="list" aria-label={scope.label}>
+          {renderedTags.map((tag, index) => {
             const key = overviewTagKey(scope.key, tag.id);
             return <SortableTag
               disabled={selecting || filtered}
@@ -561,6 +581,12 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     updateProject(updatePromptScope(project, scope.key, tags));
   };
 
+  const reorderTags = (scope, tags) => {
+    if (filtered || tags.length !== scope.tags.length) return;
+    const unchanged = tags.every((tag, index) => tag.id === scope.tags[index]?.id);
+    if (!unchanged) updateProject(updatePromptScope(project, scope.key, tags));
+  };
+
   const keyboardMove = (scope, index, event) => {
     if (!event.altKey || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
     event.preventDefault();
@@ -681,7 +707,7 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     addDraft,
     addingScopeKey,
     filtered,
-    onMoveTag: moveTag,
+    onReorderTags: reorderTags,
     editingKey,
     onAddScope: addTags,
     onAddDraftChange: setAddDraft,
