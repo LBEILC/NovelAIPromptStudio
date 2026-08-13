@@ -1,65 +1,142 @@
 [
   {
-    "text": "NovelAI 图片里的 Prompt，\n不该一直困在 metadata 里。",
-    "startMs": 400,
-    "endMs": 4440,
-    "timestampMs": 400,
+    "text": "用 NovelAI 生成的图片越来越多以后，\n管理起来其实很麻烦。",
+    "startMs": 0,
+    "endMs": 4386,
+    "timestampMs": 0,
     "confidence": 1
   },
   {
-    "text": "把图片拖进 NovelAI Prompt Studio，",
-    "startMs": 5100,
-    "endMs": 8600,
-    "timestampMs": 5100,
+    "text": "想找某张图片，常常只能一张张翻。",
+    "startMs": 4929,
+    "endMs": 7664,
+    "timestampMs": 4929,
     "confidence": 1
   },
   {
-    "text": "Base、Character 和 Undesired Content，\n会自动拆分成清晰的 Tag。",
-    "startMs": 8600,
-    "endMs": 12460,
-    "timestampMs": 8600,
+    "text": "提示词本身也很难整理。",
+    "startMs": 8080,
+    "endMs": 9821,
+    "timestampMs": 8080,
     "confidence": 1
   },
   {
-    "text": "按区域和类别筛选，查看翻译、调整权重，\n再一键复制需要的 Prompt。",
-    "startMs": 12733,
-    "endMs": 18773,
-    "timestampMs": 12733,
+    "text": "基础提示词中，控制画面的 Tag、风格描述和画师串，\n经常交错在一起。",
+    "startMs": 10220,
+    "endMs": 15801,
+    "timestampMs": 10220,
     "confidence": 1
   },
   {
-    "text": "图片带有内嵌 Vibe 时，\n软件会只读识别它的强度和 Information Extracted。",
-    "startMs": 19400,
-    "endMs": 23300,
-    "timestampMs": 19400,
+    "text": "角色提示词中，角色特征和服饰内容，\n也混在同一串里。",
+    "startMs": 16129,
+    "endMs": 20284,
+    "timestampMs": 16129,
     "confidence": 1
   },
   {
-    "text": "并恢复导出为可以继续使用的 Vibe 文件。",
-    "startMs": 23300,
-    "endMs": 27520,
-    "timestampMs": 23300,
+    "text": "遇到不认识的 Tag，还得一个个复制出来翻译。",
+    "startMs": 20816,
+    "endMs": 23788,
+    "timestampMs": 20816,
     "confidence": 1
   },
   {
-    "text": "批量导入生成图片，按文件名、Tag 或译名搜索，\n相同 Prompt 的结果还会自动分组。",
-    "startMs": 28233,
-    "endMs": 34753,
-    "timestampMs": 28233,
+    "text": "想找到并修改某一部分内容，往往要花不少时间。",
+    "startMs": 24218,
+    "endMs": 27814,
+    "timestampMs": 24218,
     "confidence": 1
   },
   {
-    "text": "所有整理数据都保存在本地，\n原图保持只读。",
-    "startMs": 35400,
-    "endMs": 38660,
-    "timestampMs": 35400,
+    "text": "如果生成时使用了 Vibe，",
+    "startMs": 28324,
+    "endMs": 29766,
+    "timestampMs": 28324,
     "confidence": 1
   },
   {
-    "text": "NovelAI Prompt Studio，\n让 Prompt 真正回到创作流程里。",
-    "startMs": 39667,
-    "endMs": 44687,
-    "timestampMs": 39667,
+    "text": "只把图片重新拖回 NovelAI，",
+    "startMs": 30018,
+    "endMs": 32210,
+    "timestampMs": 30018,
+    "confidence": 1
+  },
+  {
+    "text": "也没办法把其中的 Vibe 完整恢复出来。",
+    "startMs": 32565,
+    "endMs": 35484,
+    "timestampMs": 32565,
+    "confidence": 1
+  },
+  {
+    "text": "所以，我写了一个开源工具——NovelAI Prompt Studio，\n专门解决这些问题。",
+    "startMs": 36047,
+    "endMs": 41216,
+    "timestampMs": 36047,
+    "confidence": 1
+  },
+  {
+    "text": "它可以批量导入和管理生成图片，\n按照文件名、Tag 或中文译名搜索；使用相同提示词的图片，也会自动归类。",
+    "startMs": 41680,
+    "endMs": 49936,
+    "timestampMs": 41680,
+    "confidence": 1
+  },
+  {
+    "text": "软件会自动识别 Tag 的用途，\n把画面控制、画师、角色和服饰等内容分类整理。",
+    "startMs": 50508,
+    "endMs": 56566,
+    "timestampMs": 50508,
+    "confidence": 1
+  },
+  {
+    "text": "你可以按区域和类别筛选，直接查看翻译、\n调整权重，再一键复制。",
+    "startMs": 56965,
+    "endMs": 62117,
+    "timestampMs": 56965,
+    "confidence": 1
+  },
+  {
+    "text": "图片里内嵌的 Vibe，也可以读取相关参数并恢复导出。",
+    "startMs": 62539,
+    "endMs": 66439,
+    "timestampMs": 62539,
+    "confidence": 1
+  },
+  {
+    "text": "所有数据都保存在本地。",
+    "startMs": 66832,
+    "endMs": 68775,
+    "timestampMs": 66832,
+    "confidence": 1
+  },
+  {
+    "text": "原始图片不会被修改。",
+    "startMs": 69163,
+    "endMs": 70690,
+    "timestampMs": 69163,
+    "confidence": 1
+  },
+  {
+    "text": "项目已经开源在 GitHub，\n链接放在简介和置顶评论。",
+    "startMs": 71208,
+    "endMs": 75256,
+    "timestampMs": 71208,
+    "confidence": 1
+  },
+  {
+    "text": "欢迎大家下载试用。",
+    "startMs": 75651,
+    "endMs": 76945,
+    "timestampMs": 75651,
+    "confidence": 1
+  },
+  {
+    "text": "如果遇到问题，或者有想加入的新功能，\n也欢迎来提供反馈。",
+    "startMs": 77358,
+    "endMs": 81575,
+    "timestampMs": 77358,
     "confidence": 1
   }
 ]

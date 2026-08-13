@@ -1,12 +1,14 @@
 import "./index.css";
 import { Composition, Folder } from "remotion";
-import { FeaturesScene } from "./scenes/FeaturesScene";
+import { ImagePainScene } from "./scenes/ImagePainScene";
+import { TagPainScene } from "./scenes/TagPainScene";
+import { TranslationPainScene } from "./scenes/TranslationPainScene";
+import { VibePainScene } from "./scenes/VibePainScene";
 import { GalleryScene } from "./scenes/GalleryScene";
 import { HeroScene } from "./scenes/HeroScene";
 import { OutroScene } from "./scenes/OutroScene";
 import { EditScene } from "./scenes/EditScene";
 import { VibeScene } from "./scenes/VibeScene";
-import { WorkbenchScene } from "./scenes/WorkbenchScene";
 import { PromoVideo } from "./Video";
 
 export const RemotionRoot: React.FC = () => {
@@ -14,57 +16,73 @@ export const RemotionRoot: React.FC = () => {
     <>
       <Folder name="NovelAI-Prompt-Studio-Demo-Scenes">
         <Composition
-          id="01-Hero"
+          id="01-Image-Pain"
+          component={ImagePainScene}
+          durationInFrames={242}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="02-Tag-Pain"
+          component={TagPainScene}
+          durationInFrames={382}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="03-Translation-Pain"
+          component={TranslationPainScene}
+          durationInFrames={226}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="04-Vibe-Pain"
+          component={VibePainScene}
+          durationInFrames={231}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="05-Open-Source-Reveal"
           component={HeroScene}
-          durationInFrames={150}
+          durationInFrames={169}
           fps={30}
           width={1920}
           height={1080}
         />
         <Composition
-          id="02-Workbench"
-          component={WorkbenchScene}
-          durationInFrames={250}
-          fps={30}
-          width={1920}
-          height={1080}
-        />
-        <Composition
-          id="03-Edit"
-          component={EditScene}
-          durationInFrames={215}
-          fps={30}
-          width={1920}
-          height={1080}
-        />
-        <Composition
-          id="04-Vibe"
-          component={VibeScene}
-          durationInFrames={280}
-          fps={30}
-          width={1920}
-          height={1080}
-        />
-        <Composition
-          id="05-Gallery"
+          id="06-Gallery"
           component={GalleryScene}
-          durationInFrames={230}
+          durationInFrames={265}
           fps={30}
           width={1920}
           height={1080}
         />
         <Composition
-          id="06-Features"
-          component={FeaturesScene}
-          durationInFrames={140}
+          id="07-Tag-Organization"
+          component={EditScene}
+          durationInFrames={361}
           fps={30}
           width={1920}
           height={1080}
         />
         <Composition
-          id="07-Outro"
+          id="08-Vibe-And-Privacy"
+          component={VibeScene}
+          durationInFrames={260}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="09-GitHub-Outro"
           component={OutroScene}
-          durationInFrames={180}
+          durationInFrames={351}
           fps={30}
           width={1920}
           height={1080}
@@ -73,7 +91,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="NovelAIPromptStudio-Demo-16x9"
         component={PromoVideo}
-        durationInFrames={1352}
+        durationInFrames={2487}
         fps={30}
         width={1920}
         height={1080}

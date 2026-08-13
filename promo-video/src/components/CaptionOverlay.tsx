@@ -59,14 +59,14 @@ export const CaptionOverlay: React.FC = () => {
         name="Voiceover caption"
         style={{
           maxWidth: 1500,
-          padding: "15px 27px 17px",
+          padding: "14px 28px 16px",
           borderRadius: 16,
           background: "rgba(2, 7, 15, 0.82)",
           border: "1px solid rgba(135, 192, 255, 0.28)",
           boxShadow: "0 16px 50px rgba(0, 0, 0, 0.46)",
           backdropFilter: "blur(14px)",
           color: "#f7faff",
-          fontSize: 34,
+          fontSize: 32,
           lineHeight: 1.42,
           fontWeight: 700,
           textAlign: "center",

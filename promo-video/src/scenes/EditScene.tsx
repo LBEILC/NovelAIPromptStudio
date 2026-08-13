@@ -7,61 +7,33 @@ import {
   useVideoConfig,
 } from "remotion";
 import { ScreenFrame } from "../components/ScreenFrame";
-import { VoiceTrack } from "../components/VoiceTrack";
 
-const Step: React.FC<{ index: number; label: string; detail: string }> = ({
-  index,
-  label,
-  detail,
-}) => {
+const CategoryChip: React.FC<{ index: number; label: string; count: number }> = ({ index, label, count }) => {
   const frame = useCurrentFrame();
 
   return (
     <Interactive.Div
-      name={`Edit step ${index + 1}`}
+      name={`Tag category ${label}`}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 18,
-        padding: "17px 22px",
-        borderRadius: 18,
-        background: "rgba(4, 11, 22, 0.82)",
-        border: "1px solid rgba(111, 181, 255, 0.28)",
-        boxShadow: "0 18px 55px rgba(0, 0, 0, 0.34)",
-        opacity: interpolate(frame, [26 + index * 15, 48 + index * 15], [0, 1], {
+        padding: "15px 18px",
+        borderRadius: 15,
+        background: "rgba(6,14,25,0.9)",
+        border: "1px solid rgba(107,179,250,0.3)",
+        boxShadow: "0 18px 45px rgba(0,0,0,0.32)",
+        opacity: interpolate(frame, [38 + index * 16, 62 + index * 16], [0, 1], {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
           easing: Easing.bezier(0.16, 1, 0.3, 1),
         }),
-        translate: interpolate(frame, [26 + index * 15, 48 + index * 15], ["28px 0px", "0px 0px"], {
+        translate: interpolate(frame, [38 + index * 16, 62 + index * 16], ["24px 0px", "0px 0px"], {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
           easing: Easing.bezier(0.16, 1, 0.3, 1),
         }),
       }}
     >
-      <div
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 14,
-          display: "grid",
-          placeItems: "center",
-          flex: "0 0 auto",
-          background: "linear-gradient(135deg, #67b6ff, #318fff)",
-          color: "#03101d",
-          fontSize: 25,
-          fontWeight: 900,
-        }}
-      >
-        {index + 1}
-      </div>
-      <div>
-        <div style={{ fontSize: 29, fontWeight: 800, color: "#f5f9ff" }}>{label}</div>
-        <div style={{ marginTop: 4, fontSize: 21, color: "rgba(216, 233, 251, 0.68)" }}>
-          {detail}
-        </div>
-      </div>
+      <div style={{ fontSize: 26, fontWeight: 850 }}>{label}</div>
+      <div style={{ marginTop: 4, color: "#82c4ff", fontSize: 20, fontWeight: 700 }}>{count} 个 Tag</div>
     </Interactive.Div>
   );
 };
@@ -72,58 +44,69 @@ export const EditScene: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#02050b", color: "white", overflow: "hidden" }}>
-      <ScreenFrame
-        asset="workbench.webp"
-        name="Prompt editing screenshot"
-        highlight={{ left: 745, top: 178, width: 930, height: 760 }}
-      />
-      <VoiceTrack asset="03-edit.wav" from={15} />
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(90deg, rgba(2, 5, 11, 0.12) 0%, rgba(2, 5, 11, 0.42) 48%, rgba(2, 5, 11, 0.96) 100%)",
-        }}
-      />
+      <ScreenFrame asset="workbench.webp" name="Classified prompt workspace" highlight={{ left: 735, top: 176, width: 1000, height: 785 }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(2,5,11,0.2), rgba(2,5,11,0.56) 48%, rgba(2,5,11,0.97) 100%)" }} />
       <Interactive.Div
-        name="Edit scene headline"
+        name="Tag organization headline"
         style={{
           position: "absolute",
-          right: 92,
-          top: 126,
-          width: 520,
-          fontSize: 60,
-          lineHeight: 1.15,
-          fontWeight: 850,
-          letterSpacing: -2,
+          right: 90,
+          top: 95,
+          width: 650,
           textAlign: "right",
-          opacity: interpolate(frame, [8, 34, durationInFrames - 16, durationInFrames - 1], [0, 1, 1, 0], {
+          fontSize: 70,
+          lineHeight: 1.13,
+          fontWeight: 850,
+          letterSpacing: -2.5,
+          opacity: interpolate(frame, [10, 38, durationInFrames - 18, durationInFrames - 1], [0, 1, 1, 0], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
             easing: Easing.bezier(0.16, 1, 0.3, 1),
           }),
         }}
       >
-        从看懂 Prompt
+        自动识别用途
         <br />
-        到直接使用
+        Tag 分类整理
       </Interactive.Div>
-      <div
+      <div style={{ position: "absolute", right: 90, top: 310, width: 620, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 13 }}>
+        <CategoryChip index={0} label="画面控制" count={16} />
+        <CategoryChip index={1} label="画师" count={16} />
+        <CategoryChip index={2} label="角色特征" count={7} />
+        <CategoryChip index={3} label="服饰内容" count={23} />
+      </div>
+      <Interactive.Div
+        name="Prompt editing actions"
         style={{
           position: "absolute",
-          right: 92,
-          top: 330,
-          width: 520,
-          display: "flex",
-          flexDirection: "column",
-          gap: 14,
+          right: 90,
+          top: 615,
+          width: 620,
+          padding: "25px 28px",
+          borderRadius: 20,
+          background: "rgba(5,13,24,0.92)",
+          border: "1px solid rgba(111,181,255,0.3)",
+          boxShadow: "0 24px 70px rgba(0,0,0,0.38)",
+          opacity: interpolate(frame, [168, 202], [0, 1], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+            easing: Easing.bezier(0.16, 1, 0.3, 1),
+          }),
+          translate: interpolate(frame, [168, 202], ["0px 28px", "0px 0px"], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+            easing: Easing.bezier(0.16, 1, 0.3, 1),
+          }),
         }}
       >
-        <Step index={0} label="筛选与搜索" detail="按区域、类别和译名快速聚焦" />
-        <Step index={1} label="翻译与调整" detail="理解 Tag，并保留原始语法与权重" />
-        <Step index={2} label="一键复制" detail="复制可见、完整或指定区域 Prompt" />
-      </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          {["区域筛选", "类别筛选", "查看翻译", "调整权重", "一键复制"].map((label, index) => (
+            <span key={label} style={{ padding: "12px 15px", borderRadius: 12, background: index === 4 ? "linear-gradient(135deg,#62b4ff,#338fff)" : "rgba(255,255,255,0.055)", color: index === 4 ? "#03101d" : "#f1f6fc", fontSize: 23, fontWeight: 800 }}>
+              {label}
+            </span>
+          ))}
+        </div>
+      </Interactive.Div>
     </AbsoluteFill>
   );
 };

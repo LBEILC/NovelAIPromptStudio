@@ -1,8 +1,8 @@
 # NovelAI Prompt Studio 宣传视频
 
-这是独立于桌面应用的 Remotion 视频工程。当前主合成为 16:9、1920×1080、30fps、约 45 秒的中文口播 Demo。
+这是独立于桌面应用的 Remotion 视频工程。当前主合成为 16:9、1920×1080、30fps、约 83 秒的中文口播 Demo。
 
-口播使用本地 GPT-SoVITS Bagpipe 模型合成，完整文案与生成设置见 [voiceover-script.md](./voiceover-script.md)。字幕采用 Remotion Caption JSON，并按实际 WAV 时长编排。
+口播使用用户提供的 MiniMax 成品音频，完整文案与时间轴见 [voiceover-script.md](./voiceover-script.md)。字幕采用 Remotion Caption JSON，并根据静音区间与人工校正后的转写编排。
 
 ## 本地预览
 
@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-在 Remotion Studio 中选择 `NovelAIPromptStudio-Demo-16x9`。七个场景也分别注册为独立 Composition，便于单独调整。
+在 Remotion Studio 中选择 `NovelAIPromptStudio-Demo-16x9`。九个场景也分别注册为独立 Composition，便于单独调整。
 
 ## 检查与渲染
 
@@ -21,7 +21,7 @@ npm run build
 npm run render:demo
 ```
 
-成片输出到 `out/novelai-prompt-studio-demo-16x9-voiceover.mp4`。`out/` 不提交到 Git。
+成片输出到 `out/novelai-prompt-studio-demo-16x9-minimax.mp4`。`out/` 不提交到 Git。
 
 ## 素材
 

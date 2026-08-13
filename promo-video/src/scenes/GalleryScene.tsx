@@ -7,91 +7,90 @@ import {
   useVideoConfig,
 } from "remotion";
 import { ScreenFrame } from "../components/ScreenFrame";
-import { VoiceTrack } from "../components/VoiceTrack";
 
 export const GalleryScene: React.FC = () => {
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
+  const { durationInFrames } = useVideoConfig();
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#02050b", color: "white", overflow: "hidden" }}>
-      <ScreenFrame asset="gallery-groups.webp" name="Grouped gallery screenshot" />
-      <VoiceTrack asset="05-gallery.wav" from={15} />
+      <ScreenFrame asset="gallery-groups.webp" name="Searchable grouped gallery" />
       <div
         style={{
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(90deg, rgba(2, 5, 11, 0.98) 0%, rgba(2, 5, 11, 0.75) 30%, transparent 62%), linear-gradient(0deg, rgba(2, 5, 11, 0.7), transparent 32%)",
+            "linear-gradient(90deg, rgba(2,5,11,0.98) 0%, rgba(2,5,11,0.78) 34%, transparent 63%), linear-gradient(0deg, rgba(2,5,11,0.76), transparent 35%)",
         }}
       />
       <Interactive.Div
-        name="Gallery kicker"
+        name="Gallery solution label"
         style={{
           position: "absolute",
           left: 100,
-          top: 220,
-          fontSize: 27,
-          fontWeight: 800,
-          letterSpacing: 2,
+          top: 170,
           color: "#71b8ff",
-          opacity: interpolate(frame, [0.5 * fps, 1.1 * fps], [0, 1], {
+          fontSize: 25,
+          fontWeight: 850,
+          letterSpacing: 2,
+          opacity: interpolate(frame, [10, 30], [0, 1], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
-            easing: Easing.bezier(0.16, 1, 0.3, 1),
           }),
         }}
       >
-        VISUAL LIBRARY
+        IMAGE LIBRARY
       </Interactive.Div>
       <Interactive.Div
         name="Gallery headline"
         style={{
           position: "absolute",
           left: 96,
-          top: 280,
-          width: 680,
-          fontSize: 82,
-          lineHeight: 1.15,
-          fontWeight: 800,
+          top: 230,
+          width: 700,
+          fontSize: 78,
+          lineHeight: 1.14,
+          fontWeight: 850,
           letterSpacing: -3,
-          textShadow: "0 12px 45px rgba(0, 0, 0, 0.75)",
-          opacity: interpolate(frame, [0.8 * fps, 1.55 * fps, durationInFrames - 18, durationInFrames - 1], [0, 1, 1, 0], {
+          textShadow: "0 14px 50px rgba(0,0,0,0.72)",
+          opacity: interpolate(frame, [22, 50, durationInFrames - 18, durationInFrames - 1], [0, 1, 1, 0], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
             easing: Easing.bezier(0.16, 1, 0.3, 1),
           }),
-          translate: interpolate(frame, [0.8 * fps, 1.55 * fps], ["-38px 0px", "0px 0px"], {
+          translate: interpolate(frame, [22, 50], ["-34px 0px", "0px 0px"], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
             easing: Easing.bezier(0.16, 1, 0.3, 1),
           }),
         }}
       >
-        把生成记录
+        图片集中管理
         <br />
-        变成可检索的图片库
+        搜索和归类一步完成
       </Interactive.Div>
       <Interactive.Div
-        name="Gallery feature chips"
+        name="Gallery search modes"
         style={{
           position: "absolute",
           left: 96,
-          top: 570,
+          top: 520,
+          width: 700,
           display: "flex",
-          gap: 14,
-          fontSize: 26,
-          fontWeight: 650,
-          opacity: interpolate(frame, [1.55 * fps, 2.25 * fps], [0, 1], {
+          flexWrap: "wrap",
+          gap: 13,
+          opacity: interpolate(frame, [65, 95], [0, 1], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
             easing: Easing.bezier(0.16, 1, 0.3, 1),
           }),
         }}
       >
-        <span style={{ padding: "13px 18px", borderRadius: 12, background: "rgba(22, 35, 52, 0.86)", border: "1px solid rgba(118, 179, 255, 0.28)" }}>批量导入</span>
-        <span style={{ padding: "13px 18px", borderRadius: 12, background: "rgba(22, 35, 52, 0.86)", border: "1px solid rgba(118, 179, 255, 0.28)" }}>Prompt 搜索</span>
-        <span style={{ padding: "13px 18px", borderRadius: 12, background: "rgba(22, 35, 52, 0.86)", border: "1px solid rgba(118, 179, 255, 0.28)" }}>自动分组</span>
+        {["批量导入", "文件名搜索", "Tag 搜索", "中文译名搜索", "相同提示词自动归类"].map((label) => (
+          <span key={label} style={{ padding: "13px 18px", borderRadius: 13, background: "rgba(17,31,49,0.9)", border: "1px solid rgba(111,178,249,0.28)", fontSize: 24, fontWeight: 700 }}>
+            {label}
+          </span>
+        ))}
       </Interactive.Div>
     </AbsoluteFill>
   );
