@@ -150,7 +150,7 @@ export default function WorkbenchPage({
       <LobeDraggablePanel
         className="workbench-source-shell"
         classNames={{ content: 'workspace-side-panel-content' }}
-        defaultSize={{ width: '34vw' }}
+        defaultSize={{ width: 'clamp(280px, 34vw, 560px)' }}
         maxWidth={560}
         minWidth={280}
         onSizeChange={(_delta, size) => setSourcePanelWidth(size?.width)}
