@@ -1,12 +1,18 @@
 import fs from 'node:fs';
 import zlib from 'node:zlib';
+import sharp from 'sharp';
 import { extractV4PromptData } from '../src/lib/promptStructure.js';
 import { detectGenerationMode } from '../src/lib/generationMetadata.js';
 import { extractEmbeddedVibes } from './vibes.js';
 
+const PNG_SIGNATURE = '89504e470d0a1a0a';
+const STEALTH_MAGIC_LENGTH = 15;
+const STEALTH_HEADER_BYTES = STEALTH_MAGIC_LENGTH + 4;
+const MAX_STEALTH_METADATA_BYTES = 16 * 1024 * 1024;
+
 function parsePngText(buffer) {
   const signature = buffer.subarray(0, 8).toString('hex');
-  if (signature !== '89504e470d0a1a0a') return {};
+  if (signature !== PNG_SIGNATURE) return {};
   const text = {};
   let offset = 8;
   while (offset + 12 <= buffer.length) {
@@ -39,13 +45,60 @@ function parsePngText(buffer) {
   return text;
 }
 
+function readAlphaLsbByte(data, width, height, byteIndex) {
+  let value = 0;
+  for (let bit = 0; bit < 8; bit += 1) {
+    const streamIndex = (byteIndex * 8) + bit;
+    const x = Math.floor(streamIndex / height);
+    const y = streamIndex % height;
+    value = (value << 1) | (data[((y * width) + x) * 4 + 3] & 1);
+  }
+  return value;
+}
+
+async function parseStealthPngText(buffer) {
+  if (buffer.subarray(0, 8).toString('hex') !== PNG_SIGNATURE) return {};
+  try {
+    const { data, info } = await sharp(buffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const capacity = Math.floor((info.width * info.height) / 8);
+    if (capacity < STEALTH_HEADER_BYTES) return {};
+
+    const header = Buffer.alloc(STEALTH_HEADER_BYTES);
+    for (let index = 0; index < header.length; index += 1) {
+      header[index] = readAlphaLsbByte(data, info.width, info.height, index);
+    }
+    const magic = header.subarray(0, STEALTH_MAGIC_LENGTH).toString('utf8');
+    if (magic !== 'stealth_pngcomp' && magic !== 'stealth_pnginfo') return {};
+
+    const bitLength = header.readUInt32BE(STEALTH_MAGIC_LENGTH);
+    if (bitLength % 8 !== 0) return {};
+    const payloadLength = bitLength / 8;
+    if (payloadLength <= 0
+      || payloadLength > capacity - STEALTH_HEADER_BYTES
+      || payloadLength > MAX_STEALTH_METADATA_BYTES) return {};
+
+    const payload = Buffer.alloc(payloadLength);
+    for (let index = 0; index < payload.length; index += 1) {
+      payload[index] = readAlphaLsbByte(data, info.width, info.height, STEALTH_HEADER_BYTES + index);
+    }
+    const decoded = magic === 'stealth_pngcomp'
+      ? zlib.gunzipSync(payload, { maxOutputLength: MAX_STEALTH_METADATA_BYTES })
+      : payload;
+    const parsed = safeJson(decoded.toString('utf8'));
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 function parsePngDimensions(buffer) {
-  if (buffer.length < 24 || buffer.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') return { width: 0, height: 0 };
+  if (buffer.length < 24 || buffer.subarray(0, 8).toString('hex') !== PNG_SIGNATURE) return { width: 0, height: 0 };
   if (buffer.subarray(12, 16).toString('ascii') !== 'IHDR') return { width: 0, height: 0 };
   return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
 }
 
 function safeJson(value) {
+  if (value && typeof value === 'object') return value;
   try {
     return JSON.parse(value);
   } catch {
@@ -60,9 +113,14 @@ function first(source, keys, fallback = '') {
   return fallback;
 }
 
-export function readNovelAIMetadata(filePath) {
+export async function readNovelAIMetadata(filePath) {
   const buffer = fs.readFileSync(filePath);
-  const text = parsePngText(buffer);
+  let text = parsePngText(buffer);
+  const hasStandardGenerationMetadata = Object.values(text).some((value) => {
+    const parsed = safeJson(value);
+    return parsed && typeof parsed === 'object';
+  });
+  if (!hasStandardGenerationMetadata) text = { ...await parseStealthPngText(buffer), ...text };
   const dimensions = parsePngDimensions(buffer);
   const candidates = Object.values(text).map(safeJson).filter((value) => value && typeof value === 'object');
   const raw = candidates.reduce((merged, item) => ({ ...merged, ...item }), {});

@@ -22,7 +22,7 @@ export async function readWorkbenchImage(filePath, { enrichProjectTags = (projec
   if (!SUPPORTED_EXTENSIONS.has(path.extname(resolvedPath).toLowerCase())) throw new Error('工作台仅支持 PNG、JPG 和 WEBP 图片');
   if (stat.size > MAX_IMAGE_BYTES) throw new Error('单张图片不能超过 100 MB');
 
-  const metadata = readNovelAIMetadata(resolvedPath);
+  const metadata = await readNovelAIMetadata(resolvedPath);
   if (!metadata.width || !metadata.height) {
     const dimensions = await sharp(resolvedPath).metadata();
     metadata.width = Number(dimensions.width || 0);

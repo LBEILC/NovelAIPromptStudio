@@ -44,7 +44,7 @@ export async function importImage(sourcePath, assetsDirectory, options = {}) {
   const id = crypto.randomUUID();
   const { targetPath, thumbnailPath } = await copyWithThumbnail(sourcePath, assetsDirectory);
   try {
-    const metadata = readNovelAIMetadata(sourcePath);
+    const metadata = await readNovelAIMetadata(sourcePath);
     if (!metadata.width || !metadata.height) {
       const imageMetadata = await sharp(sourcePath).metadata();
       metadata.width = Number(imageMetadata.width || 0);

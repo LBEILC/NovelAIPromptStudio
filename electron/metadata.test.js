@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
+import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
 import { readNovelAIMetadata } from './metadata.js';
 
@@ -13,12 +15,37 @@ function chunk(type, content = Buffer.alloc(0)) {
   return Buffer.concat([length, typeBuffer, content, Buffer.alloc(4)]);
 }
 
+async function writeStealthPng(filePath, metadata, { compressed = true } = {}) {
+  const width = 128;
+  const height = 128;
+  const raw = Buffer.alloc(width * height * 4, 255);
+  const json = Buffer.from(JSON.stringify(metadata));
+  const payload = compressed ? zlib.gzipSync(json) : json;
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(payload.length * 8);
+  const hidden = Buffer.concat([
+    Buffer.from(compressed ? 'stealth_pngcomp' : 'stealth_pnginfo'),
+    length,
+    payload,
+  ]);
+  if (hidden.length * 8 > width * height) throw new Error('Stealth test metadata exceeds image capacity');
+
+  for (let streamIndex = 0; streamIndex < hidden.length * 8; streamIndex += 1) {
+    const x = Math.floor(streamIndex / height);
+    const y = streamIndex % height;
+    const bit = (hidden[Math.floor(streamIndex / 8)] >> (7 - (streamIndex % 8))) & 1;
+    const alphaIndex = ((y * width) + x) * 4 + 3;
+    raw[alphaIndex] = (raw[alphaIndex] & 0xfe) | bit;
+  }
+  await sharp(raw, { raw: { width, height, channels: 4 } }).png().toFile(filePath);
+}
+
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
 describe('NovelAI PNG metadata', () => {
-  it('recovers generation fields from a Description JSON text chunk', () => {
+  it('recovers generation fields from a Description JSON text chunk', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
     temporaryDirectories.push(directory);
     const filePath = path.join(directory, 'sample.png');
@@ -38,7 +65,7 @@ describe('NovelAI PNG metadata', () => {
     ]);
     fs.writeFileSync(filePath, png);
 
-    expect(readNovelAIMetadata(filePath)).toMatchObject({
+    expect(await readNovelAIMetadata(filePath)).toMatchObject({
       prompt_raw: '1girl, 1.3::silver hair ::',
       negative_prompt: 'lowres, blurry',
       seed: '42042',
@@ -49,7 +76,7 @@ describe('NovelAI PNG metadata', () => {
     });
   });
 
-  it('reads the generated image dimensions from the PNG IHDR chunk', () => {
+  it('reads the generated image dimensions from the PNG IHDR chunk', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
     temporaryDirectories.push(directory);
     const filePath = path.join(directory, 'dimensions.png');
@@ -63,10 +90,44 @@ describe('NovelAI PNG metadata', () => {
     ]);
     fs.writeFileSync(filePath, png);
 
-    expect(readNovelAIMetadata(filePath)).toMatchObject({ width: 1024, height: 1536 });
+    expect(await readNovelAIMetadata(filePath)).toMatchObject({ width: 1024, height: 1536 });
   });
 
-  it('separates V4 base and character prompts with undesired content and positions', () => {
+  it.each([
+    ['compressed', true],
+    ['uncompressed', false],
+  ])('recovers generation fields from %s alpha-channel stealth metadata', async (_label, compressed) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
+    temporaryDirectories.push(directory);
+    const filePath = path.join(directory, 'stealth.png');
+    await writeStealthPng(filePath, {
+      Description: '2girls, outdoors',
+      Software: 'NovelAI',
+      Source: 'NovelAI Diffusion V4.5',
+      Comment: JSON.stringify({
+        prompt: '2girls, outdoors',
+        uc: 'lowres, blurry',
+        seed: 1127158183,
+        steps: 28,
+        sampler: 'k_euler_ancestral',
+        scale: 6,
+      }),
+    }, { compressed });
+
+    expect(await readNovelAIMetadata(filePath)).toMatchObject({
+      prompt_raw: '2girls, outdoors',
+      negative_prompt: 'lowres, blurry',
+      seed: '1127158183',
+      steps: 28,
+      sampler: 'k_euler_ancestral',
+      guidance: 6,
+      model: 'NovelAI Diffusion V4.5',
+      width: 128,
+      height: 128,
+    });
+  });
+
+  it('separates V4 base and character prompts with undesired content and positions', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
     temporaryDirectories.push(directory);
     const filePath = path.join(directory, 'v4.png');
@@ -101,7 +162,7 @@ describe('NovelAI PNG metadata', () => {
     ]);
     fs.writeFileSync(filePath, png);
 
-    const metadata = readNovelAIMetadata(filePath);
+    const metadata = await readNovelAIMetadata(filePath);
     expect(metadata.prompt_raw).toBe('2girls, outdoors');
     expect(metadata.negative_prompt).toBe('lowres, blurry');
     expect(metadata.prompt_structure_raw).toMatchObject({
@@ -114,7 +175,7 @@ describe('NovelAI PNG metadata', () => {
     });
   });
 
-  it('extracts encoded Vibes from NovelAI PNG metadata', () => {
+  it('extracts encoded Vibes from NovelAI PNG metadata', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
     temporaryDirectories.push(directory);
     const filePath = path.join(directory, 'vibes.png');
@@ -131,13 +192,13 @@ describe('NovelAI PNG metadata', () => {
     ]);
     fs.writeFileSync(filePath, png);
 
-    const metadata = readNovelAIMetadata(filePath);
+    const metadata = await readNovelAIMetadata(filePath);
     expect(metadata.embedded_vibes).toEqual([
       expect.objectContaining({ strength: 0.4, information_extracted: null, model: 'nai-diffusion-4-5-full' }),
     ]);
   });
 
-  it('recognizes NativeInfillingRequest images without discarding their generation fields', () => {
+  it('recognizes NativeInfillingRequest images without discarding their generation fields', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
     temporaryDirectories.push(directory);
     const filePath = path.join(directory, 'inpainting.png');
@@ -156,7 +217,7 @@ describe('NovelAI PNG metadata', () => {
     ]);
     fs.writeFileSync(filePath, png);
 
-    expect(readNovelAIMetadata(filePath)).toMatchObject({
+    expect(await readNovelAIMetadata(filePath)).toMatchObject({
       generation_mode: 'inpainting',
       prompt_raw: '1girl, white background',
       seed: '1658537204',
