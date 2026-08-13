@@ -152,6 +152,7 @@ export default function GalleryPage({
 }) {
   const [previewExpanded, setPreviewExpanded] = useState(Boolean(preview));
   const [previewPanelWidth, setPreviewPanelWidth] = useState();
+  const [previewPinned, setPreviewPinned] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const renameTargetRef = useRef('');
@@ -255,12 +256,13 @@ export default function GalleryPage({
         />}
       </section>
       <LobeDraggablePanel
-        className="gallery-preview-shell"
+        className={`gallery-preview-shell ${previewPinned ? 'is-fixed' : 'is-floating'}`}
         classNames={{ content: 'workspace-side-panel-content' }}
         defaultSize={{ width: 'clamp(340px, 28vw, 560px)' }}
         expand={previewExpanded}
         maxWidth={560}
         minWidth={340}
+        mode={previewPinned ? 'fixed' : 'float'}
         onExpandChange={setPreviewExpanded}
         onSizeChange={(_delta, size) => setPreviewPanelWidth(size?.width)}
         placement="right"
@@ -289,6 +291,15 @@ export default function GalleryPage({
                 <LobeButton onClick={saveName} size="small" type="primary">保存</LobeButton>
                 <LobeButton onClick={() => setRenaming(false)} size="small" type="text">取消</LobeButton>
               </div> : <h2 onDoubleClick={() => view !== 'trash' && setRenaming(true)} title={preview.name}>{preview.name}</h2>}
+              <ActionIcon
+                active={previewPinned}
+                aria-label={previewPinned ? '取消固定预览面板' : '固定预览面板'}
+                aria-pressed={previewPinned}
+                className="gallery-preview-pin"
+                icon={<Icon name={previewPinned ? 'pinOff' : 'pin'}/>}
+                onClick={() => setPreviewPinned((pinned) => !pinned)}
+                title={previewPinned ? '取消固定，浮动显示' : '固定为分栏'}
+              />
             </header>
             <ImageStage
               alt={preview.name}

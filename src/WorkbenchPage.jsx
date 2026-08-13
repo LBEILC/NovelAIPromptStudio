@@ -156,6 +156,7 @@ export default function WorkbenchPage({
         onSizeChange={(_delta, size) => setSourcePanelWidth(size?.width)}
         placement="left"
         showHandleHighlight
+        stableLayout
         size={sourcePanelWidth ? { height: '100%', width: sourcePanelWidth } : undefined}
       >
         <LobeDraggablePanel.Body className="workbench-source-panel">
