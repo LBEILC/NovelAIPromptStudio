@@ -12,6 +12,7 @@ import {
   WORKBENCH_SOURCE_PANEL_WIDTH_KEY,
   writePanelWidth,
 } from './lib/panelLayout.js';
+import { fitTabPreviewCanvas } from './lib/imagePreview.js';
 import { countPromptTags, formatPositivePromptForCopy, positivePromptCopyOptions } from './lib/promptStructure.js';
 import { activeWorkbenchCopyContext, activeWorkbenchTab, scopeWorkbenchCopyContext, workbenchTabHasChanges } from './lib/workbenchSession.js';
 
@@ -46,12 +47,19 @@ function WorkbenchTabPreview({ tab }) {
   const filePath = project?.image_path || tab.source?.path || '';
   const width = Number(project?.metadata?.width || 0);
   const height = Number(project?.metadata?.height || 0);
+  const previewCanvas = fitTabPreviewCanvas(width, height);
   const dirty = workbenchTabHasChanges(tab);
   const detail = project
     ? `${width && height ? `${width} × ${height} · ` : ''}${countPromptTags(project)} 个 Tag${dirty ? ' · 有未保存修改' : ''}`
     : tab.error || '图片源不可用';
 
-  return <div className="workbench-tab-preview">
+  return <div
+    className="workbench-tab-preview"
+    style={{
+      '--workbench-tab-preview-ratio': `${previewCanvas.width} / ${previewCanvas.height}`,
+      '--workbench-tab-preview-width': `${previewCanvas.width}px`,
+    }}
+  >
     <div className="workbench-tab-preview-media">
       {project && filePath
         ? <img alt="" loading="lazy" src={mediaUrl(filePath)}/>
