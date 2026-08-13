@@ -6,7 +6,13 @@ import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
 import { galleryEmptyState } from './lib/gallery.js';
-import { panelWidthForViewport } from './lib/panelLayout.js';
+import {
+  GALLERY_PREVIEW_PANEL_WIDTH_KEY,
+  panelStorage,
+  panelWidthForViewport,
+  readPanelWidth,
+  writePanelWidth,
+} from './lib/panelLayout.js';
 import { countPromptTags, positiveRawPromptScopes } from './lib/promptStructure.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
 
@@ -152,7 +158,13 @@ export default function GalleryPage({
   onDownloadImage,
 }) {
   const [previewExpanded, setPreviewExpanded] = useState(Boolean(preview));
-  const [previewPanelWidth, setPreviewPanelWidth] = useState(() => panelWidthForViewport(globalThis.innerWidth, .28, 340, 560));
+  const [previewPanelWidth, setPreviewPanelWidth] = useState(() => readPanelWidth(
+    panelStorage(),
+    GALLERY_PREVIEW_PANEL_WIDTH_KEY,
+    panelWidthForViewport(globalThis.innerWidth, .28, 340, 560),
+    340,
+    560,
+  ));
   const [previewPinned, setPreviewPinned] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -265,7 +277,10 @@ export default function GalleryPage({
         minWidth={340}
         mode={previewPinned ? 'fixed' : 'float'}
         onExpandChange={setPreviewExpanded}
-        onSizeChange={(_delta, size) => setPreviewPanelWidth(size?.width)}
+        onSizeChange={(_delta, size) => {
+          const width = writePanelWidth(panelStorage(), GALLERY_PREVIEW_PANEL_WIDTH_KEY, size?.width, 340, 560);
+          if (width !== undefined) setPreviewPanelWidth(width);
+        }}
         placement="right"
         showHandleHighlight
         stableLayout

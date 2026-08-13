@@ -5,7 +5,13 @@ import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage from './components/ImageStage.jsx';
-import { panelWidthForViewport } from './lib/panelLayout.js';
+import {
+  panelStorage,
+  panelWidthForViewport,
+  readPanelWidth,
+  WORKBENCH_SOURCE_PANEL_WIDTH_KEY,
+  writePanelWidth,
+} from './lib/panelLayout.js';
 import { countPromptTags, formatPositivePromptForCopy, positivePromptCopyOptions } from './lib/promptStructure.js';
 import { activeWorkbenchCopyContext, activeWorkbenchTab, scopeWorkbenchCopyContext, workbenchTabHasChanges } from './lib/workbenchSession.js';
 
@@ -79,7 +85,13 @@ export default function WorkbenchPage({
   onUpdateProject,
   session,
 }) {
-  const [sourcePanelWidth, setSourcePanelWidth] = useState(() => panelWidthForViewport(globalThis.innerWidth, .34, 280, 560));
+  const [sourcePanelWidth, setSourcePanelWidth] = useState(() => readPanelWidth(
+    panelStorage(),
+    WORKBENCH_SOURCE_PANEL_WIDTH_KEY,
+    panelWidthForViewport(globalThis.innerWidth, .34, 280, 560),
+    280,
+    560,
+  ));
   const [copyContextState, setCopyContextState] = useState({ tabId: '', text: '', count: 0 });
   const tab = activeWorkbenchTab(session);
   const project = tab?.project;
@@ -154,7 +166,10 @@ export default function WorkbenchPage({
         defaultSize={{ width: 'clamp(280px, 34vw, 560px)' }}
         maxWidth={560}
         minWidth={280}
-        onSizeChange={(_delta, size) => setSourcePanelWidth(size?.width)}
+        onSizeChange={(_delta, size) => {
+          const width = writePanelWidth(panelStorage(), WORKBENCH_SOURCE_PANEL_WIDTH_KEY, size?.width, 280, 560);
+          if (width !== undefined) setSourcePanelWidth(width);
+        }}
         placement="left"
         showHandleHighlight
         stableLayout
