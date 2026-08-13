@@ -4,6 +4,7 @@ import {
   isDanbooruArtist,
   isExplicitArtistTag,
 } from './danbooru.js';
+import { inferCategory } from '../src/lib/prompt.js';
 
 const DANBOORU_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -68,8 +69,11 @@ export async function annotateTags(texts, options) {
   const missing = cleaned.map((tag, index) => {
     const cached = dictionary.get(dictionaryKey(tag));
     const artist = isDanbooruArtist(artistEntry(tag));
+    const ruleCategory = inferCategory(tag);
+    const manualCategory = cached?.has_classification && cached.category_source === 'manual';
     const hasTranslation = artist || Boolean(cached?.has_translation);
-    const hasClassification = artist || Boolean(cached?.has_classification);
+    const hasClassification = artist || manualCategory || ruleCategory !== 'Unsorted'
+      || (cached?.has_classification && cached.category !== 'Unsorted');
     return hasTranslation && hasClassification ? null : { tag, index };
   }).filter(Boolean);
 
@@ -79,6 +83,7 @@ export async function annotateTags(texts, options) {
     const cached = dictionary.get(dictionaryKey(tag));
     const ai = generatedByIndex.get(index) || {};
     const artist = isDanbooruArtist(artistEntry(tag));
+    const ruleCategory = inferCategory(tag);
     const manualTranslation = cached?.has_translation && cached.translation_source === 'manual';
     const manualCategory = cached?.has_classification && cached.category_source === 'manual';
     return {
@@ -93,11 +98,21 @@ export async function annotateTags(texts, options) {
         ? cached.category
         : artist
           ? 'ArtistEra'
-          : cached?.has_classification
-            ? cached.category
-            : ai.category,
+          : ruleCategory !== 'Unsorted'
+            ? ruleCategory
+            : cached?.has_classification && cached.category !== 'Unsorted'
+              ? cached.category
+              : ai.category,
       translation_source: manualTranslation ? 'manual' : artist ? 'danbooru' : cached?.has_translation ? 'cache' : 'ai',
-      category_source: manualCategory ? 'manual' : artist ? 'danbooru' : cached?.has_classification ? 'cache' : 'ai',
+      category_source: manualCategory
+        ? 'manual'
+        : artist
+          ? 'danbooru'
+          : ruleCategory !== 'Unsorted'
+            ? 'rule'
+            : cached?.has_classification && cached.category !== 'Unsorted'
+              ? 'cache'
+              : 'ai',
     };
   });
 

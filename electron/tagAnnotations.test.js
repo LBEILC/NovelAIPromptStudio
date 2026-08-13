@@ -34,7 +34,7 @@ describe('tag annotation orchestration', () => {
     expect(result.items).toEqual([
       { translation: '画师:shion(mirudakemann)', category: 'ArtistEra', translation_source: 'danbooru', category_source: 'danbooru' },
       { translation: '画师:yamamoto souichirou', category: 'ArtistEra', translation_source: 'danbooru', category_source: 'danbooru' },
-      { translation: '红发', category: 'Body', translation_source: 'ai', category_source: 'ai' },
+      { translation: '红发', category: 'Body', translation_source: 'ai', category_source: 'rule' },
     ]);
     expect(result.danbooruChecks).toHaveLength(2);
   });
@@ -63,6 +63,36 @@ describe('tag annotation orchestration', () => {
       category: 'ArtistEra',
       translation_source: 'danbooru',
       category_source: 'danbooru',
+    });
+  });
+
+  it('repairs an old AI Unsorted clothing result with the deterministic rule', async () => {
+    const translateMissing = vi.fn();
+    const result = await annotateTags(['light gray ribbed knit sleeveless turtleneck top'], {
+      dictionary: dictionary([{
+        tag: 'light gray ribbed knit sleeveless turtleneck top',
+        translation: '浅灰色罗纹针织无袖高领上衣',
+        category: 'Unsorted',
+        has_translation: 1,
+        has_classification: 1,
+        translation_source: 'ai',
+        category_source: 'ai',
+      }]),
+      danbooruCache: new Map([['light_gray_ribbed_knit_sleeveless_turtleneck_top', {
+        category: 0,
+        checked_at: '2026-08-12T00:00:00.000Z',
+      }]]),
+      lookupDanbooru: vi.fn(),
+      translateMissing,
+      now,
+    });
+
+    expect(translateMissing).not.toHaveBeenCalled();
+    expect(result.items[0]).toEqual({
+      translation: '浅灰色罗纹针织无袖高领上衣',
+      category: 'Clothing',
+      translation_source: 'cache',
+      category_source: 'rule',
     });
   });
 

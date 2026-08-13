@@ -69,6 +69,40 @@ describe('phase 2 core database', () => {
     expect(cached.get('not_an_artist')).toMatchObject({ category: -1 });
   });
 
+  it('does not let an old AI Unsorted cache override a clear clothing rule', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    const tag = 'light gray ribbed knit sleeveless turtleneck top';
+    database.upsertTagDictionary([{
+      tag,
+      translation: '浅灰色罗纹针织无袖高领上衣',
+      category: 'Unsorted',
+      has_translation: true,
+      has_classification: true,
+      translation_source: 'ai',
+      category_source: 'ai',
+    }]);
+    const clothingProject = project('clothing');
+    clothingProject.tags = [{ ...clothingProject.tags[0], tag, category: 'Unsorted', category_source: 'heuristic' }];
+    const enriched = database.enrichProjectTags(clothingProject);
+    expect(enriched.tags[0]).toMatchObject({
+      translation: '浅灰色罗纹针织无袖高领上衣',
+      category: 'Clothing',
+      category_source: 'rule',
+    });
+    database.upsertTagDictionary([{
+      tag,
+      translation: enriched.tags[0].translation,
+      category: enriched.tags[0].category,
+      has_translation: true,
+      has_classification: true,
+      translation_source: 'cache',
+      category_source: 'rule',
+    }]);
+    expect(database.lookupTagDictionary([tag]).get(tag)).toMatchObject({ category: 'Clothing', category_source: 'rule' });
+  });
+
   it('creates one immutable pre-phase2 backup before reopening an existing database', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
     temporaryDirectories.push(directory);

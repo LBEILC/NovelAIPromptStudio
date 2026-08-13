@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import initSqlJs from 'sql.js';
-import { CATEGORY_OPTIONS, normalizeCategory } from '../src/lib/prompt.js';
+import { CATEGORY_OPTIONS, inferCategory, normalizeCategory } from '../src/lib/prompt.js';
 import { promptFingerprint } from '../src/lib/promptFingerprint.js';
 import { danbooruLookupName } from './danbooru.js';
 
@@ -213,7 +213,7 @@ export async function openDatabase(dataDirectory) {
     }
   };
 
-  const knowledgePriority = (source) => ({ manual: 4, danbooru: 3, ai: 2, cache: 1, builtin: 0, heuristic: 0 }[source] || 0);
+  const knowledgePriority = (source) => ({ manual: 4, danbooru: 3, rule: 3, ai: 2, cache: 1, builtin: 0, heuristic: 0 }[source] || 0);
   const upsertTagDictionary = (entries = [], updatedAt = new Date().toISOString()) => {
     for (const entry of entries) {
       const key = dictionaryKey(entry.tag);
@@ -288,13 +288,23 @@ export async function openDatabase(dataDirectory) {
     const cached = lookupTagDictionary(projectTags(project).map((tag) => tag.tag));
     const enrich = (tag) => {
       const entry = cached.get(dictionaryKey(tag.tag));
-      const category = normalizeCategory(tag.category, tag.tag);
-      const migrated = category === tag.category ? tag : { ...tag, category, category_source: tag.category_source || 'migration' };
+      const normalizedCategory = normalizeCategory(tag.category, tag.tag);
+      const ruleCategory = inferCategory(tag.tag);
+      const useRule = tag.category_source !== 'manual' && ruleCategory !== 'Unsorted';
+      const category = useRule ? ruleCategory : normalizedCategory;
+      const migrated = category === tag.category
+        ? tag
+        : { ...tag, category, category_source: useRule ? 'rule' : tag.category_source || 'migration' };
       if (!entry) return migrated;
+      const cachedCategoryWins = entry.has_classification && (
+        entry.category_source === 'manual'
+        || entry.category_source === 'danbooru'
+        || !useRule
+      );
       return {
         ...migrated,
         ...(entry.has_translation ? { translation: entry.translation, translation_source: entry.translation_source || 'cache' } : {}),
-        ...(entry.has_classification ? { category: normalizeCategory(entry.category, tag.tag), category_source: entry.category_source || 'cache' } : {}),
+        ...(cachedCategoryWins ? { category: normalizeCategory(entry.category, tag.tag), category_source: entry.category_source || 'cache' } : {}),
       };
     };
     const structure = project.prompt_structure || {};

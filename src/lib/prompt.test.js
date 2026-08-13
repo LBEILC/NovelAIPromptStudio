@@ -162,6 +162,10 @@ describe('NovelAI prompt codec', () => {
     expect(inferCategory('elf')).toBe('Identity');
     expect(inferCategory('silver hair')).toBe('Body');
     expect(inferCategory('black military uniform')).toBe('Clothing');
+    expect(inferCategory('light gray ribbed knit sleeveless turtleneck top')).toBe('Clothing');
+    expect(inferCategory('white off shoulder blouse')).toBe('Clothing');
+    expect(inferCategory('black thighhigh stockings')).toBe('Clothing');
+    expect(inferCategory('top-down view')).toBe('Composition');
     expect(inferCategory('smile')).toBe('Action');
     expect(inferCategory('hand up')).toBe('Action');
     expect(inferCategory('upper body')).toBe('Composition');
