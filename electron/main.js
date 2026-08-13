@@ -8,6 +8,8 @@ import { openDatabase } from './database.js';
 import { backfillProjectContentHashes, backfillProjectDimensions, importLibraryFiles } from './importer.js';
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
+import { lookupDanbooruTags } from './danbooru.js';
+import { annotateTags } from './tagAnnotations.js';
 import { exportEmbeddedVibeFile } from './vibes.js';
 import { readWorkbenchImage } from './workbench.js';
 import { listSystemFonts } from './fonts.js';
@@ -644,27 +646,26 @@ app.whenReady().then(async () => {
   ipcMain.handle('translation:tags', async (_event, tags) => {
     try {
       const cleaned = (tags || []).map((tag) => String(tag || '').trim());
-      const keyOf = (tag) => tag.toLocaleLowerCase('en-US');
-      const cached = database.lookupTagDictionary(cleaned);
-      const missing = cleaned.map((tag, index) => {
-        const entry = cached.get(keyOf(tag));
-        return !entry?.has_translation || !entry?.has_classification ? { tag, index } : null;
-      }).filter(Boolean);
-      const generated = missing.length ? await translateTags(missing.map((item) => item.tag), preferences.credentials(), net.fetch) : null;
-      const generatedByIndex = new Map(missing.map((item, index) => [item.index, generated.items[index]]));
-      const items = cleaned.map((tag, index) => {
-        const entry = cached.get(keyOf(tag));
-        const ai = generatedByIndex.get(index);
-        return {
-          translation: entry?.has_translation ? entry.translation : ai.translation,
-          category: entry?.has_classification ? entry.category : ai.category,
-          translation_source: entry?.has_translation ? 'cache' : 'ai',
-          category_source: entry?.has_classification ? 'cache' : 'ai',
-        };
+      const resolved = await annotateTags(cleaned, {
+        dictionary: database.lookupTagDictionary(cleaned),
+        danbooruCache: database.lookupDanbooruTagCache(cleaned),
+        lookupDanbooru: (values) => lookupDanbooruTags(values, net.fetch),
+        translateMissing: (values) => translateTags(values, preferences.credentials(), net.fetch),
       });
+      const { items, generated, danbooruChecks } = resolved;
+      database.upsertDanbooruTagCache(danbooruChecks);
       database.upsertTagDictionary(cleaned.map((tag, index) => ({ tag, ...items[index], has_translation: true, has_classification: true })));
       database.persist();
-      return { ok: true, model: generated?.model || '本地词典', items, translations: items.map((item) => item.translation), categories: items.map((item) => item.category), cache_hits: cleaned.length - missing.length, ai_count: missing.length };
+      return {
+        ok: true,
+        model: generated?.model || '本地词典 / Danbooru',
+        items,
+        translations: items.map((item) => item.translation),
+        categories: items.map((item) => item.category),
+        cache_hits: resolved.cacheHits,
+        ai_count: resolved.aiCount,
+        danbooru_artist_count: items.filter((item) => item.category_source === 'danbooru').length,
+      };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }

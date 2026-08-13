@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import initSqlJs from 'sql.js';
 import { CATEGORY_OPTIONS, normalizeCategory } from '../src/lib/prompt.js';
 import { promptFingerprint } from '../src/lib/promptFingerprint.js';
+import { danbooruLookupName } from './danbooru.js';
 
 const require = createRequire(import.meta.url);
 const TAG_CATEGORIES = new Set(CATEGORY_OPTIONS);
@@ -66,6 +67,14 @@ CREATE TABLE IF NOT EXISTS tag_dictionary (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_tag_dictionary_category ON tag_dictionary(category);
+CREATE TABLE IF NOT EXISTS danbooru_tag_cache (
+  tag TEXT PRIMARY KEY,
+  canonical_tag TEXT NOT NULL DEFAULT '',
+  category INTEGER NOT NULL DEFAULT -1,
+  is_deprecated INTEGER NOT NULL DEFAULT 0,
+  post_count INTEGER NOT NULL DEFAULT 0,
+  checked_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS app_meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -172,7 +181,39 @@ export async function openDatabase(dataDirectory) {
     return found;
   };
 
-  const knowledgePriority = (source) => ({ manual: 3, ai: 2, cache: 1, builtin: 0, heuristic: 0 }[source] || 0);
+  const lookupDanbooruTagCache = (tags = []) => {
+    const found = new Map();
+    for (const tag of tags) {
+      const key = danbooruLookupName(tag);
+      if (!key || found.has(key)) continue;
+      const row = query('SELECT * FROM danbooru_tag_cache WHERE tag = $tag', { $tag: key })[0];
+      if (row) found.set(key, row);
+    }
+    return found;
+  };
+
+  const upsertDanbooruTagCache = (entries = []) => {
+    for (const entry of entries) {
+      const key = danbooruLookupName(entry.tag);
+      if (!key) continue;
+      database.run(
+        `INSERT INTO danbooru_tag_cache (tag, canonical_tag, category, is_deprecated, post_count, checked_at)
+         VALUES ($tag, $canonical_tag, $category, $is_deprecated, $post_count, $checked_at)
+         ON CONFLICT(tag) DO UPDATE SET canonical_tag = excluded.canonical_tag, category = excluded.category,
+          is_deprecated = excluded.is_deprecated, post_count = excluded.post_count, checked_at = excluded.checked_at`,
+        {
+          $tag: key,
+          $canonical_tag: String(entry.canonical_tag || key),
+          $category: Number(entry.category ?? -1),
+          $is_deprecated: entry.is_deprecated ? 1 : 0,
+          $post_count: Number(entry.post_count || 0),
+          $checked_at: String(entry.checked_at || new Date().toISOString()),
+        },
+      );
+    }
+  };
+
+  const knowledgePriority = (source) => ({ manual: 4, danbooru: 3, ai: 2, cache: 1, builtin: 0, heuristic: 0 }[source] || 0);
   const upsertTagDictionary = (entries = [], updatedAt = new Date().toISOString()) => {
     for (const entry of entries) {
       const key = dictionaryKey(entry.tag);
@@ -536,7 +577,9 @@ export async function openDatabase(dataDirectory) {
     setProjectDimensions,
     relocateAssetPaths,
     lookupTagDictionary,
+    lookupDanbooruTagCache,
     upsertTagDictionary,
+    upsertDanbooruTagCache,
     updateTagDictionary,
     enrichProjectTags,
     insertProject,

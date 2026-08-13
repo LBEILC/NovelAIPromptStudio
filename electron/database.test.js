@@ -54,6 +54,21 @@ describe('phase 2 core database', () => {
     expect(enriched.tags[0]).toMatchObject({ translation: '画师 Ciloranko', category: 'ArtistEra', translation_source: 'manual', category_source: 'manual' });
   });
 
+  it('persists positive and negative Danbooru tag checks by normalized name', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    database.upsertDanbooruTagCache([
+      { tag: 'yamamoto souichirou', canonical_tag: 'yamamoto_souichirou', category: 1, post_count: 2028, checked_at: '2026-08-13T00:00:00.000Z' },
+      { tag: 'not an artist', canonical_tag: 'not_an_artist', category: -1, checked_at: '2026-08-13T00:00:00.000Z' },
+    ]);
+    database.persist();
+    const reopened = await openDatabase(directory);
+    const cached = reopened.lookupDanbooruTagCache(['Yamamoto_Souichirou', 'not an artist']);
+    expect(cached.get('yamamoto_souichirou')).toMatchObject({ category: 1, canonical_tag: 'yamamoto_souichirou', post_count: 2028 });
+    expect(cached.get('not_an_artist')).toMatchObject({ category: -1 });
+  });
+
   it('creates one immutable pre-phase2 backup before reopening an existing database', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
     temporaryDirectories.push(directory);
