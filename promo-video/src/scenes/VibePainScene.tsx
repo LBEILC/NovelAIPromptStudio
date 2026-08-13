@@ -87,8 +87,26 @@ export const VibePainScene: React.FC = () => {
         }}
       >
         拖回 NovelAI
-        <div style={{ marginTop: 17, height: 4, borderRadius: 999, background: "linear-gradient(90deg, rgba(89,170,255,0.15), #5daeff)" }} />
-        <div style={{ marginTop: -21, textAlign: "right", fontSize: 42 }}>›</div>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 430 52"
+          style={{ display: "block", width: 430, height: 52, marginTop: 8 }}
+        >
+          <defs>
+            <linearGradient id="drag-back-arrow-gradient" x1="0" x2="1">
+              <stop offset="0" stopColor="rgba(89, 170, 255, 0.18)" />
+              <stop offset="1" stopColor="#5daeff" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M 4 26 H 410 M 394 11 L 410 26 L 394 41"
+            fill="none"
+            stroke="url(#drag-back-arrow-gradient)"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </Interactive.Div>
       <Interactive.Div
         name="Incomplete restore result"

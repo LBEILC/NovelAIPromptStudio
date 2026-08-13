@@ -18,7 +18,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="01-Image-Pain"
           component={ImagePainScene}
-          durationInFrames={242}
+          durationInFrames={226}
           fps={30}
           width={1920}
           height={1080}
@@ -26,7 +26,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="02-Tag-Pain"
           component={TagPainScene}
-          durationInFrames={382}
+          durationInFrames={281}
           fps={30}
           width={1920}
           height={1080}
@@ -34,7 +34,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="03-Translation-Pain"
           component={TranslationPainScene}
-          durationInFrames={226}
+          durationInFrames={212}
           fps={30}
           width={1920}
           height={1080}
@@ -42,7 +42,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="04-Vibe-Pain"
           component={VibePainScene}
-          durationInFrames={231}
+          durationInFrames={204}
           fps={30}
           width={1920}
           height={1080}
@@ -50,7 +50,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="05-Open-Source-Reveal"
           component={HeroScene}
-          durationInFrames={169}
+          durationInFrames={167}
           fps={30}
           width={1920}
           height={1080}
@@ -58,7 +58,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="06-Gallery"
           component={GalleryScene}
-          durationInFrames={265}
+          durationInFrames={247}
           fps={30}
           width={1920}
           height={1080}
@@ -66,7 +66,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="07-Tag-Organization"
           component={EditScene}
-          durationInFrames={361}
+          durationInFrames={353}
           fps={30}
           width={1920}
           height={1080}
@@ -74,7 +74,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="08-Vibe-And-Privacy"
           component={VibeScene}
-          durationInFrames={260}
+          durationInFrames={231}
           fps={30}
           width={1920}
           height={1080}
@@ -82,7 +82,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="09-GitHub-Outro"
           component={OutroScene}
-          durationInFrames={351}
+          durationInFrames={299}
           fps={30}
           width={1920}
           height={1080}
@@ -91,7 +91,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="NovelAIPromptStudio-Demo-16x9"
         component={PromoVideo}
-        durationInFrames={2487}
+        durationInFrames={2220}
         fps={30}
         width={1920}
         height={1080}

@@ -14,31 +14,31 @@ import { CaptionOverlay } from "./components/CaptionOverlay";
 export const PromoVideo: React.FC = () => {
   return (
     <>
-      <Sequence durationInFrames={242} name="Pain: image management">
+      <Sequence durationInFrames={226} name="Pain: image management">
         <ImagePainScene />
       </Sequence>
-      <Sequence from={242} durationInFrames={382} name="Pain: mixed tags">
+      <Sequence from={226} durationInFrames={281} name="Pain: mixed tags">
         <TagPainScene />
       </Sequence>
-      <Sequence from={624} durationInFrames={226} name="Pain: translation">
+      <Sequence from={507} durationInFrames={212} name="Pain: translation">
         <TranslationPainScene />
       </Sequence>
-      <Sequence from={850} durationInFrames={231} name="Pain: Vibe restore">
+      <Sequence from={719} durationInFrames={204} name="Pain: Vibe restore">
         <VibePainScene />
       </Sequence>
-      <Sequence from={1081} durationInFrames={169} name="Open-source reveal">
+      <Sequence from={923} durationInFrames={167} name="Open-source reveal">
         <HeroScene />
       </Sequence>
-      <Sequence from={1250} durationInFrames={265} name="Solution: gallery">
+      <Sequence from={1090} durationInFrames={247} name="Solution: gallery">
         <GalleryScene />
       </Sequence>
-      <Sequence from={1515} durationInFrames={361} name="Solution: tag organization">
+      <Sequence from={1337} durationInFrames={353} name="Solution: tag organization">
         <EditScene />
       </Sequence>
-      <Sequence from={1876} durationInFrames={260} name="Solution: Vibe and privacy">
+      <Sequence from={1690} durationInFrames={231} name="Solution: Vibe and privacy">
         <VibeScene />
       </Sequence>
-      <Sequence from={2136} durationInFrames={351} name="GitHub and feedback">
+      <Sequence from={1921} durationInFrames={299} name="GitHub and feedback">
         <OutroScene />
       </Sequence>
       <Audio src={staticFile("audio/narration-minimax.wav")} volume={1.35} />

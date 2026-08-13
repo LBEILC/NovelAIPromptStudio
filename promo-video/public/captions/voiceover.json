@@ -1,142 +1,44 @@
 [
-  {
-    "text": "用 NovelAI 生成的图片越来越多以后，\n管理起来其实很麻烦。",
-    "startMs": 0,
-    "endMs": 4386,
-    "timestampMs": 0,
-    "confidence": 1
-  },
-  {
-    "text": "想找某张图片，常常只能一张张翻。",
-    "startMs": 4929,
-    "endMs": 7664,
-    "timestampMs": 4929,
-    "confidence": 1
-  },
-  {
-    "text": "提示词本身也很难整理。",
-    "startMs": 8080,
-    "endMs": 9821,
-    "timestampMs": 8080,
-    "confidence": 1
-  },
-  {
-    "text": "基础提示词中，控制画面的 Tag、风格描述和画师串，\n经常交错在一起。",
-    "startMs": 10220,
-    "endMs": 15801,
-    "timestampMs": 10220,
-    "confidence": 1
-  },
-  {
-    "text": "角色提示词中，角色特征和服饰内容，\n也混在同一串里。",
-    "startMs": 16129,
-    "endMs": 20284,
-    "timestampMs": 16129,
-    "confidence": 1
-  },
-  {
-    "text": "遇到不认识的 Tag，还得一个个复制出来翻译。",
-    "startMs": 20816,
-    "endMs": 23788,
-    "timestampMs": 20816,
-    "confidence": 1
-  },
-  {
-    "text": "想找到并修改某一部分内容，往往要花不少时间。",
-    "startMs": 24218,
-    "endMs": 27814,
-    "timestampMs": 24218,
-    "confidence": 1
-  },
-  {
-    "text": "如果生成时使用了 Vibe，",
-    "startMs": 28324,
-    "endMs": 29766,
-    "timestampMs": 28324,
-    "confidence": 1
-  },
-  {
-    "text": "只把图片重新拖回 NovelAI，",
-    "startMs": 30018,
-    "endMs": 32210,
-    "timestampMs": 30018,
-    "confidence": 1
-  },
-  {
-    "text": "也没办法把其中的 Vibe 完整恢复出来。",
-    "startMs": 32565,
-    "endMs": 35484,
-    "timestampMs": 32565,
-    "confidence": 1
-  },
-  {
-    "text": "所以，我写了一个开源工具——NovelAI Prompt Studio，\n专门解决这些问题。",
-    "startMs": 36047,
-    "endMs": 41216,
-    "timestampMs": 36047,
-    "confidence": 1
-  },
-  {
-    "text": "它可以批量导入和管理生成图片，\n按照文件名、Tag 或中文译名搜索；使用相同提示词的图片，也会自动归类。",
-    "startMs": 41680,
-    "endMs": 49936,
-    "timestampMs": 41680,
-    "confidence": 1
-  },
-  {
-    "text": "软件会自动识别 Tag 的用途，\n把画面控制、画师、角色和服饰等内容分类整理。",
-    "startMs": 50508,
-    "endMs": 56566,
-    "timestampMs": 50508,
-    "confidence": 1
-  },
-  {
-    "text": "你可以按区域和类别筛选，直接查看翻译、\n调整权重，再一键复制。",
-    "startMs": 56965,
-    "endMs": 62117,
-    "timestampMs": 56965,
-    "confidence": 1
-  },
-  {
-    "text": "图片里内嵌的 Vibe，也可以读取相关参数并恢复导出。",
-    "startMs": 62539,
-    "endMs": 66439,
-    "timestampMs": 62539,
-    "confidence": 1
-  },
-  {
-    "text": "所有数据都保存在本地。",
-    "startMs": 66832,
-    "endMs": 68775,
-    "timestampMs": 66832,
-    "confidence": 1
-  },
-  {
-    "text": "原始图片不会被修改。",
-    "startMs": 69163,
-    "endMs": 70690,
-    "timestampMs": 69163,
-    "confidence": 1
-  },
-  {
-    "text": "项目已经开源在 GitHub，\n链接放在简介和置顶评论。",
-    "startMs": 71208,
-    "endMs": 75256,
-    "timestampMs": 71208,
-    "confidence": 1
-  },
-  {
-    "text": "欢迎大家下载试用。",
-    "startMs": 75651,
-    "endMs": 76945,
-    "timestampMs": 75651,
-    "confidence": 1
-  },
-  {
-    "text": "如果遇到问题，或者有想加入的新功能，\n也欢迎来提供反馈。",
-    "startMs": 77358,
-    "endMs": 81575,
-    "timestampMs": 77358,
-    "confidence": 1
-  }
+  {"text":"用 NovelAI 生成的图片越来越多以后","startMs":0,"endMs":2648,"timestampMs":0,"confidence":1},
+  {"text":"管理起来其实很麻烦","startMs":2873,"endMs":4152,"timestampMs":2873,"confidence":1},
+  {"text":"想找某张图片","startMs":4550,"endMs":5648,"timestampMs":4550,"confidence":1},
+  {"text":"常常只能一张张翻","startMs":5648,"endMs":7113,"timestampMs":5648,"confidence":1},
+  {"text":"提示词本身也很难整理","startMs":7547,"endMs":9108,"timestampMs":7547,"confidence":1},
+  {"text":"控制画面的 Tag","startMs":9374,"endMs":10450,"timestampMs":9374,"confidence":1},
+  {"text":"风格描述和画师串经常交错在一起","startMs":10450,"endMs":13330,"timestampMs":10450,"confidence":1},
+  {"text":"角色特征和服饰内容也混在同一串里","startMs":13616,"endMs":16443,"timestampMs":13616,"confidence":1},
+  {"text":"遇到不认识的 Tag","startMs":16900,"endMs":17943,"timestampMs":16900,"confidence":1},
+  {"text":"还得一个个复制出来翻译","startMs":17943,"endMs":19581,"timestampMs":17943,"confidence":1},
+  {"text":"想找到并修改某一部分内容","startMs":19953,"endMs":22082,"timestampMs":19953,"confidence":1},
+  {"text":"往往要花不少时间","startMs":22082,"endMs":23501,"timestampMs":22082,"confidence":1},
+  {"text":"如果生成时使用了 Vibe","startMs":23979,"endMs":25820,"timestampMs":23979,"confidence":1},
+  {"text":"只把图片重新拖回 NovelAI","startMs":25820,"endMs":27660,"timestampMs":25820,"confidence":1},
+  {"text":"也没办法把其中的 Vibe 完整恢复出来","startMs":27956,"endMs":30338,"timestampMs":27956,"confidence":1},
+  {"text":"所以我写了一个开源工具","startMs":30752,"endMs":32564,"timestampMs":30752,"confidence":1},
+  {"text":"NovelAI Prompt Studio","startMs":32872,"endMs":34278,"timestampMs":32872,"confidence":1},
+  {"text":"专门解决这些问题","startMs":34560,"endMs":35851,"timestampMs":34560,"confidence":1},
+  {"text":"它可以批量导入和管理生成图片","startMs":36344,"endMs":38508,"timestampMs":36344,"confidence":1},
+  {"text":"按照文件名","startMs":38748,"endMs":39631,"timestampMs":38748,"confidence":1},
+  {"text":"Tag","startMs":39819,"endMs":40091,"timestampMs":39819,"confidence":1},
+  {"text":"或中文译名搜索","startMs":40314,"endMs":41336,"timestampMs":40314,"confidence":1},
+  {"text":"使用相同提示词的图片","startMs":41648,"endMs":42970,"timestampMs":41648,"confidence":1},
+  {"text":"也会自动归类","startMs":42970,"endMs":44131,"timestampMs":42970,"confidence":1},
+  {"text":"软件会自动识别 Tag 的用途","startMs":44577,"endMs":46461,"timestampMs":44577,"confidence":1},
+  {"text":"把画面控制","startMs":46738,"endMs":47612,"timestampMs":46738,"confidence":1},
+  {"text":"画师","startMs":47832,"endMs":48291,"timestampMs":47832,"confidence":1},
+  {"text":"角色和服饰等内容分类整理","startMs":48504,"endMs":50609,"timestampMs":48504,"confidence":1},
+  {"text":"你可以按区域和类别筛选","startMs":50934,"endMs":52734,"timestampMs":50934,"confidence":1},
+  {"text":"直接查看翻译","startMs":52915,"endMs":53915,"timestampMs":52915,"confidence":1},
+  {"text":"调整权重","startMs":54123,"endMs":55038,"timestampMs":54123,"confidence":1},
+  {"text":"再一键复制","startMs":55038,"endMs":55951,"timestampMs":55038,"confidence":1},
+  {"text":"图片里内嵌的 Vibe","startMs":56317,"endMs":57594,"timestampMs":56317,"confidence":1},
+  {"text":"也可以读取相关参数并恢复导出","startMs":57594,"endMs":59829,"timestampMs":57594,"confidence":1},
+  {"text":"所有数据都保存在本地","startMs":60143,"endMs":61748,"timestampMs":60143,"confidence":1},
+  {"text":"原始图片不会被修改","startMs":62054,"endMs":63470,"timestampMs":62054,"confidence":1},
+  {"text":"项目已经开源在 GitHub","startMs":64017,"endMs":65521,"timestampMs":64017,"confidence":1},
+  {"text":"链接放在简介和置顶评论","startMs":65721,"endMs":67610,"timestampMs":65721,"confidence":1},
+  {"text":"欢迎大家下载试用","startMs":67898,"endMs":69157,"timestampMs":67898,"confidence":1},
+  {"text":"如果遇到问题","startMs":69518,"endMs":70519,"timestampMs":69518,"confidence":1},
+  {"text":"或者有想加入的新功能","startMs":70519,"endMs":72188,"timestampMs":70519,"confidence":1},
+  {"text":"也欢迎来提供反馈","startMs":72188,"endMs":73523,"timestampMs":72188,"confidence":1}
 ]

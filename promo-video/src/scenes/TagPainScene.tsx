@@ -92,9 +92,9 @@ export const TagPainScene: React.FC = () => {
         style={{
           position: "absolute",
           left: 96,
-          top: 135,
+          top: 138,
           width: 390,
-          fontSize: 78,
+          fontSize: 72,
           lineHeight: 1.12,
           fontWeight: 850,
           letterSpacing: -3,
@@ -105,16 +105,16 @@ export const TagPainScene: React.FC = () => {
           }),
         }}
       >
-        Tag 很多
+        Tag 的用途
         <br />
-        用途却混在一起
+        混在一起
       </Interactive.Div>
       <Interactive.Div
         name="Mixed category legend"
         style={{
           position: "absolute",
           left: 100,
-          top: 390,
+          top: 350,
           width: 350,
           display: "flex",
           flexWrap: "wrap",
