@@ -29,14 +29,14 @@ describe('image preview actions', () => {
 
 describe('tab image preview sizing', () => {
   it('adapts common portrait, landscape, and square images to their source ratio', () => {
-    expect(fitTabPreviewCanvas(832, 1216)).toEqual({ width: 274, height: 400 });
-    expect(fitTabPreviewCanvas(1216, 832)).toEqual({ width: 360, height: 246 });
-    expect(fitTabPreviewCanvas(1024, 1024)).toEqual({ width: 360, height: 360 });
+    expect(fitTabPreviewCanvas(832, 1216)).toEqual({ width: 246, height: 360 });
+    expect(fitTabPreviewCanvas(1216, 832)).toEqual({ width: 320, height: 219 });
+    expect(fitTabPreviewCanvas(1024, 1024)).toEqual({ width: 320, height: 320 });
   });
 
   it('keeps extreme and missing dimensions within readable preview bounds', () => {
-    expect(fitTabPreviewCanvas(100, 1000)).toEqual({ width: 220, height: 400 });
-    expect(fitTabPreviewCanvas(1000, 100)).toEqual({ width: 360, height: 160 });
-    expect(fitTabPreviewCanvas(0, 0)).toEqual({ width: 280, height: 280 });
+    expect(fitTabPreviewCanvas(100, 1000)).toEqual({ width: 220, height: 360 });
+    expect(fitTabPreviewCanvas(1000, 100)).toEqual({ width: 320, height: 160 });
+    expect(fitTabPreviewCanvas(0, 0)).toEqual({ width: 260, height: 260 });
   });
 });

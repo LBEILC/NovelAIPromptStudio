@@ -16,11 +16,11 @@ export function imagePreviewActions(info = {}, handlers = {}) {
 export function fitTabPreviewCanvas(width, height, bounds = {}) {
   const sourceWidth = Number(width);
   const sourceHeight = Number(height);
-  const maxWidth = Number(bounds.maxWidth) || 360;
-  const maxHeight = Number(bounds.maxHeight) || 400;
+  const maxWidth = Number(bounds.maxWidth) || 320;
+  const maxHeight = Number(bounds.maxHeight) || 360;
   const minWidth = Math.min(maxWidth, Number(bounds.minWidth) || 220);
   const minHeight = Math.min(maxHeight, Number(bounds.minHeight) || 160);
-  if (!(sourceWidth > 0) || !(sourceHeight > 0)) return { width: 280, height: 280 };
+  if (!(sourceWidth > 0) || !(sourceHeight > 0)) return { width: 260, height: 260 };
 
   const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
   return {
