@@ -1,5 +1,12 @@
 import { formatTagLabel } from './prompt.js';
 
+export function tagHoverPreviewFields(language = 'original') {
+  return {
+    original: language === 'translated',
+    translation: language === 'original',
+  };
+}
+
 export function tagPresentation(tag, language = 'original') {
   const original = formatTagLabel(tag);
   if (language === 'translated') {

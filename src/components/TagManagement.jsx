@@ -7,6 +7,7 @@ import {
   SliderWithInput as LobeSliderWithInput,
 } from '@lobehub/ui/base-ui';
 import { CATEGORY_LABELS, CATEGORY_OPTIONS, formatTagLabel, inferCategory } from '../lib/prompt.js';
+import { tagHoverPreviewFields } from '../lib/tagManagement.js';
 import Icon from './Icon.jsx';
 import SelectionMark from './SelectionMark.jsx';
 
@@ -120,11 +121,12 @@ export function TagPopover({ children, content, disabled, editKey, editingKey, o
   </LobePopover>;
 }
 
-export function TagHoverPreview({ actionHint, scopeLabel, tag, warning }) {
+export function TagHoverPreview({ actionHint, language, scopeLabel, tag, warning }) {
   const category = tag.category || 'Unsorted';
   const translation = tag.translation?.trim();
   const weight = Number(tag.weight);
   const showWeight = Number.isFinite(weight) && Math.abs(weight - 1) >= 0.001;
+  const fields = tagHoverPreviewFields(language);
 
   return <div className={`tag-hover-preview cat-${String(category).toLowerCase()}`}>
     <header className="tag-hover-preview-header">
@@ -133,14 +135,14 @@ export function TagHoverPreview({ actionHint, scopeLabel, tag, warning }) {
       {scopeLabel && <small>· {scopeLabel}</small>}
       {showWeight && <em>{weight.toFixed(2)}</em>}
     </header>
-    <div className="tag-hover-preview-field">
+    {fields.original && <div className="tag-hover-preview-field">
       <span>原文</span>
       <strong>{formatTagLabel(tag)}</strong>
-    </div>
-    <div className={`tag-hover-preview-field ${translation ? '' : 'empty'}`}>
+    </div>}
+    {fields.translation && <div className={`tag-hover-preview-field ${translation ? '' : 'empty'}`}>
       <span>翻译</span>
       <p>{translation || '暂无翻译'}</p>
-    </div>
+    </div>}
     {warning && <div className="tag-hover-preview-warning"><Icon name="warning" size={14}/><span>{warning}</span></div>}
     <footer>{actionHint}</footer>
   </div>;

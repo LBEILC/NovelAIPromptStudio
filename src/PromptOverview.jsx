@@ -57,7 +57,7 @@ function syntaxMessage(tag) {
   return '';
 }
 
-function SortableTag({ animateLayout, disabled, display, editKey, editingKey, index, onEditingChange, onKeyboardMove, onTagContextMenu, onToggleSelect, onTranslateTag, onUpdateTag, scope, selected, selecting, tag, translating, warning }) {
+function SortableTag({ animateLayout, disabled, display, editKey, editingKey, index, language, onEditingChange, onKeyboardMove, onTagContextMenu, onToggleSelect, onTranslateTag, onUpdateTag, scope, selected, selecting, tag, translating, warning }) {
   const {
     attributes,
     isDragging,
@@ -88,6 +88,7 @@ function SortableTag({ animateLayout, disabled, display, editKey, editingKey, in
     tag={tag}
     tooltip={<TagHoverPreview
       actionHint={selecting ? '点击选择' : disabled ? '点击编辑 · 清除筛选后可拖动排序' : '点击编辑 · 拖动排序 · Alt + 方向键键盘排序'}
+      language={language}
       scopeLabel={scope.label}
       tag={tag}
       warning={warning}
@@ -299,6 +300,7 @@ function ScopeTags({
               editingKey={editingKey}
               index={index}
               key={tag.id}
+              language={language}
               onEditingChange={onEditingChange}
               onKeyboardMove={onKeyboardMove}
               onTagContextMenu={onTagContextMenu}
@@ -371,6 +373,7 @@ function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, o
         tag={entry.tag}
         tooltip={<TagHoverPreview
           actionHint={selecting ? '点击选择' : '点击编辑'}
+          language={language}
           scopeLabel={entry.scopeLabel}
           tag={entry.tag}
           warning={warning}

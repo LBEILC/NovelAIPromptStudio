@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { tagPresentation } from '../lib/tagManagement.js';
+import { tagHoverPreviewFields, tagPresentation } from '../lib/tagManagement.js';
 
 describe('shared Tag presentation', () => {
   const tag = { tag: 'bagpipe (arknights)', translation: '风笛（明日方舟）' };
@@ -27,5 +27,11 @@ describe('shared Tag presentation', () => {
       primary: 'unknown tag',
       fallback: true,
     });
+  });
+
+  it('only previews content missing from the active language mode', () => {
+    expect(tagHoverPreviewFields('original')).toEqual({ original: false, translation: true });
+    expect(tagHoverPreviewFields('translated')).toEqual({ original: true, translation: false });
+    expect(tagHoverPreviewFields('bilingual')).toEqual({ original: false, translation: false });
   });
 });
