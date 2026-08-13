@@ -328,18 +328,52 @@ export async function openDatabase(dataDirectory) {
     return { items, total: Number(total) || 0, limit, offset };
   };
 
-  const deleteTagDictionary = (tag) => {
-    const key = dictionaryKey(tag);
-    if (!key || !lookupTagDictionary([tag]).has(key)) return false;
+  const updateTagDictionaryCategory = (tags = [], category) => {
+    if (!TAG_CATEGORIES.has(category)) throw new Error('Tag 分类无效');
+    const keys = [...new Set(tags.map(dictionaryKey).filter(Boolean))];
+    const existing = lookupTagDictionary(keys);
+    const updatedAt = new Date().toISOString();
+    database.run('BEGIN');
+    try {
+      for (const key of keys) {
+        if (!existing.has(key)) continue;
+        database.run(
+          `UPDATE tag_dictionary
+           SET category = $category, has_classification = 1, category_source = 'manual', updated_at = $updated_at
+           WHERE tag = $tag`,
+          { $category: category, $tag: key, $updated_at: updatedAt },
+        );
+      }
+      database.run('COMMIT');
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+    if (existing.size) persist();
+    return [...lookupTagDictionary(keys).values()];
+  };
 
-    database.run('DELETE FROM tag_dictionary WHERE tag = $tag', { $tag: key });
-    const danbooruTag = danbooruLookupName(tag);
-    if (danbooruTag) {
-      database.run('DELETE FROM danbooru_tag_cache WHERE tag = $tag', { $tag: danbooruTag });
+  const deleteTagDictionaries = (tags = []) => {
+    const keys = [...new Set(tags.map(dictionaryKey).filter(Boolean))];
+    const existing = lookupTagDictionary(keys);
+    if (!existing.size) return 0;
+    database.run('BEGIN');
+    try {
+      for (const key of existing.keys()) {
+        database.run('DELETE FROM tag_dictionary WHERE tag = $tag', { $tag: key });
+        const danbooruTag = danbooruLookupName(key);
+        if (danbooruTag) database.run('DELETE FROM danbooru_tag_cache WHERE tag = $tag', { $tag: danbooruTag });
+      }
+      database.run('COMMIT');
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
     }
     persist();
-    return true;
+    return existing.size;
   };
+
+  const deleteTagDictionary = (tag) => deleteTagDictionaries([tag]) > 0;
 
   const enrichProjectTags = (project) => {
     const cached = lookupTagDictionary(projectTags(project).map((tag) => tag.tag));
@@ -650,6 +684,8 @@ export async function openDatabase(dataDirectory) {
     updateTagDictionary,
     listTagDictionary,
     deleteTagDictionary,
+    updateTagDictionaryCategory,
+    deleteTagDictionaries,
     enrichProjectTags,
     insertProject,
     deleteProject,

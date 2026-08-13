@@ -559,9 +559,26 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  ipcMain.handle('tag-cache:update-many', (_event, request = {}) => {
+    try {
+      return {
+        ok: true,
+        items: database.updateTagDictionaryCategory(request.tags || [], String(request.category || '')),
+      };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle('tag-cache:delete', (_event, tag) => {
     try {
       return { ok: true, deleted: database.deleteTagDictionary(tag) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('tag-cache:delete-many', (_event, tags = []) => {
+    try {
+      return { ok: true, deleted: database.deleteTagDictionaries(tags) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }

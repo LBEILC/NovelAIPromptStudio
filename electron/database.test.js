@@ -118,6 +118,14 @@ describe('phase 2 core database', () => {
       translation: '风笛',
       category: 'Identity',
     })).toMatchObject({ translation: '风笛', translation_source: 'manual', category_source: 'manual' });
+    expect(database.updateTagDictionaryCategory([
+      'light gray ribbed knit sleeveless turtleneck top',
+      'bagpipe (arknights)',
+      'missing tag',
+    ], 'Body')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ tag: 'light gray ribbed knit sleeveless turtleneck top', category: 'Body', category_source: 'manual' }),
+      expect.objectContaining({ tag: 'bagpipe (arknights)', category: 'Body', category_source: 'manual' }),
+    ]));
 
     database.upsertDanbooruTagCache([{
       tag: 'bagpipe (arknights)',
@@ -129,6 +137,12 @@ describe('phase 2 core database', () => {
     expect(database.lookupTagDictionary(['bagpipe (arknights)']).size).toBe(0);
     expect(database.lookupDanbooruTagCache(['bagpipe (arknights)']).size).toBe(0);
     expect(database.deleteTagDictionary('bagpipe (arknights)')).toBe(false);
+    expect(database.deleteTagDictionaries([
+      'light gray ribbed knit sleeveless turtleneck top',
+      'yamamoto souichirou',
+      'missing tag',
+    ])).toBe(2);
+    expect(database.listTagDictionary().total).toBe(0);
   });
 
   it('does not let an old AI Unsorted cache override a clear clothing rule', async () => {

@@ -11,13 +11,13 @@ import {
   Input as LobeInput,
   Segmented as LobeSegmented,
   Select as LobeSelect,
-  SliderWithInput as LobeSliderWithInput,
   TextArea as LobeTextArea,
 } from '@lobehub/ui/base-ui';
-import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, formatTagLabel, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
+import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
 import { addPromptCharacter, getPromptScope, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
-import SelectionMark from './components/SelectionMark.jsx';
 import Icon from './components/Icon.jsx';
+import { TagCategorySection, TagChip, TagPopover, TagQuickEditor } from './components/TagManagement.jsx';
+import { tagPresentation } from './lib/tagManagement.js';
 import {
   DEFAULT_OVERVIEW_FILTERS,
   deleteOverviewTags,
@@ -56,122 +56,6 @@ function syntaxMessage(tag) {
   return '';
 }
 
-function tagPresentation(tag, language) {
-  const original = formatTagLabel(tag);
-  if (language === 'translated') {
-    return {
-      primary: tag.translation || tag.tag,
-      secondary: '',
-      title: tag.translation ? `原文：${original}` : `暂无翻译 · 原文：${original}`,
-      fallback: !tag.translation,
-    };
-  }
-  if (language === 'bilingual') {
-    return {
-      primary: original,
-      secondary: tag.translation || '暂无翻译',
-      title: tag.translation ? `原文：${original}\n翻译：${tag.translation}` : `原文：${original}\n暂无翻译`,
-      fallback: !tag.translation,
-    };
-  }
-  return {
-    primary: original,
-    secondary: '',
-    title: tag.translation ? `翻译：${tag.translation}` : '暂无翻译',
-    fallback: false,
-  };
-}
-
-function WeightEditor({ value, onCommit }) {
-  const parsedValue = Number(value);
-  const normalizedValue = Number.isFinite(parsedValue) ? parsedValue : 1;
-  const [draft, setDraft] = useState(normalizedValue);
-
-  useEffect(() => setDraft(normalizedValue), [normalizedValue]);
-
-  const commit = (nextValue = draft) => {
-    const numericValue = Number(nextValue);
-    if (!Number.isFinite(numericValue) || numericValue === normalizedValue) return;
-    onCommit(numericValue);
-  };
-
-  return <div
-    className="tag-weight-editor"
-    onBlur={(event) => {
-      if (!event.currentTarget.contains(event.relatedTarget)) commit();
-    }}
-    onKeyDown={(event) => {
-      if (event.key === 'Enter') commit();
-    }}
-  >
-    <LobeSliderWithInput
-      controls={false}
-      gap={8}
-      max={10}
-      min={-10}
-      onChange={(weight) => setDraft(Number(weight))}
-      onChangeComplete={(weight) => commit(weight)}
-      size="small"
-      step={0.05}
-      styles={{ input: { flex: '0 0 68px', maxWidth: 68, minWidth: 68 }, slider: { minWidth: 0 } }}
-      value={draft}
-    />
-  </div>;
-}
-
-function TagQuickEditor({ tag, translating, onChange, onClose, onTranslate }) {
-  const braceDepth = Math.max(0, Math.trunc(Number(tag.brace_depth) || 0));
-  return <div className="tag-quick-editor" onClick={(event) => event.stopPropagation()}>
-    <div className="tag-quick-editor-heading">
-      <div><strong>编辑 Tag</strong><small>修改只保存在当前工作台草稿</small></div>
-      <LobeButton onClick={onClose} size="small" type="text">完成</LobeButton>
-    </div>
-    <label><span>{braceDepth ? '括号内原文' : '原文'}</span><LobeInput autoFocus onChange={(event) => onChange({ tag: event.target.value, translation: '', translation_source: '', category: inferCategory(event.target.value), category_source: 'heuristic', raw_segment: '', syntax_issue: '' })} size="small" value={tag.tag}/></label>
-    <label><span>翻译</span><LobeInput onChange={(event) => onChange({ translation: event.target.value, translation_source: 'manual' })} placeholder="添加中文翻译" size="small" value={tag.translation || ''}/></label>
-    <div className="tag-quick-editor-row">
-      <label><span>分类</span><LobeSelect onChange={(category) => onChange({ category, category_source: 'manual' })} options={CATEGORY_OPTIONS.map((value) => ({ label: CATEGORY_LABELS[value], value }))} size="small" value={tag.category || 'Unsorted'}/></label>
-      {braceDepth
-        ? <label><span>强调结构</span><LobeInput disabled size="small" value={`${braceDepth} 层花括号`}/></label>
-        : <label><span>权重</span><WeightEditor onCommit={(weight) => onChange({ weight, raw_segment: '', syntax_issue: '' })} value={tag.weight}/></label>}
-    </div>
-    <div className="tag-quick-editor-footer">
-      <LobeButton disabled={translating} icon={<Icon name="spark" size={14}/>} onClick={onTranslate} size="small">{translating ? '翻译中…' : 'AI 翻译'}</LobeButton>
-    </div>
-  </div>;
-}
-
-function EditableTag({ children, disabled, editKey, editingKey, onEditingChange, onTranslate, onUpdate, tag, translating }) {
-  if (disabled) return children;
-  return <LobePopover
-    arrow
-    className="tag-quick-popover"
-    content={<TagQuickEditor tag={tag} translating={translating} onChange={onUpdate} onClose={() => onEditingChange('')} onTranslate={onTranslate}/>}
-    onOpenChange={(open) => onEditingChange(open ? editKey : '')}
-    open={editingKey === editKey}
-    placement="bottomLeft"
-    trigger="click"
-  >
-    {children}
-  </LobePopover>;
-}
-
-function TagButton({ buttonRef, className = '', display, dragging = false, overlay = false, selected, selecting, tag, warning, ...rest }) {
-  return <button
-    aria-hidden={overlay || undefined}
-    aria-pressed={selecting ? selected : undefined}
-    className={`overview-tag cat-${String(tag.category || 'Unsorted').toLowerCase()} ${dragging ? 'dragging' : ''} ${overlay ? 'drag-overlay' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''} ${className}`.trim()}
-    ref={buttonRef}
-    tabIndex={overlay ? -1 : undefined}
-    type="button"
-    {...rest}
-  >
-    {selecting && <SelectionMark selected={selected}/>}
-    <span className="overview-tag-copy"><span>{display.primary}</span>{display.secondary && <small>{display.secondary}</small>}</span>
-    {Math.abs(Number(tag.weight) - 1) >= 0.001 && <em>{Number(tag.weight).toFixed(2)}</em>}
-    {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}
-  </button>;
-}
-
 function SortableTag({ animateLayout, disabled, display, editKey, editingKey, index, onEditingChange, onKeyboardMove, onTagContextMenu, onToggleSelect, onTranslateTag, onUpdateTag, scope, selected, selecting, tag, translating, warning }) {
   const {
     attributes,
@@ -184,7 +68,7 @@ function SortableTag({ animateLayout, disabled, display, editKey, editingKey, in
     disabled,
     id: tag.id,
   });
-  const tagButton = <TagButton
+  const tagButton = <TagChip
     {...(disabled ? {} : attributes)}
     {...listeners}
     buttonRef={setActivatorNodeRef}
@@ -212,18 +96,15 @@ function SortableTag({ animateLayout, disabled, display, editKey, editingKey, in
     role="listitem"
     transition={animateLayout ? { layout: TAG_LAYOUT_TRANSITION } : undefined}
   >
-    <EditableTag
+    <TagPopover
+      content={<TagQuickEditor tag={tag} translating={translating} onChange={(patch) => onUpdateTag(scope.key, tag.id, patch)} onClose={() => onEditingChange('')} onTranslate={() => onTranslateTag(scope.key, tag)}/>}
       disabled={selecting}
       editKey={editKey}
       editingKey={editingKey}
       onEditingChange={onEditingChange}
-      onTranslate={() => onTranslateTag(scope.key, tag)}
-      onUpdate={(patch) => onUpdateTag(scope.key, tag.id, patch)}
-      tag={tag}
-      translating={translating}
     >
       {tagButton}
-    </EditableTag>
+    </TagPopover>
   </motion.div>;
 }
 
@@ -436,7 +317,7 @@ function ScopeTags({
         dropAnimation={{ duration: 180, easing: 'cubic-bezier(.22, 1, .36, 1)' }}
         modifiers={[restrictToWindowEdges]}
       >
-        {activeTag && activeDisplay ? <TagButton
+        {activeTag && activeDisplay ? <TagChip
           display={activeDisplay}
           overlay
           selected={false}
@@ -459,53 +340,44 @@ function SelectionGroupButton({ entries, selectedKeys, onToggle }) {
 
 function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, onEditingChange, onToggleSelect, onToggleGroup, onTranslateTag, onUpdateTag, onTagContextMenu, translatingKeys }) {
   const selectedSet = new Set(selectedKeys);
-  return <section className={`overview-category-group cat-${String(group.category).toLowerCase()}`}>
-    <div className="overview-category-body">
-      <div className="overview-category-heading">
-        <div><strong>{CATEGORY_LABELS[group.category] || group.category}</strong><small>{group.entries.length} 个 Tag</small></div>
-        {selecting && <SelectionGroupButton entries={group.entries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/>}
-      </div>
-      <div className="overview-tags" role="list" aria-label={`${CATEGORY_LABELS[group.category] || group.category} Tag`}>
-        {group.entries.map((entry) => {
-          const selected = selectedSet.has(entry.key);
-          const display = tagPresentation(entry.tag, language);
-          const warning = syntaxMessage(entry.tag);
-          const tagButton = <button
-            key={entry.key}
-            className={`overview-tag cat-${String(group.category).toLowerCase()} ${entry.scopePolarity === 'undesired' ? 'undesired-tag' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''}`}
-            onClick={(event) => {
-              if (!selecting) return;
-              event.preventDefault();
-              event.stopPropagation();
-              onToggleSelect(entry.key);
-            }}
-            onContextMenu={(event) => onTagContextMenu(event, entry.scopeKey, entry.tag)}
-            role="listitem"
-            aria-pressed={selecting ? selected : undefined}
-            title={`${display.title}\n区域：${entry.scopeLabel}${warning ? `\n语法提醒：${warning}` : ''}${selecting ? '\n点击选择' : '\n点击编辑'}`}
-          >
-            {selecting && <SelectionMark selected={selected}/>}
-            <span className="overview-tag-copy"><span>{display.primary}</span>{display.secondary && <small>{display.secondary}</small>}</span>
-            {Math.abs(Number(entry.tag.weight) - 1) >= 0.001 && <em>{Number(entry.tag.weight).toFixed(2)}</em>}
-            {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}
-          </button>;
-          return <EditableTag
-            disabled={selecting}
-            editKey={entry.key}
-            editingKey={editingKey}
-            key={entry.key}
-            onEditingChange={onEditingChange}
-            onTranslate={() => onTranslateTag(entry.scopeKey, entry.tag)}
-            onUpdate={(patch) => onUpdateTag(entry.scopeKey, entry.tag.id, patch)}
-            tag={entry.tag}
-            translating={translatingKeys.has(entry.key)}
-          >
-            {tagButton}
-          </EditableTag>;
-        })}
-      </div>
-    </div>
-  </section>;
+  return <TagCategorySection
+    action={selecting ? <SelectionGroupButton entries={group.entries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : null}
+    category={group.category}
+    count={group.entries.length}
+  >
+    {group.entries.map((entry) => {
+      const selected = selectedSet.has(entry.key);
+      const display = tagPresentation(entry.tag, language);
+      const warning = syntaxMessage(entry.tag);
+      const tagButton = <TagChip
+        className={entry.scopePolarity === 'undesired' ? 'undesired-tag' : ''}
+        display={display}
+        onClick={(event) => {
+          if (!selecting) return;
+          event.preventDefault();
+          event.stopPropagation();
+          onToggleSelect(entry.key);
+        }}
+        onContextMenu={(event) => onTagContextMenu(event, entry.scopeKey, entry.tag)}
+        role="listitem"
+        selected={selected}
+        selecting={selecting}
+        tag={entry.tag}
+        title={`${display.title}\n区域：${entry.scopeLabel}${warning ? `\n语法提醒：${warning}` : ''}${selecting ? '\n点击选择' : '\n点击编辑'}`}
+        warning={warning}
+      />;
+      return <TagPopover
+        content={<TagQuickEditor tag={entry.tag} translating={translatingKeys.has(entry.key)} onChange={(patch) => onUpdateTag(entry.scopeKey, entry.tag.id, patch)} onClose={() => onEditingChange('')} onTranslate={() => onTranslateTag(entry.scopeKey, entry.tag)}/>}
+        disabled={selecting}
+        editKey={entry.key}
+        editingKey={editingKey}
+        key={entry.key}
+        onEditingChange={onEditingChange}
+      >
+        {tagButton}
+      </TagPopover>;
+    })}
+  </TagCategorySection>;
 }
 
 function Segment({ value, options, onChange, label }) {
