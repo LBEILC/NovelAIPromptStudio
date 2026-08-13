@@ -58,11 +58,16 @@ export const ScreenFrame: React.FC<{
             borderRadius: 22,
             boxShadow:
               "0 0 0 7px rgba(76, 153, 255, 0.12), 0 0 46px rgba(67, 154, 255, 0.24)",
-            opacity: interpolate(frame, [34, 52, 124, 142], [0, 1, 1, 0], {
+            opacity: interpolate(
+              frame,
+              [34, 52, durationInFrames - 35, durationInFrames - 18],
+              [0, 1, 1, 0],
+              {
               extrapolateLeft: "clamp",
               extrapolateRight: "clamp",
               easing: Easing.bezier(0.16, 1, 0.3, 1),
-            }),
+              },
+            ),
             scale: interpolate(frame, [34, 52], [1.025, 1], {
               extrapolateLeft: "clamp",
               extrapolateRight: "clamp",

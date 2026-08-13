@@ -7,6 +7,7 @@ import {
   useVideoConfig,
 } from "remotion";
 import { ScreenFrame } from "../components/ScreenFrame";
+import { VoiceTrack } from "../components/VoiceTrack";
 
 export const GalleryScene: React.FC = () => {
   const frame = useCurrentFrame();
@@ -14,7 +15,8 @@ export const GalleryScene: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#02050b", color: "white", overflow: "hidden" }}>
-      <ScreenFrame asset="gallery.webp" name="Gallery screenshot" />
+      <ScreenFrame asset="gallery-groups.webp" name="Grouped gallery screenshot" />
+      <VoiceTrack asset="05-gallery.wav" from={15} />
       <div
         style={{
           position: "absolute",
@@ -28,7 +30,7 @@ export const GalleryScene: React.FC = () => {
         style={{
           position: "absolute",
           left: 100,
-          top: 230,
+          top: 220,
           fontSize: 27,
           fontWeight: 800,
           letterSpacing: 2,
@@ -47,7 +49,7 @@ export const GalleryScene: React.FC = () => {
         style={{
           position: "absolute",
           left: 96,
-          top: 290,
+          top: 280,
           width: 680,
           fontSize: 82,
           lineHeight: 1.15,
@@ -75,7 +77,7 @@ export const GalleryScene: React.FC = () => {
         style={{
           position: "absolute",
           left: 96,
-          top: 560,
+          top: 570,
           display: "flex",
           gap: 14,
           fontSize: 26,

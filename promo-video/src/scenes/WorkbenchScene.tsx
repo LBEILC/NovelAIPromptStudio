@@ -7,6 +7,7 @@ import {
   useVideoConfig,
 } from "remotion";
 import { ScreenFrame } from "../components/ScreenFrame";
+import { VoiceTrack } from "../components/VoiceTrack";
 
 export const WorkbenchScene: React.FC = () => {
   const frame = useCurrentFrame();
@@ -19,6 +20,7 @@ export const WorkbenchScene: React.FC = () => {
         name="Workbench screenshot"
         highlight={{ left: 680, top: 188, width: 1008, height: 330 }}
       />
+      <VoiceTrack asset="02-workbench.wav" from={18} />
       <div
         style={{
           position: "absolute",
@@ -32,7 +34,7 @@ export const WorkbenchScene: React.FC = () => {
         style={{
           position: "absolute",
           left: 96,
-          bottom: 238,
+          bottom: 248,
           padding: "11px 18px",
           borderRadius: 999,
           background: "rgba(70, 158, 255, 0.16)",
@@ -55,7 +57,7 @@ export const WorkbenchScene: React.FC = () => {
         style={{
           position: "absolute",
           left: 96,
-          bottom: 120,
+          bottom: 138,
           fontSize: 74,
           fontWeight: 800,
           letterSpacing: -2,
@@ -79,7 +81,7 @@ export const WorkbenchScene: React.FC = () => {
         style={{
           position: "absolute",
           right: 96,
-          bottom: 128,
+          bottom: 145,
           maxWidth: 500,
           textAlign: "right",
           fontSize: 29,

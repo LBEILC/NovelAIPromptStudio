@@ -9,6 +9,7 @@ import {
   useVideoConfig,
 } from "remotion";
 import { ProductBackground } from "../components/ProductBackground";
+import { VoiceTrack } from "../components/VoiceTrack";
 
 export const HeroScene: React.FC = () => {
   const frame = useCurrentFrame();
@@ -17,6 +18,7 @@ export const HeroScene: React.FC = () => {
   return (
     <AbsoluteFill style={{ color: "white", overflow: "hidden" }}>
       <ProductBackground />
+      <VoiceTrack asset="01-intro.wav" from={12} />
       <Interactive.Div
         name="Hero prompt chips"
         style={{

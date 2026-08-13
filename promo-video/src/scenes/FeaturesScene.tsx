@@ -8,6 +8,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+import { VoiceTrack } from "../components/VoiceTrack";
 
 const FeatureCard: React.FC<{
   index: number;
@@ -57,6 +58,7 @@ export const FeaturesScene: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#02050b", color: "white", overflow: "hidden" }}>
+      <VoiceTrack asset="06-privacy.wav" from={15} />
       <CanvasImage
         name="Feature background"
         src={staticFile("assets/hero.webp")}
@@ -112,26 +114,6 @@ export const FeaturesScene: React.FC = () => {
         <FeatureCard index={2} title="AI 功能可选" description="不配置 AI 服务，也能完成核心整理工作。" accent="rgba(158, 126, 255, 0.4)" />
         <FeatureCard index={3} title="跨平台" description="Windows 与 macOS 都是一等支持平台。" accent="rgba(99, 184, 255, 0.4)" />
       </div>
-      <Interactive.Div
-        name="Feature footer"
-        style={{
-          position: "absolute",
-          left: 96,
-          right: 96,
-          bottom: 110,
-          textAlign: "center",
-          fontSize: 38,
-          fontWeight: 650,
-          color: "rgba(220, 234, 251, 0.84)",
-          opacity: interpolate(frame, [68, 96, durationInFrames - 12, durationInFrames - 1], [0, 1, 1, 0], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-            easing: Easing.bezier(0.16, 1, 0.3, 1),
-          }),
-        }}
-      >
-        从一张图片，到一套清晰、可复用的 Prompt 工作流
-      </Interactive.Div>
     </AbsoluteFill>
   );
 };

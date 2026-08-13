@@ -1,0 +1,65 @@
+[
+  {
+    "text": "NovelAI 图片里的 Prompt，\n不该一直困在 metadata 里。",
+    "startMs": 400,
+    "endMs": 4440,
+    "timestampMs": 400,
+    "confidence": 1
+  },
+  {
+    "text": "把图片拖进 NovelAI Prompt Studio，",
+    "startMs": 5100,
+    "endMs": 8600,
+    "timestampMs": 5100,
+    "confidence": 1
+  },
+  {
+    "text": "Base、Character 和 Undesired Content，\n会自动拆分成清晰的 Tag。",
+    "startMs": 8600,
+    "endMs": 12460,
+    "timestampMs": 8600,
+    "confidence": 1
+  },
+  {
+    "text": "按区域和类别筛选，查看翻译、调整权重，\n再一键复制需要的 Prompt。",
+    "startMs": 12733,
+    "endMs": 18773,
+    "timestampMs": 12733,
+    "confidence": 1
+  },
+  {
+    "text": "图片带有内嵌 Vibe 时，\n软件会只读识别它的强度和 Information Extracted。",
+    "startMs": 19400,
+    "endMs": 23300,
+    "timestampMs": 19400,
+    "confidence": 1
+  },
+  {
+    "text": "并恢复导出为可以继续使用的 Vibe 文件。",
+    "startMs": 23300,
+    "endMs": 27520,
+    "timestampMs": 23300,
+    "confidence": 1
+  },
+  {
+    "text": "批量导入生成图片，按文件名、Tag 或译名搜索，\n相同 Prompt 的结果还会自动分组。",
+    "startMs": 28233,
+    "endMs": 34753,
+    "timestampMs": 28233,
+    "confidence": 1
+  },
+  {
+    "text": "所有整理数据都保存在本地，\n原图保持只读。",
+    "startMs": 35400,
+    "endMs": 38660,
+    "timestampMs": 35400,
+    "confidence": 1
+  },
+  {
+    "text": "NovelAI Prompt Studio，\n让 Prompt 真正回到创作流程里。",
+    "startMs": 39667,
+    "endMs": 44687,
+    "timestampMs": 39667,
+    "confidence": 1
+  }
+]

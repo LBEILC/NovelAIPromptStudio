@@ -9,6 +9,7 @@ import {
   useVideoConfig,
 } from "remotion";
 import { ProductBackground } from "../components/ProductBackground";
+import { VoiceTrack } from "../components/VoiceTrack";
 
 export const OutroScene: React.FC = () => {
   const frame = useCurrentFrame();
@@ -17,6 +18,7 @@ export const OutroScene: React.FC = () => {
   return (
     <AbsoluteFill style={{ color: "white", overflow: "hidden" }}>
       <ProductBackground />
+      <VoiceTrack asset="07-outro.wav" from={18} />
       <Interactive.Div
         name="Outro logo"
         style={{
@@ -124,26 +126,6 @@ export const OutroScene: React.FC = () => {
         }}
       >
         github.com/LBEILC/NovelAIPromptStudio
-      </Interactive.Div>
-      <Interactive.Div
-        name="Outro final line"
-        style={{
-          position: "absolute",
-          left: 100,
-          right: 100,
-          bottom: 124,
-          textAlign: "center",
-          color: "rgba(155, 202, 255, 0.66)",
-          fontSize: 25,
-          letterSpacing: 1.6,
-          opacity: interpolate(frame, [64, 82], [0, 1], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-            easing: Easing.bezier(0.16, 1, 0.3, 1),
-          }),
-        }}
-      >
-        让散落在 metadata 里的 Prompt，重新变得可理解、可编辑、可复用
       </Interactive.Div>
     </AbsoluteFill>
   );

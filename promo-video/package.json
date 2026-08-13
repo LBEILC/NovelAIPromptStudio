@@ -6,7 +6,9 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@remotion/captions": "4.0.509",
     "@remotion/cli": "4.0.509",
+    "@remotion/media": "4.0.509",
     "@remotion/tailwind-v4": "4.0.509",
     "@remotion/transitions": "4.0.509",
     "react": "19.2.3",
@@ -25,7 +27,7 @@
   "scripts": {
     "dev": "remotion studio",
     "build": "remotion bundle",
-    "render:demo": "remotion render NovelAIPromptStudio-Demo-16x9 out/novelai-prompt-studio-demo-16x9.mp4 --codec=h264 --crf=18 --pixel-format=yuv420p",
+    "render:demo": "remotion render NovelAIPromptStudio-Demo-16x9 out/novelai-prompt-studio-demo-16x9-voiceover.mp4 --codec=h264 --crf=18 --pixel-format=yuv420p",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"
   },

@@ -4,6 +4,8 @@ import { FeaturesScene } from "./scenes/FeaturesScene";
 import { GalleryScene } from "./scenes/GalleryScene";
 import { HeroScene } from "./scenes/HeroScene";
 import { OutroScene } from "./scenes/OutroScene";
+import { EditScene } from "./scenes/EditScene";
+import { VibeScene } from "./scenes/VibeScene";
 import { WorkbenchScene } from "./scenes/WorkbenchScene";
 import { PromoVideo } from "./Video";
 
@@ -14,7 +16,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="01-Hero"
           component={HeroScene}
-          durationInFrames={105}
+          durationInFrames={150}
           fps={30}
           width={1920}
           height={1080}
@@ -22,31 +24,47 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="02-Workbench"
           component={WorkbenchScene}
-          durationInFrames={195}
+          durationInFrames={250}
           fps={30}
           width={1920}
           height={1080}
         />
         <Composition
-          id="03-Gallery"
+          id="03-Edit"
+          component={EditScene}
+          durationInFrames={215}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="04-Vibe"
+          component={VibeScene}
+          durationInFrames={280}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="05-Gallery"
           component={GalleryScene}
-          durationInFrames={165}
+          durationInFrames={230}
           fps={30}
           width={1920}
           height={1080}
         />
         <Composition
-          id="04-Features"
+          id="06-Features"
           component={FeaturesScene}
-          durationInFrames={135}
+          durationInFrames={140}
           fps={30}
           width={1920}
           height={1080}
         />
         <Composition
-          id="05-Outro"
+          id="07-Outro"
           component={OutroScene}
-          durationInFrames={105}
+          durationInFrames={180}
           fps={30}
           width={1920}
           height={1080}
@@ -55,7 +73,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="NovelAIPromptStudio-Demo-16x9"
         component={PromoVideo}
-        durationInFrames={642}
+        durationInFrames={1352}
         fps={30}
         width={1920}
         height={1080}
