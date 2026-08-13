@@ -12,6 +12,7 @@ import {
 } from '@lobehub/ui/base-ui';
 import { findCustomThemeName, primaryColors } from '@lobehub/ui/es/styles/index';
 import Icon from './components/Icon.jsx';
+import TagCacheSettings from './components/TagCacheSettings.jsx';
 import { fontStack, partitionFontFamilies, quoteFontFamily } from './lib/fonts.js';
 
 const ReleaseNotes = lazy(() => import('./components/ReleaseNotes.jsx'));
@@ -41,7 +42,7 @@ function FontOption({ family, role }) {
   </span>;
 }
 
-export default function SettingsPage({ appearance, onAppearanceChange, onInstallUpdate, onLibraryChange, showToast, studio }) {
+export default function SettingsPage({ appearance, onAppearanceChange, onConfirm, onInstallUpdate, onLibraryChange, showToast, studio }) {
   const [section, setSection] = useState('appearance');
   const [navExpanded, setNavExpanded] = useState(() => typeof window === 'undefined' || window.innerWidth >= 900);
   const [navTouched, setNavTouched] = useState(false);
@@ -284,11 +285,12 @@ export default function SettingsPage({ appearance, onAppearanceChange, onInstall
           <LobeButton block className={section === 'appearance' ? 'active' : ''} icon={<Icon name="settings"/>} onClick={() => setSection('appearance')} type="text"><strong>外观</strong></LobeButton>
           <LobeButton block className={section === 'storage' ? 'active' : ''} icon={<Icon name="folder"/>} onClick={() => setSection('storage')} type="text"><strong>资源库</strong></LobeButton>
           <LobeButton block className={section === 'ai' ? 'active' : ''} icon={<Icon name="spark"/>} onClick={() => setSection('ai')} type="text"><strong>AI 服务</strong></LobeButton>
+          <LobeButton block className={section === 'tags' ? 'active' : ''} icon={<Icon name="tags"/>} onClick={() => setSection('tags')} type="text"><strong>Tag 缓存</strong></LobeButton>
           <LobeButton block className={section === 'updates' ? 'active' : ''} icon={<Icon name="refresh"/>} onClick={() => setSection('updates')} type="text"><strong>关于与更新</strong></LobeButton>
         </nav>
       </LobeDraggablePanel.Body>
     </LobeDraggablePanel>
-    <section className="settings-content">
+    <section className={`settings-content${section === 'tags' ? ' tag-cache-settings-content' : ''}`}>
       {section === 'appearance' ? <>
         <header className="settings-heading"><h2>外观</h2></header>
         <div className="settings-group">
@@ -362,7 +364,7 @@ export default function SettingsPage({ appearance, onAppearanceChange, onInstall
         />
         <div className="settings-actions"><LobeButton onClick={testConnection} disabled={Boolean(busy)}>测试连接</LobeButton><LobeButton type="primary" onClick={saveAI} disabled={Boolean(busy)}>{busy === 'save' ? '保存中…' : '保存 AI 设置'}</LobeButton></div>
         {!aiSettings.encryptionAvailable && <LobeAlert className="settings-warning" message="当前系统安全存储不可用，应用不会以明文保存 API Key。" type="warning" variant="outlined"/>}
-      </> : <>
+      </> : section === 'tags' ? <TagCacheSettings onConfirm={onConfirm} showToast={showToast} studio={studio}/> : <>
         <header className="settings-heading"><h2>关于与更新</h2><p>检查 NovelAI Prompt Studio 的官方稳定版本。</p></header>
         <div className="settings-group update-settings-group">
           <div className="settings-row">

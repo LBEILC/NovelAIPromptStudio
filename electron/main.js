@@ -535,6 +535,37 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  ipcMain.handle('tag-cache:list', (_event, request = {}) => {
+    try {
+      return { ok: true, ...database.listTagDictionary(request) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('tag-cache:update', (_event, request = {}) => {
+    try {
+      const tag = String(request.tag || '').trim();
+      if (!tag) throw new Error('Tag 不能为空');
+      if (!database.lookupTagDictionary([tag]).size) throw new Error('Tag 缓存不存在或已被删除');
+      const patch = request.patch || {};
+      return {
+        ok: true,
+        item: database.updateTagDictionary(tag, {
+          translation: patch.translation,
+          category: patch.category,
+        }),
+      };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('tag-cache:delete', (_event, tag) => {
+    try {
+      return { ok: true, deleted: database.deleteTagDictionary(tag) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle('vibe:embedded:reveal', (_event, vibe = {}) => {
     try {
       const filePath = exportEmbeddedVibeFile(vibe, assetsDirectory);

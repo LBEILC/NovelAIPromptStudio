@@ -281,7 +281,64 @@ export async function openDatabase(dataDirectory) {
       },
     );
     persist();
-    return query('SELECT * FROM tag_dictionary ORDER BY tag');
+    return query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0] || null;
+  };
+
+  const listTagDictionary = (filters = {}) => {
+    const search = String(filters.query || '').trim().toLowerCase().slice(0, 240);
+    const category = TAG_CATEGORIES.has(filters.category) ? filters.category : '';
+    const allowedSources = new Set(['manual', 'danbooru', 'rule', 'ai', 'cache', 'builtin', 'heuristic']);
+    const source = allowedSources.has(filters.source) ? filters.source : '';
+    const limit = Math.min(200, Math.max(1, Number.parseInt(filters.limit, 10) || 50));
+    const offset = Math.max(0, Number.parseInt(filters.offset, 10) || 0);
+    const clauses = [];
+    const params = {};
+
+    if (search) {
+      clauses.push(`(
+        instr(lower(tag), $search) > 0
+        OR instr(lower(display_tag), $search) > 0
+        OR instr(lower(translation), $search) > 0
+      )`);
+      params.$search = search;
+    }
+    if (category) {
+      clauses.push('category = $category');
+      params.$category = category;
+    }
+    if (source) {
+      clauses.push('(translation_source = $source OR category_source = $source)');
+      params.$source = source;
+    }
+
+    const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const [{ total = 0 } = {}] = query(
+      `SELECT COUNT(*) AS total FROM tag_dictionary ${whereClause}`,
+      params,
+    );
+    const items = query(
+      `SELECT *
+       FROM tag_dictionary
+       ${whereClause}
+       ORDER BY updated_at DESC, tag ASC
+       LIMIT $limit OFFSET $offset`,
+      { ...params, $limit: limit, $offset: offset },
+    );
+
+    return { items, total: Number(total) || 0, limit, offset };
+  };
+
+  const deleteTagDictionary = (tag) => {
+    const key = dictionaryKey(tag);
+    if (!key || !lookupTagDictionary([tag]).has(key)) return false;
+
+    database.run('DELETE FROM tag_dictionary WHERE tag = $tag', { $tag: key });
+    const danbooruTag = danbooruLookupName(tag);
+    if (danbooruTag) {
+      database.run('DELETE FROM danbooru_tag_cache WHERE tag = $tag', { $tag: danbooruTag });
+    }
+    persist();
+    return true;
   };
 
   const enrichProjectTags = (project) => {
@@ -591,6 +648,8 @@ export async function openDatabase(dataDirectory) {
     upsertTagDictionary,
     upsertDanbooruTagCache,
     updateTagDictionary,
+    listTagDictionary,
+    deleteTagDictionary,
     enrichProjectTags,
     insertProject,
     deleteProject,

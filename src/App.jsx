@@ -68,6 +68,9 @@ const studio = window.studio || {
   copyWorkbenchImage: unavailable('请在桌面应用中复制图片'),
   downloadWorkbenchImage: unavailable('请在桌面应用中下载图片'),
   saveTagAnnotations: async () => ({ ok: true }),
+  listTagCache: async () => ({ ok: true, items: [], limit: 40, offset: 0, total: 0 }),
+  updateTagCache: unavailable('请在桌面应用中修改 Tag 缓存'),
+  deleteTagCache: unavailable('请在桌面应用中删除 Tag 缓存'),
   revealFile: async () => {},
   getAISettings: async () => ({ baseUrl: 'https://api.openai.com/v1', model: '', hasApiKey: false, encryptionAvailable: true }),
   saveAISettings: async (settings) => settings,
@@ -885,7 +888,7 @@ export default function App({ appearance, setAppearance }) {
         selectedImageCount={selectedProjectIds.length}
         sort={sort}
         view={galleryView}
-      /> : <SettingsPage appearance={appearance} onAppearanceChange={changeAppearance} onInstallUpdate={installDownloadedUpdate} onLibraryChange={() => reloadLibrary(galleryView)} showToast={showToast} studio={studio}/>}
+      /> : <SettingsPage appearance={appearance} onAppearanceChange={changeAppearance} onConfirm={requestConfirmation} onInstallUpdate={installDownloadedUpdate} onLibraryChange={() => reloadLibrary(galleryView)} showToast={showToast} studio={studio}/>}
     </div>
     <ImportExperience dragState={dragState} onCancel={() => importProgress?.batchId && studio.cancelImport(importProgress.batchId)} onDismiss={() => setImportResult(null)} progress={importProgress} result={importResult} target={page}/>
     <LobeModal

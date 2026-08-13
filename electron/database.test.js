@@ -69,6 +69,68 @@ describe('phase 2 core database', () => {
     expect(cached.get('not_an_artist')).toMatchObject({ category: -1 });
   });
 
+  it('searches, filters, edits, paginates, and deletes Tag cache entries', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    database.upsertTagDictionary([
+      {
+        tag: 'light gray ribbed knit sleeveless turtleneck top',
+        translation: '浅灰色罗纹针织无袖高领上衣',
+        category: 'Clothing',
+        has_translation: true,
+        has_classification: true,
+        translation_source: 'ai',
+        category_source: 'rule',
+      },
+      {
+        tag: 'bagpipe (arknights)',
+        translation: '风笛（明日方舟）',
+        category: 'Identity',
+        has_translation: true,
+        has_classification: true,
+        translation_source: 'ai',
+        category_source: 'danbooru',
+      },
+      {
+        tag: 'yamamoto souichirou',
+        translation: '画师:yamamoto souichirou',
+        category: 'ArtistEra',
+        has_translation: true,
+        has_classification: true,
+        translation_source: 'danbooru',
+        category_source: 'danbooru',
+      },
+    ]);
+
+    expect(database.listTagDictionary({ query: '浅灰色' })).toMatchObject({
+      total: 1,
+      items: [{ tag: 'light gray ribbed knit sleeveless turtleneck top', category: 'Clothing' }],
+    });
+    expect(database.listTagDictionary({ category: 'Identity' })).toMatchObject({
+      total: 1,
+      items: [{ tag: 'bagpipe (arknights)' }],
+    });
+    expect(database.listTagDictionary({ source: 'danbooru' }).total).toBe(2);
+    expect(database.listTagDictionary({ limit: 1, offset: 1 })).toMatchObject({ total: 3, limit: 1, offset: 1 });
+
+    expect(database.updateTagDictionary('bagpipe (arknights)', {
+      translation: '风笛',
+      category: 'Identity',
+    })).toMatchObject({ translation: '风笛', translation_source: 'manual', category_source: 'manual' });
+
+    database.upsertDanbooruTagCache([{
+      tag: 'bagpipe (arknights)',
+      canonical_tag: 'bagpipe_(arknights)',
+      category: 4,
+      checked_at: '2026-08-13T00:00:00.000Z',
+    }]);
+    expect(database.deleteTagDictionary('bagpipe (arknights)')).toBe(true);
+    expect(database.lookupTagDictionary(['bagpipe (arknights)']).size).toBe(0);
+    expect(database.lookupDanbooruTagCache(['bagpipe (arknights)']).size).toBe(0);
+    expect(database.deleteTagDictionary('bagpipe (arknights)')).toBe(false);
+  });
+
   it('does not let an old AI Unsorted cache override a clear clothing rule', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
     temporaryDirectories.push(directory);
