@@ -12,6 +12,11 @@ export function overviewTagKey(scopeKey, tagId) {
   return `${scopeKey}\u0000${tagId}`;
 }
 
+export function isOverviewTagVisible(entries = [], scopeKey, tagId) {
+  const targetKey = overviewTagKey(scopeKey, tagId);
+  return entries.some((entry) => entry.key === targetKey);
+}
+
 export function reorderOverviewTags(tags = [], activeId, overId) {
   const sourceIndex = tags.findIndex((tag) => tag.id === activeId);
   const targetIndex = tags.findIndex((tag) => tag.id === overId);

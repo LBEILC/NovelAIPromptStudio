@@ -22,6 +22,7 @@ import {
   createWorkbenchTab,
   cycleWorkbenchTab,
   LEGACY_WORKBENCH_SESSION_KEY,
+  normalizeWorkbenchViewState,
   parseWorkbenchSession,
   serializeWorkbenchSession,
   updateWorkbenchTab,
@@ -259,6 +260,7 @@ export default function App({ appearance, setAppearance }) {
             originalProject: null,
             project: null,
             savedDraft: stored.draft,
+            viewState: normalizeWorkbenchViewState(stored.viewState),
             updatedAt: stored.updatedAt,
             error: result?.error || '图片源已不可用',
           };
@@ -850,6 +852,10 @@ export default function App({ appearance, setAppearance }) {
         onTagContextMenu={tagContextMenu}
         onTranslateTags={translateWorkbenchTags}
         onUpdateProject={updateWorkbenchProject}
+        onUpdateViewState={(tabId, viewState) => setWorkbenchSession((current) => updateWorkbenchTab(current, tabId, (tab) => ({
+          ...tab,
+          viewState: normalizeWorkbenchViewState(viewState),
+        })))}
         session={workbenchSession}
       /> : page === 'gallery' ? <GalleryPage
         groups={visibleGroups}

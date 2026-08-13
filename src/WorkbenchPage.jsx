@@ -1,10 +1,10 @@
-import { Alert as LobeAlert, DraggablePanel as LobeDraggablePanel } from '@lobehub/ui';
+import { Alert as LobeAlert, DraggablePanel as LobeDraggablePanel, Popover, PopoverGroup } from '@lobehub/ui';
 import { Button as LobeButton, showContextMenu, SplitButton, Tabs } from '@lobehub/ui/base-ui';
 import { useCallback, useMemo, useState } from 'react';
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
-import ImageStage from './components/ImageStage.jsx';
+import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import {
   panelStorage,
   panelWidthForViewport,
@@ -41,28 +41,56 @@ function ImageOpenButton({ loading, onChooseImage, onClipboardImage, primary = f
   </SplitButton>;
 }
 
-function tabLabel(tab, onClose) {
+function WorkbenchTabPreview({ tab }) {
+  const project = tab.project;
+  const filePath = project?.image_path || tab.source?.path || '';
+  const width = Number(project?.metadata?.width || 0);
+  const height = Number(project?.metadata?.height || 0);
   const dirty = workbenchTabHasChanges(tab);
-  return <span
-    className="workbench-tab-label"
-    onAuxClick={(event) => { if (event.button === 1) onClose(tab.id); }}
-    onContextMenu={(event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      showContextMenu([{ key: 'close-tab', label: '关闭标签', onClick: () => onClose(tab.id) }]);
-    }}
-    title={tab.displayName}
+  const detail = project
+    ? `${width && height ? `${width} × ${height} · ` : ''}${countPromptTags(project)} 个 Tag${dirty ? ' · 有未保存修改' : ''}`
+    : tab.error || '图片源不可用';
+
+  return <div className="workbench-tab-preview">
+    <div className="workbench-tab-preview-media">
+      {project && filePath
+        ? <img alt="" loading="lazy" src={mediaUrl(filePath)}/>
+        : <div className="workbench-tab-preview-unavailable"><Icon name="image" size={24}/><span>无法预览图片</span></div>}
+    </div>
+    <div className="workbench-tab-preview-copy">
+      <strong>{tab.displayName || project?.name || '未命名图片'}</strong>
+      <span>{detail}</span>
+    </div>
+  </div>;
+}
+
+function WorkbenchTabLabel({ tab, onClose }) {
+  const dirty = workbenchTabHasChanges(tab);
+  return <Popover
+    content={<WorkbenchTabPreview tab={tab}/>}
+    placement="bottomLeft"
+    trigger="hover"
   >
-    {dirty && <span aria-label="有未处理修改" className="workbench-tab-dirty"/>}
-    <span className="workbench-tab-title">{tab.displayName || tab.project?.name || '未命名图片'}</span>
     <span
-      aria-label={`关闭 ${tab.displayName || '标签'}`}
-      className="workbench-tab-close"
-      onClick={(event) => { event.preventDefault(); event.stopPropagation(); onClose(tab.id); }}
-      onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
-      role="button"
-    >×</span>
-  </span>;
+      className="workbench-tab-label"
+      onAuxClick={(event) => { if (event.button === 1) onClose(tab.id); }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        showContextMenu([{ key: 'close-tab', label: '关闭标签', onClick: () => onClose(tab.id) }]);
+      }}
+    >
+      {dirty && <span aria-label="有未处理修改" className="workbench-tab-dirty"/>}
+      <span className="workbench-tab-title">{tab.displayName || tab.project?.name || '未命名图片'}</span>
+      <span
+        aria-label={`关闭 ${tab.displayName || '标签'}`}
+        className="workbench-tab-close"
+        onClick={(event) => { event.preventDefault(); event.stopPropagation(); onClose(tab.id); }}
+        onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
+        role="button"
+      >×</span>
+    </span>
+  </Popover>;
 }
 
 export default function WorkbenchPage({
@@ -83,6 +111,7 @@ export default function WorkbenchPage({
   onTagContextMenu,
   onTranslateTags,
   onUpdateProject,
+  onUpdateViewState,
   session,
 }) {
   const [sourcePanelWidth, setSourcePanelWidth] = useState(() => readPanelWidth(
@@ -144,19 +173,21 @@ export default function WorkbenchPage({
       </div>
     </header>
     <div className="workbench-tabs-scroll">
-      <Tabs
-        activeKey={session.activeTabId}
-        className="workbench-tabs"
-        classNames={{
-          indicator: 'workbench-tabs-indicator',
-          list: 'workbench-tabs-list',
-          tab: 'workbench-tab',
-        }}
-        items={session.tabs.map((item) => ({ key: item.id, label: tabLabel(item, onCloseTab) }))}
-        onChange={onActivateTab}
-        size="small"
-        variant="rounded"
-      />
+      <PopoverGroup closeDelay={120} openDelay={450} placement="bottomLeft" trigger="hover">
+        <Tabs
+          activeKey={session.activeTabId}
+          className="workbench-tabs"
+          classNames={{
+            indicator: 'workbench-tabs-indicator',
+            list: 'workbench-tabs-list',
+            tab: 'workbench-tab',
+          }}
+          items={session.tabs.map((item) => ({ key: item.id, label: <WorkbenchTabLabel onClose={onCloseTab} tab={item}/> }))}
+          onChange={onActivateTab}
+          size="small"
+          variant="rounded"
+        />
+      </PopoverGroup>
     </div>
     {(error || tab.error) && <LobeAlert className="workbench-inline-error" message={tab.error || error} type="error" variant="outlined"/>}
     {project ? <div className="workbench-body">
@@ -203,6 +234,8 @@ export default function WorkbenchPage({
           onTranslateTags={onTranslateTags}
           project={project}
           updateProject={onUpdateProject}
+          viewState={tab.viewState}
+          onViewStateChange={(viewState) => onUpdateViewState(tab.id, viewState)}
         />
       </section>
     </div> : <div className="workbench-tab-error"><strong>图片源不可用</strong><span>{tab.error || '该图片已被移动或删除，可以关闭此标签后继续使用其他标签。'}</span></div>}

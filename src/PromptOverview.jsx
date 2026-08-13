@@ -19,9 +19,9 @@ import Icon from './components/Icon.jsx';
 import { TagCategorySection, TagChip, TagPopover, TagQuickEditor } from './components/TagManagement.jsx';
 import { tagPresentation } from './lib/tagManagement.js';
 import {
-  DEFAULT_OVERVIEW_FILTERS,
   deleteOverviewTags,
   filterOverviewScopes,
+  isOverviewTagVisible,
   overviewCategoryGroups,
   overviewCopyContext,
   overviewEntries,
@@ -30,6 +30,7 @@ import {
   overviewTagKey,
   toggleOverviewSelectionGroup,
 } from './lib/promptOverview.js';
+import { DEFAULT_WORKBENCH_VIEW_STATE } from './lib/workbenchSession.js';
 
 const LANGUAGE_OPTIONS = [
   ['original', '原文'],
@@ -384,10 +385,8 @@ function Segment({ value, options, onChange, label }) {
   return <LobeSegmented aria-label={label} className="overview-segment" onChange={onChange} options={options.map(([option, text]) => ({ label: text, value: option }))} size="small" value={value}/>;
 }
 
-export default function PromptOverview({ project, updateProject, focusScopeKey, focusTagId, onTagContextMenu, onCopyContextChange, onCopyText, onNotify, onTranslateTags }) {
-  const [filters, setFilters] = useState(DEFAULT_OVERVIEW_FILTERS);
-  const [language, setLanguage] = useState('original');
-  const [viewMode, setViewMode] = useState('structure');
+export default function PromptOverview({ project, updateProject, viewState = DEFAULT_WORKBENCH_VIEW_STATE, onViewStateChange, focusScopeKey, focusTagId, onTagContextMenu, onCopyContextChange, onCopyText, onNotify, onTranslateTags }) {
+  const { filters, language, viewMode } = viewState;
   const [selecting, setSelecting] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [deleteArmed, setDeleteArmed] = useState(false);
@@ -401,8 +400,6 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
   const structure = project.prompt_structure;
 
   useEffect(() => {
-    setFilters(DEFAULT_OVERVIEW_FILTERS);
-    setViewMode('structure');
     setSelecting(false);
     setSelectedKeys([]);
     setDeleteArmed(false);
@@ -414,13 +411,6 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
     setEditingCharacterId('');
     setTranslatingKeys(new Set());
   }, [project.id]);
-
-  useEffect(() => {
-    if (!focusTagId || !focusScopeKey) return;
-    setFilters(DEFAULT_OVERVIEW_FILTERS);
-    setViewMode('structure');
-    setEditingKey(overviewTagKey(focusScopeKey, focusTagId));
-  }, [focusScopeKey, focusTagId]);
 
   useEffect(() => {
     if (!deleteArmed) return undefined;
@@ -443,14 +433,26 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
   const filtered = filters.category !== 'All' || filters.polarity !== 'all' || filters.domain !== 'all' || Boolean(filters.query.trim());
 
   useEffect(() => {
+    if (!focusTagId || !focusScopeKey) return;
+    if (!isOverviewTagVisible(visibleEntries, focusScopeKey, focusTagId)) {
+      setEditingKey('');
+      onNotify?.('当前筛选已隐藏该 Tag', 'warning');
+      return;
+    }
+    setEditingKey(overviewTagKey(focusScopeKey, focusTagId));
+  }, [focusScopeKey, focusTagId]);
+
+  useEffect(() => {
     onCopyContextChange?.(visibleCopyContext);
   }, [onCopyContextChange, visibleCopyContext]);
 
   const changeFilter = (patch) => {
-    setFilters((current) => ({ ...current, ...patch }));
+    onViewStateChange?.({ ...viewState, filters: { ...filters, ...patch } });
     setSelectedKeys([]);
     setDeleteArmed(false);
   };
+
+  const changeViewState = (patch) => onViewStateChange?.({ ...viewState, ...patch });
 
   const moveTag = (scope, sourceIndex, targetIndex) => {
     if (filtered || sourceIndex === targetIndex || sourceIndex < 0 || targetIndex < 0 || targetIndex >= scope.tags.length) return;
@@ -621,8 +623,8 @@ export default function PromptOverview({ project, updateProject, focusScopeKey, 
         <div className="overview-filter-controls">
           <Segment value={filters.polarity} options={[["all", '全部'], ['prompt', 'Prompt'], ['undesired', 'Undesired']]} onChange={(polarity) => changeFilter({ polarity })} label="Prompt 类型"/>
           <Segment value={filters.domain} options={[["all", '全部区域'], ['base', 'Base'], ['character', 'Character']]} onChange={(domain) => changeFilter({ domain })} label="Prompt 区域"/>
-          <Segment value={viewMode} options={[["structure", '按结构'], ['category', '按分类']]} onChange={setViewMode} label="总览分组方式"/>
-          <Segment value={language} options={LANGUAGE_OPTIONS} onChange={setLanguage} label="显示语言"/>
+          <Segment value={viewMode} options={[["structure", '按结构'], ['category', '按分类']]} onChange={(nextViewMode) => changeViewState({ viewMode: nextViewMode })} label="总览分组方式"/>
+          <Segment value={language} options={LANGUAGE_OPTIONS} onChange={(nextLanguage) => changeViewState({ language: nextLanguage })} label="显示语言"/>
         </div>
         <div className="overview-category-row" aria-label="Tag 分类筛选">
           <LobeButton className={filters.category === 'All' ? 'active' : ''} onClick={() => changeFilter({ category: 'All' })} size="small">全部 <b>{overviewEntries(categorySourceScopes).length}</b></LobeButton>

@@ -6,9 +6,11 @@ import {
   closeWorkbenchTab,
   createWorkbenchSession,
   createWorkbenchTab,
+  normalizeWorkbenchViewState,
   parseWorkbenchSession,
   scopeWorkbenchCopyContext,
   serializeWorkbenchSession,
+  updateWorkbenchTab,
   workbenchHasChanges,
 } from './workbenchSession.js';
 
@@ -48,6 +50,52 @@ describe('workbench session v2', () => {
     expect(workbenchHasChanges(session)).toBe(false);
     activeWorkbenchTab(session).project.tags[0].weight = 1.2;
     expect(workbenchHasChanges(session)).toBe(true);
+  });
+
+  it('preserves independent overview view state in each serialized tab', () => {
+    let session = createWorkbenchSession(fixture());
+    const firstId = session.activeTabId;
+    session = updateWorkbenchTab(session, firstId, (tab) => ({
+      ...tab,
+      viewState: normalizeWorkbenchViewState({
+        filters: { category: 'Body', polarity: 'prompt', domain: 'character', query: 'hair' },
+        language: 'bilingual',
+        viewMode: 'category',
+      }),
+    }));
+    session = addWorkbenchTab(session, fixture('workbench-2', 'C:\\images\\other.png'));
+    const secondId = session.activeTabId;
+    session = updateWorkbenchTab(session, secondId, (tab) => ({
+      ...tab,
+      viewState: normalizeWorkbenchViewState({
+        filters: { category: 'Environment', polarity: 'undesired', domain: 'base', query: '' },
+        language: 'translated',
+        viewMode: 'structure',
+      }),
+    }));
+
+    const restored = parseWorkbenchSession(serializeWorkbenchSession(session));
+    expect(restored.tabs.find((tab) => tab.id === firstId).viewState).toMatchObject({
+      filters: { category: 'Body', polarity: 'prompt', domain: 'character', query: 'hair' },
+      language: 'bilingual',
+      viewMode: 'category',
+    });
+    expect(restored.tabs.find((tab) => tab.id === secondId).viewState).toMatchObject({
+      filters: { category: 'Environment', polarity: 'undesired', domain: 'base', query: '' },
+      language: 'translated',
+      viewMode: 'structure',
+    });
+  });
+
+  it('supplies safe defaults when restoring a session without view state', () => {
+    const serialized = JSON.parse(serializeWorkbenchSession(createWorkbenchSession(fixture())));
+    delete serialized.tabs[0].viewState;
+    const restored = parseWorkbenchSession(JSON.stringify(serialized));
+    expect(restored.tabs[0].viewState).toEqual({
+      filters: { category: 'All', polarity: 'all', domain: 'all', query: '' },
+      language: 'original',
+      viewMode: 'structure',
+    });
   });
 
   it('deduplicates stable sources and activates the existing tab', () => {

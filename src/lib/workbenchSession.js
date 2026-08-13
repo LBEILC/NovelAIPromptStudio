@@ -1,7 +1,39 @@
 import { promptSnapshot, restorePromptSnapshot, syncProjectPromptMetadata } from './promptStructure.js';
+import { CATEGORY_OPTIONS } from './prompt.js';
 
 export const WORKBENCH_SESSION_KEY = 'novelai-prompt-studio.workbench-session.v2';
 export const LEGACY_WORKBENCH_SESSION_KEY = 'novelai-prompt-studio.workbench-session.v1';
+
+const OVERVIEW_CATEGORIES = new Set(['All', ...CATEGORY_OPTIONS]);
+const OVERVIEW_POLARITIES = new Set(['all', 'prompt', 'undesired']);
+const OVERVIEW_DOMAINS = new Set(['all', 'base', 'character']);
+const OVERVIEW_LANGUAGES = new Set(['original', 'translated', 'bilingual']);
+const OVERVIEW_VIEW_MODES = new Set(['structure', 'category']);
+
+export const DEFAULT_WORKBENCH_VIEW_STATE = Object.freeze({
+  filters: Object.freeze({
+    category: 'All',
+    polarity: 'all',
+    domain: 'all',
+    query: '',
+  }),
+  language: 'original',
+  viewMode: 'structure',
+});
+
+export function normalizeWorkbenchViewState(value = {}) {
+  const filters = value?.filters || {};
+  return {
+    filters: {
+      category: OVERVIEW_CATEGORIES.has(filters.category) ? filters.category : DEFAULT_WORKBENCH_VIEW_STATE.filters.category,
+      polarity: OVERVIEW_POLARITIES.has(filters.polarity) ? filters.polarity : DEFAULT_WORKBENCH_VIEW_STATE.filters.polarity,
+      domain: OVERVIEW_DOMAINS.has(filters.domain) ? filters.domain : DEFAULT_WORKBENCH_VIEW_STATE.filters.domain,
+      query: typeof filters.query === 'string' ? filters.query : DEFAULT_WORKBENCH_VIEW_STATE.filters.query,
+    },
+    language: OVERVIEW_LANGUAGES.has(value?.language) ? value.language : DEFAULT_WORKBENCH_VIEW_STATE.language,
+    viewMode: OVERVIEW_VIEW_MODES.has(value?.viewMode) ? value.viewMode : DEFAULT_WORKBENCH_VIEW_STATE.viewMode,
+  };
+}
 
 const now = () => new Date().toISOString();
 
@@ -32,6 +64,7 @@ export function createWorkbenchTab(project, options = {}) {
     source,
     originalProject,
     project: draft,
+    viewState: normalizeWorkbenchViewState(options.viewState),
     updatedAt: options.updatedAt || now(),
     error: '',
   };
@@ -88,6 +121,7 @@ function serializableTab(tab) {
     displayName: tab.displayName,
     updatedAt: tab.updatedAt || now(),
     draft: tab.project ? promptSnapshot(tab.project) : tab.savedDraft,
+    viewState: normalizeWorkbenchViewState(tab.viewState),
   };
 }
 
@@ -121,7 +155,11 @@ export function parseWorkbenchSession(value) {
   try {
     const parsed = JSON.parse(value);
     if (parsed?.version !== 2) return migrateV1(parsed);
-    const tabs = Array.isArray(parsed.tabs) ? parsed.tabs.filter((tab) => tab?.id && tab?.source && tab?.draft) : [];
+    const tabs = Array.isArray(parsed.tabs)
+      ? parsed.tabs
+        .filter((tab) => tab?.id && tab?.source && tab?.draft)
+        .map((tab) => ({ ...tab, viewState: normalizeWorkbenchViewState(tab.viewState) }))
+      : [];
     if (!tabs.length) return null;
     return {
       version: 2,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deleteOverviewTags, filterOverviewScopes, overviewCategoryGroups, overviewCopyContext, overviewEntries, reorderOverviewTags, shouldReorderOverviewTags, toggleOverviewSelectionGroup } from './promptOverview.js';
+import { deleteOverviewTags, filterOverviewScopes, isOverviewTagVisible, overviewCategoryGroups, overviewCopyContext, overviewEntries, reorderOverviewTags, shouldReorderOverviewTags, toggleOverviewSelectionGroup } from './promptOverview.js';
 
 function projectFixture() {
   const tag = (id, value, category, translation = '', weight = 1) => ({ id, tag: value, category, translation, weight, note: '' });
@@ -38,6 +38,18 @@ describe('Prompt overview operations', () => {
   it('filters by category, polarity, domain, and translated search text', () => {
     const scopes = filterOverviewScopes(projectFixture(), { category: 'Body', polarity: 'prompt', domain: 'character', query: '蓝发' });
     expect(overviewEntries(scopes).map((entry) => entry.tag.tag)).toEqual(['blue hair']);
+  });
+
+  it('only focuses a context-menu edit target while it remains visible', () => {
+    const visibleEntries = overviewEntries(filterOverviewScopes(projectFixture(), {
+      category: 'Body',
+      polarity: 'prompt',
+      domain: 'character',
+      query: '',
+    }));
+    const visible = visibleEntries[0];
+    expect(isOverviewTagVisible(visibleEntries, visible.scopeKey, visible.tag.id)).toBe(true);
+    expect(isOverviewTagVisible(visibleEntries, 'base:prompt', 'artist')).toBe(false);
   });
 
   it('copies selected tags before visible filtered tags', () => {
