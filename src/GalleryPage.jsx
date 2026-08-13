@@ -6,6 +6,7 @@ import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
 import { galleryEmptyState } from './lib/gallery.js';
+import { panelWidthForViewport } from './lib/panelLayout.js';
 import { countPromptTags, positiveRawPromptScopes } from './lib/promptStructure.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
 
@@ -151,7 +152,7 @@ export default function GalleryPage({
   onDownloadImage,
 }) {
   const [previewExpanded, setPreviewExpanded] = useState(Boolean(preview));
-  const [previewPanelWidth, setPreviewPanelWidth] = useState();
+  const [previewPanelWidth, setPreviewPanelWidth] = useState(() => panelWidthForViewport(globalThis.innerWidth, .28, 340, 560));
   const [previewPinned, setPreviewPinned] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -268,7 +269,7 @@ export default function GalleryPage({
         placement="right"
         showHandleHighlight
         stableLayout
-        size={previewPanelWidth ? { height: '100%', width: previewPanelWidth } : undefined}
+        size={{ height: '100%', width: previewPanelWidth }}
       >
         {preview && <LobeDraggablePanel.Body
           className={`gallery-preview ${view === 'trash' ? 'is-trash' : ''}`}

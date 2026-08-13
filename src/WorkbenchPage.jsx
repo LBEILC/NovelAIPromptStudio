@@ -5,6 +5,7 @@ import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage from './components/ImageStage.jsx';
+import { panelWidthForViewport } from './lib/panelLayout.js';
 import { countPromptTags, formatPositivePromptForCopy, positivePromptCopyOptions } from './lib/promptStructure.js';
 import { activeWorkbenchCopyContext, activeWorkbenchTab, scopeWorkbenchCopyContext, workbenchTabHasChanges } from './lib/workbenchSession.js';
 
@@ -78,7 +79,7 @@ export default function WorkbenchPage({
   onUpdateProject,
   session,
 }) {
-  const [sourcePanelWidth, setSourcePanelWidth] = useState();
+  const [sourcePanelWidth, setSourcePanelWidth] = useState(() => panelWidthForViewport(globalThis.innerWidth, .34, 280, 560));
   const [copyContextState, setCopyContextState] = useState({ tabId: '', text: '', count: 0 });
   const tab = activeWorkbenchTab(session);
   const project = tab?.project;
@@ -157,7 +158,7 @@ export default function WorkbenchPage({
         placement="left"
         showHandleHighlight
         stableLayout
-        size={sourcePanelWidth ? { height: '100%', width: sourcePanelWidth } : undefined}
+        size={{ height: '100%', width: sourcePanelWidth }}
       >
         <LobeDraggablePanel.Body className="workbench-source-panel">
           <figure>
