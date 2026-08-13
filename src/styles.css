@@ -276,6 +276,20 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .overview-tag em { color: var(--muted); font-size: var(--text-micro); font-style: normal; }
 .overview-tag.syntax-warning { border-style: dashed; border-color: var(--warning); }
 .overview-syntax-mark { color: var(--warning); }
+.tag-hover-preview { width: min(280px, calc(100vw - 48px)); display: grid; gap: 10px; padding: 10px 11px; text-align: start; }
+.tag-hover-preview-header { min-width: 0; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--text-micro); }
+.tag-hover-preview-header i { width: 7px; height: 7px; flex: 0 0 auto; background: var(--tag-color, var(--faint)); border-radius: 50%; }
+.tag-hover-preview-header span { color: var(--text); font-weight: 600; }
+.tag-hover-preview-header small { min-width: 0; overflow: hidden; flex: 1; color: var(--muted); font-size: inherit; text-overflow: ellipsis; white-space: nowrap; }
+.tag-hover-preview-header em { margin-inline-start: auto; color: var(--muted); font: normal var(--text-micro) var(--font-mono); }
+.tag-hover-preview-field { min-width: 0; display: grid; gap: 4px; }
+.tag-hover-preview-field > span { color: var(--faint); font-size: var(--text-micro); }
+.tag-hover-preview-field strong { overflow-wrap: anywhere; color: var(--text); font: 600 var(--text-secondary)/1.45 var(--font-mono); }
+.tag-hover-preview-field p { margin: 0; overflow-wrap: anywhere; color: var(--text); font-size: var(--text-secondary); line-height: 1.5; }
+.tag-hover-preview-field.empty p { color: var(--faint); }
+.tag-hover-preview-warning { padding: 7px 8px; display: flex; align-items: flex-start; gap: 6px; color: var(--warning); background: color-mix(in srgb, var(--warning) 8%, transparent); border-radius: 6px; font-size: var(--text-micro); line-height: 1.45; }
+.tag-hover-preview-warning svg { flex: 0 0 auto; margin-top: 1px; }
+.tag-hover-preview footer { padding-top: 8px; color: var(--muted); border-top: 1px solid var(--line-soft); font-size: var(--text-micro); line-height: 1.4; }
 .overview-scope.undesired .overview-tag, .overview-tag.undesired-tag { background: color-mix(in srgb, var(--danger) 7%, transparent); border-color: color-mix(in srgb, var(--danger) 28%, var(--line)); }
 .overview-no-results, .overview-add-character { max-width: 760px; min-height: 72px; padding: 14px; color: var(--muted); border: 1px dashed var(--line); border-radius: 7px; }
 .overview-no-results { margin: 24px auto; }

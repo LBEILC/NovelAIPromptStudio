@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Popover as LobePopover } from '@lobehub/ui';
+import { Popover as LobePopover, Tooltip as LobeTooltip } from '@lobehub/ui';
 import {
   Button as LobeButton,
   Input as LobeInput,
   Select as LobeSelect,
   SliderWithInput as LobeSliderWithInput,
 } from '@lobehub/ui/base-ui';
-import { CATEGORY_LABELS, CATEGORY_OPTIONS, inferCategory } from '../lib/prompt.js';
+import { CATEGORY_LABELS, CATEGORY_OPTIONS, formatTagLabel, inferCategory } from '../lib/prompt.js';
 import Icon from './Icon.jsx';
 import SelectionMark from './SelectionMark.jsx';
 
@@ -120,6 +120,32 @@ export function TagPopover({ children, content, disabled, editKey, editingKey, o
   </LobePopover>;
 }
 
+export function TagHoverPreview({ actionHint, scopeLabel, tag, warning }) {
+  const category = tag.category || 'Unsorted';
+  const translation = tag.translation?.trim();
+  const weight = Number(tag.weight);
+  const showWeight = Number.isFinite(weight) && Math.abs(weight - 1) >= 0.001;
+
+  return <div className={`tag-hover-preview cat-${String(category).toLowerCase()}`}>
+    <header className="tag-hover-preview-header">
+      <i aria-hidden="true"/>
+      <span>{CATEGORY_LABELS[category] || category}</span>
+      {scopeLabel && <small>· {scopeLabel}</small>}
+      {showWeight && <em>{weight.toFixed(2)}</em>}
+    </header>
+    <div className="tag-hover-preview-field">
+      <span>原文</span>
+      <strong>{formatTagLabel(tag)}</strong>
+    </div>
+    <div className={`tag-hover-preview-field ${translation ? '' : 'empty'}`}>
+      <span>翻译</span>
+      <p>{translation || '暂无翻译'}</p>
+    </div>
+    {warning && <div className="tag-hover-preview-warning"><Icon name="warning" size={14}/><span>{warning}</span></div>}
+    <footer>{actionHint}</footer>
+  </div>;
+}
+
 export function TagChip({
   buttonRef,
   className = '',
@@ -130,10 +156,11 @@ export function TagChip({
   selecting,
   showWeight = true,
   tag,
+  tooltip,
   warning,
   ...rest
 }) {
-  return <button
+  const chip = <button
     aria-hidden={overlay || undefined}
     aria-pressed={selecting ? selected : undefined}
     className={`overview-tag cat-${String(tag.category || 'Unsorted').toLowerCase()} ${dragging ? 'dragging' : ''} ${overlay ? 'drag-overlay' : ''} ${selected ? 'selected' : ''} ${selecting ? 'selecting' : ''} ${display.fallback ? 'translation-fallback' : ''} ${warning ? 'syntax-warning' : ''} ${className}`.trim()}
@@ -147,6 +174,17 @@ export function TagChip({
     {showWeight && Math.abs(Number(tag.weight) - 1) >= 0.001 && <em>{Number(tag.weight).toFixed(2)}</em>}
     {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}
   </button>;
+
+  if (!tooltip || overlay) return chip;
+  return <LobeTooltip
+    arrow
+    openDelay={320}
+    placement="top"
+    styles={{ content: { padding: 0 } }}
+    title={tooltip}
+  >
+    {chip}
+  </LobeTooltip>;
 }
 
 export function TagCategorySection({ action, category, children, count }) {

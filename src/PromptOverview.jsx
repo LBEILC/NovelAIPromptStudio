@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { DndContext, DragOverlay, getFirstCollision, pointerWithin, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { SortableContext, useSortable } from '@dnd-kit/sortable';
-import { Popover as LobePopover, SearchBar as LobeSearchBar } from '@lobehub/ui';
+import { Popover as LobePopover, SearchBar as LobeSearchBar, TooltipGroup as LobeTooltipGroup } from '@lobehub/ui';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   Button as LobeButton,
@@ -16,7 +16,7 @@ import {
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
 import { addPromptCharacter, getPromptScope, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
 import Icon from './components/Icon.jsx';
-import { TagCategorySection, TagChip, TagPopover, TagQuickEditor } from './components/TagManagement.jsx';
+import { TagCategorySection, TagChip, TagHoverPreview, TagPopover, TagQuickEditor } from './components/TagManagement.jsx';
 import { tagPresentation } from './lib/tagManagement.js';
 import {
   deleteOverviewTags,
@@ -86,7 +86,12 @@ function SortableTag({ animateLayout, disabled, display, editKey, editingKey, in
     selected={selected}
     selecting={selecting}
     tag={tag}
-    title={`${display.title}${warning ? `\n语法提醒：${warning}` : ''}${selecting ? '\n点击选择' : disabled ? '\n清除筛选后可拖动排序' : '\n点击编辑，拖动排序；Alt + 方向键可键盘排序'}`}
+    tooltip={<TagHoverPreview
+      actionHint={selecting ? '点击选择' : disabled ? '点击编辑 · 清除筛选后可拖动排序' : '点击编辑 · 拖动排序 · Alt + 方向键键盘排序'}
+      scopeLabel={scope.label}
+      tag={tag}
+      warning={warning}
+    />}
     warning={warning}
   />;
 
@@ -364,7 +369,12 @@ function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, o
         selected={selected}
         selecting={selecting}
         tag={entry.tag}
-        title={`${display.title}\n区域：${entry.scopeLabel}${warning ? `\n语法提醒：${warning}` : ''}${selecting ? '\n点击选择' : '\n点击编辑'}`}
+        tooltip={<TagHoverPreview
+          actionHint={selecting ? '点击选择' : '点击编辑'}
+          scopeLabel={entry.scopeLabel}
+          tag={entry.tag}
+          warning={warning}
+        />}
         warning={warning}
       />;
       return <TagPopover
@@ -608,7 +618,8 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     rawEditingScopeKey,
   };
 
-  return <div className="prompt-overview">
+  return <LobeTooltipGroup arrow closeDelay={80} layoutAnimation openDelay={320}>
+    <div className="prompt-overview">
     <header className="overview-header">
       <div className="overview-toolbar">
         <LobeSearchBar className="overview-search" onInputChange={(query) => changeFilter({ query })} placeholder="筛选 Tag 或译名" value={filters.query}/>
@@ -686,5 +697,6 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
         </LobeButton>
       </div>}
     </div>
-  </div>;
+    </div>
+  </LobeTooltipGroup>;
 }
