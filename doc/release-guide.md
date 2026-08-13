@@ -97,15 +97,31 @@ git push origin main
 
 - 描述已修复的问题和交互改进。
 
+## 下载指引
+
+| 你的系统 | 下载文件 |
+|---|---|
+| Windows 10/11 x64 | [NovelAI-Prompt-Studio-Setup-<版本>-x64.exe](https://github.com/LBEILC/NovelAIPromptStudio/releases/download/v<版本>/NovelAI-Prompt-Studio-Setup-<版本>-x64.exe) |
+| macOS Intel | [NovelAI-Prompt-Studio-<版本>-x64.dmg](https://github.com/LBEILC/NovelAIPromptStudio/releases/download/v<版本>/NovelAI-Prompt-Studio-<版本>-x64.dmg) |
+| macOS Apple Silicon（M 系列芯片） | [NovelAI-Prompt-Studio-<版本>-arm64.dmg](https://github.com/LBEILC/NovelAIPromptStudio/releases/download/v<版本>/NovelAI-Prompt-Studio-<版本>-arm64.dmg) |
+
+- `.zip`、`.blockmap`、`latest.yml`、`latest-mac.yml` 是应用内自动更新使用的文件，一般无需手动下载。
+- 不确定芯片类型时，macOS 点左上角  →「关于本机」查看。
+
 ## 下载提示
 
 - 当前安装包尚未签名，系统可能显示安全警告。
 - 请只从本仓库 Releases 页面下载。
 
-完整提交记录：https://github.com/LBEILC/NovelAIPromptStudio/compare/v0.2.1...v0.3.0
+完整提交记录：https://github.com/LBEILC/NovelAIPromptStudio/compare/v<上一版本>...v<本版本>
 ```
 
-更新说明应从实际提交记录整理，优先写用户能感知的变化，不要逐条复制内部重构、测试和文档提交。
+模板说明：
+
+- 把 `<版本>` 替换为实际版本号（如 `0.5.0`），`<上一版本>` 替换为上一个标签。
+- 文件名来自 `package.json` 的 `build.win.artifactName`（`NovelAI-Prompt-Studio-Setup-<版本>-x64.exe`）和 `build.mac.artifactName`（`NovelAI-Prompt-Studio-<版本>-x64.dmg` / `-arm64.dmg`），与 GitHub Release 资产名必须完全一致；若打包配置改了命名，同步更新本表。
+- 固定链接格式为 `https://github.com/LBEILC/NovelAIPromptStudio/releases/download/v<版本>/<资产名>`，Release 创建后即可点击跳转下载。
+- 更新说明应从实际提交记录整理，优先写用户能感知的变化，不要逐条复制内部重构、测试和文档提交。
 
 ## 5. 创建并推送版本标签
 
