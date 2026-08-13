@@ -277,8 +277,10 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .overview-tag.syntax-warning { border-style: dashed; border-color: var(--warning); }
 .overview-syntax-mark { color: var(--warning); }
 .overview-scope.undesired .overview-tag, .overview-tag.undesired-tag { background: color-mix(in srgb, var(--danger) 7%, transparent); border-color: color-mix(in srgb, var(--danger) 28%, var(--line)); }
-.overview-no-results, .overview-add-character { max-width: 760px; min-height: 72px; margin: 24px auto; padding: 14px; color: var(--muted); border: 1px dashed var(--line); border-radius: 7px; }
-.overview-add-character { width: calc(100% - 60px); display: flex; align-items: center; gap: 12px; text-align: start; }
+.overview-no-results, .overview-add-character { max-width: 760px; min-height: 72px; padding: 14px; color: var(--muted); border: 1px dashed var(--line); border-radius: 7px; }
+.overview-no-results { margin: 24px auto; }
+.overview-add-character-shell { margin: 24px 0; display: flex; justify-content: center; }
+.overview-add-character { width: calc(100% - 60px); gap: 12px; text-align: start; }
 .overview-add-character strong, .overview-add-character small { display: block; }
 .overview-no-results { display: grid; place-content: center; text-align: center; }
 .cat-artistera { --tag-color: var(--category-artist-era); }.cat-subject { --tag-color: var(--category-subject); }.cat-identity { --tag-color: var(--category-identity); }.cat-body { --tag-color: var(--category-body); }.cat-clothing { --tag-color: var(--category-clothing); }.cat-action { --tag-color: var(--category-action); }.cat-environment { --tag-color: var(--category-environment); }.cat-composition { --tag-color: var(--category-composition); }.cat-stylequality { --tag-color: var(--category-style); }.cat-unsorted { --tag-color: var(--category-unsorted); }
