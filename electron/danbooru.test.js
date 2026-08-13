@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   artistTranslation,
+  danbooruStudioCategory,
   danbooruLookupName,
   isDanbooruArtist,
   isExplicitArtistTag,
@@ -38,9 +39,16 @@ describe('Danbooru artist tag lookup', () => {
     expect(found.get('yamamoto_souichirou')).toMatchObject({ category: 1, canonical_tag: 'yamamoto_souichirou' });
     expect(isDanbooruArtist(found.get('yamamoto_souichirou'))).toBe(true);
     expect(isDanbooruArtist(found.get('red_hair'))).toBe(false);
+    expect(danbooruStudioCategory(found.get('yamamoto_souichirou'))).toBe('ArtistEra');
     const firstUrl = new URL(fetcher.mock.calls[0][0]);
     expect(firstUrl.hostname).toBe('danbooru.donmai.us');
     expect(firstUrl.searchParams.getAll('search[name][]')).toHaveLength(50);
+  });
+
+  it('maps Danbooru character tags into studio identity tags', () => {
+    expect(danbooruStudioCategory({ category: 4, is_deprecated: false })).toBe('Identity');
+    expect(danbooruStudioCategory({ category: 3, is_deprecated: false })).toBeNull();
+    expect(danbooruStudioCategory({ category: 4, is_deprecated: true })).toBeNull();
   });
 
   it('rejects unsuccessful API responses', async () => {

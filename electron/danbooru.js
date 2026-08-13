@@ -1,5 +1,6 @@
 const DANBOORU_TAGS_URL = 'https://danbooru.donmai.us/tags.json';
 const DANBOORU_ARTIST_CATEGORY = 1;
+const DANBOORU_CHARACTER_CATEGORY = 4;
 const DANBOORU_LOOKUP_BATCH_SIZE = 50;
 const DANBOORU_LOOKUP_TIMEOUT_MS = 12000;
 
@@ -49,7 +50,7 @@ async function fetchTagBatch(names, fetcher) {
     response = await fetcher(url.toString(), {
       headers: {
         Accept: 'application/json',
-        'User-Agent': 'NovelAIPromptStudio/0.2 (Danbooru artist tag lookup)',
+        'User-Agent': 'NovelAIPromptStudio/0.2 (Danbooru tag category lookup)',
       },
       signal: controller.signal,
     });
@@ -84,4 +85,11 @@ export function isDanbooruArtist(entry) {
   return Number(entry?.category) === DANBOORU_ARTIST_CATEGORY && !Boolean(entry?.is_deprecated);
 }
 
-export { DANBOORU_ARTIST_CATEGORY, DANBOORU_TAGS_URL };
+export function danbooruStudioCategory(entry) {
+  if (Boolean(entry?.is_deprecated)) return null;
+  if (Number(entry?.category) === DANBOORU_ARTIST_CATEGORY) return 'ArtistEra';
+  if (Number(entry?.category) === DANBOORU_CHARACTER_CATEGORY) return 'Identity';
+  return null;
+}
+
+export { DANBOORU_ARTIST_CATEGORY, DANBOORU_CHARACTER_CATEGORY, DANBOORU_TAGS_URL };

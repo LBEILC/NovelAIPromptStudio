@@ -664,7 +664,8 @@ app.whenReady().then(async () => {
         categories: items.map((item) => item.category),
         cache_hits: resolved.cacheHits,
         ai_count: resolved.aiCount,
-        danbooru_artist_count: items.filter((item) => item.category_source === 'danbooru').length,
+        danbooru_category_count: items.filter((item) => item.category_source === 'danbooru').length,
+        danbooru_artist_count: items.filter((item) => item.category_source === 'danbooru' && item.category === 'ArtistEra').length,
       };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };

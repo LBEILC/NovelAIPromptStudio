@@ -1,5 +1,6 @@
 import {
   artistTranslation,
+  danbooruStudioCategory,
   danbooruLookupName,
   isDanbooruArtist,
   isExplicitArtistTag,
@@ -60,7 +61,7 @@ export async function annotateTags(texts, options) {
   }
 
   const checkedByName = new Map(danbooruChecks.map((entry) => [danbooruLookupName(entry.tag), entry]));
-  const artistEntry = (tag) => {
+  const danbooruEntry = (tag) => {
     if (isExplicitArtistTag(tag)) return { category: 1, is_deprecated: false };
     const lookupName = danbooruLookupName(tag);
     return checkedByName.get(lookupName) || (freshDanbooruEntry(danbooruCache.get(lookupName), nowMs) ? danbooruCache.get(lookupName) : null);
@@ -68,11 +69,13 @@ export async function annotateTags(texts, options) {
 
   const missing = cleaned.map((tag, index) => {
     const cached = dictionary.get(dictionaryKey(tag));
-    const artist = isDanbooruArtist(artistEntry(tag));
+    const remoteEntry = danbooruEntry(tag);
+    const artist = isDanbooruArtist(remoteEntry);
+    const remoteCategory = danbooruStudioCategory(remoteEntry);
     const ruleCategory = inferCategory(tag);
     const manualCategory = cached?.has_classification && cached.category_source === 'manual';
     const hasTranslation = artist || Boolean(cached?.has_translation);
-    const hasClassification = artist || manualCategory || ruleCategory !== 'Unsorted'
+    const hasClassification = Boolean(remoteCategory) || manualCategory || ruleCategory !== 'Unsorted'
       || (cached?.has_classification && cached.category !== 'Unsorted');
     return hasTranslation && hasClassification ? null : { tag, index };
   }).filter(Boolean);
@@ -82,7 +85,9 @@ export async function annotateTags(texts, options) {
   const items = cleaned.map((tag, index) => {
     const cached = dictionary.get(dictionaryKey(tag));
     const ai = generatedByIndex.get(index) || {};
-    const artist = isDanbooruArtist(artistEntry(tag));
+    const remoteEntry = danbooruEntry(tag);
+    const artist = isDanbooruArtist(remoteEntry);
+    const remoteCategory = danbooruStudioCategory(remoteEntry);
     const ruleCategory = inferCategory(tag);
     const manualTranslation = cached?.has_translation && cached.translation_source === 'manual';
     const manualCategory = cached?.has_classification && cached.category_source === 'manual';
@@ -96,8 +101,8 @@ export async function annotateTags(texts, options) {
             : ai.translation,
       category: manualCategory
         ? cached.category
-        : artist
-          ? 'ArtistEra'
+        : remoteCategory
+          ? remoteCategory
           : ruleCategory !== 'Unsorted'
             ? ruleCategory
             : cached?.has_classification && cached.category !== 'Unsorted'
@@ -106,7 +111,7 @@ export async function annotateTags(texts, options) {
       translation_source: manualTranslation ? 'manual' : artist ? 'danbooru' : cached?.has_translation ? 'cache' : 'ai',
       category_source: manualCategory
         ? 'manual'
-        : artist
+        : remoteCategory
           ? 'danbooru'
           : ruleCategory !== 'Unsorted'
             ? 'rule'

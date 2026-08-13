@@ -66,6 +66,59 @@ describe('tag annotation orchestration', () => {
     });
   });
 
+  it('uses a Danbooru character category while keeping AI translation', async () => {
+    const translateMissing = vi.fn(async () => ({
+      model: 'test-model',
+      items: [{ translation: '风笛（明日方舟）', category: 'Unsorted' }],
+    }));
+    const result = await annotateTags(['bagpipe (arknights)'], {
+      dictionary: new Map(),
+      danbooruCache: new Map(),
+      lookupDanbooru: async () => new Map([['bagpipe_(arknights)', {
+        canonical_tag: 'bagpipe_(arknights)',
+        category: 4,
+        is_deprecated: false,
+        post_count: 1102,
+      }]]),
+      translateMissing,
+      now,
+    });
+
+    expect(translateMissing).toHaveBeenCalledWith(['bagpipe (arknights)']);
+    expect(result.items[0]).toEqual({
+      translation: '风笛（明日方舟）',
+      category: 'Identity',
+      translation_source: 'ai',
+      category_source: 'danbooru',
+    });
+  });
+
+  it('repairs a cached Unsorted character tag without another AI request', async () => {
+    const translateMissing = vi.fn();
+    const result = await annotateTags(['bagpipe (arknights)'], {
+      dictionary: dictionary([{
+        tag: 'bagpipe (arknights)',
+        translation: '风笛（明日方舟）',
+        category: 'Unsorted',
+        has_translation: 1,
+        has_classification: 1,
+        translation_source: 'ai',
+        category_source: 'ai',
+      }]),
+      danbooruCache: new Map([['bagpipe_(arknights)', {
+        category: 4,
+        is_deprecated: 0,
+        checked_at: '2026-08-12T00:00:00.000Z',
+      }]]),
+      lookupDanbooru: vi.fn(),
+      translateMissing,
+      now,
+    });
+
+    expect(translateMissing).not.toHaveBeenCalled();
+    expect(result.items[0]).toMatchObject({ category: 'Identity', category_source: 'danbooru' });
+  });
+
   it('repairs an old AI Unsorted clothing result with the deterministic rule', async () => {
     const translateMissing = vi.fn();
     const result = await annotateTags(['light gray ribbed knit sleeveless turtleneck top'], {
