@@ -64,19 +64,19 @@ function ImportButton({ importing, onImport, onImportClipboard }) {
   </SplitButton>;
 }
 
-function BatchToolbar({ view, selectedGroups, selectedImages, onFavorite, onTrash, onRestore, onPermanentDelete, onClear }) {
+export function BatchToolbar({ view, selectedGroups, selectedImages, onFavorite, onTrash, onRestore, onPermanentDelete, onClear }) {
   if (!selectedGroups) return null;
   return <div className="gallery-selection-bar">
     <span>已选 <b>{selectedGroups}</b> 组 · <b>{selectedImages}</b> 张图片</span>
     {view === 'trash' ? <>
-      <LobeButton icon={<Icon name="restore" size={14}/>} onClick={onRestore} size="small">恢复</LobeButton>
-      <LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={onPermanentDelete} size="small">永久删除</LobeButton>
+      <LobeButton icon={<Icon name="restore" size={14}/>} onClick={() => onRestore()} size="small">恢复</LobeButton>
+      <LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={() => onPermanentDelete()} size="small">永久删除</LobeButton>
     </> : <>
       <LobeButton icon={<Icon name="star" size={14}/>} onClick={() => onFavorite(true)} size="small">收藏</LobeButton>
       <LobeButton onClick={() => onFavorite(false)} size="small">取消收藏</LobeButton>
-      <LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={onTrash} size="small" type="fill">移入回收站</LobeButton>
+      <LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={() => onTrash()} size="small" type="fill">移入回收站</LobeButton>
     </>}
-    <LobeButton onClick={onClear} size="small" type="text">取消选择</LobeButton>
+    <LobeButton onClick={() => onClear()} size="small" type="text">取消选择</LobeButton>
   </div>;
 }
 
