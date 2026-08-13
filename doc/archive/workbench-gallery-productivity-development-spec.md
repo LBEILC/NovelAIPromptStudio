@@ -1,14 +1,18 @@
 # 工作台与图片库效率功能开发规格
 
-> 状态：已开发，待跨平台验收
+> 状态：已归档（功能已经实现并发布）
 > 日期：2026-07-22
-> 最后更新：2026-07-27
+> 最后更新：2026-08-13
 > 适用平台：Windows / macOS，尽量保持 Linux 兼容
-> 关联文档：[工作台与图片库两阶段重构计划](./two-page-workbench-gallery-refactor-plan.md)、[Lobe 视觉层级与颜色语义规范](./lobe-visual-language.md)
+> 当前事实：[当前产品边界](../product-boundary.md)
+>
+> 视觉规范：[Lobe 视觉层级与颜色语义规范](../lobe-visual-language.md)
+>
+> 本文保留原始实施范围、顺序和验收依据，不再建立开发待办。尚需另一平台执行的检查以 [`coordination/`](../../coordination/README.md) 当前交接文件为准。
 
 ## 1. 文档目的
 
-本文定义 NovelAI Prompt Studio 下一阶段的已确认功能与交互边界，作为后续设计、实现、测试和跨平台验收的共同依据。
+本文曾定义 NovelAI Prompt Studio 该阶段的功能与交互边界，现作为实施和验收历史保留。
 
 本阶段包含：
 

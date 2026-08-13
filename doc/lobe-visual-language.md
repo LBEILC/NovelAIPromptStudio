@@ -4,7 +4,7 @@
 >
 > 最后核对：2026-07-27
 >
-> 产品边界：[当前产品边界](./two-page-workbench-gallery-refactor-plan.md)
+> 产品边界：[当前产品边界](./product-boundary.md)
 >
 > 组件工作流：[Lobe UI 前端开发 Skill](../.agents/skills/lobe-ui-frontend/SKILL.md)
 

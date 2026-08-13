@@ -30,6 +30,8 @@ Read `coordination/README.md` before platform-sensitive work. Check the file for
 
 Only add a handoff when the work genuinely requires the other platform. Include the commit, exact action, expected result, and observed result. Mark completed items in place so both environments retain the history.
 
+Keep `coordination/MACOS.md` and `coordination/WINDOWS.md` focused on current actionable requests. Before archiving a completed item, record its final status and observed result. Periodically move completed, superseded, or consolidated entries into `coordination/archive/` without deleting their history; archived entries are not active requests.
+
 ## Delivery workflow
 
 After completing a code change:

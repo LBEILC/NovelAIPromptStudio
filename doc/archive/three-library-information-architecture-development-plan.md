@@ -6,7 +6,7 @@
 >
 > 适用平台：Windows / macOS
 >
-> 2026-07-22 产品方向更新：本计划已由[工作台与图片库两阶段重构计划](../two-page-workbench-gallery-refactor-plan.md)取代，仅保留为历史记录。Tag 库、Vibe 库、分支、实验、系列和关系能力将退出产品。
+> 2026-07-22 产品方向更新：本计划已由[当前产品边界](../product-boundary.md)取代，仅保留为历史记录。Tag 库、Vibe 库、分支、实验、系列和关系能力已经退出产品。
 >
 > 关联文档：[资源库管理、Tag 分类、设置与交互设计](./library-management-taxonomy-settings-design.md)
 >
