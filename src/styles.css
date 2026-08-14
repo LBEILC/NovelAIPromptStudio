@@ -137,9 +137,11 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .workbench-tab::after { content: ''; pointer-events: none; position: absolute; inset-block-start: 50%; inset-inline-end: 0; width: 1px; height: 16px; background: var(--line); opacity: .78; transform: translateY(-50%); transition: opacity 120ms cubic-bezier(.22, 1, .36, 1); }
 .workbench-tab:hover:not([data-active]) { background: var(--panel-2); }
 .workbench-tabs-list.sorting .workbench-tab { will-change: transform; }
-.workbench-tabs-list.sorting .workbench-tab[data-active], .workbench-tab.dragging { background: var(--raised); }
-.workbench-tab.dragging { z-index: 3; opacity: .96; box-shadow: 0 8px 22px rgb(0 0 0 / 24%); cursor: grabbing; }
-.workbench-tab:last-child::after, .workbench-tab[data-active]::after, .workbench-tab:has(+ .workbench-tab[data-active])::after, .workbench-tab:hover::after, .workbench-tab:has(+ .workbench-tab:hover)::after, .workbench-tabs-list.sorting .workbench-tab::after { opacity: 0; }
+.workbench-tabs-list.sorting .workbench-tab[data-active] { background: var(--raised); }
+.workbench-tab.dragging { opacity: 0; cursor: grabbing; }
+.workbench-tab:last-child::after, .workbench-tab[data-active]::after, .workbench-tab:has(+ .workbench-tab[data-active])::after, .workbench-tabs-list:not(.sorting) .workbench-tab:hover::after, .workbench-tabs-list:not(.sorting) .workbench-tab:has(+ .workbench-tab:hover)::after, .workbench-tab.dragging::after, .workbench-tab-drag-overlay::after { opacity: 0; }
+.workbench-tab-drag-overlay-root { width: 100%; height: 100%; pointer-events: none; }
+.workbench-tab-drag-overlay { width: 100%; max-width: none; height: 100%; flex: none !important; background: var(--raised); box-shadow: 0 8px 22px rgb(0 0 0 / 24%); cursor: grabbing; transition: none !important; }
 .workbench-tab-label { width: 100%; min-width: 0; height: 20px; display: flex; align-items: center; gap: 7px; }
 .workbench-tab-title { min-width: 0; overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
 .workbench-tab-dirty { width: 6px; height: 6px; flex: 0 0 auto; background: var(--accent); border-radius: 50%; }

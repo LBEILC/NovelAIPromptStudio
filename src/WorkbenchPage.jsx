@@ -1,10 +1,12 @@
-import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { closestCenter, DndContext, DragOverlay, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { horizontalListSortingStrategy, sortableKeyboardCoordinates, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Alert as LobeAlert, DraggablePanel as LobeDraggablePanel, Popover, PopoverGroup } from '@lobehub/ui';
 import { Button as LobeButton, showContextMenu, SplitButton, TabsIndicator, TabsList, TabsRoot, TabsTab } from '@lobehub/ui/base-ui';
 import { useCallback, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useReducedMotion } from 'motion/react';
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
@@ -27,6 +29,7 @@ const WORKBENCH_TAB_SORT_ACCESSIBILITY = {
 };
 const WORKBENCH_TAB_SORT_MODIFIERS = [restrictToHorizontalAxis, restrictToParentElement];
 const WORKBENCH_TAB_SORT_TRANSITION = { duration: 160, easing: 'cubic-bezier(.22, 1, .36, 1)' };
+const WORKBENCH_TAB_DROP_ANIMATION = { duration: 200, easing: 'cubic-bezier(.22, 1, .36, 1)' };
 
 function WorkbenchVibes({ vibes, onReveal }) {
   if (!vibes?.length) return <div className="workbench-vibe-empty"><Icon name="info" size={15}/><span>没有检测到 Vibe</span></div>;
@@ -141,9 +144,28 @@ function SortableWorkbenchTab({ previewDisabled, tab, onClose }) {
   </TabsTab>;
 }
 
+function WorkbenchTabDragOverlay({ tab }) {
+  return <TabsRoot
+    aria-hidden="true"
+    className="workbench-tab-drag-overlay-root"
+    inert
+    size="small"
+    value={tab.id}
+    variant="rounded"
+  >
+    <TabsTab className="workbench-tab workbench-tab-drag-overlay" tabIndex={-1} value={tab.id}>
+      <WorkbenchTabLabel onClose={() => {}} previewDisabled tab={tab}/>
+    </TabsTab>
+  </TabsRoot>;
+}
+
 function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
   const [sortingTabId, setSortingTabId] = useState('');
   const tabIds = useMemo(() => session.tabs.map((tab) => tab.id), [session.tabs]);
+  const sortingTab = session.tabs.find((tab) => tab.id === sortingTabId);
+  const systemReducedMotion = useReducedMotion();
+  const motionMode = document.documentElement.dataset.motion || 'full';
+  const animateDrop = motionMode === 'full' || (motionMode !== 'off' && !systemReducedMotion);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -182,6 +204,12 @@ function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
         </TabsList>
       </TabsRoot>
     </PopoverGroup>
+    {createPortal(<DragOverlay
+      adjustScale={false}
+      dropAnimation={animateDrop ? WORKBENCH_TAB_DROP_ANIMATION : null}
+    >
+      {sortingTab ? <WorkbenchTabDragOverlay tab={sortingTab}/> : null}
+    </DragOverlay>, document.body)}
   </DndContext>;
 }
 
