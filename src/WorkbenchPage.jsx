@@ -21,6 +21,7 @@ import {
 } from './lib/panelLayout.js';
 import { fitTabPreviewCanvas } from './lib/imagePreview.js';
 import { countPromptTags, formatPositivePromptForCopy, positivePromptCopyOptions } from './lib/promptStructure.js';
+import { hiddenWorkbenchTabSeparatorIds } from './lib/workbenchTabLayout.js';
 import { activeWorkbenchCopyContext, activeWorkbenchTab, scopeWorkbenchCopyContext, workbenchTabHasChanges } from './lib/workbenchSession.js';
 
 const WORKBENCH_TAB_SORT_ACCESSIBILITY = {
@@ -117,7 +118,7 @@ function WorkbenchTabLabel({ previewDisabled = false, tab, onClose }) {
   >{label}</Popover>;
 }
 
-function SortableWorkbenchTab({ previewDisabled, tab, onClose }) {
+function SortableWorkbenchTab({ hideSeparator, previewDisabled, tab, onClose }) {
   const {
     attributes,
     isDragging,
@@ -133,7 +134,7 @@ function SortableWorkbenchTab({ previewDisabled, tab, onClose }) {
     {...listeners}
     aria-describedby={attributes['aria-describedby']}
     aria-roledescription={attributes['aria-roledescription']}
-    className={`workbench-tab ${isDragging ? 'dragging' : ''}`}
+    className={`workbench-tab ${isDragging ? 'dragging' : ''} ${hideSeparator ? 'hide-separator' : ''}`}
     ref={setNodeRef}
     style={{
       '--workbench-tab-transform': CSS.Transform.toString(transform),
@@ -147,7 +148,12 @@ function SortableWorkbenchTab({ previewDisabled, tab, onClose }) {
 
 function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
   const [sortingTabId, setSortingTabId] = useState('');
+  const [sortingOverTabId, setSortingOverTabId] = useState('');
   const tabIds = useMemo(() => session.tabs.map((tab) => tab.id), [session.tabs]);
+  const hiddenSeparatorIds = useMemo(
+    () => hiddenWorkbenchTabSeparatorIds(tabIds, session.activeTabId, sortingTabId, sortingOverTabId),
+    [session.activeTabId, sortingOverTabId, sortingTabId, tabIds],
+  );
   const sortingTab = session.tabs.find((tab) => tab.id === sortingTabId);
   const systemReducedMotion = useReducedMotion();
   const motionMode = document.documentElement.dataset.motion || 'full';
@@ -162,12 +168,21 @@ function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
     collisionDetection={closestCenter}
     modifiers={WORKBENCH_TAB_SORT_MODIFIERS}
     sensors={sensors}
-    onDragCancel={() => setSortingTabId('')}
+    onDragCancel={() => {
+      setSortingTabId('');
+      setSortingOverTabId('');
+    }}
     onDragEnd={({ active, over }) => {
       setSortingTabId('');
+      setSortingOverTabId('');
       if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
     }}
-    onDragStart={({ active }) => setSortingTabId(String(active.id))}
+    onDragOver={({ over }) => { if (over) setSortingOverTabId(String(over.id)); }}
+    onDragStart={({ active }) => {
+      const activeId = String(active.id);
+      setSortingTabId(activeId);
+      setSortingOverTabId(activeId);
+    }}
   >
     <PopoverGroup closeDelay={120} openDelay={450} placement="bottomLeft" trigger="hover">
       <TabsRoot
@@ -181,6 +196,7 @@ function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
           <TabsIndicator className="workbench-tabs-indicator"/>
           <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
             {session.tabs.map((item) => <SortableWorkbenchTab
+              hideSeparator={hiddenSeparatorIds.has(item.id)}
               key={item.id}
               onClose={onClose}
               previewDisabled={Boolean(sortingTabId)}

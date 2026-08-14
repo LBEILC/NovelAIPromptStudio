@@ -139,7 +139,7 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .workbench-tabs-list.sorting .workbench-tab { will-change: transform; }
 .workbench-tabs-list.sorting .workbench-tab[data-active] { background: var(--raised); }
 .workbench-tab.dragging { opacity: 0; cursor: grabbing; }
-.workbench-tab:last-child::after, .workbench-tab[data-active]::after, .workbench-tab:has(+ .workbench-tab[data-active])::after, .workbench-tabs-list:not(.sorting) .workbench-tab:hover::after, .workbench-tabs-list:not(.sorting) .workbench-tab:has(+ .workbench-tab:hover)::after, .workbench-tab.dragging::after { opacity: 0; }
+.workbench-tab.hide-separator::after, .workbench-tabs-list:not(.sorting) .workbench-tab:hover::after, .workbench-tabs-list:not(.sorting) .workbench-tab:has(+ .workbench-tab:hover)::after { opacity: 0; }
 .workbench-tab-drag-overlay { width: 100%; min-width: 0; height: 100%; overflow: hidden; padding-inline: 10px; display: flex; align-items: center; justify-content: center; color: var(--muted); background: var(--raised); border-radius: 6px; box-shadow: 0 8px 22px rgb(0 0 0 / 24%); font-size: 12px; font-weight: 500; white-space: nowrap; pointer-events: none; cursor: grabbing; }
 .workbench-tab-drag-overlay.active { color: var(--ant-color-primary, var(--accent)); }
 .workbench-tab-label { width: 100%; min-width: 0; height: 20px; display: flex; align-items: center; gap: 7px; }
