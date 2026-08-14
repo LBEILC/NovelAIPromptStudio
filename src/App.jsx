@@ -459,8 +459,8 @@ export default function App({ appearance, setAppearance }) {
     const tab = workbenchSession.tabs.find((item) => item.id === tabId);
     if (!tab) return;
     if (workbenchTabHasChanges(tab) && !(await requestConfirmation({
-      title: '关闭有修改的标签？',
-      message: `“${tab.displayName}”包含尚未处理的修改。`,
+      title: '关闭已修改的标签？',
+      message: `“${tab.displayName}”的 Prompt 已相对原图修改。`,
       detail: '关闭后会丢弃这个标签的草稿，其他标签不受影响。',
       okText: '丢弃并关闭',
       danger: true,
@@ -679,7 +679,7 @@ export default function App({ appearance, setAppearance }) {
     if (!(await requestConfirmation({
       title: ids.length > 1 ? '永久删除这些图片？' : '永久删除当前图片？',
       message: `将永久删除 ${ids.length} 张图片${knownBytes == null ? '' : `，预计释放 ${formatBytes(knownBytes)}`}。`,
-      detail: `${impact.open ? `${impact.open} 张仍在工作台打开。` : ''}${impact.dirty ? `其中 ${impact.dirty} 个标签包含未保存修改，继续会丢弃。` : ''} 此操作不可撤销。`,
+      detail: `${impact.open ? `${impact.open} 张仍在工作台打开。` : ''}${impact.dirty ? `其中 ${impact.dirty} 个标签包含工作区草稿，继续会丢弃。` : ''} 此操作不可撤销。`,
       okText: '永久删除',
       danger: true,
       primaryDanger: true,

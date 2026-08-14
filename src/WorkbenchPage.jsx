@@ -50,7 +50,7 @@ function WorkbenchTabPreview({ tab }) {
   const previewCanvas = fitTabPreviewCanvas(width, height);
   const dirty = workbenchTabHasChanges(tab);
   const detail = project
-    ? `${width && height ? `${width} × ${height} · ` : ''}${countPromptTags(project)} 个 Tag${dirty ? ' · 有未保存修改' : ''}`
+    ? `${width && height ? `${width} × ${height} · ` : ''}${countPromptTags(project)} 个 Tag${dirty ? ' · Prompt 已修改' : ''}`
     : tab.error || '图片源不可用';
 
   return <div
@@ -88,7 +88,7 @@ function WorkbenchTabLabel({ tab, onClose }) {
         showContextMenu([{ key: 'close-tab', label: '关闭标签', onClick: () => onClose(tab.id) }]);
       }}
     >
-      {dirty && <span aria-label="有未处理修改" className="workbench-tab-dirty"/>}
+      {dirty && <span aria-label="Prompt 已相对原图修改" className="workbench-tab-dirty"/>}
       <span className="workbench-tab-title">{tab.displayName || tab.project?.name || '未命名图片'}</span>
       <span
         aria-label={`关闭 ${tab.displayName || '标签'}`}
@@ -180,7 +180,7 @@ export default function WorkbenchPage({
         </SplitButton>}
       </div>
     </header>
-    <div className="workbench-tabs-scroll">
+    <div className="workbench-tabs-bar">
       <PopoverGroup closeDelay={120} openDelay={450} placement="bottomLeft" trigger="hover">
         <Tabs
           activeKey={session.activeTabId}
