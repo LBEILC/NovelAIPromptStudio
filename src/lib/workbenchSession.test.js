@@ -8,6 +8,7 @@ import {
   createWorkbenchTab,
   normalizeWorkbenchViewState,
   parseWorkbenchSession,
+  reorderWorkbenchTabs,
   scopeWorkbenchCopyContext,
   serializeWorkbenchSession,
   updateWorkbenchTab,
@@ -114,6 +115,26 @@ describe('workbench session v2', () => {
     session = { ...session, activeTabId: middle };
     session = closeWorkbenchTab(session, middle);
     expect(session.activeTabId).toBe(session.tabs[0].id);
+  });
+
+  it('reorders tabs without changing the active tab and persists the new order', () => {
+    let session = createWorkbenchSession(fixture('one', 'C:\\one.png'));
+    session = addWorkbenchTab(session, fixture('two', 'C:\\two.png'));
+    session = addWorkbenchTab(session, fixture('three', 'C:\\three.png'));
+    const [first, second, third] = session.tabs.map((tab) => tab.id);
+    session = { ...session, activeTabId: second };
+
+    const reordered = reorderWorkbenchTabs(session, first, third);
+
+    expect(reordered.tabs.map((tab) => tab.id)).toEqual([second, third, first]);
+    expect(reordered.activeTabId).toBe(second);
+    expect(parseWorkbenchSession(serializeWorkbenchSession(reordered)).tabs.map((tab) => tab.id)).toEqual([second, third, first]);
+  });
+
+  it('ignores invalid or unchanged tab reorder requests', () => {
+    const session = createWorkbenchSession(fixture());
+    expect(reorderWorkbenchTabs(session, session.activeTabId, session.activeTabId)).toBe(session);
+    expect(reorderWorkbenchTabs(session, 'missing', session.activeTabId)).toBe(session);
   });
 
   it('migrates a v1 session into one v2 tab', () => {

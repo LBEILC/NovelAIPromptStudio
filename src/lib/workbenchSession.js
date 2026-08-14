@@ -98,6 +98,17 @@ export function updateWorkbenchTab(session, tabId, updater) {
   };
 }
 
+export function reorderWorkbenchTabs(session, tabId, targetTabId) {
+  if (!session?.tabs?.length || tabId === targetTabId) return session;
+  const fromIndex = session.tabs.findIndex((tab) => tab.id === tabId);
+  const targetIndex = session.tabs.findIndex((tab) => tab.id === targetTabId);
+  if (fromIndex < 0 || targetIndex < 0) return session;
+  const tabs = [...session.tabs];
+  const [moved] = tabs.splice(fromIndex, 1);
+  tabs.splice(targetIndex, 0, moved);
+  return { ...session, tabs };
+}
+
 export function closeWorkbenchTab(session, tabId) {
   const index = session.tabs.findIndex((tab) => tab.id === tabId);
   if (index < 0) return session;

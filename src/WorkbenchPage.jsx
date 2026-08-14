@@ -1,5 +1,9 @@
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+import { horizontalListSortingStrategy, sortableKeyboardCoordinates, SortableContext, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Alert as LobeAlert, DraggablePanel as LobeDraggablePanel, Popover, PopoverGroup } from '@lobehub/ui';
-import { Button as LobeButton, showContextMenu, SplitButton, Tabs } from '@lobehub/ui/base-ui';
+import { Button as LobeButton, showContextMenu, SplitButton, TabsIndicator, TabsList, TabsRoot, TabsTab } from '@lobehub/ui/base-ui';
 import { useCallback, useMemo, useState } from 'react';
 import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
@@ -15,6 +19,14 @@ import {
 import { fitTabPreviewCanvas } from './lib/imagePreview.js';
 import { countPromptTags, formatPositivePromptForCopy, positivePromptCopyOptions } from './lib/promptStructure.js';
 import { activeWorkbenchCopyContext, activeWorkbenchTab, scopeWorkbenchCopyContext, workbenchTabHasChanges } from './lib/workbenchSession.js';
+
+const WORKBENCH_TAB_SORT_ACCESSIBILITY = {
+  screenReaderInstructions: {
+    draggable: '按空格键开始移动标签，使用左右方向键调整位置，再按空格键放下；按 Escape 取消。',
+  },
+};
+const WORKBENCH_TAB_SORT_MODIFIERS = [restrictToHorizontalAxis, restrictToParentElement];
+const WORKBENCH_TAB_SORT_TRANSITION = { duration: 160, easing: 'cubic-bezier(.22, 1, .36, 1)' };
 
 function WorkbenchVibes({ vibes, onReveal }) {
   if (!vibes?.length) return <div className="workbench-vibe-empty"><Icon name="info" size={15}/><span>没有检测到 Vibe</span></div>;
@@ -72,33 +84,105 @@ function WorkbenchTabPreview({ tab }) {
   </div>;
 }
 
-function WorkbenchTabLabel({ tab, onClose }) {
+function WorkbenchTabLabel({ previewDisabled = false, tab, onClose }) {
   const dirty = workbenchTabHasChanges(tab);
+  const label = <span
+    className="workbench-tab-label"
+    onAuxClick={(event) => { if (event.button === 1) onClose(tab.id); }}
+    onContextMenu={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showContextMenu([{ key: 'close-tab', label: '关闭标签', onClick: () => onClose(tab.id) }]);
+    }}
+  >
+    {dirty && <span aria-label="Prompt 已相对原图修改" className="workbench-tab-dirty"/>}
+    <span className="workbench-tab-title">{tab.displayName || tab.project?.name || '未命名图片'}</span>
+    <span
+      aria-label={`关闭 ${tab.displayName || '标签'}`}
+      className="workbench-tab-close"
+      onClick={(event) => { event.preventDefault(); event.stopPropagation(); onClose(tab.id); }}
+      onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
+      role="button"
+    >×</span>
+  </span>;
+  if (previewDisabled) return label;
   return <Popover
     content={<WorkbenchTabPreview tab={tab}/>}
     placement="bottomLeft"
     trigger="hover"
+  >{label}</Popover>;
+}
+
+function SortableWorkbenchTab({ previewDisabled, tab, onClose }) {
+  const {
+    attributes,
+    isDragging,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({
+    id: tab.id,
+    transition: WORKBENCH_TAB_SORT_TRANSITION,
+  });
+  return <TabsTab
+    {...listeners}
+    aria-describedby={attributes['aria-describedby']}
+    aria-roledescription={attributes['aria-roledescription']}
+    className={`workbench-tab ${isDragging ? 'dragging' : ''}`}
+    ref={setNodeRef}
+    style={{
+      '--workbench-tab-transform': CSS.Transform.toString(transform),
+      '--workbench-tab-transition': transition,
+    }}
+    value={tab.id}
   >
-    <span
-      className="workbench-tab-label"
-      onAuxClick={(event) => { if (event.button === 1) onClose(tab.id); }}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        showContextMenu([{ key: 'close-tab', label: '关闭标签', onClick: () => onClose(tab.id) }]);
-      }}
-    >
-      {dirty && <span aria-label="Prompt 已相对原图修改" className="workbench-tab-dirty"/>}
-      <span className="workbench-tab-title">{tab.displayName || tab.project?.name || '未命名图片'}</span>
-      <span
-        aria-label={`关闭 ${tab.displayName || '标签'}`}
-        className="workbench-tab-close"
-        onClick={(event) => { event.preventDefault(); event.stopPropagation(); onClose(tab.id); }}
-        onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
-        role="button"
-      >×</span>
-    </span>
-  </Popover>;
+    <WorkbenchTabLabel onClose={onClose} previewDisabled={previewDisabled} tab={tab}/>
+  </TabsTab>;
+}
+
+function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
+  const [sortingTabId, setSortingTabId] = useState('');
+  const tabIds = useMemo(() => session.tabs.map((tab) => tab.id), [session.tabs]);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  return <DndContext
+    accessibility={WORKBENCH_TAB_SORT_ACCESSIBILITY}
+    collisionDetection={closestCenter}
+    modifiers={WORKBENCH_TAB_SORT_MODIFIERS}
+    sensors={sensors}
+    onDragCancel={() => setSortingTabId('')}
+    onDragEnd={({ active, over }) => {
+      setSortingTabId('');
+      if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
+    }}
+    onDragStart={({ active }) => setSortingTabId(String(active.id))}
+  >
+    <PopoverGroup closeDelay={120} openDelay={450} placement="bottomLeft" trigger="hover">
+      <TabsRoot
+        className="workbench-tabs"
+        size="small"
+        value={session.activeTabId}
+        variant="rounded"
+        onValueChange={(value) => { if (value != null) onActivate(String(value)); }}
+      >
+        <TabsList className={`workbench-tabs-list ${sortingTabId ? 'sorting' : ''}`}>
+          <TabsIndicator className="workbench-tabs-indicator"/>
+          <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+            {session.tabs.map((item) => <SortableWorkbenchTab
+              key={item.id}
+              onClose={onClose}
+              previewDisabled={Boolean(sortingTabId)}
+              tab={item}
+            />)}
+          </SortableContext>
+        </TabsList>
+      </TabsRoot>
+    </PopoverGroup>
+  </DndContext>;
 }
 
 export default function WorkbenchPage({
@@ -115,6 +199,7 @@ export default function WorkbenchPage({
   onDownloadImage,
   onRevealVibe,
   onNotify,
+  onReorderTab,
   onReset,
   onTagContextMenu,
   onTranslateTags,
@@ -181,21 +266,7 @@ export default function WorkbenchPage({
       </div>
     </header>
     <div className="workbench-tabs-bar">
-      <PopoverGroup closeDelay={120} openDelay={450} placement="bottomLeft" trigger="hover">
-        <Tabs
-          activeKey={session.activeTabId}
-          className="workbench-tabs"
-          classNames={{
-            indicator: 'workbench-tabs-indicator',
-            list: 'workbench-tabs-list',
-            tab: 'workbench-tab',
-          }}
-          items={session.tabs.map((item) => ({ key: item.id, label: <WorkbenchTabLabel onClose={onCloseTab} tab={item}/> }))}
-          onChange={onActivateTab}
-          size="small"
-          variant="rounded"
-        />
-      </PopoverGroup>
+      <WorkbenchTabs onActivate={onActivateTab} onClose={onCloseTab} onReorder={onReorderTab} session={session}/>
     </div>
     {(error || tab.error) && <LobeAlert className="workbench-inline-error" message={tab.error || error} type="error" variant="outlined"/>}
     {project ? <div className="workbench-body">

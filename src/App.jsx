@@ -24,6 +24,7 @@ import {
   LEGACY_WORKBENCH_SESSION_KEY,
   normalizeWorkbenchViewState,
   parseWorkbenchSession,
+  reorderWorkbenchTabs,
   serializeWorkbenchSession,
   updateWorkbenchTab,
   WORKBENCH_SESSION_KEY,
@@ -845,6 +846,7 @@ export default function App({ appearance, setAppearance }) {
         }}
         onNotify={showToast}
         onReset={resetWorkbench}
+        onReorderTab={(tabId, targetTabId) => setWorkbenchSession((current) => reorderWorkbenchTabs(current, tabId, targetTabId))}
         onRevealVibe={async (vibe) => {
           const result = await studio.revealEmbeddedVibe(vibe);
           showToast(result?.ok ? '已在文件夹中显示 Vibe 文件' : result?.error || 'Vibe 文件没有生成', result?.ok ? 'success' : 'error');
