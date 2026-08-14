@@ -2,6 +2,15 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+## Verify dependency security refresh and macOS packaging
+
+- Status: Pending
+- Date/source: 2026-08-14, Windows
+- Related commit: `545ea46`
+- Action: Check out current `main` containing `545ea46`, run `npm ci`, `npm audit`, `npm test`, `npm run build`, and `npm run package -- --mac`. Confirm the audit reports zero vulnerabilities, the DMG/ZIP and update metadata are generated successfully, then launch the packaged app and perform one update check from Settings.
+- Expected: The clean install remains reproducible on macOS with zero reported vulnerabilities; tests, production build, native dependency rebuild, DMG/ZIP packaging, packaged startup, and update metadata parsing all succeed without regressions.
+- Observed: Windows clean install and audit reported zero vulnerabilities; all 143 tests, the production build, the Windows NSIS package, and `latest.yml` artifact verification passed. macOS verification is pending.
+
 ## Verify the current desktop shell, fonts, and persisted panel layout
 
 - Status: Pending
