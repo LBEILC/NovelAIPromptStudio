@@ -139,7 +139,7 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .workbench-tab-label { width: 100%; min-width: 0; height: 20px; display: flex; align-items: center; gap: 7px; }
 .workbench-tab-title { min-width: 0; overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
 .workbench-tab-dirty { width: 6px; height: 6px; flex: 0 0 auto; background: var(--accent); border-radius: 50%; }
-.workbench-tab-close { width: 20px; height: 20px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 5px; font-size: 1rem; line-height: 1; }
+.workbench-tab-close { width: 20px; height: 20px; margin-inline-end: -6px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 5px; font-size: 1rem; line-height: 1; }
 .workbench-tab-close:hover { color: var(--text); background: var(--raised); }
 @container workbench-tab (max-width: 110px) {
   .workbench-tab-close { display: none; }
