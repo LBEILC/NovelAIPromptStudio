@@ -11,6 +11,7 @@ import PromptOverview from './PromptOverview.jsx';
 import Icon from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
+import WorkbenchTabDragOverlay from './components/WorkbenchTabDragOverlay.jsx';
 import {
   panelStorage,
   panelWidthForViewport,
@@ -144,21 +145,6 @@ function SortableWorkbenchTab({ previewDisabled, tab, onClose }) {
   </TabsTab>;
 }
 
-function WorkbenchTabDragOverlay({ tab }) {
-  return <TabsRoot
-    aria-hidden="true"
-    className="workbench-tab-drag-overlay-root"
-    inert
-    size="small"
-    value={tab.id}
-    variant="rounded"
-  >
-    <TabsTab className="workbench-tab workbench-tab-drag-overlay" tabIndex={-1} value={tab.id}>
-      <WorkbenchTabLabel onClose={() => {}} previewDisabled tab={tab}/>
-    </TabsTab>
-  </TabsRoot>;
-}
-
 function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
   const [sortingTabId, setSortingTabId] = useState('');
   const tabIds = useMemo(() => session.tabs.map((tab) => tab.id), [session.tabs]);
@@ -208,7 +194,11 @@ function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
       adjustScale={false}
       dropAnimation={animateDrop ? WORKBENCH_TAB_DROP_ANIMATION : null}
     >
-      {sortingTab ? <WorkbenchTabDragOverlay tab={sortingTab}/> : null}
+      {sortingTab ? <WorkbenchTabDragOverlay
+        active={sortingTab.id === session.activeTabId}
+        dirty={workbenchTabHasChanges(sortingTab)}
+        title={sortingTab.displayName || sortingTab.project?.name || '未命名图片'}
+      /> : null}
     </DragOverlay>, document.body)}
   </DndContext>;
 }
