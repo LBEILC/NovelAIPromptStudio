@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "A local-first asset and prompt manager for NovelAI Diffusion V4/V4.5.",
+  "license": "Apache-2.0",
   "productName": "NovelAI Prompt Studio",
   "author": "LBEILC",
   "main": "electron/main.js",
