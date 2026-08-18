@@ -3,8 +3,9 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import initSqlJs from 'sql.js';
 import { CATEGORY_OPTIONS, inferCategory, normalizeCategory } from '../src/lib/prompt.js';
-import { promptFingerprint } from '../src/lib/promptFingerprint.js';
+import { galleryProjectGroupingFingerprints } from '../src/lib/galleryGrouping.js';
 import { danbooruLookupName } from './danbooru.js';
+import { extractEmbeddedVibes, fingerprintVibes } from './vibes.js';
 
 const require = createRequire(import.meta.url);
 const TAG_CATEGORIES = new Set(CATEGORY_OPTIONS);
@@ -18,6 +19,9 @@ CREATE TABLE IF NOT EXISTS projects (
   thumbnail_path TEXT NOT NULL,
   content_hash TEXT NOT NULL DEFAULT '',
   prompt_fingerprint TEXT NOT NULL DEFAULT '',
+  base_prompt_fingerprint TEXT NOT NULL DEFAULT '',
+  vibe_fingerprint TEXT NOT NULL DEFAULT '',
+  exact_group_fingerprint TEXT NOT NULL DEFAULT '',
   is_favorite INTEGER NOT NULL DEFAULT 0,
   deleted_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
@@ -136,10 +140,15 @@ export async function openDatabase(dataDirectory) {
   const projectColumns = tableColumns(database, 'projects');
   ensureColumn(database, 'projects', projectColumns, 'content_hash', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(database, 'projects', projectColumns, 'prompt_fingerprint', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(database, 'projects', projectColumns, 'base_prompt_fingerprint', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(database, 'projects', projectColumns, 'vibe_fingerprint', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(database, 'projects', projectColumns, 'exact_group_fingerprint', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(database, 'projects', projectColumns, 'is_favorite', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn(database, 'projects', projectColumns, 'deleted_at', "TEXT NOT NULL DEFAULT ''");
   database.run("CREATE INDEX IF NOT EXISTS idx_projects_content_hash ON projects(content_hash) WHERE content_hash != ''");
   database.run("CREATE INDEX IF NOT EXISTS idx_projects_prompt_fingerprint ON projects(prompt_fingerprint) WHERE prompt_fingerprint != ''");
+  database.run("CREATE INDEX IF NOT EXISTS idx_projects_base_prompt_fingerprint ON projects(base_prompt_fingerprint) WHERE base_prompt_fingerprint != ''");
+  database.run("CREATE INDEX IF NOT EXISTS idx_projects_exact_group_fingerprint ON projects(exact_group_fingerprint) WHERE exact_group_fingerprint != ''");
   const tagColumns = tableColumns(database, 'prompt_tags');
   ensureColumn(database, 'prompt_tags', tagColumns, 'raw_segment', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(database, 'prompt_tags', tagColumns, 'syntax_issue', "TEXT NOT NULL DEFAULT ''");
@@ -423,8 +432,8 @@ export async function openDatabase(dataDirectory) {
       metadata,
       prompt_structure: safeJson(metadata.prompt_structure_json),
     });
-    const cover = project.prompt_fingerprint
-      ? query('SELECT project_id FROM prompt_group_covers WHERE prompt_fingerprint = $fingerprint', { $fingerprint: project.prompt_fingerprint })[0]
+    const cover = project.exact_group_fingerprint
+      ? query('SELECT project_id FROM prompt_group_covers WHERE prompt_fingerprint = $fingerprint', { $fingerprint: project.exact_group_fingerprint })[0]
       : null;
     return { ...hydrated, group_cover_id: cover?.project_id || '' };
   };
@@ -440,16 +449,20 @@ export async function openDatabase(dataDirectory) {
   const insertProject = (project) => {
     database.run('BEGIN');
     try {
+      const groupingFingerprints = galleryProjectGroupingFingerprints(project);
       database.run(
-        `INSERT INTO projects (id, name, image_path, thumbnail_path, content_hash, prompt_fingerprint, is_favorite, deleted_at, created_at, updated_at)
-         VALUES ($id, $name, $image_path, $thumbnail_path, $content_hash, $prompt_fingerprint, 0, '', $created_at, $updated_at)`,
+        `INSERT INTO projects (id, name, image_path, thumbnail_path, content_hash, prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint, exact_group_fingerprint, is_favorite, deleted_at, created_at, updated_at)
+         VALUES ($id, $name, $image_path, $thumbnail_path, $content_hash, $prompt_fingerprint, $base_prompt_fingerprint, $vibe_fingerprint, $exact_group_fingerprint, 0, '', $created_at, $updated_at)`,
         {
           $id: project.id,
           $name: String(project.name || 'Untitled'),
           $image_path: String(project.image_path || ''),
           $thumbnail_path: String(project.thumbnail_path || ''),
           $content_hash: String(project.content_hash || ''),
-          $prompt_fingerprint: promptFingerprint(project),
+          $prompt_fingerprint: groupingFingerprints.promptFingerprint,
+          $base_prompt_fingerprint: groupingFingerprints.basePromptFingerprint,
+          $vibe_fingerprint: String(project.metadata?.vibe_fingerprint || ''),
+          $exact_group_fingerprint: groupingFingerprints.exactGroupFingerprint,
           $created_at: String(project.created_at || new Date().toISOString()),
           $updated_at: String(project.updated_at || project.created_at || new Date().toISOString()),
         },
@@ -621,7 +634,7 @@ export async function openDatabase(dataDirectory) {
     const normalizedFingerprint = String(fingerprint || '');
     const id = String(projectId || '');
     const project = query(
-      'SELECT id FROM projects WHERE id = $id AND prompt_fingerprint = $fingerprint',
+      'SELECT id FROM projects WHERE id = $id AND exact_group_fingerprint = $fingerprint',
       { $id: id, $fingerprint: normalizedFingerprint },
     )[0];
     if (!normalizedFingerprint || !project) throw new Error('图片不属于当前图片组');
@@ -640,21 +653,53 @@ export async function openDatabase(dataDirectory) {
        WHERE NOT EXISTS (
          SELECT 1 FROM projects
          WHERE projects.id = prompt_group_covers.project_id
-           AND projects.prompt_fingerprint = prompt_group_covers.prompt_fingerprint
+           AND projects.exact_group_fingerprint = prompt_group_covers.prompt_fingerprint
        )`,
     );
   };
 
   const backfillPromptFingerprints = () => {
     let changed = 0;
-    for (const row of query('SELECT id, prompt_fingerprint FROM projects')) {
-      const fingerprint = promptFingerprint(hydrateProject(row));
-      if (fingerprint === row.prompt_fingerprint) continue;
-      database.run('UPDATE projects SET prompt_fingerprint = $fingerprint WHERE id = $id', {
-        $id: row.id,
-        $fingerprint: fingerprint,
-      });
+    for (const row of query('SELECT id, prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint, exact_group_fingerprint FROM projects')) {
+      const project = hydrateProject(row);
+      const raw = safeJson(project.metadata?.extra_json);
+      const vibeFingerprint = fingerprintVibes(extractEmbeddedVibes(raw.parsed || raw, project.metadata?.model));
+      const fingerprints = galleryProjectGroupingFingerprints({ ...project, vibe_fingerprint: vibeFingerprint });
+      if (fingerprints.promptFingerprint === row.prompt_fingerprint
+        && fingerprints.basePromptFingerprint === row.base_prompt_fingerprint
+        && vibeFingerprint === row.vibe_fingerprint
+        && fingerprints.exactGroupFingerprint === row.exact_group_fingerprint) continue;
+      database.run(
+        `UPDATE projects
+         SET prompt_fingerprint = $prompt_fingerprint,
+             base_prompt_fingerprint = $base_prompt_fingerprint,
+             vibe_fingerprint = $vibe_fingerprint,
+             exact_group_fingerprint = $exact_group_fingerprint
+         WHERE id = $id`,
+        {
+          $id: row.id,
+          $prompt_fingerprint: fingerprints.promptFingerprint,
+          $base_prompt_fingerprint: fingerprints.basePromptFingerprint,
+          $vibe_fingerprint: vibeFingerprint,
+          $exact_group_fingerprint: fingerprints.exactGroupFingerprint,
+        },
+      );
       changed += 1;
+    }
+    for (const cover of query('SELECT prompt_fingerprint, project_id FROM prompt_group_covers')) {
+      const project = query(
+        'SELECT prompt_fingerprint, exact_group_fingerprint FROM projects WHERE id = $id',
+        { $id: cover.project_id },
+      )[0];
+      if (!project || cover.prompt_fingerprint === project.exact_group_fingerprint) continue;
+      if (cover.prompt_fingerprint === project.prompt_fingerprint && project.exact_group_fingerprint) {
+        database.run(
+          `INSERT INTO prompt_group_covers (prompt_fingerprint, project_id) VALUES ($fingerprint, $project_id)
+           ON CONFLICT(prompt_fingerprint) DO NOTHING`,
+          { $fingerprint: project.exact_group_fingerprint, $project_id: cover.project_id },
+        );
+      }
+      database.run('DELETE FROM prompt_group_covers WHERE prompt_fingerprint = $fingerprint', { $fingerprint: cover.prompt_fingerprint });
     }
     clearInvalidGroupCovers();
     if (changed) persist();

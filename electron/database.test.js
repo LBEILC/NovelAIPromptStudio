@@ -252,9 +252,29 @@ describe('phase 2 core database', () => {
     const loaded = database.loadLibrary();
     expect(loaded[0].prompt_fingerprint).toBeTruthy();
     expect(loaded[0].prompt_fingerprint).toBe(loaded[1].prompt_fingerprint);
-    database.setGroupCover(loaded[0].prompt_fingerprint, 'project-1');
+    expect(loaded[0].base_prompt_fingerprint).toBeTruthy();
+    expect(loaded[0].exact_group_fingerprint).toBe(loaded[1].exact_group_fingerprint);
+    database.setGroupCover(loaded[0].exact_group_fingerprint, 'project-1');
     expect(database.loadLibrary().every((entry) => entry.group_cover_id === 'project-1')).toBe(true);
     database.deleteProject('project-1');
     expect(database.loadLibrary()[0].group_cover_id).toBe('');
+  });
+
+  it('keeps Vibe and generation model inside the persistent exact-group boundary', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    database.insertProject({ ...project('vibe-a'), metadata: { ...project('vibe-a').metadata, vibe_fingerprint: 'vibe-a' } });
+    database.insertProject({ ...project('vibe-b'), metadata: { ...project('vibe-b').metadata, vibe_fingerprint: 'vibe-b' } });
+    database.insertProject({ ...project('model-b'), metadata: { ...project('model-b').metadata, model: 'nai-v4.5-curated', vibe_fingerprint: 'vibe-a' } });
+    const loaded = database.loadLibrary();
+    const first = loaded.find((entry) => entry.id === 'vibe-a');
+    const differentVibe = loaded.find((entry) => entry.id === 'vibe-b');
+    const differentModel = loaded.find((entry) => entry.id === 'model-b');
+
+    expect(first.prompt_fingerprint).toBe(differentVibe.prompt_fingerprint);
+    expect(first.exact_group_fingerprint).not.toBe(differentVibe.exact_group_fingerprint);
+    expect(first.exact_group_fingerprint).not.toBe(differentModel.exact_group_fingerprint);
+    expect(() => database.setGroupCover(first.exact_group_fingerprint, differentVibe.id)).toThrow('图片不属于当前图片组');
   });
 });

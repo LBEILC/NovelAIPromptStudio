@@ -1,22 +1,28 @@
 import { allPromptTags } from './promptStructure.js';
 import { expandSearch, normalizeSearch } from './prompt.js';
+import { galleryGroupingFingerprint, isExactGalleryGrouping, normalizeGalleryGrouping } from './galleryGrouping.js';
 
-export function groupGalleryProjects(projects = []) {
+export function groupGalleryProjects(projects = [], groupingValue) {
+  const grouping = normalizeGalleryGrouping(groupingValue);
+  const exact = isExactGalleryGrouping(grouping);
   const groups = new Map();
   for (const project of projects) {
-    const fingerprint = String(project.prompt_fingerprint || '');
-    const key = fingerprint ? `prompt:${fingerprint}` : `project:${project.id}`;
+    const fingerprint = galleryGroupingFingerprint(project, grouping);
+    const key = fingerprint ? `group:${fingerprint}` : `project:${project.id}`;
     if (!groups.has(key)) groups.set(key, { key, fingerprint, members: [] });
     groups.get(key).members.push(project);
   }
   return [...groups.values()].map((group) => {
     const members = [...group.members].sort((left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0));
-    const requestedCover = members.find((project) => project.id === members[0]?.group_cover_id)
-      || members.find((project) => project.id === project.group_cover_id);
+    const requestedCover = exact
+      ? members.find((project) => members.some((member) => member.group_cover_id === project.id))
+      : null;
     const cover = requestedCover || members[0];
     return {
       ...group,
       cover,
+      canSetCover: exact && Boolean(group.fingerprint),
+      grouping,
       members,
       id: group.key,
       latestAt: members[0]?.created_at || '',
@@ -27,13 +33,17 @@ export function groupGalleryProjects(projects = []) {
 
 export function filterAndSortGalleryGroups(groups = [], query = '', sort = 'recent') {
   const needles = expandSearch(query);
-  const matched = needles.length ? groups.filter((group) => group.members.some((project) => (
+  const projectMatches = (project) => (
     [project.name, ...allPromptTags(project).flatMap((tag) => [tag.tag, tag.translation])]
       .some((value) => needles.some((needle) => normalizeSearch(value).includes(needle)))
-  ))) : groups;
+  );
+  const matched = needles.length ? groups.flatMap((group) => {
+    const displayCover = group.members.find(projectMatches);
+    return displayCover ? [{ ...group, displayCover }] : [];
+  }) : groups;
   return [...matched].sort((left, right) => {
     if (sort === 'oldest') return new Date(left.latestAt || 0) - new Date(right.latestAt || 0);
-    if (sort === 'name') return String(left.cover?.name || '').localeCompare(String(right.cover?.name || ''), 'zh-CN', { numeric: true });
+    if (sort === 'name') return String(left.displayCover?.name || left.cover?.name || '').localeCompare(String(right.displayCover?.name || right.cover?.name || ''), 'zh-CN', { numeric: true });
     return new Date(right.latestAt || 0) - new Date(left.latestAt || 0);
   });
 }
@@ -53,7 +63,7 @@ export function galleryScrubMemberIndex(pointerX, boundsLeft, boundsWidth, membe
 }
 
 export function galleryGroupMember(group, projectId) {
-  return group?.members?.find((project) => project.id === projectId) || group?.cover;
+  return group?.members?.find((project) => project.id === projectId) || group?.displayCover || group?.cover;
 }
 
 export function isGalleryBlankClickTarget(target) {
@@ -76,7 +86,7 @@ export function galleryGroupMenuLabels(group) {
     favorite: grouped
       ? `${allFavorite ? '取消收藏' : '收藏'}整个图片组`
       : allFavorite ? '取消收藏图片' : '收藏图片',
-    rename: grouped ? '重命名头图' : '重命名',
+    rename: grouped ? (group?.canSetCover ? '重命名头图' : '重命名当前图片') : '重命名',
   };
 }
 

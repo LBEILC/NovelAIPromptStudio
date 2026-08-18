@@ -9,6 +9,16 @@ export function fingerprintVibe(value) {
   return crypto.createHash('sha256').update(payload).digest('hex');
 }
 
+export function fingerprintVibes(vibes = []) {
+  const payload = (Array.isArray(vibes) ? vibes : []).map((vibe) => ({
+    encoding: fingerprintVibe(vibe?.encoding),
+    strength: finiteNumber(vibe?.strength, 0.6),
+    informationExtracted: finiteNumber(vibe?.information_extracted),
+    model: String(vibe?.model || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US'),
+  }));
+  return payload.length ? fingerprintVibe(JSON.stringify(payload)) : '';
+}
+
 function finiteNumber(value, fallback = null) {
   if (value === null || value === undefined || value === '') return fallback;
   const number = Number(value);

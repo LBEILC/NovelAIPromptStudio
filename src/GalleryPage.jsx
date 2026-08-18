@@ -1,5 +1,5 @@
 import { Accordion, AccordionItem, ActionIcon, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, Highlighter, Popover, PopoverGroup, SearchBar as LobeSearchBar } from '@lobehub/ui';
-import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, Slider, SplitButton } from '@lobehub/ui/base-ui';
+import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, Slider, SplitButton, Switch as LobeSwitch } from '@lobehub/ui/base-ui';
 import { useEffect, useRef, useState } from 'react';
 import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
@@ -14,6 +14,12 @@ import {
   writeGalleryCardSize,
 } from './lib/galleryLayout.js';
 import { fitTabPreviewCanvas } from './lib/imagePreview.js';
+import {
+  DEFAULT_GALLERY_GROUPING,
+  GALLERY_PROMPT_SCOPE_LABELS,
+  galleryPromptScopeAt,
+  galleryPromptScopeIndex,
+} from './lib/galleryGrouping.js';
 import {
   GALLERY_PREVIEW_PANEL_EXPANDED_KEY,
   GALLERY_PREVIEW_PANEL_PINNED_KEY,
@@ -126,8 +132,8 @@ export function GalleryCardHoverPreview({ group, project = group.cover }) {
 
 const GALLERY_HOVER_POSITIONER_STYLES = { root: { pointerEvents: 'none' } };
 
-export function GalleryCardView({ active, group, hoverProject = group.cover, selected, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
-  const project = group.cover;
+export function GalleryCardView({ active, group, hoverProject = group.displayCover || group.cover, selected, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
+  const project = group.displayCover || group.cover;
   const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
   return <Popover content={<GalleryCardHoverPreview group={group} project={hoverProject}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
     <button
@@ -209,7 +215,7 @@ export function GalleryCard(props) {
       updateScrubProject(event.clientX, bounds);
     }}
     onPreview={(renderedProject, event) => {
-      const candidate = event?.detail === 0 ? group.cover : currentScrubProject() || renderedProject;
+      const candidate = event?.detail === 0 ? galleryGroupMember(group) : currentScrubProject() || renderedProject;
       if (!activatedProjectIdRef.current || !event || event.detail <= 1) activatedProjectIdRef.current = candidate?.id || '';
       props.onPreview(galleryGroupMember(group, activatedProjectIdRef.current || candidate?.id));
     }}
@@ -226,6 +232,7 @@ export default function GalleryPage({
   importing,
   selectedGroupIds,
   selectedImageCount,
+  grouping = DEFAULT_GALLERY_GROUPING,
   onClearSelection,
   onEmptyTrash,
   onFavorite,
@@ -249,6 +256,7 @@ export default function GalleryPage({
   onViewChange,
   onCopyImage,
   onDownloadImage,
+  onGroupingChange,
 }) {
   const [previewExpanded, setPreviewExpanded] = useState(() => readPanelBoolean(
     panelStorage(),
@@ -302,7 +310,7 @@ export default function GalleryPage({
     if (await onRename(preview, nameDraft)) setRenaming(false);
   };
   const requestRename = (group) => {
-    const project = group.cover;
+    const project = group.displayCover || group.cover;
     updatePreviewExpanded(true);
     if (preview?.id === project.id) {
       setNameDraft(project.name || '');
@@ -348,6 +356,31 @@ export default function GalleryPage({
           value={galleryCardSize}
         />
         <Icon name="image" size={18}/>
+      </div>
+      <div className="gallery-grouping-control" title={`分组范围：${GALLERY_PROMPT_SCOPE_LABELS[grouping.promptScope]}`}>
+        <span>分组</span>
+        <Slider
+          aria-label="自动分组范围"
+          className="gallery-grouping-slider"
+          getAriaValueText={(value) => GALLERY_PROMPT_SCOPE_LABELS[galleryPromptScopeAt(value)]}
+          max={2}
+          min={0}
+          onChange={(value) => onGroupingChange({ promptScope: galleryPromptScopeAt(value) })}
+          step={1}
+          value={galleryPromptScopeIndex(grouping.promptScope)}
+        />
+        <strong>{GALLERY_PROMPT_SCOPE_LABELS[grouping.promptScope]}</strong>
+      </div>
+      <div className="gallery-vibe-grouping" title={grouping.promptScope === 'separate' ? '全部分开时不进行自动分组' : '允许相同 Prompt、不同 Vibe 的图片进入同一组'}>
+        <LobeSwitch
+          aria-label="跨 Vibe 合并"
+          checked={grouping.promptScope !== 'separate' && grouping.mergeVibes}
+          disabled={grouping.promptScope === 'separate'}
+          id="gallery-merge-vibes"
+          onChange={(checked) => onGroupingChange({ mergeVibes: checked })}
+          size="small"
+        />
+        <label htmlFor="gallery-merge-vibes">跨 Vibe 合并</label>
       </div>
       <span className="gallery-count">{groups.length} 组 · {groups.reduce((count, group) => count + group.count, 0)} 张</span>
       <LobeButton disabled={!groups.length} onClick={onSelectAll} size="small" type="text">全选当前结果</LobeButton>
@@ -475,7 +508,7 @@ export default function GalleryPage({
             <LobeButton icon={<Icon name="star" size={14}/>} onClick={() => onFavorite(!preview.is_favorite, [preview.id])}>{preview.is_favorite ? '取消收藏' : '收藏'}</LobeButton>
             <LobeButton icon={<Icon name="folder" size={14}/>} onClick={() => onReveal(preview)}>在文件夹中显示</LobeButton>
             {view !== 'trash' && <LobeButton onClick={() => setRenaming(true)}>重命名</LobeButton>}
-            {previewGroup?.count > 1 && previewGroup.cover.id !== preview.id && view !== 'trash' && <LobeButton onClick={() => onSetCover(previewGroup, preview)}>设为头图</LobeButton>}
+            {previewGroup?.canSetCover && previewGroup.count > 1 && previewGroup.cover.id !== preview.id && view !== 'trash' && <LobeButton onClick={() => onSetCover(previewGroup, preview)}>设为头图</LobeButton>}
             {view === 'trash'
               ? <><LobeButton icon={<Icon name="restore" size={14}/>} onClick={() => onRestore([preview.id])}>恢复当前图片</LobeButton><LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={() => onPermanentDelete([preview.id])}>永久删除当前图片</LobeButton></>
               : <LobeButton className="gallery-preview-action-wide" danger icon={<Icon name="trash" size={14}/>} onClick={() => onTrash([preview.id], 'detail')} type="fill">删除当前图片</LobeButton>}

@@ -32,6 +32,20 @@ export function promptSemanticPayload(project = {}) {
   };
 }
 
+export function basePromptSemanticPayload(project = {}) {
+  let id = 0;
+  const structure = normalizePromptStructure(project.prompt_structure, project.metadata, () => `base-fingerprint-${id++}`);
+  return {
+    prompt: (project.tags || []).map(normalizedTag),
+    undesired: (structure.base_undesired_tags || []).map(normalizedTag),
+  };
+}
+
+export function basePromptFingerprint(project = {}) {
+  const payload = basePromptSemanticPayload(project);
+  return payload.prompt.length || payload.undesired.length ? JSON.stringify(payload) : '';
+}
+
 export function promptFingerprint(project = {}) {
   const payload = promptSemanticPayload(project);
   const hasPrompt = payload.base.prompt.length

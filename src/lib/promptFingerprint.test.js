@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { promptFingerprint } from './promptFingerprint.js';
+import { basePromptFingerprint, promptFingerprint } from './promptFingerprint.js';
 
 function project({ seed = '1', undesired = 'lowres', center = { x: 0.25, y: 0.5 }, order = ['girl', 'blue hair'] } = {}) {
   const tag = (value, index) => ({ id: `${value}-${index}`, tag: value, weight: 1 });
@@ -30,5 +30,11 @@ describe('complete Prompt fingerprint', () => {
 
   it('does not group images without any Prompt semantic', () => {
     expect(promptFingerprint({ tags: [], metadata: {}, prompt_structure: { base_undesired_tags: [], characters: [] } })).toBe('');
+  });
+
+  it('keeps Base Prompt and Base Undesired while ignoring all character semantics', () => {
+    expect(basePromptFingerprint(project({ center: { x: 0.75, y: 0.25 }, order: ['blue hair', 'girl'] })))
+      .toBe(basePromptFingerprint(project()));
+    expect(basePromptFingerprint(project({ undesired: 'blurry' }))).not.toBe(basePromptFingerprint(project()));
   });
 });

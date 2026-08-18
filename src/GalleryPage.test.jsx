@@ -25,6 +25,7 @@ vi.mock('@lobehub/ui/base-ui', () => {
     Segmented: Component,
     Select: Component,
     Slider: Component,
+    Switch: Component,
     SplitButton: Object.assign(Component, { Main: Component, Menu: Component }),
   };
 });

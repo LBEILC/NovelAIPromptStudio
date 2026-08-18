@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { adjacentGallerySelection, galleryEmptyState, galleryGroupMember, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, groupGalleryProjects, isGalleryBlankClickTarget, reconcileGallerySelection, shouldCollapseGalleryPreview } from './gallery.js';
+import { adjacentGallerySelection, filterAndSortGalleryGroups, galleryEmptyState, galleryGroupMember, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, groupGalleryProjects, isGalleryBlankClickTarget, reconcileGallerySelection, shouldCollapseGalleryPreview } from './gallery.js';
 
 const item = (id, fingerprint, createdAt, cover = '') => ({
+  base_prompt_fingerprint: fingerprint === 'same-character-a' || fingerprint === 'same-character-b' ? 'same-base' : fingerprint,
   id,
   name: id,
   prompt_fingerprint: fingerprint,
+  vibe_fingerprint: 'vibe-a',
   created_at: createdAt,
   group_cover_id: cover,
   tags: [],
-  metadata: {},
+  metadata: { model: 'nai-v4.5' },
   prompt_structure: { base_undesired_tags: [], characters: [] },
 });
 
@@ -21,7 +23,7 @@ describe('gallery grouping and selection', () => {
       item('plain-b', '', '2026-03-02'),
     ]);
     expect(groups).toHaveLength(3);
-    expect(groups.find((group) => group.fingerprint === 'same')).toMatchObject({ count: 2, cover: { id: 'older' } });
+    expect(groups.find((group) => group.count === 2)).toMatchObject({ canSetCover: true, cover: { id: 'older' } });
   });
 
   it('falls back to the newest remaining member when a persisted cover is invalid', () => {
@@ -40,7 +42,7 @@ describe('gallery grouping and selection', () => {
 
   it('chooses the next member after detail deletion and then an adjacent group', () => {
     const groups = groupGalleryProjects([item('a', 'same', '2026-01-01'), item('b', 'same', '2026-02-01'), item('c', 'other', '2026-03-01')]);
-    const same = groups.find((group) => group.fingerprint === 'same');
+    const same = groups.find((group) => group.count === 2);
     expect(adjacentGallerySelection(groups, same.id, 'b')).toEqual({ groupId: same.id, projectId: 'a' });
   });
 
@@ -49,10 +51,36 @@ describe('gallery grouping and selection', () => {
       favorite: '收藏图片',
       rename: '重命名',
     });
-    expect(galleryGroupMenuLabels({ count: 2, members: [{ is_favorite: 1 }, { is_favorite: 1 }] })).toEqual({
+    expect(galleryGroupMenuLabels({ canSetCover: true, count: 2, members: [{ is_favorite: 1 }, { is_favorite: 1 }] })).toEqual({
       favorite: '取消收藏整个图片组',
       rename: '重命名头图',
     });
+  });
+
+  it('expands grouping monotonically across Prompt scope and the Vibe option while keeping model as a boundary', () => {
+    const projects = [
+      item('a', 'same-character-a', '2026-01-01'),
+      { ...item('b', 'same-character-a', '2026-01-02'), vibe_fingerprint: 'vibe-b' },
+      item('c', 'same-character-b', '2026-01-03'),
+      { ...item('d', 'same-character-b', '2026-01-04'), metadata: { model: 'different-model' } },
+    ];
+
+    expect(groupGalleryProjects(projects, { promptScope: 'separate', mergeVibes: false })).toHaveLength(4);
+    expect(groupGalleryProjects(projects, { promptScope: 'full', mergeVibes: false })).toHaveLength(4);
+    expect(groupGalleryProjects(projects, { promptScope: 'full', mergeVibes: true })).toHaveLength(3);
+    expect(groupGalleryProjects(projects, { promptScope: 'base', mergeVibes: false })).toHaveLength(3);
+    expect(groupGalleryProjects(projects, { promptScope: 'base', mergeVibes: true })).toHaveLength(2);
+  });
+
+  it('ignores persisted covers for dynamic groups and shows a search-matched member transiently', () => {
+    const groups = groupGalleryProjects([
+      item('older match', 'same', '2026-01-01', 'older match'),
+      item('newer', 'same', '2026-02-01', 'older match'),
+    ], { promptScope: 'full', mergeVibes: true });
+    expect(groups[0]).toMatchObject({ canSetCover: false, cover: { id: 'newer' } });
+    const [matched] = filterAndSortGalleryGroups(groups, 'older match');
+    expect(matched.displayCover.id).toBe('older match');
+    expect(matched.cover.id).toBe('newer');
   });
 
   it('maps the initial pointer position and subsequent movement directly to group members', () => {

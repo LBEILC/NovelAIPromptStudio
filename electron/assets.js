@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
 import { readNovelAIMetadata } from './metadata.js';
+import { fingerprintVibes } from './vibes.js';
 import { parsePrompt } from '../src/lib/prompt.js';
 import { createPromptStructure } from '../src/lib/promptStructure.js';
 
@@ -50,6 +51,7 @@ export async function importImage(sourcePath, assetsDirectory, options = {}) {
       metadata.width = Number(imageMetadata.width || 0);
       metadata.height = Number(imageMetadata.height || 0);
     }
+    metadata.vibe_fingerprint = fingerprintVibes(metadata.embedded_vibes);
     delete metadata.embedded_vibes;
     const now = new Date().toISOString();
     return {
