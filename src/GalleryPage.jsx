@@ -1,11 +1,19 @@
-import { Accordion, AccordionItem, ActionIcon, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, Highlighter, SearchBar as LobeSearchBar } from '@lobehub/ui';
-import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, SplitButton } from '@lobehub/ui/base-ui';
+import { Accordion, AccordionItem, ActionIcon, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, Highlighter, Popover, PopoverGroup, SearchBar as LobeSearchBar } from '@lobehub/ui';
+import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, Slider, SplitButton } from '@lobehub/ui/base-ui';
 import { useEffect, useRef, useState } from 'react';
 import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
 import { galleryEmptyState } from './lib/gallery.js';
+import {
+  GALLERY_CARD_SIZE_MAX,
+  GALLERY_CARD_SIZE_MIN,
+  galleryDensityForSize,
+  readGalleryCardSize,
+  writeGalleryCardSize,
+} from './lib/galleryLayout.js';
+import { fitTabPreviewCanvas } from './lib/imagePreview.js';
 import {
   GALLERY_PREVIEW_PANEL_WIDTH_KEY,
   panelStorage,
@@ -87,10 +95,32 @@ export function BatchToolbar({ view, selectedGroups, selectedImages, onFavorite,
   </div>;
 }
 
+export function GalleryCardHoverPreview({ group }) {
+  const project = group.cover;
+  const width = Number(project.metadata?.width || 0);
+  const height = Number(project.metadata?.height || 0);
+  const previewCanvas = fitTabPreviewCanvas(width, height, { maxWidth: 320, maxHeight: 360, minWidth: 220, minHeight: 180 });
+  return <div
+    className="gallery-card-hover-preview"
+    style={{
+      '--gallery-card-hover-ratio': `${previewCanvas.width} / ${previewCanvas.height}`,
+      '--gallery-card-hover-width': `${previewCanvas.width}px`,
+    }}
+  >
+    <div className="gallery-card-hover-media">
+      <img alt="" src={mediaUrl(project.thumbnail_path || project.image_path)}/>
+    </div>
+    <div className="gallery-card-hover-meta">
+      <span>{width || '—'} × {height || '—'} · {countPromptTags(project)} Tags</span>
+      <span>{group.count > 1 ? `${group.count} 张变体 · ` : ''}{formatDate(project.created_at)}</span>
+    </div>
+  </div>;
+}
+
 function GalleryCard({ active, group, selected, onPreview, onSelect, onContextMenu }) {
   const project = group.cover;
   const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
-  return <article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
+  return <Popover content={<GalleryCardHoverPreview group={group}/>} placement="rightTop" trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
     <button
       className="gallery-card-main"
       onClick={(event) => selected || event.ctrlKey || event.metaKey || event.shiftKey ? onSelect(event) : onPreview()}
@@ -107,7 +137,7 @@ function GalleryCard({ active, group, selected, onPreview, onSelect, onContextMe
           src={mediaUrl(member.thumbnail_path || member.image_path)}
         />)}
         <img alt="" loading="lazy" src={mediaUrl(project.thumbnail_path || project.image_path)}/>
-        {group.count > 1 && <span className="gallery-group-count">{group.count} 张</span>}
+        {group.count > 1 && <span className="gallery-group-count"><b>{group.count}</b><span> 张</span></span>}
       </span>
       <span className="gallery-card-copy">
         <strong title={project.name}>{project.name}</strong>
@@ -120,7 +150,7 @@ function GalleryCard({ active, group, selected, onPreview, onSelect, onContextMe
       onClick={(event) => { event.stopPropagation(); onSelect(event); }}
       type="button"
     ><SelectionMark selected={selected}/></button>
-  </article>;
+  </article></Popover>;
 }
 
 export default function GalleryPage({
@@ -166,6 +196,7 @@ export default function GalleryPage({
     560,
   ));
   const [previewPinned, setPreviewPinned] = useState(false);
+  const [galleryCardSize, setGalleryCardSize] = useState(() => readGalleryCardSize(panelStorage()));
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const renameTargetRef = useRef('');
@@ -189,6 +220,7 @@ export default function GalleryPage({
   }, [onNavigatePreview, previewGroup]);
 
   const memberIndex = previewGroup?.members.findIndex((project) => project.id === preview?.id) ?? -1;
+  const galleryDensity = galleryDensityForSize(galleryCardSize);
   const emptyState = galleryEmptyState(view, query);
   const saveName = async () => {
     if (await onRename(preview, nameDraft)) setRenaming(false);
@@ -226,6 +258,21 @@ export default function GalleryPage({
           { label: '按名称', value: 'name' },
         ]} value={sort}/>
       </div>
+      <div className="gallery-size-control" title={`缩略图大小：${galleryCardSize} 像素`}>
+        <Icon name="image" size={13}/>
+        <Slider
+          aria-label="缩略图大小"
+          className="gallery-size-slider"
+          getAriaValueText={(value) => `${value} 像素`}
+          max={GALLERY_CARD_SIZE_MAX}
+          min={GALLERY_CARD_SIZE_MIN}
+          onChange={setGalleryCardSize}
+          onChangeComplete={(value) => writeGalleryCardSize(panelStorage(), value)}
+          step={8}
+          value={galleryCardSize}
+        />
+        <Icon name="image" size={18}/>
+      </div>
       <span className="gallery-count">{groups.length} 组 · {groups.reduce((count, group) => count + group.count, 0)} 张</span>
       <LobeButton disabled={!groups.length} onClick={onSelectAll} size="small" type="text">全选当前结果</LobeButton>
       {view === 'trash' && <LobeButton danger disabled={!groups.length} onClick={onEmptyTrash} size="small">清空回收站</LobeButton>}
@@ -248,7 +295,10 @@ export default function GalleryPage({
           onWorkspaceContextMenu(event);
         }}
       >
-        {groups.length ? <div className="gallery-grid">
+        {groups.length ? <PopoverGroup closeDelay={120} openDelay={450} placement="rightTop" trigger="hover"><div
+          className={`gallery-grid density-${galleryDensity}`}
+          style={{ '--gallery-card-min-width': `${galleryCardSize}px` }}
+        >
           {groups.map((group) => <GalleryCard
             active={previewGroup?.id === group.id}
             group={group}
@@ -258,7 +308,7 @@ export default function GalleryPage({
             onSelect={(event) => onToggleSelect(group, event)}
             selected={selectedGroupIds.includes(group.id)}
           />)}
-        </div> : <LobeEmpty
+        </div></PopoverGroup> : <LobeEmpty
           className="gallery-empty"
           description={emptyState.description}
           gap={6}

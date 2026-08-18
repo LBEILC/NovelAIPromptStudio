@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BatchToolbar } from './GalleryPage.jsx';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { BatchToolbar, GalleryCardHoverPreview } from './GalleryPage.jsx';
 
 vi.mock('@lobehub/ui', () => {
   const Component = () => null;
@@ -10,6 +11,8 @@ vi.mock('@lobehub/ui', () => {
     DraggablePanel: Object.assign(Component, { Body: Component }),
     Empty: Component,
     Highlighter: Component,
+    Popover: Component,
+    PopoverGroup: Component,
     SearchBar: Component,
   };
 });
@@ -21,6 +24,7 @@ vi.mock('@lobehub/ui/base-ui', () => {
     Input: Component,
     Segmented: Component,
     Select: Component,
+    Slider: Component,
     SplitButton: Object.assign(Component, { Main: Component, Menu: Component }),
   };
 });
@@ -64,5 +68,27 @@ describe('BatchToolbar', () => {
 
     expect(onRestore).toHaveBeenCalledWith();
     expect(onPermanentDelete).toHaveBeenCalledWith();
+  });
+});
+
+describe('GalleryCardHoverPreview', () => {
+  it('uses the thumbnail and keeps the preview focused on visual metadata', () => {
+    const html = renderToStaticMarkup(<GalleryCardHoverPreview group={{
+      count: 2,
+      cover: {
+        created_at: '2026-08-18T00:00:00.000Z',
+        image_path: 'C:\\gallery\\original.png',
+        metadata: { height: 1216, width: 832 },
+        name: 'unused generated filename',
+        prompt_structure: { base_undesired_tags: [], characters: [] },
+        tags: [{ id: 'one', tag: '1girl' }, { id: 'two', tag: 'outdoors' }],
+        thumbnail_path: 'C:\\gallery\\thumbnail.webp',
+      },
+    }}/>);
+
+    expect(html).toContain('thumbnail.webp');
+    expect(html).toContain('832 × 1216 · 2 Tags');
+    expect(html).toContain('2 张变体');
+    expect(html).not.toContain('unused generated filename');
   });
 });
