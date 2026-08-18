@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BatchToolbar, GalleryCard, GalleryCardHoverPreview } from './GalleryPage.jsx';
+import { BatchToolbar, GalleryCardHoverPreview, GalleryCardView } from './GalleryPage.jsx';
 
 vi.mock('@lobehub/ui', () => {
   const Component = () => null;
@@ -73,27 +73,57 @@ describe('BatchToolbar', () => {
 
 describe('GalleryCardHoverPreview', () => {
   it('uses the thumbnail and keeps the preview focused on visual metadata', () => {
+    const cover = {
+      created_at: '2026-08-18T00:00:00.000Z',
+      id: 'cover',
+      image_path: 'C:\\gallery\\original.png',
+      metadata: { height: 1216, width: 832 },
+      name: 'unused generated filename',
+      prompt_structure: { base_undesired_tags: [], characters: [] },
+      tags: [{ id: 'one', tag: '1girl' }, { id: 'two', tag: 'outdoors' }],
+      thumbnail_path: 'C:\\gallery\\thumbnail.webp',
+    };
     const html = renderToStaticMarkup(<GalleryCardHoverPreview group={{
       count: 2,
-      cover: {
-        created_at: '2026-08-18T00:00:00.000Z',
-        image_path: 'C:\\gallery\\original.png',
-        metadata: { height: 1216, width: 832 },
-        name: 'unused generated filename',
-        prompt_structure: { base_undesired_tags: [], characters: [] },
-        tags: [{ id: 'one', tag: '1girl' }, { id: 'two', tag: 'outdoors' }],
-        thumbnail_path: 'C:\\gallery\\thumbnail.webp',
-      },
+      cover,
+      members: [cover],
     }}/>);
 
     expect(html).toContain('thumbnail.webp');
     expect(html).toContain('832 × 1216 · 2 Tags');
-    expect(html).toContain('2 张变体');
+    expect(html).toContain('1 / 2');
     expect(html).not.toContain('unused generated filename');
   });
 
+  it('renders the currently scrubbed group member and its position', () => {
+    const cover = {
+      created_at: '2026-08-18T00:00:00.000Z',
+      id: 'cover',
+      image_path: 'C:\\gallery\\cover.png',
+      metadata: { height: 1216, width: 832 },
+      name: 'cover',
+      prompt_structure: { base_undesired_tags: [], characters: [] },
+      tags: [],
+    };
+    const variant = {
+      ...cover,
+      id: 'variant',
+      image_path: 'C:\\gallery\\variant.png',
+      metadata: { height: 832, width: 1216 },
+      name: 'variant',
+    };
+    const html = renderToStaticMarkup(<GalleryCardHoverPreview
+      group={{ count: 2, cover, members: [cover, variant] }}
+      project={variant}
+    />);
+
+    expect(html).toContain('variant.png');
+    expect(html).toContain('1216 × 832');
+    expect(html).toContain('2 / 2');
+  });
+
   it('keeps the visual-only hover layer transparent to pointer hit testing', () => {
-    const element = GalleryCard({
+    const element = GalleryCardView({
       active: false,
       group: {
         count: 1,
@@ -126,7 +156,7 @@ describe('GalleryCardHoverPreview', () => {
       prompt_structure: { base_undesired_tags: [], characters: [] },
       tags: [],
     };
-    const element = GalleryCard({
+    const element = GalleryCardView({
       active: false,
       group: { count: 3, cover, members: [cover] },
       onContextMenu: vi.fn(),
@@ -152,7 +182,7 @@ describe('GalleryCardHoverPreview', () => {
       prompt_structure: { base_undesired_tags: [], characters: [] },
       tags: [],
     };
-    const element = GalleryCard({
+    const element = GalleryCardView({
       active: false,
       group: { count: 1, cover, members: [cover] },
       onContextMenu: vi.fn(),

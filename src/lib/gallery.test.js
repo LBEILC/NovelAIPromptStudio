@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adjacentGallerySelection, galleryEmptyState, galleryGroupMenuLabels, gallerySelectionProjectIds, groupGalleryProjects, reconcileGallerySelection } from './gallery.js';
+import { adjacentGallerySelection, galleryEmptyState, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, groupGalleryProjects, isGalleryBlankClickTarget, reconcileGallerySelection } from './gallery.js';
 
 const item = (id, fingerprint, createdAt, cover = '') => ({
   id,
@@ -53,6 +53,22 @@ describe('gallery grouping and selection', () => {
       favorite: '取消收藏整个图片组',
       rename: '重命名头图',
     });
+  });
+
+  it('maps horizontal pointer movement across a card to stable group members', () => {
+    expect(galleryScrubMemberIndex(100, 100, 200, 4)).toBe(0);
+    expect(galleryScrubMemberIndex(149, 100, 200, 4)).toBe(0);
+    expect(galleryScrubMemberIndex(150, 100, 200, 4)).toBe(1);
+    expect(galleryScrubMemberIndex(299, 100, 200, 4)).toBe(3);
+    expect(galleryScrubMemberIndex(300, 100, 200, 4)).toBe(3);
+    expect(galleryScrubMemberIndex(200, 100, 0, 4)).toBe(0);
+    expect(galleryScrubMemberIndex(200, 100, 200, 1)).toBe(0);
+  });
+
+  it('only treats clicks outside image cards as Gallery blank-space clicks', () => {
+    expect(isGalleryBlankClickTarget({ closest: () => null })).toBe(true);
+    expect(isGalleryBlankClickTarget({ closest: (selector) => selector === '.gallery-card' ? {} : null })).toBe(false);
+    expect(isGalleryBlankClickTarget(null)).toBe(true);
   });
 
   it('gives every empty gallery view an accurate next step', () => {

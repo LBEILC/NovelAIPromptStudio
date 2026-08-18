@@ -62,5 +62,6 @@ describe('shared Tag presentation', () => {
       content: { padding: 0 },
       root: { pointerEvents: 'none' },
     });
+    expect(element.props.positionerProps).toEqual({ style: { pointerEvents: 'none' } });
   });
 });

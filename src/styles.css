@@ -232,6 +232,8 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .gallery-card-hover-preview { width: min(var(--gallery-card-hover-width, 280px), calc(100vw - 48px)); display: grid; gap: 10px; }
 .gallery-card-hover-media { width: 100%; aspect-ratio: var(--gallery-card-hover-ratio, 1); overflow: hidden; display: grid; place-items: center; background: var(--raised); border: 1px solid var(--line-soft); border-radius: 7px; }
 .gallery-card-hover-media > img { min-width: 0; min-height: 0; max-width: 100%; max-height: 100%; width: auto; height: auto; display: block; object-fit: contain; }
+.gallery-card-hover-scrub { height: 2px; overflow: hidden; background: var(--line-soft); border-radius: 999px; }
+.gallery-card-hover-scrub > i { width: 100%; height: 100%; display: block; background: var(--accent); border-radius: inherit; transform: scaleX(var(--gallery-card-hover-progress, 0)); transform-origin: left center; transition: transform .1s cubic-bezier(.22, 1, .36, 1); }
 .gallery-card-hover-meta { min-width: 0; display: grid; gap: 2px; color: var(--muted); font: var(--text-micro)/1.45 var(--font-mono); }
 .gallery-card-hover-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gallery-empty { height: 100%; min-height: 360px; }

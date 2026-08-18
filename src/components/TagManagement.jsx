@@ -19,6 +19,7 @@ const TAG_HOVER_PREVIEW_STYLES = {
   content: { padding: 0 },
   root: { pointerEvents: 'none' },
 };
+const TAG_HOVER_PREVIEW_POSITIONER_PROPS = { style: { pointerEvents: 'none' } };
 
 function WeightEditor({ value, onCommit }) {
   const parsedValue = Number(value);
@@ -186,6 +187,7 @@ export function TagChip({
     arrow
     openDelay={320}
     placement="top"
+    positionerProps={TAG_HOVER_PREVIEW_POSITIONER_PROPS}
     styles={TAG_HOVER_PREVIEW_STYLES}
     title={tooltip}
   >

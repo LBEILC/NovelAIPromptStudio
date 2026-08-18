@@ -43,6 +43,19 @@ export function gallerySelectionProjectIds(groups = [], selectedGroupIds = []) {
   return groups.filter((group) => selected.has(group.id)).flatMap((group) => group.members.map((project) => project.id));
 }
 
+export function galleryScrubMemberIndex(pointerX, boundsLeft, boundsWidth, memberCount) {
+  const count = Math.max(0, Math.trunc(Number(memberCount) || 0));
+  const width = Number(boundsWidth);
+  if (count <= 1 || !Number.isFinite(width) || width <= 0) return 0;
+  const progress = (Number(pointerX) - Number(boundsLeft)) / width;
+  const normalizedProgress = Math.min(1, Math.max(0, Number.isFinite(progress) ? progress : 0));
+  return Math.min(count - 1, Math.floor(normalizedProgress * count));
+}
+
+export function isGalleryBlankClickTarget(target) {
+  return !target?.closest?.('.gallery-card');
+}
+
 export function reconcileGallerySelection(groups = [], selectedGroupIds = []) {
   const visible = new Set(groups.map((group) => group.id));
   return selectedGroupIds.filter((id) => visible.has(id));
