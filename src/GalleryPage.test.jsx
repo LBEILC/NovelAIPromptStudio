@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BatchToolbar, GalleryCardHoverPreview } from './GalleryPage.jsx';
+import { BatchToolbar, GalleryCard, GalleryCardHoverPreview } from './GalleryPage.jsx';
 
 vi.mock('@lobehub/ui', () => {
   const Component = () => null;
@@ -90,5 +90,29 @@ describe('GalleryCardHoverPreview', () => {
     expect(html).toContain('832 × 1216 · 2 Tags');
     expect(html).toContain('2 张变体');
     expect(html).not.toContain('unused generated filename');
+  });
+
+  it('keeps the visual-only hover layer transparent to pointer hit testing', () => {
+    const element = GalleryCard({
+      active: false,
+      group: {
+        count: 1,
+        cover: {
+          id: 'cover',
+          image_path: 'C:\\gallery\\original.png',
+          metadata: {},
+          name: 'cover',
+          prompt_structure: { base_undesired_tags: [], characters: [] },
+          tags: [],
+        },
+        members: [],
+      },
+      onContextMenu: vi.fn(),
+      onPreview: vi.fn(),
+      onSelect: vi.fn(),
+      selected: false,
+    });
+
+    expect(element.props.styles).toEqual({ root: { pointerEvents: 'none' } });
   });
 });

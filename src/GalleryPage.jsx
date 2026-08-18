@@ -117,10 +117,12 @@ export function GalleryCardHoverPreview({ group }) {
   </div>;
 }
 
-function GalleryCard({ active, group, selected, onPreview, onSelect, onContextMenu }) {
+const GALLERY_HOVER_POSITIONER_STYLES = { root: { pointerEvents: 'none' } };
+
+export function GalleryCard({ active, group, selected, onPreview, onSelect, onContextMenu }) {
   const project = group.cover;
   const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
-  return <Popover content={<GalleryCardHoverPreview group={group}/>} placement="rightTop" trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
+  return <Popover content={<GalleryCardHoverPreview group={group}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
     <button
       className="gallery-card-main"
       onClick={(event) => selected || event.ctrlKey || event.metaKey || event.shiftKey ? onSelect(event) : onPreview()}
