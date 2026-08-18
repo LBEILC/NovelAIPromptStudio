@@ -52,8 +52,16 @@ export function galleryScrubMemberIndex(pointerX, boundsLeft, boundsWidth, membe
   return Math.min(count - 1, Math.floor(normalizedProgress * count));
 }
 
+export function galleryGroupMember(group, projectId) {
+  return group?.members?.find((project) => project.id === projectId) || group?.cover;
+}
+
 export function isGalleryBlankClickTarget(target) {
   return !target?.closest?.('.gallery-card');
+}
+
+export function shouldCollapseGalleryPreview(target, pinned = false) {
+  return !pinned && isGalleryBlankClickTarget(target);
 }
 
 export function reconcileGallerySelection(groups = [], selectedGroupIds = []) {

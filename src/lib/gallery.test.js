@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adjacentGallerySelection, galleryEmptyState, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, groupGalleryProjects, isGalleryBlankClickTarget, reconcileGallerySelection } from './gallery.js';
+import { adjacentGallerySelection, galleryEmptyState, galleryGroupMember, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, groupGalleryProjects, isGalleryBlankClickTarget, reconcileGallerySelection, shouldCollapseGalleryPreview } from './gallery.js';
 
 const item = (id, fingerprint, createdAt, cover = '') => ({
   id,
@@ -66,10 +66,29 @@ describe('gallery grouping and selection', () => {
     expect(galleryScrubMemberIndex(200, 100, 200, 1)).toBe(0);
   });
 
+  it('resolves a scrubbed member and safely falls back to the group cover', () => {
+    const cover = item('cover', 'same', '2026-01-01');
+    const variant = item('variant', 'same', '2026-01-02');
+    const group = { cover, members: [cover, variant] };
+
+    expect(galleryGroupMember(group, 'variant')).toBe(variant);
+    expect(galleryGroupMember(group, 'missing')).toBe(cover);
+    expect(galleryGroupMember(undefined, 'variant')).toBeUndefined();
+  });
+
   it('only treats clicks outside image cards as Gallery blank-space clicks', () => {
     expect(isGalleryBlankClickTarget({ closest: () => null })).toBe(true);
     expect(isGalleryBlankClickTarget({ closest: (selector) => selector === '.gallery-card' ? {} : null })).toBe(false);
     expect(isGalleryBlankClickTarget(null)).toBe(true);
+  });
+
+  it('only collapses a floating Gallery preview from a blank-space click', () => {
+    const blank = { closest: () => null };
+    const card = { closest: (selector) => selector === '.gallery-card' ? {} : null };
+
+    expect(shouldCollapseGalleryPreview(blank, false)).toBe(true);
+    expect(shouldCollapseGalleryPreview(blank, true)).toBe(false);
+    expect(shouldCollapseGalleryPreview(card, false)).toBe(false);
   });
 
   it('gives every empty gallery view an accurate next step', () => {

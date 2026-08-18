@@ -5,7 +5,7 @@ import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
-import { galleryEmptyState, galleryScrubMemberIndex, isGalleryBlankClickTarget } from './lib/gallery.js';
+import { galleryEmptyState, galleryGroupMember, galleryScrubMemberIndex, shouldCollapseGalleryPreview } from './lib/gallery.js';
 import {
   GALLERY_CARD_SIZE_MAX,
   GALLERY_CARD_SIZE_MIN,
@@ -131,12 +131,13 @@ export function GalleryCardView({ active, group, hoverProject = group.cover, sel
   const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
   return <Popover content={<GalleryCardHoverPreview group={group} project={hoverProject}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
     <button
+      aria-label={group.count > 1 ? `预览图片组：${project.name}，共 ${group.count} 张` : `预览图片：${project.name}`}
       className="gallery-card-main"
-      onClick={(event) => selected || event.ctrlKey || event.metaKey || event.shiftKey ? onSelect(event) : onPreview()}
+      onClick={(event) => selected || event.ctrlKey || event.metaKey || event.shiftKey ? onSelect(event) : onPreview(hoverProject, event)}
       onContextMenu={onContextMenu}
       onDoubleClick={(event) => {
         if (!onOpenWorkbench || event.ctrlKey || event.metaKey || event.shiftKey) return;
-        onOpenWorkbench(project);
+        onOpenWorkbench(hoverProject);
       }}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
@@ -154,10 +155,7 @@ export function GalleryCardView({ active, group, hoverProject = group.cover, sel
         />)}
         <img alt="" loading="lazy" src={mediaUrl(project.thumbnail_path || project.image_path)}/>
         {group.count > 1 && <span className="gallery-group-count"><b>{group.count}</b><span> 张</span></span>}
-      </span>
-      <span className="gallery-card-copy">
-        <strong title={project.name}>{project.name}</strong>
-        <small>{countPromptTags(project)} Tags · {project.metadata?.width || '—'} × {project.metadata?.height || '—'}</small>
+        <span aria-hidden="true" className="gallery-card-hover-name">{hoverProject.name}</span>
       </span>
     </button>
     <button
@@ -173,23 +171,34 @@ export function GalleryCard(props) {
   const { group } = props;
   const [hoverProjectId, setHoverProjectId] = useState('');
   const scrubBoundsRef = useRef(null);
-  const hoverProject = group.members.find((member) => member.id === hoverProjectId) || group.cover;
+  const hoverProjectIdRef = useRef('');
+  const activatedProjectIdRef = useRef('');
+  const hoverProject = galleryGroupMember(group, hoverProjectId);
+  const currentScrubProject = () => galleryGroupMember(group, hoverProjectIdRef.current);
   const resetScrub = () => {
     scrubBoundsRef.current = null;
+    hoverProjectIdRef.current = '';
     setHoverProjectId('');
   };
   const updateScrubProject = (pointerX, bounds) => {
     if (group.count <= 1) return;
     const member = group.members[galleryScrubMemberIndex(pointerX, bounds.left, bounds.width, group.members.length)];
-    if (member) setHoverProjectId((current) => current === member.id ? current : member.id);
+    if (!member) return;
+    hoverProjectIdRef.current = member.id;
+    setHoverProjectId((current) => current === member.id ? current : member.id);
   };
 
   return <GalleryCardView
     {...props}
     hoverProject={hoverProject}
+    onOpenWorkbench={props.onOpenWorkbench ? (renderedProject) => {
+      const projectId = hoverProjectIdRef.current || activatedProjectIdRef.current || renderedProject?.id;
+      props.onOpenWorkbench(galleryGroupMember(group, projectId));
+    } : undefined}
     onPointerEnter={(event) => {
       const bounds = event.currentTarget.getBoundingClientRect();
       scrubBoundsRef.current = bounds;
+      activatedProjectIdRef.current = '';
       updateScrubProject(event.clientX, bounds);
     }}
     onPointerLeave={resetScrub}
@@ -198,6 +207,11 @@ export function GalleryCard(props) {
       const bounds = scrubBoundsRef.current || event.currentTarget.getBoundingClientRect();
       scrubBoundsRef.current = bounds;
       updateScrubProject(event.clientX, bounds);
+    }}
+    onPreview={(renderedProject, event) => {
+      const candidate = event?.detail === 0 ? group.cover : currentScrubProject() || renderedProject;
+      if (!activatedProjectIdRef.current || !event || event.detail <= 1) activatedProjectIdRef.current = candidate?.id || '';
+      props.onPreview(galleryGroupMember(group, activatedProjectIdRef.current || candidate?.id));
     }}
   />;
 }
@@ -353,7 +367,7 @@ export default function GalleryPage({
       <section
         className="gallery-grid-scroll"
         onClick={(event) => {
-          if (!isGalleryBlankClickTarget(event.target)) return;
+          if (!shouldCollapseGalleryPreview(event.target, previewPinned)) return;
           updatePreviewExpanded(false);
         }}
         onContextMenu={(event) => {
@@ -371,7 +385,7 @@ export default function GalleryPage({
             key={group.id}
             onContextMenu={(event) => onProjectContextMenu(event, group, () => requestRename(group))}
             onOpenWorkbench={view === 'trash' ? undefined : onOpenWorkbench}
-            onPreview={() => { updatePreviewExpanded(true); onPreview(group); }}
+            onPreview={(project) => { updatePreviewExpanded(true); onPreview(group, project); }}
             onSelect={(event) => onToggleSelect(group, event)}
             selected={selectedGroupIds.includes(group.id)}
           />)}

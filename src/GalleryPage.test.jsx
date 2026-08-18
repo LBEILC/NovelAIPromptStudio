@@ -146,8 +146,38 @@ describe('GalleryCardHoverPreview', () => {
     expect(element.props.styles).toEqual({ root: { pointerEvents: 'none' } });
   });
 
-  it('opens the group cover in Workbench on an unmodified double click', () => {
+  it('keeps filenames out of the permanent card layout and exposes the scrubbed name as a hover label', () => {
+    const cover = {
+      id: 'cover',
+      image_path: 'C:\\gallery\\cover.png',
+      metadata: {},
+      name: 'cover.png',
+      prompt_structure: { base_undesired_tags: [], characters: [] },
+      tags: [],
+    };
+    const variant = { ...cover, id: 'variant', name: 'variant.png' };
+    const element = GalleryCardView({
+      active: false,
+      group: { count: 2, cover, members: [cover, variant] },
+      hoverProject: variant,
+      onContextMenu: vi.fn(),
+      onPreview: vi.fn(),
+      onSelect: vi.fn(),
+      selected: false,
+    });
+    const mainButton = element.props.children.props.children[0];
+    const imageChildren = mainButton.props.children.props.children.flat(Infinity).filter(Boolean);
+    const hoverName = imageChildren.find((child) => child.props?.className === 'gallery-card-hover-name');
+
+    expect(mainButton.props['aria-label']).toContain('cover.png');
+    expect(hoverName.props.children).toBe('variant.png');
+    expect(hoverName.props['aria-hidden']).toBe('true');
+    expect(mainButton.props.children.props.className).toBe('gallery-card-image');
+  });
+
+  it('opens the currently scrubbed member in the detail panel and Workbench', () => {
     const onOpenWorkbench = vi.fn();
+    const onPreview = vi.fn();
     const cover = {
       id: 'cover',
       image_path: 'C:\\gallery\\cover.png',
@@ -156,20 +186,25 @@ describe('GalleryCardHoverPreview', () => {
       prompt_structure: { base_undesired_tags: [], characters: [] },
       tags: [],
     };
+    const variant = { ...cover, id: 'variant', image_path: 'C:\\gallery\\variant.png', name: 'variant' };
     const element = GalleryCardView({
       active: false,
-      group: { count: 3, cover, members: [cover] },
+      group: { count: 2, cover, members: [cover, variant] },
+      hoverProject: variant,
       onContextMenu: vi.fn(),
       onOpenWorkbench,
-      onPreview: vi.fn(),
+      onPreview,
       onSelect: vi.fn(),
       selected: false,
     });
     const mainButton = element.props.children.props.children[0];
+    const clickEvent = { ctrlKey: false, detail: 1, metaKey: false, shiftKey: false };
 
-    mainButton.props.onDoubleClick({ ctrlKey: false, metaKey: false, shiftKey: false });
+    mainButton.props.onClick(clickEvent);
+    mainButton.props.onDoubleClick(clickEvent);
 
-    expect(onOpenWorkbench).toHaveBeenCalledWith(cover);
+    expect(onPreview).toHaveBeenCalledWith(variant, clickEvent);
+    expect(onOpenWorkbench).toHaveBeenCalledWith(variant);
   });
 
   it('keeps modified double clicks available for selection gestures', () => {

@@ -33,6 +33,7 @@ import {
 import {
   adjacentGallerySelection,
   filterAndSortGalleryGroups,
+  galleryGroupMember,
   galleryGroupMenuLabels,
   gallerySelectionProjectIds,
   groupGalleryProjects,
@@ -741,9 +742,10 @@ export default function App({ appearance, setAppearance }) {
     lastSelectedGroupRef.current = group.id;
   };
 
-  const previewGalleryGroup = (group) => {
+  const previewGalleryGroup = (group, requestedProject) => {
+    const project = galleryGroupMember(group, requestedProject?.id);
     setPreviewGroupId(group.id);
-    setPreviewProjectId(group.cover.id);
+    setPreviewProjectId(project.id);
   };
 
   const navigatePreview = useCallback((direction) => {
