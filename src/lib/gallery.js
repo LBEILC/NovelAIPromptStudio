@@ -1,9 +1,107 @@
 import { allPromptTags } from './promptStructure.js';
 import { expandSearch, normalizeSearch } from './prompt.js';
-import { galleryGroupingFingerprint, isExactGalleryGrouping, normalizeGalleryGrouping } from './galleryGrouping.js';
+import {
+  galleryBasePromptPayloadSimilarity,
+  galleryBasePromptSimilarityPayload,
+  galleryGroupingBoundaryFingerprint,
+  galleryGroupingFingerprint,
+  isExactGalleryGrouping,
+  normalizeGalleryGrouping,
+} from './galleryGrouping.js';
+
+function galleryProjectDate(project) {
+  return new Date(project.created_at || 0).getTime() || 0;
+}
+
+function completeLinkSimilarityClusters(projects, threshold) {
+  const ordered = [...projects].sort((left, right) => (
+    galleryProjectDate(left) - galleryProjectDate(right)
+    || String(left.id).localeCompare(String(right.id))
+  ));
+  const payloads = ordered.map(galleryBasePromptSimilarityPayload);
+  const similarities = Array.from({ length: ordered.length }, () => Array(ordered.length).fill(0));
+  const edges = [];
+  for (let left = 0; left < ordered.length; left += 1) {
+    for (let right = left + 1; right < ordered.length; right += 1) {
+      const score = galleryBasePromptPayloadSimilarity(payloads[left], payloads[right]);
+      similarities[left][right] = score;
+      similarities[right][left] = score;
+      if (score >= threshold) edges.push({ left, right, score });
+    }
+  }
+  edges.sort((a, b) => b.score - a.score || a.left - b.left || a.right - b.right);
+
+  const parents = ordered.map((_project, index) => index);
+  const clusterMembers = new Map(ordered.map((_project, index) => [index, new Set([index])]));
+  const find = (index) => {
+    let root = index;
+    while (parents[root] !== root) root = parents[root];
+    let cursor = index;
+    while (parents[cursor] !== cursor) {
+      const next = parents[cursor];
+      parents[cursor] = root;
+      cursor = next;
+    }
+    return root;
+  };
+
+  for (const edge of edges) {
+    const leftRoot = find(edge.left);
+    const rightRoot = find(edge.right);
+    if (leftRoot === rightRoot) continue;
+    const leftMembers = clusterMembers.get(leftRoot);
+    const rightMembers = clusterMembers.get(rightRoot);
+    const compatible = [...leftMembers].every((left) => (
+      [...rightMembers].every((right) => similarities[left][right] >= threshold)
+    ));
+    if (!compatible) continue;
+    const [nextRoot, mergedRoot] = leftRoot < rightRoot ? [leftRoot, rightRoot] : [rightRoot, leftRoot];
+    parents[mergedRoot] = nextRoot;
+    clusterMembers.set(nextRoot, new Set([...clusterMembers.get(nextRoot), ...clusterMembers.get(mergedRoot)]));
+    clusterMembers.delete(mergedRoot);
+  }
+
+  return [...clusterMembers.values()].map((indices) => [...indices].map((index) => ordered[index]));
+}
+
+function finalizeGalleryGroup(group, grouping, exact = false) {
+  const members = [...group.members].sort((left, right) => galleryProjectDate(right) - galleryProjectDate(left));
+  const requestedCover = exact
+    ? members.find((project) => members.some((member) => member.group_cover_id === project.id))
+    : null;
+  const cover = requestedCover || members[0];
+  return {
+    ...group,
+    cover,
+    canSetCover: exact && Boolean(group.fingerprint),
+    grouping,
+    members,
+    id: group.key,
+    latestAt: members[0]?.created_at || '',
+    count: members.length,
+  };
+}
+
+function groupSimilarGalleryProjects(projects, grouping) {
+  const buckets = new Map();
+  for (const project of projects) {
+    const boundary = galleryGroupingBoundaryFingerprint(project, grouping);
+    if (!buckets.has(boundary)) buckets.set(boundary, []);
+    buckets.get(boundary).push(project);
+  }
+  const threshold = grouping.similarityThreshold / 100;
+  return [...buckets.entries()].flatMap(([boundary, members]) => (
+    completeLinkSimilarityClusters(members, threshold).map((cluster) => finalizeGalleryGroup({
+      key: `similar:${grouping.similarityThreshold}:${boundary}:${cluster.map((project) => project.id).sort().join('|')}`,
+      fingerprint: '',
+      members: cluster,
+    }, grouping, false))
+  ));
+}
 
 export function groupGalleryProjects(projects = [], groupingValue) {
   const grouping = normalizeGalleryGrouping(groupingValue);
+  if (grouping.promptScope === 'similar') return groupSimilarGalleryProjects(projects, grouping);
   const exact = isExactGalleryGrouping(grouping);
   const groups = new Map();
   for (const project of projects) {
@@ -12,23 +110,7 @@ export function groupGalleryProjects(projects = [], groupingValue) {
     if (!groups.has(key)) groups.set(key, { key, fingerprint, members: [] });
     groups.get(key).members.push(project);
   }
-  return [...groups.values()].map((group) => {
-    const members = [...group.members].sort((left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0));
-    const requestedCover = exact
-      ? members.find((project) => members.some((member) => member.group_cover_id === project.id))
-      : null;
-    const cover = requestedCover || members[0];
-    return {
-      ...group,
-      cover,
-      canSetCover: exact && Boolean(group.fingerprint),
-      grouping,
-      members,
-      id: group.key,
-      latestAt: members[0]?.created_at || '',
-      count: members.length,
-    };
-  });
+  return [...groups.values()].map((group) => finalizeGalleryGroup(group, grouping, exact));
 }
 
 export function filterAndSortGalleryGroups(groups = [], query = '', sort = 'recent') {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BatchToolbar, GalleryCardHoverPreview, GalleryCardView } from './GalleryPage.jsx';
+import { BatchToolbar, GalleryCardHoverPreview, GalleryCardView, GalleryGroupingControl } from './GalleryPage.jsx';
 
 vi.mock('@lobehub/ui', () => {
   const Component = () => null;
@@ -69,6 +69,44 @@ describe('BatchToolbar', () => {
 
     expect(onRestore).toHaveBeenCalledWith();
     expect(onPermanentDelete).toHaveBeenCalledWith();
+  });
+});
+
+describe('GalleryGroupingControl', () => {
+  it('keeps advanced controls inside a click popover and exposes the current combined state', () => {
+    const onChange = vi.fn();
+    const element = GalleryGroupingControl({
+      grouping: { promptScope: 'similar', mergeVibes: true, similarityThreshold: 80 },
+      onChange,
+    });
+    const contentChildren = element.props.content.props.children.flat(Infinity).filter(Boolean);
+    const options = contentChildren.find((child) => child.props?.role === 'radiogroup');
+    const similarity = contentChildren.find((child) => child.props?.className === 'gallery-similarity-control');
+    const vibe = contentChildren.find((child) => child.props?.className === 'gallery-grouping-vibe-row');
+
+    expect(element.props.trigger).toBe('click');
+    expect(element.props.children.props['aria-label']).toContain('相似 80% · 跨 Vibe');
+    expect(options.props.children).toHaveLength(4);
+    expect(similarity).toBeTruthy();
+    expect(vibe).toBeTruthy();
+
+    options.props.children[2].props.onClick();
+    similarity.props.children[1].props.onChangeComplete(90);
+    vibe.props.children[1].props.onChange(false);
+    expect(onChange.mock.calls).toEqual([
+      [{ promptScope: 'base' }],
+      [{ similarityThreshold: 90 }],
+      [{ mergeVibes: false }],
+    ]);
+  });
+
+  it('does not expose the similarity slider outside similar mode', () => {
+    const element = GalleryGroupingControl({
+      grouping: { promptScope: 'full', mergeVibes: false, similarityThreshold: 85 },
+      onChange: vi.fn(),
+    });
+    const content = element.props.content.props.children.flat(Infinity).filter(Boolean);
+    expect(content.some((child) => child.props?.className === 'gallery-similarity-control')).toBe(false);
   });
 });
 

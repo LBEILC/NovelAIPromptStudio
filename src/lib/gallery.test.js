@@ -14,6 +14,17 @@ const item = (id, fingerprint, createdAt, cover = '') => ({
   prompt_structure: { base_undesired_tags: [], characters: [] },
 });
 
+const similarItem = (id, tags, { model = 'nai-v4.5', vibe = 'vibe-a', undesired = [] } = {}) => ({
+  ...item(id, id, `2026-01-${String(id.length).padStart(2, '0')}`),
+  tags: tags.map((tag) => ({ tag, category: 'Unsorted', weight: 1 })),
+  vibe_fingerprint: vibe,
+  metadata: { model },
+  prompt_structure: {
+    base_undesired_tags: undesired.map((tag) => ({ tag, category: 'StyleQuality', weight: 1 })),
+    characters: [],
+  },
+});
+
 describe('gallery grouping and selection', () => {
   it('groups only non-empty matching fingerprints and honors a valid persisted cover', () => {
     const groups = groupGalleryProjects([
@@ -81,6 +92,40 @@ describe('gallery grouping and selection', () => {
     const [matched] = filterAndSortGalleryGroups(groups, 'older match');
     expect(matched.displayCover.id).toBe('older match');
     expect(matched.cover.id).toBe('newer');
+  });
+
+  it('forms similar-Prompt groups without transitive chain expansion', () => {
+    const projects = [
+      similarItem('a', ['a', 'b', 'c', 'd']),
+      similarItem('bb', ['a', 'b', 'c', 'd', 'e']),
+      similarItem('ccc', ['b', 'c', 'd', 'e']),
+    ];
+    const groups = groupGalleryProjects(projects, { promptScope: 'similar', mergeVibes: false, similarityThreshold: 75 });
+
+    expect(groups.map((group) => group.members.map((project) => project.id).sort())).toEqual([
+      ['a', 'bb'],
+      ['ccc'],
+    ]);
+    expect(groups.every((group) => !group.canSetCover)).toBe(true);
+  });
+
+  it('keeps Vibe and model as independent hard boundaries in similar mode', () => {
+    const projects = [
+      similarItem('a', ['style', 'lighting']),
+      similarItem('bb', ['style', 'lighting'], { vibe: 'vibe-b' }),
+      similarItem('ccc', ['style', 'lighting'], { model: 'different-model' }),
+    ];
+    expect(groupGalleryProjects(projects, { promptScope: 'similar', mergeVibes: false, similarityThreshold: 70 })).toHaveLength(3);
+    expect(groupGalleryProjects(projects, { promptScope: 'similar', mergeVibes: true, similarityThreshold: 70 })).toHaveLength(2);
+  });
+
+  it('uses the selected percentage as the minimum Base Prompt similarity', () => {
+    const projects = [
+      similarItem('a', ['style', 'lighting'], { undesired: ['lowres'] }),
+      similarItem('bb', ['style', 'lighting'], { undesired: ['blurry'] }),
+    ];
+    expect(groupGalleryProjects(projects, { promptScope: 'similar', mergeVibes: false, similarityThreshold: 85 })).toHaveLength(2);
+    expect(groupGalleryProjects(projects, { promptScope: 'similar', mergeVibes: false, similarityThreshold: 80 })).toHaveLength(1);
   });
 
   it('maps the initial pointer position and subsequent movement directly to group members', () => {

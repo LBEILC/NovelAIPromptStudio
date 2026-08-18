@@ -16,9 +16,11 @@ import {
 import { fitTabPreviewCanvas } from './lib/imagePreview.js';
 import {
   DEFAULT_GALLERY_GROUPING,
+  GALLERY_PROMPT_SCOPES,
   GALLERY_PROMPT_SCOPE_LABELS,
-  galleryPromptScopeAt,
-  galleryPromptScopeIndex,
+  GALLERY_SIMILARITY_MAX,
+  GALLERY_SIMILARITY_MIN,
+  galleryGroupingStatusLabel,
 } from './lib/galleryGrouping.js';
 import {
   GALLERY_PREVIEW_PANEL_EXPANDED_KEY,
@@ -87,6 +89,73 @@ function ImportButton({ importing, onImport, onImportClipboard }) {
       placement="bottomRight"
     />
   </SplitButton>;
+}
+
+const GALLERY_GROUPING_DESCRIPTIONS = {
+  separate: '每张图片独立显示',
+  full: '角色、位置与完整 Prompt 必须相同',
+  base: '忽略角色 Prompt 与位置',
+  similar: '按基础 Prompt 的 Tag 相似度归组',
+};
+
+export function GalleryGroupingControl({ grouping = DEFAULT_GALLERY_GROUPING, onChange }) {
+  const status = galleryGroupingStatusLabel(grouping);
+  const content = <div className="gallery-grouping-panel">
+    <strong className="gallery-grouping-heading">分组方式</strong>
+    <div aria-label="图片自动分组方式" className="gallery-grouping-options" role="radiogroup">
+      {GALLERY_PROMPT_SCOPES.map((scope) => {
+        const selected = grouping.promptScope === scope;
+        return <button
+          aria-checked={selected}
+          className={`gallery-grouping-option ${selected ? 'selected' : ''}`}
+          key={scope}
+          onClick={() => onChange({ promptScope: scope })}
+          role="radio"
+          type="button"
+        >
+          <span aria-hidden="true" className="gallery-grouping-radio">{selected && <Icon name="check" size={11}/>}</span>
+          <span><strong>{GALLERY_PROMPT_SCOPE_LABELS[scope]}</strong><small>{GALLERY_GROUPING_DESCRIPTIONS[scope]}</small></span>
+        </button>;
+      })}
+    </div>
+    {grouping.promptScope === 'similar' && <div className="gallery-similarity-control">
+      <div><span>最低相似度</span><strong>{grouping.similarityThreshold}%</strong></div>
+      <Slider
+        aria-label="基础 Prompt 最低相似度"
+        defaultValue={grouping.similarityThreshold}
+        getAriaValueText={(value) => `${value}%`}
+        key={grouping.similarityThreshold}
+        max={GALLERY_SIMILARITY_MAX}
+        min={GALLERY_SIMILARITY_MIN}
+        onChangeComplete={(value) => onChange({ similarityThreshold: value })}
+        step={5}
+      />
+      <div className="gallery-similarity-scale"><span>宽松</span><span>严格</span></div>
+    </div>}
+    <div className="gallery-grouping-vibe-row">
+      <div><strong>跨 Vibe 合并</strong><small>{grouping.promptScope === 'separate' ? '全部分开时不适用' : '允许不同 Vibe 进入同一组'}</small></div>
+      <LobeSwitch
+        aria-label="跨 Vibe 合并"
+        checked={grouping.promptScope !== 'separate' && grouping.mergeVibes}
+        disabled={grouping.promptScope === 'separate'}
+        onChange={(checked) => onChange({ mergeVibes: checked })}
+        size="small"
+      />
+    </div>
+  </div>;
+
+  return <Popover
+    arrow
+    className="gallery-grouping-popover"
+    content={content}
+    placement="bottomRight"
+    standalone
+    trigger="click"
+  >
+    <LobeButton aria-label={`图库分组设置，当前：${status}`} icon={<Icon name="layers" size={14}/>} size="small">
+      分组：{status}
+    </LobeButton>
+  </Popover>;
 }
 
 export function BatchToolbar({ view, selectedGroups, selectedImages, onFavorite, onTrash, onRestore, onPermanentDelete, onClear }) {
@@ -357,31 +426,7 @@ export default function GalleryPage({
         />
         <Icon name="image" size={18}/>
       </div>
-      <div className="gallery-grouping-control" title={`分组范围：${GALLERY_PROMPT_SCOPE_LABELS[grouping.promptScope]}`}>
-        <span>分组</span>
-        <Slider
-          aria-label="自动分组范围"
-          className="gallery-grouping-slider"
-          getAriaValueText={(value) => GALLERY_PROMPT_SCOPE_LABELS[galleryPromptScopeAt(value)]}
-          max={2}
-          min={0}
-          onChange={(value) => onGroupingChange({ promptScope: galleryPromptScopeAt(value) })}
-          step={1}
-          value={galleryPromptScopeIndex(grouping.promptScope)}
-        />
-        <strong>{GALLERY_PROMPT_SCOPE_LABELS[grouping.promptScope]}</strong>
-      </div>
-      <div className="gallery-vibe-grouping" title={grouping.promptScope === 'separate' ? '全部分开时不进行自动分组' : '允许相同 Prompt、不同 Vibe 的图片进入同一组'}>
-        <LobeSwitch
-          aria-label="跨 Vibe 合并"
-          checked={grouping.promptScope !== 'separate' && grouping.mergeVibes}
-          disabled={grouping.promptScope === 'separate'}
-          id="gallery-merge-vibes"
-          onChange={(checked) => onGroupingChange({ mergeVibes: checked })}
-          size="small"
-        />
-        <label htmlFor="gallery-merge-vibes">跨 Vibe 合并</label>
-      </div>
+      <GalleryGroupingControl grouping={grouping} onChange={onGroupingChange}/>
       <span className="gallery-count">{groups.length} 组 · {groups.reduce((count, group) => count + group.count, 0)} 张</span>
       <LobeButton disabled={!groups.length} onClick={onSelectAll} size="small" type="text">全选当前结果</LobeButton>
       {view === 'trash' && <LobeButton danger disabled={!groups.length} onClick={onEmptyTrash} size="small">清空回收站</LobeButton>}
