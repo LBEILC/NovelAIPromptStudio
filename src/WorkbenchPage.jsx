@@ -35,6 +35,7 @@ const WORKBENCH_TAB_SORT_ACCESSIBILITY = {
 const WORKBENCH_TAB_SORT_MODIFIERS = [restrictToHorizontalAxis, restrictToParentElement];
 const WORKBENCH_TAB_SORT_TRANSITION = { duration: 160, easing: 'cubic-bezier(.22, 1, .36, 1)' };
 const WORKBENCH_TAB_DROP_ANIMATION = { duration: 200, easing: 'cubic-bezier(.22, 1, .36, 1)' };
+const WORKBENCH_TAB_PREVIEW_STYLES = { root: { pointerEvents: 'none' } };
 
 function WorkbenchVibes({ vibes, onReveal }) {
   if (!vibes?.length) return <div className="workbench-vibe-empty"><Icon name="info" size={15}/><span>没有检测到 Vibe</span></div>;
@@ -92,7 +93,7 @@ function WorkbenchTabPreview({ tab }) {
   </div>;
 }
 
-function WorkbenchTabLabel({ previewDisabled = false, tab, onClose }) {
+export function WorkbenchTabLabel({ previewDisabled = false, tab, onClose }) {
   const dirty = workbenchTabHasChanges(tab);
   const label = <span
     className="workbench-tab-label"
@@ -117,6 +118,7 @@ function WorkbenchTabLabel({ previewDisabled = false, tab, onClose }) {
   return <Popover
     content={<WorkbenchTabPreview tab={tab}/>}
     placement="bottomLeft"
+    styles={WORKBENCH_TAB_PREVIEW_STYLES}
     trigger="hover"
   >{label}</Popover>;
 }

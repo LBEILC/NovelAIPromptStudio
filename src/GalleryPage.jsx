@@ -123,7 +123,7 @@ export function GalleryCardHoverPreview({ group }) {
 
 const GALLERY_HOVER_POSITIONER_STYLES = { root: { pointerEvents: 'none' } };
 
-export function GalleryCard({ active, group, selected, onPreview, onSelect, onContextMenu }) {
+export function GalleryCard({ active, group, selected, onOpenWorkbench, onPreview, onSelect, onContextMenu }) {
   const project = group.cover;
   const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
   return <Popover content={<GalleryCardHoverPreview group={group}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
@@ -131,6 +131,10 @@ export function GalleryCard({ active, group, selected, onPreview, onSelect, onCo
       className="gallery-card-main"
       onClick={(event) => selected || event.ctrlKey || event.metaKey || event.shiftKey ? onSelect(event) : onPreview()}
       onContextMenu={onContextMenu}
+      onDoubleClick={(event) => {
+        if (!onOpenWorkbench || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        onOpenWorkbench(project);
+      }}
       type="button"
     >
       <span className="gallery-card-image">
@@ -323,6 +327,7 @@ export default function GalleryPage({
             group={group}
             key={group.id}
             onContextMenu={(event) => onProjectContextMenu(event, group, () => requestRename(group))}
+            onOpenWorkbench={view === 'trash' ? undefined : onOpenWorkbench}
             onPreview={() => { updatePreviewExpanded(true); onPreview(group); }}
             onSelect={(event) => onToggleSelect(group, event)}
             selected={selectedGroupIds.includes(group.id)}

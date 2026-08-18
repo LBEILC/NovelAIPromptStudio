@@ -115,4 +115,56 @@ describe('GalleryCardHoverPreview', () => {
 
     expect(element.props.styles).toEqual({ root: { pointerEvents: 'none' } });
   });
+
+  it('opens the group cover in Workbench on an unmodified double click', () => {
+    const onOpenWorkbench = vi.fn();
+    const cover = {
+      id: 'cover',
+      image_path: 'C:\\gallery\\cover.png',
+      metadata: {},
+      name: 'cover',
+      prompt_structure: { base_undesired_tags: [], characters: [] },
+      tags: [],
+    };
+    const element = GalleryCard({
+      active: false,
+      group: { count: 3, cover, members: [cover] },
+      onContextMenu: vi.fn(),
+      onOpenWorkbench,
+      onPreview: vi.fn(),
+      onSelect: vi.fn(),
+      selected: false,
+    });
+    const mainButton = element.props.children.props.children[0];
+
+    mainButton.props.onDoubleClick({ ctrlKey: false, metaKey: false, shiftKey: false });
+
+    expect(onOpenWorkbench).toHaveBeenCalledWith(cover);
+  });
+
+  it('keeps modified double clicks available for selection gestures', () => {
+    const onOpenWorkbench = vi.fn();
+    const cover = {
+      id: 'cover',
+      image_path: 'C:\\gallery\\cover.png',
+      metadata: {},
+      name: 'cover',
+      prompt_structure: { base_undesired_tags: [], characters: [] },
+      tags: [],
+    };
+    const element = GalleryCard({
+      active: false,
+      group: { count: 1, cover, members: [cover] },
+      onContextMenu: vi.fn(),
+      onOpenWorkbench,
+      onPreview: vi.fn(),
+      onSelect: vi.fn(),
+      selected: false,
+    });
+    const mainButton = element.props.children.props.children[0];
+
+    mainButton.props.onDoubleClick({ ctrlKey: true, metaKey: false, shiftKey: false });
+
+    expect(onOpenWorkbench).not.toHaveBeenCalled();
+  });
 });

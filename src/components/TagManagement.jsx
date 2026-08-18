@@ -15,6 +15,10 @@ const CATEGORY_SELECT_OPTIONS = CATEGORY_OPTIONS.map((value) => ({
   label: CATEGORY_LABELS[value] || value,
   value,
 }));
+const TAG_HOVER_PREVIEW_STYLES = {
+  content: { padding: 0 },
+  root: { pointerEvents: 'none' },
+};
 
 function WeightEditor({ value, onCommit }) {
   const parsedValue = Number(value);
@@ -182,7 +186,7 @@ export function TagChip({
     arrow
     openDelay={320}
     placement="top"
-    styles={{ content: { padding: 0 } }}
+    styles={TAG_HOVER_PREVIEW_STYLES}
     title={tooltip}
   >
     {chip}
