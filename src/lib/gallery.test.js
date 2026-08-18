@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adjacentGallerySelection, galleryEmptyState, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, groupGalleryProjects, hasGalleryScrubIntent, isGalleryBlankClickTarget, reconcileGallerySelection } from './gallery.js';
+import { adjacentGallerySelection, galleryEmptyState, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, groupGalleryProjects, isGalleryBlankClickTarget, reconcileGallerySelection } from './gallery.js';
 
 const item = (id, fingerprint, createdAt, cover = '') => ({
   id,
@@ -55,22 +55,15 @@ describe('gallery grouping and selection', () => {
     });
   });
 
-  it('maps horizontal pointer movement across a card to stable group members', () => {
+  it('maps the initial pointer position and subsequent movement directly to group members', () => {
     expect(galleryScrubMemberIndex(100, 100, 200, 4)).toBe(0);
     expect(galleryScrubMemberIndex(149, 100, 200, 4)).toBe(0);
     expect(galleryScrubMemberIndex(150, 100, 200, 4)).toBe(1);
+    expect(galleryScrubMemberIndex(200, 100, 200, 4)).toBe(2);
     expect(galleryScrubMemberIndex(299, 100, 200, 4)).toBe(3);
     expect(galleryScrubMemberIndex(300, 100, 200, 4)).toBe(3);
     expect(galleryScrubMemberIndex(200, 100, 0, 4)).toBe(0);
     expect(galleryScrubMemberIndex(200, 100, 200, 1)).toBe(0);
-  });
-
-  it('recognizes deliberate horizontal scrubbing without depending on popup state', () => {
-    expect(hasGalleryScrubIntent(107, 100)).toBe(false);
-    expect(hasGalleryScrubIntent(108, 100)).toBe(true);
-    expect(hasGalleryScrubIntent(92, 100)).toBe(true);
-    expect(hasGalleryScrubIntent(undefined, 100)).toBe(false);
-    expect(hasGalleryScrubIntent(100, null)).toBe(false);
   });
 
   it('only treats clicks outside image cards as Gallery blank-space clicks', () => {

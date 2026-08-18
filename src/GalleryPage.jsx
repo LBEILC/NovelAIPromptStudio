@@ -5,7 +5,7 @@ import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
-import { galleryEmptyState, galleryScrubMemberIndex, hasGalleryScrubIntent, isGalleryBlankClickTarget } from './lib/gallery.js';
+import { galleryEmptyState, galleryScrubMemberIndex, isGalleryBlankClickTarget } from './lib/gallery.js';
 import {
   GALLERY_CARD_SIZE_MAX,
   GALLERY_CARD_SIZE_MIN,
@@ -173,35 +173,31 @@ export function GalleryCard(props) {
   const { group } = props;
   const [hoverProjectId, setHoverProjectId] = useState('');
   const scrubBoundsRef = useRef(null);
-  const scrubOriginXRef = useRef(null);
-  const scrubActiveRef = useRef(false);
   const hoverProject = group.members.find((member) => member.id === hoverProjectId) || group.cover;
   const resetScrub = () => {
     scrubBoundsRef.current = null;
-    scrubOriginXRef.current = null;
-    scrubActiveRef.current = false;
     setHoverProjectId('');
+  };
+  const updateScrubProject = (pointerX, bounds) => {
+    if (group.count <= 1) return;
+    const member = group.members[galleryScrubMemberIndex(pointerX, bounds.left, bounds.width, group.members.length)];
+    if (member) setHoverProjectId((current) => current === member.id ? current : member.id);
   };
 
   return <GalleryCardView
     {...props}
     hoverProject={hoverProject}
     onPointerEnter={(event) => {
-      scrubBoundsRef.current = event.currentTarget.getBoundingClientRect();
-      scrubOriginXRef.current = event.clientX;
-      scrubActiveRef.current = false;
+      const bounds = event.currentTarget.getBoundingClientRect();
+      scrubBoundsRef.current = bounds;
+      updateScrubProject(event.clientX, bounds);
     }}
     onPointerLeave={resetScrub}
     onPointerMove={(event) => {
       if (group.count <= 1) return;
-      if (!scrubActiveRef.current) {
-        if (!hasGalleryScrubIntent(event.clientX, scrubOriginXRef.current)) return;
-        scrubActiveRef.current = true;
-      }
       const bounds = scrubBoundsRef.current || event.currentTarget.getBoundingClientRect();
       scrubBoundsRef.current = bounds;
-      const member = group.members[galleryScrubMemberIndex(event.clientX, bounds.left, bounds.width, group.members.length)];
-      if (member) setHoverProjectId((current) => current === member.id ? current : member.id);
+      updateScrubProject(event.clientX, bounds);
     }}
   />;
 }
