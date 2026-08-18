@@ -15,8 +15,11 @@ import WorkbenchTabDragOverlay from './components/WorkbenchTabDragOverlay.jsx';
 import {
   panelStorage,
   panelWidthForViewport,
+  readPanelBoolean,
   readPanelWidth,
+  WORKBENCH_SOURCE_PANEL_EXPANDED_KEY,
   WORKBENCH_SOURCE_PANEL_WIDTH_KEY,
+  writePanelBoolean,
   writePanelWidth,
 } from './lib/panelLayout.js';
 import { fitTabPreviewCanvas } from './lib/imagePreview.js';
@@ -248,6 +251,11 @@ export default function WorkbenchPage({
     280,
     560,
   ));
+  const [sourcePanelExpanded, setSourcePanelExpanded] = useState(() => readPanelBoolean(
+    panelStorage(),
+    WORKBENCH_SOURCE_PANEL_EXPANDED_KEY,
+    true,
+  ));
   const [copyContextState, setCopyContextState] = useState({ tabId: '', text: '', count: 0 });
   const tab = activeWorkbenchTab(session);
   const project = tab?.project;
@@ -308,8 +316,12 @@ export default function WorkbenchPage({
         className="workbench-source-shell"
         classNames={{ content: 'workspace-side-panel-content' }}
         defaultSize={{ width: 'clamp(280px, 34vw, 560px)' }}
+        expand={sourcePanelExpanded}
         maxWidth={560}
         minWidth={280}
+        onExpandChange={(expanded) => {
+          setSourcePanelExpanded(writePanelBoolean(panelStorage(), WORKBENCH_SOURCE_PANEL_EXPANDED_KEY, expanded));
+        }}
         onSizeChange={(_delta, size) => {
           const width = writePanelWidth(panelStorage(), WORKBENCH_SOURCE_PANEL_WIDTH_KEY, size?.width, 280, 560);
           if (width !== undefined) setSourcePanelWidth(width);

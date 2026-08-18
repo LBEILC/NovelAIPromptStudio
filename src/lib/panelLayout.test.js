@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizePanelWidth,
   panelWidthForViewport,
+  readPanelBoolean,
   readPanelWidth,
+  writePanelBoolean,
   writePanelWidth,
 } from './panelLayout.js';
 
@@ -44,5 +46,30 @@ describe('panel layout sizing', () => {
 
     expect(readPanelWidth(unavailableStorage, 'panel', 420, 280, 560)).toBe(420);
     expect(writePanelWidth(unavailableStorage, 'panel', 450, 280, 560)).toBe(450);
+  });
+
+  it('persists explicit expanded and pinned boolean values', () => {
+    const values = new Map();
+    const storage = {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+    };
+
+    expect(readPanelBoolean(storage, 'expanded', true)).toBe(true);
+    expect(writePanelBoolean(storage, 'expanded', false)).toBe(false);
+    expect(readPanelBoolean(storage, 'expanded', true)).toBe(false);
+    expect(writePanelBoolean(storage, 'pinned', true)).toBe(true);
+    expect(readPanelBoolean(storage, 'pinned', false)).toBe(true);
+  });
+
+  it('falls back safely for missing, invalid, or unavailable boolean state', () => {
+    const unavailableStorage = {
+      getItem: () => { throw new Error('unavailable'); },
+      setItem: () => { throw new Error('unavailable'); },
+    };
+
+    expect(readPanelBoolean({ getItem: () => 'invalid' }, 'panel', false)).toBe(false);
+    expect(readPanelBoolean(unavailableStorage, 'panel', true)).toBe(true);
+    expect(writePanelBoolean(unavailableStorage, 'panel', false)).toBe(false);
   });
 });

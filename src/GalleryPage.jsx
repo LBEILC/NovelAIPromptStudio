@@ -15,10 +15,14 @@ import {
 } from './lib/galleryLayout.js';
 import { fitTabPreviewCanvas } from './lib/imagePreview.js';
 import {
+  GALLERY_PREVIEW_PANEL_EXPANDED_KEY,
+  GALLERY_PREVIEW_PANEL_PINNED_KEY,
   GALLERY_PREVIEW_PANEL_WIDTH_KEY,
   panelStorage,
   panelWidthForViewport,
+  readPanelBoolean,
   readPanelWidth,
+  writePanelBoolean,
   writePanelWidth,
 } from './lib/panelLayout.js';
 import { countPromptTags, positiveRawPromptScopes } from './lib/promptStructure.js';
@@ -189,7 +193,11 @@ export default function GalleryPage({
   onCopyImage,
   onDownloadImage,
 }) {
-  const [previewExpanded, setPreviewExpanded] = useState(Boolean(preview));
+  const [previewExpanded, setPreviewExpanded] = useState(() => readPanelBoolean(
+    panelStorage(),
+    GALLERY_PREVIEW_PANEL_EXPANDED_KEY,
+    Boolean(preview),
+  ));
   const [previewPanelWidth, setPreviewPanelWidth] = useState(() => readPanelWidth(
     panelStorage(),
     GALLERY_PREVIEW_PANEL_WIDTH_KEY,
@@ -197,14 +205,17 @@ export default function GalleryPage({
     340,
     560,
   ));
-  const [previewPinned, setPreviewPinned] = useState(false);
+  const [previewPinned, setPreviewPinned] = useState(() => readPanelBoolean(
+    panelStorage(),
+    GALLERY_PREVIEW_PANEL_PINNED_KEY,
+    false,
+  ));
   const [galleryCardSize, setGalleryCardSize] = useState(() => readGalleryCardSize(panelStorage()));
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const renameTargetRef = useRef('');
 
   useEffect(() => {
-    setPreviewExpanded(Boolean(preview));
     const requestedRename = Boolean(preview && renameTargetRef.current === preview.id);
     renameTargetRef.current = '';
     setRenaming(requestedRename);
@@ -224,12 +235,18 @@ export default function GalleryPage({
   const memberIndex = previewGroup?.members.findIndex((project) => project.id === preview?.id) ?? -1;
   const galleryDensity = galleryDensityForSize(galleryCardSize);
   const emptyState = galleryEmptyState(view, query);
+  const updatePreviewExpanded = (expanded) => {
+    setPreviewExpanded(writePanelBoolean(panelStorage(), GALLERY_PREVIEW_PANEL_EXPANDED_KEY, expanded));
+  };
+  const updatePreviewPinned = (pinned) => {
+    setPreviewPinned(writePanelBoolean(panelStorage(), GALLERY_PREVIEW_PANEL_PINNED_KEY, pinned));
+  };
   const saveName = async () => {
     if (await onRename(preview, nameDraft)) setRenaming(false);
   };
   const requestRename = (group) => {
     const project = group.cover;
-    setPreviewExpanded(true);
+    updatePreviewExpanded(true);
     if (preview?.id === project.id) {
       setNameDraft(project.name || '');
       setRenaming(true);
@@ -306,7 +323,7 @@ export default function GalleryPage({
             group={group}
             key={group.id}
             onContextMenu={(event) => onProjectContextMenu(event, group, () => requestRename(group))}
-            onPreview={() => { setPreviewExpanded(true); onPreview(group); }}
+            onPreview={() => { updatePreviewExpanded(true); onPreview(group); }}
             onSelect={(event) => onToggleSelect(group, event)}
             selected={selectedGroupIds.includes(group.id)}
           />)}
@@ -324,11 +341,11 @@ export default function GalleryPage({
         className={`gallery-preview-shell ${previewPinned ? 'is-fixed' : 'is-floating'}`}
         classNames={{ content: 'workspace-side-panel-content' }}
         defaultSize={{ width: 'clamp(340px, 28vw, 560px)' }}
-        expand={previewExpanded}
+        expand={Boolean(preview) && previewExpanded}
         maxWidth={560}
         minWidth={340}
         mode={previewPinned ? 'fixed' : 'float'}
-        onExpandChange={setPreviewExpanded}
+        onExpandChange={updatePreviewExpanded}
         onSizeChange={(_delta, size) => {
           const width = writePanelWidth(panelStorage(), GALLERY_PREVIEW_PANEL_WIDTH_KEY, size?.width, 340, 560);
           if (width !== undefined) setPreviewPanelWidth(width);
@@ -365,7 +382,7 @@ export default function GalleryPage({
                 aria-pressed={previewPinned}
                 className="gallery-preview-pin"
                 icon={<Icon name={previewPinned ? 'pinOff' : 'pin'}/>}
-                onClick={() => setPreviewPinned((pinned) => !pinned)}
+                onClick={() => updatePreviewPinned(!previewPinned)}
                 title={previewPinned ? '取消固定，浮动显示' : '固定为分栏'}
               />
             </header>
