@@ -47,6 +47,15 @@ Only current actionable macOS requests are kept here. Earlier completed, superse
 - Expected: Native dialogs and Finder drag semantics remain correct; ZIP entry names and duplicate detection are stable; grouping never merges different Prompt semantics; destructive actions clearly state their scope and never touch files outside the managed resource directory; migration copies and verifies assets before retiring the old location and survives restart.
 - Observed: On 2026-08-13, the unsigned packaged arm64 app imported a NovelAI ZIP whose path and entry names contained CJK characters, spaces, and parentheses. It imported three distinct images, grouped the two semantically identical Prompts together, kept the different Prompt separate, and skipped a byte-for-byte duplicate on reimport. Clipboard pixel import completed without crashing, Gallery search reduced the result set correctly, sorting switched between recent and earliest import, grouped-member navigation worked, and selecting a different group cover succeeded. Workbench-opened files did not appear in Gallery until explicitly imported. Trash/restore scope, permanent deletion, empty trash, resource migration, panel persistence, and a restart check for the selected group cover remain pending; bitmap-only clipboard import also lacks the required missing-metadata warning noted in the Workbench handoff.
 
+## Verify Gallery density slider and hover previews
+
+- Status: Pending
+- Date/source: 2026-08-18, Windows
+- Related commit: `d549f23`
+- Action: On an unlocked macOS session, follow `doc/manual-verification-20260818-gallery-density-hover-preview.md`. Pay particular attention to trackpad and keyboard control of the thumbnail-size slider, toolbar wrapping at the minimum window width, hover delay while moving across many cards, popup collision near every window edge, light/dark and reduced/off motion modes, and restoration of the selected density after page changes and a full restart.
+- Expected: The slider continuously changes the image-first grid between comfortable, compact, and overview density without clipping selection or grouped-card indicators; hover previews use thumbnails, preserve image proportions, avoid flicker and viewport overflow, and never block click, selection, or context-menu behavior; the chosen size persists across restarts on macOS.
+- Observed: Windows non-GUI checks completed: clean dependency installation, all 154 tests, the production build, and the Lobe UI audit passed. Interactive Windows and macOS verification remain pending.
+
 ## Verify manual update mode for unsigned macOS builds
 
 - Status: Pending
