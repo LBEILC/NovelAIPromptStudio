@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adjacentGallerySelection, galleryEmptyState, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, groupGalleryProjects, isGalleryBlankClickTarget, reconcileGallerySelection } from './gallery.js';
+import { adjacentGallerySelection, galleryEmptyState, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, groupGalleryProjects, hasGalleryScrubIntent, isGalleryBlankClickTarget, reconcileGallerySelection } from './gallery.js';
 
 const item = (id, fingerprint, createdAt, cover = '') => ({
   id,
@@ -63,6 +63,14 @@ describe('gallery grouping and selection', () => {
     expect(galleryScrubMemberIndex(300, 100, 200, 4)).toBe(3);
     expect(galleryScrubMemberIndex(200, 100, 0, 4)).toBe(0);
     expect(galleryScrubMemberIndex(200, 100, 200, 1)).toBe(0);
+  });
+
+  it('recognizes deliberate horizontal scrubbing without depending on popup state', () => {
+    expect(hasGalleryScrubIntent(107, 100)).toBe(false);
+    expect(hasGalleryScrubIntent(108, 100)).toBe(true);
+    expect(hasGalleryScrubIntent(92, 100)).toBe(true);
+    expect(hasGalleryScrubIntent(undefined, 100)).toBe(false);
+    expect(hasGalleryScrubIntent(100, null)).toBe(false);
   });
 
   it('only treats clicks outside image cards as Gallery blank-space clicks', () => {

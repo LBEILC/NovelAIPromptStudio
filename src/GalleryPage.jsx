@@ -5,7 +5,7 @@ import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
-import { galleryEmptyState, galleryScrubMemberIndex, isGalleryBlankClickTarget } from './lib/gallery.js';
+import { galleryEmptyState, galleryScrubMemberIndex, hasGalleryScrubIntent, isGalleryBlankClickTarget } from './lib/gallery.js';
 import {
   GALLERY_CARD_SIZE_MAX,
   GALLERY_CARD_SIZE_MIN,
@@ -126,10 +126,10 @@ export function GalleryCardHoverPreview({ group, project = group.cover }) {
 
 const GALLERY_HOVER_POSITIONER_STYLES = { root: { pointerEvents: 'none' } };
 
-export function GalleryCardView({ active, group, hoverProject = group.cover, selected, onHoverOpenChange, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
+export function GalleryCardView({ active, group, hoverProject = group.cover, selected, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
   const project = group.cover;
   const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
-  return <Popover content={<GalleryCardHoverPreview group={group} project={hoverProject}/>} onOpenChange={onHoverOpenChange} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
+  return <Popover content={<GalleryCardHoverPreview group={group} project={hoverProject}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
     <button
       className="gallery-card-main"
       onClick={(event) => selected || event.ctrlKey || event.metaKey || event.shiftKey ? onSelect(event) : onPreview()}
@@ -171,28 +171,33 @@ export function GalleryCardView({ active, group, hoverProject = group.cover, sel
 
 export function GalleryCard(props) {
   const { group } = props;
-  const [hoverPreviewOpen, setHoverPreviewOpen] = useState(false);
   const [hoverProjectId, setHoverProjectId] = useState('');
   const scrubBoundsRef = useRef(null);
+  const scrubOriginXRef = useRef(null);
+  const scrubActiveRef = useRef(false);
   const hoverProject = group.members.find((member) => member.id === hoverProjectId) || group.cover;
   const resetScrub = () => {
     scrubBoundsRef.current = null;
+    scrubOriginXRef.current = null;
+    scrubActiveRef.current = false;
     setHoverProjectId('');
   };
 
   return <GalleryCardView
     {...props}
     hoverProject={hoverProject}
-    onHoverOpenChange={(open) => {
-      setHoverPreviewOpen(open);
-      if (!open) resetScrub();
-    }}
     onPointerEnter={(event) => {
       scrubBoundsRef.current = event.currentTarget.getBoundingClientRect();
+      scrubOriginXRef.current = event.clientX;
+      scrubActiveRef.current = false;
     }}
     onPointerLeave={resetScrub}
     onPointerMove={(event) => {
-      if (!hoverPreviewOpen || group.count <= 1) return;
+      if (group.count <= 1) return;
+      if (!scrubActiveRef.current) {
+        if (!hasGalleryScrubIntent(event.clientX, scrubOriginXRef.current)) return;
+        scrubActiveRef.current = true;
+      }
       const bounds = scrubBoundsRef.current || event.currentTarget.getBoundingClientRect();
       scrubBoundsRef.current = bounds;
       const member = group.members[galleryScrubMemberIndex(event.clientX, bounds.left, bounds.width, group.members.length)];

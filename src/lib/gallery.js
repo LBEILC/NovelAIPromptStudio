@@ -52,6 +52,14 @@ export function galleryScrubMemberIndex(pointerX, boundsLeft, boundsWidth, membe
   return Math.min(count - 1, Math.floor(normalizedProgress * count));
 }
 
+export function hasGalleryScrubIntent(pointerX, originX, threshold = 8) {
+  if (pointerX == null || originX == null) return false;
+  const current = Number(pointerX);
+  const origin = Number(originX);
+  const distance = Math.max(0, Number(threshold) || 0);
+  return Number.isFinite(current) && Number.isFinite(origin) && Math.abs(current - origin) >= distance;
+}
+
 export function isGalleryBlankClickTarget(target) {
   return !target?.closest?.('.gallery-card');
 }
