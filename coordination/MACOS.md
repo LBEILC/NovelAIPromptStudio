@@ -51,10 +51,10 @@ Only current actionable macOS requests are kept here. Earlier completed, superse
 
 - Status: Pending
 - Date/source: 2026-08-18, Windows
-- Related commit: `d549f23`
-- Action: On an unlocked macOS session, follow `doc/manual-verification-20260818-gallery-density-hover-preview.md`. Pay particular attention to trackpad and keyboard control of the thumbnail-size slider, toolbar wrapping at the minimum window width, hover delay while moving across many cards, popup collision near every window edge, light/dark and reduced/off motion modes, and restoration of the selected density after page changes and a full restart.
-- Expected: The slider continuously changes the image-first grid between comfortable, compact, and overview density without clipping selection or grouped-card indicators; hover previews use thumbnails, preserve image proportions, avoid flicker and viewport overflow, and never block click, selection, or context-menu behavior; the chosen size persists across restarts on macOS.
-- Observed: Windows non-GUI checks completed: clean dependency installation, all 154 tests, the production build, and the Lobe UI audit passed. Interactive Windows and macOS verification remain pending.
+- Related commits: `d549f23`, `acff1c9`
+- Action: On an unlocked macOS session, follow `doc/manual-verification-20260818-gallery-density-hover-preview.md`. Pay particular attention to trackpad and keyboard control of the thumbnail-size slider, toolbar wrapping at the minimum window width, hover delay while moving across many cards, popup collision near every window edge, light/dark and reduced/off motion modes, and restoration of the selected density after page changes and a full restart. With the popup placed on both the left and right, move the pointer directly onto cards visually covered by it and confirm the preview switches immediately without routing around the popup.
+- Expected: The slider continuously changes the image-first grid between comfortable, compact, and overview density without clipping selection or grouped-card indicators; hover previews use thumbnails, preserve image proportions, avoid flicker and viewport overflow, remain transparent to pointer hit testing over underlying cards, and never block click, selection, or context-menu behavior; the chosen size persists across restarts on macOS.
+- Observed: Windows non-GUI checks completed: clean dependency installation, all 155 tests, the production build, and the Lobe UI audit passed. The pointer-blocking issue reported during initial Windows use is fixed in `acff1c9`; interactive Windows retesting and macOS verification remain pending.
 
 ## Verify manual update mode for unsigned macOS builds
 
