@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   GALLERY_CARD_SIZE_DEFAULT,
   GALLERY_CARD_SIZE_KEY,
+  GALLERY_CARD_SIZE_MAX,
+  GALLERY_CARD_SIZE_MIN,
+  galleryCardSizeFromWheel,
   galleryDensityForSize,
+  isGalleryWheelZoomGesture,
   normalizeGalleryCardSize,
   readGalleryCardSize,
   writeGalleryCardSize,
@@ -20,6 +24,18 @@ describe('gallery card sizing', () => {
     expect(galleryDensityForSize(96)).toBe('overview');
     expect(galleryDensityForSize(144)).toBe('compact');
     expect(galleryDensityForSize(190)).toBe('comfortable');
+  });
+
+  it('maps modified wheel gestures to bounded browser-style zoom steps', () => {
+    expect(isGalleryWheelZoomGesture({ ctrlKey: true, deltaY: -100 })).toBe(true);
+    expect(isGalleryWheelZoomGesture({ metaKey: true, deltaY: 100 })).toBe(true);
+    expect(isGalleryWheelZoomGesture({ deltaY: -100 })).toBe(false);
+    expect(isGalleryWheelZoomGesture({ ctrlKey: true, deltaY: 0 })).toBe(false);
+
+    expect(galleryCardSizeFromWheel(190, -100)).toBe(198);
+    expect(galleryCardSizeFromWheel(190, 100)).toBe(182);
+    expect(galleryCardSizeFromWheel(GALLERY_CARD_SIZE_MAX, -100)).toBe(GALLERY_CARD_SIZE_MAX);
+    expect(galleryCardSizeFromWheel(GALLERY_CARD_SIZE_MIN, 100)).toBe(GALLERY_CARD_SIZE_MIN);
   });
 
   it('reads, writes, and safely falls back when storage is unavailable', () => {

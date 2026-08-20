@@ -19,7 +19,11 @@ import {
 import {
   GALLERY_CARD_SIZE_MAX,
   GALLERY_CARD_SIZE_MIN,
+  GALLERY_CARD_SIZE_STEP,
+  GALLERY_CARD_SIZE_WHEEL_THRESHOLD,
+  galleryCardSizeFromWheel,
   galleryDensityForSize,
+  isGalleryWheelZoomGesture,
   normalizeGalleryCardSize,
   readGalleryCardSize,
   writeGalleryCardSize,
@@ -906,7 +910,10 @@ export default function GalleryPage({
   const renameTargetRef = useRef('');
   const galleryScrollRef = useRef(null);
   const galleryCardSizeFrameRef = useRef(null);
+  const galleryCardSizePersistTimerRef = useRef(null);
   const pendingGalleryCardSizeRef = useRef(galleryCardSize);
+  const galleryWheelDeltaRef = useRef(0);
+  const galleryWheelFrameRef = useRef(null);
 
   const updateGalleryCardSize = useCallback((value) => {
     const nextSize = normalizeGalleryCardSize(value);
@@ -927,12 +934,53 @@ export default function GalleryPage({
       window.cancelAnimationFrame(galleryCardSizeFrameRef.current);
       galleryCardSizeFrameRef.current = null;
     }
+    if (galleryCardSizePersistTimerRef.current !== null) {
+      window.clearTimeout(galleryCardSizePersistTimerRef.current);
+      galleryCardSizePersistTimerRef.current = null;
+    }
     setGalleryCardSize(nextSize);
     writeGalleryCardSize(panelStorage(), nextSize);
   }, []);
 
+  const scheduleGalleryCardSizePersistence = useCallback(() => {
+    if (galleryCardSizePersistTimerRef.current !== null) window.clearTimeout(galleryCardSizePersistTimerRef.current);
+    galleryCardSizePersistTimerRef.current = window.setTimeout(() => {
+      galleryCardSizePersistTimerRef.current = null;
+      writeGalleryCardSize(panelStorage(), pendingGalleryCardSizeRef.current);
+    }, 180);
+  }, []);
+
+  useEffect(() => {
+    const surface = galleryScrollRef.current;
+    if (!surface) return undefined;
+    const handleWheel = (event) => {
+      if (!isGalleryWheelZoomGesture(event)) return;
+      event.preventDefault();
+      const deltaScale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? Math.max(1, surface.clientHeight) : 1;
+      galleryWheelDeltaRef.current += event.deltaY * deltaScale;
+      if (Math.abs(galleryWheelDeltaRef.current) < GALLERY_CARD_SIZE_WHEEL_THRESHOLD || galleryWheelFrameRef.current !== null) return;
+      galleryWheelFrameRef.current = window.requestAnimationFrame(() => {
+        galleryWheelFrameRef.current = null;
+        const wheelDelta = galleryWheelDeltaRef.current;
+        galleryWheelDeltaRef.current = 0;
+        const nextSize = galleryCardSizeFromWheel(pendingGalleryCardSizeRef.current, wheelDelta);
+        if (nextSize === pendingGalleryCardSizeRef.current) return;
+        pendingGalleryCardSizeRef.current = nextSize;
+        setGalleryCardSize(nextSize);
+        scheduleGalleryCardSizePersistence();
+      });
+    };
+    surface.addEventListener('wheel', handleWheel, { passive: false });
+    return () => surface.removeEventListener('wheel', handleWheel);
+  }, [scheduleGalleryCardSizePersistence]);
+
   useEffect(() => () => {
     if (galleryCardSizeFrameRef.current !== null) window.cancelAnimationFrame(galleryCardSizeFrameRef.current);
+    if (galleryWheelFrameRef.current !== null) window.cancelAnimationFrame(galleryWheelFrameRef.current);
+    if (galleryCardSizePersistTimerRef.current !== null) {
+      window.clearTimeout(galleryCardSizePersistTimerRef.current);
+      writeGalleryCardSize(panelStorage(), pendingGalleryCardSizeRef.current);
+    }
   }, []);
 
   useEffect(() => {
@@ -1054,7 +1102,7 @@ export default function GalleryPage({
           { label: '按名称', value: 'name' },
         ]} value={sort}/>
       </div>
-      <div className="gallery-size-control" title={`缩略图大小：${galleryCardSize} 像素`}>
+      <div className="gallery-size-control" title={`缩略图大小：${galleryCardSize} 像素 · Ctrl/⌘ + 滚轮`}>
         <Icon name="image" size={13}/>
         <Slider
           aria-label="缩略图大小"
@@ -1064,7 +1112,7 @@ export default function GalleryPage({
           min={GALLERY_CARD_SIZE_MIN}
           onChange={updateGalleryCardSize}
           onChangeComplete={completeGalleryCardSize}
-          step={8}
+          step={GALLERY_CARD_SIZE_STEP}
           value={galleryCardSize}
         />
         <Icon name="image" size={18}/>
@@ -1128,9 +1176,10 @@ export default function GalleryPage({
           />
         </LobeDraggablePanel.Body>
       </LobeDraggablePanel>
-      <section
+      <motion.section
         aria-busy={showLoadingPage || progressiveRendering}
         className="gallery-grid-scroll"
+        layoutScroll
         onClick={(event) => {
           if (!shouldCollapseGalleryPreview(event.target, previewPinned)) return;
           updatePreviewExpanded(false);
@@ -1177,7 +1226,7 @@ export default function GalleryPage({
             /></motion.div>}
           </AnimatePresence>
         </PopoverGroup>
-      </section>
+      </motion.section>
       <LobeDraggablePanel
         className={`gallery-preview-shell ${previewPinned ? 'is-fixed' : 'is-floating'}`}
         classNames={{ content: 'workspace-side-panel-content' }}

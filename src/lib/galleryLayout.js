@@ -2,6 +2,8 @@ export const GALLERY_CARD_SIZE_KEY = 'novelai-prompt-studio.gallery-card-size.v1
 export const GALLERY_CARD_SIZE_MIN = 96;
 export const GALLERY_CARD_SIZE_MAX = 260;
 export const GALLERY_CARD_SIZE_DEFAULT = 190;
+export const GALLERY_CARD_SIZE_STEP = 8;
+export const GALLERY_CARD_SIZE_WHEEL_THRESHOLD = 24;
 
 export function normalizeGalleryCardSize(value) {
   if (value == null || value === '') return undefined;
@@ -15,6 +17,17 @@ export function galleryDensityForSize(value) {
   if (size <= 128) return 'overview';
   if (size <= 168) return 'compact';
   return 'comfortable';
+}
+
+export function isGalleryWheelZoomGesture(event) {
+  return Boolean(event && (event.ctrlKey || event.metaKey) && Number(event.deltaY));
+}
+
+export function galleryCardSizeFromWheel(value, deltaY) {
+  const size = normalizeGalleryCardSize(value) ?? GALLERY_CARD_SIZE_DEFAULT;
+  const numericDelta = Number(deltaY);
+  if (!Number.isFinite(numericDelta) || numericDelta === 0) return size;
+  return normalizeGalleryCardSize(size + (numericDelta < 0 ? GALLERY_CARD_SIZE_STEP : -GALLERY_CARD_SIZE_STEP));
 }
 
 export function readGalleryCardSize(storage) {
