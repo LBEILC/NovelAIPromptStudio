@@ -27,7 +27,9 @@ import {
   overviewCategoryGroups,
   overviewCopyContext,
   overviewEntries,
+  overviewMoveContext,
   overviewTagInteractionState,
+  moveOverviewTags,
   reorderOverviewTags,
   selectedOverviewEntries,
   shouldReorderOverviewTags,
@@ -636,6 +638,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     const contextKeys = selectedKeys.length ? selectedKeys : [overviewTagKey(scopeKey, tag.id)];
     const contextEntries = selectedKeys.length ? selectedEntries : selectedOverviewEntries(project, contextKeys);
     const contextCopy = overviewCopyContext(project, visibleScopes, contextKeys);
+    const moveContext = overviewMoveContext(project, contextKeys);
     if (!selectedKeys.length) {
       setSelectedKeys(contextKeys);
       setDeleteArmed(false);
@@ -644,12 +647,22 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
       count: contextEntries.length,
       copyCount: contextCopy.count,
       ignored: contextCopy.ignored,
+      moveContext,
       translating: contextEntries.some((entry) => translatingKeys.has(entry.key)),
       onCopy: () => onCopyText?.(contextCopy.text, contextCopy.count, true, contextCopy.ignored),
       onTranslate: () => translateEntries(contextEntries),
       onCategoryChange: (category) => {
         updateProject(updateOverviewTags(project, contextKeys, { category, category_source: 'manual' }));
         onNotify?.(`已设置 ${contextEntries.length} 个 Tag 分类`);
+      },
+      onMove: (targetScopeKey) => {
+        const target = moveContext.options.find((option) => option.key === targetScopeKey);
+        const result = moveOverviewTags(project, contextKeys, targetScopeKey);
+        if (!result.movedCount) return;
+        updateProject(result.project);
+        setSelectedKeys([]);
+        setDeleteArmed(false);
+        onNotify?.(`已移动 ${result.movedCount} 个 Tag 到 ${target?.label || '目标区域'}${result.mergedCount ? `，合并 ${result.mergedCount} 个重复项` : ''}`);
       },
       onDelete: () => {
         updateProject(deleteOverviewTags(project, contextKeys));

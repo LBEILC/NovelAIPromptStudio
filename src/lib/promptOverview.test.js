@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { deleteOverviewTags, filterOverviewScopes, isOverviewTagVisible, overviewCategoryGroups, overviewCopyContext, overviewEntries, overviewSelectionMenuItems, overviewTagInteractionState, reorderOverviewTags, selectedOverviewEntries, shouldReorderOverviewTags, toggleOverviewSelectionGroup, updateOverviewTags } from './promptOverview.js';
+import { deleteOverviewTags, filterOverviewScopes, isOverviewTagVisible, moveOverviewTags, overviewCategoryGroups, overviewCopyContext, overviewEntries, overviewMoveContext, overviewSelectionMenuItems, overviewTagInteractionState, overviewTagKey, reorderOverviewTags, selectedOverviewEntries, shouldReorderOverviewTags, toggleOverviewSelectionGroup, updateOverviewTags } from './promptOverview.js';
 
 function projectFixture() {
   const tag = (id, value, category, translation = '', weight = 1) => ({ id, tag: value, category, translation, weight, note: '' });
@@ -150,33 +150,93 @@ describe('Prompt overview operations', () => {
     expect(next.prompt_structure.characters[0].prompt_tags.find((tag) => tag.id === 'shirt').category).toBe('Clothing');
   });
 
+  it('offers same-polarity move targets and disables mixed-polarity selection', () => {
+    const project = projectFixture();
+    const entries = overviewEntries(filterOverviewScopes(project));
+    const artist = entries.find((entry) => entry.tag.id === 'artist');
+    const character = entries.find((entry) => entry.tag.id === 'shirt');
+    const undesired = entries.find((entry) => entry.tag.id === 'lowres');
+    const moveContext = overviewMoveContext(project, [artist.key]);
+
+    expect(moveContext.disabled).toBe(false);
+    expect(moveContext.options.map((option) => [option.label, option.disabled])).toEqual([
+      ['Base Prompt', true],
+      ['Character 1 Prompt', false],
+    ]);
+    expect(overviewMoveContext(project, [artist.key, character.key]).options.every((option) => !option.disabled)).toBe(true);
+    expect(overviewMoveContext(project, [artist.key, undesired.key])).toMatchObject({
+      disabled: true,
+      description: 'Prompt 与 Undesired Tag 不能混合移动',
+      options: [],
+    });
+  });
+
+  it('moves selected Tags between prompt scopes and merges destination duplicates', () => {
+    const project = projectFixture();
+    project.prompt_structure.characters[0].prompt_tags.push({ ...project.tags[1], id: 'duplicate-scene' });
+    const selectedKeys = project.tags.map((tag) => overviewTagKey('base:prompt', tag.id));
+    const result = moveOverviewTags(project, selectedKeys, 'character:character:prompt');
+
+    expect(result).toMatchObject({ movedCount: 2, mergedCount: 1 });
+    expect(result.project.tags).toEqual([]);
+    expect(result.project.prompt_structure.characters[0].prompt_tags.map((tag) => tag.id)).toEqual([
+      'shirt',
+      'button',
+      'hair',
+      'duplicate-scene',
+      'artist',
+    ]);
+    expect(result.project.prompt_structure.base_prompt_raw).toBe('');
+    expect(result.project.prompt_structure.characters[0].prompt_raw).toContain('artist:foo');
+  });
+
+  it('moves Undesired Tags only into an Undesired destination', () => {
+    const project = projectFixture();
+    const lowresKey = overviewTagKey('base:undesired', 'lowres');
+    const invalid = moveOverviewTags(project, [lowresKey], 'character:character:prompt');
+    const result = moveOverviewTags(project, [lowresKey], 'character:character:undesired');
+
+    expect(invalid.project).toBe(project);
+    expect(invalid.movedCount).toBe(0);
+    expect(result.project.prompt_structure.base_undesired_tags).toEqual([]);
+    expect(result.project.prompt_structure.characters[0].undesired_tags.map((tag) => tag.id)).toEqual(['lowres']);
+    expect(result.project.prompt_structure.characters[0].undesired_raw).toBe('lowres');
+  });
+
   it('builds a Tag batch context menu whose actions target the active selection', () => {
     const onCopy = vi.fn();
     const onTranslate = vi.fn();
     const onCategoryChange = vi.fn();
     const onDelete = vi.fn();
+    const onMove = vi.fn();
     const items = overviewSelectionMenuItems({
       categories: [['Body', '身体'], ['Clothing', '服装']],
       count: 3,
       copyCount: 2,
       ignored: 1,
+      moveContext: { disabled: false, description: '', options: [{ key: 'character:character:prompt', label: 'Character 1 Prompt', disabled: false }] },
       onCategoryChange,
       onCopy,
       onDelete,
+      onMove,
       onTranslate,
     });
     const categoryMenu = items.find((item) => item.key === 'set-selected-tags-category');
+    const moveMenu = items.find((item) => item.key === 'move-selected-tags');
 
     expect(items.find((item) => item.key === 'copy-selected-tags').label).toContain('忽略 1 个排除 Tag');
     expect(categoryMenu.label).toContain('已选 3 个');
+    expect(moveMenu.children[0].label).toBe('Character 1 Prompt');
     expect(items.find((item) => item.key === 'delete-selected-tags').danger).toBe(true);
     items.find((item) => item.key === 'copy-selected-tags').onClick();
     items.find((item) => item.key === 'translate-selected-tags').onClick();
+    moveMenu.children[0].onClick();
     categoryMenu.children[1].onClick();
     items.find((item) => item.key === 'delete-selected-tags').onClick();
 
     expect(onCopy).toHaveBeenCalledOnce();
     expect(onTranslate).toHaveBeenCalledOnce();
+    expect(onMove).toHaveBeenCalledWith('character:character:prompt');
     expect(onCategoryChange).toHaveBeenCalledWith('Clothing');
     expect(onDelete).toHaveBeenCalledOnce();
   });

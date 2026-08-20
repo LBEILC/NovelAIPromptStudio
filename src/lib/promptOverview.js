@@ -125,14 +125,77 @@ export function selectedOverviewEntries(project, selectedKeys = []) {
   return overviewEntries(getPromptScopes(project)).filter((entry) => selected.has(entry.key));
 }
 
+export function overviewMoveContext(project, selectedKeys = []) {
+  const entries = selectedOverviewEntries(project, selectedKeys);
+  const polarities = new Set(entries.map((entry) => entry.scopePolarity));
+  if (!entries.length) return { disabled: true, description: '没有可移动的 Tag', options: [] };
+  if (polarities.size !== 1) {
+    return {
+      disabled: true,
+      description: 'Prompt 与 Undesired Tag 不能混合移动',
+      options: [],
+    };
+  }
+  const [polarity] = polarities;
+  const options = getPromptScopes(project)
+    .filter((scope) => scope.polarity === polarity)
+    .map((scope) => ({
+      disabled: entries.every((entry) => entry.scopeKey === scope.key),
+      key: scope.key,
+      label: scope.label,
+    }));
+  const disabled = options.every((option) => option.disabled);
+  return {
+    disabled,
+    description: disabled ? '没有其他可移动的提示词区域' : '',
+    options,
+  };
+}
+
+export function moveOverviewTags(project, selectedKeys = [], targetScopeKey = '') {
+  const entries = selectedOverviewEntries(project, selectedKeys);
+  const target = getPromptScopes(project).find((scope) => scope.key === targetScopeKey);
+  const polarities = new Set(entries.map((entry) => entry.scopePolarity));
+  if (!target || !entries.length || polarities.size !== 1 || !polarities.has(target.polarity)) {
+    return { project, movedCount: 0, mergedCount: 0 };
+  }
+
+  const movingEntries = entries.filter((entry) => entry.scopeKey !== target.key);
+  if (!movingEntries.length) return { project, movedCount: 0, mergedCount: 0 };
+
+  const selected = new Set(selectedKeys);
+  let nextProject = getPromptScopes(project).reduce((current, scope) => {
+    if (scope.key === target.key) return current;
+    const nextTags = scope.tags.filter((tag) => !selected.has(overviewTagKey(scope.key, tag.id)));
+    return nextTags.length === scope.tags.length ? current : updatePromptScope(current, scope.key, nextTags);
+  }, project);
+
+  const targetTags = [...target.tags];
+  const seen = new Set(targetTags.map((tag) => String(tag.tag || '').trim().toLocaleLowerCase('en-US')).filter(Boolean));
+  let mergedCount = 0;
+  for (const entry of movingEntries) {
+    const key = String(entry.tag.tag || '').trim().toLocaleLowerCase('en-US');
+    if (key && seen.has(key)) {
+      mergedCount += 1;
+      continue;
+    }
+    targetTags.push(entry.tag);
+    if (key) seen.add(key);
+  }
+  nextProject = updatePromptScope(nextProject, target.key, targetTags);
+  return { project: nextProject, movedCount: movingEntries.length, mergedCount };
+}
+
 export function overviewSelectionMenuItems({
   categories = [],
   count = 0,
   copyCount = 0,
   ignored = 0,
+  moveContext,
   onCategoryChange,
   onCopy,
   onDelete,
+  onMove,
   onTranslate,
   translating = false,
 }) {
@@ -147,6 +210,20 @@ export function overviewSelectionMenuItems({
       disabled: count < 1 || translating,
       onClick: () => onTranslate?.(),
     },
+    moveContext && {
+      key: 'move-selected-tags',
+      label: '移动到',
+      desc: moveContext.description || undefined,
+      disabled: moveContext.disabled,
+      type: 'submenu',
+      openOnHover: true,
+      children: moveContext.options.map((option) => ({
+        key: `move-selected-tags-${option.key}`,
+        label: option.label,
+        disabled: option.disabled,
+        onClick: () => onMove?.(option.key),
+      })),
+    },
     {
       key: 'set-selected-tags-category',
       label: `设置已选 ${count} 个 Tag 分类`,
@@ -160,7 +237,7 @@ export function overviewSelectionMenuItems({
     },
     { key: 'selected-tags-divider', type: 'divider' },
     { key: 'delete-selected-tags', label: `删除已选 ${count} 个 Tag`, danger: true, onClick: () => onDelete?.() },
-  ];
+  ].filter(Boolean);
 }
 
 export function updateOverviewTags(project, selectedKeys = [], patch = {}) {

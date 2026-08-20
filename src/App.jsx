@@ -4,7 +4,7 @@ import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/exter
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import { ActionIcon as LobeActionIcon, SideNav as LobeSideNav } from '@lobehub/ui';
 import { Button as LobeButton, Modal as LobeModal, showContextMenu as showLobeContextMenu, toast as lobeToast } from '@lobehub/ui/base-ui';
-import { Check, ClipboardPaste, Copy, FolderOpen, Pencil, Redo2, Scissors, Sparkles, Tags, Trash2, Undo2 } from 'lucide-react';
+import { Check, ClipboardPaste, Copy, FolderOpen, MoveRight, Pencil, Redo2, Scissors, Sparkles, Tags, Trash2, Undo2 } from 'lucide-react';
 import { motion, useAnimationControls } from 'motion/react';
 import GalleryPage from './GalleryPage.jsx';
 import SettingsPage from './SettingsPage.jsx';
@@ -54,7 +54,7 @@ import {
 import { readGalleryGrouping, writeGalleryGrouping } from './lib/galleryGrouping.js';
 import { scheduleGalleryComputation } from './lib/galleryTransition.js';
 import { MOTION_EASE_OUT, useStudioReducedMotion } from './lib/motion.js';
-import { overviewSelectionMenuItems } from './lib/promptOverview.js';
+import { moveOverviewTags, overviewMoveContext, overviewSelectionMenuItems, overviewTagKey } from './lib/promptOverview.js';
 
 const unavailable = (error) => async () => ({ ok: false, error });
 const studio = window.studio || {
@@ -793,6 +793,7 @@ export default function App({ appearance, setAppearance }) {
       }).map((item) => {
         if (item.key === 'copy-selected-tags') return { ...item, icon: Copy };
         if (item.key === 'translate-selected-tags') return { ...item, icon: Sparkles };
+        if (item.key === 'move-selected-tags') return { ...item, icon: MoveRight };
         if (item.key === 'set-selected-tags-category') return { ...item, icon: Tags };
         if (item.key === 'delete-selected-tags') return { ...item, icon: Trash2 };
         return item;
@@ -803,12 +804,35 @@ export default function App({ appearance, setAppearance }) {
     const project = activeTab.project;
     const scope = getPromptScope(project, scopeKey);
     const setCategory = (category) => updateWorkbenchProject(updatePromptScope(project, scope.key, scope.tags.map((item) => item.id === tag.id ? { ...item, category, category_source: 'manual' } : item)));
+    const moveContext = overviewMoveContext(project, [overviewTagKey(scopeKey, tag.id)]);
+    const moveTagTo = (targetScopeKey) => {
+      const target = moveContext.options.find((option) => option.key === targetScopeKey);
+      const result = moveOverviewTags(project, [overviewTagKey(scopeKey, tag.id)], targetScopeKey);
+      if (!result.movedCount) return;
+      updateWorkbenchProject(result.project);
+      showToast(`已移动 Tag 到 ${target?.label || '目标区域'}${result.mergedCount ? '，并合并目标中的重复项' : ''}`);
+    };
     openContextMenu(event, [
       { key: 'copy-tag', label: '复制 Tag', icon: Copy, onClick: async () => { await navigator.clipboard.writeText(tag.tag); showToast('Tag 已复制'); } },
       { key: 'copy-weighted-tag', label: '复制 Tag（含权重）', icon: Copy, onClick: async () => { await navigator.clipboard.writeText(formatTag(tag)); showToast('Tag 已复制（含权重）'); } },
       { key: 'copy-translation', label: '复制翻译', icon: Copy, disabled: !tag.translation?.trim(), onClick: async () => { await navigator.clipboard.writeText(tag.translation || ''); showToast('翻译已复制'); } },
       { key: 'edit-tag', label: '编辑', icon: Pencil, onClick: () => { setWorkbenchFocus({ scopeKey, tagId: null }); requestAnimationFrame(() => setWorkbenchFocus({ scopeKey, tagId: tag.id })); } },
       { key: 'translate-tag', label: 'AI 翻译与分类', icon: Sparkles, onClick: () => translateWorkbenchTags([{ scopeKey, tag }]) },
+      {
+        key: 'move-tag',
+        label: '移动到',
+        desc: moveContext.description || undefined,
+        icon: MoveRight,
+        disabled: moveContext.disabled,
+        type: 'submenu',
+        openOnHover: true,
+        children: moveContext.options.map((option) => ({
+          key: `move-tag-${option.key}`,
+          label: option.label,
+          disabled: option.disabled,
+          onClick: () => moveTagTo(option.key),
+        })),
+      },
       {
         key: 'set-category',
         label: '设置分类',
