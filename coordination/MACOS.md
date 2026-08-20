@@ -7,9 +7,9 @@ Only current actionable macOS requests are kept here. Earlier completed, superse
 - Status: Pending
 - Date/source: 2026-08-20, Windows
 - Related commit: `3665fbd`
-- Action: On an unlocked macOS session, check out current `main` and follow `doc/manual-verification-20260820-theme-transition.md`, substituting macOS system appearance and Reduce Motion settings for their Windows equivalents. Verify dark, light, and follow-system changes on Workbench, Gallery, and Settings, including rapid interruption, restart restoration, floating layers, a populated image grid, and a large Workbench preview.
+- Action: On an unlocked macOS session, check out current `main` and follow `doc/archive/manual-verification-20260820-theme-transition.md`, substituting macOS system appearance and Reduce Motion settings for their Windows equivalents. Verify dark, light, and follow-system changes on Workbench, Gallery, and Settings, including rapid interruption, restart restoration, floating layers, a populated image grid, and a large Workbench preview.
 - Expected: Lobe UI remains the only component/theme system. A real resolved-theme change reveals one coherent new root snapshot from bottom to top in about 320 ms without moving layout or flashing individual components. The transition is interruptible, skips unchanged resolved themes, degrades to an immediate update for motion-off/reduced settings or unsupported APIs, and does not run during initial persisted-theme restoration or later system-driven follow-mode changes.
-- Observed: Windows clean `npm ci`, all 232 tests in 41 files, the production build, and the Lobe UI 5.20.3 audit passed. Windows and macOS interactive verification remain pending.
+- Observed: Windows clean `npm ci`, all 232 tests in 41 files, the production build, and the Lobe UI 5.20.3 audit passed. On 2026-08-20, the user completed the Windows interactive checklist and confirmed the transition passed without reported issues. macOS interactive verification remains pending.
 
 ## Verify Gallery and Prompt Tag marquee selection
 
