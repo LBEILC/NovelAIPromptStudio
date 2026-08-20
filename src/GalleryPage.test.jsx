@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BatchToolbar, GalleryCardHoverPreview, GalleryCardView, GalleryFilterControl, GalleryGroupingControl } from './GalleryPage.jsx';
+import { BatchToolbar, GalleryCardHoverPreview, GalleryCardView, GalleryFilterControl, GalleryGroupingControl, nextGalleryRenderCount } from './GalleryPage.jsx';
 
 vi.mock('@lobehub/ui', () => {
   const Component = () => null;
@@ -154,6 +154,15 @@ describe('GalleryFilterControl', () => {
       [{ dateFrom: '2026-08-03' }],
       [expect.objectContaining({ query: 'bagpipe', includeTags: [], models: [], datePreset: 'all' })],
     ]);
+  });
+});
+
+describe('progressive gallery rendering', () => {
+  it('caps the initial render and adds bounded idle batches', () => {
+    expect(nextGalleryRenderCount(12)).toBe(12);
+    expect(nextGalleryRenderCount(200)).toBe(30);
+    expect(nextGalleryRenderCount(200, 30)).toBe(54);
+    expect(nextGalleryRenderCount(53, 30)).toBe(53);
   });
 });
 

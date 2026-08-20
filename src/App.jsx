@@ -41,7 +41,6 @@ import {
 } from './lib/gallery.js';
 import {
   DEFAULT_GALLERY_FILTERS,
-  galleryFilterOptions as buildGalleryFilterOptions,
   hasActiveGalleryFilters,
   normalizeGalleryFilters,
 } from './lib/galleryFilters.js';
@@ -625,7 +624,6 @@ export default function App({ appearance, setAppearance }) {
   const editingSmartCollection = galleryCollectionsWithCounts.find(
     (collection) => collection.id === editingSmartCollectionId && collection.kind === 'smart',
   ) || null;
-  const galleryFilterOptions = useMemo(() => buildGalleryFilterOptions(collectionScopedProjects), [collectionScopedProjects]);
   const exactVisibleGroups = useMemo(
     () => deferredGalleryComputation.grouping.promptScope === 'similar'
       ? null
@@ -701,7 +699,7 @@ export default function App({ appearance, setAppearance }) {
   const galleryUpdating = libraryLoading
     || deferredGalleryComputation !== galleryComputation
     || (deferredGalleryComputation.grouping.promptScope === 'similar' && similarGroupingState.loading);
-  const galleryContentKey = `${deferredGalleryComputation.view}:${deferredGalleryComputation.activeCollection?.id || 'all'}:${deferredGalleryComputation.grouping.promptScope}:${deferredGalleryComputation.grouping.mergeVibes ? 1 : 0}:${deferredGalleryComputation.grouping.similarityThreshold}:${deferredGalleryComputation.sort}:${similarGroupingState.requestId}:${visibleGroups.length}:${visibleGroups[0]?.id || ''}:${visibleGroups.at(-1)?.id || ''}`;
+  const galleryContentKey = `${deferredGalleryComputation.view}:${deferredGalleryComputation.activeCollection?.id || 'all'}:${deferredGalleryComputation.grouping.promptScope}:${deferredGalleryComputation.grouping.mergeVibes ? 1 : 0}:${deferredGalleryComputation.grouping.similarityThreshold}:${deferredGalleryComputation.sort}:${JSON.stringify(deferredGalleryComputation.filters)}:${similarGroupingState.requestId}:${visibleGroups.length}:${visibleGroups[0]?.id || ''}:${visibleGroups.at(-1)?.id || ''}`;
   const previewGroup = visibleGroups.find((group) => group.id === previewGroupId)
     || visibleGroups.find((group) => group.members.some((project) => project.id === previewProjectId))
     || null;
@@ -1193,7 +1191,9 @@ export default function App({ appearance, setAppearance }) {
         collections={galleryCollectionsWithCounts}
         contentKey={galleryContentKey}
         editingSmartCollection={editingSmartCollection}
-        filterOptions={galleryFilterOptions}
+        filterCacheSource={deferredGalleryComputation.projects}
+        filterProjects={collectionScopedProjects}
+        filterScopeKey={`${deferredGalleryComputation.view}:${deferredGalleryComputation.activeCollection?.id || 'all'}:${deferredGalleryComputation.activeCollection?.updated_at || ''}`}
         filters={galleryFilters}
         grouping={galleryGrouping}
         groups={visibleGroups}

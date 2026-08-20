@@ -77,6 +77,11 @@ describe('gallery filters', () => {
     expect(filterGalleryProjects(items, { includeTags: ['bagpipe', 'uniform'], excludeTags: ['male'], tagMatch: 'any' }).map((item) => item.id)).toEqual(['both', 'one']);
   });
 
+  it('returns the original project list when no filters are active', () => {
+    const items = [project('one'), project('two')];
+    expect(filterGalleryProjects(items, DEFAULT_GALLERY_FILTERS)).toBe(items);
+  });
+
   it('uses local inclusive calendar days for relative and custom import ranges', () => {
     const now = new Date(2026, 7, 20, 18, 0, 0);
     const recent = galleryDateBounds({ datePreset: '7d' }, now);

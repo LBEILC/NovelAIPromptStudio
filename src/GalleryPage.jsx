@@ -2,7 +2,7 @@ import { Accordion, AccordionItem, ActionIcon, DatePicker as LobeDatePicker, Dra
 import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, Slider, SplitButton, Switch as LobeSwitch } from '@lobehub/ui/base-ui';
 import dayjs from 'dayjs';
 import { motion, useAnimationControls } from 'motion/react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, startTransition, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
@@ -12,6 +12,7 @@ import {
   DEFAULT_GALLERY_FILTERS,
   GALLERY_DATE_PRESETS,
   galleryActiveFilterCount,
+  galleryFilterOptions as buildGalleryFilterOptions,
   hasActiveGalleryFilters,
   normalizeGalleryFilters,
 } from './lib/galleryFilters.js';
@@ -192,13 +193,39 @@ function galleryDatePopupContainer(trigger) {
   return trigger.closest('.gallery-filter-popover') || document.body;
 }
 
-export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, options = {}, onChange }) {
+const EMPTY_GALLERY_FILTER_OPTIONS = Object.freeze({ models: [], tags: [], vibes: [] });
+const EMPTY_GALLERY_PROJECTS = Object.freeze([]);
+const GALLERY_FILTER_OPTIONS_CACHE = new WeakMap();
+
+function cachedGalleryFilterOptions(cacheSource, scopeKey) {
+  return GALLERY_FILTER_OPTIONS_CACHE.get(cacheSource)?.get(scopeKey);
+}
+
+function storeGalleryFilterOptions(cacheSource, scopeKey, options) {
+  let cache = GALLERY_FILTER_OPTIONS_CACHE.get(cacheSource);
+  if (!cache) {
+    cache = new Map();
+    GALLERY_FILTER_OPTIONS_CACHE.set(cacheSource, cache);
+  }
+  cache.set(scopeKey, options);
+}
+
+function scheduleGalleryIdleWork(callback) {
+  if (typeof window.requestIdleCallback === 'function') {
+    const id = window.requestIdleCallback(callback, { timeout: 120 });
+    return () => window.cancelIdleCallback?.(id);
+  }
+  const id = window.setTimeout(callback, 0);
+  return () => window.clearTimeout(id);
+}
+
+export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, loading = false, onChange, onOpenChange, open, options = EMPTY_GALLERY_FILTER_OPTIONS }) {
   const value = normalizeGalleryFilters(filters);
   const activeCount = galleryActiveFilterCount(value);
   const tagOptions = options.tags || [];
   const content = <div className="gallery-filter-panel">
     <header className="gallery-filter-header">
-      <div><strong>筛选图片</strong><small>不同筛选项之间同时满足</small></div>
+      <div><strong>筛选图片</strong><small>{loading ? '正在准备筛选选项' : '不同筛选项之间同时满足'}</small></div>
       <LobeButton disabled={!activeCount} onClick={() => onChange({ ...DEFAULT_GALLERY_FILTERS, query: value.query })} size="small" type="text">清除</LobeButton>
     </header>
     <section className="gallery-filter-section">
@@ -215,6 +242,7 @@ export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, option
       <GalleryFilterSelect
         aria-label="必须包含的 Tag"
         items={tagOptions}
+        loading={loading}
         mode="multiple"
         onChange={(includeTags) => onChange({ includeTags: Array.isArray(includeTags) ? includeTags : [] })}
         placeholder="选择 Tag"
@@ -226,6 +254,7 @@ export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, option
       <GalleryFilterSelect
         aria-label="要排除的 Tag"
         items={tagOptions}
+        loading={loading}
         mode="multiple"
         onChange={(excludeTags) => onChange({ excludeTags: Array.isArray(excludeTags) ? excludeTags : [] })}
         placeholder="选择不想出现的 Tag"
@@ -238,6 +267,7 @@ export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, option
         <GalleryFilterSelect
           aria-label="生成模型"
           items={options.models || []}
+          loading={loading}
           mode="multiple"
           onChange={(models) => onChange({ models: Array.isArray(models) ? models : [] })}
           placeholder="不限模型"
@@ -249,6 +279,7 @@ export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, option
         <GalleryFilterSelect
           aria-label="Vibe"
           items={options.vibes || []}
+          loading={loading}
           mode="multiple"
           onChange={(vibes) => onChange({ vibes: Array.isArray(vibes) ? vibes : [] })}
           placeholder="不限 Vibe"
@@ -294,6 +325,8 @@ export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, option
     arrow
     className="gallery-filter-popover"
     content={content}
+    onOpenChange={onOpenChange}
+    open={open}
     placement="bottom"
     standalone
     trigger="click"
@@ -308,6 +341,49 @@ export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, option
       筛选{activeCount ? ` · ${activeCount}` : ''}
     </LobeButton>
   </Popover>;
+}
+
+function GalleryFilterOptionsControl({ cacheSource = EMPTY_GALLERY_PROJECTS, filters, onChange, projects = EMPTY_GALLERY_PROJECTS, scopeKey }) {
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState({ loading: false, options: EMPTY_GALLERY_FILTER_OPTIONS, scopeKey: '', source: null });
+  const current = state.source === cacheSource && state.scopeKey === scopeKey
+    ? state
+    : { loading: open, options: EMPTY_GALLERY_FILTER_OPTIONS };
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const cached = cachedGalleryFilterOptions(cacheSource, scopeKey);
+    if (cached) {
+      setState({ loading: false, options: cached, scopeKey, source: cacheSource });
+      return undefined;
+    }
+
+    let active = true;
+    setState({ loading: true, options: EMPTY_GALLERY_FILTER_OPTIONS, scopeKey, source: cacheSource });
+    let cancelIdle = () => {};
+    const frame = window.requestAnimationFrame(() => {
+      cancelIdle = scheduleGalleryIdleWork(() => {
+        const options = buildGalleryFilterOptions(projects);
+        storeGalleryFilterOptions(cacheSource, scopeKey, options);
+        if (!active) return;
+        startTransition(() => setState({ loading: false, options, scopeKey, source: cacheSource }));
+      });
+    });
+    return () => {
+      active = false;
+      window.cancelAnimationFrame(frame);
+      cancelIdle();
+    };
+  }, [cacheSource, open, projects, scopeKey]);
+
+  return <GalleryFilterControl
+    filters={filters}
+    loading={current.loading}
+    onChange={onChange}
+    onOpenChange={setOpen}
+    open={open}
+    options={current.options}
+  />;
 }
 
 function CollectionMembershipControl({ className, collections = [], projectIds = [], onChange, size, label = '加入收藏集' }) {
@@ -534,6 +610,15 @@ function GalleryLoadingGrid({ cardSize, density }) {
   >{Array.from({ length: 12 }, (_, index) => <span className="gallery-loading-card" key={index}/>)}</div>;
 }
 
+export const GALLERY_INITIAL_RENDER_COUNT = 30;
+export const GALLERY_RENDER_BATCH_SIZE = 24;
+
+export function nextGalleryRenderCount(total, current = 0) {
+  const safeTotal = Math.max(0, Number(total) || 0);
+  if (current <= 0) return Math.min(safeTotal, GALLERY_INITIAL_RENDER_COUNT);
+  return Math.min(safeTotal, current + GALLERY_RENDER_BATCH_SIZE);
+}
+
 export function GalleryCardView({ active, group, hoverProject = group.cover, selected, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
   const project = group.cover;
   const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
@@ -625,14 +710,59 @@ export function GalleryCard(props) {
   />;
 }
 
+const GalleryGridCard = memo(function GalleryGridCard({ actionsRef, active, canOpenWorkbench, group, selected }) {
+  return <GalleryCard
+    active={active}
+    group={group}
+    onContextMenu={(event) => actionsRef.current.onProjectContextMenu(event, group, () => actionsRef.current.requestRename(group))}
+    onOpenWorkbench={canOpenWorkbench ? (project) => actionsRef.current.onOpenWorkbench(project) : undefined}
+    onPreview={(project) => {
+      actionsRef.current.updatePreviewExpanded(true);
+      actionsRef.current.onPreview(group, project);
+    }}
+    onSelect={(event) => actionsRef.current.onToggleSelect(group, event)}
+    selected={selected}
+  />;
+});
+
+const ProgressiveGalleryGrid = memo(function ProgressiveGalleryGrid({ actionsRef, canOpenWorkbench, groups, onRenderingChange, previewGroupId, selectedGroupIds }) {
+  const [renderCount, setRenderCount] = useState(() => nextGalleryRenderCount(groups.length));
+  const hasMore = renderCount < groups.length;
+  const selectedIds = new Set(selectedGroupIds);
+
+  useEffect(() => {
+    onRenderingChange(hasMore);
+  }, [hasMore, onRenderingChange]);
+
+  useEffect(() => () => onRenderingChange(false), [onRenderingChange]);
+
+  useEffect(() => {
+    if (!hasMore) return undefined;
+    return scheduleGalleryIdleWork(() => {
+      startTransition(() => setRenderCount((current) => nextGalleryRenderCount(groups.length, current)));
+    });
+  }, [groups.length, hasMore, renderCount]);
+
+  return groups.slice(0, renderCount).map((group) => <GalleryGridCard
+    actionsRef={actionsRef}
+    active={previewGroupId === group.id}
+    canOpenWorkbench={canOpenWorkbench}
+    group={group}
+    key={group.id}
+    selected={selectedIds.has(group.id)}
+  />);
+});
+
 export default function GalleryPage({
   activeCollection,
   collections = [],
   contentKey = '',
   editingSmartCollection,
-  groups,
+  groups = [],
   filters,
-  filterOptions,
+  filterCacheSource,
+  filterProjects,
+  filterScopeKey = 'all',
   query,
   sort,
   view,
@@ -640,7 +770,7 @@ export default function GalleryPage({
   preview,
   importing,
   loading = false,
-  selectedGroupIds,
+  selectedGroupIds = [],
   selectedImageCount,
   grouping = DEFAULT_GALLERY_GROUPING,
   onClearSelection,
@@ -707,6 +837,7 @@ export default function GalleryPage({
     360,
   ));
   const [galleryCardSize, setGalleryCardSize] = useState(() => readGalleryCardSize(panelStorage()));
+  const [progressiveRendering, setProgressiveRendering] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const renameTargetRef = useRef('');
@@ -763,6 +894,15 @@ export default function GalleryPage({
     renameTargetRef.current = project.id;
     onPreview(group);
   };
+  const gridActionsRef = useRef({});
+  gridActionsRef.current = {
+    onOpenWorkbench,
+    onPreview,
+    onProjectContextMenu,
+    onToggleSelect,
+    requestRename,
+    updatePreviewExpanded,
+  };
 
   return <main className="gallery-page">
     <header className="workspace-page-header">
@@ -787,7 +927,13 @@ export default function GalleryPage({
         title={view === 'trash' ? '回收站不使用收藏集' : undefined}
       >{activeCollection ? activeCollection.name : '收藏集'}</LobeButton>
       <LobeSearchBar className="gallery-search" onInputChange={onQueryChange} placeholder="搜索文件名、Tag 或译名" value={query}/>
-      <GalleryFilterControl filters={filters} onChange={onFiltersChange} options={filterOptions}/>
+      <GalleryFilterOptionsControl
+        cacheSource={filterCacheSource || filterProjects}
+        filters={filters}
+        onChange={onFiltersChange}
+        projects={filterProjects}
+        scopeKey={filterScopeKey}
+      />
       <div className="gallery-sort">
         <LobeSelect aria-label="图片排序" onChange={onSortChange} options={[
           { label: '最近导入', value: 'recent' },
@@ -836,7 +982,7 @@ export default function GalleryPage({
       view={view}
     />
     <div className="gallery-workspace">
-      <DelayedGalleryStatus active={updating} loading={loading}/>
+      <DelayedGalleryStatus active={updating || progressiveRendering} loading={loading}/>
       <LobeDraggablePanel
         className="gallery-collections-shell"
         classNames={{ content: 'workspace-side-panel-content' }}
@@ -870,7 +1016,7 @@ export default function GalleryPage({
         </LobeDraggablePanel.Body>
       </LobeDraggablePanel>
       <section
-        aria-busy={updating}
+        aria-busy={updating || progressiveRendering}
         className="gallery-grid-scroll"
         onClick={(event) => {
           if (!shouldCollapseGalleryPreview(event.target, previewPinned)) return;
@@ -887,16 +1033,15 @@ export default function GalleryPage({
           contentKey={contentKey}
           style={{ '--gallery-card-min-width': `${galleryCardSize}px` }}
         >
-          {groups.map((group) => <GalleryCard
-            active={previewGroup?.id === group.id}
-            group={group}
-            key={group.id}
-            onContextMenu={(event) => onProjectContextMenu(event, group, () => requestRename(group))}
-            onOpenWorkbench={view === 'trash' ? undefined : onOpenWorkbench}
-            onPreview={(project) => { updatePreviewExpanded(true); onPreview(group, project); }}
-            onSelect={(event) => onToggleSelect(group, event)}
-            selected={selectedGroupIds.includes(group.id)}
-          />)}
+          <ProgressiveGalleryGrid
+            actionsRef={gridActionsRef}
+            canOpenWorkbench={view !== 'trash'}
+            groups={groups}
+            key={contentKey}
+            onRenderingChange={setProgressiveRendering}
+            previewGroupId={previewGroup?.id || ''}
+            selectedGroupIds={selectedGroupIds}
+          />
         </GalleryResultsSurface></PopoverGroup> : loading ? <GalleryLoadingGrid cardSize={galleryCardSize} density={galleryDensity}/> : <LobeEmpty
           className="gallery-empty"
           description={emptyState.description}
