@@ -1161,19 +1161,6 @@ export default function GalleryPage({
         <LobeButton onClick={onCollectionRulesCancel} size="small" type="text">取消</LobeButton>
       </div>
     </div>}
-    <BatchToolbar
-      onClear={onClearSelection}
-      onPermanentDelete={onPermanentDelete}
-      onRestore={onRestore}
-      onTrash={onTrash}
-      activeCollection={activeCollection}
-      collections={collections}
-      onCollectionProjectsChange={onCollectionProjectsChange}
-      selectedProjectIds={selectedGroupIds.length ? groups.filter((group) => selectedGroupIds.includes(group.id)).flatMap((group) => group.members.map((project) => project.id)) : []}
-      selectedGroups={selectedGroupIds.length}
-      selectedImages={selectedImageCount}
-      view={view}
-    />
     <div className="gallery-workspace">
       <DelayedGalleryStatus active={!showLoadingPage && progressiveRendering} loading={false}/>
       <LobeDraggablePanel
@@ -1208,59 +1195,82 @@ export default function GalleryPage({
           />
         </LobeDraggablePanel.Body>
       </LobeDraggablePanel>
-      <motion.section
-        aria-busy={showLoadingPage || progressiveRendering}
-        className="gallery-grid-scroll"
-        {...marqueeSelection.handlers}
-        layoutScroll
-        onClick={(event) => {
-          if (!shouldCollapseGalleryPreview(event.target, previewPinned)) return;
-          updatePreviewExpanded(false);
-          updateCollectionsExpanded(false);
+      <div
+        className="gallery-grid-shell"
+        style={{
+          '--gallery-collection-overlay-width': view !== 'trash' && collectionsExpanded ? `${collectionsPanelWidth}px` : '0px',
+          '--gallery-preview-overlay-width': preview && previewExpanded && !previewPinned ? `${previewPanelWidth}px` : '0px',
         }}
-        onContextMenu={(event) => {
-          if (event.target.closest('.gallery-card')) return;
-          onWorkspaceContextMenu(event);
-        }}
-        ref={galleryScrollRef}
       >
-        <PopoverGroup closeDelay={120} openDelay={450} placement="rightTop" trigger="hover">
-          <AnimatePresence initial={false} mode="wait">
-            {showLoadingPage ? <GalleryLoadingState reduceMotion={reduceMotion}/> : groups.length ? <GalleryResultsSurface
-              className={`gallery-grid density-${galleryDensity}`}
-              key={`results:${contentKey}`}
-              style={{ '--gallery-card-min-width': `${galleryCardSize}px` }}
-            >
-              <ProgressiveGalleryGrid
-                actionsRef={gridActionsRef}
-                canOpenWorkbench={view !== 'trash'}
-                groups={groups}
-                key={contentKey}
-                layoutSize={galleryCardSize}
-                onRenderingChange={setProgressiveRendering}
-                previewGroupId={previewGroup?.id || ''}
-                reduceMotion={reduceMotion}
-                selectedGroupIds={selectedGroupIds}
-              />
-            </GalleryResultsSurface> : <motion.div
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              initial={{ opacity: reduceMotion ? 1 : 0 }}
-              key={`empty:${contentKey}`}
-              className="gallery-transition-empty"
-            ><LobeEmpty
-              className="gallery-empty"
-              description={emptyState.description}
-              gap={6}
-              icon={getIconComponent(emptyState.icon)}
-              imageSize={38}
-              justify="center"
-              title={emptyState.title}
-            /></motion.div>}
-          </AnimatePresence>
-        </PopoverGroup>
-      </motion.section>
-      <MarqueeSelectionOverlay rect={marqueeSelection.rect}/>
+        <motion.section
+          aria-busy={showLoadingPage || progressiveRendering}
+          className={`gallery-grid-scroll ${selectedGroupIds.length ? 'has-selection' : ''}`}
+          {...marqueeSelection.handlers}
+          layoutScroll
+          onClick={(event) => {
+            if (!shouldCollapseGalleryPreview(event.target, previewPinned)) return;
+            updatePreviewExpanded(false);
+            updateCollectionsExpanded(false);
+          }}
+          onContextMenu={(event) => {
+            if (event.target.closest('.gallery-card')) return;
+            onWorkspaceContextMenu(event);
+          }}
+          ref={galleryScrollRef}
+        >
+          <PopoverGroup closeDelay={120} openDelay={450} placement="rightTop" trigger="hover">
+            <AnimatePresence initial={false} mode="wait">
+              {showLoadingPage ? <GalleryLoadingState reduceMotion={reduceMotion}/> : groups.length ? <GalleryResultsSurface
+                className={`gallery-grid density-${galleryDensity}`}
+                key={`results:${contentKey}`}
+                style={{ '--gallery-card-min-width': `${galleryCardSize}px` }}
+              >
+                <ProgressiveGalleryGrid
+                  actionsRef={gridActionsRef}
+                  canOpenWorkbench={view !== 'trash'}
+                  groups={groups}
+                  key={contentKey}
+                  layoutSize={galleryCardSize}
+                  onRenderingChange={setProgressiveRendering}
+                  previewGroupId={previewGroup?.id || ''}
+                  reduceMotion={reduceMotion}
+                  selectedGroupIds={selectedGroupIds}
+                />
+              </GalleryResultsSurface> : <motion.div
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                initial={{ opacity: reduceMotion ? 1 : 0 }}
+                key={`empty:${contentKey}`}
+                className="gallery-transition-empty"
+              ><LobeEmpty
+                className="gallery-empty"
+                description={emptyState.description}
+                gap={6}
+                icon={getIconComponent(emptyState.icon)}
+                imageSize={38}
+                justify="center"
+                title={emptyState.title}
+              /></motion.div>}
+            </AnimatePresence>
+          </PopoverGroup>
+        </motion.section>
+        {selectedGroupIds.length > 0 && <div className="gallery-selection-dock">
+          <BatchToolbar
+            onClear={onClearSelection}
+            onPermanentDelete={onPermanentDelete}
+            onRestore={onRestore}
+            onTrash={onTrash}
+            activeCollection={activeCollection}
+            collections={collections}
+            onCollectionProjectsChange={onCollectionProjectsChange}
+            selectedProjectIds={groups.filter((group) => selectedGroupIds.includes(group.id)).flatMap((group) => group.members.map((project) => project.id))}
+            selectedGroups={selectedGroupIds.length}
+            selectedImages={selectedImageCount}
+            view={view}
+          />
+        </div>}
+        <MarqueeSelectionOverlay rect={marqueeSelection.rect}/>
+      </div>
       <LobeDraggablePanel
         className={`gallery-preview-shell ${previewPinned ? 'is-fixed' : 'is-floating'}`}
         classNames={{ content: 'workspace-side-panel-content' }}

@@ -233,8 +233,9 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .gallery-grouping-vibe-row > div { min-width: 0; display: grid; gap: 2px; }
 .gallery-grouping-vibe-row strong { font-size: var(--text-secondary); font-weight: 550; }
 .gallery-count { flex: 0 0 auto; margin-inline-start: auto; color: var(--muted); font: var(--text-micro) var(--font-mono); white-space: nowrap; }
-.gallery-selection-bar { min-height: 44px; flex: 0 0 auto; padding: 7px clamp(20px, 3vw, 44px); display: flex; align-items: center; gap: 8px; background: color-mix(in srgb, var(--accent) 6%, var(--panel)); border-bottom: 1px solid var(--line-soft); }
-.gallery-selection-bar > span { margin-inline-end: auto; color: var(--muted); font-size: var(--text-secondary); }
+.gallery-selection-dock { position: absolute; z-index: 9; inset: auto calc(var(--gallery-preview-overlay-width, 0px) + 16px) 16px calc(var(--gallery-collection-overlay-width, 0px) + 16px); display: flex; justify-content: center; pointer-events: none; }
+.gallery-selection-bar { width: max-content; max-width: 100%; min-height: 44px; padding: 7px 8px 7px 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; background: color-mix(in srgb, var(--accent) 6%, var(--panel)); border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line)); border-radius: 10px; box-shadow: 0 10px 28px rgb(0 0 0 / 22%); pointer-events: auto; }
+.gallery-selection-bar > span { margin-inline-end: 8px; color: var(--muted); font-size: var(--text-secondary); white-space: nowrap; }
 .gallery-rule-edit-bar { min-height: 50px; flex: 0 0 auto; padding: 7px clamp(20px, 3vw, 44px); display: flex; align-items: center; justify-content: space-between; gap: 16px; background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border-bottom: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line-soft)); }
 .gallery-rule-edit-bar > span { min-width: 0; display: flex; align-items: center; gap: 9px; color: var(--accent); }
 .gallery-rule-edit-bar > span > span { min-width: 0; display: grid; gap: 1px; }
@@ -242,6 +243,7 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .gallery-rule-edit-bar small { color: var(--muted); font-size: var(--text-micro); }
 .gallery-rule-edit-bar > div { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
 .gallery-workspace { position: relative; min-width: 0; min-height: 0; flex: 1; display: flex; }
+.gallery-grid-shell { position: relative; min-width: 0; min-height: 0; flex: 1; display: flex; }
 .gallery-update-status { position: absolute; z-index: 12; inset: 12px 18px auto auto; display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; color: var(--muted); background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line-soft); border-radius: 999px; box-shadow: 0 6px 18px rgb(0 0 0 / 14%); font-size: var(--text-micro); pointer-events: none; }
 .gallery-update-status svg { animation: gallery-status-spin .8s linear infinite; }
 @keyframes gallery-status-spin { to { transform: rotate(360deg); } }
@@ -291,6 +293,7 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .gallery-collection-picker-list > button > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gallery-collection-picker-list small { color: var(--muted); font: var(--text-micro) var(--font-mono); }
 .gallery-grid-scroll { min-width: 0; min-height: 0; flex: 1; overflow: auto; padding: clamp(16px, 2vw, 28px); }
+.gallery-grid-scroll.has-selection { padding-bottom: max(88px, clamp(16px, 2vw, 28px)); scroll-padding-bottom: 96px; }
 .gallery-grid-scroll, .overview-content.is-marquee-enabled { user-select: none; }
 .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--gallery-card-min-width, 190px)), 1fr)); gap: 12px; }
 .gallery-transition-loading { min-height: 100%; display: grid; place-content: center; justify-items: center; gap: 9px; color: var(--muted); font-size: var(--text-secondary); }
@@ -618,7 +621,7 @@ html.is-marquee-selecting, html.is-marquee-selecting * { cursor: crosshair !impo
   .gallery-size-control { min-width: 152px; }
   .gallery-count { margin-inline-start: 0; }
   .gallery-filter-fields, .gallery-filter-date-range { grid-template-columns: 1fr; }
-  .gallery-selection-bar { flex-wrap: wrap; }
+  .gallery-grid-scroll.has-selection { padding-bottom: 128px; scroll-padding-bottom: 136px; }
   .gallery-selection-bar > span { flex: 1 0 100%; }
   .gallery-rule-edit-bar { align-items: flex-start; flex-wrap: wrap; }
   .gallery-rule-edit-bar > span { flex: 1 0 100%; }
