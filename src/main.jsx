@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import App from './App.jsx';
@@ -43,7 +43,7 @@ function StudioRoot() {
     window.studio?.getAppearanceSettings?.().then(setAppearance).catch(() => {});
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
     const applyTheme = () => {
       const resolvedTheme = appearance.themeMode === 'auto'

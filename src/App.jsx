@@ -1,4 +1,5 @@
 import { Activity, startTransition, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { dropTargetForExternal, monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
 import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
@@ -54,6 +55,7 @@ import {
 import { readGalleryGrouping, writeGalleryGrouping } from './lib/galleryGrouping.js';
 import { scheduleGalleryComputation } from './lib/galleryTransition.js';
 import { MOTION_EASE_OUT, useStudioReducedMotion } from './lib/motion.js';
+import { commitThemeAppearance } from './lib/themeTransition.js';
 import { moveOverviewTags, overviewMoveContext, overviewSelectionMenuItems, overviewTagKey } from './lib/promptOverview.js';
 
 const unavailable = (error) => async () => ({ ok: false, error });
@@ -1199,6 +1201,14 @@ export default function App({ appearance, setAppearance }) {
 
   const changeAppearance = async (patch) => {
     const saved = await studio.saveAppearanceSettings({ ...appearance, ...patch });
+    if (Object.hasOwn(patch, 'themeMode')) {
+      commitThemeAppearance({
+        currentAppearance: appearance,
+        nextAppearance: saved,
+        update: () => flushSync(() => setAppearance(saved)),
+      });
+      return;
+    }
     setAppearance(saved);
   };
 
