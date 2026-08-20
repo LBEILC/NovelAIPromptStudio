@@ -60,10 +60,10 @@ Only current actionable macOS requests are kept here. Earlier completed, superse
 
 - Status: Pending
 - Date/source: 2026-08-20, Windows
-- Related commit: `55fe1e4`
+- Related commits: `55fe1e4`, `cd13c80`
 - Action: On an unlocked macOS session, follow `doc/manual-verification-20260820-gallery-filter-before-grouping.md`. Pay particular attention to searching a member-only Tag inside a similar-Prompt group, keyboard and trackpad interaction with multi-select Tag/model/Vibe controls, local calendar boundaries in the relative and custom import-date filters, popover collision and scrolling at minimum window size, and operation scope after filter changes.
-- Expected: Search and every advanced condition filter individual images before automatic grouping, so no non-matching member remains accessible through card scrubbing, detail navigation, selection, context menus, or batch actions. Different filter dimensions combine with AND; multi-selected model/Vibe values and “任意 Tag” combine with OR inside their own field; excluded Tags always win. Changing conditions clears batch selection, filtered-out previews reconcile safely, and light/dark plus keyboard states remain coherent on macOS.
-- Observed: Windows clean `npm ci`, all 190 tests in 35 files, the production build, and the Lobe UI audit passed for `55fe1e4`. Windows and macOS interactive verification remain pending.
+- Expected: Search and every advanced condition filter individual images before automatic grouping, so no non-matching member remains accessible through card scrubbing, detail navigation, selection, context menus, or batch actions. Different filter dimensions combine with AND; multi-selected model/Vibe values and “任意 Tag” combine with OR inside their own field; excluded Tags always win. Tag selection searches inside the opened multi-select like the model control, custom dates use the themed Lobe UI DatePicker without dismissing the parent filter popover, changing conditions clears batch selection, and light/dark plus keyboard states remain coherent on macOS.
+- Observed: Windows clean `npm ci`, all 190 tests in 35 files, the production build, and the Lobe UI audit passed through `cd13c80`. The user confirmed the original filter behavior was broadly correct before requesting the Tag-control and DatePicker consistency fixes; those fixes still need Windows and macOS interactive verification.
 
 ## Verify manual update mode for unsigned macOS builds
 
