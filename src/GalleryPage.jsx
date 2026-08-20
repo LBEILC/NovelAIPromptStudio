@@ -536,6 +536,7 @@ function GalleryLoadingGrid({ cardSize, density }) {
 
 export function GalleryCardView({ active, group, hoverProject = group.cover, selected, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
   const project = group.cover;
+  const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
   return <Popover content={<GalleryCardHoverPreview group={group} project={hoverProject}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
     <button
       aria-label={group.count > 1 ? `预览图片组：${project.name}，共 ${group.count} 张` : `预览图片：${project.name}`}
@@ -552,7 +553,15 @@ export function GalleryCardView({ active, group, hoverProject = group.cover, sel
       type="button"
     >
       <span className="gallery-card-image">
-        {group.count > 1 && <><span aria-hidden="true" className="gallery-card-stack gallery-card-stack-1"/><span aria-hidden="true" className="gallery-card-stack gallery-card-stack-2"/></>}
+        {stackMembers.map((member, index) => <img
+          alt=""
+          aria-hidden="true"
+          className={`gallery-card-stack gallery-card-stack-${index + 1}`}
+          decoding="async"
+          key={member.id}
+          loading="lazy"
+          src={mediaUrl(member.thumbnail_path || member.image_path)}
+        />)}
         <GalleryThumbnail key={mediaUrl(project.thumbnail_path || project.image_path)} src={mediaUrl(project.thumbnail_path || project.image_path)}/>
         {group.count > 1 && <span className="gallery-group-count"><b>{group.count}</b><span> 张</span></span>}
         <span aria-hidden="true" className="gallery-card-hover-name">{hoverProject.name}</span>

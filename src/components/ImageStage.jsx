@@ -1,9 +1,8 @@
 import { Image as LobeImage } from '@lobehub/ui';
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { mediaUrl, shouldResetImageStageLoading } from '../lib/imageStage.js';
 
-export function mediaUrl(filePath) {
-  return filePath ? `novelai-media://file?path=${encodeURIComponent(filePath)}` : '';
-}
+export { mediaUrl } from '../lib/imageStage.js';
 
 export default function ImageStage({
   alt,
@@ -15,9 +14,16 @@ export default function ImageStage({
   children,
 }) {
   const [loaded, setLoaded] = useState(false);
-  useLayoutEffect(() => setLoaded(false), [filePath]);
+  const stageRef = useRef(null);
+  const previousFilePathRef = useRef(filePath);
+  useLayoutEffect(() => {
+    if (shouldResetImageStageLoading(previousFilePathRef.current, filePath)) setLoaded(false);
+    previousFilePathRef.current = filePath;
+    const image = stageRef.current?.querySelector('.image-stage-media');
+    if (image?.complete && image.naturalWidth > 0) setLoaded(true);
+  }, [filePath]);
 
-  return <div aria-busy={Boolean(filePath) && !loaded} className={`image-stage ${className}`}>
+  return <div aria-busy={Boolean(filePath) && !loaded} className={`image-stage ${className}`} ref={stageRef}>
     {filePath && !loaded && <span aria-hidden="true" className="image-stage-loading"/>}
     {filePath ? <LobeImage
       alt={alt || ''}

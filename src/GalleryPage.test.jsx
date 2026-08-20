@@ -241,7 +241,7 @@ describe('GalleryCardHoverPreview', () => {
       prompt_structure: { base_undesired_tags: [], characters: [] },
       tags: [],
     };
-    const variant = { ...cover, id: 'variant', name: 'variant.png' };
+    const variant = { ...cover, id: 'variant', image_path: 'C:\\gallery\\variant.png', name: 'variant.png' };
     const element = GalleryCardView({
       active: false,
       group: { count: 2, cover, members: [cover, variant] },
@@ -254,10 +254,13 @@ describe('GalleryCardHoverPreview', () => {
     const mainButton = element.props.children.props.children[0];
     const imageChildren = mainButton.props.children.props.children.flat(Infinity).filter(Boolean);
     const hoverName = imageChildren.find((child) => child.props?.className === 'gallery-card-hover-name');
+    const stackImage = imageChildren.find((child) => child.props?.className === 'gallery-card-stack gallery-card-stack-1');
 
     expect(mainButton.props['aria-label']).toContain('cover.png');
     expect(hoverName.props.children).toBe('variant.png');
     expect(hoverName.props['aria-hidden']).toBe('true');
+    expect(stackImage.props).toMatchObject({ decoding: 'async', loading: 'lazy' });
+    expect(stackImage.props.src).toContain('variant.png');
     expect(mainButton.props.children.props.className).toBe('gallery-card-image');
   });
 
