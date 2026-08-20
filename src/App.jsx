@@ -202,6 +202,7 @@ export default function App({ appearance, setAppearance }) {
   const [projects, setProjects] = useState([]);
   const [galleryCollections, setGalleryCollections] = useState([]);
   const [activeCollectionId, setActiveCollectionId] = useState('');
+  const [editingSmartCollectionId, setEditingSmartCollectionId] = useState('');
   const [galleryView, setGalleryView] = useState('all');
   const [loading, setLoading] = useState(true);
   const [galleryFilters, setGalleryFilters] = useState(DEFAULT_GALLERY_FILTERS);
@@ -554,6 +555,9 @@ export default function App({ appearance, setAppearance }) {
       ? galleryCollectionScope(projects, collection).length
       : collection.kind === 'manual' ? Number(collection.active_member_count || 0) : null,
   })), [galleryCollections, galleryView, projects]);
+  const editingSmartCollection = galleryCollectionsWithCounts.find(
+    (collection) => collection.id === editingSmartCollectionId && collection.kind === 'smart',
+  ) || null;
   const galleryFilterOptions = useMemo(() => buildGalleryFilterOptions(collectionScopedProjects), [collectionScopedProjects]);
   const visibleGroups = useMemo(
     () => galleryViewGroups(collectionScopedProjects, galleryFilters, galleryGrouping, sort),
@@ -809,6 +813,7 @@ export default function App({ appearance, setAppearance }) {
 
   const selectGalleryCollection = (collectionId) => {
     const id = writeActiveGalleryCollection(globalThis.localStorage, collectionId);
+    setEditingSmartCollectionId('');
     setActiveCollectionId(id);
     setGalleryView('all');
     setGalleryFilters(DEFAULT_GALLERY_FILTERS);
@@ -849,9 +854,28 @@ export default function App({ appearance, setAppearance }) {
     return true;
   };
 
-  const updateSmartCollectionRules = async (collection) => {
-    if (activeCollectionId || !hasActiveGalleryFilters(galleryFilters)) {
-      showToast(activeCollectionId ? '请先返回全部图片，再设置要替换的新筛选条件' : '请先设置要保存的新搜索或筛选条件', 'warning');
+  const beginSmartCollectionRulesEdit = (collection) => {
+    if (collection?.kind !== 'smart') return;
+    writeActiveGalleryCollection(globalThis.localStorage, '');
+    setActiveCollectionId('');
+    setEditingSmartCollectionId(collection.id);
+    setGalleryView('all');
+    setGalleryFilters(normalizeGalleryFilters(collection.filters));
+    setSelectedGroupIds([]);
+    setPreviewGroupId('');
+    setPreviewProjectId('');
+    lastSelectedGroupRef.current = '';
+  };
+
+  const saveSmartCollectionRules = async () => {
+    const collection = galleryCollections.find((item) => item.id === editingSmartCollectionId && item.kind === 'smart');
+    if (!collection) {
+      showToast('要修改的智能收藏集已不存在', 'error');
+      setEditingSmartCollectionId('');
+      return false;
+    }
+    if (!hasActiveGalleryFilters(galleryFilters)) {
+      showToast('智能收藏集至少需要一个搜索或筛选条件', 'warning');
       return false;
     }
     const result = await studio.updateCollection(collection.id, { filters: normalizeGalleryFilters(galleryFilters) });
@@ -859,10 +883,14 @@ export default function App({ appearance, setAppearance }) {
       showToast(result?.error || '智能收藏集规则没有更新', 'error');
       return false;
     }
-    setGalleryFilters(DEFAULT_GALLERY_FILTERS);
     await reloadCollections();
-    showToast('智能收藏集规则已替换');
+    selectGalleryCollection(collection.id);
+    showToast('智能收藏集规则已更新');
     return true;
+  };
+
+  const cancelSmartCollectionRulesEdit = () => {
+    if (editingSmartCollectionId) selectGalleryCollection(editingSmartCollectionId);
   };
 
   const deleteGalleryCollection = async (collection) => {
@@ -878,7 +906,7 @@ export default function App({ appearance, setAppearance }) {
       showToast(result?.error || '收藏集没有删除', 'error');
       return false;
     }
-    if (activeCollectionId === collection.id) selectGalleryCollection('');
+    if (activeCollectionId === collection.id || editingSmartCollectionId === collection.id) selectGalleryCollection('');
     await reloadCollections();
     showToast('收藏集已删除');
     return true;
@@ -1015,6 +1043,7 @@ export default function App({ appearance, setAppearance }) {
       /> : page === 'gallery' ? <GalleryPage
         activeCollection={activeCollection}
         collections={galleryCollectionsWithCounts}
+        editingSmartCollection={editingSmartCollection}
         filterOptions={galleryFilterOptions}
         filters={galleryFilters}
         grouping={galleryGrouping}
@@ -1025,7 +1054,9 @@ export default function App({ appearance, setAppearance }) {
         onCollectionDelete={deleteGalleryCollection}
         onCollectionProjectsChange={updateGalleryCollectionProjects}
         onCollectionRename={renameGalleryCollection}
-        onCollectionRulesUpdate={updateSmartCollectionRules}
+        onCollectionRulesCancel={cancelSmartCollectionRulesEdit}
+        onCollectionRulesEdit={beginSmartCollectionRulesEdit}
+        onCollectionRulesSave={saveSmartCollectionRules}
         onCollectionSelect={selectGalleryCollection}
         onCopyImage={async (project) => {
           const result = await studio.copyProjectImage(project.id);
@@ -1055,7 +1086,7 @@ export default function App({ appearance, setAppearance }) {
         onSortChange={setSort}
         onToggleSelect={toggleGroupSelection}
         onTrash={moveToTrash}
-        onViewChange={(view) => { writeActiveGalleryCollection(globalThis.localStorage, ''); setActiveCollectionId(''); setGalleryView(view); setGalleryFilters(DEFAULT_GALLERY_FILTERS); setSelectedGroupIds([]); setPreviewGroupId(''); setPreviewProjectId(''); }}
+        onViewChange={(view) => { writeActiveGalleryCollection(globalThis.localStorage, ''); setActiveCollectionId(''); setEditingSmartCollectionId(''); setGalleryView(view); setGalleryFilters(DEFAULT_GALLERY_FILTERS); setSelectedGroupIds([]); setPreviewGroupId(''); setPreviewProjectId(''); }}
         preview={preview}
         previewGroup={previewGroup}
         query={galleryFilters.query}

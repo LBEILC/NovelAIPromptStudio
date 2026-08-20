@@ -339,11 +339,12 @@ function collectionRuleCount(collection) {
 function GalleryCollectionsPanel({
   activeCollection,
   collections = [],
+  editingSmartCollection,
   filters,
   onCreate,
   onDelete,
   onRename,
-  onRulesUpdate,
+  onRulesEdit,
   onSelect,
 }) {
   const [editor, setEditor] = useState(null);
@@ -351,7 +352,7 @@ function GalleryCollectionsPanel({
   const [saving, setSaving] = useState(false);
   const manual = collections.filter((collection) => collection.kind === 'manual');
   const smart = collections.filter((collection) => collection.kind === 'smart');
-  const canSaveSmart = !activeCollection && hasActiveGalleryFilters(filters);
+  const canSaveSmart = !activeCollection && !editingSmartCollection && hasActiveGalleryFilters(filters);
   const beginEditor = (mode, collection = null) => {
     setEditor({ mode, collection });
     setNameDraft(collection?.name || (mode === 'smart' ? gallerySmartCollectionDefaultName(filters) : ''));
@@ -370,7 +371,7 @@ function GalleryCollectionsPanel({
     <h3>{title}</h3>
     {items.length ? <div className="gallery-collections-list">{items.map((collection) => <div
       aria-current={activeCollection?.id === collection.id ? 'page' : undefined}
-      className={activeCollection?.id === collection.id ? 'active' : ''}
+      className={activeCollection?.id === collection.id ? 'active' : editingSmartCollection?.id === collection.id ? 'editing' : ''}
       key={collection.id}
       onClick={() => onSelect(collection.id)}
       onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onSelect(collection.id); } }}
@@ -378,16 +379,15 @@ function GalleryCollectionsPanel({
       tabIndex={0}
     >
       <Icon name={collection.kind === 'smart' ? 'spark' : 'folder'} size={15}/>
-      <span><strong>{collection.name}</strong><small>{collection.kind === 'smart' ? `${collectionRuleCount(collection)} 条规则` : '普通收藏集'}</small></span>
+      <span><strong>{collection.name}</strong><small>{editingSmartCollection?.id === collection.id ? '正在编辑规则' : collection.kind === 'smart' ? `${collectionRuleCount(collection)} 条规则` : '普通收藏集'}</small></span>
       <em>{collection.image_count == null ? '—' : collection.image_count}</em>
       <span className="gallery-collection-row-actions">
         {collection.kind === 'smart' && <ActionIcon
-          aria-label={`用当前筛选替换“${collection.name}”的规则`}
-          disabled={!canSaveSmart}
-          icon={<Icon name="refresh" size={13}/>}
-          onClick={(event) => { event.stopPropagation(); onRulesUpdate(collection); }}
+          aria-label={`编辑“${collection.name}”的规则`}
+          icon={<Icon name="filter" size={13}/>}
+          onClick={(event) => { event.stopPropagation(); onRulesEdit(collection); }}
           size="small"
-          title={canSaveSmart ? '用当前筛选替换规则' : activeCollection ? '先返回全部图片并设置筛选' : '先设置新的搜索或筛选条件'}
+          title="编辑规则"
         />}
         <ActionIcon aria-label={`重命名“${collection.name}”`} icon={<Icon name="edit" size={13}/>} onClick={(event) => { event.stopPropagation(); beginEditor('rename', collection); }} size="small" title="重命名"/>
         <ActionIcon aria-label={`删除“${collection.name}”`} icon={<Icon name="trash" size={13}/>} onClick={(event) => { event.stopPropagation(); onDelete(collection); }} size="small" title="删除收藏集"/>
@@ -422,7 +422,7 @@ function GalleryCollectionsPanel({
       />
       <div><LobeButton disabled={!nameDraft.trim()} loading={saving} onClick={saveEditor} size="small" type="primary">保存</LobeButton><LobeButton onClick={() => setEditor(null)} size="small" type="text">取消</LobeButton></div>
     </div>}
-    <button className={!activeCollection ? 'gallery-collection-all active' : 'gallery-collection-all'} onClick={() => onSelect('')} type="button">
+    <button className={!activeCollection && !editingSmartCollection ? 'gallery-collection-all active' : 'gallery-collection-all'} onClick={() => onSelect('')} type="button">
       <Icon name="library" size={15}/><span>全部图片</span>
     </button>
     <div className="gallery-collections-scroll">
@@ -568,6 +568,7 @@ export function GalleryCard(props) {
 export default function GalleryPage({
   activeCollection,
   collections = [],
+  editingSmartCollection,
   groups,
   filters,
   filterOptions,
@@ -585,7 +586,9 @@ export default function GalleryPage({
   onCollectionDelete,
   onCollectionProjectsChange,
   onCollectionRename,
-  onCollectionRulesUpdate,
+  onCollectionRulesCancel,
+  onCollectionRulesEdit,
+  onCollectionRulesSave,
   onCollectionSelect,
   onEmptyTrash,
   onImport,
@@ -749,6 +752,13 @@ export default function GalleryPage({
       <LobeButton disabled={!groups.length} onClick={onSelectAll} size="small" type="text">全选当前结果</LobeButton>
       {view === 'trash' && <LobeButton danger disabled={!groups.length} onClick={onEmptyTrash} size="small">清空回收站</LobeButton>}
     </div>
+    {editingSmartCollection && <div className="gallery-rule-edit-bar">
+      <span><Icon name="filter" size={15}/><span><strong>正在编辑“{editingSmartCollection.name}”</strong><small>调整搜索与筛选，图库结果会实时预览</small></span></span>
+      <div>
+        <LobeButton disabled={!hasActiveGalleryFilters(filters)} onClick={onCollectionRulesSave} size="small" type="primary">保存修改</LobeButton>
+        <LobeButton onClick={onCollectionRulesCancel} size="small" type="text">取消</LobeButton>
+      </div>
+    </div>}
     <BatchToolbar
       onClear={onClearSelection}
       onPermanentDelete={onPermanentDelete}
@@ -785,11 +795,12 @@ export default function GalleryPage({
           <GalleryCollectionsPanel
             activeCollection={activeCollection}
             collections={collections}
+            editingSmartCollection={editingSmartCollection}
             filters={filters}
             onCreate={onCollectionCreate}
             onDelete={onCollectionDelete}
             onRename={onCollectionRename}
-            onRulesUpdate={onCollectionRulesUpdate}
+            onRulesEdit={onCollectionRulesEdit}
             onSelect={(id) => { onCollectionSelect(id); updateCollectionsExpanded(false); }}
           />
         </LobeDraggablePanel.Body>
