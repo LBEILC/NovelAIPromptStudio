@@ -63,7 +63,16 @@ Only current actionable macOS requests are kept here. Earlier completed, superse
 - Related commits: `55fe1e4`, `cd13c80`
 - Action: On an unlocked macOS session, follow `doc/manual-verification-20260820-gallery-filter-before-grouping.md`. Pay particular attention to searching a member-only Tag inside a similar-Prompt group, keyboard and trackpad interaction with multi-select Tag/model/Vibe controls, local calendar boundaries in the relative and custom import-date filters, popover collision and scrolling at minimum window size, and operation scope after filter changes.
 - Expected: Search and every advanced condition filter individual images before automatic grouping, so no non-matching member remains accessible through card scrubbing, detail navigation, selection, context menus, or batch actions. Different filter dimensions combine with AND; multi-selected model/Vibe values and “任意 Tag” combine with OR inside their own field; excluded Tags always win. Tag selection searches inside the opened multi-select like the model control, custom dates use the themed Lobe UI DatePicker without dismissing the parent filter popover, changing conditions clears batch selection, and light/dark plus keyboard states remain coherent on macOS.
-- Observed: Windows clean `npm ci`, all 190 tests in 35 files, the production build, and the Lobe UI audit passed through `cd13c80`. The user confirmed the original filter behavior was broadly correct before requesting the Tag-control and DatePicker consistency fixes; those fixes still need Windows and macOS interactive verification.
+- Observed: Windows clean `npm ci`, all 190 tests in 35 files, the production build, and the Lobe UI audit passed through `cd13c80`. On 2026-08-20, the user completed the Windows interactive checklist and confirmed filter-before-grouping, combined filters, the aligned Tag multi-select, and the Lobe UI date picker passed without issues. macOS interactive verification remains pending.
+
+## Verify Gallery manual and smart collections
+
+- Status: Pending
+- Date/source: 2026-08-20, Windows
+- Related commit: `6f3938c`
+- Action: On an unlocked macOS session, check out current `main` and follow `doc/manual-verification-20260820-gallery-collections.md`. Pay particular attention to the additive SQLite migration on an existing library, persistence across a full restart, left floating-panel resize/collapse behavior, keyboard access, minimum-window popover collision, Finder-imported images automatically entering smart collections, and collection membership cleanup after permanent deletion.
+- Expected: Manual collections persist explicit image membership and allow one image to belong to several collections without duplicating or deleting image records. Smart collections persist normalized search/filter rules and automatically reevaluate new images. Collection scope and every temporary image filter run before grouping, so unmatched members never leak into scrubbing, detail navigation, selection, or actions. The left collection panel overlays rather than shrinks the grid, and its width plus expanded state persist independently. Database migration and IPC remain compatible with packaged macOS builds and paths.
+- Observed: Windows clean `npm ci`, all 195 tests in 36 files, and the production build passed for `6f3938c`. Windows interactive verification is pending; macOS verification is pending.
 
 ## Verify manual update mode for unsigned macOS builds
 
