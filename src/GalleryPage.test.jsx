@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BatchToolbar, GalleryCardHoverPreview, GalleryCardView, GalleryGroupingControl } from './GalleryPage.jsx';
+import { BatchToolbar, GalleryCardHoverPreview, GalleryCardView, GalleryFilterControl, GalleryGroupingControl } from './GalleryPage.jsx';
 
 vi.mock('@lobehub/ui', () => {
   const Component = () => null;
@@ -107,6 +107,49 @@ describe('GalleryGroupingControl', () => {
     });
     const content = element.props.content.props.children.flat(Infinity).filter(Boolean);
     expect(content.some((child) => child.props?.className === 'gallery-similarity-control')).toBe(false);
+  });
+});
+
+describe('GalleryFilterControl', () => {
+  it('keeps combined filters in a progressive popover and emits field patches', () => {
+    const onChange = vi.fn();
+    const element = GalleryFilterControl({
+      filters: {
+        query: 'bagpipe',
+        includeTags: ['bagpipe'],
+        excludeTags: [],
+        tagMatch: 'all',
+        models: ['nai-v4.5'],
+        vibes: [],
+        datePreset: 'custom',
+        dateFrom: '2026-08-01',
+        dateTo: '2026-08-20',
+      },
+      options: {
+        tags: [{ value: 'bagpipe', label: 'bagpipe · 风笛', count: 8 }],
+        models: [{ value: 'nai-v4.5', label: 'nai-v4.5', count: 12 }],
+        vibes: [],
+      },
+      onChange,
+    });
+    const panel = element.props.content;
+    const children = panel.props.children.flat(Infinity).filter(Boolean);
+    const includeSection = children.find((child) => child.props?.className === 'gallery-filter-section');
+    const dateSection = children.filter((child) => child.props?.className === 'gallery-filter-section').at(-1);
+    const clearButton = children.find((child) => child.type === 'header').props.children[1];
+
+    expect(element.props.trigger).toBe('click');
+    expect(element.props.children.props['aria-label']).toContain('已启用 3 项');
+    expect(element.props.children.props['aria-pressed']).toBe(true);
+    includeSection.props.children[1].props.onChange(['bagpipe', 'uniform']);
+    dateSection.props.children[1].props.onChange('30d');
+    clearButton.props.onClick();
+
+    expect(onChange.mock.calls).toEqual([
+      [{ includeTags: ['bagpipe', 'uniform'] }],
+      [{ datePreset: '30d' }],
+      [expect.objectContaining({ query: 'bagpipe', includeTags: [], models: [], datePreset: 'all' })],
+    ]);
   });
 });
 

@@ -7,6 +7,13 @@ import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
 import { galleryEmptyState, galleryGroupMember, galleryScrubMemberIndex, shouldCollapseGalleryPreview } from './lib/gallery.js';
 import {
+  DEFAULT_GALLERY_FILTERS,
+  GALLERY_DATE_PRESETS,
+  galleryActiveFilterCount,
+  hasActiveGalleryFilters,
+  normalizeGalleryFilters,
+} from './lib/galleryFilters.js';
+import {
   GALLERY_CARD_SIZE_MAX,
   GALLERY_CARD_SIZE_MIN,
   galleryDensityForSize,
@@ -158,6 +165,125 @@ export function GalleryGroupingControl({ grouping = DEFAULT_GALLERY_GROUPING, on
   </Popover>;
 }
 
+function gallerySelectOptions(items = []) {
+  return items.map((item) => ({ label: item.label, title: `${item.label} · ${item.count} 张`, value: item.value }));
+}
+
+function GalleryFilterSelect({ items, ...props }) {
+  const countByValue = new Map(items.map((item) => [item.value, item.count]));
+  return <LobeSelect
+    {...props}
+    listHeight={260}
+    optionRender={(option) => <span className="gallery-filter-option"><span>{option.label}</span><small>{countByValue.get(option.value) || 0}</small></span>}
+    options={gallerySelectOptions(items)}
+    popupMatchSelectWidth={360}
+    showSearch
+    size="small"
+  />;
+}
+
+export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, options = {}, onChange }) {
+  const value = normalizeGalleryFilters(filters);
+  const activeCount = galleryActiveFilterCount(value);
+  const tagOptions = options.tags || [];
+  const content = <div className="gallery-filter-panel">
+    <header className="gallery-filter-header">
+      <div><strong>筛选图片</strong><small>不同筛选项之间同时满足</small></div>
+      <LobeButton disabled={!activeCount} onClick={() => onChange({ ...DEFAULT_GALLERY_FILTERS, query: value.query })} size="small" type="text">清除</LobeButton>
+    </header>
+    <section className="gallery-filter-section">
+      <div className="gallery-filter-label">
+        <span>包含 Tag</span>
+        <Segmented
+          aria-label="包含 Tag 的匹配方式"
+          onChange={(tagMatch) => onChange({ tagMatch })}
+          options={[{ label: '全部', value: 'all' }, { label: '任意', value: 'any' }]}
+          size="small"
+          value={value.tagMatch}
+        />
+      </div>
+      <GalleryFilterSelect
+        aria-label="必须包含的 Tag"
+        items={tagOptions}
+        mode="tags"
+        onChange={(includeTags) => onChange({ includeTags: Array.isArray(includeTags) ? includeTags : [] })}
+        placeholder="选择或输入 Tag"
+        tokenSeparators={[',', '，']}
+        value={value.includeTags}
+      />
+    </section>
+    <section className="gallery-filter-section">
+      <span className="gallery-filter-label">排除 Tag</span>
+      <GalleryFilterSelect
+        aria-label="要排除的 Tag"
+        items={tagOptions}
+        mode="tags"
+        onChange={(excludeTags) => onChange({ excludeTags: Array.isArray(excludeTags) ? excludeTags : [] })}
+        placeholder="选择或输入不想出现的 Tag"
+        tokenSeparators={[',', '，']}
+        value={value.excludeTags}
+      />
+    </section>
+    <div className="gallery-filter-fields">
+      <section className="gallery-filter-section">
+        <span className="gallery-filter-label">模型</span>
+        <GalleryFilterSelect
+          aria-label="生成模型"
+          items={options.models || []}
+          mode="multiple"
+          onChange={(models) => onChange({ models: Array.isArray(models) ? models : [] })}
+          placeholder="不限模型"
+          value={value.models}
+        />
+      </section>
+      <section className="gallery-filter-section">
+        <span className="gallery-filter-label">Vibe</span>
+        <GalleryFilterSelect
+          aria-label="Vibe"
+          items={options.vibes || []}
+          mode="multiple"
+          onChange={(vibes) => onChange({ vibes: Array.isArray(vibes) ? vibes : [] })}
+          placeholder="不限 Vibe"
+          value={value.vibes}
+        />
+      </section>
+    </div>
+    <section className="gallery-filter-section">
+      <span className="gallery-filter-label">导入时间</span>
+      <LobeSelect
+        aria-label="导入时间"
+        onChange={(datePreset) => onChange({ datePreset: datePreset || 'all' })}
+        options={GALLERY_DATE_PRESETS}
+        size="small"
+        value={value.datePreset}
+      />
+      {value.datePreset === 'custom' && <div className="gallery-filter-date-range">
+        <label><span>从</span><LobeInput aria-label="最早导入日期" onChange={(event) => onChange({ dateFrom: event.target.value })} size="small" type="date" value={value.dateFrom}/></label>
+        <label><span>至</span><LobeInput aria-label="最晚导入日期" onChange={(event) => onChange({ dateTo: event.target.value })} size="small" type="date" value={value.dateTo}/></label>
+      </div>}
+    </section>
+  </div>;
+
+  return <Popover
+    arrow
+    className="gallery-filter-popover"
+    content={content}
+    placement="bottom"
+    standalone
+    trigger="click"
+  >
+    <LobeButton
+      aria-label={`图库筛选${activeCount ? `，已启用 ${activeCount} 项` : '，未启用'}`}
+      aria-pressed={Boolean(activeCount)}
+      className={activeCount ? 'gallery-filter-trigger active' : 'gallery-filter-trigger'}
+      icon={<Icon name="filter" size={14}/>}
+      size="small"
+    >
+      筛选{activeCount ? ` · ${activeCount}` : ''}
+    </LobeButton>
+  </Popover>;
+}
+
 export function BatchToolbar({ view, selectedGroups, selectedImages, onFavorite, onTrash, onRestore, onPermanentDelete, onClear }) {
   if (!selectedGroups) return null;
   return <div className="gallery-selection-bar">
@@ -201,8 +327,8 @@ export function GalleryCardHoverPreview({ group, project = group.cover }) {
 
 const GALLERY_HOVER_POSITIONER_STYLES = { root: { pointerEvents: 'none' } };
 
-export function GalleryCardView({ active, group, hoverProject = group.displayCover || group.cover, selected, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
-  const project = group.displayCover || group.cover;
+export function GalleryCardView({ active, group, hoverProject = group.cover, selected, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
+  const project = group.cover;
   const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
   return <Popover content={<GalleryCardHoverPreview group={group} project={hoverProject}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
     <button
@@ -293,6 +419,8 @@ export function GalleryCard(props) {
 
 export default function GalleryPage({
   groups,
+  filters,
+  filterOptions,
   query,
   sort,
   view,
@@ -326,6 +454,7 @@ export default function GalleryPage({
   onCopyImage,
   onDownloadImage,
   onGroupingChange,
+  onFiltersChange,
 }) {
   const [previewExpanded, setPreviewExpanded] = useState(() => readPanelBoolean(
     panelStorage(),
@@ -368,7 +497,7 @@ export default function GalleryPage({
 
   const memberIndex = previewGroup?.members.findIndex((project) => project.id === preview?.id) ?? -1;
   const galleryDensity = galleryDensityForSize(galleryCardSize);
-  const emptyState = galleryEmptyState(view, query);
+  const emptyState = galleryEmptyState(view, hasActiveGalleryFilters(filters));
   const updatePreviewExpanded = (expanded) => {
     setPreviewExpanded(writePanelBoolean(panelStorage(), GALLERY_PREVIEW_PANEL_EXPANDED_KEY, expanded));
   };
@@ -379,7 +508,7 @@ export default function GalleryPage({
     if (await onRename(preview, nameDraft)) setRenaming(false);
   };
   const requestRename = (group) => {
-    const project = group.displayCover || group.cover;
+    const project = group.cover;
     updatePreviewExpanded(true);
     if (preview?.id === project.id) {
       setNameDraft(project.name || '');
@@ -404,6 +533,7 @@ export default function GalleryPage({
         value={view}
       />
       <LobeSearchBar className="gallery-search" onInputChange={onQueryChange} placeholder="搜索文件名、Tag 或译名" value={query}/>
+      <GalleryFilterControl filters={filters} onChange={onFiltersChange} options={filterOptions}/>
       <div className="gallery-sort">
         <LobeSelect aria-label="图片排序" onChange={onSortChange} options={[
           { label: '最近导入', value: 'recent' },

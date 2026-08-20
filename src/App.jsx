@@ -32,13 +32,17 @@ import {
 } from './lib/workbenchSession.js';
 import {
   adjacentGallerySelection,
-  filterAndSortGalleryGroups,
   galleryGroupMember,
   galleryGroupMenuLabels,
   gallerySelectionProjectIds,
-  groupGalleryProjects,
+  galleryViewGroups,
   reconcileGallerySelection,
 } from './lib/gallery.js';
+import {
+  DEFAULT_GALLERY_FILTERS,
+  galleryFilterOptions as buildGalleryFilterOptions,
+  normalizeGalleryFilters,
+} from './lib/galleryFilters.js';
 import { readGalleryGrouping, writeGalleryGrouping } from './lib/galleryGrouping.js';
 
 const unavailable = (error) => async () => ({ ok: false, error });
@@ -187,7 +191,7 @@ export default function App({ appearance, setAppearance }) {
   const [projects, setProjects] = useState([]);
   const [galleryView, setGalleryView] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
+  const [galleryFilters, setGalleryFilters] = useState(DEFAULT_GALLERY_FILTERS);
   const [sort, setSort] = useState('recent');
   const [galleryGrouping, setGalleryGrouping] = useState(() => readGalleryGrouping(globalThis.localStorage));
   const [previewGroupId, setPreviewGroupId] = useState('');
@@ -503,10 +507,13 @@ export default function App({ appearance, setAppearance }) {
     return () => window.removeEventListener('keydown', keydown);
   }, [activeTab, closeTab, importImages, openClipboardWorkbenchImage, openWorkbenchPath, page, workbenchSession.tabs.length]);
 
-  const galleryGroups = useMemo(() => groupGalleryProjects(projects, galleryGrouping), [galleryGrouping, projects]);
-  const visibleGroups = useMemo(() => filterAndSortGalleryGroups(galleryGroups, query, sort), [galleryGroups, query, sort]);
-  const previewGroup = galleryGroups.find((group) => group.id === previewGroupId)
-    || galleryGroups.find((group) => group.members.some((project) => project.id === previewProjectId))
+  const galleryFilterOptions = useMemo(() => buildGalleryFilterOptions(projects), [projects]);
+  const visibleGroups = useMemo(
+    () => galleryViewGroups(projects, galleryFilters, galleryGrouping, sort),
+    [galleryFilters, galleryGrouping, projects, sort],
+  );
+  const previewGroup = visibleGroups.find((group) => group.id === previewGroupId)
+    || visibleGroups.find((group) => group.members.some((project) => project.id === previewProjectId))
     || null;
   const preview = previewGroup?.members.find((project) => project.id === previewProjectId) || previewGroup?.cover || null;
   const selectedProjectIds = useMemo(
@@ -524,6 +531,8 @@ export default function App({ appearance, setAppearance }) {
       setPreviewProjectId('');
     } else if (previewGroup && previewGroup.id !== previewGroupId) {
       setPreviewGroupId(previewGroup.id);
+    } else if (previewGroup && !previewGroup.members.some((project) => project.id === previewProjectId)) {
+      setPreviewProjectId(previewGroup.cover?.id || '');
     }
   }, [previewGroup, previewGroupId, previewProjectId]);
 
@@ -642,7 +651,7 @@ export default function App({ appearance, setAppearance }) {
       danger: true,
     }))) return;
     const next = previewGroup && preview && ids.includes(preview.id)
-      ? adjacentGallerySelection(galleryGroups, previewGroup.id, preview.id)
+      ? adjacentGallerySelection(visibleGroups, previewGroup.id, preview.id)
       : null;
     const result = await studio.moveProjectsToTrash(ids);
     if (!summarizeBatch(result, '移入回收站', isDetail ? 0 : selectedGroups)) return;
@@ -754,6 +763,12 @@ export default function App({ appearance, setAppearance }) {
     setGalleryGrouping((current) => writeGalleryGrouping(globalThis.localStorage, { ...current, ...patch }));
   };
 
+  const updateGalleryFilters = (patch) => {
+    setGalleryFilters((current) => normalizeGalleryFilters({ ...current, ...patch }));
+    setSelectedGroupIds([]);
+    lastSelectedGroupRef.current = '';
+  };
+
   const navigatePreview = useCallback((direction) => {
     if (!previewGroup?.members.length || !preview) return;
     const index = previewGroup.members.findIndex((project) => project.id === preview.id);
@@ -762,7 +777,7 @@ export default function App({ appearance, setAppearance }) {
   }, [preview, previewGroup]);
 
   const galleryContextMenu = (event, group, onRenameRequest) => {
-    const project = group.displayCover || group.cover;
+    const project = group.cover;
     const ids = group.members.map((item) => item.id);
     const labels = galleryGroupMenuLabels(group);
     openContextMenu(event, [
@@ -868,6 +883,8 @@ export default function App({ appearance, setAppearance }) {
         })))}
         session={workbenchSession}
       /> : page === 'gallery' ? <GalleryPage
+        filterOptions={galleryFilterOptions}
+        filters={galleryFilters}
         grouping={galleryGrouping}
         groups={visibleGroups}
         importing={isImportActive(importProgress)}
@@ -881,6 +898,7 @@ export default function App({ appearance, setAppearance }) {
           if (!result?.canceled) showToast(result?.ok ? '图片已下载，原始格式与元数据已保留' : result?.error || '图片下载失败', result?.ok ? 'success' : 'error');
         }}
         onGroupingChange={updateGalleryGrouping}
+        onFiltersChange={updateGalleryFilters}
         onEmptyTrash={emptyTrash}
         onFavorite={setFavorite}
         onImport={() => importImages()}
@@ -891,7 +909,7 @@ export default function App({ appearance, setAppearance }) {
         onPreview={previewGalleryGroup}
         onProjectContextMenu={galleryContextMenu}
         onWorkspaceContextMenu={galleryWorkspaceContextMenu}
-        onQueryChange={setQuery}
+        onQueryChange={(query) => updateGalleryFilters({ query })}
         onRename={renameProject}
         onRestore={restoreProjects}
         onReveal={(project) => studio.revealFile(project.image_path)}
@@ -900,10 +918,10 @@ export default function App({ appearance, setAppearance }) {
         onSortChange={setSort}
         onToggleSelect={toggleGroupSelection}
         onTrash={moveToTrash}
-        onViewChange={(view) => { setGalleryView(view); setQuery(''); setSelectedGroupIds([]); setPreviewGroupId(''); setPreviewProjectId(''); }}
+        onViewChange={(view) => { setGalleryView(view); setGalleryFilters(DEFAULT_GALLERY_FILTERS); setSelectedGroupIds([]); setPreviewGroupId(''); setPreviewProjectId(''); }}
         preview={preview}
         previewGroup={previewGroup}
-        query={query}
+        query={galleryFilters.query}
         selectedGroupIds={selectedGroupIds}
         selectedImageCount={selectedProjectIds.length}
         sort={sort}

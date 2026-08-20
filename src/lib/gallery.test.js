@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adjacentGallerySelection, filterAndSortGalleryGroups, galleryEmptyState, galleryGroupMember, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, groupGalleryProjects, isGalleryBlankClickTarget, reconcileGallerySelection, shouldCollapseGalleryPreview } from './gallery.js';
+import { adjacentGallerySelection, galleryEmptyState, galleryGroupMember, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, galleryViewGroups, groupGalleryProjects, isGalleryBlankClickTarget, reconcileGallerySelection, shouldCollapseGalleryPreview } from './gallery.js';
 
 const item = (id, fingerprint, createdAt, cover = '') => ({
   base_prompt_fingerprint: fingerprint === 'same-character-a' || fingerprint === 'same-character-b' ? 'same-base' : fingerprint,
@@ -83,15 +83,27 @@ describe('gallery grouping and selection', () => {
     expect(groupGalleryProjects(projects, { promptScope: 'base', mergeVibes: true })).toHaveLength(2);
   });
 
-  it('ignores persisted covers for dynamic groups and shows a search-matched member transiently', () => {
-    const groups = groupGalleryProjects([
+  it('filters individual images before dynamic grouping instead of retaining hidden group members', () => {
+    const groups = galleryViewGroups([
       item('older match', 'same', '2026-01-01', 'older match'),
       item('newer', 'same', '2026-02-01', 'older match'),
-    ], { promptScope: 'full', mergeVibes: true });
-    expect(groups[0]).toMatchObject({ canSetCover: false, cover: { id: 'newer' } });
-    const [matched] = filterAndSortGalleryGroups(groups, 'older match');
-    expect(matched.displayCover.id).toBe('older match');
-    expect(matched.cover.id).toBe('newer');
+    ], { query: 'older match' }, { promptScope: 'full', mergeVibes: true });
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ canSetCover: false, count: 1, cover: { id: 'older match' } });
+    expect(groups[0].members.map((project) => project.id)).toEqual(['older match']);
+  });
+
+  it('removes non-matching members before similar-Prompt grouping and selection expansion', () => {
+    const shared = ['style', 'lighting', 'portrait', 'blue sky', 'outdoors', 'day', 'solo'];
+    const projects = [
+      similarItem('bagpipe', [...shared, 'bagpipe']),
+      similarItem('other', [...shared, 'texas']),
+    ];
+    expect(groupGalleryProjects(projects, { promptScope: 'similar', similarityThreshold: 75 })).toMatchObject([{ count: 2 }]);
+
+    const groups = galleryViewGroups(projects, { query: 'bagpipe' }, { promptScope: 'similar', similarityThreshold: 75 });
+    expect(groups).toMatchObject([{ count: 1, members: [{ id: 'bagpipe' }] }]);
+    expect(gallerySelectionProjectIds(groups, [groups[0].id])).toEqual(['bagpipe']);
   });
 
   it('forms similar-Prompt groups without transitive chain expansion', () => {
@@ -167,7 +179,7 @@ describe('gallery grouping and selection', () => {
   it('gives every empty gallery view an accurate next step', () => {
     expect(galleryEmptyState('favorites')).toMatchObject({ title: '暂无收藏', icon: 'star' });
     expect(galleryEmptyState('trash')).toMatchObject({ title: '回收站为空', icon: 'trash' });
-    expect(galleryEmptyState('all', 'artist')).toMatchObject({ title: '没有匹配的图片', icon: 'search' });
+    expect(galleryEmptyState('all', true)).toMatchObject({ title: '没有匹配的图片', icon: 'search' });
     expect(galleryEmptyState('all').description).toContain('导入图片');
   });
 });

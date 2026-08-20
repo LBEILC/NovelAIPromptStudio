@@ -1,5 +1,4 @@
-import { allPromptTags } from './promptStructure.js';
-import { expandSearch, normalizeSearch } from './prompt.js';
+import { filterGalleryProjects } from './galleryFilters.js';
 import {
   galleryBasePromptPayloadSimilarity,
   galleryBasePromptSimilarityPayload,
@@ -113,21 +112,17 @@ export function groupGalleryProjects(projects = [], groupingValue) {
   return [...groups.values()].map((group) => finalizeGalleryGroup(group, grouping, exact));
 }
 
-export function filterAndSortGalleryGroups(groups = [], query = '', sort = 'recent') {
-  const needles = expandSearch(query);
-  const projectMatches = (project) => (
-    [project.name, ...allPromptTags(project).flatMap((tag) => [tag.tag, tag.translation])]
-      .some((value) => needles.some((needle) => normalizeSearch(value).includes(needle)))
-  );
-  const matched = needles.length ? groups.flatMap((group) => {
-    const displayCover = group.members.find(projectMatches);
-    return displayCover ? [{ ...group, displayCover }] : [];
-  }) : groups;
-  return [...matched].sort((left, right) => {
+export function sortGalleryGroups(groups = [], sort = 'recent') {
+  return [...groups].sort((left, right) => {
     if (sort === 'oldest') return new Date(left.latestAt || 0) - new Date(right.latestAt || 0);
-    if (sort === 'name') return String(left.displayCover?.name || left.cover?.name || '').localeCompare(String(right.displayCover?.name || right.cover?.name || ''), 'zh-CN', { numeric: true });
+    if (sort === 'name') return String(left.cover?.name || '').localeCompare(String(right.cover?.name || ''), 'zh-CN', { numeric: true });
     return new Date(right.latestAt || 0) - new Date(left.latestAt || 0);
   });
+}
+
+export function galleryViewGroups(projects = [], filters, grouping, sort = 'recent', nowValue = new Date()) {
+  const filteredProjects = filterGalleryProjects(projects, filters, nowValue);
+  return sortGalleryGroups(groupGalleryProjects(filteredProjects, grouping), sort);
 }
 
 export function gallerySelectionProjectIds(groups = [], selectedGroupIds = []) {
@@ -145,7 +140,7 @@ export function galleryScrubMemberIndex(pointerX, boundsLeft, boundsWidth, membe
 }
 
 export function galleryGroupMember(group, projectId) {
-  return group?.members?.find((project) => project.id === projectId) || group?.displayCover || group?.cover;
+  return group?.members?.find((project) => project.id === projectId) || group?.cover;
 }
 
 export function isGalleryBlankClickTarget(target) {
@@ -172,10 +167,10 @@ export function galleryGroupMenuLabels(group) {
   };
 }
 
-export function galleryEmptyState(view = 'all', query = '') {
-  if (String(query).trim()) {
+export function galleryEmptyState(view = 'all', filtered = false) {
+  if (filtered) {
     return {
-      description: '尝试其他关键词，或清除搜索条件。',
+      description: '尝试其他关键词，或调整筛选条件。',
       icon: 'search',
       title: '没有匹配的图片',
     };
