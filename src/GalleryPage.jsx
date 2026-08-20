@@ -553,11 +553,12 @@ export function GalleryCardHoverPreview({ group, project = group.cover }) {
 
 const GALLERY_HOVER_POSITIONER_STYLES = { root: { pointerEvents: 'none' } };
 
-function GalleryThumbnail({ alt = '', src }) {
+function GalleryThumbnail({ alt = '', className = '', src, ...imageProps }) {
   const [loaded, setLoaded] = useState(false);
   return <img
+    {...imageProps}
     alt={alt}
-    className={loaded ? 'is-loaded' : ''}
+    className={`${className} ${loaded ? 'is-loaded' : ''}`.trim()}
     decoding="async"
     loading="lazy"
     onLoad={() => setLoaded(true)}
@@ -571,14 +572,13 @@ function GalleryResultsSurface({ children, className, contentKey, style }) {
 
   useLayoutEffect(() => {
     if (reduceMotion) {
-      controls.set({ opacity: 1, y: 0 });
+      controls.set({ opacity: 1 });
       return undefined;
     }
-    controls.set({ opacity: 0.68, y: 4 });
+    controls.set({ opacity: 0.9 });
     controls.start({
       opacity: 1,
-      transition: { duration: 0.2, ease: MOTION_EASE_OUT },
-      y: 0,
+      transition: { duration: 0.14, ease: MOTION_EASE_OUT },
     });
     return () => controls.stop();
   }, [contentKey, controls, reduceMotion]);
@@ -638,7 +638,7 @@ export function GalleryCardView({ active, group, hoverProject = group.cover, sel
       type="button"
     >
       <span className="gallery-card-image">
-        {stackMembers.map((member, index) => <img
+        {stackMembers.map((member, index) => <GalleryThumbnail
           alt=""
           aria-hidden="true"
           className={`gallery-card-stack gallery-card-stack-${index + 1}`}
@@ -841,6 +841,11 @@ export default function GalleryPage({
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const renameTargetRef = useRef('');
+  const galleryScrollRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (updating && galleryScrollRef.current) galleryScrollRef.current.scrollTop = 0;
+  }, [updating]);
 
   useEffect(() => {
     const requestedRename = Boolean(preview && renameTargetRef.current === preview.id);
@@ -1027,8 +1032,9 @@ export default function GalleryPage({
           if (event.target.closest('.gallery-card')) return;
           onWorkspaceContextMenu(event);
         }}
+        ref={galleryScrollRef}
       >
-        {groups.length ? <PopoverGroup closeDelay={120} openDelay={450} placement="rightTop" trigger="hover"><GalleryResultsSurface
+        {updating ? <GalleryLoadingGrid cardSize={galleryCardSize} density={galleryDensity}/> : groups.length ? <PopoverGroup closeDelay={120} openDelay={450} placement="rightTop" trigger="hover"><GalleryResultsSurface
           className={`gallery-grid density-${galleryDensity}`}
           contentKey={contentKey}
           style={{ '--gallery-card-min-width': `${galleryCardSize}px` }}
