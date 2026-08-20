@@ -499,12 +499,12 @@ function GalleryResultsSurface({ children, className, contentKey, style }) {
       return undefined;
     }
     controls.set({ opacity: 0.68, y: 4 });
-    const animation = controls.start({
+    controls.start({
       opacity: 1,
       transition: { duration: 0.2, ease: MOTION_EASE_OUT },
       y: 0,
     });
-    return () => animation.stop();
+    return () => controls.stop();
   }, [contentKey, controls, reduceMotion]);
 
   return <motion.div animate={controls} className={className} initial={false} style={style}>{children}</motion.div>;

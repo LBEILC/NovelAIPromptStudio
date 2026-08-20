@@ -193,13 +193,13 @@ function PageSurface({ active, motionMode, children }) {
       return undefined;
     }
     controls.set({ opacity: 0.72, y: 5 });
-    const animation = controls.start({
+    controls.start({
       opacity: 1,
       transition: { duration: 0.18, ease: MOTION_EASE_OUT },
       y: 0,
     });
     return () => {
-      animation.stop();
+      controls.stop();
       controls.set({ opacity: 0, y: 3 });
     };
   }, [active, controls, reduceMotion]);
