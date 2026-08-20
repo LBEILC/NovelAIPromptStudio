@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  contentRectInViewport,
   decodeMarqueeKey,
   marqueeMode,
   marqueeRect,
   marqueeSelection,
   MARQUEE_DRAG_THRESHOLD,
+  pointInScrollableContent,
+  rectInScrollableContent,
   rectanglesIntersect,
 } from '../lib/marqueeSelection.js';
 
@@ -58,10 +61,20 @@ export function useMarqueeSelection({
     if (!drag.active) {
       drag.active = true;
       document.documentElement.classList.add('is-marquee-selecting');
+      // Capturing on pointerdown redirects an ordinary button click to the container.
+      // Wait until the gesture is unquestionably a drag.
+      container.setPointerCapture?.(drag.pointerId);
     }
-    const nextRect = marqueeRect(drag.start, point);
+    const viewport = container.getBoundingClientRect();
+    const scroll = { left: container.scrollLeft, top: container.scrollTop };
+    // Content coordinates keep the original anchor stable while the container scrolls.
+    const contentPoint = pointInScrollableContent(point, viewport, scroll);
+    const contentRect = marqueeRect(drag.contentStart, contentPoint);
     const hitKeys = [...container.querySelectorAll(itemSelector)]
-      .filter((element) => rectanglesIntersect(nextRect, element.getBoundingClientRect()))
+      .filter((element) => rectanglesIntersect(
+        contentRect,
+        rectInScrollableContent(element.getBoundingClientRect(), viewport, scroll),
+      ))
       .map((element) => decodeMarqueeKey(element.getAttribute('data-marquee-key')))
       .filter(Boolean);
     const nextSelection = marqueeSelection(drag.initialKeys, hitKeys, drag.mode);
@@ -69,7 +82,7 @@ export function useMarqueeSelection({
       drag.lastSelection = nextSelection;
       onSelectionChangeRef.current?.(nextSelection);
     }
-    setRect(nextRect);
+    setRect(contentRectInViewport(contentRect, viewport, scroll));
     return true;
   };
 
@@ -116,8 +129,14 @@ export function useMarqueeSelection({
       const item = target.closest?.(itemSelector);
       if (target.closest?.(INTERACTIVE_SELECTOR) && !item) return;
       const startKey = item ? decodeMarqueeKey(item.getAttribute('data-marquee-key')) : '';
+      const viewport = container.getBoundingClientRect();
       dragRef.current = {
         active: false,
+        contentStart: pointInScrollableContent(
+          { x: event.clientX, y: event.clientY },
+          viewport,
+          { left: container.scrollLeft, top: container.scrollTop },
+        ),
         initialKeys: [...selectedKeysRef.current],
         lastSelection: [...selectedKeysRef.current],
         mode: marqueeMode(event),
@@ -126,11 +145,14 @@ export function useMarqueeSelection({
         start: { x: event.clientX, y: event.clientY },
         startKey,
       };
-      container.setPointerCapture?.(event.pointerId);
     },
     onPointerMove: (event) => {
       if (dragRef.current?.pointerId !== event.pointerId) return;
       if (updateSelection({ x: event.clientX, y: event.clientY })) event.preventDefault();
+    },
+    onScroll: () => {
+      const drag = dragRef.current;
+      if (drag?.active) updateSelection(drag.point);
     },
     onPointerUp: (event) => finishSelection(event),
   };
