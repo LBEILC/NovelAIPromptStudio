@@ -17,12 +17,14 @@ export function isOverviewTagVisible(entries = [], scopeKey, tagId) {
   return entries.some((entry) => entry.key === targetKey);
 }
 
-export function overviewTagInteractionState(selectedCount = 0, filtered = false) {
+export function overviewTagInteractionState(selectedCount = 0, filtered = false, selectionMode = false) {
   const selectionActive = selectedCount > 0;
+  const selectionModeActive = selectionMode || selectionActive;
   return {
-    reorderDisabled: selectionActive || filtered,
+    reorderDisabled: selectionModeActive || filtered,
     selectionActive,
-    startMarqueeOnItems: selectionActive,
+    selectionModeActive,
+    startMarqueeOnItems: selectionModeActive,
   };
 }
 

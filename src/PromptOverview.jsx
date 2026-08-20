@@ -62,7 +62,7 @@ function syntaxMessage(tag) {
   return '';
 }
 
-function SortableTag({ animateLayout, display, editKey, editingKey, index, language, onEditingChange, onKeyboardMove, onTagClick, onTagContextMenu, onTranslateTag, onUpdateTag, reorderDisabled, scope, selected, selectionActive, tag, translating, warning }) {
+function SortableTag({ animateLayout, display, editKey, editingKey, index, language, onEditingChange, onKeyboardMove, onTagClick, onTagContextMenu, onTranslateTag, onUpdateTag, reorderDisabled, scope, selected, selectionModeActive, tag, translating, warning }) {
   const {
     attributes,
     isDragging,
@@ -82,13 +82,13 @@ function SortableTag({ animateLayout, display, editKey, editingKey, index, langu
     dragging={isDragging}
     onClick={(event) => onTagClick(event, editKey)}
     onContextMenu={(event) => onTagContextMenu(event, scope.key, tag)}
-    onKeyDown={(event) => selectionActive ? undefined : onKeyboardMove(scope, index, event)}
+    onKeyDown={(event) => selectionModeActive ? undefined : onKeyboardMove(scope, index, event)}
     selected={selected}
-    selecting={selectionActive}
+    selecting={selectionModeActive}
     showSelectionMark={false}
     tag={tag}
     tooltip={<TagHoverPreview
-      actionHint={selectionActive
+      actionHint={selectionModeActive
         ? '点击选择或取消 · 拖动 Tag 或空白处框选'
         : reorderDisabled
           ? '点击编辑 · 从空白处框选 · 清除筛选后可排序'
@@ -111,7 +111,7 @@ function SortableTag({ animateLayout, display, editKey, editingKey, index, langu
   >
     <TagPopover
       content={<TagQuickEditor tag={tag} translating={translating} onChange={(patch) => onUpdateTag(scope.key, tag.id, patch)} onClose={() => onEditingChange('')} onTranslate={() => onTranslateTag(scope.key, tag)}/>}
-      disabled={selectionActive}
+      disabled={selectionModeActive}
       editKey={editKey}
       editingKey={editingKey}
       onEditingChange={onEditingChange}
@@ -234,11 +234,11 @@ function ScopeTags({
   const activeTag = scope.tags.find((tag) => tag.id === activeTagId);
   const activeDisplay = activeTag ? tagPresentation(activeTag, language) : null;
   const activeWarning = activeTag ? syntaxMessage(activeTag) : '';
-  const { reorderDisabled, selectionActive } = interactionState;
+  const { reorderDisabled, selectionModeActive } = interactionState;
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
       <div><strong>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</strong>{scope.tags.length > 0 && <small>{scope.tags.length} 个 Tag</small>}</div>
-      {selectionActive ? <SelectionGroupButton entries={scopeEntries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : <div className="overview-scope-actions">
+      {selectionModeActive ? <SelectionGroupButton entries={scopeEntries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : <div className="overview-scope-actions">
         <LobePopover
           arrow
           className="raw-prompt-popover-shell"
@@ -316,7 +316,7 @@ function ScopeTags({
               reorderDisabled={reorderDisabled}
               scope={scope}
               selected={selectedSet.has(key)}
-              selectionActive={selectionActive}
+              selectionModeActive={selectionModeActive}
               tag={tag}
               translating={translatingKeys.has(key)}
               warning={syntaxMessage(tag)}
@@ -353,10 +353,10 @@ function SelectionGroupButton({ entries, selectedKeys, onToggle }) {
   return <LobeButton onClick={() => onToggle(entries)} size="small" type={allSelected ? 'primary' : 'default'}>{allSelected ? '取消整组' : `选择整组 ${entries.length}`}</LobeButton>;
 }
 
-function CategoryGroup({ group, language, selectionActive, selectedKeys, editingKey, onEditingChange, onTagClick, onToggleGroup, onTranslateTag, onUpdateTag, onTagContextMenu, translatingKeys }) {
+function CategoryGroup({ group, language, selectionModeActive, selectedKeys, editingKey, onEditingChange, onTagClick, onToggleGroup, onTranslateTag, onUpdateTag, onTagContextMenu, translatingKeys }) {
   const selectedSet = new Set(selectedKeys);
   return <TagCategorySection
-    action={selectionActive ? <SelectionGroupButton entries={group.entries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : null}
+    action={selectionModeActive ? <SelectionGroupButton entries={group.entries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : null}
     category={group.category}
     count={group.entries.length}
   >
@@ -372,11 +372,11 @@ function CategoryGroup({ group, language, selectionActive, selectedKeys, editing
         onContextMenu={(event) => onTagContextMenu(event, entry.scopeKey, entry.tag)}
         role="listitem"
         selected={selected}
-        selecting={selectionActive}
+        selecting={selectionModeActive}
         showSelectionMark={false}
         tag={entry.tag}
         tooltip={<TagHoverPreview
-          actionHint={selectionActive ? '点击选择或取消 · 拖动 Tag 或空白处框选' : '点击编辑 · 从空白处框选'}
+          actionHint={selectionModeActive ? '点击选择或取消 · 拖动 Tag 或空白处框选' : '点击编辑 · 从空白处框选'}
           language={language}
           scopeLabel={entry.scopeLabel}
           tag={entry.tag}
@@ -386,7 +386,7 @@ function CategoryGroup({ group, language, selectionActive, selectedKeys, editing
       />;
       return <TagPopover
         content={<TagQuickEditor tag={entry.tag} translating={translatingKeys.has(entry.key)} onChange={(patch) => onUpdateTag(entry.scopeKey, entry.tag.id, patch)} onClose={() => onEditingChange('')} onTranslate={() => onTranslateTag(entry.scopeKey, entry.tag)}/>}
-        disabled={selectionActive}
+        disabled={selectionModeActive}
         editKey={entry.key}
         editingKey={editingKey}
         key={entry.key}
@@ -404,6 +404,7 @@ function Segment({ value, options, onChange, label }) {
 
 export default function PromptOverview({ project, updateProject, viewState = DEFAULT_WORKBENCH_VIEW_STATE, onViewStateChange, focusScopeKey, focusTagId, onTagContextMenu, onCopyContextChange, onCopyText, onNotify, onTranslateTags }) {
   const { filters, language, viewMode } = viewState;
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [editingKey, setEditingKey] = useState('');
@@ -418,6 +419,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
   const structure = project.prompt_structure;
 
   useEffect(() => {
+    setSelectionMode(false);
     setSelectedKeys([]);
     setDeleteArmed(false);
     setEditingKey('');
@@ -449,8 +451,8 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
   const baseScopes = visibleScopes.filter((scope) => scope.kind === 'base');
   const characterScopes = visibleScopes.filter((scope) => scope.kind === 'character');
   const filtered = filters.category !== 'All' || filters.polarity !== 'all' || filters.domain !== 'all' || Boolean(filters.query.trim());
-  const interactionState = overviewTagInteractionState(selectedKeys.length, filtered);
-  const { selectionActive } = interactionState;
+  const interactionState = overviewTagInteractionState(selectedKeys.length, filtered, selectionMode);
+  const { selectionModeActive } = interactionState;
   const marqueeSelection = useMarqueeSelection({
     containerRef: overviewContentRef,
     enabled: visibleEntries.length > 0,
@@ -543,6 +545,20 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     onNotify?.(`已删除 ${count} 个 Tag`);
   };
 
+  const toggleSelectionMode = () => {
+    if (selectionModeActive) {
+      setSelectionMode(false);
+      setSelectedKeys([]);
+      setDeleteArmed(false);
+      return;
+    }
+    setSelectionMode(true);
+    setEditingKey('');
+    setAddingScopeKey('');
+    setRawEditingScopeKey('');
+    setDeleteArmed(false);
+  };
+
   const updateTag = (scopeKey, tagId, patch) => {
     const scope = getPromptScope(project, scopeKey);
     updateProject(updatePromptScope(project, scopeKey, scope.tags.map((tag) => tag.id === tagId ? { ...tag, ...patch } : tag)));
@@ -604,7 +620,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     }
     selectionGestureRef.current = false;
     const modifierSelection = event.ctrlKey || event.metaKey || event.shiftKey;
-    if (!selectionActive && !modifierSelection) return;
+    if (!selectionModeActive && !modifierSelection) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.detail > 1) return;
@@ -613,13 +629,17 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
   };
 
   const openTagContextMenu = (event, scopeKey, tag) => {
-    if (!selectionActive) {
+    if (!selectionModeActive) {
       onTagContextMenu?.(event, scopeKey, tag);
       return;
     }
-    const contextKeys = selectedKeys;
-    const contextEntries = selectedEntries;
+    const contextKeys = selectedKeys.length ? selectedKeys : [overviewTagKey(scopeKey, tag.id)];
+    const contextEntries = selectedKeys.length ? selectedEntries : selectedOverviewEntries(project, contextKeys);
     const contextCopy = overviewCopyContext(project, visibleScopes, contextKeys);
+    if (!selectedKeys.length) {
+      setSelectedKeys(contextKeys);
+      setDeleteArmed(false);
+    }
     onTagContextMenu?.(event, scopeKey, tag, {
       count: contextEntries.length,
       copyCount: contextCopy.count,
@@ -688,8 +708,18 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
       <div className="overview-toolbar">
         <LobeSearchBar className="overview-search" onInputChange={(query) => changeFilter({ query })} placeholder="筛选 Tag 或译名" value={filters.query}/>
         <div className="overview-primary-actions">
-          <LobeButton disabled={!visibleEntries.length || translatingKeys.size > 0} icon={<Icon name="spark" size={13}/>} onClick={() => translateEntries(visibleEntries)} size="small">{translatingKeys.size ? '翻译中…' : `AI 翻译 ${visibleEntries.length}`}</LobeButton>
-          <LobeButton disabled={structure.characters.length >= 6} icon={<Icon name="plus" size={14}/>} onClick={addCharacter} size="small">角色</LobeButton>
+          {selectionModeActive ? <>
+            <span className="overview-selection-summary">已选 <b>{selectedKeys.length}</b></span>
+            <LobeButton disabled={!visibleEntries.length} onClick={selectAllVisible} size="small">全选可见</LobeButton>
+            <LobeButton disabled={!selectedKeys.length} onClick={() => setSelectedKeys([])} size="small">取消选择</LobeButton>
+            <LobeButton disabled={!copyContext.count} onClick={copyVisibleOrSelected} size="small" type="primary">复制 {copyContext.count}</LobeButton>
+            <LobeButton danger className={deleteArmed ? 'armed' : ''} disabled={!selectedKeys.length} onClick={deleteSelected} size="small" type={deleteArmed ? 'primary' : 'default'}>{deleteArmed ? `确认删除 ${selectedKeys.length}` : `删除 ${selectedKeys.length}`}</LobeButton>
+            <LobeButton onClick={toggleSelectionMode} size="small">退出多选</LobeButton>
+          </> : <>
+            <LobeButton disabled={!visibleEntries.length || translatingKeys.size > 0} icon={<Icon name="spark" size={13}/>} onClick={() => translateEntries(visibleEntries)} size="small">{translatingKeys.size ? '翻译中…' : `AI 翻译 ${visibleEntries.length}`}</LobeButton>
+            <LobeButton disabled={structure.characters.length >= 6} icon={<Icon name="plus" size={14}/>} onClick={addCharacter} size="small">角色</LobeButton>
+            <LobeButton onClick={toggleSelectionMode} size="small">多选</LobeButton>
+          </>}
         </div>
       </div>
 
@@ -706,17 +736,10 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
         </div>
       </div>
 
-      {selectionActive && <div className="overview-selection-bar">
-        <span>已选 <b>{selectedKeys.length}</b> 个{copyContext.categoryCount ? ` · ${copyContext.categoryCount} 个分类` : ''}{copyContext.ignored ? ` · ${copyContext.ignored} 个排除 Tag 不会复制` : ''}。</span>
-        <LobeButton disabled={!visibleEntries.length} onClick={selectAllVisible} size="small">全选可见</LobeButton>
-        <LobeButton disabled={!selectedKeys.length} onClick={() => setSelectedKeys([])} size="small">取消选择</LobeButton>
-        <LobeButton disabled={!copyContext.count} onClick={copyVisibleOrSelected} size="small" type="primary">{copyContext.selected ? `复制已选 ${copyContext.count}` : `复制可见 ${copyContext.count}`}</LobeButton>
-        <LobeButton danger className={deleteArmed ? 'armed' : ''} disabled={!selectedKeys.length} onClick={deleteSelected} size="small" type={deleteArmed ? 'primary' : 'default'}>{deleteArmed ? `再次点击删除 ${selectedKeys.length}` : `删除已选 ${selectedKeys.length}`}</LobeButton>
-      </div>}
     </header>
 
     <div
-      className={`overview-content is-marquee-enabled ${viewMode === 'category' ? 'category-view' : ''} ${selectionActive ? 'is-selection-active' : ''}`}
+      className={`overview-content is-marquee-enabled ${viewMode === 'category' ? 'category-view' : ''} ${selectionModeActive ? 'is-selection-active' : ''}`}
       ref={overviewContentRef}
       {...marqueeSelection.handlers}
     >
@@ -724,7 +747,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
         key={group.category}
         group={group}
         language={language}
-        selectionActive={selectionActive}
+        selectionModeActive={selectionModeActive}
         selectedKeys={selectedKeys}
         editingKey={editingKey}
         onEditingChange={setEditingKey}

@@ -20,14 +20,22 @@ describe('Prompt overview operations', () => {
     expect(overviewTagInteractionState(0, false)).toEqual({
       reorderDisabled: false,
       selectionActive: false,
+      selectionModeActive: false,
       startMarqueeOnItems: false,
     });
     expect(overviewTagInteractionState(2, false)).toEqual({
       reorderDisabled: true,
       selectionActive: true,
+      selectionModeActive: true,
       startMarqueeOnItems: true,
     });
     expect(overviewTagInteractionState(0, true).reorderDisabled).toBe(true);
+    expect(overviewTagInteractionState(0, false, true)).toMatchObject({
+      reorderDisabled: true,
+      selectionActive: false,
+      selectionModeActive: true,
+      startMarqueeOnItems: true,
+    });
   });
 
   it('reorders the real tag array used by wrapped drag previews', () => {
