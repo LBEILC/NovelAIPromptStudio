@@ -56,6 +56,15 @@ Only current actionable macOS requests are kept here. Earlier completed, superse
 - Expected: The slider continuously changes the image-first grid between comfortable, compact, and overview density without clipping selection or grouped-card indicators, and its 14-pixel thumb retains visible symmetric clearance from both size icons at the minimum and maximum endpoints. Gallery cards remain image-first; a compact, pointer-transparent filename appears on hover or keyboard focus only above the content-driven width threshold. Gallery, Tag, and Workbench-tab hover previews remain transparent to pointer hit testing. Every grouped card immediately previews the member corresponding to the pointer position, and its filename, single-click detail target, and double-click Workbench target all remain synchronized. Keyboard activation without a pointer uses the cover. Floating preview panels collapse from Gallery blank-space clicks, while fixed panels remain open until explicitly collapsed. Selection, context menus, renaming, and cover management retain their existing scope.
 - Observed: Windows non-GUI checks completed through `a8fd737`: `npm ci`, all 167 tests, the production build, and the Lobe UI audit passed. On 2026-08-19, Windows interactive verification passed for the image-first card layout, synchronized member activation, width-dependent filename, and fixed-panel blank-click behavior. The user noted that the thumbnail-size slider thumb sat too close to its icons at both endpoints; `a8fd737` increases the logical gap from 8 to 12 pixels and awaits Windows and macOS interactive verification.
 
+## Verify Gallery filter-before-grouping and combined filters
+
+- Status: Pending
+- Date/source: 2026-08-20, Windows
+- Related commit: `55fe1e4`
+- Action: On an unlocked macOS session, follow `doc/manual-verification-20260820-gallery-filter-before-grouping.md`. Pay particular attention to searching a member-only Tag inside a similar-Prompt group, keyboard and trackpad interaction with multi-select Tag/model/Vibe controls, local calendar boundaries in the relative and custom import-date filters, popover collision and scrolling at minimum window size, and operation scope after filter changes.
+- Expected: Search and every advanced condition filter individual images before automatic grouping, so no non-matching member remains accessible through card scrubbing, detail navigation, selection, context menus, or batch actions. Different filter dimensions combine with AND; multi-selected model/Vibe values and “任意 Tag” combine with OR inside their own field; excluded Tags always win. Changing conditions clears batch selection, filtered-out previews reconcile safely, and light/dark plus keyboard states remain coherent on macOS.
+- Observed: Windows clean `npm ci`, all 190 tests in 35 files, the production build, and the Lobe UI audit passed for `55fe1e4`. Windows and macOS interactive verification remain pending.
+
 ## Verify manual update mode for unsigned macOS builds
 
 - Status: Pending
