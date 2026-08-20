@@ -1,6 +1,7 @@
 export const GALLERY_CARD_STAGGER_LIMIT = 12;
 export const GALLERY_CARD_EXIT_STAGGER_SECONDS = 0.006;
 export const GALLERY_CARD_EXIT_DURATION_SECONDS = 0.08;
+export const GALLERY_CARD_LAYOUT_DURATION_SECONDS = 0.2;
 export const GALLERY_COMPUTATION_GATE_MS = Math.round((
   GALLERY_CARD_STAGGER_LIMIT * GALLERY_CARD_EXIT_STAGGER_SECONDS
   + GALLERY_CARD_EXIT_DURATION_SECONDS
@@ -9,6 +10,13 @@ export const GALLERY_COMPUTATION_GATE_MS = Math.round((
 export function galleryCardTransitionDelay(index, phase = 'visible') {
   const boundedIndex = Math.min(Math.max(0, Number(index) || 0), GALLERY_CARD_STAGGER_LIMIT);
   return boundedIndex * (phase === 'exit' ? GALLERY_CARD_EXIT_STAGGER_SECONDS : 0.008);
+}
+
+export function galleryCardLayoutTransition(reduceMotion = false) {
+  return reduceMotion ? { duration: 0 } : {
+    duration: GALLERY_CARD_LAYOUT_DURATION_SECONDS,
+    ease: [0.16, 1, 0.3, 1],
+  };
 }
 
 export function galleryComputationGateDelay(reduceMotion = false) {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   GALLERY_COMPUTATION_GATE_MS,
+  galleryCardLayoutTransition,
   galleryCardTransitionDelay,
   galleryComputationGateDelay,
   scheduleGalleryComputation,
@@ -18,6 +19,14 @@ describe('gallery result transition scheduling', () => {
     expect(galleryComputationGateDelay()).toBe(GALLERY_COMPUTATION_GATE_MS);
     expect(GALLERY_COMPUTATION_GATE_MS).toBe(176);
     expect(galleryComputationGateDelay(true)).toBe(0);
+  });
+
+  it('uses a short interruptible layout transition and disables it for reduced motion', () => {
+    expect(galleryCardLayoutTransition()).toEqual({
+      duration: 0.2,
+      ease: [0.16, 1, 0.3, 1],
+    });
+    expect(galleryCardLayoutTransition(true)).toEqual({ duration: 0 });
   });
 
   it('cancels superseded computation requests', () => {

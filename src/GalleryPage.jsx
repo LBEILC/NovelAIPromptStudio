@@ -2,7 +2,7 @@ import { Accordion, AccordionItem, ActionIcon, DatePicker as LobeDatePicker, Dra
 import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, Slider, SplitButton, Switch as LobeSwitch } from '@lobehub/ui/base-ui';
 import dayjs from 'dayjs';
 import { AnimatePresence, motion } from 'motion/react';
-import { memo, startTransition, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
@@ -20,6 +20,7 @@ import {
   GALLERY_CARD_SIZE_MAX,
   GALLERY_CARD_SIZE_MIN,
   galleryDensityForSize,
+  normalizeGalleryCardSize,
   readGalleryCardSize,
   writeGalleryCardSize,
 } from './lib/galleryLayout.js';
@@ -48,7 +49,7 @@ import {
 import { countPromptTags, positiveRawPromptScopes } from './lib/promptStructure.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
 import { gallerySmartCollectionDefaultName } from './lib/galleryCollections.js';
-import { galleryCardTransitionDelay } from './lib/galleryTransition.js';
+import { galleryCardLayoutTransition, galleryCardTransitionDelay } from './lib/galleryTransition.js';
 import { MOTION_EASE_OUT, useStudioReducedMotion } from './lib/motion.js';
 
 function formatDate(value) {
@@ -762,10 +763,13 @@ const GalleryGridCard = memo(function GalleryGridCard({ actionsRef, active, canO
   />;
 });
 
-const GalleryGridSlot = memo(function GalleryGridSlot({ actionsRef, active, canOpenWorkbench, group, index, reduceMotion, selected }) {
+const GalleryGridSlot = memo(function GalleryGridSlot({ actionsRef, active, canOpenWorkbench, group, index, layoutSize, reduceMotion, selected }) {
   return <motion.div
     className="gallery-card-slot"
-    custom={{ index, reduceMotion }}
+    custom={{ index, layoutSize, reduceMotion }}
+    layout={!reduceMotion}
+    layoutDependency={layoutSize}
+    transition={{ layout: galleryCardLayoutTransition(reduceMotion) }}
     variants={GALLERY_CARD_TRANSITION_VARIANTS}
   >
     <GalleryGridCard
@@ -778,7 +782,7 @@ const GalleryGridSlot = memo(function GalleryGridSlot({ actionsRef, active, canO
   </motion.div>;
 });
 
-const ProgressiveGalleryGrid = memo(function ProgressiveGalleryGrid({ actionsRef, canOpenWorkbench, groups, onRenderingChange, previewGroupId, reduceMotion, selectedGroupIds }) {
+const ProgressiveGalleryGrid = memo(function ProgressiveGalleryGrid({ actionsRef, canOpenWorkbench, groups, layoutSize, onRenderingChange, previewGroupId, reduceMotion, selectedGroupIds }) {
   const [renderCount, setRenderCount] = useState(() => nextGalleryRenderCount(groups.length));
   const hasMore = renderCount < groups.length;
   const selectedIds = new Set(selectedGroupIds);
@@ -803,6 +807,7 @@ const ProgressiveGalleryGrid = memo(function ProgressiveGalleryGrid({ actionsRef
     group={group}
     index={index}
     key={group.id}
+    layoutSize={layoutSize}
     reduceMotion={reduceMotion}
     selected={selectedIds.has(group.id)}
   />);
@@ -900,6 +905,35 @@ export default function GalleryPage({
   const [loadingHeld, setLoadingHeld] = useState(transitionBusy);
   const renameTargetRef = useRef('');
   const galleryScrollRef = useRef(null);
+  const galleryCardSizeFrameRef = useRef(null);
+  const pendingGalleryCardSizeRef = useRef(galleryCardSize);
+
+  const updateGalleryCardSize = useCallback((value) => {
+    const nextSize = normalizeGalleryCardSize(value);
+    if (nextSize === undefined) return;
+    pendingGalleryCardSizeRef.current = nextSize;
+    if (galleryCardSizeFrameRef.current !== null) return;
+    galleryCardSizeFrameRef.current = window.requestAnimationFrame(() => {
+      galleryCardSizeFrameRef.current = null;
+      setGalleryCardSize(pendingGalleryCardSizeRef.current);
+    });
+  }, []);
+
+  const completeGalleryCardSize = useCallback((value) => {
+    const nextSize = normalizeGalleryCardSize(value);
+    if (nextSize === undefined) return;
+    pendingGalleryCardSizeRef.current = nextSize;
+    if (galleryCardSizeFrameRef.current !== null) {
+      window.cancelAnimationFrame(galleryCardSizeFrameRef.current);
+      galleryCardSizeFrameRef.current = null;
+    }
+    setGalleryCardSize(nextSize);
+    writeGalleryCardSize(panelStorage(), nextSize);
+  }, []);
+
+  useEffect(() => () => {
+    if (galleryCardSizeFrameRef.current !== null) window.cancelAnimationFrame(galleryCardSizeFrameRef.current);
+  }, []);
 
   useEffect(() => {
     if (transitionBusy) {
@@ -1028,8 +1062,8 @@ export default function GalleryPage({
           getAriaValueText={(value) => `${value} 像素`}
           max={GALLERY_CARD_SIZE_MAX}
           min={GALLERY_CARD_SIZE_MIN}
-          onChange={setGalleryCardSize}
-          onChangeComplete={(value) => writeGalleryCardSize(panelStorage(), value)}
+          onChange={updateGalleryCardSize}
+          onChangeComplete={completeGalleryCardSize}
           step={8}
           value={galleryCardSize}
         />
@@ -1120,6 +1154,7 @@ export default function GalleryPage({
                 canOpenWorkbench={view !== 'trash'}
                 groups={groups}
                 key={contentKey}
+                layoutSize={galleryCardSize}
                 onRenderingChange={setProgressiveRendering}
                 previewGroupId={previewGroup?.id || ''}
                 reduceMotion={reduceMotion}
