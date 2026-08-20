@@ -6,10 +6,10 @@ Only current actionable macOS requests are kept here. Earlier completed, superse
 
 - Status: Pending
 - Date/source: 2026-08-20, Windows
-- Related commit: `0b76414`
+- Related commits: `0b76414`, `d60c22a`
 - Action: On an unlocked macOS session, check out current `main` and follow `doc/manual-verification-20260820-marquee-batch-selection.md`. Pay particular attention to starting a marquee from card/Tag surfaces without losing ordinary click or double-click behavior, `Shift` additive selection, `Command` toggle selection, pointer cancellation, dark/light themes, minimum window size, grouped-card scrubbing, and Tag drag sorting after leaving multi-select mode.
 - Expected: Gallery cards can be marquee-selected at any time, while Prompt Tags can be marquee-selected in multi-select mode. Native text/image dragging never appears, the full tinted selection rectangle tracks pointer bounds, intersecting items update live, `Shift` adds, `Command` toggles, and a completed drag cannot leak an extra click. Ordinary preview, Workbench activation, context menus, grouped-member scrubbing, selection buttons, Tag editing, and Tag reorder remain intact.
-- Observed: Windows clean `npm ci`, all 214 tests in 40 files, and the production build passed. The shared selection logic also has unit coverage for `metaKey` toggle behavior and composite Tag keys. Windows and macOS interactive verification are pending.
+- Observed: Windows clean `npm ci` passed. The first Windows interactive check found that early pointer capture broke ordinary clicks and viewport-space geometry dropped earlier hits while scrolling; `d60c22a` delays capture until the drag threshold and anchors hit testing in scroll-content coordinates. All 216 tests in 40 files and the production build pass after the fix, including unit coverage for scroll conversion, viewport clipping, `metaKey` toggle behavior, and composite Tag keys. Windows re-verification and macOS interactive verification are pending.
 
 ## Verify dependency security refresh and macOS packaging
 
