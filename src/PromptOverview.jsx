@@ -28,9 +28,11 @@ import {
   overviewCopyContext,
   overviewEntries,
   reorderOverviewTags,
+  selectedOverviewEntries,
   shouldReorderOverviewTags,
   overviewTagKey,
   toggleOverviewSelectionGroup,
+  updateOverviewTags,
 } from './lib/promptOverview.js';
 import { DEFAULT_WORKBENCH_VIEW_STATE } from './lib/workbenchSession.js';
 
@@ -440,6 +442,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
   const visibleEntries = useMemo(() => overviewEntries(visibleScopes), [visibleScopes]);
   const categoryGroups = useMemo(() => overviewCategoryGroups(visibleEntries), [visibleEntries]);
   const copyContext = useMemo(() => overviewCopyContext(project, visibleScopes, selectedKeys), [project, visibleScopes, selectedKeys]);
+  const selectedEntries = useMemo(() => selectedOverviewEntries(project, selectedKeys), [project, selectedKeys]);
   const visibleCopyContext = useMemo(() => overviewCopyContext(project, visibleScopes, []), [project, visibleScopes]);
   const categorySourceScopes = useMemo(() => filterOverviewScopes(project, { ...filters, category: 'All' }), [project, filters]);
   const categoryCounts = useMemo(() => overviewEntries(categorySourceScopes).reduce((counts, entry) => {
@@ -593,6 +596,38 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     }
   };
 
+  const openTagContextMenu = (event, scopeKey, tag) => {
+    if (!selecting) {
+      onTagContextMenu?.(event, scopeKey, tag);
+      return;
+    }
+    const contextKeys = selectedKeys.length ? selectedKeys : [overviewTagKey(scopeKey, tag.id)];
+    const contextEntries = selectedKeys.length ? selectedEntries : selectedOverviewEntries(project, contextKeys);
+    const contextCopy = overviewCopyContext(project, visibleScopes, contextKeys);
+    if (!selectedKeys.length) {
+      setSelectedKeys(contextKeys);
+      setDeleteArmed(false);
+    }
+    onTagContextMenu?.(event, scopeKey, tag, {
+      count: contextEntries.length,
+      copyCount: contextCopy.count,
+      ignored: contextCopy.ignored,
+      translating: contextEntries.some((entry) => translatingKeys.has(entry.key)),
+      onCopy: () => onCopyText?.(contextCopy.text, contextCopy.count, true, contextCopy.ignored),
+      onTranslate: () => translateEntries(contextEntries),
+      onCategoryChange: (category) => {
+        updateProject(updateOverviewTags(project, contextKeys, { category, category_source: 'manual' }));
+        onNotify?.(`已设置 ${contextEntries.length} 个 Tag 分类`);
+      },
+      onDelete: () => {
+        updateProject(deleteOverviewTags(project, contextKeys));
+        setSelectedKeys([]);
+        setDeleteArmed(false);
+        onNotify?.(`已删除 ${contextEntries.length} 个 Tag`);
+      },
+    });
+  };
+
   const addCharacter = () => {
     const next = addPromptCharacter(project);
     if (next === project) { onNotify?.('最多支持 6 个 Character Prompt'); return; }
@@ -629,7 +664,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     onKeyboardMove: keyboardMove,
     onToggleSelect: toggleSelection,
     onToggleGroup: toggleEntryGroup,
-    onTagContextMenu,
+    onTagContextMenu: openTagContextMenu,
     translatingKeys,
     rawDraft,
     rawEditingScopeKey,
@@ -686,7 +721,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
         onToggleGroup={toggleEntryGroup}
         onTranslateTag={(scopeKey, tag) => translateEntries([{ scopeKey, tag }])}
         onUpdateTag={updateTag}
-        onTagContextMenu={onTagContextMenu}
+        onTagContextMenu={openTagContextMenu}
         translatingKeys={translatingKeys}
       />)}
 

@@ -109,6 +109,62 @@ export function overviewCopyContext(project, visibleScopes, selectedKeys = []) {
   };
 }
 
+export function selectedOverviewEntries(project, selectedKeys = []) {
+  const selected = new Set(selectedKeys);
+  return overviewEntries(getPromptScopes(project)).filter((entry) => selected.has(entry.key));
+}
+
+export function overviewSelectionMenuItems({
+  categories = [],
+  count = 0,
+  copyCount = 0,
+  ignored = 0,
+  onCategoryChange,
+  onCopy,
+  onDelete,
+  onTranslate,
+  translating = false,
+}) {
+  const copyLabel = ignored
+    ? `复制可用 ${copyCount} 个 Prompt Tag（忽略 ${ignored} 个排除 Tag）`
+    : `复制已选 ${copyCount} 个 Prompt Tag`;
+  return [
+    { key: 'copy-selected-tags', label: copyLabel, disabled: copyCount < 1, onClick: () => onCopy?.() },
+    {
+      key: 'translate-selected-tags',
+      label: translating ? 'AI 翻译已选 Tag 中…' : `AI 翻译已选 ${count} 个 Tag`,
+      disabled: count < 1 || translating,
+      onClick: () => onTranslate?.(),
+    },
+    {
+      key: 'set-selected-tags-category',
+      label: `设置已选 ${count} 个 Tag 分类`,
+      type: 'submenu',
+      openOnHover: true,
+      children: categories.map(([category, label]) => ({
+        key: `selected-category-${category}`,
+        label,
+        onClick: () => onCategoryChange?.(category),
+      })),
+    },
+    { key: 'selected-tags-divider', type: 'divider' },
+    { key: 'delete-selected-tags', label: `删除已选 ${count} 个 Tag`, danger: true, onClick: () => onDelete?.() },
+  ];
+}
+
+export function updateOverviewTags(project, selectedKeys = [], patch = {}) {
+  const selected = new Set(selectedKeys);
+  return getPromptScopes(project).reduce((current, scope) => {
+    let changed = false;
+    const nextTags = scope.tags.map((tag) => {
+      if (!selected.has(overviewTagKey(scope.key, tag.id))) return tag;
+      changed = true;
+      return { ...tag, ...patch };
+    });
+    return changed ? updatePromptScope(current, scope.key, nextTags) : current;
+  }, project);
+}
+
 export function deleteOverviewTags(project, selectedKeys = []) {
   const selected = new Set(selectedKeys);
   return getPromptScopes(project).reduce((current, scope) => {

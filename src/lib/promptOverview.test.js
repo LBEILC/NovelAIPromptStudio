@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { deleteOverviewTags, filterOverviewScopes, isOverviewTagVisible, overviewCategoryGroups, overviewCopyContext, overviewEntries, reorderOverviewTags, shouldReorderOverviewTags, toggleOverviewSelectionGroup } from './promptOverview.js';
+import { describe, expect, it, vi } from 'vitest';
+import { deleteOverviewTags, filterOverviewScopes, isOverviewTagVisible, overviewCategoryGroups, overviewCopyContext, overviewEntries, overviewSelectionMenuItems, reorderOverviewTags, selectedOverviewEntries, shouldReorderOverviewTags, toggleOverviewSelectionGroup, updateOverviewTags } from './promptOverview.js';
 
 function projectFixture() {
   const tag = (id, value, category, translation = '', weight = 1) => ({ id, tag: value, category, translation, weight, note: '' });
@@ -115,5 +115,47 @@ describe('Prompt overview operations', () => {
     expect(next.tags.map((tag) => tag.tag)).toEqual(['night']);
     expect(next.prompt_structure.characters[0].prompt_tags).toEqual([]);
     expect(next.prompt_structure.base_undesired_tags).toHaveLength(1);
+  });
+
+  it('updates selected tags across prompt scopes without changing unselected tags', () => {
+    const project = projectFixture();
+    const entries = overviewEntries(filterOverviewScopes(project));
+    const selectedKeys = entries.filter((entry) => ['artist', 'hair', 'lowres'].includes(entry.tag.id)).map((entry) => entry.key);
+    const next = updateOverviewTags(project, selectedKeys, { category: 'Body', category_source: 'manual' });
+
+    expect(selectedOverviewEntries(next, selectedKeys).every((entry) => entry.tag.category === 'Body')).toBe(true);
+    expect(next.tags.find((tag) => tag.id === 'scene').category).toBe('Environment');
+    expect(next.prompt_structure.characters[0].prompt_tags.find((tag) => tag.id === 'shirt').category).toBe('Clothing');
+  });
+
+  it('builds a Tag batch context menu whose actions target the active selection', () => {
+    const onCopy = vi.fn();
+    const onTranslate = vi.fn();
+    const onCategoryChange = vi.fn();
+    const onDelete = vi.fn();
+    const items = overviewSelectionMenuItems({
+      categories: [['Body', '身体'], ['Clothing', '服装']],
+      count: 3,
+      copyCount: 2,
+      ignored: 1,
+      onCategoryChange,
+      onCopy,
+      onDelete,
+      onTranslate,
+    });
+    const categoryMenu = items.find((item) => item.key === 'set-selected-tags-category');
+
+    expect(items.find((item) => item.key === 'copy-selected-tags').label).toContain('忽略 1 个排除 Tag');
+    expect(categoryMenu.label).toContain('已选 3 个');
+    expect(items.find((item) => item.key === 'delete-selected-tags').danger).toBe(true);
+    items.find((item) => item.key === 'copy-selected-tags').onClick();
+    items.find((item) => item.key === 'translate-selected-tags').onClick();
+    categoryMenu.children[1].onClick();
+    items.find((item) => item.key === 'delete-selected-tags').onClick();
+
+    expect(onCopy).toHaveBeenCalledOnce();
+    expect(onTranslate).toHaveBeenCalledOnce();
+    expect(onCategoryChange).toHaveBeenCalledWith('Clothing');
+    expect(onDelete).toHaveBeenCalledOnce();
   });
 });

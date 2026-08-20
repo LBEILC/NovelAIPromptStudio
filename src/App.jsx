@@ -54,6 +54,7 @@ import {
 import { readGalleryGrouping, writeGalleryGrouping } from './lib/galleryGrouping.js';
 import { scheduleGalleryComputation } from './lib/galleryTransition.js';
 import { MOTION_EASE_OUT, useStudioReducedMotion } from './lib/motion.js';
+import { overviewSelectionMenuItems } from './lib/promptOverview.js';
 
 const unavailable = (error) => async () => ({ ok: false, error });
 const studio = window.studio || {
@@ -774,8 +775,31 @@ export default function App({ appearance, setAppearance }) {
     showToast(result.ai_count ? `已翻译并分类 ${entries.length} 个 Tag` : '已复用本地翻译与分类');
   };
 
-  const tagContextMenu = (event, scopeKey, tag) => {
+  const tagContextMenu = (event, scopeKey, tag, selectionContext = null) => {
     if (!activeTab?.project) return;
+    if (selectionContext?.count) {
+      const items = overviewSelectionMenuItems({
+        categories: TAG_CONTEXT_CATEGORIES,
+        ...selectionContext,
+        onDelete: async () => {
+          if (!(await requestConfirmation({
+            title: `删除已选 ${selectionContext.count} 个 Tag？`,
+            message: '这些 Tag 将从当前工作台草稿的 Prompt 结构中删除。',
+            okText: '删除已选 Tag',
+            danger: true,
+          }))) return;
+          selectionContext.onDelete?.();
+        },
+      }).map((item) => {
+        if (item.key === 'copy-selected-tags') return { ...item, icon: Copy };
+        if (item.key === 'translate-selected-tags') return { ...item, icon: Sparkles };
+        if (item.key === 'set-selected-tags-category') return { ...item, icon: Tags };
+        if (item.key === 'delete-selected-tags') return { ...item, icon: Trash2 };
+        return item;
+      });
+      openContextMenu(event, items);
+      return;
+    }
     const project = activeTab.project;
     const scope = getPromptScope(project, scopeKey);
     const setCategory = (category) => updateWorkbenchProject(updatePromptScope(project, scope.key, scope.tags.map((item) => item.id === tag.id ? { ...item, category, category_source: 'manual' } : item)));
