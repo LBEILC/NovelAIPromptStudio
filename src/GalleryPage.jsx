@@ -48,6 +48,7 @@ import {
 import { countPromptTags, positiveRawPromptScopes } from './lib/promptStructure.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
 import { gallerySmartCollectionDefaultName } from './lib/galleryCollections.js';
+import { galleryCardTransitionDelay } from './lib/galleryTransition.js';
 import { MOTION_EASE_OUT, useStudioReducedMotion } from './lib/motion.js';
 
 function formatDate(value) {
@@ -571,10 +572,6 @@ const GALLERY_RESULTS_VARIANTS = {
   visible: { opacity: 1 },
   exit: { opacity: 1, transition: { when: 'afterChildren' } },
 };
-
-export function galleryCardTransitionDelay(index, phase = 'visible') {
-  return Math.min(Math.max(0, Number(index) || 0), 12) * (phase === 'exit' ? 0.006 : 0.008);
-}
 
 const GALLERY_CARD_TRANSITION_VARIANTS = {
   enter: ({ reduceMotion }) => ({ opacity: reduceMotion ? 1 : 0 }),

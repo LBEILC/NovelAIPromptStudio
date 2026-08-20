@@ -1,4 +1,4 @@
-import { Activity, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Activity, startTransition, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { dropTargetForExternal, monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
 import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
@@ -51,6 +51,7 @@ import {
   writeActiveGalleryCollection,
 } from './lib/galleryCollections.js';
 import { readGalleryGrouping, writeGalleryGrouping } from './lib/galleryGrouping.js';
+import { scheduleGalleryComputation } from './lib/galleryTransition.js';
 import { MOTION_EASE_OUT, useStudioReducedMotion } from './lib/motion.js';
 
 const unavailable = (error) => async () => ({ ok: false, error });
@@ -258,6 +259,7 @@ export default function App({ appearance, setAppearance }) {
   const activeTab = activeWorkbenchTab(workbenchSession);
   const projects = projectsByView[galleryView] || [];
   const libraryLoading = Boolean(libraryLoadingByView[galleryView]);
+  const reduceMotion = useStudioReducedMotion(appearance.motion);
 
   const showToast = useCallback((message, type = 'success') => {
     const method = lobeToast[type] || lobeToast.success;
@@ -605,7 +607,14 @@ export default function App({ appearance, setAppearance }) {
     sort,
     view: galleryView,
   }), [activeCollection, galleryFilters, galleryGrouping, galleryView, projects, sort]);
-  const deferredGalleryComputation = useDeferredValue(galleryComputation);
+  const [gatedGalleryComputation, setGatedGalleryComputation] = useState(galleryComputation);
+  useEffect(() => {
+    if (gatedGalleryComputation === galleryComputation) return undefined;
+    return scheduleGalleryComputation(() => {
+      startTransition(() => setGatedGalleryComputation(galleryComputation));
+    }, reduceMotion);
+  }, [galleryComputation, gatedGalleryComputation, reduceMotion]);
+  const deferredGalleryComputation = useDeferredValue(gatedGalleryComputation);
   const collectionScopedProjects = useMemo(
     () => galleryCollectionScope(
       deferredGalleryComputation.projects,
@@ -615,12 +624,12 @@ export default function App({ appearance, setAppearance }) {
   );
   const galleryCollectionsWithCounts = useMemo(() => galleryCollections.map((collection) => ({
     ...collection,
-    image_count: galleryView === 'all'
+    image_count: deferredGalleryComputation.view === 'all'
       ? collection.kind === 'manual'
         ? Number(collection.active_member_count ?? collection.member_ids?.length ?? 0)
         : galleryCollectionScope(deferredGalleryComputation.projects, collection).length
       : collection.kind === 'manual' ? Number(collection.active_member_count || 0) : null,
-  })), [deferredGalleryComputation.projects, galleryCollections, galleryView]);
+  })), [deferredGalleryComputation.projects, deferredGalleryComputation.view, galleryCollections]);
   const editingSmartCollection = galleryCollectionsWithCounts.find(
     (collection) => collection.id === editingSmartCollectionId && collection.kind === 'smart',
   ) || null;
