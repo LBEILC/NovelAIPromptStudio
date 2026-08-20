@@ -6,6 +6,7 @@ import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useRef,
 import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
+import { MarqueeSelectionOverlay, useMarqueeSelection } from './components/MarqueeSelection.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
 import { galleryEmptyState, galleryGroupMember, galleryScrubMemberIndex, shouldCollapseGalleryPreview } from './lib/gallery.js';
 import {
@@ -29,6 +30,7 @@ import {
   writeGalleryCardSize,
 } from './lib/galleryLayout.js';
 import { fitTabPreviewCanvas } from './lib/imagePreview.js';
+import { encodeMarqueeKey } from './lib/marqueeSelection.js';
 import {
   DEFAULT_GALLERY_GROUPING,
   GALLERY_PROMPT_SCOPES,
@@ -771,6 +773,7 @@ const GalleryGridSlot = memo(function GalleryGridSlot({ actionsRef, active, canO
   return <motion.div
     className="gallery-card-slot"
     custom={{ index, layoutSize, reduceMotion }}
+    data-marquee-key={encodeMarqueeKey(group.id)}
     layout={!reduceMotion}
     layoutDependency={layoutSize}
     transition={{ layout: galleryCardLayoutTransition(reduceMotion) }}
@@ -861,6 +864,7 @@ export default function GalleryPage({
   onReveal,
   onSetCover,
   onSelectAll,
+  onSelectionChange,
   onSortChange,
   onToggleSelect,
   onTrash,
@@ -998,6 +1002,12 @@ export default function GalleryPage({
   }, [groups, loadingHeld, transitionBusy]);
 
   const showLoadingPage = transitionBusy || loadingHeld;
+  const marqueeSelection = useMarqueeSelection({
+    containerRef: galleryScrollRef,
+    enabled: !showLoadingPage && groups.length > 0,
+    onSelectionChange,
+    selectedKeys: selectedGroupIds,
+  });
 
   useLayoutEffect(() => {
     if (updating && galleryScrollRef.current) galleryScrollRef.current.scrollTop = 0;
@@ -1179,6 +1189,7 @@ export default function GalleryPage({
       <motion.section
         aria-busy={showLoadingPage || progressiveRendering}
         className="gallery-grid-scroll"
+        {...marqueeSelection.handlers}
         layoutScroll
         onClick={(event) => {
           if (!shouldCollapseGalleryPreview(event.target, previewPinned)) return;
@@ -1227,6 +1238,7 @@ export default function GalleryPage({
           </AnimatePresence>
         </PopoverGroup>
       </motion.section>
+      <MarqueeSelectionOverlay rect={marqueeSelection.rect}/>
       <LobeDraggablePanel
         className={`gallery-preview-shell ${previewPinned ? 'is-fixed' : 'is-floating'}`}
         classNames={{ content: 'workspace-side-panel-content' }}

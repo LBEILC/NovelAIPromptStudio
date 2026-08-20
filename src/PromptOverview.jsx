@@ -16,8 +16,10 @@ import {
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
 import { addPromptCharacter, getPromptScope, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
 import Icon from './components/Icon.jsx';
+import { MarqueeSelectionOverlay, useMarqueeSelection } from './components/MarqueeSelection.jsx';
 import { TagCategorySection, TagChip, TagHoverPreview, TagPopover, TagQuickEditor } from './components/TagManagement.jsx';
 import { tagPresentation } from './lib/tagManagement.js';
+import { encodeMarqueeKey } from './lib/marqueeSelection.js';
 import {
   deleteOverviewTags,
   filterOverviewScopes,
@@ -87,7 +89,7 @@ function SortableTag({ animateLayout, disabled, display, editKey, editingKey, in
     selecting={selecting}
     tag={tag}
     tooltip={<TagHoverPreview
-      actionHint={selecting ? '点击选择' : disabled ? '点击编辑 · 清除筛选后可拖动排序' : '点击编辑 · 拖动排序 · Alt + 方向键键盘排序'}
+      actionHint={selecting ? '点击选择 · 拖动框选' : disabled ? '点击编辑 · 清除筛选后可拖动排序' : '点击编辑 · 拖动排序 · Alt + 方向键键盘排序'}
       language={language}
       scopeLabel={scope.label}
       tag={tag}
@@ -98,6 +100,7 @@ function SortableTag({ animateLayout, disabled, display, editKey, editingKey, in
 
   return <motion.div
     className={`overview-tag-shell ${isDragging ? 'dragging' : ''}`}
+    data-marquee-key={encodeMarqueeKey(editKey)}
     layout={animateLayout ? 'position' : false}
     ref={setNodeRef}
     role="listitem"
@@ -359,6 +362,7 @@ function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, o
       const warning = syntaxMessage(entry.tag);
       const tagButton = <TagChip
         className={entry.scopePolarity === 'undesired' ? 'undesired-tag' : ''}
+        data-marquee-key={encodeMarqueeKey(entry.key)}
         display={display}
         onClick={(event) => {
           if (!selecting) return;
@@ -372,7 +376,7 @@ function CategoryGroup({ group, language, selecting, selectedKeys, editingKey, o
         selecting={selecting}
         tag={entry.tag}
         tooltip={<TagHoverPreview
-          actionHint={selecting ? '点击选择' : '点击编辑'}
+          actionHint={selecting ? '点击选择 · 拖动框选' : '点击编辑'}
           language={language}
           scopeLabel={entry.scopeLabel}
           tag={entry.tag}
@@ -410,6 +414,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
   const [rawDraft, setRawDraft] = useState('');
   const [editingCharacterId, setEditingCharacterId] = useState('');
   const [translatingKeys, setTranslatingKeys] = useState(new Set());
+  const overviewContentRef = useRef(null);
   const structure = project.prompt_structure;
 
   useEffect(() => {
@@ -444,6 +449,15 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
   const baseScopes = visibleScopes.filter((scope) => scope.kind === 'base');
   const characterScopes = visibleScopes.filter((scope) => scope.kind === 'character');
   const filtered = filters.category !== 'All' || filters.polarity !== 'all' || filters.domain !== 'all' || Boolean(filters.query.trim());
+  const marqueeSelection = useMarqueeSelection({
+    containerRef: overviewContentRef,
+    enabled: selecting && visibleEntries.length > 0,
+    onSelectionChange: (keys) => {
+      setDeleteArmed(false);
+      setSelectedKeys(keys);
+    },
+    selectedKeys,
+  });
 
   useEffect(() => {
     if (!focusTagId || !focusScopeKey) return;
@@ -655,7 +669,11 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
       </div>}
     </header>
 
-    <div className={`overview-content ${viewMode === 'category' ? 'category-view' : ''}`}>
+    <div
+      className={`overview-content ${viewMode === 'category' ? 'category-view' : ''} ${selecting ? 'is-marquee-enabled' : ''}`}
+      ref={overviewContentRef}
+      {...marqueeSelection.handlers}
+    >
       {viewMode === 'category' && categoryGroups.map((group) => <CategoryGroup
         key={group.category}
         group={group}
@@ -700,6 +718,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
         </LobeButton>
       </div>}
     </div>
+    <MarqueeSelectionOverlay rect={marqueeSelection.rect}/>
     </div>
   </LobeTooltipGroup>;
 }

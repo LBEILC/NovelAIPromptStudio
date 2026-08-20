@@ -1241,6 +1241,10 @@ export default function App({ appearance, setAppearance }) {
         onRename={renameProject}
         onRestore={restoreProjects}
         onReveal={(project) => studio.revealFile(project.image_path)}
+        onSelectionChange={(groupIds) => {
+          setSelectedGroupIds(groupIds);
+          lastSelectedGroupRef.current = groupIds.at(-1) || '';
+        }}
         onSetCover={setGroupCover}
         onSelectAll={() => setSelectedGroupIds(visibleGroups.map((group) => group.id))}
         onSortChange={setSort}
