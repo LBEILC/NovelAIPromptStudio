@@ -203,6 +203,7 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .gallery-filter-option small { flex: 0 0 auto; color: var(--muted); font: var(--text-micro) var(--font-mono); }
 .gallery-filter-date-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .gallery-filter-date-range label { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 7px; color: var(--muted); font-size: var(--text-micro); }
+.gallery-filter-date-range > label > :last-child { min-width: 0; width: 100%; }
 .gallery-filter-trigger.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .gallery-sort { min-width: 0; flex: 0 0 130px; }
 .gallery-size-control { min-width: 152px; flex: 0 0 auto; display: flex; align-items: center; gap: 12px; color: var(--muted); }

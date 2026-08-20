@@ -1,5 +1,6 @@
-import { Accordion, AccordionItem, ActionIcon, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, Highlighter, Popover, PopoverGroup, SearchBar as LobeSearchBar } from '@lobehub/ui';
+import { Accordion, AccordionItem, ActionIcon, DatePicker as LobeDatePicker, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, Highlighter, Popover, PopoverGroup, SearchBar as LobeSearchBar } from '@lobehub/ui';
 import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, Slider, SplitButton, Switch as LobeSwitch } from '@lobehub/ui/base-ui';
+import dayjs from 'dayjs';
 import { useEffect, useRef, useState } from 'react';
 import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
@@ -182,6 +183,10 @@ function GalleryFilterSelect({ items, ...props }) {
   />;
 }
 
+function galleryDatePopupContainer(trigger) {
+  return trigger.closest('.gallery-filter-popover') || document.body;
+}
+
 export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, options = {}, onChange }) {
   const value = normalizeGalleryFilters(filters);
   const activeCount = galleryActiveFilterCount(value);
@@ -205,10 +210,9 @@ export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, option
       <GalleryFilterSelect
         aria-label="必须包含的 Tag"
         items={tagOptions}
-        mode="tags"
+        mode="multiple"
         onChange={(includeTags) => onChange({ includeTags: Array.isArray(includeTags) ? includeTags : [] })}
-        placeholder="选择或输入 Tag"
-        tokenSeparators={[',', '，']}
+        placeholder="选择 Tag"
         value={value.includeTags}
       />
     </section>
@@ -217,10 +221,9 @@ export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, option
       <GalleryFilterSelect
         aria-label="要排除的 Tag"
         items={tagOptions}
-        mode="tags"
+        mode="multiple"
         onChange={(excludeTags) => onChange({ excludeTags: Array.isArray(excludeTags) ? excludeTags : [] })}
-        placeholder="选择或输入不想出现的 Tag"
-        tokenSeparators={[',', '，']}
+        placeholder="选择不想出现的 Tag"
         value={value.excludeTags}
       />
     </section>
@@ -258,8 +261,26 @@ export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, option
         value={value.datePreset}
       />
       {value.datePreset === 'custom' && <div className="gallery-filter-date-range">
-        <label><span>从</span><LobeInput aria-label="最早导入日期" onChange={(event) => onChange({ dateFrom: event.target.value })} size="small" type="date" value={value.dateFrom}/></label>
-        <label><span>至</span><LobeInput aria-label="最晚导入日期" onChange={(event) => onChange({ dateTo: event.target.value })} size="small" type="date" value={value.dateTo}/></label>
+        <label><span>从</span><LobeDatePicker
+          allowClear
+          aria-label="最早导入日期"
+          format="YYYY-MM-DD"
+          getPopupContainer={galleryDatePopupContainer}
+          onChange={(_date, dateString) => onChange({ dateFrom: String(dateString || '') })}
+          placeholder="开始日期"
+          size="small"
+          value={value.dateFrom ? dayjs(value.dateFrom) : null}
+        /></label>
+        <label><span>至</span><LobeDatePicker
+          allowClear
+          aria-label="最晚导入日期"
+          format="YYYY-MM-DD"
+          getPopupContainer={galleryDatePopupContainer}
+          onChange={(_date, dateString) => onChange({ dateTo: String(dateString || '') })}
+          placeholder="结束日期"
+          size="small"
+          value={value.dateTo ? dayjs(value.dateTo) : null}
+        /></label>
       </div>}
     </section>
   </div>;

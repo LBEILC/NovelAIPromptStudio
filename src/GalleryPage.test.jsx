@@ -8,6 +8,7 @@ vi.mock('@lobehub/ui', () => {
     Accordion: Component,
     AccordionItem: Component,
     ActionIcon: Component,
+    DatePicker: Component,
     DraggablePanel: Object.assign(Component, { Body: Component }),
     Empty: Component,
     Highlighter: Component,
@@ -142,12 +143,16 @@ describe('GalleryFilterControl', () => {
     expect(element.props.children.props['aria-label']).toContain('已启用 3 项');
     expect(element.props.children.props['aria-pressed']).toBe(true);
     includeSection.props.children[1].props.onChange(['bagpipe', 'uniform']);
+    expect(includeSection.props.children[1].props.mode).toBe('multiple');
     dateSection.props.children[1].props.onChange('30d');
+    const datePickers = dateSection.props.children[2].props.children;
+    datePickers[0].props.children[1].props.onChange(null, '2026-08-03');
     clearButton.props.onClick();
 
     expect(onChange.mock.calls).toEqual([
       [{ includeTags: ['bagpipe', 'uniform'] }],
       [{ datePreset: '30d' }],
+      [{ dateFrom: '2026-08-03' }],
       [expect.objectContaining({ query: 'bagpipe', includeTags: [], models: [], datePreset: 'all' })],
     ]);
   });
