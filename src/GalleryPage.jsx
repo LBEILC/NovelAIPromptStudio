@@ -397,7 +397,7 @@ function GalleryCollectionsPanel({
 
   return <div className="gallery-collections-panel">
     <header className="gallery-collections-header">
-      <div><strong>收藏集</strong><small>先限定图片范围，再应用筛选与分组</small></div>
+      <strong>收藏集</strong>
       <Popover
         arrow
         content={<div className="gallery-collections-create-menu">
@@ -680,6 +680,9 @@ export default function GalleryPage({
   const updateCollectionsExpanded = (expanded) => {
     setCollectionsExpanded(writePanelBoolean(panelStorage(), GALLERY_COLLECTIONS_PANEL_EXPANDED_KEY, expanded));
   };
+  useEffect(() => {
+    if (view === 'trash' && collectionsExpanded) updateCollectionsExpanded(false);
+  }, [collectionsExpanded, view]);
   const saveName = async () => {
     if (await onRename(preview, nameDraft)) setRenaming(false);
   };
@@ -709,11 +712,13 @@ export default function GalleryPage({
         value={view}
       />
       <LobeButton
-        aria-expanded={collectionsExpanded}
+        aria-expanded={view !== 'trash' && collectionsExpanded}
         className={activeCollection ? 'gallery-collections-trigger active' : 'gallery-collections-trigger'}
+        disabled={view === 'trash'}
         icon={<Icon name="folder" size={14}/>}
         onClick={() => updateCollectionsExpanded(!collectionsExpanded)}
         size="small"
+        title={view === 'trash' ? '回收站不使用收藏集' : undefined}
       >{activeCollection ? activeCollection.name : '收藏集'}</LobeButton>
       <LobeSearchBar className="gallery-search" onInputChange={onQueryChange} placeholder="搜索文件名、Tag 或译名" value={query}/>
       <GalleryFilterControl filters={filters} onChange={onFiltersChange} options={filterOptions}/>
@@ -762,7 +767,7 @@ export default function GalleryPage({
         className="gallery-collections-shell"
         classNames={{ content: 'workspace-side-panel-content' }}
         defaultSize={{ width: 'clamp(248px, 18vw, 360px)' }}
-        expand={collectionsExpanded}
+        expand={view !== 'trash' && collectionsExpanded}
         maxWidth={360}
         minWidth={248}
         mode="float"
@@ -904,7 +909,7 @@ export default function GalleryPage({
             {view !== 'trash' && <LobeButton onClick={() => setRenaming(true)}>重命名</LobeButton>}
             {previewGroup?.canSetCover && previewGroup.count > 1 && previewGroup.cover.id !== preview.id && view !== 'trash' && <LobeButton onClick={() => onSetCover(previewGroup, preview)}>设为头图</LobeButton>}
             {view === 'trash'
-              ? <><LobeButton icon={<Icon name="restore" size={14}/>} onClick={() => onRestore([preview.id])}>恢复当前图片</LobeButton><LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={() => onPermanentDelete([preview.id])}>永久删除当前图片</LobeButton></>
+              ? <><LobeButton icon={<Icon name="restore" size={14}/>} onClick={() => onRestore([preview.id])}>恢复当前图片</LobeButton><LobeButton className="gallery-preview-action-wide" danger icon={<Icon name="trash" size={14}/>} onClick={() => onPermanentDelete([preview.id])}>永久删除当前图片</LobeButton></>
               : <LobeButton className="gallery-preview-action-wide" danger icon={<Icon name="trash" size={14}/>} onClick={() => onTrash([preview.id], 'detail')} type="fill">删除当前图片</LobeButton>}
           </footer>
         </LobeDraggablePanel.Body>}

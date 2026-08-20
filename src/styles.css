@@ -237,10 +237,8 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .gallery-workspace { position: relative; min-width: 0; min-height: 0; flex: 1; display: flex; }
 .gallery-collections-shell { z-index: 6; height: 100%; box-shadow: 0 0 24px rgb(0 0 0 / 18%); }
 .gallery-collections-panel { min-width: 0; min-height: 0; height: 100%; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); background: var(--panel); }
-.gallery-collections-header { min-width: 0; min-height: 58px; padding: 12px 12px 10px 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line-soft); }
-.gallery-collections-header > div { min-width: 0; display: grid; gap: 2px; }
+.gallery-collections-header { min-width: 0; min-height: 48px; padding: 8px 12px 8px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line-soft); }
 .gallery-collections-header strong { font-size: var(--text-secondary); font-weight: 600; }
-.gallery-collections-header small { color: var(--muted); font-size: var(--text-micro); line-height: 1.35; }
 .gallery-collection-editor { margin: 10px 10px 2px; padding: 10px; display: grid; gap: 8px; background: var(--raised); border: 1px solid var(--line-soft); border-radius: 8px; }
 .gallery-collection-editor label { color: var(--muted); font-size: var(--text-micro); }
 .gallery-collection-editor > div { display: flex; justify-content: flex-end; gap: 5px; }
@@ -325,7 +323,7 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .gallery-preview-shell { height: 100%; }
 .gallery-preview-shell.is-floating { box-shadow: 0 0 24px rgb(0 0 0 / 18%); }
 .gallery-preview { min-width: 0; min-height: 0; height: 100%; overflow: hidden; display: grid; grid-template-rows: 55% minmax(0, 1fr) 190px; }
-.gallery-preview.is-trash { grid-template-rows: 55% minmax(0, 1fr) 80px; }
+.gallery-preview.is-trash { grid-template-rows: 55% minmax(0, 1fr) 120px; }
 .gallery-preview-primary { min-width: 0; min-height: 0; height: 100%; overflow: hidden; padding: 20px 20px 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .gallery-preview-primary > header { min-width: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .gallery-preview-primary > header > h2 { min-width: 0; flex: 1; }
