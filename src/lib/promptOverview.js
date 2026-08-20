@@ -17,6 +17,15 @@ export function isOverviewTagVisible(entries = [], scopeKey, tagId) {
   return entries.some((entry) => entry.key === targetKey);
 }
 
+export function overviewTagInteractionState(selectedCount = 0, filtered = false) {
+  const selectionActive = selectedCount > 0;
+  return {
+    reorderDisabled: selectionActive || filtered,
+    selectionActive,
+    startMarqueeOnItems: selectionActive,
+  };
+}
+
 export function reorderOverviewTags(tags = [], activeId, overId) {
   const sourceIndex = tags.findIndex((tag) => tag.id === activeId);
   const targetIndex = tags.findIndex((tag) => tag.id === overId);

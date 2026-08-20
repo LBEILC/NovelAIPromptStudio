@@ -161,6 +161,7 @@ export function TagChip({
   overlay = false,
   selected,
   selecting,
+  showSelectionMark = selecting,
   showWeight = true,
   tag,
   tooltip,
@@ -176,7 +177,7 @@ export function TagChip({
     type="button"
     {...rest}
   >
-    {selecting && <SelectionMark selected={selected}/>}
+    {showSelectionMark && <SelectionMark selected={selected}/>}
     <span className="overview-tag-copy"><span>{display.primary}</span>{display.secondary && <small>{display.secondary}</small>}</span>
     {showWeight && Math.abs(Number(tag.weight) - 1) >= 0.001 && <em>{Number(tag.weight).toFixed(2)}</em>}
     {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}

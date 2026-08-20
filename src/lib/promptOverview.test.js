@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { deleteOverviewTags, filterOverviewScopes, isOverviewTagVisible, overviewCategoryGroups, overviewCopyContext, overviewEntries, overviewSelectionMenuItems, reorderOverviewTags, selectedOverviewEntries, shouldReorderOverviewTags, toggleOverviewSelectionGroup, updateOverviewTags } from './promptOverview.js';
+import { deleteOverviewTags, filterOverviewScopes, isOverviewTagVisible, overviewCategoryGroups, overviewCopyContext, overviewEntries, overviewSelectionMenuItems, overviewTagInteractionState, reorderOverviewTags, selectedOverviewEntries, shouldReorderOverviewTags, toggleOverviewSelectionGroup, updateOverviewTags } from './promptOverview.js';
 
 function projectFixture() {
   const tag = (id, value, category, translation = '', weight = 1) => ({ id, tag: value, category, translation, weight, note: '' });
@@ -16,6 +16,20 @@ function projectFixture() {
 }
 
 describe('Prompt overview operations', () => {
+  it('keeps Tag reorder active until a marquee selection exists', () => {
+    expect(overviewTagInteractionState(0, false)).toEqual({
+      reorderDisabled: false,
+      selectionActive: false,
+      startMarqueeOnItems: false,
+    });
+    expect(overviewTagInteractionState(2, false)).toEqual({
+      reorderDisabled: true,
+      selectionActive: true,
+      startMarqueeOnItems: true,
+    });
+    expect(overviewTagInteractionState(0, true).reorderDisabled).toBe(true);
+  });
+
   it('reorders the real tag array used by wrapped drag previews', () => {
     const tags = projectFixture().prompt_structure.characters[0].prompt_tags;
     const reordered = reorderOverviewTags(tags, 'shirt', 'hair');

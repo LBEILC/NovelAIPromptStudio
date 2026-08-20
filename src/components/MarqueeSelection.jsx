@@ -41,6 +41,7 @@ export function useMarqueeSelection({
   itemSelector = '[data-marquee-key]',
   onSelectionChange,
   selectedKeys = [],
+  startOnItems = true,
 }) {
   const [rect, setRect] = useState(null);
   const dragRef = useRef(null);
@@ -127,6 +128,7 @@ export function useMarqueeSelection({
       if (!container || pointerOnScrollbar(container, event)) return;
       const target = event.target;
       const item = target.closest?.(itemSelector);
+      if (item && !startOnItems) return;
       if (target.closest?.(INTERACTIVE_SELECTOR) && !item) return;
       const startKey = item ? decodeMarqueeKey(item.getAttribute('data-marquee-key')) : '';
       const viewport = container.getBoundingClientRect();

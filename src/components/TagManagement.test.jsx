@@ -1,5 +1,7 @@
+import { Children } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { tagHoverPreviewFields, tagPresentation } from '../lib/tagManagement.js';
+import SelectionMark from './SelectionMark.jsx';
 import { TagChip } from './TagManagement.jsx';
 
 vi.mock('@lobehub/ui', () => {
@@ -63,5 +65,20 @@ describe('shared Tag presentation', () => {
       root: { pointerEvents: 'none' },
     });
     expect(element.props.positionerProps).toEqual({ style: { pointerEvents: 'none' } });
+  });
+
+  it('can express an active selection with the Tag border and no selection mark', () => {
+    const element = TagChip({
+      display: { fallback: false, primary: '1girl', secondary: '' },
+      selected: true,
+      selecting: true,
+      showSelectionMark: false,
+      tag: { category: 'Character', tag: '1girl', weight: 1 },
+    });
+    const children = Children.toArray(element.props.children);
+
+    expect(element.props.className).toContain('selected');
+    expect(element.props['aria-pressed']).toBe(true);
+    expect(children.some((child) => child.type === SelectionMark)).toBe(false);
   });
 });
