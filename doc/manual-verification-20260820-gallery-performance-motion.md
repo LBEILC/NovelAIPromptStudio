@@ -2,7 +2,7 @@
 
 ## 验证对象
 
-- 变更或提交：`c7a2d91 perf: smooth gallery navigation and loading`
+- 变更或提交：`783c132 fix: stop motion controls without crashing`（包含 `c7a2d91` 的图库性能与过渡优化）
 - 目标操作系统：Windows 11
 - 验证范围：工作台与图片库切换、收藏集切换、全部与回收站切换、相似 Prompt 分组、缩略图与预览图加载、动效降级
 
@@ -55,5 +55,4 @@
 
 
 ## 发现的问题
-
 
