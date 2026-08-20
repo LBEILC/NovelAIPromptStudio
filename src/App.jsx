@@ -41,13 +41,25 @@ import {
 import {
   DEFAULT_GALLERY_FILTERS,
   galleryFilterOptions as buildGalleryFilterOptions,
+  hasActiveGalleryFilters,
   normalizeGalleryFilters,
 } from './lib/galleryFilters.js';
+import {
+  galleryCollectionScope,
+  normalizeGalleryCollection,
+  readActiveGalleryCollection,
+  writeActiveGalleryCollection,
+} from './lib/galleryCollections.js';
 import { readGalleryGrouping, writeGalleryGrouping } from './lib/galleryGrouping.js';
 
 const unavailable = (error) => async () => ({ ok: false, error });
 const studio = window.studio || {
   loadLibrary: async () => [],
+  loadCollections: async () => ({ ok: true, collections: [] }),
+  createCollection: unavailable('请在桌面应用中创建收藏集'),
+  updateCollection: unavailable('请在桌面应用中修改收藏集'),
+  deleteCollection: unavailable('请在桌面应用中删除收藏集'),
+  updateCollectionProjects: unavailable('请在桌面应用中管理收藏集图片'),
   getLibraryStorage: async () => ({ ok: true, assetsDirectory: '', fileCount: 0, totalBytes: 0, isDefault: true }),
   changeLibraryStorage: unavailable('请在桌面应用中更改资源库位置'),
   revealLibraryStorage: unavailable('请在桌面应用中打开资源库文件夹'),
@@ -189,6 +201,8 @@ function formatBytes(bytes) {
 export default function App({ appearance, setAppearance }) {
   const [page, setPage] = useState('workbench');
   const [projects, setProjects] = useState([]);
+  const [galleryCollections, setGalleryCollections] = useState([]);
+  const [activeCollectionId, setActiveCollectionId] = useState('');
   const [galleryView, setGalleryView] = useState('all');
   const [loading, setLoading] = useState(true);
   const [galleryFilters, setGalleryFilters] = useState(DEFAULT_GALLERY_FILTERS);
@@ -241,9 +255,30 @@ export default function App({ appearance, setAppearance }) {
     setProjects((items || []).map(hydrateProject));
   }, [galleryView, hydrateProject]);
 
+  const reloadCollections = useCallback(async () => {
+    const result = await studio.loadCollections();
+    if (!result?.ok) {
+      showToast(result?.error || '收藏集没有加载', 'error');
+      return [];
+    }
+    const next = (result.collections || []).map(normalizeGalleryCollection);
+    setGalleryCollections(next);
+    setActiveCollectionId((current) => {
+      const restored = current && next.some((collection) => collection.id === current)
+        ? current
+        : readActiveGalleryCollection(globalThis.localStorage, next);
+      return writeActiveGalleryCollection(globalThis.localStorage, restored);
+    });
+    return next;
+  }, [showToast]);
+
   useEffect(() => {
     reloadLibrary(galleryView).finally(() => setLoading(false));
   }, [galleryView, reloadLibrary]);
+
+  useEffect(() => {
+    reloadCollections();
+  }, [reloadCollections]);
 
   useEffect(() => {
     let active = true;
@@ -507,10 +542,23 @@ export default function App({ appearance, setAppearance }) {
     return () => window.removeEventListener('keydown', keydown);
   }, [activeTab, closeTab, importImages, openClipboardWorkbenchImage, openWorkbenchPath, page, workbenchSession.tabs.length]);
 
-  const galleryFilterOptions = useMemo(() => buildGalleryFilterOptions(projects), [projects]);
+  const activeCollection = galleryView === 'all'
+    ? galleryCollections.find((collection) => collection.id === activeCollectionId) || null
+    : null;
+  const collectionScopedProjects = useMemo(
+    () => galleryCollectionScope(projects, activeCollection),
+    [activeCollection, projects],
+  );
+  const galleryCollectionsWithCounts = useMemo(() => galleryCollections.map((collection) => ({
+    ...collection,
+    image_count: galleryView === 'all'
+      ? galleryCollectionScope(projects, collection).length
+      : collection.kind === 'manual' ? Number(collection.active_member_count || 0) : null,
+  })), [galleryCollections, galleryView, projects]);
+  const galleryFilterOptions = useMemo(() => buildGalleryFilterOptions(collectionScopedProjects), [collectionScopedProjects]);
   const visibleGroups = useMemo(
-    () => galleryViewGroups(projects, galleryFilters, galleryGrouping, sort),
-    [galleryFilters, galleryGrouping, projects, sort],
+    () => galleryViewGroups(collectionScopedProjects, galleryFilters, galleryGrouping, sort),
+    [collectionScopedProjects, galleryFilters, galleryGrouping, sort],
   );
   const previewGroup = visibleGroups.find((group) => group.id === previewGroupId)
     || visibleGroups.find((group) => group.members.some((project) => project.id === previewProjectId))
@@ -618,7 +666,7 @@ export default function App({ appearance, setAppearance }) {
   };
 
   const reloadAfterGalleryAction = async () => {
-    await reloadLibrary(galleryView);
+    await Promise.all([reloadLibrary(galleryView), reloadCollections()]);
     setSelectedGroupIds([]);
   };
 
@@ -769,6 +817,99 @@ export default function App({ appearance, setAppearance }) {
     lastSelectedGroupRef.current = '';
   };
 
+  const selectGalleryCollection = (collectionId) => {
+    const id = writeActiveGalleryCollection(globalThis.localStorage, collectionId);
+    setActiveCollectionId(id);
+    setGalleryView('all');
+    setGalleryFilters(DEFAULT_GALLERY_FILTERS);
+    setSelectedGroupIds([]);
+    setPreviewGroupId('');
+    setPreviewProjectId('');
+    lastSelectedGroupRef.current = '';
+  };
+
+  const createGalleryCollection = async (kind, name) => {
+    if (kind === 'smart' && (activeCollectionId || !hasActiveGalleryFilters(galleryFilters))) {
+      showToast(activeCollectionId ? '请先返回全部图片，再设置要保存的筛选条件' : '请先设置搜索或筛选条件', 'warning');
+      return false;
+    }
+    const result = await studio.createCollection({
+      name,
+      kind,
+      filters: kind === 'smart' ? normalizeGalleryFilters(galleryFilters) : undefined,
+    });
+    if (!result?.ok) {
+      showToast(result?.error || '收藏集没有创建', 'error');
+      return false;
+    }
+    await reloadCollections();
+    selectGalleryCollection(result.collection.id);
+    showToast(kind === 'smart' ? '智能收藏集已保存' : '普通收藏集已创建');
+    return true;
+  };
+
+  const renameGalleryCollection = async (collection, name) => {
+    const result = await studio.updateCollection(collection.id, { name });
+    if (!result?.ok) {
+      showToast(result?.error || '收藏集名称没有修改', 'error');
+      return false;
+    }
+    await reloadCollections();
+    showToast('收藏集名称已修改');
+    return true;
+  };
+
+  const updateSmartCollectionRules = async (collection) => {
+    if (activeCollectionId || !hasActiveGalleryFilters(galleryFilters)) {
+      showToast(activeCollectionId ? '请先返回全部图片，再设置要替换的新筛选条件' : '请先设置要保存的新搜索或筛选条件', 'warning');
+      return false;
+    }
+    const result = await studio.updateCollection(collection.id, { filters: normalizeGalleryFilters(galleryFilters) });
+    if (!result?.ok) {
+      showToast(result?.error || '智能收藏集规则没有更新', 'error');
+      return false;
+    }
+    setGalleryFilters(DEFAULT_GALLERY_FILTERS);
+    await reloadCollections();
+    showToast('智能收藏集规则已替换');
+    return true;
+  };
+
+  const deleteGalleryCollection = async (collection) => {
+    if (!(await requestConfirmation({
+      title: `删除“${collection.name}”？`,
+      message: collection.kind === 'smart' ? '将删除这组自动筛选规则。' : '将删除收藏集及其中的成员关系。',
+      detail: '图片文件与图库中的图片不会被删除。',
+      okText: '删除收藏集',
+      danger: true,
+    }))) return false;
+    const result = await studio.deleteCollection(collection.id);
+    if (!result?.ok) {
+      showToast(result?.error || '收藏集没有删除', 'error');
+      return false;
+    }
+    if (activeCollectionId === collection.id) selectGalleryCollection('');
+    await reloadCollections();
+    showToast('收藏集已删除');
+    return true;
+  };
+
+  const updateGalleryCollectionProjects = async (collectionId, ids, action = 'add') => {
+    const projectIds = [...new Set((ids || []).map(String).filter(Boolean))];
+    if (!projectIds.length) return false;
+    const result = await studio.updateCollectionProjects(collectionId, projectIds, action);
+    if (!result?.ok) {
+      showToast(result?.error || '收藏集成员没有更新', 'error');
+      return false;
+    }
+    await reloadCollections();
+    if (action === 'remove' && activeCollectionId === collectionId) setSelectedGroupIds([]);
+    const success = result.summary?.success || 0;
+    const skipped = result.summary?.skipped || 0;
+    showToast(`${action === 'remove' ? '已移出' : '已加入'} ${success} 张图片${skipped ? `，跳过 ${skipped} 张` : ''}`);
+    return true;
+  };
+
   const navigatePreview = useCallback((direction) => {
     if (!previewGroup?.members.length || !preview) return;
     const index = previewGroup.members.findIndex((project) => project.id === preview.id);
@@ -883,12 +1024,20 @@ export default function App({ appearance, setAppearance }) {
         })))}
         session={workbenchSession}
       /> : page === 'gallery' ? <GalleryPage
+        activeCollection={activeCollection}
+        collections={galleryCollectionsWithCounts}
         filterOptions={galleryFilterOptions}
         filters={galleryFilters}
         grouping={galleryGrouping}
         groups={visibleGroups}
         importing={isImportActive(importProgress)}
         onClearSelection={() => setSelectedGroupIds([])}
+        onCollectionCreate={createGalleryCollection}
+        onCollectionDelete={deleteGalleryCollection}
+        onCollectionProjectsChange={updateGalleryCollectionProjects}
+        onCollectionRename={renameGalleryCollection}
+        onCollectionRulesUpdate={updateSmartCollectionRules}
+        onCollectionSelect={selectGalleryCollection}
         onCopyImage={async (project) => {
           const result = await studio.copyProjectImage(project.id);
           showToast(result?.ok ? '图片已复制到系统剪贴板' : result?.error || '图片复制失败', result?.ok ? 'success' : 'error');
@@ -918,7 +1067,7 @@ export default function App({ appearance, setAppearance }) {
         onSortChange={setSort}
         onToggleSelect={toggleGroupSelection}
         onTrash={moveToTrash}
-        onViewChange={(view) => { setGalleryView(view); setGalleryFilters(DEFAULT_GALLERY_FILTERS); setSelectedGroupIds([]); setPreviewGroupId(''); setPreviewProjectId(''); }}
+        onViewChange={(view) => { writeActiveGalleryCollection(globalThis.localStorage, ''); setActiveCollectionId(''); setGalleryView(view); setGalleryFilters(DEFAULT_GALLERY_FILTERS); setSelectedGroupIds([]); setPreviewGroupId(''); setPreviewProjectId(''); }}
         preview={preview}
         previewGroup={previewGroup}
         query={galleryFilters.query}

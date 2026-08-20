@@ -179,6 +179,42 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('library:load', async (_event, request = {}) => { await contentBackfill; return database.loadLibrary(request.view); });
+  ipcMain.handle('library:collections:list', () => {
+    try {
+      return { ok: true, collections: database.listCollections() };
+    } catch (error) {
+      return { ok: false, collections: [], error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('library:collections:create', (_event, request = {}) => {
+    try {
+      return { ok: true, collection: database.createCollection({ ...request, id: crypto.randomUUID() }) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('library:collections:update', (_event, request = {}) => {
+    try {
+      return { ok: true, collection: database.updateCollection(request.id, request.patch) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('library:collections:delete', (_event, id) => {
+    try {
+      return { ok: true, deleted: database.deleteCollection(id) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('library:collections:projects', (_event, request = {}) => {
+    try {
+      const results = database.updateCollectionProjects(request.id, request.projectIds, request.action);
+      return { ok: true, results, summary: batchSummary(results) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle('library:storage:get', async () => {
     try {
       const details = await describeAssetDirectory(assetsDirectory);

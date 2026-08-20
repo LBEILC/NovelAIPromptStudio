@@ -87,6 +87,21 @@ CREATE TABLE IF NOT EXISTS prompt_group_covers (
   prompt_fingerprint TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS gallery_collections (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('manual', 'smart')),
+  filter_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS gallery_collection_projects (
+  collection_id TEXT NOT NULL REFERENCES gallery_collections(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (collection_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS idx_gallery_collection_projects_project ON gallery_collection_projects(project_id);
 `;
 
 function rows(statement) {
@@ -446,6 +461,129 @@ export async function openDatabase(dataDirectory) {
     return query(`SELECT * FROM projects WHERE ${where} ORDER BY created_at DESC`).map(hydrateProject);
   };
 
+  const cleanCollectionName = (name) => {
+    const cleaned = String(name || '').trim();
+    if (!cleaned) throw new Error('收藏集名称不能为空');
+    if (cleaned.length > 80) throw new Error('收藏集名称不能超过 80 个字符');
+    return cleaned;
+  };
+  const collectionFilters = (value) => {
+    const filters = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const serialized = JSON.stringify(filters);
+    if (serialized.length > 20_000) throw new Error('智能收藏集筛选条件过大');
+    return serialized;
+  };
+  const listCollections = () => query(
+    `SELECT gallery_collections.*,
+      (SELECT COUNT(*) FROM gallery_collection_projects
+       JOIN projects ON projects.id = gallery_collection_projects.project_id
+       WHERE gallery_collection_projects.collection_id = gallery_collections.id AND projects.deleted_at = '') AS active_member_count
+     FROM gallery_collections ORDER BY created_at ASC`,
+  ).map((collection) => ({
+    ...collection,
+    filters: safeJson(collection.filter_json),
+    member_ids: collection.kind === 'manual'
+      ? query(
+        'SELECT project_id FROM gallery_collection_projects WHERE collection_id = $id ORDER BY created_at ASC',
+        { $id: collection.id },
+      ).map((row) => row.project_id)
+      : [],
+  }));
+  const loadCollection = (id) => listCollections().find((collection) => collection.id === String(id || '')) || null;
+  const createCollection = (value = {}) => {
+    const id = String(value.id || '').trim();
+    if (!id) throw new Error('收藏集 ID 不能为空');
+    const kind = value.kind === 'smart' ? 'smart' : 'manual';
+    const name = cleanCollectionName(value.name);
+    const nowValue = new Date().toISOString();
+    database.run(
+      `INSERT INTO gallery_collections (id, name, kind, filter_json, created_at, updated_at)
+       VALUES ($id, $name, $kind, $filter_json, $created_at, $updated_at)`,
+      {
+        $id: id,
+        $name: name,
+        $kind: kind,
+        $filter_json: kind === 'smart' ? collectionFilters(value.filters) : '{}',
+        $created_at: nowValue,
+        $updated_at: nowValue,
+      },
+    );
+    persist();
+    return loadCollection(id);
+  };
+  const updateCollection = (id, patch = {}) => {
+    const collection = query('SELECT * FROM gallery_collections WHERE id = $id', { $id: String(id || '') })[0];
+    if (!collection) throw new Error('收藏集不存在');
+    const name = patch.name === undefined ? collection.name : cleanCollectionName(patch.name);
+    const filterJson = collection.kind === 'smart' && patch.filters !== undefined
+      ? collectionFilters(patch.filters)
+      : collection.filter_json;
+    database.run(
+      `UPDATE gallery_collections SET name = $name, filter_json = $filter_json, updated_at = $updated_at WHERE id = $id`,
+      { $id: collection.id, $name: name, $filter_json: filterJson, $updated_at: new Date().toISOString() },
+    );
+    persist();
+    return loadCollection(collection.id);
+  };
+  const deleteCollection = (id) => {
+    const collectionId = String(id || '');
+    const exists = Boolean(query('SELECT id FROM gallery_collections WHERE id = $id', { $id: collectionId })[0]);
+    if (!exists) return false;
+    database.run('DELETE FROM gallery_collection_projects WHERE collection_id = $id', { $id: collectionId });
+    database.run('DELETE FROM gallery_collections WHERE id = $id', { $id: collectionId });
+    persist();
+    return true;
+  };
+  const updateCollectionProjects = (collectionId, projectIds = [], action = 'add') => {
+    const id = String(collectionId || '');
+    const collection = query('SELECT id, kind FROM gallery_collections WHERE id = $id', { $id: id })[0];
+    if (!collection) throw new Error('收藏集不存在');
+    if (collection.kind !== 'manual') throw new Error('智能收藏集由筛选条件自动管理');
+    const uniqueIds = [...new Set(projectIds.map(String).filter(Boolean))];
+    const results = { success: [], skipped: [], failed: [] };
+    database.run('BEGIN');
+    try {
+      for (const projectId of uniqueIds) {
+        const project = query('SELECT id FROM projects WHERE id = $id', { $id: projectId })[0];
+        if (!project) {
+          results.failed.push({ id: projectId, error: '图片不存在' });
+          continue;
+        }
+        const membership = query(
+          'SELECT project_id FROM gallery_collection_projects WHERE collection_id = $collection_id AND project_id = $project_id',
+          { $collection_id: id, $project_id: projectId },
+        )[0];
+        if (action === 'remove') {
+          if (!membership) {
+            results.skipped.push(projectId);
+            continue;
+          }
+          database.run(
+            'DELETE FROM gallery_collection_projects WHERE collection_id = $collection_id AND project_id = $project_id',
+            { $collection_id: id, $project_id: projectId },
+          );
+        } else {
+          if (membership) {
+            results.skipped.push(projectId);
+            continue;
+          }
+          database.run(
+            `INSERT INTO gallery_collection_projects (collection_id, project_id, created_at)
+             VALUES ($collection_id, $project_id, $created_at)`,
+            { $collection_id: id, $project_id: projectId, $created_at: new Date().toISOString() },
+          );
+        }
+        results.success.push(projectId);
+      }
+      database.run('COMMIT');
+      persist();
+      return results;
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+  };
+
   const insertProject = (project) => {
     database.run('BEGIN');
     try {
@@ -577,6 +715,7 @@ export async function openDatabase(dataDirectory) {
   };
   const deleteProject = (id) => {
     const projectId = String(id || '');
+    database.run('DELETE FROM gallery_collection_projects WHERE project_id = $id', { $id: projectId });
     database.run('DELETE FROM prompt_group_covers WHERE project_id = $id', { $id: projectId });
     database.run('DELETE FROM projects WHERE id = $id', { $id: projectId });
     persist();
@@ -716,6 +855,11 @@ export async function openDatabase(dataDirectory) {
   return {
     loadLibrary,
     loadProject,
+    listCollections,
+    createCollection,
+    updateCollection,
+    deleteCollection,
+    updateCollectionProjects,
     findProjectByContentHash,
     projectHashCandidates,
     projectDimensionCandidates,

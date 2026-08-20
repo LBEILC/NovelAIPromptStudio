@@ -31,7 +31,7 @@ function project(id = 'project-1') {
 }
 
 describe('phase 2 core database', () => {
-  it('stores image, prompt structure, metadata, and no library concepts', async () => {
+  it('stores image, prompt structure, metadata, and excludes retired branch concepts', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
     temporaryDirectories.push(directory);
     const database = await openDatabase(directory);
@@ -241,6 +241,63 @@ describe('phase 2 core database', () => {
     expect(() => database.updateProjectName('project-1', 'trashed')).toThrow('恢复');
     database.updateProjects(['project-1'], { deleted: false });
     expect(database.loadLibrary('favorites')).toHaveLength(1);
+  });
+
+  it('persists manual and smart collections without copying image records', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    database.insertProject(project('project-1'));
+    database.insertProject(project('project-2'));
+
+    expect(database.createCollection({ id: 'manual-1', name: '  灵感图  ', kind: 'manual' })).toMatchObject({
+      id: 'manual-1',
+      kind: 'manual',
+      name: '灵感图',
+      member_ids: [],
+    });
+    expect(database.updateCollectionProjects('manual-1', ['project-1', 'project-2'], 'add').success).toEqual(['project-1', 'project-2']);
+    expect(database.updateCollectionProjects('manual-1', ['project-2'], 'remove').success).toEqual(['project-2']);
+    expect(database.createCollection({
+      id: 'smart-1',
+      name: '风笛',
+      kind: 'smart',
+      filters: { includeTags: ['girl'], tagMatch: 'all' },
+    })).toMatchObject({
+      id: 'smart-1',
+      kind: 'smart',
+      filters: { includeTags: ['girl'], tagMatch: 'all' },
+      member_ids: [],
+    });
+    expect(() => database.updateCollectionProjects('smart-1', ['project-1'], 'add')).toThrow('自动管理');
+
+    const reopened = await openDatabase(directory);
+    expect(reopened.listCollections()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'manual-1', member_ids: ['project-1'], active_member_count: 1 }),
+      expect.objectContaining({ id: 'smart-1', filters: expect.objectContaining({ includeTags: ['girl'] }) }),
+    ]));
+    expect(reopened.updateCollection('smart-1', { name: '角色图', filters: { models: ['nai-v4.5'] } })).toMatchObject({
+      name: '角色图',
+      filters: { models: ['nai-v4.5'] },
+    });
+  });
+
+  it('keeps collection membership through trash and cascades it on permanent deletion', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    database.insertProject(project());
+    database.createCollection({ id: 'manual-1', name: '保留', kind: 'manual' });
+    database.updateCollectionProjects('manual-1', ['project-1'], 'add');
+
+    database.updateProjects(['project-1'], { deleted: true });
+    expect(database.listCollections()[0]).toMatchObject({ member_ids: ['project-1'], active_member_count: 0 });
+    database.updateProjects(['project-1'], { deleted: false });
+    expect(database.listCollections()[0].active_member_count).toBe(1);
+    database.deleteProject('project-1');
+    expect(database.listCollections()[0].member_ids).toEqual([]);
+    expect(database.deleteCollection('manual-1')).toBe(true);
+    expect(database.listCollections()).toEqual([]);
   });
 
   it('groups seed variants with a stable Prompt fingerprint and persists a valid cover', async () => {

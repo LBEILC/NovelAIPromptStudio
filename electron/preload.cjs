@@ -2,6 +2,11 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('studio', {
   loadLibrary: (view = 'all') => ipcRenderer.invoke('library:load', { view }),
+  loadCollections: () => ipcRenderer.invoke('library:collections:list'),
+  createCollection: (collection) => ipcRenderer.invoke('library:collections:create', collection),
+  updateCollection: (id, patch) => ipcRenderer.invoke('library:collections:update', { id, patch }),
+  deleteCollection: (id) => ipcRenderer.invoke('library:collections:delete', id),
+  updateCollectionProjects: (id, projectIds, action = 'add') => ipcRenderer.invoke('library:collections:projects', { id, projectIds, action }),
   getLibraryStorage: () => ipcRenderer.invoke('library:storage:get'),
   changeLibraryStorage: () => ipcRenderer.invoke('library:storage:change'),
   revealLibraryStorage: () => ipcRenderer.invoke('library:storage:reveal'),

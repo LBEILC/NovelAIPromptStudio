@@ -34,6 +34,8 @@ import {
   GALLERY_PREVIEW_PANEL_EXPANDED_KEY,
   GALLERY_PREVIEW_PANEL_PINNED_KEY,
   GALLERY_PREVIEW_PANEL_WIDTH_KEY,
+  GALLERY_COLLECTIONS_PANEL_EXPANDED_KEY,
+  GALLERY_COLLECTIONS_PANEL_WIDTH_KEY,
   panelStorage,
   panelWidthForViewport,
   readPanelBoolean,
@@ -305,7 +307,131 @@ export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, option
   </Popover>;
 }
 
-export function BatchToolbar({ view, selectedGroups, selectedImages, onFavorite, onTrash, onRestore, onPermanentDelete, onClear }) {
+function CollectionMembershipControl({ collections = [], projectIds = [], onChange, size = 'small', label = '加入收藏集' }) {
+  const manualCollections = collections.filter((collection) => collection.kind === 'manual');
+  if (!projectIds.length) return null;
+  const content = <div className="gallery-collection-picker">
+    <header><strong>加入普通收藏集</strong><small>一张图片可以加入多个收藏集</small></header>
+    {manualCollections.length ? <div className="gallery-collection-picker-list">{manualCollections.map((collection) => {
+      const members = new Set(collection.member_ids || []);
+      const included = projectIds.filter((id) => members.has(id)).length;
+      return <button
+        disabled={included === projectIds.length}
+        key={collection.id}
+        onClick={() => onChange(collection.id, projectIds, 'add')}
+        type="button"
+      >
+        <Icon name="folder" size={14}/><span>{collection.name}</span><small>{included === projectIds.length ? '已加入' : included ? `${included}/${projectIds.length}` : `${collection.image_count ?? collection.member_ids?.length ?? 0} 张`}</small>
+      </button>;
+    })}</div> : <p>还没有普通收藏集，可在左侧收藏集面板中新建。</p>}
+  </div>;
+  return <Popover arrow content={content} placement="bottom" standalone trigger="click">
+    <LobeButton icon={<Icon name="folder" size={14}/>} size={size}>{label}</LobeButton>
+  </Popover>;
+}
+
+function collectionRuleCount(collection) {
+  const filters = normalizeGalleryFilters(collection.filters);
+  return galleryActiveFilterCount(filters) + (filters.query.trim() ? 1 : 0);
+}
+
+function GalleryCollectionsPanel({
+  activeCollection,
+  collections = [],
+  filters,
+  onCreate,
+  onDelete,
+  onRename,
+  onRulesUpdate,
+  onSelect,
+}) {
+  const [editor, setEditor] = useState(null);
+  const [nameDraft, setNameDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const manual = collections.filter((collection) => collection.kind === 'manual');
+  const smart = collections.filter((collection) => collection.kind === 'smart');
+  const canSaveSmart = !activeCollection && hasActiveGalleryFilters(filters);
+  const beginEditor = (mode, collection = null) => {
+    setEditor({ mode, collection });
+    setNameDraft(collection?.name || '');
+  };
+  const saveEditor = async () => {
+    const name = nameDraft.trim();
+    if (!name || saving) return;
+    setSaving(true);
+    const saved = editor.mode === 'rename'
+      ? await onRename(editor.collection, name)
+      : await onCreate(editor.mode === 'smart' ? 'smart' : 'manual', name);
+    setSaving(false);
+    if (saved) setEditor(null);
+  };
+  const section = (title, items, empty) => <section className="gallery-collections-section">
+    <h3>{title}</h3>
+    {items.length ? <div className="gallery-collections-list">{items.map((collection) => <div
+      aria-current={activeCollection?.id === collection.id ? 'page' : undefined}
+      className={activeCollection?.id === collection.id ? 'active' : ''}
+      key={collection.id}
+      onClick={() => onSelect(collection.id)}
+      onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onSelect(collection.id); } }}
+      role="button"
+      tabIndex={0}
+    >
+      <Icon name={collection.kind === 'smart' ? 'spark' : 'folder'} size={15}/>
+      <span><strong>{collection.name}</strong><small>{collection.kind === 'smart' ? `${collectionRuleCount(collection)} 条规则` : '普通收藏集'}</small></span>
+      <em>{collection.image_count == null ? '—' : collection.image_count}</em>
+      <span className="gallery-collection-row-actions">
+        {collection.kind === 'smart' && <ActionIcon
+          aria-label={`用当前筛选替换“${collection.name}”的规则`}
+          disabled={!canSaveSmart}
+          icon={<Icon name="refresh" size={13}/>}
+          onClick={(event) => { event.stopPropagation(); onRulesUpdate(collection); }}
+          size="small"
+          title={canSaveSmart ? '用当前筛选替换规则' : activeCollection ? '先返回全部图片并设置筛选' : '先设置新的搜索或筛选条件'}
+        />}
+        <ActionIcon aria-label={`重命名“${collection.name}”`} icon={<Icon name="edit" size={13}/>} onClick={(event) => { event.stopPropagation(); beginEditor('rename', collection); }} size="small" title="重命名"/>
+        <ActionIcon aria-label={`删除“${collection.name}”`} icon={<Icon name="trash" size={13}/>} onClick={(event) => { event.stopPropagation(); onDelete(collection); }} size="small" title="删除收藏集"/>
+      </span>
+    </div>)}</div> : <p className="gallery-collections-empty">{empty}</p>}
+  </section>;
+
+  return <div className="gallery-collections-panel">
+    <header className="gallery-collections-header">
+      <div><strong>收藏集</strong><small>先限定图片范围，再应用筛选与分组</small></div>
+      <Popover
+        arrow
+        content={<div className="gallery-collections-create-menu">
+          <button onClick={() => beginEditor('manual')} type="button"><Icon name="folder" size={15}/><span><strong>新建普通收藏集</strong><small>手动添加或移除图片</small></span></button>
+          <button disabled={!canSaveSmart} onClick={() => beginEditor('smart')} type="button"><Icon name="spark" size={15}/><span><strong>保存为智能收藏集</strong><small>{canSaveSmart ? '使用当前搜索与筛选条件' : activeCollection ? '请先返回全部图片' : '请先设置搜索或筛选条件'}</small></span></button>
+        </div>}
+        placement="bottomLeft"
+        standalone
+        trigger="click"
+      ><ActionIcon aria-label="新建收藏集" icon={<Icon name="plus"/>} title="新建收藏集"/></Popover>
+    </header>
+    {editor && <div className="gallery-collection-editor">
+      <label>{editor.mode === 'rename' ? '重命名收藏集' : editor.mode === 'smart' ? '智能收藏集名称' : '普通收藏集名称'}</label>
+      <LobeInput
+        autoFocus
+        maxLength={80}
+        onChange={(event) => setNameDraft(event.target.value)}
+        onKeyDown={(event) => { if (event.key === 'Enter') saveEditor(); if (event.key === 'Escape') setEditor(null); }}
+        placeholder={editor.mode === 'smart' ? '例如：Bagpipe · 最近 30 天' : '例如：构图参考'}
+        size="small"
+        value={nameDraft}
+      />
+      <div><LobeButton disabled={!nameDraft.trim()} loading={saving} onClick={saveEditor} size="small" type="primary">保存</LobeButton><LobeButton onClick={() => setEditor(null)} size="small" type="text">取消</LobeButton></div>
+    </div>}
+    <button className={!activeCollection ? 'gallery-collection-all active' : 'gallery-collection-all'} onClick={() => onSelect('')} type="button">
+      <Icon name="library" size={15}/><span>全部图片</span>
+    </button>
+    <div className="gallery-collections-scroll">
+      {section('普通收藏集', manual, '还没有普通收藏集')}
+      {section('智能收藏集', smart, '把当前搜索与筛选保存为自动更新的收藏集')}
+    </div>
+  </div>;
+}
+
+export function BatchToolbar({ view, selectedGroups, selectedImages, selectedProjectIds = [], collections = [], activeCollection, onCollectionProjectsChange, onFavorite, onTrash, onRestore, onPermanentDelete, onClear }) {
   if (!selectedGroups) return null;
   return <div className="gallery-selection-bar">
     <span>已选 <b>{selectedGroups}</b> 组 · <b>{selectedImages}</b> 张图片</span>
@@ -316,6 +442,8 @@ export function BatchToolbar({ view, selectedGroups, selectedImages, onFavorite,
       <LobeButton icon={<Icon name="star" size={14}/>} onClick={() => onFavorite(true)} size="small">收藏</LobeButton>
       <LobeButton onClick={() => onFavorite(false)} size="small">取消收藏</LobeButton>
       <LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={() => onTrash()} size="small" type="fill">移入回收站</LobeButton>
+      <CollectionMembershipControl collections={collections} onChange={onCollectionProjectsChange} projectIds={selectedProjectIds}/>
+      {activeCollection?.kind === 'manual' && <LobeButton onClick={() => onCollectionProjectsChange(activeCollection.id, selectedProjectIds, 'remove')} size="small">移出当前收藏集</LobeButton>}
     </>}
     <LobeButton onClick={() => onClear()} size="small" type="text">取消选择</LobeButton>
   </div>;
@@ -439,6 +567,8 @@ export function GalleryCard(props) {
 }
 
 export default function GalleryPage({
+  activeCollection,
+  collections = [],
   groups,
   filters,
   filterOptions,
@@ -452,6 +582,12 @@ export default function GalleryPage({
   selectedImageCount,
   grouping = DEFAULT_GALLERY_GROUPING,
   onClearSelection,
+  onCollectionCreate,
+  onCollectionDelete,
+  onCollectionProjectsChange,
+  onCollectionRename,
+  onCollectionRulesUpdate,
+  onCollectionSelect,
   onEmptyTrash,
   onFavorite,
   onImport,
@@ -494,6 +630,18 @@ export default function GalleryPage({
     GALLERY_PREVIEW_PANEL_PINNED_KEY,
     false,
   ));
+  const [collectionsExpanded, setCollectionsExpanded] = useState(() => readPanelBoolean(
+    panelStorage(),
+    GALLERY_COLLECTIONS_PANEL_EXPANDED_KEY,
+    false,
+  ));
+  const [collectionsPanelWidth, setCollectionsPanelWidth] = useState(() => readPanelWidth(
+    panelStorage(),
+    GALLERY_COLLECTIONS_PANEL_WIDTH_KEY,
+    panelWidthForViewport(globalThis.innerWidth, .18, 248, 360),
+    248,
+    360,
+  ));
   const [galleryCardSize, setGalleryCardSize] = useState(() => readGalleryCardSize(panelStorage()));
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -518,12 +666,21 @@ export default function GalleryPage({
 
   const memberIndex = previewGroup?.members.findIndex((project) => project.id === preview?.id) ?? -1;
   const galleryDensity = galleryDensityForSize(galleryCardSize);
-  const emptyState = galleryEmptyState(view, hasActiveGalleryFilters(filters));
+  const emptyState = activeCollection
+    ? hasActiveGalleryFilters(filters)
+      ? { icon: 'search', title: '收藏集中没有匹配图片', description: '清除当前搜索或筛选条件后再试。' }
+      : activeCollection.kind === 'smart'
+        ? { icon: 'spark', title: '智能收藏集暂无匹配图片', description: '新导入的图片满足规则后会自动出现在这里。' }
+        : { icon: 'folder', title: '收藏集为空', description: '选择图片后，将它们加入这个普通收藏集。' }
+    : galleryEmptyState(view, hasActiveGalleryFilters(filters));
   const updatePreviewExpanded = (expanded) => {
     setPreviewExpanded(writePanelBoolean(panelStorage(), GALLERY_PREVIEW_PANEL_EXPANDED_KEY, expanded));
   };
   const updatePreviewPinned = (pinned) => {
     setPreviewPinned(writePanelBoolean(panelStorage(), GALLERY_PREVIEW_PANEL_PINNED_KEY, pinned));
+  };
+  const updateCollectionsExpanded = (expanded) => {
+    setCollectionsExpanded(writePanelBoolean(panelStorage(), GALLERY_COLLECTIONS_PANEL_EXPANDED_KEY, expanded));
   };
   const saveName = async () => {
     if (await onRename(preview, nameDraft)) setRenaming(false);
@@ -553,6 +710,13 @@ export default function GalleryPage({
         size="small"
         value={view}
       />
+      <LobeButton
+        aria-expanded={collectionsExpanded}
+        className={activeCollection ? 'gallery-collections-trigger active' : 'gallery-collections-trigger'}
+        icon={<Icon name="folder" size={14}/>}
+        onClick={() => updateCollectionsExpanded(!collectionsExpanded)}
+        size="small"
+      >{activeCollection ? activeCollection.name : '收藏集'}</LobeButton>
       <LobeSearchBar className="gallery-search" onInputChange={onQueryChange} placeholder="搜索文件名、Tag 或译名" value={query}/>
       <GalleryFilterControl filters={filters} onChange={onFiltersChange} options={filterOptions}/>
       <div className="gallery-sort">
@@ -588,16 +752,52 @@ export default function GalleryPage({
       onPermanentDelete={onPermanentDelete}
       onRestore={onRestore}
       onTrash={onTrash}
+      activeCollection={activeCollection}
+      collections={collections}
+      onCollectionProjectsChange={onCollectionProjectsChange}
+      selectedProjectIds={selectedGroupIds.length ? groups.filter((group) => selectedGroupIds.includes(group.id)).flatMap((group) => group.members.map((project) => project.id)) : []}
       selectedGroups={selectedGroupIds.length}
       selectedImages={selectedImageCount}
       view={view}
     />
     <div className="gallery-workspace">
+      <LobeDraggablePanel
+        className="gallery-collections-shell"
+        classNames={{ content: 'workspace-side-panel-content' }}
+        defaultSize={{ width: 'clamp(248px, 18vw, 360px)' }}
+        expand={collectionsExpanded}
+        maxWidth={360}
+        minWidth={248}
+        mode="float"
+        onExpandChange={updateCollectionsExpanded}
+        onSizeChange={(_delta, size) => {
+          const width = writePanelWidth(panelStorage(), GALLERY_COLLECTIONS_PANEL_WIDTH_KEY, size?.width, 248, 360);
+          if (width !== undefined) setCollectionsPanelWidth(width);
+        }}
+        placement="left"
+        showHandleHighlight
+        stableLayout
+        size={{ height: '100%', width: collectionsPanelWidth }}
+      >
+        <LobeDraggablePanel.Body style={{ display: 'block', height: '100%', minHeight: 0, overflow: 'hidden', padding: 0 }}>
+          <GalleryCollectionsPanel
+            activeCollection={activeCollection}
+            collections={collections}
+            filters={filters}
+            onCreate={onCollectionCreate}
+            onDelete={onCollectionDelete}
+            onRename={onCollectionRename}
+            onRulesUpdate={onCollectionRulesUpdate}
+            onSelect={(id) => { onCollectionSelect(id); updateCollectionsExpanded(false); }}
+          />
+        </LobeDraggablePanel.Body>
+      </LobeDraggablePanel>
       <section
         className="gallery-grid-scroll"
         onClick={(event) => {
           if (!shouldCollapseGalleryPreview(event.target, previewPinned)) return;
           updatePreviewExpanded(false);
+          updateCollectionsExpanded(false);
         }}
         onContextMenu={(event) => {
           if (event.target.closest('.gallery-card')) return;
@@ -702,6 +902,8 @@ export default function GalleryPage({
           <footer className="gallery-preview-actions">
             {view !== 'trash' && <LobeButton className="gallery-preview-action-wide" icon={<Icon name="edit" size={14}/>} onClick={() => onOpenWorkbench(preview)} type="primary">在工作台编辑</LobeButton>}
             <LobeButton icon={<Icon name="star" size={14}/>} onClick={() => onFavorite(!preview.is_favorite, [preview.id])}>{preview.is_favorite ? '取消收藏' : '收藏'}</LobeButton>
+            {view !== 'trash' && <CollectionMembershipControl collections={collections} onChange={onCollectionProjectsChange} projectIds={[preview.id]}/>}
+            {activeCollection?.kind === 'manual' && view !== 'trash' && <LobeButton onClick={() => onCollectionProjectsChange(activeCollection.id, [preview.id], 'remove')}>移出当前收藏集</LobeButton>}
             <LobeButton icon={<Icon name="folder" size={14}/>} onClick={() => onReveal(preview)}>在文件夹中显示</LobeButton>
             {view !== 'trash' && <LobeButton onClick={() => setRenaming(true)}>重命名</LobeButton>}
             {previewGroup?.canSetCover && previewGroup.count > 1 && previewGroup.cover.id !== preview.id && view !== 'trash' && <LobeButton onClick={() => onSetCover(previewGroup, preview)}>设为头图</LobeButton>}
