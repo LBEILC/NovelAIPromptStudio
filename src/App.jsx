@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { dropTargetForExternal, monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
 import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import { ActionIcon as LobeActionIcon, SideNav as LobeSideNav } from '@lobehub/ui';
 import { Button as LobeButton, Modal as LobeModal, showContextMenu as showLobeContextMenu, toast as lobeToast } from '@lobehub/ui/base-ui';
 import { Check, ClipboardPaste, Copy, FolderOpen, Pencil, Redo2, Scissors, Sparkles, Tags, Trash2, Undo2 } from 'lucide-react';
+import { motion, useAnimationControls } from 'motion/react';
 import GalleryPage from './GalleryPage.jsx';
 import SettingsPage from './SettingsPage.jsx';
 import WorkbenchPage from './WorkbenchPage.jsx';
@@ -51,6 +52,7 @@ import {
   writeActiveGalleryCollection,
 } from './lib/galleryCollections.js';
 import { readGalleryGrouping, writeGalleryGrouping } from './lib/galleryGrouping.js';
+import { MOTION_EASE_OUT, useStudioReducedMotion } from './lib/motion.js';
 
 const unavailable = (error) => async () => ({ ok: false, error });
 const studio = window.studio || {
@@ -180,6 +182,31 @@ function SideNav({ page, onNavigate }) {
   />;
 }
 
+function PageSurface({ active, motionMode, children }) {
+  const controls = useAnimationControls();
+  const reduceMotion = useStudioReducedMotion(motionMode);
+
+  useLayoutEffect(() => {
+    if (!active) return undefined;
+    if (reduceMotion) {
+      controls.set({ opacity: 1, y: 0 });
+      return undefined;
+    }
+    controls.set({ opacity: 0.72, y: 5 });
+    const animation = controls.start({
+      opacity: 1,
+      transition: { duration: 0.18, ease: MOTION_EASE_OUT },
+      y: 0,
+    });
+    return () => {
+      animation.stop();
+      controls.set({ opacity: 0, y: 3 });
+    };
+  }, [active, controls, reduceMotion]);
+
+  return <motion.div animate={controls} className="app-page-surface" initial={false}>{children}</motion.div>;
+}
+
 function ImportExperience({ dragState, progress, result, target, onCancel, onDismiss }) {
   const importing = isImportActive(progress);
   const percent = progress?.total ? Math.min(100, Math.round((progress.processed || 0) / progress.total * 100)) : 0;
@@ -199,12 +226,12 @@ function formatBytes(bytes) {
 
 export default function App({ appearance, setAppearance }) {
   const [page, setPage] = useState('workbench');
-  const [projects, setProjects] = useState([]);
+  const [projectsByView, setProjectsByView] = useState({ all: [], trash: [] });
   const [galleryCollections, setGalleryCollections] = useState([]);
   const [activeCollectionId, setActiveCollectionId] = useState('');
   const [editingSmartCollectionId, setEditingSmartCollectionId] = useState('');
   const [galleryView, setGalleryView] = useState('all');
-  const [loading, setLoading] = useState(true);
+  const [libraryLoadingByView, setLibraryLoadingByView] = useState({ all: true, trash: false });
   const [galleryFilters, setGalleryFilters] = useState(DEFAULT_GALLERY_FILTERS);
   const [sort, setSort] = useState('recent');
   const [galleryGrouping, setGalleryGrouping] = useState(() => readGalleryGrouping(globalThis.localStorage));
@@ -225,7 +252,13 @@ export default function App({ appearance, setAppearance }) {
   const annotationTimer = useRef(null);
   const confirmationResolverRef = useRef(null);
   const lastSelectedGroupRef = useRef('');
+  const libraryRequestsRef = useRef({ all: 0, trash: 0 });
+  const loadedLibraryViewsRef = useRef(new Set());
+  const groupingWorkerRef = useRef(null);
+  const groupingRequestRef = useRef(0);
   const activeTab = activeWorkbenchTab(workbenchSession);
+  const projects = projectsByView[galleryView] || [];
+  const libraryLoading = Boolean(libraryLoadingByView[galleryView]);
 
   const showToast = useCallback((message, type = 'success') => {
     const method = lobeToast[type] || lobeToast.success;
@@ -250,10 +283,29 @@ export default function App({ appearance, setAppearance }) {
     prompt_structure: normalizePromptStructure(project.prompt_structure, project.metadata),
   }), []);
 
-  const reloadLibrary = useCallback(async (view = galleryView) => {
-    const items = await studio.loadLibrary(view);
-    setProjects((items || []).map(hydrateProject));
-  }, [galleryView, hydrateProject]);
+  const reloadLibrary = useCallback(async (view = 'all') => {
+    const targetView = view === 'trash' ? 'trash' : 'all';
+    const requestId = (libraryRequestsRef.current[targetView] || 0) + 1;
+    libraryRequestsRef.current[targetView] = requestId;
+    setLibraryLoadingByView((current) => ({ ...current, [targetView]: true }));
+    try {
+      const items = await studio.loadLibrary(targetView);
+      if (libraryRequestsRef.current[targetView] !== requestId) return [];
+      const hydrated = (items || []).map(hydrateProject);
+      setProjectsByView((current) => ({ ...current, [targetView]: hydrated }));
+      loadedLibraryViewsRef.current.add(targetView);
+      return hydrated;
+    } catch (error) {
+      if (libraryRequestsRef.current[targetView] === requestId) {
+        showToast(error instanceof Error ? error.message : String(error), 'error');
+      }
+      return [];
+    } finally {
+      if (libraryRequestsRef.current[targetView] === requestId) {
+        setLibraryLoadingByView((current) => ({ ...current, [targetView]: false }));
+      }
+    }
+  }, [hydrateProject, showToast]);
 
   const reloadCollections = useCallback(async () => {
     const result = await studio.loadCollections();
@@ -273,7 +325,7 @@ export default function App({ appearance, setAppearance }) {
   }, [showToast]);
 
   useEffect(() => {
-    reloadLibrary(galleryView).finally(() => setLoading(false));
+    if (!loadedLibraryViewsRef.current.has(galleryView)) reloadLibrary(galleryView);
   }, [galleryView, reloadLibrary]);
 
   useEffect(() => {
@@ -456,6 +508,7 @@ export default function App({ appearance, setAppearance }) {
       return;
     }
     setPage('gallery');
+    setGalleryView('all');
     setImportResult(null);
     setImportProgress({ phase: 'preparing', processed: 0, total: 0, current: '准备中' });
     try {
@@ -465,7 +518,7 @@ export default function App({ appearance, setAppearance }) {
       if (result?.canceled) return;
       setImportResult(result);
       if (!result?.ok && result?.error) showToast(result.error, 'error');
-      await reloadLibrary(galleryView);
+      await reloadLibrary('all');
       if (result?.imported?.length) {
         const id = result.imported.at(-1).id;
         setPreviewProjectId(id);
@@ -476,7 +529,7 @@ export default function App({ appearance, setAppearance }) {
     } finally {
       setImportProgress(null);
     }
-  }, [galleryView, reloadLibrary, showToast]);
+  }, [reloadLibrary, showToast]);
 
   useEffect(() => {
     if (!appShellRef.current || !['workbench', 'gallery'].includes(page)) return undefined;
@@ -545,24 +598,110 @@ export default function App({ appearance, setAppearance }) {
   const activeCollection = galleryView === 'all'
     ? galleryCollections.find((collection) => collection.id === activeCollectionId) || null
     : null;
+  const galleryComputation = useMemo(() => ({
+    activeCollection,
+    filters: galleryFilters,
+    grouping: galleryGrouping,
+    projects,
+    sort,
+    view: galleryView,
+  }), [activeCollection, galleryFilters, galleryGrouping, galleryView, projects, sort]);
+  const deferredGalleryComputation = useDeferredValue(galleryComputation);
   const collectionScopedProjects = useMemo(
-    () => galleryCollectionScope(projects, activeCollection),
-    [activeCollection, projects],
+    () => galleryCollectionScope(
+      deferredGalleryComputation.projects,
+      deferredGalleryComputation.activeCollection,
+    ),
+    [deferredGalleryComputation.activeCollection, deferredGalleryComputation.projects],
   );
   const galleryCollectionsWithCounts = useMemo(() => galleryCollections.map((collection) => ({
     ...collection,
     image_count: galleryView === 'all'
-      ? galleryCollectionScope(projects, collection).length
+      ? collection.kind === 'manual'
+        ? Number(collection.active_member_count ?? collection.member_ids?.length ?? 0)
+        : galleryCollectionScope(deferredGalleryComputation.projects, collection).length
       : collection.kind === 'manual' ? Number(collection.active_member_count || 0) : null,
-  })), [galleryCollections, galleryView, projects]);
+  })), [deferredGalleryComputation.projects, galleryCollections, galleryView]);
   const editingSmartCollection = galleryCollectionsWithCounts.find(
     (collection) => collection.id === editingSmartCollectionId && collection.kind === 'smart',
   ) || null;
   const galleryFilterOptions = useMemo(() => buildGalleryFilterOptions(collectionScopedProjects), [collectionScopedProjects]);
-  const visibleGroups = useMemo(
-    () => galleryViewGroups(collectionScopedProjects, galleryFilters, galleryGrouping, sort),
-    [collectionScopedProjects, galleryFilters, galleryGrouping, sort],
+  const exactVisibleGroups = useMemo(
+    () => deferredGalleryComputation.grouping.promptScope === 'similar'
+      ? null
+      : galleryViewGroups(
+        collectionScopedProjects,
+        deferredGalleryComputation.filters,
+        deferredGalleryComputation.grouping,
+        deferredGalleryComputation.sort,
+      ),
+    [collectionScopedProjects, deferredGalleryComputation.filters, deferredGalleryComputation.grouping, deferredGalleryComputation.sort],
   );
+  const [similarGroupingState, setSimilarGroupingState] = useState({ groups: [], loading: false, requestId: 0 });
+
+  useEffect(() => {
+    if (deferredGalleryComputation.grouping.promptScope !== 'similar') {
+      groupingWorkerRef.current?.terminate();
+      groupingWorkerRef.current = null;
+      setSimilarGroupingState((current) => current.loading ? { ...current, loading: false } : current);
+      return undefined;
+    }
+
+    const requestId = groupingRequestRef.current + 1;
+    groupingRequestRef.current = requestId;
+    groupingWorkerRef.current?.terminate();
+    setSimilarGroupingState((current) => ({ ...current, loading: true }));
+
+    const acceptGroups = (groups) => {
+      if (groupingRequestRef.current !== requestId) return;
+      setSimilarGroupingState({ groups, loading: false, requestId });
+    };
+    const handleError = (error) => {
+      if (groupingRequestRef.current !== requestId) return;
+      setSimilarGroupingState({ groups: [], loading: false, requestId });
+      showToast(`相似 Prompt 分组没有完成：${error instanceof Error ? error.message : String(error)}`, 'error');
+    };
+    const payload = {
+      filters: deferredGalleryComputation.filters,
+      grouping: deferredGalleryComputation.grouping,
+      id: requestId,
+      projects: collectionScopedProjects,
+      sort: deferredGalleryComputation.sort,
+    };
+
+    if (typeof Worker === 'undefined') {
+      const timer = window.setTimeout(() => {
+        try {
+          acceptGroups(galleryViewGroups(payload.projects, payload.filters, payload.grouping, payload.sort));
+        } catch (error) {
+          handleError(error);
+        }
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const worker = new Worker(new URL('./workers/galleryGrouping.worker.js', import.meta.url), { type: 'module' });
+    groupingWorkerRef.current = worker;
+    worker.onmessage = ({ data }) => {
+      if (data?.id !== requestId) return;
+      if (data.error) handleError(new Error(data.error));
+      else acceptGroups(data.groups || []);
+    };
+    worker.onerror = (event) => handleError(new Error(event.message || '后台计算发生错误'));
+    worker.postMessage(payload);
+    return () => {
+      worker.terminate();
+      if (groupingWorkerRef.current === worker) groupingWorkerRef.current = null;
+    };
+  }, [collectionScopedProjects, deferredGalleryComputation.filters, deferredGalleryComputation.grouping, deferredGalleryComputation.sort, showToast]);
+
+  const visibleGroups = deferredGalleryComputation.grouping.promptScope === 'similar'
+    ? similarGroupingState.groups
+    : exactVisibleGroups || [];
+  const galleryUpdating = libraryLoading
+    || deferredGalleryComputation !== galleryComputation
+    || (deferredGalleryComputation.grouping.promptScope === 'similar' && similarGroupingState.loading);
+  const galleryContentKey = `${deferredGalleryComputation.view}:${deferredGalleryComputation.activeCollection?.id || 'all'}:${deferredGalleryComputation.grouping.promptScope}:${deferredGalleryComputation.grouping.mergeVibes ? 1 : 0}:${deferredGalleryComputation.grouping.similarityThreshold}:${deferredGalleryComputation.sort}:${similarGroupingState.requestId}:${visibleGroups.length}:${visibleGroups[0]?.id || ''}:${visibleGroups.at(-1)?.id || ''}`;
   const previewGroup = visibleGroups.find((group) => group.id === previewGroupId)
     || visibleGroups.find((group) => group.members.some((project) => project.id === previewProjectId))
     || null;
@@ -669,7 +808,7 @@ export default function App({ appearance, setAppearance }) {
   };
 
   const reloadAfterGalleryAction = async () => {
-    await Promise.all([reloadLibrary(galleryView), reloadCollections()]);
+    await Promise.all([reloadLibrary('all'), reloadLibrary('trash'), reloadCollections()]);
     setSelectedGroupIds([]);
   };
 
@@ -802,7 +941,12 @@ export default function App({ appearance, setAppearance }) {
   };
 
   const updateGalleryGrouping = (patch) => {
+    if (patch.promptScope === 'similar' && galleryGrouping.promptScope !== 'similar') {
+      setSimilarGroupingState((current) => ({ ...current, groups: visibleGroups }));
+    }
     setGalleryGrouping((current) => writeGalleryGrouping(globalThis.localStorage, { ...current, ...patch }));
+    setSelectedGroupIds([]);
+    lastSelectedGroupRef.current = '';
   };
 
   const updateGalleryFilters = (patch) => {
@@ -1002,7 +1146,8 @@ export default function App({ appearance, setAppearance }) {
   return <div className="app-shell" ref={appShellRef}>
     <SideNav onNavigate={setPage} page={page}/>
     <div className="app-content">
-      {loading ? <div className="app-loading"><Icon name="refresh" size={24}/><span>正在读取图片库…</span></div> : page === 'workbench' ? <WorkbenchPage
+      <Activity mode={page === 'workbench' ? 'visible' : 'hidden'}>
+        <PageSurface active={page === 'workbench'} motionMode={appearance.motion}><WorkbenchPage
         error={workbenchError}
         focusScopeKey={workbenchFocus.scopeKey}
         focusTagId={workbenchFocus.tagId}
@@ -1039,16 +1184,22 @@ export default function App({ appearance, setAppearance }) {
           ...tab,
           viewState: normalizeWorkbenchViewState(viewState),
         })))}
-        session={workbenchSession}
-      /> : page === 'gallery' ? <GalleryPage
+          session={workbenchSession}
+        /></PageSurface>
+      </Activity>
+      <Activity mode={page === 'gallery' ? 'visible' : 'hidden'}>
+        <PageSurface active={page === 'gallery'} motionMode={appearance.motion}><GalleryPage
         activeCollection={activeCollection}
         collections={galleryCollectionsWithCounts}
+        contentKey={galleryContentKey}
         editingSmartCollection={editingSmartCollection}
         filterOptions={galleryFilterOptions}
         filters={galleryFilters}
         grouping={galleryGrouping}
         groups={visibleGroups}
         importing={isImportActive(importProgress)}
+        loading={(libraryLoading && !projects.length)
+          || (deferredGalleryComputation.grouping.promptScope === 'similar' && similarGroupingState.loading && !similarGroupingState.groups.length)}
         onClearSelection={() => setSelectedGroupIds([])}
         onCollectionCreate={createGalleryCollection}
         onCollectionDelete={deleteGalleryCollection}
@@ -1093,8 +1244,21 @@ export default function App({ appearance, setAppearance }) {
         selectedGroupIds={selectedGroupIds}
         selectedImageCount={selectedProjectIds.length}
         sort={sort}
+        updating={galleryUpdating}
         view={galleryView}
-      /> : <SettingsPage appearance={appearance} onAppearanceChange={changeAppearance} onConfirm={requestConfirmation} onInstallUpdate={installDownloadedUpdate} onLibraryChange={() => reloadLibrary(galleryView)} showToast={showToast} studio={studio}/>}
+        /></PageSurface>
+      </Activity>
+      <Activity mode={page === 'settings' ? 'visible' : 'hidden'}>
+        <PageSurface active={page === 'settings'} motionMode={appearance.motion}><SettingsPage
+          appearance={appearance}
+          onAppearanceChange={changeAppearance}
+          onConfirm={requestConfirmation}
+          onInstallUpdate={installDownloadedUpdate}
+          onLibraryChange={() => Promise.all([reloadLibrary('all'), reloadLibrary('trash')])}
+          showToast={showToast}
+          studio={studio}
+        /></PageSurface>
+      </Activity>
     </div>
     <ImportExperience dragState={dragState} onCancel={() => importProgress?.batchId && studio.cancelImport(importProgress.batchId)} onDismiss={() => setImportResult(null)} progress={importProgress} result={importResult} target={page}/>
     <LobeModal

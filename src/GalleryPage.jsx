@@ -1,7 +1,8 @@
 import { Accordion, AccordionItem, ActionIcon, DatePicker as LobeDatePicker, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, Highlighter, Popover, PopoverGroup, SearchBar as LobeSearchBar } from '@lobehub/ui';
 import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, Slider, SplitButton, Switch as LobeSwitch } from '@lobehub/ui/base-ui';
 import dayjs from 'dayjs';
-import { useEffect, useRef, useState } from 'react';
+import { motion, useAnimationControls } from 'motion/react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
@@ -46,6 +47,7 @@ import {
 import { countPromptTags, positiveRawPromptScopes } from './lib/promptStructure.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
 import { gallerySmartCollectionDefaultName } from './lib/galleryCollections.js';
+import { MOTION_EASE_OUT, useStudioReducedMotion } from './lib/motion.js';
 
 function formatDate(value) {
   if (!value) return '未知时间';
@@ -475,9 +477,65 @@ export function GalleryCardHoverPreview({ group, project = group.cover }) {
 
 const GALLERY_HOVER_POSITIONER_STYLES = { root: { pointerEvents: 'none' } };
 
+function GalleryThumbnail({ alt = '', src }) {
+  const [loaded, setLoaded] = useState(false);
+  return <img
+    alt={alt}
+    className={loaded ? 'is-loaded' : ''}
+    decoding="async"
+    loading="lazy"
+    onLoad={() => setLoaded(true)}
+    src={src}
+  />;
+}
+
+function GalleryResultsSurface({ children, className, contentKey, style }) {
+  const controls = useAnimationControls();
+  const reduceMotion = useStudioReducedMotion();
+
+  useLayoutEffect(() => {
+    if (reduceMotion) {
+      controls.set({ opacity: 1, y: 0 });
+      return undefined;
+    }
+    controls.set({ opacity: 0.68, y: 4 });
+    const animation = controls.start({
+      opacity: 1,
+      transition: { duration: 0.2, ease: MOTION_EASE_OUT },
+      y: 0,
+    });
+    return () => animation.stop();
+  }, [contentKey, controls, reduceMotion]);
+
+  return <motion.div animate={controls} className={className} initial={false} style={style}>{children}</motion.div>;
+}
+
+function DelayedGalleryStatus({ active, loading }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setVisible(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setVisible(true), 140);
+    return () => window.clearTimeout(timer);
+  }, [active]);
+  if (!visible) return null;
+  return <div aria-live="polite" className="gallery-update-status" role="status">
+    <Icon name="refresh" size={13}/><span>{loading ? '正在准备图库' : '正在更新图库'}</span>
+  </div>;
+}
+
+function GalleryLoadingGrid({ cardSize, density }) {
+  return <div
+    aria-hidden="true"
+    className={`gallery-grid gallery-loading-grid density-${density}`}
+    style={{ '--gallery-card-min-width': `${cardSize}px` }}
+  >{Array.from({ length: 12 }, (_, index) => <span className="gallery-loading-card" key={index}/>)}</div>;
+}
+
 export function GalleryCardView({ active, group, hoverProject = group.cover, selected, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
   const project = group.cover;
-  const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
   return <Popover content={<GalleryCardHoverPreview group={group} project={hoverProject}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
     <button
       aria-label={group.count > 1 ? `预览图片组：${project.name}，共 ${group.count} 张` : `预览图片：${project.name}`}
@@ -494,15 +552,8 @@ export function GalleryCardView({ active, group, hoverProject = group.cover, sel
       type="button"
     >
       <span className="gallery-card-image">
-        {stackMembers.map((member, index) => <img
-          alt=""
-          aria-hidden="true"
-          className={`gallery-card-stack gallery-card-stack-${index + 1}`}
-          key={member.id}
-          loading="lazy"
-          src={mediaUrl(member.thumbnail_path || member.image_path)}
-        />)}
-        <img alt="" loading="lazy" src={mediaUrl(project.thumbnail_path || project.image_path)}/>
+        {group.count > 1 && <><span aria-hidden="true" className="gallery-card-stack gallery-card-stack-1"/><span aria-hidden="true" className="gallery-card-stack gallery-card-stack-2"/></>}
+        <GalleryThumbnail key={mediaUrl(project.thumbnail_path || project.image_path)} src={mediaUrl(project.thumbnail_path || project.image_path)}/>
         {group.count > 1 && <span className="gallery-group-count"><b>{group.count}</b><span> 张</span></span>}
         <span aria-hidden="true" className="gallery-card-hover-name">{hoverProject.name}</span>
       </span>
@@ -568,6 +619,7 @@ export function GalleryCard(props) {
 export default function GalleryPage({
   activeCollection,
   collections = [],
+  contentKey = '',
   editingSmartCollection,
   groups,
   filters,
@@ -578,6 +630,7 @@ export default function GalleryPage({
   previewGroup,
   preview,
   importing,
+  loading = false,
   selectedGroupIds,
   selectedImageCount,
   grouping = DEFAULT_GALLERY_GROUPING,
@@ -613,6 +666,7 @@ export default function GalleryPage({
   onDownloadImage,
   onGroupingChange,
   onFiltersChange,
+  updating = false,
 }) {
   const [previewExpanded, setPreviewExpanded] = useState(() => readPanelBoolean(
     panelStorage(),
@@ -749,8 +803,8 @@ export default function GalleryPage({
       </div>
       <GalleryGroupingControl grouping={grouping} onChange={onGroupingChange}/>
       <span className="gallery-count">{groups.length} 组 · {groups.reduce((count, group) => count + group.count, 0)} 张</span>
-      <LobeButton disabled={!groups.length} onClick={onSelectAll} size="small" type="text">全选当前结果</LobeButton>
-      {view === 'trash' && <LobeButton danger disabled={!groups.length} onClick={onEmptyTrash} size="small">清空回收站</LobeButton>}
+      <LobeButton disabled={updating || !groups.length} onClick={onSelectAll} size="small" type="text">全选当前结果</LobeButton>
+      {view === 'trash' && <LobeButton danger disabled={updating || !groups.length} onClick={onEmptyTrash} size="small">清空回收站</LobeButton>}
     </div>
     {editingSmartCollection && <div className="gallery-rule-edit-bar">
       <span><Icon name="filter" size={15}/><span><strong>正在编辑“{editingSmartCollection.name}”</strong><small>调整搜索与筛选，图库结果会实时预览</small></span></span>
@@ -773,6 +827,7 @@ export default function GalleryPage({
       view={view}
     />
     <div className="gallery-workspace">
+      <DelayedGalleryStatus active={updating} loading={loading}/>
       <LobeDraggablePanel
         className="gallery-collections-shell"
         classNames={{ content: 'workspace-side-panel-content' }}
@@ -806,6 +861,7 @@ export default function GalleryPage({
         </LobeDraggablePanel.Body>
       </LobeDraggablePanel>
       <section
+        aria-busy={updating}
         className="gallery-grid-scroll"
         onClick={(event) => {
           if (!shouldCollapseGalleryPreview(event.target, previewPinned)) return;
@@ -817,8 +873,9 @@ export default function GalleryPage({
           onWorkspaceContextMenu(event);
         }}
       >
-        {groups.length ? <PopoverGroup closeDelay={120} openDelay={450} placement="rightTop" trigger="hover"><div
+        {groups.length ? <PopoverGroup closeDelay={120} openDelay={450} placement="rightTop" trigger="hover"><GalleryResultsSurface
           className={`gallery-grid density-${galleryDensity}`}
+          contentKey={contentKey}
           style={{ '--gallery-card-min-width': `${galleryCardSize}px` }}
         >
           {groups.map((group) => <GalleryCard
@@ -831,7 +888,7 @@ export default function GalleryPage({
             onSelect={(event) => onToggleSelect(group, event)}
             selected={selectedGroupIds.includes(group.id)}
           />)}
-        </div></PopoverGroup> : <LobeEmpty
+        </GalleryResultsSurface></PopoverGroup> : loading ? <GalleryLoadingGrid cardSize={galleryCardSize} density={galleryDensity}/> : <LobeEmpty
           className="gallery-empty"
           description={emptyState.description}
           gap={6}

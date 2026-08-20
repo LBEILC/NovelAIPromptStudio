@@ -198,11 +198,24 @@ export async function openDatabase(dataDirectory) {
 
   const lookupTagDictionary = (tags = []) => {
     const found = new Map();
+    const requested = new Map();
     for (const tag of tags) {
       const key = dictionaryKey(tag);
-      if (!key || found.has(key)) continue;
-      const row = query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0];
-      if (row) found.set(key, { ...row, category: normalizeCategory(row.category, tag) });
+      if (key && !requested.has(key)) requested.set(key, tag);
+    }
+    const keys = [...requested.keys()];
+    for (let offset = 0; offset < keys.length; offset += 400) {
+      const chunk = keys.slice(offset, offset + 400);
+      const params = {};
+      const placeholders = chunk.map((key, index) => {
+        const parameter = `$tag${index}`;
+        params[parameter] = key;
+        return parameter;
+      });
+      for (const row of query(`SELECT * FROM tag_dictionary WHERE tag IN (${placeholders.join(', ')})`, params)) {
+        const original = requested.get(row.tag) || row.display_tag || row.tag;
+        found.set(row.tag, { ...row, category: normalizeCategory(row.category, original) });
+      }
     }
     return found;
   };
@@ -401,8 +414,8 @@ export async function openDatabase(dataDirectory) {
 
   const deleteTagDictionary = (tag) => deleteTagDictionaries([tag]) > 0;
 
-  const enrichProjectTags = (project) => {
-    const cached = lookupTagDictionary(projectTags(project).map((tag) => tag.tag));
+  const enrichProjectTags = (project, cachedEntries = null) => {
+    const cached = cachedEntries || lookupTagDictionary(projectTags(project).map((tag) => tag.tag));
     const enrich = (tag) => {
       const entry = cached.get(dictionaryKey(tag.tag));
       const normalizedCategory = normalizeCategory(tag.category, tag.tag);
@@ -458,9 +471,44 @@ export async function openDatabase(dataDirectory) {
   const loadProject = (projectId) => hydrateProject(query('SELECT * FROM projects WHERE id = $id', { $id: String(projectId || '') })[0]);
   const loadLibrary = (view = 'all') => {
     const where = view === 'trash'
-      ? "deleted_at != ''"
-      : view === 'favorites' ? "deleted_at = '' AND is_favorite = 1" : "deleted_at = ''";
-    return query(`SELECT * FROM projects WHERE ${where} ORDER BY created_at DESC`).map(hydrateProject);
+      ? "projects.deleted_at != ''"
+      : view === 'favorites' ? "projects.deleted_at = '' AND projects.is_favorite = 1" : "projects.deleted_at = ''";
+    const projects = query(`SELECT projects.* FROM projects WHERE ${where} ORDER BY projects.created_at DESC`);
+    if (!projects.length) return [];
+
+    const metadataByProject = new Map(query(
+      `SELECT generation_metadata.* FROM generation_metadata
+       JOIN projects ON projects.id = generation_metadata.project_id
+       WHERE ${where}`,
+    ).map((metadata) => [metadata.project_id, metadata]));
+    const tagsByProject = new Map();
+    for (const tag of query(
+      `SELECT prompt_tags.* FROM prompt_tags
+       JOIN projects ON projects.id = prompt_tags.project_id
+       WHERE ${where}
+       ORDER BY prompt_tags.project_id, prompt_tags.position`,
+    )) {
+      if (!tagsByProject.has(tag.project_id)) tagsByProject.set(tag.project_id, []);
+      tagsByProject.get(tag.project_id).push(tag);
+    }
+    const covers = new Map(query(
+      `SELECT prompt_group_covers.prompt_fingerprint, prompt_group_covers.project_id
+       FROM prompt_group_covers
+       JOIN projects ON projects.exact_group_fingerprint = prompt_group_covers.prompt_fingerprint
+       WHERE ${where}`,
+    ).map((cover) => [cover.prompt_fingerprint, cover.project_id]));
+    const hydrated = projects.map((project) => {
+      const metadata = metadataByProject.get(project.id) || {};
+      return {
+        ...project,
+        tags: tagsByProject.get(project.id) || [],
+        metadata,
+        prompt_structure: safeJson(metadata.prompt_structure_json),
+        group_cover_id: covers.get(project.exact_group_fingerprint) || '',
+      };
+    });
+    const cached = lookupTagDictionary(hydrated.flatMap((project) => projectTags(project).map((tag) => tag.tag)));
+    return hydrated.map((project) => enrichProjectTags(project, cached));
   };
 
   const cleanCollectionName = (name) => {
