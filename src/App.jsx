@@ -4,7 +4,7 @@ import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/exter
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import { ActionIcon as LobeActionIcon, SideNav as LobeSideNav } from '@lobehub/ui';
 import { Button as LobeButton, Modal as LobeModal, showContextMenu as showLobeContextMenu, toast as lobeToast } from '@lobehub/ui/base-ui';
-import { Check, ClipboardPaste, Copy, FolderOpen, Pencil, Redo2, Scissors, Sparkles, Star, Tags, Trash2, Undo2 } from 'lucide-react';
+import { Check, ClipboardPaste, Copy, FolderOpen, Pencil, Redo2, Scissors, Sparkles, Tags, Trash2, Undo2 } from 'lucide-react';
 import GalleryPage from './GalleryPage.jsx';
 import SettingsPage from './SettingsPage.jsx';
 import WorkbenchPage from './WorkbenchPage.jsx';
@@ -77,7 +77,6 @@ const studio = window.studio || {
   onImportProgress: () => {},
   offImportProgress: () => {},
   updateProjectName: unavailable('请在桌面应用中修改名称'),
-  setProjectsFavorite: unavailable('请在桌面应用中管理收藏'),
   moveProjectsToTrash: unavailable('请在桌面应用中管理回收站'),
   restoreProjects: unavailable('请在桌面应用中管理回收站'),
   permanentlyDeleteProjects: unavailable('请在桌面应用中管理回收站'),
@@ -670,14 +669,6 @@ export default function App({ appearance, setAppearance }) {
     setSelectedGroupIds([]);
   };
 
-  const setFavorite = async (isFavorite, explicitIds = null, scope = 'selection') => {
-    const ids = explicitIds || selectedProjectIds;
-    if (!ids.length) return;
-    const result = await studio.setProjectsFavorite(ids, isFavorite);
-    const groupCount = scope === 'group' ? 1 : explicitIds ? 0 : selectedGroupIds.length;
-    if (summarizeBatch(result, isFavorite ? '收藏' : '取消收藏', groupCount)) await reloadAfterGalleryAction();
-  };
-
   const tabImpact = (ids) => {
     const selected = new Set(ids);
     const tabs = workbenchSession.tabs.filter((tab) => tab.source?.type === 'library' && selected.has(tab.source.projectId));
@@ -688,13 +679,12 @@ export default function App({ appearance, setAppearance }) {
     const ids = explicitIds || selectedProjectIds;
     if (!ids.length) return;
     const selectedGroups = scope === 'group' ? 1 : selectedGroupIds.length;
-    const favoriteCount = projects.filter((project) => ids.includes(project.id) && project.is_favorite).length;
     const impact = tabImpact(ids);
     const isDetail = scope === 'detail';
     if (!(await requestConfirmation({
       title: isDetail ? '删除当前图片？' : '删除整个图片组？',
       message: isDetail ? '将当前图片移入回收站。' : `将 ${selectedGroups} 组共 ${ids.length} 张图片移入回收站。`,
-      detail: `${favoriteCount ? `包含 ${favoriteCount} 张收藏图片。` : ''}${impact.open ? ` ${impact.open} 张仍在工作台打开，标签会继续可用。` : ''}`,
+      detail: impact.open ? `${impact.open} 张仍在工作台打开，标签会继续可用。` : '',
       okText: '移入回收站',
       danger: true,
     }))) return;
@@ -927,7 +917,6 @@ export default function App({ appearance, setAppearance }) {
         { key: 'permanent-group', label: group.count > 1 ? '永久删除整个图片组' : '永久删除图片', icon: Trash2, danger: true, onClick: () => permanentDelete(ids, null, 'group') },
       ] : [
         { key: 'open-workbench', label: '在工作台中打开', icon: Pencil, onClick: () => openWorkbenchPath(project.image_path, { type: 'library', projectId: project.id, path: project.image_path }) },
-        { key: 'favorite-group', label: labels.favorite, icon: Star, onClick: () => setFavorite(!group.members.every((item) => item.is_favorite), ids, 'group') },
         { key: 'rename-project', label: labels.rename, icon: Pencil, onClick: onRenameRequest },
         { key: 'reveal-project', label: '在文件夹中显示', icon: FolderOpen, onClick: () => studio.revealFile(project.image_path) },
         { key: 'project-divider', type: 'divider' },
@@ -1049,7 +1038,6 @@ export default function App({ appearance, setAppearance }) {
         onGroupingChange={updateGalleryGrouping}
         onFiltersChange={updateGalleryFilters}
         onEmptyTrash={emptyTrash}
-        onFavorite={setFavorite}
         onImport={() => importImages()}
         onImportClipboard={() => importImages(null, true)}
         onNavigatePreview={navigatePreview}

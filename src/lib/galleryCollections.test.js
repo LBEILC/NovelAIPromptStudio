@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   galleryCollectionImageCount,
   galleryCollectionScope,
+  gallerySmartCollectionDefaultName,
   normalizeGalleryCollection,
   readActiveGalleryCollection,
   writeActiveGalleryCollection,
@@ -22,6 +23,13 @@ describe('gallery collections', () => {
   it('evaluates smart collection rules against individual images', () => {
     const collection = normalizeGalleryCollection({ id: 'smart', kind: 'smart', filters: { includeTags: ['bagpipe'] } });
     expect(galleryCollectionScope(projects, collection).map((project) => project.id)).toEqual(['one']);
+  });
+
+  it('generates a concise smart collection name from the current filters', () => {
+    expect(gallerySmartCollectionDefaultName({ query: 'portrait lighting', datePreset: '30d' })).toBe('搜索 portrait lighting · 最近 30 天');
+    expect(gallerySmartCollectionDefaultName({ includeTags: ['1girl', 'outdoors', 'day'], tagMatch: 'all' })).toBe('包含 1girl、outdoors 等');
+    expect(gallerySmartCollectionDefaultName({ models: ['nai-v4.5'], vibes: ['vibe-a'] })).toBe('nai-v4.5 · 指定 Vibe');
+    expect(gallerySmartCollectionDefaultName()).toBe('智能收藏集');
   });
 
   it('persists only a collection id that still exists', () => {

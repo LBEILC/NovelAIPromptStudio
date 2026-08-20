@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { openDatabase } from './database.js';
+import { DEFAULT_GALLERY_COLLECTION_ID, openDatabase } from './database.js';
 
 const temporaryDirectories = [];
 afterEach(() => {
@@ -282,6 +282,30 @@ describe('phase 2 core database', () => {
     });
   });
 
+  it('migrates every legacy favorite into the default collection exactly once', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    database.insertProject(project('active-favorite'));
+    database.insertProject(project('trashed-favorite'));
+    database.insertProject(project('ordinary'));
+    database.updateProjects(['active-favorite', 'trashed-favorite'], { isFavorite: true });
+    database.updateProjects(['trashed-favorite'], { deleted: true });
+
+    const defaultCollection = database.listCollections().find((collection) => collection.id === DEFAULT_GALLERY_COLLECTION_ID);
+    expect(defaultCollection).toMatchObject({
+      name: '默认收藏夹',
+      kind: 'manual',
+      active_member_count: 1,
+    });
+    expect(defaultCollection.member_ids.sort()).toEqual(['active-favorite', 'trashed-favorite']);
+
+    database.updateCollectionProjects(DEFAULT_GALLERY_COLLECTION_ID, ['active-favorite'], 'remove');
+    const reopened = await openDatabase(directory);
+    expect(reopened.listCollections().find((collection) => collection.id === DEFAULT_GALLERY_COLLECTION_ID)?.member_ids).toEqual(['trashed-favorite']);
+    expect(reopened.loadProject('active-favorite')).toMatchObject({ is_favorite: 1 });
+  });
+
   it('keeps collection membership through trash and cascades it on permanent deletion', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
     temporaryDirectories.push(directory);
@@ -291,13 +315,14 @@ describe('phase 2 core database', () => {
     database.updateCollectionProjects('manual-1', ['project-1'], 'add');
 
     database.updateProjects(['project-1'], { deleted: true });
-    expect(database.listCollections()[0]).toMatchObject({ member_ids: ['project-1'], active_member_count: 0 });
+    const manualCollection = () => database.listCollections().find((collection) => collection.id === 'manual-1');
+    expect(manualCollection()).toMatchObject({ member_ids: ['project-1'], active_member_count: 0 });
     database.updateProjects(['project-1'], { deleted: false });
-    expect(database.listCollections()[0].active_member_count).toBe(1);
+    expect(manualCollection().active_member_count).toBe(1);
     database.deleteProject('project-1');
-    expect(database.listCollections()[0].member_ids).toEqual([]);
+    expect(manualCollection().member_ids).toEqual([]);
     expect(database.deleteCollection('manual-1')).toBe(true);
-    expect(database.listCollections()).toEqual([]);
+    expect(database.listCollections().map((collection) => collection.id)).toEqual([DEFAULT_GALLERY_COLLECTION_ID]);
   });
 
   it('groups seed variants with a stable Prompt fingerprint and persists a valid cover', async () => {

@@ -45,6 +45,7 @@ import {
 } from './lib/panelLayout.js';
 import { countPromptTags, positiveRawPromptScopes } from './lib/promptStructure.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
+import { gallerySmartCollectionDefaultName } from './lib/galleryCollections.js';
 
 function formatDate(value) {
   if (!value) return '未知时间';
@@ -307,7 +308,7 @@ export function GalleryFilterControl({ filters = DEFAULT_GALLERY_FILTERS, option
   </Popover>;
 }
 
-function CollectionMembershipControl({ collections = [], projectIds = [], onChange, size = 'small', label = '加入收藏集' }) {
+function CollectionMembershipControl({ className, collections = [], projectIds = [], onChange, size, label = '加入收藏集' }) {
   const manualCollections = collections.filter((collection) => collection.kind === 'manual');
   if (!projectIds.length) return null;
   const content = <div className="gallery-collection-picker">
@@ -326,7 +327,7 @@ function CollectionMembershipControl({ collections = [], projectIds = [], onChan
     })}</div> : <p>还没有普通收藏集，可在左侧收藏集面板中新建。</p>}
   </div>;
   return <Popover arrow content={content} placement="bottom" standalone trigger="click">
-    <LobeButton icon={<Icon name="folder" size={14}/>} size={size}>{label}</LobeButton>
+    <LobeButton className={className} icon={<Icon name="folderPlus" size={14}/>} size={size}>{label}</LobeButton>
   </Popover>;
 }
 
@@ -353,7 +354,7 @@ function GalleryCollectionsPanel({
   const canSaveSmart = !activeCollection && hasActiveGalleryFilters(filters);
   const beginEditor = (mode, collection = null) => {
     setEditor({ mode, collection });
-    setNameDraft(collection?.name || '');
+    setNameDraft(collection?.name || (mode === 'smart' ? gallerySmartCollectionDefaultName(filters) : ''));
   };
   const saveEditor = async () => {
     const name = nameDraft.trim();
@@ -415,7 +416,7 @@ function GalleryCollectionsPanel({
         maxLength={80}
         onChange={(event) => setNameDraft(event.target.value)}
         onKeyDown={(event) => { if (event.key === 'Enter') saveEditor(); if (event.key === 'Escape') setEditor(null); }}
-        placeholder={editor.mode === 'smart' ? '例如：Bagpipe · 最近 30 天' : '例如：构图参考'}
+        placeholder={editor.mode === 'smart' ? '按当前筛选自动生成，可直接修改' : '例如：构图参考'}
         size="small"
         value={nameDraft}
       />
@@ -431,7 +432,7 @@ function GalleryCollectionsPanel({
   </div>;
 }
 
-export function BatchToolbar({ view, selectedGroups, selectedImages, selectedProjectIds = [], collections = [], activeCollection, onCollectionProjectsChange, onFavorite, onTrash, onRestore, onPermanentDelete, onClear }) {
+export function BatchToolbar({ view, selectedGroups, selectedImages, selectedProjectIds = [], collections = [], activeCollection, onCollectionProjectsChange, onTrash, onRestore, onPermanentDelete, onClear }) {
   if (!selectedGroups) return null;
   return <div className="gallery-selection-bar">
     <span>已选 <b>{selectedGroups}</b> 组 · <b>{selectedImages}</b> 张图片</span>
@@ -439,10 +440,8 @@ export function BatchToolbar({ view, selectedGroups, selectedImages, selectedPro
       <LobeButton icon={<Icon name="restore" size={14}/>} onClick={() => onRestore()} size="small">恢复</LobeButton>
       <LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={() => onPermanentDelete()} size="small">永久删除</LobeButton>
     </> : <>
-      <LobeButton icon={<Icon name="star" size={14}/>} onClick={() => onFavorite(true)} size="small">收藏</LobeButton>
-      <LobeButton onClick={() => onFavorite(false)} size="small">取消收藏</LobeButton>
       <LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={() => onTrash()} size="small" type="fill">移入回收站</LobeButton>
-      <CollectionMembershipControl collections={collections} onChange={onCollectionProjectsChange} projectIds={selectedProjectIds}/>
+      <CollectionMembershipControl collections={collections} onChange={onCollectionProjectsChange} projectIds={selectedProjectIds} size="small"/>
       {activeCollection?.kind === 'manual' && <LobeButton onClick={() => onCollectionProjectsChange(activeCollection.id, selectedProjectIds, 'remove')} size="small">移出当前收藏集</LobeButton>}
     </>}
     <LobeButton onClick={() => onClear()} size="small" type="text">取消选择</LobeButton>
@@ -589,7 +588,6 @@ export default function GalleryPage({
   onCollectionRulesUpdate,
   onCollectionSelect,
   onEmptyTrash,
-  onFavorite,
   onImport,
   onImportClipboard,
   onNavigatePreview,
@@ -706,7 +704,7 @@ export default function GalleryPage({
       <Segmented
         aria-label="图片库视图"
         onChange={onViewChange}
-        options={[{ label: '全部', value: 'all' }, { label: '收藏', value: 'favorites' }, { label: '回收站', value: 'trash' }]}
+        options={[{ label: '全部', value: 'all' }, { label: '回收站', value: 'trash' }]}
         size="small"
         value={view}
       />
@@ -748,7 +746,6 @@ export default function GalleryPage({
     </div>
     <BatchToolbar
       onClear={onClearSelection}
-      onFavorite={onFavorite}
       onPermanentDelete={onPermanentDelete}
       onRestore={onRestore}
       onTrash={onTrash}
@@ -901,8 +898,7 @@ export default function GalleryPage({
           </section>
           <footer className="gallery-preview-actions">
             {view !== 'trash' && <LobeButton className="gallery-preview-action-wide" icon={<Icon name="edit" size={14}/>} onClick={() => onOpenWorkbench(preview)} type="primary">在工作台编辑</LobeButton>}
-            <LobeButton icon={<Icon name="star" size={14}/>} onClick={() => onFavorite(!preview.is_favorite, [preview.id])}>{preview.is_favorite ? '取消收藏' : '收藏'}</LobeButton>
-            {view !== 'trash' && <CollectionMembershipControl collections={collections} onChange={onCollectionProjectsChange} projectIds={[preview.id]}/>}
+            {view !== 'trash' && <CollectionMembershipControl className="gallery-preview-action-button" collections={collections} onChange={onCollectionProjectsChange} projectIds={[preview.id]}/>}
             {activeCollection?.kind === 'manual' && view !== 'trash' && <LobeButton onClick={() => onCollectionProjectsChange(activeCollection.id, [preview.id], 'remove')}>移出当前收藏集</LobeButton>}
             <LobeButton icon={<Icon name="folder" size={14}/>} onClick={() => onReveal(preview)}>在文件夹中显示</LobeButton>
             {view !== 'trash' && <LobeButton onClick={() => setRenaming(true)}>重命名</LobeButton>}

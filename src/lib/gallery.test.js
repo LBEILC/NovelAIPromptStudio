@@ -58,14 +58,8 @@ describe('gallery grouping and selection', () => {
   });
 
   it('uses single-image wording unless the card represents a real group', () => {
-    expect(galleryGroupMenuLabels({ count: 1, members: [{ is_favorite: 0 }] })).toEqual({
-      favorite: '收藏图片',
-      rename: '重命名',
-    });
-    expect(galleryGroupMenuLabels({ canSetCover: true, count: 2, members: [{ is_favorite: 1 }, { is_favorite: 1 }] })).toEqual({
-      favorite: '取消收藏整个图片组',
-      rename: '重命名头图',
-    });
+    expect(galleryGroupMenuLabels({ count: 1 })).toEqual({ rename: '重命名' });
+    expect(galleryGroupMenuLabels({ canSetCover: true, count: 2 })).toEqual({ rename: '重命名头图' });
   });
 
   it('expands grouping monotonically across Prompt scope and the Vibe option while keeping model as a boundary', () => {
@@ -177,7 +171,6 @@ describe('gallery grouping and selection', () => {
   });
 
   it('gives every empty gallery view an accurate next step', () => {
-    expect(galleryEmptyState('favorites')).toMatchObject({ title: '暂无收藏', icon: 'star' });
     expect(galleryEmptyState('trash')).toMatchObject({ title: '回收站为空', icon: 'trash' });
     expect(galleryEmptyState('all', true)).toMatchObject({ title: '没有匹配的图片', icon: 'search' });
     expect(galleryEmptyState('all').description).toContain('导入图片');

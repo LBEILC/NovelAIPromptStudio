@@ -9,6 +9,8 @@ import { extractEmbeddedVibes, fingerprintVibes } from './vibes.js';
 
 const require = createRequire(import.meta.url);
 const TAG_CATEGORIES = new Set(CATEGORY_OPTIONS);
+export const DEFAULT_GALLERY_COLLECTION_ID = 'default-gallery-collection';
+const FAVORITES_COLLECTION_MIGRATION_KEY = 'gallery_favorites_collection_v1';
 
 const CORE_SCHEMA = `
 PRAGMA foreign_keys = ON;
@@ -473,22 +475,60 @@ export async function openDatabase(dataDirectory) {
     if (serialized.length > 20_000) throw new Error('智能收藏集筛选条件过大');
     return serialized;
   };
-  const listCollections = () => query(
+  const migrateLegacyFavorites = () => {
+    const migrated = query('SELECT value FROM app_meta WHERE key = $key', { $key: FAVORITES_COLLECTION_MIGRATION_KEY })[0];
+    if (migrated?.value === 'complete') return { migrated: false, projectIds: [] };
+    const favoriteIds = query('SELECT id FROM projects WHERE is_favorite = 1 ORDER BY created_at ASC').map((project) => project.id);
+    const nowValue = new Date().toISOString();
+    database.run('BEGIN');
+    try {
+      database.run(
+        `INSERT OR IGNORE INTO gallery_collections (id, name, kind, filter_json, created_at, updated_at)
+         VALUES ($id, $name, 'manual', '{}', $created_at, $updated_at)`,
+        {
+          $id: DEFAULT_GALLERY_COLLECTION_ID,
+          $name: '默认收藏夹',
+          $created_at: nowValue,
+          $updated_at: nowValue,
+        },
+      );
+      for (const projectId of favoriteIds) database.run(
+        `INSERT OR IGNORE INTO gallery_collection_projects (collection_id, project_id, created_at)
+         VALUES ($collection_id, $project_id, $created_at)`,
+        { $collection_id: DEFAULT_GALLERY_COLLECTION_ID, $project_id: projectId, $created_at: nowValue },
+      );
+      database.run(
+        'INSERT OR REPLACE INTO app_meta (key, value) VALUES ($key, $value)',
+        { $key: FAVORITES_COLLECTION_MIGRATION_KEY, $value: 'complete' },
+      );
+      database.run('COMMIT');
+      persist();
+      return { migrated: true, projectIds: favoriteIds };
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+  };
+  const listCollections = () => {
+    migrateLegacyFavorites();
+    return query(
     `SELECT gallery_collections.*,
       (SELECT COUNT(*) FROM gallery_collection_projects
        JOIN projects ON projects.id = gallery_collection_projects.project_id
        WHERE gallery_collection_projects.collection_id = gallery_collections.id AND projects.deleted_at = '') AS active_member_count
-     FROM gallery_collections ORDER BY created_at ASC`,
-  ).map((collection) => ({
-    ...collection,
-    filters: safeJson(collection.filter_json),
-    member_ids: collection.kind === 'manual'
-      ? query(
-        'SELECT project_id FROM gallery_collection_projects WHERE collection_id = $id ORDER BY created_at ASC',
-        { $id: collection.id },
-      ).map((row) => row.project_id)
-      : [],
-  }));
+     FROM gallery_collections
+     ORDER BY CASE WHEN id = '${DEFAULT_GALLERY_COLLECTION_ID}' THEN 0 ELSE 1 END, created_at ASC`,
+    ).map((collection) => ({
+      ...collection,
+      filters: safeJson(collection.filter_json),
+      member_ids: collection.kind === 'manual'
+        ? query(
+          'SELECT project_id FROM gallery_collection_projects WHERE collection_id = $id ORDER BY created_at ASC',
+          { $id: collection.id },
+        ).map((row) => row.project_id)
+        : [],
+    }));
+  };
   const loadCollection = (id) => listCollections().find((collection) => collection.id === String(id || '')) || null;
   const createCollection = (value = {}) => {
     const id = String(value.id || '').trim();
@@ -856,6 +896,7 @@ export async function openDatabase(dataDirectory) {
     loadLibrary,
     loadProject,
     listCollections,
+    migrateLegacyFavorites,
     createCollection,
     updateCollection,
     deleteCollection,

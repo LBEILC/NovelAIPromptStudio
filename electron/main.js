@@ -179,8 +179,9 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('library:load', async (_event, request = {}) => { await contentBackfill; return database.loadLibrary(request.view); });
-  ipcMain.handle('library:collections:list', () => {
+  ipcMain.handle('library:collections:list', async () => {
     try {
+      await contentBackfill;
       return { ok: true, collections: database.listCollections() };
     } catch (error) {
       return { ok: false, collections: [], error: error instanceof Error ? error.message : String(error) };
@@ -414,14 +415,6 @@ app.whenReady().then(async () => {
   ipcMain.handle('project:update-name', (_event, id, name) => {
     try {
       return { ok: true, project: database.updateProjectName(id, name) };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-  ipcMain.handle('project:set-favorite', (_event, ids, isFavorite) => {
-    try {
-      const results = database.updateProjects(ids, { isFavorite });
-      return { ok: true, results, summary: batchSummary(results) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }

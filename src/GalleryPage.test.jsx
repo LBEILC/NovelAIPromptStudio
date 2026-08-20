@@ -36,7 +36,6 @@ function toolbarActions(view, callbacks) {
     view,
     selectedGroups: 2,
     selectedImages: 3,
-    onFavorite: vi.fn(),
     onTrash: vi.fn(),
     onRestore: vi.fn(),
     onPermanentDelete: vi.fn(),
@@ -55,7 +54,7 @@ describe('BatchToolbar', () => {
     const onTrash = vi.fn();
     const { batch } = toolbarActions('all', { onTrash });
 
-    batch[2].props.onClick({ type: 'click' });
+    batch[0].props.onClick({ type: 'click' });
 
     expect(onTrash).toHaveBeenCalledWith();
   });

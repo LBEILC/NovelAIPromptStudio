@@ -158,11 +158,7 @@ export function reconcileGallerySelection(groups = [], selectedGroupIds = []) {
 
 export function galleryGroupMenuLabels(group) {
   const grouped = Number(group?.count || group?.members?.length || 0) > 1;
-  const allFavorite = Boolean(group?.members?.length) && group.members.every((project) => project.is_favorite);
   return {
-    favorite: grouped
-      ? `${allFavorite ? '取消收藏' : '收藏'}整个图片组`
-      : allFavorite ? '取消收藏图片' : '收藏图片',
     rename: grouped ? (group?.canSetCover ? '重命名头图' : '重命名当前图片') : '重命名',
   };
 }
@@ -173,13 +169,6 @@ export function galleryEmptyState(view = 'all', filtered = false) {
       description: '尝试其他关键词，或调整筛选条件。',
       icon: 'search',
       title: '没有匹配的图片',
-    };
-  }
-  if (view === 'favorites') {
-    return {
-      description: '在“全部”中收藏图片后，会显示在这里。',
-      icon: 'star',
-      title: '暂无收藏',
     };
   }
   if (view === 'trash') {

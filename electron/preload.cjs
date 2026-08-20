@@ -33,7 +33,6 @@ contextBridge.exposeInMainWorld('studio', {
   },
   offImportProgress: () => ipcRenderer.removeAllListeners('library:import-progress'),
   updateProjectName: (id, name) => ipcRenderer.invoke('project:update-name', id, name),
-  setProjectsFavorite: (ids, isFavorite) => ipcRenderer.invoke('project:set-favorite', ids, isFavorite),
   moveProjectsToTrash: (ids) => ipcRenderer.invoke('project:move-to-trash', ids),
   restoreProjects: (ids) => ipcRenderer.invoke('project:restore', ids),
   permanentlyDeleteProjects: (ids) => ipcRenderer.invoke('project:permanent-delete', ids),
