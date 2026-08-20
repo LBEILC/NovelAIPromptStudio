@@ -35,6 +35,7 @@ import {
   adjacentGallerySelection,
   galleryGroupMember,
   galleryGroupMenuLabels,
+  gallerySelectionMenuItems,
   gallerySelectionProjectIds,
   galleryViewGroups,
   reconcileGallerySelection,
@@ -1087,6 +1088,27 @@ export default function App({ appearance, setAppearance }) {
   }, [preview, previewGroup]);
 
   const galleryContextMenu = (event, group, onRenameRequest) => {
+    if (selectedGroupIds.length) {
+      const items = gallerySelectionMenuItems({
+        activeCollection,
+        collections: galleryCollectionsWithCounts,
+        groupCount: selectedGroupIds.length,
+        imageCount: selectedProjectIds.length,
+        onCollectionProjectsChange: updateGalleryCollectionProjects,
+        onPermanentDelete: permanentDelete,
+        onRestore: restoreProjects,
+        onTrash: moveToTrash,
+        projectIds: selectedProjectIds,
+        view: galleryView,
+      }).map((item) => {
+        if (item.key === 'add-selection-to-collection') return { ...item, icon: FolderOpen };
+        if (item.key === 'restore-selection') return { ...item, icon: Undo2 };
+        if (['permanent-selection', 'trash-selection'].includes(item.key)) return { ...item, icon: Trash2 };
+        return item;
+      });
+      openContextMenu(event, items);
+      return;
+    }
     const project = group.cover;
     const ids = group.members.map((item) => item.id);
     const labels = galleryGroupMenuLabels(group);

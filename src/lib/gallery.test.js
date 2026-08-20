@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { adjacentGallerySelection, galleryEmptyState, galleryGroupMember, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionProjectIds, galleryViewGroups, groupGalleryProjects, isGalleryBlankClickTarget, reconcileGallerySelection, shouldCollapseGalleryPreview } from './gallery.js';
+import { describe, expect, it, vi } from 'vitest';
+import { adjacentGallerySelection, galleryEmptyState, galleryGroupMember, galleryGroupMenuLabels, galleryScrubMemberIndex, gallerySelectionMenuItems, gallerySelectionProjectIds, galleryViewGroups, groupGalleryProjects, isGalleryBlankClickTarget, reconcileGallerySelection, shouldCollapseGalleryPreview } from './gallery.js';
 
 const item = (id, fingerprint, createdAt, cover = '') => ({
   base_prompt_fingerprint: fingerprint === 'same-character-a' || fingerprint === 'same-character-b' ? 'same-base' : fingerprint,
@@ -174,5 +174,55 @@ describe('gallery grouping and selection', () => {
     expect(galleryEmptyState('trash')).toMatchObject({ title: '回收站为空', icon: 'trash' });
     expect(galleryEmptyState('all', true)).toMatchObject({ title: '没有匹配的图片', icon: 'search' });
     expect(galleryEmptyState('all').description).toContain('导入图片');
+  });
+
+  it('builds a batch context menu whose actions target the current selection', () => {
+    const onCollectionProjectsChange = vi.fn();
+    const onTrash = vi.fn();
+    const projectIds = ['one', 'two', 'three'];
+    const items = gallerySelectionMenuItems({
+      activeCollection: { id: 'active', kind: 'manual', name: '当前收藏' },
+      collections: [
+        { id: 'manual', kind: 'manual', name: '参考图' },
+        { id: 'smart', kind: 'smart', name: '自动筛选' },
+      ],
+      groupCount: 2,
+      imageCount: 3,
+      onCollectionProjectsChange,
+      onTrash,
+      projectIds,
+      view: 'all',
+    });
+    const addMenu = items.find((item) => item.key === 'add-selection-to-collection');
+    const remove = items.find((item) => item.key === 'remove-selection-from-collection');
+    const trash = items.find((item) => item.key === 'trash-selection');
+
+    expect(addMenu.children).toHaveLength(1);
+    expect(trash.label).toContain('2 组 · 3 张图片');
+    addMenu.children[0].onClick();
+    remove.onClick();
+    trash.onClick();
+
+    expect(onCollectionProjectsChange).toHaveBeenNthCalledWith(1, 'manual', projectIds, 'add');
+    expect(onCollectionProjectsChange).toHaveBeenNthCalledWith(2, 'active', projectIds, 'remove');
+    expect(onTrash).toHaveBeenCalledWith();
+  });
+
+  it('limits the Trash selection menu to batch restore and permanent deletion', () => {
+    const onRestore = vi.fn();
+    const onPermanentDelete = vi.fn();
+    const items = gallerySelectionMenuItems({
+      groupCount: 4,
+      imageCount: 7,
+      onPermanentDelete,
+      onRestore,
+      view: 'trash',
+    });
+
+    expect(items.map((item) => item.key)).toEqual(['restore-selection', 'permanent-selection']);
+    items[0].onClick();
+    items[1].onClick();
+    expect(onRestore).toHaveBeenCalledWith();
+    expect(onPermanentDelete).toHaveBeenCalledWith();
   });
 });

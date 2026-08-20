@@ -163,6 +163,45 @@ export function galleryGroupMenuLabels(group) {
   };
 }
 
+export function gallerySelectionMenuItems({
+  activeCollection,
+  collections = [],
+  groupCount = 0,
+  imageCount = 0,
+  onCollectionProjectsChange,
+  onPermanentDelete,
+  onRestore,
+  onTrash,
+  projectIds = [],
+  view = 'all',
+}) {
+  const scopeLabel = `${groupCount} 组 · ${imageCount} 张图片`;
+  if (view === 'trash') return [
+    { key: 'restore-selection', label: `恢复已选 ${scopeLabel}`, onClick: () => onRestore?.() },
+    { key: 'permanent-selection', label: `永久删除已选 ${scopeLabel}`, danger: true, onClick: () => onPermanentDelete?.() },
+  ];
+  const manualCollections = collections.filter((collection) => collection.kind === 'manual');
+  return [
+    ...(manualCollections.length ? [{
+      children: manualCollections.map((collection) => ({
+        key: `add-selection-to-${collection.id}`,
+        label: collection.name,
+        onClick: () => onCollectionProjectsChange?.(collection.id, projectIds, 'add'),
+      })),
+      key: 'add-selection-to-collection',
+      label: `将已选 ${groupCount} 组加入收藏集`,
+      type: 'submenu',
+    }] : []),
+    ...(activeCollection?.kind === 'manual' ? [{
+      key: 'remove-selection-from-collection',
+      label: `将已选 ${groupCount} 组移出“${activeCollection.name}”`,
+      onClick: () => onCollectionProjectsChange?.(activeCollection.id, projectIds, 'remove'),
+    }] : []),
+    ...((manualCollections.length || activeCollection?.kind === 'manual') ? [{ key: 'selection-divider', type: 'divider' }] : []),
+    { key: 'trash-selection', label: `将已选 ${scopeLabel} 移入回收站`, danger: true, onClick: () => onTrash?.() },
+  ];
+}
+
 export function galleryEmptyState(view = 'all', filtered = false) {
   if (filtered) {
     return {

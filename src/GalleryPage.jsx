@@ -663,17 +663,25 @@ export function nextGalleryRenderCount(total, current = 0) {
   return Math.min(safeTotal, current + GALLERY_RENDER_BATCH_SIZE);
 }
 
-export function GalleryCardView({ active, group, hoverProject = group.cover, selected, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
+export function GalleryCardView({ active, group, hoverProject = group.cover, selected, selecting = false, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
   const project = group.cover;
   const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
   return <Popover content={<GalleryCardHoverPreview group={group} project={hoverProject}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
     <button
-      aria-label={group.count > 1 ? `预览图片组：${project.name}，共 ${group.count} 张` : `预览图片：${project.name}`}
+      aria-label={selecting
+        ? selected ? `取消选择 ${project.name}` : `选择 ${project.name}`
+        : group.count > 1 ? `预览图片组：${project.name}，共 ${group.count} 张` : `预览图片：${project.name}`}
       className="gallery-card-main"
-      onClick={(event) => selected || event.ctrlKey || event.metaKey || event.shiftKey ? onSelect(event) : onPreview(hoverProject, event)}
+      onClick={(event) => {
+        if (selecting || event.ctrlKey || event.metaKey || event.shiftKey) {
+          if (event.detail <= 1) onSelect(event);
+          return;
+        }
+        onPreview(hoverProject, event);
+      }}
       onContextMenu={onContextMenu}
       onDoubleClick={(event) => {
-        if (!onOpenWorkbench || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        if (selecting || !onOpenWorkbench || event.ctrlKey || event.metaKey || event.shiftKey) return;
         onOpenWorkbench(hoverProject);
       }}
       onPointerEnter={onPointerEnter}
@@ -711,6 +719,7 @@ export function GalleryCard(props) {
   const scrubBoundsRef = useRef(null);
   const hoverProjectIdRef = useRef('');
   const activatedProjectIdRef = useRef('');
+  const selectionGestureRef = useRef(false);
   const hoverProject = galleryGroupMember(group, hoverProjectId);
   const currentScrubProject = () => galleryGroupMember(group, hoverProjectIdRef.current);
   const resetScrub = () => {
@@ -730,6 +739,10 @@ export function GalleryCard(props) {
     {...props}
     hoverProject={hoverProject}
     onOpenWorkbench={props.onOpenWorkbench ? (renderedProject) => {
+      if (selectionGestureRef.current) {
+        selectionGestureRef.current = false;
+        return;
+      }
       const projectId = hoverProjectIdRef.current || activatedProjectIdRef.current || renderedProject?.id;
       props.onOpenWorkbench(galleryGroupMember(group, projectId));
     } : undefined}
@@ -747,29 +760,36 @@ export function GalleryCard(props) {
       updateScrubProject(event.clientX, bounds);
     }}
     onPreview={(renderedProject, event) => {
+      if (selectionGestureRef.current && event?.detail > 1) return;
+      selectionGestureRef.current = false;
       const candidate = event?.detail === 0 ? galleryGroupMember(group) : currentScrubProject() || renderedProject;
       if (!activatedProjectIdRef.current || !event || event.detail <= 1) activatedProjectIdRef.current = candidate?.id || '';
       props.onPreview(galleryGroupMember(group, activatedProjectIdRef.current || candidate?.id));
     }}
+    onSelect={(event) => {
+      if (props.selecting && event?.detail > 0) selectionGestureRef.current = true;
+      props.onSelect(event);
+    }}
   />;
 }
 
-const GalleryGridCard = memo(function GalleryGridCard({ actionsRef, active, canOpenWorkbench, group, selected }) {
+const GalleryGridCard = memo(function GalleryGridCard({ actionsRef, active, canOpenWorkbench, group, selected, selecting }) {
   return <GalleryCard
     active={active}
     group={group}
     onContextMenu={(event) => actionsRef.current.onProjectContextMenu(event, group, () => actionsRef.current.requestRename(group))}
-    onOpenWorkbench={canOpenWorkbench ? (project) => actionsRef.current.onOpenWorkbench(project) : undefined}
+    onOpenWorkbench={canOpenWorkbench && !selecting ? (project) => actionsRef.current.onOpenWorkbench(project) : undefined}
     onPreview={(project) => {
       actionsRef.current.updatePreviewExpanded(true);
       actionsRef.current.onPreview(group, project);
     }}
     onSelect={(event) => actionsRef.current.onToggleSelect(group, event)}
     selected={selected}
+    selecting={selecting}
   />;
 });
 
-const GalleryGridSlot = memo(function GalleryGridSlot({ actionsRef, active, canOpenWorkbench, group, index, layoutSize, reduceMotion, selected }) {
+const GalleryGridSlot = memo(function GalleryGridSlot({ actionsRef, active, canOpenWorkbench, group, index, layoutSize, reduceMotion, selected, selecting }) {
   return <motion.div
     className="gallery-card-slot"
     custom={{ index, layoutSize, reduceMotion }}
@@ -785,6 +805,7 @@ const GalleryGridSlot = memo(function GalleryGridSlot({ actionsRef, active, canO
       canOpenWorkbench={canOpenWorkbench}
       group={group}
       selected={selected}
+      selecting={selecting}
     />
   </motion.div>;
 });
@@ -817,6 +838,7 @@ const ProgressiveGalleryGrid = memo(function ProgressiveGalleryGrid({ actionsRef
     layoutSize={layoutSize}
     reduceMotion={reduceMotion}
     selected={selectedIds.has(group.id)}
+    selecting={selectedGroupIds.length > 0}
   />);
 });
 

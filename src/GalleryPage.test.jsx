@@ -331,4 +331,40 @@ describe('GalleryCardHoverPreview', () => {
 
     expect(onOpenWorkbench).not.toHaveBeenCalled();
   });
+
+  it('uses card clicks only for toggling while Gallery multi-select is active', () => {
+    const onOpenWorkbench = vi.fn();
+    const onPreview = vi.fn();
+    const onSelect = vi.fn();
+    const cover = {
+      id: 'cover',
+      image_path: 'C:\\gallery\\cover.png',
+      metadata: {},
+      name: 'cover',
+      prompt_structure: { base_undesired_tags: [], characters: [] },
+      tags: [],
+    };
+    const element = GalleryCardView({
+      active: false,
+      group: { count: 1, cover, members: [cover] },
+      onContextMenu: vi.fn(),
+      onOpenWorkbench,
+      onPreview,
+      onSelect,
+      selected: false,
+      selecting: true,
+    });
+    const mainButton = element.props.children.props.children[0];
+    const clickEvent = { ctrlKey: false, detail: 1, metaKey: false, shiftKey: false };
+
+    mainButton.props.onClick(clickEvent);
+    mainButton.props.onClick({ ...clickEvent, detail: 2 });
+    mainButton.props.onDoubleClick(clickEvent);
+
+    expect(mainButton.props['aria-label']).toBe('选择 cover');
+    expect(onSelect).toHaveBeenCalledWith(clickEvent);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onPreview).not.toHaveBeenCalled();
+    expect(onOpenWorkbench).not.toHaveBeenCalled();
+  });
 });
