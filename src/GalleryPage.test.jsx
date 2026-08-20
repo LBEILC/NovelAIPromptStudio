@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BatchToolbar, GalleryCardHoverPreview, GalleryCardView, GalleryFilterControl, GalleryGroupingControl, nextGalleryRenderCount } from './GalleryPage.jsx';
+import { BatchToolbar, galleryCardTransitionDelay, GalleryCardHoverPreview, GalleryCardView, GalleryFilterControl, GalleryGroupingControl, nextGalleryRenderCount } from './GalleryPage.jsx';
 
 vi.mock('@lobehub/ui', () => {
   const Component = () => null;
@@ -163,6 +163,13 @@ describe('progressive gallery rendering', () => {
     expect(nextGalleryRenderCount(200)).toBe(30);
     expect(nextGalleryRenderCount(200, 30)).toBe(54);
     expect(nextGalleryRenderCount(53, 30)).toBe(53);
+  });
+
+  it('bounds sequential card timing for large result sets', () => {
+    expect(galleryCardTransitionDelay(0)).toBe(0);
+    expect(galleryCardTransitionDelay(5)).toBeCloseTo(0.04);
+    expect(galleryCardTransitionDelay(100)).toBeCloseTo(0.096);
+    expect(galleryCardTransitionDelay(100, 'exit')).toBeCloseTo(0.072);
   });
 });
 

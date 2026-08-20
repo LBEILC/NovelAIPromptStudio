@@ -292,12 +292,16 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .gallery-collection-picker-list small { color: var(--muted); font: var(--text-micro) var(--font-mono); }
 .gallery-grid-scroll { min-width: 0; min-height: 0; flex: 1; overflow: auto; padding: clamp(16px, 2vw, 28px); }
 .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--gallery-card-min-width, 190px)), 1fr)); gap: 12px; }
-.gallery-loading-card { aspect-ratio: 1; display: block; overflow: hidden; background: var(--raised); border: 1px solid var(--line-soft); border-radius: 9px; }
-.gallery-loading-card::after, .image-stage-loading::after { content: ""; width: 42%; height: 180%; display: block; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 7%, transparent), transparent); animation: gallery-loading-sheen 1.35s ease-in-out infinite; transform: translate(-180%, -22%) rotate(12deg); }
+.gallery-transition-loading { min-height: 100%; display: grid; place-content: center; justify-items: center; gap: 9px; color: var(--muted); font-size: var(--text-secondary); }
+.gallery-transition-empty { min-height: 100%; }
+.gallery-transition-loading-icon { width: 34px; height: 34px; display: grid; place-items: center; color: var(--text-secondary); background: var(--raised); border: 1px solid var(--line-soft); border-radius: 50%; animation: gallery-transition-loading-spin 1.2s linear infinite; }
+@keyframes gallery-transition-loading-spin { to { transform: rotate(360deg); } }
+.image-stage-loading::after { content: ""; width: 42%; height: 180%; display: block; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 7%, transparent), transparent); animation: gallery-loading-sheen 1.35s ease-in-out infinite; transform: translate(-180%, -22%) rotate(12deg); }
 @keyframes gallery-loading-sheen { to { transform: translate(380%, -22%) rotate(12deg); } }
 .gallery-grid.density-compact { gap: 8px; }
 .gallery-grid.density-overview { gap: 4px; }
 .gallery-card { position: relative; min-width: 0; overflow: visible; container-type: inline-size; content-visibility: auto; contain-intrinsic-size: auto 200px; padding: 3px; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 9px; text-align: start; transition: background-color .16s, border-color .16s; }
+.gallery-card-slot { min-width: 0; }
 .gallery-card:hover { background: var(--panel); border-color: var(--line-soft); }
 .gallery-card.active, .gallery-card.selected { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border-color: var(--accent); }
 .gallery-card-main { width: 100%; min-width: 0; padding: 0; display: block; color: inherit; background: transparent; text-align: start; }

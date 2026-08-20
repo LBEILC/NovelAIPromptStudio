@@ -1,7 +1,7 @@
 import { Accordion, AccordionItem, ActionIcon, DatePicker as LobeDatePicker, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, Highlighter, Popover, PopoverGroup, SearchBar as LobeSearchBar } from '@lobehub/ui';
 import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, Slider, SplitButton, Switch as LobeSwitch } from '@lobehub/ui/base-ui';
 import dayjs from 'dayjs';
-import { motion, useAnimationControls } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { memo, startTransition, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
@@ -566,24 +566,45 @@ function GalleryThumbnail({ alt = '', className = '', src, ...imageProps }) {
   />;
 }
 
-function GalleryResultsSurface({ children, className, contentKey, style }) {
-  const controls = useAnimationControls();
-  const reduceMotion = useStudioReducedMotion();
+const GALLERY_RESULTS_VARIANTS = {
+  enter: { opacity: 1 },
+  visible: { opacity: 1 },
+  exit: { opacity: 1, transition: { when: 'afterChildren' } },
+};
 
-  useLayoutEffect(() => {
-    if (reduceMotion) {
-      controls.set({ opacity: 1 });
-      return undefined;
-    }
-    controls.set({ opacity: 0.9 });
-    controls.start({
-      opacity: 1,
-      transition: { duration: 0.14, ease: MOTION_EASE_OUT },
-    });
-    return () => controls.stop();
-  }, [contentKey, controls, reduceMotion]);
+export function galleryCardTransitionDelay(index, phase = 'visible') {
+  return Math.min(Math.max(0, Number(index) || 0), 12) * (phase === 'exit' ? 0.006 : 0.008);
+}
 
-  return <motion.div animate={controls} className={className} initial={false} style={style}>{children}</motion.div>;
+const GALLERY_CARD_TRANSITION_VARIANTS = {
+  enter: ({ reduceMotion }) => ({ opacity: reduceMotion ? 1 : 0 }),
+  visible: ({ index, reduceMotion }) => ({
+    opacity: 1,
+    transition: reduceMotion ? { duration: 0 } : {
+      delay: galleryCardTransitionDelay(index),
+      duration: 0.14,
+      ease: MOTION_EASE_OUT,
+    },
+  }),
+  exit: ({ index, reduceMotion }) => ({
+    opacity: 0,
+    transition: reduceMotion ? { duration: 0 } : {
+      delay: galleryCardTransitionDelay(index, 'exit'),
+      duration: 0.08,
+      ease: 'easeIn',
+    },
+  }),
+};
+
+function GalleryResultsSurface({ children, className, style }) {
+  return <motion.div
+    animate="visible"
+    className={className}
+    exit="exit"
+    initial="enter"
+    style={style}
+    variants={GALLERY_RESULTS_VARIANTS}
+  >{children}</motion.div>;
 }
 
 function DelayedGalleryStatus({ active, loading }) {
@@ -602,12 +623,31 @@ function DelayedGalleryStatus({ active, loading }) {
   </div>;
 }
 
-function GalleryLoadingGrid({ cardSize, density }) {
-  return <div
-    aria-hidden="true"
-    className={`gallery-grid gallery-loading-grid density-${density}`}
-    style={{ '--gallery-card-min-width': `${cardSize}px` }}
-  >{Array.from({ length: 12 }, (_, index) => <span className="gallery-loading-card" key={index}/>)}</div>;
+function GalleryLoadingState({ reduceMotion }) {
+  return <motion.div
+    animate={{ opacity: 1 }}
+    aria-live="polite"
+    className="gallery-transition-loading"
+    exit={{ opacity: 0, transition: { duration: reduceMotion ? 0 : 0.08 } }}
+    initial={{ opacity: reduceMotion ? 1 : 0 }}
+    key="gallery-loading"
+    role="status"
+    transition={{ duration: reduceMotion ? 0 : 0.12, ease: MOTION_EASE_OUT }}
+  >
+    <span aria-hidden="true" className="gallery-transition-loading-icon"><Icon name="refresh" size={18}/></span>
+    <span>正在加载图片</span>
+  </motion.div>;
+}
+
+function preloadGalleryThumbnails(groups) {
+  if (typeof Image === 'undefined') return;
+  for (const group of groups.slice(0, GALLERY_INITIAL_RENDER_COUNT)) {
+    for (const project of [group.cover, ...group.members.filter((member) => member.id !== group.cover?.id).slice(0, 2)]) {
+      const image = new Image();
+      image.decoding = 'async';
+      image.src = mediaUrl(project.thumbnail_path || project.image_path);
+    }
+  }
 }
 
 export const GALLERY_INITIAL_RENDER_COUNT = 30;
@@ -725,7 +765,23 @@ const GalleryGridCard = memo(function GalleryGridCard({ actionsRef, active, canO
   />;
 });
 
-const ProgressiveGalleryGrid = memo(function ProgressiveGalleryGrid({ actionsRef, canOpenWorkbench, groups, onRenderingChange, previewGroupId, selectedGroupIds }) {
+const GalleryGridSlot = memo(function GalleryGridSlot({ actionsRef, active, canOpenWorkbench, group, index, reduceMotion, selected }) {
+  return <motion.div
+    className="gallery-card-slot"
+    custom={{ index, reduceMotion }}
+    variants={GALLERY_CARD_TRANSITION_VARIANTS}
+  >
+    <GalleryGridCard
+      actionsRef={actionsRef}
+      active={active}
+      canOpenWorkbench={canOpenWorkbench}
+      group={group}
+      selected={selected}
+    />
+  </motion.div>;
+});
+
+const ProgressiveGalleryGrid = memo(function ProgressiveGalleryGrid({ actionsRef, canOpenWorkbench, groups, onRenderingChange, previewGroupId, reduceMotion, selectedGroupIds }) {
   const [renderCount, setRenderCount] = useState(() => nextGalleryRenderCount(groups.length));
   const hasMore = renderCount < groups.length;
   const selectedIds = new Set(selectedGroupIds);
@@ -743,12 +799,14 @@ const ProgressiveGalleryGrid = memo(function ProgressiveGalleryGrid({ actionsRef
     });
   }, [groups.length, hasMore, renderCount]);
 
-  return groups.slice(0, renderCount).map((group) => <GalleryGridCard
+  return groups.slice(0, renderCount).map((group, index) => <GalleryGridSlot
     actionsRef={actionsRef}
     active={previewGroupId === group.id}
     canOpenWorkbench={canOpenWorkbench}
     group={group}
+    index={index}
     key={group.id}
+    reduceMotion={reduceMotion}
     selected={selectedIds.has(group.id)}
   />);
 });
@@ -840,8 +898,27 @@ export default function GalleryPage({
   const [progressiveRendering, setProgressiveRendering] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
+  const reduceMotion = useStudioReducedMotion();
+  const transitionBusy = loading || updating;
+  const [loadingHeld, setLoadingHeld] = useState(transitionBusy);
   const renameTargetRef = useRef('');
   const galleryScrollRef = useRef(null);
+
+  useEffect(() => {
+    if (transitionBusy) {
+      if (!loadingHeld) setLoadingHeld(true);
+      return undefined;
+    }
+    if (!loadingHeld) return undefined;
+    const timer = window.setTimeout(() => setLoadingHeld(false), reduceMotion ? 0 : 220);
+    return () => window.clearTimeout(timer);
+  }, [loadingHeld, reduceMotion, transitionBusy]);
+
+  useEffect(() => {
+    if (!transitionBusy && loadingHeld) preloadGalleryThumbnails(groups);
+  }, [groups, loadingHeld, transitionBusy]);
+
+  const showLoadingPage = transitionBusy || loadingHeld;
 
   useLayoutEffect(() => {
     if (updating && galleryScrollRef.current) galleryScrollRef.current.scrollTop = 0;
@@ -987,7 +1064,7 @@ export default function GalleryPage({
       view={view}
     />
     <div className="gallery-workspace">
-      <DelayedGalleryStatus active={updating || progressiveRendering} loading={loading}/>
+      <DelayedGalleryStatus active={!showLoadingPage && progressiveRendering} loading={false}/>
       <LobeDraggablePanel
         className="gallery-collections-shell"
         classNames={{ content: 'workspace-side-panel-content' }}
@@ -1021,7 +1098,7 @@ export default function GalleryPage({
         </LobeDraggablePanel.Body>
       </LobeDraggablePanel>
       <section
-        aria-busy={updating || progressiveRendering}
+        aria-busy={showLoadingPage || progressiveRendering}
         className="gallery-grid-scroll"
         onClick={(event) => {
           if (!shouldCollapseGalleryPreview(event.target, previewPinned)) return;
@@ -1034,29 +1111,40 @@ export default function GalleryPage({
         }}
         ref={galleryScrollRef}
       >
-        {updating ? <GalleryLoadingGrid cardSize={galleryCardSize} density={galleryDensity}/> : groups.length ? <PopoverGroup closeDelay={120} openDelay={450} placement="rightTop" trigger="hover"><GalleryResultsSurface
-          className={`gallery-grid density-${galleryDensity}`}
-          contentKey={contentKey}
-          style={{ '--gallery-card-min-width': `${galleryCardSize}px` }}
-        >
-          <ProgressiveGalleryGrid
-            actionsRef={gridActionsRef}
-            canOpenWorkbench={view !== 'trash'}
-            groups={groups}
-            key={contentKey}
-            onRenderingChange={setProgressiveRendering}
-            previewGroupId={previewGroup?.id || ''}
-            selectedGroupIds={selectedGroupIds}
-          />
-        </GalleryResultsSurface></PopoverGroup> : loading ? <GalleryLoadingGrid cardSize={galleryCardSize} density={galleryDensity}/> : <LobeEmpty
-          className="gallery-empty"
-          description={emptyState.description}
-          gap={6}
-          icon={getIconComponent(emptyState.icon)}
-          imageSize={38}
-          justify="center"
-          title={emptyState.title}
-        />}
+        <PopoverGroup closeDelay={120} openDelay={450} placement="rightTop" trigger="hover">
+          <AnimatePresence initial={false} mode="wait">
+            {showLoadingPage ? <GalleryLoadingState reduceMotion={reduceMotion}/> : groups.length ? <GalleryResultsSurface
+              className={`gallery-grid density-${galleryDensity}`}
+              key={`results:${contentKey}`}
+              style={{ '--gallery-card-min-width': `${galleryCardSize}px` }}
+            >
+              <ProgressiveGalleryGrid
+                actionsRef={gridActionsRef}
+                canOpenWorkbench={view !== 'trash'}
+                groups={groups}
+                key={contentKey}
+                onRenderingChange={setProgressiveRendering}
+                previewGroupId={previewGroup?.id || ''}
+                reduceMotion={reduceMotion}
+                selectedGroupIds={selectedGroupIds}
+              />
+            </GalleryResultsSurface> : <motion.div
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              initial={{ opacity: reduceMotion ? 1 : 0 }}
+              key={`empty:${contentKey}`}
+              className="gallery-transition-empty"
+            ><LobeEmpty
+              className="gallery-empty"
+              description={emptyState.description}
+              gap={6}
+              icon={getIconComponent(emptyState.icon)}
+              imageSize={38}
+              justify="center"
+              title={emptyState.title}
+            /></motion.div>}
+          </AnimatePresence>
+        </PopoverGroup>
       </section>
       <LobeDraggablePanel
         className={`gallery-preview-shell ${previewPinned ? 'is-fixed' : 'is-floating'}`}
