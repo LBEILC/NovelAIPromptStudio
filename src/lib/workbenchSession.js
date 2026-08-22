@@ -184,7 +184,20 @@ export function parseWorkbenchSession(value) {
 
 export function workbenchTabHasChanges(tab) {
   if (!tab?.project || !tab?.originalProject) return false;
-  return JSON.stringify(promptSnapshot(tab.project)) !== JSON.stringify(promptSnapshot(tab.originalProject));
+  const comparableSnapshot = (project) => JSON.stringify(normalizePromptChangeValue(promptSnapshot(project)));
+  return comparableSnapshot(tab.project) !== comparableSnapshot(tab.originalProject);
+}
+
+function normalizePromptChangeValue(value) {
+  if (Array.isArray(value)) return value.map(normalizePromptChangeValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.keys(value)
+    .filter((key) => key !== 'id')
+    .sort()
+    .reduce((normalized, key) => {
+      normalized[key] = normalizePromptChangeValue(value[key]);
+      return normalized;
+    }, {});
 }
 
 export function scopeWorkbenchCopyContext(context = {}, tabId = '') {

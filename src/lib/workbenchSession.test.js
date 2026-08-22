@@ -13,6 +13,7 @@ import {
   serializeWorkbenchSession,
   updateWorkbenchTab,
   workbenchHasChanges,
+  workbenchTabHasChanges,
 } from './workbenchSession.js';
 
 function fixture(id = 'workbench-1', imagePath = 'C:\\images\\source.png') {
@@ -43,6 +44,30 @@ describe('workbench session v2', () => {
     expect(restored.project.id).toBe('workbench-2');
     expect(restored.project.tags[0].translation).toBe('一名女孩');
     expect(restored.source.path).toBe(reparsed.image_path);
+  });
+
+  it('does not mark an unchanged restored prompt as modified when parser identities change', () => {
+    const original = fixture();
+    original.prompt_structure.characters = [{
+      id: 'character-before-restart',
+      label: 'Character 1',
+      prompt_raw: 'blue eyes',
+      undesired_raw: '',
+      prompt_tags: [{ id: 'character-tag-before-restart', tag: 'blue eyes', weight: 1, category: 'Body' }],
+      undesired_tags: [],
+      center: { x: 0.5, y: 0.5 },
+    }];
+    const saved = parseWorkbenchSession(serializeWorkbenchSession(createWorkbenchSession(original)));
+    const reparsed = structuredClone(original);
+    reparsed.tags[0].id = 'base-tag-after-restart';
+    reparsed.prompt_structure.characters[0].id = 'character-after-restart';
+    reparsed.prompt_structure.characters[0].prompt_tags[0].id = 'character-tag-after-restart';
+
+    const restored = createWorkbenchTab(reparsed, { ...saved.tabs[0], draft: saved.tabs[0].draft });
+
+    expect(workbenchTabHasChanges(restored)).toBe(false);
+    restored.project.prompt_structure.characters[0].prompt_tags[0].weight = 1.2;
+    expect(workbenchTabHasChanges(restored)).toBe(true);
   });
 
   it('detects prompt edits independently in each tab', () => {
