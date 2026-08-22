@@ -11,7 +11,7 @@ import { listModels, testModel, translateTags } from './translation.js';
 import { lookupDanbooruTags } from './danbooru.js';
 import { annotateTags } from './tagAnnotations.js';
 import { exportEmbeddedVibeFile } from './vibes.js';
-import { readWorkbenchImage } from './workbench.js';
+import { applyWorkbenchLibraryDetails, readWorkbenchImage } from './workbench.js';
 import { listSystemFonts } from './fonts.js';
 import { describeAssetDirectory, migrateAssetDirectory } from './libraryStorage.js';
 import { cleanupWorkbenchTemporaryImages, readClipboardImageSource } from './clipboardImages.js';
@@ -288,6 +288,10 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle('workbench:image:open', async (_event, request = {}) => {
     let filePath = String(request.filePath || '');
+    const libraryProject = request.source?.type === 'library' && request.source.projectId
+      ? database.loadProject(request.source.projectId)
+      : null;
+    if (libraryProject?.image_path) filePath = libraryProject.image_path;
     if (request.fromDrop && !filePath) return { ok: false, project: null, error: '无法读取拖入文件的本地路径' };
     if (!filePath) {
       const result = await dialog.showOpenDialog({
@@ -301,10 +305,13 @@ app.whenReady().then(async () => {
       rememberImageDirectory(result.filePaths);
     }
     try {
+      const project = await readWorkbenchImage(filePath, { enrichProjectTags: database.enrichProjectTags });
       return {
         ok: true,
-        project: await readWorkbenchImage(filePath, { enrichProjectTags: database.enrichProjectTags }),
-        source: request.source || { type: 'file', path: filePath },
+        project: applyWorkbenchLibraryDetails(project, libraryProject),
+        source: request.source
+          ? { ...request.source, path: filePath }
+          : { type: 'file', path: filePath },
       };
     } catch (error) {
       return { ok: false, project: null, error: error instanceof Error ? error.message : String(error) };

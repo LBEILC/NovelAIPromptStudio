@@ -14,6 +14,15 @@ function safeName(filePath) {
   return path.basename(filePath, path.extname(filePath)).replace(/[^\p{L}\p{N}._-]+/gu, ' ').trim() || 'Untitled';
 }
 
+export function applyWorkbenchLibraryDetails(project, libraryProject) {
+  if (!project || !libraryProject) return project;
+  return {
+    ...project,
+    name: String(libraryProject.name || '').trim() || project.name,
+    thumbnail_path: String(libraryProject.thumbnail_path || '').trim(),
+  };
+}
+
 export async function readWorkbenchImage(filePath, { enrichProjectTags = (project) => project } = {}) {
   const resolvedPath = path.resolve(String(filePath || ''));
   if (!resolvedPath || !fs.existsSync(resolvedPath)) throw new Error('图片不存在或已被移动');

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readWorkbenchImage } from './workbench.js';
+import { applyWorkbenchLibraryDetails, readWorkbenchImage } from './workbench.js';
 
 const temporaryDirectories = [];
 
@@ -37,6 +37,13 @@ afterEach(() => {
 });
 
 describe('workbench image reader', () => {
+  it('uses the library title and thumbnail for library-backed workbench tabs', () => {
+    expect(applyWorkbenchLibraryDetails(
+      { name: 'internal-asset-id', thumbnail_path: '' },
+      { name: '图库标题', thumbnail_path: 'thumbnail.webp' },
+    )).toMatchObject({ name: '图库标题', thumbnail_path: 'thumbnail.webp' });
+  });
+
   it('parses a source image without copying it into the library', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-workbench-'));
     temporaryDirectories.push(directory);
@@ -65,4 +72,3 @@ describe('workbench image reader', () => {
     await expect(readWorkbenchImage(filePath)).rejects.toThrow('仅支持 PNG、JPG 和 WEBP');
   });
 });
-

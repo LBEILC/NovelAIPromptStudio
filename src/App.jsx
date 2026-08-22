@@ -380,7 +380,13 @@ export default function App({ appearance, setAppearance }) {
             error: result?.error || '图片源已不可用',
           };
         }
-        return createWorkbenchTab(hydrateProject(result.project), { ...stored, draft: stored.draft, source: stored.source });
+        const restoredSource = result.source || stored.source;
+        return createWorkbenchTab(hydrateProject(result.project), {
+          ...stored,
+          displayName: restoredSource.type === 'library' ? result.project.name : stored.displayName,
+          draft: stored.draft,
+          source: restoredSource,
+        });
       }));
       if (!active) return;
       setWorkbenchSession({
@@ -472,7 +478,7 @@ export default function App({ appearance, setAppearance }) {
       const result = await studio.openWorkbenchImage(filePath, source);
       if (result?.canceled) return false;
       if (!result?.ok || !result.project) throw new Error(result?.error || '图片没有打开');
-      acceptWorkbenchProject(result.project, source || result.source);
+      acceptWorkbenchProject(result.project, result.source || source);
       showToast('图片已在新工作台标签中打开');
       return true;
     } catch (error) {

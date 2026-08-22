@@ -31,12 +31,14 @@ describe('WorkbenchTabDragOverlay', () => {
     const markup = renderToStaticMarkup(<WorkbenchTabDragOverlay
       active
       dirty
-      title="example.png"
+      imageSrc="novelai-media:///example.png"
+      position={3}
     />);
 
     expect(markup).toContain('workbench-tab-drag-overlay active');
     expect(markup).toContain('workbench-tab-dirty');
-    expect(markup).toContain('example.png');
+    expect(markup).toContain('novelai-media:///example.png');
+    expect(markup).toContain('workbench-tab-position">3');
   });
 });
 
@@ -44,9 +46,12 @@ describe('WorkbenchTabLabel', () => {
   it('keeps image hover previews transparent to pointer hit testing', () => {
     const element = WorkbenchTabLabel({
       onClose: () => {},
-      tab: { displayName: 'example.png', id: 'tab-1', project: null },
+      position: 2,
+      tab: { displayName: 'example.png', id: 'tab-1', project: { image_path: 'C:\\images\\example.png' } },
     });
 
     expect(element.props.styles).toEqual({ root: { pointerEvents: 'none' } });
+    expect(element.props.children.props.children.some((child) => child?.props?.className === 'workbench-tab-thumbnail')).toBe(true);
+    expect(element.props.children.props.children.some((child) => child?.props?.children === 2)).toBe(true);
   });
 });

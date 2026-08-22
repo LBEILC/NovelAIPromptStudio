@@ -2,9 +2,9 @@ import { closestCenter, DndContext, DragOverlay, KeyboardSensor, PointerSensor, 
 import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { horizontalListSortingStrategy, sortableKeyboardCoordinates, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Alert as LobeAlert, DraggablePanel as LobeDraggablePanel, Popover, PopoverGroup } from '@lobehub/ui';
+import { ActionIcon, Alert as LobeAlert, DraggablePanel as LobeDraggablePanel, Popover, PopoverGroup } from '@lobehub/ui';
 import { Button as LobeButton, showContextMenu, SplitButton, TabsIndicator, TabsList, TabsRoot, TabsTab } from '@lobehub/ui/base-ui';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useReducedMotion } from 'motion/react';
 import PromptOverview from './PromptOverview.jsx';
@@ -24,7 +24,6 @@ import {
 } from './lib/panelLayout.js';
 import { fitTabPreviewCanvas } from './lib/imagePreview.js';
 import { countPromptTags, formatPositivePromptForCopy, positivePromptCopyOptions } from './lib/promptStructure.js';
-import { hiddenWorkbenchTabSeparatorIds } from './lib/workbenchTabLayout.js';
 import { activeWorkbenchCopyContext, activeWorkbenchTab, scopeWorkbenchCopyContext, workbenchTabHasChanges } from './lib/workbenchSession.js';
 
 const WORKBENCH_TAB_SORT_ACCESSIBILITY = {
@@ -93,8 +92,10 @@ function WorkbenchTabPreview({ tab }) {
   </div>;
 }
 
-export function WorkbenchTabLabel({ previewDisabled = false, tab, onClose }) {
+export function WorkbenchTabLabel({ position = 1, previewDisabled = false, tab, onClose }) {
   const dirty = workbenchTabHasChanges(tab);
+  const project = tab.project;
+  const filePath = project?.thumbnail_path || project?.image_path || tab.source?.path || '';
   const label = <span
     className="workbench-tab-label"
     onAuxClick={(event) => { if (event.button === 1) onClose(tab.id); }}
@@ -104,8 +105,13 @@ export function WorkbenchTabLabel({ previewDisabled = false, tab, onClose }) {
       showContextMenu([{ key: 'close-tab', label: '关闭标签', onClick: () => onClose(tab.id) }]);
     }}
   >
+    <span className="workbench-tab-thumbnail">
+      {filePath
+        ? <img alt="" decoding="async" draggable="false" loading="lazy" src={mediaUrl(filePath)}/>
+        : <span className="workbench-tab-thumbnail-empty"><Icon name="image" size={20}/></span>}
+    </span>
+    <span aria-hidden="true" className="workbench-tab-position">{position}</span>
     {dirty && <span aria-label="Prompt 已相对原图修改" className="workbench-tab-dirty"/>}
-    <span className="workbench-tab-title">{tab.displayName || tab.project?.name || '未命名图片'}</span>
     <span
       aria-label={`关闭 ${tab.displayName || '标签'}`}
       className="workbench-tab-close"
@@ -123,7 +129,7 @@ export function WorkbenchTabLabel({ previewDisabled = false, tab, onClose }) {
   >{label}</Popover>;
 }
 
-function SortableWorkbenchTab({ hideSeparator, previewDisabled, tab, onClose }) {
+function SortableWorkbenchTab({ position, previewDisabled, tab, onClose }) {
   const {
     attributes,
     isDragging,
@@ -137,9 +143,11 @@ function SortableWorkbenchTab({ hideSeparator, previewDisabled, tab, onClose }) 
   });
   return <TabsTab
     {...listeners}
+    aria-label={`第 ${position} 张，${tab.displayName || tab.project?.name || '未命名图片'}${workbenchTabHasChanges(tab) ? '，Prompt 已修改' : ''}`}
     aria-describedby={attributes['aria-describedby']}
     aria-roledescription={attributes['aria-roledescription']}
-    className={`workbench-tab ${isDragging ? 'dragging' : ''} ${hideSeparator ? 'hide-separator' : ''}`}
+    className={`workbench-tab ${isDragging ? 'dragging' : ''}`}
+    data-workbench-tab-id={tab.id}
     ref={setNodeRef}
     style={{
       '--workbench-tab-transform': CSS.Transform.toString(transform),
@@ -147,26 +155,63 @@ function SortableWorkbenchTab({ hideSeparator, previewDisabled, tab, onClose }) 
     }}
     value={tab.id}
   >
-    <WorkbenchTabLabel onClose={onClose} previewDisabled={previewDisabled} tab={tab}/>
+    <WorkbenchTabLabel onClose={onClose} position={position} previewDisabled={previewDisabled} tab={tab}/>
   </TabsTab>;
 }
 
 function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
   const [sortingTabId, setSortingTabId] = useState('');
   const [sortingOverTabId, setSortingOverTabId] = useState('');
+  const [scrollState, setScrollState] = useState({ canNext: false, canPrevious: false, overflow: false });
+  const scrollViewportRef = useRef(null);
   const tabIds = useMemo(() => session.tabs.map((tab) => tab.id), [session.tabs]);
-  const hiddenSeparatorIds = useMemo(
-    () => hiddenWorkbenchTabSeparatorIds(tabIds, session.activeTabId, sortingTabId, sortingOverTabId),
-    [session.activeTabId, sortingOverTabId, sortingTabId, tabIds],
-  );
   const sortingTab = session.tabs.find((tab) => tab.id === sortingTabId);
   const systemReducedMotion = useReducedMotion();
   const motionMode = document.documentElement.dataset.motion || 'full';
   const animateDrop = motionMode === 'full' || (motionMode !== 'off' && !systemReducedMotion);
+  const measureScroll = useCallback(() => {
+    const viewport = scrollViewportRef.current;
+    if (!viewport) return;
+    const maximum = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+    setScrollState({
+      canNext: viewport.scrollLeft < maximum - 1,
+      canPrevious: viewport.scrollLeft > 1,
+      overflow: maximum > 1,
+    });
+  }, []);
+  const scrollFilmstrip = useCallback((direction) => {
+    const viewport = scrollViewportRef.current;
+    if (!viewport) return;
+    viewport.scrollBy({
+      behavior: animateDrop ? 'smooth' : 'auto',
+      left: direction * Math.max(180, viewport.clientWidth * .72),
+    });
+  }, [animateDrop]);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  useLayoutEffect(() => {
+    const viewport = scrollViewportRef.current;
+    if (!viewport) return undefined;
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measureScroll) : null;
+    observer?.observe(viewport);
+    viewport.addEventListener('scroll', measureScroll, { passive: true });
+    measureScroll();
+    return () => {
+      observer?.disconnect();
+      viewport.removeEventListener('scroll', measureScroll);
+    };
+  }, [measureScroll, session.tabs.length]);
+
+  useLayoutEffect(() => {
+    const viewport = scrollViewportRef.current;
+    const active = [...(viewport?.querySelectorAll('[data-workbench-tab-id]') || [])]
+      .find((element) => element.dataset.workbenchTabId === session.activeTabId);
+    active?.scrollIntoView({ behavior: animateDrop ? 'smooth' : 'auto', block: 'nearest', inline: 'nearest' });
+    measureScroll();
+  }, [animateDrop, measureScroll, scrollState.overflow, session.activeTabId, session.tabs.length]);
 
   return <DndContext
     accessibility={WORKBENCH_TAB_SORT_ACCESSIBILITY}
@@ -197,18 +242,40 @@ function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
         variant="rounded"
         onValueChange={(value) => { if (value != null) onActivate(String(value)); }}
       >
-        <TabsList className={`workbench-tabs-list ${sortingTabId ? 'sorting' : ''}`}>
-          <TabsIndicator className="workbench-tabs-indicator"/>
-          <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
-            {session.tabs.map((item) => <SortableWorkbenchTab
-              hideSeparator={hiddenSeparatorIds.has(item.id)}
-              key={item.id}
-              onClose={onClose}
-              previewDisabled={Boolean(sortingTabId)}
-              tab={item}
-            />)}
-          </SortableContext>
-        </TabsList>
+        <div className="workbench-filmstrip-row">
+          {scrollState.overflow && <ActionIcon
+            aria-label="向前浏览已打开图片"
+            className="workbench-filmstrip-control"
+            disabled={!scrollState.canPrevious}
+            icon={<Icon name="previous" size={16}/>}
+            onClick={() => scrollFilmstrip(-1)}
+            size="small"
+            title="向前浏览"
+          />}
+          <div className="workbench-filmstrip-viewport" ref={scrollViewportRef}>
+            <TabsList className={`workbench-tabs-list ${sortingTabId ? 'sorting' : ''}`}>
+              <TabsIndicator className="workbench-tabs-indicator"/>
+              <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+                {session.tabs.map((item, index) => <SortableWorkbenchTab
+                  key={item.id}
+                  onClose={onClose}
+                  position={index + 1}
+                  previewDisabled={Boolean(sortingTabId)}
+                  tab={item}
+                />)}
+              </SortableContext>
+            </TabsList>
+          </div>
+          {scrollState.overflow && <ActionIcon
+            aria-label="向后浏览已打开图片"
+            className="workbench-filmstrip-control"
+            disabled={!scrollState.canNext}
+            icon={<Icon name="next" size={16}/>}
+            onClick={() => scrollFilmstrip(1)}
+            size="small"
+            title="向后浏览"
+          />}
+        </div>
       </TabsRoot>
     </PopoverGroup>
     {createPortal(<DragOverlay
@@ -218,7 +285,8 @@ function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
       {sortingTab ? <WorkbenchTabDragOverlay
         active={sortingTab.id === session.activeTabId}
         dirty={workbenchTabHasChanges(sortingTab)}
-        title={sortingTab.displayName || sortingTab.project?.name || '未命名图片'}
+        imageSrc={mediaUrl(sortingTab.project?.thumbnail_path || sortingTab.project?.image_path || sortingTab.source?.path || '')}
+        position={session.tabs.findIndex((item) => item.id === sortingTab.id) + 1}
       /> : null}
     </DragOverlay>, document.body)}
   </DndContext>;
@@ -263,6 +331,7 @@ export default function WorkbenchPage({
   const tab = activeWorkbenchTab(session);
   const project = tab?.project;
   const activeTabId = tab?.id || '';
+  const activeTabPosition = Math.max(0, session.tabs.findIndex((item) => item.id === activeTabId));
   const copyContext = activeWorkbenchCopyContext(copyContextState, activeTabId);
   const updateCopyContext = useCallback((context) => {
     setCopyContextState(scopeWorkbenchCopyContext(context, activeTabId));
@@ -298,7 +367,7 @@ export default function WorkbenchPage({
 
   return <main className="workbench-page workbench-active-page">
     <header className="workbench-header">
-      <div className="workbench-header-copy"><h1>工作台</h1><p title={project?.name || tab.displayName}>{project ? `${project.name} · ${countPromptTags(project)} 个 Tag` : tab.displayName}</p></div>
+      <div className="workbench-header-copy"><h1>工作台</h1><p>{project ? `第 ${activeTabPosition + 1} / ${session.tabs.length} 张 · ${countPromptTags(project)} 个 Tag${workbenchTabHasChanges(tab) ? ' · 已修改' : ''}` : `第 ${activeTabPosition + 1} / ${session.tabs.length} 张`}</p></div>
       <div className="workbench-header-actions">
         <ImageOpenButton loading={loading} onChooseImage={onChooseImage} onClipboardImage={onClipboardImage}/>
         {project && <LobeButton icon={<Icon name="refresh" size={14}/>} onClick={onReset}>恢复原图</LobeButton>}
