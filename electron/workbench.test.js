@@ -23,6 +23,8 @@ function workbenchPng(filePath) {
     model: 'nai-diffusion-4-5-full',
     reference_image_multiple: ['a'.repeat(1000)],
     reference_strength_multiple: [0.45],
+    qualityToggle: true,
+    ucPreset: 0,
   });
   fs.writeFileSync(filePath, Buffer.concat([
     Buffer.from('89504e470d0a1a0a', 'hex'),
@@ -61,6 +63,7 @@ describe('workbench image reader', () => {
       tags: [{ tag: '1girl', translation: '缓存翻译' }, { tag: 'silver hair', translation: '缓存翻译' }],
       vibes: [{ name: 'Vibe 1', strength: 0.45 }],
     });
+    expect(project.prompt_structure.novelai_auto).toMatchObject({ quality_toggle: true, uc_preset: 0 });
     expect(fs.readdirSync(directory)).toEqual(['source.png']);
   });
 

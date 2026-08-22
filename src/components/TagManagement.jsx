@@ -126,7 +126,7 @@ export function TagPopover({ children, content, disabled, editKey, editingKey, o
   </LobePopover>;
 }
 
-export function TagHoverPreview({ actionHint, language, scopeLabel, tag, warning }) {
+export function TagHoverPreview({ actionHint, language, scopeLabel, sourceLabel, tag, warning }) {
   const category = tag.category || 'Unsorted';
   const translation = tag.translation?.trim();
   const weight = Number(tag.weight);
@@ -148,12 +148,14 @@ export function TagHoverPreview({ actionHint, language, scopeLabel, tag, warning
       <span>翻译</span>
       <p>{translation || '暂无翻译'}</p>
     </div>}
+    {sourceLabel && <div className="tag-hover-preview-source"><span>来源</span><strong>{sourceLabel}</strong></div>}
     {warning && <div className="tag-hover-preview-warning"><Icon name="warning" size={14}/><span>{warning}</span></div>}
     <footer>{actionHint}</footer>
   </div>;
 }
 
 export function TagChip({
+  badge,
   buttonRef,
   className = '',
   display,
@@ -179,6 +181,7 @@ export function TagChip({
   >
     {showSelectionMark && <SelectionMark selected={selected}/>}
     <span className="overview-tag-copy"><span>{display.primary}</span>{display.secondary && <small>{display.secondary}</small>}</span>
+    {badge && <span className="overview-tag-source-badge">{badge}</span>}
     {showWeight && Math.abs(Number(tag.weight) - 1) >= 0.001 && <em>{Number(tag.weight).toFixed(2)}</em>}
     {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}
   </button>;

@@ -117,6 +117,32 @@ describe('NovelAI V4 prompt structure', () => {
     expect(positivePromptCopyOptions(project).map((option) => option.text)).toEqual([base, character]);
   });
 
+  it('excludes confirmed NovelAI quality tags by default and can include the generation-ready raw prompt', () => {
+    const raw = '1girl, blue hair, very aesthetic, masterpiece, no text, Text: Hello';
+    const metadata = {
+      model: 'NovelAI Diffusion V5 0ADF9AB7',
+      prompt_raw: raw,
+      prompt_structure_raw: {
+        base_prompt_raw: raw,
+        base_undesired_raw: '',
+        characters: [],
+        novelai_auto: {
+          model: 'NovelAI Diffusion V5 0ADF9AB7',
+          quality_toggle: true,
+          quality_source: 'tag_hint_qt',
+          uc_preset: 0,
+          uc_preset_source: 'tag_hint_uc_preset',
+        },
+      },
+    };
+    const project = { metadata, prompt_structure: createPromptStructure(metadata), tags: parsePrompt(raw) };
+
+    expect(formatPositivePromptForCopy(project)).toBe('1girl, blue hair, Text: Hello');
+    expect(formatPositivePromptForCopy(project, { includeAutomatic: true })).toBe(raw);
+    expect(positivePromptCopyOptions(project)[0]).toMatchObject({ text: '1girl, blue hair, Text: Hello', count: 3, automaticCount: 3 });
+    expect(positivePromptCopyOptions(project, { includeAutomatic: true })[0]).toMatchObject({ text: raw, count: 6, automaticCount: 3 });
+  });
+
   it('renames a character without changing imported positioning metadata', () => {
     const project = {
       metadata: { prompt_raw: '2girls' },

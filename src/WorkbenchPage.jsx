@@ -327,7 +327,7 @@ export default function WorkbenchPage({
     WORKBENCH_SOURCE_PANEL_EXPANDED_KEY,
     true,
   ));
-  const [copyContextState, setCopyContextState] = useState({ tabId: '', text: '', count: 0 });
+  const [copyContextState, setCopyContextState] = useState({ tabId: '', text: '', count: 0, automaticIgnored: 0 });
   const tab = activeWorkbenchTab(session);
   const project = tab?.project;
   const activeTabId = tab?.id || '';
@@ -338,21 +338,35 @@ export default function WorkbenchPage({
   }, [activeTabId]);
 
   const copyOptions = useMemo(() => project ? positivePromptCopyOptions(project) : [], [project]);
+  const automaticCount = copyOptions.reduce((count, item) => count + item.automaticCount, 0);
   const copyItems = useMemo(() => project ? [
     {
       key: 'all',
-      label: '复制全部 Prompt',
+      label: automaticCount > 0 ? '复制全部 Prompt（不含 NovelAI 自动 Tag）' : '复制全部 Prompt',
       disabled: !formatPositivePromptForCopy(project),
-      onClick: () => onCopyText(formatPositivePromptForCopy(project), copyOptions.reduce((count, item) => count + item.count, 0), false, 0, '全部 Prompt'),
+      onClick: () => onCopyText(formatPositivePromptForCopy(project), copyOptions.reduce((count, item) => count + item.count, 0), false, 0, '全部 Prompt', automaticCount),
     },
     { key: 'copy-divider', type: 'divider' },
     ...copyOptions.map((option) => ({
       key: option.key,
       label: option.label,
       disabled: !option.text,
-      onClick: () => onCopyText(option.text, option.count, false, 0, option.label.replace(/^复制/, '')),
+      onClick: () => onCopyText(option.text, option.count, false, 0, option.label.replace(/^复制/, ''), option.automaticCount),
     })),
-  ] : [], [copyOptions, onCopyText, project]);
+    automaticCount > 0 && { key: 'automatic-divider', type: 'divider' },
+    automaticCount > 0 && {
+      key: 'all-with-automatic',
+      label: `复制全部 Prompt（包含 ${automaticCount} 个 NovelAI 自动 Tag）`,
+      disabled: !formatPositivePromptForCopy(project, { includeAutomatic: true }),
+      onClick: () => onCopyText(
+        formatPositivePromptForCopy(project, { includeAutomatic: true }),
+        positivePromptCopyOptions(project, { includeAutomatic: true }).reduce((count, item) => count + item.count, 0),
+        false,
+        0,
+        '全部 Prompt（含自动 Tag）',
+      ),
+    },
+  ].filter(Boolean) : [], [automaticCount, copyOptions, onCopyText, project]);
 
   if (!tab) return <main className="workbench-page workbench-empty-page">
     <div className="workbench-empty-copy">
@@ -372,7 +386,7 @@ export default function WorkbenchPage({
         <ImageOpenButton loading={loading} onChooseImage={onChooseImage} onClipboardImage={onClipboardImage}/>
         {project && <LobeButton icon={<Icon name="refresh" size={14}/>} onClick={onReset}>恢复原图</LobeButton>}
         {project && <SplitButton type="primary">
-          <SplitButton.Main disabled={!copyContext.count} icon={<Icon name="copy" size={14}/>} onClick={() => onCopyText(copyContext.text, copyContext.count, false, 0, '可见 Prompt')}>
+          <SplitButton.Main disabled={!copyContext.count} icon={<Icon name="copy" size={14}/>} onClick={() => onCopyText(copyContext.text, copyContext.count, false, 0, '可见 Prompt', copyContext.automaticIgnored)}>
             复制可见 Prompt{copyContext.count ? ` · ${copyContext.count}` : ''}
           </SplitButton.Main>
           <SplitButton.Menu aria-label="其他 Prompt 复制方式" items={copyItems} placement="bottomRight"/>

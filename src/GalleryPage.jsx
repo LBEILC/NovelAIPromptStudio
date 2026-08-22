@@ -1,4 +1,4 @@
-import { Accordion, AccordionItem, ActionIcon, DatePicker as LobeDatePicker, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, Highlighter, Popover, PopoverGroup, SearchBar as LobeSearchBar } from '@lobehub/ui';
+import { Accordion, AccordionItem, ActionIcon, DatePicker as LobeDatePicker, DraggablePanel as LobeDraggablePanel, Empty as LobeEmpty, Highlighter, Popover, PopoverGroup, SearchBar as LobeSearchBar, usePopoverContext } from '@lobehub/ui';
 import { Button as LobeButton, Input as LobeInput, Segmented, Select as LobeSelect, Slider, SplitButton, Switch as LobeSwitch } from '@lobehub/ui/base-ui';
 import dayjs from 'dayjs';
 import { AnimatePresence, motion } from 'motion/react';
@@ -85,7 +85,7 @@ function RawPromptSections({ project }) {
       itemKey={scope.key}
       key={scope.key}
       padding={0}
-      title={<span className="gallery-preview-prompt-title"><strong>{promptScopeTitle(scope)}</strong><small>{scope.tags.length} Tags</small></span>}
+      title={<span className="gallery-preview-prompt-title"><strong>{promptScopeTitle(scope)}</strong><small>{scope.tags.length} Tags{scope.automation?.status === 'confirmed' ? ` · 含 ${scope.automation.tagCount} 个 NovelAI 自动质量词` : scope.automation?.status === 'suspected' ? ` · 疑似含 ${scope.automation.tagCount} 个自动质量词` : ''}</small></span>}
       variant="outlined"
     >
       <Highlighter
@@ -534,7 +534,16 @@ export function BatchToolbar({ view, selectedGroups, selectedImages, selectedPro
   </div>;
 }
 
-export function GalleryCardHoverPreview({ group, project = group.cover }) {
+function GalleryHoverPreviewDismissBridge({ onReady }) {
+  const { close } = usePopoverContext();
+  useLayoutEffect(() => {
+    onReady(close);
+    return () => onReady(null);
+  }, [close, onReady]);
+  return null;
+}
+
+export function GalleryCardHoverPreview({ group, onDismissReady, project = group.cover }) {
   const width = Number(project.metadata?.width || 0);
   const height = Number(project.metadata?.height || 0);
   const memberIndex = Math.max(0, (group.members || []).findIndex((member) => member.id === project.id));
@@ -546,6 +555,7 @@ export function GalleryCardHoverPreview({ group, project = group.cover }) {
       '--gallery-card-hover-width': `${previewCanvas.width}px`,
     }}
   >
+    {onDismissReady && <GalleryHoverPreviewDismissBridge onReady={onDismissReady}/>}
     <div className="gallery-card-hover-media">
       <img alt="" key={project.id} src={mediaUrl(project.thumbnail_path || project.image_path)}/>
     </div>
@@ -663,10 +673,10 @@ export function nextGalleryRenderCount(total, current = 0) {
   return Math.min(safeTotal, current + GALLERY_RENDER_BATCH_SIZE);
 }
 
-export function GalleryCardView({ active, group, hoverProject = group.cover, selected, selecting = false, onDismissHoverPreview, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
+export function GalleryCardView({ active, group, hoverProject = group.cover, selected, selecting = false, onDismissHoverPreview, onHoverPreviewDismissReady, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
   const project = group.cover;
   const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
-  return <Popover content={<GalleryCardHoverPreview group={group} project={hoverProject}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
+  return <Popover content={<GalleryCardHoverPreview group={group} onDismissReady={onHoverPreviewDismissReady} project={hoverProject}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
     <button
       aria-label={selecting
         ? selected ? `取消选择 ${project.name}` : `选择 ${project.name}`
@@ -780,6 +790,7 @@ const GalleryGridCard = memo(function GalleryGridCard({ actionsRef, active, canO
     group={group}
     onContextMenu={(event) => actionsRef.current.onProjectContextMenu(event, group, () => actionsRef.current.requestRename(group))}
     onDismissHoverPreview={() => actionsRef.current.dismissHoverPreview()}
+    onHoverPreviewDismissReady={(dismiss) => actionsRef.current.registerHoverPreviewDismiss(dismiss)}
     onOpenWorkbench={canOpenWorkbench && !selecting ? (project) => actionsRef.current.onOpenWorkbench(project) : undefined}
     onPreview={(project) => {
       actionsRef.current.updatePreviewExpanded(true);
@@ -930,13 +941,13 @@ export default function GalleryPage({
   ));
   const [galleryCardSize, setGalleryCardSize] = useState(() => readGalleryCardSize(panelStorage()));
   const [progressiveRendering, setProgressiveRendering] = useState(false);
-  const [hoverPreviewSession, setHoverPreviewSession] = useState(0);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const reduceMotion = useStudioReducedMotion();
   const transitionBusy = loading || updating;
   const [loadingHeld, setLoadingHeld] = useState(transitionBusy);
   const renameTargetRef = useRef('');
+  const hoverPreviewDismissRef = useRef(null);
   const galleryScrollRef = useRef(null);
   const galleryCardSizeFrameRef = useRef(null);
   const galleryCardSizePersistTimerRef = useRef(null);
@@ -1092,11 +1103,16 @@ export default function GalleryPage({
   };
   const gridActionsRef = useRef({});
   gridActionsRef.current = {
-    dismissHoverPreview: () => setHoverPreviewSession((current) => current + 1),
+    dismissHoverPreview: () => {
+      const dismiss = hoverPreviewDismissRef.current;
+      hoverPreviewDismissRef.current = null;
+      dismiss?.();
+    },
     onOpenWorkbench,
     onPreview,
     onProjectContextMenu,
     onToggleSelect,
+    registerHoverPreviewDismiss: (dismiss) => { hoverPreviewDismissRef.current = dismiss; },
     requestRename,
     updatePreviewExpanded,
   };
@@ -1222,7 +1238,7 @@ export default function GalleryPage({
           }}
           ref={galleryScrollRef}
         >
-          <PopoverGroup closeDelay={120} key={hoverPreviewSession} openDelay={450} placement="rightTop" trigger="hover">
+          <PopoverGroup closeDelay={120} openDelay={450} placement="rightTop" trigger="hover">
             <AnimatePresence initial={false} mode="wait">
               {showLoadingPage ? <GalleryLoadingState reduceMotion={reduceMotion}/> : groups.length ? <GalleryResultsSurface
                 className={`gallery-grid density-${galleryDensity}`}

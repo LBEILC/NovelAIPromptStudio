@@ -459,6 +459,10 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .overview-scope { min-width: 0; padding: 12px 0 18px; }
 .overview-scope + .overview-scope { border-top: 1px dashed var(--line-soft); }
 .overview-scope-heading > div { min-width: 0; }
+.overview-scope-title { display: grid; gap: 4px; }
+.overview-scope-meta { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.overview-automatic-summary { width: fit-content; max-width: 100%; padding: 2px 6px; overflow: hidden; color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line)); border-radius: 4px; font-size: var(--text-micro); line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.overview-automatic-summary.suspected, .overview-automatic-summary.mismatch { color: var(--warning); background: color-mix(in srgb, var(--warning) 7%, transparent); border-color: color-mix(in srgb, var(--warning) 28%, var(--line)); }
 .overview-scope.undesired .overview-scope-heading strong { color: var(--danger); }
 .overview-tags { min-width: 0; display: flex; flex-wrap: wrap; gap: 7px; user-select: none; }
 .overview-tag-shell { width: fit-content; max-width: 100%; flex: 0 0 auto; display: flex; }
@@ -475,6 +479,10 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .overview-tag-copy small, .overview-filter-empty { color: var(--muted); font-size: var(--text-micro); }
 .overview-tag em { color: var(--muted); font-size: var(--text-micro); font-style: normal; }
 .overview-tag.syntax-warning { border-style: dashed; border-color: var(--warning); }
+.overview-tag.automatic-prompt-tag { border-style: dashed; }
+.overview-tag.automatic-prompt-tag.confirmed { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 34%, var(--line)); }
+.overview-tag.automatic-prompt-tag.selected { border-style: solid; }
+.overview-tag-source-badge { flex: 0 0 auto; padding: 1px 4px; color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); border-radius: 3px; font: 600 var(--text-micro)/1.35 var(--font-sans); }
 .overview-syntax-mark { color: var(--warning); }
 .tag-hover-preview { width: min(280px, calc(100vw - 48px)); display: grid; gap: 10px; padding: 10px 11px; text-align: start; }
 .tag-hover-preview-header { min-width: 0; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--text-micro); }
@@ -488,9 +496,13 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .tag-hover-preview-field p { margin: 0; overflow-wrap: anywhere; color: var(--text); font-size: var(--text-secondary); line-height: 1.5; }
 .tag-hover-preview-field.empty p { color: var(--faint); }
 .tag-hover-preview-warning { padding: 7px 8px; display: flex; align-items: flex-start; gap: 6px; color: var(--warning); background: color-mix(in srgb, var(--warning) 8%, transparent); border-radius: 6px; font-size: var(--text-micro); line-height: 1.45; }
+.tag-hover-preview-source { padding: 7px 8px; display: grid; gap: 2px; color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: 6px; font-size: var(--text-micro); line-height: 1.45; }
+.tag-hover-preview-source span { color: var(--muted); }
+.tag-hover-preview-source strong { font-weight: 600; }
 .tag-hover-preview-warning svg { flex: 0 0 auto; margin-top: 1px; }
 .tag-hover-preview footer { padding-top: 8px; color: var(--muted); border-top: 1px solid var(--line-soft); font-size: var(--text-micro); line-height: 1.4; }
 .overview-scope.undesired .overview-tag, .overview-tag.undesired-tag { background: color-mix(in srgb, var(--danger) 7%, transparent); border-color: color-mix(in srgb, var(--danger) 28%, var(--line)); }
+.overview-scope.undesired .overview-tag.automatic-prompt-tag, .overview-tag.undesired-tag.automatic-prompt-tag { background: color-mix(in srgb, var(--danger) 9%, var(--panel)); border-color: color-mix(in srgb, var(--danger) 36%, var(--line)); }
 .overview-scope.undesired .overview-tag.selected, .overview-tag.undesired-tag.selected, .overview-tag.syntax-warning.selected { border-color: var(--accent); border-style: solid; }
 .overview-no-results, .overview-add-character { max-width: 760px; min-height: 72px; padding: 14px; color: var(--muted); border: 1px dashed var(--line); border-radius: 7px; }
 .overview-no-results { margin: 24px auto; }

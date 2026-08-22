@@ -1,4 +1,5 @@
 import { formatPrompt, formatPromptGroupedInline, formatPromptInline, normalizeCategory, parsePrompt, repairLegacyPromptTags } from './prompt.js';
+import { analyzeNovelAIAutomaticPrompts, extractNovelAIAutoSettings } from './novelaiAutoPrompt.js';
 
 const createId = () => crypto.randomUUID();
 export const MAX_PROMPT_CHARACTERS = 22;
@@ -31,7 +32,7 @@ function firstCenter(...candidates) {
   return { x: 0.5, y: 0.5 };
 }
 
-export function extractV4PromptData(raw = {}, fallbackPrompt = '', fallbackUndesired = '') {
+export function extractV4PromptData(raw = {}, fallbackPrompt = '', fallbackUndesired = '', model = '') {
   const positive = safeObject(raw.v4_prompt);
   const negative = safeObject(raw.v4_negative_prompt);
   const positiveCaption = promptCaption(positive);
@@ -45,6 +46,7 @@ export function extractV4PromptData(raw = {}, fallbackPrompt = '', fallbackUndes
     base_undesired_raw: typeof negativeCaption.base_caption === 'string' ? negativeCaption.base_caption : String(fallbackUndesired || ''),
     use_coords: Boolean(positive.use_coords),
     use_order: positive.use_order !== false,
+    novelai_auto: extractNovelAIAutoSettings(raw, model),
     characters: Array.from({ length: characterCount }, (_, index) => {
       const prompt = safeObject(positiveCharacters[index]);
       const undesired = safeObject(negativeCharacters[index]);
@@ -61,7 +63,7 @@ function rawStructureFromMetadata(metadata = {}) {
   if (metadata.prompt_structure_raw) return metadata.prompt_structure_raw;
   const extra = safeObject(metadata.extra_json);
   const parsed = safeObject(extra.parsed);
-  return extractV4PromptData(parsed, metadata.prompt_raw, metadata.negative_prompt);
+  return extractV4PromptData(parsed, metadata.prompt_raw, metadata.negative_prompt, metadata.model);
 }
 
 function normalizeTag(tag, idFactory) {
@@ -87,6 +89,9 @@ function normalizeTags(tags, rawPrompt, idFactory) {
 export function normalizePromptStructure(structure, metadata = {}, idFactory = createId) {
   const parsedStructure = safeObject(structure);
   const metadataStructure = rawStructureFromMetadata(metadata);
+  const storedAutomaticSettings = Object.prototype.hasOwnProperty.call(parsedStructure, 'novelai_auto')
+    ? safeObject(parsedStructure.novelai_auto)
+    : safeObject(metadataStructure.novelai_auto);
   const hasStoredCharacters = Object.prototype.hasOwnProperty.call(parsedStructure, 'characters');
   const sourceCharacters = hasStoredCharacters && Array.isArray(parsedStructure.characters)
     ? parsedStructure.characters
@@ -110,6 +115,7 @@ export function normalizePromptStructure(structure, metadata = {}, idFactory = c
     use_order: Object.prototype.hasOwnProperty.call(parsedStructure, 'use_order')
       ? Boolean(parsedStructure.use_order)
       : metadataStructure.use_order !== false,
+    novelai_auto: { ...extractNovelAIAutoSettings({}, metadata.model), ...storedAutomaticSettings },
     characters: (sourceCharacters || []).map((character, index) => {
       const metadataCharacter = metadataStructure.characters[index] || {};
       const promptRaw = Object.prototype.hasOwnProperty.call(character, 'prompt_raw') ? character.prompt_raw : metadataCharacter.prompt_raw;
@@ -133,7 +139,7 @@ export function createPromptStructure(metadata = {}, idFactory = createId) {
 
 export function getPromptScopes(project) {
   const structure = project.prompt_structure || normalizePromptStructure(null, project.metadata);
-  return [
+  const scopes = [
     { key: 'base:prompt', kind: 'base', polarity: 'prompt', label: 'Base Prompt', raw_prompt: structure.base_prompt_raw ?? project.metadata?.prompt_raw ?? '', tags: project.tags || [] },
     { key: 'base:undesired', kind: 'base', polarity: 'undesired', label: 'Base Undesired Content', raw_prompt: structure.base_undesired_raw ?? project.metadata?.negative_prompt ?? '', tags: structure.base_undesired_tags || [] },
     ...structure.characters.flatMap((character, index) => [
@@ -141,6 +147,8 @@ export function getPromptScopes(project) {
       { key: `character:${character.id}:undesired`, kind: 'character', polarity: 'undesired', characterId: character.id, characterIndex: index, character, label: `${character.label} Undesired Content`, raw_prompt: character.undesired_raw || '', tags: character.undesired_tags },
     ]),
   ];
+  const automatic = analyzeNovelAIAutomaticPrompts({ ...project, prompt_structure: structure }, scopes);
+  return scopes.map((scope) => ({ ...scope, automation: automatic.scopes[scope.key] || null }));
 }
 
 export function getPromptScope(project, scopeKey = 'base:prompt') {
@@ -210,10 +218,13 @@ export function formatPositivePrompt(project) {
   return scopes.map((scope) => formatPrompt(scope.tags)).filter(Boolean).join('\n|\n');
 }
 
-export function formatPositivePromptForCopy(project) {
+export function formatPositivePromptForCopy(project, { includeAutomatic = false } = {}) {
   return getPromptScopes(project)
     .filter((scope) => scope.polarity === 'prompt')
-    .map((scope) => String(scope.raw_prompt || '').trim() ? scope.raw_prompt : formatPromptInline(scope.tags))
+    .map((scope) => {
+      if (!includeAutomatic && scope.automation?.status === 'confirmed') return scope.automation.cleanedRaw;
+      return String(scope.raw_prompt || '').trim() ? scope.raw_prompt : formatPromptInline(scope.tags);
+    })
     .filter(Boolean)
     .join('\n|\n');
 }
@@ -229,13 +240,18 @@ export function formatPositiveScopeForCopy(project, scopeKey) {
   return scope.polarity === 'prompt' ? formatPromptInline(scope.tags) : '';
 }
 
-export function positivePromptCopyOptions(project) {
+export function positivePromptCopyOptions(project, { includeAutomatic = false } = {}) {
   const scopes = getPromptScopes(project).filter((scope) => scope.polarity === 'prompt');
   return scopes.map((scope) => ({
     key: scope.key,
-    label: scope.kind === 'base' ? '复制完整 Base Prompt' : `复制角色 ${(scope.characterIndex ?? 0) + 1} Prompt`,
-    text: String(scope.raw_prompt || '').trim() ? scope.raw_prompt : formatPromptInline(scope.tags),
-    count: scope.tags.length,
+    label: scope.kind === 'base'
+      ? !includeAutomatic && scope.automation?.status === 'confirmed' ? '复制 Base Prompt（不含自动质量词）' : '复制完整 Base Prompt'
+      : `复制角色 ${(scope.characterIndex ?? 0) + 1} Prompt`,
+    text: !includeAutomatic && scope.automation?.status === 'confirmed'
+      ? scope.automation.cleanedRaw
+      : String(scope.raw_prompt || '').trim() ? scope.raw_prompt : formatPromptInline(scope.tags),
+    count: scope.tags.length - (!includeAutomatic && scope.automation?.status === 'confirmed' ? scope.automation.tagIds.length : 0),
+    automaticCount: scope.automation?.status === 'confirmed' ? scope.automation.tagIds.length : 0,
   }));
 }
 

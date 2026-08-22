@@ -157,6 +157,10 @@ function textBlockStart(source, cursor) {
   return -1;
 }
 
+export function findPromptTextBlockStart(source = '') {
+  return textBlockStart(String(source || ''), 0);
+}
+
 function scanPromptSegments(source, state) {
   const segments = [];
   let cursor = 0;

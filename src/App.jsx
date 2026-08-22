@@ -1268,11 +1268,15 @@ export default function App({ appearance, setAppearance }) {
           const result = await studio.copyWorkbenchImage(project.image_path);
           showToast(result?.ok ? '图片已复制到系统剪贴板' : result?.error || '图片复制失败', result?.ok ? 'success' : 'error');
         }}
-        onCopyText={async (text, count, selected, ignored = 0, label = '') => {
+        onCopyText={async (text, count, selected, ignored = 0, label = '', automaticIgnored = 0) => {
           if (!text) return;
           await navigator.clipboard.writeText(text);
-          if (selected && ignored) showToast(`已复制 ${count} 个 Prompt Tag，忽略 ${ignored} 个排除 Tag`);
-          else showToast(`已复制 ${count} 个${label ? ` ${label}` : selected ? '已选 Prompt Tag' : '可见 Prompt Tag'}`);
+          const ignoredLabels = [
+            ignored ? `${ignored} 个排除 Tag` : '',
+            automaticIgnored ? `${automaticIgnored} 个 NovelAI 自动 Tag` : '',
+          ].filter(Boolean);
+          const copiedLabel = label ? ` ${label}` : selected ? '已选 Prompt Tag' : '可见 Prompt Tag';
+          showToast(`已复制 ${count} 个${copiedLabel}${ignoredLabels.length ? `，忽略 ${ignoredLabels.join('、')}` : ''}`);
         }}
         onConfirm={requestConfirmation}
         onDownloadImage={async (project) => {

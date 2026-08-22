@@ -61,7 +61,7 @@ function syntaxMessage(tag) {
   return '';
 }
 
-function SortableTag({ animateLayout, display, editKey, editingKey, index, language, onEditingChange, onKeyboardMove, onTagClick, onTagContextMenu, onTranslateTag, onUpdateTag, reorderDisabled, scope, selected, selectionModeActive, tag, translating, warning }) {
+function SortableTag({ animateLayout, automation, display, editKey, editingKey, index, language, onEditingChange, onKeyboardMove, onTagClick, onTagContextMenu, onTranslateTag, onUpdateTag, reorderDisabled, scope, selected, selectionModeActive, tag, translating, warning }) {
   const {
     attributes,
     isDragging,
@@ -76,7 +76,9 @@ function SortableTag({ animateLayout, display, editKey, editingKey, index, langu
   const tagButton = <TagChip
     {...(reorderDisabled ? {} : attributes)}
     {...(reorderDisabled ? {} : listeners)}
+    badge={automation ? (automation.kind === 'undesired' ? '预设' : '自动') : ''}
     buttonRef={reorderDisabled ? undefined : setActivatorNodeRef}
+    className={automation ? `automatic-prompt-tag ${automation.status}` : ''}
     display={display}
     dragging={isDragging}
     onClick={(event) => onTagClick(event, editKey)}
@@ -94,6 +96,7 @@ function SortableTag({ animateLayout, display, editKey, editingKey, index, langu
           : '点击编辑 · 拖动排序 · 从空白处框选'}
       language={language}
       scopeLabel={scope.label}
+      sourceLabel={automation?.sourceLabel}
       tag={tag}
       warning={warning}
     />}
@@ -118,6 +121,22 @@ function SortableTag({ animateLayout, display, editKey, editingKey, index, langu
       {tagButton}
     </TagPopover>
   </motion.div>;
+}
+
+function AutomaticPromptSummary({ automation }) {
+  if (!automation || !['confirmed', 'suspected', 'mismatch'].includes(automation.status)) return null;
+  const isQuality = automation.kind === 'quality';
+  const label = automation.status === 'mismatch'
+    ? isQuality ? '质量词开关已启用 · 模板未匹配' : 'UC 预设已启用 · 模板未匹配'
+    : isQuality
+      ? `${automation.status === 'suspected' ? '疑似 ' : ''}NovelAI ${automation.modelLabel} 自动质量词 · ${automation.tagCount}`
+      : `${automation.status === 'suspected' ? '疑似 ' : ''}NovelAI UC ${automation.label} · ${automation.tagCount}`;
+  const title = automation.status === 'confirmed'
+    ? '元数据与官方预设模板均匹配；默认复制时会排除这些自动内容。'
+    : automation.status === 'suspected'
+      ? '文本与官方预设模板匹配，但元数据缺少明确开关；复制时不会自动排除。'
+      : '元数据显示已启用自动预设，但当前文本与已知模板不一致；复制时不会自动排除。';
+  return <span className={`overview-automatic-summary ${automation.status}`} title={title}>{label}</span>;
 }
 
 function AddTagEditor({ draft, pending, scope, onAdd, onChange, onClose }) {
@@ -203,10 +222,11 @@ function ScopeTags({
   const activeTag = scope.tags.find((tag) => tag.id === activeTagId);
   const activeDisplay = activeTag ? tagPresentation(activeTag, language) : null;
   const activeWarning = activeTag ? syntaxMessage(activeTag) : '';
+  const activeAutomation = activeTag && scope.automation?.tagIds?.includes(activeTag.id) ? scope.automation : null;
   const { reorderDisabled, selectionModeActive } = interactionState;
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
-      <div><strong>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</strong>{scope.tags.length > 0 && <small>{scope.tags.length} 个 Tag</small>}</div>
+      <div className="overview-scope-title"><strong>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</strong><div className="overview-scope-meta">{scope.tags.length > 0 && <small>{scope.tags.length} 个 Tag</small>}<AutomaticPromptSummary automation={scope.automation}/></div></div>
       {selectionModeActive ? <SelectionGroupButton entries={scopeEntries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : <div className="overview-scope-actions">
         <LobePopover
           arrow
@@ -268,8 +288,10 @@ function ScopeTags({
         <div className={`overview-tags ${activeTagId ? 'sorting' : ''}`} role="list" aria-label={scope.label}>
           {renderedTags.map((tag, index) => {
             const key = overviewTagKey(scope.key, tag.id);
+            const automation = scope.automation?.tagIds?.includes(tag.id) ? scope.automation : null;
             return <SortableTag
               animateLayout={animateLayout}
+              automation={automation}
               display={tagPresentation(tag, language)}
               editKey={key}
               editingKey={editingKey}
@@ -302,6 +324,8 @@ function ScopeTags({
         modifiers={[restrictToWindowEdges]}
       >
         {activeTag && activeDisplay ? <TagChip
+          badge={activeAutomation ? (activeAutomation.kind === 'undesired' ? '预设' : '自动') : ''}
+          className={activeAutomation ? `automatic-prompt-tag ${activeAutomation.status}` : ''}
           display={activeDisplay}
           overlay
           selected={false}
@@ -334,7 +358,8 @@ function CategoryGroup({ group, language, selectionModeActive, selectedKeys, edi
       const display = tagPresentation(entry.tag, language);
       const warning = syntaxMessage(entry.tag);
       const tagButton = <TagChip
-        className={entry.scopePolarity === 'undesired' ? 'undesired-tag' : ''}
+        badge={entry.automation ? (entry.automation.kind === 'undesired' ? '预设' : '自动') : ''}
+        className={`${entry.scopePolarity === 'undesired' ? 'undesired-tag' : ''} ${entry.automation ? `automatic-prompt-tag ${entry.automation.status}` : ''}`}
         data-marquee-key={encodeMarqueeKey(entry.key)}
         display={display}
         onClick={(event) => onTagClick(event, entry.key)}
@@ -348,6 +373,7 @@ function CategoryGroup({ group, language, selectionModeActive, selectedKeys, edi
           actionHint={selectionModeActive ? '点击选择或取消 · 拖动 Tag 或空白处框选' : '点击编辑 · 从空白处框选'}
           language={language}
           scopeLabel={entry.scopeLabel}
+          sourceLabel={entry.automation?.sourceLabel}
           tag={entry.tag}
           warning={warning}
         />}
@@ -501,7 +527,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     setDeleteArmed(false);
   };
 
-  const copyVisibleOrSelected = () => onCopyText?.(copyContext.text, copyContext.count, copyContext.selected, copyContext.ignored);
+  const copyVisibleOrSelected = () => onCopyText?.(copyContext.text, copyContext.count, copyContext.selected, copyContext.ignored, '', copyContext.automaticIgnored);
 
   const deleteSelected = () => {
     if (!selectedKeys.length) return;
@@ -616,9 +642,10 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
       count: contextEntries.length,
       copyCount: contextCopy.count,
       ignored: contextCopy.ignored,
+      automaticIgnored: contextCopy.automaticIgnored,
       moveContext,
       translating: contextEntries.some((entry) => translatingKeys.has(entry.key)),
-      onCopy: () => onCopyText?.(contextCopy.text, contextCopy.count, true, contextCopy.ignored),
+      onCopy: () => onCopyText?.(contextCopy.text, contextCopy.count, true, contextCopy.ignored, '', contextCopy.automaticIgnored),
       onTranslate: () => translateEntries(contextEntries),
       onCategoryChange: (category) => {
         updateProject(updateOverviewTags(project, contextKeys, { category, category_source: 'manual' }));

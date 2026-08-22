@@ -57,6 +57,8 @@ describe('NovelAI PNG metadata', () => {
       sampler: 'k_euler_ancestral',
       scale: 5.5,
       model: 'nai-diffusion-4-5-full',
+      qualityToggle: true,
+      ucPreset: 0,
     });
     const png = Buffer.concat([
       Buffer.from('89504e470d0a1a0a', 'hex'),
@@ -73,6 +75,50 @@ describe('NovelAI PNG metadata', () => {
       sampler: 'k_euler_ancestral',
       guidance: 5.5,
       model: 'nai-diffusion-4-5-full',
+      prompt_structure_raw: {
+        novelai_auto: {
+          model: 'nai-diffusion-4-5-full',
+          quality_toggle: true,
+          quality_source: 'qualityToggle',
+          uc_preset: 0,
+          uc_preset_source: 'ucPreset',
+        },
+      },
+    });
+  });
+
+  it('recovers V5 automatic prompt hints from official-style metadata', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
+    temporaryDirectories.push(directory);
+    const filePath = path.join(directory, 'v5.png');
+    const description = JSON.stringify({
+      prompt: '1girl, very aesthetic, masterpiece, no text',
+      uc: 'lowres',
+      model_name: 'NovelAI Diffusion V5',
+      tag_hint_qt: 1,
+      tag_hint_uc_preset: 3,
+      version: 1,
+    });
+    const png = Buffer.concat([
+      Buffer.from('89504e470d0a1a0a', 'hex'),
+      chunk('tEXt', Buffer.concat([Buffer.from('Description'), Buffer.from([0]), Buffer.from(description)])),
+      chunk('tEXt', Buffer.concat([Buffer.from('Source'), Buffer.from([0]), Buffer.from('NovelAI Diffusion V5 0ADF9AB7')])),
+      chunk('IEND'),
+    ]);
+    fs.writeFileSync(filePath, png);
+
+    expect(await readNovelAIMetadata(filePath)).toMatchObject({
+      model: 'NovelAI Diffusion V5 0ADF9AB7',
+      prompt_structure_raw: {
+        novelai_auto: {
+          model: 'NovelAI Diffusion V5 0ADF9AB7',
+          quality_toggle: true,
+          quality_source: 'tag_hint_qt',
+          uc_preset: 3,
+          uc_preset_source: 'tag_hint_uc_preset',
+          params_version: 1,
+        },
+      },
     });
   });
 

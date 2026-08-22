@@ -65,6 +65,7 @@ export function filterOverviewScopes(project, filters = DEFAULT_OVERVIEW_FILTERS
 
 export function overviewEntries(scopes) {
   return scopes.flatMap((scope) => scope.tags.map((tag) => ({
+    automation: scope.automation?.tagIds?.includes(tag.id) ? scope.automation : null,
     key: overviewTagKey(scope.key, tag.id),
     scopeKey: scope.key,
     scopeLabel: scope.label,
@@ -105,8 +106,10 @@ export function overviewCopyContext(project, visibleScopes, selectedKeys = []) {
   const source = selected.size
     ? overviewEntries(getPromptScopes(project)).filter((entry) => selected.has(entry.key))
     : overviewEntries(visibleScopes);
-  const positive = source.filter((entry) => entry.scopePolarity === 'prompt');
-  const ignored = source.length - positive.length;
+  const promptEntries = source.filter((entry) => entry.scopePolarity === 'prompt');
+  const positive = promptEntries.filter((entry) => entry.automation?.status !== 'confirmed');
+  const ignored = source.length - promptEntries.length;
+  const automaticIgnored = promptEntries.length - positive.length;
   const groups = selected.size ? overviewCategoryGroups(positive) : [];
   return {
     text: selected.size
@@ -114,6 +117,7 @@ export function overviewCopyContext(project, visibleScopes, selectedKeys = []) {
       : positive.map((entry) => formatTag(entry.tag)).join(', '),
     count: positive.length,
     ignored,
+    automaticIgnored,
     selected: selected.size > 0,
     categoryCount: selected.size ? groups.length : 0,
     entries: positive,
@@ -187,6 +191,7 @@ export function moveOverviewTags(project, selectedKeys = [], targetScopeKey = ''
 }
 
 export function overviewSelectionMenuItems({
+  automaticIgnored = 0,
   categories = [],
   count = 0,
   copyCount = 0,
@@ -199,8 +204,12 @@ export function overviewSelectionMenuItems({
   onTranslate,
   translating = false,
 }) {
-  const copyLabel = ignored
-    ? `复制可用 ${copyCount} 个 Prompt Tag（忽略 ${ignored} 个排除 Tag）`
+  const ignoredLabels = [
+    ignored ? `${ignored} 个排除 Tag` : '',
+    automaticIgnored ? `${automaticIgnored} 个 NovelAI 自动 Tag` : '',
+  ].filter(Boolean);
+  const copyLabel = ignoredLabels.length
+    ? `复制可用 ${copyCount} 个 Prompt Tag（忽略 ${ignoredLabels.join('、')}）`
     : `复制已选 ${copyCount} 个 Prompt Tag`;
   return [
     { key: 'copy-selected-tags', label: copyLabel, disabled: copyCount < 1, onClick: () => onCopy?.() },

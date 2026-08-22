@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { deleteOverviewTags, filterOverviewScopes, isOverviewTagVisible, moveOverviewTags, overviewCategoryGroups, overviewCopyContext, overviewEntries, overviewMoveContext, overviewSelectionMenuItems, overviewTagInteractionState, overviewTagKey, reorderOverviewTags, selectedOverviewEntries, shouldReorderOverviewTags, toggleOverviewSelectionGroup, updateOverviewTags } from './promptOverview.js';
+import { parsePrompt } from './prompt.js';
 
 function projectFixture() {
   const tag = (id, value, category, translation = '', weight = 1) => ({ id, tag: value, category, translation, weight, note: '' });
@@ -105,6 +106,35 @@ describe('Prompt overview operations', () => {
       categoryCount: 3,
       selected: true,
     });
+  });
+
+  it('excludes confirmed NovelAI automatic quality tags from visible and selected copies', () => {
+    let id = 0;
+    const prompt = '1girl, very aesthetic, masterpiece, no text';
+    const tags = parsePrompt(prompt, () => `automatic-${id++}`);
+    const project = {
+      tags,
+      metadata: { model: 'NovelAI Diffusion V5 0ADF9AB7' },
+      prompt_structure: {
+        base_prompt_raw: prompt,
+        base_undesired_raw: '',
+        base_undesired_tags: [],
+        characters: [],
+        novelai_auto: {
+          model: 'NovelAI Diffusion V5 0ADF9AB7',
+          quality_toggle: true,
+          quality_source: 'tag_hint_qt',
+          uc_preset: 0,
+          uc_preset_source: 'tag_hint_uc_preset',
+        },
+      },
+    };
+    const visible = filterOverviewScopes(project);
+    const context = overviewCopyContext(project, visible);
+    expect(context).toMatchObject({ text: '1girl', count: 1, automaticIgnored: 3 });
+
+    const automaticKeys = overviewEntries(visible).filter((entry) => entry.automation).map((entry) => entry.key);
+    expect(overviewCopyContext(project, visible, automaticKeys)).toMatchObject({ text: '', count: 0, automaticIgnored: 3, selected: true });
   });
 
   it('groups visible entries by category in the category display order', () => {

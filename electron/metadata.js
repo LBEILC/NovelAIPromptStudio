@@ -126,8 +126,8 @@ export async function readNovelAIMetadata(filePath) {
   const raw = candidates.reduce((merged, item) => ({ ...merged, ...item }), {});
   const legacyPrompt = first(raw, ['prompt', 'description'], text.Description || '');
   const legacyNegative = first(raw, ['uc', 'negative_prompt', 'negativePrompt'], '');
-  const promptStructure = extractV4PromptData(raw, legacyPrompt, legacyNegative);
   const model = String(first(raw, ['model', 'source'], text.Source || text.Software || ''));
+  const promptStructure = extractV4PromptData(raw, legacyPrompt, legacyNegative, model);
   return {
     prompt_raw: promptStructure.base_prompt_raw,
     negative_prompt: promptStructure.base_undesired_raw,
