@@ -448,6 +448,13 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .overview-layer-heading strong, .overview-layer-heading small, .overview-category-heading strong, .overview-category-heading small, .overview-scope-heading strong, .overview-scope-heading small { display: block; }
 .overview-layer-heading small, .overview-category-heading small, .overview-scope-heading small { color: var(--muted); font-size: var(--text-micro); }
 .overview-layer-heading > span, .overview-layer-heading > button, .overview-category-heading > button, .overview-scope-heading > button, .overview-scope-actions { margin-inline-start: auto; }
+.character-layer .overview-layer-heading { align-items: center; }
+.character-heading-main { min-width: 0; flex: 1; }
+.character-heading-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.character-heading-actions, .character-heading-rename { min-width: 0; display: flex; align-items: center; gap: 4px; }
+.character-heading-actions { flex: 0 0 auto; margin-inline-start: auto; }
+.character-heading-rename { width: min(420px, 100%); }
+.character-heading-rename > div:first-child { min-width: 120px; flex: 1; }
 .overview-scope-actions { display: flex; align-items: center; gap: 4px; }
 .overview-scope { min-width: 0; padding: 12px 0 18px; }
 .overview-scope + .overview-scope { border-top: 1px dashed var(--line-soft); }
@@ -503,10 +510,10 @@ html.is-marquee-selecting, html.is-marquee-selecting * { cursor: crosshair !impo
 .tag-quick-editor-heading > div { min-width: 0; flex: 1; }
 .tag-quick-editor-heading > button { flex: 0 0 auto; }
 .tag-quick-editor-heading > div, .tag-quick-editor label { display: grid; gap: 4px; }
-.tag-quick-editor-heading small, .tag-quick-editor label > span, .character-quick-editor > label > span { color: var(--muted); font-size: var(--text-caption); }
+.tag-quick-editor-heading small, .tag-quick-editor label > span { color: var(--muted); font-size: var(--text-caption); }
 .tag-quick-editor-row { display: grid; grid-template-columns: 124px minmax(0, 1fr); gap: 10px; }
 .tag-weight-editor { min-width: 0; }
-.tag-quick-editor-footer, .character-quick-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.tag-quick-editor-footer { display: flex; justify-content: flex-end; gap: 8px; }
 .add-tag-popover-shell { width: min(420px, calc(100vw - 32px)); }
 .add-tag-popover { width: 390px; max-width: 100%; padding: 4px; display: grid; gap: 12px; }
 .add-tag-popover-footer { display: flex; align-items: center; gap: 12px; }
@@ -519,22 +526,6 @@ html.is-marquee-selecting, html.is-marquee-selecting * { cursor: crosshair !impo
 .raw-prompt-editor-footer { display: flex; align-items: center; gap: 12px; }
 .raw-prompt-editor-footer > span { min-width: 0; flex: 1; color: var(--muted); font-size: var(--text-micro); }
 .raw-prompt-editor-footer > button { flex: 0 0 auto; }
-.character-quick-popover { width: min(440px, calc(100vw - 32px)); }
-.character-quick-editor { width: 410px; max-width: 100%; padding: 4px; display: grid; gap: 14px; }
-.character-quick-editor > label { display: grid; gap: 6px; }
-.character-position-heading, .character-position-footer { display: flex; align-items: center; gap: 12px; }
-.character-position-heading > div { flex: 1; }
-.character-position-heading strong, .character-position-heading small { display: block; }
-.character-position-heading small { color: var(--muted); font-size: var(--text-micro); }
-.character-position-grid { height: 144px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-.character-position-grid button { display: grid; place-items: center; background: color-mix(in srgb, var(--text) 3%, transparent); border: 1px solid var(--line-soft); border-radius: 6px; }
-.character-position-grid button i { width: 6px; height: 6px; background: var(--faint); border-radius: 50%; }
-.character-position-grid button.active { border-color: var(--accent); }
-.character-position-grid button.active i { background: var(--accent); }
-.character-position-grid.disabled { opacity: .38; }
-.character-position-footer code { color: var(--muted); font: var(--text-micro) var(--font-mono); }
-.character-position-footer > label { margin-inline-start: auto; }
-
 .settings-page { display: flex; overflow: hidden; background: var(--ink); }
 .settings-nav-shell { height: 100%; flex: 0 0 auto; }
 .settings-nav { min-height: 0; padding: 32px 14px 18px; display: flex; flex-direction: column; background: var(--panel); border-inline-end: 1px solid var(--line-soft); }

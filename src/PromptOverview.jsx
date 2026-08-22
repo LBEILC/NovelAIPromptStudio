@@ -3,18 +3,19 @@ import { createPortal } from 'react-dom';
 import { DndContext, DragOverlay, getFirstCollision, pointerWithin, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { SortableContext, useSortable } from '@dnd-kit/sortable';
-import { Popover as LobePopover, SearchBar as LobeSearchBar, TooltipGroup as LobeTooltipGroup } from '@lobehub/ui';
+import { ActionIcon as LobeActionIcon, Popover as LobePopover, SearchBar as LobeSearchBar, TooltipGroup as LobeTooltipGroup } from '@lobehub/ui';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   Button as LobeButton,
-  Checkbox as LobeCheckbox,
+  DropdownMenu as LobeDropdownMenu,
   Input as LobeInput,
   Segmented as LobeSegmented,
   Select as LobeSelect,
   TextArea as LobeTextArea,
 } from '@lobehub/ui/base-ui';
+import { Check, MoreHorizontal, Pencil, Trash2, X } from 'lucide-react';
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
-import { addPromptCharacter, getPromptScope, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
+import { addPromptCharacter, getPromptScope, MAX_PROMPT_CHARACTERS, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
 import Icon from './components/Icon.jsx';
 import { MarqueeSelectionOverlay, useMarqueeSelection } from './components/MarqueeSelection.jsx';
 import { TagCategorySection, TagChip, TagHoverPreview, TagPopover, TagQuickEditor } from './components/TagManagement.jsx';
@@ -53,10 +54,6 @@ const TAG_SORT_ACCESSIBILITY = {
 
 const LIVE_TAG_SORTING_STRATEGY = () => null;
 const TAG_LAYOUT_TRANSITION = { duration: 0.18, ease: [0.22, 1, 0.36, 1] };
-
-function compactPosition(center) {
-  return `${Math.round(Number(center?.x ?? 0.5) * 100)} / ${Math.round(Number(center?.y ?? 0.5) * 100)}`;
-}
 
 function syntaxMessage(tag) {
   if (tag.syntax_issue === 'control_only') return '单独的 :: 是结束控制符，不是 Tag，建议删除。';
@@ -161,36 +158,6 @@ function RawPromptEditor({ draft, pending, scope, onChange, onClose, onSave }) {
       <span>将解析为 {pending.tags.length} 个 Tag{pending.syntaxIssueCount ? ` · ${pending.syntaxIssueCount} 个语法提示` : ''}</span>
       <LobeButton onClick={onSave} size="small" type="primary">保存并解析</LobeButton>
     </div>
-  </div>;
-}
-
-function CharacterEditor({ character, project, onChange, onClose, onDelete }) {
-  const structure = project.prompt_structure;
-  const activeColumn = Math.max(0, Math.min(4, Math.round(Number(character.center?.x ?? 0.5) * 5 - 0.5)));
-  const activeRow = Math.max(0, Math.min(4, Math.round(Number(character.center?.y ?? 0.5) * 5 - 0.5)));
-  const updateStructure = (patch) => onChange({ ...project, prompt_structure: { ...structure, ...patch } });
-  const choosePosition = (column, row) => onChange(updatePromptCharacter(project, character.id, {
-    center: { x: (column + 0.5) / 5, y: (row + 0.5) / 5 },
-  }));
-  return <div className="character-quick-editor" onClick={(event) => event.stopPropagation()}>
-    <div className="tag-quick-editor-heading">
-      <div><strong>角色设置</strong><small>名称、位置与生成顺序</small></div>
-      <LobeButton onClick={onClose} size="small" type="text">完成</LobeButton>
-    </div>
-    <label><span>角色名称</span><LobeInput autoFocus onChange={(event) => onChange(updatePromptCharacter(project, character.id, { label: event.target.value }))} value={character.label}/></label>
-    <div className="character-position-heading">
-      <div><strong>Character Position</strong><small>5 × 5 粗略位置引导</small></div>
-      <label><LobeCheckbox checked={Boolean(structure.use_coords)} onChange={(checked) => updateStructure({ use_coords: checked })} size={16}/><span>{structure.use_coords ? '自定义位置' : 'AI 选择'}</span></label>
-    </div>
-    <div className={`character-position-grid ${structure.use_coords ? '' : 'disabled'}`} aria-label={`${character.label} 位置`}>
-      {Array.from({ length: 25 }, (_, index) => {
-        const column = index % 5;
-        const row = Math.floor(index / 5);
-        return <button aria-label={`第 ${row + 1} 行，第 ${column + 1} 列`} className={activeColumn === column && activeRow === row ? 'active' : ''} disabled={!structure.use_coords} key={index} onClick={() => choosePosition(column, row)}><i/></button>;
-      })}
-    </div>
-    <div className="character-position-footer"><code>X {Number(character.center?.x ?? 0.5).toFixed(2)} · Y {Number(character.center?.y ?? 0.5).toFixed(2)}</code><label><LobeCheckbox checked={Boolean(structure.use_order)} onChange={(checked) => updateStructure({ use_order: checked })} size={16}/><span>遵循角色顺序</span></label></div>
-    <div className="character-quick-editor-actions"><LobeButton danger icon={<Icon name="trash" size={14}/>} onClick={onDelete} size="small">移除角色</LobeButton></div>
   </div>;
 }
 
@@ -404,7 +371,7 @@ function Segment({ value, options, onChange, label }) {
   return <LobeSegmented aria-label={label} className="overview-segment" onChange={onChange} options={options.map(([option, text]) => ({ label: text, value: option }))} size="small" value={value}/>;
 }
 
-export default function PromptOverview({ project, updateProject, viewState = DEFAULT_WORKBENCH_VIEW_STATE, onViewStateChange, focusScopeKey, focusTagId, onTagContextMenu, onCopyContextChange, onCopyText, onNotify, onTranslateTags }) {
+export default function PromptOverview({ project, updateProject, viewState = DEFAULT_WORKBENCH_VIEW_STATE, onViewStateChange, focusScopeKey, focusTagId, onConfirm, onTagContextMenu, onCopyContextChange, onCopyText, onNotify, onTranslateTags }) {
   const { filters, language, viewMode } = viewState;
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState([]);
@@ -414,7 +381,8 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
   const [addDraft, setAddDraft] = useState('');
   const [rawEditingScopeKey, setRawEditingScopeKey] = useState('');
   const [rawDraft, setRawDraft] = useState('');
-  const [editingCharacterId, setEditingCharacterId] = useState('');
+  const [renamingCharacterId, setRenamingCharacterId] = useState('');
+  const [characterNameDraft, setCharacterNameDraft] = useState('');
   const [translatingKeys, setTranslatingKeys] = useState(new Set());
   const overviewContentRef = useRef(null);
   const selectionGestureRef = useRef(false);
@@ -429,7 +397,8 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     setAddDraft('');
     setRawEditingScopeKey('');
     setRawDraft('');
-    setEditingCharacterId('');
+    setRenamingCharacterId('');
+    setCharacterNameDraft('');
     setTranslatingKeys(new Set());
   }, [project.id]);
 
@@ -675,15 +644,46 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
 
   const addCharacter = () => {
     const next = addPromptCharacter(project);
-    if (next === project) { onNotify?.('最多支持 6 个 Character Prompt'); return; }
+    if (next === project) { onNotify?.(`最多支持 ${MAX_PROMPT_CHARACTERS} 个 Character Prompt`); return; }
     const character = next.prompt_structure.characters.at(-1);
     updateProject(next);
-    setEditingCharacterId(character.id);
+    setRenamingCharacterId(character.id);
+    setCharacterNameDraft(character.label);
     onNotify?.(`${character.label} 已添加`);
   };
 
-  const deleteCharacter = (character) => {
-    setEditingCharacterId('');
+  const beginCharacterRename = (character) => {
+    setRenamingCharacterId(character.id);
+    setCharacterNameDraft(character.label);
+  };
+
+  const cancelCharacterRename = () => {
+    setRenamingCharacterId('');
+    setCharacterNameDraft('');
+  };
+
+  const commitCharacterRename = (character) => {
+    const label = characterNameDraft.trim();
+    if (!label) {
+      onNotify?.('角色名称不能为空', 'error');
+      return;
+    }
+    updateProject(updatePromptCharacter(project, character.id, { label }));
+    cancelCharacterRename();
+    if (label !== character.label) onNotify?.(`角色已重命名为 ${label}`);
+  };
+
+  const deleteCharacter = async (character) => {
+    const tagCount = (character.prompt_tags?.length || 0) + (character.undesired_tags?.length || 0);
+    const confirmed = onConfirm ? await onConfirm({
+      title: `移除“${character.label}”？`,
+      message: '该角色的 Prompt、Undesired Content 和已整理的 Tag 将一并移除。',
+      detail: tagCount ? `共包含 ${tagCount} 个 Tag。` : '',
+      okText: '移除角色',
+      danger: true,
+    }) : true;
+    if (!confirmed) return;
+    cancelCharacterRename();
     updateProject(removePromptCharacter(project, character.id));
     onNotify?.(`${character.label} 已移除`);
   };
@@ -730,7 +730,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
             <LobeButton onClick={toggleSelectionMode} size="small">退出多选</LobeButton>
           </> : <>
             <LobeButton disabled={!visibleEntries.length || translatingKeys.size > 0} icon={<Icon name="spark" size={13}/>} onClick={() => translateEntries(visibleEntries)} size="small">{translatingKeys.size ? '翻译中…' : `AI 翻译 ${visibleEntries.length}`}</LobeButton>
-            <LobeButton disabled={structure.characters.length >= 6} icon={<Icon name="plus" size={14}/>} onClick={addCharacter} size="small">角色</LobeButton>
+            <LobeButton disabled={structure.characters.length >= MAX_PROMPT_CHARACTERS} icon={<Icon name="plus" size={14}/>} onClick={addCharacter} size="small">角色</LobeButton>
             <LobeButton onClick={toggleSelectionMode} size="small">多选</LobeButton>
           </>}
         </div>
@@ -785,8 +785,36 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
         return <section className="overview-layer character-layer" key={character.id}>
           <div className="overview-layer-body">
             <div className="overview-layer-heading">
-              <strong>{character.label}</strong>
-              <LobePopover arrow className="character-quick-popover" content={<CharacterEditor character={character} project={project} onChange={updateProject} onClose={() => setEditingCharacterId('')} onDelete={() => deleteCharacter(character)}/>} onOpenChange={(open) => setEditingCharacterId(open ? character.id : '')} open={editingCharacterId === character.id} placement="bottomRight" trigger="click"><LobeButton size="small" type="text">{structure.use_coords ? `位置 ${compactPosition(character.center)}` : 'AI 位置'}</LobeButton></LobePopover>
+              <div className="character-heading-main">
+                {renamingCharacterId === character.id ? <div className="character-heading-rename">
+                  <LobeInput
+                    aria-label={`重命名 ${character.label}`}
+                    autoFocus
+                    maxLength={80}
+                    onChange={(event) => setCharacterNameDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') { event.preventDefault(); commitCharacterRename(character); }
+                      if (event.key === 'Escape') { event.preventDefault(); cancelCharacterRename(); }
+                    }}
+                    value={characterNameDraft}
+                  />
+                  <LobeActionIcon aria-label="保存角色名称" disabled={!characterNameDraft.trim()} icon={Check} onClick={() => commitCharacterRename(character)} size="small" title="保存"/>
+                  <LobeActionIcon aria-label="取消重命名" icon={X} onClick={cancelCharacterRename} size="small" title="取消"/>
+                </div> : <strong className="character-heading-title" title={character.label}>{character.label}</strong>}
+              </div>
+              <div className="character-heading-actions">
+                {renamingCharacterId !== character.id && <LobeActionIcon aria-label={`重命名 ${character.label}`} icon={Pencil} onClick={() => beginCharacterRename(character)} size="small" title="重命名角色"/>}
+                <LobeDropdownMenu
+                  items={[
+                    { key: 'rename-character', label: '重命名', icon: Pencil, onClick: () => beginCharacterRename(character) },
+                    { key: 'character-divider', type: 'divider' },
+                    { key: 'delete-character', label: '移除角色', icon: Trash2, danger: true, onClick: () => deleteCharacter(character) },
+                  ]}
+                  placement="bottomRight"
+                >
+                  <LobeActionIcon aria-label={`${character.label} 的更多操作`} icon={MoreHorizontal} size="small" title="更多角色操作"/>
+                </LobeDropdownMenu>
+              </div>
             </div>
             {sections.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
           </div>
@@ -796,7 +824,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
       {!visibleEntries.length && filtered && <div className="overview-no-results"><strong>没有符合条件的 Tag</strong><span>调整分类、区域或搜索词后，顶部复制内容会同步更新。</span></div>}
       {viewMode === 'structure' && !structure.characters.length && filters.domain !== 'base' && <div className="overview-add-character-shell">
         <LobeButton className="overview-add-character" icon={<Icon name="plus" size={20}/>} onClick={addCharacter} type="dashed">
-          <div><strong>暂无角色 Prompt</strong><small>添加后可设置角色名称、位置和独立 Prompt。</small></div>
+          <div><strong>暂无角色 Prompt</strong><small>添加后可分别整理角色 Prompt 与排除内容。</small></div>
         </LobeButton>
       </div>}
     </div>

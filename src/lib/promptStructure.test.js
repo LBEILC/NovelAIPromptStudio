@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addPromptCharacter,
   createPromptStructure,
   extractV4PromptData,
   formatPositivePrompt,
   formatPositivePromptForCopy,
   getPromptScope,
   getPromptScopes,
+  MAX_PROMPT_CHARACTERS,
+  normalizePromptStructure,
+  positivePromptCopyOptions,
   positiveRawPromptScopes,
   syncProjectPromptMetadata,
   updatePromptScope,
+  updatePromptCharacter,
 } from './promptStructure.js';
 import { parsePrompt } from './prompt.js';
 
@@ -72,7 +77,7 @@ describe('NovelAI V4 prompt structure', () => {
     const updated = updatePromptScope(project, characterScope.key, [...characterScope.tags].reverse());
     expect(getPromptScopes(updated)[2].tags.map((tag) => tag.tag)).toEqual(['red hair', 'girl']);
     expect(formatPositivePrompt(project)).toContain('|');
-    expect(formatPositivePromptForCopy(project)).toBe('2girls\n|\ngirl, red hair');
+    expect(formatPositivePromptForCopy(project)).toBe('2girls, outdoors\n|\ngirl, red hair');
   });
 
   it('preserves exact raw prompt text until a structured tag is edited', () => {
@@ -93,6 +98,61 @@ describe('NovelAI V4 prompt structure', () => {
 
     const rawEdited = syncProjectPromptMetadata(updatePromptScope(edited, 'base:prompt', editedTags, `${raw}\n`));
     expect(rawEdited.metadata.prompt_raw).toBe(`${raw}\n`);
+    expect(formatPositivePromptForCopy(rawEdited)).toBe(`${raw}\n`);
+  });
+
+  it('copies V5 natural-language and Text blocks from the raw prompt', () => {
+    const base = '1girl, a sign reading "Hello, world!", Text: Hello, world!\n\n第二行，保持原样';
+    const character = 'girl, She is holding the sign, without changing its punctuation.';
+    const metadata = {
+      prompt_raw: base,
+      prompt_structure_raw: {
+        base_prompt_raw: base,
+        characters: [{ prompt_raw: character, undesired_raw: '', center: { x: 0.25, y: 0.75 } }],
+      },
+    };
+    const project = { metadata, prompt_structure: createPromptStructure(metadata), tags: parsePrompt(base) };
+
+    expect(formatPositivePromptForCopy(project)).toBe(`${base}\n|\n${character}`);
+    expect(positivePromptCopyOptions(project).map((option) => option.text)).toEqual([base, character]);
+  });
+
+  it('renames a character without changing imported positioning metadata', () => {
+    const project = {
+      metadata: { prompt_raw: '2girls' },
+      prompt_structure: {
+        base_prompt_raw: '2girls',
+        use_coords: true,
+        use_order: false,
+        characters: [{ id: 'alice', label: 'Character 1', center: { x: 0.2, y: 0.8 }, prompt_tags: [], undesired_tags: [] }],
+      },
+      tags: parsePrompt('2girls'),
+    };
+    const renamed = updatePromptCharacter(project, 'alice', { label: 'Alice' });
+
+    expect(renamed.prompt_structure).toMatchObject({ use_coords: true, use_order: false });
+    expect(renamed.prompt_structure.characters[0]).toMatchObject({ label: 'Alice', center: { x: 0.2, y: 0.8 } });
+  });
+
+  it('preserves imported character prompts beyond the V4.5 six-character limit', () => {
+    const characters = Array.from({ length: MAX_PROMPT_CHARACTERS }, (_, index) => ({
+      prompt_raw: `character ${index + 1}`,
+      undesired_raw: '',
+      center: { x: 0.5, y: 0.5 },
+    }));
+    const metadata = {
+      prompt_raw: '22 characters',
+      prompt_structure_raw: { base_prompt_raw: '22 characters', characters },
+    };
+    const structure = normalizePromptStructure(null, metadata, (() => {
+      let id = 0;
+      return () => `character-${id++}`;
+    })());
+    const project = { metadata, prompt_structure: structure, tags: parsePrompt(metadata.prompt_raw) };
+
+    expect(structure.characters).toHaveLength(MAX_PROMPT_CHARACTERS);
+    expect(addPromptCharacter(project)).toBe(project);
+    expect(structure.characters.at(-1).prompt_raw).toBe(`character ${MAX_PROMPT_CHARACTERS}`);
   });
 
   it('keeps raw base and character prompts separate and omits empty sections', () => {

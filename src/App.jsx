@@ -1268,6 +1268,7 @@ export default function App({ appearance, setAppearance }) {
           if (selected && ignored) showToast(`已复制 ${count} 个 Prompt Tag，忽略 ${ignored} 个排除 Tag`);
           else showToast(`已复制 ${count} 个${label ? ` ${label}` : selected ? '已选 Prompt Tag' : '可见 Prompt Tag'}`);
         }}
+        onConfirm={requestConfirmation}
         onDownloadImage={async (project) => {
           const result = await studio.downloadWorkbenchImage(project.image_path, project.name);
           if (!result?.canceled) showToast(result?.ok ? '图片已下载，原始格式与元数据已保留' : result?.error || '图片下载失败', result?.ok ? 'success' : 'error');

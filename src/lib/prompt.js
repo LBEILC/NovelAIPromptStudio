@@ -86,6 +86,54 @@ function braceGroupAt(source, cursor) {
   };
 }
 
+const QUOTE_PAIRS = new Map([
+  ['"', '"'],
+  ["'", "'"],
+  ['`', '`'],
+  ['“', '”'],
+  ['‘', '’'],
+  ['「', '」'],
+  ['『', '』'],
+]);
+
+function scanPromptBoundary(source, cursor) {
+  let closingQuote = '';
+  for (let index = cursor; index < source.length; index += 1) {
+    const character = source[index];
+    if (closingQuote) {
+      if (character === closingQuote && source[index - 1] !== '\\') closingQuote = '';
+      continue;
+    }
+    if (QUOTE_PAIRS.has(character)) {
+      closingQuote = QUOTE_PAIRS.get(character);
+      continue;
+    }
+    if (character === ',' || character === '\n') return index;
+  }
+  return source.length;
+}
+
+function textBlockStart(source, cursor) {
+  let closingQuote = '';
+  let braceDepth = 0;
+  for (let index = cursor; index < source.length; index += 1) {
+    const character = source[index];
+    if (closingQuote) {
+      if (character === closingQuote && source[index - 1] !== '\\') closingQuote = '';
+      continue;
+    }
+    if (QUOTE_PAIRS.has(character)) {
+      closingQuote = QUOTE_PAIRS.get(character);
+      continue;
+    }
+    if (character === '{' || character === '[') braceDepth += 1;
+    else if ((character === '}' || character === ']') && braceDepth > 0) braceDepth -= 1;
+    if (braceDepth > 0 || (index > cursor && !/\s/.test(source[index - 1]))) continue;
+    if (/^text\s*:/i.test(source.slice(index))) return index;
+  }
+  return -1;
+}
+
 function scanPromptSegments(source, state) {
   const segments = [];
   let cursor = 0;
@@ -120,10 +168,15 @@ function scanPromptSegments(source, state) {
       continue;
     }
 
-    const comma = source.indexOf(',', cursor);
-    const newline = source.indexOf('\n', cursor);
-    const boundaries = [comma, newline].filter((value) => value !== -1);
-    const end = boundaries.length ? Math.min(...boundaries) : source.length;
+    const textStart = textBlockStart(source, cursor);
+    if (textStart === cursor) {
+      const rawSegment = source.slice(cursor).trim();
+      if (rawSegment) segments.push({ tag: rawSegment, weight: 1, raw_segment: rawSegment, segment_type: 'text_block' });
+      break;
+    }
+
+    const regularBoundary = scanPromptBoundary(source, cursor);
+    const end = textStart > cursor ? Math.min(regularBoundary, textStart) : regularBoundary;
     const rawSegment = source.slice(cursor, end).trim();
     if (rawSegment) {
       if (rawSegment === '::') {
@@ -142,7 +195,7 @@ function scanPromptSegments(source, state) {
         });
       }
     }
-    cursor = end + 1;
+    cursor = end === textStart ? end : end + 1;
   }
   return segments;
 }
@@ -162,7 +215,7 @@ function hasBraceGroups(value) {
 
 export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
   return promptSegments(prompt)
-    .map(({ tag, weight, raw_segment = '', syntax_issue = '', brace_depth = 0, brace_group = '', brace_trailing_comma = false }, position) => {
+    .map(({ tag, weight, raw_segment = '', syntax_issue = '', segment_type = 'tag', brace_depth = 0, brace_group = '', brace_trailing_comma = false }, position) => {
       return {
         id: createId(),
         tag,
@@ -172,6 +225,7 @@ export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
         category_source: 'heuristic',
         weight,
         raw_segment,
+        segment_type,
         syntax_issue,
         brace_depth,
         brace_group,

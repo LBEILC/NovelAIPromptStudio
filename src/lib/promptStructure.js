@@ -1,6 +1,7 @@
 import { formatPrompt, formatPromptGroupedInline, formatPromptInline, normalizeCategory, parsePrompt, repairLegacyPromptTags } from './prompt.js';
 
 const createId = () => crypto.randomUUID();
+export const MAX_PROMPT_CHARACTERS = 22;
 
 function safeObject(value) {
   if (value && typeof value === 'object' && !Array.isArray(value)) return value;
@@ -109,7 +110,7 @@ export function normalizePromptStructure(structure, metadata = {}, idFactory = c
     use_order: Object.prototype.hasOwnProperty.call(parsedStructure, 'use_order')
       ? Boolean(parsedStructure.use_order)
       : metadataStructure.use_order !== false,
-    characters: (sourceCharacters || []).slice(0, 6).map((character, index) => {
+    characters: (sourceCharacters || []).map((character, index) => {
       const metadataCharacter = metadataStructure.characters[index] || {};
       const promptRaw = Object.prototype.hasOwnProperty.call(character, 'prompt_raw') ? character.prompt_raw : metadataCharacter.prompt_raw;
       const undesiredRaw = Object.prototype.hasOwnProperty.call(character, 'undesired_raw') ? character.undesired_raw : metadataCharacter.undesired_raw;
@@ -180,7 +181,7 @@ export function updatePromptCharacter(project, characterId, patch) {
 
 export function addPromptCharacter(project, idFactory = createId) {
   const structure = normalizePromptStructure(project.prompt_structure, project.metadata, idFactory);
-  if (structure.characters.length >= 6) return project;
+  if (structure.characters.length >= MAX_PROMPT_CHARACTERS) return project;
   const character = {
     id: idFactory(),
     label: `Character ${structure.characters.length + 1}`,
@@ -210,8 +211,11 @@ export function formatPositivePrompt(project) {
 }
 
 export function formatPositivePromptForCopy(project) {
-  const scopes = getPromptScopes(project).filter((scope) => scope.polarity === 'prompt');
-  return scopes.map((scope) => formatPromptInline(scope.tags)).filter(Boolean).join('\n|\n');
+  return getPromptScopes(project)
+    .filter((scope) => scope.polarity === 'prompt')
+    .map((scope) => String(scope.raw_prompt || '').trim() ? scope.raw_prompt : formatPromptInline(scope.tags))
+    .filter(Boolean)
+    .join('\n|\n');
 }
 
 export function positiveRawPromptScopes(project) {
@@ -230,7 +234,7 @@ export function positivePromptCopyOptions(project) {
   return scopes.map((scope) => ({
     key: scope.key,
     label: scope.kind === 'base' ? '复制完整 Base Prompt' : `复制角色 ${(scope.characterIndex ?? 0) + 1} Prompt`,
-    text: formatPromptInline(scope.tags),
+    text: String(scope.raw_prompt || '').trim() ? scope.raw_prompt : formatPromptInline(scope.tags),
     count: scope.tags.length,
   }));
 }

@@ -235,6 +235,7 @@ export default function WorkbenchPage({
   onCloseTab,
   onCopyImage,
   onCopyText,
+  onConfirm,
   onDownloadImage,
   onRevealVibe,
   onNotify,
@@ -354,6 +355,7 @@ export default function WorkbenchPage({
         <PromptOverview
           focusScopeKey={focusScopeKey}
           focusTagId={focusTagId}
+          onConfirm={onConfirm}
           onCopyContextChange={updateCopyContext}
           onCopyText={onCopyText}
           onNotify={onNotify}

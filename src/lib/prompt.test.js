@@ -90,6 +90,19 @@ describe('NovelAI prompt codec', () => {
     expect(batch).toMatchObject({ duplicateCount: 0, syntaxIssueCount: 0 });
   });
 
+  it('keeps quoted punctuation and a trailing Text block intact', () => {
+    let id = 0;
+    const prompt = '1girl, a handwritten speech bubble reading "Hello, world!", Text: Hello, world!\n\nSecond line, still text';
+    const tags = parsePrompt(prompt, () => `natural-${id++}`);
+
+    expect(tags.map((tag) => tag.tag)).toEqual([
+      '1girl',
+      'a handwritten speech bubble reading "Hello, world!"',
+      'Text: Hello, world!\n\nSecond line, still text',
+    ]);
+    expect(tags[2]).toMatchObject({ segment_type: 'text_block', raw_segment: 'Text: Hello, world!\n\nSecond line, still text' });
+  });
+
   it('splits brace groups into editable inner tags while retaining their emphasis structure', () => {
     let id = 0;
     const prompt = '{artist:terasu mc, artist:shirabe shiki, artist:meme50, year 2024, year 2025, } {uncensored, no watermark, best quality, amazing quality, very aesthetic, absurdres, highres, masterpiece, } {3d, 3d background, realistic, beach, wave, splashing, } {from forward, }';
