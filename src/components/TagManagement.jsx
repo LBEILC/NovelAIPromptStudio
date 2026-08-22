@@ -186,7 +186,7 @@ export function TagChip({
   if (!tooltip || overlay) return chip;
   return <LobeTooltip
     arrow
-    openDelay={320}
+    openDelay={80}
     placement="top"
     positionerProps={TAG_HOVER_PREVIEW_POSITIONER_PROPS}
     styles={TAG_HOVER_PREVIEW_STYLES}

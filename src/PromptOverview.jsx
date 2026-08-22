@@ -715,7 +715,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     rawEditingScopeKey,
   };
 
-  return <LobeTooltipGroup arrow closeDelay={80} layoutAnimation openDelay={320}>
+  return <LobeTooltipGroup arrow closeDelay={0} layoutAnimation openDelay={80}>
     <div className="prompt-overview">
     <header className="overview-header">
       <div className="overview-toolbar">

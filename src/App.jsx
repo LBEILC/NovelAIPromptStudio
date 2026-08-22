@@ -54,7 +54,13 @@ import {
 } from './lib/galleryCollections.js';
 import { readGalleryGrouping, writeGalleryGrouping } from './lib/galleryGrouping.js';
 import { scheduleGalleryComputation } from './lib/galleryTransition.js';
-import { MOTION_EASE_OUT, useStudioReducedMotion } from './lib/motion.js';
+import {
+  MOTION_BLUR_MEDIUM_PX,
+  MOTION_DISTANCE_BASE_PX,
+  MOTION_DURATION_FAST_SECONDS,
+  MOTION_EASE_SMOOTH_OUT,
+  useStudioReducedMotion,
+} from './lib/motion.js';
 import { commitThemeAppearance } from './lib/themeTransition.js';
 import { moveOverviewTags, overviewMoveContext, overviewSelectionMenuItems, overviewTagKey } from './lib/promptOverview.js';
 
@@ -193,18 +199,27 @@ function PageSurface({ active, motionMode, children }) {
   useLayoutEffect(() => {
     if (!active) return undefined;
     if (reduceMotion) {
-      controls.set({ opacity: 1, y: 0 });
+      controls.set({ filter: 'blur(0px)', opacity: 1, y: 0 });
       return undefined;
     }
-    controls.set({ opacity: 0.72, y: 5 });
+    controls.set({
+      filter: `blur(${MOTION_BLUR_MEDIUM_PX}px)`,
+      opacity: 0.72,
+      y: MOTION_DISTANCE_BASE_PX,
+    });
     controls.start({
+      filter: 'blur(0px)',
       opacity: 1,
-      transition: { duration: 0.18, ease: MOTION_EASE_OUT },
+      transition: { duration: MOTION_DURATION_FAST_SECONDS, ease: MOTION_EASE_SMOOTH_OUT },
       y: 0,
     });
     return () => {
       controls.stop();
-      controls.set({ opacity: 0, y: 3 });
+      controls.set({
+        filter: `blur(${MOTION_BLUR_MEDIUM_PX}px)`,
+        opacity: 0,
+        y: MOTION_DISTANCE_BASE_PX,
+      });
     };
   }, [active, controls, reduceMotion]);
 
