@@ -2,6 +2,15 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+## Verify Workbench thumbnail filmstrip
+
+- Status: Pending
+- Date/source: 2026-08-22, Windows
+- Related commit: `c46b07e`
+- Action: On an unlocked macOS session, check out current `main` and follow `doc/manual-verification-20260822-workbench-filmstrip.md`. Pay particular attention to trackpad horizontal scrolling, the conditional previous/next controls, automatic reveal of the active thumbnail, pointer and keyboard drag sorting near overflow edges, `Cmd+Tab` / `Cmd+Shift+Tab` / `Cmd+W`, hover-preview collision, light/dark themes, reduced/off motion, and session restoration of Gallery-backed items.
+- Expected: Workbench uses fixed-size image thumbnails instead of filename labels while retaining Lobe UI tab semantics. Overflow is navigable without a visible native scrollbar, the active item stays visible, close/dirty/position overlays remain legible, drag sorting and shortcuts work, and Gallery-backed tabs use the current Gallery title and managed thumbnail rather than an internal UUID. Reduced/off motion avoids smooth scrolling and drop animation.
+- Observed: Windows clean `npm ci`, all 233 tests in 40 files, the production build, and the Lobe UI 5.20.3 audit passed. Interactive verification was not automated; Windows and macOS checklist results remain pending.
+
 ## Verify V5 Prompt fidelity and Character management
 
 - Status: Pending
