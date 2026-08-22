@@ -276,6 +276,7 @@ describe('GalleryCardHoverPreview', () => {
 
   it('opens the currently scrubbed member in the detail panel and Workbench', () => {
     const onDismissHoverPreview = vi.fn();
+    const onHoverPreviewDismissReady = vi.fn();
     const onOpenWorkbench = vi.fn();
     const onPreview = vi.fn();
     const cover = {
@@ -293,6 +294,7 @@ describe('GalleryCardHoverPreview', () => {
       hoverProject: variant,
       onContextMenu: vi.fn(),
       onDismissHoverPreview,
+      onHoverPreviewDismissReady,
       onOpenWorkbench,
       onPreview,
       onSelect: vi.fn(),
@@ -301,6 +303,7 @@ describe('GalleryCardHoverPreview', () => {
     const mainButton = element.props.children.props.children[0];
     const clickEvent = { ctrlKey: false, detail: 1, metaKey: false, shiftKey: false };
 
+    expect(element.props.content.props.onDismissReady).toBe(onHoverPreviewDismissReady);
     mainButton.props.onClick(clickEvent);
     mainButton.props.onDoubleClick(clickEvent);
 
