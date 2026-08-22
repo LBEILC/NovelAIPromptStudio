@@ -2,6 +2,15 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+## Verify V5 Prompt fidelity and Character management
+
+- Status: Pending
+- Date/source: 2026-08-22, Windows
+- Related commit: `84d530b`
+- Action: On an unlocked macOS session, check out current `main` and follow `doc/manual-verification-20260822-v5-prompt-character-management.md`. Pay particular attention to copying quoted natural-language Prompt text and multiline `Text:` blocks without rewriting them, importing and navigating more than six Character Prompts, inline rename save/cancel keyboard behavior, the overflow-menu rename/delete entries, the delete confirmation Modal, dark/light themes, and the minimum window width. Also load an existing V4.5 image containing Character coordinates and confirm its Prompt data remains usable even though the position/order editor is no longer exposed.
+- Expected: V5 natural-language and `Text:` content is copied from the original raw Prompt without comma/newline damage; imports preserve up to 22 Character Prompts and manual creation stops clearly at 22. Character position controls are absent, rename and delete remain discoverable and keyboard-accessible, deletion always requires confirmation, and the surrounding layout remains stable. Existing V4.5 coordinate/order metadata remains in the project data and exact grouping fingerprint; only its editing UI is removed.
+- Observed: Windows clean `npm ci`, all 236 tests in 41 files, the production build, and the Lobe UI 5.20.3 audit passed. Interactive verification was not automated; Windows and macOS checklist results remain pending.
+
 ## Verify upward light and dark theme transition
 
 - Status: Pending

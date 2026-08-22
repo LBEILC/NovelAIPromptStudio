@@ -3,7 +3,7 @@
 ## 受测变更
 
 - 变更：NovelAI V5 自然语言与 `Text:` 区块保真、最多 22 个 Character Prompt、角色行内重命名与安全删除、移除角色位置编辑界面。
-- 受测提交：完成代码提交后，以包含本文件的当前分支最新提交为准。
+- 受测提交：`84d530b`（`feat: support V5 prompt and character workflows`）。
 
 ## 目标操作系统
 
@@ -67,5 +67,4 @@
 
 
 ## 发现的问题
-
 
