@@ -76,7 +76,6 @@ function SortableTag({ animateLayout, automation, display, editKey, editingKey, 
   const tagButton = <TagChip
     {...(reorderDisabled ? {} : attributes)}
     {...(reorderDisabled ? {} : listeners)}
-    badge={automation ? (automation.kind === 'undesired' ? '预设' : '自动') : ''}
     buttonRef={reorderDisabled ? undefined : setActivatorNodeRef}
     className={automation ? `automatic-prompt-tag ${automation.status}` : ''}
     display={display}
@@ -327,7 +326,6 @@ function ScopeTags({
         modifiers={[restrictToWindowEdges]}
       >
         {activeTag && activeDisplay ? <TagChip
-          badge={activeAutomation ? (activeAutomation.kind === 'undesired' ? '预设' : '自动') : ''}
           className={activeAutomation ? `automatic-prompt-tag ${activeAutomation.status}` : ''}
           display={activeDisplay}
           overlay
@@ -361,7 +359,6 @@ function CategoryGroup({ group, language, selectionModeActive, selectedKeys, edi
       const display = tagPresentation(entry.tag, language);
       const warning = syntaxMessage(entry.tag);
       const tagButton = <TagChip
-        badge={entry.automation ? (entry.automation.kind === 'undesired' ? '预设' : '自动') : ''}
         className={`${entry.scopePolarity === 'undesired' ? 'undesired-tag' : ''} ${entry.automation ? `automatic-prompt-tag ${entry.automation.status}` : ''}`}
         data-marquee-key={encodeMarqueeKey(entry.key)}
         display={display}

@@ -17,7 +17,7 @@
 ## 验证步骤
 
 1. 打开工作台，导入开启自动质量词的 V5 图片。
-   - 预期结果：Base Prompt 标题下显示“NovelAI V5 Quality Tags Standard”提示和数量；对应 Tag 显示“自动”来源标记。
+   - 预期结果：Base Prompt 标题下显示“NovelAI V5 Quality Tags Standard”提示和数量；对应 Tag 通过虚线边框和底色区分，不显示多余的“自动”文字徽标。
    - 实际结果：
 
 2. 将鼠标停留在任一 V5 自动质量 Tag 上。
@@ -25,7 +25,7 @@
    - 实际结果：
 
 3. 检查同一图片的 Base Undesired Content。
-   - 预期结果：能够按照图片元数据和文本显示 Heavy、Light、Human Focus 或其他已确认的 UC 预设名称；对应预设 Tag 显示“预设”来源标记。
+   - 预期结果：能够按照图片元数据和文本显示 Heavy、Light、Human Focus 或其他已确认的 UC 预设名称；对应预设 Tag 通过样式区分，不显示多余的“预设”文字徽标。
    - 实际结果：
 
 4. 点击顶部主按钮“复制可见 Prompt”，粘贴到纯文本编辑器。
@@ -52,12 +52,12 @@
    - 预期结果：界面提示模板未匹配，不再把这些 Tag 当作已确认自动内容排除，复制结果不会静默丢词。
    - 实际结果：
 
-10. 分别在浅色和深色主题、最小窗口宽度下检查 Base Prompt、Base Undesired Content、Tag 来源标记和复制菜单。
-    - 预期结果：提示文字可辨认，长提示可截断并通过标题说明查看，不遮挡操作按钮，Tag 与菜单没有溢出或错位。
+10. 分别在浅色和深色主题、最小窗口宽度下检查 Base Prompt、Base Undesired Content、Tag 来源样式和复制菜单。
+    - 预期结果：提示文字可辨认，识别提示与下方 Tag 列表之间留有清晰间距；长提示可截断并通过标题说明查看，不遮挡操作按钮，Tag 与菜单没有溢出或错位。
     - 实际结果：
 
 11. 在工作台打开回归图片 `772245e5-1309-481d-9877-a04851eac2ca.png`。
-    - 预期结果：Base Prompt 显示“推断 NovelAI V4.5 Full Quality Tags Standard · 3”，三个对应 Tag 显示“自动”；Base Undesired Content 显示“推断 NovelAI UC Heavy · 17”，即使 Heavy 前面还有用户输入的 `nsfw`。
+    - 预期结果：Base Prompt 显示“推断 NovelAI V4.5 Full Quality Tags Standard · 3”，三个对应 Tag 仅通过样式区分；Base Undesired Content 显示“推断 NovelAI UC Heavy · 17”，即使 Heavy 前面还有用户输入的 `nsfw`，预设 Tag 也不显示“预设”文字徽标。
     - 实际结果：
 
 12. 对回归图片分别执行默认“复制全部 Prompt”和“包含自动 Tag”的复制操作。

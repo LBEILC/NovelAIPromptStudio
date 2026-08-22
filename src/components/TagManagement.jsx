@@ -155,7 +155,6 @@ export function TagHoverPreview({ actionHint, language, scopeLabel, sourceLabel,
 }
 
 export function TagChip({
-  badge,
   buttonRef,
   className = '',
   display,
@@ -181,7 +180,6 @@ export function TagChip({
   >
     {showSelectionMark && <SelectionMark selected={selected}/>}
     <span className="overview-tag-copy"><span>{display.primary}</span>{display.secondary && <small>{display.secondary}</small>}</span>
-    {badge && <span className="overview-tag-source-badge">{badge}</span>}
     {showWeight && Math.abs(Number(tag.weight) - 1) >= 0.001 && <em>{Number(tag.weight).toFixed(2)}</em>}
     {warning && <Icon name="warning" className="overview-syntax-mark" size={15}/>}
   </button>;
