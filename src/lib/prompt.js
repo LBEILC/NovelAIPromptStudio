@@ -96,16 +96,38 @@ const QUOTE_PAIRS = new Map([
   ['『', '』'],
 ]);
 
+function isEscaped(source, index) {
+  let slashCount = 0;
+  for (let cursor = index - 1; cursor >= 0 && source[cursor] === '\\'; cursor -= 1) slashCount += 1;
+  return slashCount % 2 === 1;
+}
+
+function openingQuoteAt(source, index) {
+  const character = source[index];
+  const closingQuote = QUOTE_PAIRS.get(character);
+  if (!closingQuote || isEscaped(source, index)) return '';
+
+  // ASCII apostrophes inside or after words are punctuation, not quote openers.
+  // This covers contractions and possessives such as "don't", "another's", and "girls' hands".
+  if (character === "'" && /[\p{L}\p{N}]/u.test(source[index - 1] || '')) return '';
+
+  for (let cursor = index + 1; cursor < source.length; cursor += 1) {
+    if (source[cursor] === closingQuote && !isEscaped(source, cursor)) return closingQuote;
+  }
+  return '';
+}
+
 function scanPromptBoundary(source, cursor) {
   let closingQuote = '';
   for (let index = cursor; index < source.length; index += 1) {
     const character = source[index];
     if (closingQuote) {
-      if (character === closingQuote && source[index - 1] !== '\\') closingQuote = '';
+      if (character === closingQuote && !isEscaped(source, index)) closingQuote = '';
       continue;
     }
-    if (QUOTE_PAIRS.has(character)) {
-      closingQuote = QUOTE_PAIRS.get(character);
+    const openedQuote = openingQuoteAt(source, index);
+    if (openedQuote) {
+      closingQuote = openedQuote;
       continue;
     }
     if (character === ',' || character === '\n') return index;
@@ -119,11 +141,12 @@ function textBlockStart(source, cursor) {
   for (let index = cursor; index < source.length; index += 1) {
     const character = source[index];
     if (closingQuote) {
-      if (character === closingQuote && source[index - 1] !== '\\') closingQuote = '';
+      if (character === closingQuote && !isEscaped(source, index)) closingQuote = '';
       continue;
     }
-    if (QUOTE_PAIRS.has(character)) {
-      closingQuote = QUOTE_PAIRS.get(character);
+    const openedQuote = openingQuoteAt(source, index);
+    if (openedQuote) {
+      closingQuote = openedQuote;
       continue;
     }
     if (character === '{' || character === '[') braceDepth += 1;

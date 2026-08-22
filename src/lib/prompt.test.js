@@ -103,6 +103,30 @@ describe('NovelAI prompt codec', () => {
     expect(tags[2]).toMatchObject({ segment_type: 'text_block', raw_segment: 'Text: Hello, world!\n\nSecond line, still text' });
   });
 
+  it('treats contractions and possessives as apostrophes instead of quote openers', () => {
+    let id = 0;
+    const prompt = "pov hands, hand on another's cheek, location, girl's hands, don't look away, girls' hands, 'Hello, world!', final tag";
+    const tags = parsePrompt(prompt, () => `apostrophe-${id++}`);
+
+    expect(tags.map((tag) => tag.tag)).toEqual([
+      'pov hands',
+      "hand on another's cheek",
+      'location',
+      "girl's hands",
+      "don't look away",
+      "girls' hands",
+      "'Hello, world!'",
+      'final tag',
+    ]);
+  });
+
+  it('does not let an unmatched quote consume the rest of the Prompt', () => {
+    let id = 0;
+    const tags = parsePrompt('portrait, text saying "unfinished, outdoors, daylight', () => `unmatched-${id++}`);
+
+    expect(tags.map((tag) => tag.tag)).toEqual(['portrait', 'text saying "unfinished', 'outdoors', 'daylight']);
+  });
+
   it('splits brace groups into editable inner tags while retaining their emphasis structure', () => {
     let id = 0;
     const prompt = '{artist:terasu mc, artist:shirabe shiki, artist:meme50, year 2024, year 2025, } {uncensored, no watermark, best quality, amazing quality, very aesthetic, absurdres, highres, masterpiece, } {3d, 3d background, realistic, beach, wave, splashing, } {from forward, }';
