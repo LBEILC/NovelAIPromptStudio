@@ -70,6 +70,14 @@ function promptScopeTitle(scope) {
   return `${/^Character \d+$/i.test(label) || !label ? fallback : label} Prompt`;
 }
 
+function promptAutomationSummary(automation) {
+  if (!automation || !['confirmed', 'inferred', 'suspected'].includes(automation.status)) return '';
+  const prefix = automation.status === 'inferred' ? '推断 ' : automation.status === 'suspected' ? '疑似 ' : '';
+  return automation.kind === 'undesired'
+    ? ` · ${prefix}NovelAI UC ${automation.label} · ${automation.tagCount}`
+    : ` · ${prefix}NovelAI Quality Tags ${automation.label} · ${automation.tagCount}`;
+}
+
 function RawPromptSections({ project }) {
   const scopes = positiveRawPromptScopes(project);
   if (!scopes.length) return <div className="gallery-preview-prompt-empty">没有检测到 Prompt</div>;
@@ -85,7 +93,7 @@ function RawPromptSections({ project }) {
       itemKey={scope.key}
       key={scope.key}
       padding={0}
-      title={<span className="gallery-preview-prompt-title"><strong>{promptScopeTitle(scope)}</strong><small>{scope.tags.length} Tags{scope.automation?.status === 'confirmed' ? ` · 含 ${scope.automation.tagCount} 个 NovelAI 自动质量词` : scope.automation?.status === 'suspected' ? ` · 疑似含 ${scope.automation.tagCount} 个自动质量词` : ''}</small></span>}
+      title={<span className="gallery-preview-prompt-title"><strong>{promptScopeTitle(scope)}</strong><small>{scope.tags.length} Tags{promptAutomationSummary(scope.automation)}</small></span>}
       variant="outlined"
     >
       <Highlighter

@@ -143,6 +143,27 @@ describe('NovelAI V4 prompt structure', () => {
     expect(positivePromptCopyOptions(project, { includeAutomatic: true })[0]).toMatchObject({ text: raw, count: 6, automaticCount: 3 });
   });
 
+  it('excludes an exactly inferred Standard quality suffix from default copy', () => {
+    const raw = '1girl, blue hair, very aesthetic, masterpiece, no text';
+    const metadata = {
+      model: 'NovelAI Diffusion V4.5 4BDE2A90',
+      prompt_raw: raw,
+      negative_prompt: '',
+      prompt_structure_raw: {
+        base_prompt_raw: raw,
+        base_undesired_raw: '',
+        characters: [],
+        use_coords: false,
+        use_order: true,
+      },
+    };
+    const project = { metadata, prompt_structure: createPromptStructure(metadata), tags: parsePrompt(raw) };
+
+    expect(formatPositivePromptForCopy(project)).toBe('1girl, blue hair');
+    expect(positivePromptCopyOptions(project)[0]).toMatchObject({ count: 2, automaticCount: 3 });
+    expect(formatPositivePromptForCopy(project, { includeAutomatic: true })).toBe(raw);
+  });
+
   it('renames a character without changing imported positioning metadata', () => {
     const project = {
       metadata: { prompt_raw: '2girls' },

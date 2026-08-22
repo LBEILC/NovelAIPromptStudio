@@ -11,16 +11,17 @@
 - 准备至少一张开启自动质量词和 UC 预设的 NovelAI Diffusion V5 图片。
 - 准备至少一张开启自动质量词的 NovelAI Diffusion V4.5 Full 或 Curated 图片。
 - 如条件允许，再准备一张关闭自动质量词、但由用户手动输入相同质量词的图片。
+- 准备回归图片 `772245e5-1309-481d-9877-a04851eac2ca.png`。
 - 系统剪贴板可正常读写。
 
 ## 验证步骤
 
 1. 打开工作台，导入开启自动质量词的 V5 图片。
-   - 预期结果：Base Prompt 标题下显示“NovelAI V5 自动质量词”提示和数量；对应 Tag 显示“自动”来源标记。
+   - 预期结果：Base Prompt 标题下显示“NovelAI V5 Quality Tags Standard”提示和数量；对应 Tag 显示“自动”来源标记。
    - 实际结果：
 
 2. 将鼠标停留在任一 V5 自动质量 Tag 上。
-   - 预期结果：悬浮信息明确显示来源为“NovelAI V5 自动质量词”，Tag 仍可正常编辑、选择和拖动。
+   - 预期结果：悬浮信息明确显示来源为“NovelAI V5 Quality Tags · Standard”，Tag 仍可正常编辑、选择和拖动。
    - 实际结果：
 
 3. 检查同一图片的 Base Undesired Content。
@@ -55,8 +56,15 @@
     - 预期结果：提示文字可辨认，长提示可截断并通过标题说明查看，不遮挡操作按钮，Tag 与菜单没有溢出或错位。
     - 实际结果：
 
+11. 在工作台打开回归图片 `772245e5-1309-481d-9877-a04851eac2ca.png`。
+    - 预期结果：Base Prompt 显示“推断 NovelAI V4.5 Full Quality Tags Standard · 3”，三个对应 Tag 显示“自动”；Base Undesired Content 显示“推断 NovelAI UC Heavy · 17”，即使 Heavy 前面还有用户输入的 `nsfw`。
+    - 实际结果：
+
+12. 对回归图片分别执行默认“复制全部 Prompt”和“包含自动 Tag”的复制操作。
+    - 预期结果：默认复制排除末尾的 `very aesthetic, masterpiece, no text`，但保留用户自己的强化质量词组和角色 Prompt；“包含自动 Tag”复制保持原始内容不变。
+    - 实际结果：
+
 ## 验证结论
 
 - 总体结果：
 - 发现的问题：
-

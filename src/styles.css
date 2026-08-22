@@ -480,7 +480,7 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .overview-tag em { color: var(--muted); font-size: var(--text-micro); font-style: normal; }
 .overview-tag.syntax-warning { border-style: dashed; border-color: var(--warning); }
 .overview-tag.automatic-prompt-tag { border-style: dashed; }
-.overview-tag.automatic-prompt-tag.confirmed { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 34%, var(--line)); }
+.overview-tag.automatic-prompt-tag.confirmed, .overview-tag.automatic-prompt-tag.inferred { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 34%, var(--line)); }
 .overview-tag.automatic-prompt-tag.selected { border-style: solid; }
 .overview-tag-source-badge { flex: 0 0 auto; padding: 1px 4px; color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); border-radius: 3px; font: 600 var(--text-micro)/1.35 var(--font-sans); }
 .overview-syntax-mark { color: var(--warning); }

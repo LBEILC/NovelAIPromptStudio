@@ -124,17 +124,20 @@ function SortableTag({ animateLayout, automation, display, editKey, editingKey, 
 }
 
 function AutomaticPromptSummary({ automation }) {
-  if (!automation || !['confirmed', 'suspected', 'mismatch'].includes(automation.status)) return null;
+  if (!automation || !['confirmed', 'inferred', 'suspected', 'mismatch'].includes(automation.status)) return null;
   const isQuality = automation.kind === 'quality';
+  const statusPrefix = automation.status === 'inferred' ? '推断 ' : automation.status === 'suspected' ? '疑似 ' : '';
   const label = automation.status === 'mismatch'
     ? isQuality ? '质量词开关已启用 · 模板未匹配' : 'UC 预设已启用 · 模板未匹配'
     : isQuality
-      ? `${automation.status === 'suspected' ? '疑似 ' : ''}NovelAI ${automation.modelLabel} 自动质量词 · ${automation.tagCount}`
-      : `${automation.status === 'suspected' ? '疑似 ' : ''}NovelAI UC ${automation.label} · ${automation.tagCount}`;
+      ? `${statusPrefix}NovelAI ${automation.modelLabel} Quality Tags ${automation.label} · ${automation.tagCount}`
+      : `${statusPrefix}NovelAI UC ${automation.label} · ${automation.tagCount}`;
   const title = automation.status === 'confirmed'
     ? '元数据与官方预设模板均匹配；默认复制时会排除这些自动内容。'
+    : automation.status === 'inferred'
+      ? '元数据没有显式预设字段，但模型、完整模板与注入边界匹配；默认复制时会排除这些推断出的自动内容。'
     : automation.status === 'suspected'
-      ? '文本与官方预设模板匹配，但元数据缺少明确开关；复制时不会自动排除。'
+      ? '文本与预设模板匹配，但元数据状态与自动预设不一致；复制时不会自动排除。'
       : '元数据显示已启用自动预设，但当前文本与已知模板不一致；复制时不会自动排除。';
   return <span className={`overview-automatic-summary ${automation.status}`} title={title}>{label}</span>;
 }

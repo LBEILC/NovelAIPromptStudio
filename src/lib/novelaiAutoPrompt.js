@@ -10,7 +10,7 @@ const V45_FULL_HUMAN = `${V45_FULL_HEAVY}, @_@, mismatched pupils, glowing eyes,
 const MODEL_PROFILES = {
   v5: {
     label: 'V5',
-    quality: { template: 'very aesthetic, masterpiece, no text', position: 'suffix' },
+    quality: { label: 'Standard', template: 'very aesthetic, masterpiece, no text', position: 'suffix' },
     undesired: [
       { label: 'Furry Focus', template: V45_FULL_FURRY },
       { label: 'Heavy', template: V45_FULL_HEAVY },
@@ -20,7 +20,13 @@ const MODEL_PROFILES = {
   },
   v45Full: {
     label: 'V4.5 Full',
-    quality: { template: 'location, very aesthetic, masterpiece, no text', position: 'suffix' },
+    quality: {
+      // NovelAI imports older V4.5 PNGs with this three-tag suffix as the Standard preset.
+      compatibleTemplates: ['very aesthetic, masterpiece, no text'],
+      label: 'Standard',
+      template: 'location, very aesthetic, masterpiece, no text',
+      position: 'suffix',
+    },
     undesired: [
       { label: 'Furry Focus', template: V45_FULL_FURRY },
       { label: 'Heavy', template: V45_FULL_HEAVY },
@@ -30,7 +36,7 @@ const MODEL_PROFILES = {
   },
   v45Curated: {
     label: 'V4.5 Curated',
-    quality: { template: 'location, masterpiece, no text, -0.8::feet::, rating:general', position: 'suffix' },
+    quality: { label: 'Standard', template: 'location, masterpiece, no text, -0.8::feet::, rating:general', position: 'suffix' },
     undesired: [
       { label: 'Heavy', template: 'blurry, lowres, upscaled, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, halftone, multiple views, logo, too many watermarks, negative space, blank page' },
       { label: 'Light', template: 'blurry, lowres, upscaled, artistic error, scan artifacts, jpeg artifacts, logo, too many watermarks, negative space, blank page' },
@@ -39,7 +45,7 @@ const MODEL_PROFILES = {
   },
   v4Full: {
     label: 'V4 Full',
-    quality: { template: 'no text, best quality, very aesthetic, absurdres', position: 'suffix' },
+    quality: { label: 'Standard', template: 'no text, best quality, very aesthetic, absurdres', position: 'suffix' },
     undesired: [
       { label: 'Heavy', template: 'blurry, lowres, error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, multiple views, logo, too many watermarks' },
       { label: 'Light', template: 'blurry, lowres, error, worst quality, bad quality, jpeg artifacts, very displeasing' },
@@ -47,7 +53,7 @@ const MODEL_PROFILES = {
   },
   v4Curated: {
     label: 'V4 Curated',
-    quality: { template: 'rating:general, amazing quality, very aesthetic, absurdres', position: 'suffix' },
+    quality: { label: 'Standard', template: 'rating:general, amazing quality, very aesthetic, absurdres', position: 'suffix' },
     undesired: [
       { label: 'Heavy', template: 'blurry, lowres, error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, logo, dated, signature, multiple views, gigantic breasts' },
       { label: 'Light', template: 'blurry, lowres, error, worst quality, bad quality, jpeg artifacts, very displeasing, logo, dated, signature' },
@@ -55,7 +61,7 @@ const MODEL_PROFILES = {
   },
   animeV3: {
     label: 'Anime V3',
-    quality: { template: 'best quality, amazing quality, very aesthetic, absurdres', position: 'suffix' },
+    quality: { label: 'Standard', template: 'best quality, amazing quality, very aesthetic, absurdres', position: 'suffix' },
     undesired: [
       { label: 'Heavy', template: 'lowres, {bad}, error, fewer, extra, missing, worst quality, jpeg artifacts, bad quality, watermark, unfinished, displeasing, chromatic aberration, signature, extra digits, artistic error, username, scan, [abstract]' },
       { label: 'Light', template: 'lowres, jpeg artifacts, worst quality, watermark, blurry, very displeasing' },
@@ -64,7 +70,7 @@ const MODEL_PROFILES = {
   },
   furryV3: {
     label: 'Furry V3',
-    quality: { template: '{best quality}, {amazing quality}', position: 'suffix' },
+    quality: { label: 'Standard', template: '{best quality}, {amazing quality}', position: 'suffix' },
     undesired: [
       { label: 'Heavy', template: '{{worst quality}}, [displeasing], {unusual pupils}, guide lines, {{unfinished}}, {bad}, url, artist name, {{tall image}}, mosaic, {sketch page}, comic panel, impact (font), [dated], {logo}, ych, {what}, {where is your god now}, {distorted text}, repeated text, {floating head}, {1994}, {widescreen}, absolutely everyone, sequence, {compression artifacts}, hard translated, {cropped}, {commissioner name}, unknown text, high contrast' },
       { label: 'Light', template: '{worst quality}, guide lines, unfinished, bad, url, tall image, widescreen, compression artifacts, unknown text' },
@@ -72,7 +78,7 @@ const MODEL_PROFILES = {
   },
   animeV2: {
     label: 'Anime V2',
-    quality: { template: 'very aesthetic, best quality, absurdres', position: 'prefix' },
+    quality: { label: 'Standard', template: 'very aesthetic, best quality, absurdres', position: 'prefix' },
     undesired: [
       { label: 'Heavy', template: 'lowres, bad, text, error, missing, extra, fewer, cropped, jpeg artifacts, worst quality, bad quality, watermark, displeasing, unfinished, chromatic aberration, scan, scan artifacts' },
       { label: 'Light', template: 'lowres, jpeg artifacts, worst quality, watermark, blurry, very displeasing' },
@@ -154,10 +160,22 @@ function stripPrefixTemplate(rawPrompt, template) {
   return { cleanedRaw: raw.slice(match[0].length), matchIndex: match.index };
 }
 
+function stripContainedTemplate(rawPrompt, template) {
+  const raw = String(rawPrompt || '');
+  const expression = new RegExp(`(?:^|[,，]\\s*)${templatePattern(template)}(?=\\s*(?:[,，]|$))`, 'i');
+  const match = expression.exec(raw);
+  if (!match) return null;
+  const cleanedRaw = `${raw.slice(0, match.index)}${raw.slice(match.index + match[0].length)}`
+    .replace(/^\s*[,，]\s*/, '')
+    .replace(/\s*[,，]\s*$/, '')
+    .trim();
+  return { cleanedRaw, matchIndex: match.index };
+}
+
 function stripTemplate(rawPrompt, definition) {
-  return definition.position === 'prefix'
-    ? stripPrefixTemplate(rawPrompt, definition.template)
-    : stripSuffixTemplate(rawPrompt, definition.template);
+  if (definition.position === 'prefix') return stripPrefixTemplate(rawPrompt, definition.template);
+  if (definition.position === 'contained') return stripContainedTemplate(rawPrompt, definition.template);
+  return stripSuffixTemplate(rawPrompt, definition.template);
 }
 
 function normalizedTag(tag) {
@@ -181,7 +199,7 @@ function templateTagIds(scopeTags, definition) {
     ));
     if (equal) matches.push(index);
   }
-  const start = definition.position === 'prefix' ? matches[0] : matches.at(-1);
+  const start = definition.position === 'suffix' ? matches.at(-1) : matches[0];
   if (!Number.isInteger(start)) return [];
   return scopeTags.slice(start, start + expected.length).map((tag) => tag.id);
 }
@@ -202,19 +220,25 @@ function emptyAnalysis(kind, status = 'unknown') {
 function analyzeQuality(settings, scope, profiles) {
   if (settings.quality_toggle === false) return emptyAnalysis('quality', 'disabled');
   for (const profile of profiles) {
-    const match = stripTemplate(scope.raw_prompt, profile.quality);
-    if (!match) continue;
-    const status = settings.quality_toggle === true ? 'confirmed' : 'suspected';
-    const tagIds = templateTagIds(scope.tags, profile.quality);
-    return {
-      ...emptyAnalysis('quality', status),
-      ...match,
-      label: '自动质量词',
-      modelLabel: profile.label,
-      sourceLabel: status === 'confirmed' ? `NovelAI ${profile.label} 自动质量词` : `疑似 NovelAI ${profile.label} 自动质量词`,
-      tagCount: tagIds.length || parsePrompt(profile.quality.template, () => '').length,
-      tagIds,
-    };
+    const definitions = [profile.quality.template, ...(profile.quality.compatibleTemplates || [])]
+      .map((template) => ({ ...profile.quality, template }));
+    for (const definition of definitions) {
+      const match = stripTemplate(scope.raw_prompt, definition);
+      if (!match) continue;
+      const status = settings.quality_toggle === true ? 'confirmed' : 'inferred';
+      const tagIds = templateTagIds(scope.tags, definition);
+      return {
+        ...emptyAnalysis('quality', status),
+        ...match,
+        label: definition.label || 'Standard',
+        modelLabel: profile.label,
+        sourceLabel: status === 'confirmed'
+          ? `NovelAI ${profile.label} Quality Tags · ${definition.label || 'Standard'}`
+          : `推断为 NovelAI ${profile.label} Quality Tags · ${definition.label || 'Standard'}`,
+        tagCount: tagIds.length || parsePrompt(definition.template, () => '').length,
+        tagIds,
+      };
+    }
   }
   return settings.quality_toggle === true ? emptyAnalysis('quality', 'mismatch') : emptyAnalysis('quality');
 }
@@ -229,18 +253,20 @@ function analyzeUndesired(settings, scope, profiles) {
   const selection = ucSelectionState(settings);
   for (const profile of profiles) {
     for (const preset of [...profile.undesired].sort((left, right) => right.template.length - left.template.length)) {
-      const definition = { ...preset, position: 'prefix' };
+      const definition = { ...preset, position: 'contained' };
       const match = stripTemplate(scope.raw_prompt, definition);
       if (!match) continue;
       const confirmed = selection === 'selected' || selection === 'legacy';
-      const status = confirmed ? 'confirmed' : 'suspected';
+      const status = confirmed ? 'confirmed' : selection === 'unknown' ? 'inferred' : 'suspected';
       const tagIds = templateTagIds(scope.tags, definition);
       return {
         ...emptyAnalysis('undesired', status),
         ...match,
         label: preset.label,
         modelLabel: profile.label,
-        sourceLabel: status === 'confirmed' ? `NovelAI UC · ${preset.label}` : `疑似 NovelAI UC · ${preset.label}`,
+        sourceLabel: status === 'confirmed'
+          ? `NovelAI UC · ${preset.label}`
+          : status === 'inferred' ? `推断为 NovelAI UC · ${preset.label}` : `疑似 NovelAI UC · ${preset.label}`,
         tagCount: tagIds.length || parsePrompt(preset.template, () => '').length,
         tagIds,
       };

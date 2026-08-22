@@ -222,7 +222,7 @@ export function formatPositivePromptForCopy(project, { includeAutomatic = false 
   return getPromptScopes(project)
     .filter((scope) => scope.polarity === 'prompt')
     .map((scope) => {
-      if (!includeAutomatic && scope.automation?.status === 'confirmed') return scope.automation.cleanedRaw;
+      if (!includeAutomatic && ['confirmed', 'inferred'].includes(scope.automation?.status)) return scope.automation.cleanedRaw;
       return String(scope.raw_prompt || '').trim() ? scope.raw_prompt : formatPromptInline(scope.tags);
     })
     .filter(Boolean)
@@ -242,17 +242,21 @@ export function formatPositiveScopeForCopy(project, scopeKey) {
 
 export function positivePromptCopyOptions(project, { includeAutomatic = false } = {}) {
   const scopes = getPromptScopes(project).filter((scope) => scope.polarity === 'prompt');
-  return scopes.map((scope) => ({
-    key: scope.key,
-    label: scope.kind === 'base'
-      ? !includeAutomatic && scope.automation?.status === 'confirmed' ? '复制 Base Prompt（不含自动质量词）' : '复制完整 Base Prompt'
-      : `复制角色 ${(scope.characterIndex ?? 0) + 1} Prompt`,
-    text: !includeAutomatic && scope.automation?.status === 'confirmed'
-      ? scope.automation.cleanedRaw
-      : String(scope.raw_prompt || '').trim() ? scope.raw_prompt : formatPromptInline(scope.tags),
-    count: scope.tags.length - (!includeAutomatic && scope.automation?.status === 'confirmed' ? scope.automation.tagIds.length : 0),
-    automaticCount: scope.automation?.status === 'confirmed' ? scope.automation.tagIds.length : 0,
-  }));
+  return scopes.map((scope) => {
+    const excludeAutomatic = !includeAutomatic && ['confirmed', 'inferred'].includes(scope.automation?.status);
+    const automaticCount = ['confirmed', 'inferred'].includes(scope.automation?.status) ? scope.automation.tagIds.length : 0;
+    return {
+      key: scope.key,
+      label: scope.kind === 'base'
+        ? excludeAutomatic ? '复制 Base Prompt（不含自动质量词）' : '复制完整 Base Prompt'
+        : `复制角色 ${(scope.characterIndex ?? 0) + 1} Prompt`,
+      text: excludeAutomatic
+        ? scope.automation.cleanedRaw
+        : String(scope.raw_prompt || '').trim() ? scope.raw_prompt : formatPromptInline(scope.tags),
+      count: scope.tags.length - (excludeAutomatic ? scope.automation.tagIds.length : 0),
+      automaticCount,
+    };
+  });
 }
 
 export function syncProjectPromptMetadata(project) {

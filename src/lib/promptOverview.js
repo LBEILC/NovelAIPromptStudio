@@ -107,7 +107,7 @@ export function overviewCopyContext(project, visibleScopes, selectedKeys = []) {
     ? overviewEntries(getPromptScopes(project)).filter((entry) => selected.has(entry.key))
     : overviewEntries(visibleScopes);
   const promptEntries = source.filter((entry) => entry.scopePolarity === 'prompt');
-  const positive = promptEntries.filter((entry) => entry.automation?.status !== 'confirmed');
+  const positive = promptEntries.filter((entry) => !['confirmed', 'inferred'].includes(entry.automation?.status));
   const ignored = source.length - promptEntries.length;
   const automaticIgnored = promptEntries.length - positive.length;
   const groups = selected.size ? overviewCategoryGroups(positive) : [];

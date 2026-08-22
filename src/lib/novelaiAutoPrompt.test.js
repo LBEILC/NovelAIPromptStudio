@@ -82,10 +82,34 @@ describe('NovelAI automatic prompt recognition', () => {
     expect(automation.tagIds).toHaveLength(5);
   });
 
-  it('marks an exact template without a metadata hint as suspected instead of confirmed', () => {
+  it('infers an exact model template without a metadata hint', () => {
     const prompt = '1girl, very aesthetic, masterpiece, no text';
     const automation = getPromptScopes(projectFixture({ prompt }))[0].automation;
-    expect(automation).toMatchObject({ status: 'suspected', cleanedRaw: '1girl', tagCount: 3 });
+    expect(automation).toMatchObject({ status: 'inferred', label: 'Standard', cleanedRaw: '1girl', tagCount: 3 });
+  });
+
+  it('matches the V4.5 Standard compatibility suffix and Heavy UC within custom content', () => {
+    const heavy = 'lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page';
+    const project = projectFixture({
+      model: 'NovelAI Diffusion V4.5 4BDE2A90',
+      prompt: '1girl, {{{custom quality tags}}}, very aesthetic, masterpiece, no text',
+      undesired: `nsfw, ${heavy}, custom exclusion`,
+    });
+    const [quality, undesired] = getPromptScopes(project).slice(0, 2).map((scope) => scope.automation);
+
+    expect(quality).toMatchObject({
+      status: 'inferred',
+      label: 'Standard',
+      modelLabel: 'V4.5 Full',
+      cleanedRaw: '1girl, {{{custom quality tags}}}',
+    });
+    expect(quality.tagIds).toHaveLength(3);
+    expect(undesired).toMatchObject({
+      status: 'inferred',
+      label: 'Heavy',
+      cleanedRaw: 'nsfw, custom exclusion',
+    });
+    expect(undesired.tagIds).toHaveLength(17);
   });
 
   it('recognizes V5 Heavy, Light, and Human Focus UC hints by their exact prefix', () => {
