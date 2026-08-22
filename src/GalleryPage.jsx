@@ -663,7 +663,7 @@ export function nextGalleryRenderCount(total, current = 0) {
   return Math.min(safeTotal, current + GALLERY_RENDER_BATCH_SIZE);
 }
 
-export function GalleryCardView({ active, group, hoverProject = group.cover, selected, selecting = false, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
+export function GalleryCardView({ active, group, hoverProject = group.cover, selected, selecting = false, onDismissHoverPreview, onOpenWorkbench, onPointerEnter, onPointerLeave, onPointerMove, onPreview, onSelect, onContextMenu }) {
   const project = group.cover;
   const stackMembers = group.members.filter((member) => member.id !== project.id).slice(0, 2);
   return <Popover content={<GalleryCardHoverPreview group={group} project={hoverProject}/>} placement="rightTop" styles={GALLERY_HOVER_POSITIONER_STYLES} trigger="hover"><article className={`gallery-card ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${group.count > 1 ? 'grouped' : ''}`}>
@@ -682,6 +682,7 @@ export function GalleryCardView({ active, group, hoverProject = group.cover, sel
       onContextMenu={onContextMenu}
       onDoubleClick={(event) => {
         if (selecting || !onOpenWorkbench || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        onDismissHoverPreview?.();
         onOpenWorkbench(hoverProject);
       }}
       onPointerEnter={onPointerEnter}
@@ -778,6 +779,7 @@ const GalleryGridCard = memo(function GalleryGridCard({ actionsRef, active, canO
     active={active}
     group={group}
     onContextMenu={(event) => actionsRef.current.onProjectContextMenu(event, group, () => actionsRef.current.requestRename(group))}
+    onDismissHoverPreview={() => actionsRef.current.dismissHoverPreview()}
     onOpenWorkbench={canOpenWorkbench && !selecting ? (project) => actionsRef.current.onOpenWorkbench(project) : undefined}
     onPreview={(project) => {
       actionsRef.current.updatePreviewExpanded(true);
@@ -928,6 +930,7 @@ export default function GalleryPage({
   ));
   const [galleryCardSize, setGalleryCardSize] = useState(() => readGalleryCardSize(panelStorage()));
   const [progressiveRendering, setProgressiveRendering] = useState(false);
+  const [hoverPreviewSession, setHoverPreviewSession] = useState(0);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const reduceMotion = useStudioReducedMotion();
@@ -1089,6 +1092,7 @@ export default function GalleryPage({
   };
   const gridActionsRef = useRef({});
   gridActionsRef.current = {
+    dismissHoverPreview: () => setHoverPreviewSession((current) => current + 1),
     onOpenWorkbench,
     onPreview,
     onProjectContextMenu,
@@ -1218,7 +1222,7 @@ export default function GalleryPage({
           }}
           ref={galleryScrollRef}
         >
-          <PopoverGroup closeDelay={120} openDelay={450} placement="rightTop" trigger="hover">
+          <PopoverGroup closeDelay={120} key={hoverPreviewSession} openDelay={450} placement="rightTop" trigger="hover">
             <AnimatePresence initial={false} mode="wait">
               {showLoadingPage ? <GalleryLoadingState reduceMotion={reduceMotion}/> : groups.length ? <GalleryResultsSurface
                 className={`gallery-grid density-${galleryDensity}`}

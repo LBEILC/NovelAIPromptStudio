@@ -275,6 +275,7 @@ describe('GalleryCardHoverPreview', () => {
   });
 
   it('opens the currently scrubbed member in the detail panel and Workbench', () => {
+    const onDismissHoverPreview = vi.fn();
     const onOpenWorkbench = vi.fn();
     const onPreview = vi.fn();
     const cover = {
@@ -291,6 +292,7 @@ describe('GalleryCardHoverPreview', () => {
       group: { count: 2, cover, members: [cover, variant] },
       hoverProject: variant,
       onContextMenu: vi.fn(),
+      onDismissHoverPreview,
       onOpenWorkbench,
       onPreview,
       onSelect: vi.fn(),
@@ -303,10 +305,13 @@ describe('GalleryCardHoverPreview', () => {
     mainButton.props.onDoubleClick(clickEvent);
 
     expect(onPreview).toHaveBeenCalledWith(variant, clickEvent);
+    expect(onDismissHoverPreview).toHaveBeenCalledOnce();
     expect(onOpenWorkbench).toHaveBeenCalledWith(variant);
+    expect(onDismissHoverPreview.mock.invocationCallOrder[0]).toBeLessThan(onOpenWorkbench.mock.invocationCallOrder[0]);
   });
 
   it('keeps modified double clicks available for selection gestures', () => {
+    const onDismissHoverPreview = vi.fn();
     const onOpenWorkbench = vi.fn();
     const cover = {
       id: 'cover',
@@ -320,6 +325,7 @@ describe('GalleryCardHoverPreview', () => {
       active: false,
       group: { count: 1, cover, members: [cover] },
       onContextMenu: vi.fn(),
+      onDismissHoverPreview,
       onOpenWorkbench,
       onPreview: vi.fn(),
       onSelect: vi.fn(),
@@ -329,6 +335,7 @@ describe('GalleryCardHoverPreview', () => {
 
     mainButton.props.onDoubleClick({ ctrlKey: true, metaKey: false, shiftKey: false });
 
+    expect(onDismissHoverPreview).not.toHaveBeenCalled();
     expect(onOpenWorkbench).not.toHaveBeenCalled();
   });
 
