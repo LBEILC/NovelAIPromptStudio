@@ -462,7 +462,13 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .overview-scope-heading > div { min-width: 0; }
 .overview-scope-title { display: grid; gap: 4px; }
 .overview-scope-meta { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.overview-automatic-summary { width: fit-content; max-width: 100%; padding: 2px 6px; overflow: hidden; color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line)); border-radius: 4px; font-size: var(--text-micro); line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.overview-automatic-summary { width: fit-content; max-width: 100%; padding: 2px 6px; overflow: hidden; display: inline-flex; align-items: center; gap: 3px; color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line)); border-radius: 4px; font-family: inherit; font-size: var(--text-micro); line-height: 1.35; text-align: start; }
+.overview-automatic-summary > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.overview-automatic-summary { appearance: none; cursor: pointer; }
+button.overview-automatic-summary:hover { background: color-mix(in srgb, currentColor 12%, transparent); border-color: color-mix(in srgb, currentColor 42%, var(--line)); }
+button.overview-automatic-summary:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
+.overview-automatic-summary-icon { flex: 0 0 auto; }
+.overview-automatic-summary.is-expanded .overview-automatic-summary-icon { transform: rotate(90deg); }
 .overview-automatic-summary.suspected, .overview-automatic-summary.mismatch { color: var(--warning); background: color-mix(in srgb, var(--warning) 7%, transparent); border-color: color-mix(in srgb, var(--warning) 28%, var(--line)); }
 .overview-scope.undesired .overview-scope-heading strong { color: var(--danger); }
 .overview-tags { min-width: 0; display: flex; flex-wrap: wrap; gap: 7px; user-select: none; }

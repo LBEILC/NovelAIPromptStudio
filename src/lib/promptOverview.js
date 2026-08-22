@@ -63,6 +63,26 @@ export function filterOverviewScopes(project, filters = DEFAULT_OVERVIEW_FILTERS
     }));
 }
 
+export function isAutomaticPromptCollapsible(automation) {
+  return ['confirmed', 'inferred'].includes(automation?.status) && Boolean(automation?.tagIds?.length);
+}
+
+export function filterCollapsedAutomaticScopes(scopes = [], expandedScopeKeys = []) {
+  const expanded = expandedScopeKeys instanceof Set ? expandedScopeKeys : new Set(expandedScopeKeys);
+  return scopes.map((scope) => {
+    if (!isAutomaticPromptCollapsible(scope.automation) || expanded.has(scope.key)) {
+      return { ...scope, automaticCollapsed: false };
+    }
+    const automaticTagIds = new Set(scope.automation.tagIds);
+    const tags = scope.tags.filter((tag) => !automaticTagIds.has(tag.id));
+    return {
+      ...scope,
+      automaticCollapsed: tags.length !== scope.tags.length,
+      tags,
+    };
+  });
+}
+
 export function overviewEntries(scopes) {
   return scopes.flatMap((scope) => scope.tags.map((tag) => ({
     automation: scope.automation?.tagIds?.includes(tag.id) ? scope.automation : null,

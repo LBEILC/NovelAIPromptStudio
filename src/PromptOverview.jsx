@@ -23,7 +23,9 @@ import { tagPresentation } from './lib/tagManagement.js';
 import { encodeMarqueeKey } from './lib/marqueeSelection.js';
 import {
   deleteOverviewTags,
+  filterCollapsedAutomaticScopes,
   filterOverviewScopes,
+  isAutomaticPromptCollapsible,
   isOverviewTagVisible,
   overviewCategoryGroups,
   overviewCopyContext,
@@ -122,7 +124,7 @@ function SortableTag({ animateLayout, automation, display, editKey, editingKey, 
   </motion.div>;
 }
 
-function AutomaticPromptSummary({ automation }) {
+function AutomaticPromptSummary({ automation, controlsId, expanded = false, onToggle }) {
   if (!automation || !['confirmed', 'inferred', 'suspected', 'mismatch'].includes(automation.status)) return null;
   const isQuality = automation.kind === 'quality';
   const statusPrefix = automation.status === 'inferred' ? '推断 ' : automation.status === 'suspected' ? '疑似 ' : '';
@@ -138,7 +140,16 @@ function AutomaticPromptSummary({ automation }) {
     : automation.status === 'suspected'
       ? '文本与预设模板匹配，但元数据状态与自动预设不一致；复制时不会自动排除。'
       : '元数据显示已启用自动预设，但当前文本与已知模板不一致；复制时不会自动排除。';
-  return <span className={`overview-automatic-summary ${automation.status}`} title={title}>{label}</span>;
+  const content = <><span>{label}</span>{onToggle && <Icon className="overview-automatic-summary-icon" name="next" size={11}/>}</>;
+  if (!onToggle) return <span className={`overview-automatic-summary ${automation.status}`} title={title}>{content}</span>;
+  return <button
+    aria-controls={controlsId}
+    aria-expanded={expanded}
+    className={`overview-automatic-summary ${automation.status} ${expanded ? 'is-expanded' : ''}`}
+    onClick={onToggle}
+    title={`${title} 点击${expanded ? '隐藏' : '显示'}这些自动 Tag。`}
+    type="button"
+  >{content}</button>;
 }
 
 function AddTagEditor({ draft, pending, scope, onAdd, onChange, onClose }) {
@@ -184,6 +195,7 @@ function RawPromptEditor({ draft, pending, scope, onChange, onClose, onSave }) {
 
 function ScopeTags({
   scope,
+  automaticExpanded,
   addDraft,
   addingScopeKey,
   language,
@@ -205,6 +217,7 @@ function ScopeTags({
   onTagClick,
   onToggleGroup,
   onTagContextMenu,
+  onToggleAutomatic,
   translatingKeys,
   rawDraft,
   rawEditingScopeKey,
@@ -225,10 +238,13 @@ function ScopeTags({
   const activeDisplay = activeTag ? tagPresentation(activeTag, language) : null;
   const activeWarning = activeTag ? syntaxMessage(activeTag) : '';
   const activeAutomation = activeTag && scope.automation?.tagIds?.includes(activeTag.id) ? scope.automation : null;
-  const { reorderDisabled, selectionModeActive } = interactionState;
+  const { selectionModeActive } = interactionState;
+  const reorderDisabled = interactionState.reorderDisabled || scope.automaticCollapsed;
+  const tagListId = `overview-tags-${scope.key.replace(/[^a-z0-9_-]+/gi, '-')}`;
+  const automaticToggle = isAutomaticPromptCollapsible(scope.automation) ? () => onToggleAutomatic(scope) : undefined;
   return <div className={`overview-scope ${scope.polarity === 'undesired' ? 'undesired' : ''}`}>
     <div className="overview-scope-heading">
-      <div className="overview-scope-title"><strong>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</strong><div className="overview-scope-meta">{scope.tags.length > 0 && <small>{scope.tags.length} 个 Tag</small>}<AutomaticPromptSummary automation={scope.automation}/></div></div>
+      <div className="overview-scope-title"><strong>{scope.polarity === 'undesired' ? '排除' : 'Prompt'}</strong><div className="overview-scope-meta">{scope.tags.length > 0 && <small>{scope.tags.length} 个 Tag</small>}<AutomaticPromptSummary automation={scope.automation} controlsId={tagListId} expanded={automaticExpanded} onToggle={automaticToggle}/></div></div>
       {selectionModeActive ? <SelectionGroupButton entries={scopeEntries} selectedKeys={selectedKeys} onToggle={onToggleGroup}/> : <div className="overview-scope-actions">
         <LobePopover
           arrow
@@ -287,7 +303,7 @@ function ScopeTags({
       }}
     >
       <SortableContext items={renderedTags.map((tag) => tag.id)} strategy={LIVE_TAG_SORTING_STRATEGY}>
-        <div className={`overview-tags ${activeTagId ? 'sorting' : ''}`} role="list" aria-label={scope.label}>
+        <div className={`overview-tags ${activeTagId ? 'sorting' : ''}`} id={tagListId} role="list" aria-label={scope.label}>
           {renderedTags.map((tag, index) => {
             const key = overviewTagKey(scope.key, tag.id);
             const automation = scope.automation?.tagIds?.includes(tag.id) ? scope.automation : null;
@@ -315,9 +331,11 @@ function ScopeTags({
               warning={syntaxMessage(tag)}
             />;
           })}
-          {!scope.tags.length && (filtered
-            ? <span className="overview-filter-empty">当前筛选无 Tag</span>
-            : <span className="overview-filter-empty">暂无 Tag，使用右上角 + 添加</span>)}
+          {!scope.tags.length && (scope.automaticCollapsed
+            ? <span className="overview-filter-empty">自动 Tag 已折叠，点击上方提示显示</span>
+            : filtered
+              ? <span className="overview-filter-empty">当前筛选无 Tag</span>
+              : <span className="overview-filter-empty">暂无 Tag，使用右上角 + 添加</span>)}
         </div>
       </SortableContext>
       {createPortal(<DragOverlay
@@ -410,6 +428,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
   const [renamingCharacterId, setRenamingCharacterId] = useState('');
   const [characterNameDraft, setCharacterNameDraft] = useState('');
   const [translatingKeys, setTranslatingKeys] = useState(new Set());
+  const [expandedAutomaticScopes, setExpandedAutomaticScopes] = useState(new Set());
   const overviewContentRef = useRef(null);
   const selectionGestureRef = useRef(false);
   const structure = project.prompt_structure;
@@ -426,6 +445,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     setRenamingCharacterId('');
     setCharacterNameDraft('');
     setTranslatingKeys(new Set());
+    setExpandedAutomaticScopes(new Set());
   }, [project.id]);
 
   useEffect(() => {
@@ -435,18 +455,20 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
   }, [deleteArmed]);
 
   const visibleScopes = useMemo(() => filterOverviewScopes(project, filters), [project, filters]);
-  const visibleEntries = useMemo(() => overviewEntries(visibleScopes), [visibleScopes]);
+  const displayedScopes = useMemo(() => filterCollapsedAutomaticScopes(visibleScopes, expandedAutomaticScopes), [visibleScopes, expandedAutomaticScopes]);
+  const visibleEntries = useMemo(() => overviewEntries(displayedScopes), [displayedScopes]);
   const categoryGroups = useMemo(() => overviewCategoryGroups(visibleEntries), [visibleEntries]);
   const copyContext = useMemo(() => overviewCopyContext(project, visibleScopes, selectedKeys), [project, visibleScopes, selectedKeys]);
   const selectedEntries = useMemo(() => selectedOverviewEntries(project, selectedKeys), [project, selectedKeys]);
   const visibleCopyContext = useMemo(() => overviewCopyContext(project, visibleScopes, []), [project, visibleScopes]);
   const categorySourceScopes = useMemo(() => filterOverviewScopes(project, { ...filters, category: 'All' }), [project, filters]);
-  const categoryCounts = useMemo(() => overviewEntries(categorySourceScopes).reduce((counts, entry) => {
+  const displayedCategorySourceScopes = useMemo(() => filterCollapsedAutomaticScopes(categorySourceScopes, expandedAutomaticScopes), [categorySourceScopes, expandedAutomaticScopes]);
+  const categoryCounts = useMemo(() => overviewEntries(displayedCategorySourceScopes).reduce((counts, entry) => {
     counts[entry.tag.category || 'Unsorted'] = (counts[entry.tag.category || 'Unsorted'] || 0) + 1;
     return counts;
-  }, {}), [categorySourceScopes]);
-  const baseScopes = visibleScopes.filter((scope) => scope.kind === 'base');
-  const characterScopes = visibleScopes.filter((scope) => scope.kind === 'character');
+  }, {}), [displayedCategorySourceScopes]);
+  const baseScopes = displayedScopes.filter((scope) => scope.kind === 'base');
+  const characterScopes = displayedScopes.filter((scope) => scope.kind === 'character');
   const filtered = filters.category !== 'All' || filters.polarity !== 'all' || filters.domain !== 'all' || Boolean(filters.query.trim());
   const interactionState = overviewTagInteractionState(selectedKeys.length, filtered, selectionMode);
   const { selectionModeActive } = interactionState;
@@ -540,6 +562,21 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     setSelectedKeys([]);
     setDeleteArmed(false);
     onNotify?.(`已删除 ${count} 个 Tag`);
+  };
+
+  const toggleAutomaticScope = (scope) => {
+    const collapsing = expandedAutomaticScopes.has(scope.key);
+    if (collapsing) {
+      const automaticKeys = new Set(scope.automation.tagIds.map((tagId) => overviewTagKey(scope.key, tagId)));
+      setSelectedKeys((current) => current.filter((key) => !automaticKeys.has(key)));
+      setEditingKey((current) => automaticKeys.has(current) ? '' : current);
+    }
+    setExpandedAutomaticScopes((current) => {
+      const next = new Set(current);
+      if (next.has(scope.key)) next.delete(scope.key);
+      else next.add(scope.key);
+      return next;
+    });
   };
 
   const toggleSelectionMode = () => {
@@ -736,6 +773,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
     onKeyboardMove: keyboardMove,
     onTagClick: handleTagClick,
     onToggleGroup: toggleEntryGroup,
+    onToggleAutomatic: toggleAutomaticScope,
     onTagContextMenu: openTagContextMenu,
     translatingKeys,
     rawDraft,
@@ -771,7 +809,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
           <Segment value={language} options={LANGUAGE_OPTIONS} onChange={(nextLanguage) => changeViewState({ language: nextLanguage })} label="显示语言"/>
         </div>
         <div className="overview-category-row" aria-label="Tag 分类筛选">
-          <LobeButton className={filters.category === 'All' ? 'active' : ''} onClick={() => changeFilter({ category: 'All' })} size="small">全部 <b>{overviewEntries(categorySourceScopes).length}</b></LobeButton>
+          <LobeButton className={filters.category === 'All' ? 'active' : ''} onClick={() => changeFilter({ category: 'All' })} size="small">全部 <b>{overviewEntries(displayedCategorySourceScopes).length}</b></LobeButton>
           {CATEGORY_OPTIONS.map((category) => <LobeButton key={category} className={`${filters.category === category ? 'active' : ''} cat-${category.toLowerCase()}`} onClick={() => changeFilter({ category })} size="small">{CATEGORY_LABELS[category]} <b>{categoryCounts[category] || 0}</b></LobeButton>)}
         </div>
       </div>
@@ -802,7 +840,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
       {viewMode === 'structure' && baseScopes.length > 0 && <section className="overview-layer base-layer">
         <div className="overview-layer-body">
           <div className="overview-layer-heading"><strong>基础 Prompt</strong></div>
-          {baseScopes.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
+          {baseScopes.map((scope) => <ScopeTags automaticExpanded={expandedAutomaticScopes.has(scope.key)} key={scope.key} scope={scope} {...scopeProps}/>) }
         </div>
       </section>}
 
@@ -843,7 +881,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
                 </LobeDropdownMenu>
               </div>
             </div>
-            {sections.map((scope) => <ScopeTags key={scope.key} scope={scope} {...scopeProps}/>) }
+            {sections.map((scope) => <ScopeTags automaticExpanded={expandedAutomaticScopes.has(scope.key)} key={scope.key} scope={scope} {...scopeProps}/>) }
           </div>
         </section>;
       })}

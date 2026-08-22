@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { deleteOverviewTags, filterOverviewScopes, isOverviewTagVisible, moveOverviewTags, overviewCategoryGroups, overviewCopyContext, overviewEntries, overviewMoveContext, overviewSelectionMenuItems, overviewTagInteractionState, overviewTagKey, reorderOverviewTags, selectedOverviewEntries, shouldReorderOverviewTags, toggleOverviewSelectionGroup, updateOverviewTags } from './promptOverview.js';
+import { deleteOverviewTags, filterCollapsedAutomaticScopes, filterOverviewScopes, isAutomaticPromptCollapsible, isOverviewTagVisible, moveOverviewTags, overviewCategoryGroups, overviewCopyContext, overviewEntries, overviewMoveContext, overviewSelectionMenuItems, overviewTagInteractionState, overviewTagKey, reorderOverviewTags, selectedOverviewEntries, shouldReorderOverviewTags, toggleOverviewSelectionGroup, updateOverviewTags } from './promptOverview.js';
 import { parsePrompt } from './prompt.js';
 
 function projectFixture() {
@@ -135,6 +135,43 @@ describe('Prompt overview operations', () => {
 
     const automaticKeys = overviewEntries(visible).filter((entry) => entry.automation).map((entry) => entry.key);
     expect(overviewCopyContext(project, visible, automaticKeys)).toMatchObject({ text: '', count: 0, automaticIgnored: 3, selected: true });
+  });
+
+  it('collapses reliable automatic tags by default and restores them per expanded scope', () => {
+    const automation = { status: 'inferred', tagIds: ['automatic-1', 'automatic-2'] };
+    const scopes = [{
+      key: 'base:prompt',
+      automation,
+      tags: [
+        { id: 'user', tag: '1girl' },
+        { id: 'automatic-1', tag: 'masterpiece' },
+        { id: 'automatic-2', tag: 'no text' },
+      ],
+    }];
+
+    expect(isAutomaticPromptCollapsible(automation)).toBe(true);
+    expect(filterCollapsedAutomaticScopes(scopes)[0]).toMatchObject({
+      automaticCollapsed: true,
+      tags: [{ id: 'user', tag: '1girl' }],
+    });
+    expect(filterCollapsedAutomaticScopes(scopes, new Set(['base:prompt']))[0]).toMatchObject({
+      automaticCollapsed: false,
+      tags: scopes[0].tags,
+    });
+  });
+
+  it('keeps suspected preset matches visible instead of hiding user-authored tags', () => {
+    const scopes = [{
+      key: 'base:undesired',
+      automation: { status: 'suspected', tagIds: ['lowres'] },
+      tags: [{ id: 'lowres', tag: 'lowres' }],
+    }];
+
+    expect(isAutomaticPromptCollapsible(scopes[0].automation)).toBe(false);
+    expect(filterCollapsedAutomaticScopes(scopes)[0]).toMatchObject({
+      automaticCollapsed: false,
+      tags: scopes[0].tags,
+    });
   });
 
   it('groups visible entries by category in the category display order', () => {
