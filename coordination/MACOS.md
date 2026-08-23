@@ -2,6 +2,15 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+## Verify GPL license resources in macOS packages
+
+- Status: Pending
+- Date/source: 2026-08-23, Windows
+- Related commit: `255d24e`
+- Action: On macOS, check out current `main` containing `255d24e`, run `npm ci`, `npm test`, `npm run build`, and `npm run package -- --mac`. Inspect every generated Intel and Apple Silicon `.app` bundle and confirm `Contents/Resources/LICENSE`, `Contents/Resources/LICENSES/README.md`, and `Contents/Resources/LICENSES/Apache-2.0.txt` are present. Compare the packaged `LICENSE` byte-for-byte with the repository GPLv3 text and confirm the historical Apache file remains readable.
+- Expected: Both macOS architectures package the exact `GPL-3.0-only` license plus the authorization-history files without affecting DMG/ZIP/update-metadata generation. The source tag, lock file, build scripts, and license resources remain available together through the GitHub Release.
+- Observed: Windows clean installation completed, all 261 tests in 43 files and the production build passed, and the NSIS package succeeded. The unpacked Windows package contains byte-identical GPLv3 text plus `LICENSES/README.md` and the historical Apache-2.0 text. macOS packaging remains pending.
+
 ## Verify isolated Demo Profile startup and persistence
 
 - Status: Pending
