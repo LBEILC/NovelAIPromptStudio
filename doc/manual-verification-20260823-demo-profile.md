@@ -1,6 +1,6 @@
 # Demo Profile 人工验证清单
 
-- 变更或提交：命名 Profile 数据隔离（`--profile=demo`、`start:demo`、`dev:demo`）
+- 变更或提交：`1621812 feat: add isolated app profiles`
 - 目标操作系统：Windows 10/11
 - 验证状态：待人工验证
 

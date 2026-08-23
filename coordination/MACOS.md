@@ -2,6 +2,15 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+## Verify isolated Demo Profile startup and persistence
+
+- Status: Pending
+- Date/source: 2026-08-23, Windows
+- Related commit: `1621812`
+- Action: On an unlocked macOS session, check out current `main` containing `1621812`, run the automated checks, then adapt `doc/manual-verification-20260823-demo-profile.md` for macOS. Start the default profile and record an existing library item, quit, start `npm run start:demo`, import disposable demo images, create a collection and change one local UI preference, restart the Demo Profile, then return to the default profile. Also inspect `~/Library/Application Support/` after both instances are closed and confirm the default and `NovelAI Prompt Studio-demo` roots are siblings with independent `data`, `assets`, `session`, and `workbench-temp` contents.
+- Expected: `--profile=demo` isolates the SQLite database, preferences including saved credentials and recent paths, managed assets, Chromium localStorage/session data, and Workbench temporary files. Demo state survives a restart, the original profile remains unchanged, paths with spaces work, and an ordinary launch remains backward compatible.
+- Observed: Windows `npm ci`, all 261 tests in 43 files, and the production build passed. Windows and macOS interactive verification remain pending.
+
 ## Verify packaged Lobe UI style parity
 
 - Status: Pending
