@@ -15,14 +15,16 @@
    git status --short --branch
    ```
 
-3. 查看上个版本以来的提交，作为更新说明的依据：
+3. GPLv3 发布必须让安装包接收者能从同一 Release 获得对应源代码。确认待发布标签包含完整源码、锁文件、构建与打包脚本；如果安装包加入内置数据或经转换生成的资源，还要提交其许可证、固定的上游版本和生成脚本。GitHub 自动生成的 `Source code (zip)` 与 `Source code (tar.gz)` 将作为当前发布方式的源码入口。打包后还要确认应用资源目录包含根许可证 `LICENSE` 和历史/第三方授权目录 `LICENSES/`。
+
+4. 查看上个版本以来的提交，作为更新说明的依据：
 
    ```bash
    git tag --sort=-version:refname --list "v*"
    git log <上一个标签>..HEAD --oneline
    ```
 
-4. 根据变更范围选择版本号：
+5. 根据变更范围选择版本号：
 
    - `patch`：兼容性修复，例如 `0.2.1` → `0.2.2`。
    - `minor`：向后兼容的新功能，例如 `0.2.1` → `0.3.0`。
@@ -178,6 +180,7 @@ git push origin refs/tags/v0.3.0
 - macOS Intel 与 Apple Silicon 的 DMG。
 - macOS Intel 与 Apple Silicon 的 ZIP、blockmap 和 `latest-mac.yml`。
 - 所有上传文件的 SHA-256 校验清单。
+- GitHub 根据发布标签自动提供的完整源码 ZIP 与 TAR.GZ；它们必须和安装包指向同一标签。
 
 `workflow_dispatch` 可手动验证云端打包，但因为它不是标签事件，不会创建 GitHub Release。
 
@@ -225,7 +228,8 @@ git push origin refs/tags/v0.3.0
 2. Release 标题、正文和版本号正确。
 3. Windows、macOS Intel、macOS Apple Silicon 产物均存在。
 4. `SHA256SUMS.txt` 存在，且与下载的当前平台安装包实测校验一致。
-5. 下载并启动至少一个当前平台安装包。
-6. Release 正文的「下载指引」链接可正常访问；链接或正文有误时可用 `gh release edit --notes-file` 无损修正，但下次发版仍以 annotated tag 说明为准。
-7. 检查 README 的“最新版”链接能进入新 Release。
-8. 需要另一平台验证时，更新 `coordination/` 中对应记录。
+5. Release 自动生成的 `Source code (zip)` 与 `Source code (tar.gz)` 可以下载，并对应本次发布标签。
+6. 下载并启动至少一个当前平台安装包。
+7. Release 正文的「下载指引」链接可正常访问；链接或正文有误时可用 `gh release edit --notes-file` 无损修正，但下次发版仍以 annotated tag 说明为准。
+8. 检查 README 的“最新版”链接能进入新 Release。
+9. 需要另一平台验证时，更新 `coordination/` 中对应记录。
