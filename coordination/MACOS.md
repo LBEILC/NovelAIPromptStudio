@@ -2,6 +2,15 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+## Verify cached Gallery thumbnails after Workbench restart restore
+
+- Status: Pending
+- Date/source: 2026-08-23, Windows
+- Related commit: `3600610`
+- Action: On an unlocked macOS session, check out current `main` and follow `doc/manual-verification-20260823-gallery-thumbnail-restart.md`. Open multiple Gallery images in Workbench, quit while Workbench is active, restart, let the Workbench session restore, and enter Gallery without first visiting Trash. Also cover grouped cards, later progressively rendered items, page round trips, and light/dark themes.
+- Expected: Gallery thumbnails that were loaded into Chromium's cache while Gallery was hidden are recognized as complete when Gallery becomes visible. They do not remain transparent after restart, and switching to Trash and back is no longer required. Normal lazy loading and thumbnail fade-in remain intact.
+- Observed: Windows clean `npm ci`, all 253 tests in 41 files, and the production build passed. Automated coverage distinguishes cached complete images from incomplete or failed images. Windows and macOS interactive verification remain pending.
+
 ## Verify Workbench Prompt dirty state after restart
 
 - Status: Pending
