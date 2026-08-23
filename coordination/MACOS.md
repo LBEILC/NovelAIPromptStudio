@@ -2,6 +2,15 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+## Verify redesigned Settings and built-in Help Center
+
+- Status: Pending
+- Date/source: 2026-08-23, Windows
+- Related commit: `c9555f9`
+- Action: On macOS, check out current `main` containing `c9555f9` and follow `doc/manual-verification-20260823-settings-help-center.md`. Pay particular attention to the left-aligned grouped Settings navigation, wide/narrow layouts, light/dark/follow-system themes, Reduce Motion and motion-off static help demonstrations, keyboard focus, Command shortcut wording, diagnostic copy content, and the two official GitHub feedback links opening in the default browser without submitting anything.
+- Expected: Settings preserves all existing appearance, resource, AI, Tag-data, and update behavior while presenting a clearer grouped navigation and wider content rhythm. The bundled Help Center works offline, searches six task-oriented topics, uses only side-effect-free Lobe UI/DOM/CSS demonstrations, adapts to macOS themes and reduced motion, and never exposes local paths, Prompt content, credentials, or logs in diagnostics or feedback URLs.
+- Observed: Windows clean `npm ci`, all 263 tests in 44 files, the production build, and the Lobe UI 5.20.3 audit passed. Interactive Windows and macOS verification remain pending.
+
 ## Verify GPL license resources in macOS packages
 
 - Status: Pending
