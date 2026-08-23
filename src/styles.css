@@ -177,7 +177,7 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .workbench-filmstrip-viewport { min-width: 0; overflow-x: auto; flex: 1; scrollbar-width: none; overscroll-behavior-inline: contain; }
 .workbench-filmstrip-viewport::-webkit-scrollbar { display: none; }
 .workbench-filmstrip-control { flex: 0 0 auto; }
-.workbench-tabs-list { width: max-content; min-width: 100%; min-height: 58px; justify-content: flex-start; gap: 7px !important; align-items: center; }
+.workbench-tabs-list { width: max-content; min-width: 100%; min-height: 58px; justify-content: flex-start; gap: 4px !important; align-items: center; }
 .workbench-tabs-indicator { opacity: 1; transition-duration: var(--duration-fast) !important; transition-property: inset-inline-start, inset-block-start, width, height, transform, opacity !important; transition-timing-function: var(--ease-smooth-out) !important; }
 .workbench-tabs-list.sorting .workbench-tabs-indicator { opacity: 0; }
 .workbench-tab { position: relative; width: 58px; min-width: 58px; max-width: 58px; height: 58px; min-height: 58px; overflow: hidden; padding: 5px !important; flex: 0 0 58px !important; touch-action: none; cursor: grab; transform: var(--workbench-tab-transform, none) !important; transition: var(--workbench-tab-transition, color 120ms cubic-bezier(.22, 1, .36, 1), background-color 120ms cubic-bezier(.22, 1, .36, 1)) !important; }

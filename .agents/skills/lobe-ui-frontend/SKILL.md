@@ -34,6 +34,7 @@ Use the installed package as the source of truth. Lobe UI evolves quickly; never
 - Preserve the product's existing visual language. Do not add decorative labels, explanatory UI copy, gradients, glass effects, or animation merely because a request mentions a design requirement.
 - Keep developer requirements in code and documentation, not in user-facing interface copy.
 - Verify CSS selectors after a Base UI migration. Prefer semantic classes over implementation selectors such as `.ant-btn`.
+- Treat CSS-in-JS component styles as potentially later than static application CSS in production. For app-specific geometry on Lobe UI or Base UI primitives, do not rely on an equal-specificity `width` or `height` override winning by source order. Prefer injection-order-independent constraints such as matching `min-*` / `max-*` bounds, use a narrowly scoped specificity increase only when constraints cannot express the invariant, and add regression coverage for the required geometry.
 - Do not combine a dependency upgrade with a component migration unless the user requests both or the installed version blocks the migration.
 
 ## Completion Criteria

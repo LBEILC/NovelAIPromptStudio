@@ -44,8 +44,9 @@ describe('WorkbenchTabDragOverlay', () => {
 });
 
 describe('WorkbenchTabLabel', () => {
-  it('keeps the filmstrip height independent of Base UI runtime style order', () => {
+  it('keeps the filmstrip geometry independent of Base UI runtime style order', () => {
     const styles = fs.readFileSync(new URL('./styles.css', import.meta.url), 'utf8');
+    expect(styles).toMatch(/\.workbench-tabs-list \{[^}]*gap: 4px !important;/);
     expect(styles).toMatch(/\.workbench-tab \{[^}]*min-height: 58px;/);
   });
 
