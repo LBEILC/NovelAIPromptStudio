@@ -21,9 +21,10 @@ Use the installed package as the source of truth. Lobe UI evolves quickly; never
 5. Use official Lobe UI documentation or its source repository when local types do not answer the question. For version-sensitive decisions, compare the documentation against the installed version.
 6. Read [component-selection.md](references/component-selection.md) before introducing or replacing a component.
 7. Read [migration-rules.md](references/migration-rules.md) when changing imports, replacing deprecated components, or upgrading `@lobehub/ui`.
-8. Implement the smallest coherent change. Preserve unrelated worktree changes.
-9. Validate relevant states: light and dark themes, keyboard focus, disabled/loading behavior, long text, narrow panels, and reduced motion.
-10. Run the repository's tests and production build. Follow its cross-platform handoff and delivery instructions.
+8. Read [runtime-style-order.md](references/runtime-style-order.md) when adding custom CSS to a Lobe UI component or investigating a development/production visual mismatch.
+9. Implement the smallest coherent change. Preserve unrelated worktree changes.
+10. Validate relevant states: light and dark themes, keyboard focus, disabled/loading behavior, long text, narrow panels, and reduced motion.
+11. Run the repository's tests and production build. Follow its cross-platform handoff and delivery instructions.
 
 ## Required Practices
 
@@ -34,7 +35,7 @@ Use the installed package as the source of truth. Lobe UI evolves quickly; never
 - Preserve the product's existing visual language. Do not add decorative labels, explanatory UI copy, gradients, glass effects, or animation merely because a request mentions a design requirement.
 - Keep developer requirements in code and documentation, not in user-facing interface copy.
 - Verify CSS selectors after a Base UI migration. Prefer semantic classes over implementation selectors such as `.ant-btn`.
-- Treat CSS-in-JS component styles as potentially later than static application CSS in production. For app-specific geometry on Lobe UI or Base UI primitives, do not rely on an equal-specificity `width` or `height` override winning by source order. Prefer injection-order-independent constraints such as matching `min-*` / `max-*` bounds, use a narrowly scoped specificity increase only when constraints cannot express the invariant, and add regression coverage for the required geometry.
+- Treat CSS-in-JS component styles as potentially later than static application CSS in production. Any deliberate application override—including layout, spacing, typography, color, background, or borders—must not rely on equal specificity or development-time source order. Preserve component hover, active, focus, disabled, and loading states while making the base override deterministic, and add regression coverage for the intended invariant.
 - Do not combine a dependency upgrade with a component migration unless the user requests both or the installed version blocks the migration.
 
 ## Completion Criteria
