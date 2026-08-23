@@ -15,11 +15,14 @@ describe('production-safe Lobe UI overrides', () => {
     expect(styles).toMatch(/\.workbench-source-panel\.workbench-source-panel \{[^}]*padding:/);
     expect(styles).toMatch(/\.settings-nav\.settings-nav \{[^}]*padding:/);
     expect(styles).toMatch(/\.settings-nav-group > button\.active \{[^}]*background:/);
+    expect(styles).toMatch(/\.settings-nav-group > button strong \{[^}]*line-height: 1\.45;/);
     expect(styles).toMatch(/\.settings-font-select\.settings-font-select \{[^}]*width: 260px;/);
     expect(styles).toMatch(/\.gallery-size-slider\.gallery-size-slider \{[^}]*width: 96px;/);
   });
 
   it('keeps built-in help demonstrations compatible with motion preferences', () => {
+    expect(styles).toMatch(/\.help-article > header \{[^}]*align-items: center;/);
+    expect(styles).toMatch(/\.help-article > header > svg \{[^}]*margin-inline-start: 5px;/);
     expect(styles).toMatch(/\.help-marquee-box \{[^}]*animation: help-marquee-box/);
     expect(styles).toMatch(/html\[data-motion="off"\] \*, html\[data-motion="off"\] \*::before, html\[data-motion="off"\] \*::after \{[^}]*animation-duration: \.01ms !important;/);
   });
