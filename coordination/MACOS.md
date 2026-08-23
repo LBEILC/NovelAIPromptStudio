@@ -2,6 +2,15 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+## Verify offline DSO Tag dictionary and package resources
+
+- Status: Pending
+- Date/source: 2026-08-24, Windows
+- Related commit: `3c62134`
+- Action: On macOS, check out current `main` containing `3c62134`, run `npm ci`, `npm run dso:verify`, `npm test`, `npm run build`, and `npm run package -- --mac`. Inspect the Intel and Apple Silicon `.app` bundles and confirm `Contents/Resources/app.asar` contains `electron/data/dso-dictionary.json`, while `Contents/Resources/LICENSES/DanbooruSearchOnline/README.md` and `LICENSE` are present and the packaged DSO license has SHA-256 `3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986`. Then follow `doc/manual-verification-20260824-offline-dso-tag-dictionary.md` on macOS, using Command where the checklist refers to platform modifiers.
+- Expected: Without configuring an AI model, DSO hits such as `blue_hair` and `school_uniform` receive Chinese translations and deterministic Body/Clothing classifications; unknown Tags return safely as partial results; manual corrections remain highest priority; DSO-missing bare artist names can still use the Danbooru validator. Both architectures package the same pinned 52,475-entry runtime dictionary and its GPLv3 attribution without changing startup, theme, narrow-layout, or update artifact behavior.
+- Observed: The clean Windows worktree for `3c62134` passed `npm ci`, DSO verification for 52,475 Tags and 93 Tag Groups, all 272 tests in 46 files, the production build, the Lobe UI 5.20.3 audit with zero issues, and NSIS packaging. The unpacked package contains the runtime dictionary plus byte-identical DSO GPLv3 text and attribution. macOS packaging and interactive verification remain pending.
+
 ## Verify redesigned Settings and built-in Help Center
 
 - Status: Pending
