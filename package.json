@@ -10,11 +10,13 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
+    "dev:demo": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron . --dev --profile=demo\"",
     "build": "vite build",
     "icons:generate": "node scripts/generate-app-icons.mjs",
     "package": "npm run build && electron-builder --publish never",
     "verify:update-artifacts": "node scripts/verify-update-artifacts.mjs release",
     "start": "electron .",
+    "start:demo": "electron . --profile=demo",
     "test": "vitest run"
   },
   "dependencies": {

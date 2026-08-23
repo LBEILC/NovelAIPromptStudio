@@ -16,6 +16,7 @@ import { listSystemFonts } from './fonts.js';
 import { describeAssetDirectory, migrateAssetDirectory } from './libraryStorage.js';
 import { cleanupWorkbenchTemporaryImages, readClipboardImageSource } from './clipboardImages.js';
 import { checkForUpdates as checkReleaseUpdates, getUpdateCapabilities } from './updates.js';
+import { configureAppProfile } from './appProfile.js';
 import {
   copyImageToClipboard,
   copyManagedImageToClipboard,
@@ -29,6 +30,7 @@ import {
 const { autoUpdater } = electronUpdater;
 
 app.setName('NovelAI Prompt Studio');
+configureAppProfile(app);
 if (process.platform === 'win32') app.setAppUserModelId('studio.novelai.prompt');
 protocol.registerSchemesAsPrivileged([{ scheme: 'novelai-media', privileges: { secure: true, standard: true, supportFetchAPI: true, stream: true } }]);
 

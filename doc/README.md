@@ -11,6 +11,7 @@
 | [当前产品边界](./product-boundary.md) | 说明应用现在是什么、已经具备什么、明确不做什么 | 当前有效 |
 | [产品品味与体验改进计划](./design-improvement-plan.md) | 分阶段改进对外呈现、首次使用、认知密度、发现性与品牌辨识度 | 执行中（批次 A） |
 | [v0.9 宣传演示数据规范](./promo-demo-data-v090.md) | 约束批次 A 的独立演示图库、文件命名、取图状态与隐私检查 | 执行中 |
+| [独立演示环境](./demo-profile.md) | 说明命名 Profile 的启动方式、隔离边界与演示图库准备流程 | 当前有效 |
 | [Lobe 视觉层级与颜色语义规范](./lobe-visual-language.md) | 约束页面层级、组件语义、主题与 Tag 配色 | 当前有效 |
 | [发版指南](./release-guide.md) | 说明版本号、验证、Release Note、标签、Action 与失败处理流程 | 当前有效 |
 | [跨平台协作说明](../coordination/README.md) | 说明 Windows 与 macOS 之间如何提交、完成和归档交接 | 当前有效 |
@@ -24,6 +25,7 @@
 手工验证文档在等待用户结果期间保留在 `doc/` 根目录；记录结果后移入 `archive/`。当前待验收项：
 
 - [批次 A 人工取图与验收清单](./manual-verification-20260823-batch-a-promo-capture.md)
+- [Demo Profile 人工验证清单](./manual-verification-20260823-demo-profile.md)
 
 需要另一操作系统完成的检查不在这里重复维护，以 [`coordination/`](../coordination/README.md) 中的当前交接文件为准。
 
