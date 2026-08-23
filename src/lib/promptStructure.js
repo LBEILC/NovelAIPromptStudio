@@ -4,6 +4,22 @@ import { analyzeNovelAIAutomaticPrompts, extractNovelAIAutoSettings } from './no
 const createId = () => crypto.randomUUID();
 export const MAX_PROMPT_CHARACTERS = 22;
 
+const PROMPT_ANNOTATION_FIELDS = new Set([
+  'category',
+  'category_source',
+  'note',
+  'translation',
+  'translation_source',
+]);
+
+export function isPromptAnnotationField(field) {
+  return PROMPT_ANNOTATION_FIELDS.has(field);
+}
+
+export function isPromptAnnotationPatch(patch = {}) {
+  return Object.keys(patch).every(isPromptAnnotationField);
+}
+
 function safeObject(value) {
   if (value && typeof value === 'object' && !Array.isArray(value)) return value;
   if (typeof value !== 'string' || !value.trim()) return {};
@@ -174,6 +190,11 @@ export function updatePromptScope(project, scopeKey, tags, rawPrompt) {
       characters: structure.characters.map((character) => character.id === characterId ? { ...character, [field]: tags, [rawField]: nextRawPrompt } : character),
     },
   };
+}
+
+export function updatePromptScopeAnnotations(project, scopeKey, tags) {
+  const scope = getPromptScope(project, scopeKey);
+  return updatePromptScope(project, scopeKey, tags, scope.raw_prompt);
 }
 
 export function updatePromptCharacter(project, characterId, patch) {

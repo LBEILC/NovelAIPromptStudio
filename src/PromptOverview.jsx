@@ -15,7 +15,7 @@ import {
 } from '@lobehub/ui/base-ui';
 import { Check, MoreHorizontal, Pencil, Trash2, X } from 'lucide-react';
 import { analyzePromptBatch, CATEGORY_LABELS, CATEGORY_OPTIONS, inferCategory, parsePromptPreservingEdits } from './lib/prompt.js';
-import { addPromptCharacter, getPromptScope, MAX_PROMPT_CHARACTERS, removePromptCharacter, updatePromptCharacter, updatePromptScope } from './lib/promptStructure.js';
+import { addPromptCharacter, getPromptScope, isPromptAnnotationPatch, MAX_PROMPT_CHARACTERS, removePromptCharacter, updatePromptCharacter, updatePromptScope, updatePromptScopeAnnotations } from './lib/promptStructure.js';
 import Icon from './components/Icon.jsx';
 import { MarqueeSelectionOverlay, useMarqueeSelection } from './components/MarqueeSelection.jsx';
 import { TagCategorySection, TagChip, TagHoverPreview, TagPopover, TagQuickEditor } from './components/TagManagement.jsx';
@@ -595,7 +595,10 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
 
   const updateTag = (scopeKey, tagId, patch) => {
     const scope = getPromptScope(project, scopeKey);
-    updateProject(updatePromptScope(project, scopeKey, scope.tags.map((tag) => tag.id === tagId ? { ...tag, ...patch } : tag)));
+    const tags = scope.tags.map((tag) => tag.id === tagId ? { ...tag, ...patch } : tag);
+    updateProject(isPromptAnnotationPatch(patch)
+      ? updatePromptScopeAnnotations(project, scopeKey, tags)
+      : updatePromptScope(project, scopeKey, tags));
   };
 
   const changeAddingScope = (scopeKey) => {

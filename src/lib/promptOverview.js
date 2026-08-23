@@ -1,5 +1,5 @@
 import { CATEGORY_OPTIONS, formatTag, normalizeSearch } from './prompt.js';
-import { getPromptScopes, updatePromptScope } from './promptStructure.js';
+import { getPromptScopes, isPromptAnnotationPatch, updatePromptScope, updatePromptScopeAnnotations } from './promptStructure.js';
 
 export const DEFAULT_OVERVIEW_FILTERS = {
   category: 'All',
@@ -278,7 +278,10 @@ export function updateOverviewTags(project, selectedKeys = [], patch = {}) {
       changed = true;
       return { ...tag, ...patch };
     });
-    return changed ? updatePromptScope(current, scope.key, nextTags) : current;
+    if (!changed) return current;
+    return isPromptAnnotationPatch(patch)
+      ? updatePromptScopeAnnotations(current, scope.key, nextTags)
+      : updatePromptScope(current, scope.key, nextTags);
   }, project);
 }
 

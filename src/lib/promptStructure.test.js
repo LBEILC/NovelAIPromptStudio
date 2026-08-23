@@ -13,6 +13,7 @@ import {
   positiveRawPromptScopes,
   syncProjectPromptMetadata,
   updatePromptScope,
+  updatePromptScopeAnnotations,
   updatePromptCharacter,
 } from './promptStructure.js';
 import { parsePrompt } from './prompt.js';
@@ -91,6 +92,16 @@ describe('NovelAI V4 prompt structure', () => {
 
     expect(hydrated.metadata.prompt_raw).toBe(raw);
     expect(getPromptScope(hydrated, 'base:prompt').raw_prompt).toBe(raw);
+
+    const annotatedTags = hydrated.tags.map((tag) => ({
+      ...tag,
+      category: 'Body',
+      category_source: 'dso',
+      translation: `译文：${tag.tag}`,
+      translation_source: 'dso',
+    }));
+    const annotated = syncProjectPromptMetadata(updatePromptScopeAnnotations(hydrated, 'base:prompt', annotatedTags));
+    expect(annotated.metadata.prompt_raw).toBe(raw);
 
     const editedTags = hydrated.tags.map((tag) => tag.tag === 'amazing quality' ? { ...tag, tag: 'very aesthetic' } : tag);
     const edited = syncProjectPromptMetadata(updatePromptScope(hydrated, 'base:prompt', editedTags));

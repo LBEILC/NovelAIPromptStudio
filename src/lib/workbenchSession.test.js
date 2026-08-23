@@ -70,6 +70,21 @@ describe('workbench session v2', () => {
     expect(workbenchTabHasChanges(restored)).toBe(true);
   });
 
+  it('does not treat translations, categories, or notes as Prompt modifications', () => {
+    const tab = createWorkbenchTab(fixture());
+    Object.assign(tab.project.tags[0], {
+      category: 'Body',
+      category_source: 'dso',
+      note: '本地注释',
+      translation: '一名女孩',
+      translation_source: 'dso',
+    });
+
+    expect(workbenchTabHasChanges(tab)).toBe(false);
+    tab.project.tags[0].weight = 1.2;
+    expect(workbenchTabHasChanges(tab)).toBe(true);
+  });
+
   it('detects prompt edits independently in each tab', () => {
     let session = createWorkbenchSession(fixture());
     session = addWorkbenchTab(session, fixture('workbench-2', 'C:\\images\\other.png'));

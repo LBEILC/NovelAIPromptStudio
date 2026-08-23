@@ -1,4 +1,4 @@
-import { promptSnapshot, restorePromptSnapshot, syncProjectPromptMetadata } from './promptStructure.js';
+import { isPromptAnnotationField, promptSnapshot, restorePromptSnapshot, syncProjectPromptMetadata } from './promptStructure.js';
 import { CATEGORY_OPTIONS } from './prompt.js';
 
 export const WORKBENCH_SESSION_KEY = 'novelai-prompt-studio.workbench-session.v2';
@@ -192,7 +192,7 @@ function normalizePromptChangeValue(value) {
   if (Array.isArray(value)) return value.map(normalizePromptChangeValue);
   if (!value || typeof value !== 'object') return value;
   return Object.keys(value)
-    .filter((key) => key !== 'id')
+    .filter((key) => key !== 'id' && !isPromptAnnotationField(key))
     .sort()
     .reduce((normalized, key) => {
       normalized[key] = normalizePromptChangeValue(value[key]);

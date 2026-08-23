@@ -11,7 +11,7 @@ import GalleryPage from './GalleryPage.jsx';
 import SettingsPage from './SettingsPage.jsx';
 import WorkbenchPage from './WorkbenchPage.jsx';
 import Icon from './components/Icon.jsx';
-import { allPromptTags, getPromptScope, normalizePromptStructure, syncProjectPromptMetadata, updatePromptScope } from './lib/promptStructure.js';
+import { allPromptTags, getPromptScope, normalizePromptStructure, syncProjectPromptMetadata, updatePromptScope, updatePromptScopeAnnotations } from './lib/promptStructure.js';
 import { CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatTag, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
 import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT, fontStack } from './lib/fonts.js';
 import { assessDroppedFiles, assessWorkbenchDroppedFiles } from './lib/importDrop.js';
@@ -789,7 +789,7 @@ export default function App({ appearance, setAppearance }) {
       entries.forEach((entry, index) => {
         const scope = getPromptScope(nextProject, entry.scopeKey);
         const item = result.items?.[index] || {};
-        nextProject = updatePromptScope(nextProject, scope.key, scope.tags.map((tag) => tag.id === entry.tag.id ? { ...tag, ...item, translation_source: item.translation_source || '', category_source: item.category_source || '' } : tag));
+        nextProject = updatePromptScopeAnnotations(nextProject, scope.key, scope.tags.map((tag) => tag.id === entry.tag.id ? { ...tag, ...item, translation_source: item.translation_source || '', category_source: item.category_source || '' } : tag));
       });
       const updated = { ...syncProjectPromptMetadata(nextProject), updated_at: new Date().toISOString() };
       scheduleAnnotations(updated);
@@ -828,7 +828,7 @@ export default function App({ appearance, setAppearance }) {
     }
     const project = activeTab.project;
     const scope = getPromptScope(project, scopeKey);
-    const setCategory = (category) => updateWorkbenchProject(updatePromptScope(project, scope.key, scope.tags.map((item) => item.id === tag.id ? { ...item, category, category_source: 'manual' } : item)));
+    const setCategory = (category) => updateWorkbenchProject(updatePromptScopeAnnotations(project, scope.key, scope.tags.map((item) => item.id === tag.id ? { ...item, category, category_source: 'manual' } : item)));
     const moveContext = overviewMoveContext(project, [overviewTagKey(scopeKey, tag.id)]);
     const moveTagTo = (targetScopeKey) => {
       const target = moveContext.options.find((option) => option.key === targetScopeKey);
