@@ -7,9 +7,18 @@ Only current actionable macOS requests are kept here. Earlier completed, superse
 - Status: Pending
 - Date/source: 2026-08-23, Windows
 - Related commit: `1621812`
-- Action: On an unlocked macOS session, check out current `main` containing `1621812`, run the automated checks, then adapt `doc/manual-verification-20260823-demo-profile.md` for macOS. Start the default profile and record an existing library item, quit, start `npm run start:demo`, import disposable demo images, create a collection and change one local UI preference, restart the Demo Profile, then return to the default profile. Also inspect `~/Library/Application Support/` after both instances are closed and confirm the default and `NovelAI Prompt Studio-demo` roots are siblings with independent `data`, `assets`, `session`, and `workbench-temp` contents.
+- Action: On an unlocked macOS session, check out current `main` containing `1621812`, run the automated checks, then adapt `doc/archive/manual-verification-20260823-demo-profile.md` for macOS. Start the default profile and record an existing library item, quit, start `npm run start:demo`, import disposable demo images, create a collection and change one local UI preference, restart the Demo Profile, then return to the default profile. Also inspect `~/Library/Application Support/` after both instances are closed and confirm the default and `NovelAI Prompt Studio-demo` roots are siblings with independent `data`, `assets`, `session`, and `workbench-temp` contents.
 - Expected: `--profile=demo` isolates the SQLite database, preferences including saved credentials and recent paths, managed assets, Chromium localStorage/session data, and Workbench temporary files. Demo state survives a restart, the original profile remains unchanged, paths with spaces work, and an ordinary launch remains backward compatible.
-- Observed: Windows `npm ci`, all 261 tests in 43 files, and the production build passed. Windows and macOS interactive verification remain pending.
+- Observed: Windows `npm ci`, all 261 tests in 43 files, and the production build passed. On 2026-08-23, the user reported no issues after completing the Windows isolation workflow; the completed Windows checklist is archived. macOS interactive verification remains pending.
+
+## Verify v0.9 promotional screenshot parity
+
+- Status: Pending
+- Date/source: 2026-08-23, Windows
+- Related commit: `4237554`
+- Action: On an unlocked macOS session, check out `4237554` or later and compare the seven `doc/screenshots/*-v090.webp` assets referenced by README with the current macOS application. Confirm that Workbench, Gallery grouping and batch selection, Appearance settings, and About & Updates do not imply Windows-only product behavior. Check the README at a typical GitHub content width and record any platform-specific mismatch in `doc/manual-verification-20260823-batch-a-promo-capture.md`.
+- Expected: The Windows screenshots remain truthful product illustrations on macOS; only window chrome and platform-specific update wording differ. Text, controls, collections, Prompt scopes, grouping, and batch-action semantics match the current macOS build, and the images remain legible at README width.
+- Observed: Windows capture and visual correspondence passed for `4237554`; macOS comparison remains pending.
 
 ## Verify packaged Lobe UI style parity
 
