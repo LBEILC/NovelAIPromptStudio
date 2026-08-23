@@ -8,15 +8,15 @@ vi.mock('@lobehub/ui', () => ({
 vi.mock('@lobehub/ui/base-ui', () => ({
   Button: ({ children, icon, ...props }) => <button {...props}>{icon}{children}</button>,
   Input: (props) => <input {...props}/>,
-  Segmented: ({ options = [], value }) => <div>{options.find((option) => option.value === value)?.label}</div>,
+  Segmented: ({ onChange, options = [], size, value, ...props }) => <div {...props}>{options.find((option) => option.value === value)?.label}</div>,
 }));
 
 import HelpCenter, { filterHelpTopics, HELP_GROUPS, HELP_TOPICS } from './HelpCenter.jsx';
 
 describe('HelpCenter', () => {
-  it('organizes bundled help into four small task groups', () => {
+  it('organizes bundled help into expandable task groups', () => {
     expect(HELP_GROUPS.map((group) => group.title)).toEqual(['开始使用', '工作台', '图片库', '参考与支持']);
-    expect(HELP_GROUPS.every((group) => group.topics.length <= 4)).toBe(true);
+    expect(HELP_GROUPS.every((group) => group.topics.length > 0)).toBe(true);
     expect(HELP_TOPICS).toHaveLength(16);
     expect(new Set(HELP_TOPICS.map((topic) => topic.id)).size).toBe(HELP_TOPICS.length);
   });
@@ -37,6 +37,7 @@ describe('HelpCenter', () => {
       platform="win32"
       studio={{ openReleasePage: async () => ({ ok: true }) }}
     />);
+    const translationHtml = renderToStaticMarkup(HELP_TOPICS.find((topic) => topic.id === 'translation-and-categories').content);
 
     expect(html).toContain('帮助与反馈');
     expect(html).toContain('4 组 · 16 篇');
@@ -49,6 +50,10 @@ describe('HelpCenter', () => {
     expect(html).toContain('打开图片，找到并复制 Prompt');
     expect(html).toContain('翻译与分类 Tag');
     expect(html).toContain('读懂分类视图，并整理当前需要的 Tag');
+    expect(translationHtml).toContain('翻译分类演示分组方式');
+    expect(translationHtml).toContain('按钮只处理当前可见的 4 个 Tag');
+    expect(translationHtml).toContain('你的修正');
+    expect(translationHtml).toContain('可选 AI');
     expect(html).toContain('<h3>从一张图片开始</h3><p>打开图片，找到并复制 Prompt</p>');
     expect(html).toContain('报告问题');
     expect(html).toContain('提出建议');

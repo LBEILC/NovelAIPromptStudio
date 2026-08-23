@@ -31,6 +31,8 @@ describe('production-safe Lobe UI overrides', () => {
     expect(styles).not.toMatch(/\.help-facts li:first-child \{[^}]*border-top:/);
     expect(styles).toMatch(/\.help-table-wrap \{[^}]*overflow-x: auto;/);
     expect(styles).toMatch(/\.help-troubleshooting > div \{[^}]*border-bottom:/);
+    expect(styles).toMatch(/\.help-translation-demo \{[^}]*overflow: hidden;[^}]*background: var\(--raised\);/);
+    expect(styles).toMatch(/\.help-resolution-path \{[^}]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/);
     expect(styles).toMatch(/\.help-marquee-box \{[^}]*animation: help-marquee-box/);
     expect(styles).toMatch(/html\[data-motion="off"\] \*, html\[data-motion="off"\] \*::before, html\[data-motion="off"\] \*::after \{[^}]*animation-duration: \.01ms !important;/);
   });

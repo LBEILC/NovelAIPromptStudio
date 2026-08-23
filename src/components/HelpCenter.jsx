@@ -38,6 +38,85 @@ function PromptScopeDemo() {
   </div>;
 }
 
+const TRANSLATION_DEMO_TAGS = [
+  { category: '角色组成', categoryKey: 'subject', original: '1girl', scope: 'Character 1', source: 'DSO 离线', translation: '1个女孩' },
+  { category: '外貌身体', categoryKey: 'body', original: 'blue hair', scope: 'Character 1', source: 'DSO 离线', translation: '蓝色头发' },
+  { category: '服装配饰', categoryKey: 'clothing', original: 'school uniform', scope: 'Character 1', source: '用户修正', translation: '校服' },
+  { category: '未分类', categoryKey: 'unsorted', original: 'custom visual motif', scope: 'Base Prompt', source: '等待补全', translation: '' },
+];
+
+function TranslationCategoryDemo() {
+  const [organized, setOrganized] = useState(true);
+  const [viewMode, setViewMode] = useState('category');
+  const [language, setLanguage] = useState('bilingual');
+  const [category, setCategory] = useState('all');
+  const resolvedTags = TRANSLATION_DEMO_TAGS.map((tag) => organized ? tag : { ...tag, category: '未分类', categoryKey: 'unsorted', source: '', translation: '' });
+  const categoryOptions = organized
+    ? [{ key: 'all', label: '全部' }, ...TRANSLATION_DEMO_TAGS.map((tag) => ({ key: tag.categoryKey, label: tag.category }))]
+    : [{ key: 'all', label: '全部' }, { key: 'unsorted', label: '未分类' }];
+  const visibleTags = resolvedTags.filter((tag) => category === 'all' || tag.categoryKey === category);
+  const groupKey = viewMode === 'category' ? 'category' : 'scope';
+  const groups = visibleTags.reduce((result, tag) => {
+    const title = tag[groupKey];
+    const current = result.find((group) => group.title === title);
+    if (current) current.tags.push(tag);
+    else result.push({ title, tags: [tag] });
+    return result;
+  }, []);
+
+  const toggleOrganized = () => {
+    if (organized) {
+      setOrganized(false);
+      setViewMode('structure');
+      setLanguage('original');
+      setCategory('all');
+      return;
+    }
+    setOrganized(true);
+    setViewMode('category');
+    setLanguage('bilingual');
+  };
+
+  return <div className="help-translation-demo">
+    <div className="help-translation-toolbar">
+      <div className="help-translation-control"><span>总览分组</span><LobeSegmented aria-label="翻译分类演示分组方式" onChange={setViewMode} options={[{ label: '按结构', value: 'structure' }, { label: '按分类', value: 'category' }]} size="small" value={viewMode}/></div>
+      <div className="help-translation-control"><span>显示语言</span><LobeSegmented aria-label="翻译分类演示显示语言" onChange={setLanguage} options={[{ label: '原文', value: 'original' }, { label: '翻译', value: 'translated' }, { label: '对照', value: 'bilingual' }]} size="small" value={language}/></div>
+      <LobeButton aria-pressed={organized} icon={<Icon name="spark" size={14}/>} onClick={toggleOrganized} size="small" type={organized ? 'default' : 'primary'}>{organized ? '查看整理前' : `翻译与分类 ${visibleTags.length}`}</LobeButton>
+    </div>
+    <div aria-label="演示 Tag 分类筛选" className="help-translation-filters">
+      {categoryOptions.map((option) => {
+        const count = option.key === 'all' ? resolvedTags.length : resolvedTags.filter((tag) => tag.categoryKey === option.key).length;
+        return <button aria-pressed={category === option.key} className={category === option.key ? 'active' : ''} key={option.key} onClick={() => setCategory(option.key)} type="button">{option.label} <b>{count}</b></button>;
+      })}
+    </div>
+    <div aria-live="polite" className="help-translation-groups">
+      {groups.map((group) => <section key={group.title}>
+        <header><strong>{group.title}</strong><span>{group.tags.length}</span></header>
+        <div className="help-translation-tags">
+          {group.tags.map((tag) => <span className={`help-translation-tag cat-${tag.categoryKey}`} key={tag.original}>
+            <span>
+              <strong>{language === 'translated' && tag.translation ? tag.translation : tag.original}</strong>
+              {language === 'bilingual' && <small>{tag.translation || '等待补全译文'}</small>}
+            </span>
+            {organized && <small>{viewMode === 'structure' ? tag.category : tag.source}</small>}
+          </span>)}
+        </div>
+      </section>)}
+    </div>
+    <footer><span><Icon name="filter" size={13}/>按钮只处理当前可见的 {visibleTags.length} 个 Tag</span><span><Icon name="copy" size={13}/>复制始终使用原始 Tag</span></footer>
+  </div>;
+}
+
+function TranslationResolutionPath() {
+  return <ol aria-label="翻译与分类处理优先顺序" className="help-resolution-path">
+    <li><span>1</span><strong>你的修正</strong><small>本地 · 最高优先</small></li>
+    <li><span>2</span><strong>画师验证</strong><small>仅缺失名称 · 联网</small></li>
+    <li><span>3</span><strong>DSO 词典</strong><small>精确命中 · 离线</small></li>
+    <li><span>4</span><strong>本地规则</strong><small>继续推断 · 离线</small></li>
+    <li><span>5</span><strong>可选 AI</strong><small>只补全剩余 Tag</small></li>
+  </ol>;
+}
+
 function MarqueeDemo() {
   return <div aria-hidden="true" className="help-marquee-demo">
     {['1girl', 'solo', 'looking at viewer', 'upper body', 'soft light', 'outdoors'].map((tag) => <span key={tag}>{tag}</span>)}
@@ -190,27 +269,12 @@ export const HELP_GROUPS = [
         summary: '读懂分类视图，并整理当前需要的 Tag',
         keywords: '翻译 分类 tag 按分类 按结构 原文 译文 对照 DSO 离线 词典 Danbooru AI 补全 未分类 Tag 数据 缓存 手动 修正 可见 选中',
         content: <>
-          <p>翻译帮助阅读英文 Tag；分类把 Tag 按角色组成、外貌身体、服装配饰、动作表情、环境背景、镜头光影等用途重新分组。两者只改变工作台中的显示和本地数据，不会把中文译文写进 Prompt，也不会改写原图。</p>
-          <HelpSection title="分类视图与分类筛选">
-            <HelpFacts items={[
-              { title: '按结构', detail: '保留 Base、Character、Prompt 与 Undesired 的原始层级，适合检查 Tag 属于哪里。' },
-              { title: '按分类', detail: '把当前可见 Tag 按用途集中展示，适合一起检查服装、动作、环境或镜头内容；不会移动 Tag 的作用域。' },
-              { title: '分类筛选', detail: '点击某个分类只显示该类 Tag，并同步影响“当前可见”的翻译、复制和数量。再次选择“全部”即可恢复。' },
-              { title: '原文、翻译与对照', detail: '只切换阅读方式；无论当前显示哪一种，生成用复制内容仍采用原始 Tag。' },
-            ]}/>
+          <p>试着切换分组、语言和分类。按分类只重新组织当前显示，原来的 Base / Character 作用域不会改变。</p>
+          <TranslationCategoryDemo/>
+          <HelpSection title="从哪里得到结果">
+            <TranslationResolutionPath/>
           </HelpSection>
-          <HelpSection title="使用翻译与分类">
-            <HelpSteps items={[
-              { title: '确定处理范围', detail: '顶部“翻译与分类”处理当前筛选后可见的 Tag；只想整理一部分时，可以先筛选，或多选 Tag 后使用批量翻译。' },
-              { title: '开始整理', detail: '应用先采用你的历史修正，再依次尝试 Danbooru 画师验证、内置 DSO 离线词典和本地规则。' },
-              { title: '按需使用 AI', detail: '只有仍缺少译文或可靠分类、并且已经配置模型的 Tag，才会发送到你配置的 OpenAI-compatible 服务补全。' },
-              { title: '检查并修正结果', detail: '切换到“对照”或“按分类”检查结果；可以右键单个 Tag、使用多选工具，或在设置 → Tag 数据中修改。' },
-            ]}/>
-          </HelpSection>
-          <HelpSection title="结果与未分类">
-            <p>DSO 精确命中的翻译和分类不需要 AI。并非所有 General Tag 都有可靠分类，未识别内容可以保留为“未分类”或缺少译文；这不会阻止编辑和复制。整理结果保存在本地 Tag 数据中，手动修正始终具有最高优先级。</p>
-          </HelpSection>
-          <p className="help-note"><Icon name="info" size={15}/>删除 Tag 数据只会移除翻译与分类缓存，不会删除工作台 Tag 或修改图片；以后再次整理时，应用可能重新生成结果。</p>
+          <p className="help-note"><Icon name="info" size={15}/>未识别内容可以保留为“未分类”或缺少译文，不影响编辑与复制。你可以右键或多选修正，也可以前往设置 → Tag 数据统一管理；删除其中的缓存不会删除工作台 Tag 或修改图片。</p>
         </>,
       },
       {
