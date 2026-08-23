@@ -19,7 +19,7 @@
   </p>
 </div>
 
-![NovelAI Prompt Studio 工作台](./doc/screenshots/hero-v042.webp)
+![NovelAI Prompt Studio 工作台](./doc/screenshots/hero-v090.webp)
 
 ## Prompt 不该困在图片的 metadata 里
 
@@ -33,7 +33,7 @@
 
 ## 工作台
 
-![按分类与双语对照整理 Prompt](./doc/screenshots/workbench-v042.webp)
+![按分类与双语对照整理 Prompt](./doc/screenshots/workbench-v090.webp)
 
 - **结构化 Prompt**：完整保留 Tag 顺序、权重、作用域和可识别的原始语法。
 - **多标签编辑**：同时处理多张图片；每个标签拥有独立草稿、来源和修改状态，重启后继续工作。
@@ -47,7 +47,7 @@
 
 ## 图片库
 
-![可检索的本地 NovelAI 图片库](./doc/screenshots/gallery-v042.webp)
+![可检索的本地 NovelAI 图片库](./doc/screenshots/gallery-v090.webp)
 
 把散落的生成结果整理成真正可回访的本地图库：
 
@@ -60,13 +60,13 @@
 
 ### 同 Prompt 图片自动成组
 
-![同 Prompt 图片组与组内浏览](./doc/screenshots/gallery-groups-v042.webp)
+![同 Prompt 图片组与组内浏览](./doc/screenshots/gallery-groups-v090.webp)
 
 完整 Prompt 相同、仅 Seed 等结果属性不同的图片会折叠为一组。你仍可以逐张浏览、选择头图和操作当前图片，而图库不会被大量相似卡片淹没。
 
 ### 批量整理，也能放心撤回
 
-![图片库批量选择与操作](./doc/screenshots/gallery-batch-v042.webp)
+![图片库批量选择与操作](./doc/screenshots/gallery-batch-v090.webp)
 
 支持 `Ctrl/Cmd` 增减选择、`Shift` 范围选择和全选当前结果。可批量收藏、取消收藏或移入回收站；普通删除不会立刻清理文件，恢复、永久删除与清空回收站都有明确的作用范围和确认提示。
 
@@ -74,8 +74,8 @@
 
 <table>
   <tr>
-    <td width="50%"><img src="./doc/screenshots/settings-appearance-v042.webp" alt="主题、颜色、字体与动效设置"></td>
-    <td width="50%"><img src="./doc/screenshots/settings-updates-v042.webp" alt="NovelAI Prompt Studio 应用内更新"></td>
+    <td width="50%"><img src="./doc/screenshots/settings-appearance-v090.webp" alt="主题、颜色、字体与动效设置"></td>
+    <td width="50%"><img src="./doc/screenshots/settings-updates-v090.webp" alt="NovelAI Prompt Studio 应用内更新"></td>
   </tr>
   <tr>
     <td align="center"><strong>让界面适应你的桌面</strong></td>
