@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BatchToolbar, GalleryCardHoverPreview, GalleryCardView, GalleryFilterControl, GalleryGroupingControl, nextGalleryRenderCount } from './GalleryPage.jsx';
+import { BatchToolbar, GalleryCardHoverPreview, GalleryCardView, GalleryFilterControl, GalleryGroupingControl, galleryThumbnailIsReady, nextGalleryRenderCount } from './GalleryPage.jsx';
 
 vi.mock('@lobehub/ui', () => {
   const Component = () => null;
@@ -165,6 +165,18 @@ describe('progressive gallery rendering', () => {
     expect(nextGalleryRenderCount(53, 30)).toBe(53);
   });
 
+});
+
+describe('gallery thumbnail restoration', () => {
+  it('recognizes an already cached image when the hidden Gallery becomes visible', () => {
+    expect(galleryThumbnailIsReady({ complete: true, naturalWidth: 512 })).toBe(true);
+  });
+
+  it('keeps incomplete and failed images in the loading state', () => {
+    expect(galleryThumbnailIsReady({ complete: false, naturalWidth: 512 })).toBe(false);
+    expect(galleryThumbnailIsReady({ complete: true, naturalWidth: 0 })).toBe(false);
+    expect(galleryThumbnailIsReady(null)).toBe(false);
+  });
 });
 
 describe('GalleryCardHoverPreview', () => {

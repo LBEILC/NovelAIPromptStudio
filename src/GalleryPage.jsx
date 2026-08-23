@@ -579,8 +579,16 @@ export function GalleryCardHoverPreview({ group, onDismissReady, project = group
 
 const GALLERY_HOVER_POSITIONER_STYLES = { root: { pointerEvents: 'none' } };
 
+export function galleryThumbnailIsReady(image) {
+  return Boolean(image?.complete && Number(image.naturalWidth) > 0);
+}
+
 function GalleryThumbnail({ alt = '', className = '', src, ...imageProps }) {
   const [loaded, setLoaded] = useState(false);
+  const imageRef = useRef(null);
+  useLayoutEffect(() => {
+    setLoaded(galleryThumbnailIsReady(imageRef.current));
+  }, [src]);
   return <img
     {...imageProps}
     alt={alt}
@@ -588,6 +596,7 @@ function GalleryThumbnail({ alt = '', className = '', src, ...imageProps }) {
     decoding="async"
     loading="lazy"
     onLoad={() => setLoaded(true)}
+    ref={imageRef}
     src={src}
   />;
 }
