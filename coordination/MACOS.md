@@ -2,14 +2,14 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
-## Verify packaged Workbench filmstrip height
+## Verify packaged Workbench filmstrip geometry
 
 - Status: Pending
 - Date/source: 2026-08-23, Windows
-- Related commit: `072e28a`
-- Action: On an unlocked macOS session, check out current `main`, build and install a package containing `072e28a`, then adapt `doc/archive/manual-verification-20260823-workbench-filmstrip-packaged-height.md` for macOS. Compare the packaged app with development mode, open enough Workbench items to overflow the filmstrip, and check normal, active, hover, dirty, and close-button states in light/dark themes and representative display scaling.
-- Expected: Lobe UI runtime style injection cannot reduce a Workbench thumbnail tab to the small text-tab height. Each filmstrip item remains a complete 58 × 58 pixel cell in both development and packaged builds, with no bottom clipping and no regression to overflow navigation or overlays.
-- Observed: Windows automated checks passed all 254 tests in 41 files, the production build, and the Lobe UI 5.20.3 audit with zero issues. On 2026-08-23, the user confirmed the installed Windows build no longer clips the filmstrip vertically. macOS installed-package verification remains pending.
+- Related commits: `072e28a`, `226ee51`
+- Action: On an unlocked macOS session, check out current `main`, build and install a package containing `226ee51`, then adapt `doc/archive/manual-verification-20260823-workbench-filmstrip-packaged-height.md` and `doc/manual-verification-20260823-workbench-filmstrip-spacing.md` for macOS. Compare the packaged app with development mode, open enough Workbench items to overflow the filmstrip, and check normal, active, hover, dirty, close-button, and drag states in light/dark themes and representative display scaling.
+- Expected: Lobe UI runtime style injection cannot reduce a Workbench thumbnail tab to the small text-tab height. Each filmstrip item remains a complete 58 × 58 pixel cell in both development and packaged builds, adjacent cells use the compact 4-pixel gap, and neither change regresses overflow navigation or overlays.
+- Observed: Windows automated checks passed all 254 tests in 41 files, the production build, and the Lobe UI 5.20.3 audit with zero issues. On 2026-08-23, the user confirmed the installed Windows build no longer clips the filmstrip vertically. Windows spacing verification and macOS installed-package verification remain pending.
 
 ## Verify cached Gallery thumbnails after Workbench restart restore
 
