@@ -138,6 +138,25 @@ export const HELP_GROUPS = [
           ]}/>
         </>,
       },
+      {
+        id: 'tabs-and-drafts',
+        icon: 'image',
+        title: '标签、草稿与恢复',
+        summary: '同时处理多张图片并安全恢复会话',
+        keywords: '标签 多图 草稿 修改 重启 恢复 关闭 排序 ctrl command tab w session',
+        content: <>
+          <p>每张打开的图片都有独立标签、来源、Prompt 草稿和修改状态。应用会保存标签顺序、当前标签和草稿，完整退出并重新启动后可以继续工作。</p>
+          <HelpFacts items={[
+            { title: '重复来源会复用标签', detail: '再次打开同一个文件或同一张图片库图片时，会优先回到已有标签。' },
+            { title: '已修改标签会明确标记', detail: '修改 Prompt 后，标签和工作台标题会显示修改状态。' },
+            { title: '关闭前保护草稿', detail: '关闭已修改标签时会要求确认；丢弃只影响该标签。' },
+            { title: '源文件仍然独立', detail: '草稿恢复不等于写回图片；外部图片被移动或删除时，标签可能提示来源不可用。' },
+          ]}/>
+          <HelpSection title="常用操作">
+            <p>拖动顶部缩略图可以调整标签顺序；使用 Ctrl/Cmd + Tab 前进、Ctrl/Cmd + Shift + Tab 后退，使用 Ctrl/Cmd + W 关闭当前标签。</p>
+          </HelpSection>
+        </>,
+      },
     ],
   },
   {
@@ -162,6 +181,36 @@ export const HELP_GROUPS = [
             ]}/>
           </HelpSection>
           <p className="help-note"><Icon name="info" size={15}/>应用会标记能够确认的 NovelAI 自动质量词或 UC 预设。普通复制可以排除它们，完整复现时可以显式复制包含自动 Tag 的原始内容。</p>
+        </>,
+      },
+      {
+        id: 'translation-and-categories',
+        icon: 'spark',
+        title: '翻译与分类 Tag',
+        summary: '读懂分类视图，并整理当前需要的 Tag',
+        keywords: '翻译 分类 tag 按分类 按结构 原文 译文 对照 DSO 离线 词典 Danbooru AI 补全 未分类 Tag 数据 缓存 手动 修正 可见 选中',
+        content: <>
+          <p>翻译帮助阅读英文 Tag；分类把 Tag 按角色组成、外貌身体、服装配饰、动作表情、环境背景、镜头光影等用途重新分组。两者只改变工作台中的显示和本地数据，不会把中文译文写进 Prompt，也不会改写原图。</p>
+          <HelpSection title="分类视图与分类筛选">
+            <HelpFacts items={[
+              { title: '按结构', detail: '保留 Base、Character、Prompt 与 Undesired 的原始层级，适合检查 Tag 属于哪里。' },
+              { title: '按分类', detail: '把当前可见 Tag 按用途集中展示，适合一起检查服装、动作、环境或镜头内容；不会移动 Tag 的作用域。' },
+              { title: '分类筛选', detail: '点击某个分类只显示该类 Tag，并同步影响“当前可见”的翻译、复制和数量。再次选择“全部”即可恢复。' },
+              { title: '原文、翻译与对照', detail: '只切换阅读方式；无论当前显示哪一种，生成用复制内容仍采用原始 Tag。' },
+            ]}/>
+          </HelpSection>
+          <HelpSection title="使用翻译与分类">
+            <HelpSteps items={[
+              { title: '确定处理范围', detail: '顶部“翻译与分类”处理当前筛选后可见的 Tag；只想整理一部分时，可以先筛选，或多选 Tag 后使用批量翻译。' },
+              { title: '开始整理', detail: '应用先采用你的历史修正，再依次尝试 Danbooru 画师验证、内置 DSO 离线词典和本地规则。' },
+              { title: '按需使用 AI', detail: '只有仍缺少译文或可靠分类、并且已经配置模型的 Tag，才会发送到你配置的 OpenAI-compatible 服务补全。' },
+              { title: '检查并修正结果', detail: '切换到“对照”或“按分类”检查结果；可以右键单个 Tag、使用多选工具，或在设置 → Tag 数据中修改。' },
+            ]}/>
+          </HelpSection>
+          <HelpSection title="结果与未分类">
+            <p>DSO 精确命中的翻译和分类不需要 AI。并非所有 General Tag 都有可靠分类，未识别内容可以保留为“未分类”或缺少译文；这不会阻止编辑和复制。整理结果保存在本地 Tag 数据中，手动修正始终具有最高优先级。</p>
+          </HelpSection>
+          <p className="help-note"><Icon name="info" size={15}/>删除 Tag 数据只会移除翻译与分类缓存，不会删除工作台 Tag 或修改图片；以后再次整理时，应用可能重新生成结果。</p>
         </>,
       },
       {
@@ -203,25 +252,6 @@ export const HELP_GROUPS = [
             ]}/>
           </HelpSection>
           <p className="help-note"><Icon name="info" size={15}/>右键菜单和顶部多选工具栏提供相同的核心批量路径；不用右键也能完成操作。键盘聚焦 Tag 后，可用 Alt + 方向键调整顺序。</p>
-        </>,
-      },
-      {
-        id: 'tabs-and-drafts',
-        icon: 'image',
-        title: '标签、草稿与恢复',
-        summary: '同时处理多张图片并安全恢复会话',
-        keywords: '标签 多图 草稿 修改 重启 恢复 关闭 排序 ctrl command tab w session',
-        content: <>
-          <p>每张打开的图片都有独立标签、来源、Prompt 草稿和修改状态。应用会保存标签顺序、当前标签和草稿，完整退出并重新启动后可以继续工作。</p>
-          <HelpFacts items={[
-            { title: '重复来源会复用标签', detail: '再次打开同一个文件或同一张图片库图片时，会优先回到已有标签。' },
-            { title: '已修改标签会明确标记', detail: '修改 Prompt 后，标签和工作台标题会显示修改状态。' },
-            { title: '关闭前保护草稿', detail: '关闭已修改标签时会要求确认；丢弃只影响该标签。' },
-            { title: '源文件仍然独立', detail: '草稿恢复不等于写回图片；外部图片被移动或删除时，标签可能提示来源不可用。' },
-          ]}/>
-          <HelpSection title="常用操作">
-            <p>拖动顶部缩略图可以调整标签顺序；使用 Ctrl/Cmd + Tab 前进、Ctrl/Cmd + Shift + Tab 后退，使用 Ctrl/Cmd + W 关闭当前标签。</p>
-          </HelpSection>
         </>,
       },
     ],
