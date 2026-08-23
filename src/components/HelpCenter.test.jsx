@@ -24,6 +24,7 @@ describe('HelpCenter', () => {
     expect(html).toContain('帮助与反馈');
     expect(html).toContain('快速开始');
     expect(html).toContain('打开图片，找到并复制 Prompt');
+    expect(html).toContain('<h3>快速开始</h3><p>打开图片，找到并复制 Prompt</p>');
     expect(html).toContain('报告问题');
     expect(html).toContain('提出建议');
     expect(html).not.toContain('<img');

@@ -200,7 +200,7 @@ export default function HelpCenter({ currentVersion = '—', platform = '', show
         {!filteredTopics.length && <div className="help-no-results"><Icon name="search" size={20}/><strong>没有找到相关内容</strong><small>尝试搜索“框选”“Prompt”或“快捷键”。</small></div>}
       </nav>
       {activeTopic && <article className="help-article" key={activeTopic.id}>
-        <header><Icon name={activeTopic.icon} size={20}/><div><h3>{activeTopic.title}</h3><p>{activeTopic.summary}</p></div></header>
+        <header><Icon name={activeTopic.icon} size={20}/><h3>{activeTopic.title}</h3><p>{activeTopic.summary}</p></header>
         <div className="help-article-body">{activeTopic.content}</div>
       </article>}
     </div>

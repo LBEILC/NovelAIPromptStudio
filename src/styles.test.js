@@ -21,8 +21,10 @@ describe('production-safe Lobe UI overrides', () => {
   });
 
   it('keeps built-in help demonstrations compatible with motion preferences', () => {
-    expect(styles).toMatch(/\.help-article > header \{[^}]*align-items: flex-start;/);
-    expect(styles).toMatch(/\.help-article > header > svg \{[^}]*margin-block-start: 2px;[^}]*margin-inline-start: 5px;/);
+    expect(styles).toMatch(/\.help-article > header \{[^}]*display: grid;[^}]*grid-template-columns: max-content minmax\(0, 1fr\);[^}]*align-items: center;/);
+    expect(styles).toMatch(/\.help-article > header > svg \{[^}]*grid-row: 1;[^}]*margin-inline-start: 5px;/);
+    expect(styles).toMatch(/\.help-article h3 \{[^}]*grid-row: 1;/);
+    expect(styles).toMatch(/\.help-article header p \{[^}]*grid-row: 2;/);
     expect(styles).toMatch(/\.help-marquee-box \{[^}]*animation: help-marquee-box/);
     expect(styles).toMatch(/html\[data-motion="off"\] \*, html\[data-motion="off"\] \*::before, html\[data-motion="off"\] \*::after \{[^}]*animation-duration: \.01ms !important;/);
   });

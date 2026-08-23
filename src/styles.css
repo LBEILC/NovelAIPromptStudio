@@ -654,10 +654,10 @@ html.is-marquee-selecting, html.is-marquee-selecting * { cursor: crosshair !impo
 .help-no-results strong { margin-top: 5px; color: var(--text); }
 .help-no-results small { max-width: 210px; color: var(--faint); line-height: 1.5; }
 .help-article { min-width: 0; padding: clamp(24px, 4vw, 42px); }
-.help-article > header { padding-bottom: 18px; display: flex; align-items: flex-start; gap: var(--distance-small); border-bottom: 1px solid var(--line-soft); }
-.help-article > header > svg { margin-block-start: 2px; margin-inline-start: 5px; flex: 0 0 auto; color: var(--accent); }
-.help-article h3 { margin: 0; font-size: 1.2rem; font-weight: 600; letter-spacing: -.015em; }
-.help-article header p { margin: 4px 0 0; color: var(--muted); font-size: var(--text-secondary); }
+.help-article > header { padding-bottom: 18px; display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; column-gap: var(--distance-small); row-gap: 4px; border-bottom: 1px solid var(--line-soft); }
+.help-article > header > svg { grid-column: 1; grid-row: 1; margin-inline-start: 5px; color: var(--accent); }
+.help-article h3 { grid-column: 2; grid-row: 1; margin: 0; font-size: 1.2rem; font-weight: 600; letter-spacing: -.015em; }
+.help-article header p { grid-column: 2; grid-row: 2; margin: 0; color: var(--muted); font-size: var(--text-secondary); }
 .help-article-body { padding-top: 20px; color: var(--muted); line-height: 1.7; }
 .help-article-body > :first-child { margin-top: 0; }
 .help-article-body > :last-child { margin-bottom: 0; }
