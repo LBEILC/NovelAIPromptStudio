@@ -319,7 +319,6 @@ async function runElectronRenderer() {
       backgroundThrottling: false,
       contextIsolation: true,
       nodeIntegration: false,
-      offscreen: true,
     },
   });
   try {
