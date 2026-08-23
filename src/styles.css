@@ -690,6 +690,7 @@ html.is-marquee-selecting, html.is-marquee-selecting * { cursor: crosshair !impo
 .help-marquee-box { position: absolute; z-index: 2; inset: 16px auto auto 16px; width: 190px; height: 72px; background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid var(--accent); border-radius: 3px; transform: scale(.08); transform-origin: left top; animation: help-marquee-box 4s var(--ease-smooth-out) infinite; }
 .help-marquee-cursor { position: absolute; z-index: 3; inset: 18px auto auto 18px; width: 11px; height: 16px; background: var(--text); clip-path: polygon(0 0, 100% 68%, 58% 73%, 38% 100%); animation: help-marquee-cursor 4s var(--ease-smooth-out) infinite; }
 .help-note { padding: 10px 12px; display: flex; align-items: flex-start; gap: 8px; color: var(--muted); background: color-mix(in srgb, var(--accent) 6%, transparent); border-radius: 7px; font-size: var(--text-secondary); }
+.help-marquee-demo + p.help-note { margin-top: 12px; }
 .help-note svg { margin-top: 3px; flex: 0 0 auto; color: var(--accent); }
 .help-gallery-demo { padding: 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; background: var(--raised); border: 1px solid var(--line-soft); border-radius: 9px; }
 .help-gallery-demo > div { position: relative; min-width: 0; padding: 5px; display: grid; gap: 6px; background: var(--panel); border: 1px solid var(--line-soft); border-radius: 7px; }
@@ -707,7 +708,6 @@ html.is-marquee-selecting, html.is-marquee-selecting * { cursor: crosshair !impo
 .help-shortcuts dd { margin: 0; color: var(--muted); font-size: var(--text-secondary); }
 .help-facts { margin: 0; padding: 0; display: grid; gap: 0; list-style: none; }
 .help-facts li { padding: 13px 0; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 9px; border-bottom: 1px solid var(--line-soft); }
-.help-facts li:first-child { border-top: 1px solid var(--line-soft); }
 .help-facts svg { margin-top: 3px; color: var(--accent); }
 .help-facts strong { display: block; }
 .help-feedback { margin-top: 18px; padding: 18px 20px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 24px; background: var(--panel); border: 1px solid var(--line-soft); border-radius: 12px; }

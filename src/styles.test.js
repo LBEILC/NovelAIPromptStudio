@@ -25,6 +25,8 @@ describe('production-safe Lobe UI overrides', () => {
     expect(styles).toMatch(/\.help-article > header > svg \{[^}]*grid-row: 1;[^}]*margin-inline-start: 5px;/);
     expect(styles).toMatch(/\.help-article h3 \{[^}]*grid-row: 1;/);
     expect(styles).toMatch(/\.help-article header p \{[^}]*grid-row: 2;/);
+    expect(styles).toMatch(/\.help-marquee-demo \+ p\.help-note \{[^}]*margin-top: 12px;/);
+    expect(styles).not.toMatch(/\.help-facts li:first-child \{[^}]*border-top:/);
     expect(styles).toMatch(/\.help-marquee-box \{[^}]*animation: help-marquee-box/);
     expect(styles).toMatch(/html\[data-motion="off"\] \*, html\[data-motion="off"\] \*::before, html\[data-motion="off"\] \*::after \{[^}]*animation-duration: \.01ms !important;/);
   });
