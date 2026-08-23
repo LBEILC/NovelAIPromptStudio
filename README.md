@@ -3,16 +3,8 @@
 
   <h1>NovelAI Prompt Studio</h1>
 
-  <p><strong>把藏在 NovelAI 图片里的 Prompt，变成清晰、可编辑、可复用的创作资产。</strong></p>
-  <p>面向 NovelAI Diffusion V4 / V4.5 的本地 Prompt 工作台与图片库。</p>
-
-  <p>
-    <a href="https://github.com/LBEILC/NovelAIPromptStudio/releases/latest"><img src="https://img.shields.io/github/v/release/LBEILC/NovelAIPromptStudio?display_name=tag&style=flat-square&label=Release" alt="最新版本"></a>
-    <a href="https://github.com/LBEILC/NovelAIPromptStudio/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/LBEILC/NovelAIPromptStudio/release.yml?style=flat-square&label=Build" alt="构建状态"></a>
-    <img src="https://img.shields.io/badge/Windows%20%7C%20macOS-supported-4f9cf9?style=flat-square" alt="支持 Windows 和 macOS">
-    <img src="https://img.shields.io/badge/local--first-privacy-34c759?style=flat-square" alt="本地优先">
-    <a href="./LICENSE"><img src="https://img.shields.io/github/license/LBEILC/NovelAIPromptStudio?style=flat-square" alt="许可证"></a>
-  </p>
+  <p><strong>打开一张 NovelAI 图片，找回 Prompt，继续创作。</strong></p>
+  <p>在本地整理、编辑和复用 NovelAI Diffusion V4 / V4.5 图片中的 Prompt 与 Tag。</p>
 
   <p>
     <a href="https://github.com/LBEILC/NovelAIPromptStudio/releases/latest"><strong>下载最新版</strong></a>
@@ -22,12 +14,14 @@
     <a href="#图片库">图片库</a>
     ·
     <a href="#快速开始">快速开始</a>
+    ·
+    <a href="#本地优先">数据安全</a>
   </p>
 </div>
 
 ![NovelAI Prompt Studio 工作台](./doc/screenshots/hero-v042.webp)
 
-## 从一张图片开始，而不是从一整段文本开始
+## Prompt 不该困在图片的 metadata 里
 
 把 NovelAI 图片拖进应用，Prompt Studio 会读取其中的生成信息，并将 Base Prompt、Character Prompt 与 Undesired Content 拆解为可视化 Tag。你可以搜索、翻译、分类、排序、调整权重，再按需要复制回 NovelAI。
 
@@ -93,7 +87,7 @@
 - 分别选择界面非衬线字体与 Prompt 等宽字体，并控制动效偏好。
 - 记住最近使用的图片目录，可迁移图片库资源位置。
 - Windows 支持应用内检查、下载和安装更新；未签名 macOS 构建会检查版本并引导至官方 Release。
-- `v0.4` 系列进一步优化了大图居中、图库详情侧栏、原始 Prompt 操作、Tag 拖拽动画与更新说明展示。
+- 设置与工作状态保存在本地，重启后继续整理，不需要重新搭建熟悉的工作视图。
 
 ## 本地优先
 
@@ -105,6 +99,13 @@
 - 应用不生成图片，也不是 NovelAI 官方客户端；它专注于整理生成结果与 Prompt。
 
 ## 快速开始
+
+<p>
+  <a href="https://github.com/LBEILC/NovelAIPromptStudio/releases/latest"><img src="https://img.shields.io/github/v/release/LBEILC/NovelAIPromptStudio?display_name=tag&style=flat-square&label=Release" alt="最新版本"></a>
+  <a href="https://github.com/LBEILC/NovelAIPromptStudio/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/LBEILC/NovelAIPromptStudio/release.yml?style=flat-square&label=Build" alt="构建状态"></a>
+  <img src="https://img.shields.io/badge/Windows%20%7C%20macOS-supported-4f9cf9?style=flat-square" alt="支持 Windows 和 macOS">
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/LBEILC/NovelAIPromptStudio?style=flat-square" alt="许可证"></a>
+</p>
 
 1. 前往 [Releases](https://github.com/LBEILC/NovelAIPromptStudio/releases/latest) 下载适合系统的安装包。
 2. 启动应用，将一张 NovelAI 图片拖入工作台。
