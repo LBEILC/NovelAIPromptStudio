@@ -7,13 +7,13 @@ NovelAI Prompt Studio is a cross-platform desktop application. Windows and macOS
 - Do not introduce platform-specific shell syntax into shared npm scripts.
 - Use Node.js or cross-platform CLI arguments for shared automation.
 - Treat filesystem paths, keyboard modifiers, window chrome, secure storage, and packaging as platform-sensitive code.
-- Test platform-neutral changes with `npm ci`, `npm test`, and `npm run build`.
+- Run `npm ci`, `npm test`, and `npm run build` only when the task makes explicit code changes, including source code, test code, shared scripts, build configuration, or dependency manifests. Do not run these commands for documentation-only changes, content or media asset changes, Skill/plugin installation, repository inspection, or other read-only/non-code operations.
 - Startup, window behavior, shortcuts, file dialogs, and secure storage must be verified on the affected operating system when they change. Unless the user explicitly requests computer use, follow the manual verification workflow below.
 
 ## Manual application verification
 
 - Do not use computer use, GUI automation, or simulated mouse and keyboard input for verification unless the user explicitly requests it in the current task.
-- Continue to run applicable non-GUI checks such as linting, unit tests, integration tests, and production builds. This restriction applies to interactive application verification, not command-line checks.
+- When code changes are present, continue to run applicable non-GUI checks such as linting, unit tests, integration tests, and production builds. This restriction applies to interactive application verification, not command-line checks, and does not require checks for non-code-only work.
 - When a change needs interactive verification, create `doc/manual-verification-YYYYMMDD-<topic>.md` before handing the change back to the user. Do not claim that the interactive behavior has been verified.
 - Write all manual verification documents in Chinese.
 - The manual verification document must include the change or commit under test, target operating system, prerequisites, numbered verification steps, the expected result for every step, and empty fields for the observed result, overall result, and discovered issues.
