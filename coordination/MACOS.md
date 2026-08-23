@@ -2,6 +2,15 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+## Verify Workbench Prompt dirty state after restart
+
+- Status: Pending
+- Date/source: 2026-08-23, Windows
+- Related commit: `89b09c8`
+- Action: On an unlocked macOS session, check out current `main` and follow `doc/manual-verification-20260823-workbench-restart-dirty-state.md`. Pay particular attention to an unchanged Base/Character Prompt session across a full app restart, one genuinely edited draft alongside unchanged tabs, reset behavior, and the close-confirmation boundary.
+- Expected: Parser-generated Tag and Character identities do not make an unchanged restored Prompt appear modified. Genuine Prompt edits still persist as drafts and remain marked after restart; reset clears the mark; only genuinely modified tabs require discard confirmation.
+- Observed: Windows clean `npm ci`, all 251 tests in 41 files, and the production build passed. Automated coverage recreates a restored Base/Character Prompt with entirely different parser identities, confirms it remains clean, then confirms a real Tag weight edit is detected. Windows and macOS interactive verification remain pending.
+
 ## Verify Workbench thumbnail filmstrip
 
 - Status: Pending
