@@ -3,113 +3,121 @@
 
   <h1>NovelAI Prompt Studio</h1>
 
-  <p><strong>打开一张 NovelAI 图片，找回 Prompt，继续创作。</strong></p>
-  <p>在本地整理、编辑和复用 NovelAI Diffusion V4 / V4.5 图片中的 Prompt 与 Tag。</p>
+  <p><strong>让 Prompt 回到创作流程。</strong></p>
+  <p>从 NovelAI 图片中恢复、整理并复用 Prompt 的本地桌面工作台。</p>
 
   <p>
     <a href="https://github.com/LBEILC/NovelAIPromptStudio/releases/latest"><strong>下载最新版</strong></a>
     ·
-    <a href="#工作台">工作台</a>
-    ·
-    <a href="#图片库">图片库</a>
+    <a href="#从一张图片回到完整创作上下文">了解工作流</a>
     ·
     <a href="#快速开始">快速开始</a>
     ·
-    <a href="#本地优先">数据安全</a>
+    <a href="#本地优先不是一句口号">数据与隐私</a>
   </p>
 </div>
 
-![NovelAI Prompt Studio 工作台](./doc/screenshots/hero-v090.webp)
+![NovelAI Prompt Studio 工作台主视觉](./doc/screenshots/readme-hero-v090.webp)
 
-## Prompt 不该困在图片的 metadata 里
-
-把 NovelAI 图片拖进应用，Prompt Studio 会读取其中的生成信息，并将 Base Prompt、Character Prompt 与 Undesired Content 拆解为可视化 Tag。你可以搜索、翻译、分类、排序、调整权重，再按需要复制回 NovelAI。
-
-| 读取 | 整理 | 复用 |
-| --- | --- | --- |
-| 从图片 metadata 恢复 Prompt 结构 | 按作用域、分类和语言查看 Tag | 复制可见、全部、Base 或 Character Prompt |
-| 支持文件、拖放和剪贴板 | 编辑原始文本、权重与顺序 | 将值得保留的图片收入本地图片库 |
-| 识别 V4 / V4.5 与内嵌 Vibe | 可选的 AI 翻译与分类 | 不改写原图，不锁定你的工作流 |
-
-## 工作台
-
-![按分类与双语对照整理 Prompt](./doc/screenshots/workbench-v090.webp)
-
-- **结构化 Prompt**：完整保留 Tag 顺序、权重、作用域和可识别的原始语法。
-- **多标签编辑**：同时处理多张图片；每个标签拥有独立草稿、来源和修改状态，重启后继续工作。
-- **灵活浏览**：在 Prompt / Undesired、Base / Character、按结构 / 按分类以及原文 / 翻译 / 对照之间切换。
-- **快速整理**：搜索、拖拽排序、多选、批量添加与删除，并对异常 Prompt 语法给出提示。
-- **精确复制**：主按钮复制当前筛选后可见的正向 Prompt；菜单可复制全部、完整 Base 或指定 Character Prompt。
-- **AI 辅助**：连接你自己的 OpenAI-compatible 服务翻译和分类 Tag，结果缓存在本地并允许手动修正。
-- **Vibe 恢复**：只读识别图片内嵌 Vibe，并按需导出 `.naiv4vibe` 文件。
-
-工作台只读取源图片并保存本地草稿：不会自动加入图片库，也不会覆盖图片或改写 metadata。
-
-## 图片库
-
-![可检索的本地 NovelAI 图片库](./doc/screenshots/gallery-v090.webp)
-
-把散落的生成结果整理成真正可回访的本地图库：
-
-- 导入 `PNG`、`JPG`、`JPEG`、`WEBP` 或 NovelAI 导出 `ZIP`，支持多选、拖放和剪贴板。
-- 按文件名、Tag 或译名搜索，并按最近或最早导入排序。
-- 根据图片内容识别重复项，避免反复保存同一张图片。
-- 收藏与重命名图片，在详情栏查看尺寸、日期和完整 Prompt。
-- 从图库直接送入工作台，或在系统文件夹中定位资源。
-- 大图预览支持缩放、旋转、翻转和复制；下载原图时保留格式与 NovelAI metadata。
-
-### 同 Prompt 图片自动成组
-
-![同 Prompt 图片组与组内浏览](./doc/screenshots/gallery-groups-v090.webp)
-
-完整 Prompt 相同、仅 Seed 等结果属性不同的图片会折叠为一组。你仍可以逐张浏览、选择头图和操作当前图片，而图库不会被大量相似卡片淹没。
-
-### 批量整理，也能放心撤回
-
-![图片库批量选择与操作](./doc/screenshots/gallery-batch-v090.webp)
-
-支持 `Ctrl/Cmd` 增减选择、`Shift` 范围选择和全选当前结果。可批量收藏、取消收藏或移入回收站；普通删除不会立刻清理文件，恢复、永久删除与清空回收站都有明确的作用范围和确认提示。
-
-## 为桌面创作流程打磨
-
-<table>
-  <tr>
-    <td width="50%"><img src="./doc/screenshots/settings-appearance-v090.webp" alt="主题、颜色、字体与动效设置"></td>
-    <td width="50%"><img src="./doc/screenshots/settings-updates-v090.webp" alt="NovelAI Prompt Studio 应用内更新"></td>
-  </tr>
-  <tr>
-    <td align="center"><strong>让界面适应你的桌面</strong></td>
-    <td align="center"><strong>保持在稳定版本</strong></td>
-  </tr>
-</table>
-
-- 跟随系统、浅色和深色主题，12 种主题色。
-- 分别选择界面非衬线字体与 Prompt 等宽字体，并控制动效偏好。
-- 记住最近使用的图片目录，可迁移图片库资源位置。
-- Windows 支持应用内检查、下载和安装更新；未签名 macOS 构建会检查版本并引导至官方 Release。
-- 设置与工作状态保存在本地，重启后继续整理，不需要重新搭建熟悉的工作视图。
-
-## 本地优先
-
-图片、Prompt 草稿、Tag 字典和设置默认保存在本机。只有在你主动使用 AI 翻译或分类时，相关 Tag 文本才会发送到所配置的 OpenAI-compatible API。
-
-- API Key 由 Electron 主进程通过操作系统安全存储加密，渲染页面无法读取明文。
-- 工作台不复制源图；图片库只保存主动导入的独立副本和缩略图。
-- 从图片库移除内容不会删除最初导入的外部源文件。
-- 应用不生成图片，也不是 NovelAI 官方客户端；它专注于整理生成结果与 Prompt。
-
-## 快速开始
-
-<p>
+<p align="center">
   <a href="https://github.com/LBEILC/NovelAIPromptStudio/releases/latest"><img src="https://img.shields.io/github/v/release/LBEILC/NovelAIPromptStudio?display_name=tag&style=flat-square&label=Release" alt="最新版本"></a>
   <a href="https://github.com/LBEILC/NovelAIPromptStudio/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/LBEILC/NovelAIPromptStudio/release.yml?style=flat-square&label=Build" alt="构建状态"></a>
   <img src="https://img.shields.io/badge/Windows%20%7C%20macOS-supported-4f9cf9?style=flat-square" alt="支持 Windows 和 macOS">
   <a href="./LICENSE"><img src="https://img.shields.io/github/license/LBEILC/NovelAIPromptStudio?style=flat-square" alt="许可证"></a>
 </p>
 
-1. 前往 [Releases](https://github.com/LBEILC/NovelAIPromptStudio/releases/latest) 下载适合系统的安装包。
-2. 启动应用，将一张 NovelAI 图片拖入工作台。
-3. 筛选、翻译、分类或调整 Tag，然后点击 **复制可见 Prompt**。
+## 从一张图片，回到完整创作上下文
+
+一张生成图不只是最终结果。它还保存着当时使用的 Base Prompt、Character Prompt、Undesired Content、模型参数，以及可能内嵌的 Vibe。
+
+NovelAI Prompt Studio 把这些信息从 metadata 里重新带回可读、可编辑的工作区：你可以看清 Prompt 的结构，整理真正属于自己的 Tag，再把需要的部分准确复制回下一次创作。
+
+| 打开 | 整理 | 复用 |
+| --- | --- | --- |
+| 从文件、拖放或剪贴板打开图片 | 按作用域、分类和语言查看 Prompt | 复制可见、选中、Base 或 Character Prompt |
+| 多张图片保留为独立工作标签 | 搜索、翻译、分类、排序与调整权重 | 保留原始顺序、权重、换行和特殊语法 |
+| 识别 NovelAI V4、V4.5 与 V5 信息 | 区分用户内容与 NovelAI 自动 Prompt | 导出可恢复的 Vibe，或把图片收入本地图库 |
+
+> NovelAI Prompt Studio 不生成图片，也不替代 NovelAI。它专注于图片生成之后、下一次创作之前的整理工作。
+
+## 工作台：把 Prompt 看清楚
+
+![按分类与双语对照整理 Prompt](./doc/screenshots/readme-workbench-v090.webp)
+
+### 保留结构，而不是把 Prompt 压成一行文本
+
+工作台会区分 Base、Character 与各自的 Undesired Content，并尽可能保留原始 Tag 顺序、权重、花括号、换行和作用域。对于 NovelAI V5，自然语言段落、引号中的逗号和多行 `Text:` 内容也会按原始文本保真复制。
+
+角色 Prompt 可以单独查看、重命名、添加或移除；当前最多支持 22 个角色，同时继续兼容已导入图片中的原始角色信息。
+
+### 只复制这一次真正需要的内容
+
+你可以在 Prompt / Undesired、Base / Character、按结构 / 按分类以及原文 / 翻译 / 对照之间切换，并结合搜索、分类筛选和多选得到精确范围。
+
+主按钮复制当前可见的正向 Prompt；菜单还可以复制全部、完整 Base、指定 Character 或包含自动 Tag 的原始 Prompt。译文不会混入生成用 Prompt，Undesired Content 也不会意外进入正向结果。
+
+### 把 NovelAI 自动添加的内容与自己的创作区分开
+
+对于可确认的 NovelAI V4.5 / V5 自动质量词和 UC 预设，工作台会标记来源并默认折叠。普通复制可以排除这些自动 Tag；需要完整复现时，仍可显式复制包含自动 Tag 的原始 Prompt。
+
+如果内容与官方模板不完全匹配，应用不会擅自把它当作自动内容删除。
+
+### AI 是可选的整理助手
+
+连接你自己的 OpenAI-compatible 服务后，可以批量翻译和分类 Tag。结果缓存在本地，允许随时修正；没有配置 AI 服务时，Prompt 解析、编辑、筛选、复制和图片库仍可离线使用。
+
+每张打开的图片都拥有独立草稿、来源与修改状态。标签顺序、当前图片和工作状态会在重启后恢复，而源图片不会被覆盖或改写。
+
+## 图片库：让用过的 Prompt 重新可发现
+
+![可检索的本地 NovelAI 图片库](./doc/screenshots/readme-gallery-v090.webp)
+
+图库不是另一个生成器，而是一个面向回访与复用的本地创作档案：
+
+- 导入 `PNG`、`JPG`、`JPEG`、`WEBP` 或 NovelAI 导出的 `ZIP`，支持多选、拖放和剪贴板。
+- 按文件名、原始 Tag 或译名搜索，并结合包含 / 排除 Tag、模型、Vibe 与导入日期筛选。
+- 根据图片内容跳过重复项；完整 Prompt 相同、仅 Seed 等结果属性不同的图片会自动折叠成组。
+- 使用普通收藏集手动整理图片，或把当前搜索与筛选保存为会自动更新的智能收藏集。
+- 支持框选、`Ctrl/Cmd` 增减选择、`Shift` 范围选择，以及批量收藏、加入收藏集和移入回收站。
+- 在大图预览中缩放、旋转、翻转、复制或下载原图，并随时把当前图片送回工作台。
+
+普通删除只会把应用管理副本移入回收站。恢复、永久删除与清空回收站都有明确的作用范围和确认步骤。
+
+## 本地优先，不是一句口号
+
+图片、工作台草稿、Tag 缓存、图库索引和设置默认保存在本机。应用不会要求账号，也不会把你的图库上传到远程服务。
+
+| 操作 | 对源图片的影响 | 网络请求 |
+| --- | --- | --- |
+| 打开到工作台 | 只读，不复制、不改写 | 无 |
+| 导入图片库 | 创建应用管理的独立副本 | 无 |
+| 编辑、筛选或复制 Prompt | 只修改本地草稿 | 无 |
+| AI 翻译或分类 | 不修改源图 | 仅发送待处理 Tag 到你配置的 API |
+
+- API Key 由 Electron 主进程通过操作系统安全存储加密，渲染页面无法读取明文。
+- 从图片库移除内容不会删除最初导入的外部文件。
+- 下载图片时保留应用持有的原始格式与 metadata。
+- 图片库资源位置可以迁移；复制和校验完成前不会删除旧文件。
+
+## 支持范围
+
+| 类别 | 当前支持 |
+| --- | --- |
+| 操作系统 | Windows x64、macOS Apple Silicon、macOS Intel |
+| NovelAI Prompt | Diffusion V4、V4.5、V5 |
+| 工作台图片 | PNG、JPG / JPEG、WEBP |
+| 图片库导入 | PNG、JPG / JPEG、WEBP、NovelAI ZIP |
+| Metadata | NovelAI PNG 文本 metadata 与可识别的 Stealth PNG 信息 |
+| Vibe | 只读识别与导出可恢复的 `.naiv4vibe`；不提供本地编辑或效果预览 |
+
+JPG、WEBP、截图以及经过社交平台压缩的图片仍可打开和收藏，但如果 NovelAI metadata 已经丢失，就无法自动恢复完整 Prompt。
+
+## 快速开始
+
+1. 前往 [Releases](https://github.com/LBEILC/NovelAIPromptStudio/releases/latest)。
+2. 下载适合当前系统的安装包并完成安装。
+3. 启动应用，将一张 NovelAI 图片拖入工作台。
+4. 筛选、翻译或整理 Tag，然后点击 **复制可见 Prompt**。
 
 | 平台 | 安装包 |
 | --- | --- |
@@ -119,8 +127,6 @@
 
 > [!NOTE]
 > 当前安装包尚未进行代码签名，Windows 或 macOS 可能显示安全提示。请只从本仓库的 Releases 页面下载。
-
-没有可识别 NovelAI metadata 的图片仍可查看和收藏，但无法自动恢复完整 Prompt。应用主要面向 NovelAI Diffusion V4 / V4.5 图片。
 
 ## 常用快捷键
 
@@ -140,25 +146,25 @@
 <details>
 <summary><strong>会修改我的原图吗？</strong></summary>
 
-不会。工作台只读取源图并保存独立草稿；图片库保存的是应用管理副本。从图片库移除项目也不会删除最初导入的源文件。
+不会。工作台只读取源图并保存独立草稿；图片库保存的是应用管理副本。从图片库移除项目也不会删除最初导入的外部文件。
 </details>
 
 <details>
 <summary><strong>必须配置 AI 服务才能使用吗？</strong></summary>
 
-不需要。Prompt 解析、筛选、编辑、复制和图片库均可离线使用。AI 服务只用于可选的 Tag 翻译与分类。
+不需要。AI 服务只用于可选的 Tag 翻译与分类。Prompt 解析、编辑、筛选、复制和图片库均可离线使用。
 </details>
 
 <details>
 <summary><strong>为什么从剪贴板打开后没有 Prompt？</strong></summary>
 
-应用会优先读取剪贴板中的原始图片数据以保留 metadata；但网页“复制图片”、截图工具和部分软件只提供像素，此时 NovelAI Prompt metadata 已经丢失。图片仍可正常打开或导入。
+应用会优先读取剪贴板中的原始图片数据以保留 metadata；但网页“复制图片”、截图工具和部分软件只提供重新编码后的像素，此时 NovelAI metadata 可能已经丢失。
 </details>
 
 <details>
 <summary><strong>数据保存在哪里？</strong></summary>
 
-数据写入 Electron 的系统 `userData` 目录。数据库位于 `data/studio.sqlite`，图片库副本和缩略图位于 `assets/`。资源库位置可在设置中迁移。
+数据写入 Electron 的系统 `userData` 目录。数据库默认位于 `data/studio.sqlite`，图片库副本与缩略图位于 `assets/`。资源库位置可以在设置中迁移。
 </details>
 
 <details>
@@ -191,5 +197,5 @@ npm run package   # 生成当前平台安装包
 ---
 
 <div align="center">
-  <sub>让 Prompt 回到创作流程里，而不是困在 metadata 里。</sub>
+  <sub>一张图片，是一次创作留下的完整线索。</sub>
 </div>

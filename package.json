@@ -14,6 +14,7 @@
     "build": "vite build",
     "icons:generate": "node scripts/generate-app-icons.mjs",
     "package": "npm run build && electron-builder --publish never",
+    "screenshots:readme": "node scripts/render-readme-artwork.mjs",
     "verify:update-artifacts": "node scripts/verify-update-artifacts.mjs release",
     "start": "electron .",
     "start:demo": "electron . --profile=demo",
