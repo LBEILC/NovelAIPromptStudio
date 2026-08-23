@@ -61,6 +61,8 @@ npm test
 npm run build
 ```
 
+Windows 上执行 `npm ci` 前先确认没有本地 `npm run dev` 开发服务器在运行：Vite 会锁定 `node_modules` 中的原生绑定文件，导致 `npm ci` 删除重装时报 `EPERM` 或 `ENOTEMPTY`。中断的 `npm ci` 可能留下半删除的 `node_modules`，停止占用进程后重试通常即可恢复。
+
 涉及桌面打包、主进程、原生依赖或自动更新时，还应在受影响的平台运行：
 
 ```bash
@@ -121,7 +123,10 @@ git push origin main
 - 把 `<版本>` 替换为实际版本号（如 `0.5.0`），`<上一版本>` 替换为上一个标签。
 - 文件名来自 `package.json` 的 `build.win.artifactName`（`NovelAI-Prompt-Studio-Setup-<版本>-x64.exe`）和 `build.mac.artifactName`（`NovelAI-Prompt-Studio-<版本>-x64.dmg` / `-arm64.dmg`），与 GitHub Release 资产名必须完全一致；若打包配置改了命名，同步更新本表。
 - 固定链接格式为 `https://github.com/LBEILC/NovelAIPromptStudio/releases/download/v<版本>/<资产名>`，Release 创建后即可点击跳转下载。
-- 更新说明应从实际提交记录整理，优先写用户能感知的变化，不要逐条复制内部重构、测试和文档提交。
+- 更新说明编写原则：
+
+- **面向用户、按模块组织**：新功能按功能模块分组描述，写清关键交互（快捷键、手势等），例如「按住 Ctrl/⌘ 滚动滚轮缩放缩略图」。功能细节应核对实际实现，不能只看提交标题——功能可能藏在标题不含「feat」的提交里（如图库卡片双击打开工作台位于指针交互重构提交中）。
+- **修复只列已发布版本的问题**：「体验与修复」只收录修复上一已发布版本问题的提交。新版本开发过程中引入并随即修复的问题不列入——这类修复通常紧跟在对应功能或重构提交之后，或修复对象（如新引入的动画系统）在上一版本中并不存在。判断时可用 `git show <上一标签>:<文件>` 确认修复对象在上一版本中是否存在，避免把开发过程写成用户可见的修复。
 
 ## 5. 创建并推送版本标签
 
@@ -198,6 +203,10 @@ git push origin refs/tags/v0.3.0
 
 在 `main` 修复问题、重新验证并递增 patch 版本，然后创建新标签。正式标签一旦推送，应保留历史，不要 force-push。
 
+### 工作流 run 立即失败且没有任何 job
+
+说明工作流文件解析失败，GitHub 无法加载定义。已知原因：`secrets` context 不允许出现在 `if:` 条件中（引用未配置 secret 的 `env:` 值也可能把空字符串传给工具，例如 electron-builder 会把「存在但为空」的 `CSC_LINK` 当作相对文件路径解析）。修复工作流后提交推送 `main`，递增 patch 版本并推送新标签；工作流文件的修改不会对已推送的旧标签生效。
+
 ### Release job 找不到 annotated tag
 
 发布 job 必须使用 `actions/checkout` 且设置 `fetch-depth: 0`，否则 `--notes-from-tag` 无法读取本地标签。当前工作流已经包含这项配置。
@@ -215,7 +224,8 @@ git push origin refs/tags/v0.3.0
 1. GitHub Actions 所有 job 成功。
 2. Release 标题、正文和版本号正确。
 3. Windows、macOS Intel、macOS Apple Silicon 产物均存在。
-4. `SHA256SUMS.txt` 存在。
+4. `SHA256SUMS.txt` 存在，且与下载的当前平台安装包实测校验一致。
 5. 下载并启动至少一个当前平台安装包。
-6. 检查 README 的“最新版”链接能进入新 Release。
-7. 需要另一平台验证时，更新 `coordination/` 中对应记录。
+6. Release 正文的「下载指引」链接可正常访问；链接或正文有误时可用 `gh release edit --notes-file` 无损修正，但下次发版仍以 annotated tag 说明为准。
+7. 检查 README 的“最新版”链接能进入新 Release。
+8. 需要另一平台验证时，更新 `coordination/` 中对应记录。
