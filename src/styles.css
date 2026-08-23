@@ -641,15 +641,22 @@ html.is-marquee-selecting, html.is-marquee-selecting * { cursor: crosshair !impo
 .help-center { min-height: 520px; overflow: hidden; display: grid; grid-template-columns: minmax(230px, .72fr) minmax(0, 1.55fr); background: var(--panel); border: 1px solid var(--line-soft); border-radius: 12px; }
 .help-topic-list { min-width: 0; padding: 12px 10px; border-inline-end: 1px solid var(--line-soft); }
 .help-topic-list > span { display: block; padding: 4px 9px 10px; color: var(--faint); font-size: var(--text-micro); font-weight: 600; }
-.help-topic-list > button { width: 100%; min-height: 58px; padding: 9px; display: grid; grid-template-columns: 22px minmax(0, 1fr) 16px; align-items: center; gap: 9px; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 8px; font: inherit; text-align: start; cursor: pointer; transition: color var(--duration-quick) var(--ease-out), background-color var(--duration-quick) var(--ease-out), border-color var(--duration-quick) var(--ease-out); }
-.help-topic-list > button:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
-.help-topic-list > button.active { color: var(--text); background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: color-mix(in srgb, var(--accent) 22%, transparent); }
-.help-topic-list > button.active > svg:first-child { color: var(--accent); }
-.help-topic-list > button > span { min-width: 0; }
-.help-topic-list > button strong, .help-topic-list > button small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.help-topic-list > button strong { font-size: var(--text-ui); font-weight: 550; }
-.help-topic-list > button small { margin-top: 3px; color: var(--faint); font-size: var(--text-micro); }
-.help-topic-list > button > svg:last-child { color: var(--faint); }
+.help-topic-group + .help-topic-group { margin-top: 12px; }
+.help-topic-group > summary { min-height: 34px; padding: 6px 9px; display: grid; grid-template-columns: minmax(0, 1fr) auto 14px; align-items: center; gap: 7px; color: var(--faint); border-radius: 7px; font-size: var(--text-micro); font-weight: 600; list-style: none; cursor: pointer; }
+.help-topic-group > summary::-webkit-details-marker { display: none; }
+.help-topic-group > summary:hover { color: var(--text); background: color-mix(in srgb, var(--text) 4%, transparent); }
+.help-topic-group > summary small { font: inherit; }
+.help-topic-group > summary svg { transition: transform var(--duration-quick) var(--ease-out); }
+.help-topic-group[open] > summary svg { transform: rotate(90deg); }
+.help-topic-group > button { width: 100%; min-height: 58px; padding: 9px; display: grid; grid-template-columns: 22px minmax(0, 1fr) 16px; align-items: center; gap: 9px; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 8px; font: inherit; text-align: start; cursor: pointer; transition: color var(--duration-quick) var(--ease-out), background-color var(--duration-quick) var(--ease-out), border-color var(--duration-quick) var(--ease-out); }
+.help-topic-group > button:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.help-topic-group > button.active { color: var(--text); background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: color-mix(in srgb, var(--accent) 22%, transparent); }
+.help-topic-group > button.active > svg:first-child { color: var(--accent); }
+.help-topic-group > button > span { min-width: 0; }
+.help-topic-group > button strong, .help-topic-group > button small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.help-topic-group > button strong { font-size: var(--text-ui); font-weight: 550; }
+.help-topic-group > button small { margin-top: 3px; color: var(--faint); font-size: var(--text-micro); }
+.help-topic-group > button > svg:last-child { color: var(--faint); }
 .help-no-results { min-height: 200px; padding: 30px 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; color: var(--muted); text-align: center; }
 .help-no-results strong { margin-top: 5px; color: var(--text); }
 .help-no-results small { max-width: 210px; color: var(--faint); line-height: 1.5; }
@@ -663,6 +670,14 @@ html.is-marquee-selecting, html.is-marquee-selecting * { cursor: crosshair !impo
 .help-article-body > :last-child { margin-bottom: 0; }
 .help-article-body p { margin: 0 0 18px; }
 .help-article-body strong { color: var(--text); font-weight: 550; }
+.help-section { margin-top: 24px; }
+.help-section > h4 { margin: 0 0 8px; color: var(--text); font-size: var(--text-ui); font-weight: 600; }
+.help-section > :last-child { margin-bottom: 0; }
+.help-table-wrap { margin: 20px 0 24px; overflow-x: auto; }
+.help-table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: var(--text-secondary); }
+.help-table th, .help-table td { padding: 11px 12px; border-bottom: 1px solid var(--line-soft); text-align: start; vertical-align: top; }
+.help-table thead th { color: var(--faint); font-size: var(--text-micro); font-weight: 600; }
+.help-table tbody th { width: 100px; color: var(--text); font-weight: 550; }
 .help-steps { margin: 20px 0 24px; padding: 0; display: grid; gap: 0; list-style: none; }
 .help-steps li { min-height: 68px; padding: 12px 0; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; border-bottom: 1px solid var(--line-soft); }
 .help-steps li:first-child { border-top: 1px solid var(--line-soft); }
@@ -690,7 +705,7 @@ html.is-marquee-selecting, html.is-marquee-selecting * { cursor: crosshair !impo
 .help-marquee-box { position: absolute; z-index: 2; inset: 16px auto auto 16px; width: 190px; height: 72px; background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid var(--accent); border-radius: 3px; transform: scale(.08); transform-origin: left top; animation: help-marquee-box 4s var(--ease-smooth-out) infinite; }
 .help-marquee-cursor { position: absolute; z-index: 3; inset: 18px auto auto 18px; width: 11px; height: 16px; background: var(--text); clip-path: polygon(0 0, 100% 68%, 58% 73%, 38% 100%); animation: help-marquee-cursor 4s var(--ease-smooth-out) infinite; }
 .help-note { padding: 10px 12px; display: flex; align-items: flex-start; gap: 8px; color: var(--muted); background: color-mix(in srgb, var(--accent) 6%, transparent); border-radius: 7px; font-size: var(--text-secondary); }
-.help-marquee-demo + p.help-note { margin-top: 12px; }
+.help-article-body p.help-note { margin: 12px 0 18px; }
 .help-note svg { margin-top: 3px; flex: 0 0 auto; color: var(--accent); }
 .help-gallery-demo { padding: 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; background: var(--raised); border: 1px solid var(--line-soft); border-radius: 9px; }
 .help-gallery-demo > div { position: relative; min-width: 0; padding: 5px; display: grid; gap: 6px; background: var(--panel); border: 1px solid var(--line-soft); border-radius: 7px; }
@@ -710,6 +725,10 @@ html.is-marquee-selecting, html.is-marquee-selecting * { cursor: crosshair !impo
 .help-facts li { padding: 13px 0; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 9px; border-bottom: 1px solid var(--line-soft); }
 .help-facts svg { margin-top: 3px; color: var(--accent); }
 .help-facts strong { display: block; }
+.help-troubleshooting { margin: 0; }
+.help-troubleshooting > div { padding: 14px 0; border-bottom: 1px solid var(--line-soft); }
+.help-troubleshooting dt { color: var(--text); font-weight: 600; }
+.help-troubleshooting dd { margin: 4px 0 0; color: var(--muted); }
 .help-feedback { margin-top: 18px; padding: 18px 20px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 24px; background: var(--panel); border: 1px solid var(--line-soft); border-radius: 12px; }
 .help-feedback > div:first-child > span { color: var(--accent); font-size: var(--text-micro); font-weight: 600; }
 .help-feedback h3 { margin: 4px 0 3px; font-size: 1rem; }
@@ -782,7 +801,7 @@ html.is-marquee-selecting, html.is-marquee-selecting * { cursor: crosshair !impo
   .settings-content { padding: 28px 20px 48px; }
   .help-center { min-height: 0; grid-template-columns: 1fr; }
   .help-topic-list { border-inline-end: 0; border-bottom: 1px solid var(--line-soft); }
-  .help-topic-list > button { min-height: 52px; }
+  .help-topic-group > button { min-height: 52px; }
   .help-article { padding: 24px 20px 30px; }
   .help-flow-demo { flex-wrap: wrap; }
   .help-demo-prompt { flex-basis: 100%; order: 3; }

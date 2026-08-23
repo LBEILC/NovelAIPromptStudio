@@ -25,8 +25,12 @@ describe('production-safe Lobe UI overrides', () => {
     expect(styles).toMatch(/\.help-article > header > svg \{[^}]*grid-row: 1;[^}]*margin-inline-start: 5px;/);
     expect(styles).toMatch(/\.help-article h3 \{[^}]*grid-row: 1;/);
     expect(styles).toMatch(/\.help-article header p \{[^}]*grid-row: 2;/);
-    expect(styles).toMatch(/\.help-marquee-demo \+ p\.help-note \{[^}]*margin-top: 12px;/);
+    expect(styles).toMatch(/\.help-topic-group > summary \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto 14px;/);
+    expect(styles).toMatch(/\.help-topic-group > button \{[^}]*min-height: 58px;/);
+    expect(styles).toMatch(/\.help-article-body p\.help-note \{[^}]*margin: 12px 0 18px;/);
     expect(styles).not.toMatch(/\.help-facts li:first-child \{[^}]*border-top:/);
+    expect(styles).toMatch(/\.help-table-wrap \{[^}]*overflow-x: auto;/);
+    expect(styles).toMatch(/\.help-troubleshooting > div \{[^}]*border-bottom:/);
     expect(styles).toMatch(/\.help-marquee-box \{[^}]*animation: help-marquee-box/);
     expect(styles).toMatch(/html\[data-motion="off"\] \*, html\[data-motion="off"\] \*::before, html\[data-motion="off"\] \*::after \{[^}]*animation-duration: \.01ms !important;/);
   });
