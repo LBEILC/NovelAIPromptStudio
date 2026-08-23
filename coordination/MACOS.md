@@ -74,14 +74,14 @@ Only current actionable macOS requests are kept here. Earlier completed, superse
 - Expected: Gallery thumbnails that were loaded into Chromium's cache while Gallery was hidden are recognized as complete when Gallery becomes visible. They do not remain transparent after restart, and switching to Trash and back is no longer required. Normal lazy loading and thumbnail fade-in remain intact.
 - Observed: Windows clean `npm ci`, all 253 tests in 41 files, and the production build passed. Automated coverage distinguishes cached complete images from incomplete or failed images. Windows and macOS interactive verification remain pending.
 
-## Verify Workbench Prompt dirty state after restart
+## Verify Workbench Prompt dirty state and annotation boundary
 
 - Status: Pending
-- Date/source: 2026-08-23, Windows
-- Related commit: `89b09c8`
-- Action: On an unlocked macOS session, check out current `main` and follow `doc/manual-verification-20260823-workbench-restart-dirty-state.md`. Pay particular attention to an unchanged Base/Character Prompt session across a full app restart, one genuinely edited draft alongside unchanged tabs, reset behavior, and the close-confirmation boundary.
-- Expected: Parser-generated Tag and Character identities do not make an unchanged restored Prompt appear modified. Genuine Prompt edits still persist as drafts and remain marked after restart; reset clears the mark; only genuinely modified tabs require discard confirmation.
-- Observed: Windows clean `npm ci`, all 251 tests in 41 files, and the production build passed. Automated coverage recreates a restored Base/Character Prompt with entirely different parser identities, confirms it remains clean, then confirms a real Tag weight edit is detected. Windows and macOS interactive verification remain pending.
+- Date/source: 2026-08-24, Windows
+- Related commits: `89b09c8`, `7e3a5e8`
+- Action: On an unlocked macOS session, check out current `main` and follow `doc/manual-verification-20260823-workbench-restart-dirty-state.md` plus `doc/manual-verification-20260824-workbench-annotation-dirty-state.md`. Pay particular attention to an unchanged Base/Character Prompt session across a full app restart; batch and single-Tag translation/category actions that update annotations without rewriting the original raw Prompt; one genuinely edited draft alongside unchanged tabs; reset behavior; and the close-confirmation boundary.
+- Expected: Parser-generated identities and Tag annotation fields such as translation, category, source, and note do not make an unchanged Prompt appear modified. Annotation-only operations preserve the exact raw Prompt including whitespace, line breaks, braces, and ordering. Genuine Prompt edits still persist as drafts and remain marked after restart; reset clears the mark; only genuinely modified tabs require discard confirmation.
+- Observed: Windows clean `npm ci`, all 275 tests in 46 files, and the production build passed for `7e3a5e8`. Automated coverage recreates restored Prompts with different parser identities, verifies annotation-only changes remain clean while preserving exact raw Prompt text, and confirms a real Tag weight edit is detected. Windows and macOS interactive verification remain pending.
 
 ## Verify Workbench thumbnail filmstrip
 
