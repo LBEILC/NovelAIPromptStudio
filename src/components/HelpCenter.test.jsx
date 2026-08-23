@@ -6,9 +6,12 @@ vi.mock('@lobehub/ui', () => ({
 }));
 
 vi.mock('@lobehub/ui/base-ui', () => ({
-  Button: ({ children, icon, ...props }) => <button {...props}>{icon}{children}</button>,
+  Button: ({ children, icon, type, ...props }) => <button {...props} type={type === 'submit' || type === 'reset' ? type : 'button'}>{icon}{children}</button>,
   Input: (props) => <input {...props}/>,
   Segmented: ({ onChange, options = [], size, value, ...props }) => <div {...props}>{options.find((option) => option.value === value)?.label}</div>,
+  Select: ({ onChange, options = [], value, ...props }) => <select {...props} defaultValue={value}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
+  Slider: ({ onChange, value, ...props }) => <input {...props} defaultValue={value} type="range"/>,
+  Switch: ({ checked, onChange, ...props }) => <button aria-pressed={checked} {...props} type="button"/>,
 }));
 
 import HelpCenter, { filterHelpTopics, HELP_GROUPS, HELP_TOPICS } from './HelpCenter.jsx';
@@ -37,7 +40,7 @@ describe('HelpCenter', () => {
       platform="win32"
       studio={{ openReleasePage: async () => ({ ok: true }) }}
     />);
-    const translationHtml = renderToStaticMarkup(HELP_TOPICS.find((topic) => topic.id === 'translation-and-categories').content);
+    const articleHtml = Object.fromEntries(HELP_TOPICS.map((topic) => [topic.id, renderToStaticMarkup(topic.content)]));
 
     expect(html).toContain('帮助与反馈');
     expect(html).toContain('4 组 · 16 篇');
@@ -50,10 +53,21 @@ describe('HelpCenter', () => {
     expect(html).toContain('打开图片，找到并复制 Prompt');
     expect(html).toContain('翻译与分类 Tag');
     expect(html).toContain('读懂分类视图，并整理当前需要的 Tag');
-    expect(translationHtml).toContain('翻译分类演示分组方式');
-    expect(translationHtml).toContain('按钮只处理当前可见的 4 个 Tag');
-    expect(translationHtml).toContain('你的修正');
-    expect(translationHtml).toContain('可选 AI');
+    expect(articleHtml['translation-and-categories']).toContain('翻译分类演示分组方式');
+    expect(articleHtml['translation-and-categories']).toContain('按钮只处理当前可见的 4 个 Tag');
+    expect(articleHtml['translation-and-categories']).toContain('你的修正');
+    expect(articleHtml['translation-and-categories']).toContain('可选 AI');
+    expect(articleHtml['find-and-copy']).toContain('复制演示内容类型');
+    expect(articleHtml['edit-and-fidelity']).toContain('原文保真演示视图');
+    expect(articleHtml.selection).toContain('批量选择演示 Tag');
+    expect(articleHtml['tabs-and-drafts']).toContain('标签草稿演示状态');
+    expect(articleHtml['gallery-import']).toContain('图库分组演示方式');
+    expect(articleHtml['gallery-find']).toContain('智能收藏集');
+    expect(articleHtml['gallery-batch']).toContain('图片组操作范围演示');
+    expect(articleHtml['gallery-trash']).toContain('迁移资源位置');
+    expect(articleHtml.data).toContain('数据流演示操作');
+    expect(articleHtml.troubleshooting).toContain('常见问题现象');
+    expect(articleHtml.feedback).toContain('绝不会自动包含');
     expect(html).toContain('<h3>从一张图片开始</h3><p>打开图片，找到并复制 Prompt</p>');
     expect(html).toContain('报告问题');
     expect(html).toContain('提出建议');

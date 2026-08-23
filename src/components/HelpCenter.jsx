@@ -1,139 +1,27 @@
 import { useMemo, useState } from 'react';
-import { Button as LobeButton, Input as LobeInput, Segmented as LobeSegmented } from '@lobehub/ui/base-ui';
+import { Button as LobeButton, Input as LobeInput } from '@lobehub/ui/base-ui';
+import {
+  CopyScopeDemo,
+  DataFlowDemo,
+  DiagnosticsDemo,
+  FidelityDemo,
+  GalleryFilterDemo,
+  GalleryGroupingDemo,
+  GalleryScopeDemo,
+  PromptScopeDemo,
+  SelectionBatchDemo,
+  TabDraftDemo,
+  TranslationCategoryDemo,
+  TranslationResolutionPath,
+  TrashLifecycleDemo,
+  TroubleshootingDemo,
+  WorkbenchFlowDemo,
+} from './HelpDemos.jsx';
 import Icon from './Icon.jsx';
 
 const PROJECT_URL = 'https://github.com/LBEILC/NovelAIPromptStudio/';
 const REPORT_URL = `${PROJECT_URL}issues/new?labels=bug&title=%5B%E9%97%AE%E9%A2%98%5D%20`;
 const SUGGEST_URL = `${PROJECT_URL}issues/new?labels=enhancement&title=%5B%E5%BB%BA%E8%AE%AE%5D%20`;
-
-function WorkbenchFlowDemo() {
-  return <div aria-hidden="true" className="help-flow-demo">
-    <div className="help-demo-image"><Icon name="image" size={22}/><span>NovelAI 图片</span></div>
-    <span className="help-flow-arrow">→</span>
-    <div className="help-demo-prompt">
-      <span>Prompt</span>
-      <div><i>1girl</i><i>blue eyes</i><i>city night</i></div>
-    </div>
-    <span className="help-flow-arrow">→</span>
-    <div className="help-demo-copy"><Icon name="copy" size={16}/><span>复制</span></div>
-  </div>;
-}
-
-function PromptScopeDemo() {
-  const [kind, setKind] = useState('prompt');
-  const [scope, setScope] = useState('base');
-  const tags = kind === 'undesired'
-    ? scope === 'base' ? ['lowres', 'blurry'] : ['bad hands', 'extra fingers']
-    : scope === 'base' ? ['masterpiece', 'cinematic lighting'] : ['silver hair', 'blue eyes'];
-
-  return <div className="help-scope-demo">
-    <div className="help-scope-controls">
-      <LobeSegmented aria-label="演示 Prompt 类型" options={[{ label: 'Prompt', value: 'prompt' }, { label: 'Undesired', value: 'undesired' }]} size="small" value={kind} onChange={setKind}/>
-      <LobeSegmented aria-label="演示 Prompt 范围" options={[{ label: 'Base', value: 'base' }, { label: 'Character', value: 'character' }]} size="small" value={scope} onChange={setScope}/>
-    </div>
-    <div className={`help-demo-tags${kind === 'undesired' ? ' undesired' : ''}`}>
-      {tags.map((tag) => <span key={tag}>{tag}</span>)}
-    </div>
-    <small>这里使用演示数据，不会修改当前工作台。</small>
-  </div>;
-}
-
-const TRANSLATION_DEMO_TAGS = [
-  { category: '角色组成', categoryKey: 'subject', original: '1girl', scope: 'Character 1', source: 'DSO 离线', translation: '1个女孩' },
-  { category: '外貌身体', categoryKey: 'body', original: 'blue hair', scope: 'Character 1', source: 'DSO 离线', translation: '蓝色头发' },
-  { category: '服装配饰', categoryKey: 'clothing', original: 'school uniform', scope: 'Character 1', source: '用户修正', translation: '校服' },
-  { category: '未分类', categoryKey: 'unsorted', original: 'custom visual motif', scope: 'Base Prompt', source: '等待补全', translation: '' },
-];
-
-function TranslationCategoryDemo() {
-  const [organized, setOrganized] = useState(true);
-  const [viewMode, setViewMode] = useState('category');
-  const [language, setLanguage] = useState('bilingual');
-  const [category, setCategory] = useState('all');
-  const resolvedTags = TRANSLATION_DEMO_TAGS.map((tag) => organized ? tag : { ...tag, category: '未分类', categoryKey: 'unsorted', source: '', translation: '' });
-  const categoryOptions = organized
-    ? [{ key: 'all', label: '全部' }, ...TRANSLATION_DEMO_TAGS.map((tag) => ({ key: tag.categoryKey, label: tag.category }))]
-    : [{ key: 'all', label: '全部' }, { key: 'unsorted', label: '未分类' }];
-  const visibleTags = resolvedTags.filter((tag) => category === 'all' || tag.categoryKey === category);
-  const groupKey = viewMode === 'category' ? 'category' : 'scope';
-  const groups = visibleTags.reduce((result, tag) => {
-    const title = tag[groupKey];
-    const current = result.find((group) => group.title === title);
-    if (current) current.tags.push(tag);
-    else result.push({ title, tags: [tag] });
-    return result;
-  }, []);
-
-  const toggleOrganized = () => {
-    if (organized) {
-      setOrganized(false);
-      setViewMode('structure');
-      setLanguage('original');
-      setCategory('all');
-      return;
-    }
-    setOrganized(true);
-    setViewMode('category');
-    setLanguage('bilingual');
-  };
-
-  return <div className="help-translation-demo">
-    <div className="help-translation-toolbar">
-      <div className="help-translation-control"><span>总览分组</span><LobeSegmented aria-label="翻译分类演示分组方式" onChange={setViewMode} options={[{ label: '按结构', value: 'structure' }, { label: '按分类', value: 'category' }]} size="small" value={viewMode}/></div>
-      <div className="help-translation-control"><span>显示语言</span><LobeSegmented aria-label="翻译分类演示显示语言" onChange={setLanguage} options={[{ label: '原文', value: 'original' }, { label: '翻译', value: 'translated' }, { label: '对照', value: 'bilingual' }]} size="small" value={language}/></div>
-      <LobeButton aria-pressed={organized} icon={<Icon name="spark" size={14}/>} onClick={toggleOrganized} size="small" type={organized ? 'default' : 'primary'}>{organized ? '查看整理前' : `翻译与分类 ${visibleTags.length}`}</LobeButton>
-    </div>
-    <div aria-label="演示 Tag 分类筛选" className="help-translation-filters">
-      {categoryOptions.map((option) => {
-        const count = option.key === 'all' ? resolvedTags.length : resolvedTags.filter((tag) => tag.categoryKey === option.key).length;
-        return <button aria-pressed={category === option.key} className={category === option.key ? 'active' : ''} key={option.key} onClick={() => setCategory(option.key)} type="button">{option.label} <b>{count}</b></button>;
-      })}
-    </div>
-    <div aria-live="polite" className="help-translation-groups">
-      {groups.map((group) => <section key={group.title}>
-        <header><strong>{group.title}</strong><span>{group.tags.length}</span></header>
-        <div className="help-translation-tags">
-          {group.tags.map((tag) => <span className={`help-translation-tag cat-${tag.categoryKey}`} key={tag.original}>
-            <span>
-              <strong>{language === 'translated' && tag.translation ? tag.translation : tag.original}</strong>
-              {language === 'bilingual' && <small>{tag.translation || '等待补全译文'}</small>}
-            </span>
-            {organized && <small>{viewMode === 'structure' ? tag.category : tag.source}</small>}
-          </span>)}
-        </div>
-      </section>)}
-    </div>
-    <footer><span><Icon name="filter" size={13}/>按钮只处理当前可见的 {visibleTags.length} 个 Tag</span><span><Icon name="copy" size={13}/>复制始终使用原始 Tag</span></footer>
-  </div>;
-}
-
-function TranslationResolutionPath() {
-  return <ol aria-label="翻译与分类处理优先顺序" className="help-resolution-path">
-    <li><span>1</span><strong>你的修正</strong><small>本地 · 最高优先</small></li>
-    <li><span>2</span><strong>画师验证</strong><small>仅缺失名称 · 联网</small></li>
-    <li><span>3</span><strong>DSO 词典</strong><small>精确命中 · 离线</small></li>
-    <li><span>4</span><strong>本地规则</strong><small>继续推断 · 离线</small></li>
-    <li><span>5</span><strong>可选 AI</strong><small>只补全剩余 Tag</small></li>
-  </ol>;
-}
-
-function MarqueeDemo() {
-  return <div aria-hidden="true" className="help-marquee-demo">
-    {['1girl', 'solo', 'looking at viewer', 'upper body', 'soft light', 'outdoors'].map((tag) => <span key={tag}>{tag}</span>)}
-    <i className="help-marquee-box"/>
-    <i className="help-marquee-cursor"/>
-  </div>;
-}
-
-function GalleryDemo() {
-  return <div aria-hidden="true" className="help-gallery-demo">
-    {[0, 1, 2, 3].map((item) => <div className={item < 2 ? 'selected' : ''} key={item}>
-      <span>{item < 2 && <Icon name="check" size={12}/>}</span>
-      <i/>
-      <small>{item === 0 ? '构图参考' : item === 1 ? '夜景角色' : item === 2 ? '服装设计' : '光影练习'}</small>
-    </div>)}
-  </div>;
-}
 
 function HelpSection({ children, title }) {
   return <section className="help-section"><h4>{title}</h4>{children}</section>;
@@ -143,12 +31,6 @@ function HelpSteps({ items }) {
   return <ol className="help-steps">{items.map((item, index) => <li key={item.title}>
     <span>{index + 1}</span><div><strong>{item.title}</strong><small>{item.detail}</small></div>
   </li>)}</ol>;
-}
-
-function HelpFacts({ items }) {
-  return <ul className="help-facts">{items.map((item) => <li key={item.title}>
-    <Icon name="check" size={15}/><span><strong>{item.title}</strong>{item.detail}</span>
-  </li>)}</ul>;
 }
 
 export const HELP_GROUPS = [
@@ -203,18 +85,9 @@ export const HELP_GROUPS = [
         summary: '确定范围、筛选结果并选择复制方式',
         keywords: '复制 可见 全部 base character selected 自动 tag 正向 负向 翻译 原文 范围',
         content: <>
-          <p>复制结果由当前 Prompt 类型、作用域、搜索与分类筛选共同决定。复制前先确认自己需要的是完整复现、单个角色，还是当前筛选后的一小部分。</p>
-          <HelpSteps items={[
-            { title: '选择 Prompt 类型', detail: 'Prompt 是正向内容；Undesired 是负向内容。主复制操作不会把 Undesired 混入正向结果。' },
-            { title: '选择 Base 或 Character', detail: 'Base 描述基础画面；Character 分别保存每个角色自己的 Prompt。' },
-            { title: '缩小可见范围', detail: '切换结构或分类视图，并结合搜索、分类、语言显示和多选得到目标 Tag。' },
-            { title: '核对复制菜单', detail: '主按钮复制当前可见正向 Prompt；菜单提供全部、完整 Base、指定 Character 和包含自动 Tag 的原始范围。' },
-          ]}/>
-          <HelpFacts items={[
-            { title: '保留 NovelAI 语法', detail: '复制会保留原始 Tag、顺序、权重、花括号、换行和作用域。' },
-            { title: '译文只用于阅读', detail: '切换到译文或对照显示不会把中文译文写入生成用 Prompt。' },
-            { title: '多选只复制选中内容', detail: '选中 Tag 后使用对应批量复制，可以得到精确的局部结果。' },
-          ]}/>
+          <p>切换内容、区域和分类，观察“当前可见”与正向复制结果如何同步变化。</p>
+          <CopyScopeDemo/>
+          <p className="help-note"><Icon name="info" size={15}/>主按钮复制当前可见的正向 Prompt；菜单仍可选择完整 Base、指定 Character 或包含自动 Tag 的原始范围。复制始终保留原始语法，不会混入译文。</p>
         </>,
       },
       {
@@ -224,15 +97,10 @@ export const HELP_GROUPS = [
         summary: '同时处理多张图片并安全恢复会话',
         keywords: '标签 多图 草稿 修改 重启 恢复 关闭 排序 ctrl command tab w session',
         content: <>
-          <p>每张打开的图片都有独立标签、来源、Prompt 草稿和修改状态。应用会保存标签顺序、当前标签和草稿，完整退出并重新启动后可以继续工作。</p>
-          <HelpFacts items={[
-            { title: '重复来源会复用标签', detail: '再次打开同一个文件或同一张图片库图片时，会优先回到已有标签。' },
-            { title: '已修改标签会明确标记', detail: '修改 Prompt 后，标签和工作台标题会显示修改状态。' },
-            { title: '关闭前保护草稿', detail: '关闭已修改标签时会要求确认；丢弃只影响该标签。' },
-            { title: '源文件仍然独立', detail: '草稿恢复不等于写回图片；外部图片被移动或删除时，标签可能提示来源不可用。' },
-          ]}/>
+          <p>切换下面四种状态，查看独立标签、修改标记、重启恢复和来源失效分别意味着什么。</p>
+          <TabDraftDemo/>
           <HelpSection title="常用操作">
-            <p>拖动顶部缩略图可以调整标签顺序；使用 Ctrl/Cmd + Tab 前进、Ctrl/Cmd + Shift + Tab 后退，使用 Ctrl/Cmd + W 关闭当前标签。</p>
+            <p>再次打开同一来源会优先复用已有标签。拖动缩略图可以排序；Ctrl/Cmd + Tab 切换标签，Ctrl/Cmd + W 关闭当前标签。关闭已修改标签时会要求确认。</p>
           </HelpSection>
         </>,
       },
@@ -251,14 +119,6 @@ export const HELP_GROUPS = [
         content: <>
           <p><strong>Prompt / Undesired</strong> 决定查看正向还是负向内容；<strong>Base / Character</strong> 决定查看基础画面还是角色范围。它们是两个独立维度，不是四种互斥模式。</p>
           <PromptScopeDemo/>
-          <HelpSection title="如何理解四个组合">
-            <HelpFacts items={[
-              { title: 'Base Prompt', detail: '描述构图、场景、画面质量与所有角色共享的内容。' },
-              { title: 'Character Prompt', detail: '保存单个角色的外观、服装、姿势等内容；不同角色可以独立查看和命名。' },
-              { title: 'Base Undesired', detail: '针对整个画面的负向内容。' },
-              { title: 'Character Undesired', detail: '只属于某个角色的负向内容。' },
-            ]}/>
-          </HelpSection>
           <p className="help-note"><Icon name="info" size={15}/>应用会标记能够确认的 NovelAI 自动质量词或 UC 预设。普通复制可以排除它们，完整复现时可以显式复制包含自动 Tag 的原始内容。</p>
         </>,
       },
@@ -284,18 +144,9 @@ export const HELP_GROUPS = [
         summary: '修改 Tag，同时保留可复用的原始语法',
         keywords: '编辑 添加 删除 排序 权重 原始文本 raw v5 text 引号 换行 vibe 恢复原图',
         content: <>
-          <p>工作台中的修改只保存在当前标签草稿，不会写回图片 metadata。可以编辑 Tag 文本、权重和分类，也可以添加、删除、排序或在作用域之间移动 Tag。</p>
-          <HelpSection title="结构化编辑与原始文本">
-            <p>结构视图适合逐个整理 Tag；原始文本适合检查完整语法。两种视图会尽量同步，解析失败时保留原始文本，避免因为结构化失败丢失内容。</p>
-          </HelpSection>
-          <HelpSection title="复制时保留什么">
-            <HelpFacts items={[
-              { title: '权重与顺序', detail: '花括号、数值权重、Tag 顺序和作用域按原始 Prompt 保留。' },
-              { title: 'V5 文本', detail: '自然语言段落、引号中的逗号和多行 Text: 内容不会被压成普通逗号列表。' },
-              { title: 'Vibe 数据', detail: '可以识别并导出可恢复的 .naiv4vibe；应用不提供 Vibe 强度编辑或本地效果预览。' },
-            ]}/>
-          </HelpSection>
-          <p className="help-note"><Icon name="info" size={15}/>“恢复原图”只清除当前标签的 Prompt 草稿并重新采用图片内容，不会修改图片文件，也不会影响其他标签。</p>
+          <p>在结构视图和原始文本之间切换，再调整演示 Tag 的顺序与权重。</p>
+          <FidelityDemo/>
+          <p className="help-note"><Icon name="info" size={15}/>工作台修改只保存在当前标签草稿，不写回图片 metadata。“恢复原图”只清除该标签草稿。Vibe 可以只读导出，不能在本地编辑强度或预览效果。</p>
         </>,
       },
       {
@@ -305,17 +156,9 @@ export const HELP_GROUPS = [
         summary: '框选、追加选择和移动 Tag',
         keywords: '框选 多选 批量 右键 ctrl command shift tag 移动 分类 删除 翻译 alt 方向键',
         content: <>
-          <p>需要同时处理多个 Tag 时，可以从空白处拖出框选区域。普通框选替换当前选择；按住 Ctrl（Windows）或 Command（macOS）可以切换选中状态，按住 Shift 可以追加。</p>
-          <MarqueeDemo/>
-          <HelpSection title="选中后可以做什么">
-            <HelpFacts items={[
-              { title: '复制与翻译', detail: '只处理当前选中的 Tag，不影响未选内容。' },
-              { title: '设置分类', detail: '把选中 Tag 统一设为人物、服装、构图等分类，并允许以后修正。' },
-              { title: '移动作用域', detail: '把 Tag 移到 Base、指定 Character 或相应的 Undesired 范围。' },
-              { title: '删除', detail: '只从当前工作台草稿移除选中 Tag，不修改原始图片。' },
-            ]}/>
-          </HelpSection>
-          <p className="help-note"><Icon name="info" size={15}/>右键菜单和顶部多选工具栏提供相同的核心批量路径；不用右键也能完成操作。键盘聚焦 Tag 后，可用 Alt + 方向键调整顺序。</p>
+          <p>点击 Tag 增减选择，再试用批量工具栏；演示不会复制、移动或删除真实内容。</p>
+          <SelectionBatchDemo/>
+          <p className="help-note"><Icon name="info" size={15}/>空白处拖动可以框选；Ctrl（Windows）或 Command（macOS）切换选中，Shift 追加。右键菜单提供相同核心操作；键盘聚焦 Tag 后可用 Alt + 方向键排序。</p>
         </>,
       },
     ],
@@ -331,19 +174,9 @@ export const HELP_GROUPS = [
         summary: '保存图片，并按 Prompt 关系整理',
         keywords: '图库 导入 png jpg jpeg webp zip 拖放 剪贴板 重复 去重 分组 完整 基础 相似 vibe seed',
         content: <>
-          <p>图片库接受 PNG、JPG、JPEG、WebP 和 NovelAI 导出的 ZIP。可以通过文件选择、拖放或剪贴板导入；成功后，应用在资源目录中保存自己的副本和缩略图。</p>
-          <GalleryDemo/>
-          <HelpSection title="重复图片如何处理">
-            <p>内容完全相同的图片会被跳过，不会生成第二份副本。导入数量少于选择数量时，先检查是否存在重复项，而不是立即重新导入。</p>
-          </HelpSection>
-          <HelpSection title="选择分组方式">
-            <HelpFacts items={[
-              { title: '全部分开', detail: '每张图片独立显示，不做 Prompt 归组。' },
-              { title: '完整 Prompt', detail: '角色、位置与完整 Prompt 相同时归为一组，适合整理仅 Seed 等结果参数不同的图片。' },
-              { title: '基础 Prompt', detail: '忽略角色 Prompt 与位置，按 Base 内容归组。' },
-              { title: '相似 Prompt', detail: '按 Base Tag 相似度归组，可以调整最低相似度，并决定是否跨 Vibe 合并。' },
-            ]}/>
-          </HelpSection>
+          <p>切换四种分组方式，观察相同的四张演示图片如何重新归组。</p>
+          <GalleryGroupingDemo/>
+          <p className="help-note"><Icon name="info" size={15}/>图片库接受 PNG、JPG、JPEG、WebP 和 NovelAI ZIP，并在资源目录保存应用副本。内容完全相同的图片会跳过，不会生成第二份副本。</p>
         </>,
       },
       {
@@ -353,17 +186,9 @@ export const HELP_GROUPS = [
         summary: '快速找到一组可复用的图片',
         keywords: '搜索 筛选 文件名 tag 译名 模型 vibe 日期 包含 排除 收藏集 智能收藏集 规则',
         content: <>
-          <p>搜索可以匹配文件名、原始 Tag 和译名。高级筛选可以组合包含或排除 Tag、模型、Vibe 和导入日期；筛选发生在分组之前，因此图片组里不会混入不符合条件的成员。</p>
-          <HelpSection title="组合多个条件">
-            <HelpFacts items={[
-              { title: '不同筛选维度使用“并且”', detail: '例如“指定模型 + 最近 30 天”要求两项都满足。' },
-              { title: '同一字段可以多选', detail: '多个模型或 Vibe 在字段内部按“任意一个”匹配。' },
-              { title: '排除条件优先', detail: '被排除 Tag 命中的图片不会因为其他条件再次出现。' },
-            ]}/>
-          </HelpSection>
-          <HelpSection title="普通与智能收藏集">
-            <p><strong>普通收藏集</strong>由你手动加入或移除图片；<strong>智能收藏集</strong>保存当前搜索与筛选规则，新导入且符合规则的图片会自动出现。编辑智能收藏集时，应用会把保存的规则重新加载到图库筛选器供你预览。</p>
-          </HelpSection>
+          <p>组合模型、包含 Tag、排除 Tag 和日期，观察结果数量；再切换智能收藏集查看规则保存后的区别。</p>
+          <GalleryFilterDemo/>
+          <p className="help-note"><Icon name="info" size={15}/>搜索还能匹配文件名、原始 Tag 和译名。普通收藏集保存手动成员；智能收藏集保存规则，并自动接收以后符合条件的新图片。</p>
         </>,
       },
       {
@@ -373,14 +198,10 @@ export const HELP_GROUPS = [
         summary: '确认当前图片、图片组和选择范围',
         keywords: '图片组 组内 浏览 悬停 单击 双击 详情 多选 框选 ctrl command shift 批量 缩略图 缩放',
         content: <>
-          <p>图片卡可能代表一张图片，也可能代表一个自动分组。把指针移过图片组可以浏览成员；单击打开当前成员详情，双击把同一成员送入工作台。</p>
-          <HelpFacts items={[
-            { title: '批量选择以图片组为单位', detail: '框选、Ctrl/Cmd 增减选择或 Shift 范围选择后，批量收藏、加入收藏集和移入回收站会作用于当前显示的整组。' },
-            { title: '详情操作只针对当前图片', detail: '详情侧栏中的重命名、复制、下载、设为头图等操作以当前浏览成员为准。' },
-            { title: '固定头图仅属于精确组', detail: '只有完整 Prompt 且不跨 Vibe 的精确分组允许持久选择头图。' },
-          ]}/>
+          <p>切换当前成员，再比较详情侧栏和批量工具栏的操作范围。</p>
+          <GalleryScopeDemo/>
           <HelpSection title="调整图库密度">
-            <p>使用工具栏滑块调整缩略图大小；也可以在图库上按住 Ctrl（Windows）或 Command（macOS）滚动。普通滚轮仍然滚动页面，不会改变应用缩放比例。</p>
+            <p>工具栏滑块调整缩略图大小；也可以在图库上按住 Ctrl（Windows）或 Command（macOS）滚动。普通滚轮仍然滚动页面。固定头图只适用于完整 Prompt 且不跨 Vibe 的精确组。</p>
           </HelpSection>
         </>,
       },
@@ -391,15 +212,9 @@ export const HELP_GROUPS = [
         summary: '安全删除应用副本并迁移图库资源',
         keywords: '回收站 删除 恢复 永久删除 清空 外部原图 应用副本 资源位置 迁移 备份 文件夹',
         content: <>
-          <p>普通删除只把应用管理副本移入应用内部回收站。最初导入的外部文件不受影响；从工作台打开的外部图片也不会因为图库操作被删除。</p>
-          <HelpSteps items={[
-            { title: '先移入回收站', detail: '项目会从普通图库和收藏集中隐藏，但仍可恢复。' },
-            { title: '在回收站确认范围', detail: '可以恢复单项或选中项；永久删除和清空回收站都会再次确认。' },
-            { title: '永久删除应用副本', detail: '只清理经过验证、位于应用资源目录中的图片副本、缩略图和相关资源。' },
-          ]}/>
-          <HelpSection title="迁移资源位置">
-            <p>在设置的“资源库”中选择新的空目录。应用会先复制并校验资源，再切换位置；失败时保留旧目录和可恢复备份。迁移期间不要手动移动或删除源目录。</p>
-          </HelpSection>
+          <p>沿着演示生命周期移动应用副本，或查看资源迁移的安全顺序。</p>
+          <TrashLifecycleDemo/>
+          <p className="help-note"><Icon name="info" size={15}/>永久删除和清空回收站都会再次确认。迁移时请选择新的空目录；失败会保留旧目录和可恢复备份，期间不要手动移动源目录。</p>
         </>,
       },
     ],
@@ -435,15 +250,8 @@ export const HELP_GROUPS = [
         summary: '了解本地数据、联网边界和凭据安全',
         keywords: '数据 隐私 本地 api key ai dso danbooru 离线 词典 安全 原图 资源库 联网 翻译 分类 缓存 metadata',
         content: <>
-          <HelpFacts items={[
-            { title: '工作台只读原图', detail: '打开图片不会修改 metadata、覆盖文件或自动写入图片库。' },
-            { title: '图片库管理本地副本', detail: '图片、缩略图、索引、收藏集和回收站状态保存在本机资源目录。' },
-            { title: '离线词典优先，AI 只负责补全', detail: '应用先使用用户修正、DSO 内置词典、Danbooru 画师验证与本地规则；只有仍未完成且已配置模型的 Tag 才会发送到你的服务。' },
-            { title: 'API Key 使用系统安全存储', detail: '安全存储不可用时，应用不会退回明文保存。' },
-          ]}/>
-          <HelpSection title="哪些操作不需要网络">
-            <p>解析图片、编辑与复制 Prompt、DSO 精确命中的翻译和本地分类、图片库管理以及本帮助内容都可以离线完成。检查更新、GitHub 反馈、DSO 未收录名称的 Danbooru 画师验证，以及需要远程模型补全的 Tag 才会访问网络。</p>
-          </HelpSection>
+          <p>切换常见操作，查看数据留在本机还是需要访问你明确配置的服务。</p>
+          <DataFlowDemo/>
           <p className="help-note"><Icon name="info" size={15}/>诊断信息只包含应用版本和平台，不包含图片路径、Prompt、API 地址、API Key 或日志。</p>
         </>,
       },
@@ -454,14 +262,8 @@ export const HELP_GROUPS = [
         summary: '从现象判断原因并找到下一步',
         keywords: '问题 排查 错误 没有 prompt metadata 剪贴板 导入 重复 ai 连接 来源不可用 更新',
         content: <>
-          <dl className="help-troubleshooting">
-            <div><dt>图片能打开，但没有 Prompt</dt><dd>截图、社交平台下载、JPG/WebP 转码或网页“复制图片”可能已经移除 metadata。优先使用 NovelAI 原始导出的 PNG；应用无法从纯像素还原已经丢失的 Prompt。</dd></div>
-            <div><dt>按 Ctrl/Cmd + V 没有打开图片</dt><dd>文本框获得焦点时，粘贴会保留为普通文本操作。先退出文本编辑，或使用“打开图片 / 导入图片”按钮选择原文件。</dd></div>
-            <div><dt>导入数量少于选择数量</dt><dd>内容完全相同的图片会自动跳过。检查导入结果提示和现有图片，再决定是否需要重新导入。</dd></div>
-            <div><dt>翻译或分类没有完成</dt><dd>DSO 未收录的 General Tag 可能没有可靠分类；名称也可能需要 Danbooru 验证。需要 AI 补全时，请在“AI 服务”中检查配置并测试连接。失败不会影响本地 Prompt 编辑和图片库，未完成的 Tag 可以稍后重试或手动修正。</dd></div>
-            <div><dt>工作台提示图片来源不可用</dt><dd>外部文件可能被移动、重命名或删除。重新打开当前文件；如果来源是图片库，请确认资源位置仍可访问且迁移已经完成。</dd></div>
-            <div><dt>搜索后看不到图片组中的某些成员</dt><dd>这是预期行为：搜索和筛选先作用于单张图片，再进行分组，不符合条件的成员不会留在结果组中。</dd></div>
-          </dl>
+          <p>先选择最接近的现象，再按“下一步”处理；切换选项不会检查或修改真实数据。</p>
+          <TroubleshootingDemo/>
         </>,
       },
       {
@@ -471,12 +273,12 @@ export const HELP_GROUPS = [
         summary: '提交可复现、且不泄露隐私的问题',
         keywords: '反馈 报告问题 建议 github issue 诊断 版本 平台 隐私 复现',
         content: <>
-          <p>帮助内容没有解决问题时，可以在页面底部打开官方 GitHub 问题或建议入口。应用只负责打开并预填标题，不会自动提交任何内容。</p>
+          <p>先确认诊断信息包含什么，再准备复现步骤和经过检查的附件。</p>
+          <DiagnosticsDemo/>
           <HelpSteps items={[
-            { title: '复制诊断信息', detail: '只复制当前应用版本和操作系统平台，不包含路径、Prompt、API 地址、凭据或日志。' },
-            { title: '描述复现步骤', detail: '写明所在页面、执行顺序、预期结果和实际结果；如果问题只在某个主题或窗口宽度出现，也请注明。' },
-            { title: '检查附件', detail: '截图前遮住文件名、Prompt、路径和服务配置；不要上传包含 API Key 的设置画面。' },
-            { title: '选择问题或建议', detail: '功能异常使用“报告问题”，体验改进或新需求使用“提出建议”。' },
+            { title: '描述复现步骤', detail: '写明页面、操作顺序、预期和实际结果。' },
+            { title: '检查附件', detail: '遮住文件名、Prompt、路径和服务配置，尤其不要暴露 API Key。' },
+            { title: '选择反馈类型', detail: '异常使用“报告问题”，体验改进或新需求使用“提出建议”。' },
           ]}/>
           <p className="help-note"><Icon name="info" size={15}/>反馈页面需要网络和系统浏览器。关闭浏览器不会影响应用中的图片、草稿或设置。</p>
         </>,

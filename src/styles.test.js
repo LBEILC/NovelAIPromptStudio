@@ -28,12 +28,13 @@ describe('production-safe Lobe UI overrides', () => {
     expect(styles).toMatch(/\.help-topic-group > summary \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto 14px;/);
     expect(styles).toMatch(/\.help-topic-group > button \{[^}]*min-height: 58px;/);
     expect(styles).toMatch(/\.help-article-body p\.help-note \{[^}]*margin: 12px 0 18px;/);
-    expect(styles).not.toMatch(/\.help-facts li:first-child \{[^}]*border-top:/);
     expect(styles).toMatch(/\.help-table-wrap \{[^}]*overflow-x: auto;/);
-    expect(styles).toMatch(/\.help-troubleshooting > div \{[^}]*border-bottom:/);
-    expect(styles).toMatch(/\.help-translation-demo \{[^}]*overflow: hidden;[^}]*background: var\(--raised\);/);
+    expect(styles).toMatch(/\.help-simulator, \.help-translation-demo \{[^}]*overflow: hidden;[^}]*background: var\(--raised\);/);
+    expect(styles).toMatch(/\.help-demo-toolbar, \.help-translation-toolbar \{[^}]*display: flex;/);
+    expect(styles).toMatch(/\.help-demo-images \{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
+    expect(styles).toMatch(/\.help-data-flow \{[^}]*display: flex;/);
+    expect(styles).toMatch(/\.help-troubleshooting-demo dl > div \{[^}]*grid-template-columns: 88px minmax\(0, 1fr\);/);
     expect(styles).toMatch(/\.help-resolution-path \{[^}]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/);
-    expect(styles).toMatch(/\.help-marquee-box \{[^}]*animation: help-marquee-box/);
     expect(styles).toMatch(/html\[data-motion="off"\] \*, html\[data-motion="off"\] \*::before, html\[data-motion="off"\] \*::after \{[^}]*animation-duration: \.01ms !important;/);
   });
 });
