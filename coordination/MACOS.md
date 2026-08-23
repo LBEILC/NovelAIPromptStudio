@@ -6,10 +6,10 @@ Only current actionable macOS requests are kept here. Earlier completed, superse
 
 - Status: Pending
 - Date/source: 2026-08-23, Windows
-- Related commit: `c9555f9`
-- Action: On macOS, check out current `main` containing `c9555f9` and follow `doc/manual-verification-20260823-settings-help-center.md`. Pay particular attention to the left-aligned grouped Settings navigation, wide/narrow layouts, light/dark/follow-system themes, Reduce Motion and motion-off static help demonstrations, keyboard focus, Command shortcut wording, diagnostic copy content, and the two official GitHub feedback links opening in the default browser without submitting anything.
-- Expected: Settings preserves all existing appearance, resource, AI, Tag-data, and update behavior while presenting a clearer grouped navigation and wider content rhythm. The bundled Help Center works offline, searches six task-oriented topics, uses only side-effect-free Lobe UI/DOM/CSS demonstrations, adapts to macOS themes and reduced motion, and never exposes local paths, Prompt content, credentials, or logs in diagnostics or feedback URLs.
-- Observed: Windows clean `npm ci`, all 263 tests in 44 files, the production build, and the Lobe UI 5.20.3 audit passed. Interactive Windows and macOS verification remain pending.
+- Related commits: `c9555f9`, `0517047`
+- Action: On macOS, check out current `main` containing `0517047` and follow `doc/manual-verification-20260823-settings-help-center.md`. Pay particular attention to the left-aligned grouped Settings navigation, the full lowercase `g` descender in “Tag 数据”, Help article title-icon optical alignment, wide/narrow layouts, light/dark/follow-system themes, Reduce Motion and motion-off static help demonstrations, keyboard focus, Command shortcut wording, diagnostic copy content, and the two official GitHub feedback links opening in the default browser without submitting anything.
+- Expected: Settings preserves all existing appearance, resource, AI, Tag-data, and update behavior while presenting a clearer grouped navigation and wider content rhythm. Navigation labels are not vertically clipped, and Help article icons align cleanly with the title-and-summary block. The bundled Help Center works offline, searches six task-oriented topics, uses only side-effect-free Lobe UI/DOM/CSS demonstrations, adapts to macOS themes and reduced motion, and never exposes local paths, Prompt content, credentials, or logs in diagnostics or feedback URLs.
+- Observed: Windows clean `npm ci`, all 263 tests in 44 files, the production build, and the Lobe UI 5.20.3 audit passed. The user found a clipped lowercase `g` in “Tag 数据” and a Help title icon that looked too far left and high; both were corrected in `0517047` and await Windows re-verification. macOS interactive verification remains pending.
 
 ## Verify GPL license resources in macOS packages
 
