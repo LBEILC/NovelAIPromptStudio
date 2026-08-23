@@ -190,12 +190,12 @@ export default function TagCacheSettings({ onConfirm, showToast, studio }) {
 
   return <>
     <header className="settings-heading">
-      <h2>Tag 缓存</h2>
+      <h2>Tag 数据</h2>
       <p>按工作台的分类方式查看并修正全局译文与分类。</p>
     </header>
     <div className="tag-cache-toolbar">
       <LobeSearchBar
-        aria-label="搜索 Tag 缓存"
+        aria-label="搜索 Tag 数据"
         className="tag-cache-search"
         loading={cache.loading}
         onInputChange={(value) => changeFilter(setQuery, value)}
@@ -208,7 +208,7 @@ export default function TagCacheSettings({ onConfirm, showToast, studio }) {
     {cache.error && <LobeAlert className="settings-warning" message={cache.error} type="error" variant="outlined"/>}
     <div className="tag-cache-commandbar">
       <LobeSegmented aria-label="Tag 显示语言" onChange={setLanguage} options={LANGUAGE_OPTIONS} size="small" value={language}/>
-      <span>{cache.loading ? '正在读取…' : `共 ${cache.total} 条缓存`}{cache.total > PAGE_SIZE ? ` · 第 ${page}/${pageCount} 页` : ''}</span>
+      <span>{cache.loading ? '正在读取…' : `共 ${cache.total} 条 Tag 数据`}{cache.total > PAGE_SIZE ? ` · 第 ${page}/${pageCount} 页` : ''}</span>
       <LobeButton disabled={cache.loading || !cache.items.length} icon={<Icon name={selecting ? 'close' : 'check'} size={14}/>} onClick={() => selecting ? closeSelection() : setSelecting(true)} size="small">{selecting ? '完成选择' : '选择'}</LobeButton>
     </div>
     {selecting && <div className="tag-cache-selection-bar">
@@ -221,8 +221,8 @@ export default function TagCacheSettings({ onConfirm, showToast, studio }) {
     <div className="tag-cache-groups" aria-busy={cache.loading}>
       {!cache.loading && !cache.items.length ? <div className="tag-cache-empty">
         <Icon name="search" size={20}/>
-        <strong>{query || category !== 'All' || source !== 'All' ? '没有匹配的 Tag 缓存' : '还没有 Tag 缓存'}</strong>
-        <span>{query || category !== 'All' || source !== 'All' ? '试试更换搜索词或筛选条件。' : '整理或翻译 Tag 后，缓存会显示在这里。'}</span>
+        <strong>{query || category !== 'All' || source !== 'All' ? '没有匹配的 Tag 数据' : '还没有 Tag 数据'}</strong>
+        <span>{query || category !== 'All' || source !== 'All' ? '试试更换搜索词或筛选条件。' : '整理或翻译 Tag 后，全局数据会显示在这里。'}</span>
       </div> : groups.map((group) => {
         const allSelected = group.items.every((item) => selectedSet.has(item.tag));
         return <TagCategorySection

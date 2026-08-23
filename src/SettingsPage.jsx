@@ -11,6 +11,7 @@ import {
   TextArea as LobeTextArea,
 } from '@lobehub/ui/base-ui';
 import { findCustomThemeName, primaryColors } from '@lobehub/ui/es/styles/index';
+import HelpCenter from './components/HelpCenter.jsx';
 import Icon from './components/Icon.jsx';
 import TagCacheSettings from './components/TagCacheSettings.jsx';
 import { fontStack, partitionFontFamilies, quoteFontFamily } from './lib/fonts.js';
@@ -22,6 +23,30 @@ const PRIMARY_COLOR_OPTIONS = [
   ['yellow', '黄色'], ['lime', '青柠'], ['green', '绿色'], ['cyan', '青色'],
   ['blue', '蓝色'], ['geekblue', '靛蓝'], ['purple', '紫色'], ['magenta', '洋红'],
 ].map(([key, title]) => ({ color: primaryColors[key], key, title }));
+
+const SETTINGS_NAV_GROUPS = [
+  {
+    label: '偏好',
+    items: [
+      { id: 'appearance', icon: 'palette', label: '外观' },
+    ],
+  },
+  {
+    label: '数据与服务',
+    items: [
+      { id: 'storage', icon: 'folder', label: '资源库' },
+      { id: 'ai', icon: 'spark', label: 'AI 服务' },
+      { id: 'tags', icon: 'database', label: 'Tag 数据' },
+    ],
+  },
+  {
+    label: '支持',
+    items: [
+      { id: 'help', icon: 'help', label: '帮助与反馈' },
+      { id: 'updates', icon: 'info', label: '关于与更新' },
+    ],
+  },
+];
 
 const fontLabel = (family) => family === 'system-ui' ? '系统界面字体' : family === 'monospace' ? '系统等宽字体' : family;
 const formatBytes = (bytes) => {
@@ -268,7 +293,7 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
   return <main className="settings-page">
     <LobeDraggablePanel
       className="settings-nav-shell"
-      defaultSize={{ width: 220 }}
+      defaultSize={{ width: 236 }}
       expand={navExpanded}
       expandable
       mode="fixed"
@@ -276,23 +301,31 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
       placement="left"
       resize={false}
       showHandleWhenCollapsed
-      size={{ height: '100%', width: 220 }}
+      size={{ height: '100%', width: 236 }}
       stableLayout
     >
       <LobeDraggablePanel.Body className="settings-nav">
-        <header><h1>设置</h1></header>
+        <header><h1>设置</h1><p>偏好、本地数据与支持</p></header>
         <nav aria-label="设置分类">
-          <LobeButton block className={section === 'appearance' ? 'active' : ''} icon={<Icon name="settings"/>} onClick={() => setSection('appearance')} type="text"><strong>外观</strong></LobeButton>
-          <LobeButton block className={section === 'storage' ? 'active' : ''} icon={<Icon name="folder"/>} onClick={() => setSection('storage')} type="text"><strong>资源库</strong></LobeButton>
-          <LobeButton block className={section === 'ai' ? 'active' : ''} icon={<Icon name="spark"/>} onClick={() => setSection('ai')} type="text"><strong>AI 服务</strong></LobeButton>
-          <LobeButton block className={section === 'tags' ? 'active' : ''} icon={<Icon name="tags"/>} onClick={() => setSection('tags')} type="text"><strong>Tag 缓存</strong></LobeButton>
-          <LobeButton block className={section === 'updates' ? 'active' : ''} icon={<Icon name="refresh"/>} onClick={() => setSection('updates')} type="text"><strong>关于与更新</strong></LobeButton>
+          {SETTINGS_NAV_GROUPS.map((group) => <div className="settings-nav-group" key={group.label}>
+            <span>{group.label}</span>
+            {group.items.map((item) => <LobeButton
+              aria-current={section === item.id ? 'page' : undefined}
+              block
+              className={section === item.id ? 'active' : ''}
+              icon={<Icon name={item.icon}/>}
+              key={item.id}
+              onClick={() => setSection(item.id)}
+              title={item.label}
+              type="text"
+            ><strong>{item.label}</strong></LobeButton>)}
+          </div>)}
         </nav>
       </LobeDraggablePanel.Body>
     </LobeDraggablePanel>
-    <section className={`settings-content${section === 'tags' ? ' tag-cache-settings-content' : ''}`}>
+    <section className={`settings-content${section === 'tags' ? ' tag-cache-settings-content' : ''}${section === 'help' ? ' help-settings-content' : ''}`}>
       {section === 'appearance' ? <>
-        <header className="settings-heading"><h2>外观</h2></header>
+        <header className="settings-heading"><h2>外观</h2><p>调整界面主题、字体和动效；更改会立即应用。</p></header>
         <div className="settings-group">
           <div className="settings-row"><strong>主题</strong><LobeSegmented aria-label="界面主题" className="settings-segment" options={[{ label: '跟随系统', value: 'auto' }, { label: '浅色', value: 'light' }, { label: '深色', value: 'dark' }]} value={appearance.themeMode} onChange={(value) => onAppearanceChange({ themeMode: value })}/></div>
           <div className="settings-row settings-color-row">
@@ -364,7 +397,12 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
         />
         <div className="settings-actions"><LobeButton onClick={testConnection} disabled={Boolean(busy)}>测试连接</LobeButton><LobeButton type="primary" onClick={saveAI} disabled={Boolean(busy)}>{busy === 'save' ? '保存中…' : '保存 AI 设置'}</LobeButton></div>
         {!aiSettings.encryptionAvailable && <LobeAlert className="settings-warning" message="当前系统安全存储不可用，应用不会以明文保存 API Key。" type="warning" variant="outlined"/>}
-      </> : section === 'tags' ? <TagCacheSettings onConfirm={onConfirm} showToast={showToast} studio={studio}/> : <>
+      </> : section === 'tags' ? <TagCacheSettings onConfirm={onConfirm} showToast={showToast} studio={studio}/> : section === 'help' ? <HelpCenter
+        currentVersion={updateState.currentVersion}
+        platform={updateState.platform}
+        showToast={showToast}
+        studio={studio}
+      /> : <>
         <header className="settings-heading"><h2>关于与更新</h2><p>检查 NovelAI Prompt Studio 的官方稳定版本。</p></header>
         <div className="settings-group update-settings-group">
           <div className="settings-row">
