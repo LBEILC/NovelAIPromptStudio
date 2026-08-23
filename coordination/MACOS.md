@@ -2,6 +2,15 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+## Verify packaged Lobe UI style parity
+
+- Status: Pending
+- Date/source: 2026-08-23, Windows
+- Related commit: `ebcd92d`
+- Action: On an unlocked macOS session, check out current `main`, build and install a package containing `ebcd92d`, then adapt `doc/manual-verification-20260823-packaged-style-parity.md` for macOS. Compare development and packaged rendering for the empty Character Prompt action, Workbench source-panel padding, Settings navigation padding and font-select width, and the Gallery size-slider width in light/dark themes and wide/narrow windows.
+- Expected: Runtime Lobe UI styles do not override application-specific base appearance in the packaged app. Color, gap, padding, border, radius, and width match development mode while hover, active, focus, disabled, and loading states remain owned by the component library.
+- Observed: Windows automated checks passed all 255 tests in 42 files, the production build, and the Lobe UI 5.20.3 audit with zero issues. Windows and macOS packaged visual comparison remain pending.
+
 ## Verify packaged Workbench filmstrip geometry
 
 - Status: Pending
