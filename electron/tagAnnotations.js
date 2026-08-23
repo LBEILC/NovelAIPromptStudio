@@ -21,13 +21,14 @@ function freshDanbooruEntry(entry, now) {
 export async function annotateTags(texts, options) {
   const cleaned = (texts || []).map((tag) => String(tag || '').trim());
   const dictionary = options.dictionary || new Map();
+  const dsoDictionary = options.dsoDictionary || new Map();
   const danbooruCache = options.danbooruCache || new Map();
   const now = options.now instanceof Date ? options.now : new Date();
   const nowMs = now.getTime();
 
   const lookupValues = [];
   for (const tag of cleaned) {
-    if (isExplicitArtistTag(tag)) continue;
+    if (isExplicitArtistTag(tag) || dsoDictionary.has(danbooruLookupName(tag))) continue;
     const lookupName = danbooruLookupName(tag);
     if (!lookupName || freshDanbooruEntry(danbooruCache.get(lookupName), nowMs)) continue;
     lookupValues.push(tag);
@@ -66,28 +67,37 @@ export async function annotateTags(texts, options) {
     const lookupName = danbooruLookupName(tag);
     return checkedByName.get(lookupName) || (freshDanbooruEntry(danbooruCache.get(lookupName), nowMs) ? danbooruCache.get(lookupName) : null);
   };
+  const dsoEntry = (tag) => dsoDictionary.get(danbooruLookupName(tag)) || null;
 
   const missing = cleaned.map((tag, index) => {
     const cached = dictionary.get(dictionaryKey(tag));
     const remoteEntry = danbooruEntry(tag);
+    const offlineEntry = dsoEntry(tag);
     const artist = isDanbooruArtist(remoteEntry);
     const remoteCategory = danbooruStudioCategory(remoteEntry);
+    const offlineCategory = offlineEntry?.category && offlineEntry.category !== 'Unsorted' ? offlineEntry.category : '';
     const ruleCategory = inferCategory(tag);
     const manualCategory = cached?.has_classification && cached.category_source === 'manual';
-    const hasTranslation = artist || Boolean(cached?.has_translation);
-    const hasClassification = Boolean(remoteCategory) || manualCategory || ruleCategory !== 'Unsorted'
+    const hasTranslation = artist || Boolean(offlineEntry?.translation) || Boolean(cached?.has_translation);
+    const hasClassification = Boolean(remoteCategory) || manualCategory || Boolean(offlineCategory) || ruleCategory !== 'Unsorted'
       || (cached?.has_classification && cached.category !== 'Unsorted');
     return hasTranslation && hasClassification ? null : { tag, index };
   }).filter(Boolean);
 
-  const generated = missing.length ? await options.translateMissing(missing.map((entry) => entry.tag)) : null;
-  const generatedByIndex = new Map(missing.map((entry, index) => [entry.index, generated.items[index]]));
+  const generated = missing.length && typeof options.translateMissing === 'function'
+    ? await options.translateMissing(missing.map((entry) => entry.tag))
+    : null;
+  const generatedItems = generated?.items || [];
+  const generatedByIndex = new Map(missing.map((entry, index) => [entry.index, generatedItems[index] || {}]));
   const items = cleaned.map((tag, index) => {
     const cached = dictionary.get(dictionaryKey(tag));
     const ai = generatedByIndex.get(index) || {};
     const remoteEntry = danbooruEntry(tag);
+    const offlineEntry = dsoEntry(tag);
     const artist = isDanbooruArtist(remoteEntry);
     const remoteCategory = danbooruStudioCategory(remoteEntry);
+    const offlineTranslation = String(offlineEntry?.translation || '').trim();
+    const offlineCategory = offlineEntry?.category && offlineEntry.category !== 'Unsorted' ? offlineEntry.category : '';
     const ruleCategory = inferCategory(tag);
     const manualTranslation = cached?.has_translation && cached.translation_source === 'manual';
     const manualCategory = cached?.has_classification && cached.category_source === 'manual';
@@ -96,28 +106,46 @@ export async function annotateTags(texts, options) {
         ? cached.translation
         : artist
           ? artistTranslation(tag)
-          : cached?.has_translation
-            ? cached.translation
-            : ai.translation,
+          : offlineTranslation
+            ? offlineTranslation
+            : cached?.has_translation
+              ? cached.translation
+              : ai.translation || '',
       category: manualCategory
         ? cached.category
         : remoteCategory
           ? remoteCategory
-          : ruleCategory !== 'Unsorted'
-            ? ruleCategory
-            : cached?.has_classification && cached.category !== 'Unsorted'
-              ? cached.category
-              : ai.category,
-      translation_source: manualTranslation ? 'manual' : artist ? 'danbooru' : cached?.has_translation ? 'cache' : 'ai',
+          : offlineCategory
+            ? offlineCategory
+            : ruleCategory !== 'Unsorted'
+              ? ruleCategory
+              : cached?.has_classification && cached.category !== 'Unsorted'
+                ? cached.category
+                : ai.category || 'Unsorted',
+      translation_source: manualTranslation
+        ? 'manual'
+        : artist
+          ? 'danbooru'
+          : offlineTranslation
+            ? 'dso'
+            : cached?.has_translation
+              ? 'cache'
+              : ai.translation
+                ? 'ai'
+                : '',
       category_source: manualCategory
         ? 'manual'
         : remoteCategory
           ? 'danbooru'
-          : ruleCategory !== 'Unsorted'
-            ? 'rule'
-            : cached?.has_classification && cached.category !== 'Unsorted'
-              ? 'cache'
-              : 'ai',
+          : offlineCategory
+            ? 'dso'
+            : ruleCategory !== 'Unsorted'
+              ? 'rule'
+              : cached?.has_classification && cached.category !== 'Unsorted'
+                ? 'cache'
+                : ai.category
+                  ? 'ai'
+                  : '',
     };
   });
 
@@ -125,8 +153,11 @@ export async function annotateTags(texts, options) {
     items,
     generated,
     danbooruChecks,
-    aiCount: missing.length,
+    aiCount: generated ? missing.length : 0,
     cacheHits: cleaned.length - missing.length,
+    dsoTranslationCount: items.filter((item) => item.translation_source === 'dso').length,
+    dsoCategoryCount: items.filter((item) => item.category_source === 'dso').length,
+    unresolvedCount: items.filter((item) => !item.translation || item.category === 'Unsorted').length,
   };
 }
 

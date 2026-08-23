@@ -252,7 +252,7 @@ export async function openDatabase(dataDirectory) {
     }
   };
 
-  const knowledgePriority = (source) => ({ manual: 4, danbooru: 3, rule: 3, ai: 2, cache: 1, builtin: 0, heuristic: 0 }[source] || 0);
+  const knowledgePriority = (source) => ({ manual: 5, danbooru: 4, dso: 3, rule: 2, ai: 1, cache: 0, builtin: 0, heuristic: 0 }[source] || 0);
   const upsertTagDictionary = (entries = [], updatedAt = new Date().toISOString()) => {
     for (const entry of entries) {
       const key = dictionaryKey(entry.tag);
@@ -326,7 +326,7 @@ export async function openDatabase(dataDirectory) {
   const listTagDictionary = (filters = {}) => {
     const search = String(filters.query || '').trim().toLowerCase().slice(0, 240);
     const category = TAG_CATEGORIES.has(filters.category) ? filters.category : '';
-    const allowedSources = new Set(['manual', 'danbooru', 'rule', 'ai', 'cache', 'builtin', 'heuristic']);
+    const allowedSources = new Set(['manual', 'danbooru', 'dso', 'rule', 'ai', 'cache', 'builtin', 'heuristic']);
     const source = allowedSources.has(filters.source) ? filters.source : '';
     const limit = Math.min(200, Math.max(1, Number.parseInt(filters.limit, 10) || 50));
     const offset = Math.max(0, Number.parseInt(filters.offset, 10) || 0);
@@ -429,6 +429,7 @@ export async function openDatabase(dataDirectory) {
       const cachedCategoryWins = entry.has_classification && (
         entry.category_source === 'manual'
         || entry.category_source === 'danbooru'
+        || entry.category_source === 'dso'
         || !useRule
       );
       return {

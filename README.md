@@ -62,9 +62,11 @@ NovelAI Prompt Studio 把这些信息从 metadata 里重新带回可读、可编
 
 如果内容与官方模板不完全匹配，应用不会擅自把它当作自动内容删除。
 
-### AI 是可选的整理助手
+### 离线词典优先，AI 是可选的补全助手
 
-连接你自己的 OpenAI-compatible 服务后，可以批量翻译和分类 Tag。结果缓存在本地，允许随时修正；没有配置 AI 服务时，Prompt 解析、编辑、筛选、复制和图片库仍可离线使用。
+应用内置由 [DanbooruSearchOnline（DSO）](https://github.com/SuzumiyaAkizuki/DanbooruSearchOnline) 固定版本转换而来的 52,475 条中文 Tag 译名，并使用其 93 个 Danbooru Tag Group 为常见外貌、服装、动作、环境、构图和风格 Tag 提供确定性分类。点击“翻译与分类”时会优先使用用户修正、Danbooru 画师验证、DSO 离线词典和本地规则；只有仍未完成且已经配置模型的 Tag 才交给 OpenAI-compatible 服务补全。
+
+DSO 精确命中的翻译与分类不需要 AI 或网络。General Tag 并非都有可靠的 Tag Group，因此一部分内容仍会保留为“未分类”；DSO 未收录的名字可能继续通过 Danbooru 标签 API 验证是否为画师。所有结果都会缓存到本地并允许随时修正，用户修改始终具有最高优先级。内置数据版本、生成方式和原始许可证见[第三方数据说明](./third_party/DanbooruSearchOnline/README.md)。
 
 每张打开的图片都拥有独立草稿、来源与修改状态。标签顺序、当前图片和工作状态会在重启后恢复，而源图片不会被覆盖或改写。
 
@@ -92,7 +94,9 @@ NovelAI Prompt Studio 把这些信息从 metadata 里重新带回可读、可编
 | 打开到工作台 | 只读，不复制、不改写 | 无 |
 | 导入图片库 | 创建应用管理的独立副本 | 无 |
 | 编辑、筛选或复制 Prompt | 只修改本地草稿 | 无 |
-| AI 翻译或分类 | 不修改源图 | 仅发送待处理 Tag 到你配置的 API |
+| DSO 词典翻译与本地分类 | 不修改源图 | 精确命中时无 |
+| Danbooru 画师验证 | 不修改源图 | 仅查询 DSO 未收录的 Tag 名称 |
+| AI 翻译与分类补全 | 不修改源图 | 仅发送离线方式仍未完成的 Tag 到你配置的 API |
 
 - API Key 由 Electron 主进程通过操作系统安全存储加密，渲染页面无法读取明文。
 - 从图片库移除内容不会删除最初导入的外部文件。
@@ -152,7 +156,7 @@ JPG、WEBP、截图以及经过社交平台压缩的图片仍可打开和收藏�
 <details>
 <summary><strong>必须配置 AI 服务才能使用吗？</strong></summary>
 
-不需要。AI 服务只用于可选的 Tag 翻译与分类。Prompt 解析、编辑、筛选、复制和图片库均可离线使用。
+不需要。内置 DSO 中文词典和 Tag Group 分类可以离线处理已收录内容；AI 只用于补全仍缺少译文或可靠分类的 Tag。Prompt 解析、编辑、筛选、复制和图片库也都可以在不配置 AI 的情况下使用。
 </details>
 
 <details>
@@ -199,6 +203,8 @@ npm run package   # 生成当前平台安装包
 当前开发分支及 `v0.9.2` 之后发布的版本采用 [GNU GPLv3](./LICENSE)（`GPL-3.0-only`）。你可以使用、研究、修改和再分发本项目；分发修改版本或安装包时，需要同时按 GPLv3 提供对应源代码并保留许可证声明。
 
 `v0.9.2` 及更早的已发布版本继续适用原 Apache License 2.0。完整的授权边界与历史说明见 [`LICENSES/README.md`](./LICENSES/README.md)。用户导入的图片、Prompt 与其他个人数据不因使用本应用而改用 GPLv3。
+
+内置中文 Tag 数据来自 GPLv3 项目 [DanbooruSearchOnline](https://github.com/SuzumiyaAkizuki/DanbooruSearchOnline)，固定来源、原始数据、许可证与转换说明保存在 [`third_party/DanbooruSearchOnline`](./third_party/DanbooruSearchOnline/README.md)。
 
 ---
 

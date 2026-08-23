@@ -145,6 +145,67 @@ describe('phase 2 core database', () => {
     expect(database.listTagDictionary().total).toBe(0);
   });
 
+  it('keeps manual and Danbooru knowledge above DSO, and DSO above local rules and AI', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(directory);
+    const tag = 'red hair';
+    database.upsertTagDictionary([{
+      tag,
+      translation: '红色头发（AI）',
+      category: 'Body',
+      has_translation: true,
+      has_classification: true,
+      translation_source: 'ai',
+      category_source: 'ai',
+    }]);
+    database.upsertTagDictionary([{
+      tag,
+      translation: '红发',
+      category: 'Clothing',
+      has_translation: true,
+      has_classification: true,
+      translation_source: 'dso',
+      category_source: 'dso',
+    }]);
+    database.upsertTagDictionary([{
+      tag,
+      translation: '规则译名',
+      category: 'Body',
+      has_translation: true,
+      has_classification: true,
+      translation_source: 'rule',
+      category_source: 'rule',
+    }]);
+    expect(database.lookupTagDictionary([tag]).get(tag)).toMatchObject({
+      translation: '红发',
+      category: 'Clothing',
+      translation_source: 'dso',
+      category_source: 'dso',
+    });
+    const clothingProject = project('dso-priority');
+    clothingProject.tags = [{ ...clothingProject.tags[0], tag, category: 'Body', category_source: 'rule' }];
+    expect(database.enrichProjectTags(clothingProject).tags[0]).toMatchObject({ category: 'Clothing', category_source: 'dso' });
+
+    database.updateTagDictionary(tag, { translation: '我的红发', category: 'StyleQuality' });
+    database.upsertTagDictionary([{
+      tag,
+      translation: 'DSO 新译名',
+      category: 'Body',
+      has_translation: true,
+      has_classification: true,
+      translation_source: 'dso',
+      category_source: 'dso',
+    }]);
+    expect(database.lookupTagDictionary([tag]).get(tag)).toMatchObject({
+      translation: '我的红发',
+      category: 'StyleQuality',
+      translation_source: 'manual',
+      category_source: 'manual',
+    });
+    expect(database.listTagDictionary({ source: 'dso' }).total).toBe(0);
+  });
+
   it('does not let an old AI Unsorted cache override a clear clothing rule', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
     temporaryDirectories.push(directory);

@@ -794,7 +794,7 @@ export default function PromptOverview({ project, updateProject, viewState = DEF
             <LobeButton danger className={deleteArmed ? 'armed' : ''} disabled={!selectedKeys.length} onClick={deleteSelected} size="small" type={deleteArmed ? 'primary' : 'default'}>{deleteArmed ? `确认删除 ${selectedKeys.length}` : `删除 ${selectedKeys.length}`}</LobeButton>
             <LobeButton onClick={toggleSelectionMode} size="small">退出多选</LobeButton>
           </> : <>
-            <LobeButton disabled={!visibleEntries.length || translatingKeys.size > 0} icon={<Icon name="spark" size={13}/>} onClick={() => translateEntries(visibleEntries)} size="small">{translatingKeys.size ? '翻译中…' : `AI 翻译 ${visibleEntries.length}`}</LobeButton>
+            <LobeButton disabled={!visibleEntries.length || translatingKeys.size > 0} icon={<Icon name="spark" size={13}/>} onClick={() => translateEntries(visibleEntries)} size="small">{translatingKeys.size ? '整理中…' : `翻译与分类 ${visibleEntries.length}`}</LobeButton>
             <LobeButton disabled={structure.characters.length >= MAX_PROMPT_CHARACTERS} icon={<Icon name="plus" size={14}/>} onClick={addCharacter} size="small">角色</LobeButton>
             <LobeButton onClick={toggleSelectionMode} size="small">多选</LobeButton>
           </>}

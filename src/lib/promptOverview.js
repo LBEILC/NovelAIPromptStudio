@@ -235,7 +235,7 @@ export function overviewSelectionMenuItems({
     { key: 'copy-selected-tags', label: copyLabel, disabled: copyCount < 1, onClick: () => onCopy?.() },
     {
       key: 'translate-selected-tags',
-      label: translating ? 'AI 翻译已选 Tag 中…' : `AI 翻译已选 ${count} 个 Tag`,
+      label: translating ? '正在整理已选 Tag…' : `翻译与分类已选 ${count} 个 Tag`,
       disabled: count < 1 || translating,
       onClick: () => onTranslate?.(),
     },

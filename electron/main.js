@@ -9,6 +9,7 @@ import { backfillProjectContentHashes, backfillProjectDimensions, importLibraryF
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
 import { lookupDanbooruTags } from './danbooru.js';
+import { lookupDsoTags } from './dsoDictionary.js';
 import { annotateTags } from './tagAnnotations.js';
 import { exportEmbeddedVibeFile } from './vibes.js';
 import { applyWorkbenchLibraryDetails, readWorkbenchImage } from './workbench.js';
@@ -732,24 +733,36 @@ app.whenReady().then(async () => {
   ipcMain.handle('translation:tags', async (_event, tags) => {
     try {
       const cleaned = (tags || []).map((tag) => String(tag || '').trim());
+      const aiSettings = preferences.publicSettings();
       const resolved = await annotateTags(cleaned, {
         dictionary: database.lookupTagDictionary(cleaned),
+        dsoDictionary: lookupDsoTags(cleaned),
         danbooruCache: database.lookupDanbooruTagCache(cleaned),
         lookupDanbooru: (values) => lookupDanbooruTags(values, net.fetch),
-        translateMissing: (values) => translateTags(values, preferences.credentials(), net.fetch),
+        translateMissing: aiSettings.model
+          ? (values) => translateTags(values, preferences.credentials(), net.fetch)
+          : null,
       });
       const { items, generated, danbooruChecks } = resolved;
       database.upsertDanbooruTagCache(danbooruChecks);
-      database.upsertTagDictionary(cleaned.map((tag, index) => ({ tag, ...items[index], has_translation: true, has_classification: true })));
+      database.upsertTagDictionary(cleaned.map((tag, index) => ({
+        tag,
+        ...items[index],
+        has_translation: Boolean(items[index].translation),
+        has_classification: Boolean(items[index].category_source),
+      })));
       database.persist();
       return {
         ok: true,
-        model: generated?.model || '本地词典 / Danbooru',
+        model: generated?.model || 'DSO 内置词典 / Danbooru / 本地规则',
         items,
         translations: items.map((item) => item.translation),
         categories: items.map((item) => item.category),
         cache_hits: resolved.cacheHits,
         ai_count: resolved.aiCount,
+        dso_translation_count: resolved.dsoTranslationCount,
+        dso_category_count: resolved.dsoCategoryCount,
+        unresolved_count: resolved.unresolvedCount,
         danbooru_category_count: items.filter((item) => item.category_source === 'danbooru').length,
         danbooru_artist_count: items.filter((item) => item.category_source === 'danbooru' && item.category === 'ArtistEra').length,
       };

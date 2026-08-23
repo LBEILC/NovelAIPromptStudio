@@ -12,6 +12,8 @@
     "dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
     "dev:demo": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron . --dev --profile=demo\"",
     "build": "vite build",
+    "dso:update": "node scripts/update-dso-dictionary.mjs",
+    "dso:verify": "node scripts/update-dso-dictionary.mjs --check",
     "icons:generate": "node scripts/generate-app-icons.mjs",
     "package": "npm run build && electron-builder --publish never",
     "screenshots:readme": "node scripts/render-readme-artwork.mjs",
@@ -78,6 +80,14 @@
       {
         "from": "LICENSES",
         "to": "LICENSES"
+      },
+      {
+        "from": "third_party/DanbooruSearchOnline/README.md",
+        "to": "LICENSES/DanbooruSearchOnline/README.md"
+      },
+      {
+        "from": "third_party/DanbooruSearchOnline/LICENSE",
+        "to": "LICENSES/DanbooruSearchOnline/LICENSE"
       }
     ],
     "publish": [

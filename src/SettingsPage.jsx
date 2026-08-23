@@ -367,7 +367,7 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
         <LobeAlert className="settings-warning" message="更改位置会自动移动现有资源；复制和校验完成前，旧文件不会被删除。" type="info" variant="outlined"/>
         {libraryStorage.error && <LobeAlert className="settings-warning" message={libraryStorage.error} type="error" variant="outlined"/>}
       </> : section === 'ai' ? <>
-        <header className="settings-heading"><h2>AI 服务</h2><p>用于 Tag 翻译和分类。</p></header>
+        <header className="settings-heading"><h2>AI 服务</h2><p>用于补全内置词典尚未覆盖的 Tag 翻译和分类。</p></header>
         <div className="settings-group ai-settings-group">
           <label><span><strong>API Base URL</strong><small>兼容 OpenAI API 格式的服务地址</small></span><LobeInput value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
           <label><span><strong>API Key</strong><small>{aiSettings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}</small></span><LobeInputPassword value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '已安全保存' : '输入 API Key'}/></label>

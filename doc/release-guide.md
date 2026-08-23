@@ -15,7 +15,13 @@
    git status --short --branch
    ```
 
-3. GPLv3 发布必须让安装包接收者能从同一 Release 获得对应源代码。确认待发布标签包含完整源码、锁文件、构建与打包脚本；如果安装包加入内置数据或经转换生成的资源，还要提交其许可证、固定的上游版本和生成脚本。GitHub 自动生成的 `Source code (zip)` 与 `Source code (tar.gz)` 将作为当前发布方式的源码入口。打包后还要确认应用资源目录包含根许可证 `LICENSE` 和历史/第三方授权目录 `LICENSES/`。
+3. GPLv3 发布必须让安装包接收者能从同一 Release 获得对应源代码。确认待发布标签包含完整源码、锁文件、构建与打包脚本；如果安装包加入内置数据或经转换生成的资源，还要提交其许可证、固定的上游版本和生成脚本。GitHub 自动生成的 `Source code (zip)` 与 `Source code (tar.gz)` 将作为当前发布方式的源码入口。打包后还要确认应用资源目录包含根许可证 `LICENSE`、历史/第三方授权目录 `LICENSES/`，以及 `LICENSES/DanbooruSearchOnline/README.md` 和 `LICENSES/DanbooruSearchOnline/LICENSE`。
+
+   内置 DSO 词典还必须通过固定源数据校验：
+
+   ```bash
+   npm run dso:verify
+   ```
 
 4. 查看上个版本以来的提交，作为更新说明的依据：
 

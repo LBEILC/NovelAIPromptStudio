@@ -780,7 +780,7 @@ export default function App({ appearance, setAppearance }) {
     const tabId = activeTab.id;
     const result = await studio.translateTags(entries.map((entry) => entry.tag.tag));
     if (!result?.ok) {
-      showToast(result?.error || 'AI 翻译没有完成', 'error');
+      showToast(result?.error || '翻译与分类没有完成', 'error');
       return;
     }
     setWorkbenchSession((current) => updateWorkbenchTab(current, tabId, (tab) => {
@@ -789,13 +789,15 @@ export default function App({ appearance, setAppearance }) {
       entries.forEach((entry, index) => {
         const scope = getPromptScope(nextProject, entry.scopeKey);
         const item = result.items?.[index] || {};
-        nextProject = updatePromptScope(nextProject, scope.key, scope.tags.map((tag) => tag.id === entry.tag.id ? { ...tag, ...item, translation_source: item.translation_source || 'ai', category_source: item.category_source || 'ai' } : tag));
+        nextProject = updatePromptScope(nextProject, scope.key, scope.tags.map((tag) => tag.id === entry.tag.id ? { ...tag, ...item, translation_source: item.translation_source || '', category_source: item.category_source || '' } : tag));
       });
       const updated = { ...syncProjectPromptMetadata(nextProject), updated_at: new Date().toISOString() };
       scheduleAnnotations(updated);
       return { ...tab, project: updated, updatedAt: updated.updated_at };
     }));
-    showToast(result.ai_count ? `已翻译并分类 ${entries.length} 个 Tag` : '已复用本地翻译与分类');
+    if (result.ai_count) showToast(`已整理 ${entries.length} 个 Tag，其中 ${result.ai_count} 个由 AI 补全`);
+    else if (result.unresolved_count) showToast(`已应用离线结果，${result.unresolved_count} 个 Tag 仍缺少译文或分类`);
+    else showToast(`已通过离线词典整理 ${entries.length} 个 Tag`);
   };
 
   const tagContextMenu = (event, scopeKey, tag, selectionContext = null) => {
@@ -840,7 +842,7 @@ export default function App({ appearance, setAppearance }) {
       { key: 'copy-weighted-tag', label: '复制 Tag（含权重）', icon: Copy, onClick: async () => { await navigator.clipboard.writeText(formatTag(tag)); showToast('Tag 已复制（含权重）'); } },
       { key: 'copy-translation', label: '复制翻译', icon: Copy, disabled: !tag.translation?.trim(), onClick: async () => { await navigator.clipboard.writeText(tag.translation || ''); showToast('翻译已复制'); } },
       { key: 'edit-tag', label: '编辑', icon: Pencil, onClick: () => { setWorkbenchFocus({ scopeKey, tagId: null }); requestAnimationFrame(() => setWorkbenchFocus({ scopeKey, tagId: tag.id })); } },
-      { key: 'translate-tag', label: 'AI 翻译与分类', icon: Sparkles, onClick: () => translateWorkbenchTags([{ scopeKey, tag }]) },
+      { key: 'translate-tag', label: '翻译与分类', icon: Sparkles, onClick: () => translateWorkbenchTags([{ scopeKey, tag }]) },
       {
         key: 'move-tag',
         label: '移动到',

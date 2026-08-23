@@ -8,6 +8,75 @@ function dictionary(entries = []) {
 }
 
 describe('tag annotation orchestration', () => {
+  it('uses the bundled DSO result without Danbooru or AI requests', async () => {
+    const lookupDanbooru = vi.fn();
+    const translateMissing = vi.fn();
+    const result = await annotateTags(['blue hair', 'school uniform'], {
+      dictionary: new Map(),
+      dsoDictionary: new Map([
+        ['blue_hair', { translation: '蓝发', category: 'Body' }],
+        ['school_uniform', { translation: '校服', category: 'Clothing' }],
+      ]),
+      danbooruCache: new Map(),
+      lookupDanbooru,
+      translateMissing,
+      now,
+    });
+
+    expect(lookupDanbooru).not.toHaveBeenCalled();
+    expect(translateMissing).not.toHaveBeenCalled();
+    expect(result.items).toEqual([
+      { translation: '蓝发', category: 'Body', translation_source: 'dso', category_source: 'dso' },
+      { translation: '校服', category: 'Clothing', translation_source: 'dso', category_source: 'dso' },
+    ]);
+    expect(result).toMatchObject({ aiCount: 0, dsoTranslationCount: 2, dsoCategoryCount: 2, unresolvedCount: 0 });
+  });
+
+  it('returns partial local results when AI is not configured', async () => {
+    const result = await annotateTags(['unknown prompt phrase'], {
+      dictionary: new Map(),
+      dsoDictionary: new Map(),
+      danbooruCache: new Map(),
+      lookupDanbooru: async () => new Map(),
+      translateMissing: null,
+      now,
+    });
+
+    expect(result.items[0]).toEqual({
+      translation: '',
+      category: 'Unsorted',
+      translation_source: '',
+      category_source: '',
+    });
+    expect(result).toMatchObject({ aiCount: 0, unresolvedCount: 1 });
+  });
+
+  it('keeps user corrections above DSO translations and categories', async () => {
+    const result = await annotateTags(['blue hair'], {
+      dictionary: dictionary([{
+        tag: 'blue hair',
+        translation: '我常用的蓝发译名',
+        category: 'StyleQuality',
+        has_translation: 1,
+        has_classification: 1,
+        translation_source: 'manual',
+        category_source: 'manual',
+      }]),
+      dsoDictionary: new Map([['blue_hair', { translation: '蓝发', category: 'Body' }]]),
+      danbooruCache: new Map(),
+      lookupDanbooru: vi.fn(),
+      translateMissing: vi.fn(),
+      now,
+    });
+
+    expect(result.items[0]).toMatchObject({
+      translation: '我常用的蓝发译名',
+      category: 'StyleQuality',
+      translation_source: 'manual',
+      category_source: 'manual',
+    });
+  });
+
   it('classifies prefixed and bare Danbooru artist tags without sending them to AI', async () => {
     const lookupDanbooru = vi.fn(async () => new Map([
       ['yamamoto_souichirou', { canonical_tag: 'yamamoto_souichirou', category: 1, is_deprecated: false, post_count: 2028 }],

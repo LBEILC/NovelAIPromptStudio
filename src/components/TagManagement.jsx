@@ -105,7 +105,7 @@ export function TagQuickEditor({
     </div>
     {metadata && <div className="tag-quick-editor-metadata">{metadata}</div>}
     <div className="tag-quick-editor-footer">
-      {onTranslate && <LobeButton disabled={translating} icon={<Icon name="spark" size={14}/>} onClick={onTranslate} size="small">{translating ? '翻译中…' : 'AI 翻译'}</LobeButton>}
+      {onTranslate && <LobeButton disabled={translating} icon={<Icon name="spark" size={14}/>} onClick={onTranslate} size="small">{translating ? '整理中…' : '翻译与分类'}</LobeButton>}
       {actions}
     </div>
   </div>;

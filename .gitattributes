@@ -1,0 +1,4 @@
+third_party/DanbooruSearchOnline/origin_database/tags_enhanced.csv -text
+third_party/DanbooruSearchOnline/origin_database/tag_groups.json -text
+third_party/DanbooruSearchOnline/LICENSE -text
+electron/data/dso-dictionary.json text eol=lf
