@@ -8,8 +8,8 @@ vi.mock('@lobehub/ui/base-ui', () => ({
 }));
 
 vi.mock('@lobehub/ui', () => ({
-  Popover: ({ children, content, trigger }) => <div data-popover-trigger={trigger}>{children}<aside>{content}</aside></div>,
-  PopoverGroup: ({ children, closeDelay, openDelay }) => <section data-close-delay={closeDelay} data-open-delay={openDelay}>{children}</section>,
+  Popover: ({ children, content, disabled, trigger }) => <div data-popover-disabled={String(Boolean(disabled))} data-popover-trigger={trigger}>{children}<aside>{content}</aside></div>,
+  PopoverGroup: ({ children, closeDelay, openDelay, zIndex }) => <section data-close-delay={closeDelay} data-open-delay={openDelay} data-z-index={zIndex}>{children}</section>,
 }));
 
 vi.mock('./Icon.jsx', () => ({ default: () => null }));
@@ -48,6 +48,7 @@ describe('ArchiveImportModal', () => {
     expect(html).toContain('data-popover-trigger="hover"');
     expect(html).toContain('data-open-delay="80"');
     expect(html).toContain('data-close-delay="0"');
+    expect(html).toContain('data-z-index="1203"');
     expect(html).toContain('gallery-card-hover-preview');
     expect(html).toContain('1280 × 640 · ZIP 预览');
     expect(html).not.toContain('aria-label="预览 第一张.png"');
@@ -57,5 +58,37 @@ describe('ArchiveImportModal', () => {
     expect(html).toContain('archive-import-card-select');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('disabled=""');
+  });
+
+  it('enables each hover preview as soon as that entry is ready', () => {
+    const html = renderToStaticMarkup(<ArchiveImportModal
+      importSession={{
+        archives: [{ id: 'archive', name: '渐进预览.zip', count: 2 }],
+        directImageCount: 0,
+        entries: [
+          {
+            archiveId: 'archive',
+            fileName: '已生成.png',
+            id: 'ready',
+            previewHeight: 1216,
+            previewPath: 'C:\\preview\\ready.webp',
+            previewWidth: 832,
+          },
+          { archiveId: 'archive', fileName: '生成中.png', id: 'pending' },
+        ],
+        previewComplete: false,
+        previewCompleted: 1,
+        sessionId: 'session',
+      }}
+      onCancel={vi.fn()}
+      onImport={vi.fn()}
+    />);
+
+    expect(html).toContain('正在生成预览 1 / 2');
+    expect(html.match(/data-popover-trigger="hover"/g)).toHaveLength(2);
+    expect(html.match(/data-popover-disabled="false"/g)).toHaveLength(1);
+    expect(html.match(/data-popover-disabled="true"/g)).toHaveLength(1);
+    expect(html).toContain('832 × 1216 · ZIP 预览');
+    expect(html).toContain('data-z-index="1203"');
   });
 });

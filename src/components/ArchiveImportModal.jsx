@@ -11,6 +11,9 @@ import SelectionMark from './SelectionMark.jsx';
 import Icon from './Icon.jsx';
 
 const ARCHIVE_HOVER_POSITIONER_STYLES = { root: { pointerEvents: 'none' } };
+const ARCHIVE_IMPORT_MODAL_Z_INDEX = 1200;
+const ARCHIVE_IMPORT_MARQUEE_Z_INDEX = 1202;
+const ARCHIVE_IMPORT_PREVIEW_Z_INDEX = 1203;
 
 function ArchiveImportHoverPreview({ entry }) {
   const { name, folder } = archiveImportNameParts(entry.fileName);
@@ -61,9 +64,11 @@ const ArchiveImportCard = memo(function ArchiveImportCard({ entry, onToggle, sel
       type="button"
     ><SelectionMark className="archive-import-selection-mark" selected={selected}/></button>}
   </article>;
-  if (!entry.previewPath) return card;
   return <Popover
-    content={<ArchiveImportHoverPreview entry={entry}/>}
+    content={entry.previewPath
+      ? <ArchiveImportHoverPreview entry={entry}/>
+      : <span aria-hidden="true"/>}
+    disabled={!entry.previewPath}
     placement="rightTop"
     styles={ARCHIVE_HOVER_POSITIONER_STYLES}
     trigger="hover"
@@ -145,7 +150,7 @@ export default function ArchiveImportModal({ importSession, onCancel, onImport }
     styles={{ body: { minHeight: 0, overflow: 'hidden', padding: 0 } }}
     title="选择要导入的图片"
     width="min(980px, calc(100vw - 48px))"
-    zIndex={1200}
+    zIndex={ARCHIVE_IMPORT_MODAL_Z_INDEX}
   >
     <div className="archive-import-dialog">
       <div className="archive-import-toolbar">
@@ -162,7 +167,13 @@ export default function ArchiveImportModal({ importSession, onCancel, onImport }
         <Icon name="warning" size={15}/>
         <span>{failedCount ? `${failedCount} 张图片无法读取，已从选择中排除。` : ''}{importSession.problemCount ? `另有 ${importSession.problemCount} 个文件无法准备，导入结果中会说明。` : ''}{importSession.previewError ? ` ${importSession.previewError}` : ''}</span>
       </div>}
-      <PopoverGroup closeDelay={0} openDelay={80} placement="rightTop" trigger="hover">
+      <PopoverGroup
+        closeDelay={0}
+        openDelay={80}
+        placement="rightTop"
+        trigger="hover"
+        zIndex={ARCHIVE_IMPORT_PREVIEW_Z_INDEX}
+      >
         <div className="archive-import-scroll" onDragStart={(event) => event.preventDefault()} ref={containerRef} {...marqueeSelection.handlers}>
           {importSession.archives.map((archive) => {
             const archiveEntries = entries.filter((entry) => entry.archiveId === archive.id);
@@ -180,7 +191,7 @@ export default function ArchiveImportModal({ importSession, onCancel, onImport }
         </div>
       </PopoverGroup>
       <div className="archive-import-hint">单击选择 · Shift 连选 · Ctrl/Cmd 切换 · 拖动框选 · 悬停预览</div>
-      <MarqueeSelectionOverlay rect={marqueeSelection.rect} zIndex={1202}/>
+      <MarqueeSelectionOverlay rect={marqueeSelection.rect} zIndex={ARCHIVE_IMPORT_MARQUEE_Z_INDEX}/>
     </div>
   </LobeModal>;
 }
