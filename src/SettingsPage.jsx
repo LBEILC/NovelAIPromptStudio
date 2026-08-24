@@ -11,7 +11,7 @@ import {
   TextArea as LobeTextArea,
 } from '@lobehub/ui/base-ui';
 import { findCustomThemeName, primaryColors } from '@lobehub/ui/es/styles/index';
-import HelpCenter from './components/HelpCenter.jsx';
+import FeedbackCenter from './components/FeedbackCenter.jsx';
 import Icon from './components/Icon.jsx';
 import TagCacheSettings from './components/TagCacheSettings.jsx';
 import { fontStack, partitionFontFamilies, quoteFontFamily } from './lib/fonts.js';
@@ -42,7 +42,7 @@ const SETTINGS_NAV_GROUPS = [
   {
     label: '支持',
     items: [
-      { id: 'help', icon: 'help', label: '帮助与反馈' },
+      { id: 'support', icon: 'help', label: '反馈与支持' },
       { id: 'updates', icon: 'info', label: '关于与更新' },
     ],
   },
@@ -323,7 +323,7 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
         </nav>
       </LobeDraggablePanel.Body>
     </LobeDraggablePanel>
-    <section className={`settings-content${section === 'tags' ? ' tag-cache-settings-content' : ''}${section === 'help' ? ' help-settings-content' : ''}`}>
+    <section className={`settings-content${section === 'tags' ? ' tag-cache-settings-content' : ''}`}>
       {section === 'appearance' ? <>
         <header className="settings-heading"><h2>外观</h2><p>调整界面主题、字体和动效；更改会立即应用。</p></header>
         <div className="settings-group">
@@ -397,7 +397,7 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
         />
         <div className="settings-actions"><LobeButton onClick={testConnection} disabled={Boolean(busy)}>测试连接</LobeButton><LobeButton type="primary" onClick={saveAI} disabled={Boolean(busy)}>{busy === 'save' ? '保存中…' : '保存 AI 设置'}</LobeButton></div>
         {!aiSettings.encryptionAvailable && <LobeAlert className="settings-warning" message="当前系统安全存储不可用，应用不会以明文保存 API Key。" type="warning" variant="outlined"/>}
-      </> : section === 'tags' ? <TagCacheSettings onConfirm={onConfirm} showToast={showToast} studio={studio}/> : section === 'help' ? <HelpCenter
+      </> : section === 'tags' ? <TagCacheSettings onConfirm={onConfirm} showToast={showToast} studio={studio}/> : section === 'support' ? <FeedbackCenter
         currentVersion={updateState.currentVersion}
         platform={updateState.platform}
         showToast={showToast}
