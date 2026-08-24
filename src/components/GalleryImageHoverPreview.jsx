@@ -15,7 +15,7 @@ export default function GalleryImageHoverPreview({ children, height, src, width 
     }}
   >
     <div className="gallery-card-hover-media">
-      <img alt="" decoding="async" draggable="false" src={src}/>
+      <img alt="" draggable="false" key={src} src={src}/>
     </div>
     {children}
   </div>;

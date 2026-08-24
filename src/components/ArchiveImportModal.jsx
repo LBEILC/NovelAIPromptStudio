@@ -1,5 +1,5 @@
 import { Button as LobeButton, Modal as LobeModal } from '@lobehub/ui/base-ui';
-import { Popover } from '@lobehub/ui';
+import { Popover, PopoverGroup } from '@lobehub/ui';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { archiveImportNameParts, reconcileArchiveImportSelection, selectableArchiveEntries, toggleArchiveImportSelection } from '../lib/archiveImport.js';
 import { isTextEditingTarget } from '../lib/contextMenu.js';
@@ -21,7 +21,7 @@ function ArchiveImportHoverPreview({ entry }) {
   >
     <div className="gallery-card-hover-meta">
       <span>{entry.previewWidth || '—'} × {entry.previewHeight || '—'} · ZIP 预览</span>
-      <span title={entry.fileName}>{folder || name}</span>
+      <span>{folder || name}</span>
     </div>
   </GalleryImageHoverPreview>;
 }
@@ -32,7 +32,7 @@ const ArchiveImportCard = memo(function ArchiveImportCard({ entry, onToggle, sel
   const card = <article
     className={`archive-import-card ${selected ? 'selected' : ''} ${unavailable ? 'unavailable' : ''}`}
     data-marquee-key={unavailable ? undefined : encodeMarqueeKey(entry.id)}
-    title={entry.previewError || entry.fileName}
+    title={entry.previewError || undefined}
   >
     <button
       aria-label={unavailable ? `${name} 无法预览或导入` : selected ? `取消选择 ${name}` : `选择 ${name}`}
@@ -162,21 +162,23 @@ export default function ArchiveImportModal({ importSession, onCancel, onImport }
         <Icon name="warning" size={15}/>
         <span>{failedCount ? `${failedCount} 张图片无法读取，已从选择中排除。` : ''}{importSession.problemCount ? `另有 ${importSession.problemCount} 个文件无法准备，导入结果中会说明。` : ''}{importSession.previewError ? ` ${importSession.previewError}` : ''}</span>
       </div>}
-      <div className="archive-import-scroll" onDragStart={(event) => event.preventDefault()} ref={containerRef} {...marqueeSelection.handlers}>
-        {importSession.archives.map((archive) => {
-          const archiveEntries = entries.filter((entry) => entry.archiveId === archive.id);
-          const archiveSelected = archiveEntries.filter((entry) => selectedSet.has(entry.id)).length;
-          return <section className="archive-import-source" key={archive.id}>
-            <header>
-              <strong title={archive.name}>{archive.name}</strong>
-              <span>{archiveSelected} / {archiveEntries.filter((entry) => !entry.previewError).length}</span>
-            </header>
-            <div className="archive-import-grid">
-              {archiveEntries.map((entry) => <ArchiveImportCard entry={entry} key={entry.id} onToggle={toggleEntry} selected={selectedSet.has(entry.id)}/>)}
-            </div>
-          </section>;
-        })}
-      </div>
+      <PopoverGroup closeDelay={0} openDelay={80} placement="rightTop" trigger="hover">
+        <div className="archive-import-scroll" onDragStart={(event) => event.preventDefault()} ref={containerRef} {...marqueeSelection.handlers}>
+          {importSession.archives.map((archive) => {
+            const archiveEntries = entries.filter((entry) => entry.archiveId === archive.id);
+            const archiveSelected = archiveEntries.filter((entry) => selectedSet.has(entry.id)).length;
+            return <section className="archive-import-source" key={archive.id}>
+              <header>
+                <strong title={archive.name}>{archive.name}</strong>
+                <span>{archiveSelected} / {archiveEntries.filter((entry) => !entry.previewError).length}</span>
+              </header>
+              <div className="archive-import-grid">
+                {archiveEntries.map((entry) => <ArchiveImportCard entry={entry} key={entry.id} onToggle={toggleEntry} selected={selectedSet.has(entry.id)}/>)}
+              </div>
+            </section>;
+          })}
+        </div>
+      </PopoverGroup>
       <div className="archive-import-hint">单击选择 · Shift 连选 · Ctrl/Cmd 切换 · 拖动框选 · 悬停预览</div>
       <MarqueeSelectionOverlay rect={marqueeSelection.rect} zIndex={1202}/>
     </div>

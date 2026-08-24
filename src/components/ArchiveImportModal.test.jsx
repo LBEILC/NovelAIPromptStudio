@@ -9,6 +9,7 @@ vi.mock('@lobehub/ui/base-ui', () => ({
 
 vi.mock('@lobehub/ui', () => ({
   Popover: ({ children, content, trigger }) => <div data-popover-trigger={trigger}>{children}<aside>{content}</aside></div>,
+  PopoverGroup: ({ children, closeDelay, openDelay }) => <section data-close-delay={closeDelay} data-open-delay={openDelay}>{children}</section>,
 }));
 
 vi.mock('./Icon.jsx', () => ({ default: () => null }));
@@ -45,9 +46,12 @@ describe('ArchiveImportModal', () => {
     expect(html).toContain('第一张.png');
     expect(html).toContain('损坏.png');
     expect(html).toContain('data-popover-trigger="hover"');
+    expect(html).toContain('data-open-delay="80"');
+    expect(html).toContain('data-close-delay="0"');
     expect(html).toContain('gallery-card-hover-preview');
     expect(html).toContain('1280 × 640 · ZIP 预览');
     expect(html).not.toContain('aria-label="预览 第一张.png"');
+    expect(html).not.toContain('title="作品/第一张.png"');
     expect(html).toContain('draggable="false"');
     expect(html).toContain('archive-import-hover-name');
     expect(html).toContain('archive-import-card-select');
