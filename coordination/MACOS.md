@@ -2,6 +2,15 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+## Verify selective ZIP image import
+
+- Status: Pending
+- Date/source: 2026-08-24, Windows
+- Related commit: `0b760f0`
+- Action: On macOS, check out current `main` containing `0b760f0`, run `npm ci`, `npm test`, and `npm run build`, then follow `doc/manual-verification-20260824-zip-import-selection.md`. Pay particular attention to Finder drag/drop, native file-dialog paths containing CJK characters, spaces, or parentheses, Command selection modifiers and Command+A, Shift ranges, the marquee overlay above the Lobe Modal, progressive thumbnail generation, cancellation and temporary-file cleanup, mixed ZIP and loose-image imports, narrow windows, themes, and motion preferences.
+- Expected: Ordinary images still import directly. Any batch containing a valid ZIP opens an image-first modal with all valid PNGs selected by default. Click, Shift, Command, and marquee semantics match Gallery; unreadable PNGs are excluded; selected entry IDs remain exact even for duplicate names; only selected ZIP entries plus loose files import; duplicate-content handling still skips existing images; and preview sessions clean up on cancel, commit, and quit.
+- Observed: On Windows, a clean `npm ci`, all 284 tests in 49 files, the production build, and the Lobe UI 5.20.3 audit with zero issues passed for `0b760f0`. Automated tests cover exact duplicate-name entry selection, bounded WebP preview generation, selection helpers, component structure, and production-safe CSS. Windows and macOS interactive verification remain pending.
+
 ## Verify offline DSO Tag dictionary and package resources
 
 - Status: Pending
