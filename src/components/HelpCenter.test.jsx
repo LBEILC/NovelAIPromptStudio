@@ -9,7 +9,7 @@ vi.mock('@lobehub/ui/base-ui', () => ({
   Button: ({ children, icon, type, ...props }) => <button {...props} type={type === 'submit' || type === 'reset' ? type : 'button'}>{icon}{children}</button>,
   Input: (props) => <input {...props}/>,
   Segmented: ({ onChange, options = [], size, value, ...props }) => <div {...props}>{options.find((option) => option.value === value)?.label}</div>,
-  Select: ({ onChange, options = [], value, ...props }) => <select {...props} defaultValue={value}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
+  Select: ({ mode, onChange, options = [], value, ...props }) => <select {...props} defaultValue={value} multiple={mode === 'multiple'}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
   Slider: ({ onChange, value, ...props }) => <input {...props} defaultValue={value} type="range"/>,
   Switch: ({ checked, onChange, ...props }) => <button aria-pressed={checked} {...props} type="button"/>,
 }));
@@ -20,7 +20,7 @@ describe('HelpCenter', () => {
   it('organizes bundled help into expandable task groups', () => {
     expect(HELP_GROUPS.map((group) => group.title)).toEqual(['开始使用', '工作台', '图片库', '参考与支持']);
     expect(HELP_GROUPS.every((group) => group.topics.length > 0)).toBe(true);
-    expect(HELP_TOPICS).toHaveLength(16);
+    expect(HELP_TOPICS).toHaveLength(17);
     expect(new Set(HELP_TOPICS.map((topic) => topic.id)).size).toBe(HELP_TOPICS.length);
   });
 
@@ -28,6 +28,8 @@ describe('HelpCenter', () => {
     expect(filterHelpTopics('来源不可用').map((topic) => topic.id)).toContain('troubleshooting');
     expect(filterHelpTopics('API Key').map((topic) => topic.id)).toContain('data');
     expect(filterHelpTopics('智能收藏集').map((topic) => topic.id)).toContain('gallery-find');
+    expect(filterHelpTopics('压缩包').map((topic) => topic.id)).toContain('gallery-import');
+    expect(filterHelpTopics('相似 Prompt').map((topic) => topic.id)).toContain('gallery-grouping');
     expect(filterHelpTopics('DSO').map((topic) => topic.id)).toContain('translation-and-categories');
     expect(filterHelpTopics('未分类').map((topic) => topic.id)).toContain('translation-and-categories');
     expect(filterHelpTopics('按分类').map((topic) => topic.id)).toContain('translation-and-categories');
@@ -43,7 +45,7 @@ describe('HelpCenter', () => {
     const articleHtml = Object.fromEntries(HELP_TOPICS.map((topic) => [topic.id, renderToStaticMarkup(topic.content)]));
 
     expect(html).toContain('帮助与反馈');
-    expect(html).toContain('4 组 · 16 篇');
+    expect(html).toContain('4 组 · 17 篇');
     expect(html).toContain('开始使用');
     expect(html).toContain('工作台');
     expect(html).toContain('图片库');
@@ -61,7 +63,9 @@ describe('HelpCenter', () => {
     expect(articleHtml['edit-and-fidelity']).toContain('原文保真演示视图');
     expect(articleHtml.selection).toContain('批量选择演示 Tag');
     expect(articleHtml['tabs-and-drafts']).toContain('标签草稿演示状态');
-    expect(articleHtml['gallery-import']).toContain('图库分组演示方式');
+    expect(articleHtml['gallery-import']).toContain('图库导入演示内容');
+    expect(articleHtml['gallery-grouping']).toContain('图库分组演示方式');
+    expect(articleHtml['gallery-grouping']).toContain('gallery-card-stack');
     expect(articleHtml['gallery-find']).toContain('智能收藏集');
     expect(articleHtml['gallery-batch']).toContain('图片组操作范围演示');
     expect(articleHtml['gallery-trash']).toContain('迁移资源位置');

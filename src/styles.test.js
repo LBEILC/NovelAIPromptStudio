@@ -31,7 +31,9 @@ describe('production-safe Lobe UI overrides', () => {
     expect(styles).toMatch(/\.help-table-wrap \{[^}]*overflow-x: auto;/);
     expect(styles).toMatch(/\.help-simulator, \.help-translation-demo \{[^}]*overflow: hidden;[^}]*background: var\(--raised\);/);
     expect(styles).toMatch(/\.help-demo-toolbar, \.help-translation-toolbar \{[^}]*display: flex;/);
-    expect(styles).toMatch(/\.help-demo-images \{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
+    expect(styles).toMatch(/\.help-gallery-teaching-layout \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(260px, 310px\);/);
+    expect(styles).toMatch(/\.help-real-gallery-grid \{[^}]*grid-template-columns: repeat\(2, minmax\(72px, 1fr\)\);/);
+    expect(styles).toMatch(/\.help-grouping-panel-embedded\.gallery-grouping-panel, \.help-filter-panel-embedded\.gallery-filter-panel \{[^}]*width: 100%;/);
     expect(styles).toMatch(/\.help-data-flow \{[^}]*display: flex;/);
     expect(styles).toMatch(/\.help-troubleshooting-demo dl > div \{[^}]*grid-template-columns: 88px minmax\(0, 1fr\);/);
     expect(styles).toMatch(/\.help-resolution-path \{[^}]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/);

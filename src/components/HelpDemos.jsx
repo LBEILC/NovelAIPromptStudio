@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Button as LobeButton,
+  Input as LobeInput,
   Segmented as LobeSegmented,
   Select as LobeSelect,
   Slider as LobeSlider,
@@ -256,11 +257,82 @@ export function TabDraftDemo() {
 }
 
 const GROUPING_IMAGES = [
-  { label: 'A', name: '夜景角色 01', vibe: 'Vibe A' },
-  { label: 'B', name: '夜景角色 02', vibe: 'Vibe B' },
-  { label: 'C', name: '夜景角色 03', vibe: 'Vibe A' },
-  { label: 'D', name: '海边角色 01', vibe: 'Vibe A' },
+  { name: '夜景角色 01', scene: 'night', vibe: 'Vibe A' },
+  { name: '夜景角色 02', scene: 'station', vibe: 'Vibe B' },
+  { name: '夜景角色 03', scene: 'library', vibe: 'Vibe A' },
+  { name: '海边角色 01', scene: 'beach', vibe: 'Vibe A' },
 ];
+
+const GALLERY_GROUPING_LABELS = {
+  base: '基础 Prompt', full: '完整 Prompt', separate: '全部分开', similar: '相似 Prompt',
+};
+
+const GALLERY_GROUPING_DESCRIPTIONS = {
+  base: '忽略角色 Prompt 与位置',
+  full: '角色、位置与完整 Prompt 必须相同',
+  separate: '每张图片独立显示',
+  similar: '按基础 Prompt 的 Tag 相似度归组',
+};
+
+function HelpGalleryArtwork({ scene }) {
+  return <svg aria-hidden="true" className={`help-gallery-art scene-${scene}`} viewBox="0 0 120 120">
+    <rect className="help-art-sky" height="120" width="120"/>
+    <circle className="help-art-light" cx={scene === 'beach' ? 92 : 24} cy={scene === 'night' ? 24 : 32} r="13"/>
+    <path className="help-art-ground" d={scene === 'beach' ? 'M0 72 Q30 61 60 73 T120 70 V120 H0Z' : 'M0 78 L120 68 V120 H0Z'}/>
+    <path className="help-art-figure" d="M63 35c9 0 15 8 15 18 0 7-3 11-6 15l9 34H43l9-34c-4-4-7-9-7-15 0-10 7-18 18-18Z"/>
+    <path className="help-art-detail" d={scene === 'library' ? 'M9 18h25v53H9zm77 8h25v47H86z' : scene === 'station' ? 'M12 26h30v8H12zm4 11h22v37H16z' : 'M14 84h30m47-8h22'}/>
+  </svg>;
+}
+
+function helpGalleryGroups(images, assignments) {
+  return assignments.reduce((groups, assignment, index) => {
+    const current = groups.find((group) => group.id === assignment);
+    if (current) current.members.push(images[index]);
+    else groups.push({ id: assignment, members: [images[index]] });
+    return groups;
+  }, []);
+}
+
+function HelpGalleryCard({ group, onSelect, selected }) {
+  const cover = group.members[0];
+  return <article className={`gallery-card help-gallery-card${group.members.length > 1 ? ' grouped' : ''}${selected ? ' selected' : ''}`}>
+    <button aria-label={`${cover.name}${group.members.length > 1 ? `，共 ${group.members.length} 张` : ''}`} aria-pressed={selected} className="gallery-card-main" onClick={onSelect} type="button">
+      <span className="gallery-card-image">
+        {group.members.slice(1, 3).map((member, index) => <span aria-hidden="true" className={`gallery-card-stack gallery-card-stack-${index + 1}`} key={member.name}><HelpGalleryArtwork scene={member.scene}/></span>)}
+        <span className="help-gallery-card-cover"><HelpGalleryArtwork scene={cover.scene}/></span>
+        {group.members.length > 1 && <span className="gallery-group-count"><b>{group.members.length}</b><span> 张</span></span>}
+        <span className="help-gallery-card-name">{cover.name}</span>
+      </span>
+    </button>
+  </article>;
+}
+
+function HelpGalleryGrid({ groups }) {
+  const [selected, setSelected] = useState('');
+  return <div aria-label="演示图库结果" className="help-real-gallery-grid">{groups.map((group) => <HelpGalleryCard group={group} key={group.id} onSelect={() => setSelected(group.id)} selected={selected === group.id}/>)}</div>;
+}
+
+export function GalleryImportDemo() {
+  const [source, setSource] = useState('image');
+  const [imported, setImported] = useState(false);
+  const items = source === 'image'
+    ? [{ name: '雨后候车亭.png', scene: 'station' }]
+    : [{ name: '夜景角色-01.png', scene: 'night' }, { name: '夜景角色-02.png', scene: 'library' }, { name: '海边角色-01.png', scene: 'beach' }];
+  const changeSource = (value) => { setSource(value); setImported(false); };
+  return <div className="help-simulator help-import-demo">
+    <div className="help-demo-toolbar">
+      <DemoControl label="选择导入内容"><LobeSegmented aria-label="图库导入演示内容" onChange={changeSource} options={[{ label: '单张图片', value: 'image' }, { label: 'NovelAI ZIP', value: 'zip' }]} size="small" value={source}/></DemoControl>
+      <LobeButton icon={<Icon name="plus" size={14}/>} onClick={() => setImported(true)} size="small" type="primary">模拟导入</LobeButton>
+    </div>
+    <div className="help-import-body">
+      <div className="help-import-source"><Icon name={source === 'image' ? 'image' : 'folder'} size={22}/><span><strong>{source === 'image' ? '雨后候车亭.png' : 'NovelAI 导出.zip'}</strong><small>{source === 'image' ? '读取一张图片及其 metadata' : '自动展开支持的图片，保留 ZIP 内文件名'}</small></span></div>
+      <Icon aria-hidden="true" className="help-import-arrow" name="next" size={16}/>
+      <div className="help-import-preview">{items.map((item) => <div key={item.name}><HelpGalleryArtwork scene={item.scene}/><span>{item.name}</span></div>)}</div>
+    </div>
+    <div className="help-import-steps"><span className={imported ? 'complete' : ''}>读取</span><span className={imported ? 'complete' : ''}>检查重复</span><span className={imported ? 'complete' : ''}>保存应用副本</span><span className={imported ? 'complete' : ''}>加入图库</span></div>
+    <DemoStatus icon={imported ? 'check' : 'info'}>{imported ? `${items.length} 张演示图片已加入下方流程；外部原图没有被修改。` : '演示只模拟选择结果，不会打开文件窗口或写入真实图片库。'}</DemoStatus>
+  </div>;
+}
 
 export function galleryGroupingAssignments(mode, similarity = 85, mergeVibe = false) {
   if (mode === 'separate') return ['A', 'B', 'C', 'D'];
@@ -272,59 +344,76 @@ export function galleryGroupingAssignments(mode, similarity = 85, mergeVibe = fa
 }
 
 export function GalleryGroupingDemo() {
-  const [mode, setMode] = useState('full');
+  const [mode, setMode] = useState('base');
   const [similarity, setSimilarity] = useState(85);
   const [mergeVibe, setMergeVibe] = useState(false);
   const assignments = galleryGroupingAssignments(mode, similarity, mergeVibe);
-  const groupCount = new Set(assignments).size;
+  const groups = helpGalleryGroups(GROUPING_IMAGES, assignments);
   return <div className="help-simulator help-grouping-demo">
-    <div className="help-demo-toolbar"><DemoControl label="分组方式"><LobeSegmented aria-label="图库分组演示方式" onChange={setMode} options={[{ label: '全部分开', value: 'separate' }, { label: '完整 Prompt', value: 'full' }, { label: '基础 Prompt', value: 'base' }, { label: '相似 Prompt', value: 'similar' }]} size="small" value={mode}/></DemoControl></div>
-    {mode === 'similar' && <div className="help-grouping-options">
-      <DemoControl label={`最低相似度 ${similarity}%`}><LobeSlider aria-label="演示最低相似度" max={95} min={70} onChange={setSimilarity} step={1} value={similarity}/></DemoControl>
-      <div className="help-grouping-switch"><span>跨 Vibe 合并</span><LobeSwitch aria-label="演示跨 Vibe 合并" checked={mergeVibe} onChange={setMergeVibe}/></div>
-    </div>}
-    <div className="help-demo-images">{GROUPING_IMAGES.map((image, index) => <div key={image.name}><i/><b>组 {assignments[index]}</b><strong>{image.name}</strong><small>{image.vibe}</small></div>)}</div>
-    <DemoStatus icon="library">当前得到 {groupCount} 个图片组；改变模式不会修改图片或 Prompt。</DemoStatus>
+    <div className="help-real-gallery-toolbar"><LobeInput aria-label="演示图库搜索" placeholder="搜索文件名、Tag 或译名" readOnly/><LobeButton icon={<Icon name="layers" size={14}/>} size="small">分组：{GALLERY_GROUPING_LABELS[mode]}</LobeButton><span>{groups.length} 组 · 4 张</span></div>
+    <div className="help-gallery-teaching-layout">
+      <div className="help-real-gallery-surface"><HelpGalleryGrid groups={groups}/></div>
+      <div className="gallery-grouping-panel help-grouping-panel-embedded">
+        <strong className="gallery-grouping-heading">分组方式</strong>
+        <div aria-label="图库分组演示方式" className="gallery-grouping-options" role="radiogroup">{['separate', 'full', 'base', 'similar'].map((scope) => {
+          const selected = mode === scope;
+          return <button aria-checked={selected} className={`gallery-grouping-option ${selected ? 'selected' : ''}`} key={scope} onClick={() => setMode(scope)} role="radio" type="button"><span aria-hidden="true" className="gallery-grouping-radio">{selected && <Icon name="check" size={11}/>}</span><span><strong>{GALLERY_GROUPING_LABELS[scope]}</strong><small>{GALLERY_GROUPING_DESCRIPTIONS[scope]}</small></span></button>;
+        })}</div>
+        {mode === 'similar' && <div className="gallery-similarity-control"><div><span>最低相似度</span><strong>{similarity}%</strong></div><LobeSlider aria-label="演示最低相似度" max={95} min={70} onChange={setSimilarity} step={5} value={similarity}/><div className="gallery-similarity-scale"><span>宽松</span><span>严格</span></div></div>}
+        <div className="gallery-grouping-vibe-row"><div><strong>跨 Vibe 合并</strong><small>{mode === 'separate' ? '全部分开时不适用' : '允许不同 Vibe 进入同一组'}</small></div><LobeSwitch aria-label="演示跨 Vibe 合并" checked={mode !== 'separate' && mergeVibe} disabled={mode === 'separate'} onChange={setMergeVibe} size="small"/></div>
+      </div>
+    </div>
+    <DemoStatus icon="library">右侧使用与图库相同的设置面板；左侧会真正合并卡片，并以堆叠和数量标记分组结果。</DemoStatus>
   </div>;
 }
 
 const FILTER_IMAGES = [
-  { days: 4, model: 'v45', name: '蓝发夜景', tags: ['blue hair', 'night'] },
-  { days: 12, model: 'v45', name: '蓝发室内', tags: ['blue hair', 'indoors'] },
-  { days: 2, model: 'v4', name: '蓝发模糊图', tags: ['blue hair', 'blurry'] },
-  { days: 8, model: 'v45', name: '银发夜景', tags: ['silver hair', 'night'] },
-  { days: 48, model: 'v45', name: '早期蓝发图', tags: ['blue hair', 'outdoors'] },
-  { days: 3, model: 'v4', name: '海边角色', tags: ['blonde hair', 'beach'] },
+  { days: 4, model: 'v45', name: '蓝发夜景', scene: 'night', tags: ['blue hair', 'night'], vibe: 'vibe-a' },
+  { days: 12, model: 'v45', name: '蓝发室内', scene: 'library', tags: ['blue hair', 'indoors'], vibe: 'vibe-a' },
+  { days: 2, model: 'v4', name: '蓝发模糊图', scene: 'station', tags: ['blue hair', 'blurry'], vibe: 'none' },
+  { days: 8, model: 'v45', name: '银发夜景', scene: 'night', tags: ['silver hair', 'night'], vibe: 'vibe-b' },
+  { days: 48, model: 'v45', name: '早期蓝发图', scene: 'station', tags: ['blue hair', 'outdoors'], vibe: 'vibe-a' },
+  { days: 3, model: 'v4', name: '海边角色', scene: 'beach', tags: ['blonde hair', 'beach'], vibe: 'none' },
 ];
 
 export function filterGalleryDemoItems(filters) {
   return FILTER_IMAGES.filter((image) => {
-    if (filters.model !== 'all' && image.model !== filters.model) return false;
-    if (filters.includeBlue && !image.tags.includes('blue hair')) return false;
-    if (filters.excludeBlurry && image.tags.includes('blurry')) return false;
-    if (filters.recent && image.days > 30) return false;
+    const query = filters.query?.trim().toLowerCase();
+    if (query && ![image.name, ...image.tags].some((value) => value.toLowerCase().includes(query))) return false;
+    if (filters.models?.length && !filters.models.includes(image.model)) return false;
+    if (filters.vibes?.length && !filters.vibes.includes(image.vibe)) return false;
+    if (filters.includeTags?.length) {
+      const matches = filters.includeTags.map((tag) => image.tags.includes(tag));
+      if (filters.tagMatch === 'any' ? !matches.some(Boolean) : !matches.every(Boolean)) return false;
+    }
+    if (filters.excludeTags?.some((tag) => image.tags.includes(tag))) return false;
+    if (filters.datePreset === '30d' && image.days > 30) return false;
     return true;
   });
 }
 
 export function GalleryFilterDemo() {
-  const [filters, setFilters] = useState({ excludeBlurry: true, includeBlue: true, model: 'v45', recent: true });
+  const [filters, setFilters] = useState({ datePreset: '30d', excludeTags: ['blurry'], includeTags: ['blue hair'], models: ['v45'], query: '', tagMatch: 'all', vibes: [] });
   const [smart, setSmart] = useState(false);
   const results = filterGalleryDemoItems(filters);
-  const toggle = (key) => setFilters((current) => ({ ...current, [key]: !current[key] }));
+  const change = (patch) => { setSmart(false); setFilters((current) => ({ ...current, ...patch })); };
+  const reset = () => change({ datePreset: 'all', excludeTags: [], includeTags: [], models: [], query: '', tagMatch: 'all', vibes: [] });
+  const activeCount = [filters.includeTags.length, filters.excludeTags.length, filters.models.length, filters.vibes.length, filters.datePreset === 'all' ? 0 : 1].filter(Boolean).length;
+  const tagOptions = [{ label: 'blue hair', value: 'blue hair' }, { label: 'night', value: 'night' }, { label: 'indoors', value: 'indoors' }, { label: 'blurry', value: 'blurry' }];
   return <div className="help-simulator help-filter-demo">
-    <div className="help-demo-toolbar">
-      <DemoControl label="模型"><LobeSegmented aria-label="筛选演示模型" onChange={(model) => setFilters((current) => ({ ...current, model }))} options={[{ label: '全部', value: 'all' }, { label: 'NAI v4.5', value: 'v45' }, { label: 'NAI v4', value: 'v4' }]} size="small" value={filters.model}/></DemoControl>
-      <div className="help-demo-switch"><span>智能收藏集</span><LobeSwitch aria-label="保存为智能收藏集演示" checked={smart} onChange={setSmart}/></div>
+    <div className="help-real-gallery-toolbar"><LobeInput aria-label="图库搜索演示" onChange={(event) => change({ query: event.target.value })} placeholder="搜索文件名、Tag 或译名" value={filters.query}/><LobeButton aria-pressed={Boolean(activeCount)} className={activeCount ? 'gallery-filter-trigger active' : 'gallery-filter-trigger'} icon={<Icon name="filter" size={14}/>} size="small">筛选 · {activeCount}</LobeButton><span>{results.length} 组 · {results.length} 张</span></div>
+    <div className="help-gallery-teaching-layout filter-layout">
+      <div className="gallery-filter-panel help-filter-panel-embedded">
+        <header className="gallery-filter-header"><div><strong>筛选图片</strong><small>不同筛选项之间同时满足</small></div><LobeButton disabled={!activeCount} onClick={reset} size="small" type="text">清除</LobeButton></header>
+        <section className="gallery-filter-section"><div className="gallery-filter-label"><span>包含 Tag</span><LobeSegmented aria-label="包含 Tag 的匹配方式演示" onChange={(tagMatch) => change({ tagMatch })} options={[{ label: '全部', value: 'all' }, { label: '任意', value: 'any' }]} size="small" value={filters.tagMatch}/></div><LobeSelect aria-label="必须包含的 Tag 演示" mode="multiple" onChange={(includeTags) => change({ includeTags: Array.isArray(includeTags) ? includeTags : [] })} options={tagOptions} placeholder="选择 Tag" size="small" value={filters.includeTags}/></section>
+        <section className="gallery-filter-section"><span className="gallery-filter-label">排除 Tag</span><LobeSelect aria-label="要排除的 Tag 演示" mode="multiple" onChange={(excludeTags) => change({ excludeTags: Array.isArray(excludeTags) ? excludeTags : [] })} options={tagOptions} placeholder="选择不想出现的 Tag" size="small" value={filters.excludeTags}/></section>
+        <div className="gallery-filter-fields"><section className="gallery-filter-section"><span className="gallery-filter-label">模型</span><LobeSelect aria-label="生成模型演示" mode="multiple" onChange={(models) => change({ models: Array.isArray(models) ? models : [] })} options={[{ label: 'NAI v4.5', value: 'v45' }, { label: 'NAI v4', value: 'v4' }]} placeholder="不限模型" size="small" value={filters.models}/></section><section className="gallery-filter-section"><span className="gallery-filter-label">Vibe</span><LobeSelect aria-label="Vibe 演示" mode="multiple" onChange={(vibes) => change({ vibes: Array.isArray(vibes) ? vibes : [] })} options={[{ label: 'Vibe A', value: 'vibe-a' }, { label: 'Vibe B', value: 'vibe-b' }, { label: '无 Vibe', value: 'none' }]} placeholder="不限 Vibe" size="small" value={filters.vibes}/></section></div>
+        <section className="gallery-filter-section"><span className="gallery-filter-label">导入时间</span><LobeSelect aria-label="导入时间演示" onChange={(datePreset) => change({ datePreset })} options={[{ label: '不限时间', value: 'all' }, { label: '最近 30 天', value: '30d' }]} size="small" value={filters.datePreset}/></section>
+        <LobeButton icon={<Icon name={smart ? 'check' : 'spark'} size={14}/>} onClick={() => setSmart(true)} size="small">{smart ? '已保存演示规则' : '保存为智能收藏集'}</LobeButton>
+      </div>
+      <div className="help-real-gallery-surface"><HelpGalleryGrid groups={results.map((image, index) => ({ id: `${image.name}-${index}`, members: [image] }))}/></div>
     </div>
-    <div className="help-demo-filters">
-      <button aria-pressed={filters.includeBlue} className={filters.includeBlue ? 'active' : ''} onClick={() => toggle('includeBlue')} type="button">包含 blue hair</button>
-      <button aria-pressed={filters.excludeBlurry} className={filters.excludeBlurry ? 'active' : ''} onClick={() => toggle('excludeBlurry')} type="button">排除 blurry</button>
-      <button aria-pressed={filters.recent} className={filters.recent ? 'active' : ''} onClick={() => toggle('recent')} type="button">最近 30 天</button>
-    </div>
-    <div className="help-filter-logic"><span>字段之间：并且</span><span>同一字段多选：任意一个</span><span>排除条件：优先</span></div>
-    <div className="help-demo-images compact">{results.map((image) => <div key={image.name}><i/><strong>{image.name}</strong><small>{image.model === 'v45' ? 'NAI v4.5' : 'NAI v4'} · {image.days} 天前</small></div>)}</div>
-    <DemoStatus icon={smart ? 'star' : 'filter'}>{smart ? `规则已保存为演示智能收藏集；以后符合条件的图片会自动进入。当前 ${results.length} 张。` : `临时筛选结果 ${results.length} 张；筛选发生在自动分组之前。`}</DemoStatus>
+    <DemoStatus icon={smart ? 'star' : 'filter'}>{smart ? `已保存当前 ${activeCount} 项演示规则；以后符合条件的图片会自动进入。` : `右侧是筛选后的真实卡片形态；排除条件优先，并且筛选发生在自动分组之前。`}</DemoStatus>
   </div>;
 }
 

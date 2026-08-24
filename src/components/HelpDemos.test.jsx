@@ -6,8 +6,9 @@ vi.mock('@lobehub/ui', () => ({
 
 vi.mock('@lobehub/ui/base-ui', () => ({
   Button: ({ children, icon, type, ...props }) => <button {...props} type={type === 'submit' || type === 'reset' ? type : 'button'}>{icon}{children}</button>,
+  Input: (props) => <input {...props}/>,
   Segmented: ({ options = [], value, ...props }) => <div {...props}>{options.find((option) => option.value === value)?.label}</div>,
-  Select: ({ options = [], value, ...props }) => <select {...props} defaultValue={value}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
+  Select: ({ mode, options = [], value, ...props }) => <select {...props} defaultValue={value} multiple={mode === 'multiple'}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
   Slider: ({ value, ...props }) => <input {...props} defaultValue={value} type="range"/>,
   Switch: ({ checked, ...props }) => <button aria-pressed={checked} {...props} type="button"/>,
 }));
@@ -27,7 +28,7 @@ describe('HelpDemos', () => {
   });
 
   it('combines gallery filters with AND and exclusion priority', () => {
-    const results = filterGalleryDemoItems({ excludeBlurry: true, includeBlue: true, model: 'v45', recent: true });
+    const results = filterGalleryDemoItems({ datePreset: '30d', excludeTags: ['blurry'], includeTags: ['blue hair'], models: ['v45'], query: '', tagMatch: 'all', vibes: [] });
     expect(results.map((item) => item.name)).toEqual(['蓝发夜景', '蓝发室内']);
   });
 });

@@ -7,6 +7,7 @@ import {
   FidelityDemo,
   GalleryFilterDemo,
   GalleryGroupingDemo,
+  GalleryImportDemo,
   GalleryScopeDemo,
   PromptScopeDemo,
   SelectionBatchDemo,
@@ -170,13 +171,25 @@ export const HELP_GROUPS = [
       {
         id: 'gallery-import',
         icon: 'upload',
-        title: '导入、去重与分组',
-        summary: '保存图片，并按 Prompt 关系整理',
-        keywords: '图库 导入 png jpg jpeg webp zip 拖放 剪贴板 重复 去重 分组 完整 基础 相似 vibe seed',
+        title: '导入图片与压缩包',
+        summary: '理解单图、ZIP、去重和应用副本',
+        keywords: '图库 导入 png jpg jpeg webp zip 压缩包 拖放 剪贴板 重复 去重 应用副本',
         content: <>
-          <p>切换四种分组方式，观察相同的四张演示图片如何重新归组。</p>
+          <p>分别选择单张图片和 NovelAI ZIP，查看导入前后的文件展开与处理步骤。</p>
+          <GalleryImportDemo/>
+          <p className="help-note"><Icon name="info" size={15}/>图片库接受 PNG、JPG、JPEG、WebP 和 NovelAI ZIP，也支持拖放与剪贴板。内容完全相同的图片会跳过；应用只保存自己的资源副本，不修改外部原图。</p>
+        </>,
+      },
+      {
+        id: 'gallery-grouping',
+        icon: 'layers',
+        title: '选择自动分组方式',
+        summary: '看懂卡片合并、Vibe 边界和相似度',
+        keywords: '图库 分组 图片组 全部分开 完整 prompt 基础 相似 Prompt vibe seed 阈值 头图',
+        content: <>
+          <p>右侧面板与真实图库的分组设置一致；切换方式时，观察左侧图片卡是否合并、堆叠和显示数量。</p>
           <GalleryGroupingDemo/>
-          <p className="help-note"><Icon name="info" size={15}/>图片库接受 PNG、JPG、JPEG、WebP 和 NovelAI ZIP，并在资源目录保存应用副本。内容完全相同的图片会跳过，不会生成第二份副本。</p>
+          <p className="help-note"><Icon name="info" size={15}/>分组只改变图库的组织方式，不改图片和 Prompt。只有完整 Prompt 且不跨 Vibe 的精确组可以持久指定头图。</p>
         </>,
       },
       {
