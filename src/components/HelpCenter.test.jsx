@@ -6,7 +6,7 @@ vi.mock('@lobehub/ui', () => ({
 }));
 
 vi.mock('@lobehub/ui/base-ui', () => ({
-  Button: ({ children, icon, type, ...props }) => <button {...props} type={type === 'submit' || type === 'reset' ? type : 'button'}>{icon}{children}</button>,
+  Button: ({ children, icon, size, type, ...props }) => <button {...props} data-size={size} type={type === 'submit' || type === 'reset' ? type : 'button'}>{icon}{children}</button>,
   Input: (props) => <input {...props}/>,
   Segmented: ({ onChange, options = [], size, value, ...props }) => <div {...props}>{options.find((option) => option.value === value)?.label}</div>,
   Select: ({ mode, onChange, options = [], value, ...props }) => <select {...props} defaultValue={value} multiple={mode === 'multiple'}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
@@ -64,6 +64,7 @@ describe('HelpCenter', () => {
     expect(articleHtml.selection).toContain('批量选择演示 Tag');
     expect(articleHtml['tabs-and-drafts']).toContain('标签草稿演示状态');
     expect(articleHtml['gallery-import']).toContain('图库导入演示内容');
+    expect(articleHtml['gallery-import']).toContain('data-size="middle"');
     expect(articleHtml['gallery-grouping']).toContain('图库分组演示方式');
     expect(articleHtml['gallery-grouping']).toContain('gallery-card-stack');
     expect(articleHtml['gallery-find']).toContain('智能收藏集');

@@ -322,7 +322,7 @@ export function GalleryImportDemo() {
   return <div className="help-simulator help-import-demo">
     <div className="help-demo-toolbar">
       <DemoControl label="选择导入内容"><LobeSegmented aria-label="图库导入演示内容" onChange={changeSource} options={[{ label: '单张图片', value: 'image' }, { label: 'NovelAI ZIP', value: 'zip' }]} size="small" value={source}/></DemoControl>
-      <LobeButton icon={<Icon name="plus" size={14}/>} onClick={() => setImported(true)} size="small" type="primary">模拟导入</LobeButton>
+      <LobeButton icon={<Icon name="plus" size={14}/>} onClick={() => setImported(true)} size="middle" type="primary">模拟导入</LobeButton>
     </div>
     <div className="help-import-body">
       <div className="help-import-source"><Icon name={source === 'image' ? 'image' : 'folder'} size={22}/><span><strong>{source === 'image' ? '雨后候车亭.png' : 'NovelAI 导出.zip'}</strong><small>{source === 'image' ? '读取一张图片及其 metadata' : '自动展开支持的图片，保留 ZIP 内文件名'}</small></span></div>
