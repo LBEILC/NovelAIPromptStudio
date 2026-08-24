@@ -26,12 +26,12 @@ function pointerOnScrollbar(container, event) {
     || (horizontalScrollbar > 0 && event.clientY >= bounds.bottom - horizontalScrollbar);
 }
 
-export function MarqueeSelectionOverlay({ rect }) {
+export function MarqueeSelectionOverlay({ rect, zIndex }) {
   if (!rect || typeof document === 'undefined') return null;
   return createPortal(<div
     aria-hidden="true"
     className="marquee-selection-box"
-    style={{ height: rect.height, left: rect.left, top: rect.top, width: rect.width }}
+    style={{ height: rect.height, left: rect.left, top: rect.top, width: rect.width, ...(zIndex == null ? {} : { zIndex }) }}
   />, document.body);
 }
 

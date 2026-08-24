@@ -21,6 +21,15 @@ const DIRECT_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 const ZIP_UTF8_FLAG = 0x800;
 const ZIP_UNICODE_PATH_EXTRA_FIELD = 0x7075;
 
+async function closeZipFile(zipfile) {
+  if (!zipfile?.isOpen) return;
+  await new Promise((resolve, reject) => {
+    zipfile.once('close', resolve);
+    zipfile.once('error', reject);
+    zipfile.close();
+  });
+}
+
 function readableBytes(value) {
   if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
   if (value >= 1024 ** 2) return `${Math.ceil(value / 1024 ** 2)} MB`;
@@ -93,6 +102,7 @@ export function validateZipImageEntry(entry, totals = { expandedBytes: 0, imageC
 
 export async function inspectZipArchive(zipPath, { signal } = {}) {
   const zipfile = await yauzl.openPromise(zipPath, {
+    autoClose: false,
     decodeStrings: false,
     validateEntrySizes: true,
     strictFileNames: false,
@@ -115,20 +125,21 @@ export async function inspectZipArchive(zipPath, { signal } = {}) {
       totals.imageCount += 1;
       totals.expandedBytes += entry.uncompressedSize;
       accepted.push({
+        entryIndex: accepted.length,
         fileName: verdict.fileName,
         compressedSize: entry.compressedSize,
         uncompressedSize: entry.uncompressedSize,
       });
     }
   } finally {
-    zipfile.close();
+    await closeZipFile(zipfile);
   }
   if (signal?.aborted) return { entries: [], ...totals, cancelled: true };
   if (!accepted.length) throw new Error('ZIP 中没有可导入的 PNG');
   return { entries: accepted, ...totals };
 }
 
-async function planImports(filePaths, onProgress, signal) {
+export async function inspectLibraryImportFiles(filePaths, { onProgress, signal } = {}) {
   const plans = [];
   const errors = [];
   let skipped = 0;
@@ -174,9 +185,10 @@ async function firstBytes(filePath, length) {
 }
 
 async function processZipPlan(plan, temporaryDirectory, processSource, recordFailure, signal) {
-  const wanted = new Map();
-  for (const entry of plan.entries) wanted.set(entry.fileName, (wanted.get(entry.fileName) || 0) + 1);
+  const wanted = new Set(plan.entries.map((entry) => entry.entryIndex));
+  const totals = { expandedBytes: 0, imageCount: 0 };
   const zipfile = await yauzl.openPromise(plan.filePath, {
+    autoClose: false,
     decodeStrings: false,
     validateEntrySizes: true,
     strictFileNames: false,
@@ -184,10 +196,14 @@ async function processZipPlan(plan, temporaryDirectory, processSource, recordFai
   try {
     for await (const entry of zipfile.eachEntry()) {
       if (signal?.aborted) break;
-      const fileName = decodeZipEntryFileName(entry);
-      const remaining = wanted.get(fileName) || 0;
-      if (!remaining) continue;
-      wanted.set(fileName, remaining - 1);
+      const verdict = validateZipImageEntry(entry, totals);
+      if (verdict.action === 'reject') throw new Error(verdict.reason);
+      if (verdict.action === 'skip') continue;
+      const entryIndex = totals.imageCount;
+      totals.imageCount += 1;
+      totals.expandedBytes += entry.uncompressedSize;
+      if (!wanted.has(entryIndex)) continue;
+      const fileName = verdict.fileName;
       const temporaryPath = path.join(temporaryDirectory, `${crypto.randomUUID()}.png`);
       try {
         try {
@@ -205,7 +221,60 @@ async function processZipPlan(plan, temporaryDirectory, processSource, recordFai
       }
     }
   } finally {
-    zipfile.close();
+    await closeZipFile(zipfile);
+  }
+}
+
+export async function generateZipEntryPreviews({
+  zipPath,
+  entries,
+  previewDirectory,
+  signal,
+  onPreview,
+}) {
+  const wanted = new Map(entries.map((entry) => [entry.entryIndex, entry]));
+  const totals = { expandedBytes: 0, imageCount: 0 };
+  const zipfile = await yauzl.openPromise(zipPath, {
+    autoClose: false,
+    decodeStrings: false,
+    validateEntrySizes: true,
+    strictFileNames: false,
+  });
+  try {
+    for await (const entry of zipfile.eachEntry()) {
+      if (signal?.aborted) break;
+      const verdict = validateZipImageEntry(entry, totals);
+      if (verdict.action === 'reject') throw new Error(verdict.reason);
+      if (verdict.action === 'skip') continue;
+      const entryIndex = totals.imageCount;
+      totals.imageCount += 1;
+      totals.expandedBytes += entry.uncompressedSize;
+      const requested = wanted.get(entryIndex);
+      if (!requested) continue;
+
+      const sourcePath = path.join(previewDirectory, `${crypto.randomUUID()}.png`);
+      const previewPath = path.join(previewDirectory, `${requested.id}.webp`);
+      try {
+        const readStream = await zipfile.openReadStreamPromise(entry);
+        await pipeline(readStream, fs.createWriteStream(sourcePath, { flags: 'wx' }));
+        if (!isPngSignature(await firstBytes(sourcePath, PNG_SIGNATURE.length))) {
+          throw new Error('扩展名是 PNG，但文件签名不匹配');
+        }
+        await sharp(sourcePath)
+          .rotate()
+          .resize({ width: 320, height: 320, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 78 })
+          .toFile(previewPath);
+        onPreview?.({ id: requested.id, previewPath });
+      } catch (error) {
+        fs.rmSync(previewPath, { force: true });
+        onPreview?.({ id: requested.id, error: error instanceof Error ? error.message : String(error) });
+      } finally {
+        fs.rmSync(sourcePath, { force: true });
+      }
+    }
+  } finally {
+    await closeZipFile(zipfile);
   }
 }
 
@@ -239,6 +308,7 @@ export async function importLibraryFiles({
   filePaths,
   assetsDirectory,
   database,
+  selectedArchiveEntries,
   prepareProject = async (project) => project,
   signal,
   onProgress,
@@ -249,7 +319,17 @@ export async function importLibraryFiles({
   const resultErrors = [];
   let processed = 0;
   try {
-    const plan = await planImports(filePaths, onProgress, signal);
+    const plan = await inspectLibraryImportFiles(filePaths, { onProgress, signal });
+    if (selectedArchiveEntries instanceof Map) {
+      plan.plans = plan.plans.flatMap((item) => {
+        if (item.kind !== 'zip') return [item];
+        const selected = selectedArchiveEntries.get(item.filePath);
+        if (!(selected instanceof Set)) return [item];
+        const entries = item.entries.filter((entry) => selected.has(entry.entryIndex));
+        return entries.length ? [{ ...item, entries }] : [];
+      });
+      plan.total = plan.plans.reduce((sum, item) => sum + item.entries.length, 0);
+    }
     resultErrors.push(...plan.errors);
     const report = (patch = {}) => onProgress?.({
       phase: 'importing',

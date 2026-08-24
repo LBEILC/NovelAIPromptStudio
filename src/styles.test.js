@@ -18,6 +18,9 @@ describe('production-safe Lobe UI overrides', () => {
     expect(styles).toMatch(/\.settings-nav-group > button strong \{[^}]*line-height: 1\.45;/);
     expect(styles).toMatch(/\.settings-font-select\.settings-font-select \{[^}]*width: 260px;/);
     expect(styles).toMatch(/\.gallery-size-slider\.gallery-size-slider \{[^}]*width: 96px;/);
+    expect(styles).toMatch(/button\.archive-import-card \{[^}]*border: 1px solid var\(--line\);/);
+    expect(styles).toMatch(/button\.archive-import-card\.selected \{[^}]*border-color: var\(--accent\);[^}]*box-shadow:/);
+    expect(styles).toMatch(/button\.archive-import-card:focus-visible \{[^}]*outline: 2px solid var\(--accent\);/);
   });
 
   it('keeps built-in help demonstrations compatible with motion preferences', () => {

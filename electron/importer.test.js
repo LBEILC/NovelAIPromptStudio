@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { openDatabase } from './database.js';
 import {
   decodeZipEntryFileName,
+  generateZipEntryPreviews,
   importLibraryFiles,
   inspectZipArchive,
   isPngSignature,
@@ -17,7 +19,7 @@ import {
 const temporaryDirectories = [];
 
 afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
+  for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true, maxRetries: 4, retryDelay: 50 });
 });
 
 async function pngBuffer(color = { r: 220, g: 150, b: 80, alpha: 1 }) {
@@ -80,6 +82,49 @@ describe('safe ZIP import', () => {
     expect(result.duplicates[0]).toMatchObject({ file: 'export.zip / renamed-inside-zip.png', projectId: result.imported[0].id });
     expect(database.loadLibrary()).toHaveLength(1);
     expect(database.loadLibrary()[0].content_hash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('imports only the selected ZIP entry even when archive names are duplicated', async () => {
+    const directory = temporaryWorkspace();
+    const zipPath = path.join(directory, 'duplicates.zip');
+    const first = await pngBuffer({ r: 220, g: 80, b: 80, alpha: 1 });
+    const second = await pngBuffer({ r: 80, g: 120, b: 220, alpha: 1 });
+    await writeZip(zipPath, [
+      { name: 'same-name.png', buffer: first },
+      { name: 'same-name.png', buffer: second },
+    ]);
+    const database = await openDatabase(path.join(directory, 'data'));
+
+    const result = await importLibraryFiles({
+      filePaths: [zipPath],
+      assetsDirectory: path.join(directory, 'assets'),
+      database,
+      selectedArchiveEntries: new Map([[zipPath, new Set([1])]]),
+    });
+
+    expect(result.summary).toMatchObject({ total: 1, processed: 1, imported: 1, failed: 0 });
+    expect(result.imported[0].content_hash).toBe(crypto.createHash('sha256').update(second).digest('hex'));
+  });
+
+  it('generates bounded WebP previews for selectable archive entries', async () => {
+    const directory = temporaryWorkspace();
+    const zipPath = path.join(directory, 'preview.zip');
+    const previewDirectory = path.join(directory, 'previews');
+    fs.mkdirSync(previewDirectory);
+    await writeZip(zipPath, [{ name: 'folder/preview.png', buffer: await pngBuffer() }]);
+    const inspection = await inspectZipArchive(zipPath);
+    const updates = [];
+
+    await generateZipEntryPreviews({
+      zipPath,
+      entries: inspection.entries.map((entry) => ({ ...entry, id: 'entry-one' })),
+      previewDirectory,
+      onPreview: (update) => updates.push(update),
+    });
+
+    expect(updates).toEqual([{ id: 'entry-one', previewPath: path.join(previewDirectory, 'entry-one.webp') }]);
+    const metadata = await sharp(fs.readFileSync(updates[0].previewPath)).metadata();
+    expect(metadata).toMatchObject({ format: 'webp', width: 3, height: 3 });
   });
 
   it('recovers UTF-8 names from macOS ZIPs that omit the language flag', async () => {

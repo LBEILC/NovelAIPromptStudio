@@ -1,11 +1,18 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, net, protocol, safeStorage, screen, shell } from 'electron';
 import electronUpdater from 'electron-updater';
 import { openDatabase } from './database.js';
-import { backfillProjectContentHashes, backfillProjectDimensions, importLibraryFiles } from './importer.js';
+import {
+  backfillProjectContentHashes,
+  backfillProjectDimensions,
+  generateZipEntryPreviews,
+  importLibraryFiles,
+  inspectLibraryImportFiles,
+} from './importer.js';
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
 import { lookupDanbooruTags } from './danbooru.js';
@@ -44,7 +51,41 @@ let permanentDeletionActive = false;
 let workbenchTemporaryDirectory;
 let updateState = { phase: 'idle', progress: 0, currentVersion: '', latestVersion: '', error: '', releaseUrl: '' };
 const activeImports = new Map();
+const preparedImports = new Map();
 const appIconPath = path.join(import.meta.dirname, '..', 'build', 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+
+function cleanupPreviewDirectory(directory) {
+  if (!directory) return;
+  try {
+    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 4, retryDelay: 50 });
+  } catch (error) {
+    const retry = setTimeout(() => {
+      try {
+        fs.rmSync(directory, { recursive: true, force: true, maxRetries: 4, retryDelay: 100 });
+      } catch (retryError) {
+        console.warn('Unable to remove import preview directory', retryError);
+      }
+    }, 1000);
+    retry.unref?.();
+    console.warn('Import preview cleanup delayed', error);
+  }
+}
+
+async function releasePreparedImport(sessionId) {
+  const id = String(sessionId || '');
+  const session = preparedImports.get(id);
+  if (!session) return null;
+  preparedImports.delete(id);
+  clearTimeout(session.expiryTimer);
+  session.controller.abort();
+  await session.previewPromise?.catch(() => {});
+  cleanupPreviewDirectory(session.previewDirectory);
+  return session;
+}
+
+function sendPreparedImportUpdate(sender, update) {
+  if (!sender.isDestroyed()) sender.send('library:import-preview', update);
+}
 
 function createWindow() {
   const { width: workAreaWidth, height: workAreaHeight } = screen.getPrimaryDisplay().workAreaSize;
@@ -361,6 +402,166 @@ app.whenReady().then(async () => {
       return { ok: true, removed: cleanupWorkbenchTemporaryImages(workbenchTemporaryDirectory, referencedPaths) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('library:import-prepare', async (_event, request = {}) => {
+    if (storageMigrationActive) return { ok: false, error: '资源库正在迁移，请稍候' };
+    await contentBackfill;
+    let filePaths = Array.isArray(request.filePaths) ? request.filePaths : [];
+    if (!filePaths.length) {
+      const result = await dialog.showOpenDialog({
+        title: '导入 NovelAI 图片或 ZIP',
+        defaultPath: imageDialogDefaultPath(),
+        properties: ['openFile', 'multiSelections'],
+        filters: [
+          { name: 'NovelAI 图片与 ZIP', extensions: ['png', 'jpg', 'jpeg', 'webp', 'zip'] },
+          { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] },
+          { name: 'ZIP archives', extensions: ['zip'] },
+        ],
+      });
+      if (result.canceled) return { ok: true, canceled: true };
+      filePaths = result.filePaths;
+      rememberImageDirectory(result.filePaths);
+    }
+
+    try {
+      const inspection = await inspectLibraryImportFiles(filePaths);
+      const sessionId = crypto.randomUUID();
+      const archives = inspection.plans.filter((item) => item.kind === 'zip').map((plan) => {
+        const archiveId = crypto.randomUUID();
+        return {
+          archiveId,
+          filePath: plan.filePath,
+          name: path.basename(plan.filePath),
+          signature: (() => {
+            const stat = fs.statSync(plan.filePath);
+            return { mtimeMs: stat.mtimeMs, size: stat.size };
+          })(),
+          entries: plan.entries.map((entry) => ({ ...entry, archiveId, id: crypto.randomUUID() })),
+        };
+      });
+      const previewDirectory = archives.length
+        ? await fs.promises.mkdtemp(path.join(os.tmpdir(), 'novelai-prompt-studio-preview-'))
+        : '';
+      const session = {
+        id: sessionId,
+        archives,
+        controller: new AbortController(),
+        filePaths,
+        previewDirectory,
+        previewPromise: null,
+      };
+      session.expiryTimer = setTimeout(() => {
+        releasePreparedImport(sessionId).catch((error) => console.warn('Unable to expire import preview', error));
+      }, 30 * 60 * 1000);
+      session.expiryTimer.unref?.();
+      preparedImports.set(sessionId, session);
+      return {
+        ok: true,
+        sessionId,
+        requiresSelection: archives.length > 0,
+        directImageCount: inspection.plans.filter((item) => item.kind === 'image').length,
+        skippedCount: inspection.skipped,
+        problemCount: inspection.errors.length,
+        archives: archives.map((archive) => ({ id: archive.archiveId, name: archive.name, count: archive.entries.length })),
+        entries: archives.flatMap((archive) => archive.entries.map((entry) => ({
+          archiveId: archive.archiveId,
+          compressedSize: entry.compressedSize,
+          fileName: entry.fileName,
+          id: entry.id,
+          previewPath: '',
+          uncompressedSize: entry.uncompressedSize,
+        }))),
+      };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('library:import-previews:start', (event, sessionId) => {
+    const session = preparedImports.get(String(sessionId || ''));
+    if (!session) return { ok: false, error: '导入预览已过期，请重新选择压缩包' };
+    if (session.previewPromise) return { ok: true };
+    const total = session.archives.reduce((sum, archive) => sum + archive.entries.length, 0);
+    let completed = 0;
+    session.previewPromise = (async () => {
+      try {
+        for (const archive of session.archives) {
+          if (session.controller.signal.aborted) break;
+          await generateZipEntryPreviews({
+            zipPath: archive.filePath,
+            entries: archive.entries,
+            previewDirectory: session.previewDirectory,
+            signal: session.controller.signal,
+            onPreview: (preview) => {
+              completed += 1;
+              sendPreparedImportUpdate(event.sender, {
+                sessionId: session.id,
+                phase: 'preview',
+                entryId: preview.id,
+                previewPath: preview.previewPath || '',
+                error: preview.error || '',
+                completed,
+                total,
+              });
+            },
+          });
+        }
+        if (!session.controller.signal.aborted) sendPreparedImportUpdate(event.sender, { sessionId: session.id, phase: 'complete', completed, total });
+      } catch (error) {
+        if (!session.controller.signal.aborted) sendPreparedImportUpdate(event.sender, {
+          sessionId: session.id,
+          phase: 'complete',
+          completed,
+          total,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+    return { ok: true };
+  });
+  ipcMain.handle('library:import-prepared:cancel', async (_event, sessionId) => ({ ok: Boolean(await releasePreparedImport(sessionId)) }));
+  ipcMain.handle('library:import-prepared:commit', async (event, request = {}) => {
+    if (storageMigrationActive) {
+      await releasePreparedImport(request.sessionId).catch(() => {});
+      return { ok: false, imported: [], duplicates: [], errors: [], error: '资源库正在迁移，请稍候' };
+    }
+    await contentBackfill;
+    const session = preparedImports.get(String(request.sessionId || ''));
+    if (!session) return { ok: false, imported: [], duplicates: [], errors: [], error: '导入预览已过期，请重新选择压缩包' };
+    const batchId = crypto.randomUUID();
+    const controller = new AbortController();
+    activeImports.set(batchId, controller);
+    const notify = (progress) => { if (!event.sender.isDestroyed()) event.sender.send('library:import-progress', { batchId, ...progress }); };
+    notify({ phase: 'preparing', processed: 0, total: 0, current: '准备所选图片' });
+    try {
+      for (const archive of session.archives) {
+        const stat = fs.statSync(archive.filePath);
+        if (stat.size !== archive.signature.size || stat.mtimeMs !== archive.signature.mtimeMs) {
+          throw new Error(`${archive.name} 在预览后发生了变化，请重新选择压缩包`);
+        }
+      }
+      const selectedIds = new Set(Array.isArray(request.entryIds) ? request.entryIds.map(String) : []);
+      const selectedArchiveEntries = new Map(session.archives.map((archive) => [
+        archive.filePath,
+        new Set(archive.entries.filter((entry) => selectedIds.has(entry.id)).map((entry) => entry.entryIndex)),
+      ]));
+      const released = await releasePreparedImport(session.id);
+      const imported = await importLibraryFiles({
+        filePaths: released.filePaths,
+        assetsDirectory,
+        database,
+        selectedArchiveEntries,
+        signal: controller.signal,
+        onProgress: notify,
+        prepareProject: async (project) => database.enrichProjectTags(project),
+      });
+      return { batchId, ...imported };
+    } catch (error) {
+      await releasePreparedImport(session.id).catch(() => {});
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, batchId, imported: [], duplicates: [], errors: [{ file: '导入批次', error: message }], summary: { total: 0, processed: 0, imported: 0, duplicates: 0, failed: 1, skipped: 0, remaining: 0, cancelled: false } };
+    } finally {
+      activeImports.delete(batchId);
     }
   });
   ipcMain.handle('library:import-images', async (event, request = {}) => {
@@ -776,3 +977,6 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('before-quit', () => {
+  for (const sessionId of preparedImports.keys()) releasePreparedImport(sessionId).catch(() => {});
+});

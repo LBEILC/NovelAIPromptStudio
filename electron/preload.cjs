@@ -26,6 +26,18 @@ contextBridge.exposeInMainWorld('studio', {
   importDroppedFiles: (files) => ipcRenderer.invoke('library:import-images', {
     filePaths: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean),
   }),
+  prepareImport: () => ipcRenderer.invoke('library:import-prepare'),
+  prepareDroppedImport: (files) => ipcRenderer.invoke('library:import-prepare', {
+    filePaths: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean),
+  }),
+  startPreparedImportPreviews: (sessionId) => ipcRenderer.invoke('library:import-previews:start', sessionId),
+  cancelPreparedImport: (sessionId) => ipcRenderer.invoke('library:import-prepared:cancel', sessionId),
+  commitPreparedImport: (sessionId, entryIds) => ipcRenderer.invoke('library:import-prepared:commit', { sessionId, entryIds }),
+  onPreparedImportPreview: (callback) => {
+    ipcRenderer.removeAllListeners('library:import-preview');
+    ipcRenderer.on('library:import-preview', (_event, update) => callback(update));
+  },
+  offPreparedImportPreview: () => ipcRenderer.removeAllListeners('library:import-preview'),
   cancelImport: (batchId) => ipcRenderer.invoke('library:import-cancel', batchId),
   onImportProgress: (callback) => {
     ipcRenderer.removeAllListeners('library:import-progress');

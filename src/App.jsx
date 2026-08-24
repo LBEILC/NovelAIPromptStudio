@@ -10,6 +10,7 @@ import { motion, useAnimationControls } from 'motion/react';
 import GalleryPage from './GalleryPage.jsx';
 import SettingsPage from './SettingsPage.jsx';
 import WorkbenchPage from './WorkbenchPage.jsx';
+import ArchiveImportModal from './components/ArchiveImportModal.jsx';
 import Icon from './components/Icon.jsx';
 import { allPromptTags, getPromptScope, normalizePromptStructure, syncProjectPromptMetadata, updatePromptScope, updatePromptScopeAnnotations } from './lib/promptStructure.js';
 import { CATEGORY_LABELS, CATEGORY_OPTIONS, expandSearch, formatTag, normalizeSearch, repairLegacyPromptTags } from './lib/prompt.js';
@@ -85,6 +86,13 @@ const studio = window.studio || {
   importImages: async () => ({ ok: true, canceled: true, imported: [], duplicates: [], errors: [], summary: null }),
   importClipboardImage: unavailable('请在桌面应用中读取剪贴板'),
   importDroppedFiles: unavailable('请在桌面应用中导入'),
+  prepareImport: async () => ({ ok: true, canceled: true }),
+  prepareDroppedImport: unavailable('请在桌面应用中导入'),
+  startPreparedImportPreviews: unavailable('请在桌面应用中预览压缩包'),
+  cancelPreparedImport: async () => ({ ok: true }),
+  commitPreparedImport: unavailable('请在桌面应用中导入'),
+  onPreparedImportPreview: () => {},
+  offPreparedImportPreview: () => {},
   cancelImport: unavailable('没有进行中的导入'),
   onImportProgress: () => {},
   offImportProgress: () => {},
@@ -265,6 +273,7 @@ export default function App({ appearance, setAppearance }) {
   const [dragState, setDragState] = useState({ active: false, valid: false });
   const [importProgress, setImportProgress] = useState(null);
   const [importResult, setImportResult] = useState(null);
+  const [archiveImport, setArchiveImport] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
   const appShellRef = useRef(null);
   const dropHandlerRef = useRef(null);
@@ -430,6 +439,47 @@ export default function App({ appearance, setAppearance }) {
   }, []);
 
   useEffect(() => {
+    studio.onPreparedImportPreview((update) => {
+      setArchiveImport((current) => {
+        if (!current || current.sessionId !== update?.sessionId) return current;
+        if (update.phase === 'preview') {
+          return {
+            ...current,
+            previewCompleted: update.completed || 0,
+            entries: current.entries.map((entry) => entry.id === update.entryId
+              ? { ...entry, previewPath: update.previewPath || '', previewError: update.error || '' }
+              : entry),
+          };
+        }
+        if (update.phase === 'complete') {
+          return {
+            ...current,
+            previewComplete: true,
+            previewCompleted: update.completed || 0,
+            previewError: update.error || '',
+          };
+        }
+        return current;
+      });
+    });
+    return () => studio.offPreparedImportPreview();
+  }, []);
+
+  useEffect(() => {
+    if (!archiveImport?.sessionId) return;
+    studio.startPreparedImportPreviews(archiveImport.sessionId).then((result) => {
+      if (result?.ok) return;
+      setArchiveImport((current) => current?.sessionId === archiveImport.sessionId
+        ? { ...current, previewComplete: true, previewError: result?.error || '压缩包预览没有启动' }
+        : current);
+    }).catch((error) => {
+      setArchiveImport((current) => current?.sessionId === archiveImport.sessionId
+        ? { ...current, previewComplete: true, previewError: error instanceof Error ? error.message : String(error) }
+        : current);
+    });
+  }, [archiveImport?.sessionId]);
+
+  useEffect(() => {
     const timer = window.setTimeout(async () => {
       const settings = await studio.getProductivitySettings().catch(() => null);
       if (!settings?.autoCheckUpdates) return;
@@ -528,7 +578,16 @@ export default function App({ appearance, setAppearance }) {
     }
   }, [acceptWorkbenchProject, showToast]);
 
+  const acceptLibraryImportResult = useCallback(async (result) => {
+    setImportResult(result);
+    if (!result?.ok && result?.error) showToast(result.error, 'error');
+    await reloadLibrary('all');
+    if (result?.imported?.length) setPreviewProjectId(result.imported.at(-1).id);
+    if (result?.metadataMissing) showToast('已读取剪贴板图片，但只包含像素，未检测到 NovelAI Prompt 元数据', 'warning');
+  }, [reloadLibrary, showToast]);
+
   const importImages = useCallback(async (files = null, fromClipboard = false) => {
+    if (archiveImport || isImportActive(importProgress)) return;
     if (files && !assessDroppedFiles(files).valid) {
       showToast('图片库只支持图片或 ZIP', 'warning');
       return;
@@ -537,25 +596,54 @@ export default function App({ appearance, setAppearance }) {
     setGalleryView('all');
     setImportResult(null);
     setImportProgress({ phase: 'preparing', processed: 0, total: 0, current: '准备中' });
+    let preparedSessionId = '';
     try {
-      const result = fromClipboard
-        ? await studio.importClipboardImage()
-        : files ? await studio.importDroppedFiles(files) : await studio.importImages();
-      if (result?.canceled) return;
-      setImportResult(result);
-      if (!result?.ok && result?.error) showToast(result.error, 'error');
-      await reloadLibrary('all');
-      if (result?.imported?.length) {
-        const id = result.imported.at(-1).id;
-        setPreviewProjectId(id);
+      if (fromClipboard) {
+        const result = await studio.importClipboardImage();
+        if (!result?.canceled) await acceptLibraryImportResult(result);
+        return;
       }
-      if (result?.metadataMissing) showToast('已读取剪贴板图片，但只包含像素，未检测到 NovelAI Prompt 元数据', 'warning');
+      const preparation = files ? await studio.prepareDroppedImport(files) : await studio.prepareImport();
+      if (preparation?.canceled) return;
+      if (!preparation?.ok) throw new Error(preparation?.error || '文件没有准备完成');
+      preparedSessionId = preparation.sessionId;
+      if (preparation.requiresSelection) {
+        setArchiveImport({ ...preparation, previewComplete: false, previewCompleted: 0, previewError: '' });
+        return;
+      }
+      const result = await studio.commitPreparedImport(preparation.sessionId, []);
+      if (result?.canceled) return;
+      preparedSessionId = '';
+      await acceptLibraryImportResult(result);
+    } catch (error) {
+      if (preparedSessionId) studio.cancelPreparedImport(preparedSessionId);
+      showToast(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      setImportProgress(null);
+    }
+  }, [acceptLibraryImportResult, archiveImport, importProgress, showToast]);
+
+  const cancelArchiveImport = useCallback(() => {
+    const sessionId = archiveImport?.sessionId;
+    setArchiveImport(null);
+    if (sessionId) studio.cancelPreparedImport(sessionId);
+  }, [archiveImport]);
+
+  const commitArchiveImport = useCallback(async (entryIds) => {
+    const sessionId = archiveImport?.sessionId;
+    if (!sessionId) return;
+    setArchiveImport(null);
+    setImportResult(null);
+    setImportProgress({ phase: 'preparing', processed: 0, total: 0, current: '准备所选图片' });
+    try {
+      const result = await studio.commitPreparedImport(sessionId, entryIds);
+      await acceptLibraryImportResult(result);
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), 'error');
     } finally {
       setImportProgress(null);
     }
-  }, [reloadLibrary, showToast]);
+  }, [acceptLibraryImportResult, archiveImport, showToast]);
 
   useEffect(() => {
     if (!appShellRef.current || !['workbench', 'gallery'].includes(page)) return undefined;
@@ -1382,6 +1470,7 @@ export default function App({ appearance, setAppearance }) {
       </Activity>
     </div>
     <ImportExperience dragState={dragState} onCancel={() => importProgress?.batchId && studio.cancelImport(importProgress.batchId)} onDismiss={() => setImportResult(null)} progress={importProgress} result={importResult} target={page}/>
+    <ArchiveImportModal importSession={archiveImport} key={archiveImport?.sessionId || 'archive-import'} onCancel={cancelArchiveImport} onImport={commitArchiveImport}/>
     <LobeModal
       cancelText="取消"
       destroyOnHidden
