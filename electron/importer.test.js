@@ -125,7 +125,12 @@ describe('safe ZIP import', () => {
       onPreview: (update) => updates.push(update),
     });
 
-    expect(updates).toEqual([{ id: 'entry-one', previewPath: path.join(previewDirectory, 'entry-one.webp') }]);
+    expect(updates).toEqual([{
+      id: 'entry-one',
+      previewHeight: 640,
+      previewPath: path.join(previewDirectory, 'entry-one.webp'),
+      previewWidth: 1280,
+    }]);
     const metadata = await sharp(fs.readFileSync(updates[0].previewPath)).metadata();
     expect(metadata).toMatchObject({ format: 'webp', width: 1280, height: 640 });
   });

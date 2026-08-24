@@ -166,7 +166,7 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .archive-import-source > header strong { min-width: 0; overflow: hidden; color: var(--text); font-size: var(--text-secondary); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .archive-import-source > header span { flex: 0 0 auto; margin-inline-start: auto; font: var(--text-micro) var(--font-mono); }
 .archive-import-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
-.archive-import-card { position: relative; min-width: 0; padding: 3px; overflow: visible; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 9px; container-type: inline-size; transition: background-color var(--duration-quick) var(--ease-out), border-color var(--duration-quick) var(--ease-out); }
+.archive-import-card { position: relative; min-width: 0; padding: 3px; overflow: visible; isolation: isolate; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 9px; container-type: inline-size; transition: background-color var(--duration-quick) var(--ease-out), border-color var(--duration-quick) var(--ease-out); }
 .archive-import-card:hover { background: var(--panel); border-color: var(--line-soft); }
 .archive-import-card.selected { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border-color: var(--accent); }
 .archive-import-card.unavailable { opacity: .68; }
@@ -183,12 +183,8 @@ html[data-theme-mode="light"] .studio-brand-logo-light { display: block !importa
 .archive-import-hover-name small { color: rgb(226 232 240 / 72%); font-size: var(--text-micro); line-height: 1.25; }
 .archive-import-card-select { position: absolute; z-index: 4; inset: 10px auto auto 10px; padding: 0; background: transparent; opacity: 0; transition: opacity var(--duration-quick) var(--ease-out); }
 .archive-import-selection-mark { box-shadow: 0 2px 8px rgb(0 0 0 / 28%); }
-.archive-import-card .archive-import-preview-action { position: absolute; z-index: 4; inset: 8px 8px auto auto; opacity: 0; transition: opacity var(--duration-quick) var(--ease-out); }
 .archive-import-card:hover .archive-import-hover-name, .archive-import-card:focus-within .archive-import-hover-name { opacity: 1; transform: translateY(0); }
-.archive-import-card:hover .archive-import-card-select, .archive-import-card.selected .archive-import-card-select, .archive-import-card-select:focus-visible, .archive-import-card:hover .archive-import-preview-action, .archive-import-card:focus-within .archive-import-preview-action { opacity: 1; }
-@media (hover: none) {
-  .archive-import-card .archive-import-preview-action { opacity: 1; }
-}
+.archive-import-card:hover .archive-import-card-select, .archive-import-card.selected .archive-import-card-select, .archive-import-card-select:focus-visible { opacity: 1; }
 .archive-import-hint { flex: 0 0 auto; padding: 7px 16px; color: var(--faint); background: var(--panel); border-top: 1px solid var(--line-soft); font-size: var(--text-micro); text-align: center; }
 @keyframes archive-import-preview-pulse { from { opacity: .42; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
 

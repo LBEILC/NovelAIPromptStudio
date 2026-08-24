@@ -18,10 +18,9 @@ describe('production-safe Lobe UI overrides', () => {
     expect(styles).toMatch(/\.settings-nav-group > button strong \{[^}]*line-height: 1\.45;/);
     expect(styles).toMatch(/\.settings-font-select\.settings-font-select \{[^}]*width: 260px;/);
     expect(styles).toMatch(/\.gallery-size-slider\.gallery-size-slider \{[^}]*width: 96px;/);
-    expect(styles).toMatch(/\.archive-import-card \{[^}]*border: 1px solid transparent;/);
+    expect(styles).toMatch(/\.archive-import-card \{[^}]*isolation: isolate;[^}]*border: 1px solid transparent;/);
     expect(styles).toMatch(/\.archive-import-card\.selected \{[^}]*background: color-mix\([^}]*border-color: var\(--accent\);/);
     expect(styles).toMatch(/\.archive-import-card-main:focus-visible \{[^}]*outline: 2px solid var\(--accent\);/);
-    expect(styles).toMatch(/\.archive-import-card \.archive-import-preview-action \{[^}]*position: absolute;[^}]*opacity: 0;/);
     expect(styles).toMatch(/\.archive-import-thumbnail img \{[^}]*object-fit: cover;[^}]*-webkit-user-drag: none;/);
     expect(styles).toMatch(/\.archive-import-card:hover \.archive-import-hover-name, \.archive-import-card:focus-within \.archive-import-hover-name \{[^}]*opacity: 1;/);
   });

@@ -7,14 +7,9 @@ vi.mock('@lobehub/ui/base-ui', () => ({
   Modal: ({ children, okText, title }) => <section><h2>{title}</h2>{children}<footer>{okText}</footer></section>,
 }));
 
-vi.mock('@lobehub/ui', () => {
-  const Image = () => null;
-  Image.PreviewGroup = ({ children, items }) => <div data-preview-items={items.length}>{children}</div>;
-  return {
-    ActionIcon: ({ icon, title, ...props }) => <button {...props}>{icon}<span>{title}</span></button>,
-    Image,
-  };
-});
+vi.mock('@lobehub/ui', () => ({
+  Popover: ({ children, content, trigger }) => <div data-popover-trigger={trigger}>{children}<aside>{content}</aside></div>,
+}));
 
 vi.mock('./Icon.jsx', () => ({ default: () => null }));
 
@@ -25,7 +20,14 @@ describe('ArchiveImportModal', () => {
         archives: [{ id: 'archive', name: 'NovelAI 图片.zip', count: 2 }],
         directImageCount: 1,
         entries: [
-          { archiveId: 'archive', fileName: '作品/第一张.png', id: 'one', previewPath: 'C:\\preview\\one.webp' },
+          {
+            archiveId: 'archive',
+            fileName: '作品/第一张.png',
+            id: 'one',
+            previewHeight: 640,
+            previewPath: 'C:\\preview\\one.webp',
+            previewWidth: 1280,
+          },
           { archiveId: 'archive', fileName: '作品/损坏.png', id: 'broken', previewError: '文件签名不匹配' },
         ],
         previewComplete: true,
@@ -42,8 +44,10 @@ describe('ArchiveImportModal', () => {
     expect(html).toContain('NovelAI 图片.zip');
     expect(html).toContain('第一张.png');
     expect(html).toContain('损坏.png');
-    expect(html).toContain('aria-label="预览 第一张.png"');
-    expect(html).toContain('data-preview-items="1"');
+    expect(html).toContain('data-popover-trigger="hover"');
+    expect(html).toContain('gallery-card-hover-preview');
+    expect(html).toContain('1280 × 640 · ZIP 预览');
+    expect(html).not.toContain('aria-label="预览 第一张.png"');
     expect(html).toContain('draggable="false"');
     expect(html).toContain('archive-import-hover-name');
     expect(html).toContain('archive-import-card-select');

@@ -447,7 +447,13 @@ export default function App({ appearance, setAppearance }) {
             ...current,
             previewCompleted: update.completed || 0,
             entries: current.entries.map((entry) => entry.id === update.entryId
-              ? { ...entry, previewPath: update.previewPath || '', previewError: update.error || '' }
+              ? {
+                ...entry,
+                previewHeight: update.previewHeight || 0,
+                previewPath: update.previewPath || '',
+                previewWidth: update.previewWidth || 0,
+                previewError: update.error || '',
+              }
               : entry),
           };
         }

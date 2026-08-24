@@ -260,12 +260,17 @@ export async function generateZipEntryPreviews({
         if (!isPngSignature(await firstBytes(sourcePath, PNG_SIGNATURE.length))) {
           throw new Error('扩展名是 PNG，但文件签名不匹配');
         }
-        await sharp(sourcePath)
+        const previewInfo = await sharp(sourcePath)
           .rotate()
           .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
           .webp({ quality: 82 })
           .toFile(previewPath);
-        onPreview?.({ id: requested.id, previewPath });
+        onPreview?.({
+          id: requested.id,
+          previewHeight: previewInfo.height,
+          previewPath,
+          previewWidth: previewInfo.width,
+        });
       } catch (error) {
         fs.rmSync(previewPath, { force: true });
         onPreview?.({ id: requested.id, error: error instanceof Error ? error.message : String(error) });

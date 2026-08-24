@@ -6,6 +6,7 @@ import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useRef,
 import Icon, { getIconComponent } from './components/Icon.jsx';
 import ImagePreviewToolbar from './components/ImagePreviewToolbar.jsx';
 import ImageStage, { mediaUrl } from './components/ImageStage.jsx';
+import GalleryImageHoverPreview from './components/GalleryImageHoverPreview.jsx';
 import { MarqueeSelectionOverlay, useMarqueeSelection } from './components/MarqueeSelection.jsx';
 import SelectionMark from './components/SelectionMark.jsx';
 import { galleryEmptyState, galleryGroupMember, galleryScrubMemberIndex, shouldCollapseGalleryPreview } from './lib/gallery.js';
@@ -29,7 +30,6 @@ import {
   readGalleryCardSize,
   writeGalleryCardSize,
 } from './lib/galleryLayout.js';
-import { fitTabPreviewCanvas } from './lib/imagePreview.js';
 import { encodeMarqueeKey } from './lib/marqueeSelection.js';
 import {
   DEFAULT_GALLERY_GROUPING,
@@ -555,18 +555,12 @@ export function GalleryCardHoverPreview({ group, onDismissReady, project = group
   const width = Number(project.metadata?.width || 0);
   const height = Number(project.metadata?.height || 0);
   const memberIndex = Math.max(0, (group.members || []).findIndex((member) => member.id === project.id));
-  const previewCanvas = fitTabPreviewCanvas(width, height, { maxWidth: 320, maxHeight: 360, minWidth: 220, minHeight: 180 });
-  return <div
-    className="gallery-card-hover-preview"
-    style={{
-      '--gallery-card-hover-ratio': `${previewCanvas.width} / ${previewCanvas.height}`,
-      '--gallery-card-hover-width': `${previewCanvas.width}px`,
-    }}
+  return <GalleryImageHoverPreview
+    height={height}
+    src={mediaUrl(project.thumbnail_path || project.image_path)}
+    width={width}
   >
     {onDismissReady && <GalleryHoverPreviewDismissBridge onReady={onDismissReady}/>}
-    <div className="gallery-card-hover-media">
-      <img alt="" key={project.id} src={mediaUrl(project.thumbnail_path || project.image_path)}/>
-    </div>
     {group.count > 1 && <div className="gallery-card-hover-scrub" aria-hidden="true">
       <i style={{ '--gallery-card-hover-progress': (memberIndex + 1) / group.count }}/>
     </div>}
@@ -574,7 +568,7 @@ export function GalleryCardHoverPreview({ group, onDismissReady, project = group
       <span>{width || '—'} × {height || '—'} · {countPromptTags(project)} Tags</span>
       <span>{group.count > 1 ? `${memberIndex + 1} / ${group.count} · ` : ''}{formatDate(project.created_at)}</span>
     </div>
-  </div>;
+  </GalleryImageHoverPreview>;
 }
 
 const GALLERY_HOVER_POSITIONER_STYLES = { root: { pointerEvents: 'none' } };

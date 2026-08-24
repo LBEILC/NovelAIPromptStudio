@@ -469,7 +469,9 @@ app.whenReady().then(async () => {
           compressedSize: entry.compressedSize,
           fileName: entry.fileName,
           id: entry.id,
+          previewHeight: 0,
           previewPath: '',
+          previewWidth: 0,
           uncompressedSize: entry.uncompressedSize,
         }))),
       };
@@ -499,6 +501,8 @@ app.whenReady().then(async () => {
                 phase: 'preview',
                 entryId: preview.id,
                 previewPath: preview.previewPath || '',
+                previewHeight: preview.previewHeight || 0,
+                previewWidth: preview.previewWidth || 0,
                 error: preview.error || '',
                 completed,
                 total,
