@@ -1,4 +1,5 @@
 import { Button as LobeButton, Modal as LobeModal } from '@lobehub/ui/base-ui';
+import { ActionIcon, Image as LobeImage } from '@lobehub/ui';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { archiveImportNameParts, reconcileArchiveImportSelection, selectableArchiveEntries, toggleArchiveImportSelection } from '../lib/archiveImport.js';
 import { isTextEditingTarget } from '../lib/contextMenu.js';
@@ -8,32 +9,50 @@ import { MarqueeSelectionOverlay, useMarqueeSelection } from './MarqueeSelection
 import SelectionMark from './SelectionMark.jsx';
 import Icon from './Icon.jsx';
 
-const ArchiveImportCard = memo(function ArchiveImportCard({ entry, onToggle, selected }) {
+const ArchiveImportCard = memo(function ArchiveImportCard({ entry, onPreview, onToggle, selected }) {
   const { name, folder } = archiveImportNameParts(entry.fileName);
   const unavailable = Boolean(entry.previewError);
-  return <button
-    aria-label={unavailable ? `${name} 无法预览或导入` : selected ? `取消选择 ${name}` : `选择 ${name}`}
-    aria-pressed={unavailable ? undefined : selected}
+  return <article
     className={`archive-import-card ${selected ? 'selected' : ''} ${unavailable ? 'unavailable' : ''}`}
     data-marquee-key={unavailable ? undefined : encodeMarqueeKey(entry.id)}
-    disabled={unavailable}
-    onClick={(event) => onToggle(entry.id, event)}
     title={entry.previewError || entry.fileName}
-    type="button"
   >
-    <span className="archive-import-thumbnail">
-      {entry.previewPath
-        ? <img alt="" decoding="async" src={mediaUrl(entry.previewPath)}/>
-        : entry.previewError
-          ? <span className="archive-import-thumbnail-error"><Icon name="warning" size={22}/></span>
-          : <span aria-hidden="true" className="archive-import-thumbnail-loading"/>}
-      {!unavailable && <SelectionMark className="archive-import-selection-mark" selected={selected}/>}
-    </span>
-    <span className="archive-import-card-copy">
-      <strong>{name}</strong>
-      {folder && <small>{folder}</small>}
-    </span>
-  </button>;
+    <button
+      aria-label={unavailable ? `${name} 无法预览或导入` : selected ? `取消选择 ${name}` : `选择 ${name}`}
+      aria-pressed={unavailable ? undefined : selected}
+      className="archive-import-card-main"
+      disabled={unavailable}
+      onClick={(event) => onToggle(entry.id, event)}
+      type="button"
+    >
+      <span className="archive-import-thumbnail">
+        {entry.previewPath
+          ? <img alt="" decoding="async" draggable="false" loading="lazy" src={mediaUrl(entry.previewPath)}/>
+          : entry.previewError
+            ? <span className="archive-import-thumbnail-error"><Icon name="warning" size={22}/></span>
+            : <span aria-hidden="true" className="archive-import-thumbnail-loading"/>}
+        <span aria-hidden="true" className="archive-import-hover-name">
+          <strong>{name}</strong>
+          {folder && <small>{folder}</small>}
+        </span>
+      </span>
+    </button>
+    {!unavailable && <button
+      aria-label={selected ? `取消选择 ${name}` : `选择 ${name}`}
+      className="archive-import-card-select"
+      onClick={(event) => { event.stopPropagation(); onToggle(entry.id, event); }}
+      type="button"
+    ><SelectionMark className="archive-import-selection-mark" selected={selected}/></button>}
+    {entry.previewPath && <ActionIcon
+      aria-label={`预览 ${name}`}
+      className="archive-import-preview-action"
+      icon={<Icon name="zoomIn" size={14}/>}
+      onClick={(event) => { event.stopPropagation(); onPreview(entry.id); }}
+      size="small"
+      title="预览图片"
+      variant="filled"
+    />}
+  </article>;
 });
 
 export default function ArchiveImportModal({ importSession, onCancel, onImport }) {
@@ -46,6 +65,9 @@ export default function ArchiveImportModal({ importSession, onCancel, onImport }
   const selectableEntries = useMemo(() => selectableArchiveEntries(entries), [entries]);
   const selectableIds = useMemo(() => selectableEntries.map((entry) => entry.id), [selectableEntries]);
   const activeSelectedIds = useMemo(() => reconcileArchiveImportSelection(entries, selectedIds), [entries, selectedIds]);
+  const previewEntries = useMemo(() => entries.filter((entry) => entry.previewPath && !entry.previewError), [entries]);
+  const [previewEntryId, setPreviewEntryId] = useState('');
+  const previewIndex = previewEntries.findIndex((entry) => entry.id === previewEntryId);
   entriesRef.current = entries;
 
   useEffect(() => {
@@ -54,8 +76,13 @@ export default function ArchiveImportModal({ importSession, onCancel, onImport }
     sessionIdRef.current = sessionId;
     const ids = selectableArchiveEntries(importSession.entries).map((entry) => entry.id);
     setSelectedIds(ids);
+    setPreviewEntryId('');
     anchorRef.current = '';
   }, [importSession]);
+
+  useEffect(() => {
+    if (previewEntryId && previewIndex < 0) setPreviewEntryId('');
+  }, [previewEntryId, previewIndex]);
 
   useEffect(() => {
     if (!importSession) return undefined;
@@ -128,22 +155,33 @@ export default function ArchiveImportModal({ importSession, onCancel, onImport }
         <Icon name="warning" size={15}/>
         <span>{failedCount ? `${failedCount} 张图片无法读取，已从选择中排除。` : ''}{importSession.problemCount ? `另有 ${importSession.problemCount} 个文件无法准备，导入结果中会说明。` : ''}{importSession.previewError ? ` ${importSession.previewError}` : ''}</span>
       </div>}
-      <div className="archive-import-scroll" ref={containerRef} {...marqueeSelection.handlers}>
-        {importSession.archives.map((archive) => {
-          const archiveEntries = entries.filter((entry) => entry.archiveId === archive.id);
-          const archiveSelected = archiveEntries.filter((entry) => selectedSet.has(entry.id)).length;
-          return <section className="archive-import-source" key={archive.id}>
-            <header>
-              <strong title={archive.name}>{archive.name}</strong>
-              <span>{archiveSelected} / {archiveEntries.filter((entry) => !entry.previewError).length}</span>
-            </header>
-            <div className="archive-import-grid">
-              {archiveEntries.map((entry) => <ArchiveImportCard entry={entry} key={entry.id} onToggle={toggleEntry} selected={selectedSet.has(entry.id)}/>)}
-            </div>
-          </section>;
-        })}
-      </div>
-      <div className="archive-import-hint">单击选择 · Shift 连选 · Ctrl/Cmd 切换 · 可从图片或空白处拖动框选</div>
+      <LobeImage.PreviewGroup
+        items={previewEntries.map((entry) => mediaUrl(entry.previewPath))}
+        preview={{
+          current: Math.max(0, previewIndex),
+          onChange: (current) => setPreviewEntryId(previewEntries[current]?.id || ''),
+          onOpenChange: (open) => { if (!open) setPreviewEntryId(''); },
+          open: previewIndex >= 0,
+          zIndex: 1300,
+        }}
+      >
+        <div className="archive-import-scroll" onDragStart={(event) => event.preventDefault()} ref={containerRef} {...marqueeSelection.handlers}>
+          {importSession.archives.map((archive) => {
+            const archiveEntries = entries.filter((entry) => entry.archiveId === archive.id);
+            const archiveSelected = archiveEntries.filter((entry) => selectedSet.has(entry.id)).length;
+            return <section className="archive-import-source" key={archive.id}>
+              <header>
+                <strong title={archive.name}>{archive.name}</strong>
+                <span>{archiveSelected} / {archiveEntries.filter((entry) => !entry.previewError).length}</span>
+              </header>
+              <div className="archive-import-grid">
+                {archiveEntries.map((entry) => <ArchiveImportCard entry={entry} key={entry.id} onPreview={setPreviewEntryId} onToggle={toggleEntry} selected={selectedSet.has(entry.id)}/>)}
+              </div>
+            </section>;
+          })}
+        </div>
+      </LobeImage.PreviewGroup>
+      <div className="archive-import-hint">单击选择 · Shift 连选 · Ctrl/Cmd 切换 · 拖动框选 · 右上角预览</div>
       <MarqueeSelectionOverlay rect={marqueeSelection.rect} zIndex={1202}/>
     </div>
   </LobeModal>;

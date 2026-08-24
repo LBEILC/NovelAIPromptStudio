@@ -262,8 +262,8 @@ export async function generateZipEntryPreviews({
         }
         await sharp(sourcePath)
           .rotate()
-          .resize({ width: 320, height: 320, fit: 'inside', withoutEnlargement: true })
-          .webp({ quality: 78 })
+          .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 82 })
           .toFile(previewPath);
         onPreview?.({ id: requested.id, previewPath });
       } catch (error) {

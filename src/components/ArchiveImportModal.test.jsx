@@ -7,6 +7,15 @@ vi.mock('@lobehub/ui/base-ui', () => ({
   Modal: ({ children, okText, title }) => <section><h2>{title}</h2>{children}<footer>{okText}</footer></section>,
 }));
 
+vi.mock('@lobehub/ui', () => {
+  const Image = () => null;
+  Image.PreviewGroup = ({ children, items }) => <div data-preview-items={items.length}>{children}</div>;
+  return {
+    ActionIcon: ({ icon, title, ...props }) => <button {...props}>{icon}<span>{title}</span></button>,
+    Image,
+  };
+});
+
 vi.mock('./Icon.jsx', () => ({ default: () => null }));
 
 describe('ArchiveImportModal', () => {
@@ -33,6 +42,11 @@ describe('ArchiveImportModal', () => {
     expect(html).toContain('NovelAI 图片.zip');
     expect(html).toContain('第一张.png');
     expect(html).toContain('损坏.png');
+    expect(html).toContain('aria-label="预览 第一张.png"');
+    expect(html).toContain('data-preview-items="1"');
+    expect(html).toContain('draggable="false"');
+    expect(html).toContain('archive-import-hover-name');
+    expect(html).toContain('archive-import-card-select');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('disabled=""');
   });

@@ -111,7 +111,10 @@ describe('safe ZIP import', () => {
     const zipPath = path.join(directory, 'preview.zip');
     const previewDirectory = path.join(directory, 'previews');
     fs.mkdirSync(previewDirectory);
-    await writeZip(zipPath, [{ name: 'folder/preview.png', buffer: await pngBuffer() }]);
+    const largePng = await sharp({
+      create: { width: 1800, height: 900, channels: 4, background: { r: 80, g: 120, b: 220, alpha: 1 } },
+    }).png().toBuffer();
+    await writeZip(zipPath, [{ name: 'folder/preview.png', buffer: largePng }]);
     const inspection = await inspectZipArchive(zipPath);
     const updates = [];
 
@@ -124,7 +127,7 @@ describe('safe ZIP import', () => {
 
     expect(updates).toEqual([{ id: 'entry-one', previewPath: path.join(previewDirectory, 'entry-one.webp') }]);
     const metadata = await sharp(fs.readFileSync(updates[0].previewPath)).metadata();
-    expect(metadata).toMatchObject({ format: 'webp', width: 3, height: 3 });
+    expect(metadata).toMatchObject({ format: 'webp', width: 1280, height: 640 });
   });
 
   it('recovers UTF-8 names from macOS ZIPs that omit the language flag', async () => {
