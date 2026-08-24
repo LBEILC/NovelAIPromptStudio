@@ -65,6 +65,9 @@
 
 ## 总体结果
 
+Windows 验证通过。用户于 2026-08-24 确认已完成验证并要求归档；macOS 对应检查继续由 `coordination/MACOS.md` 跟踪。
+
 
 ## 发现的问题
 
+Windows 本轮未报告问题。

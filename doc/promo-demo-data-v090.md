@@ -202,7 +202,7 @@ nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad qua
 4. 外围背景只允许低对比度 Tag 结构、纸张/画布层次、轻微档案索引或来自应用图标的括号语言。
 5. 禁止紫蓝渐变字、霓虹描边、玻璃卡片堆叠、假终端、假指标、装饰性状态点和通用 SaaS Hero 构图。
 6. 缩放到 README 常见宽度后再次检查：应用页面类型、主要图片和核心操作仍应一眼可辨。
-7. 发布前按 [批次 A 人工取图与验收清单](./manual-verification-20260823-batch-a-promo-capture.md) 逐项记录结果。
+7. 发布前按 [批次 A 人工取图与验收清单](./archive/manual-verification-20260823-batch-a-promo-capture.md) 逐项记录结果。
 
 ## 6. 隐私与真实性检查
 
