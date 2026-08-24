@@ -7,6 +7,7 @@ import {
   Slider as LobeSlider,
   Switch as LobeSwitch,
 } from '@lobehub/ui/base-ui';
+import { galleryScrubMemberIndex } from '../lib/gallery.js';
 import Icon from './Icon.jsx';
 
 function DemoControl({ children, label }) {
@@ -417,18 +418,54 @@ export function GalleryFilterDemo() {
   </div>;
 }
 
-const SCOPE_MEMBERS = ['夜景角色 01', '夜景角色 02', '夜景角色 03'];
+const SCOPE_MEMBERS = [
+  { name: '夜景角色 01', scene: 'night' },
+  { name: '夜景角色 02', scene: 'station' },
+  { name: '夜景角色 03', scene: 'library' },
+];
 
 export function GalleryScopeDemo() {
-  const [member, setMember] = useState(0);
+  const [previewMember, setPreviewMember] = useState(0);
+  const [detailMember, setDetailMember] = useState(0);
   const [actionScope, setActionScope] = useState('detail');
+  const preview = SCOPE_MEMBERS[previewMember];
+  const detail = SCOPE_MEMBERS[detailMember];
+  const updatePreview = (event) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    setPreviewMember(galleryScrubMemberIndex(event.clientX, bounds.left, bounds.width, SCOPE_MEMBERS.length));
+  };
+  const movePreviewWithKeyboard = (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    setPreviewMember((current) => Math.min(SCOPE_MEMBERS.length - 1, Math.max(0, current + (event.key === 'ArrowRight' ? 1 : -1))));
+  };
   return <div className="help-simulator help-gallery-scope-demo">
     <div className="help-demo-toolbar"><DemoControl label="操作位置"><LobeSegmented aria-label="图片组操作范围演示" onChange={setActionScope} options={[{ label: '详情侧栏', value: 'detail' }, { label: '批量工具栏', value: 'batch' }]} size="small" value={actionScope}/></DemoControl></div>
     <div className="help-gallery-members">
-      <div className="help-gallery-group-card"><span>完整 Prompt 组 · 3 张</span><i/><strong>{SCOPE_MEMBERS[member]}</strong><small>移动指针浏览成员，单击查看详情</small></div>
-      <div aria-label="演示图片组成员" className="help-gallery-member-list">{SCOPE_MEMBERS.map((name, index) => <button aria-pressed={member === index} className={member === index ? 'active' : ''} key={name} onClick={() => setMember(index)} type="button"><i/><span>{index + 1}</span></button>)}</div>
+      <div className="help-gallery-scrub-column">
+        <button aria-label="图片组卡片擦看演示：左右移动指针预览，单击打开当前成员" className="help-gallery-scrub-card" onClick={() => setDetailMember(previewMember)} onKeyDown={movePreviewWithKeyboard} onPointerEnter={updatePreview} onPointerMove={updatePreview} type="button">
+          <span aria-hidden="true" className="help-gallery-scrub-stack stack-2"/><span aria-hidden="true" className="help-gallery-scrub-stack stack-1"/>
+          <span className="help-gallery-scrub-preview" key={preview.name}><HelpGalleryArtwork scene={preview.scene}/></span>
+          <span className="gallery-group-count"><b>3</b><span> 张</span></span>
+          <span className="help-gallery-scrub-index">{previewMember + 1} / {SCOPE_MEMBERS.length}</span>
+          <strong>{preview.name}</strong>
+        </button>
+        <div aria-hidden="true" className="help-gallery-scrub-track">{SCOPE_MEMBERS.map((member, index) => <i className={previewMember === index ? 'active' : ''} key={member.name}/>)}</div>
+        <small>在卡片上左右移动指针预览；单击把当前成员打开到详情。</small>
+      </div>
+      {actionScope === 'detail' ? <div className="help-gallery-scope-panel">
+        <header><span>详情侧栏</span><small>当前成员</small></header>
+        <div className="help-gallery-scope-preview"><HelpGalleryArtwork scene={detail.scene}/></div>
+        <strong>{detail.name}</strong>
+        <div className="help-gallery-scope-actions"><span>重命名</span><span>复制</span><span>下载</span></div>
+      </div> : <div className="help-gallery-scope-panel batch">
+        <header><span>批量工具栏</span><small>完整图片组</small></header>
+        <div className="help-gallery-scope-thumbnails">{SCOPE_MEMBERS.map((member) => <span key={member.name}><HelpGalleryArtwork scene={member.scene}/><Icon name="check" size={11}/></span>)}</div>
+        <strong>已选 1 组 · 3 张</strong>
+        <div className="help-gallery-scope-actions"><span>收藏</span><span>加入收藏集</span><span>移入回收站</span></div>
+      </div>}
     </div>
-    <DemoStatus icon={actionScope === 'detail' ? 'image' : 'tags'}>{actionScope === 'detail' ? `重命名、复制和下载只作用于当前成员“${SCOPE_MEMBERS[member]}”。` : '收藏、加入收藏集或移入回收站会作用于当前显示的整个图片组（3 张）。'}</DemoStatus>
+    <DemoStatus icon={actionScope === 'detail' ? 'image' : 'tags'}>{actionScope === 'detail' ? `正在预览“${preview.name}”；详情操作仍只作用于单击后打开的“${detail.name}”。` : '收藏、加入收藏集或移入回收站会作用于当前显示的整个图片组（3 张）。'}</DemoStatus>
   </div>;
 }
 

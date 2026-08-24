@@ -34,6 +34,9 @@ describe('production-safe Lobe UI overrides', () => {
     expect(styles).toMatch(/\.help-gallery-teaching-layout \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(260px, 310px\);/);
     expect(styles).toMatch(/\.help-real-gallery-grid \{[^}]*grid-template-columns: repeat\(2, minmax\(72px, 1fr\)\);/);
     expect(styles).toMatch(/\.help-grouping-panel-embedded\.gallery-grouping-panel, \.help-filter-panel-embedded\.gallery-filter-panel \{[^}]*width: 100%;/);
+    expect(styles).toMatch(/\.help-gallery-scrub-card \{[^}]*cursor: ew-resize;/);
+    expect(styles).toMatch(/\.help-gallery-scope-panel \{[^}]*display: grid;/);
+    expect(styles).toMatch(/@keyframes help-gallery-preview-swap \{ from \{ opacity: \.65; transform: scale\(\.985\); \} to \{ opacity: 1; transform: scale\(1\); \} \}/);
     expect(styles).toMatch(/\.help-data-flow \{[^}]*display: flex;/);
     expect(styles).toMatch(/\.help-troubleshooting-demo dl > div \{[^}]*grid-template-columns: 88px minmax\(0, 1fr\);/);
     expect(styles).toMatch(/\.help-resolution-path \{[^}]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/);

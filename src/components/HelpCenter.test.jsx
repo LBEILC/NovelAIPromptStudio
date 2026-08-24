@@ -69,6 +69,8 @@ describe('HelpCenter', () => {
     expect(articleHtml['gallery-grouping']).toContain('gallery-card-stack');
     expect(articleHtml['gallery-find']).toContain('智能收藏集');
     expect(articleHtml['gallery-batch']).toContain('图片组操作范围演示');
+    expect(articleHtml['gallery-batch']).toContain('图片组卡片擦看演示');
+    expect(articleHtml['gallery-batch']).toContain('正在预览“夜景角色 01”');
     expect(articleHtml['gallery-trash']).toContain('迁移资源位置');
     expect(articleHtml.data).toContain('数据流演示操作');
     expect(articleHtml.troubleshooting).toContain('常见问题现象');

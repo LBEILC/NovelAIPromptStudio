@@ -211,7 +211,7 @@ export const HELP_GROUPS = [
         summary: '确认当前图片、图片组和选择范围',
         keywords: '图片组 组内 浏览 悬停 单击 双击 详情 多选 框选 ctrl command shift 批量 缩略图 缩放',
         content: <>
-          <p>切换当前成员，再比较详情侧栏和批量工具栏的操作范围。</p>
+          <p>在图片组卡片上左右移动指针预览不同成员，单击打开当前成员，再比较详情侧栏和批量工具栏的操作范围。</p>
           <GalleryScopeDemo/>
           <HelpSection title="调整图库密度">
             <p>工具栏滑块调整缩略图大小；也可以在图库上按住 Ctrl（Windows）或 Command（macOS）滚动。普通滚轮仍然滚动页面。固定头图只适用于完整 Prompt 且不跨 Vibe 的精确组。</p>
