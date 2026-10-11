@@ -114,8 +114,8 @@ function Weight() {
       step={0.05}
       precision={2}
       label="权重"
-      decreaseLabel="【文案待定：减少权重】"
-      increaseLabel="【文案待定：增加权重】"
+      decreaseLabel="减少权重"
+      increaseLabel="增加权重"
     />
   );
 }
@@ -194,7 +194,7 @@ function Showcase() {
           <Button>复制 Prompt</Button>
           <Button className="nps-demo-hover">悬停</Button>
           <Button className="nps-demo-focus">焦点</Button>
-          <Button disabled disabledReason="【文案待定：不可用原因】">
+          <Button disabled disabledReason="余额不足，暂时不能生成">
             不可用
           </Button>
         </Row>
@@ -245,7 +245,7 @@ function Showcase() {
             options={samplers}
             value={sampler}
             onChange={setSampler}
-            label="【文案待定：采样器】"
+            label="采样器"
             size="small"
           />
           <Weight />
@@ -255,7 +255,7 @@ function Showcase() {
         </Row>
         <Row label="页签">
           <Tabs
-            label="【文案待定：页签组】"
+            label="Prompt 的页签"
             items={['Prompt', '参数', '参考'].map((label) => ({
               value: label,
               label,
@@ -268,8 +268,8 @@ function Showcase() {
         <Row label="开关">
           <Switch label="自动翻译新出现的 Tag 和段落" checked={off} onChange={setOff} />
           <Switch label="无人值守连续生成" checked={on} onChange={setOn} />
-          <Checkbox label="【文案待定：复选框】" checked={checkOff} onChange={setCheckOff} />
-          <Checkbox label="【文案待定：复选框】" checked={checkOn} onChange={setCheckOn} />
+          <Checkbox label="记住这个选择" checked={checkOff} onChange={setCheckOff} />
+          <Checkbox label="记住这个选择" checked={checkOn} onChange={setCheckOn} />
         </Row>
         <Row label="滑块">
           <Slider
@@ -278,7 +278,7 @@ function Showcase() {
             min={0}
             max={1}
             step={0.01}
-            label="【文案待定：滑块】"
+            label="缩略图大小"
             format={(value) => value.toFixed(2)}
           />
         </Row>
@@ -458,13 +458,13 @@ function Showcase() {
         </Row>
         <Row>
           <span>正在生成第 2 张，共 4 张</span>
-          <Button variant="quiet" size="small">
+          <Button variant="quiet" size="small" className="nps-demo-end">
             取消剩下的
           </Button>
         </Row>
         <Progress value={38} label="正在生成第 2 张，共 4 张" />
       </Section>
-      <Section title="【文案待定：交互与补充状态】" wide>
+      <Section title="可以实际操作的示例" wide>
         <Row>
           <Menu items={menu} label="右键菜单" />
           <ContextMenu items={menu} label="右键菜单">
@@ -511,7 +511,7 @@ function Showcase() {
         </Row>
         <Row>
           <div className="nps-menu">
-            <div role="listbox" aria-label="【文案待定：采样器】">
+            <div role="listbox" aria-label="采样器">
               {samplers.map((item) => (
                 <div
                   key={item.value}
@@ -534,15 +534,10 @@ function Showcase() {
           <Input disabled aria-label="角色名称" value="黍" />
           <Switch label="动效" checked={false} onChange={() => {}} disabled />
           <Switch label="动效" checked onChange={() => {}} disabled />
-          <Checkbox label="【文案待定：复选框】" checked onChange={() => {}} disabled />
-          <Checkbox label="【文案待定：复选框】" checked={false} onChange={() => {}} disabled />
+          <Checkbox label="记住这个选择" checked onChange={() => {}} disabled />
+          <Checkbox label="记住这个选择" checked={false} onChange={() => {}} disabled />
           <Switch label="动效" checked onChange={() => {}} className="nps-demo-focus" />
-          <Checkbox
-            label="【文案待定：复选框】"
-            checked
-            onChange={() => {}}
-            className="nps-demo-focus"
-          />
+          <Checkbox label="记住这个选择" checked onChange={() => {}} className="nps-demo-focus" />
           <Shortcut keys={['Mod', 'V']} />
         </Row>
         <Banner tone="ok">已复制 52 个 Tag</Banner>
@@ -565,12 +560,12 @@ function Showcase() {
               悬停
             </Button>
             <Button variant={variant} className="nps-demo-active">
-              【文案待定：按下】
+              按下
             </Button>
             <Button variant={variant} className="nps-demo-focus">
               焦点
             </Button>
-            <Button variant={variant} disabled disabledReason="【文案待定：不可用原因】">
+            <Button variant={variant} disabled disabledReason="余额不足，暂时不能生成">
               不可用
             </Button>
             <Button variant={variant} loading>
@@ -600,7 +595,7 @@ function Showcase() {
           fine="打开图片不会修改原图，也不会自动存进图片库。"
         />
       </Section>
-      <Section title="【文案待定：可拖宽的面板】" wide>
+      <Section title="可拖宽的面板" wide>
         <ResizablePanel
           width={width}
           onWidthChange={setWidth}

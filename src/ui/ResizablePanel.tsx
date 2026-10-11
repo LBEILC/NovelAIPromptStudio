@@ -7,7 +7,7 @@ export function ResizablePanel({
   min,
   max,
   defaultWidth,
-  step = 10,
+  step,
   label,
   children,
   edge = 'right',
@@ -41,6 +41,7 @@ export function ResizablePanel({
           event.preventDefault();
           event.currentTarget.focus();
           drag.current = { x: event.clientX, width };
+          event.currentTarget.dataset.dragging = 'true';
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={(event) => {
@@ -51,26 +52,33 @@ export function ResizablePanel({
         }}
         onPointerUp={(event) => {
           drag.current = null;
+          delete event.currentTarget.dataset.dragging;
           if (event.currentTarget.hasPointerCapture(event.pointerId))
             event.currentTarget.releasePointerCapture(event.pointerId);
         }}
-        onPointerCancel={() => {
+        onPointerCancel={(event) => {
           drag.current = null;
+          delete event.currentTarget.dataset.dragging;
         }}
-        onLostPointerCapture={() => {
+        onLostPointerCapture={(event) => {
           drag.current = null;
+          delete event.currentTarget.dataset.dragging;
         }}
         onDoubleClick={() => onWidthChange(clamp(defaultWidth, min, max))}
         onKeyDown={(event) => {
+          const tokenStep = parseFloat(
+            getComputedStyle(event.currentTarget).getPropertyValue('--split-step'),
+          );
+          const delta = (step ?? tokenStep) * (event.shiftKey ? 4 : 1);
           const next =
             event.key === 'Home'
               ? min
               : event.key === 'End'
                 ? max
                 : event.key === 'ArrowRight'
-                  ? width + step * direction
+                  ? width + delta * direction
                   : event.key === 'ArrowLeft'
-                    ? width - step * direction
+                    ? width - delta * direction
                     : undefined;
           if (next !== undefined) {
             event.preventDefault();

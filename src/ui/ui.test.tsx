@@ -607,6 +607,8 @@ describe('Panel, placement and platform', () => {
     }
     render(<Fixture />);
     const separator = query('[role="separator"]');
+    // happy-dom does not load the imported CSS token sheet.
+    separator.style.setProperty('--split-step', '16px');
     key(separator, 'ArrowRight');
     key(separator, 'ArrowRight');
     expect(separator.getAttribute('aria-valuenow')).toBe('210');
@@ -614,6 +616,10 @@ describe('Panel, placement and platform', () => {
     expect(separator.getAttribute('aria-valuenow')).toBe('100');
     act(() => separator.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
     expect(separator.getAttribute('aria-valuenow')).toBe('150');
+    key(separator, 'ArrowLeft');
+    expect(separator.getAttribute('aria-valuenow')).toBe('134');
+    key(separator, 'ArrowRight', { shiftKey: true });
+    expect(separator.getAttribute('aria-valuenow')).toBe('198');
   });
   it('flips layers at right and bottom edges and clamps oversized geometry', () => {
     const layer = document.createElement('div');

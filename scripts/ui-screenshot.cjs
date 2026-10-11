@@ -3,6 +3,9 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const url = process.argv.find((value) => value.startsWith('--origin=')).slice('--origin='.length);
+const referenceOrigin = process.argv
+  .find((value) => value.startsWith('--reference-origin='))
+  .slice('--reference-origin='.length);
 const output = process.argv
   .find((value) => value.startsWith('--output='))
   .slice('--output='.length);
@@ -10,11 +13,11 @@ app.setPath('userData', path.join(output, 'profile'));
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('force-device-scale-factor', '1');
 
-async function settle(window, theme = 'light') {
+async function settle(window, theme = 'light', reference = false) {
   await window.webContents.executeJavaScript(`new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Showcase readiness timeout')), 5000);
     const check = () => {
-      if (document.querySelector('[data-showcase="004"]') && document.documentElement.dataset.theme === ${JSON.stringify(theme)}) {
+      if (document.querySelector(${JSON.stringify(reference ? '.sheet' : '[data-showcase="004"]')}) && document.documentElement.dataset.theme === ${JSON.stringify(theme)}) {
         clearTimeout(timer); resolve();
       } else requestAnimationFrame(check);
     };
@@ -37,9 +40,14 @@ async function paint(window) {
 async function run() {
   await app.whenReady();
   session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+    if (details.url.startsWith('https://fonts.googleapis.com/')) {
+      callback({ redirectURL: `${referenceOrigin}/offline-fonts.css` });
+      return;
+    }
     callback({
       cancel:
         !details.url.startsWith(url) &&
+        !details.url.startsWith(referenceOrigin) &&
         !details.url.startsWith('devtools:') &&
         !details.url.startsWith('data:'),
     });
@@ -47,7 +55,7 @@ async function run() {
   const errors = [];
   const createWindow = (height = 760) => {
     const window = new BrowserWindow({
-      width: 1240,
+      width: 1280,
       height,
       useContentSize: true,
       enableLargerThanScreen: true,
@@ -65,42 +73,96 @@ async function run() {
     return window;
   };
   app.on('window-all-closed', () => {});
-  for (const theme of ['light', 'dark']) {
-    const page = `${url}/ui-showcase.html?theme=${theme}&motion=off`;
-    const measureWindow = createWindow();
-    await measureWindow.loadURL(page);
-    await settle(measureWindow, theme);
-    const height = await measureWindow.webContents.executeJavaScript(
-      'Math.ceil(document.documentElement.scrollHeight)',
-    );
-    measureWindow.destroy();
-    const window = createWindow();
-    window.setContentSize(1240, height);
-    await window.loadURL(page);
-    await window.webContents.executeJavaScript(`new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Viewport resize timeout: ' + innerWidth + 'x' + innerHeight)), 5000);
+  const comparison = [];
+  const captureWindow = createWindow();
+  const resize = async (height) => {
+    captureWindow.setContentSize(1280, height);
+    await captureWindow.webContents.executeJavaScript(`new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Viewport resize timeout')), 5000);
       const check = () => {
-        if (innerWidth === 1240 && innerHeight === ${height}) {
-          clearTimeout(timer); window.removeEventListener('resize', check); resolve();
-        }
-      };
-      window.addEventListener('resize', check); check();
+        if (innerWidth === 1280 && innerHeight === ${height}) { clearTimeout(timer); resolve(); }
+        else requestAnimationFrame(check);
+      }; check();
     })`);
-    await settle(window, theme);
-    // The offscreen paint event already carries the complete native bitmap.
-    // Reading that frame avoids capturePage's intermittent UnknownVizError
-    // when a hidden Chromium surface has just changed size on Windows.
-    await paint(window);
-    // Drain any first frame queued before React's theme effect committed.
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    const image = await paint(window);
-    if (image.getSize().width !== 1240 || image.getSize().height !== height) {
-      throw new Error(`Unexpected offscreen frame size: ${JSON.stringify(image.getSize())}`);
+  };
+  for (const theme of ['light', 'dark']) {
+    for (const reference of [true, false]) {
+      captureWindow.setContentSize(1280, 760);
+      const page = reference
+        ? `${referenceOrigin}/design/preview.html?page=comps&theme=${theme}`
+        : `${url}/ui-showcase.html?theme=${theme}&motion=off`;
+      await captureWindow.loadURL(page);
+      await resize(760);
+      await settle(captureWindow, theme, reference);
+      if (reference) await captureWindow.webContents.insertCSS('.spin { animation: none; }');
+      const height = await captureWindow.webContents.executeJavaScript(
+        'Math.ceil(document.documentElement.scrollHeight)',
+      );
+      await resize(height);
+      await settle(captureWindow, theme, reference);
+      const bounds = await captureWindow.webContents.executeJavaScript(`(() => {
+        const sheet = document.querySelector(${JSON.stringify(reference ? '.sheet' : '.nps-demo-sheet')});
+        const rect = sheet.getBoundingClientRect();
+        const sections = Array.from(sheet.children).slice(0, 9);
+        const bottom = ${reference} ? rect.bottom : Math.max(...sections.map(section => section.getBoundingClientRect().bottom)) + parseFloat(getComputedStyle(sheet).paddingBottom);
+        return { x: Math.floor(rect.x), y: Math.floor(rect.y), width: Math.ceil(rect.width), height: Math.ceil(bottom - rect.y) };
+      })()`);
+      await paint(captureWindow);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const image = await paint(captureWindow);
+      if (image.getSize().width !== 1280 || image.getSize().height !== height)
+        throw new Error(`Unexpected offscreen frame size: ${JSON.stringify(image.getSize())}`);
+      const name = reference ? 'reference' : 'showcase';
+      await fs.writeFile(path.join(output, `${name}-${theme}.png`), image.crop(bounds).toPNG());
+      if (!reference) await fs.writeFile(path.join(output, `${theme}.png`), image.toPNG());
+      comparison.push({ theme, source: name, page, bounds, windowId: captureWindow.id });
+      if (!reference) {
+        const metrics = await captureWindow.webContents.executeJavaScript(`(() => {
+          const slider = document.querySelector('input[type="range"]');
+          const spinner = getComputedStyle(document.querySelector('.nps-loader'));
+          const dot = getComputedStyle(document.querySelector('.nps-dot'));
+          const token = name => getComputedStyle(slider).getPropertyValue(name).trim();
+          return {
+            slider: { type: slider.type, name: slider.getAttribute('aria-label'), min: slider.min, max: slider.max,
+              step: slider.step, value: slider.value, valueText: slider.getAttribute('aria-valuetext'),
+              appearance: getComputedStyle(slider).appearance, width: getComputedStyle(slider).width,
+              expectedWidth: token('--slider-w') },
+            spinner: { width: spinner.width, expectedWidth: token('--spin'), animation: spinner.animationName },
+            tagDot: { width: dot.width, height: dot.height, expectedSize: token('--cat-dot') },
+            stepper: { value: document.querySelector('[role="spinbutton"]').value },
+          };
+        })()`);
+        if (
+          metrics.slider.type !== 'range' ||
+          metrics.slider.appearance !== 'none' ||
+          metrics.slider.width !== metrics.slider.expectedWidth ||
+          metrics.spinner.width !== metrics.spinner.expectedWidth ||
+          metrics.tagDot.width !== metrics.tagDot.expectedSize ||
+          metrics.tagDot.height !== metrics.tagDot.expectedSize ||
+          metrics.spinner.animation !== 'none'
+        )
+          throw new Error('Rendered control metrics failed: ' + JSON.stringify(metrics));
+        await fs.writeFile(
+          path.join(output, `controls-${theme}.json`),
+          JSON.stringify(metrics, null, 2),
+        );
+      }
+      console.log(`${name}-${theme}.png: ${bounds.width} x ${bounds.height}`);
     }
-    await fs.writeFile(path.join(output, `${theme}.png`), image.toPNG());
-    console.log(`${theme}.png: ${image.getSize().width} × ${image.getSize().height}`);
-    window.destroy();
   }
+  await fs.writeFile(
+    path.join(output, 'comparison.json'),
+    JSON.stringify(
+      {
+        fontPolicy:
+          'Offline: declared system fallbacks on both pages; Google Fonts stylesheet redirected to empty local CSS. No design source modified.',
+        captures: comparison,
+      },
+      null,
+      2,
+    ),
+  );
+  captureWindow.destroy();
   // Native browser semantics cannot be established by a DOM shim. This fixture is
   // opened by React on mount; no simulated mouse or keyboard input is sent.
   const window = createWindow();

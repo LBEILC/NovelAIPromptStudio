@@ -40,10 +40,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ui-004-${{ matrix.os }}-node${{ matrix.node }}
+          name: ui-004a-${{ matrix.os }}-node${{ matrix.node }}
           path: |
-            .codex-runs/004/*.png
-            .codex-runs/004/*.json
+            .codex-runs/004a/*.png
+            .codex-runs/004a/*.json
+            .codex-runs/004/production-files.json
           if-no-files-found: ignore
       - name: Probe SQLite in Electron main process
         run: node scripts/probe-data-layer-electron.mjs --dev-only

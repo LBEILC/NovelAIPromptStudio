@@ -7,7 +7,7 @@ import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
 } from 'react';
-import { Check, Minus, Plus, LoaderCircle, ChevronDown } from 'lucide-react';
+import { Check, Minus, Plus, ChevronDown } from 'lucide-react';
 import { cx, composing, quantize } from './internal';
 import { Layer, Tooltip } from './overlays';
 
@@ -49,8 +49,8 @@ export function Button({
         } else onClick?.(event);
       }}
     >
-      <span className={cx('nps-button-label', loading && 'nps-loading-label')}>{children}</span>
-      {loading && <LoaderCircle {...iconProps} className="nps-loader" />}
+      {loading && <span aria-hidden="true" className="nps-loader" />}
+      <span className="nps-button-label">{children}</span>
     </button>
   );
   return disabled && disabledReason ? <Tooltip text={disabledReason}>{button}</Tooltip> : button;
@@ -455,6 +455,9 @@ export function Slider({
     <label className="nps-slider">
       <input
         type="range"
+        style={{
+          backgroundImage: `linear-gradient(to right, var(--text) ${max > min ? Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100)) : 0}%, var(--border) 0%)`,
+        }}
         aria-label={label}
         aria-valuetext={format(value)}
         min={min}

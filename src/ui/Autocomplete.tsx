@@ -2,6 +2,7 @@ import { useId, useRef, useState } from 'react';
 import { Input } from './controls';
 import { Layer } from './overlays';
 import { cx } from './internal';
+import { Shortcut } from './ThemeProvider';
 
 export interface Suggestion {
   id: string;
@@ -25,7 +26,7 @@ export function SuggestionList({
   directAdd?: { label: string; onSelect: () => void };
 }) {
   return (
-    <div role="listbox" id={id}>
+    <div role="listbox" id={id} className="nps-suggestions">
       {items.map((item, index) => (
         <div
           role="option"
@@ -54,7 +55,10 @@ export function SuggestionList({
             onPointerMove={() => onActiveChange?.(items.length)}
             onClick={directAdd.onSelect}
           >
-            {directAdd.label}
+            <span className="nps-help">{directAdd.label}</span>
+            <span className="nps-menu-trailing">
+              <Shortcut keys={['Enter']} />
+            </span>
           </div>
         </>
       )}
