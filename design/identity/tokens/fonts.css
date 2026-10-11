@@ -1,0 +1,12 @@
+:root {
+  --font-display: "Newsreader", Georgia, "Songti SC", serif;
+  --font-display-weight: 500;
+  --font-display-tracking: -0.010em;
+  --font-display-variation: "opsz" 72;
+  --font-text: "MiSans VF", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  --font-text-weight: 400;
+  --font-text-tracking: 0.000em;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --font-mono-weight: 400;
+  --font-mono-tracking: 0.000em;
+}

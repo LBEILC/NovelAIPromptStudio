@@ -4,3 +4,4 @@ dist/
 *.log
 release/
 .codex-runs/
+design/brand/

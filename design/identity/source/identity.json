@@ -1,0 +1,510 @@
+{
+  "schema": "brand-identity/identity@1",
+  "brand": {
+    "name": "NovelAI Prompt Studio",
+    "tagline": "从一张图，到下一张图",
+    "languages": [
+      "en"
+    ],
+    "doc_lang": "zh",
+    "sector": "面向 NovelAI 创作者的桌面创作工具",
+    "numbers": true,
+    "copy": {
+      "sentence": {
+        "en": "Read a picture back into its prompt, change one thing, make the next."
+      },
+      "nav": [
+        "工作台",
+        "图片库",
+        "素材"
+      ],
+      "cta": "生成"
+    }
+  },
+  "set": {
+    "id": "B",
+    "name": "括号里的图",
+    "recommended": true,
+    "mechanism": "Prompt 的花括号里放着一张图：衬线体的括号是文字，朱红的方块是图，也是盖在纸上的一方印。",
+    "expression_move": "那一块朱红的方形，标志里的图，界面里只用于“这一张”。",
+    "differs_by": "同类产品几乎都以深色界面为主；这一套以白纸黑字为主，用衬线体和一方朱印，像画室而不像控制台。"
+  },
+  "axes": {
+    "quiet_loud": 0,
+    "warm_cool": -2,
+    "playful_serious": 1,
+    "classic_contemporary": -1
+  },
+  "components": {
+    "logo": {
+      "mode": "new",
+      "status": "proposed",
+      "source": null,
+      "sha256": null
+    },
+    "type": {
+      "mode": "new",
+      "status": "proposed",
+      "source": null,
+      "sha256": null
+    },
+    "palette": {
+      "mode": "new",
+      "status": "proposed",
+      "source": null,
+      "sha256": null
+    }
+  },
+  "type": {
+    "pairing_mode": "contrast",
+    "display": {
+      "family": "Newsreader",
+      "source": "google",
+      "license": "OFL-1.1",
+      "weights": [
+        500
+      ],
+      "location": {
+        "wght": 500,
+        "opsz": 72
+      },
+      "features": [],
+      "case": "as-is",
+      "tracking": -10,
+      "fallback": "Georgia, \"Songti SC\", serif",
+      "file": null
+    },
+    "text": {
+      "family": "MiSans VF",
+      "source": "user",
+      "license": "commercial",
+      "weights": [
+        400,
+        500
+      ],
+      "location": {
+        "wght": 400
+      },
+      "features": [
+        "tnum"
+      ],
+      "case": "as-is",
+      "tracking": 0,
+      "fallback": "\"Segoe UI\", \"Microsoft YaHei UI\", sans-serif",
+      "file": "design/brand/local-fonts/MiSansVF.ttf"
+    },
+    "mono": {
+      "family": "IBM Plex Mono",
+      "source": "google",
+      "license": "OFL-1.1",
+      "weights": [
+        400
+      ],
+      "location": {
+        "wght": 400
+      },
+      "features": [
+        "tnum"
+      ],
+      "case": "as-is",
+      "tracking": 0,
+      "fallback": "ui-monospace, Consolas, monospace",
+      "file": null
+    }
+  },
+  "logo": {
+    "type": "symbol+wordmark",
+    "concept": "现有的 {N} 标志去掉 N，换成一个实心方块：括号是 Prompt，方块是图。",
+    "symbol": "logo/symbol.svg",
+    "wordmark": {
+      "text": "NovelAI Prompt Studio",
+      "role": "display",
+      "location": null,
+      "tracking": -10,
+      "case": "as-is"
+    },
+    "monogram": null,
+    "lockups": [
+      "horizontal",
+      "stacked"
+    ],
+    "colors": {
+      "brace-open": "text",
+      "brace-close": "text",
+      "picture": "primary",
+      "wordmark": "text"
+    },
+    "tags": [
+      "letterform"
+    ],
+    "clear_space": {
+      "unit": "cap-height",
+      "multiple": 1,
+      "inferred": true
+    },
+    "min_size": {
+      "px": 20,
+      "mm": 6
+    },
+    "misuse": [
+      {
+        "do": "stretch"
+      },
+      {
+        "do": "recolour"
+      },
+      {
+        "do": "crowd"
+      },
+      {
+        "do": "rearrange"
+      },
+      {
+        "svg": "logo/misuse-1.svg",
+        "label": "不要把方块画成空心"
+      },
+      {
+        "svg": "logo/misuse-2.svg",
+        "label": "不要把方块换成别的形状"
+      }
+    ]
+  },
+  "palette": "palette.json",
+  "defaults_used": [],
+  "rationale": [
+    {
+      "claim": "保留现有标志的花括号，延续已有的辨识度；去掉字母 N，标志不再以 NovelAI 的首字母为主体。",
+      "evidence": "judgement",
+      "source": "设计负责人"
+    },
+    {
+      "claim": "已测量的三个同类产品网站，主色分别是深海军蓝、荧光黄和亮蓝，没有红橙色系。",
+      "evidence": "measured",
+      "source": "brand.py site competitors"
+    },
+    {
+      "claim": "正文用 MiSans VF：技能自带的字库里没有覆盖中文的字体；MiSans 的中英文字符和等宽数字检查通过。它有自己的授权条款（可免费商用、可随软件分发、不得修改、不得单独分发字体文件），这里按商业字体登记。",
+      "evidence": "measured",
+      "source": "brand.py fonts audit"
+    }
+  ],
+  "derived": [
+    {
+      "file": "card.png",
+      "requires": [
+        "logo",
+        "type",
+        "palette"
+      ],
+      "inputs_sha256": "862e7b1702dc8e9e70c9c33f7b9abdaca6c86bbd93ddfbc3ff9563d096616b76"
+    }
+  ],
+  "audit": {
+    "schema": "brand-identity/audit@1",
+    "passed": true,
+    "counts": {
+      "gate": 0,
+      "warn": 9,
+      "info": 11
+    },
+    "findings": [
+      {
+        "id": "palette.contrast.light.accent-on-background",
+        "component": "palette",
+        "severity": "warn",
+        "measured": 2.57,
+        "threshold": 3.0,
+        "message": "light: accent #fb775f on background #fbfbfa is 2.57:1, below 3.0:1 (accent fill against the page (needs a label or border if lower); WCAG 2, no rounding)",
+        "suggested_fix": {
+          "change": "modes.light.accent",
+          "from": "#fb775f",
+          "to": "#f15940",
+          "how": "use accent-500 (same scale)",
+          "ratio_after": 3.25
+        },
+        "roles": [
+          "light.accent",
+          "light.background"
+        ]
+      },
+      {
+        "id": "palette.distinct.dark.primary-accent",
+        "component": "palette",
+        "severity": "warn",
+        "measured": 2.33,
+        "threshold": 10.0,
+        "message": "dark: primary #fa816b and accent #fb775f are only CIEDE2000 2.3 apart; users may read one as the other",
+        "suggested_fix": {
+          "change": "modes.dark.primary",
+          "from": "#fa816b",
+          "to": "#ffa591",
+          "how": "lighten by OKLCH L +0.08, same hue"
+        },
+        "roles": [
+          "dark.primary",
+          "dark.accent"
+        ]
+      },
+      {
+        "id": "palette.cvd.dark.protan.primary-accent",
+        "component": "palette",
+        "severity": "warn",
+        "measured": 2.87,
+        "threshold": 10.0,
+        "message": "dark: primary and accent collapse to CIEDE2000 2.9 for protanopia (#9f9469 vs #998d5c)",
+        "suggested_fix": {
+          "change": "modes.dark.accent",
+          "from": "#fb775f",
+          "to": "#e4624b",
+          "how": "never carry meaning by colour alone (icon/label); or darken by OKLCH L -0.06, same hue"
+        },
+        "roles": [
+          "dark.primary",
+          "dark.accent"
+        ]
+      },
+      {
+        "id": "palette.cvd.dark.deutan.primary-accent",
+        "component": "palette",
+        "severity": "warn",
+        "measured": 2.08,
+        "threshold": 10.0,
+        "message": "dark: primary and accent collapse to CIEDE2000 2.1 for deutanopia (#bdae69 vs #b9aa5c)",
+        "suggested_fix": {
+          "change": "modes.dark.accent",
+          "from": "#fb775f",
+          "to": "#db5a44",
+          "how": "never carry meaning by colour alone (icon/label); or darken by OKLCH L -0.09, same hue"
+        },
+        "roles": [
+          "dark.primary",
+          "dark.accent"
+        ]
+      },
+      {
+        "id": "palette.cvd.dark.tritan.primary-accent",
+        "component": "palette",
+        "severity": "warn",
+        "measured": 2.21,
+        "threshold": 10.0,
+        "message": "dark: primary and accent collapse to CIEDE2000 2.2 for tritanopia (#fc7c8d vs #fd7185)",
+        "suggested_fix": {
+          "change": "modes.dark.accent",
+          "from": "#fb775f",
+          "to": "#dd5c45",
+          "how": "never carry meaning by colour alone (icon/label); or darken by OKLCH L -0.08, same hue"
+        },
+        "roles": [
+          "dark.primary",
+          "dark.accent"
+        ]
+      },
+      {
+        "id": "palette.structure.lightness-range",
+        "component": "palette",
+        "severity": "warn",
+        "measured": 17.6,
+        "threshold": 25,
+        "message": "brand and action colours span only Delta L* 17.6; without a clear light/dark step between them the palette reads flat (lightness contrast is the strongest harmony predictor, O'Donovan 2011)",
+        "suggested_fix": {
+          "change": "brand/accent",
+          "how": "move the accent (not a locked brand colour) at least 25 L* away from the primary"
+        },
+        "roles": [
+          "brand",
+          "light.primary",
+          "light.accent"
+        ]
+      },
+      {
+        "id": "palette.structure.mid-lightness.brand-1",
+        "component": "palette",
+        "severity": "warn",
+        "measured": [
+          4.86,
+          4.33
+        ],
+        "threshold": 5.0,
+        "message": "#d4351c is a mid-lightness trap: white 4.86:1, black 4.33:1; body text on it needs a darker or lighter derivative",
+        "suggested_fix": {
+          "change": "brand-1",
+          "how": "keep the brand colour for large areas/logo; put text on a derivative step of its scale"
+        },
+        "roles": [
+          "brand-1"
+        ]
+      },
+      {
+        "id": "palette.contrast.light.border-on-background",
+        "component": "palette",
+        "severity": "info",
+        "measured": 1.35,
+        "threshold": 3.0,
+        "message": "light: border #dadad6 on background #fbfbfa is 1.35:1, below 3.0:1 (borders: dividers are exempt, input outlines need 3:1; WCAG 2, no rounding)",
+        "suggested_fix": {
+          "change": "modes.light.border",
+          "from": "#dadad6",
+          "to": "#92928e",
+          "how": "darken by OKLCH L -0.23, same hue",
+          "ratio_after": 3.02
+        },
+        "roles": [
+          "light.border",
+          "light.background"
+        ]
+      },
+      {
+        "id": "palette.contrast.dark.link-on-text",
+        "component": "palette",
+        "severity": "info",
+        "measured": 2.25,
+        "threshold": 3.0,
+        "message": "dark: link #fa816b on text #f3f3f3 is 2.25:1, below 3.0:1 (underline links in dark mode (WCAG G183: without underline a link needs 3:1 against body text); WCAG 2, no rounding)",
+        "suggested_fix": {
+          "change": "modes.dark.link",
+          "from": "#fa816b",
+          "to": "#d4351c",
+          "how": "use primary-600 (same scale)",
+          "ratio_after": 4.38
+        },
+        "roles": [
+          "dark.link",
+          "dark.text"
+        ]
+      },
+      {
+        "id": "palette.contrast.dark.border-on-background",
+        "component": "palette",
+        "severity": "info",
+        "measured": 2.45,
+        "threshold": 3.0,
+        "message": "dark: border #555555 on background #161514 is 2.45:1, below 3.0:1 (borders: dividers are exempt, input outlines need 3:1; WCAG 2, no rounding)",
+        "suggested_fix": {
+          "change": "modes.dark.border",
+          "from": "#555555",
+          "to": "#737373",
+          "how": "use neutral-500 (same scale)",
+          "ratio_after": 3.85
+        },
+        "roles": [
+          "dark.border",
+          "dark.background"
+        ]
+      },
+      {
+        "id": "palette.gamut.brand-1",
+        "component": "palette",
+        "severity": "info",
+        "measured": 0.91,
+        "threshold": 0.9,
+        "message": "#d4351c sits at the sRGB gamut edge (91% of max chroma); vivid colours like this often fall outside CMYK process gamut: specify Lab D50 + tolerance, check with the printer, consider a spot colour",
+        "suggested_fix": null,
+        "roles": [
+          "brand-1"
+        ]
+      },
+      {
+        "id": "palette.gamut.brand-2",
+        "component": "palette",
+        "severity": "info",
+        "measured": 0.95,
+        "threshold": 0.9,
+        "message": "#fb775f sits at the sRGB gamut edge (95% of max chroma); vivid colours like this often fall outside CMYK process gamut: specify Lab D50 + tolerance, check with the printer, consider a spot colour",
+        "suggested_fix": null,
+        "roles": [
+          "brand-2"
+        ]
+      },
+      {
+        "id": "type.display.coverage.en_Latn.extended",
+        "component": "type",
+        "severity": "info",
+        "measured": "101/102",
+        "threshold": "100% auxiliary + punctuation",
+        "message": "Newsreader lacks English auxiliary/punctuation characters: ʻ",
+        "suggested_fix": "fine if the brand never writes them (loanwords, names); else another family"
+      },
+      {
+        "id": "type.display.web-weight",
+        "component": "type",
+        "severity": "info",
+        "measured": 105,
+        "threshold": null,
+        "message": "Newsreader: ~105 KB WOFF2 for the brief's characters (one variable file, all weights; estimate)",
+        "suggested_fix": null
+      },
+      {
+        "id": "type.text.license",
+        "component": "type",
+        "severity": "info",
+        "measured": "commercial",
+        "threshold": null,
+        "message": "MiSans VF: Commercial · licences per weight: desktop / web (pageviews) / app · trial OK for this preview only · the client buys the licence",
+        "suggested_fix": "show this note on the card; offer a rendered Google Fonts alternative"
+      },
+      {
+        "id": "type.text.weights",
+        "component": "type",
+        "severity": "warn",
+        "measured": 1,
+        "threshold": "regular (300-500) + bold (>= 600), or wght 400-700",
+        "message": "MiSans VF has < 2 usable weights (400, 500); hierarchy will need faux bold",
+        "suggested_fix": "use it for display only, or pick a family with 400 and 600/700"
+      },
+      {
+        "id": "type.text.web-weight",
+        "component": "type",
+        "severity": "info",
+        "measured": 19,
+        "threshold": null,
+        "message": "MiSans VF: ~19 KB WOFF2 for the brief's characters (per weight file; estimate)",
+        "suggested_fix": null
+      },
+      {
+        "id": "type.mono.web-weight",
+        "component": "type",
+        "severity": "info",
+        "measured": 12,
+        "threshold": null,
+        "message": "IBM Plex Mono: ~12 KB WOFF2 for the brief's characters (per weight file; estimate)",
+        "suggested_fix": null
+      },
+      {
+        "id": "logo.thin-feature",
+        "component": "logo",
+        "severity": "info",
+        "measured": {
+          "stroke_px2": 1.43,
+          "gap_px2": 0.2
+        },
+        "threshold": ">= 1 px = 5.0 units (heuristic, uncalibrated)",
+        "message": "symbol at 20 px (min size): strokes/gaps thinner than 1 px (lost 1.43 px², clogged 0.2 px²); symbol-small.svg covers small sizes",
+        "suggested_fix": "add symbol_small_svg for small sizes, or raise logo.min_size.px (or thicken the thin part / widen the gap)"
+      },
+      {
+        "id": "logo.small-size",
+        "component": "logo",
+        "severity": "warn",
+        "measured": {
+          "stroke_px2": 1.04,
+          "gap_px2": 0.2
+        },
+        "threshold": "1 px (raster erosion test, heuristic, uncalibrated)",
+        "message": "symbol-small at 16 px: features narrower than 1 px (lost 1.04 px², clogged 0.2 px²)",
+        "suggested_fix": "add or simplify symbol-small.svg: fewer, bolder parts"
+      }
+    ],
+    "defaults": {
+      "matched": []
+    }
+  },
+  "palette_build": {
+    "strategy": "mono",
+    "accent": null,
+    "light_bg": "#fbfbfa",
+    "dark_bg": "#161514",
+    "neutral_tint": null,
+    "neutral_chroma": 0.006,
+    "extra": []
+  }
+}
