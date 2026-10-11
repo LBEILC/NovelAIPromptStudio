@@ -1,4 +1,51 @@
-# Codex project instructions
+# NovelAI Prompt Studio
+
+本地优先的 NovelAI 图片与 Prompt 管理桌面应用：把生成的图片拖进工作台，恢复、整理、翻译、分类并复制 Prompt Tag，也可以存进本地图片库。产品边界见 `doc/product-boundary.md`。
+
+技术栈：Electron + React + Vite，测试用 vitest。Windows 和 macOS 都是一等平台。
+
+项目正在做一次整体重构（类型检查、数据层、界面全部重新设计），阶段和进度见 `doc/rebuild-plan.md`。
+
+## 角色
+
+| 角色 | 负责什么 | 角色文档 |
+|---|---|---|
+| 设计负责人 | 方向与范围、产品结构与流程（UX）、视觉识别（VI）、界面与交互设计、设计令牌、界面文案、任务说明、验收 | `doc/roles/design.md` |
+| 工程负责人 | 主进程、数据层、IPC、类型、构建与打包、按定稿实现界面与组件、测试、验收工具、修 bug | `doc/roles/engineering.md` |
+
+开工前你会被告知自己的角色，然后去读对应的角色文档。不要因为自己是哪个模型就推断角色；没被告知时先问用户。
+
+## 共同规则
+
+- 和用户交流用中文。代码注释的语言跟随所在文件已有的风格。
+- 只 `git add` 具体文件，不用 `git add -A` / `git add .`。提交时在命令末尾列出路径：`git commit -m "…" -- <文件1> <文件2>`；新文件先 `git add` 再这样提交。
+- 提交信息用中文写一句话：工程提交加 `[工程]` 前缀，设计提交加 `[设计]` 前缀。
+- 只做任务说明范围内的事，不做无关改动。新增依赖要在汇报里说明理由，并优先选发布超过 7 天的版本。
+- **重构期间的界面约定**：新写或迁移后的界面不再使用 `@lobehub/ui`，颜色、字号、间距、圆角、动效只从 `design/tokens.css` 取。`.agents/skills/lobe-ui-frontend/` 和 `doc/lobe-visual-language.md` 只适用于还没迁移的旧界面；它们与 `doc/design.md`、`design/` 冲突时，以后者为准。
+- 开发和测试不碰用户日常使用的图库数据。需要真实数据时用独立的演示环境（`--profile=demo`，见 `doc/demo-profile.md`）或临时目录。
+- 调用外部程序时，参数用数组传，不拼 shell 命令字符串。
+- `node_modules/`、构建产物、`.codex-runs/`、日志都不进 git。
+
+## 文件归属
+
+| 文件 | 归属 |
+|---|---|
+| `doc/design.md`、`doc/rebuild-plan.md`、`doc/product-boundary.md`、`doc/roles/`、`doc/specs/` | 设计 |
+| `design/`（设计令牌、界面稿、图标源文件） | 设计 |
+| 界面文案、应用图标与品牌素材、README 的产品介绍与截图取向 | 设计 |
+| `src/`、`electron/`、`scripts/`、测试、`package.json`、构建与打包配置 | 工程 |
+| `coordination/`、`doc/manual-verification-*.md`、`doc/release-guide.md` | 谁做的改动谁写 |
+
+`design/tokens.css` 是设计令牌的唯一来源，产品代码直接引用它，不复制、不另起一套变量。
+
+## 文档地图
+
+- 重构计划：`doc/rebuild-plan.md`
+- 产品边界：`doc/product-boundary.md`
+- 设计文档：`doc/design.md`，设计令牌与界面稿在 `design/`（重构阶段 2 建立）
+- 任务说明：`doc/specs/NNN-简述.md`，索引在 `doc/specs/README.md`
+- 角色：`doc/roles/`
+- 文档总索引：`doc/README.md`
 
 ## Platform support
 
@@ -37,7 +84,7 @@ Keep `coordination/MACOS.md` and `coordination/WINDOWS.md` focused on current ac
 After completing a code change:
 
 1. Run the relevant tests and production build.
-2. Commit the completed change with a focused message.
-3. Push the current branch to its configured remote.
+2. Commit the completed change with a focused message, following the commit rules in 共同规则 above.
+3. Push the current branch to its configured remote. Exception: when working as 工程负责人 on a dispatched task, commit but do not push; 设计负责人 pushes after acceptance.
 
 Never force-push. If the push is rejected or requires work from the other operating system, record an actionable handoff in `coordination/` and report the blocker.
