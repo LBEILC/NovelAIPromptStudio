@@ -1,3 +1,4 @@
+import { dimensions, generationParameters, modelDisplayName } from './presentation';
 import { useState } from 'react';
 import { Button, Dialog, Input } from '../ui';
 import { mediaUrl } from '../lib/imageStage.js';
@@ -39,6 +40,7 @@ export function LibraryDetail({
   if (!detail) return <aside className="library-detail" />;
   const group = p.previewGroup;
   const pending = p.preview?.id !== detail.id;
+  const parameters = generationParameters(detail.metadata);
   return (
     <aside className="library-detail" data-detail-id={detail.id} aria-busy={pending}>
       <div className="library-detail-scroll">
@@ -66,12 +68,20 @@ export function LibraryDetail({
         <div className="library-caption">
           <b>{detail.name}</b>
           <span className="library-mono">
-            {detail.metadata.width} × {detail.metadata.height} · {detail.metadata.model}
+            {dimensions(detail.metadata)}
+            {detail.metadata.model && (
+              <>
+                {' '}
+                ·{' '}
+                <span title={detail.metadata.model}>{modelDisplayName(detail.metadata.model)}</span>
+              </>
+            )}
           </span>
-          <span className="library-mono">
-            {detail.metadata.steps} 步 · 引导 {detail.metadata.guidance} · Seed{' '}
-            {detail.metadata.seed}
-          </span>
+          {parameters && (
+            <span className="library-mono" data-generation-parameters>
+              {parameters}
+            </span>
+          )}
           <span>
             {(p.view === 'trash' ? detail.deleted_at : detail.created_at).slice(0, 10)}{' '}
             {p.view === 'trash' ? '移入回收站' : '导入'}
@@ -85,6 +95,7 @@ export function LibraryDetail({
                 size="small"
                 onClick={() => p.onRestore([detail.id], 'detail')}
               >
+                <i className="ri-arrow-go-back-line" />
                 恢复
               </Button>
               <Button

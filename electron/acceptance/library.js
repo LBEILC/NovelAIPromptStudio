@@ -1,3 +1,8 @@
+import {
+  checkLibraryButtonGaps,
+  checkCollectionContext,
+  libraryFinishChecks,
+} from './libraryFinish.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -111,6 +116,7 @@ export async function libraryChecks(env) {
       '横竖方图每行等高、非末行铺满、比例准确',
       `(()=>{const rows=[...document.querySelectorAll('.library-row')];const cards=rows.flatMap(row=>[...row.querySelectorAll('.library-card')]);return rows.length>1 && rows.every((row,i)=>{const rect=row.getBoundingClientRect();const items=[...row.children];return items.every(c=>Math.abs(c.getBoundingClientRect().height-rect.height)<=1) && (i===rows.length-1 || Math.abs(items.at(-1).getBoundingClientRect().right-rect.right)<=1)}) && cards.every(c=>{const image=c.querySelector('img');const rect=c.getBoundingClientRect();return !image.complete||!image.naturalWidth||Math.abs(rect.width/rect.height-Math.min(2.5,Math.max(.5,image.naturalWidth/image.naturalHeight)))<.02})})()`,
     );
+    await checkLibraryButtonGaps(h, '默认');
     if (!reduced) await screen('mixed');
     await selectCard(1);
     await waitDetail();
@@ -146,6 +152,7 @@ export async function libraryChecks(env) {
       'Shift 单击连续选中三张',
       'document.querySelectorAll(".library-card.picked").length===3',
     );
+    await checkLibraryButtonGaps(h, '多选');
     if (!reduced) await screen('select');
     await click('取消', 'document.querySelector(".library-selection-bar")');
     await check('多选取消退出操作条', '!document.querySelector(".library-selection-bar")');
@@ -239,6 +246,7 @@ export async function libraryChecks(env) {
     await click('筛选', scope);
     await input('input[aria-label="包含 Tag"]', '1girl');
     await key('Enter');
+    await checkLibraryButtonGaps(h, '筛选');
     if (!reduced) await screen('filter');
     await click('存为智能收藏集');
     await input('input[aria-label="智能收藏集名称"]', `012智能${reduced}`);
@@ -249,11 +257,16 @@ export async function libraryChecks(env) {
       '将当前条件存为智能收藏集',
       () => !!smart && smart.filters.includeTags.includes('1girl'),
     );
+    await check(
+      '智能收藏集显示规则和全部管理入口',
+      'document.querySelector(".library-collection-row").textContent.includes("包含 1girl") && document.querySelectorAll(".library-collection-row button").length===3',
+    );
+    await checkCollectionContext(h, smart.id);
     if (!reduced) await screen('smart');
     await click('编辑规则', scope);
     await input('input[aria-label="排除 Tag"]', '1boy');
     await key('Enter');
-    await click('【文案待定：保存规则】');
+    await click('保存规则');
     await wait('!document.querySelector(".nps-popover:popover-open")');
     await check('智能收藏集规则使用同一筛选浮层更新', () =>
       database
@@ -261,14 +274,14 @@ export async function libraryChecks(env) {
         .find((c) => c.id === smart.id)
         .filters.excludeTags.includes('1boy'),
     );
-    await click('重命名', 'document.querySelector(".library-side")');
+    await click('重命名', 'document.querySelector(".library-collection-row")');
     await input('input[aria-label="收藏集名称"]', `012改名${reduced}`);
     await click('重命名', dialog);
     await wait(`!!document.querySelector('.library-side [aria-label="012改名${reduced}"]')`);
     await check('智能收藏集重命名持久化', () =>
       database.listCollections().some((c) => c.name === `012改名${reduced}`),
     );
-    await click('删除收藏集', 'document.querySelector(".library-side")');
+    await click('删除收藏集', 'document.querySelector(".library-collection-row")');
     await check('删除收藏集先确认且聚焦取消', 'document.activeElement.textContent.trim()==="取消"');
     await click('删除收藏集', dialog);
     await wait('!document.querySelector("dialog[open]")');
@@ -353,6 +366,16 @@ export async function libraryChecks(env) {
       '一摞图片逐张切换并设为封面',
       () => database.loadProject(cover).group_cover_id === cover,
     );
+    await e(
+      'document.querySelector(".library-detail-picture img").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
+    );
+    await wait('!!document.querySelector(".library-viewer .library-strip")');
+    const coverMetadata = database.loadProject(cover).metadata;
+    await check(
+      '一摞大图顶部显示实际尺寸及当前序号',
+      `(()=>{const buttons=[...document.querySelectorAll('.library-viewer .library-strip button')];const index=buttons.findIndex(b=>b.classList.contains('is-current'));return buttons.length>1&&index>=0&&document.querySelector('.library-viewer-top .library-mono').textContent.trim()===${JSON.stringify(`${coverMetadata.width} × ${coverMetadata.height}`)}+' · '+(index+1)+' / '+buttons.length})()`,
+    );
+    await key('Escape', {}, 'document.querySelector(".library-viewer")');
     if (!reduced) await screen('group');
     await refresh();
     await check('重新加载后封面仍在', () => database.loadProject(cover).group_cover_id === cover);
@@ -477,6 +500,11 @@ export async function libraryChecks(env) {
       '大图左键切回',
       'document.querySelector(".library-viewer-top b").textContent===' + JSON.stringify(beforeName),
     );
+    await checkLibraryButtonGaps(h, '大图');
+    await check(
+      '大图摞内位置与小图条一致',
+      "(()=>{const strip=document.querySelector('.library-viewer .library-strip');return !strip || document.querySelector('.library-viewer-top .library-mono').textContent.trim().endsWith(' · '+([...strip.children].findIndex(b=>b.classList.contains('is-current'))+1)+' / '+strip.children.length)})()",
+    );
     if (!reduced) await screen('viewer');
     await key('Escape', {}, viewer);
     await wait('!document.querySelector(".library-viewer")');
@@ -506,6 +534,10 @@ export async function libraryChecks(env) {
     await wait(
       '!![...document.querySelectorAll(".nps-toast button")].find(b=>b.textContent==="撤销")',
     );
+    await check(
+      '单图回收通知使用定稿文案',
+      'document.querySelector(".nps-notifications").textContent.includes("已移入回收站")',
+    );
     await click('撤销', 'document.querySelector(".nps-notifications")');
     await h.until(() => !database.loadProject(trashId).deleted_at, '撤销移入回收站');
     await check('移入回收站后通知可以撤销', () => !database.loadProject(trashId).deleted_at);
@@ -524,6 +556,15 @@ export async function libraryChecks(env) {
     await wait('document.querySelectorAll(".library-card").length===1');
     await selectCard(0);
     await waitDetail();
+    await checkLibraryButtonGaps(h, '回收站');
+    await check(
+      '恢复按钮有返回图标',
+      '!!document.querySelector(".library-detail-actions .ri-arrow-go-back-line")',
+    );
+    await check(
+      '清空回收站位于说明行且使用安静危险小按钮',
+      "!document.querySelector('.library-tools .nps-button-danger') && !!document.querySelector('.library-chips.library-help .nps-button-danger.nps-small')",
+    );
     if (!reduced) await screen('trash');
     await click('恢复', 'document.querySelector(".library-detail-actions")');
     await h.until(() => !database.loadProject(trashAgain).deleted_at, '恢复图片');
@@ -657,7 +698,16 @@ export async function libraryChecks(env) {
       `(()=>{const mark=document.querySelector('.nps-empty-mark');return document.querySelector('.library-empty').textContent.includes('图片库里还没有图片')&&!!mark?.querySelector('svg')&&getComputedStyle(mark.querySelector('[data-color=text]')).fill===getComputedStyle(mark).color&&getComputedStyle(mark.querySelector('[data-color=empty]')).stroke===getComputedStyle(mark).color})()`,
     );
     await screen('empty');
+    const emptyCollection = database
+      .listCollections()
+      .find((collection) => collection.kind === 'manual');
+    await click(emptyCollection.name, 'document.querySelector(".library-side")');
+    await check(
+      '全库无图片时收藏集管理行仍可用',
+      '!!document.querySelector(".library-collection-row") && document.querySelectorAll(".library-collection-row button").length===2',
+    );
     database.updateProjects(activeIds, { deleted: false });
     await refresh();
   }
+  await libraryFinishChecks({ h, database, refresh, click, input, selectCard, waitDetail });
 }

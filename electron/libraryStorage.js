@@ -16,13 +16,13 @@ export function createDatabaseStorage(dataDirectory) {
       /[/\\:\0]/.test(name) ||
       (name !== fileName && !backupName(name))
     )
-      throw new Error('【文案待定：无法定位数据目录以外或未列出的文件】');
+      throw new Error('无法定位数据目录以外或未列出的文件');
     const candidate = path.resolve(directory, name);
     const stat = await promises.lstat(candidate);
     const realDirectory = await promises.realpath(directory);
     const realFile = await promises.realpath(candidate);
     if (!stat.isFile() || stat.isSymbolicLink() || path.dirname(realFile) !== realDirectory)
-      throw new Error('【文案待定：无法定位数据目录以外或未列出的文件】');
+      throw new Error('无法定位数据目录以外或未列出的文件');
     return { candidate, stat };
   };
   return {
@@ -51,7 +51,7 @@ export function createDatabaseStorage(dataDirectory) {
     },
     async reveal(name, showItemInFolder) {
       if (name !== fileName && !listedNames.has(name))
-        throw new Error('【文案待定：无法定位数据目录以外或未列出的文件】');
+        throw new Error('无法定位数据目录以外或未列出的文件');
       const { candidate } = await resolveFile(name);
       showItemInFolder(candidate);
     },

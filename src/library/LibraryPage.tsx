@@ -82,7 +82,7 @@ export default function LibraryPage(
     >
       <LibrarySidebar p={p} />
       <main className="library-middle">
-        {!noImages && (
+        {(!noImages || !!p.activeCollection) && (
           <LibraryToolbar
             p={p}
             rowHeight={rowHeight}
@@ -153,6 +153,7 @@ export default function LibraryPage(
               {p.view === 'trash' ? (
                 <>
                   <Button variant="quiet" size="small" onClick={() => p.onRestore(ids)}>
+                    <i className="ri-arrow-go-back-line" />
                     恢复
                   </Button>
                   <Button variant="danger" size="small" onClick={() => p.onPermanentDelete(ids)}>
@@ -209,7 +210,7 @@ export default function LibraryPage(
         )}
         {p.dragState?.active && (
           <div className="library-drop">
-            {p.dragState.valid ? '松开后导入图片库' : '【文案待定：不支持的文件】'}
+            {p.dragState.valid ? '松开后导入图片库' : '只能导入 PNG、JPG、WEBP 图片和 ZIP'}
           </div>
         )}
       </main>

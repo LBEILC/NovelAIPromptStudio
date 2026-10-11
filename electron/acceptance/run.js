@@ -201,7 +201,7 @@ export async function runAcceptance(context) {
           );
         }
         await section('关于与更新');
-        await font('.studio-titlebar nav button', 'MiSans');
+        await font('.studio-titlebar nav button .nps-button-label', 'MiSans');
         await font('.settings-about-name', 'Newsreader');
         await e(
           `(() => { const p=document.createElement('p'); p.id='acceptance-font-mono';p.style.fontFamily='var(--font-mono)';p.textContent='blue_hair 1.25';document.querySelector('.settings-about-head').append(p) })()`,

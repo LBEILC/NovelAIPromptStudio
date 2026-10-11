@@ -2,7 +2,7 @@
 .library-page i, .library-filter-panel i { font-size:var(--icon); }
 .library-page button { cursor:pointer; }
 .library-side { flex:0 0 var(--side-w); width:var(--side-w); display:flex; flex-direction:column; padding:var(--sp-3) var(--sp-2); gap:var(--bw); background:var(--pane); border-right:var(--bw) solid var(--border); overflow:auto; }
-.library-side-item { display:flex; align-items:center; gap:var(--sp-2); width:100%; min-height:var(--ctl); padding:0 var(--sp-2); border:0; border-radius:var(--r-ctl); background:transparent; color:var(--text-2); text-align:left; }
+.library-side-item { display:flex; align-items:center; gap:var(--ctl-gap); width:100%; min-height:var(--ctl); padding:0 var(--sp-2); border:0; border-radius:var(--r-ctl); background:transparent; color:var(--text-2); text-align:left; }
 .library-side-item:hover { background:var(--hover); }
 .library-side-item.on { background:var(--selected); color:var(--text); font-weight:var(--fw-strong); }
 .library-side-item span { margin-left:auto; color:var(--text-3); font:var(--fs-caption)/1 var(--font-mono); }
@@ -10,7 +10,6 @@
 .library-side-label { display:flex; align-items:center; justify-content:space-between; padding:var(--sp-4) var(--sp-2) var(--sp-1); color:var(--text-3); font-size:var(--fs-caption); }
 .library-side-label .nps-button { margin:calc(-1 * var(--sp-1)); }
 .library-trash { margin-top:auto; }
-.library-collection-actions { display:flex; flex-wrap:wrap; }
 .library-middle { flex:1 1 0; min-width:0; min-height:0; display:flex; flex-direction:column; position:relative; }
 .library-tools { display:flex; align-items:center; gap:var(--ctl-gap); padding:var(--sp-2) var(--sp-5); flex:0 0 auto; }
 .library-tools .nps-button { flex-shrink:0; }
@@ -133,3 +132,5 @@
 .library-filter-panel .nps-options { flex-wrap:wrap; }
 .library-filter-panel .nps-option { white-space:nowrap; }
 .library-view-vibe { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); }
+.library-row-end { margin-left:auto; }
+.library-side .nps-menu-trigger { display:flex; width:100%; }

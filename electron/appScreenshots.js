@@ -221,7 +221,7 @@ export async function runAppScreenshots({
             throw new Error(`Unexpected capture size: ${size.width}x${size.height}`);
           const file = `${scene.name}-${theme}.png`;
           await fs.writeFile(path.join(mode.output, file), image.toPNG());
-          const fontSelectors = [['ui', '.studio-titlebar nav button', 'MiSans']];
+          const fontSelectors = [['ui', '.studio-titlebar nav button .nps-button-label', 'MiSans']];
           if (scene.name === 'workbench')
             fontSelectors.push(['tag', '.overview-tag-copy', 'IBM Plex Mono']);
           if (scene.name === 'settings-updates')

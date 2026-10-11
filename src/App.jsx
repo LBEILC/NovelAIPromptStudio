@@ -1,3 +1,4 @@
+import { deletionDetail } from './library/presentation';
 import { useLibraryComputation } from './state/libraryComputation';
 import { useLibraryState } from './state/library';
 import {
@@ -837,7 +838,7 @@ export default function App() {
     async (files = null, fromClipboard = false) => {
       if (archiveImport || isImportActive(importProgress)) return;
       if (files && !assessDroppedFiles(files).valid) {
-        showToast('图片库只支持图片或 ZIP', 'warning');
+        showToast('只能导入 PNG、JPG、WEBP 图片和 ZIP', 'warning');
         return;
       }
       setPage('gallery');
@@ -1334,7 +1335,7 @@ export default function App() {
     }
     await reloadAfterGalleryAction();
     notify({
-      text: '【文案待定：已移入回收站】',
+      text: ids.length === 1 ? '已移入回收站' : `已将 ${ids.length} 张图片移入回收站`,
       action: { label: '撤销', onClick: () => restoreProjects(result.results?.success || ids) },
     });
   };
@@ -1378,12 +1379,9 @@ export default function App() {
       !(await requestConfirmation({
         title: `永久删除这 ${ids.length} 张图片？`,
         message: `会删除图片库里保存的这 ${ids.length} 份副本和它们的记录，删除后无法恢复。你导入时用的原文件不受影响。`,
-        // TODO(design): The reference does not cover open drafts or a trash-size summary.
         detail:
           page === 'gallery'
-            ? impact.open || knownBytes != null
-              ? '【文案待定：工作台草稿影响与释放空间】'
-              : ''
+            ? deletionDetail(impact, formatBytes(knownBytes))
             : `${impact.open ? `${impact.open} 张仍在工作台打开。` : ''}${impact.dirty ? `其中 ${impact.dirty} 个标签包含工作区草稿，继续会丢弃。` : ''} 此操作不可撤销。`,
         okText: '永久删除',
         danger: true,

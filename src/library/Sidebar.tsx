@@ -1,13 +1,11 @@
 import { useState } from 'react';
-import { Button, Dialog, Input } from '../ui';
+import { Button, Dialog, Input, ContextMenu } from '../ui';
 import type { Collection } from '../shared/types';
 import type { LibraryProps } from './types';
 
 export function LibrarySidebar({ p }: { p: LibraryProps }) {
-  // TODO(design): Specify collection-management placement and the new-collection dialog copy.
   const [naming, setNaming] = useState<Collection | 'new' | null>(null);
   const [name, setName] = useState('');
-  const [menu, setMenu] = useState('');
   return (
     <aside className="library-side" aria-label="图片库导航">
       <button
@@ -38,43 +36,39 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
           {p.collections
             .filter((collection) => collection.kind === kind)
             .map((collection) => (
-              <div key={collection.id}>
+              <ContextMenu
+                key={collection.id}
+                label={collection.name + '管理'}
+                items={[
+                  {
+                    id: 'rename',
+                    label: '重命名',
+                    onSelect: () => {
+                      setName(collection.name);
+                      setNaming(collection);
+                    },
+                  },
+                  {
+                    id: 'delete',
+                    label: '删除收藏集',
+                    danger: true,
+                    onSelect: () => {
+                      void p.onCollectionDelete(collection);
+                    },
+                  },
+                ]}
+              >
                 <button
                   aria-label={collection.name}
                   data-collection-id={collection.id}
                   className={`library-side-item ${p.activeCollection?.id === collection.id || p.editingSmartCollection?.id === collection.id ? 'on' : ''}`}
                   onClick={() => p.onCollectionSelect(collection.id)}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    setMenu(menu === collection.id ? '' : collection.id);
-                  }}
                 >
                   <i className={kind === 'manual' ? 'ri-folder-line' : 'ri-folder-settings-line'} />
                   {collection.name}
                   <span>{collection.image_count ?? 0}</span>
                 </button>
-                {(menu === collection.id || p.activeCollection?.id === collection.id) && (
-                  <div className="library-collection-actions">
-                    <Button
-                      size="small"
-                      variant="quiet"
-                      onClick={() => {
-                        setName(collection.name);
-                        setNaming(collection);
-                      }}
-                    >
-                      重命名
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="danger"
-                      onClick={() => p.onCollectionDelete(collection)}
-                    >
-                      删除收藏集
-                    </Button>
-                  </div>
-                )}
-              </div>
+              </ContextMenu>
             ))}
         </div>
       ))}
@@ -88,9 +82,9 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
       </button>
       <Dialog
         open={!!naming}
-        title={naming === 'new' ? '【文案待定：新建收藏集】' : '重命名'}
+        title={naming === 'new' ? '新建收藏集' : '重命名'}
         cancelLabel="取消"
-        confirmLabel={naming === 'new' ? '【文案待定：新建】' : '重命名'}
+        confirmLabel={naming === 'new' ? '新建' : '重命名'}
         onCancel={() => setNaming(null)}
         onConfirm={async () => {
           if (!name.trim() || !naming) return;
@@ -101,6 +95,7 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
       >
         <Input
           aria-label="收藏集名称"
+          placeholder="收藏集名称"
           value={name}
           onChange={(event) => setName(event.target.value)}
         />

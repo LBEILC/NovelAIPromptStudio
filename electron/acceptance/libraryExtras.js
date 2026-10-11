@@ -32,7 +32,7 @@ export async function extraLibraryChecks({
   await click('清除', scope);
   await click('新建收藏集', side);
   await input('input[aria-label="收藏集名称"]', `012多选${reduced}`);
-  await click('【文案待定：新建】', dialog);
+  await click('新建', dialog);
   await wait('!document.querySelector("dialog[open]")');
   const collection = database.listCollections().find((c) => c.name === `012多选${reduced}`);
   await check(
@@ -74,7 +74,11 @@ export async function extraLibraryChecks({
     '切换普通收藏集只显示成员，侧栏数量准确',
     `(()=>{const cards=[...document.querySelectorAll('.library-card')];return cards.length===2&&cards.every(c=>${JSON.stringify(selected)}.includes(c.dataset.projectId))&&document.querySelector('[data-collection-id="${collection.id}"] span').textContent==='2'})()`,
   );
-  await click('重命名', side);
+  await check(
+    '普通收藏集管理移至网格上方，侧栏不展开按钮',
+    'document.querySelector(".library-collection-row").textContent.includes("手动整理，从详情栏或多选条加入图片") && !document.querySelector(".library-side .library-collection-actions")',
+  );
+  await click('重命名', 'document.querySelector(".library-collection-row")');
   await input('input[aria-label="收藏集名称"]', `012多选改名${reduced}`);
   await click('重命名', dialog);
   await wait('!document.querySelector("dialog[open]")');
@@ -93,12 +97,12 @@ export async function extraLibraryChecks({
       database.listCollections().find((c) => c.id === collection.id).member_ids.length === 0 &&
       selected.every((id) => !!database.loadProject(id)),
   );
-  await click('删除收藏集', side);
+  await click('删除收藏集', 'document.querySelector(".library-collection-row")');
   await click('取消', dialog);
   await check('取消删除收藏集保留集合', () =>
     database.listCollections().some((c) => c.id === collection.id),
   );
-  await click('删除收藏集', side);
+  await click('删除收藏集', 'document.querySelector(".library-collection-row")');
   await click('删除收藏集', dialog);
   await wait('!document.querySelector("dialog[open]")');
   await check(
@@ -145,6 +149,10 @@ export async function extraLibraryChecks({
   await check(
     '多选操作条批量移入回收站',
     () => trashed.length === 2 && trashed.every((id) => !!database.loadProject(id).deleted_at),
+  );
+  await check(
+    '多张回收通知使用数量文案',
+    'document.querySelector(".nps-notifications").textContent.includes("已将 2 张图片移入回收站")',
   );
   await click('回收站', side);
   // Select only the two new trash records; leave pre-existing trash untouched.

@@ -1,3 +1,4 @@
+import { dimensions } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../ui';
@@ -78,7 +79,10 @@ export function LibraryViewer({ p, onClose }: { p: LibraryProps; onClose: () => 
       <div className="library-viewer-top">
         <b>{image.name}</b>
         <span className="library-help library-mono">
-          {image.metadata.width} × {image.metadata.height}
+          {dimensions(image.metadata)}
+          {p.previewGroup &&
+            p.previewGroup.members.length > 1 &&
+            ` · ${p.previewGroup.members.findIndex((member) => member.id === image.id) + 1} / ${p.previewGroup.members.length}`}
         </span>
         <Button variant="quiet" size="small" onClick={onClose}>
           <i className="ri-close-line" />

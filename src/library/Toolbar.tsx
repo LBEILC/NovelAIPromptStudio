@@ -3,10 +3,12 @@ import { Button, Input, OptionGroup, Popover, Select, Slider, Switch, Dialog } f
 import {
   DEFAULT_GALLERY_FILTERS,
   GALLERY_DATE_PRESETS,
+  GALLERY_UNKNOWN_MODEL_VALUE,
   galleryFilterOptions,
 } from '../lib/galleryFilters.js';
 import type { GalleryFilters } from '../shared/types';
 import type { LibraryProps } from './types';
+import { groupModelOptions } from './presentation';
 
 export function FilterChips({
   filters,
@@ -15,11 +17,11 @@ export function FilterChips({
   filters: GalleryFilters;
   onChange: (patch: Partial<GalleryFilters>) => void;
 }) {
-  const chips: { id: string; label: string; value: string; clear: () => void }[] = [];
+  const chips: { id: string; label: string; value: string; title?: string; clear: () => void }[] =
+    [];
   for (const [key, label] of [
     ['includeTags', '包含'],
     ['excludeTags', '排除'],
-    ['models', '模型'],
     ['vibes', 'Vibe'],
   ] as const) {
     filters[key].forEach((value) =>
@@ -30,6 +32,21 @@ export function FilterChips({
         clear: () => onChange({ [key]: filters[key].filter((item) => item !== value) }),
       }),
     );
+  }
+  for (const model of groupModelOptions(
+    filters.models.map((value) => ({
+      label: value === GALLERY_UNKNOWN_MODEL_VALUE ? '未知模型' : value,
+      value,
+    })),
+  )) {
+    chips.push({
+      id: 'model' + model.label,
+      label: '模型',
+      value: model.label,
+      title: model.values.join('\n'),
+      clear: () =>
+        onChange({ models: filters.models.filter((value) => !model.values.includes(value)) }),
+    });
   }
   if (filters.datePreset !== 'all')
     chips.push({
@@ -48,6 +65,7 @@ export function FilterChips({
         <button
           className="library-chip"
           key={chip.id}
+          title={chip.title}
           onClick={chip.clear}
           aria-label={`移除${chip.label} ${chip.value}`}
         >
@@ -138,15 +156,37 @@ export function LibraryToolbar({
   const [open, setOpen] = useState('');
   const [name, setName] = useState('');
   const [naming, setNaming] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const filterAnchor = useRef<HTMLButtonElement>(null);
   const viewAnchor = useRef<HTMLButtonElement>(null);
   const importAnchor = useRef<HTMLButtonElement>(null);
   const options = useMemo(() => galleryFilterOptions(p.filterProjects), [p.filterProjects]);
   const filters = p.filters;
+  const groupedModels = groupModelOptions(options.models);
+  const rules = { ...DEFAULT_GALLERY_FILTERS, ...p.activeCollection?.filters };
+  const ruleParts = [
+    rules.query,
+    ...rules.includeTags.map((v) => '包含 ' + v),
+    ...rules.excludeTags.map((v) => '排除 ' + v),
+    ...groupModelOptions(
+      rules.models.map((v) => ({
+        label: v === GALLERY_UNKNOWN_MODEL_VALUE ? '未知模型' : v,
+        value: v,
+      })),
+    ).map((v) => '模型 ' + v.label),
+    ...rules.vibes.map(
+      (v) => options.vibes.find((option) => option.value === v)?.label || 'Vibe ' + v,
+    ),
+    rules.datePreset === 'custom'
+      ? rules.dateFrom + ' 至 ' + rules.dateTo
+      : rules.datePreset !== 'all'
+        ? GALLERY_DATE_PRESETS.find((v) => v.value === rules.datePreset)?.label
+        : '',
+  ].filter(Boolean);
   const count =
     filters.includeTags.length +
     filters.excludeTags.length +
-    filters.models.length +
+    groupModelOptions(filters.models.map((value) => ({ label: value, value }))).length +
     filters.vibes.length +
     Number(filters.datePreset !== 'all');
   return (
@@ -197,22 +237,42 @@ export function LibraryToolbar({
             </Button>
           </div>
         )}
-        {p.view === 'trash' && (
-          // TODO(design): Keep the existing toolbar action until its new placement is specified.
-          <Button variant="danger" onClick={p.onEmptyTrash}>
-            清空回收站
-          </Button>
-        )}
       </div>
       <FilterChips filters={filters} onChange={p.onFiltersChange} />
       {p.view === 'trash' && (
         <div className="library-chips library-help">
-          回收站里的图片不会自动清理。永久删除只删除图片库里保存的副本。
+          <span>回收站里的图片不会自动清理。永久删除只删除图片库里保存的副本。</span>
+          {(p.trashCount ?? 0) > 0 && (
+            <Button
+              className="library-row-end"
+              variant="danger"
+              size="small"
+              onClick={p.onEmptyTrash}
+            >
+              清空回收站
+            </Button>
+          )}
         </div>
       )}
       {p.activeCollection && (
-        <div className="library-chips">
-          <span>{p.activeCollection.kind === 'smart' ? '规则' : p.activeCollection.name}</span>
+        <div className="library-chips library-collection-row">
+          {p.activeCollection.kind === 'smart' ? (
+            ruleParts.length ? (
+              <>
+                <span className="library-help">规则</span>
+                {ruleParts.map((part, index) => (
+                  <span className="library-chip" key={index}>
+                    {part}
+                  </span>
+                ))}
+              </>
+            ) : (
+              <span className="library-help">没有规则，包含全部图片</span>
+            )
+          ) : (
+            <span className="library-help">手动整理，从详情栏或多选条加入图片</span>
+          )}
+          <span className="library-row-end" />
           {p.activeCollection.kind === 'smart' && (
             <Button
               size="small"
@@ -225,6 +285,23 @@ export function LibraryToolbar({
               编辑规则
             </Button>
           )}
+          <Button
+            size="small"
+            variant="quiet"
+            onClick={() => {
+              setName(p.activeCollection!.name);
+              setRenaming(true);
+            }}
+          >
+            重命名
+          </Button>
+          <Button
+            size="small"
+            variant="danger"
+            onClick={() => p.onCollectionDelete(p.activeCollection!)}
+          >
+            删除收藏集
+          </Button>
         </div>
       )}
       <Popover
@@ -262,16 +339,37 @@ export function LibraryToolbar({
             <div className="library-filter-row" key={key}>
               <span>{key === 'models' ? '模型' : 'Vibe'}</span>
               <div className="library-filter-options">
-                {options[key].map((option) => (
-                  <label key={option.value}>
+                {(key === 'models'
+                  ? groupedModels
+                  : options.vibes.map((option) => ({ label: option.label, values: [option.value] }))
+                ).map((option) => (
+                  <label
+                    key={key === 'models' ? option.label : option.values[0]}
+                    title={
+                      key === 'models'
+                        ? option.values
+                            .map(
+                              (value) =>
+                                options.models.find((item) => item.value === value)?.label || value,
+                            )
+                            .join('\n')
+                        : undefined
+                    }
+                  >
                     <input
                       type="checkbox"
-                      checked={filters[key].includes(option.value)}
+                      checked={option.values.every((value) => filters[key].includes(value))}
+                      ref={(node) => {
+                        if (node)
+                          node.indeterminate =
+                            option.values.some((value) => filters[key].includes(value)) &&
+                            !option.values.every((value) => filters[key].includes(value));
+                      }}
                       onChange={(event) =>
                         p.onFiltersChange({
                           [key]: event.target.checked
-                            ? [...filters[key], option.value]
-                            : filters[key].filter((v) => v !== option.value),
+                            ? [...new Set([...filters[key], ...option.values])]
+                            : filters[key].filter((v) => !option.values.includes(v)),
                         })
                       }
                     />
@@ -325,8 +423,7 @@ export function LibraryToolbar({
                   setOpen('');
                 }}
               >
-                {/* TODO(design): Specify the edited smart-collection rule confirmation label. */}
-                【文案待定：保存规则】
+                保存规则
               </Button>
             ) : (
               <Button
@@ -364,8 +461,8 @@ export function LibraryToolbar({
               onChange={p.onSortChange}
               options={[
                 { value: 'recent', label: '最近导入的在前' },
-                { value: 'oldest', label: '【文案待定：最早导入的在前】' },
-                { value: 'name', label: '【文案待定：按名称排序】' },
+                { value: 'oldest', label: '最早导入的在前' },
+                { value: 'name', label: '按名称排序' },
               ]}
             />
           </div>
@@ -444,6 +541,27 @@ export function LibraryToolbar({
       >
         <Input
           aria-label="智能收藏集名称"
+          placeholder="收藏集名称"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </Dialog>
+      <Dialog
+        open={renaming}
+        title="重命名"
+        cancelLabel="取消"
+        confirmLabel="重命名"
+        onCancel={() => setRenaming(false)}
+        onConfirm={async () => {
+          if (name.trim() && p.activeCollection) {
+            await p.onCollectionRename(p.activeCollection, name.trim());
+            setRenaming(false);
+          }
+        }}
+      >
+        <Input
+          aria-label="收藏集名称"
+          placeholder="收藏集名称"
           value={name}
           onChange={(event) => setName(event.target.value)}
         />

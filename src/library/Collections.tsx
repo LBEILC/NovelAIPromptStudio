@@ -47,6 +47,7 @@ export function CollectionPicker({ p, ids }: { p: LibraryProps; ids: string[] })
           <div className="library-date-range">
             <Input
               aria-label="新收藏集名称"
+              placeholder="收藏集名称"
               value={name}
               onChange={(event) => setName(event.target.value)}
             />

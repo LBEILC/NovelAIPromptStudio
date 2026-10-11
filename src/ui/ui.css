@@ -149,3 +149,5 @@
 .nps-empty-mark svg { display:block; width:100%; height:100%; }
 .nps-empty-mark [data-color="text"] { fill:currentColor; }
 .nps-empty-mark [data-color="empty"] { stroke:currentColor; }
+
+.nps-button-label { display:inline-flex; align-items:center; justify-content:center; gap:var(--ctl-gap); }
