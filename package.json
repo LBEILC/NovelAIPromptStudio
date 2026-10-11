@@ -20,7 +20,10 @@
     "verify:update-artifacts": "node scripts/verify-update-artifacts.mjs release",
     "start": "electron .",
     "start:demo": "electron . --profile=demo",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"{src,electron,scripts}/**/*.{js,jsx,ts,tsx,cjs,mjs}\" \"vite.config.js\"",
+    "format:check": "prettier --check \"{src,electron,scripts}/**/*.{js,jsx,ts,tsx,cjs,mjs}\" \"vite.config.js\""
   },
   "dependencies": {
     "electron-updater": "6.8.9",
@@ -43,6 +46,9 @@
     "@lobehub/webfont-geist": "1.0.0",
     "@lobehub/webfont-geist-mono": "1.0.0",
     "@lobehub/webfont-harmony-sans-sc": "1.0.0",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "6.0.3",
     "concurrently": "9.2.4",
     "dayjs": "1.11.21",
@@ -50,8 +56,10 @@
     "electron-builder": "26.15.3",
     "lucide-react": "1.24.0",
     "motion": "12.40.0",
+    "prettier": "3.6.2",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "typescript": "5.9.3",
     "vite": "8.1.5",
     "vitest": "4.1.10",
     "wait-on": "9.0.3",

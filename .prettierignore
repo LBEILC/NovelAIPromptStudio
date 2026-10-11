@@ -1,0 +1,12 @@
+**/*.css
+**/*.md
+**/*.markdown
+**/*.json
+electron/data/
+third_party/
+dist/
+release/
+demo/
+doc/
+build/
+.agents/

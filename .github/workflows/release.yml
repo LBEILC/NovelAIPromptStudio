@@ -56,6 +56,9 @@ jobs:
         if: github.ref_type == 'tag'
         run: node scripts/verify-release-tag.mjs "${{ github.ref_name }}"
 
+      - name: Type check
+        run: npm run typecheck
+
       - name: Package application
         if: runner.os != 'macOS'
         run: npm run package -- ${{ matrix.package_args }}
