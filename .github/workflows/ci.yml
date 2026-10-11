@@ -37,13 +37,23 @@ jobs:
       - run: npm run build
       - run: npm run audit:ui
       - name: Cache pinned MiSans VF
-        uses: actions/cache@v5
+        id: misans-cache
+        uses: actions/cache/restore@v5
         with:
-          path: .local/fonts/
+          path: .local/fonts/MiSansVF.ttf
+          enableCrossOsArchive: true
           key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
       - name: Acquire and verify MiSans (required for screenshots and packaging)
+        if: steps.misans-cache.outputs.cache-hit != 'true'
         run: npm run fonts
       - run: npm run fonts:check
+      - name: Save verified MiSans for all platforms
+        if: steps.misans-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .local/fonts/MiSansVF.ttf
+          enableCrossOsArchive: true
+          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
       - run: npm run verify:app
       - name: Upload acceptance checks and screenshots
         if: always()
