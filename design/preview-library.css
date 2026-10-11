@@ -83,3 +83,10 @@
 .viewer .strip img { width: var(--strip-w); height: var(--strip-h); border-radius: var(--r-thumb); }
 .selbar .sep { width: var(--bw); height: var(--sp-4); background: var(--border); margin: 0 var(--sp-1); }
 .selbar.tools-bar { padding-left: var(--sp-1); }
+
+/* 横竖混排：每一行等高，图片按自己的宽高比占宽度，一行排满；最后一行不拉伸 */
+.just { display: flex; flex-direction: column; gap: var(--thumb-gap); padding: var(--sp-1) var(--sp-5) var(--sp-5); }
+.jrow { display: flex; gap: var(--thumb-gap); }
+.jrow .card { flex: var(--r) 1 0; min-width: 0; }
+.jrow .card img { aspect-ratio: var(--r); }
+.jrow.last .card { flex: 0 0 calc(var(--thumb-row) * var(--r)); }

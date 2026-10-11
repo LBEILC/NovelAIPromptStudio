@@ -1,6 +1,6 @@
 // 界面稿（第四部分）：图片库的各个状态。依赖 preview.js 和 preview-pages.js。
 // 地址参数：preview.html?page=lib&sub=filter
-const LIB_STATES = [['home', '默认'], ['group', '一组图片'], ['filter', '筛选'], ['view', '视图'], ['select', '多选'], ['collect', '加入收藏集'], ['smart', '智能收藏集'],
+const LIB_STATES = [['home', '默认'], ['group', '一组图片'], ['mixed', '横竖混排'], ['square', '方格（对比）'], ['filter', '筛选'], ['view', '视图'], ['select', '多选'], ['collect', '加入收藏集'], ['smart', '智能收藏集'],
   ['import', '导入'], ['zip', '导入 ZIP'], ['drop', '拖入'], ['viewer', '大图'], ['trash', '回收站'], ['purge', '永久删除'], ['empty', '空图片库'], ['nomatch', '没有结果']];
 const LIB_PICS = ['雨后候车亭-02', '夜间书店-01', '夜间书店-02', '玻璃花房-01', '海边写生-01', '玻璃花房-02', '玻璃花房-03', '夜间书店-03', '玻璃花房-04', '海边写生-02'];
 const libState = () => (LIB_STATES.some(([k]) => k === S.sub) ? S.sub : 'home');
@@ -36,6 +36,18 @@ function libGrid({ pics = LIB_PICS, on = 0, picked = null, dim = [], count = '14
   return `<div class="scroll"><div class="grid">${pics.map((p, i) => `<div class="card ${i === on ? 'on' : ''} ${picked && picked.includes(i) ? 'picked' : ''} ${dim.includes(i) ? 'dim' : ''}">
       <img src="${IMG(p)}" alt="">${picked ? `<span class="check pick">${picked.includes(i) ? ic('check-line') : ''}</span>` : ''}${stacks[LIB_PICS.indexOf(p)] ? `<span class="stack">${stacks[LIB_PICS.indexOf(p)]}</span>` : ''}</div>`).join('')}</div>
     <div class="label count">${count}</div></div>`;
+}
+
+// 横竖混排的两种排法。r 是宽高比；演示图都是竖图，横图和方图用裁切来示意
+const MIXED = [['雨后候车亭-02', 0.684, '4 张'], ['夜间书店-01', 1.462], ['夜间书店-02', 0.684], ['玻璃花房-01', 0.684],
+  ['海边写生-01', 1.462], ['玻璃花房-02', 1], ['玻璃花房-03', 0.684],
+  ['夜间书店-03', 0.684], ['海边写生-02', 1.462, '2 张'], ['玻璃花房-04', 0.684]];
+function libJust() {
+  const row = (items, last) => `<div class="jrow ${last ? 'last' : ''}">${items.map(([p, r, n], i) => `<div class="card ${p === '雨后候车亭-02' ? 'on' : ''}" style="--r:${r}"><img src="${IMG(p)}" alt="">${n ? `<span class="stack">${n}</span>` : ''}</div>`).join('')}</div>`;
+  return `<div class="scroll"><div class="just">${row(MIXED.slice(0, 4))}${row(MIXED.slice(4, 7))}${row(MIXED.slice(7), true)}</div><div class="label count">142 组 · 159 张</div></div>`;
+}
+function libSquare() {
+  return `<div class="scroll"><div class="grid sq">${MIXED.map(([p, r, n]) => `<div class="card ${p === '雨后候车亭-02' ? 'on' : ''}"><img src="${IMG(p)}" alt="" style="aspect-ratio:1">${n ? `<span class="stack">${n}</span>` : ''}</div>`).join('')}</div><div class="label count">142 组 · 159 张</div></div>`;
 }
 
 // 详情栏里的只读 Prompt，显示方式和工作台相同
@@ -125,6 +137,8 @@ VIEWS.lib = () => {
   const few = LIB_PICS.slice(0, 4);
   let side = libSide('all'), tools = libTools(), mid = libGrid(), detail = libDetail('one'), over = '', inGrid = '';
   if (st === 'group') detail = libDetail('group');
+  if (st === 'mixed') mid = libJust();
+  if (st === 'square') mid = libSquare();
   if (st === 'filter') { tools = libTools(5, 'filter'); mid = filterChips + libGrid({ pics: few, count: '4 组 · 7 张，共 159 张' }); inGrid = libFilter('<button class="btn quiet sm">清除</button><span class="sp"></span><button class="btn sm">存为智能收藏集</button>'); }
   if (st === 'view') { tools = libTools(0, 'view'); inGrid = libView(); }
   if (st === 'select') { mid = libGrid({ on: -1, picked: [0, 2, 5] }); detail = libDetail('multi');
