@@ -35,7 +35,6 @@ VIEWS.set = () => `${titlebar('')}<div class="body">${setNav('set')}
     <div class="setrow"><div>界面字体<small>用于界面和中文</small></div>${sel('MiSans（内置）')}</div>
     <div class="setrow"><div>等宽字体<small>用于 Tag、权重和参数</small></div>${sel('IBM Plex Mono（内置）')}</div>
     <div class="setrow"><div>段落字体<small>用于成段的自然语言</small></div>${sel('Newsreader（内置）')}</div>
-    <div class="setrow"><div>界面缩放</div><span class="row"><span class="slider"><i style="width:50%"></i><b style="left:50%"></b></span><span class="mono muted">100%</span></span></div>
     <div class="setrow"><div>动效<small>关闭后，所有位置变化都立刻完成</small></div>${opts(['完整', '跟随系统', '关闭'], 1)}</div>
     <h2>Prompt 的显示</h2>
     <div class="setrow"><div>默认显示<small>打开一张图时先看到什么</small></div>${opts(['原文', '译文', '对照'], 2)}</div>
@@ -125,7 +124,7 @@ VIEWS.comps = () => `<div class="sheet">
 Object.assign(NOTES, {
   assets: ['常用块按行排列，不做卡片。每一行就是一个可以直接插入的块，显示方式和 Prompt 里一样。',
            'Vibe 旁边注明目前只能用在 V4.5 上，这是调研的结论。'],
-  set: ['设置用一行一项的列表，不做卡片。开关、选项、下拉、滑块都在这一页出现了。',
+  set: ['设置用一行一项的列表，不做卡片。开关、选项、下拉都在这一页出现了。',
         '三种字体各有一项，说明它们分别用在哪里。'],
   acct: ['两处告知都在这一页：页面顶部的"非官方工具"声明，以及"无人值守"开关旁的说明。',
          'Agent 生成的方式默认是"排队后由我确认"；花费上限默认不启用。'],
