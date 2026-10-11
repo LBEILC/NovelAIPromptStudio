@@ -30,6 +30,13 @@ export interface Failure {
   ok: false;
   error: string;
 }
+/**
+ * Advisory build progress: loadLibraryCards resolving is the completion signal;
+ * hide progress then, without waiting for a completed === total event. Events
+ * and the IPC reply have no ordering guarantee at the renderer. A fast build
+ * may emit no events. Within one build completed never decreases; total may
+ * change after imports/deletions (and can fall below completed).
+ */
 export interface LibraryCardCacheProgress {
   readonly completed: number;
   readonly total: number;

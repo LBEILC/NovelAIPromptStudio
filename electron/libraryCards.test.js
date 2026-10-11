@@ -731,6 +731,62 @@ it('shares one complete build across views and reconciles every write between ba
   expect(await api.loadLibraryCards('trash')).toEqual(trash);
 });
 
+it('keeps completed monotonic while deletions and imports change the build total', async () => {
+  const directory = temporary();
+  const api = await open(directory);
+  api.insertProjects(Array.from({ length: 80 }, (_, i) => sample(i)));
+  const progress = [];
+  let removed = false;
+  let imported = false;
+  const cards = await api.loadLibraryCards('all', (value) => {
+    progress.push(value);
+    if (!removed && value.completed >= 50) {
+      removed = true;
+      edit(directory, (raw) =>
+        raw.exec('DELETE FROM projects WHERE id IN (SELECT project_id FROM library_card_cache)'),
+      );
+    } else if (removed && !imported && value.total < 80) {
+      imported = true;
+      api.insertProject(sample(100));
+    }
+  });
+  expect(removed && imported).toBe(true);
+  expect(progress.every((p, i) => i === 0 || p.completed >= progress[i - 1].completed)).toBe(true);
+  expect(progress.some((p, i) => i > 0 && p.total < progress[i - 1].total)).toBe(true);
+  expect(progress.some((p, i) => i > 0 && p.total > progress[i - 1].total)).toBe(true);
+  expect(cards).toHaveLength(api.loadLibrary().length);
+  expect(cards.some((p) => p.id === 'p100')).toBe(true);
+});
+
+it('uses the resolved list as completion even when terminal progress delivery is delayed', async () => {
+  const api = await open(temporary());
+  api.insertProjects(Array.from({ length: 60 }, (_, i) => sample(i)));
+  const received = [];
+  const delayed = [];
+  let listening = true;
+  const cards = await api.loadLibraryCards('all', (value) => {
+    if (value.completed === value.total) delayed.push(() => listening && received.push(value));
+    else received.push(value);
+  });
+  listening = false;
+  delayed.forEach((deliver) => deliver());
+  expect(cards).toHaveLength(60);
+  expect(delayed.length).toBeGreaterThan(0);
+  expect(received.some((p) => p.completed > 0 && p.completed < p.total)).toBe(true);
+  expect(received.every((p) => p.completed < p.total)).toBe(true);
+});
+
+it('returns complete empty and hot lists without any progress events', async () => {
+  const api = await open(temporary());
+  const progress = vi.fn();
+  expect(await api.loadLibraryCards('all', progress)).toEqual([]);
+  expect(progress).not.toHaveBeenCalled();
+  api.insertProject(sample(0));
+  await api.loadLibraryCards();
+  expect(await api.loadLibraryCards('all', progress)).toHaveLength(1);
+  expect(progress).not.toHaveBeenCalled();
+});
+
 it('rejects pending readers on close and resumes committed batches on reopen', async () => {
   const directory = temporary();
   let api = await open(directory);

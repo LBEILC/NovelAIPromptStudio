@@ -20,6 +20,13 @@ export async function settingsChecks(context, restart) {
       () =>
         JSON.stringify(preferences.appearanceSettings()) === JSON.stringify(expected.appearance) &&
         preferences.productivitySettings().autoCheckUpdates === expected.autoCheck,
+      () => ({
+        expected,
+        actual: {
+          appearance: preferences.appearanceSettings(),
+          autoCheck: preferences.productivitySettings().autoCheckUpdates,
+        },
+      }),
     );
     await section('AI 服务');
     await wait('!!document.querySelector("input[type=password]")');

@@ -33,7 +33,7 @@ export function harness(window, mode, checks) {
     throw Error(`等待超时：${label}`);
   };
   let category = '启动';
-  const check = async (label, expression) => {
+  const check = async (label, expression, failureDetails) => {
     const record = { category, label, status: 'failed' };
     checks.push(record);
     try {
@@ -44,19 +44,34 @@ export function harness(window, mode, checks) {
       console.log(`PASS [${category}] ${label}`);
     } catch (error) {
       record.error = String(error);
+      if (failureDetails !== undefined) {
+        try {
+          record.details =
+            typeof failureDetails === 'string'
+              ? await evaluate(failureDetails)
+              : await failureDetails();
+        } catch (detailsError) {
+          record.details = { error: String(detailsError) };
+        }
+      }
       record.context = await evaluate('document.body.innerText.slice(-6000)').catch(
         () => 'renderer unavailable',
       );
-      console.error(`FAIL [${category}] ${label}\n${record.error}\n${record.context}`);
+      console.error(
+        `FAIL [${category}] ${label}\n${record.error}${record.details === undefined ? '' : `\n失败说明：${JSON.stringify(record.details)}`}\n${record.context}`,
+      );
     }
   };
-  const checkSoon = (label, expression, timeoutMs = UI_FEEDBACK_MS, action = '') =>
-    check(label, () =>
-      typeof expression === 'string'
-        ? evaluate(
-            `(${waitForFeedback.toString()})(()=>(${expression}),${timeoutMs},()=>{${action}})`,
-          )
-        : waitForFeedback(expression, timeoutMs),
+  const checkSoon = (label, expression, timeoutMs = UI_FEEDBACK_MS, action = '', failureDetails) =>
+    check(
+      label,
+      () =>
+        typeof expression === 'string'
+          ? evaluate(
+              `(${waitForFeedback.toString()})(()=>(${expression}),${timeoutMs},()=>{${action}})`,
+            )
+          : waitForFeedback(expression, timeoutMs),
+      failureDetails,
     );
   const click = async (text, scope = 'document', index = 0) => {
     console.log(`操作：点击 ${text}`);

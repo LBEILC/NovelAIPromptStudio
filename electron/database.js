@@ -1153,15 +1153,21 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
     return index;
   };
   let cardBuild;
+  let cardCompleted = 0;
   const cardProgressListeners = new Map();
   const reportCardProgress = () => {
     const { total, completed } = query(`SELECT count(*) AS total,
       count(c.project_id) AS completed FROM projects p
       LEFT JOIN library_card_cache c ON c.project_id = p.id`)[0];
-    for (const listener of cardProgressListeners.keys()) listener({ completed, total });
+    // Deletions and dirty-row invalidation can lower the live cache count.
+    // Progress is advisory and monotonic within a build, even if total shrinks.
+    cardCompleted = Math.max(cardCompleted, completed);
+    for (const listener of cardProgressListeners.keys())
+      listener({ completed: cardCompleted, total });
   };
   const yieldCardBuild = () => new Promise((resolve) => setImmediate(resolve));
   const ensureLibraryCards = async () => {
+    cardCompleted = 0;
     let worked = false;
     try {
       for (;;) {
@@ -1236,6 +1242,8 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
     }
   };
   const loadLibraryCards = async (view = 'all', onProgress) => {
+    // Resolution is the completion signal. Consumers must not wait for a final
+    // progress event: IPC delivery can lag the reply, and hot reads emit none.
     if (onProgress)
       cardProgressListeners.set(onProgress, (cardProgressListeners.get(onProgress) || 0) + 1);
     try {
