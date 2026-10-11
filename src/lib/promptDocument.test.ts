@@ -72,7 +72,230 @@ function syntheticProject(prompt = mixed, model = 'nai-diffusion-4-5-full') {
   } as unknown as Pick<ImageProject, 'metadata' | 'tags' | 'prompt_structure'>;
 }
 
+const rainyParagraph =
+  '雨刚停，女孩站在候车亭下，手里握着一把透明的伞，伞面上还挂着水珠，远处的路灯一盏一盏亮起来，地上的积水映出灯光，她低头看着手机，耳机线垂在胸前，风把她的头发吹乱了，她却没有在意。';
+const shortEnglishParagraph =
+  'A quiet street after the rain, puddles everywhere, the girl waits under the shelter, holding a clear umbrella, droplets on its surface, streetlights turning on, one by one, reflections in the water, she looks at her phone, earphones hanging, wind in her hair.';
+const syntheticParagraphCases = [
+  {
+    name: 'A',
+    count: 24,
+    han: 105,
+    words: 3,
+    functionItems: 0,
+    punctuation: 1,
+    items: [
+      '清晨的阳光穿过窗户洒在桌面的花瓶上 soft light',
+      ...Array(19).fill('微风拂面'),
+      ...Array(4).fill('天渐暗'),
+    ],
+  },
+  {
+    name: 'B',
+    count: 19,
+    han: 144,
+    words: 3,
+    functionItems: 0,
+    punctuation: 0,
+    items: [
+      '清晨的阳光穿过窗户洒在桌面的花瓶上 soft light',
+      ...Array(17).fill('微风吹过旧窗台'),
+      '远处的山渐渐暗了',
+    ],
+  },
+  {
+    name: 'C',
+    count: 40,
+    han: 218,
+    words: 3,
+    functionItems: 0,
+    punctuation: 0,
+    items: [
+      '清晨的阳光穿过窗户洒在桌面的花瓶上 soft light',
+      ...Array(33).fill('微风轻拂面'),
+      ...Array(6).fill('远处山色渐暗'),
+    ],
+  },
+  {
+    name: 'D',
+    count: 10,
+    han: 0,
+    words: 29,
+    functionItems: 1,
+    punctuation: 1,
+    items: [
+      'The traveler walks slowly beside quiet rivers carrying old wooden boxes filled with faded letters gathered from distant villages during long summer journeys beneath pale clouds drifting toward mountains',
+      ...Array(9).fill('soft morning light'),
+    ],
+  },
+  {
+    name: 'E',
+    count: 30,
+    han: 0,
+    words: 16,
+    functionItems: 11,
+    punctuation: 0,
+    items: [
+      'The traveler walks slowly beside quiet rivers carrying old wooden boxes filled with faded handwritten letters',
+      ...Array(10).fill('she walks onward'),
+      ...Array(19).fill('soft morning light'),
+    ],
+  },
+  {
+    name: 'F',
+    count: 33,
+    han: 0,
+    words: 17,
+    functionItems: 10,
+    punctuation: 0,
+    items: [
+      'The traveler walks slowly beside quiet rivers carrying old wooden boxes filled with faded handwritten family letters',
+      ...Array(9).fill('they follow quietly'),
+      ...Array(23).fill('soft morning light'),
+    ],
+  },
+  {
+    name: 'G',
+    count: 15,
+    han: 0,
+    words: 14,
+    functionItems: 2,
+    punctuation: 0,
+    items: [
+      'The traveler walks slowly beside quiet rivers carrying old wooden boxes filled with letters',
+      'she walks onward',
+      ...Array(13).fill('soft morning light'),
+    ],
+  },
+];
+
 describe('lossless block document', () => {
+  it.each(syntheticParagraphCases)(
+    'keeps synthetic paragraph $name with the specified numeric features',
+    (sample) => {
+      const source =
+        sample.items.join(sample.han ? '，' : ', ') +
+        (sample.punctuation ? (sample.han ? '。' : '.') : '');
+      expect(sample.items).toHaveLength(sample.count);
+      expect(source.match(/\p{Script=Han}/gu) || []).toHaveLength(sample.han);
+      expect(Math.max(...sample.items.map((item) => item.split(/\s+/).length))).toBe(sample.words);
+      expect(
+        sample.items.filter((item) =>
+          /\b(a|an|the|she|he|her|his|him|they|them|their|it|its|i|my|we|our|you|your|is|are|was|were)\b/i.test(
+            item,
+          ),
+        ),
+      ).toHaveLength(sample.functionItems);
+      expect(source.match(/[.!?。！？]/g) || []).toHaveLength(sample.punctuation);
+      const section = parsePromptSection(source);
+      expect(section.blocks).toHaveLength(1);
+      expect(section.blocks[0].type).toBe('paragraph');
+      expect(section.blocks[0].tags).toEqual([]);
+      expect(serializePromptSection(section)).toBe(source);
+    },
+  );
+
+  it.each([rainyParagraph, rainyParagraph.slice(0, -1), shortEnglishParagraph])(
+    'keeps the specified prose as a paragraph: %s',
+    (source) => {
+      const section = parsePromptSection(source);
+      expect(section.blocks).toHaveLength(1);
+      expect(section.blocks[0].type).toBe('paragraph');
+      expect(serializePromptSection(section)).toBe(source);
+    },
+  );
+
+  it.each([
+    ['黑色长发，蓝色眼睛，校服，短裙，白袜，皮鞋，发带，微笑', 'tags'],
+    ['春风拂面，细雨初停，远山渐暗，天色晚', 'tags'],
+    ['春风拂面，细雨初停，远山渐暗，天色渐晚', 'paragraph'],
+    ['春风拂面，细雨初停，远山渐暗，天色渐晚，云', 'tags'],
+    ['春风拂面，细雨初停，远山渐暗，天色渐晚，sky，river', 'paragraph'],
+  ] as const)('checks Chinese prose totals and averages: %s', (source, expected) => {
+    expect(classifyPromptBlock(source)).toBe(expected);
+    expect(serializePromptSection(parsePromptSection(source))).toBe(source);
+  });
+
+  it.each([
+    [10, 1, 'tags'],
+    [10, 2, 'tags'],
+    [5, 2, 'tags'],
+    [10, 3, 'paragraph'],
+    [11, 3, 'tags'],
+    [11, 4, 'paragraph'],
+  ] as const)(
+    'checks short-list prose thresholds: %i items, %i function-word items',
+    (count, matches, expected) => {
+      const source = [
+        ...Array(matches).fill('the golden hour'),
+        'warm interior',
+        ...Array(count - matches - 1).fill('soft focus background'),
+      ].join(', ');
+      expect(classifyPromptBlock(source)).toBe(expected);
+      expect(serializePromptSection(parsePromptSection(source))).toBe(source);
+    },
+  );
+
+  it.each([
+    [24, 'tags'],
+    [25, 'paragraph'],
+  ] as const)('limits a long-list item to %i words', (words, expected) => {
+    expect(
+      classifyPromptBlock(
+        [...Array(19).fill('sky'), Array(words).fill('word').join(' ')].join(', '),
+      ),
+    ).toBe(expected);
+  });
+
+  it.each([
+    [15, 'tags'],
+    [16, 'paragraph'],
+  ] as const)('limits whole-block Han characters at %i', (count, expected) => {
+    const source = [
+      ...Array(18).fill('sky'),
+      '山'.repeat(count - 1),
+      '水 ' + 'word '.repeat(13).trim(),
+    ].join(', ');
+    expect(classifyPromptBlock(source)).toBe(expected);
+  });
+
+  it.each([
+    [20, 3, 'tags'],
+    [20, 4, 'paragraph'],
+    [21, 4, 'tags'],
+    [21, 5, 'paragraph'],
+  ] as const)(
+    'checks strict function-word ratio: %i items, %i matching items',
+    (count, matches, expected) => {
+      const items = [
+        'word '.repeat(13).trim(),
+        ...Array(matches).fill('THE sky'),
+        ...Array(count - matches - 1).fill('sky'),
+      ];
+      expect(classifyPromptBlock(items.join(', '))).toBe(expected);
+    },
+  );
+
+  it.each(
+    'a an the she he her his him they them their it its i my we our you your is are was were'.split(
+      ' ',
+    ),
+  )('matches the whole function word %s case-insensitively, counting each item once', (word) => {
+    const longItem = 'word '.repeat(13).trim();
+    const matching = `${word.toUpperCase()} ${word}`;
+    expect(
+      classifyPromptBlock(
+        [longItem, ...Array(3).fill(matching), ...Array(16).fill('sky')].join(', '),
+      ),
+    ).toBe('tags');
+    expect(
+      classifyPromptBlock(
+        [longItem, ...Array(4).fill(matching), ...Array(15).fill('sky')].join(', '),
+      ),
+    ).toBe('paragraph');
+    expect(classifyPromptBlock([longItem, ...Array(19).fill(`x${word}x`)].join(', '))).toBe('tags');
+  });
+
   it('keeps a 61-item synthetic list with one 13-word item and two periods as tags', () => {
     const longItem = 'a small red kite on a thin line by an old oak tree';
     const items = Array.from({ length: 58 }, (_, index) => `synthetic detail ${index}`);
@@ -93,11 +316,15 @@ describe('lossless block document', () => {
 
   it.each([
     [9, 1, 'paragraph'],
-    [10, 1, 'tags'],
+    [10, 1, 'paragraph'],
     [11, 2, 'paragraph'],
+    [19, 1, 'paragraph'],
     [19, 2, 'paragraph'],
+    [20, 1, 'tags'],
     [20, 2, 'tags'],
     [20, 3, 'paragraph'],
+    [29, 3, 'paragraph'],
+    [30, 3, 'tags'],
     [61, 6, 'tags'],
     [61, 7, 'paragraph'],
   ])('classifies %i items with %i long items as %s', (count, longCount, expected) => {
@@ -112,14 +339,17 @@ describe('lossless block document', () => {
     'x'.repeat(101),
     'One two three four five six seven eight.',
   ])('counts each non-tag criterion once: %s', (outlier) => {
-    expect(classifyPromptBlock([...Array(9).fill('sky'), outlier].join(', '))).toBe('tags');
-    expect(classifyPromptBlock([...Array(8).fill('sky'), outlier, outlier].join(', '))).toBe(
-      'paragraph',
+    expect(classifyPromptBlock([...Array(19).fill('sky'), outlier].join(', '))).toBe('tags');
+    expect(classifyPromptBlock([...Array(18).fill('sky'), outlier, outlier].join(', '))).toBe(
+      'tags',
     );
+    expect(
+      classifyPromptBlock([...Array(17).fill('sky'), outlier, outlier, outlier].join(', ')),
+    ).toBe('paragraph');
   });
 
   it('counts weight groups as one item and requires commas for the new list rule', () => {
-    const items = [...Array(7).fill('sky'), '1::red, green, blue::', paragraphs[0]];
+    const items = [...Array(17).fill('sky'), '1::red, green, blue::', paragraphs[0]];
     expect(classifyPromptBlock(items.join(', '))).toBe('paragraph');
     items.push('soft light');
     expect(classifyPromptBlock(items.join(', '))).toBe('tags');

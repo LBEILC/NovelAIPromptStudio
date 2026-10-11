@@ -54,9 +54,16 @@ export const MAX_TAG_PHRASE_WORDS = 12;
 export const MAX_TAG_PHRASE_CHARACTERS = 100;
 export const MIN_SENTENCE_CLAUSE_WORDS = 8;
 export const MIN_PARAGRAPH_HAN_CHARACTERS = 16;
-export const MIN_LONG_TAG_LIST_ITEMS = 10;
+export const MIN_PARAGRAPH_HAN_CHARACTERS_PER_ITEM = 4;
+export const MIN_PARAGRAPH_FUNCTION_WORD_ITEMS = 3;
+export const MIN_PARAGRAPH_FUNCTION_WORD_RATIO = 0.3;
+export const MIN_LONG_TAG_LIST_ITEMS = 20;
 export const MAX_LONG_TAG_LIST_OUTLIER_RATIO = 0.1;
 export const MIN_LONG_TAG_LIST_ALLOWED_OUTLIERS = 1;
+export const MAX_LONG_TAG_LIST_ITEM_WORDS = MAX_TAG_PHRASE_WORDS * 2;
+export const MAX_LONG_TAG_LIST_FUNCTION_WORD_RATIO = 0.2;
+const ENGLISH_FUNCTION_WORDS =
+  /\b(?:a|an|the|she|he|her|his|him|they|them|their|it|its|i|my|we|our|you|your|is|are|was|were)\b/i;
 
 function blockLabel(content: string): string {
   const angle = content.match(/^<[\p{L}][\p{L}\p{N}_ -]*>/u)?.[0];
@@ -74,7 +81,14 @@ export function classifyPromptBlock(content: string): BlockType {
     .split(/[,，]+/)
     .map((item) => item.trim())
     .filter(Boolean);
-  if (commaItems.length >= MIN_LONG_TAG_LIST_ITEMS) {
+  const hanCharacters = (content.match(/\p{Script=Han}/gu) || []).length;
+  const functionWordItems = commaItems.filter((item) => ENGLISH_FUNCTION_WORDS.test(item)).length;
+  if (
+    commaItems.length >= MIN_LONG_TAG_LIST_ITEMS &&
+    commaItems.every((item) => item.split(/\s+/).length <= MAX_LONG_TAG_LIST_ITEM_WORDS) &&
+    hanCharacters < MIN_PARAGRAPH_HAN_CHARACTERS &&
+    functionWordItems < commaItems.length * MAX_LONG_TAG_LIST_FUNCTION_WORD_RATIO
+  ) {
     const outliers = commaItems.filter((item) => {
       const words = item.split(/\s+/).length;
       return (
@@ -92,6 +106,18 @@ export function classifyPromptBlock(content: string): BlockType {
     )
       return 'tags';
   }
+  const hanItemCounts = commaItems
+    .map((item) => (item.match(/\p{Script=Han}/gu) || []).length)
+    .filter((count) => count > 0);
+  if (
+    (hanCharacters >= MIN_PARAGRAPH_HAN_CHARACTERS &&
+      hanItemCounts.length > 0 &&
+      hanItemCounts.reduce((sum, count) => sum + count, 0) >=
+        hanItemCounts.length * MIN_PARAGRAPH_HAN_CHARACTERS_PER_ITEM) ||
+    (functionWordItems >= MIN_PARAGRAPH_FUNCTION_WORD_ITEMS &&
+      functionWordItems >= commaItems.length * MIN_PARAGRAPH_FUNCTION_WORD_RATIO)
+  )
+    return 'paragraph';
   const phrases = items
     .split(/[,，\r\n]+/)
     .map((item) => item.trim())
