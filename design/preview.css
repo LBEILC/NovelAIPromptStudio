@@ -78,6 +78,8 @@ button { font: inherit; color: inherit; cursor: default; }
 .field { white-space: nowrap; min-width: 0; }
 .kbd, .seg, .seg button { flex: 0 0 auto; white-space: nowrap; }
 .field.grow { flex: 1 1 0; min-width: 0; }
+/* 下拉：箭头靠右边缘，不跟在文字后面 */
+.field > [class*="ri-arrow-down-s"] { margin-left: auto; padding-left: var(--ctl-gap); }
 .seg { display: inline-flex; gap: var(--tab-gap); }
 .seg button { height: 28px; padding: 0; border: 0; background: transparent; color: var(--text-3); border-bottom: 2px solid transparent; }
 .seg button:hover { color: var(--text); }
