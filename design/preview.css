@@ -47,7 +47,12 @@ button { font: inherit; color: inherit; cursor: default; }
 .tabs { display: flex; gap: 2px; min-width: 0; }
 .tab { height: 30px; display: inline-flex; align-items: center; gap: 8px; padding: 0 10px 0 5px; border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--text-2); white-space: nowrap; }
 .tab:hover { background: var(--hover); color: var(--text); }
-.tab img { width: 17px; height: 22px; object-fit: cover; border-radius: 3px; }
+/* 标签里的缩略图等高，宽度跟着图片的比例（限制在 --tab-thumb-min-w 到 --tab-thumb-max-w），不裁成固定形状 */
+.tab img { width: var(--tab-thumb-min-w); height: var(--tab-thumb-h); object-fit: cover; border-radius: 3px; }
+.tab img.wide { width: var(--tab-thumb-max-w); }
+.tab img.square { width: var(--tab-thumb-h); }
+/* 没有起名的图片：标签里只有缩略图 */
+.tab.bare { padding: 0 5px; }
 .tab.on { background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--border); }
 .tab .n { color: var(--text-3); font-size: var(--fs-small); }
 .tab .dirty { width: 5px; height: 5px; border-radius: 50%; background: var(--text-3); }

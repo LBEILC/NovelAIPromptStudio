@@ -124,8 +124,9 @@ const wbSelbar = (neg) => `<div class="dock"><span class="selbar"><span class="n
 
 function wbTitlebar(st) {
   if (st !== 'tabs') return titlebar('wb');
-  const names = ['夜间书店-01', '雨后候车亭-02', '玻璃花房-02', '海边写生-01', '夜间书店-03', '玻璃花房-04', '海边写生-02', '夜间书店-02'];
-  const tabs = `<span class="tb-sep"></span>${ib('arrow-left-s-line', '向前')}<div class="tabs clip">${names.map((n, i) => `<button class="tab ${i === 1 ? 'on' : ''} ${i === 4 ? 'lift' : ''}">${i === 1 ? '<span class="cur"></span>' : ''}<img src="${IMG(n)}" alt="">${n.replace(/-\d+$/, '')}${i === 1 ? '<span class="dirty" title="Prompt 已修改"></span>' : ''}</button>`).join('')}</div>${ib('arrow-right-s-line', '向后')}<button class="tab add" aria-label="打开图片">${ic('add-line')}</button>`;
+  const items = [['夜间书店-01', '', 'wide'], ['雨后候车亭-02', '雨后候车亭', ''], ['玻璃花房-02', '', ''], ['海边写生-01', '', 'wide'], ['夜间书店-03', '书店 · 夜', ''], ['玻璃花房-04', '', 'square'],
+    ['海边写生-02', '', 'wide'], ['夜间书店-02', '', ''], ['玻璃花房-01', '', ''], ['海边写生-03', '海边', 'wide'], ['雨后候车亭-04', '', ''], ['玻璃花房-03', '', '']];
+  const tabs = `<span class="tb-sep"></span>${ib('arrow-left-s-line', '向前')}<div class="tabs clip">${items.map(([p, name, shape], i) => `<button class="tab ${name ? '' : 'bare'} ${i === 1 ? 'on' : ''} ${i === 4 ? 'lift' : ''}">${i === 1 ? '<span class="cur"></span>' : ''}<img class="${shape}" src="${IMG(p)}" alt="">${name}${i === 1 ? '<span class="dirty" title="Prompt 已修改"></span>' : ''}</button>`).join('')}</div>${ib('arrow-right-s-line', '向后')}<button class="tab add" aria-label="打开图片">${ic('add-line')}</button>`;
   return titlebar('wb').replace(/<span class="tb-sep"><\/span><div class="tabs">[\s\S]*?<\/div><span class="sp">/, `${tabs}<span class="sp">`);
 }
 

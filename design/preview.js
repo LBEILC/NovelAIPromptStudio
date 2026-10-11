@@ -18,9 +18,9 @@ const LOGO = `<span class="logo" aria-label="NovelAI Prompt Studio">${LOGO_SVG}<
 function titlebar(cur) {
   const nav = [['wb', '工作台'], ['lib', '图片库'], ['assets', '素材']].filter(([k]) => k !== 'assets' || gen());
   const tabs = cur === 'wb' ? `<span class="tb-sep"></span><div class="tabs">
-      <button class="tab"><img src="${IMG('夜间书店-01')}" alt="">夜间书店</button>
+      <button class="tab bare" title="没有起名 · 10-11 14:02 导入"><img class="wide" src="${IMG('夜间书店-01')}" alt=""></button>
       <button class="tab on"><span class="cur"></span><img src="${IMG('雨后候车亭-02')}" alt="">雨后候车亭${gen() ? '<span class="n mono">3 版</span>' : ''}<span class="dirty" title="有未生成的改动"></span></button>
-      <button class="tab"><img src="${IMG('玻璃花房-02')}" alt="">玻璃花房</button>
+      <button class="tab bare" title="没有起名 · 10-10 21:40 导入"><img src="${IMG('玻璃花房-02')}" alt=""></button>
       <button class="tab add" aria-label="打开图片">${ic('add-line')}</button></div>` : '';
   return `<div class="tb">${LOGO}
     <div class="nav">${nav.map(([k, t]) => `<button ${k === cur ? 'aria-current="page"' : ''}>${t}</button>`).join('')}</div>

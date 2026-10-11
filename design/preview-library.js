@@ -1,6 +1,6 @@
 // 界面稿（第四部分）：图片库的各个状态。依赖 preview.js 和 preview-pages.js。
 // 地址参数：preview.html?page=lib&sub=filter
-const LIB_STATES = [['home', '默认'], ['group', '一组图片'], ['mixed', '横竖混排'], ['filter', '筛选'], ['view', '视图'], ['select', '多选'], ['collect', '加入收藏集'], ['smart', '智能收藏集'],
+const LIB_STATES = [['home', '默认'], ['group', '一组图片'], ['mixed', '横竖混排'], ['filter', '筛选'], ['view', '视图'], ['select', '多选'], ['rename', '批量起名'], ['unnamed', '没有起名'], ['collect', '加入收藏集'], ['smart', '智能收藏集'],
   ['import', '导入'], ['zip', '导入 ZIP'], ['drop', '拖入'], ['viewer', '大图'], ['trash', '回收站'], ['purge', '永久删除'], ['empty', '空图片库'], ['nomatch', '没有结果']];
 const LIB_PICS = ['雨后候车亭-02', '夜间书店-01', '夜间书店-02', '玻璃花房-01', '海边写生-01', '玻璃花房-02', '玻璃花房-03', '夜间书店-03', '玻璃花房-04', '海边写生-02'];
 const libState = () => (LIB_STATES.some(([k]) => k === S.sub) ? S.sub : 'home');
@@ -61,16 +61,17 @@ function libDoc() {
 
 // 详情栏。mode：one 单张，group 一组，multi 多选，trash 回收站
 function libDetail(mode = 'one', open = '') {
+  const unnamed = mode === 'unnamed';
   if (mode === 'multi') return `<div class="col detail"><div class="sum">
       <div class="fan"><img src="${IMG('雨后候车亭-02')}" alt=""><img src="${IMG('夜间书店-02')}" alt=""><img src="${IMG('玻璃花房-02')}" alt=""></div>
       <b>已选 3 组 · 6 张</b><span class="help">选中一张时，这里显示它的 Prompt。</span></div></div>`;
   const strip = mode === 'group' ? `<div class="strip"><span class="cover"><img src="${IMG('雨后候车亭-01')}" alt=""></span><img class="is-cur" src="${IMG('雨后候车亭-02')}" alt=""><img src="${IMG('雨后候车亭-03')}" alt=""><img src="${IMG('雨后候车亭-04')}" alt=""><span class="label mono">2 / 4</span></div>` : '';
   const acts = mode === 'trash'
     ? `<button class="btn quiet sm">${ic('arrow-go-back-line')}恢复</button><span class="sp"></span><button class="btn danger sm">永久删除</button>`
-    : `<button class="btn quiet sm ${open === 'collect' ? 'is-hover' : ''}">${ic('folder-add-line')}加入收藏集</button><button class="btn quiet sm">${ic('edit-line')}重命名</button>${mode === 'group' ? `<button class="btn quiet sm">${ic('image-line')}设为封面</button>` : ''}<button class="btn quiet sm icon" aria-label="在文件夹中显示">${ic('folder-open-line')}</button><span class="sp"></span><button class="btn danger sm icon" aria-label="移入回收站">${ic('delete-bin-line')}</button>`;
+    : `<button class="btn quiet sm ${open === 'collect' ? 'is-hover' : ''}">${ic('folder-add-line')}加入收藏集</button><button class="btn quiet sm">${ic('edit-line')}${unnamed ? '起名' : '重命名'}</button>${mode === 'group' ? `<button class="btn quiet sm">${ic('image-line')}设为封面</button>` : ''}<button class="btn quiet sm icon" aria-label="在文件夹中显示">${ic('folder-open-line')}</button><span class="sp"></span><button class="btn danger sm icon" aria-label="移入回收站">${ic('delete-bin-line')}</button>`;
   return `<div class="col detail"><div class="scroll">
       <div class="pic"><img src="${IMG('雨后候车亭-02')}" alt=""></div>${strip}
-      <div class="caption" style="padding:10px 16px 0"><b>雨后候车亭-02</b><span class="meta mono">832 × 1216 · V5</span><span class="meta mono">28 步 · 引导 5 · Seed 2890417553</span><span class="meta">${mode === 'trash' ? '2026-10-09 移入回收站' : '2026-10-11 导入'}</span></div>
+      <div class="caption" style="padding:10px 16px 0">${unnamed ? '' : '<b>雨后候车亭-02</b>'}<span class="meta mono">832 × 1216 · V5</span><span class="meta mono">28 步 · 引导 5 · Seed 2890417553</span><span class="meta">${mode === 'trash' ? '2026-10-09 移入回收站' : '2026-10-11 导入'}</span>${unnamed ? '<span class="meta mono" title="masterpiece, 1girl, long copper hair, rain, bus shelter s-1506844432.png">文件 masterpiece, 1girl, lon…s-1506844432.png</span>' : ''}</div>
       <div class="stage-acts" style="padding:4px 8px 0">${acts}</div>
       ${libDoc()}</div>
       <div class="bar"><span class="sp"></span><button class="btn">${ic('file-copy-line')}复制 Prompt</button>${mode === 'trash' ? '' : '<button class="btn ink">在工作台打开</button>'}</div>
@@ -115,6 +116,12 @@ const libZip = () => `<div class="scrim"><div class="dialog" style="width:calc(v
   <div class="grid lib" style="padding:0;grid-template-columns:repeat(6,1fr);gap:var(--sp-2)">${LIB_PICS.concat(['海边写生-03', '雨后候车亭-03']).map((p, i) => `<div class="card ${i > 9 ? 'dim' : i === 3 || i === 7 ? '' : 'picked'}"><img src="${IMG(p)}" alt="">${i > 9 ? '<span class="stack">已有</span>' : `<span class="check pick">${i === 3 || i === 7 ? '' : ic('check-line')}</span>`}</div>`).join('')}</div>
   <div class="acts"><button class="btn">取消</button><button class="btn ink">导入 8 张</button></div></div></div>`;
 
+const libRename = () => `<div class="scrim"><div class="dialog"><h3>给这 6 张图片起名</h3>
+  <p>按现在的排列顺序编号。只改软件里显示的名称，图片文件不动。</p>
+  <div class="frow" style="display:grid;grid-template-columns:44px 1fr;align-items:center;gap:8px;margin-top:var(--sp-4)"><span class="label">名称</span><span class="field is-focus">雨后候车亭</span></div>
+  <div class="frow" style="display:grid;grid-template-columns:44px 1fr;align-items:center;gap:8px;margin-top:var(--sp-2)"><span class="label">结果</span><span class="mono muted">雨后候车亭-01 … 雨后候车亭-06</span></div>
+  <div class="acts"><button class="btn">取消</button><button class="btn ink">起名</button></div></div></div>`;
+
 const libPurge = () => `<div class="scrim"><div class="dialog"><h3>永久删除这 2 张图片？</h3>
   <p>会删除图片库里保存的这 2 份副本和它们的记录，删除后无法恢复。你导入时用的原文件不受影响。</p>
   <div class="acts"><button class="btn is-focus">取消</button><button class="btn line-danger">永久删除</button></div></div></div>`;
@@ -137,7 +144,9 @@ VIEWS.lib = () => {
   if (st === 'filter') { tools = libTools(5, 'filter'); mid = filterChips + libGrid({ pics: few, count: '4 组 · 7 张，共 159 张' }); inGrid = libFilter('<button class="btn quiet sm">清除</button><span class="sp"></span><button class="btn sm">存为智能收藏集</button>'); }
   if (st === 'view') { tools = libTools(0, 'view'); inGrid = libView(); }
   if (st === 'select') { mid = libGrid({ on: -1, picked: [0, 2, 5] }); detail = libDetail('multi');
-    inGrid = `<div class="dock"><span class="selbar"><span class="n">已选 3 组 · 6 张</span><button class="btn quiet sm">加入收藏集</button><button class="btn danger sm">移入回收站</button><button class="btn quiet sm">取消</button></span></div>`; }
+    inGrid = `<div class="dock"><span class="selbar"><span class="n">已选 3 组 · 6 张</span><button class="btn quiet sm">加入收藏集</button><button class="btn quiet sm">起名</button><button class="btn danger sm">移入回收站</button><button class="btn quiet sm">取消</button></span></div>`; }
+  if (st === 'rename') { mid = libGrid({ on: -1, picked: [0, 2, 5] }); detail = libDetail('multi'); over = libRename(); }
+  if (st === 'unnamed') detail = libDetail('unnamed');
   if (st === 'collect') { side = libSide('all'); detail = libDetail('one', 'collect'); over = libCollect(); }
   if (st === 'smart') { side = libSide('s2');
     mid = `<div class="chips"><span class="label">规则</span>${chip('模型', 'V5')}<span class="sp"></span><button class="btn quiet sm">编辑规则</button><button class="btn quiet sm">重命名</button><button class="btn danger sm">删除收藏集</button></div>` + libGrid({ count: '29 组 · 34 张' }); }
