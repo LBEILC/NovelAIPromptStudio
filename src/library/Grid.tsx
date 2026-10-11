@@ -1,0 +1,304 @@
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { adjacentRowIndex, fallbackRatio, layoutLibraryRows } from './layout';
+import { mediaUrl } from '../components/ImageStage.jsx';
+import type { LibraryProps } from './types';
+
+export function LibraryGrid({
+  p,
+  rowHeight,
+  onViewer,
+}: {
+  p: LibraryProps;
+  rowHeight: number;
+  onViewer: () => void;
+}) {
+  const scroll = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState({
+    width: 0,
+    height: 0,
+    top: 0,
+    gap: 0,
+    padding: 0,
+    inset: 0,
+    min: 0.5,
+    max: 2.5,
+  });
+  const anchor = useRef('');
+  const drag = useRef<{
+    x: number;
+    y: number;
+    active: boolean;
+    initial: string[];
+    additive: boolean;
+  } | null>(null);
+  const suppress = useRef(false);
+  const [marquee, setMarquee] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  useLayoutEffect(() => {
+    const node = scroll.current!;
+    const measure = () => {
+      const style = getComputedStyle(node);
+      const number = (name: string) => parseFloat(style.getPropertyValue(name));
+      const padding = number('--sp-5');
+      setViewport((v) => ({
+        ...v,
+        width: node.clientWidth - padding * 2,
+        height: node.clientHeight,
+        top: node.scrollTop,
+        gap: number('--thumb-gap'),
+        padding,
+        inset: number('--sp-1'),
+        min: number('--thumb-ratio-min'),
+        max: number('--thumb-ratio-max'),
+      }));
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    measure();
+    return () => observer.disconnect();
+  }, []);
+  const rows = useMemo(
+    () =>
+      layoutLibraryRows(
+        p.groups.map((group) => {
+          const { width, height } = group.cover.metadata;
+          return width && height ? width / height : fallbackRatio;
+        }),
+        viewport.width,
+        rowHeight,
+        viewport.gap,
+        viewport.min,
+        viewport.max,
+      ),
+    [p.groups, viewport.width, viewport.gap, viewport.min, viewport.max, rowHeight],
+  );
+  const selectedIndex = p.groups.findIndex((group) => group.id === p.previewGroup?.id);
+  const reveal = (index: number, focus = false) => {
+    const node = scroll.current;
+    const row = rows.find((r) => index >= r.start && index < r.start + r.widths.length);
+    if (!node || !row) return;
+    if (row.top < node.scrollTop) node.scrollTop = row.top;
+    else if (row.top + row.height + viewport.inset > node.scrollTop + node.clientHeight)
+      node.scrollTop = row.top + row.height + viewport.inset - node.clientHeight;
+    setViewport((v) => ({ ...v, top: node.scrollTop }));
+    if (focus)
+      requestAnimationFrame(() =>
+        node
+          .querySelector<HTMLElement>(`[data-library-index="${index}"]`)
+          ?.focus({ preventScroll: true }),
+      );
+  };
+  useLayoutEffect(() => {
+    if (selectedIndex >= 0) reveal(selectedIndex);
+  }, [rows, selectedIndex]);
+  useLayoutEffect(() => {
+    if (scroll.current) scroll.current.scrollTop = 0;
+  }, [p.contentKey]);
+  const visible = rows.filter(
+    (row) =>
+      row.top + row.height >= viewport.top - rowHeight &&
+      row.top <= viewport.top + viewport.height + rowHeight,
+  );
+  const totalHeight = rows.length ? rows.at(-1)!.top + rows.at(-1)!.height : 0;
+  const select = (
+    index: number,
+    event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
+  ) => {
+    const group = p.groups[index];
+    if (!group) return;
+    if (event.shiftKey) {
+      const from = Math.max(
+        0,
+        p.groups.findIndex((g) => g.id === (anchor.current || p.previewGroup?.id)),
+      );
+      p.onSelectionChange(
+        p.groups.slice(Math.min(from, index), Math.max(from, index) + 1).map((g) => g.id),
+      );
+    } else if (event.ctrlKey || event.metaKey) {
+      p.onToggleSelect(group, event);
+      anchor.current = group.id;
+    } else {
+      p.onClearSelection();
+      anchor.current = group.id;
+    }
+    p.onPreview(group);
+  };
+  return (
+    <div
+      ref={scroll}
+      className="library-scroll"
+      data-library-grid
+      tabIndex={-1}
+      onScroll={(event) => setViewport((v) => ({ ...v, top: event.currentTarget.scrollTop }))}
+      onKeyDown={(event) => {
+        if (event.ctrlKey || event.metaKey) {
+          if (event.key.toLowerCase() === 'a') {
+            event.preventDefault();
+            p.onSelectAll();
+          }
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          p.onClearSelection();
+          return;
+        }
+        if (event.key === 'Enter' && p.preview) {
+          event.preventDefault();
+          p.onOpenWorkbench(p.preview);
+          return;
+        }
+        if (event.key === ' ' && p.preview) {
+          event.preventDefault();
+          onViewer();
+          return;
+        }
+        const index = Math.max(0, selectedIndex);
+        const next =
+          event.key === 'ArrowRight'
+            ? Math.min(p.groups.length - 1, index + 1)
+            : event.key === 'ArrowLeft'
+              ? Math.max(0, index - 1)
+              : event.key === 'ArrowDown'
+                ? adjacentRowIndex(rows, index, 1, viewport.gap)
+                : event.key === 'ArrowUp'
+                  ? adjacentRowIndex(rows, index, -1, viewport.gap)
+                  : -1;
+        if (next >= 0) {
+          event.preventDefault();
+          select(next, event);
+          reveal(next, true);
+        }
+      }}
+      onPointerDown={(event) => {
+        if (event.button !== 0 || event.pointerType === 'touch') return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (event.clientX >= rect.left + event.currentTarget.clientWidth) return;
+        drag.current = {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top + event.currentTarget.scrollTop,
+          active: false,
+          initial: p.selectedGroupIds,
+          additive: event.ctrlKey || event.metaKey || event.shiftKey,
+        };
+      }}
+      onPointerMove={(event) => {
+        const initial = drag.current;
+        if (!initial) return;
+        const node = event.currentTarget;
+        const rect = node.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top + node.scrollTop;
+        if (!initial.active && Math.hypot(x - initial.x, y - initial.y) < 5) return;
+        initial.active = true;
+        suppress.current = true;
+        node.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        const box = {
+          x: Math.min(x, initial.x),
+          y: Math.min(y, initial.y),
+          width: Math.abs(x - initial.x),
+          height: Math.abs(y - initial.y),
+        };
+        setMarquee(box);
+        const hits: string[] = [];
+        for (const row of rows) {
+          if (
+            row.top + viewport.inset + row.height < box.y ||
+            row.top + viewport.inset > box.y + box.height
+          )
+            continue;
+          let left = viewport.padding;
+          row.widths.forEach((width, offset) => {
+            if (left + width >= box.x && left <= box.x + box.width)
+              hits.push(p.groups[row.start + offset].id);
+            left += width + viewport.gap;
+          });
+        }
+        p.onSelectionChange(initial.additive ? [...new Set([...initial.initial, ...hits])] : hits);
+        if (event.clientY > rect.bottom - viewport.gap) node.scrollTop += rowHeight / 4;
+        if (event.clientY < rect.top + viewport.gap) node.scrollTop -= rowHeight / 4;
+      }}
+      onPointerUp={(event) => {
+        drag.current = null;
+        setMarquee(null);
+        if (event.currentTarget.hasPointerCapture(event.pointerId))
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        setTimeout(() => {
+          suppress.current = false;
+        }, 0);
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+        setMarquee(null);
+      }}
+      onClickCapture={(event) => {
+        if (suppress.current) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
+    >
+      <div className="library-rows" style={{ height: totalHeight + viewport.inset }}>
+        {visible.map((row) => (
+          <div
+            className="library-row"
+            key={row.start}
+            style={{ top: row.top + viewport.inset, height: row.height }}
+          >
+            {row.widths.map((width, offset) => {
+              const index = row.start + offset;
+              const group = p.groups[index];
+              const selected = p.selectedGroupIds.includes(group.id);
+              return (
+                <div
+                  role="option"
+                  aria-selected={selected || group.id === p.previewGroup?.id}
+                  aria-label={group.cover.name}
+                  tabIndex={
+                    group.id === p.previewGroup?.id || (selectedIndex < 0 && index === 0) ? 0 : -1
+                  }
+                  data-library-index={index}
+                  data-group-id={group.id}
+                  data-project-id={group.cover.id}
+                  className={`library-card ${group.id === p.previewGroup?.id ? 'current' : ''} ${selected ? 'picked' : ''}`}
+                  style={{ width, height: row.height }}
+                  key={group.id}
+                  onClick={(event) => select(index, event)}
+                  onDoubleClick={() => p.onOpenWorkbench(group.cover)}
+                >
+                  <img
+                    src={mediaUrl(group.cover.thumbnail_path || group.cover.image_path)}
+                    alt=""
+                    draggable={false}
+                  />
+                  {group.members.length > 1 && (
+                    <span className="library-stack">{group.members.length} 张</span>
+                  )}
+                  {p.selectedGroupIds.length > 0 && (
+                    <span className="library-pick">
+                      {selected && <i className="ri-check-line" />}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="library-count">
+        {p.groups.length} 组 · {p.groups.reduce((sum, group) => sum + group.members.length, 0)} 张
+      </div>
+      {marquee && (
+        <div
+          className="library-marquee"
+          style={{ left: marquee.x, top: marquee.y, width: marquee.width, height: marquee.height }}
+        />
+      )}
+    </div>
+  );
+}

@@ -23,7 +23,7 @@ export function useLibraryState(initialView = 'all') {
   );
   const [previewGroupId, setPreviewGroupId] = useState('');
   const [previewProjectId, setPreviewProjectId] = useState('');
-  const [selectedGroupIds, setSelectedGroupIds] = useState([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   return {
     projectsByView,
     setProjectsByView,
