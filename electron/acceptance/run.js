@@ -1,0 +1,264 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { clipboard, nativeTheme, safeStorage } from 'electron';
+import { pathToFileURL } from 'node:url';
+import { importLibraryFiles } from '../importer.js';
+import { harness } from './harness.js';
+import { settingsChecks } from './settings.js';
+import { componentChecks } from './components.js';
+import { shortcutChecks } from './shortcuts.js';
+import { preserveClipboard } from './clipboard.js';
+
+export async function runAcceptance(context) {
+  const { app, mode, database, assetsDirectory, preferences, createWindow } = context;
+  const checks = [];
+  mode.screenshots = [];
+  const started = Date.now();
+  const restoreClipboard = preserveClipboard(clipboard);
+  const previousTheme = nativeTheme.themeSource;
+  const files = (await fs.readdir(path.join(mode.root, 'fixtures')))
+    .filter((f) => f.endsWith('.png'))
+    .sort()
+    .map((f) => path.join(mode.root, 'fixtures', f));
+  let window;
+  let h;
+  const snapshot = () =>
+    JSON.stringify({
+      library: database.loadLibrary('all'),
+      trash: database.loadLibrary('trash'),
+      collections: database.listCollections(),
+      dictionary: database.listTagDictionary({ limit: 10000 }),
+    });
+  try {
+    if (mode.phase === 0) {
+      const imported = await importLibraryFiles({ filePaths: files, database, assetsDirectory });
+      if (imported.errors.length || imported.imported.length !== 14)
+        throw Error('演示图片导入失败');
+      const projects = database.loadLibrary('all');
+      database.createCollection({ id: 'acceptance', name: '验收收藏集', kind: 'manual' });
+      database.updateCollectionProjects('acceptance', [projects[0].id]);
+      database.updateProjects([projects.at(-1).id], { deleted: true });
+      database.upsertTagDictionary(
+        Array.from({ length: 205 }, (_, i) => ({
+          tag: `acceptance_${String(i).padStart(3, '0')}`,
+          translation: `验收译文${i}`,
+          category: i % 2 ? 'Clothing' : 'Body',
+          translation_source: i % 2 ? 'ai' : 'manual',
+          category_source: 'manual',
+        })),
+      );
+    }
+    window = createWindow();
+    const overlays = [];
+    if (process.platform === 'win32') {
+      const original = window.setTitleBarOverlay.bind(window);
+      window.setTitleBarOverlay = (value) => {
+        overlays.push(value);
+        return original(value);
+      };
+    }
+    h = harness(window, mode, checks);
+    const { evaluate: e, wait, check, click, section, font } = h;
+    const blockedRequests = [];
+    window.webContents.session.webRequest.onBeforeRequest(
+      { urls: ['http://*/*', 'https://*/*'] },
+      (request, callback) => {
+        const allowed = new URL(request.url).origin === new URL(mode.baseUrl).origin;
+        if (!allowed) blockedRequests.push(request.url);
+        callback({ cancel: !allowed });
+      },
+    );
+    window.webContents.debugger.attach('1.3');
+    await window.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', {
+      enabled: true,
+    });
+    await new Promise((resolve, reject) => {
+      window.webContents.once('did-finish-load', resolve);
+      window.webContents.once('did-fail-load', (_event, code, message) =>
+        reject(Error(`${code} ${message}`)),
+      );
+    });
+    await wait('!!document.querySelector(".studio-titlebar") && !!window.studio');
+    await check(
+      '验收启动仍使用正常渲染器，无额外控制接口',
+      'window.studioScreenshot === undefined && window.studioAcceptance === undefined && typeof require === "undefined"',
+    );
+    await check('所有用户路径位于临时目录', () =>
+      ['userData', 'sessionData', 'logs', 'crashDumps'].every((name) =>
+        app.getPath(name).startsWith(mode.root + path.sep),
+      ),
+    );
+    await check('SQLite 已打开且演示图库可读', () => database.loadLibrary('all').length >= 13);
+    if (mode.packaged) {
+      await check('正在运行真正的打包程序', () => app.isPackaged === true);
+      await check(
+        '渲染页面来自目录包内部',
+        () =>
+          window.webContents.getURL() ===
+          pathToFileURL(path.join(app.getAppPath(), 'dist', 'index.html')).href,
+      );
+    }
+    const overlayCheck = async (label) => {
+      if (process.platform !== 'win32') return;
+      const tokens = await e(
+        `(() => {const s=getComputedStyle(document.documentElement);return {color:s.getPropertyValue('--pane').trim(),symbolColor:s.getPropertyValue('--text').trim()}})()`,
+      );
+      await h.until(
+        () =>
+          overlays.at(-1)?.color === tokens.color &&
+          overlays.at(-1)?.symbolColor === tokens.symbolColor,
+        label,
+      );
+      await check(
+        label,
+        () =>
+          overlays.at(-1)?.color === tokens.color &&
+          overlays.at(-1)?.symbolColor === tokens.symbolColor,
+      );
+    };
+    const environment = {
+      ...context,
+      h,
+      files,
+      overlays,
+      snapshot,
+      encrypted: safeStorage.isEncryptionAvailable(),
+    };
+    if (mode.phase > 0) {
+      h.category('数据');
+      await check(
+        '跨进程重启保留图库、收藏集、回收站和词典全部内容',
+        async () =>
+          snapshot() === (await fs.readFile(path.join(mode.root, 'snapshot.json'), 'utf8')),
+      );
+      await settingsChecks(environment, true);
+    } else {
+      for (const theme of mode.packaged ? ['light', 'dark'] : [mode.theme]) {
+        h.category(`外壳·${theme}`);
+        await section('外观');
+        await click(theme === 'light' ? '浅色' : '深色');
+        await wait(`document.documentElement.dataset.theme === '${theme}'`);
+        await check(
+          '主题应用到新旧页面',
+          `document.documentElement.dataset.theme === '${theme}' && document.documentElement.dataset.themeMode === '${theme}'`,
+        );
+        await overlayCheck('标题栏覆盖层参数与当前令牌一致');
+        for (const name of ['工作台', '图片库', '设置']) {
+          await click(name, 'document.querySelector(".studio-titlebar")');
+          await wait(
+            `document.querySelector('.studio-titlebar [aria-current=page]')?.textContent.trim() === ${JSON.stringify(name)} || document.querySelector('.studio-titlebar [aria-current=page]')?.getAttribute('aria-label') === ${JSON.stringify(name)}`,
+          );
+          await check(
+            `导航 ${name} 当前项样式与旧竖栏移除`,
+            `(() => {const e=document.querySelector('.studio-titlebar [aria-current=page]');return getComputedStyle(e).fontWeight === getComputedStyle(e).getPropertyValue('--fw-strong').trim() && !document.querySelector('.app-sidebar')})()`,
+          );
+        }
+        await section('关于与更新');
+        await font('.studio-titlebar nav button', 'MiSans');
+        await font('.settings-about-name', 'Newsreader');
+        await e(
+          `(() => { const p=document.createElement('p'); p.id='acceptance-font-mono';p.style.fontFamily='var(--font-mono)';p.textContent='blue_hair 1.25';document.querySelector('.settings-about-head').append(p) })()`,
+        );
+        await font('#acceptance-font-mono', 'IBM Plex Mono');
+        await h.screenshot(`about-${theme}`);
+        await e('document.querySelector("#acceptance-font-mono").remove()');
+      }
+      if (!mode.packaged) {
+        h.category('外壳');
+        await section('外观');
+        await e(
+          `(() => { const group=document.querySelector('[role=radiogroup][aria-label="主题"]'); for(const name of ['浅色','深色','浅色','深色']) [...group.querySelectorAll('button')].find(b=>b.textContent.trim()===name).click() })()`,
+        );
+        await wait('document.documentElement.dataset.theme === "dark"');
+        await check(
+          '快速主题切换保留最后选择',
+          () => preferences.appearanceSettings().themeMode === 'dark',
+        );
+        await overlayCheck('快速切换后标题栏采用最后主题令牌');
+        await click('跟随系统', 'document.querySelector("[role=radiogroup][aria-label=主题]")');
+        for (const theme of ['light', 'dark']) {
+          nativeTheme.themeSource = theme;
+          await wait(`document.documentElement.dataset.theme === '${theme}'`);
+          await check(
+            `跟随系统响应 ${theme}`,
+            `document.documentElement.dataset.themeMode === '${theme}'`,
+          );
+          await overlayCheck(`跟随系统 ${theme} 时标题栏令牌同步`);
+        }
+        await click('关闭', 'document.querySelector("[role=radiogroup][aria-label=动效]")');
+        await wait('document.documentElement.dataset.motion === "off"');
+        await check(
+          '关闭动效时组件过渡为零',
+          'getComputedStyle(document.querySelector(".nps-button")).transitionDuration === "0s"',
+        );
+        await click('跟随系统', 'document.querySelector("[role=radiogroup][aria-label=动效]")');
+        await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
+          features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
+        });
+        await check(
+          '系统减少动态效果时组件过渡为零',
+          'matchMedia("(prefers-reduced-motion: reduce)").matches && getComputedStyle(document.querySelector(".nps-button")).transitionDuration === "0s"',
+        );
+        await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
+          features: [],
+        });
+        window.showInactive();
+        window.maximize();
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        await check('BrowserWindow 确实进入最大化状态', () => window.isMaximized());
+        await check(
+          '最大化后内容与标题栏不重叠，设置不被覆盖',
+          `(() => {const bar=document.querySelector('.studio-titlebar').getBoundingClientRect(),body=document.querySelector('.studio-settings').getBoundingClientRect(),settings=document.querySelector('.studio-titlebar [aria-label="设置"]').getBoundingClientRect(),controls=document.querySelector('.studio-window-controls').getBoundingClientRect();return body.top>=bar.bottom-1 && settings.right<=controls.left+1 && settings.bottom<=bar.bottom})()`,
+        );
+        window.unmaximize();
+        window.hide();
+        await section('外观');
+        await click(mode.theme === 'light' ? '浅色' : '深色');
+        await wait(`document.documentElement.dataset.theme === '${mode.theme}'`);
+        await shortcutChecks(environment);
+        await settingsChecks(environment, false);
+        await componentChecks(environment);
+        await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());
+      }
+    }
+    h.category('隔离');
+    await check('验收运行没有请求外部网络', () => blockedRequests.length === 0);
+    if (checks.some((item) => item.status === 'failed'))
+      throw Object.assign(Error('验收存在失败断言，详见检查清单'), { summary: true });
+  } catch (error) {
+    console.error(error);
+    if (!error.summary)
+      checks.push({
+        category: '运行',
+        label: '操作与等待完成',
+        status: 'failed',
+        error: String(error),
+        context: await h?.evaluate('document.body.innerText.slice(-8000)').catch(() => ''),
+      });
+    await h?.screenshot(`failure-${mode.phase}`).catch(() => {});
+    throw error;
+  } finally {
+    const restored = restoreClipboard();
+    checks.push({
+      category: '隔离',
+      label: '恢复运行前剪贴板内容',
+      status: restored ? 'passed' : 'failed',
+    });
+    nativeTheme.themeSource = previousTheme;
+    await fs.writeFile(
+      path.join(mode.output, `checks-${mode.phase}.json`),
+      JSON.stringify(
+        {
+          platform: process.platform,
+          phase: mode.phase,
+          durationMs: Date.now() - started,
+          checks,
+          screenshots: mode.screenshots,
+        },
+        null,
+        2,
+      ),
+    );
+    window?.destroy();
+  }
+}

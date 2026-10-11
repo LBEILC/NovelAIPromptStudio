@@ -31,7 +31,9 @@
     "format:check": "prettier --check \"{src,electron,scripts}/**/*.{js,jsx,ts,tsx,cjs,mjs}\" \"vite.config.js\"",
     "fonts": "node scripts/fonts.mjs",
     "fonts:check": "node scripts/fonts.mjs --check",
-    "verify:fonts:package": "node scripts/verify-font-package.mjs"
+    "verify:fonts:package": "node scripts/verify-font-package.mjs",
+    "verify:app": "npm run build && node scripts/verify-app.mjs",
+    "verify:packaged": "npm run fonts:check && npm run build && node scripts/verify-app.mjs --packaged"
   },
   "dependencies": {
     "electron-updater": "6.8.9",

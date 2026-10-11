@@ -48,6 +48,7 @@ import {
 } from './updates.js';
 import { configureAppProfile } from './appProfile.js';
 import { configureScreenshotMode } from './screenshotMode.js';
+import { configureAcceptanceMode, installAcceptanceDoubles } from './acceptanceMode.js';
 import {
   copyImageToClipboard,
   copyManagedImageToClipboard,
@@ -61,6 +62,8 @@ import {
 const { autoUpdater } = electronUpdater;
 
 app.setName('NovelAI Prompt Studio');
+const acceptanceMode = configureAcceptanceMode(app);
+const acceptanceDoubles = installAcceptanceDoubles(acceptanceMode, { dialog, shell });
 const screenshotMode = configureScreenshotMode(app);
 const databaseProbeOutput = process.argv
   .find((argument) => argument.startsWith('--database-probe-output='))
@@ -71,7 +74,7 @@ const databaseProbeDirectory = databaseProbeOutput
 if (databaseProbeDirectory) {
   app.setPath('userData', databaseProbeDirectory);
   app.setPath('sessionData', databaseProbeDirectory);
-} else if (!screenshotMode) configureAppProfile(app);
+} else if (!screenshotMode && !acceptanceMode) configureAppProfile(app);
 if (process.platform === 'win32') app.setAppUserModelId('studio.novelai.prompt');
 protocol.registerSchemesAsPrivileged([
   {
@@ -189,12 +192,14 @@ function createWindow(captureState = null) {
     autoHideMenuBar: process.platform === 'win32',
     icon: appIconPath,
     backgroundColor: '#10151b',
+    ...(acceptanceMode ? { show: false } : {}),
     ...(captureState ? { show: false, useContentSize: true, enableLargerThanScreen: true } : {}),
     webPreferences: {
       preload: path.join(import.meta.dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      ...(acceptanceMode ? { backgroundThrottling: false, offscreen: true } : {}),
       ...(captureState
         ? {
             offscreen: true,
@@ -243,6 +248,7 @@ function releaseNotesText(notes) {
 }
 
 function configureAutoUpdater() {
+  if (acceptanceMode) return;
   if (!getUpdateCapabilities(process.platform, app.isPackaged).canDownloadUpdate) return;
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
@@ -1216,6 +1222,16 @@ app.whenReady().then(async () => {
     ...getUpdateCapabilities(process.platform, app.isPackaged),
   }));
   ipcMain.handle('updates:check', async () => {
+    if (acceptanceMode) {
+      notifyUpdateState({
+        phase: 'available',
+        hasUpdate: true,
+        latestVersion: '99.0.0',
+        notes: '# 验收发布说明\n\n本地替身。',
+        releaseUrl: 'https://github.com/LBEILC/NovelAIPromptStudio/releases/tag/v99.0.0',
+      });
+      return { ok: true, ...updateState };
+    }
     const capabilities = getUpdateCapabilities(process.platform, app.isPackaged);
     try {
       if (!capabilities.canDownloadUpdate) {
@@ -1388,6 +1404,26 @@ app.whenReady().then(async () => {
     }
   });
 
+  if (acceptanceMode) {
+    try {
+      const { runAcceptance } = await import('./acceptance/run.js');
+      await runAcceptance({
+        app,
+        mode: acceptanceMode,
+        doubles: acceptanceDoubles,
+        database,
+        assetsDirectory,
+        preferences,
+        createWindow,
+      });
+      app.quit();
+    } catch (error) {
+      console.error(error);
+      database?.close();
+      app.exit(1);
+    }
+    return;
+  }
   if (screenshotMode) {
     try {
       const { runAppScreenshots } = await import('./appScreenshots.js');
@@ -1414,7 +1450,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (!screenshotMode && process.platform !== 'darwin') app.quit();
+  if (!screenshotMode && !acceptanceMode && process.platform !== 'darwin') app.quit();
 });
 app.on('before-quit', () => {
   quitting = true;

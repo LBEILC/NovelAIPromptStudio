@@ -44,6 +44,14 @@ jobs:
       - name: Acquire and verify MiSans (required for screenshots and packaging)
         run: npm run fonts
       - run: npm run fonts:check
+      - run: npm run verify:app
+      - name: Upload acceptance checks and screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: acceptance-${{ matrix.os }}-node${{ matrix.node }}
+          path: .codex-runs/acceptance/
+          if-no-files-found: error
       - run: npm run screenshots:app -- --constrain-window
       - name: Upload application screenshots
         if: always()
@@ -53,9 +61,16 @@ jobs:
           path: .codex-runs/screens/
           if-no-files-found: error
       - name: Verify unsigned directory package
-        run: npm run package -- --dir
+        run: npm run verify:packaged
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Upload packaged acceptance
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: acceptance-packaged-${{ matrix.os }}-node${{ matrix.node }}
+          path: .codex-runs/acceptance-packaged/
+          if-no-files-found: error
       - run: npm run verify:fonts:package
       - run: npm run screenshots:ui
       - name: Upload component screenshots and native evidence
