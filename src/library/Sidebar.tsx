@@ -4,6 +4,7 @@ import type { Collection } from '../shared/types';
 import type { LibraryProps } from './types';
 
 export function LibrarySidebar({ p }: { p: LibraryProps }) {
+  // TODO(design): Specify collection-management placement and the new-collection dialog copy.
   const [naming, setNaming] = useState<Collection | 'new' | null>(null);
   const [name, setName] = useState('');
   const [menu, setMenu] = useState('');

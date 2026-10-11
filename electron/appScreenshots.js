@@ -3,6 +3,7 @@ import path from 'node:path';
 import { ipcMain, nativeImage, screen } from 'electron';
 import { importLibraryFiles } from './importer.js';
 import { screenshotScenes } from '../scripts/app-screenshot-scenes.mjs';
+import { prepareLibraryScreenshot } from './libraryScreenshots.js';
 
 async function renderedFonts(webContents, selectors) {
   const cdp = webContents.debugger;
@@ -95,6 +96,7 @@ export async function runAppScreenshots({
           workbenchPaths: scene.workbench ? filePaths.slice(0, 3) : [],
         };
         const window = createWindow(state);
+        let cleanupLibraryScene = async () => {};
         const overlayUpdates = [];
         if (process.platform === 'win32' && window.setTitleBarOverlay) {
           const applyOverlay = window.setTitleBarOverlay.bind(window);
@@ -175,6 +177,14 @@ export async function runAppScreenshots({
             if (innerWidth !== 1240 || innerHeight !== 760) throw new Error('Unexpected viewport size: ' + innerWidth + 'x' + innerHeight);
           })()`);
           if (errors.length) throw new Error(errors.join('\n'));
+          cleanupLibraryScene = await prepareLibraryScreenshot({
+            window,
+            scene,
+            mode,
+            database,
+            assetsDirectory,
+            filePaths,
+          });
           if (
             process.platform === 'win32' &&
             window.setTitleBarOverlay &&
@@ -270,6 +280,7 @@ export async function runAppScreenshots({
             manifest.fontProof.push({ file: proofFile, theme, renderedFonts: proof });
           }
         } finally {
+          await cleanupLibraryScene();
           window.destroy();
         }
       }

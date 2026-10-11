@@ -1,3 +1,4 @@
+import { libraryChecks } from './library.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { clipboard, nativeTheme, safeStorage } from 'electron';
@@ -11,6 +12,10 @@ import { preserveClipboard } from './clipboard.js';
 import { cardCacheChecks } from './cardCache.js';
 
 export async function runAcceptance(context) {
+  if (context.mode.libraryBenchmark) {
+    const { runLibraryBenchmark } = await import('./libraryBenchmark.js');
+    return runLibraryBenchmark(context);
+  }
   const { app, mode, database, assetsDirectory, preferences, createWindow } = context;
   const checks = [];
   mode.screenshots = [];
@@ -202,8 +207,8 @@ export async function runAcceptance(context) {
           `(() => { const p=document.createElement('p'); p.id='acceptance-font-mono';p.style.fontFamily='var(--font-mono)';p.textContent='blue_hair 1.25';document.querySelector('.settings-about-head').append(p) })()`,
         );
         await font('#acceptance-font-mono', 'IBM Plex Mono');
-        await h.screenshot(`about-${theme}`);
         await e('document.querySelector("#acceptance-font-mono").remove()');
+        await h.screenshot(`about-${theme}`);
       }
       if (!mode.packaged) {
         h.category('外壳');
@@ -258,6 +263,7 @@ export async function runAcceptance(context) {
         await click(mode.theme === 'light' ? '浅色' : '深色');
         await wait(`document.documentElement.dataset.theme === '${mode.theme}'`);
         await shortcutChecks(environment);
+        await libraryChecks(environment);
         await settingsChecks(environment, false);
         await componentChecks(environment);
         await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());
@@ -280,11 +286,19 @@ export async function runAcceptance(context) {
     await h?.screenshot(`failure-${mode.phase}`).catch(() => {});
     throw error;
   } finally {
-    const restored = restoreClipboard();
+    let restored = restoreClipboard();
+    const immediate = restored;
+    // Windows clipboard ownership may settle on the next message-loop turn.
+    // Write once; only reread, so a delayed check never overwrites another app.
+    for (let attempt = 0; !restored && attempt < 10; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      restored = restoreClipboard.verify();
+    }
     checks.push({
       category: '隔离',
       label: '恢复运行前剪贴板内容',
       status: restored ? 'passed' : 'failed',
+      details: { immediate, ...restoreClipboard.details() },
     });
     nativeTheme.themeSource = previousTheme;
     await fs.writeFile(

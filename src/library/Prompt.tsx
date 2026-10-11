@@ -42,13 +42,24 @@ function TagBlock({ block, annotations }: { block: PromptBlock; annotations: Pro
   const [expanded, setExpanded] = useState(false);
   const [limit, setLimit] = useState(Infinity);
   const measurement = useRef<HTMLDivElement>(null);
+  const moreMeasurement = useRef<HTMLButtonElement>(null);
   useLayoutEffect(() => {
     const node = measurement.current!;
     const measure = () => {
       const tops = [...node.children].map((child) => (child as HTMLElement).offsetTop);
       const second = tops.find((top) => top > (tops[0] ?? 0));
       const third = second == null ? -1 : tops.findIndex((top) => top > second);
-      setLimit(third < 0 ? Infinity : Math.max(1, third - 1));
+      let visible = third;
+      if (visible > 0) {
+        const gap = parseFloat(getComputedStyle(node).columnGap) || 0;
+        const moreWidth = moreMeasurement.current?.getBoundingClientRect().width || 0;
+        while (visible > 0 && tops[visible - 1] === second) {
+          const last = node.children[visible - 1] as HTMLElement;
+          if (last.offsetLeft + last.offsetWidth + gap + moreWidth <= node.clientWidth) break;
+          visible--;
+        }
+      }
+      setLimit(third < 0 ? Infinity : Math.max(1, visible));
     };
     const observer = new ResizeObserver(measure);
     observer.observe(node);
@@ -74,6 +85,16 @@ function TagBlock({ block, annotations }: { block: PromptBlock; annotations: Pro
       <div className="library-tags library-tags-measure" ref={measurement} aria-hidden="true">
         {tags}
       </div>
+      <Button
+        ref={moreMeasurement}
+        className="library-tags-more-measure"
+        aria-hidden="true"
+        tabIndex={-1}
+        variant="quiet"
+        size="small"
+      >
+        还有 {tags.length} 个
+      </Button>
       <div className="library-tags">
         {expanded ? tags : tags.slice(0, limit)}
         {!expanded && limit < tags.length && (

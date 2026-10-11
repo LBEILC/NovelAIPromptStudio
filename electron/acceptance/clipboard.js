@@ -1,3 +1,21 @@
+import { createHash } from 'node:crypto';
+
+export function clipboardSummary(clipboard) {
+  const digest = (value) => {
+    const bytes = Buffer.isBuffer(value) ? value : Buffer.from(String(value || ''));
+    return { bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
+  };
+  const formats = clipboard.availableFormats();
+  const image = clipboard.readImage();
+  return {
+    formats,
+    text: digest(clipboard.readText?.()),
+    html: digest(clipboard.readHTML?.()),
+    rtf: digest(clipboard.readRTF?.()),
+    image: image.isEmpty() ? null : digest(image.toPNG()),
+  };
+}
+
 // Electron.write restores the standard formats together. Calling writeBuffer
 // repeatedly would replace the previous format on each call.
 export function preserveClipboard(clipboard) {
@@ -22,14 +40,21 @@ export function preserveClipboard(clipboard) {
     data.text = bookmark.url;
     data.bookmark = bookmark.title;
   }
-  return () => {
+  const original = clipboardSummary(clipboard);
+  const verify = () =>
+    (formats.length > 0 || clipboard.availableFormats().length === 0) &&
+    (!Object.hasOwn(data, 'text') || clipboard.readText() === data.text) &&
+    (!data.html || clipboard.readHTML() === data.html) &&
+    (!data.rtf || clipboard.readRTF() === data.rtf) &&
+    (!data.image || clipboard.readImage().toPNG().equals(data.image.toPNG()));
+  let before;
+  const restore = () => {
+    before = clipboardSummary(clipboard);
     if (formats.length) clipboard.write(data);
     else clipboard.clear();
-    return (
-      (!Object.hasOwn(data, 'text') || clipboard.readText() === data.text) &&
-      (!data.html || clipboard.readHTML() === data.html) &&
-      (!data.rtf || clipboard.readRTF() === data.rtf) &&
-      (!data.image || clipboard.readImage().toPNG().equals(data.image.toPNG()))
-    );
+    return verify();
   };
+  restore.verify = verify;
+  restore.details = () => ({ original, before, after: clipboardSummary(clipboard) });
+  return restore;
 }

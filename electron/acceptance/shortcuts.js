@@ -70,9 +70,9 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
 export async function createTrashDraft({ h, database }) {
   const { evaluate: e, wait, click, check } = h;
   await click('图片库', 'document.querySelector(".studio-titlebar")');
-  await wait('!!document.querySelector(".gallery-card-main")');
+  await wait('!!document.querySelector(".library-card")');
   await e(
-    'document.querySelector(".gallery-card-main").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
+    'document.querySelector(".library-card").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
   );
   await wait('!!document.querySelector(".workbench-editor-panel")');
   await click('原始 Prompt');

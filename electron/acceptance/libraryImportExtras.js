@@ -1,0 +1,68 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import sharp from 'sharp';
+import { clipboard, nativeImage } from 'electron';
+
+export async function libraryImportExtras({ h, database, doubles, mode, files, reduced, click }) {
+  const { evaluate: e, wait, check } = h;
+  const scope = 'document.querySelector(".library-page")';
+  const before = database.loadLibrary('all').length;
+  doubles.selections.push({ canceled: true, filePaths: [] });
+  await click('导入', scope);
+  await check('取消文件选择不改变图库', () => database.loadLibrary('all').length === before);
+  clipboard.writeImage(
+    nativeImage.createFromPath(files[0]).resize({ width: 355 + Number(reduced) }),
+  );
+  await click('其他导入方式', scope);
+  await click('从剪贴板导入', 'document.querySelector(".nps-popover:popover-open")');
+  await h.until(() => database.loadLibrary('all').length === before + 1, '菜单从剪贴板导入');
+  await check('小箭头菜单从剪贴板导入', () => database.loadLibrary('all').length === before + 1);
+  const batch = [];
+  for (let i = 0; i < 60; i++) {
+    const file = path.join(mode.root, `cancel-${reduced}-${i}.png`);
+    await sharp(files[1])
+      .extract({ left: i, top: 100 + Number(reduced), width: 410, height: 510 })
+      .png()
+      .toFile(file);
+    batch.push(file);
+  }
+  const count = database.loadLibrary('all').length;
+  doubles.selections.push({ canceled: false, filePaths: batch });
+  await click('导入', scope);
+  await wait(
+    'Number(document.querySelector(".library-job [role=progressbar]")?.getAttribute("aria-valuenow"))>0',
+  );
+  await h.screenshot(`library-import-${reduced ? 'off' : 'full'}-${mode.theme}`);
+  await click('取消剩下的', scope);
+  await wait('!document.querySelector(".library-job")');
+  const imported = database.loadLibrary('all').length - count;
+  await check('取消剩余导入保留已完成的图片', () => imported > 0 && imported < 60);
+  const file = batch.at(-1);
+  await e(
+    `(()=>{const input=document.createElement('input');input.type='file';input.hidden=true;input.id='acceptance-drop-file';document.body.append(input)})()`,
+  );
+  const cdp = h.window.webContents.debugger;
+  await cdp.sendCommand('DOM.enable');
+  const { root } = await cdp.sendCommand('DOM.getDocument');
+  const { nodeId } = await cdp.sendCommand('DOM.querySelector', {
+    nodeId: root.nodeId,
+    selector: '#acceptance-drop-file',
+  });
+  await cdp.sendCommand('DOM.setFileInputFiles', { nodeId, files: [file] });
+  await e(
+    `(()=>{const source=document.querySelector('#acceptance-drop-file');const data=new DataTransfer();data.items.add(source.files[0]);window.__acceptanceDrop=data;const target=document.querySelector('.library-scroll');for(const type of ['dragenter','dragover'])target.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:data,clientX:400,clientY:300}));})()`,
+  );
+  await wait('!!document.querySelector(".library-drop")');
+  await h.screenshot(`library-drop-${reduced ? 'off' : 'full'}-${mode.theme}`);
+  await e(
+    `(()=>{document.querySelector('.library-scroll').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:window.__acceptanceDrop,clientX:400,clientY:300}));document.querySelector('#acceptance-drop-file').remove();delete window.__acceptanceDrop;})()`,
+  );
+  await h.until(
+    () => database.loadLibrary('all').some((p) => p.name === path.basename(file, '.png')),
+    '拖入文件导入',
+  );
+  await check('拖进窗口通过真实文件路径导入', () =>
+    database.loadLibrary('all').some((p) => p.name === path.basename(file, '.png')),
+  );
+  await check('导入保留用户选择的原文件', async () => !!(await fs.stat(file)));
+}

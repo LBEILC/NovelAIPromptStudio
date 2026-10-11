@@ -29,6 +29,7 @@ export function installAcceptanceDoubles(mode, { dialog, shell }) {
   if (!mode) return null;
   const calls = [];
   const selections = [];
+  const saves = [];
   const messages = [];
   const originals = [];
   const replace = (object, key, fn) => {
@@ -42,6 +43,11 @@ export function installAcceptanceDoubles(mode, { dialog, shell }) {
     calls.push({ kind: 'dialog', options: args.at(-1) });
     if (!selections.length) throw new Error('Unexpected native dialog in acceptance mode');
     return selections.shift();
+  });
+  replace(dialog, 'showSaveDialog', async (...args) => {
+    calls.push({ kind: 'save', options: args.at(-1) });
+    if (!saves.length) throw new Error('Unexpected save dialog in acceptance mode');
+    return saves.shift();
   });
   replace(dialog, 'showMessageBox', async (...args) => {
     calls.push({ kind: 'message', options: args.at(-1) });
@@ -57,6 +63,7 @@ export function installAcceptanceDoubles(mode, { dialog, shell }) {
   return {
     calls,
     selections,
+    saves,
     messages,
     restore: () => originals.reverse().forEach((restore) => restore()),
   };

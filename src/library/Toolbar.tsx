@@ -325,6 +325,7 @@ export function LibraryToolbar({
                   setOpen('');
                 }}
               >
+                {/* TODO(design): Specify the edited smart-collection rule confirmation label. */}
                 【文案待定：保存规则】
               </Button>
             ) : (
@@ -401,11 +402,14 @@ export function LibraryToolbar({
               </div>
             </>
           )}
-          <Switch
-            label="Vibe 不同的也合并"
-            checked={p.grouping.mergeVibes}
-            onChange={(mergeVibes) => p.onGroupingChange({ mergeVibes })}
-          />
+          <div className="library-view-vibe">
+            <span>Vibe 不同的也合并</span>
+            <Switch
+              label="Vibe 不同的也合并"
+              checked={p.grouping.mergeVibes}
+              onChange={(mergeVibes) => p.onGroupingChange({ mergeVibes })}
+            />
+          </div>
         </div>
       </Popover>
       <Popover

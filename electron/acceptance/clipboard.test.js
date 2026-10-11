@@ -28,3 +28,29 @@ it('refuses unsupported custom formats without modifying the clipboard', () => {
   expect(clipboard.clear).not.toHaveBeenCalled();
   expect(clipboard.write).not.toHaveBeenCalled();
 });
+
+it('rereads delayed clipboard ownership without rewriting and records only hashes and lengths', () => {
+  let value = 'private original';
+  let pending;
+  const clipboard = {
+    availableFormats: () => ['text/plain'],
+    readImage: () => ({ isEmpty: () => true }),
+    readText: () => value,
+    readBookmark: () => ({}),
+    write: vi.fn((data) => {
+      pending = data.text;
+    }),
+  };
+  const restore = preserveClipboard(clipboard);
+  value = 'temporary test value';
+  expect(restore()).toBe(false);
+  expect(restore.verify()).toBe(false);
+  value = pending;
+  expect(restore.verify()).toBe(true);
+  expect(clipboard.write).toHaveBeenCalledOnce();
+  const details = restore.details();
+  expect(details.after.text).toEqual(details.original.text);
+  expect(details.before.text).not.toEqual(details.original.text);
+  expect(JSON.stringify(details)).not.toContain('private original');
+  expect(JSON.stringify(details)).not.toContain('temporary test value');
+});

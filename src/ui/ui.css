@@ -147,3 +147,5 @@
 }
 .nps-empty-mark { display:block; width:var(--empty-mark); height:var(--empty-mark); color:var(--text-off); }
 .nps-empty-mark svg { display:block; width:100%; height:100%; }
+.nps-empty-mark [data-color="text"] { fill:currentColor; }
+.nps-empty-mark [data-color="empty"] { stroke:currentColor; }

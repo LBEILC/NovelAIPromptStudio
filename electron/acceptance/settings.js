@@ -175,12 +175,10 @@ export async function settingsChecks(context, restart) {
     return current.fileCount === initial.fileCount && current.totalBytes === initial.totalBytes;
   });
   await click('图片库', 'document.querySelector(".studio-titlebar")');
-  await wait(
-    '[...document.images].some(i=>i.getClientRects().length && i.complete && i.naturalWidth>0)',
-  );
-  await check(
+  await h.checkSoon(
     '迁移后图库图片仍能解码',
-    '[...document.images].some(i=>i.getClientRects().length && i.complete && i.naturalWidth>0)',
+    '!!document.querySelector(".library-page") && !document.querySelector("[data-library-updating=true]") && [...document.querySelectorAll(".library-card img")].some(i=>i.getClientRects().length && i.complete && i.naturalWidth>0)',
+    12000,
   );
   const draftProjectId = await createTrashDraft(context);
   await section('图片库');
