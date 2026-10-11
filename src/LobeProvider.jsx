@@ -9,6 +9,7 @@ export default function LobeProvider({
   primaryColor = 'blue',
   sansFont = DEFAULT_SANS_FONT,
   themeMode = 'dark',
+  resolvedTheme,
 }) {
   const activeSansFont = fontStack(sansFont, 'sans');
   const activeMonoFont = fontStack(monoFont, 'mono');
@@ -21,6 +22,7 @@ export default function LobeProvider({
         enableGlobalStyle
         theme={{ token: { fontFamily: activeSansFont, fontFamilyCode: activeMonoFont } }}
         themeMode={themeMode}
+        appearance={resolvedTheme}
       >
         {children}
       </ThemeProvider>

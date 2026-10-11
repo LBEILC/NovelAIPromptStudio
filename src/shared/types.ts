@@ -242,6 +242,7 @@ export interface AppearanceSettings {
     | 'yellow';
   sansFont: string;
   monoFont: string;
+  proseFont: string;
   motion: 'full' | 'reduced' | 'off';
 }
 export interface ProductivitySettings {

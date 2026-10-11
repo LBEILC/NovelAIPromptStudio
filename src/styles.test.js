@@ -15,10 +15,6 @@ describe('production-safe Lobe UI overrides', () => {
     );
     expect(styles).toMatch(/button\.overview-add-character \{[^}]*gap: 12px;/);
     expect(styles).toMatch(/\.workbench-source-panel\.workbench-source-panel \{[^}]*padding:/);
-    expect(styles).toMatch(/\.settings-nav\.settings-nav \{[^}]*padding:/);
-    expect(styles).toMatch(/\.settings-nav-group > button\.active \{[^}]*background:/);
-    expect(styles).toMatch(/\.settings-nav-group > button strong \{[^}]*line-height: 1\.45;/);
-    expect(styles).toMatch(/\.settings-font-select\.settings-font-select \{[^}]*width: 260px;/);
     expect(styles).toMatch(/\.gallery-size-slider\.gallery-size-slider \{[^}]*width: 96px;/);
     expect(styles).toMatch(
       /\.archive-import-card \{[^}]*isolation: isolate;[^}]*border: 1px solid transparent;/,

@@ -5,7 +5,7 @@ export const screenshotScenes = [
   { name: 'gallery', page: 'gallery', select: true },
   { name: 'gallery-collections', page: 'gallery', collections: true },
   { name: 'gallery-trash', page: 'gallery', view: 'trash' },
-  ...['appearance', 'storage', 'ai', 'tags', 'support', 'updates'].map((section) => ({
+  ...['appearance', 'storage', 'ai', 'tags', 'updates'].map((section) => ({
     name: `settings-${section}`,
     page: 'settings',
     section,

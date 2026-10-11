@@ -9,14 +9,12 @@ import {
   useRef,
   useState,
 } from 'react';
-import { flushSync } from 'react-dom';
 import {
   dropTargetForExternal,
   monitorForExternal,
 } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
 import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
-import { ActionIcon as LobeActionIcon, SideNav as LobeSideNav } from '@lobehub/ui';
 import {
   Button as LobeButton,
   Modal as LobeModal,
@@ -39,7 +37,10 @@ import {
 } from 'lucide-react';
 import { motion, useAnimationControls } from 'motion/react';
 import GalleryPage from './GalleryPage.jsx';
-import SettingsPage from './SettingsPage.jsx';
+import SettingsPage from './settings/SettingsPage';
+import { Titlebar } from './shell/Titlebar';
+import { useAppearance } from './state/appearance';
+import { Dialog, useNotifications } from './ui';
 import WorkbenchPage from './WorkbenchPage.jsx';
 import ArchiveImportModal from './components/ArchiveImportModal.jsx';
 import Icon from './components/Icon.jsx';
@@ -59,7 +60,7 @@ import {
   normalizeSearch,
   repairLegacyPromptTags,
 } from './lib/prompt.js';
-import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT, fontStack } from './lib/fonts.js';
+import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT } from './lib/fonts.js';
 import { assessDroppedFiles, assessWorkbenchDroppedFiles } from './lib/importDrop.js';
 import { isImportActive } from './lib/importProgress.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
@@ -107,7 +108,6 @@ import {
   MOTION_EASE_SMOOTH_OUT,
   useStudioReducedMotion,
 } from './lib/motion.js';
-import { commitThemeAppearance } from './lib/themeTransition.js';
 import {
   moveOverviewTags,
   overviewMoveContext,
@@ -281,56 +281,6 @@ async function runTextEditAction(selection, action) {
   if (command) document.execCommand(command);
 }
 
-function SideNav({ page, onNavigate }) {
-  const items = [
-    { key: 'workbench', icon: 'edit', label: '工作台' },
-    { key: 'gallery', icon: 'library', label: '图片库' },
-  ];
-  return (
-    <LobeSideNav
-      className="studio-side-nav"
-      avatar={
-        <button
-          aria-label="NovelAI Prompt Studio · 返回工作台"
-          className="studio-brand"
-          onClick={() => onNavigate('workbench')}
-          title="NovelAI Prompt Studio"
-        >
-          <img alt="" className="studio-brand-logo-dark" src="./app-icon.svg" />
-          <img alt="" className="studio-brand-logo-light" src="./app-icon-light.svg" />
-        </button>
-      }
-      bottomActions={
-        <LobeActionIcon
-          active={page === 'settings'}
-          icon={<Icon name="settings" size={19} />}
-          onClick={() => onNavigate('settings')}
-          placement="right"
-          size="large"
-          title="设置"
-          variant="borderless"
-        />
-      }
-      topActions={
-        <>
-          {items.map((item) => (
-            <LobeActionIcon
-              active={page === item.key}
-              icon={<Icon name={item.icon} size={19} />}
-              key={item.key}
-              onClick={() => onNavigate(item.key)}
-              placement="right"
-              size="large"
-              title={item.label}
-              variant="borderless"
-            />
-          ))}
-        </>
-      }
-    />
-  );
-}
-
 function PageSurface({ active, motionMode, children }) {
   const controls = useAnimationControls();
   const reduceMotion = useStudioReducedMotion(motionMode);
@@ -432,8 +382,12 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export default function App({ appearance, setAppearance }) {
+export default function App() {
+  const { appearance } = useAppearance();
   const [page, setPage] = useState(window.studioScreenshot?.page || 'workbench');
+  const notify = useNotifications();
+  const notificationTarget = useRef({ page, notify });
+  notificationTarget.current = { page, notify };
   const [projectsByView, setProjectsByView] = useState({ all: [], trash: [] });
   const [galleryCollections, setGalleryCollections] = useState([]);
   const [activeCollectionId, setActiveCollectionId] = useState('');
@@ -477,6 +431,10 @@ export default function App({ appearance, setAppearance }) {
   const reduceMotion = useStudioReducedMotion(appearance.motion);
 
   const showToast = useCallback((message, type = 'success') => {
+    if (notificationTarget.current.page === 'settings') {
+      notificationTarget.current.notify({ text: message });
+      return;
+    }
     const method = lobeToast[type] || lobeToast.success;
     method({ description: message, duration: 2600, placement: 'bottom' });
   }, []);
@@ -649,15 +607,6 @@ export default function App({ appearance, setAppearance }) {
       .map((tab) => tab.source.path);
     studio.syncWorkbenchTemporaryImages(temporaryPaths);
   }, [workbenchSession, workbenchSessionReady]);
-
-  useEffect(() => {
-    document.documentElement.style.setProperty('--font-ui', fontStack(appearance.sansFont, 'sans'));
-    document.documentElement.style.setProperty(
-      '--font-mono',
-      fontStack(appearance.monoFont, 'mono'),
-    );
-    document.documentElement.dataset.motion = appearance.motion;
-  }, [appearance]);
 
   useEffect(() => {
     studio.onImportProgress((progress) =>
@@ -1898,19 +1847,6 @@ export default function App({ appearance, setAppearance }) {
     showToast('已恢复图片中的原始 Prompt');
   };
 
-  const changeAppearance = async (patch) => {
-    const saved = await studio.saveAppearanceSettings({ ...appearance, ...patch });
-    if (Object.hasOwn(patch, 'themeMode')) {
-      commitThemeAppearance({
-        currentAppearance: appearance,
-        nextAppearance: saved,
-        update: () => flushSync(() => setAppearance(saved)),
-      });
-      return;
-    }
-    setAppearance(saved);
-  };
-
   const installDownloadedUpdate = async () => {
     try {
       const serialized = serializeWorkbenchSession(workbenchSession);
@@ -1932,7 +1868,7 @@ export default function App({ appearance, setAppearance }) {
 
   return (
     <div className="app-shell" ref={appShellRef}>
-      <SideNav onNavigate={setPage} page={page} />
+      <Titlebar onNavigate={setPage} page={page} />
       <div className="app-content">
         <Activity mode={page === 'workbench' ? 'visible' : 'hidden'}>
           <PageSurface active={page === 'workbench'} motionMode={appearance.motion}>
@@ -2116,17 +2052,13 @@ export default function App({ appearance, setAppearance }) {
           </PageSurface>
         </Activity>
         <Activity mode={page === 'settings' ? 'visible' : 'hidden'}>
-          <PageSurface active={page === 'settings'} motionMode={appearance.motion}>
+          <div className="app-page-surface">
             <SettingsPage
-              appearance={appearance}
-              onAppearanceChange={changeAppearance}
-              onConfirm={requestConfirmation}
+              onEmptyTrash={emptyTrash}
               onInstallUpdate={installDownloadedUpdate}
               onLibraryChange={() => Promise.all([reloadLibrary('all'), reloadLibrary('trash')])}
-              showToast={showToast}
-              studio={studio}
             />
-          </PageSurface>
+          </div>
         </Activity>
       </div>
       <ImportExperience
@@ -2143,25 +2075,40 @@ export default function App({ appearance, setAppearance }) {
         onCancel={cancelArchiveImport}
         onImport={commitArchiveImport}
       />
-      <LobeModal
-        cancelText="取消"
-        destroyOnHidden
-        okButtonProps={{
-          danger: Boolean(confirmation?.danger),
-          type: confirmation?.primaryDanger ? 'primary' : 'default',
-        }}
-        okText={confirmation?.okText || '确定'}
-        onCancel={() => resolveConfirmation(false)}
-        onOk={() => resolveConfirmation(true)}
-        open={Boolean(confirmation)}
-        title={confirmation?.title}
-        width={440}
-      >
-        <div className="confirmation-copy">
+      {page === 'settings' ? (
+        <Dialog
+          open={Boolean(confirmation)}
+          title={confirmation?.title || ''}
+          cancelLabel="取消"
+          confirmLabel={confirmation?.okText || '确定'}
+          destructive={Boolean(confirmation?.danger)}
+          onCancel={() => resolveConfirmation(false)}
+          onConfirm={() => resolveConfirmation(true)}
+        >
           <p>{confirmation?.message}</p>
-          {confirmation?.detail && <span>{confirmation.detail}</span>}
-        </div>
-      </LobeModal>
+          {confirmation?.detail && <p>{confirmation.detail}</p>}
+        </Dialog>
+      ) : (
+        <LobeModal
+          cancelText="取消"
+          destroyOnHidden
+          okButtonProps={{
+            danger: Boolean(confirmation?.danger),
+            type: confirmation?.primaryDanger ? 'primary' : 'default',
+          }}
+          okText={confirmation?.okText || '确定'}
+          onCancel={() => resolveConfirmation(false)}
+          onOk={() => resolveConfirmation(true)}
+          open={Boolean(confirmation)}
+          title={confirmation?.title}
+          width={440}
+        >
+          <div className="confirmation-copy">
+            <p>{confirmation?.message}</p>
+            {confirmation?.detail && <span>{confirmation.detail}</span>}
+          </div>
+        </LobeModal>
+      )}
     </div>
   );
 }

@@ -17,6 +17,40 @@ afterEach(() => {
 });
 
 describe('AI preferences', () => {
+  it('keeps legacy appearance choices and raw primary color while adding the prose font', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
+    temporaryDirectories.push(directory);
+    fs.writeFileSync(
+      path.join(directory, 'preferences.json'),
+      JSON.stringify({
+        appearance: {
+          themeMode: 'dark',
+          primaryColor: 'legacy-custom',
+          sansFont: 'Arial',
+          monoFont: 'Consolas',
+        },
+        aiModel: 'keep-model',
+      }),
+    );
+    const preferences = openPreferences(directory, safeStorage);
+    expect(preferences.appearanceSettings()).toMatchObject({
+      themeMode: 'dark',
+      sansFont: 'Arial',
+      monoFont: 'Consolas',
+      proseFont: 'Newsreader',
+    });
+    preferences.saveAppearanceSettings({ proseFont: 'Georgia' });
+    const stored = JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'));
+    expect(stored.appearance).toMatchObject({
+      primaryColor: 'legacy-custom',
+      proseFont: 'Georgia',
+      themeMode: 'dark',
+    });
+    expect(stored.aiModel).toBe('keep-model');
+    expect(() => preferences.saveAppearanceSettings({ proseFont: 'Bad; Font' })).toThrow('不支持');
+    const tokens = fs.readFileSync(new URL('../design/tokens.css', import.meta.url), 'utf8');
+    expect(tokens.match(/--font-prose:\s*"([^"]+)"/)[1]).toBe('Newsreader');
+  });
   it('never exposes the saved API key through public settings', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
     temporaryDirectories.push(directory);
@@ -74,10 +108,11 @@ describe('AI preferences', () => {
     const preferences = openPreferences(directory, safeStorage);
 
     expect(preferences.appearanceSettings()).toEqual({
-      themeMode: 'dark',
+      themeMode: 'auto',
       primaryColor: 'blue',
       sansFont: 'Geist',
       monoFont: 'Geist Mono',
+      proseFont: 'Newsreader',
       motion: 'full',
     });
     expect(
@@ -93,6 +128,7 @@ describe('AI preferences', () => {
       primaryColor: 'purple',
       sansFont: 'Microsoft YaHei UI',
       monoFont: 'Cascadia Mono',
+      proseFont: 'Newsreader',
       motion: 'reduced',
     });
     expect(() => preferences.saveAppearanceSettings({ sansFont: 'Bad; Font' })).toThrow('不支持');

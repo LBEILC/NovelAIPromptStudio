@@ -11,6 +11,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  nativeTheme,
   net,
   protocol,
   safeStorage,
@@ -134,6 +135,37 @@ function sendPreparedImportUpdate(sender, update) {
   if (!sender.isDestroyed()) sender.send('library:import-preview', update);
 }
 
+const titleBarSyncs = new WeakMap();
+async function syncTitleBarOverlay(window) {
+  if (process.platform !== 'win32' || window.isDestroyed()) return;
+  const mode = preferences.appearanceSettings().themeMode;
+  const theme = mode === 'auto' ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light') : mode;
+  const request = Symbol();
+  titleBarSyncs.set(window, request);
+  try {
+    // Read the application's actual CSS tokens; the main process owns no palette.
+    const overlay = await window.webContents.executeJavaScript(`(() => {
+      const probe = document.createElement('div');
+      probe.dataset.theme = ${JSON.stringify(theme)};
+      document.documentElement.append(probe);
+      const style = getComputedStyle(probe);
+      const value = { color: style.getPropertyValue('--pane').trim(), symbolColor: style.getPropertyValue('--text').trim(), height: parseInt(style.getPropertyValue('--titlebar-h'), 10) };
+      probe.remove();
+      return value;
+    })()`);
+    if (
+      !window.isDestroyed() &&
+      titleBarSyncs.get(window) === request &&
+      overlay.color &&
+      overlay.symbolColor &&
+      overlay.height > 0
+    )
+      window.setTitleBarOverlay(overlay);
+  } catch (error) {
+    if (!window.isDestroyed()) console.error('Unable to synchronize title bar:', error);
+  }
+}
+
 function createWindow(captureState = null) {
   const { width: workAreaWidth, height: workAreaHeight } = screen.getPrimaryDisplay().workAreaSize;
   const defaultWidth = Math.min(1720, Math.max(960, workAreaWidth - 16));
@@ -143,7 +175,13 @@ function createWindow(captureState = null) {
     height: captureState ? 760 : defaultHeight,
     minWidth: Math.min(1080, defaultWidth),
     minHeight: Math.min(700, defaultHeight),
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    titleBarStyle:
+      process.platform === 'darwin'
+        ? 'hiddenInset'
+        : process.platform === 'win32'
+          ? 'hidden'
+          : 'default',
+    ...(process.platform === 'win32' ? { titleBarOverlay: true } : {}),
     autoHideMenuBar: process.platform === 'win32',
     icon: appIconPath,
     backgroundColor: '#10151b',
@@ -162,6 +200,7 @@ function createWindow(captureState = null) {
         : {}),
     },
   });
+  window.webContents.on('did-finish-load', () => void syncTitleBarOverlay(window));
   const developmentUrl =
     process.env.NOVELAI_DEV_URL || (process.argv.includes('--dev') ? 'http://127.0.0.1:5173' : '');
   if (developmentUrl && !captureState) window.loadURL(developmentUrl);
@@ -1129,9 +1168,14 @@ app.whenReady().then(async () => {
   ipcMain.handle('ai:settings:get', () => preferences.publicSettings());
   ipcMain.handle('ai:settings:save', (_event, settings) => preferences.saveAISettings(settings));
   ipcMain.handle('appearance:settings:get', () => preferences.appearanceSettings());
-  ipcMain.handle('appearance:settings:save', (_event, settings) =>
-    preferences.saveAppearanceSettings(settings),
-  );
+  ipcMain.handle('appearance:settings:save', (_event, settings) => {
+    const saved = preferences.saveAppearanceSettings(settings);
+    for (const window of BrowserWindow.getAllWindows()) void syncTitleBarOverlay(window);
+    return saved;
+  });
+  nativeTheme.on('updated', () => {
+    for (const window of BrowserWindow.getAllWindows()) void syncTitleBarOverlay(window);
+  });
   ipcMain.handle('productivity:settings:get', () => preferences.productivitySettings());
   ipcMain.handle('productivity:settings:save', (_event, settings) =>
     preferences.saveProductivitySettings(settings),

@@ -1,0 +1,513 @@
+import { Activity, lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Button, Input, TextArea, Select, OptionGroup, Switch, Dialog } from '../ui';
+import { useAppearance } from '../state/appearance';
+import { useAISettings } from '../state/ai';
+import { useStorage } from '../state/storage';
+import { useUpdates } from '../state/updates';
+import { partitionFontFamilies, quoteFontFamily } from '../lib/fonts.js';
+import { Dictionary } from './Dictionary';
+import { BrandMark } from '../shell/Titlebar';
+import projectLicense from '../../LICENSE?raw';
+import remixLicense from '../../LICENSES/RemixIcon/LICENSE?raw';
+import dictionaryLicense from '../../third_party/DanbooruSearchOnline/LICENSE?raw';
+import type { AppearanceSettings } from '../shared/types';
+import './settings.css';
+const ReleaseNotes = lazy(() => import('../components/ReleaseNotes.jsx'));
+const sections = [
+  ['appearance', '外观', 'contrast-2-line'],
+  ['storage', '图片库', 'hard-drive-2-line'],
+  ['ai', 'AI 服务', 'translate-2'],
+  ['tags', '翻译词典', 'book-2-line'],
+  ['updates', '关于与更新', 'information-line'],
+];
+const bytes = (value: number) =>
+  value < 1024
+    ? `${value} B`
+    : value < 1048576
+      ? `${(value / 1024).toFixed(1)} KB`
+      : `${(value / 1048576).toFixed(1)} MB`;
+function Row({ title, help, children }: { title: string; help?: string; children: ReactNode }) {
+  return (
+    <div className="settings-line">
+      <div>
+        {title}
+        {help && <small>{help}</small>}
+      </div>
+      {children}
+    </div>
+  );
+}
+function Appearance() {
+  const { appearance, changeAppearance } = useAppearance();
+  const [fonts, setFonts] = useState<{ family: string; monospace: boolean }[]>([]);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    window.studio
+      ?.listSystemFonts()
+      .then((r) => {
+        if (!active) return;
+        if (r.ok) setFonts(r.fonts);
+        else setError(r.error);
+      })
+      .catch((e: Error) => setError(e.message));
+    return () => {
+      active = false;
+    };
+  }, []);
+  const groups = useMemo(() => {
+    const context = document.createElement('canvas').getContext('2d');
+    return partitionFontFamilies(
+      [
+        ...fonts,
+        { family: appearance.sansFont, monospace: false },
+        { family: appearance.monoFont, monospace: true },
+        { family: appearance.proseFont, monospace: false },
+      ],
+      context
+        ? (family: string, sample: string) => {
+            context.font = `24px ${quoteFontFamily(family)}, sans-serif`;
+            return context.measureText(sample).width;
+          }
+        : undefined,
+    );
+  }, [fonts, appearance.sansFont, appearance.monoFont, appearance.proseFont]);
+  const save = (patch: Partial<AppearanceSettings>) =>
+    void changeAppearance(patch).catch((e: Error) => setError(e.message));
+  return (
+    <div className="settings-copy">
+      <h2>外观</h2>
+      <p>更改会立刻应用到整个界面。</p>
+      <Row title="主题">
+        <OptionGroup
+          label="主题"
+          options={[
+            { value: 'auto', label: '跟随系统' },
+            { value: 'light', label: '浅色' },
+            { value: 'dark', label: '深色' },
+          ]}
+          value={appearance.themeMode}
+          onChange={(v) => save({ themeMode: v as AppearanceSettings['themeMode'] })}
+        />
+      </Row>
+      {(
+        [
+          ['sansFont', '界面字体', '用于界面和中文'],
+          ['monoFont', '等宽字体', '用于 Tag、权重和参数'],
+          ['proseFont', '段落字体', '用于成段的自然语言'],
+        ] as const
+      ).map(([key, title, help]) => (
+        <Row key={key} title={title} help={help}>
+          <Select
+            label={title}
+            value={appearance[key]}
+            options={(key === 'monoFont' ? groups.monospace : groups.proportional).map(
+              (family: string) => ({
+                value: family,
+                label:
+                  family === 'system-ui'
+                    ? '系统界面字体'
+                    : family === 'monospace'
+                      ? '系统等宽字体'
+                      : family,
+              }),
+            )}
+            onChange={(v) => save({ [key]: v })}
+          />
+        </Row>
+      ))}
+      <Row title="动效" help="关闭后，所有位置变化都立刻完成">
+        <OptionGroup
+          label="动效"
+          value={appearance.motion}
+          options={[
+            { value: 'full', label: '完整' },
+            { value: 'reduced', label: '跟随系统' },
+            { value: 'off', label: '关闭' },
+          ]}
+          onChange={(v) => save({ motion: v as AppearanceSettings['motion'] })}
+        />
+      </Row>
+      {error && <p role="alert">{error}</p>}
+    </div>
+  );
+}
+function AI() {
+  const a = useAISettings();
+  return (
+    <div className="settings-copy">
+      <h2>AI 服务</h2>
+      <p>用来补全内置词典没有的 Tag 翻译和分类、翻译段落。不配置也能使用软件的其他功能。</p>
+      <label className="settings-column">
+        服务地址
+        <Input
+          value={a.settings.baseUrl}
+          onChange={(e) => a.setSettings((s) => ({ ...s, baseUrl: e.target.value }))}
+        />
+        <small>任何兼容 OpenAI 接口格式的服务</small>
+      </label>
+      <label className="settings-column">
+        API Key
+        <Input
+          type="password"
+          value={a.settings.apiKey}
+          placeholder={a.settings.hasApiKey ? '已安全保存' : '输入 API Key'}
+          onChange={(e) => a.setSettings((s) => ({ ...s, apiKey: e.target.value }))}
+        />
+        <small>{a.settings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}</small>
+        <small>只存在系统的安全存储里，软件不会以明文保存</small>
+      </label>
+      <div className="settings-column">
+        模型
+        <div className="settings-actions">
+          <Input
+            aria-label="模型"
+            value={a.settings.model}
+            placeholder="输入或读取模型 ID"
+            onChange={(e) => a.setSettings((s) => ({ ...s, model: e.target.value }))}
+          />
+          {a.models.length > 0 && (
+            <Select
+              label="模型列表"
+              value={a.settings.model}
+              options={a.models.map((value) => ({ value, label: value }))}
+              onChange={(model) => a.setSettings((s) => ({ ...s, model }))}
+            />
+          )}
+          <Button variant="quiet" disabled={a.busy} onClick={() => void a.run('models')}>
+            重新读取模型列表
+          </Button>
+        </div>
+      </div>
+      <div className="settings-actions settings-ai-actions">
+        <Button disabled={a.busy} onClick={() => void a.run('test')}>
+          测试连接
+        </Button>
+        <span role="status">{a.message}</span>
+        <Button variant="ink" disabled={a.busy} onClick={() => void a.run('save')}>
+          保存
+        </Button>
+      </div>
+      {!a.settings.encryptionAvailable && (
+        <p role="alert">当前系统安全存储不可用，应用不会以明文保存 API Key。</p>
+      )}
+      <h2>提示词</h2>
+      <p>软件会在后面固定附加输出格式、数量和顺序的要求，这里只写翻译和分类的规则。</p>
+      {(
+        [
+          ['translationPrompt', '翻译规则'],
+          ['classificationPrompt', '分类规则'],
+        ] as const
+      ).map(([key, label]) => (
+        <label className="settings-column" key={key}>
+          {label}
+          <TextArea
+            value={a.settings[key]}
+            onChange={(e) => a.setSettings((s) => ({ ...s, [key]: e.target.value }))}
+          />
+          <Button
+            variant="quiet"
+            onClick={() =>
+              a.setSettings((s) => ({
+                ...s,
+                [key]:
+                  key === 'translationPrompt'
+                    ? s.defaultPrompts.translation
+                    : s.defaultPrompts.classification,
+              }))
+            }
+          >
+            恢复默认
+          </Button>
+        </label>
+      ))}
+    </div>
+  );
+}
+function Storage({
+  onLibraryChange,
+  onEmptyTrash,
+}: {
+  onLibraryChange: () => Promise<unknown>;
+  onEmptyTrash: () => Promise<unknown>;
+}) {
+  const s = useStorage(onLibraryChange);
+  const [trash, setTrash] = useState(0);
+  const [trashBusy, setTrashBusy] = useState(false);
+  const [trashError, setTrashError] = useState('');
+  const refresh = async () => {
+    const result = await window.studio?.getTrashSummary();
+    if (result?.ok) setTrash(result.count);
+    else if (result) throw new Error(result.error);
+  };
+  useEffect(() => {
+    void refresh().catch((error: Error) => setTrashError(error.message));
+  }, []);
+  const emptyTrash = async () => {
+    if (trashBusy) return;
+    setTrashBusy(true);
+    setTrashError('');
+    try {
+      await onEmptyTrash();
+      await refresh();
+    } catch (error) {
+      setTrashError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setTrashBusy(false);
+    }
+  };
+  return (
+    <div className="settings-copy">
+      <h2>图片库</h2>
+      <p>导入的图片、缩略图和导出的 Vibe 文件都存在这里。</p>
+      <div className="settings-column">
+        <div>图片存放位置</div>
+        <code>{s.details?.assetsDirectory || '正在读取…'}</code>
+        <small>
+          {s.details?.fileCount || 0} 个文件 · 占用 {bytes(s.details?.totalBytes || 0)}
+        </small>
+        <div className="settings-actions">
+          <Button disabled={!s.details || s.busy} onClick={() => void s.reveal()}>
+            打开文件夹
+          </Button>
+          <Button disabled={!s.details || s.busy} onClick={() => void s.change()}>
+            更改位置
+          </Button>
+        </div>
+        <small>更改位置会把现有文件移过去。复制并校验完成之前，原来的文件不会被删除。</small>
+      </div>
+      {s.busy && (
+        <div className="settings-column">
+          正在移动到新位置
+          <progress max={s.progress?.total || 1} value={s.progress?.completed || 0} />
+          <small>
+            {s.progress
+              ? `已复制 ${s.progress.completed} / ${s.progress.total} 个文件 · 可以继续使用，移动完成前不要关闭软件`
+              : '准备迁移…'}
+          </small>
+        </div>
+      )}
+      {s.error && <p role="alert">{s.error}</p>}
+      <h2>数据与备份</h2>
+      <Row title="回收站" help={`${trash} 张图片 · 永久删除后无法恢复`}>
+        <Button
+          variant="danger-outline"
+          disabled={!trash || trashBusy}
+          onClick={() => void emptyTrash()}
+        >
+          清空回收站
+        </Button>
+      </Row>
+      {trashError && <p role="alert">{trashError}</p>}
+    </div>
+  );
+}
+export function feedbackDiagnostics(version = '—', platform = '') {
+  return `NovelAI Prompt Studio v${version}\n平台：${({ darwin: 'macOS', win32: 'Windows', linux: 'Linux' } as Record<string, string>)[platform] || platform || '未知平台'}`;
+}
+export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unknown> }) {
+  const u = useUpdates();
+  const [dialog, setDialog] = useState('');
+  const [message, setMessage] = useState('');
+  const state = u.state;
+  const open = (url?: string) =>
+    void window.studio?.openReleasePage(url).catch((e: Error) => setMessage(e.message));
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        feedbackDiagnostics(state?.currentVersion, state?.platform),
+      );
+      setMessage('诊断信息已复制');
+    } catch {
+      setMessage('无法复制诊断信息');
+    }
+  };
+  const hasUpdate =
+    !!state &&
+    (state.hasUpdate || ['available', 'downloading', 'downloaded'].includes(state.phase));
+  return (
+    <div className="settings-copy">
+      <div className="settings-about-head">
+        <BrandMark />
+        <div>
+          <div className="settings-about-name">NovelAI Prompt Studio</div>
+          <code>版本 {state?.currentVersion || '—'}</code>
+        </div>
+      </div>
+      <p>非官方工具，与 NovelAI 没有隶属关系。</p>
+      <h2>更新</h2>
+      <Row title="自动检查更新" help="启动稳定后检查一次，不会自动安装">
+        <Switch
+          label="自动检查更新"
+          checked={u.autoCheck}
+          onChange={(v) => void u.changeAutoCheck(v)}
+        />
+      </Row>
+      <Row
+        title={
+          hasUpdate
+            ? `发现新版本 ${state.latestVersion}`
+            : state?.latestVersion
+              ? `已是最新版本 · v${state.latestVersion}`
+              : '官方稳定版本'
+        }
+        help={state?.packaged ? undefined : '开发模式只检查官方稳定版本，不会下载或安装更新。'}
+      >
+        <div className="settings-actions">
+          <Button disabled={state?.phase === 'checking'} onClick={() => void u.check()}>
+            {state?.phase === 'checking' ? '正在检查…' : '检查更新'}
+          </Button>
+          {state?.notes && (
+            <Button variant="quiet" onClick={() => setDialog('notes')}>
+              更新说明
+            </Button>
+          )}
+          {hasUpdate &&
+            state.canDownloadUpdate &&
+            !['downloading', 'downloaded'].includes(state.phase) && (
+              <Button onClick={() => void u.download()}>下载更新</Button>
+            )}
+          {state?.phase === 'downloaded' && state.canInstallUpdate && (
+            <Button variant="ink" onClick={() => void onInstallUpdate()}>
+              重启并安装
+            </Button>
+          )}
+          {hasUpdate && (
+            <Button onClick={() => open(state.releaseUrl)}>
+              {state.platform === 'darwin' && state.updateMode === 'manual'
+                ? '下载 macOS 安装包'
+                : '打开官方 Release'}
+            </Button>
+          )}
+        </div>
+      </Row>
+      {state?.phase === 'downloading' && (
+        <div className="settings-column">
+          正在下载更新 · {Math.round(state.progress)}%<progress max={100} value={state.progress} />
+          <small>
+            {bytes(state.transferred || 0)} / {bytes(state.total || 0)}
+          </small>
+        </div>
+      )}
+      {(u.error || state?.error) && (
+        <p role="alert">{u.error || state?.error}。本地功能不受影响，可以稍后重试。</p>
+      )}
+      {state?.packaged && state.platform === 'darwin' && state.updateMode === 'manual' && (
+        <p>
+          当前 macOS 版本未签名，无法在应用内直接安装更新。发现新版本后，请从官方 Release
+          下载对应安装包并手动替换应用。
+        </p>
+      )}
+      <h2>反馈与支持</h2>
+      <Row title="报告问题或提出建议" help="会在浏览器里打开 GitHub，不会自动附带任何数据">
+        <div className="settings-actions">
+          <Button
+            onClick={() =>
+              open(
+                'https://github.com/LBEILC/NovelAIPromptStudio/issues/new?labels=bug&title=%5B%E9%97%AE%E9%A2%98%5D%20',
+              )
+            }
+          >
+            报告问题
+          </Button>
+          <Button
+            onClick={() =>
+              open(
+                'https://github.com/LBEILC/NovelAIPromptStudio/issues/new?labels=enhancement&title=%5B%E5%BB%BA%E8%AE%AE%5D%20',
+              )
+            }
+          >
+            提出建议
+          </Button>
+        </div>
+      </Row>
+      <Row title="诊断信息" help="只包含软件版本和操作系统，不包含图片、Prompt 和路径">
+        <Button variant="quiet" onClick={() => void copy()}>
+          复制
+        </Button>
+      </Row>
+      <p role="status">{message}</p>
+      <h2>字体与开源组件</h2>
+      <Row
+        title="界面字体 MiSans · 段落字体 Newsreader · 等宽字体 IBM Plex Mono"
+        help="内置 Tag 词典来自 DanbooruSearchOnline"
+      >
+        <Button variant="quiet" onClick={() => setDialog('licenses')}>
+          查看声明
+        </Button>
+      </Row>
+      <Dialog
+        open={!!dialog}
+        title={dialog === 'notes' ? '更新说明' : '字体与开源组件'}
+        cancelLabel="关闭"
+        confirmLabel="确定"
+        onCancel={() => setDialog('')}
+        onConfirm={() => setDialog('')}
+      >
+        {dialog === 'notes' ? (
+          <Suspense fallback={null}>
+            <ReleaseNotes onOpenLink={open}>{state?.notes || ''}</ReleaseNotes>
+          </Suspense>
+        ) : (
+          <>
+            <p>【文案待定：本次未随包分发的 MiSans、Newsreader 与 IBM Plex Mono 字体说明】</p>
+            {[
+              ['NovelAI Prompt Studio', projectLicense],
+              ['Remix Icon', remixLicense],
+              ['DanbooruSearchOnline', dictionaryLicense],
+            ].map(([name, license]) => (
+              <details key={name}>
+                <summary>{name}</summary>
+                <pre className="settings-license">{license}</pre>
+              </details>
+            ))}
+          </>
+        )}
+      </Dialog>
+    </div>
+  );
+}
+export default function SettingsPage(props: {
+  onInstallUpdate: () => Promise<unknown>;
+  onLibraryChange: () => Promise<unknown>;
+  onEmptyTrash: () => Promise<unknown>;
+}) {
+  const [section, setSection] = useState(
+    (window as Window & { studioScreenshot?: { section?: string } }).studioScreenshot?.section ||
+      'appearance',
+  );
+  return (
+    <main className="studio-settings">
+      <nav className="settings-sidebar" aria-label="设置分类">
+        {sections.map(([key, label, icon]) => (
+          <Button
+            key={key}
+            variant="quiet"
+            aria-current={key === section ? 'page' : undefined}
+            onClick={() => setSection(key)}
+          >
+            <i className={`ri-${icon}`} aria-hidden="true" />
+            {label}
+          </Button>
+        ))}
+      </nav>
+      <section className="settings-body">
+        <Activity mode={section === 'appearance' ? 'visible' : 'hidden'}>
+          <Appearance />
+        </Activity>
+        <Activity mode={section === 'storage' ? 'visible' : 'hidden'}>
+          <Storage {...props} />
+        </Activity>
+        <Activity mode={section === 'ai' ? 'visible' : 'hidden'}>
+          <AI />
+        </Activity>
+        <Activity mode={section === 'tags' ? 'visible' : 'hidden'}>
+          <Dictionary />
+        </Activity>
+        <Activity mode={section === 'updates' ? 'visible' : 'hidden'}>
+          <About {...props} />
+        </Activity>
+      </section>
+    </main>
+  );
+}

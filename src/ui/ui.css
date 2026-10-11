@@ -5,6 +5,7 @@
 .nps-root *, .nps-layer *, .nps-dialog * { box-sizing: border-box; }
 .nps-root :where(button, input), .nps-layer :where(button), .nps-dialog :where(button) { font: inherit; color: inherit; }
 .nps-root [hidden] { display: none; }
+.nps-textarea { width: 100%; min-height: var(--area-min-h); padding: var(--sp-2) var(--ctl-pad-x); border: var(--bw) solid var(--border); border-radius: var(--r-ctl); background: var(--surface); color: var(--text); font: var(--fs-body)/var(--lh-body) var(--font-ui); resize: vertical; }
 .nps-root :focus-visible, .nps-layer :focus-visible, .nps-dialog :focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
 .nps-button {
   position: relative; display: inline-flex; align-items: center; justify-content: center; gap: var(--ctl-gap);

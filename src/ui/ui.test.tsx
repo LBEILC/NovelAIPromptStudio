@@ -275,6 +275,31 @@ describe('Dialog and Popover', () => {
 });
 
 describe('Select and groups', () => {
+  it('keeps decorative category prefixes out of keyboard matching and selected values', () => {
+    const changed = vi.fn();
+    render(
+      <Select
+        label="Category"
+        value="body"
+        onChange={changed}
+        options={[
+          { value: 'body', label: 'Body', prefix: <span aria-hidden="true" data-dot="body" /> },
+          {
+            value: 'clothing',
+            label: 'Clothing',
+            prefix: <span aria-hidden="true" data-dot="clothing" />,
+          },
+        ]}
+      />,
+    );
+    const trigger = query('[aria-label="Category"]');
+    expect(trigger.querySelector('[data-dot="body"]')).not.toBeNull();
+    click(trigger);
+    key(button('Body'), 'c');
+    expect(document.activeElement).toBe(button('Clothing'));
+    key(button('Clothing'), 'Enter');
+    expect(changed).toHaveBeenCalledWith('clothing');
+  });
   const options = [
     { value: 'a', label: 'Alpha' },
     { value: 'b', label: 'Beta', disabled: true },

@@ -6,6 +6,7 @@ import {
   type ReactNode,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
+  type TextareaHTMLAttributes,
 } from 'react';
 import { Check, Minus, Plus, ChevronDown } from 'lucide-react';
 import { cx, composing, quantize } from './internal';
@@ -124,7 +125,11 @@ export function Input({
 export interface Option {
   value: string;
   label: string;
+  prefix?: ReactNode;
   disabled?: boolean;
+}
+export function TextArea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={cx('nps-textarea', className)} />;
 }
 export function Select({
   options,
@@ -183,6 +188,7 @@ export function Select({
           }
         }}
       >
+        {options.find((option) => option.value === value)?.prefix}
         {options.find((option) => option.value === value)?.label}
         <ChevronDown {...iconProps} />
       </button>
@@ -255,6 +261,7 @@ export function Select({
               }
             }}
           >
+            {option.prefix}
             {option.label}
             {option.value === value && <Check {...iconProps} />}
           </button>

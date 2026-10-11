@@ -70,6 +70,14 @@ export async function runAppScreenshots({
           workbenchPaths: scene.workbench ? filePaths.slice(0, 3) : [],
         };
         const window = createWindow(state);
+        const overlayUpdates = [];
+        if (process.platform === 'win32' && window.setTitleBarOverlay) {
+          const applyOverlay = window.setTitleBarOverlay.bind(window);
+          window.setTitleBarOverlay = (overlay) => {
+            overlayUpdates.push(overlay);
+            return applyOverlay(overlay);
+          };
+        }
         try {
           // Regression mode: reproduce a small CI desktop without changing the
           // user's display settings or the normal application's window behavior.
@@ -121,7 +129,7 @@ export async function runAppScreenshots({
           );
           await window.webContents.executeJavaScript(`(async () => {
             const deadline = Date.now() + 15000;
-            while (document.documentElement.dataset.screenshotReady !== ${JSON.stringify(scene.name)} || document.documentElement.dataset.themeMode !== ${JSON.stringify(theme)}) {
+            while (document.documentElement.dataset.screenshotReady !== ${JSON.stringify(scene.name)} || document.documentElement.dataset.themeMode !== ${JSON.stringify(theme)} || document.documentElement.dataset.theme !== ${JSON.stringify(theme)}) {
               if (Date.now() > deadline) throw new Error('Application readiness timeout');
               await new Promise(resolve => setTimeout(resolve, 50));
             }
@@ -142,6 +150,28 @@ export async function runAppScreenshots({
             if (innerWidth !== 1240 || innerHeight !== 760) throw new Error('Unexpected viewport size: ' + innerWidth + 'x' + innerHeight);
           })()`);
           if (errors.length) throw new Error(errors.join('\n'));
+          if (
+            process.platform === 'win32' &&
+            window.setTitleBarOverlay &&
+            scene.name === 'workbench'
+          ) {
+            // Exercise real IPC and native overlay updates in the temporary profile.
+            // No simulated mouse/keyboard input and no user profile is involved.
+            for (const mode of [theme === 'light' ? 'dark' : 'light', theme]) {
+              const before = overlayUpdates.length;
+              await window.webContents.executeJavaScript(
+                `window.studio.saveAppearanceSettings({ themeMode: ${JSON.stringify(mode)} })`,
+              );
+              const deadline = Date.now() + 3000;
+              while (overlayUpdates.length === before) {
+                if (Date.now() > deadline) throw new Error('Native title bar update timeout');
+                await new Promise((resolve) => setTimeout(resolve, 20));
+              }
+            }
+            const last = overlayUpdates.slice(-2);
+            if (last[0].color === last[1].color || last[0].symbolColor === last[1].symbolColor)
+              throw new Error('Native title bar colors did not change');
+          }
           // capturePage() copies the native surface and can truncate a larger
           // emulated view. Capture the full renderer viewport instead.
           const { data } = await window.webContents.debugger.sendCommand('Page.captureScreenshot', {
@@ -162,6 +192,17 @@ export async function runAppScreenshots({
             theme,
             version: app.getVersion(),
             size,
+            overlayUpdates,
+            appearance: await window.webContents.executeJavaScript(`(() => {
+              const selectors = ['html', '.lobe-root', '.studio-titlebar', '.workbench-source-shell', '.workbench-tabs-list', '.studio-settings'];
+              return Object.fromEntries(selectors.map(selector => {
+                const element = document.querySelector(selector);
+                if (!element) return [selector, null];
+                const style = getComputedStyle(element);
+                return [selector, { background: style.backgroundColor, color: style.color, font: style.fontFamily,
+                  variables: Object.fromEntries(['--pane', '--text', '--font-ui', '--font-mono', '--font-prose', '--ant-color-text-base', '--ant-color-bg-layout'].map(key => [key, style.getPropertyValue(key)])) }];
+              }));
+            })()`),
           });
           console.log(`Captured ${file}`);
         } finally {

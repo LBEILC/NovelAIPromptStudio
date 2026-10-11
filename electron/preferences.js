@@ -8,10 +8,11 @@ import {
 } from './translation.js';
 
 const APPEARANCE_DEFAULTS = Object.freeze({
-  themeMode: 'dark',
+  themeMode: 'auto',
   primaryColor: 'blue',
   sansFont: 'Geist',
   monoFont: 'Geist Mono',
+  proseFont: 'Newsreader',
   motion: 'full',
 });
 const APPEARANCE_VALUES = {
@@ -134,6 +135,7 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
         : APPEARANCE_DEFAULTS.primaryColor,
       sansFont: normalizeFontFamily(stored.sansFont, APPEARANCE_DEFAULTS.sansFont),
       monoFont: normalizeFontFamily(stored.monoFont, APPEARANCE_DEFAULTS.monoFont),
+      proseFont: normalizeFontFamily(stored.proseFont, APPEARANCE_DEFAULTS.proseFont),
       motion: APPEARANCE_VALUES.motion.has(stored.motion)
         ? stored.motion
         : APPEARANCE_DEFAULTS.motion,
@@ -145,7 +147,7 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     const appearance = { ...current };
     for (const key of Object.keys(APPEARANCE_DEFAULTS)) {
       if (next[key] === undefined) continue;
-      if (key === 'sansFont' || key === 'monoFont')
+      if (key === 'sansFont' || key === 'monoFont' || key === 'proseFont')
         appearance[key] = normalizeFontFamily(next[key], current[key], true);
       else {
         if (!APPEARANCE_VALUES[key].has(next[key])) throw new Error(`不支持的外观设置：${key}`);
@@ -153,7 +155,11 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       }
     }
     const stored = read();
-    stored.appearance = appearance;
+    // Removing the UI setting must not erase a previously saved theme color.
+    const previous = stored.appearance || {};
+    stored.appearance = { ...previous, ...appearance };
+    if (Object.hasOwn(previous, 'primaryColor') && !Object.hasOwn(next, 'primaryColor'))
+      stored.appearance.primaryColor = previous.primaryColor;
     write(stored);
     return appearanceSettings();
   };
