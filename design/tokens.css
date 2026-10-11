@@ -1,0 +1,193 @@
+/* NovelAI Prompt Studio 设计令牌（设计负责人维护）
+ * 这是产品界面颜色、字号、间距、圆角、尺寸和动效的唯一来源。产品代码直接引用，不复制、不另起变量。
+ * 主题由应用在 <html data-theme="light|dark"> 上设置，默认跟随系统。
+ *
+ * 视觉方向："括号里的图"（见 design/identity/）。白纸黑字为主，像画室而不像控制台。
+ *   - 界面本身几乎没有颜色，颜色留给图片和 Tag 的分类标记。
+ *   - 朱砂是唯一的品牌色，只出现在三处：标志里的方块、"当前这一张"的标记、"生成"按钮。
+ *   - 其他主要按钮用墨色。危险操作用绛红的文字或描边，不用实心红底，避免和朱砂混淆。
+ *   - 三种字体各管一件事：界面和中文用 MiSans；Tag 和数字用等宽；成段的自然语言用衬线。
+ */
+
+:root {
+  /* 字体。产品里随包注册 MiSans；Newsreader 与 IBM Plex Mono 是开源字体，同样随包 */
+  --font-ui: "NPS MiSans", "MiSans VF", "MiSans", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+  --font-prose: "Newsreader", "Source Serif 4", Georgia, "NPS MiSans", "MiSans VF", "Songti SC", serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, Menlo, "NPS MiSans", "MiSans VF", monospace;
+
+  /* 字号 / 行高 / 字重。字重最多 500；说明文字不小于 11px */
+  --fs-title: 15px;    /* 面板标题、对话框标题 */
+  --fs-body: 13px;     /* 界面正文、按钮、输入框 */
+  --fs-small: 12px;    /* 次要信息、Tag 的英文 */
+  --fs-caption: 11px;  /* Tag 的译文、块的小标签 */
+  --fs-prose: 15px;    /* 段落块里的自然语言 */
+  --lh-body: 20px;
+  --lh-small: 18px;
+  --lh-caption: 16px;
+  --lh-prose: 24px;
+  --fw-regular: 400;
+  --fw-strong: 500;
+
+  /* 间距 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* 圆角 */
+  --r-panel: 10px;   /* 对话框、浮层、图片的外框 */
+  --r-ctl: 7px;      /* 按钮、输入框、分段控件 */
+  --r-tag: 5px;      /* Tag、小标记 */
+  --r-pill: 999px;
+
+  /* 尺寸 */
+  --ctl: 30px;          /* 默认按钮、输入框 */
+  --ctl-sm: 26px;       /* 工具栏里的小按钮 */
+  --titlebar-h: 44px;
+  --bar-h: 52px;        /* 工作台底部的操作栏 */
+  --versions-w: 212px;  /* 工作台左侧的版本栏 */
+  --prompt-w: 520px;    /* 工作台右侧的 Prompt 栏，可拖宽 */
+  --side-w: 196px;      /* 图片库、素材、设置的侧栏 */
+  --detail-w: 340px;    /* 图片库的详情栏，可拖宽 */
+  --mark: 6px;          /* "当前这一张"的朱砂方块 */
+
+  /* 窗口：默认 1240×760，最小 960×600 */
+  --win-w: 1240px;
+  --win-h: 760px;
+  --win-min-w: 960px;
+  --win-min-h: 600px;
+
+  /* 动效：只用来说明"什么变了"；可以被打断；系统开启减少动态效果时全部关掉 */
+  --dur-1: 120ms;  /* 悬停、按下 */
+  --dur-2: 180ms;  /* 进入：菜单、浮层、提案 */
+  --dur-3: 240ms;  /* 位置变化：Tag 重排、指示条滑动 */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-move: cubic-bezier(0.3, 0, 0, 1);
+
+  /* 品牌色原值，两套主题共用 */
+  --cinnabar-seal: #d4351c;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* 表面：纸 → 垫在下面的台面 → 浮起来的纸 */
+  --bg: #fbfbfa;          /* 工作画布：图片舞台、页面背景 */
+  --pane: #f5f5f3;        /* 结构面板：标题栏、侧栏、版本栏 */
+  --surface: #ffffff;     /* 内容面：Prompt 栏、详情栏、对话框、浮层 */
+  --hover: #f0f0ed;       /* 悬停 */
+  --selected: #e9e8e4;    /* 选中的列表项、当前页签 */
+  --border: #e2e1dc;      /* 控件和面板的边 */
+  --divider: #ecebe7;     /* 内容之间的分隔线 */
+
+  /* 文字 */
+  --text: #1c1c1c;        /* 墨色 */
+  --text-2: #5c5b56;      /* 次要 */
+  --text-3: #77766f;      /* 说明、占位；在纸上 4.6:1 */
+  --text-off: #a8a7a1;    /* 禁用 */
+
+  /* 墨色按钮：除"生成"以外的主要操作 */
+  --ink: #1c1c1c;
+  --ink-hover: #36352f;
+  --on-ink: #ffffff;
+
+  /* 朱砂 */
+  --cinnabar: #d4351c;        /* 实心：生成按钮、当前标记 */
+  --cinnabar-hover: #bd2e17;
+  --on-cinnabar: #ffffff;     /* 4.9:1 */
+  --cinnabar-text: #c22f18;   /* 作为文字或细线时略深，在纸上 5.6:1 */
+  --cinnabar-wash: rgba(212, 53, 28, 0.07);
+  --focus: #d4351c;
+
+  /* 状态 */
+  --ok: #08795e;
+  --ok-wash: rgba(8, 121, 94, 0.08);
+  --warn: #8f5a06;
+  --warn-wash: rgba(143, 90, 6, 0.09);
+  --danger: #a82a40;
+  --danger-wash: rgba(168, 42, 64, 0.07);
+  --info: #196aaf;
+  --info-wash: rgba(25, 106, 175, 0.08);
+
+  /* 改动：版本差异和 AI 提案共用 */
+  --add: #08795e;
+  --add-wash: rgba(8, 121, 94, 0.09);
+  --remove: #a82a40;
+  --remove-wash: rgba(168, 42, 64, 0.08);
+
+  /* Tag 分类色：只做成小圆点，不做底色。独立于品牌色，切换主题色不改变它们的含义 */
+  --cat-artist-era: #a84f78;
+  --cat-subject: #287d91;
+  --cat-identity: #4d6fa5;
+  --cat-body: #357f7a;
+  --cat-clothing: #6f5ca7;
+  --cat-action: #9a6a2a;
+  --cat-environment: #3e8061;
+  --cat-composition: #7a6a52;
+  --cat-style: #8a641e;
+  --cat-unsorted: #8a8983;
+
+  --scrim: rgba(28, 28, 28, 0.28);
+  --shadow-print: 0 1px 2px rgba(28, 28, 28, 0.06), 0 8px 24px rgba(28, 28, 28, 0.08);   /* 图片：像一张放在纸上的照片 */
+  --shadow-pop: 0 8px 28px rgba(28, 28, 28, 0.14), 0 0 0 1px var(--border);              /* 菜单、浮层 */
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #161514;
+  --pane: #121110;
+  --surface: #1d1c1a;
+  --hover: #262523;
+  --selected: #302e2b;
+  --border: #33312e;
+  --divider: #262523;
+
+  --text: #f1efea;
+  --text-2: #aba8a1;
+  --text-3: #8a877f;      /* 在深色底上 4.9:1 */
+  --text-off: #5c5a55;
+
+  --ink: #f1efea;
+  --ink-hover: #ffffff;
+  --on-ink: #161514;
+
+  --cinnabar: #d4351c;        /* 实心部分两套主题同色，标志不变色 */
+  --cinnabar-hover: #e2452b;
+  --on-cinnabar: #ffffff;
+  --cinnabar-text: #fa816b;   /* 作为文字或细线时提亮，在深色底上 6.9:1 */
+  --cinnabar-wash: rgba(250, 129, 107, 0.11);
+  --focus: #fa816b;
+
+  --ok: #3fc6a0;
+  --ok-wash: rgba(63, 198, 160, 0.11);
+  --warn: #e59b37;
+  --warn-wash: rgba(229, 155, 55, 0.11);
+  --danger: #fe818c;
+  --danger-wash: rgba(254, 129, 140, 0.10);
+  --info: #66b2fd;
+  --info-wash: rgba(102, 178, 253, 0.11);
+
+  --add: #3fc6a0;
+  --add-wash: rgba(63, 198, 160, 0.12);
+  --remove: #fe818c;
+  --remove-wash: rgba(254, 129, 140, 0.11);
+
+  --cat-artist-era: #d58aad;
+  --cat-subject: #6dbccd;
+  --cat-identity: #8aa8d8;
+  --cat-body: #6db3ae;
+  --cat-clothing: #a596d1;
+  --cat-action: #d1a063;
+  --cat-environment: #7db596;
+  --cat-composition: #b3a48c;
+  --cat-style: #cfab63;
+  --cat-unsorted: #7c7973;
+
+  --scrim: rgba(0, 0, 0, 0.55);
+  --shadow-print: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border);
+}
