@@ -11,6 +11,7 @@ const S = { page: 'wb', stage: '1.2', theme: 'light' };
 // 可以用地址参数直接打开某个状态，例如 preview.html?page=lib&theme=dark&stage=1.0
 for (const [k, v] of new URLSearchParams(location.search)) if (k in S) S[k] = v;
 const gen = () => S.stage !== '1.0';
+const ic = (name) => `<i class="ri-${name}" aria-hidden="true"></i>`;
 
 const LOGO = `<span class="logo" aria-label="NovelAI Prompt Studio"><svg viewBox="0 0 26 22" aria-hidden="true">
   <text x="1" y="17" font-family="Newsreader, Georgia, serif" font-weight="500" font-size="21" fill="currentColor">{</text>
@@ -23,11 +24,11 @@ function titlebar(cur) {
       <button class="tab"><img src="${IMG('夜间书店-01')}" alt="">夜间书店</button>
       <button class="tab on"><span class="cur"></span><img src="${IMG('雨后候车亭-02')}" alt="">雨后候车亭${gen() ? '<span class="n mono">3 版</span>' : ''}<span class="dirty" title="有未生成的改动"></span></button>
       <button class="tab"><img src="${IMG('玻璃花房-02')}" alt="">玻璃花房</button>
-      <button class="tab add" aria-label="打开图片">＋</button></div>` : '';
+      <button class="tab add" aria-label="打开图片">${ic('add-line')}</button></div>` : '';
   return `<div class="tb">${LOGO}
     <div class="nav">${nav.map(([k, t]) => `<button ${k === cur ? 'aria-current="page"' : ''}>${t}</button>`).join('')}</div>
     ${tabs}<span class="sp"></span>
-    <div class="tb-end">${gen() ? '<span class="field sm mono" title="Anlas 余额与用量">8,240 Anlas · 用量 12%</span>' : ''}<button class="btn quiet sm">设置</button></div>
+    <div class="tb-end">${gen() ? '<span class="field sm mono" title="Anlas 余额与用量">8,240 Anlas · 用量 12%</span>' : ''}<button class="btn quiet sm icon" aria-label="设置">${ic('settings-3-line')}</button></div>
     <div class="wc"><span>—</span><span>☐</span><span>✕</span></div></div>`;
 }
 
@@ -49,8 +50,8 @@ function stage() {
     <div class="canvas"><img src="${IMG('雨后候车亭-02')}" alt="当前图片"></div>
     <div class="caption"><b>雨后候车亭-02</b>
       <span class="meta mono">832 × 1216 · V5 · High · 28 步 · 引导 5 · Seed 1506844432</span></div>
-    <div class="stage-acts"><span class="saved"><span class="cur" style="background:var(--text-3)"></span>已存入图片库</span>
-      <button class="btn quiet sm">在文件夹中显示</button><button class="btn quiet sm">复制图片</button><button class="btn quiet sm">下载</button></div>
+    <div class="stage-acts"><span class="saved">${ic('check-line')}已存入图片库</span>
+      <button class="btn quiet sm">${ic('folder-open-line')}在文件夹中显示</button><button class="btn quiet sm">${ic('file-copy-line')}复制图片</button><button class="btn quiet sm">${ic('download-2-line')}下载</button></div>
   </div>`;
 }
 
@@ -59,19 +60,19 @@ const tag = (en, zh, cat, w, cls = '') => `<span class="tag ${cls}"><span class=
 function promptHead(cur) {
   const tabs = gen() ? [['p', 'Prompt'], ['a', '参数'], ['r', '参考']] : [['p', 'Prompt']];
   return `<div class="col-h"><div class="seg">${tabs.map(([k, t]) => `<button class="${k === cur ? 'on' : ''}">${t}</button>`).join('')}</div><span class="sp"></span>
-    ${cur === 'p' ? '<span class="field sm"><span class="ph">搜索 Tag 或译名</span><span class="kbd">Ctrl K</span></span><button class="btn quiet sm">对照 · 按分类</button><button class="btn quiet sm">AI</button>' : ''}</div>`;
+    ${cur === 'p' ? `<span class="field sm">${ic('search-line')}<span class="ph">搜索 Tag 或译名</span><span class="kbd">Ctrl K</span></span><button class="btn quiet sm">对照 · 按分类${ic('arrow-down-s-line')}</button><button class="btn quiet sm">AI</button>` : ''}</div>`;
 }
 
 function bar() {
-  return `<div class="bar">${gen() ? `<span class="label">Seed</span><span class="field sm mono">随机</span><span class="label">张数</span><span class="field sm mono">1</span>` : ''}
-    <span class="sp"></span><button class="btn">复制 Prompt</button>
+  return `<div class="bar">${gen() ? `<span class="label">Seed</span><span class="field sm mono">${ic('shuffle-line')}随机</span><span class="label">张数</span><span class="field sm mono">1</span>` : ''}
+    <span class="sp"></span><button class="btn">${ic('file-copy-line')}复制 Prompt</button>
     ${gen() ? '<span class="cost"><b>0 Anlas</b><span>用量 +1%</span></span><button class="btn seal">生成</button>' : ''}</div>`;
 }
 
 const styleBlock = `<div class="blk"><div class="blk-h"><span class="label">TAG 块 · 风格与画师 · 16 个</span>${gen() ? '<span class="act">存为常用</span>' : ''}</div><div class="tags">
   ${tag('artist:konya_karasue', '画师', 'artist-era', '1.0')}${tag('artist:yoneyama_mai', '画师', 'artist-era', '1.3')}${tag('artist:deyui', '画师', 'artist-era', '0.8')}
   ${tag('year 2026', '2026 年', 'artist-era', '2')}${tag('cinematic composition', '电影感构图', 'composition', '2')}${tag('soft studio lighting', '柔和的棚拍光', 'style')}
-  ${tag('flat color', '平涂', 'style', '−2')}${tag('detailed skin texture', '细腻的皮肤质感', 'body')}<span class="tag ghost">＋ 输入中文或英文</span></div></div>`;
+  ${tag('flat color', '平涂', 'style', '−2')}${tag('detailed skin texture', '细腻的皮肤质感', 'body')}<span class="tag ghost">${ic('add-line')}输入中文或英文</span></div></div>`;
 
 function promptDoc() {
   return `<div class="doc selectable">
@@ -123,27 +124,27 @@ const VIEWS = {
     const pics = ['雨后候车亭-02', '夜间书店-01', '夜间书店-02', '玻璃花房-01', '海边写生-01', '玻璃花房-02', '玻璃花房-03', '夜间书店-03', '玻璃花房-04', '海边写生-02'];
     return `${titlebar('lib')}<div class="body">
     <div class="side">
-      <div class="it on">全部图片<span class="n">159</span></div>${gen() ? '<div class="it">生成记录<span class="n">24</span></div>' : ''}
-      <div class="lb label">收藏集</div><div class="it">本周精选<span class="n">4</span></div><div class="it">构图研究<span class="n">5</span></div>
-      <div class="lb label">智能收藏集</div><div class="it">最近 7 天<span class="n">31</span></div><div class="it">V5<span class="n">34</span></div>
-      <span class="sp"></span><div class="it">回收站<span class="n">2</span></div></div>
+      <div class="it on">${ic('image-2-line')}全部图片<span class="n">159</span></div>${gen() ? `<div class="it">${ic('history-line')}生成记录<span class="n">24</span></div>` : ''}
+      <div class="lb label">收藏集</div><div class="it">${ic('folder-line')}本周精选<span class="n">4</span></div><div class="it">${ic('folder-line')}构图研究<span class="n">5</span></div>
+      <div class="lb label">智能收藏集</div><div class="it">${ic('folder-settings-line')}最近 7 天<span class="n">31</span></div><div class="it">${ic('folder-settings-line')}V5<span class="n">34</span></div>
+      <span class="sp"></span><div class="it">${ic('delete-bin-line')}回收站<span class="n">2</span></div></div>
     <div class="col" style="flex:1 1 0">
-      <div class="col-h" style="padding:0 var(--sp-5)"><span class="field grow"><span class="ph">搜索文件名、Tag、译名或段落里的词</span><span class="sp"></span><span class="kbd">Ctrl K</span></span>
-        <button class="btn quiet">筛选</button><button class="btn quiet">视图</button><button class="btn ink">导入</button></div>
+      <div class="col-h" style="padding:0 var(--sp-5)"><span class="field grow">${ic('search-line')}<span class="ph">搜索文件名、Tag、译名或段落里的词</span><span class="sp"></span><span class="kbd">Ctrl K</span></span>
+        <button class="btn quiet">${ic('filter-3-line')}筛选</button><button class="btn quiet">${ic('layout-grid-line')}视图</button><button class="btn ink">${ic('add-line')}导入</button></div>
       <div class="scroll"><div class="grid">${pics.map((p, i) => `<div class="card ${i === 0 ? 'on' : ''}"><img src="${IMG(p)}" alt="">${i === 0 ? `<span class="stack">${gen() ? '3 版 · 6 张' : '4 张'}</span>` : i === 3 ? '<span class="stack">4 张</span>' : ''}</div>`).join('')}</div>
         <div class="label" style="padding:0 var(--sp-5) var(--sp-4)">142 组 · 159 张</div></div>
     </div>
     <div class="col detail"><div class="scroll">
       <div class="pic"><img src="${IMG('雨后候车亭-02')}" alt=""></div>
       <div class="caption" style="padding:10px 16px 0"><b>雨后候车亭-02</b><span class="meta mono">832 × 1216 · V5 · 2026-10-11</span></div>
-      <div class="stage-acts" style="padding:4px 8px 0"><button class="btn quiet sm">加入收藏集</button><button class="btn quiet sm">重命名</button><button class="btn quiet sm">在文件夹中显示</button><span class="sp"></span><button class="btn danger sm">删除</button></div>
+      <div class="stage-acts" style="padding:4px 8px 0"><button class="btn quiet sm">${ic('folder-add-line')}加入收藏集</button><button class="btn quiet sm">${ic('edit-line')}重命名</button><button class="btn quiet sm icon" aria-label="在文件夹中显示">${ic('folder-open-line')}</button><span class="sp"></span><button class="btn danger sm icon" aria-label="删除">${ic('delete-bin-line')}</button></div>
       <div class="doc selectable" style="padding-top:0">
         <div class="blk"><div class="blk-h"><span class="label">TAG 块 · 风格与画师 · 16 个</span></div><div class="tags">${tag('artist:konya_karasue', '画师', 'artist-era', '1.0')}${tag('artist:yoneyama_mai', '画师', 'artist-era', '1.3')}<span class="tag ghost">还有 14 个</span></div></div>
         <div class="blk"><div class="blk-h"><span class="label">段落 · 构图</span></div>
           <p class="prose">A vertical full illustration of a girl waiting at a bus shelter just after the rain…</p>
           <p class="trans">竖幅全身插画：雨刚停，女孩在候车亭下等车…</p></div>
       </div></div>
-      <div class="bar"><span class="sp"></span><button class="btn">复制 Prompt</button><button class="btn ink">在工作台打开</button></div>
+      <div class="bar"><span class="sp"></span><button class="btn">${ic('file-copy-line')}复制 Prompt</button><button class="btn ink">在工作台打开</button></div>
     </div></div>`;
   },
 };

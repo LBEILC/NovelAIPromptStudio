@@ -8,6 +8,12 @@ button { font: inherit; color: inherit; cursor: default; }
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .muted { color: var(--text-3); }
 .sp { flex: 1 1 0; }
+[class^="ri-"], [class*=" ri-"] { font-size: var(--icon); line-height: 1; flex: 0 0 auto; }
+.btn.sm [class^="ri-"], .field.sm [class^="ri-"], .opt [class^="ri-"], .stepper [class^="ri-"], .check [class^="ri-"] { font-size: var(--icon-sm); }
+.btn.icon { width: var(--ctl-sm); height: var(--ctl-sm); padding: 0; }
+.field > [class^="ri-"], .side .it > [class^="ri-"], .mi .k > [class^="ri-"] { color: var(--text-3); }
+.side .it.on > [class^="ri-"] { color: var(--text); }
+.check.on [class^="ri-"] { font-size: 12px; }
 :focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
 
 /* ---------- 预览外框 ---------- */

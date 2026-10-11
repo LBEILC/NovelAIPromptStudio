@@ -5,7 +5,7 @@ PAGES.find(([p]) => p === 'set')[1] = '设置';
 GEN_ONLY.delete('acct');
 S.sub = 'look';
 
-const SET_PAGES = [['look', '外观'], ['lib', '图片库'], ['acct', 'NovelAI 账号', true], ['ai', 'AI 服务'], ['dict', '翻译词典'], ['agent', 'Agent 接入', true], ['about', '关于与更新']];
+const SET_PAGES = [['look', '外观', false, 'contrast-2-line'], ['lib', '图片库', false, 'hard-drive-2-line'], ['acct', 'NovelAI 账号', true, 'key-2-line'], ['ai', 'AI 服务', false, 'translate-2'], ['dict', '翻译词典', false, 'book-2-line'], ['agent', 'Agent 接入', true, 'terminal-box-line'], ['about', '关于与更新', false, 'information-line']];
 const lookView = VIEWS.set;   // 复用已经写好的"外观"和"账号"内容，只取右边的内容区
 const acctView = VIEWS.acct;
 const inner = (html) => html.slice(html.indexOf('<div class="set">'), html.lastIndexOf('</div></div></div></div>') + 6);
@@ -34,7 +34,7 @@ const SET_BODY = {
     <h2>AI 服务</h2><div class="help">用来补全内置词典没有的 Tag 翻译和分类、翻译段落。不配置也能使用软件的其他功能。</div>
     <div class="setcol"><div>服务地址</div><span class="field mono">https://api.example.com/v1</span><small>任何兼容 OpenAI 接口格式的服务</small></div>
     <div class="setcol"><div>API Key</div><div class="row"><span class="field sm mono">已保存 ••••••••</span><button class="btn sm">更换</button></div><small>只存在系统的安全存储里，软件不会以明文保存</small></div>
-    <div class="setcol"><div>模型</div><div class="row"><span class="field sm" style="min-width:240px">claude-haiku-5-5<span class="chev">▾</span></span><button class="btn quiet sm">重新读取模型列表</button></div></div>
+    <div class="setcol"><div>模型</div><div class="row"><span class="field sm" style="min-width:240px">claude-haiku-5-5${ic('arrow-down-s-line')}</span><button class="btn quiet sm">重新读取模型列表</button></div></div>
     <div class="setfoot"><button class="btn">测试连接</button><span class="banner ok" style="padding:4px 10px">连接正常 · 0.8 秒</span><span class="sp"></span><button class="btn ink">保存</button></div>
     <h2>提示词</h2><div class="help">软件会在后面固定附加输出格式、数量和顺序的要求，这里只写翻译和分类的规则。</div>
     <div class="setcol"><div>翻译规则</div><div class="area">把 Danbooru 风格的英文 Tag 翻译成简体中文。保留角色名和作品名的通用译名；画师名不翻译。</div></div>
@@ -54,11 +54,11 @@ const SET_BODY = {
     ];
     return `<div style="display:flex;flex-direction:column;height:100%;min-height:0">
     <div class="set" style="padding-bottom:10px;max-width:none"><h2>翻译词典</h2><div class="help">这里是软件记住的 Tag 译文和分类。修改只影响显示，不会改动图片里保存的 Prompt。</div></div>
-    <div class="tbl-bar"><span class="field sm grow"><span class="ph">搜索 Tag 或译文</span></span>
-      <span class="field sm">全部分类<span class="chev">▾</span></span><span class="field sm">全部来源<span class="chev">▾</span></span><span class="muted mono">2,378 条</span></div>
+    <div class="tbl-bar"><span class="field sm grow">${ic('search-line')}<span class="ph">搜索 Tag 或译文</span></span>
+      <span class="field sm">全部分类${ic('arrow-down-s-line')}</span><span class="field sm">全部来源${ic('arrow-down-s-line')}</span><span class="muted mono">2,378 条</span></div>
     <div class="tbl">
       <div class="th"><span class="check"></span></div><div class="th">Tag</div><div class="th">译文</div><div class="th">分类</div><div class="th">来源</div><div class="th"></div>
-      ${rows.map(([en, zh, [cz, cc], src, cls]) => `<div class="${cls}"><span class="check ${cls ? 'on' : ''}">${cls ? '✓' : ''}</span></div><div class="${cls}"><span class="en">${en}</span></div>
+      ${rows.map(([en, zh, [cz, cc], src, cls]) => `<div class="${cls}"><span class="check ${cls ? 'on' : ''}">${cls ? ic('check-line') : ''}</span></div><div class="${cls}"><span class="en">${en}</span></div>
         <div class="${cls}">${zh || '<span class="muted">点击填写</span>'}</div><div class="${cls}">${cat(cz, cc)}</div><div class="${cls}"><span class="src">${src}</span></div><div class="${cls}"><button class="btn quiet sm">删除</button></div>`).join('')}
     </div>
     <div style="padding:14px var(--sp-5);display:flex;justify-content:center"><span class="selbar"><span class="n">已选 2 条</span><button class="btn quiet sm">设置分类</button><button class="btn quiet sm">重新翻译</button><button class="btn danger sm">删除</button><button class="btn quiet sm">取消</button></span></div>
@@ -84,7 +84,7 @@ VIEWS.set = () => {
   if (!items.some(([k]) => k === S.sub)) S.sub = 'look';
   const full = S.sub === 'dict';
   return `${titlebar('')}<div class="body">
-    <div class="side">${items.map(([k, t]) => `<div class="it ${k === S.sub ? 'on' : ''}" data-sub="${k}">${t}</div>`).join('')}</div>
+    <div class="side">${items.map(([k, t, , i]) => `<div class="it ${k === S.sub ? 'on' : ''}" data-sub="${k}">${ic(i)}${t}</div>`).join('')}</div>
     <div class="col" style="flex:1 1 0;background:var(--surface)">${full ? SET_BODY.dict() : `<div class="scroll">${SET_BODY[S.sub]()}</div>`}</div></div>`;
 };
 delete VIEWS.acct;

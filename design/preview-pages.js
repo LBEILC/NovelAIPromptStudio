@@ -8,14 +8,14 @@ const setNav = (cur) => {
     .filter(([, k]) => gen() || (k !== 'acct' && k !== 'agent'));
   return `<div class="side">${items.map(([t, k]) => `<div class="it ${k === cur ? 'on' : ''}">${t}</div>`).join('')}</div>`;
 };
-const sel = (text, cls = '') => `<span class="field sm ${cls}" style="min-width:150px">${text}<span class="chev">▾</span></span>`;
+const sel = (text, cls = '') => `<span class="field sm ${cls}" style="min-width:150px">${text}${ic('arrow-down-s-line')}</span>`;
 const opts = (items, on) => `<span class="row">${items.map((t, i) => `<span class="opt ${i === on ? 'on' : ''}">${t}</span>`).join('')}</span>`;
 
 VIEWS.assets = () => `${titlebar('assets')}<div class="body">
-  <div class="side"><div class="it on">常用块<span class="n">6</span></div><div class="it">角色<span class="n">9</span></div><div class="it">Vibe<span class="n">10</span></div>
+  <div class="side"><div class="it on">${ic('layout-row-line')}常用块<span class="n">6</span></div><div class="it">${ic('user-3-line')}角色<span class="n">9</span></div><div class="it">${ic('palette-line')}Vibe<span class="n">10</span></div>
     <span class="sp"></span><div class="help" style="padding:0 10px 4px">Vibe 目前只能用在 V4.5 上</div></div>
   <div class="col" style="flex:1 1 0;background:var(--surface)">
-    <div class="col-h" style="padding:0 var(--sp-5);border-bottom:1px solid var(--divider)"><span class="field grow"><span class="ph">搜索常用块</span></span><button class="btn">新建</button></div>
+    <div class="col-h" style="padding:0 var(--sp-5);border-bottom:1px solid var(--divider)"><span class="field grow">${ic('search-line')}<span class="ph">搜索常用块</span></span><button class="btn">${ic('add-line')}新建</button></div>
     <div class="scroll">
       <div class="arow"><div class="top"><b>常用画师组合</b><span class="label">TAG 块 · 风格与画师 · 16 个 · 用在 31 张图里</span>
         <span class="acts"><button class="btn quiet sm">插入到当前 Prompt</button><button class="btn quiet sm">重命名</button><button class="btn danger sm">删除</button></span></div>
@@ -73,29 +73,29 @@ VIEWS.comps = () => `<div class="sheet">
   <section><h5>输入与选择</h5>
     <div class="r"><span class="cap">输入框</span><span class="field" style="width:170px"><span class="ph">角色名称</span></span><span class="field is-focus" style="width:120px">黍</span></div>
     <div class="r"><span class="cap">出错</span><span class="field is-error" style="width:170px"></span><span class="help err">角色名称不能为空</span></div>
-    <div class="r"><span class="cap">下拉</span>${sel('Euler Ancestral')}<span class="stepper"><span>−</span><b>1.20</b><span>＋</span></span></div>
+    <div class="r"><span class="cap">下拉</span>${sel('Euler Ancestral')}<span class="stepper"><span>${ic('subtract-line')}</span><b>1.20</b><span>${ic('add-line')}</span></span></div>
     <div class="r"><span class="cap">选项</span>${opts(['原文', '译文', '对照'], 2)}</div>
     <div class="r"><span class="cap">页签</span><div class="seg"><button class="on">Prompt</button><button>参数</button><button>参考</button></div></div>
-    <div class="r"><span class="cap">开关</span><span class="switch"></span><span class="switch on"></span><span class="check"></span><span class="check on">✓</span></div>
+    <div class="r"><span class="cap">开关</span><span class="switch"></span><span class="switch on"></span><span class="check"></span><span class="check on">${ic('check-line')}</span></div>
     <div class="r"><span class="cap">滑块</span><span class="slider"><i style="width:62%"></i><b style="left:62%"></b></span><span class="mono muted">0.62</span></div>
   </section>
   <section class="wide"><h5>Tag 的各种状态</h5>
     <div class="r">${tag('long hair', '长发', 'body')}${tag('悬停', '', 'body', '', 'is-hover')}${tag('long hair', '选中', 'body', '', 'sel')}${tag('long hair', '有权重', 'body', '1.40')}${tag('flat color', '负权重', 'style', '−2')}
       <span class="tag"><span class="dot" style="background:var(--cat-unsorted)"></span><span class="t"><span class="en">shu (arknights)</span><span class="zh wait">翻译中…</span></span></span>
-      ${tag('year 2026 ::', '多余的 :: 结束符', 'artist-era', '', 'warn')}${tag('rain', '新增', 'environment', '', 'new')}${tag('umbrella', '移走', 'clothing', '', 'gone')}${tag('solo', '被筛选隐藏', 'subject', '', 'dim')}${tag('side braid', '拖动中', 'body', '', 'lift')}<span class="tag ghost">＋ 输入中文或英文</span></div>
+      ${tag('year 2026 ::', '多余的 :: 结束符', 'artist-era', '', 'warn')}${tag('rain', '新增', 'environment', '', 'new')}${tag('umbrella', '移走', 'clothing', '', 'gone')}${tag('solo', '被筛选隐藏', 'subject', '', 'dim')}${tag('side braid', '拖动中', 'body', '', 'lift')}<span class="tag ghost">${ic('add-line')}输入中文或英文</span></div>
     <div class="r"><span class="cap">分类色</span>${[['画师年代', 'artist-era'], ['角色组成', 'subject'], ['身份物种', 'identity'], ['外貌身体', 'body'], ['服装配饰', 'clothing'], ['动作表情', 'action'], ['环境背景', 'environment'], ['镜头光影', 'composition'], ['风格质量', 'style'], ['未分类', 'unsorted']].map(([zh, c]) => tag(zh, '', c)).join('')}</div>
   </section>
   <section><h5>右键菜单与 Tag 提示</h5><div class="stack">
     <div class="menu"><div class="mi on">编辑<span class="k">Enter</span></div><div class="mi">复制 Tag<span class="k">Ctrl C</span></div><div class="mi">复制 Tag（含权重）</div><div class="mi">复制译文</div><hr>
-      <div class="mi">移动到<span class="k">▸</span></div><div class="mi">翻译与分类</div><div class="mi off">存为常用块</div><hr><div class="mi danger">删除<span class="k">Del</span></div></div>
+      <div class="mi">移动到<span class="k">${ic('arrow-right-s-line')}</span></div><div class="mi">翻译与分类</div><div class="mi off">存为常用块</div><hr><div class="mi danger">删除<span class="k">Del</span></div></div>
     <div class="menu" style="min-width:250px"><div class="mi on"><span class="en">copper hair</span><span class="zh">铜色头发</span><span class="k">3.2k</span></div><div class="mi"><span class="en">long copper hair</span><span class="zh">铜色长发</span><span class="k">410</span></div>
       <div class="mi"><span class="en">copper eyes</span><span class="zh">铜色眼睛</span><span class="k">96</span></div><hr><div class="mi"><span class="zh">直接添加"铜色"</span><span class="k">Enter</span></div></div>
   </div></section>
   <section><h5>编辑一个 Tag</h5>
     <div class="popover"><div class="frow"><span class="label">Tag</span><span class="field sm mono is-focus">long copper hair</span></div>
       <div class="frow"><span class="label">译文</span><span class="field sm">铜色长发</span></div>
-      <div class="frow"><span class="label">分类</span><span class="field sm"><span class="dot" style="width:5px;height:5px;border-radius:50%;background:var(--cat-body)"></span>外貌身体<span class="chev">▾</span></span></div>
-      <div class="frow"><span class="label">权重</span><span class="row"><span class="stepper"><span>−</span><b>1.20</b><span>＋</span></span><span class="help">1 是普通权重</span></span></div>
+      <div class="frow"><span class="label">分类</span><span class="field sm"><span class="dot" style="width:5px;height:5px;border-radius:50%;background:var(--cat-body)"></span>外貌身体${ic('arrow-down-s-line')}</span></div>
+      <div class="frow"><span class="label">权重</span><span class="row"><span class="stepper"><span>${ic('subtract-line')}</span><b>1.20</b><span>${ic('add-line')}</span></span><span class="help">1 是普通权重</span></span></div>
       <div class="row" style="justify-content:space-between;margin-top:2px"><button class="btn danger sm">删除</button><span class="row"><button class="btn quiet sm">取消</button><button class="btn ink sm">完成</button></span></div></div>
   </section>
   <section><h5>对话框</h5><div class="stack">
@@ -114,9 +114,9 @@ VIEWS.comps = () => `<div class="sheet">
     <div class="r"><span class="selbar"><span class="n">已选 3 个 Tag</span><button class="btn quiet sm">复制</button><button class="btn quiet sm">移动到</button><button class="btn quiet sm">翻译与分类</button><button class="btn danger sm">删除</button><button class="btn quiet sm">取消</button></span></div>
   </section>
   <section><h5>状态横幅与生成进度</h5>
-    <div class="r"><div class="banner info" style="flex:1">这张图里没有检测到 Vibe。</div></div>
-    <div class="r"><div class="banner warn" style="flex:1">这张图片已被移动或删除。可以关闭这个标签，其他标签不受影响。</div></div>
-    <div class="r"><div class="banner danger" style="flex:1">没有生成：Anlas 余额不足。<span class="sp"></span><button class="btn quiet sm" style="color:inherit">查看余额</button></div></div>
+    <div class="r"><div class="banner info" style="flex:1">${ic('information-line')}这张图里没有检测到 Vibe。</div></div>
+    <div class="r"><div class="banner warn" style="flex:1">${ic('alert-line')}这张图片已被移动或删除。可以关闭这个标签，其他标签不受影响。</div></div>
+    <div class="r"><div class="banner danger" style="flex:1">${ic('error-warning-line')}没有生成：Anlas 余额不足。<span class="sp"></span><button class="btn quiet sm" style="color:inherit">查看余额</button></div></div>
     <div class="r" style="display:block"><div class="row" style="justify-content:space-between;margin-bottom:6px"><span>正在生成第 2 张，共 4 张</span><button class="btn quiet sm">取消剩下的</button></div><div class="progress"><i style="width:38%"></i></div></div>
   </section>
 </div>`;
@@ -132,6 +132,7 @@ Object.assign(NOTES, {
           '中间的图形是标志的空心版：括号里还没有图。'],
   comps: ['这是全部基础组件和它们的状态，实现时逐个对照。',
           '风险提示里引用的那句话是 NovelAI 接口说明的原文。',
+          '图标用 Remix Icon 的线条风格，只在帮助扫读或代替文字节省空间的地方用。"生成"和"AI"按钮不加图标。',
           '分类色做过测量：任意两种的色差都在 15 以上；色觉障碍下无法全部分清，所以分类同时有文字。'],
 });
 // 这些页面是后加进来的，地址参数要在它们注册之后再读一次
