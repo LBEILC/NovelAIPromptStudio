@@ -1431,7 +1431,9 @@ export default function GalleryPage({
   updating = false,
 }) {
   const [previewExpanded, setPreviewExpanded] = useState(() =>
-    readPanelBoolean(panelStorage(), GALLERY_PREVIEW_PANEL_EXPANDED_KEY, Boolean(preview)),
+    window.studioScreenshot
+      ? Boolean(window.studioScreenshot.select)
+      : readPanelBoolean(panelStorage(), GALLERY_PREVIEW_PANEL_EXPANDED_KEY, Boolean(preview)),
   );
   const [previewPanelWidth, setPreviewPanelWidth] = useState(() =>
     readPanelWidth(
@@ -1445,8 +1447,10 @@ export default function GalleryPage({
   const [previewPinned, setPreviewPinned] = useState(() =>
     readPanelBoolean(panelStorage(), GALLERY_PREVIEW_PANEL_PINNED_KEY, false),
   );
-  const [collectionsExpanded, setCollectionsExpanded] = useState(() =>
-    readPanelBoolean(panelStorage(), GALLERY_COLLECTIONS_PANEL_EXPANDED_KEY, false),
+  const [collectionsExpanded, setCollectionsExpanded] = useState(
+    () =>
+      window.studioScreenshot?.collections ??
+      readPanelBoolean(panelStorage(), GALLERY_COLLECTIONS_PANEL_EXPANDED_KEY, false),
   );
   const [collectionsPanelWidth, setCollectionsPanelWidth] = useState(() =>
     readPanelWidth(

@@ -42,6 +42,7 @@ import {
   installUpdateAfterClosingDatabase,
 } from './updates.js';
 import { configureAppProfile } from './appProfile.js';
+import { configureScreenshotMode } from './screenshotMode.js';
 import {
   copyImageToClipboard,
   copyManagedImageToClipboard,
@@ -55,6 +56,7 @@ import {
 const { autoUpdater } = electronUpdater;
 
 app.setName('NovelAI Prompt Studio');
+const screenshotMode = configureScreenshotMode(app);
 const databaseProbeOutput = process.argv
   .find((argument) => argument.startsWith('--database-probe-output='))
   ?.slice('--database-probe-output='.length);
@@ -64,7 +66,7 @@ const databaseProbeDirectory = databaseProbeOutput
 if (databaseProbeDirectory) {
   app.setPath('userData', databaseProbeDirectory);
   app.setPath('sessionData', databaseProbeDirectory);
-} else configureAppProfile(app);
+} else if (!screenshotMode) configureAppProfile(app);
 if (process.platform === 'win32') app.setAppUserModelId('studio.novelai.prompt');
 protocol.registerSchemesAsPrivileged([
   {
@@ -132,30 +134,39 @@ function sendPreparedImportUpdate(sender, update) {
   if (!sender.isDestroyed()) sender.send('library:import-preview', update);
 }
 
-function createWindow() {
+function createWindow(captureState = null) {
   const { width: workAreaWidth, height: workAreaHeight } = screen.getPrimaryDisplay().workAreaSize;
   const defaultWidth = Math.min(1720, Math.max(960, workAreaWidth - 16));
   const defaultHeight = Math.min(1040, Math.max(680, workAreaHeight - 16));
   const window = new BrowserWindow({
-    width: defaultWidth,
-    height: defaultHeight,
+    width: captureState ? 1240 : defaultWidth,
+    height: captureState ? 760 : defaultHeight,
     minWidth: Math.min(1080, defaultWidth),
     minHeight: Math.min(700, defaultHeight),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     autoHideMenuBar: process.platform === 'win32',
     icon: appIconPath,
     backgroundColor: '#10151b',
+    ...(captureState ? { show: false, useContentSize: true, enableLargerThanScreen: true } : {}),
     webPreferences: {
       preload: path.join(import.meta.dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      ...(captureState
+        ? {
+            offscreen: true,
+            backgroundThrottling: false,
+            additionalArguments: ['--app-screenshot-state=' + JSON.stringify(captureState)],
+          }
+        : {}),
     },
   });
   const developmentUrl =
     process.env.NOVELAI_DEV_URL || (process.argv.includes('--dev') ? 'http://127.0.0.1:5173' : '');
-  if (developmentUrl) window.loadURL(developmentUrl);
+  if (developmentUrl && !captureState) window.loadURL(developmentUrl);
   else window.loadFile(path.join(import.meta.dirname, '..', 'dist', 'index.html'));
+  return window;
 }
 
 function notifyUpdateState(patch = {}) {
@@ -1305,6 +1316,25 @@ app.whenReady().then(async () => {
     }
   });
 
+  if (screenshotMode) {
+    try {
+      const { runAppScreenshots } = await import('./appScreenshots.js');
+      await runAppScreenshots({
+        app,
+        mode: screenshotMode,
+        database,
+        assetsDirectory,
+        preferences,
+        createWindow,
+      });
+      app.quit();
+    } catch (error) {
+      console.error(error);
+      database?.close();
+      app.exit(1);
+    }
+    return;
+  }
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -1312,7 +1342,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (!screenshotMode && process.platform !== 'darwin') app.quit();
 });
 app.on('before-quit', () => {
   quitting = true;

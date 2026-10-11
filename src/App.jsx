@@ -433,12 +433,12 @@ function formatBytes(bytes) {
 }
 
 export default function App({ appearance, setAppearance }) {
-  const [page, setPage] = useState('workbench');
+  const [page, setPage] = useState(window.studioScreenshot?.page || 'workbench');
   const [projectsByView, setProjectsByView] = useState({ all: [], trash: [] });
   const [galleryCollections, setGalleryCollections] = useState([]);
   const [activeCollectionId, setActiveCollectionId] = useState('');
   const [editingSmartCollectionId, setEditingSmartCollectionId] = useState('');
-  const [galleryView, setGalleryView] = useState('all');
+  const [galleryView, setGalleryView] = useState(window.studioScreenshot?.view || 'all');
   const [libraryLoadingByView, setLibraryLoadingByView] = useState({ all: true, trash: false });
   const [galleryFilters, setGalleryFilters] = useState(DEFAULT_GALLERY_FILTERS);
   const [sort, setSort] = useState('recent');
@@ -563,6 +563,19 @@ export default function App({ appearance, setAppearance }) {
   useEffect(() => {
     let active = true;
     const restore = async () => {
+      if (window.studioScreenshot) {
+        const tabs = await Promise.all(
+          (window.studioScreenshot.workbenchPaths || []).map(async (filePath) => {
+            const result = await studio.openWorkbenchImage(filePath);
+            if (!result.ok) throw new Error(result.error);
+            return createWorkbenchTab(hydrateProject(result.project), { source: result.source });
+          }),
+        );
+        if (!active) return;
+        setWorkbenchSession({ version: 2, tabs, activeTabId: tabs[0]?.id || '' });
+        setWorkbenchSessionReady(true);
+        return;
+      }
       const saved = parseWorkbenchSession(
         window.localStorage.getItem(WORKBENCH_SESSION_KEY) ||
           window.localStorage.getItem(LEGACY_WORKBENCH_SESSION_KEY),
@@ -1195,6 +1208,20 @@ export default function App({ appearance, setAppearance }) {
     previewGroup?.members.find((project) => project.id === previewProjectId) ||
     previewGroup?.cover ||
     null;
+  useEffect(() => {
+    const capture = window.studioScreenshot;
+    if (!capture || !workbenchSessionReady || galleryUpdating) return;
+    if (capture.selectedProjectId) {
+      const group = visibleGroups.find((item) =>
+        item.members.some((project) => project.id === capture.selectedProjectId),
+      );
+      if (!group) return;
+      setPreviewGroupId(group.id);
+      setPreviewProjectId(capture.selectedProjectId);
+    }
+    document.documentElement.dataset.screenshotReady = capture.name;
+  }, [workbenchSessionReady, galleryUpdating, visibleGroups]);
+
   const selectedProjectIds = useMemo(
     () => gallerySelectionProjectIds(visibleGroups, selectedGroupIds),
     [selectedGroupIds, visibleGroups],

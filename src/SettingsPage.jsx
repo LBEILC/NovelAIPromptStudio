@@ -90,7 +90,7 @@ export default function SettingsPage({
   showToast,
   studio,
 }) {
-  const [section, setSection] = useState('appearance');
+  const [section, setSection] = useState(window.studioScreenshot?.section || 'appearance');
   const [navExpanded, setNavExpanded] = useState(
     () => typeof window === 'undefined' || window.innerWidth >= 900,
   );

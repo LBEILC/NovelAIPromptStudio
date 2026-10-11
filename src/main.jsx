@@ -9,6 +9,13 @@ import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT } from './lib/fonts.js';
 import './fonts.css';
 import './styles.css';
 
+if (window.studioScreenshot) {
+  window.addEventListener('error', (event) => window.studioScreenshot.reportError(event.message));
+  window.addEventListener('unhandledrejection', (event) =>
+    window.studioScreenshot.reportError(String(event.reason)),
+  );
+}
+
 const DEFAULT_APPEARANCE = {
   themeMode: 'dark',
   primaryColor: 'blue',
