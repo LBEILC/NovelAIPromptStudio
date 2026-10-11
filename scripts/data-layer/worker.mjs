@@ -19,8 +19,38 @@ try {
     result.fileBytes = fs.statSync(path.join(directory, 'studio.sqlite')).size;
     progress('open');
     let start = performance.now();
-    const api = await openDatabase(directory);
+    let api = await openDatabase(directory);
     result.openMs = performance.now() - start;
+    api.close();
+    await new Promise((resolve) => setImmediate(resolve));
+    progress('second open');
+    start = performance.now();
+    api = await openDatabase(directory);
+    result.secondOpenMs = performance.now() - start;
+    await new Promise((resolve) => setImmediate(resolve));
+    progress('loadLibraryCards');
+    start = performance.now();
+    let cards = api.loadLibraryCards();
+    result.cardsMs = performance.now() - start;
+    start = performance.now();
+    result.cardsBytes = 2 + Math.max(0, cards.length - 1);
+    for (const card of cards) result.cardsBytes += Buffer.byteLength(JSON.stringify(card));
+    result.cardsSerializationMs = performance.now() - start;
+    const detailId = cards[0]?.id;
+    cards = null;
+    global.gc?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    progress('loadLibraryDetail');
+    start = performance.now();
+    api.loadProject(detailId);
+    result.detailMs = performance.now() - start;
+    result.maxBlockingMs = Math.max(
+      result.openMs,
+      result.secondOpenMs,
+      result.cardsMs + result.cardsSerializationMs,
+      result.detailMs,
+    );
+    await new Promise((resolve) => setImmediate(resolve));
     result.fileBytes = fs.statSync(path.join(directory, 'studio.sqlite')).size;
     progress('loadLibrary');
     start = performance.now();

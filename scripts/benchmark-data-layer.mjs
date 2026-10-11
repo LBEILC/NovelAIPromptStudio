@@ -76,11 +76,11 @@ try {
 }
 const number = (value) => (!Number.isFinite(value) ? '—' : value.toFixed(2));
 const table = [
-  '| 图片 | 引擎 | 打开 ms | loadLibrary ms | JSON MiB | 写入中位 ms | 写入最大 ms | 导入100 ms | DB MiB | 峰值RSS MiB | 状态 |',
-  '|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---|',
+  '| 图片 | 引擎 | 首次打开 ms | 再次打开 ms | 卡片 ms | 卡片 MiB | 单张详情 ms | 最长同步段 ms | loadLibrary ms | JSON MiB | 写入中位 ms | 写入最大 ms | 导入100 ms | DB MiB | 峰值RSS MiB | 状态 |',
+  '|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|',
   ...results.map(
     (r) =>
-      `| ${r.count} | ${r.kind} | ${number(r.openMs)} | ${number(r.loadMs)} | ${number(r.payloadBytes / 1048576)} | ${number(r.writeMedianMs)} | ${number(r.writeMaxMs)} | ${number(r.importMs)} | ${number(r.fileBytes / 1048576)} | ${number(r.peakRssBytes / 1048576)} | ${r.error ? `失败：${r.phase}` : '通过'} |`,
+      `| ${r.count} | ${r.kind} | ${number(r.openMs)} | ${number(r.secondOpenMs)} | ${number(r.cardsMs)} | ${number(r.cardsBytes / 1048576)} | ${number(r.detailMs)} | ${number(r.maxBlockingMs)} | ${number(r.loadMs)} | ${number(r.payloadBytes / 1048576)} | ${number(r.writeMedianMs)} | ${number(r.writeMaxMs)} | ${number(r.importMs)} | ${number(r.fileBytes / 1048576)} | ${number(r.peakRssBytes / 1048576)} | ${r.error ? `失败：${r.phase}` : '通过'} |`,
   ),
 ].join('\n');
 fs.mkdirSync('.codex-runs/data-layer', { recursive: true });

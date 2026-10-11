@@ -93,8 +93,19 @@ describe('native engine upgrade', () => {
           .all()
           .map((r) => r.name),
       ).toEqual(Object.keys(expected.tables));
-      for (const [name, rows] of Object.entries(expected.tables))
-        expect(raw.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all(), name).toEqual(rows);
+      for (const [name, rows] of Object.entries(expected.tables)) {
+        const actual = raw.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all();
+        expect(
+          name === 'app_meta'
+            ? actual.filter((row) => row.key !== 'prompt_fingerprints_version')
+            : actual,
+          name,
+        ).toEqual(rows);
+      }
+      expect(
+        raw.prepare("SELECT value FROM app_meta WHERE key = 'prompt_fingerprints_version'").get()
+          .value,
+      ).toBe('1');
       expect(raw.prepare('PRAGMA journal_mode').get().journal_mode).toBe('delete');
     });
     database.updateTagDictionary('girl', { translation: '修改后' });

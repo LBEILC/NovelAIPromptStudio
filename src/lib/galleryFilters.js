@@ -65,7 +65,7 @@ const PROJECT_FILTER_INDEX = new WeakMap();
 function projectFilterIndex(project) {
   const cached = PROJECT_FILTER_INDEX.get(project);
   if (cached) return cached;
-  const tags = allPromptTags(project);
+  const tags = project.filter_tags || allPromptTags(project);
   const modelValue = String(project.metadata?.model || '').trim() || GALLERY_UNKNOWN_MODEL_VALUE;
   const vibeValue = galleryProjectVibe(project) || GALLERY_NO_VIBE_VALUE;
   const index = {
@@ -80,7 +80,11 @@ function projectFilterIndex(project) {
           : String(tag.tag || '').trim(),
       value: String(tag.tag || '').trim(),
     })),
-    searchValues: [project.name, ...tags.flatMap((tag) => [tag.tag, tag.translation])]
+    searchValues: [
+      project.name,
+      ...(project.search_prompts || []),
+      ...tags.flatMap((tag) => [tag.tag, tag.translation]),
+    ]
       .map(normalizeSearch)
       .filter(Boolean),
     tagValues: new Set(

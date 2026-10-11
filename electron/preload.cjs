@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld(
   'studio',
   /** @satisfies {import('../src/shared/ipc').StudioApi} */ ({
     loadLibrary: (view = 'all') => invoke('library:load', { view }),
+    loadLibraryCards: (view = 'all') => invoke('library:cards', { view }),
+    loadLibraryDetail: (id) => invoke('library:detail', id),
     loadCollections: () => invoke('library:collections:list'),
     createCollection: (collection) => invoke('library:collections:create', collection),
     updateCollection: (id, patch) => invoke('library:collections:update', { id, patch }),

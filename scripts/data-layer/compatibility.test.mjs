@@ -57,6 +57,12 @@ it('seeds through production, preserves all 21 tables and orphans, and reopens a
           expect(raw.prepare('SELECT * FROM prompt_group_covers').all()).toEqual([]);
           continue;
         }
+        if (table === 'app_meta') {
+          expect(raw.prepare('SELECT * FROM app_meta ORDER BY rowid').all()).toEqual(
+            rows.filter((row) => !row.key.startsWith('prompt_fingerprints_dirty:')),
+          );
+          continue;
+        }
         expect(raw.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all(), table).toEqual(rows);
       }
     } finally {

@@ -161,6 +161,28 @@ export interface ImageRecord extends Omit<ImageProject, 'metadata' | 'prompt_str
   metadata: Partial<StoredGenerationParameters>;
   prompt_structure: StoredPromptStructure;
 }
+export interface LibraryCard
+  extends Pick<
+    ImageRecord,
+    | 'id'
+    | 'name'
+    | 'image_path'
+    | 'thumbnail_path'
+    | 'created_at'
+    | 'is_favorite'
+    | 'deleted_at'
+    | 'prompt_fingerprint'
+    | 'vibe_fingerprint'
+    | 'group_cover_id'
+  > {
+  // null reuses JSON.stringify(JSON.parse(prompt_fingerprint).base).
+  // The main process only emits it when that equals the stored base fingerprint.
+  base_prompt_fingerprint: string | null;
+  metadata: Pick<GenerationParameters, 'model' | 'width' | 'height'>;
+  filter_tags: Pick<Tag, 'tag' | 'translation' | 'category'>[];
+  search_prompts: string[];
+  base_prompt_similarity: { prompt: [string, number][]; undesired: [string, number][] };
+}
 export interface Vibe {
   id: string;
   name: string;

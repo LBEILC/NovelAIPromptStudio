@@ -89,6 +89,26 @@ export async function runAcceptance(context) {
       ),
     );
     await check('SQLite 已打开且演示图库可读', () => database.loadLibrary('all').length >= 13);
+    await check(
+      '卡片 IPC 保留所有视图、图片宽高并移除完整元数据',
+      `(async () => {
+      for (const view of ['all', 'favorites', 'trash']) {
+        const full = await window.studio.loadLibrary(view);
+        const cards = await window.studio.loadLibraryCards(view);
+        if (JSON.stringify(cards.map(p => p.id)) !== JSON.stringify(full.map(p => p.id))) return false;
+        if (!cards.every((p, i) => p.metadata.width === full[i].metadata.width && p.metadata.height === full[i].metadata.height && !('prompt_structure' in p) && !('extra_json' in p.metadata))) return false;
+      }
+      return true;
+    })()`,
+    );
+    await check(
+      '详情 IPC 与旧列表逐项一致，缺失图片返回 null',
+      `(async () => {
+      const full = [...await window.studio.loadLibrary(), ...await window.studio.loadLibrary('trash')];
+      for (const p of full) if (JSON.stringify(await window.studio.loadLibraryDetail(p.id)) !== JSON.stringify(p)) return false;
+      return await window.studio.loadLibraryDetail('missing-acceptance-image') === null;
+    })()`,
+    );
     if (mode.packaged) {
       await check('正在运行真正的打包程序', () => app.isPackaged === true);
       await check(

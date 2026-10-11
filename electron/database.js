@@ -2,7 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { CATEGORY_OPTIONS, inferCategory, normalizeCategory } from '../src/lib/prompt.js';
-import { galleryProjectGroupingFingerprints } from '../src/lib/galleryGrouping.js';
+import {
+  galleryProjectGroupingFingerprints,
+  galleryBasePromptSimilarityPayload,
+} from '../src/lib/galleryGrouping.js';
 import { danbooruLookupName } from './danbooru.js';
 import { extractEmbeddedVibes, fingerprintVibes } from './vibes.js';
 
@@ -783,6 +786,87 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
     return hydrated.map((project) => enrichProjectTags(project, cached));
   };
 
+  const loadLibraryCards = (view = 'all') => {
+    const where =
+      view === 'trash'
+        ? "p.deleted_at != ''"
+        : view === 'favorites'
+          ? "p.deleted_at = '' AND p.is_favorite = 1"
+          : "p.deleted_at = ''";
+    // Legacy prompt fallback can depend on extra_json. Read it one image at a time,
+    // derive only the filter/similarity inputs, and never include it in the result.
+    const rows = query(`SELECT p.id, p.name, p.image_path, p.thumbnail_path,
+      p.created_at, p.is_favorite, p.deleted_at, p.prompt_fingerprint,
+      p.base_prompt_fingerprint, p.vibe_fingerprint,
+      COALESCE(c.project_id, '') AS group_cover_id
+      FROM projects p LEFT JOIN prompt_group_covers c
+      ON c.prompt_fingerprint = p.exact_group_fingerprint
+      WHERE ${where} ORDER BY p.created_at DESC`);
+    const tagsByProject = new Map();
+    for (const tag of query(`SELECT t.* FROM prompt_tags t JOIN projects p ON p.id = t.project_id
+      WHERE ${where} ORDER BY t.project_id, t.position`)) {
+      if (!tagsByProject.has(tag.project_id)) tagsByProject.set(tag.project_id, []);
+      tagsByProject.get(tag.project_id).push(tag);
+    }
+    const cached = new Map(query('SELECT * FROM tag_dictionary').map((row) => [row.tag, row]));
+    return rows.map((row) => {
+      const metadata =
+        query(
+          `SELECT model, width, height, prompt_raw, negative_prompt,
+        prompt_structure_json, extra_json FROM generation_metadata WHERE project_id = $id`,
+          { $id: row.id },
+        )[0] || {};
+      const project = enrichProjectTags(
+        {
+          tags: tagsByProject.get(row.id) || [],
+          metadata,
+          prompt_structure: safeJson(metadata.prompt_structure_json),
+        },
+        cached,
+      );
+      const similarity = galleryBasePromptSimilarityPayload(project);
+      const structure = project.prompt_structure;
+      // Full fingerprints already embed their base payload. Use a lossless alias
+      // only after proving it equals the separately stored base fingerprint.
+      const embeddedBase = JSON.stringify(safeJson(row.prompt_fingerprint).base);
+      return {
+        ...row,
+        base_prompt_fingerprint:
+          row.base_prompt_fingerprint && row.base_prompt_fingerprint === embeddedBase
+            ? null
+            : row.base_prompt_fingerprint,
+        metadata: {
+          model: metadata.model || '',
+          width: metadata.width || 0,
+          height: metadata.height || 0,
+        },
+        filter_tags: projectTags(project).map(({ tag, translation, category }) => ({
+          tag,
+          translation: translation || '',
+          category,
+        })),
+        search_prompts: [
+          ...new Set(
+            [
+              metadata.prompt_raw,
+              metadata.negative_prompt,
+              structure.base_prompt_raw,
+              structure.base_undesired_raw,
+              ...(structure.characters || []).flatMap((character) => [
+                character.prompt_raw,
+                character.undesired_raw,
+              ]),
+            ].filter(Boolean),
+          ),
+        ],
+        base_prompt_similarity: {
+          prompt: [...similarity.prompt],
+          undesired: [...similarity.undesired],
+        },
+      };
+    });
+  };
+
   const cleanCollectionName = (name) => {
     const cleaned = String(name || '').trim();
     if (!cleaned) throw new Error('收藏集名称不能为空');
@@ -1217,10 +1301,48 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
     );
   };
 
-  const backfillPromptFingerprints = () => {
+  const fingerprintVersionKey = 'prompt_fingerprints_version';
+  const fingerprintDirtyPrefix = 'prompt_fingerprints_dirty:';
+  const fingerprintVersion = '1';
+  // Persistent triggers also run when an older application writes this database.
+  // Markers share the writer's transaction, including rollback and crash recovery.
+  const trackingTriggers = [];
+  for (const [table, idColumn] of [
+    ['projects', 'id'],
+    ['prompt_tags', 'project_id'],
+    ['generation_metadata', 'project_id'],
+  ]) {
+    for (const event of ['INSERT', 'UPDATE', 'DELETE']) {
+      const name = `track_prompt_${table}_${event.toLowerCase()}`;
+      const references = event === 'UPDATE' ? ['OLD', 'NEW'] : [event === 'DELETE' ? 'OLD' : 'NEW'];
+      const update =
+        table === 'projects' && event === 'UPDATE'
+          ? 'UPDATE OF id, prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint, exact_group_fingerprint'
+          : event;
+      trackingTriggers.push({
+        name,
+        sql: `CREATE TRIGGER IF NOT EXISTS ${name} AFTER ${update} ON ${table} BEGIN
+        ${references.map((reference) => `INSERT OR REPLACE INTO app_meta(key, value) VALUES ('${fingerprintDirtyPrefix}' || ${reference}.${idColumn}, '1');`).join('\n')}
+        END`,
+      });
+    }
+  }
+  const existingTriggers = new Set(
+    query("SELECT name FROM sqlite_master WHERE type = 'trigger'").map((row) => row.name),
+  );
+  const trackingMissing = trackingTriggers.some(({ name }) => !existingTriggers.has(name));
+  for (const { sql } of trackingTriggers) database.run(sql);
+
+  const backfillPromptFingerprints = (force = true) => {
     let changed = 0;
+    const full =
+      force ||
+      trackingMissing ||
+      query('SELECT value FROM app_meta WHERE key = $key', { $key: fingerprintVersionKey })[0]
+        ?.value !== fingerprintVersion;
     for (const row of query(
-      'SELECT id, prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint, exact_group_fingerprint FROM projects',
+      `SELECT id, prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint, exact_group_fingerprint FROM projects
+       ${full ? '' : 'WHERE id IN (SELECT substr(key, ' + (fingerprintDirtyPrefix.length + 1) + ") FROM app_meta WHERE key GLOB '" + fingerprintDirtyPrefix + "*')"}`,
     )) {
       const project = hydrateProject(row);
       const raw = safeJson(project.metadata?.extra_json);
@@ -1276,6 +1398,11 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
       });
     }
     clearInvalidGroupCovers();
+    database.run('INSERT OR REPLACE INTO app_meta(key, value) VALUES ($key, $value)', {
+      $key: fingerprintVersionKey,
+      $value: fingerprintVersion,
+    });
+    database.run(`DELETE FROM app_meta WHERE key GLOB '${fingerprintDirtyPrefix}*'`);
     if (changed) persist();
     return changed;
   };
@@ -1286,10 +1413,11 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
      FROM projects WHERE deleted_at != '' ORDER BY deleted_at DESC`,
     );
 
-  backfillPromptFingerprints();
+  backfillPromptFingerprints(false);
   commit();
   return {
     loadLibrary,
+    loadLibraryCards,
     loadProject,
     listCollections: atomic(listCollections),
     migrateLegacyFavorites: atomic(migrateLegacyFavorites),

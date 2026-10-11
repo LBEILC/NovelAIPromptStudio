@@ -11,6 +11,7 @@ import type {
   ImportProgress,
   ImportSummary,
   LibrarySettings,
+  LibraryCard,
   LibraryStorageProgress,
   PreparedImportEntry,
   PreparedImportPreview,
@@ -123,6 +124,8 @@ export type DroppedFiles = Iterable<File> | ArrayLike<File> | null;
 // Event unsubscriptions return ipcRenderer in the preload implementation.
 export interface StudioApi {
   loadLibrary(view?: 'all' | 'favorites' | 'trash'): Promise<ImageRecord[]>;
+  loadLibraryCards(view?: 'all' | 'favorites' | 'trash'): Promise<LibraryCard[]>;
+  loadLibraryDetail(id: string): Promise<ImageRecord | null>;
   loadCollections(): Promise<
     { ok: true; collections: Collection[] } | (Failure & { collections: Collection[] })
   >;

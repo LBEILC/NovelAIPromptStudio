@@ -74,14 +74,27 @@ export function isExactGalleryGrouping(value = {}) {
   return grouping.promptScope === 'full' && !grouping.mergeVibes;
 }
 
+function storedBasePromptFingerprint(project) {
+  // null is the card protocol's lossless alias, never an empty fingerprint.
+  if (project.base_prompt_similarity && project.base_prompt_fingerprint === null)
+    return JSON.stringify(JSON.parse(project.prompt_fingerprint).base);
+  return (
+    project.base_prompt_fingerprint ||
+    (project.base_prompt_similarity ? '' : basePromptFingerprint(project))
+  );
+}
+
 export function galleryGroupingFingerprint(project = {}, value = DEFAULT_GALLERY_GROUPING) {
   const grouping = normalizeGalleryGrouping(value);
   if (grouping.promptScope === 'separate' || grouping.promptScope === 'similar') return '';
 
   const prompt =
     grouping.promptScope === 'base'
-      ? String(project.base_prompt_fingerprint || basePromptFingerprint(project))
-      : String(project.prompt_fingerprint || promptFingerprint(project));
+      ? String(storedBasePromptFingerprint(project))
+      : String(
+          project.prompt_fingerprint ||
+            (project.base_prompt_similarity ? '' : promptFingerprint(project)),
+        );
   if (!prompt) return '';
 
   return JSON.stringify({
@@ -132,6 +145,12 @@ function similarityTagMap(tags = []) {
 }
 
 export function galleryBasePromptSimilarityPayload(project = {}) {
+  if (project.base_prompt_similarity) {
+    return {
+      prompt: new Map(project.base_prompt_similarity.prompt),
+      undesired: new Map(project.base_prompt_similarity.undesired),
+    };
+  }
   let id = 0;
   const structure = normalizePromptStructure(
     project.prompt_structure,

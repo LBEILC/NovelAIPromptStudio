@@ -385,6 +385,14 @@ app.whenReady().then(async () => {
     await contentBackfill;
     return database.loadLibrary(request.view);
   });
+  ipcMain.handle('library:cards', async (_event, request = {}) => {
+    await contentBackfill;
+    return database.loadLibraryCards(request.view);
+  });
+  ipcMain.handle('library:detail', async (_event, id) => {
+    await contentBackfill;
+    return database.loadProject(id);
+  });
   ipcMain.handle('library:collections:list', async () => {
     try {
       await contentBackfill;
