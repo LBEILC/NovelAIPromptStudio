@@ -1,6 +1,10 @@
 // 界面稿。页面内容是示意数据；图片取自仓库里的演示图。
 const IMG = (name) => `../demo/promo-v090/final/${name}.png`;
 const PAGES = [['wb', '工作台'], ['params', '更多参数'], ['ai', 'AI 提案'], ['lib', '图片库']];
+// 只在含生成的期数里才有的页面
+const GEN_ONLY = new Set(['params', 'ai']);
+// 需要不限高度的页面（组件表）
+const TALL = new Set();
 const STAGES = [['1.0', '1.0'], ['1.2', '1.1 之后（含生成）']];
 const THEMES = [['light', '浅色'], ['dark', '深色']];
 const S = { page: 'wb', stage: '1.2', theme: 'light' };
@@ -165,10 +169,12 @@ function seg(id, items, cur, key) {
 }
 function render() {
   document.documentElement.dataset.theme = S.theme;
-  if (S.stage === '1.0' && (S.page === 'params' || S.page === 'ai')) S.page = 'wb';
-  seg('pv-page', S.stage === '1.0' ? PAGES.filter(([k]) => k === 'wb' || k === 'lib') : PAGES, S.page, 'page');
+  if (S.stage === '1.0' && GEN_ONLY.has(S.page)) S.page = 'wb';
+  if (!VIEWS[S.page]) S.page = 'wb';
+  seg('pv-page', S.stage === '1.0' ? PAGES.filter(([k]) => !GEN_ONLY.has(k)) : PAGES, S.page, 'page');
   seg('pv-stage', STAGES, S.stage, 'stage');
   seg('pv-theme', THEMES, S.theme, 'theme');
+  document.getElementById('win').classList.toggle('tall', TALL.has(S.page));
   document.getElementById('win').innerHTML = VIEWS[S.page]();
   document.getElementById('pv-notes').innerHTML = `<h4>这一页的要点（讨论用，不是产品文案）</h4><ul>${NOTES[S.page].map((n) => `<li>${n}</li>`).join('')}</ul>`;
 }

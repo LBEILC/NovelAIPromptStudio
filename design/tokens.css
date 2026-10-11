@@ -4,7 +4,7 @@
  *
  * 视觉方向："括号里的图"（见 design/identity/）。白纸黑字为主，像画室而不像控制台。
  *   - 界面本身几乎没有颜色，颜色留给图片和 Tag 的分类标记。
- *   - 朱砂是唯一的品牌色，只出现在三处：标志里的方块、"当前这一张"的标记、"生成"按钮。
+ *   - 朱砂是唯一的品牌色，只出现在三处：标志里的方块、"当前这一张"的标记、"生成"按钮。键盘焦点环用墨色。
  *   - 其他主要按钮用墨色。危险操作用绛红的文字或描边，不用实心红底，避免和朱砂混淆。
  *   - 三种字体各管一件事：界面和中文用 MiSans；Tag 和数字用等宽；成段的自然语言用衬线。
  */
@@ -100,7 +100,7 @@
   --on-cinnabar: #ffffff;     /* 4.9:1 */
   --cinnabar-text: #c22f18;   /* 作为文字或细线时略深，在纸上 5.6:1 */
   --cinnabar-wash: rgba(212, 53, 28, 0.07);
-  --focus: #d4351c;
+  --focus: #1c1c1c;           /* 焦点环用墨色：朱砂的焦点环看起来像报错 */
 
   /* 状态 */
   --ok: #08795e;
@@ -118,17 +118,20 @@
   --remove: #a82a40;
   --remove-wash: rgba(168, 42, 64, 0.08);
 
-  /* Tag 分类色：只做成小圆点，不做底色。独立于品牌色，切换主题色不改变它们的含义 */
-  --cat-artist-era: #a84f78;
-  --cat-subject: #287d91;
-  --cat-identity: #4d6fa5;
-  --cat-body: #357f7a;
-  --cat-clothing: #6f5ca7;
-  --cat-action: #9a6a2a;
-  --cat-environment: #3e8061;
-  --cat-composition: #7a6a52;
-  --cat-style: #8a641e;
-  --cat-unsorted: #8a8983;
+  /* Tag 分类色：只做成小圆点，不做底色。独立于品牌色。
+   * 色相沿用原来的含义，明度和彩度按实测调整：任意两种的色差 ΔE2000 ≥ 15；
+   * 三种色觉障碍模拟下最小色差约 7（原来约 2）。十种颜色不可能在色觉障碍下全部分清，
+   * 所以分类必须同时有文字：按分类查看时的小节标题、悬停提示、编辑浮层里的分类名。 */
+  --cat-artist-era: #a04a61;
+  --cat-subject: #005e7b;
+  --cat-identity: #437ec7;
+  --cat-body: #13766c;
+  --cat-clothing: #72629d;
+  --cat-action: #814822;
+  --cat-environment: #5b9b55;
+  --cat-composition: #635747;
+  --cat-style: #8d7931;
+  --cat-unsorted: #85847e;
 
   --scrim: rgba(28, 28, 28, 0.28);
   --shadow-print: 0 1px 2px rgba(28, 28, 28, 0.06), 0 8px 24px rgba(28, 28, 28, 0.08);   /* 图片：像一张放在纸上的照片 */
@@ -160,7 +163,7 @@
   --on-cinnabar: #ffffff;
   --cinnabar-text: #fa816b;   /* 作为文字或细线时提亮，在深色底上 6.9:1 */
   --cinnabar-wash: rgba(250, 129, 107, 0.11);
-  --focus: #fa816b;
+  --focus: #f1efea;
 
   --ok: #3fc6a0;
   --ok-wash: rgba(63, 198, 160, 0.11);
@@ -176,16 +179,16 @@
   --remove: #fe818c;
   --remove-wash: rgba(254, 129, 140, 0.11);
 
-  --cat-artist-era: #d58aad;
-  --cat-subject: #6dbccd;
-  --cat-identity: #8aa8d8;
-  --cat-body: #6db3ae;
-  --cat-clothing: #a596d1;
-  --cat-action: #d1a063;
-  --cat-environment: #7db596;
-  --cat-composition: #b3a48c;
-  --cat-style: #cfab63;
-  --cat-unsorted: #7c7973;
+  --cat-artist-era: #e687b2;
+  --cat-subject: #66ddf6;
+  --cat-identity: #92bbff;
+  --cat-body: #42aba1;
+  --cat-clothing: #a785d9;
+  --cat-action: #c88660;
+  --cat-environment: #95c994;
+  --cat-composition: #a19589;
+  --cat-style: #cbb164;
+  --cat-unsorted: #cccac5;
 
   --scrim: rgba(0, 0, 0, 0.55);
   --shadow-print: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.45);
