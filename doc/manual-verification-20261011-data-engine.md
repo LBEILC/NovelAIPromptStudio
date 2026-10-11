@@ -1,6 +1,6 @@
 # Windows 数据引擎更换手动验证
 
-- 待测改动：任务 005，随本文提交的 `[工程]` 数据引擎更换提交。
+- 待测改动：任务 005，提交 `7c5fd7f`（数据引擎更换为 `node:sqlite`）。
 - 目标系统：Windows 10 / 11。
 - 执行者：用户。工程代理没有执行以下交互步骤，也没有读取真实图库。
 - 前置条件：保留升级前应用；准备几张允许导入的图片；正常关闭旧版应用。日常数据默认位于 `%APPDATA%\NovelAI Prompt Studio\`，数据库位于其中的 `data\studio.sqlite`。历史版本/开发启动若使用 `%APPDATA%\novelai-prompt-studio\`，应选实际包含日常图库数据库的原目录；不要新建或混用这两个目录。命名 Profile 则为 `%APPDATA%\NovelAI Prompt Studio-<profile>\`。资源库若曾迁移，图片还位于自行选择的资源库位置。
