@@ -15,7 +15,9 @@ try {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NOVELAI_DEV_URL;
-  child = spawn(electron, ['.', `--app-screenshots=${root}`], {
+  const args = ['.', `--app-screenshots=${root}`];
+  if (process.argv.includes('--constrain-window')) args.push('--app-screenshot-constrain-window');
+  child = spawn(electron, args, {
     env,
     stdio: 'inherit',
     windowsHide: true,

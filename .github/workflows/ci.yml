@@ -36,7 +36,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run audit:ui
-      - run: npm run screenshots:app
+      - run: npm run screenshots:app -- --constrain-window
       - name: Upload application screenshots
         if: always()
         uses: actions/upload-artifact@v7

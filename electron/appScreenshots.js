@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { ipcMain } from 'electron';
+import { ipcMain, nativeImage, screen } from 'electron';
 import { importLibraryFiles } from './importer.js';
 import { screenshotScenes } from '../scripts/app-screenshot-scenes.mjs';
 
@@ -71,18 +71,50 @@ export async function runAppScreenshots({
         };
         const window = createWindow(state);
         try {
+          // Regression mode: reproduce a small CI desktop without changing the
+          // user's display settings or the normal application's window behavior.
+          if (process.argv.includes('--app-screenshot-constrain-window')) {
+            window.setMinimumSize(0, 0);
+            window.setMaximumSize(1024, 768);
+            window.setSize(1024, 768);
+          }
           window.webContents.on('console-message', (details) => {
             if (details.level === 'error') errors.push(details.message);
           });
           window.webContents.on('render-process-gone', (_event, details) =>
             errors.push(JSON.stringify(details)),
           );
-          await new Promise((resolve, reject) => {
+          // Set metrics before the renderer initializes responsive page state.
+          window.webContents.debugger.attach('1.3');
+          const loaded = new Promise((resolve, reject) => {
             window.webContents.once('did-finish-load', resolve);
             window.webContents.once('did-fail-load', (_event, code, description) =>
               reject(new Error(`${code}: ${description}`)),
             );
           });
+          // Offscreen BrowserWindows still inherit native desktop size limits.
+          // Override the renderer view, not the native window or page zoom.
+          await Promise.all([
+            loaded,
+            window.webContents.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
+              width: 1240,
+              height: 760,
+              deviceScaleFactor: 1,
+              mobile: false,
+            }),
+          ]);
+          console.log(
+            'Screenshot geometry:',
+            JSON.stringify({
+              file: `${scene.name}-${theme}.png`,
+              bounds: window.getBounds(),
+              contentBounds: window.getContentBounds(),
+              display: screen.getDisplayMatching(window.getBounds()),
+              viewport: await window.webContents.executeJavaScript(
+                '({ width: innerWidth, height: innerHeight, deviceScaleFactor: devicePixelRatio })',
+              ),
+            }),
+          );
           await window.webContents.insertCSS(
             '*, *::before, *::after { animation: none !important; transition: none !important; caret-color: transparent !important; }',
             { cssOrigin: 'user' },
@@ -107,11 +139,21 @@ export async function runAppScreenshots({
               if (image.getClientRects().length) await image.decode();
             }
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-            if (innerWidth !== 1240 || innerHeight !== 760) throw new Error('Unexpected viewport size');
+            if (innerWidth !== 1240 || innerHeight !== 760) throw new Error('Unexpected viewport size: ' + innerWidth + 'x' + innerHeight);
           })()`);
           if (errors.length) throw new Error(errors.join('\n'));
-          const image = await window.webContents.capturePage();
+          // capturePage() copies the native surface and can truncate a larger
+          // emulated view. Capture the full renderer viewport instead.
+          const { data } = await window.webContents.debugger.sendCommand('Page.captureScreenshot', {
+            format: 'png',
+            captureBeyondViewport: false,
+            clip: { x: 0, y: 0, width: 1240, height: 760, scale: 1 },
+          });
+          const image = nativeImage.createFromBuffer(Buffer.from(data, 'base64'));
           if (image.isEmpty()) throw new Error(`Empty capture: ${scene.name}`);
+          const size = image.getSize();
+          if (size.width !== 1240 || size.height !== 760)
+            throw new Error(`Unexpected capture size: ${size.width}x${size.height}`);
           const file = `${scene.name}-${theme}.png`;
           await fs.writeFile(path.join(mode.output, file), image.toPNG());
           manifest.screenshots.push({
@@ -119,7 +161,7 @@ export async function runAppScreenshots({
             ...scene,
             theme,
             version: app.getVersion(),
-            size: image.getSize(),
+            size,
           });
           console.log(`Captured ${file}`);
         } finally {
