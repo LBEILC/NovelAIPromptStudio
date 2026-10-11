@@ -1,3 +1,4 @@
+﻿import { useLibraryState } from './state/library';
 import {
   Activity,
   startTransition,
@@ -388,20 +389,32 @@ export default function App() {
   const notify = useNotifications();
   const notificationTarget = useRef({ page, notify });
   notificationTarget.current = { page, notify };
-  const [projectsByView, setProjectsByView] = useState({ all: [], trash: [] });
-  const [galleryCollections, setGalleryCollections] = useState([]);
-  const [activeCollectionId, setActiveCollectionId] = useState('');
-  const [editingSmartCollectionId, setEditingSmartCollectionId] = useState('');
-  const [galleryView, setGalleryView] = useState(window.studioScreenshot?.view || 'all');
-  const [libraryLoadingByView, setLibraryLoadingByView] = useState({ all: true, trash: false });
-  const [galleryFilters, setGalleryFilters] = useState(DEFAULT_GALLERY_FILTERS);
-  const [sort, setSort] = useState('recent');
-  const [galleryGrouping, setGalleryGrouping] = useState(() =>
-    readGalleryGrouping(globalThis.localStorage),
-  );
-  const [previewGroupId, setPreviewGroupId] = useState('');
-  const [previewProjectId, setPreviewProjectId] = useState('');
-  const [selectedGroupIds, setSelectedGroupIds] = useState([]);
+  const {
+    projectsByView,
+    setProjectsByView,
+    galleryCollections,
+    setGalleryCollections,
+    activeCollectionId,
+    setActiveCollectionId,
+    editingSmartCollectionId,
+    setEditingSmartCollectionId,
+    galleryView,
+    setGalleryView,
+    libraryLoadingByView,
+    setLibraryLoadingByView,
+    galleryFilters,
+    setGalleryFilters,
+    sort,
+    setSort,
+    galleryGrouping,
+    setGalleryGrouping,
+    previewGroupId,
+    setPreviewGroupId,
+    previewProjectId,
+    setPreviewProjectId,
+    selectedGroupIds,
+    setSelectedGroupIds,
+  } = useLibraryState(window.studioScreenshot?.view);
   const [workbenchSession, setWorkbenchSession] = useState({
     version: 2,
     tabs: [],
