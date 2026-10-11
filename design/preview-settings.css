@@ -1,0 +1,31 @@
+/* 界面稿样式（第三部分）：设置各页用到的多行输入、表格行、关于页。只取 tokens.css 的值。 */
+
+/* 多行输入：界面字体用于普通文字，衬线用于成段的自然语言（段落块的编辑状态） */
+.area { display: block; width: 100%; min-height: var(--area-min-h); padding: var(--sp-2) var(--ctl-pad-x); border: var(--bw) solid var(--border); border-radius: var(--r-ctl); background: var(--surface); color: var(--text); font: var(--fs-body)/var(--lh-body) var(--font-ui); white-space: pre-wrap; }
+.area.prose-edit { font: var(--fs-prose)/var(--lh-prose) var(--font-prose); min-height: var(--area-prose-min-h); }
+.area.mono { font: var(--fs-small)/var(--lh-small) var(--font-mono); color: var(--text-2); }
+
+/* 设置里上下排列的一项：标签在上，控件占满一行 */
+.setcol { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) 0; border-bottom: var(--bw) solid var(--divider); }
+.setcol small { color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); }
+.setfoot { display: flex; align-items: center; gap: var(--sp-2); padding-top: var(--sp-4); }
+.path { font: var(--fs-small)/var(--lh-small) var(--font-mono); color: var(--text-2); word-break: break-all; }
+
+/* 表格：翻译词典 */
+.tbl-bar { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-5); border-bottom: var(--bw) solid var(--divider); }
+.tbl { display: grid; grid-template-columns: var(--table-check-w) minmax(160px, 1.3fr) minmax(120px, 1fr) 132px 96px 64px; }
+.tbl > div { display: flex; align-items: center; gap: var(--ctl-gap); min-height: var(--table-row-h); padding: 0 var(--sp-2); border-bottom: var(--bw) solid var(--divider); min-width: 0; }
+.tbl > div:nth-child(6n + 1) { padding-left: var(--sp-5); }
+.tbl > div:nth-child(6n) { padding-right: var(--sp-5); justify-content: flex-end; }
+.tbl .th { min-height: var(--table-head-h); color: var(--text-3); font-size: var(--fs-caption); background: var(--surface); position: sticky; top: 0; }
+.tbl .en { font: var(--fs-small)/var(--lh-small) var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tbl .src { color: var(--text-3); font-size: var(--fs-small); }
+.tbl .row-on { background: var(--selected); }
+.tbl .row-edit { background: var(--hover); }
+.cdot { width: var(--cat-dot); height: var(--cat-dot); border-radius: 50%; flex: 0 0 auto; }
+
+/* 关于 */
+.about-head { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-2) 0 var(--sp-4); }
+.about-mark { display: inline-flex; align-items: center; gap: 0.14em; font: var(--fw-strong) var(--about-mark)/1 var(--font-prose); color: var(--text); }
+.about-mark i { width: 0.34em; height: 0.34em; background: var(--cinnabar-seal); }
+.about-name { font: var(--fw-strong) var(--fs-brand)/var(--lh-brand) var(--font-prose); }

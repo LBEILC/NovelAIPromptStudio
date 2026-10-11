@@ -106,6 +106,16 @@
   --empty-mark: 64px;     /* 中间图形的字号；括号里的虚线方块边长 0.34em */
   --empty-w: 380px;       /* 说明文字的最大宽度。标题到说明 --sp-2，图形下方和按钮上方 --sp-4，小字上方 --sp-5 */
 
+  /* 多行输入、表格、关于页 */
+  --area-min-h: 72px;         /* 多行输入的最小高度；内边距上下 --sp-2、左右 --ctl-pad-x */
+  --area-prose-min-h: 96px;   /* 编辑段落块时的最小高度，字体用 --font-prose */
+  --table-row-h: 36px;
+  --table-head-h: 30px;       /* 表头用 --fs-caption、--text-3，滚动时停在顶部 */
+  --table-check-w: 52px;      /* 表格第一列（勾选）的宽度 */
+  --about-mark: 44px;         /* 关于页标志的字号 */
+  --fs-brand: 20px;           /* 关于页的产品名，行高 26px，字体 --font-prose */
+  --lh-brand: 26px;
+
   /* 可拖宽的面板 */
   --split-hit: 8px;       /* 分隔条可以点中的宽度；看得见的线是 --bw，悬停或拖动时变成 --rule-w 的墨色 */
   --split-step: 16px;     /* 方向键每次调整的宽度；按住 Shift 时乘以 4 */
