@@ -44,7 +44,7 @@
 
 **范围扩大（用户 2026-10-11）**：产品定位改为"以 Prompt 为核心的 NovelAI 本地创作客户端"，要加入按"块"组织的 Prompt（支持 V5 的自然语言）、Tag 提示、应用内生成和版本。定位、已定事项和分期见 [设计文档](./design.md)。本计划的阶段 0、1 不受影响；阶段 2 的设计范围相应扩大，阶段 3 到 5 在设计定稿后重新细化。下面第 7 节"不改 `src/lib` 的业务行为"不再适用于 Prompt 解析：它要为"块"重写，仍然保留现有测试覆盖的 V4 / V4.5 行为。
 
-- **视觉识别选定"括号里的图"**（用户 2026-10-11）：白纸黑字为主，朱砂为唯一品牌色，标题 Newsreader、正文 MiSans VF、Tag 与数字 IBM Plex Mono。用 `brand-identity` 技能出了三套方案后选定，详见 [设计文档](./design.md) 2.9 节和 `design/identity/`。
+- **视觉识别选定"括号里的图"**（用户 2026-10-11）：白纸黑字为主，朱砂为唯一品牌色，标题 Newsreader、正文 MiSans VF、Tag 与数字 IBM Plex Mono。用 `brand-identity` 技能出了三套方案后选定，详见 [设计文档](./design.md) 2.10 节和 `design/identity/`。
 
 ## 3. 待定
 
