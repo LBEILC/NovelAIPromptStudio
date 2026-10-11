@@ -145,3 +145,5 @@
 @media (prefers-reduced-motion: reduce) {
   .nps-root *, .nps-root *::after, .nps-layer *, .nps-dialog * { transition: none; animation: none; }
 }
+.nps-empty-mark { display:block; width:var(--empty-mark); height:var(--empty-mark); color:var(--text-off); }
+.nps-empty-mark svg { display:block; width:100%; height:100%; }

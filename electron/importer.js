@@ -291,6 +291,7 @@ export async function generateZipEntryPreviews({
   previewDirectory,
   signal,
   onPreview,
+  findDuplicate,
 }) {
   const wanted = new Map(entries.map((entry) => [entry.entryIndex, entry]));
   const totals = { expandedBytes: 0, imageCount: 0 };
@@ -327,6 +328,7 @@ export async function generateZipEntryPreviews({
           .toFile(previewPath);
         onPreview?.({
           id: requested.id,
+          duplicate: Boolean(findDuplicate && (await findDuplicate(await hashFile(sourcePath)))),
           previewHeight: previewInfo.height,
           previewPath,
           previewWidth: previewInfo.width,

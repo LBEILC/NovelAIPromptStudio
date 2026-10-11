@@ -558,6 +558,34 @@ describe('Feedback', () => {
     act(() => vi.advanceTimersByTime(100));
     expect(query('[role="status"]').textContent).toBe('');
   });
+  it('shows undo immediately ahead of queued notices and resumes the queue after acting', () => {
+    const undo = vi.fn();
+    function Fixture() {
+      const notify = useNotifications();
+      return (
+        <Button
+          onClick={() => {
+            notify({ text: 'Saved' });
+            notify({ text: 'Moved', action: { label: 'Undo', onClick: undo } });
+          }}
+        >
+          Notify
+        </Button>
+      );
+    }
+    render(
+      <NotificationProvider>
+        <Fixture />
+      </NotificationProvider>,
+    );
+    focus(button('Notify'));
+    click(button('Notify'));
+    expect(query('[role="status"]').textContent).toBe('MovedUndo');
+    expect(document.activeElement).toBe(button('Notify'));
+    click(button('Undo'));
+    expect(undo).toHaveBeenCalledOnce();
+    expect(query('[role="status"]').textContent).toBe('Saved');
+  });
   it('tooltip delays hover, opens for keyboard focus and hides on scroll/press', () => {
     vi.useFakeTimers();
     render(

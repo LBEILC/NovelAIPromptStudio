@@ -16,8 +16,6 @@ html, body { margin: 0; background: var(--bg); }
 .nps-demo-sheet .nps-button-cinnabar.nps-demo-hover { background: var(--cinnabar-hover); border-color: var(--cinnabar-hover); }
 .nps-demo-sheet .nps-demo-active { transform: scale(0.98); }
 .nps-demo-selection { min-height: var(--bar-h); }
-.nps-demo-empty-mark { display: inline-flex; align-items: center; gap: 0.16em; font-weight: var(--fw-strong); color: var(--text-off); font-family: var(--font-prose); }
-.nps-demo-empty-mark > span { width: 0.34em; height: 0.34em; border: var(--bw) dashed var(--text-off); }
 
 /* TODO(design): reference input examples use 170/120px widths without corresponding tokens; retain intrinsic input widths. */
 .nps-demo-fieldrow > .nps-input-group { width: 100%; }

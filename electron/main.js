@@ -746,6 +746,7 @@ app.whenReady().then(async () => {
           await generateZipEntryPreviews({
             zipPath: archive.filePath,
             entries: archive.entries,
+            findDuplicate: (hash) => database.findProjectByContentHash(hash),
             previewDirectory: session.previewDirectory,
             signal: session.controller.signal,
             onPreview: (preview) => {
@@ -755,6 +756,7 @@ app.whenReady().then(async () => {
                 phase: 'preview',
                 entryId: preview.id,
                 previewPath: preview.previewPath || '',
+                duplicate: Boolean(preview.duplicate),
                 previewHeight: preview.previewHeight || 0,
                 previewWidth: preview.previewWidth || 0,
                 error: preview.error || '',

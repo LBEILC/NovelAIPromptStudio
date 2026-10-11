@@ -164,6 +164,7 @@ export function LibraryToolbar({
         </div>
         <Button
           ref={filterAnchor}
+          aria-label="筛选"
           variant="quiet"
           className={count || open === 'filter' ? 'active' : ''}
           onClick={() => setOpen(open === 'filter' ? '' : 'filter')}
@@ -195,6 +196,12 @@ export function LibraryToolbar({
               <i className="ri-arrow-down-s-line" />
             </Button>
           </div>
+        )}
+        {p.view === 'trash' && (
+          // TODO(design): Keep the existing toolbar action until its new placement is specified.
+          <Button variant="danger" onClick={p.onEmptyTrash}>
+            清空回收站
+          </Button>
         )}
       </div>
       <FilterChips filters={filters} onChange={p.onFiltersChange} />

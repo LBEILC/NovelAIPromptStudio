@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../ui';
-import { mediaUrl } from '../components/ImageStage.jsx';
+import { mediaUrl } from '../lib/imageStage.js';
 import type { LibraryProps } from './types';
 
 export function LibraryViewer({ p, onClose }: { p: LibraryProps; onClose: () => void }) {

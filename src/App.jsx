@@ -1,9 +1,8 @@
-﻿import { useLibraryState } from './state/library';
+import { useLibraryComputation } from './state/libraryComputation';
+import { useLibraryState } from './state/library';
 import {
   Activity,
-  startTransition,
   useCallback,
-  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -37,13 +36,14 @@ import {
   Undo2,
 } from 'lucide-react';
 import { motion, useAnimationControls } from 'motion/react';
-import GalleryPage from './GalleryPage.jsx';
+import LibraryPage from './library/LibraryPage';
+import { useLibraryCacheProgress } from './state/libraryCacheProgress';
 import SettingsPage from './settings/SettingsPage';
 import { Titlebar } from './shell/Titlebar';
 import { useAppearance } from './state/appearance';
 import { Dialog, useNotifications } from './ui';
 import WorkbenchPage from './WorkbenchPage.jsx';
-import ArchiveImportModal from './components/ArchiveImportModal.jsx';
+import { ZipImport } from './library/ZipImport';
 import Icon from './components/Icon.jsx';
 import {
   allPromptTags,
@@ -83,10 +83,7 @@ import {
 import {
   adjacentGallerySelection,
   galleryGroupMember,
-  galleryGroupMenuLabels,
-  gallerySelectionMenuItems,
   gallerySelectionProjectIds,
-  galleryViewGroups,
   reconcileGallerySelection,
 } from './lib/gallery.js';
 import {
@@ -95,13 +92,11 @@ import {
   normalizeGalleryFilters,
 } from './lib/galleryFilters.js';
 import {
-  galleryCollectionScope,
   normalizeGalleryCollection,
   readActiveGalleryCollection,
   writeActiveGalleryCollection,
 } from './lib/galleryCollections.js';
-import { readGalleryGrouping, writeGalleryGrouping } from './lib/galleryGrouping.js';
-import { scheduleGalleryComputation } from './lib/galleryTransition.js';
+import { writeGalleryGrouping } from './lib/galleryGrouping.js';
 import {
   MOTION_BLUR_MEDIUM_PX,
   MOTION_DISTANCE_BASE_PX,
@@ -436,15 +431,14 @@ export default function App() {
   const lastSelectedGroupRef = useRef('');
   const libraryRequestsRef = useRef({ all: 0, trash: 0 });
   const loadedLibraryViewsRef = useRef(new Set());
-  const groupingWorkerRef = useRef(null);
-  const groupingRequestRef = useRef(0);
   const activeTab = activeWorkbenchTab(workbenchSession);
   const projects = projectsByView[galleryView] || [];
   const libraryLoading = Boolean(libraryLoadingByView[galleryView]);
+  const cacheProgress = useLibraryCacheProgress(libraryLoading);
   const reduceMotion = useStudioReducedMotion(appearance.motion);
 
   const showToast = useCallback((message, type = 'success') => {
-    if (notificationTarget.current.page === 'settings') {
+    if (['settings', 'gallery'].includes(notificationTarget.current.page)) {
       notificationTarget.current.notify({ text: message });
       return;
     }
@@ -485,9 +479,9 @@ export default function App() {
       libraryRequestsRef.current[targetView] = requestId;
       setLibraryLoadingByView((current) => ({ ...current, [targetView]: true }));
       try {
-        const items = await studio.loadLibrary(targetView);
+        const items = await studio.loadLibraryCards(targetView);
         if (libraryRequestsRef.current[targetView] !== requestId) return [];
-        const hydrated = (items || []).map(hydrateProject);
+        const hydrated = items || [];
         setProjectsByView((current) => ({ ...current, [targetView]: hydrated }));
         loadedLibraryViewsRef.current.add(targetView);
         return hydrated;
@@ -525,6 +519,7 @@ export default function App() {
 
   useEffect(() => {
     if (!loadedLibraryViewsRef.current.has(galleryView)) reloadLibrary(galleryView);
+    if (!loadedLibraryViewsRef.current.has('trash')) reloadLibrary('trash');
   }, [galleryView, reloadLibrary]);
 
   useEffect(() => {
@@ -644,6 +639,7 @@ export default function App() {
                     previewPath: update.previewPath || '',
                     previewWidth: update.previewWidth || 0,
                     previewError: update.error || '',
+                    duplicate: Boolean(update.duplicate),
                   }
                 : entry,
             ),
@@ -825,6 +821,10 @@ export default function App() {
     async (result) => {
       setImportResult(result);
       if (!result?.ok && result?.error) showToast(result.error, 'error');
+      if (result?.summary)
+        showToast(
+          `导入 ${result.summary.imported} 张 · 跳过重复 ${result.summary.duplicates} 张 · 失败 ${result.summary.failed} 张`,
+        );
       await reloadLibrary('all');
       if (result?.imported?.length) setPreviewProjectId(result.imported.at(-1).id);
       if (result?.metadataMissing)
@@ -1007,169 +1007,34 @@ export default function App() {
     workbenchSession.tabs.length,
   ]);
 
-  const activeCollection =
-    galleryView === 'all'
-      ? galleryCollections.find((collection) => collection.id === activeCollectionId) || null
-      : null;
-  const galleryComputation = useMemo(
-    () => ({
-      activeCollection,
-      filters: galleryFilters,
-      grouping: galleryGrouping,
-      projects,
-      sort,
-      view: galleryView,
-    }),
-    [activeCollection, galleryFilters, galleryGrouping, galleryView, projects, sort],
-  );
-  const [gatedGalleryComputation, setGatedGalleryComputation] = useState(galleryComputation);
-  useEffect(() => {
-    if (gatedGalleryComputation === galleryComputation) return undefined;
-    return scheduleGalleryComputation(() => {
-      startTransition(() => setGatedGalleryComputation(galleryComputation));
-    }, reduceMotion);
-  }, [galleryComputation, gatedGalleryComputation, reduceMotion]);
-  const deferredGalleryComputation = useDeferredValue(gatedGalleryComputation);
-  const collectionScopedProjects = useMemo(
-    () =>
-      galleryCollectionScope(
-        deferredGalleryComputation.projects,
-        deferredGalleryComputation.activeCollection,
-      ),
-    [deferredGalleryComputation.activeCollection, deferredGalleryComputation.projects],
-  );
-  const galleryCollectionsWithCounts = useMemo(
-    () =>
-      galleryCollections.map((collection) => ({
-        ...collection,
-        image_count:
-          deferredGalleryComputation.view === 'all'
-            ? collection.kind === 'manual'
-              ? Number(collection.active_member_count ?? collection.member_ids?.length ?? 0)
-              : galleryCollectionScope(deferredGalleryComputation.projects, collection).length
-            : collection.kind === 'manual'
-              ? Number(collection.active_member_count || 0)
-              : null,
-      })),
-    [deferredGalleryComputation.projects, deferredGalleryComputation.view, galleryCollections],
-  );
-  const editingSmartCollection =
-    galleryCollectionsWithCounts.find(
-      (collection) => collection.id === editingSmartCollectionId && collection.kind === 'smart',
-    ) || null;
-  const exactVisibleGroups = useMemo(
-    () =>
-      deferredGalleryComputation.grouping.promptScope === 'similar'
-        ? null
-        : galleryViewGroups(
-            collectionScopedProjects,
-            deferredGalleryComputation.filters,
-            deferredGalleryComputation.grouping,
-            deferredGalleryComputation.sort,
-          ),
-    [
-      collectionScopedProjects,
-      deferredGalleryComputation.filters,
-      deferredGalleryComputation.grouping,
-      deferredGalleryComputation.sort,
-    ],
-  );
-  const [similarGroupingState, setSimilarGroupingState] = useState({
-    groups: [],
-    loading: false,
-    requestId: 0,
-  });
-
-  useEffect(() => {
-    if (deferredGalleryComputation.grouping.promptScope !== 'similar') {
-      groupingWorkerRef.current?.terminate();
-      groupingWorkerRef.current = null;
-      setSimilarGroupingState((current) =>
-        current.loading ? { ...current, loading: false } : current,
-      );
-      return undefined;
-    }
-
-    const requestId = groupingRequestRef.current + 1;
-    groupingRequestRef.current = requestId;
-    groupingWorkerRef.current?.terminate();
-    setSimilarGroupingState((current) => ({ ...current, loading: true }));
-
-    const acceptGroups = (groups) => {
-      if (groupingRequestRef.current !== requestId) return;
-      setSimilarGroupingState({ groups, loading: false, requestId });
-    };
-    const handleError = (error) => {
-      if (groupingRequestRef.current !== requestId) return;
-      setSimilarGroupingState({ groups: [], loading: false, requestId });
-      showToast(
-        `相似 Prompt 分组没有完成：${error instanceof Error ? error.message : String(error)}`,
-        'error',
-      );
-    };
-    const payload = {
-      filters: deferredGalleryComputation.filters,
-      grouping: deferredGalleryComputation.grouping,
-      id: requestId,
-      projects: collectionScopedProjects,
-      sort: deferredGalleryComputation.sort,
-    };
-
-    if (typeof Worker === 'undefined') {
-      const timer = window.setTimeout(() => {
-        try {
-          acceptGroups(
-            galleryViewGroups(payload.projects, payload.filters, payload.grouping, payload.sort),
-          );
-        } catch (error) {
-          handleError(error);
-        }
-      }, 0);
-      return () => window.clearTimeout(timer);
-    }
-
-    const worker = new Worker(new URL('./workers/galleryGrouping.worker.js', import.meta.url), {
-      type: 'module',
-    });
-    groupingWorkerRef.current = worker;
-    worker.onmessage = ({ data }) => {
-      if (data?.id !== requestId) return;
-      if (data.error) handleError(new Error(data.error));
-      else acceptGroups(data.groups || []);
-    };
-    worker.onerror = (event) => handleError(new Error(event.message || '后台计算发生错误'));
-    worker.postMessage(payload);
-    return () => {
-      worker.terminate();
-      if (groupingWorkerRef.current === worker) groupingWorkerRef.current = null;
-    };
-  }, [
+  const {
+    activeCollection,
+    deferredGalleryComputation,
     collectionScopedProjects,
-    deferredGalleryComputation.filters,
-    deferredGalleryComputation.grouping,
-    deferredGalleryComputation.sort,
+    galleryCollectionsWithCounts,
+    editingSmartCollection,
+    similarGroupingState,
+    visibleGroups,
+    galleryUpdating,
+    galleryContentKey,
+    previewGroup,
+    preview,
+  } = useLibraryComputation({
+    galleryView,
+    galleryCollections,
+    activeCollectionId,
+    galleryFilters,
+    galleryGrouping,
+    projects,
+    sort,
+    reduceMotion,
+    projectsByView,
+    editingSmartCollectionId,
     showToast,
-  ]);
-
-  const visibleGroups =
-    deferredGalleryComputation.grouping.promptScope === 'similar'
-      ? similarGroupingState.groups
-      : exactVisibleGroups || [];
-  const galleryUpdating =
-    libraryLoading ||
-    deferredGalleryComputation !== galleryComputation ||
-    (deferredGalleryComputation.grouping.promptScope === 'similar' && similarGroupingState.loading);
-  const galleryContentKey = `${deferredGalleryComputation.view}:${deferredGalleryComputation.activeCollection?.id || 'all'}:${deferredGalleryComputation.grouping.promptScope}:${deferredGalleryComputation.grouping.mergeVibes ? 1 : 0}:${deferredGalleryComputation.grouping.similarityThreshold}:${deferredGalleryComputation.sort}:${JSON.stringify(deferredGalleryComputation.filters)}:${similarGroupingState.requestId}:${visibleGroups.length}:${visibleGroups[0]?.id || ''}:${visibleGroups.at(-1)?.id || ''}`;
-  const previewGroup =
-    visibleGroups.find((group) => group.id === previewGroupId) ||
-    visibleGroups.find((group) =>
-      group.members.some((project) => project.id === previewProjectId),
-    ) ||
-    null;
-  const preview =
-    previewGroup?.members.find((project) => project.id === previewProjectId) ||
-    previewGroup?.cover ||
-    null;
+    libraryLoading,
+    previewGroupId,
+    previewProjectId,
+  });
   useEffect(() => {
     const capture = window.studioScreenshot;
     if (!capture || !workbenchSessionReady || galleryUpdating) return;
@@ -1453,31 +1318,25 @@ export default function App() {
     const ids = explicitIds || selectedProjectIds;
     if (!ids.length) return;
     const selectedGroups = scope === 'group' ? 1 : selectedGroupIds.length;
-    const impact = tabImpact(ids);
     const isDetail = scope === 'detail';
-    if (
-      !(await requestConfirmation({
-        title: isDetail ? '删除当前图片？' : '删除整个图片组？',
-        message: isDetail
-          ? '将当前图片移入回收站。'
-          : `将 ${selectedGroups} 组共 ${ids.length} 张图片移入回收站。`,
-        detail: impact.open ? `${impact.open} 张仍在工作台打开，标签会继续可用。` : '',
-        okText: '移入回收站',
-        danger: true,
-      }))
-    )
-      return;
     const next =
       previewGroup && preview && ids.includes(preview.id)
         ? adjacentGallerySelection(visibleGroups, previewGroup.id, preview.id)
         : null;
     const result = await studio.moveProjectsToTrash(ids);
-    if (!summarizeBatch(result, '移入回收站', isDetail ? 0 : selectedGroups)) return;
+    if (!result?.ok) {
+      summarizeBatch(result, '移入回收站', isDetail ? 0 : selectedGroups);
+      return;
+    }
     if (next) {
       setPreviewGroupId(next.groupId);
       setPreviewProjectId(next.projectId);
     }
     await reloadAfterGalleryAction();
+    notify({
+      text: '【文案待定：已移入回收站】',
+      action: { label: '撤销', onClick: () => restoreProjects(result.results?.success || ids) },
+    });
   };
 
   const restoreProjects = async (explicitIds = null, scope = 'selection') => {
@@ -1517,9 +1376,15 @@ export default function App() {
     const impact = tabImpact(ids);
     if (
       !(await requestConfirmation({
-        title: ids.length > 1 ? '永久删除这些图片？' : '永久删除当前图片？',
-        message: `将永久删除 ${ids.length} 张图片${knownBytes == null ? '' : `，预计释放 ${formatBytes(knownBytes)}`}。`,
-        detail: `${impact.open ? `${impact.open} 张仍在工作台打开。` : ''}${impact.dirty ? `其中 ${impact.dirty} 个标签包含工作区草稿，继续会丢弃。` : ''} 此操作不可撤销。`,
+        title: `永久删除这 ${ids.length} 张图片？`,
+        message: `会删除图片库里保存的这 ${ids.length} 份副本和它们的记录，删除后无法恢复。你导入时用的原文件不受影响。`,
+        // TODO(design): The reference does not cover open drafts or a trash-size summary.
+        detail:
+          page === 'gallery'
+            ? impact.open || knownBytes != null
+              ? '【文案待定：工作台草稿影响与释放空间】'
+              : ''
+            : `${impact.open ? `${impact.open} 张仍在工作台打开。` : ''}${impact.dirty ? `其中 ${impact.dirty} 个标签包含工作区草稿，继续会丢弃。` : ''} 此操作不可撤销。`,
         okText: '永久删除',
         danger: true,
         primaryDanger: true,
@@ -1642,7 +1507,7 @@ export default function App() {
     await reloadCollections();
     selectGalleryCollection(result.collection.id);
     showToast(kind === 'smart' ? '智能收藏集已保存' : '普通收藏集已创建');
-    return true;
+    return result.collection;
   };
 
   const renameGalleryCollection = async (collection, name) => {
@@ -1741,100 +1606,6 @@ export default function App() {
       `${action === 'remove' ? '已移出' : '已加入'} ${success} 张图片${skipped ? `，跳过 ${skipped} 张` : ''}`,
     );
     return true;
-  };
-
-  const navigatePreview = useCallback(
-    (direction) => {
-      if (!previewGroup?.members.length || !preview) return;
-      const index = previewGroup.members.findIndex((project) => project.id === preview.id);
-      const next = (index + direction + previewGroup.members.length) % previewGroup.members.length;
-      setPreviewProjectId(previewGroup.members[next].id);
-    },
-    [preview, previewGroup],
-  );
-
-  const galleryContextMenu = (event, group, onRenameRequest) => {
-    if (selectedGroupIds.length) {
-      const items = gallerySelectionMenuItems({
-        activeCollection,
-        collections: galleryCollectionsWithCounts,
-        groupCount: selectedGroupIds.length,
-        imageCount: selectedProjectIds.length,
-        onCollectionProjectsChange: updateGalleryCollectionProjects,
-        onPermanentDelete: permanentDelete,
-        onRestore: restoreProjects,
-        onTrash: moveToTrash,
-        projectIds: selectedProjectIds,
-        view: galleryView,
-      }).map((item) => {
-        if (item.key === 'add-selection-to-collection') return { ...item, icon: FolderOpen };
-        if (item.key === 'restore-selection') return { ...item, icon: Undo2 };
-        if (['permanent-selection', 'trash-selection'].includes(item.key))
-          return { ...item, icon: Trash2 };
-        return item;
-      });
-      openContextMenu(event, items);
-      return;
-    }
-    const project = group.cover;
-    const ids = group.members.map((item) => item.id);
-    const labels = galleryGroupMenuLabels(group);
-    openContextMenu(event, [
-      ...(galleryView === 'trash'
-        ? [
-            {
-              key: 'restore-group',
-              label: group.count > 1 ? '恢复整个图片组' : '恢复图片',
-              onClick: () => restoreProjects(ids, 'group'),
-            },
-            {
-              key: 'permanent-group',
-              label: group.count > 1 ? '永久删除整个图片组' : '永久删除图片',
-              icon: Trash2,
-              danger: true,
-              onClick: () => permanentDelete(ids, null, 'group'),
-            },
-          ]
-        : [
-            {
-              key: 'open-workbench',
-              label: '在工作台中打开',
-              icon: Pencil,
-              onClick: () =>
-                openWorkbenchPath(project.image_path, {
-                  type: 'library',
-                  projectId: project.id,
-                  path: project.image_path,
-                }),
-            },
-            { key: 'rename-project', label: labels.rename, icon: Pencil, onClick: onRenameRequest },
-            {
-              key: 'reveal-project',
-              label: '在文件夹中显示',
-              icon: FolderOpen,
-              onClick: () => studio.revealFile(project.image_path),
-            },
-            { key: 'project-divider', type: 'divider' },
-            {
-              key: 'delete-project',
-              label: group.count > 1 ? '删除整个图片组' : '删除图片',
-              icon: Trash2,
-              danger: true,
-              onClick: () => moveToTrash(ids, 'group'),
-            },
-          ]),
-    ]);
-  };
-
-  const galleryWorkspaceContextMenu = (event) => {
-    openContextMenu(event, [
-      {
-        key: 'import-clipboard',
-        label: '从剪贴板导入',
-        icon: ClipboardPaste,
-        onClick: () => importImages(null, true),
-      },
-    ]);
   };
 
   const resetWorkbench = async () => {
@@ -1969,7 +1740,15 @@ export default function App() {
         </Activity>
         <Activity mode={page === 'gallery' ? 'visible' : 'hidden'}>
           <PageSurface active={page === 'gallery'} motionMode={appearance.motion}>
-            <GalleryPage
+            <LibraryPage
+              cacheProgress={cacheProgress}
+              allCount={projectsByView.all.length}
+              trashCount={projectsByView.trash.length}
+              importProgress={importProgress}
+              onCancelImport={() =>
+                importProgress?.batchId && studio.cancelImport(importProgress.batchId)
+              }
+              dragState={dragState}
               activeCollection={activeCollection}
               collections={galleryCollectionsWithCounts}
               contentKey={galleryContentKey}
@@ -2018,7 +1797,6 @@ export default function App() {
               onEmptyTrash={emptyTrash}
               onImport={() => importImages()}
               onImportClipboard={() => importImages(null, true)}
-              onNavigatePreview={navigatePreview}
               onOpenWorkbench={(project) =>
                 openWorkbenchPath(project.image_path, {
                   type: 'library',
@@ -2028,8 +1806,6 @@ export default function App() {
               }
               onPermanentDelete={permanentDelete}
               onPreview={previewGalleryGroup}
-              onProjectContextMenu={galleryContextMenu}
-              onWorkspaceContextMenu={galleryWorkspaceContextMenu}
               onQueryChange={(query) => updateGalleryFilters({ query })}
               onRename={renameProject}
               onRestore={restoreProjects}
@@ -2074,21 +1850,23 @@ export default function App() {
           </div>
         </Activity>
       </div>
-      <ImportExperience
-        dragState={dragState}
-        onCancel={() => importProgress?.batchId && studio.cancelImport(importProgress.batchId)}
-        onDismiss={() => setImportResult(null)}
-        progress={importProgress}
-        result={importResult}
-        target={page}
-      />
-      <ArchiveImportModal
+      {page !== 'gallery' && (
+        <ImportExperience
+          dragState={dragState}
+          onCancel={() => importProgress?.batchId && studio.cancelImport(importProgress.batchId)}
+          onDismiss={() => setImportResult(null)}
+          progress={importProgress}
+          result={importResult}
+          target={page}
+        />
+      )}
+      <ZipImport
         importSession={archiveImport}
         key={archiveImport?.sessionId || 'archive-import'}
         onCancel={cancelArchiveImport}
         onImport={commitArchiveImport}
       />
-      {page === 'settings' ? (
+      {['settings', 'gallery'].includes(page) ? (
         <Dialog
           open={Boolean(confirmation)}
           title={confirmation?.title || ''}

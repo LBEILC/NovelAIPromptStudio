@@ -2,6 +2,17 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Plus } from 'lucide-react';
 import { Button, iconProps } from './controls';
 import { cx, clamp } from './internal';
+import emptySymbol from '../../design/identity/logo/symbol-empty.svg?raw';
+
+export function EmptyMark() {
+  return (
+    <span
+      className="nps-empty-mark"
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: emptySymbol }}
+    />
+  );
+}
 
 export interface Notice {
   id: number;
@@ -73,7 +84,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [queue.length]);
   return (
     <NoticeContext.Provider
-      value={(notice) => setQueue((previous) => [...previous, { ...notice, id: ++next.current }])}
+      value={(notice) =>
+        setQueue((previous) => {
+          const nextNotice = { ...notice, id: ++next.current };
+          // An expiring action (such as trash undo) must be available immediately.
+          return notice.action ? [nextNotice, ...previous] : [...previous, nextNotice];
+        })
+      }
     >
       {children}
       <div

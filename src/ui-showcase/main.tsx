@@ -1,3 +1,4 @@
+import { EmptyMark } from '../ui';
 import { StrictMode, useRef, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Search, X } from 'lucide-react';
@@ -578,13 +579,7 @@ function Showcase() {
       </Section>
       <Section title="空状态" wide>
         <EmptyState
-          graphic={
-            <span className="nps-demo-empty-mark">
-              {'{'}
-              <span />
-              {'}'}
-            </span>
-          }
+          graphic={<EmptyMark />}
           title="把一张 NovelAI 图片拖到这里"
           description="软件会读出它的 Prompt 和参数。可以同时打开多张，每张一个标签。"
           actions={

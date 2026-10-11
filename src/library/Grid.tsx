@@ -1,15 +1,17 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { adjacentRowIndex, fallbackRatio, layoutLibraryRows } from './layout';
-import { mediaUrl } from '../components/ImageStage.jsx';
+import { mediaUrl } from '../lib/imageStage.js';
 import type { LibraryProps } from './types';
 
 export function LibraryGrid({
   p,
   rowHeight,
+  onRowHeight,
   onViewer,
 }: {
   p: LibraryProps;
   rowHeight: number;
+  onRowHeight: (height: number) => void;
   onViewer: () => void;
 }) {
   const scroll = useRef<HTMLDivElement>(null);
@@ -24,6 +26,21 @@ export function LibraryGrid({
     max: 2.5,
   });
   const anchor = useRef('');
+  const wheel = useRef(0);
+  useLayoutEffect(() => {
+    const node = scroll.current!;
+    const resize = (event: WheelEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      event.preventDefault();
+      wheel.current += event.deltaY;
+      if (Math.abs(wheel.current) >= 24) {
+        onRowHeight(Math.min(360, Math.max(120, rowHeight + (wheel.current < 0 ? 20 : -20))));
+        wheel.current = 0;
+      }
+    };
+    node.addEventListener('wheel', resize, { passive: false });
+    return () => node.removeEventListener('wheel', resize);
+  }, [rowHeight, onRowHeight]);
   const drag = useRef<{
     x: number;
     y: number;
@@ -133,7 +150,10 @@ export function LibraryGrid({
       className="library-scroll"
       data-library-grid
       tabIndex={-1}
-      onScroll={(event) => setViewport((v) => ({ ...v, top: event.currentTarget.scrollTop }))}
+      onScroll={(event) => {
+        const top = event.currentTarget.scrollTop;
+        setViewport((v) => ({ ...v, top }));
+      }}
       onKeyDown={(event) => {
         if (event.ctrlKey || event.metaKey) {
           if (event.key.toLowerCase() === 'a') {
@@ -196,7 +216,11 @@ export function LibraryGrid({
         if (!initial.active && Math.hypot(x - initial.x, y - initial.y) < 5) return;
         initial.active = true;
         suppress.current = true;
-        node.setPointerCapture(event.pointerId);
+        try {
+          node.setPointerCapture(event.pointerId);
+        } catch {
+          /* Synthetic DOM actions have no active platform pointer. */
+        }
         event.preventDefault();
         const box = {
           x: Math.min(x, initial.x),

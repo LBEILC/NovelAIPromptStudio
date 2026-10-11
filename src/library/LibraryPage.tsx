@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, EmptyState, Progress, ResizablePanel } from '../ui';
+import { Button, EmptyState, EmptyMark, Progress, ResizablePanel } from '../ui';
 import { useLibraryDetail } from '../state/libraryDetail';
 import { GALLERY_CARD_SIZE_KEY } from '../lib/galleryLayout.js';
 import { GALLERY_PREVIEW_PANEL_WIDTH_KEY } from '../lib/panelLayout.js';
@@ -14,7 +14,6 @@ import { fallbackRatio, rowHeightFromLegacyWidth } from './layout';
 import type { LibraryProps } from './types';
 import type { LibraryCardCacheProgress } from '../shared/ipc';
 import type { ImportProgress } from '../shared/types';
-import emptySymbol from '../../design/identity/logo/symbol-empty.svg?raw';
 import './library.css';
 
 function token(name: string) {
@@ -67,7 +66,20 @@ export default function LibraryPage(
   const busyImport =
     p.importProgress && ['preparing', 'importing'].includes(p.importProgress.phase);
   return (
-    <div className="library-page" data-library-page>
+    <div
+      className="library-page"
+      data-library-page
+      data-library-updating={p.updating || undefined}
+      onKeyDown={(event) => {
+        if ((event.target as HTMLElement).closest('input, textarea, [contenteditable=true]'))
+          return;
+        if (event.key === 'Escape') p.onClearSelection();
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+          event.preventDefault();
+          p.onSelectAll();
+        }
+      }}
+    >
       <LibrarySidebar p={p} />
       <main className="library-middle">
         {!noImages && (
@@ -96,14 +108,7 @@ export default function LibraryPage(
         ) : empty ? (
           <div className="library-empty">
             <EmptyState
-              graphic={
-                noImages ? (
-                  <span
-                    className="library-empty-mark"
-                    dangerouslySetInnerHTML={{ __html: emptySymbol }}
-                  />
-                ) : null
-              }
+              graphic={noImages ? <EmptyMark /> : null}
               title={noImages ? '图片库里还没有图片' : '没有符合条件的图片'}
               description={
                 noImages
@@ -128,7 +133,15 @@ export default function LibraryPage(
             />
           </div>
         ) : (
-          <LibraryGrid p={p} rowHeight={rowHeight} onViewer={() => setViewer(true)} />
+          <LibraryGrid
+            p={p}
+            rowHeight={rowHeight}
+            onRowHeight={(height) => {
+              setRowHeight(height);
+              persist(GALLERY_CARD_SIZE_KEY, height * fallbackRatio);
+            }}
+            onViewer={() => setViewer(true)}
+          />
         )}
         {error && <div role="alert">{error}</div>}
         {ids.length > 0 && (

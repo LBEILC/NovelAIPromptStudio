@@ -10,6 +10,7 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
   return (
     <aside className="library-side" aria-label="图片库导航">
       <button
+        aria-label="全部图片"
         className={`library-side-item ${p.view === 'all' && !p.activeCollection ? 'on' : ''}`}
         onClick={() => p.onCollectionSelect('')}
       >
@@ -38,6 +39,8 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
             .map((collection) => (
               <div key={collection.id}>
                 <button
+                  aria-label={collection.name}
+                  data-collection-id={collection.id}
                   className={`library-side-item ${p.activeCollection?.id === collection.id || p.editingSmartCollection?.id === collection.id ? 'on' : ''}`}
                   onClick={() => p.onCollectionSelect(collection.id)}
                   onContextMenu={(event) => {
@@ -75,6 +78,7 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
         </div>
       ))}
       <button
+        aria-label="回收站"
         className={`library-side-item library-trash ${p.view === 'trash' ? 'on' : ''}`}
         onClick={() => p.onViewChange('trash')}
       >

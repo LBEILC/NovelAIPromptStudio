@@ -6,7 +6,7 @@
 .studio-titlebar button { -webkit-app-region: no-drag; color: var(--text-2); }
 .studio-titlebar button[aria-current="page"] { color: var(--text); font-weight: var(--fw-strong); }
 .studio-brand-mark { display: inline-flex; align-items: center; }
-.studio-brand-mark svg { display: block; width: 26px; height: 22px; }
+.studio-brand-mark svg { display: block; width: var(--logo); height: var(--logo); }
 .studio-brand-mark [data-color="text"] { fill: var(--text); }
 .studio-brand-mark [data-color="primary"] { fill: var(--cinnabar-seal); }
 .studio-titlebar i { font-size: var(--icon); }

@@ -14,7 +14,9 @@ async function files(directory) {
   ).flat();
 }
 const violations = [];
-for (const file of (await Promise.all(['src/ui', 'src/settings', 'src/shell'].map(files))).flat()) {
+for (const file of (
+  await Promise.all(['src/ui', 'src/settings', 'src/shell', 'src/library'].map(files))
+).flat()) {
   const source = await readFile(file, 'utf8');
   if (/from\s*['"](?:@lobehub\/ui|antd)|!important/.test(source))
     violations.push(`${file}: prohibited import or important`);

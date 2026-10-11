@@ -1,4 +1,4 @@
-﻿.library-page { display:flex; width:100%; height:100%; min-height:0; background:var(--bg); color:var(--text); font:var(--fs-body)/var(--lh-body) var(--font-ui); }
+.library-page { display:flex; width:100%; height:100%; min-height:0; background:var(--bg); color:var(--text); font:var(--fs-body)/var(--lh-body) var(--font-ui); }
 .library-page i, .library-filter-panel i { font-size:var(--icon); }
 .library-page button { cursor:pointer; }
 .library-side { flex:0 0 var(--side-w); width:var(--side-w); display:flex; flex-direction:column; padding:var(--sp-3) var(--sp-2); gap:var(--bw); background:var(--pane); border-right:var(--bw) solid var(--border); overflow:auto; }
@@ -114,3 +114,17 @@
 .library-viewer-foot .library-strip { padding:0; }
 .library-separator { width:var(--bw); height:var(--sp-4); background:var(--border); margin:0 var(--sp-1); }
 
+.nps-dialog:has(.library-zip) { width:calc(var(--dialog-w) + var(--popover-w)); }
+.library-zip-actions { display:flex; align-items:center; gap:var(--sp-2); margin:var(--sp-4) 0 var(--sp-2); }
+.library-zip-actions > span { margin-right:auto; color:var(--text-3); }
+.library-zip-grid { position:relative; display:flex; flex-direction:column; gap:var(--sp-2); max-height:calc(var(--win-min-h) - var(--side-w)); overflow:auto; }
+.library-zip-row { display:flex; flex-shrink:0; }
+.library-zip-row button { padding:0; border:0; background:transparent; }
+.library-zip-row .dim img { opacity:var(--dim); }
+.library-zip-preview { display:block; max-width:100%; max-height:var(--win-min-h); object-fit:contain; }
+.library-page > .nps-resizable { flex-shrink:0; }
+.library-page .nps-panel-content { height:100%; }
+.library-search kbd { white-space:nowrap; font:var(--fs-caption)/1 var(--font-mono); color:var(--text-3); border:var(--bw) solid var(--border); border-radius:var(--sp-1); padding:var(--sp-0) var(--sp-1); }
+.library-middle { container-type:inline-size; }
+@container (max-width:560px) { .library-search kbd { display:none; } }
+@container (max-width:420px) { .library-tools > .nps-button > .nps-button-label > span:not(.library-condition-count) { display:none; } }

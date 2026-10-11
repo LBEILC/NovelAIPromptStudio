@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Dialog, Input } from '../ui';
-import { mediaUrl } from '../components/ImageStage.jsx';
+import { mediaUrl } from '../lib/imageStage.js';
 import { LibraryPrompt, libraryPositivePrompt } from './Prompt';
 import { CollectionPicker } from './Collections';
 import type { ImageRecord } from '../shared/types';

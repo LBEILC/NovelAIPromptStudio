@@ -136,43 +136,48 @@ describe('safe ZIP import', () => {
     );
   });
 
-  it('generates bounded WebP previews for selectable archive entries', async () => {
-    const directory = temporaryWorkspace();
-    const zipPath = path.join(directory, 'preview.zip');
-    const previewDirectory = path.join(directory, 'previews');
-    fs.mkdirSync(previewDirectory);
-    const largePng = await sharp({
-      create: {
-        width: 1800,
-        height: 900,
-        channels: 4,
-        background: { r: 80, g: 120, b: 220, alpha: 1 },
-      },
-    })
-      .png()
-      .toBuffer();
-    await writeZip(zipPath, [{ name: 'folder/preview.png', buffer: largePng }]);
-    const inspection = await inspectZipArchive(zipPath);
-    const updates = [];
+  it.each([false, true])(
+    'generates bounded WebP previews and detects existing images: %s',
+    async (duplicate) => {
+      const directory = temporaryWorkspace();
+      const zipPath = path.join(directory, 'preview.zip');
+      const previewDirectory = path.join(directory, 'previews');
+      fs.mkdirSync(previewDirectory);
+      const largePng = await sharp({
+        create: {
+          width: 1800,
+          height: 900,
+          channels: 4,
+          background: { r: 80, g: 120, b: 220, alpha: 1 },
+        },
+      })
+        .png()
+        .toBuffer();
+      await writeZip(zipPath, [{ name: 'folder/preview.png', buffer: largePng }]);
+      const inspection = await inspectZipArchive(zipPath);
+      const updates = [];
 
-    await generateZipEntryPreviews({
-      zipPath,
-      entries: inspection.entries.map((entry) => ({ ...entry, id: 'entry-one' })),
-      previewDirectory,
-      onPreview: (update) => updates.push(update),
-    });
+      await generateZipEntryPreviews({
+        zipPath,
+        entries: inspection.entries.map((entry) => ({ ...entry, id: 'entry-one' })),
+        previewDirectory,
+        findDuplicate: () => (duplicate ? { id: 'existing' } : null),
+        onPreview: (update) => updates.push(update),
+      });
 
-    expect(updates).toEqual([
-      {
-        id: 'entry-one',
-        previewHeight: 640,
-        previewPath: path.join(previewDirectory, 'entry-one.webp'),
-        previewWidth: 1280,
-      },
-    ]);
-    const metadata = await sharp(fs.readFileSync(updates[0].previewPath)).metadata();
-    expect(metadata).toMatchObject({ format: 'webp', width: 1280, height: 640 });
-  });
+      expect(updates).toEqual([
+        {
+          id: 'entry-one',
+          duplicate,
+          previewHeight: 640,
+          previewPath: path.join(previewDirectory, 'entry-one.webp'),
+          previewWidth: 1280,
+        },
+      ]);
+      const metadata = await sharp(fs.readFileSync(updates[0].previewPath)).metadata();
+      expect(metadata).toMatchObject({ format: 'webp', width: 1280, height: 640 });
+    },
+  );
 
   it('recovers UTF-8 names from macOS ZIPs that omit the language flag', async () => {
     const directory = temporaryWorkspace();

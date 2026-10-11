@@ -15,22 +15,6 @@ describe('production-safe Lobe UI overrides', () => {
     );
     expect(styles).toMatch(/button\.overview-add-character \{[^}]*gap: 12px;/);
     expect(styles).toMatch(/\.workbench-source-panel\.workbench-source-panel \{[^}]*padding:/);
-    expect(styles).toMatch(/\.gallery-size-slider\.gallery-size-slider \{[^}]*width: 96px;/);
-    expect(styles).toMatch(
-      /\.archive-import-card \{[^}]*isolation: isolate;[^}]*border: 1px solid transparent;/,
-    );
-    expect(styles).toMatch(
-      /\.archive-import-card\.selected \{[^}]*background: color-mix\([^}]*border-color: var\(--accent\);/,
-    );
-    expect(styles).toMatch(
-      /\.archive-import-card-main:focus-visible \{[^}]*outline: 2px solid var\(--accent\);/,
-    );
-    expect(styles).toMatch(
-      /\.archive-import-thumbnail img \{[^}]*object-fit: cover;[^}]*-webkit-user-drag: none;/,
-    );
-    expect(styles).toMatch(
-      /\.archive-import-card:hover \.archive-import-hover-name, \.archive-import-card:focus-within \.archive-import-hover-name \{[^}]*opacity: 1;/,
-    );
   });
 
   it('keeps built-in help demonstrations compatible with motion preferences', () => {

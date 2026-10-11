@@ -1,10 +1,10 @@
-﻿import { useState } from 'react';
-import type { ImageRecord, Collection, GalleryFilters } from '../shared/types';
+﻿import { useEffect, useState } from 'react';
+import type { LibraryCard, Collection, GalleryFilters } from '../shared/types';
 import { DEFAULT_GALLERY_FILTERS } from '../lib/galleryFilters.js';
 import { readGalleryGrouping } from '../lib/galleryGrouping.js';
 
 export function useLibraryState(initialView = 'all') {
-  const [projectsByView, setProjectsByView] = useState<Record<string, ImageRecord[]>>({
+  const [projectsByView, setProjectsByView] = useState<Record<string, LibraryCard[]>>({
     all: [],
     trash: [],
   });
@@ -17,7 +17,21 @@ export function useLibraryState(initialView = 'all') {
     trash: false,
   });
   const [galleryFilters, setGalleryFilters] = useState<GalleryFilters>(DEFAULT_GALLERY_FILTERS);
-  const [sort, setSort] = useState('recent');
+  const [sort, setSort] = useState(() => {
+    try {
+      const value = localStorage.getItem('novelai-prompt-studio.gallery-sort.v1');
+      return ['recent', 'oldest', 'name'].includes(value || '') ? value! : 'recent';
+    } catch {
+      return 'recent';
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('novelai-prompt-studio.gallery-sort.v1', sort);
+    } catch {
+      /* Session preference remains usable. */
+    }
+  }, [sort]);
   const [galleryGrouping, setGalleryGrouping] = useState(() =>
     readGalleryGrouping(globalThis.localStorage),
   );
