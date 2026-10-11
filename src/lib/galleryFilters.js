@@ -49,7 +49,9 @@ export function normalizeGalleryFilters(value = {}) {
     models: uniqueStrings(value.models),
     vibes: uniqueStrings(value.vibes),
     datePreset: DATE_PRESET_VALUES.has(value.datePreset) ? value.datePreset : 'all',
-    dateFrom: /^\d{4}-\d{2}-\d{2}$/.test(String(value.dateFrom || '')) ? String(value.dateFrom) : '',
+    dateFrom: /^\d{4}-\d{2}-\d{2}$/.test(String(value.dateFrom || ''))
+      ? String(value.dateFrom)
+      : '',
     dateTo: /^\d{4}-\d{2}-\d{2}$/.test(String(value.dateTo || '')) ? String(value.dateTo) : '',
   };
 }
@@ -71,16 +73,22 @@ function projectFilterIndex(project) {
     model: normalizeSearch(modelValue),
     modelValue,
     optionTags: tags.map((tag) => ({
-      label: String(tag.translation || '').trim() && normalizeSearch(tag.translation) !== normalizeSearch(tag.tag)
-        ? `${tag.tag} · ${tag.translation}`
-        : String(tag.tag || '').trim(),
+      label:
+        String(tag.translation || '').trim() &&
+        normalizeSearch(tag.translation) !== normalizeSearch(tag.tag)
+          ? `${tag.tag} · ${tag.translation}`
+          : String(tag.tag || '').trim(),
       value: String(tag.tag || '').trim(),
     })),
-    searchValues: [
-      project.name,
-      ...tags.flatMap((tag) => [tag.tag, tag.translation]),
-    ].map(normalizeSearch).filter(Boolean),
-    tagValues: new Set(tags.flatMap((tag) => [tag.tag, tag.translation]).map(normalizeSearch).filter(Boolean)),
+    searchValues: [project.name, ...tags.flatMap((tag) => [tag.tag, tag.translation])]
+      .map(normalizeSearch)
+      .filter(Boolean),
+    tagValues: new Set(
+      tags
+        .flatMap((tag) => [tag.tag, tag.translation])
+        .map(normalizeSearch)
+        .filter(Boolean),
+    ),
     vibe: normalizeSearch(vibeValue),
     vibeValue,
   };
@@ -135,13 +143,13 @@ function compileGalleryFilters(filtersValue, nowValue) {
     vibes: new Set(filters.vibes.map(normalizeSearch)),
   };
   compiled.active = Boolean(
-    compiled.needles.length
-    || compiled.includeTags.length
-    || compiled.excludeTags.length
-    || compiled.models.size
-    || compiled.vibes.size
-    || compiled.dateBounds.from
-    || compiled.dateBounds.to,
+    compiled.needles.length ||
+      compiled.includeTags.length ||
+      compiled.excludeTags.length ||
+      compiled.models.size ||
+      compiled.vibes.size ||
+      compiled.dateBounds.from ||
+      compiled.dateBounds.to,
   );
   return compiled;
 }
@@ -150,14 +158,20 @@ function projectMatchesCompiledFilters(project, compiled) {
   if (!compiled.active) return true;
   const index = projectFilterIndex(project);
   if (compiled.needles.length) {
-    if (!index.searchValues.some((value) => compiled.needles.some((needle) => value.includes(needle)))) return false;
+    if (
+      !index.searchValues.some((value) => compiled.needles.some((needle) => value.includes(needle)))
+    )
+      return false;
   }
 
   if (compiled.includeTags.length) {
     const matches = (tag) => index.tagValues.has(tag);
-    if (compiled.filters.tagMatch === 'all'
-      ? !compiled.includeTags.every(matches)
-      : !compiled.includeTags.some(matches)) return false;
+    if (
+      compiled.filters.tagMatch === 'all'
+        ? !compiled.includeTags.every(matches)
+        : !compiled.includeTags.some(matches)
+    )
+      return false;
   }
   if (compiled.excludeTags.some((tag) => index.tagValues.has(tag))) return false;
 
@@ -187,7 +201,9 @@ export function filterGalleryProjects(projects = [], filtersValue, nowValue = ne
 function countedOptions(projects, valuesForProject) {
   const entries = new Map();
   for (const project of projects) {
-    const projectValues = new Map(valuesForProject(project).map((item) => [normalizeSearch(item.value), item]));
+    const projectValues = new Map(
+      valuesForProject(project).map((item) => [normalizeSearch(item.value), item]),
+    );
     for (const [key, item] of projectValues) {
       if (!key) continue;
       const current = entries.get(key) || { ...item, count: 0 };
@@ -195,23 +211,32 @@ function countedOptions(projects, valuesForProject) {
       entries.set(key, current);
     }
   }
-  return [...entries.values()].sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, 'zh-CN', { numeric: true }));
+  return [...entries.values()].sort(
+    (left, right) =>
+      right.count - left.count || left.label.localeCompare(right.label, 'zh-CN', { numeric: true }),
+  );
 }
 
 export function galleryFilterOptions(projects = []) {
   const tags = countedOptions(projects, (project) => projectFilterIndex(project).optionTags);
-  const models = countedOptions(projects, (project) => [{
-    label: projectFilterIndex(project).modelValue === GALLERY_UNKNOWN_MODEL_VALUE
-      ? '未知模型'
-      : projectFilterIndex(project).modelValue,
-    value: projectFilterIndex(project).modelValue,
-  }]);
+  const models = countedOptions(projects, (project) => [
+    {
+      label:
+        projectFilterIndex(project).modelValue === GALLERY_UNKNOWN_MODEL_VALUE
+          ? '未知模型'
+          : projectFilterIndex(project).modelValue,
+      value: projectFilterIndex(project).modelValue,
+    },
+  ]);
   const vibes = countedOptions(projects, (project) => {
     const fingerprint = projectFilterIndex(project).vibeValue;
-    return [{
-      label: fingerprint === GALLERY_NO_VIBE_VALUE ? '无 Vibe' : `Vibe ${fingerprint.slice(0, 8)}`,
-      value: fingerprint,
-    }];
+    return [
+      {
+        label:
+          fingerprint === GALLERY_NO_VIBE_VALUE ? '无 Vibe' : `Vibe ${fingerprint.slice(0, 8)}`,
+        value: fingerprint,
+      },
+    ];
   });
   return { tags, models, vibes };
 }

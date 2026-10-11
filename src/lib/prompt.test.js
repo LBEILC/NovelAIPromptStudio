@@ -1,19 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { analyzePromptBatch, expandSearch, formatPrompt, formatPromptGroupedInline, formatPromptInline, formatTag, inferCategory, normalizeCategory, parsePrompt, parsePromptPreservingEdits, repairLegacyPromptTags } from './prompt.js';
+import {
+  analyzePromptBatch,
+  expandSearch,
+  formatPrompt,
+  formatPromptGroupedInline,
+  formatPromptInline,
+  formatTag,
+  inferCategory,
+  normalizeCategory,
+  parsePrompt,
+  parsePromptPreservingEdits,
+  repairLegacyPromptTags,
+} from './prompt.js';
 
 describe('NovelAI prompt codec', () => {
   it('parses numeric weights and exports the same NovelAI syntax', () => {
     let id = 0;
     const tags = parsePrompt('1girl, 1.3::silver hair ::, futuristic city', () => `tag-${id++}`);
     expect(tags).toHaveLength(3);
-    expect(tags[1]).toMatchObject({ tag: 'silver hair', weight: 1.3, translation: '银色头发', category: 'Body' });
+    expect(tags[1]).toMatchObject({
+      tag: 'silver hair',
+      weight: 1.3,
+      translation: '银色头发',
+      category: 'Body',
+    });
     expect(formatPrompt(tags)).toBe('1girl,\n1.3::silver hair ::,\nfuturistic city');
     expect(formatPromptInline(tags)).toBe('1girl, 1.3::silver hair ::, futuristic city');
   });
 
   it('expands comma-separated weighted groups and preserves negative weights', () => {
     let id = 0;
-    const tags = parsePrompt('1girl, 1.3::chibi, chibi only, thick lineart ::, -2::censored ::', () => `group-${id++}`);
+    const tags = parsePrompt(
+      '1girl, 1.3::chibi, chibi only, thick lineart ::, -2::censored ::',
+      () => `group-${id++}`,
+    );
     expect(tags.map(({ tag, weight }) => ({ tag, weight }))).toEqual([
       { tag: '1girl', weight: 1 },
       { tag: 'chibi', weight: 1.3 },
@@ -28,27 +48,77 @@ describe('NovelAI prompt codec', () => {
   it('repairs tags created by the legacy comma splitter without losing edits', () => {
     let id = 0;
     const legacy = [
-      { id: 'girl', tag: '1girl', translation: '自定义女孩', category: 'Unsorted', weight: 1, note: '保留备注' },
-      { id: 'broken', tag: '1.3::chibi', translation: '', category: 'Unsorted', weight: 1, note: '' },
-      { id: 'tail', tag: 'thick lineart ::', translation: '', category: 'Unsorted', weight: 1, note: '' },
+      {
+        id: 'girl',
+        tag: '1girl',
+        translation: '自定义女孩',
+        category: 'Unsorted',
+        weight: 1,
+        note: '保留备注',
+      },
+      {
+        id: 'broken',
+        tag: '1.3::chibi',
+        translation: '',
+        category: 'Unsorted',
+        weight: 1,
+        note: '',
+      },
+      {
+        id: 'tail',
+        tag: 'thick lineart ::',
+        translation: '',
+        category: 'Unsorted',
+        weight: 1,
+        note: '',
+      },
     ];
-    const repaired = repairLegacyPromptTags(legacy, '1girl, 1.3::chibi, chibi only, thick lineart ::', () => `new-${id++}`);
+    const repaired = repairLegacyPromptTags(
+      legacy,
+      '1girl, 1.3::chibi, chibi only, thick lineart ::',
+      () => `new-${id++}`,
+    );
     expect(repaired.map(({ tag, weight }) => ({ tag, weight }))).toEqual([
       { tag: '1girl', weight: 1 },
       { tag: 'chibi', weight: 1.3 },
       { tag: 'chibi only', weight: 1.3 },
       { tag: 'thick lineart', weight: 1.3 },
     ]);
-    expect(repaired[0]).toMatchObject({ id: 'girl', translation: '自定义女孩', note: '保留备注', category: 'Subject' });
+    expect(repaired[0]).toMatchObject({
+      id: 'girl',
+      translation: '自定义女孩',
+      note: '保留备注',
+      category: 'Subject',
+    });
   });
 
   it('reparses raw prompt text while preserving metadata for unchanged tags', () => {
     let id = 0;
     const existing = [
-      { id: 'silver', tag: 'silver hair', translation: '自定义银发', translation_source: 'manual', category: 'Clothing', category_source: 'manual', weight: 1, note: '保留备注' },
-      { id: 'removed', tag: 'old tag', translation: '旧标签', category: 'Unsorted', weight: 1, note: '' },
+      {
+        id: 'silver',
+        tag: 'silver hair',
+        translation: '自定义银发',
+        translation_source: 'manual',
+        category: 'Clothing',
+        category_source: 'manual',
+        weight: 1,
+        note: '保留备注',
+      },
+      {
+        id: 'removed',
+        tag: 'old tag',
+        translation: '旧标签',
+        category: 'Unsorted',
+        weight: 1,
+        note: '',
+      },
     ];
-    const replaced = parsePromptPreservingEdits('1.5::silver hair ::, new tag', existing, () => `raw-${id++}`);
+    const replaced = parsePromptPreservingEdits(
+      '1.5::silver hair ::, new tag',
+      existing,
+      () => `raw-${id++}`,
+    );
 
     expect(replaced).toHaveLength(2);
     expect(replaced[0]).toMatchObject({
@@ -69,7 +139,12 @@ describe('NovelAI prompt codec', () => {
     let id = 0;
     const tags = parsePrompt('masterpiece, ::year2025 ::, ::', () => `syntax-${id++}`);
     expect(tags).toHaveLength(3);
-    expect(tags[1]).toMatchObject({ tag: 'year2025', weight: 1, raw_segment: '::year2025 ::', syntax_issue: 'emphasis_closer' });
+    expect(tags[1]).toMatchObject({
+      tag: 'year2025',
+      weight: 1,
+      raw_segment: '::year2025 ::',
+      syntax_issue: 'emphasis_closer',
+    });
     expect(tags[2]).toMatchObject({ tag: '::', syntax_issue: 'control_only' });
     expect(formatPrompt(tags)).toBe('masterpiece,\n::year2025 ::,\n::');
   });
@@ -79,20 +154,29 @@ describe('NovelAI prompt codec', () => {
     const [tag] = parsePrompt('::artist:imamura ryoi::', () => `closer-${id++}`);
     const weighted = { ...tag, weight: 1.25 };
 
-    expect(tag).toMatchObject({ tag: 'artist:imamura ryoi', weight: 1, syntax_issue: 'emphasis_closer' });
+    expect(tag).toMatchObject({
+      tag: 'artist:imamura ryoi',
+      weight: 1,
+      syntax_issue: 'emphasis_closer',
+    });
     expect(formatTag(weighted)).toBe('1.25::artist:imamura ryoi ::');
   });
 
   it('parses batch input with fullwidth commas, newlines, and empty segments', () => {
     let id = 0;
-    const batch = analyzePromptBatch(',akakura,ciloranko，white background\n\n', [], () => `batch-${id++}`);
+    const batch = analyzePromptBatch(
+      ',akakura,ciloranko，white background\n\n',
+      [],
+      () => `batch-${id++}`,
+    );
     expect(batch.tags.map((tag) => tag.tag)).toEqual(['akakura', 'ciloranko', 'white background']);
     expect(batch).toMatchObject({ duplicateCount: 0, syntaxIssueCount: 0 });
   });
 
   it('keeps quoted punctuation and a trailing Text block intact', () => {
     let id = 0;
-    const prompt = '1girl, a handwritten speech bubble reading "Hello, world!", Text: Hello, world!\n\nSecond line, still text';
+    const prompt =
+      '1girl, a handwritten speech bubble reading "Hello, world!", Text: Hello, world!\n\nSecond line, still text';
     const tags = parsePrompt(prompt, () => `natural-${id++}`);
 
     expect(tags.map((tag) => tag.tag)).toEqual([
@@ -100,12 +184,16 @@ describe('NovelAI prompt codec', () => {
       'a handwritten speech bubble reading "Hello, world!"',
       'Text: Hello, world!\n\nSecond line, still text',
     ]);
-    expect(tags[2]).toMatchObject({ segment_type: 'text_block', raw_segment: 'Text: Hello, world!\n\nSecond line, still text' });
+    expect(tags[2]).toMatchObject({
+      segment_type: 'text_block',
+      raw_segment: 'Text: Hello, world!\n\nSecond line, still text',
+    });
   });
 
   it('treats contractions and possessives as apostrophes instead of quote openers', () => {
     let id = 0;
-    const prompt = "pov hands, hand on another's cheek, location, girl's hands, don't look away, girls' hands, 'Hello, world!', final tag";
+    const prompt =
+      "pov hands, hand on another's cheek, location, girl's hands, don't look away, girls' hands, 'Hello, world!', final tag";
     const tags = parsePrompt(prompt, () => `apostrophe-${id++}`);
 
     expect(tags.map((tag) => tag.tag)).toEqual([
@@ -122,39 +210,81 @@ describe('NovelAI prompt codec', () => {
 
   it('does not let an unmatched quote consume the rest of the Prompt', () => {
     let id = 0;
-    const tags = parsePrompt('portrait, text saying "unfinished, outdoors, daylight', () => `unmatched-${id++}`);
+    const tags = parsePrompt(
+      'portrait, text saying "unfinished, outdoors, daylight',
+      () => `unmatched-${id++}`,
+    );
 
-    expect(tags.map((tag) => tag.tag)).toEqual(['portrait', 'text saying "unfinished', 'outdoors', 'daylight']);
+    expect(tags.map((tag) => tag.tag)).toEqual([
+      'portrait',
+      'text saying "unfinished',
+      'outdoors',
+      'daylight',
+    ]);
   });
 
   it('splits brace groups into editable inner tags while retaining their emphasis structure', () => {
     let id = 0;
-    const prompt = '{artist:terasu mc, artist:shirabe shiki, artist:meme50, year 2024, year 2025, } {uncensored, no watermark, best quality, amazing quality, very aesthetic, absurdres, highres, masterpiece, } {3d, 3d background, realistic, beach, wave, splashing, } {from forward, }';
+    const prompt =
+      '{artist:terasu mc, artist:shirabe shiki, artist:meme50, year 2024, year 2025, } {uncensored, no watermark, best quality, amazing quality, very aesthetic, absurdres, highres, masterpiece, } {3d, 3d background, realistic, beach, wave, splashing, } {from forward, }';
     const tags = parsePrompt(prompt, () => `brace-${id++}`);
 
     expect(tags).toHaveLength(20);
     expect(tags.map((tag) => tag.tag)).toEqual([
-      'artist:terasu mc', 'artist:shirabe shiki', 'artist:meme50', 'year 2024', 'year 2025',
-      'uncensored', 'no watermark', 'best quality', 'amazing quality', 'very aesthetic', 'absurdres', 'highres', 'masterpiece',
-      '3d', '3d background', 'realistic', 'beach', 'wave', 'splashing', 'from forward',
+      'artist:terasu mc',
+      'artist:shirabe shiki',
+      'artist:meme50',
+      'year 2024',
+      'year 2025',
+      'uncensored',
+      'no watermark',
+      'best quality',
+      'amazing quality',
+      'very aesthetic',
+      'absurdres',
+      'highres',
+      'masterpiece',
+      '3d',
+      '3d background',
+      'realistic',
+      'beach',
+      'wave',
+      'splashing',
+      'from forward',
     ]);
-    expect(tags.slice(0, 5).every((tag) => tag.brace_depth === 1 && tag.brace_group === tags[0].brace_group)).toBe(true);
+    expect(
+      tags
+        .slice(0, 5)
+        .every((tag) => tag.brace_depth === 1 && tag.brace_group === tags[0].brace_group),
+    ).toBe(true);
     expect(tags[5].brace_group).not.toBe(tags[0].brace_group);
     expect(formatTag(tags[0])).toBe('{artist:terasu mc}');
     expect(formatPromptGroupedInline(tags).split('}, {')).toHaveLength(4);
 
-    const emphasized = parsePrompt('{{bad hands}}, {artist:a, artist:b, }', () => `emphasis-${id++}`);
+    const emphasized = parsePrompt(
+      '{{bad hands}}, {artist:a, artist:b, }',
+      () => `emphasis-${id++}`,
+    );
     expect(emphasized.map((tag) => tag.tag)).toEqual(['bad hands', 'artist:a', 'artist:b']);
     expect(emphasized.map(formatTag)).toEqual(['{{bad hands}}', '{artist:a}', '{artist:b}']);
   });
 
   it('keeps triple-brace source text groupable while showing each member with the same braces', () => {
     let id = 0;
-    const prompt = '{{{best quality, amazing quality, very aesthetic, highres, incredibly absurdres}}},';
+    const prompt =
+      '{{{best quality, amazing quality, very aesthetic, highres, incredibly absurdres}}},';
     const tags = parsePrompt(prompt, () => `triple-${id++}`);
 
-    expect(tags.map((tag) => tag.tag)).toEqual(['best quality', 'amazing quality', 'very aesthetic', 'highres', 'incredibly absurdres']);
-    expect(tags.every((tag) => tag.brace_depth === 3 && tag.brace_group === tags[0].brace_group)).toBe(true);
+    expect(tags.map((tag) => tag.tag)).toEqual([
+      'best quality',
+      'amazing quality',
+      'very aesthetic',
+      'highres',
+      'incredibly absurdres',
+    ]);
+    expect(
+      tags.every((tag) => tag.brace_depth === 3 && tag.brace_group === tags[0].brace_group),
+    ).toBe(true);
     expect(tags.map(formatTag)).toEqual([
       '{{{best quality}}}',
       '{{{amazing quality}}}',
@@ -162,26 +292,69 @@ describe('NovelAI prompt codec', () => {
       '{{{highres}}}',
       '{{{incredibly absurdres}}}',
     ]);
-    expect(formatPromptGroupedInline(tags)).toBe('{{{best quality, amazing quality, very aesthetic, highres, incredibly absurdres}}}');
+    expect(formatPromptGroupedInline(tags)).toBe(
+      '{{{best quality, amazing quality, very aesthetic, highres, incredibly absurdres}}}',
+    );
   });
 
   it('repairs previously imported tags that were split before legacy brace groups were supported', () => {
     let id = 0;
     const prompt = '{artist:terasu mc, artist:meme50, } {best quality, masterpiece, }';
-    const repaired = repairLegacyPromptTags([
-      { id: 'old-1', tag: '{artist:terasu mc', translation: '', category: 'Unsorted', weight: 1, note: '' },
-      { id: 'old-2', tag: 'artist:meme50', translation: '', category: 'Artist', weight: 1, note: '' },
-      { id: 'old-3', tag: '} {best quality', translation: '', category: 'Style', weight: 1, note: '' },
-      { id: 'old-4', tag: 'masterpiece', translation: '', category: 'Style', weight: 1, note: '' },
-    ], prompt, () => `repaired-${id++}`);
+    const repaired = repairLegacyPromptTags(
+      [
+        {
+          id: 'old-1',
+          tag: '{artist:terasu mc',
+          translation: '',
+          category: 'Unsorted',
+          weight: 1,
+          note: '',
+        },
+        {
+          id: 'old-2',
+          tag: 'artist:meme50',
+          translation: '',
+          category: 'Artist',
+          weight: 1,
+          note: '',
+        },
+        {
+          id: 'old-3',
+          tag: '} {best quality',
+          translation: '',
+          category: 'Style',
+          weight: 1,
+          note: '',
+        },
+        {
+          id: 'old-4',
+          tag: 'masterpiece',
+          translation: '',
+          category: 'Style',
+          weight: 1,
+          note: '',
+        },
+      ],
+      prompt,
+      () => `repaired-${id++}`,
+    );
 
-    expect(repaired.map((tag) => tag.tag)).toEqual(['artist:terasu mc', 'artist:meme50', 'best quality', 'masterpiece']);
+    expect(repaired.map((tag) => tag.tag)).toEqual([
+      'artist:terasu mc',
+      'artist:meme50',
+      'best quality',
+      'masterpiece',
+    ]);
     expect(repaired.every((tag) => !/[{}]/.test(tag.tag))).toBe(true);
   });
 
   it('preserves weighted groups and reports duplicates without removing them', () => {
     let id = 0;
-    const batch = analyzePromptBatch('1.3::shirt dress，button up ::, solo, SOLO', [{ tag: 'solo' }], () => `batch-${id++}`);
+    const batch = analyzePromptBatch(
+      '1.3::shirt dress，button up ::, solo, SOLO',
+      [{ tag: 'solo' }],
+      () => `batch-${id++}`,
+    );
     expect(batch.tags.map(({ tag, weight }) => ({ tag, weight }))).toEqual([
       { tag: 'shirt dress', weight: 1.3 },
       { tag: 'button up', weight: 1.3 },

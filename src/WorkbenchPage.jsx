@@ -1,9 +1,36 @@
-import { closestCenter, DndContext, DragOverlay, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
-import { horizontalListSortingStrategy, sortableKeyboardCoordinates, SortableContext, useSortable } from '@dnd-kit/sortable';
+import {
+  horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
+  SortableContext,
+  useSortable,
+} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ActionIcon, Alert as LobeAlert, DraggablePanel as LobeDraggablePanel, Popover, PopoverGroup } from '@lobehub/ui';
-import { Button as LobeButton, showContextMenu, SplitButton, TabsIndicator, TabsList, TabsRoot, TabsTab } from '@lobehub/ui/base-ui';
+import {
+  ActionIcon,
+  Alert as LobeAlert,
+  DraggablePanel as LobeDraggablePanel,
+  Popover,
+  PopoverGroup,
+} from '@lobehub/ui';
+import {
+  Button as LobeButton,
+  showContextMenu,
+  SplitButton,
+  TabsIndicator,
+  TabsList,
+  TabsRoot,
+  TabsTab,
+} from '@lobehub/ui/base-ui';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useReducedMotion } from 'motion/react';
@@ -23,8 +50,17 @@ import {
   writePanelWidth,
 } from './lib/panelLayout.js';
 import { fitTabPreviewCanvas } from './lib/imagePreview.js';
-import { countPromptTags, formatPositivePromptForCopy, positivePromptCopyOptions } from './lib/promptStructure.js';
-import { activeWorkbenchCopyContext, activeWorkbenchTab, scopeWorkbenchCopyContext, workbenchTabHasChanges } from './lib/workbenchSession.js';
+import {
+  countPromptTags,
+  formatPositivePromptForCopy,
+  positivePromptCopyOptions,
+} from './lib/promptStructure.js';
+import {
+  activeWorkbenchCopyContext,
+  activeWorkbenchTab,
+  scopeWorkbenchCopyContext,
+  workbenchTabHasChanges,
+} from './lib/workbenchSession.js';
 
 const WORKBENCH_TAB_SORT_ACCESSIBILITY = {
   screenReaderInstructions: {
@@ -37,29 +73,68 @@ const WORKBENCH_TAB_DROP_ANIMATION = { duration: 200, easing: 'cubic-bezier(.22,
 const WORKBENCH_TAB_PREVIEW_STYLES = { root: { pointerEvents: 'none' } };
 
 function WorkbenchVibes({ vibes, onReveal }) {
-  if (!vibes?.length) return <div className="workbench-vibe-empty"><Icon name="info" size={15}/><span>没有检测到 Vibe</span></div>;
-  return <section className="workbench-vibes" aria-label="图片中的 Vibe">
-    <header><strong>Vibe</strong><small>{vibes.length} 个</small></header>
-    <div className="workbench-vibe-list">
-      {vibes.map((vibe, index) => <div className="workbench-vibe-row" key={vibe.id || index}>
-        <div><strong>{vibe.name || `Vibe ${index + 1}`}</strong><small>原图强度 {Number(vibe.strength ?? .6).toFixed(2)} · Information {vibe.information_extracted == null ? '未知' : Number(vibe.information_extracted).toFixed(2)}</small></div>
-        <LobeButton icon={<Icon name="folder" size={13}/>} onClick={() => onReveal(vibe)} size="small">在文件夹中显示</LobeButton>
-      </div>)}
-    </div>
-  </section>;
+  if (!vibes?.length)
+    return (
+      <div className="workbench-vibe-empty">
+        <Icon name="info" size={15} />
+        <span>没有检测到 Vibe</span>
+      </div>
+    );
+  return (
+    <section className="workbench-vibes" aria-label="图片中的 Vibe">
+      <header>
+        <strong>Vibe</strong>
+        <small>{vibes.length} 个</small>
+      </header>
+      <div className="workbench-vibe-list">
+        {vibes.map((vibe, index) => (
+          <div className="workbench-vibe-row" key={vibe.id || index}>
+            <div>
+              <strong>{vibe.name || `Vibe ${index + 1}`}</strong>
+              <small>
+                原图强度 {Number(vibe.strength ?? 0.6).toFixed(2)} · Information{' '}
+                {vibe.information_extracted == null
+                  ? '未知'
+                  : Number(vibe.information_extracted).toFixed(2)}
+              </small>
+            </div>
+            <LobeButton
+              icon={<Icon name="folder" size={13} />}
+              onClick={() => onReveal(vibe)}
+              size="small"
+            >
+              在文件夹中显示
+            </LobeButton>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
-function ImageOpenButton({ loading, onChooseImage, onClipboardImage, primary = false, large = false }) {
-  return <SplitButton loading={loading} size={large ? 'large' : 'middle'} type={primary ? 'primary' : 'default'}>
-    <SplitButton.Main icon={<Icon name="image" size={14}/>} onClick={onChooseImage}>
-      {loading ? '正在读取…' : '打开图片'}
-    </SplitButton.Main>
-    <SplitButton.Menu
-      aria-label="其他打开方式"
-      items={[{ key: 'clipboard', label: '从剪贴板打开', onClick: onClipboardImage }]}
-      placement="bottomRight"
-    />
-  </SplitButton>;
+function ImageOpenButton({
+  loading,
+  onChooseImage,
+  onClipboardImage,
+  primary = false,
+  large = false,
+}) {
+  return (
+    <SplitButton
+      loading={loading}
+      size={large ? 'large' : 'middle'}
+      type={primary ? 'primary' : 'default'}
+    >
+      <SplitButton.Main icon={<Icon name="image" size={14} />} onClick={onChooseImage}>
+        {loading ? '正在读取…' : '打开图片'}
+      </SplitButton.Main>
+      <SplitButton.Menu
+        aria-label="其他打开方式"
+        items={[{ key: 'clipboard', label: '从剪贴板打开', onClick: onClipboardImage }]}
+        placement="bottomRight"
+      />
+    </SplitButton>
+  );
 }
 
 function WorkbenchTabPreview({ tab }) {
@@ -73,96 +148,130 @@ function WorkbenchTabPreview({ tab }) {
     ? `${width && height ? `${width} × ${height} · ` : ''}${countPromptTags(project)} 个 Tag${dirty ? ' · Prompt 已修改' : ''}`
     : tab.error || '图片源不可用';
 
-  return <div
-    className="workbench-tab-preview"
-    style={{
-      '--workbench-tab-preview-ratio': `${previewCanvas.width} / ${previewCanvas.height}`,
-      '--workbench-tab-preview-width': `${previewCanvas.width}px`,
-    }}
-  >
-    <div className="workbench-tab-preview-media">
-      {project && filePath
-        ? <img alt="" loading="lazy" src={mediaUrl(filePath)}/>
-        : <div className="workbench-tab-preview-unavailable"><Icon name="image" size={24}/><span>无法预览图片</span></div>}
+  return (
+    <div
+      className="workbench-tab-preview"
+      style={{
+        '--workbench-tab-preview-ratio': `${previewCanvas.width} / ${previewCanvas.height}`,
+        '--workbench-tab-preview-width': `${previewCanvas.width}px`,
+      }}
+    >
+      <div className="workbench-tab-preview-media">
+        {project && filePath ? (
+          <img alt="" loading="lazy" src={mediaUrl(filePath)} />
+        ) : (
+          <div className="workbench-tab-preview-unavailable">
+            <Icon name="image" size={24} />
+            <span>无法预览图片</span>
+          </div>
+        )}
+      </div>
+      <div className="workbench-tab-preview-copy">
+        <strong>{tab.displayName || project?.name || '未命名图片'}</strong>
+        <span>{detail}</span>
+      </div>
     </div>
-    <div className="workbench-tab-preview-copy">
-      <strong>{tab.displayName || project?.name || '未命名图片'}</strong>
-      <span>{detail}</span>
-    </div>
-  </div>;
+  );
 }
 
 export function WorkbenchTabLabel({ position = 1, previewDisabled = false, tab, onClose }) {
   const dirty = workbenchTabHasChanges(tab);
   const project = tab.project;
   const filePath = project?.thumbnail_path || project?.image_path || tab.source?.path || '';
-  const label = <span
-    className="workbench-tab-label"
-    onAuxClick={(event) => { if (event.button === 1) onClose(tab.id); }}
-    onContextMenu={(event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      showContextMenu([{ key: 'close-tab', label: '关闭标签', onClick: () => onClose(tab.id) }]);
-    }}
-  >
-    <span className="workbench-tab-thumbnail">
-      {filePath
-        ? <img alt="" decoding="async" draggable="false" loading="lazy" src={mediaUrl(filePath)}/>
-        : <span className="workbench-tab-thumbnail-empty"><Icon name="image" size={20}/></span>}
-    </span>
-    <span aria-hidden="true" className="workbench-tab-position">{position}</span>
-    {dirty && <span aria-label="Prompt 已相对原图修改" className="workbench-tab-dirty"/>}
+  const label = (
     <span
-      aria-label={`关闭 ${tab.displayName || '标签'}`}
-      className="workbench-tab-close"
-      onClick={(event) => { event.preventDefault(); event.stopPropagation(); onClose(tab.id); }}
-      onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
-      role="button"
-    >×</span>
-  </span>;
+      className="workbench-tab-label"
+      onAuxClick={(event) => {
+        if (event.button === 1) onClose(tab.id);
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        showContextMenu([{ key: 'close-tab', label: '关闭标签', onClick: () => onClose(tab.id) }]);
+      }}
+    >
+      <span className="workbench-tab-thumbnail">
+        {filePath ? (
+          <img alt="" decoding="async" draggable="false" loading="lazy" src={mediaUrl(filePath)} />
+        ) : (
+          <span className="workbench-tab-thumbnail-empty">
+            <Icon name="image" size={20} />
+          </span>
+        )}
+      </span>
+      <span aria-hidden="true" className="workbench-tab-position">
+        {position}
+      </span>
+      {dirty && <span aria-label="Prompt 已相对原图修改" className="workbench-tab-dirty" />}
+      <span
+        aria-label={`关闭 ${tab.displayName || '标签'}`}
+        className="workbench-tab-close"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose(tab.id);
+        }}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        role="button"
+      >
+        ×
+      </span>
+    </span>
+  );
   if (previewDisabled) return label;
-  return <Popover
-    content={<WorkbenchTabPreview tab={tab}/>}
-    placement="bottomLeft"
-    styles={WORKBENCH_TAB_PREVIEW_STYLES}
-    trigger="hover"
-  >{label}</Popover>;
+  return (
+    <Popover
+      content={<WorkbenchTabPreview tab={tab} />}
+      placement="bottomLeft"
+      styles={WORKBENCH_TAB_PREVIEW_STYLES}
+      trigger="hover"
+    >
+      {label}
+    </Popover>
+  );
 }
 
 function SortableWorkbenchTab({ position, previewDisabled, tab, onClose }) {
-  const {
-    attributes,
-    isDragging,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-  } = useSortable({
+  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
     id: tab.id,
     transition: WORKBENCH_TAB_SORT_TRANSITION,
   });
-  return <TabsTab
-    {...listeners}
-    aria-label={`第 ${position} 张，${tab.displayName || tab.project?.name || '未命名图片'}${workbenchTabHasChanges(tab) ? '，Prompt 已修改' : ''}`}
-    aria-describedby={attributes['aria-describedby']}
-    aria-roledescription={attributes['aria-roledescription']}
-    className={`workbench-tab ${isDragging ? 'dragging' : ''}`}
-    data-workbench-tab-id={tab.id}
-    ref={setNodeRef}
-    style={{
-      '--workbench-tab-transform': CSS.Transform.toString(transform),
-      '--workbench-tab-transition': transition,
-    }}
-    value={tab.id}
-  >
-    <WorkbenchTabLabel onClose={onClose} position={position} previewDisabled={previewDisabled} tab={tab}/>
-  </TabsTab>;
+  return (
+    <TabsTab
+      {...listeners}
+      aria-label={`第 ${position} 张，${tab.displayName || tab.project?.name || '未命名图片'}${workbenchTabHasChanges(tab) ? '，Prompt 已修改' : ''}`}
+      aria-describedby={attributes['aria-describedby']}
+      aria-roledescription={attributes['aria-roledescription']}
+      className={`workbench-tab ${isDragging ? 'dragging' : ''}`}
+      data-workbench-tab-id={tab.id}
+      ref={setNodeRef}
+      style={{
+        '--workbench-tab-transform': CSS.Transform.toString(transform),
+        '--workbench-tab-transition': transition,
+      }}
+      value={tab.id}
+    >
+      <WorkbenchTabLabel
+        onClose={onClose}
+        position={position}
+        previewDisabled={previewDisabled}
+        tab={tab}
+      />
+    </TabsTab>
+  );
 }
 
 function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
   const [sortingTabId, setSortingTabId] = useState('');
   const [sortingOverTabId, setSortingOverTabId] = useState('');
-  const [scrollState, setScrollState] = useState({ canNext: false, canPrevious: false, overflow: false });
+  const [scrollState, setScrollState] = useState({
+    canNext: false,
+    canPrevious: false,
+    overflow: false,
+  });
   const scrollViewportRef = useRef(null);
   const tabIds = useMemo(() => session.tabs.map((tab) => tab.id), [session.tabs]);
   const sortingTab = session.tabs.find((tab) => tab.id === sortingTabId);
@@ -179,14 +288,17 @@ function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
       overflow: maximum > 1,
     });
   }, []);
-  const scrollFilmstrip = useCallback((direction) => {
-    const viewport = scrollViewportRef.current;
-    if (!viewport) return;
-    viewport.scrollBy({
-      behavior: animateDrop ? 'smooth' : 'auto',
-      left: direction * Math.max(180, viewport.clientWidth * .72),
-    });
-  }, [animateDrop]);
+  const scrollFilmstrip = useCallback(
+    (direction) => {
+      const viewport = scrollViewportRef.current;
+      if (!viewport) return;
+      viewport.scrollBy({
+        behavior: animateDrop ? 'smooth' : 'auto',
+        left: direction * Math.max(180, viewport.clientWidth * 0.72),
+      });
+    },
+    [animateDrop],
+  );
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -195,7 +307,8 @@ function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
   useLayoutEffect(() => {
     const viewport = scrollViewportRef.current;
     if (!viewport) return undefined;
-    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measureScroll) : null;
+    const observer =
+      typeof ResizeObserver === 'function' ? new ResizeObserver(measureScroll) : null;
     observer?.observe(viewport);
     viewport.addEventListener('scroll', measureScroll, { passive: true });
     measureScroll();
@@ -207,89 +320,116 @@ function WorkbenchTabs({ onActivate, onClose, onReorder, session }) {
 
   useLayoutEffect(() => {
     const viewport = scrollViewportRef.current;
-    const active = [...(viewport?.querySelectorAll('[data-workbench-tab-id]') || [])]
-      .find((element) => element.dataset.workbenchTabId === session.activeTabId);
-    active?.scrollIntoView({ behavior: animateDrop ? 'smooth' : 'auto', block: 'nearest', inline: 'nearest' });
+    const active = [...(viewport?.querySelectorAll('[data-workbench-tab-id]') || [])].find(
+      (element) => element.dataset.workbenchTabId === session.activeTabId,
+    );
+    active?.scrollIntoView({
+      behavior: animateDrop ? 'smooth' : 'auto',
+      block: 'nearest',
+      inline: 'nearest',
+    });
     measureScroll();
   }, [animateDrop, measureScroll, scrollState.overflow, session.activeTabId, session.tabs.length]);
 
-  return <DndContext
-    accessibility={WORKBENCH_TAB_SORT_ACCESSIBILITY}
-    collisionDetection={closestCenter}
-    modifiers={WORKBENCH_TAB_SORT_MODIFIERS}
-    sensors={sensors}
-    onDragCancel={() => {
-      setSortingTabId('');
-      setSortingOverTabId('');
-    }}
-    onDragEnd={({ active, over }) => {
-      setSortingTabId('');
-      setSortingOverTabId('');
-      if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
-    }}
-    onDragOver={({ over }) => { if (over) setSortingOverTabId(String(over.id)); }}
-    onDragStart={({ active }) => {
-      const activeId = String(active.id);
-      setSortingTabId(activeId);
-      setSortingOverTabId(activeId);
-    }}
-  >
-    <PopoverGroup closeDelay={120} openDelay={450} placement="bottomLeft" trigger="hover">
-      <TabsRoot
-        className="workbench-tabs"
-        size="small"
-        value={session.activeTabId}
-        variant="rounded"
-        onValueChange={(value) => { if (value != null) onActivate(String(value)); }}
-      >
-        <div className="workbench-filmstrip-row">
-          {scrollState.overflow && <ActionIcon
-            aria-label="向前浏览已打开图片"
-            className="workbench-filmstrip-control"
-            disabled={!scrollState.canPrevious}
-            icon={<Icon name="previous" size={16}/>}
-            onClick={() => scrollFilmstrip(-1)}
-            size="small"
-            title="向前浏览"
-          />}
-          <div className="workbench-filmstrip-viewport" ref={scrollViewportRef}>
-            <TabsList className={`workbench-tabs-list ${sortingTabId ? 'sorting' : ''}`}>
-              <TabsIndicator className="workbench-tabs-indicator"/>
-              <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
-                {session.tabs.map((item, index) => <SortableWorkbenchTab
-                  key={item.id}
-                  onClose={onClose}
-                  position={index + 1}
-                  previewDisabled={Boolean(sortingTabId)}
-                  tab={item}
-                />)}
-              </SortableContext>
-            </TabsList>
-          </div>
-          {scrollState.overflow && <ActionIcon
-            aria-label="向后浏览已打开图片"
-            className="workbench-filmstrip-control"
-            disabled={!scrollState.canNext}
-            icon={<Icon name="next" size={16}/>}
-            onClick={() => scrollFilmstrip(1)}
-            size="small"
-            title="向后浏览"
-          />}
-        </div>
-      </TabsRoot>
-    </PopoverGroup>
-    {createPortal(<DragOverlay
-      adjustScale={false}
-      dropAnimation={animateDrop ? WORKBENCH_TAB_DROP_ANIMATION : null}
+  return (
+    <DndContext
+      accessibility={WORKBENCH_TAB_SORT_ACCESSIBILITY}
+      collisionDetection={closestCenter}
+      modifiers={WORKBENCH_TAB_SORT_MODIFIERS}
+      sensors={sensors}
+      onDragCancel={() => {
+        setSortingTabId('');
+        setSortingOverTabId('');
+      }}
+      onDragEnd={({ active, over }) => {
+        setSortingTabId('');
+        setSortingOverTabId('');
+        if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
+      }}
+      onDragOver={({ over }) => {
+        if (over) setSortingOverTabId(String(over.id));
+      }}
+      onDragStart={({ active }) => {
+        const activeId = String(active.id);
+        setSortingTabId(activeId);
+        setSortingOverTabId(activeId);
+      }}
     >
-      {sortingTab ? <WorkbenchTabDragOverlay
-        active={sortingTab.id === session.activeTabId}
-        dirty={workbenchTabHasChanges(sortingTab)}
-        imageSrc={mediaUrl(sortingTab.project?.thumbnail_path || sortingTab.project?.image_path || sortingTab.source?.path || '')}
-        position={session.tabs.findIndex((item) => item.id === sortingTab.id) + 1}
-      /> : null}
-    </DragOverlay>, document.body)}
-  </DndContext>;
+      <PopoverGroup closeDelay={120} openDelay={450} placement="bottomLeft" trigger="hover">
+        <TabsRoot
+          className="workbench-tabs"
+          size="small"
+          value={session.activeTabId}
+          variant="rounded"
+          onValueChange={(value) => {
+            if (value != null) onActivate(String(value));
+          }}
+        >
+          <div className="workbench-filmstrip-row">
+            {scrollState.overflow && (
+              <ActionIcon
+                aria-label="向前浏览已打开图片"
+                className="workbench-filmstrip-control"
+                disabled={!scrollState.canPrevious}
+                icon={<Icon name="previous" size={16} />}
+                onClick={() => scrollFilmstrip(-1)}
+                size="small"
+                title="向前浏览"
+              />
+            )}
+            <div className="workbench-filmstrip-viewport" ref={scrollViewportRef}>
+              <TabsList className={`workbench-tabs-list ${sortingTabId ? 'sorting' : ''}`}>
+                <TabsIndicator className="workbench-tabs-indicator" />
+                <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+                  {session.tabs.map((item, index) => (
+                    <SortableWorkbenchTab
+                      key={item.id}
+                      onClose={onClose}
+                      position={index + 1}
+                      previewDisabled={Boolean(sortingTabId)}
+                      tab={item}
+                    />
+                  ))}
+                </SortableContext>
+              </TabsList>
+            </div>
+            {scrollState.overflow && (
+              <ActionIcon
+                aria-label="向后浏览已打开图片"
+                className="workbench-filmstrip-control"
+                disabled={!scrollState.canNext}
+                icon={<Icon name="next" size={16} />}
+                onClick={() => scrollFilmstrip(1)}
+                size="small"
+                title="向后浏览"
+              />
+            )}
+          </div>
+        </TabsRoot>
+      </PopoverGroup>
+      {createPortal(
+        <DragOverlay
+          adjustScale={false}
+          dropAnimation={animateDrop ? WORKBENCH_TAB_DROP_ANIMATION : null}
+        >
+          {sortingTab ? (
+            <WorkbenchTabDragOverlay
+              active={sortingTab.id === session.activeTabId}
+              dirty={workbenchTabHasChanges(sortingTab)}
+              imageSrc={mediaUrl(
+                sortingTab.project?.thumbnail_path ||
+                  sortingTab.project?.image_path ||
+                  sortingTab.source?.path ||
+                  '',
+              )}
+              position={session.tabs.findIndex((item) => item.id === sortingTab.id) + 1}
+            />
+          ) : null}
+        </DragOverlay>,
+        document.body,
+      )}
+    </DndContext>
+  );
 }
 
 export default function WorkbenchPage({
@@ -315,141 +455,270 @@ export default function WorkbenchPage({
   onUpdateViewState,
   session,
 }) {
-  const [sourcePanelWidth, setSourcePanelWidth] = useState(() => readPanelWidth(
-    panelStorage(),
-    WORKBENCH_SOURCE_PANEL_WIDTH_KEY,
-    panelWidthForViewport(globalThis.innerWidth, .34, 280, 560),
-    280,
-    560,
-  ));
-  const [sourcePanelExpanded, setSourcePanelExpanded] = useState(() => readPanelBoolean(
-    panelStorage(),
-    WORKBENCH_SOURCE_PANEL_EXPANDED_KEY,
-    true,
-  ));
-  const [copyContextState, setCopyContextState] = useState({ tabId: '', text: '', count: 0, automaticIgnored: 0 });
+  const [sourcePanelWidth, setSourcePanelWidth] = useState(() =>
+    readPanelWidth(
+      panelStorage(),
+      WORKBENCH_SOURCE_PANEL_WIDTH_KEY,
+      panelWidthForViewport(globalThis.innerWidth, 0.34, 280, 560),
+      280,
+      560,
+    ),
+  );
+  const [sourcePanelExpanded, setSourcePanelExpanded] = useState(() =>
+    readPanelBoolean(panelStorage(), WORKBENCH_SOURCE_PANEL_EXPANDED_KEY, true),
+  );
+  const [copyContextState, setCopyContextState] = useState({
+    tabId: '',
+    text: '',
+    count: 0,
+    automaticIgnored: 0,
+  });
   const tab = activeWorkbenchTab(session);
   const project = tab?.project;
   const activeTabId = tab?.id || '';
-  const activeTabPosition = Math.max(0, session.tabs.findIndex((item) => item.id === activeTabId));
+  const activeTabPosition = Math.max(
+    0,
+    session.tabs.findIndex((item) => item.id === activeTabId),
+  );
   const copyContext = activeWorkbenchCopyContext(copyContextState, activeTabId);
-  const updateCopyContext = useCallback((context) => {
-    setCopyContextState(scopeWorkbenchCopyContext(context, activeTabId));
-  }, [activeTabId]);
+  const updateCopyContext = useCallback(
+    (context) => {
+      setCopyContextState(scopeWorkbenchCopyContext(context, activeTabId));
+    },
+    [activeTabId],
+  );
 
-  const copyOptions = useMemo(() => project ? positivePromptCopyOptions(project) : [], [project]);
+  const copyOptions = useMemo(() => (project ? positivePromptCopyOptions(project) : []), [project]);
   const automaticCount = copyOptions.reduce((count, item) => count + item.automaticCount, 0);
-  const copyItems = useMemo(() => project ? [
-    {
-      key: 'all',
-      label: automaticCount > 0 ? '复制全部 Prompt（不含 NovelAI 自动 Tag）' : '复制全部 Prompt',
-      disabled: !formatPositivePromptForCopy(project),
-      onClick: () => onCopyText(formatPositivePromptForCopy(project), copyOptions.reduce((count, item) => count + item.count, 0), false, 0, '全部 Prompt', automaticCount),
-    },
-    { key: 'copy-divider', type: 'divider' },
-    ...copyOptions.map((option) => ({
-      key: option.key,
-      label: option.label,
-      disabled: !option.text,
-      onClick: () => onCopyText(option.text, option.count, false, 0, option.label.replace(/^复制/, ''), option.automaticCount),
-    })),
-    automaticCount > 0 && { key: 'automatic-divider', type: 'divider' },
-    automaticCount > 0 && {
-      key: 'all-with-automatic',
-      label: `复制全部 Prompt（包含 ${automaticCount} 个 NovelAI 自动 Tag）`,
-      disabled: !formatPositivePromptForCopy(project, { includeAutomatic: true }),
-      onClick: () => onCopyText(
-        formatPositivePromptForCopy(project, { includeAutomatic: true }),
-        positivePromptCopyOptions(project, { includeAutomatic: true }).reduce((count, item) => count + item.count, 0),
-        false,
-        0,
-        '全部 Prompt（含自动 Tag）',
-      ),
-    },
-  ].filter(Boolean) : [], [automaticCount, copyOptions, onCopyText, project]);
+  const copyItems = useMemo(
+    () =>
+      project
+        ? [
+            {
+              key: 'all',
+              label:
+                automaticCount > 0 ? '复制全部 Prompt（不含 NovelAI 自动 Tag）' : '复制全部 Prompt',
+              disabled: !formatPositivePromptForCopy(project),
+              onClick: () =>
+                onCopyText(
+                  formatPositivePromptForCopy(project),
+                  copyOptions.reduce((count, item) => count + item.count, 0),
+                  false,
+                  0,
+                  '全部 Prompt',
+                  automaticCount,
+                ),
+            },
+            { key: 'copy-divider', type: 'divider' },
+            ...copyOptions.map((option) => ({
+              key: option.key,
+              label: option.label,
+              disabled: !option.text,
+              onClick: () =>
+                onCopyText(
+                  option.text,
+                  option.count,
+                  false,
+                  0,
+                  option.label.replace(/^复制/, ''),
+                  option.automaticCount,
+                ),
+            })),
+            automaticCount > 0 && { key: 'automatic-divider', type: 'divider' },
+            automaticCount > 0 && {
+              key: 'all-with-automatic',
+              label: `复制全部 Prompt（包含 ${automaticCount} 个 NovelAI 自动 Tag）`,
+              disabled: !formatPositivePromptForCopy(project, { includeAutomatic: true }),
+              onClick: () =>
+                onCopyText(
+                  formatPositivePromptForCopy(project, { includeAutomatic: true }),
+                  positivePromptCopyOptions(project, { includeAutomatic: true }).reduce(
+                    (count, item) => count + item.count,
+                    0,
+                  ),
+                  false,
+                  0,
+                  '全部 Prompt（含自动 Tag）',
+                ),
+            },
+          ].filter(Boolean)
+        : [],
+    [automaticCount, copyOptions, onCopyText, project],
+  );
 
-  if (!tab) return <main className="workbench-page workbench-empty-page">
-    <div className="workbench-empty-copy">
-      <h1>编辑图片中的 Tag</h1>
-      <p>拖入 NovelAI 图片，或从本地与剪贴板打开图片。</p>
-      <ImageOpenButton large loading={loading} onChooseImage={onChooseImage} onClipboardImage={onClipboardImage} primary/>
-      <small>PNG、JPG、WEBP</small>
-      {error && <LobeAlert className="workbench-empty-error" message={error} type="error" variant="outlined"/>}
-    </div>
-    <div className="workbench-empty-visual" aria-hidden="true"><div className="workbench-drop-frame"><Icon name="upload" size={30}/><span>拖放图片到这里</span></div></div>
-  </main>;
-
-  return <main className="workbench-page workbench-active-page">
-    <header className="workbench-header">
-      <div className="workbench-header-copy"><h1>工作台</h1><p>{project ? `第 ${activeTabPosition + 1} / ${session.tabs.length} 张 · ${countPromptTags(project)} 个 Tag${workbenchTabHasChanges(tab) ? ' · 已修改' : ''}` : `第 ${activeTabPosition + 1} / ${session.tabs.length} 张`}</p></div>
-      <div className="workbench-header-actions">
-        <ImageOpenButton loading={loading} onChooseImage={onChooseImage} onClipboardImage={onClipboardImage}/>
-        {project && <LobeButton icon={<Icon name="refresh" size={14}/>} onClick={onReset}>恢复原图</LobeButton>}
-        {project && <SplitButton type="primary">
-          <SplitButton.Main disabled={!copyContext.count} icon={<Icon name="copy" size={14}/>} onClick={() => onCopyText(copyContext.text, copyContext.count, false, 0, '可见 Prompt', copyContext.automaticIgnored)}>
-            复制可见 Prompt{copyContext.count ? ` · ${copyContext.count}` : ''}
-          </SplitButton.Main>
-          <SplitButton.Menu aria-label="其他 Prompt 复制方式" items={copyItems} placement="bottomRight"/>
-        </SplitButton>}
-      </div>
-    </header>
-    <div className="workbench-tabs-bar">
-      <WorkbenchTabs onActivate={onActivateTab} onClose={onCloseTab} onReorder={onReorderTab} session={session}/>
-    </div>
-    {(error || tab.error) && <LobeAlert className="workbench-inline-error" message={tab.error || error} type="error" variant="outlined"/>}
-    {project ? <div className="workbench-body">
-      <LobeDraggablePanel
-        className="workbench-source-shell"
-        classNames={{ content: 'workspace-side-panel-content' }}
-        defaultSize={{ width: 'clamp(280px, 34vw, 560px)' }}
-        expand={sourcePanelExpanded}
-        maxWidth={560}
-        minWidth={280}
-        onExpandChange={(expanded) => {
-          setSourcePanelExpanded(writePanelBoolean(panelStorage(), WORKBENCH_SOURCE_PANEL_EXPANDED_KEY, expanded));
-        }}
-        onSizeChange={(_delta, size) => {
-          const width = writePanelWidth(panelStorage(), WORKBENCH_SOURCE_PANEL_WIDTH_KEY, size?.width, 280, 560);
-          if (width !== undefined) setSourcePanelWidth(width);
-        }}
-        placement="left"
-        showHandleHighlight
-        stableLayout
-        size={{ height: '100%', width: sourcePanelWidth }}
-      >
-        <LobeDraggablePanel.Body className="workbench-source-panel">
-          <figure>
-            <ImageStage
-              alt={project.name}
-              className="workbench-image-stage"
-              filePath={project.image_path}
-              previewToolbar={(_originalNode, info) => <ImagePreviewToolbar
-                info={info}
-                onCopy={() => onCopyImage(project)}
-                onDownload={() => onDownloadImage(project)}
-              />}
+  if (!tab)
+    return (
+      <main className="workbench-page workbench-empty-page">
+        <div className="workbench-empty-copy">
+          <h1>编辑图片中的 Tag</h1>
+          <p>拖入 NovelAI 图片，或从本地与剪贴板打开图片。</p>
+          <ImageOpenButton
+            large
+            loading={loading}
+            onChooseImage={onChooseImage}
+            onClipboardImage={onClipboardImage}
+            primary
+          />
+          <small>PNG、JPG、WEBP</small>
+          {error && (
+            <LobeAlert
+              className="workbench-empty-error"
+              message={error}
+              type="error"
+              variant="outlined"
             />
-            <figcaption><strong>{project.name}</strong><span>{project.metadata?.width || '—'} × {project.metadata?.height || '—'}</span></figcaption>
-          </figure>
-          <WorkbenchVibes onReveal={onRevealVibe} vibes={project.vibes || []}/>
-        </LobeDraggablePanel.Body>
-      </LobeDraggablePanel>
-      <section className="workbench-editor-panel">
-        <PromptOverview
-          focusScopeKey={focusScopeKey}
-          focusTagId={focusTagId}
-          onConfirm={onConfirm}
-          onCopyContextChange={updateCopyContext}
-          onCopyText={onCopyText}
-          onNotify={onNotify}
-          onTagContextMenu={onTagContextMenu}
-          onTranslateTags={onTranslateTags}
-          project={project}
-          updateProject={onUpdateProject}
-          viewState={tab.viewState}
-          onViewStateChange={(viewState) => onUpdateViewState(tab.id, viewState)}
+          )}
+        </div>
+        <div className="workbench-empty-visual" aria-hidden="true">
+          <div className="workbench-drop-frame">
+            <Icon name="upload" size={30} />
+            <span>拖放图片到这里</span>
+          </div>
+        </div>
+      </main>
+    );
+
+  return (
+    <main className="workbench-page workbench-active-page">
+      <header className="workbench-header">
+        <div className="workbench-header-copy">
+          <h1>工作台</h1>
+          <p>
+            {project
+              ? `第 ${activeTabPosition + 1} / ${session.tabs.length} 张 · ${countPromptTags(project)} 个 Tag${workbenchTabHasChanges(tab) ? ' · 已修改' : ''}`
+              : `第 ${activeTabPosition + 1} / ${session.tabs.length} 张`}
+          </p>
+        </div>
+        <div className="workbench-header-actions">
+          <ImageOpenButton
+            loading={loading}
+            onChooseImage={onChooseImage}
+            onClipboardImage={onClipboardImage}
+          />
+          {project && (
+            <LobeButton icon={<Icon name="refresh" size={14} />} onClick={onReset}>
+              恢复原图
+            </LobeButton>
+          )}
+          {project && (
+            <SplitButton type="primary">
+              <SplitButton.Main
+                disabled={!copyContext.count}
+                icon={<Icon name="copy" size={14} />}
+                onClick={() =>
+                  onCopyText(
+                    copyContext.text,
+                    copyContext.count,
+                    false,
+                    0,
+                    '可见 Prompt',
+                    copyContext.automaticIgnored,
+                  )
+                }
+              >
+                复制可见 Prompt{copyContext.count ? ` · ${copyContext.count}` : ''}
+              </SplitButton.Main>
+              <SplitButton.Menu
+                aria-label="其他 Prompt 复制方式"
+                items={copyItems}
+                placement="bottomRight"
+              />
+            </SplitButton>
+          )}
+        </div>
+      </header>
+      <div className="workbench-tabs-bar">
+        <WorkbenchTabs
+          onActivate={onActivateTab}
+          onClose={onCloseTab}
+          onReorder={onReorderTab}
+          session={session}
         />
-      </section>
-    </div> : <div className="workbench-tab-error"><strong>图片源不可用</strong><span>{tab.error || '该图片已被移动或删除，可以关闭此标签后继续使用其他标签。'}</span></div>}
-  </main>;
+      </div>
+      {(error || tab.error) && (
+        <LobeAlert
+          className="workbench-inline-error"
+          message={tab.error || error}
+          type="error"
+          variant="outlined"
+        />
+      )}
+      {project ? (
+        <div className="workbench-body">
+          <LobeDraggablePanel
+            className="workbench-source-shell"
+            classNames={{ content: 'workspace-side-panel-content' }}
+            defaultSize={{ width: 'clamp(280px, 34vw, 560px)' }}
+            expand={sourcePanelExpanded}
+            maxWidth={560}
+            minWidth={280}
+            onExpandChange={(expanded) => {
+              setSourcePanelExpanded(
+                writePanelBoolean(panelStorage(), WORKBENCH_SOURCE_PANEL_EXPANDED_KEY, expanded),
+              );
+            }}
+            onSizeChange={(_delta, size) => {
+              const width = writePanelWidth(
+                panelStorage(),
+                WORKBENCH_SOURCE_PANEL_WIDTH_KEY,
+                size?.width,
+                280,
+                560,
+              );
+              if (width !== undefined) setSourcePanelWidth(width);
+            }}
+            placement="left"
+            showHandleHighlight
+            stableLayout
+            size={{ height: '100%', width: sourcePanelWidth }}
+          >
+            <LobeDraggablePanel.Body className="workbench-source-panel">
+              <figure>
+                <ImageStage
+                  alt={project.name}
+                  className="workbench-image-stage"
+                  filePath={project.image_path}
+                  previewToolbar={(_originalNode, info) => (
+                    <ImagePreviewToolbar
+                      info={info}
+                      onCopy={() => onCopyImage(project)}
+                      onDownload={() => onDownloadImage(project)}
+                    />
+                  )}
+                />
+                <figcaption>
+                  <strong>{project.name}</strong>
+                  <span>
+                    {project.metadata?.width || '—'} × {project.metadata?.height || '—'}
+                  </span>
+                </figcaption>
+              </figure>
+              <WorkbenchVibes onReveal={onRevealVibe} vibes={project.vibes || []} />
+            </LobeDraggablePanel.Body>
+          </LobeDraggablePanel>
+          <section className="workbench-editor-panel">
+            <PromptOverview
+              focusScopeKey={focusScopeKey}
+              focusTagId={focusTagId}
+              onConfirm={onConfirm}
+              onCopyContextChange={updateCopyContext}
+              onCopyText={onCopyText}
+              onNotify={onNotify}
+              onTagContextMenu={onTagContextMenu}
+              onTranslateTags={onTranslateTags}
+              project={project}
+              updateProject={onUpdateProject}
+              viewState={tab.viewState}
+              onViewStateChange={(viewState) => onUpdateViewState(tab.id, viewState)}
+            />
+          </section>
+        </div>
+      ) : (
+        <div className="workbench-tab-error">
+          <strong>图片源不可用</strong>
+          <span>{tab.error || '该图片已被移动或删除，可以关闭此标签后继续使用其他标签。'}</span>
+        </div>
+      )}
+    </main>
+  );
 }

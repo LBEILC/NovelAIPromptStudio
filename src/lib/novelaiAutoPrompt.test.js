@@ -45,13 +45,19 @@ describe('NovelAI automatic prompt recognition', () => {
     });
     const automation = getPromptScopes(project)[0].automation;
 
-    expect(automation).toMatchObject({ status: 'confirmed', modelLabel: 'V4.5 Full', tagCount: 4, cleanedRaw: '1girl, blue hair' });
+    expect(automation).toMatchObject({
+      status: 'confirmed',
+      modelLabel: 'V4.5 Full',
+      tagCount: 4,
+      cleanedRaw: '1girl, blue hair',
+    });
     expect(automation.tagIds).toHaveLength(4);
   });
 
   it('recognizes V5 tag hints before a generated Text block', () => {
     const project = projectFixture({
-      prompt: 'A sign beside the girl, very aesthetic, masterpiece, no text, teXt: Hello, world!\n\n第二行',
+      prompt:
+        'A sign beside the girl, very aesthetic, masterpiece, no text, teXt: Hello, world!\n\n第二行',
       qualityToggle: true,
     });
     const automation = getPromptScopes(project)[0].automation;
@@ -66,7 +72,8 @@ describe('NovelAI automatic prompt recognition', () => {
 
   it('does not remove matching user tags when the quality toggle is explicitly disabled', () => {
     const prompt = '1girl, very aesthetic, masterpiece, no text';
-    const automation = getPromptScopes(projectFixture({ prompt, qualityToggle: false }))[0].automation;
+    const automation = getPromptScopes(projectFixture({ prompt, qualityToggle: false }))[0]
+      .automation;
     expect(automation).toMatchObject({ status: 'disabled', cleanedRaw: '', tagIds: [] });
   });
 
@@ -78,24 +85,37 @@ describe('NovelAI automatic prompt recognition', () => {
       qualitySource: 'qualityToggle',
     });
     const automation = getPromptScopes(project)[0].automation;
-    expect(automation).toMatchObject({ status: 'confirmed', modelLabel: 'V4.5 Curated', cleanedRaw: '1girl', tagCount: 5 });
+    expect(automation).toMatchObject({
+      status: 'confirmed',
+      modelLabel: 'V4.5 Curated',
+      cleanedRaw: '1girl',
+      tagCount: 5,
+    });
     expect(automation.tagIds).toHaveLength(5);
   });
 
   it('infers an exact model template without a metadata hint', () => {
     const prompt = '1girl, very aesthetic, masterpiece, no text';
     const automation = getPromptScopes(projectFixture({ prompt }))[0].automation;
-    expect(automation).toMatchObject({ status: 'inferred', label: 'Standard', cleanedRaw: '1girl', tagCount: 3 });
+    expect(automation).toMatchObject({
+      status: 'inferred',
+      label: 'Standard',
+      cleanedRaw: '1girl',
+      tagCount: 3,
+    });
   });
 
   it('matches the V4.5 Standard compatibility suffix and Heavy UC within custom content', () => {
-    const heavy = 'lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page';
+    const heavy =
+      'lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page';
     const project = projectFixture({
       model: 'NovelAI Diffusion V4.5 4BDE2A90',
       prompt: '1girl, {{{custom quality tags}}}, very aesthetic, masterpiece, no text',
       undesired: `nsfw, ${heavy}, custom exclusion`,
     });
-    const [quality, undesired] = getPromptScopes(project).slice(0, 2).map((scope) => scope.automation);
+    const [quality, undesired] = getPromptScopes(project)
+      .slice(0, 2)
+      .map((scope) => scope.automation);
 
     expect(quality).toMatchObject({
       status: 'inferred',
@@ -113,26 +133,43 @@ describe('NovelAI automatic prompt recognition', () => {
   });
 
   it('recognizes V5 Heavy, Light, and Human Focus UC hints by their exact prefix', () => {
-    const heavy = 'lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page';
-    const light = 'lowres, artistic error, scan artifacts, worst quality, bad quality, jpeg artifacts, multiple views, very displeasing, too many watermarks, negative space, blank page';
+    const heavy =
+      'lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page';
+    const light =
+      'lowres, artistic error, scan artifacts, worst quality, bad quality, jpeg artifacts, multiple views, very displeasing, too many watermarks, negative space, blank page';
     const human = `${heavy}, @_@, mismatched pupils, glowing eyes, bad anatomy`;
 
-    for (const [label, preset, template] of [['Heavy', 2, heavy], ['Light', 3, light], ['Human Focus', 4, human]]) {
-      const project = projectFixture({ undesired: `${template}, custom exclusion`, ucPreset: preset });
+    for (const [label, preset, template] of [
+      ['Heavy', 2, heavy],
+      ['Light', 3, light],
+      ['Human Focus', 4, human],
+    ]) {
+      const project = projectFixture({
+        undesired: `${template}, custom exclusion`,
+        ucPreset: preset,
+      });
       const automation = getPromptScopes(project)[1].automation;
-      expect(automation).toMatchObject({ status: 'confirmed', label, cleanedRaw: 'custom exclusion' });
+      expect(automation).toMatchObject({
+        status: 'confirmed',
+        label,
+        cleanedRaw: 'custom exclusion',
+      });
       expect(automation.tagIds.length).toBeGreaterThan(0);
     }
   });
 
   it('treats V5 UC hint zero as disabled even when user text resembles a preset', () => {
-    const heavy = 'lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page';
-    const automation = getPromptScopes(projectFixture({ undesired: heavy, ucPreset: 0 }))[1].automation;
+    const heavy =
+      'lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page';
+    const automation = getPromptScopes(projectFixture({ undesired: heavy, ucPreset: 0 }))[1]
+      .automation;
     expect(automation.status).toBe('suspected');
   });
 
   it('reports an enabled V5 hint with a modified template as a mismatch', () => {
-    const automation = getPromptScopes(projectFixture({ prompt: '1girl, masterpiece', qualityToggle: true }))[0].automation;
+    const automation = getPromptScopes(
+      projectFixture({ prompt: '1girl, masterpiece', qualityToggle: true }),
+    )[0].automation;
     expect(automation).toMatchObject({ status: 'mismatch', tagIds: [] });
   });
 });

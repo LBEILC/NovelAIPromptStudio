@@ -26,32 +26,45 @@ describe('marquee selection', () => {
   it('counts touching item bounds as an intersection', () => {
     const selection = { bottom: 50, left: 10, right: 50, top: 10 };
     expect(rectanglesIntersect(selection, { bottom: 80, left: 50, right: 80, top: 50 })).toBe(true);
-    expect(rectanglesIntersect(selection, { bottom: 80, left: 51, right: 80, top: 51 })).toBe(false);
+    expect(rectanglesIntersect(selection, { bottom: 80, left: 51, right: 80, top: 51 })).toBe(
+      false,
+    );
   });
 
   it('keeps selection geometry anchored to scrollable content', () => {
     const viewport = { bottom: 500, height: 400, left: 40, right: 640, top: 100, width: 600 };
     const scroll = { left: 20, top: 300 };
-    expect(pointInScrollableContent({ x: 140, y: 250 }, viewport, scroll)).toEqual({ x: 120, y: 450 });
-    expect(rectInScrollableContent(
-      { bottom: 260, height: 60, left: 120, right: 220, top: 200, width: 100 },
-      viewport,
-      scroll,
-    )).toEqual({ bottom: 460, height: 60, left: 100, right: 200, top: 400, width: 100 });
+    expect(pointInScrollableContent({ x: 140, y: 250 }, viewport, scroll)).toEqual({
+      x: 120,
+      y: 450,
+    });
+    expect(
+      rectInScrollableContent(
+        { bottom: 260, height: 60, left: 120, right: 220, top: 200, width: 100 },
+        viewport,
+        scroll,
+      ),
+    ).toEqual({ bottom: 460, height: 60, left: 100, right: 200, top: 400, width: 100 });
   });
 
   it('clips a content-space marquee to the current scroll viewport', () => {
     const viewport = { bottom: 500, height: 400, left: 40, right: 640, top: 100, width: 600 };
-    expect(contentRectInViewport(
-      { bottom: 780, height: 480, left: 60, right: 320, top: 300, width: 260 },
-      viewport,
-      { left: 0, top: 420 },
-    )).toEqual({ bottom: 460, height: 360, left: 100, right: 360, top: 100, width: 260 });
+    expect(
+      contentRectInViewport(
+        { bottom: 780, height: 480, left: 60, right: 320, top: 300, width: 260 },
+        viewport,
+        { left: 0, top: 420 },
+      ),
+    ).toEqual({ bottom: 460, height: 360, left: 100, right: 360, top: 100, width: 260 });
   });
 
   it('supports replace, additive, and toggle selection gestures', () => {
     expect(marqueeSelection(['one', 'two'], ['two', 'three'])).toEqual(['two', 'three']);
-    expect(marqueeSelection(['one', 'two'], ['two', 'three'], 'add')).toEqual(['one', 'two', 'three']);
+    expect(marqueeSelection(['one', 'two'], ['two', 'three'], 'add')).toEqual([
+      'one',
+      'two',
+      'three',
+    ]);
     expect(marqueeSelection(['one', 'two'], ['two', 'three'], 'toggle')).toEqual(['one', 'three']);
   });
 

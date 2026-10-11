@@ -1,11 +1,35 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_BASE_URL, DEFAULT_CLASSIFICATION_PROMPT, DEFAULT_TRANSLATION_PROMPT, normalizeBaseUrl } from './translation.js';
+import {
+  DEFAULT_BASE_URL,
+  DEFAULT_CLASSIFICATION_PROMPT,
+  DEFAULT_TRANSLATION_PROMPT,
+  normalizeBaseUrl,
+} from './translation.js';
 
-const APPEARANCE_DEFAULTS = Object.freeze({ themeMode: 'dark', primaryColor: 'blue', sansFont: 'Geist', monoFont: 'Geist Mono', motion: 'full' });
+const APPEARANCE_DEFAULTS = Object.freeze({
+  themeMode: 'dark',
+  primaryColor: 'blue',
+  sansFont: 'Geist',
+  monoFont: 'Geist Mono',
+  motion: 'full',
+});
 const APPEARANCE_VALUES = {
   themeMode: new Set(['auto', 'dark', 'light']),
-  primaryColor: new Set(['blue', 'cyan', 'geekblue', 'gold', 'green', 'lime', 'magenta', 'orange', 'purple', 'red', 'volcano', 'yellow']),
+  primaryColor: new Set([
+    'blue',
+    'cyan',
+    'geekblue',
+    'gold',
+    'green',
+    'lime',
+    'magenta',
+    'orange',
+    'purple',
+    'red',
+    'volcano',
+    'yellow',
+  ]),
   motion: new Set(['full', 'reduced', 'off']),
 };
 const LEGACY_FONT_FAMILIES = new Map([
@@ -17,7 +41,8 @@ const LEGACY_FONT_FAMILIES = new Map([
 ]);
 
 function normalizeFontFamily(value, fallback, strict = false) {
-  const candidate = LEGACY_FONT_FAMILIES.get(String(value || '').trim()) || String(value || '').trim();
+  const candidate =
+    LEGACY_FONT_FAMILIES.get(String(value || '').trim()) || String(value || '').trim();
   if (!candidate) return fallback;
   if (candidate.length > 128 || /[\u0000-\u001f\u007f"\\;{}]/.test(candidate)) {
     if (strict) throw new Error('不支持的字体名称');
@@ -53,7 +78,9 @@ function normalizeRecentImageDirectory(value, strict = false) {
 
 export function openPreferences(dataDirectory, safeStorage, options = {}) {
   const filePath = path.join(dataDirectory, 'preferences.json');
-  const defaultAssetsDirectory = path.resolve(options.defaultAssetsDirectory || path.join(dataDirectory, '..', 'assets'));
+  const defaultAssetsDirectory = path.resolve(
+    options.defaultAssetsDirectory || path.join(dataDirectory, '..', 'assets'),
+  );
 
   const read = () => {
     try {
@@ -99,11 +126,17 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
   const appearanceSettings = () => {
     const stored = read().appearance || {};
     return {
-      themeMode: APPEARANCE_VALUES.themeMode.has(stored.themeMode) ? stored.themeMode : APPEARANCE_DEFAULTS.themeMode,
-      primaryColor: APPEARANCE_VALUES.primaryColor.has(stored.primaryColor) ? stored.primaryColor : APPEARANCE_DEFAULTS.primaryColor,
+      themeMode: APPEARANCE_VALUES.themeMode.has(stored.themeMode)
+        ? stored.themeMode
+        : APPEARANCE_DEFAULTS.themeMode,
+      primaryColor: APPEARANCE_VALUES.primaryColor.has(stored.primaryColor)
+        ? stored.primaryColor
+        : APPEARANCE_DEFAULTS.primaryColor,
       sansFont: normalizeFontFamily(stored.sansFont, APPEARANCE_DEFAULTS.sansFont),
       monoFont: normalizeFontFamily(stored.monoFont, APPEARANCE_DEFAULTS.monoFont),
-      motion: APPEARANCE_VALUES.motion.has(stored.motion) ? stored.motion : APPEARANCE_DEFAULTS.motion,
+      motion: APPEARANCE_VALUES.motion.has(stored.motion)
+        ? stored.motion
+        : APPEARANCE_DEFAULTS.motion,
     };
   };
 
@@ -112,7 +145,8 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     const appearance = { ...current };
     for (const key of Object.keys(APPEARANCE_DEFAULTS)) {
       if (next[key] === undefined) continue;
-      if (key === 'sansFont' || key === 'monoFont') appearance[key] = normalizeFontFamily(next[key], current[key], true);
+      if (key === 'sansFont' || key === 'monoFont')
+        appearance[key] = normalizeFontFamily(next[key], current[key], true);
       else {
         if (!APPEARANCE_VALUES[key].has(next[key])) throw new Error(`不支持的外观设置：${key}`);
         appearance[key] = next[key];
@@ -124,15 +158,26 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     return appearanceSettings();
   };
 
-  const saveAISettings = ({ baseUrl, model, apiKey, translationPrompt, classificationPrompt, clearApiKey = false }) => {
+  const saveAISettings = ({
+    baseUrl,
+    model,
+    apiKey,
+    translationPrompt,
+    classificationPrompt,
+    clearApiKey = false,
+  }) => {
     const preferences = read();
     preferences.aiBaseUrl = normalizeBaseUrl(baseUrl);
     preferences.aiModel = String(model || '').trim();
-    const nextTranslationPrompt = String(translationPrompt || '').trim() || DEFAULT_TRANSLATION_PROMPT;
-    const nextClassificationPrompt = String(classificationPrompt || '').trim() || DEFAULT_CLASSIFICATION_PROMPT;
-    if (nextTranslationPrompt === DEFAULT_TRANSLATION_PROMPT) delete preferences.aiTranslationPrompt;
+    const nextTranslationPrompt =
+      String(translationPrompt || '').trim() || DEFAULT_TRANSLATION_PROMPT;
+    const nextClassificationPrompt =
+      String(classificationPrompt || '').trim() || DEFAULT_CLASSIFICATION_PROMPT;
+    if (nextTranslationPrompt === DEFAULT_TRANSLATION_PROMPT)
+      delete preferences.aiTranslationPrompt;
     else preferences.aiTranslationPrompt = nextTranslationPrompt;
-    if (nextClassificationPrompt === DEFAULT_CLASSIFICATION_PROMPT) delete preferences.aiClassificationPrompt;
+    if (nextClassificationPrompt === DEFAULT_CLASSIFICATION_PROMPT)
+      delete preferences.aiClassificationPrompt;
     else preferences.aiClassificationPrompt = nextClassificationPrompt;
     if (clearApiKey) delete preferences.aiApiKeyEncrypted;
     if (typeof apiKey === 'string' && apiKey.trim()) {
@@ -147,8 +192,15 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
 
   const librarySettings = () => {
     const stored = read().library || {};
-    const assetsDirectory = normalizeAssetsDirectory(stored.assetsDirectory, defaultAssetsDirectory);
-    return { assetsDirectory, defaultAssetsDirectory, isDefault: assetsDirectory === defaultAssetsDirectory };
+    const assetsDirectory = normalizeAssetsDirectory(
+      stored.assetsDirectory,
+      defaultAssetsDirectory,
+    );
+    return {
+      assetsDirectory,
+      defaultAssetsDirectory,
+      isDefault: assetsDirectory === defaultAssetsDirectory,
+    };
   };
 
   const saveLibrarySettings = ({ assetsDirectory } = {}) => {
@@ -172,9 +224,13 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     const current = productivitySettings();
     const productivity = { ...current };
     if (next.recentImageDirectory !== undefined) {
-      productivity.recentImageDirectory = normalizeRecentImageDirectory(next.recentImageDirectory, Boolean(next.recentImageDirectory));
+      productivity.recentImageDirectory = normalizeRecentImageDirectory(
+        next.recentImageDirectory,
+        Boolean(next.recentImageDirectory),
+      );
     }
-    if (next.autoCheckUpdates !== undefined) productivity.autoCheckUpdates = Boolean(next.autoCheckUpdates);
+    if (next.autoCheckUpdates !== undefined)
+      productivity.autoCheckUpdates = Boolean(next.autoCheckUpdates);
     const stored = read();
     stored.productivity = productivity;
     write(stored);

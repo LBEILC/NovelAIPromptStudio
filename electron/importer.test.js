@@ -19,11 +19,14 @@ import {
 const temporaryDirectories = [];
 
 afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true, maxRetries: 4, retryDelay: 50 });
+  for (const directory of temporaryDirectories.splice(0))
+    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 4, retryDelay: 50 });
 });
 
 async function pngBuffer(color = { r: 220, g: 150, b: 80, alpha: 1 }) {
-  return sharp({ create: { width: 3, height: 3, channels: 4, background: color } }).png().toBuffer();
+  return sharp({ create: { width: 3, height: 3, channels: 4, background: color } })
+    .png()
+    .toBuffer();
 }
 
 async function writeZip(filePath, entries) {
@@ -37,8 +40,10 @@ function clearZipUtf8Flags(buffer) {
   const patched = Buffer.from(buffer);
   for (let offset = 0; offset <= patched.length - 10; offset += 1) {
     const signature = patched.readUInt32LE(offset);
-    const flagOffset = signature === 0x04034b50 ? offset + 6 : signature === 0x02014b50 ? offset + 8 : -1;
-    if (flagOffset >= 0) patched.writeUInt16LE(patched.readUInt16LE(flagOffset) & ~0x800, flagOffset);
+    const flagOffset =
+      signature === 0x04034b50 ? offset + 6 : signature === 0x02014b50 ? offset + 8 : -1;
+    if (flagOffset >= 0)
+      patched.writeUInt16LE(patched.readUInt16LE(flagOffset) & ~0x800, flagOffset);
   }
   return patched;
 }
@@ -61,7 +66,9 @@ describe('safe ZIP import', () => {
     ]);
 
     const inspection = await inspectZipArchive(zipPath);
-    expect(inspection.entries).toEqual([expect.objectContaining({ fileName: '作品/生成图.png', uncompressedSize: png.length })]);
+    expect(inspection.entries).toEqual([
+      expect.objectContaining({ fileName: '作品/生成图.png', uncompressedSize: png.length }),
+    ]);
     expect(inspection).toMatchObject({ entryCount: 3, imageCount: 1, skipped: 2 });
   });
 
@@ -76,10 +83,24 @@ describe('safe ZIP import', () => {
     await writeZip(zipPath, [{ name: 'renamed-inside-zip.png', buffer: png }]);
     const database = await openDatabase(dataDirectory);
 
-    const result = await importLibraryFiles({ filePaths: [imagePath, zipPath], assetsDirectory, database });
+    const result = await importLibraryFiles({
+      filePaths: [imagePath, zipPath],
+      assetsDirectory,
+      database,
+    });
 
-    expect(result.summary).toMatchObject({ total: 2, processed: 2, imported: 1, duplicates: 1, failed: 0, cancelled: false });
-    expect(result.duplicates[0]).toMatchObject({ file: 'export.zip / renamed-inside-zip.png', projectId: result.imported[0].id });
+    expect(result.summary).toMatchObject({
+      total: 2,
+      processed: 2,
+      imported: 1,
+      duplicates: 1,
+      failed: 0,
+      cancelled: false,
+    });
+    expect(result.duplicates[0]).toMatchObject({
+      file: 'export.zip / renamed-inside-zip.png',
+      projectId: result.imported[0].id,
+    });
     expect(database.loadLibrary()).toHaveLength(1);
     expect(database.loadLibrary()[0].content_hash).toMatch(/^[a-f0-9]{64}$/);
   });
@@ -103,7 +124,9 @@ describe('safe ZIP import', () => {
     });
 
     expect(result.summary).toMatchObject({ total: 1, processed: 1, imported: 1, failed: 0 });
-    expect(result.imported[0].content_hash).toBe(crypto.createHash('sha256').update(second).digest('hex'));
+    expect(result.imported[0].content_hash).toBe(
+      crypto.createHash('sha256').update(second).digest('hex'),
+    );
   });
 
   it('generates bounded WebP previews for selectable archive entries', async () => {
@@ -112,8 +135,15 @@ describe('safe ZIP import', () => {
     const previewDirectory = path.join(directory, 'previews');
     fs.mkdirSync(previewDirectory);
     const largePng = await sharp({
-      create: { width: 1800, height: 900, channels: 4, background: { r: 80, g: 120, b: 220, alpha: 1 } },
-    }).png().toBuffer();
+      create: {
+        width: 1800,
+        height: 900,
+        channels: 4,
+        background: { r: 80, g: 120, b: 220, alpha: 1 },
+      },
+    })
+      .png()
+      .toBuffer();
     await writeZip(zipPath, [{ name: 'folder/preview.png', buffer: largePng }]);
     const inspection = await inspectZipArchive(zipPath);
     const updates = [];
@@ -125,12 +155,14 @@ describe('safe ZIP import', () => {
       onPreview: (update) => updates.push(update),
     });
 
-    expect(updates).toEqual([{
-      id: 'entry-one',
-      previewHeight: 640,
-      previewPath: path.join(previewDirectory, 'entry-one.webp'),
-      previewWidth: 1280,
-    }]);
+    expect(updates).toEqual([
+      {
+        id: 'entry-one',
+        previewHeight: 640,
+        previewPath: path.join(previewDirectory, 'entry-one.webp'),
+        previewWidth: 1280,
+      },
+    ]);
     const metadata = await sharp(fs.readFileSync(updates[0].previewPath)).metadata();
     expect(metadata).toMatchObject({ format: 'webp', width: 1280, height: 640 });
   });
@@ -165,10 +197,17 @@ describe('safe ZIP import', () => {
     await writeZip(zipPath, [{ name: 'fake.png', buffer: Buffer.from('this is not png data') }]);
     const database = await openDatabase(path.join(directory, 'data'));
 
-    const result = await importLibraryFiles({ filePaths: [zipPath, directPath], assetsDirectory: path.join(directory, 'assets'), database });
+    const result = await importLibraryFiles({
+      filePaths: [zipPath, directPath],
+      assetsDirectory: path.join(directory, 'assets'),
+      database,
+    });
 
     expect(result.summary).toMatchObject({ total: 2, processed: 2, imported: 1, failed: 1 });
-    expect(result.errors[0]).toMatchObject({ file: 'mixed.zip / fake.png', error: expect.stringContaining('文件签名') });
+    expect(result.errors[0]).toMatchObject({
+      file: 'mixed.zip / fake.png',
+      error: expect.stringContaining('文件签名'),
+    });
   });
 
   it('can stop before starting another import item', async () => {
@@ -193,25 +232,31 @@ describe('safe ZIP import', () => {
 
 describe('import validation helpers', () => {
   it('recognizes PNG signatures and rejects traversal paths', () => {
-    expect(isPngSignature(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe(true);
+    expect(isPngSignature(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe(
+      true,
+    );
     expect(isPngSignature(Buffer.from('not-png'))).toBe(false);
-    expect(validateZipImageEntry({
-      fileName: '../escape.png',
-      externalFileAttributes: 0,
-      generalPurposeBitFlag: 0,
-      compressionMethod: 8,
-      compressedSize: 10,
-      uncompressedSize: 20,
-    }).action).toBe('reject');
+    expect(
+      validateZipImageEntry({
+        fileName: '../escape.png',
+        externalFileAttributes: 0,
+        generalPurposeBitFlag: 0,
+        compressionMethod: 8,
+        compressedSize: 10,
+        uncompressedSize: 20,
+      }).action,
+    ).toBe('reject');
   });
 
   it('keeps standard CP437 decoding for non-UTF-8 entry bytes', () => {
     const fileNameRaw = Buffer.from([0x82, 0x2e, 0x70, 0x6e, 0x67]);
-    expect(decodeZipEntryFileName({
-      fileName: fileNameRaw,
-      fileNameRaw,
-      extraFields: [],
-      generalPurposeBitFlag: 0,
-    })).toBe('é.png');
+    expect(
+      decodeZipEntryFileName({
+        fileName: fileNameRaw,
+        fileNameRaw,
+        extraFields: [],
+        generalPurposeBitFlag: 0,
+      }),
+    ).toBe('é.png');
   });
 });

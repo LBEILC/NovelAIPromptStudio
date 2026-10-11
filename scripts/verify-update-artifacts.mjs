@@ -7,7 +7,7 @@ const METADATA_FILES = ['latest.yml', 'latest-mac.yml'];
 function unquote(value) {
   const trimmed = value.trim();
   const quote = trimmed[0];
-  return quote && quote === trimmed.at(-1) && ['\'', '"'].includes(quote)
+  return quote && quote === trimmed.at(-1) && ["'", '"'].includes(quote)
     ? trimmed.slice(1, -1)
     : trimmed;
 }
@@ -45,7 +45,9 @@ export function verifyUpdateArtifacts(directory) {
   }
 
   if (missing.length) {
-    throw new Error(`Updater metadata references missing artifacts:\n${missing.map((item) => `- ${item}`).join('\n')}`);
+    throw new Error(
+      `Updater metadata references missing artifacts:\n${missing.map((item) => `- ${item}`).join('\n')}`,
+    );
   }
   return { metadataFiles, artifactCount: available.size };
 }

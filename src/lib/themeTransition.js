@@ -22,10 +22,12 @@ export function shouldAnimateThemeTransition({
   supported = false,
   visible = true,
 }) {
-  return supported
-    && visible
-    && currentTheme !== nextTheme
-    && !shouldReduceStudioMotion(motionMode, systemReducedMotion);
+  return (
+    supported &&
+    visible &&
+    currentTheme !== nextTheme &&
+    !shouldReduceStudioMotion(motionMode, systemReducedMotion)
+  );
 }
 
 export function commitThemeAppearance({
@@ -37,8 +39,8 @@ export function commitThemeAppearance({
 }) {
   const root = documentRef?.documentElement;
   const systemDark = mediaMatches(windowRef, '(prefers-color-scheme: dark)');
-  const currentTheme = root?.dataset?.themeMode
-    || resolveThemeMode(currentAppearance?.themeMode, systemDark);
+  const currentTheme =
+    root?.dataset?.themeMode || resolveThemeMode(currentAppearance?.themeMode, systemDark);
   const nextTheme = resolveThemeMode(nextAppearance?.themeMode, systemDark);
   const sequence = ++themeTransitionSequence;
 

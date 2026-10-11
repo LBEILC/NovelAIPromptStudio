@@ -21,7 +21,9 @@ export function tagPresentation(tag, language = 'original') {
     return {
       primary: original,
       secondary: tag.translation || '暂无翻译',
-      title: tag.translation ? `原文：${original}\n翻译：${tag.translation}` : `原文：${original}\n暂无翻译`,
+      title: tag.translation
+        ? `原文：${original}\n翻译：${tag.translation}`
+        : `原文：${original}\n暂无翻译`,
       fallback: !tag.translation,
     };
   }

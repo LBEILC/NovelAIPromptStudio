@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BatchToolbar, GalleryCardHoverPreview, GalleryCardView, GalleryFilterControl, GalleryGroupingControl, galleryThumbnailIsReady, nextGalleryRenderCount } from './GalleryPage.jsx';
+import {
+  BatchToolbar,
+  GalleryCardHoverPreview,
+  GalleryCardView,
+  GalleryFilterControl,
+  GalleryGroupingControl,
+  galleryThumbnailIsReady,
+  nextGalleryRenderCount,
+} from './GalleryPage.jsx';
 
 vi.mock('@lobehub/ui', () => {
   const Component = () => null;
@@ -81,8 +89,12 @@ describe('GalleryGroupingControl', () => {
     });
     const contentChildren = element.props.content.props.children.flat(Infinity).filter(Boolean);
     const options = contentChildren.find((child) => child.props?.role === 'radiogroup');
-    const similarity = contentChildren.find((child) => child.props?.className === 'gallery-similarity-control');
-    const vibe = contentChildren.find((child) => child.props?.className === 'gallery-grouping-vibe-row');
+    const similarity = contentChildren.find(
+      (child) => child.props?.className === 'gallery-similarity-control',
+    );
+    const vibe = contentChildren.find(
+      (child) => child.props?.className === 'gallery-grouping-vibe-row',
+    );
 
     expect(element.props.trigger).toBe('click');
     expect(element.props.children.props['aria-label']).toContain('相似 80% · 跨 Vibe');
@@ -106,7 +118,9 @@ describe('GalleryGroupingControl', () => {
       onChange: vi.fn(),
     });
     const content = element.props.content.props.children.flat(Infinity).filter(Boolean);
-    expect(content.some((child) => child.props?.className === 'gallery-similarity-control')).toBe(false);
+    expect(content.some((child) => child.props?.className === 'gallery-similarity-control')).toBe(
+      false,
+    );
   });
 });
 
@@ -134,8 +148,12 @@ describe('GalleryFilterControl', () => {
     });
     const panel = element.props.content;
     const children = panel.props.children.flat(Infinity).filter(Boolean);
-    const includeSection = children.find((child) => child.props?.className === 'gallery-filter-section');
-    const dateSection = children.filter((child) => child.props?.className === 'gallery-filter-section').at(-1);
+    const includeSection = children.find(
+      (child) => child.props?.className === 'gallery-filter-section',
+    );
+    const dateSection = children
+      .filter((child) => child.props?.className === 'gallery-filter-section')
+      .at(-1);
     const clearButton = children.find((child) => child.type === 'header').props.children[1];
 
     expect(element.props.trigger).toBe('click');
@@ -152,7 +170,14 @@ describe('GalleryFilterControl', () => {
       [{ includeTags: ['bagpipe', 'uniform'] }],
       [{ datePreset: '30d' }],
       [{ dateFrom: '2026-08-03' }],
-      [expect.objectContaining({ query: 'bagpipe', includeTags: [], models: [], datePreset: 'all' })],
+      [
+        expect.objectContaining({
+          query: 'bagpipe',
+          includeTags: [],
+          models: [],
+          datePreset: 'all',
+        }),
+      ],
     ]);
   });
 });
@@ -164,7 +189,6 @@ describe('progressive gallery rendering', () => {
     expect(nextGalleryRenderCount(200, 30)).toBe(54);
     expect(nextGalleryRenderCount(53, 30)).toBe(53);
   });
-
 });
 
 describe('gallery thumbnail restoration', () => {
@@ -188,14 +212,21 @@ describe('GalleryCardHoverPreview', () => {
       metadata: { height: 1216, width: 832 },
       name: 'unused generated filename',
       prompt_structure: { base_undesired_tags: [], characters: [] },
-      tags: [{ id: 'one', tag: '1girl' }, { id: 'two', tag: 'outdoors' }],
+      tags: [
+        { id: 'one', tag: '1girl' },
+        { id: 'two', tag: 'outdoors' },
+      ],
       thumbnail_path: 'C:\\gallery\\thumbnail.webp',
     };
-    const html = renderToStaticMarkup(<GalleryCardHoverPreview group={{
-      count: 2,
-      cover,
-      members: [cover],
-    }}/>);
+    const html = renderToStaticMarkup(
+      <GalleryCardHoverPreview
+        group={{
+          count: 2,
+          cover,
+          members: [cover],
+        }}
+      />,
+    );
 
     expect(html).toContain('thumbnail.webp');
     expect(html).toContain('832 × 1216 · 2 Tags');
@@ -220,10 +251,12 @@ describe('GalleryCardHoverPreview', () => {
       metadata: { height: 832, width: 1216 },
       name: 'variant',
     };
-    const html = renderToStaticMarkup(<GalleryCardHoverPreview
-      group={{ count: 2, cover, members: [cover, variant] }}
-      project={variant}
-    />);
+    const html = renderToStaticMarkup(
+      <GalleryCardHoverPreview
+        group={{ count: 2, cover, members: [cover, variant] }}
+        project={variant}
+      />,
+    );
 
     expect(html).toContain('variant.png');
     expect(html).toContain('1216 × 832');
@@ -263,7 +296,12 @@ describe('GalleryCardHoverPreview', () => {
       prompt_structure: { base_undesired_tags: [], characters: [] },
       tags: [],
     };
-    const variant = { ...cover, id: 'variant', image_path: 'C:\\gallery\\variant.png', name: 'variant.png' };
+    const variant = {
+      ...cover,
+      id: 'variant',
+      image_path: 'C:\\gallery\\variant.png',
+      name: 'variant.png',
+    };
     const element = GalleryCardView({
       active: false,
       group: { count: 2, cover, members: [cover, variant] },
@@ -275,8 +313,12 @@ describe('GalleryCardHoverPreview', () => {
     });
     const mainButton = element.props.children.props.children[0];
     const imageChildren = mainButton.props.children.props.children.flat(Infinity).filter(Boolean);
-    const hoverName = imageChildren.find((child) => child.props?.className === 'gallery-card-hover-name');
-    const stackImage = imageChildren.find((child) => child.props?.className === 'gallery-card-stack gallery-card-stack-1');
+    const hoverName = imageChildren.find(
+      (child) => child.props?.className === 'gallery-card-hover-name',
+    );
+    const stackImage = imageChildren.find(
+      (child) => child.props?.className === 'gallery-card-stack gallery-card-stack-1',
+    );
 
     expect(mainButton.props['aria-label']).toContain('cover.png');
     expect(hoverName.props.children).toBe('variant.png');
@@ -299,7 +341,12 @@ describe('GalleryCardHoverPreview', () => {
       prompt_structure: { base_undesired_tags: [], characters: [] },
       tags: [],
     };
-    const variant = { ...cover, id: 'variant', image_path: 'C:\\gallery\\variant.png', name: 'variant' };
+    const variant = {
+      ...cover,
+      id: 'variant',
+      image_path: 'C:\\gallery\\variant.png',
+      name: 'variant',
+    };
     const element = GalleryCardView({
       active: false,
       group: { count: 2, cover, members: [cover, variant] },
@@ -322,7 +369,9 @@ describe('GalleryCardHoverPreview', () => {
     expect(onPreview).toHaveBeenCalledWith(variant, clickEvent);
     expect(onDismissHoverPreview).toHaveBeenCalledOnce();
     expect(onOpenWorkbench).toHaveBeenCalledWith(variant);
-    expect(onDismissHoverPreview.mock.invocationCallOrder[0]).toBeLessThan(onOpenWorkbench.mock.invocationCallOrder[0]);
+    expect(onDismissHoverPreview.mock.invocationCallOrder[0]).toBeLessThan(
+      onOpenWorkbench.mock.invocationCallOrder[0],
+    );
   });
 
   it('keeps modified double clicks available for selection gestures', () => {

@@ -63,7 +63,7 @@ function escapeHtml(value) {
 function screenMarkup(layer, source, cropTop, className) {
   const aspectWidth = 1706;
   const contentHeight = 1002;
-  const cropOffset = layer.width * cropTop / aspectWidth;
+  const cropOffset = (layer.width * cropTop) / aspectWidth;
   const imageOffset = cropTop ? `top: -${cropOffset}px;` : '';
   return `
     <div
@@ -72,7 +72,7 @@ function screenMarkup(layer, source, cropTop, className) {
         --x: ${layer.x}px;
         --y: ${layer.y}px;
         --screen-width: ${layer.width}px;
-        --screen-height: ${layer.width * contentHeight / aspectWidth}px;
+        --screen-height: ${(layer.width * contentHeight) / aspectWidth}px;
         --rotate-x: ${layer.rotateX}deg;
         --rotate-y: ${layer.rotateY}deg;
         --rotate-z: ${layer.rotateZ}deg;
@@ -292,9 +292,15 @@ function fontAssets() {
     <rect width="100%" height="100%" filter="url(#n)" opacity=".72"/>
   </svg>`;
   return {
-    harmonyRegular: pathToFileURL(path.join(fontRoot, 'webfont-harmony-sans-sc', 'fonts', 'HarmonyOS_Sans_SC_Regular.woff2')).href,
-    harmonyBold: pathToFileURL(path.join(fontRoot, 'webfont-harmony-sans-sc', 'fonts', 'HarmonyOS_Sans_SC_Bold.woff2')).href,
-    geistMono: pathToFileURL(path.join(fontRoot, 'webfont-geist-mono', 'fonts', 'GeistMono-Regular.otf')).href,
+    harmonyRegular: pathToFileURL(
+      path.join(fontRoot, 'webfont-harmony-sans-sc', 'fonts', 'HarmonyOS_Sans_SC_Regular.woff2'),
+    ).href,
+    harmonyBold: pathToFileURL(
+      path.join(fontRoot, 'webfont-harmony-sans-sc', 'fonts', 'HarmonyOS_Sans_SC_Bold.woff2'),
+    ).href,
+    geistMono: pathToFileURL(
+      path.join(fontRoot, 'webfont-geist-mono', 'fonts', 'GeistMono-Regular.otf'),
+    ).href,
     noise: `data:image/svg+xml;base64,${Buffer.from(noiseSvg).toString('base64')}`,
   };
 }
@@ -341,7 +347,10 @@ async function runElectronRenderer() {
       if (size.width !== canvasWidth * renderScale || size.height !== canvasHeight * renderScale) {
         throw new Error(`Unexpected capture size for ${config.key}: ${size.width}x${size.height}`);
       }
-      fs.writeFileSync(path.join(screenshotDir, `.${config.key}-readme-render.png`), capture.toPNG());
+      fs.writeFileSync(
+        path.join(screenshotDir, `.${config.key}-readme-render.png`),
+        capture.toPNG(),
+      );
     }
   } finally {
     window.destroy();
@@ -362,13 +371,20 @@ async function runParent() {
   }
 
   const sharp = (await import('sharp')).default;
-  const temporaryPaths = artwork.map((config) => path.join(screenshotDir, `.${config.key}-readme-render.png`));
+  const temporaryPaths = artwork.map((config) =>
+    path.join(screenshotDir, `.${config.key}-readme-render.png`),
+  );
   try {
     for (const [index, config] of artwork.entries()) {
       const temporaryPath = temporaryPaths[index];
       const outputPath = path.join(screenshotDir, config.output);
       await sharp(temporaryPath)
-        .resize({ width: canvasWidth, height: canvasHeight, fit: 'fill', kernel: sharp.kernel.lanczos3 })
+        .resize({
+          width: canvasWidth,
+          height: canvasHeight,
+          fit: 'fill',
+          kernel: sharp.kernel.lanczos3,
+        })
         .sharpen({ sigma: 0.35, m1: 0.4, m2: 0.8 })
         .webp({ quality: 94, effort: 6 })
         .toFile(outputPath);

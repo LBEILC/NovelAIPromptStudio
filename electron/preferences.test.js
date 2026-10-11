@@ -12,7 +12,8 @@ const safeStorage = {
 };
 
 afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
+  for (const directory of temporaryDirectories.splice(0))
+    fs.rmSync(directory, { recursive: true, force: true });
 });
 
 describe('AI preferences', () => {
@@ -20,13 +21,19 @@ describe('AI preferences', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
     temporaryDirectories.push(directory);
     const preferences = openPreferences(directory, safeStorage);
-    preferences.saveAISettings({ baseUrl: 'https://api.example.com/v1', model: 'qwen-plus', apiKey: 'top-secret' });
-
-    expect(preferences.publicSettings()).toEqual(expect.objectContaining({
+    preferences.saveAISettings({
       baseUrl: 'https://api.example.com/v1',
       model: 'qwen-plus',
-      hasApiKey: true,
-    }));
+      apiKey: 'top-secret',
+    });
+
+    expect(preferences.publicSettings()).toEqual(
+      expect.objectContaining({
+        baseUrl: 'https://api.example.com/v1',
+        model: 'qwen-plus',
+        hasApiKey: true,
+      }),
+    );
     expect(preferences.publicSettings()).not.toHaveProperty('apiKey');
     expect(preferences.credentials().apiKey).toBe('top-secret');
     expect(fs.readFileSync(preferences.filePath, 'utf8')).not.toContain('top-secret');
@@ -40,15 +47,19 @@ describe('AI preferences', () => {
     const defaults = preferences.publicSettings().defaultPrompts;
     expect(defaults.translation).toBeTruthy();
     expect(defaults.classification).toBeTruthy();
-    expect(preferences.saveAISettings({
-      baseUrl: 'https://api.example.com/v1',
-      model: 'qwen-plus',
-      translationPrompt: 'Translate with my glossary.',
-      classificationPrompt: 'Classify using my taxonomy.',
-    })).toEqual(expect.objectContaining({
-      translationPrompt: 'Translate with my glossary.',
-      classificationPrompt: 'Classify using my taxonomy.',
-    }));
+    expect(
+      preferences.saveAISettings({
+        baseUrl: 'https://api.example.com/v1',
+        model: 'qwen-plus',
+        translationPrompt: 'Translate with my glossary.',
+        classificationPrompt: 'Classify using my taxonomy.',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        translationPrompt: 'Translate with my glossary.',
+        classificationPrompt: 'Classify using my taxonomy.',
+      }),
+    );
 
     const stored = JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'));
     expect(stored).toMatchObject({
@@ -62,9 +73,28 @@ describe('AI preferences', () => {
     temporaryDirectories.push(directory);
     const preferences = openPreferences(directory, safeStorage);
 
-    expect(preferences.appearanceSettings()).toEqual({ themeMode: 'dark', primaryColor: 'blue', sansFont: 'Geist', monoFont: 'Geist Mono', motion: 'full' });
-    expect(preferences.saveAppearanceSettings({ themeMode: 'auto', primaryColor: 'purple', sansFont: 'Microsoft YaHei UI', monoFont: 'Cascadia Mono', motion: 'reduced' }))
-      .toEqual({ themeMode: 'auto', primaryColor: 'purple', sansFont: 'Microsoft YaHei UI', monoFont: 'Cascadia Mono', motion: 'reduced' });
+    expect(preferences.appearanceSettings()).toEqual({
+      themeMode: 'dark',
+      primaryColor: 'blue',
+      sansFont: 'Geist',
+      monoFont: 'Geist Mono',
+      motion: 'full',
+    });
+    expect(
+      preferences.saveAppearanceSettings({
+        themeMode: 'auto',
+        primaryColor: 'purple',
+        sansFont: 'Microsoft YaHei UI',
+        monoFont: 'Cascadia Mono',
+        motion: 'reduced',
+      }),
+    ).toEqual({
+      themeMode: 'auto',
+      primaryColor: 'purple',
+      sansFont: 'Microsoft YaHei UI',
+      monoFont: 'Cascadia Mono',
+      motion: 'reduced',
+    });
     expect(() => preferences.saveAppearanceSettings({ sansFont: 'Bad; Font' })).toThrow('不支持');
     expect(() => preferences.saveAppearanceSettings({ monoFont: 'Bad "Font"' })).toThrow('不支持');
     expect(() => preferences.saveAppearanceSettings({ primaryColor: 'pink' })).toThrow('不支持');
@@ -73,9 +103,15 @@ describe('AI preferences', () => {
   it('migrates the previous fixed font option values', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
     temporaryDirectories.push(directory);
-    fs.writeFileSync(path.join(directory, 'preferences.json'), JSON.stringify({ appearance: { sansFont: 'harmony', monoFont: 'system-mono' } }));
+    fs.writeFileSync(
+      path.join(directory, 'preferences.json'),
+      JSON.stringify({ appearance: { sansFont: 'harmony', monoFont: 'system-mono' } }),
+    );
 
-    expect(openPreferences(directory, safeStorage).appearanceSettings()).toMatchObject({ sansFont: 'HarmonyOS Sans SC', monoFont: 'monospace' });
+    expect(openPreferences(directory, safeStorage).appearanceSettings()).toMatchObject({
+      sansFont: 'HarmonyOS Sans SC',
+      monoFont: 'monospace',
+    });
   });
 
   it('stores an absolute custom asset directory without moving the preferences database', () => {
@@ -85,14 +121,22 @@ describe('AI preferences', () => {
     const customAssetsDirectory = path.join(directory, 'library on another drive');
     const preferences = openPreferences(directory, safeStorage, { defaultAssetsDirectory });
 
-    expect(preferences.librarySettings()).toEqual({ assetsDirectory: defaultAssetsDirectory, defaultAssetsDirectory, isDefault: true });
+    expect(preferences.librarySettings()).toEqual({
+      assetsDirectory: defaultAssetsDirectory,
+      defaultAssetsDirectory,
+      isDefault: true,
+    });
     expect(preferences.saveLibrarySettings({ assetsDirectory: customAssetsDirectory })).toEqual({
       assetsDirectory: customAssetsDirectory,
       defaultAssetsDirectory,
       isDefault: false,
     });
-    expect(JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'))).toMatchObject({ library: { assetsDirectory: customAssetsDirectory } });
-    expect(() => preferences.saveLibrarySettings({ assetsDirectory: 'relative/assets' })).toThrow('绝对路径');
+    expect(JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'))).toMatchObject({
+      library: { assetsDirectory: customAssetsDirectory },
+    });
+    expect(() => preferences.saveLibrarySettings({ assetsDirectory: 'relative/assets' })).toThrow(
+      '绝对路径',
+    );
   });
 
   it('persists an existing absolute recent image directory and update preference', () => {
@@ -102,10 +146,19 @@ describe('AI preferences', () => {
     fs.mkdirSync(recent);
     const preferences = openPreferences(directory, safeStorage);
 
-    expect(preferences.saveProductivitySettings({ recentImageDirectory: recent, autoCheckUpdates: false }))
-      .toEqual({ recentImageDirectory: recent, autoCheckUpdates: false });
+    expect(
+      preferences.saveProductivitySettings({
+        recentImageDirectory: recent,
+        autoCheckUpdates: false,
+      }),
+    ).toEqual({ recentImageDirectory: recent, autoCheckUpdates: false });
     fs.rmSync(recent, { recursive: true });
-    expect(preferences.productivitySettings()).toEqual({ recentImageDirectory: '', autoCheckUpdates: false });
-    expect(() => preferences.saveProductivitySettings({ recentImageDirectory: 'relative' })).toThrow('绝对路径');
+    expect(preferences.productivitySettings()).toEqual({
+      recentImageDirectory: '',
+      autoCheckUpdates: false,
+    });
+    expect(() =>
+      preferences.saveProductivitySettings({ recentImageDirectory: 'relative' }),
+    ).toThrow('绝对路径');
   });
 });

@@ -10,13 +10,13 @@ import {
 
 describe('panel layout sizing', () => {
   it('converts the preferred viewport ratio to a stable pixel width', () => {
-    expect(panelWidthForViewport(1280, .34, 280, 560)).toBe(435);
-    expect(panelWidthForViewport(1280, .28, 340, 560)).toBe(358);
+    expect(panelWidthForViewport(1280, 0.34, 280, 560)).toBe(435);
+    expect(panelWidthForViewport(1280, 0.28, 340, 560)).toBe(358);
   });
 
   it('respects the panel minimum and maximum widths', () => {
-    expect(panelWidthForViewport(800, .28, 340, 560)).toBe(340);
-    expect(panelWidthForViewport(1704, .34, 280, 560)).toBe(560);
+    expect(panelWidthForViewport(800, 0.28, 340, 560)).toBe(340);
+    expect(panelWidthForViewport(1704, 0.34, 280, 560)).toBe(560);
   });
 
   it('normalizes persisted pixel widths and rejects missing values', () => {
@@ -40,8 +40,12 @@ describe('panel layout sizing', () => {
 
   it('keeps widths usable when storage access fails', () => {
     const unavailableStorage = {
-      getItem: () => { throw new Error('unavailable'); },
-      setItem: () => { throw new Error('unavailable'); },
+      getItem: () => {
+        throw new Error('unavailable');
+      },
+      setItem: () => {
+        throw new Error('unavailable');
+      },
     };
 
     expect(readPanelWidth(unavailableStorage, 'panel', 420, 280, 560)).toBe(420);
@@ -64,8 +68,12 @@ describe('panel layout sizing', () => {
 
   it('falls back safely for missing, invalid, or unavailable boolean state', () => {
     const unavailableStorage = {
-      getItem: () => { throw new Error('unavailable'); },
-      setItem: () => { throw new Error('unavailable'); },
+      getItem: () => {
+        throw new Error('unavailable');
+      },
+      setItem: () => {
+        throw new Error('unavailable');
+      },
     };
 
     expect(readPanelBoolean({ getItem: () => 'invalid' }, 'panel', false)).toBe(false);

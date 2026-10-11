@@ -2,23 +2,49 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@lobehub/ui', () => ({
-  Icon: ({ icon: Component, ...props }) => <Component {...props}/>,
+  Icon: ({ icon: Component, ...props }) => <Component {...props} />,
 }));
 
 vi.mock('@lobehub/ui/base-ui', () => ({
-  Button: ({ children, icon, size, type, ...props }) => <button {...props} data-size={size} type={type === 'submit' || type === 'reset' ? type : 'button'}>{icon}{children}</button>,
-  Input: (props) => <input {...props}/>,
-  Segmented: ({ onChange, options = [], size, value, ...props }) => <div {...props}>{options.find((option) => option.value === value)?.label}</div>,
-  Select: ({ mode, onChange, options = [], value, ...props }) => <select {...props} defaultValue={value} multiple={mode === 'multiple'}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
-  Slider: ({ onChange, value, ...props }) => <input {...props} defaultValue={value} type="range"/>,
-  Switch: ({ checked, onChange, ...props }) => <button aria-pressed={checked} {...props} type="button"/>,
+  Button: ({ children, icon, size, type, ...props }) => (
+    <button
+      {...props}
+      data-size={size}
+      type={type === 'submit' || type === 'reset' ? type : 'button'}
+    >
+      {icon}
+      {children}
+    </button>
+  ),
+  Input: (props) => <input {...props} />,
+  Segmented: ({ onChange, options = [], size, value, ...props }) => (
+    <div {...props}>{options.find((option) => option.value === value)?.label}</div>
+  ),
+  Select: ({ mode, onChange, options = [], value, ...props }) => (
+    <select {...props} defaultValue={value} multiple={mode === 'multiple'}>
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ),
+  Slider: ({ onChange, value, ...props }) => <input {...props} defaultValue={value} type="range" />,
+  Switch: ({ checked, onChange, ...props }) => (
+    <button aria-pressed={checked} {...props} type="button" />
+  ),
 }));
 
 import HelpCenter, { filterHelpTopics, HELP_GROUPS, HELP_TOPICS } from './HelpCenter.jsx';
 
 describe('HelpCenter', () => {
   it('organizes bundled help into expandable task groups', () => {
-    expect(HELP_GROUPS.map((group) => group.title)).toEqual(['开始使用', '工作台', '图片库', '参考与支持']);
+    expect(HELP_GROUPS.map((group) => group.title)).toEqual([
+      '开始使用',
+      '工作台',
+      '图片库',
+      '参考与支持',
+    ]);
     expect(HELP_GROUPS.every((group) => group.topics.length > 0)).toBe(true);
     expect(HELP_TOPICS).toHaveLength(17);
     expect(new Set(HELP_TOPICS.map((topic) => topic.id)).size).toBe(HELP_TOPICS.length);
@@ -30,19 +56,29 @@ describe('HelpCenter', () => {
     expect(filterHelpTopics('智能收藏集').map((topic) => topic.id)).toContain('gallery-find');
     expect(filterHelpTopics('压缩包').map((topic) => topic.id)).toContain('gallery-import');
     expect(filterHelpTopics('相似 Prompt').map((topic) => topic.id)).toContain('gallery-grouping');
-    expect(filterHelpTopics('DSO').map((topic) => topic.id)).toContain('translation-and-categories');
-    expect(filterHelpTopics('未分类').map((topic) => topic.id)).toContain('translation-and-categories');
-    expect(filterHelpTopics('按分类').map((topic) => topic.id)).toContain('translation-and-categories');
+    expect(filterHelpTopics('DSO').map((topic) => topic.id)).toContain(
+      'translation-and-categories',
+    );
+    expect(filterHelpTopics('未分类').map((topic) => topic.id)).toContain(
+      'translation-and-categories',
+    );
+    expect(filterHelpTopics('按分类').map((topic) => topic.id)).toContain(
+      'translation-and-categories',
+    );
     expect(filterHelpTopics('不存在的帮助词')).toEqual([]);
   });
 
   it('ships task-oriented help and feedback actions with the application', () => {
-    const html = renderToStaticMarkup(<HelpCenter
-      currentVersion="0.9.2"
-      platform="win32"
-      studio={{ openReleasePage: async () => ({ ok: true }) }}
-    />);
-    const articleHtml = Object.fromEntries(HELP_TOPICS.map((topic) => [topic.id, renderToStaticMarkup(topic.content)]));
+    const html = renderToStaticMarkup(
+      <HelpCenter
+        currentVersion="0.9.2"
+        platform="win32"
+        studio={{ openReleasePage: async () => ({ ok: true }) }}
+      />,
+    );
+    const articleHtml = Object.fromEntries(
+      HELP_TOPICS.map((topic) => [topic.id, renderToStaticMarkup(topic.content)]),
+    );
 
     expect(html).toContain('帮助与反馈');
     expect(html).toContain('4 组 · 17 篇');

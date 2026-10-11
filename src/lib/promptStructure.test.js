@@ -43,7 +43,12 @@ describe('NovelAI V4 prompt structure', () => {
       },
     };
     const extracted = extractV4PromptData(raw);
-    expect(extracted).toMatchObject({ base_prompt_raw: '2girls, outdoors', base_undesired_raw: 'lowres', use_coords: true, use_order: true });
+    expect(extracted).toMatchObject({
+      base_prompt_raw: '2girls, outdoors',
+      base_undesired_raw: 'lowres',
+      use_coords: true,
+      use_order: true,
+    });
     expect(extracted.characters).toEqual([
       { prompt_raw: 'girl, red hair', undesired_raw: 'blue hair', center: { x: 0.3, y: 0.5 } },
       { prompt_raw: 'girl, blue hair', undesired_raw: 'red hair', center: { x: 0.7, y: 0.5 } },
@@ -60,11 +65,15 @@ describe('NovelAI V4 prompt structure', () => {
         base_prompt_raw: '2girls, outdoors',
         base_undesired_raw: 'lowres',
         use_coords: true,
-        characters: [{ prompt_raw: 'girl, red hair', undesired_raw: 'blue hair', center: { x: 0.3, y: 0.5 } }],
+        characters: [
+          { prompt_raw: 'girl, red hair', undesired_raw: 'blue hair', center: { x: 0.3, y: 0.5 } },
+        ],
       },
     };
     const project = {
-      tags: [{ id: 'base', tag: '2girls', translation: '', category: 'Subject', weight: 1, note: '' }],
+      tags: [
+        { id: 'base', tag: '2girls', translation: '', category: 'Subject', weight: 1, note: '' },
+      ],
       metadata,
       prompt_structure: createPromptStructure(metadata, idFactory),
     };
@@ -75,7 +84,11 @@ describe('NovelAI V4 prompt structure', () => {
       'Character 1 Undesired Content',
     ]);
     const characterScope = getPromptScopes(project)[2];
-    const updated = updatePromptScope(project, characterScope.key, [...characterScope.tags].reverse());
+    const updated = updatePromptScope(
+      project,
+      characterScope.key,
+      [...characterScope.tags].reverse(),
+    );
     expect(getPromptScopes(updated)[2].tags.map((tag) => tag.tag)).toEqual(['red hair', 'girl']);
     expect(formatPositivePrompt(project)).toContain('|');
     expect(formatPositivePromptForCopy(project)).toBe('2girls, outdoors\n|\ngirl, red hair');
@@ -100,14 +113,22 @@ describe('NovelAI V4 prompt structure', () => {
       translation: `译文：${tag.tag}`,
       translation_source: 'dso',
     }));
-    const annotated = syncProjectPromptMetadata(updatePromptScopeAnnotations(hydrated, 'base:prompt', annotatedTags));
+    const annotated = syncProjectPromptMetadata(
+      updatePromptScopeAnnotations(hydrated, 'base:prompt', annotatedTags),
+    );
     expect(annotated.metadata.prompt_raw).toBe(raw);
 
-    const editedTags = hydrated.tags.map((tag) => tag.tag === 'amazing quality' ? { ...tag, tag: 'very aesthetic' } : tag);
-    const edited = syncProjectPromptMetadata(updatePromptScope(hydrated, 'base:prompt', editedTags));
+    const editedTags = hydrated.tags.map((tag) =>
+      tag.tag === 'amazing quality' ? { ...tag, tag: 'very aesthetic' } : tag,
+    );
+    const edited = syncProjectPromptMetadata(
+      updatePromptScope(hydrated, 'base:prompt', editedTags),
+    );
     expect(edited.metadata.prompt_raw).toBe('{{{best quality, very aesthetic}}}, 1girl');
 
-    const rawEdited = syncProjectPromptMetadata(updatePromptScope(edited, 'base:prompt', editedTags, `${raw}\n`));
+    const rawEdited = syncProjectPromptMetadata(
+      updatePromptScope(edited, 'base:prompt', editedTags, `${raw}\n`),
+    );
     expect(rawEdited.metadata.prompt_raw).toBe(`${raw}\n`);
     expect(formatPositivePromptForCopy(rawEdited)).toBe(`${raw}\n`);
   });
@@ -122,10 +143,17 @@ describe('NovelAI V4 prompt structure', () => {
         characters: [{ prompt_raw: character, undesired_raw: '', center: { x: 0.25, y: 0.75 } }],
       },
     };
-    const project = { metadata, prompt_structure: createPromptStructure(metadata), tags: parsePrompt(base) };
+    const project = {
+      metadata,
+      prompt_structure: createPromptStructure(metadata),
+      tags: parsePrompt(base),
+    };
 
     expect(formatPositivePromptForCopy(project)).toBe(`${base}\n|\n${character}`);
-    expect(positivePromptCopyOptions(project).map((option) => option.text)).toEqual([base, character]);
+    expect(positivePromptCopyOptions(project).map((option) => option.text)).toEqual([
+      base,
+      character,
+    ]);
   });
 
   it('excludes confirmed NovelAI quality tags by default and can include the generation-ready raw prompt', () => {
@@ -146,12 +174,24 @@ describe('NovelAI V4 prompt structure', () => {
         },
       },
     };
-    const project = { metadata, prompt_structure: createPromptStructure(metadata), tags: parsePrompt(raw) };
+    const project = {
+      metadata,
+      prompt_structure: createPromptStructure(metadata),
+      tags: parsePrompt(raw),
+    };
 
     expect(formatPositivePromptForCopy(project)).toBe('1girl, blue hair, Text: Hello');
     expect(formatPositivePromptForCopy(project, { includeAutomatic: true })).toBe(raw);
-    expect(positivePromptCopyOptions(project)[0]).toMatchObject({ text: '1girl, blue hair, Text: Hello', count: 3, automaticCount: 3 });
-    expect(positivePromptCopyOptions(project, { includeAutomatic: true })[0]).toMatchObject({ text: raw, count: 6, automaticCount: 3 });
+    expect(positivePromptCopyOptions(project)[0]).toMatchObject({
+      text: '1girl, blue hair, Text: Hello',
+      count: 3,
+      automaticCount: 3,
+    });
+    expect(positivePromptCopyOptions(project, { includeAutomatic: true })[0]).toMatchObject({
+      text: raw,
+      count: 6,
+      automaticCount: 3,
+    });
   });
 
   it('excludes an exactly inferred Standard quality suffix from default copy', () => {
@@ -168,7 +208,11 @@ describe('NovelAI V4 prompt structure', () => {
         use_order: true,
       },
     };
-    const project = { metadata, prompt_structure: createPromptStructure(metadata), tags: parsePrompt(raw) };
+    const project = {
+      metadata,
+      prompt_structure: createPromptStructure(metadata),
+      tags: parsePrompt(raw),
+    };
 
     expect(formatPositivePromptForCopy(project)).toBe('1girl, blue hair');
     expect(positivePromptCopyOptions(project)[0]).toMatchObject({ count: 2, automaticCount: 3 });
@@ -182,14 +226,25 @@ describe('NovelAI V4 prompt structure', () => {
         base_prompt_raw: '2girls',
         use_coords: true,
         use_order: false,
-        characters: [{ id: 'alice', label: 'Character 1', center: { x: 0.2, y: 0.8 }, prompt_tags: [], undesired_tags: [] }],
+        characters: [
+          {
+            id: 'alice',
+            label: 'Character 1',
+            center: { x: 0.2, y: 0.8 },
+            prompt_tags: [],
+            undesired_tags: [],
+          },
+        ],
       },
       tags: parsePrompt('2girls'),
     };
     const renamed = updatePromptCharacter(project, 'alice', { label: 'Alice' });
 
     expect(renamed.prompt_structure).toMatchObject({ use_coords: true, use_order: false });
-    expect(renamed.prompt_structure.characters[0]).toMatchObject({ label: 'Alice', center: { x: 0.2, y: 0.8 } });
+    expect(renamed.prompt_structure.characters[0]).toMatchObject({
+      label: 'Alice',
+      center: { x: 0.2, y: 0.8 },
+    });
   });
 
   it('preserves imported character prompts beyond the V4.5 six-character limit', () => {
@@ -202,11 +257,19 @@ describe('NovelAI V4 prompt structure', () => {
       prompt_raw: '22 characters',
       prompt_structure_raw: { base_prompt_raw: '22 characters', characters },
     };
-    const structure = normalizePromptStructure(null, metadata, (() => {
-      let id = 0;
-      return () => `character-${id++}`;
-    })());
-    const project = { metadata, prompt_structure: structure, tags: parsePrompt(metadata.prompt_raw) };
+    const structure = normalizePromptStructure(
+      null,
+      metadata,
+      (() => {
+        let id = 0;
+        return () => `character-${id++}`;
+      })(),
+    );
+    const project = {
+      metadata,
+      prompt_structure: structure,
+      tags: parsePrompt(metadata.prompt_raw),
+    };
 
     expect(structure.characters).toHaveLength(MAX_PROMPT_CHARACTERS);
     expect(addPromptCharacter(project)).toBe(project);
@@ -222,13 +285,31 @@ describe('NovelAI V4 prompt structure', () => {
         base_undesired_raw: '',
         base_undesired_tags: [],
         characters: [
-          { id: 'character-1', label: 'Alice', prompt_raw: 'red hair, smile', prompt_tags: parsePrompt('red hair, smile'), undesired_raw: '', undesired_tags: [], center: { x: 0.5, y: 0.5 } },
-          { id: 'character-2', label: 'Bob', prompt_raw: '   ', prompt_tags: [], undesired_raw: '', undesired_tags: [], center: { x: 0.5, y: 0.5 } },
+          {
+            id: 'character-1',
+            label: 'Alice',
+            prompt_raw: 'red hair, smile',
+            prompt_tags: parsePrompt('red hair, smile'),
+            undesired_raw: '',
+            undesired_tags: [],
+            center: { x: 0.5, y: 0.5 },
+          },
+          {
+            id: 'character-2',
+            label: 'Bob',
+            prompt_raw: '   ',
+            prompt_tags: [],
+            undesired_raw: '',
+            undesired_tags: [],
+            center: { x: 0.5, y: 0.5 },
+          },
         ],
       },
     };
 
-    expect(positiveRawPromptScopes(project).map((scope) => ({ key: scope.key, raw: scope.raw_prompt }))).toEqual([
+    expect(
+      positiveRawPromptScopes(project).map((scope) => ({ key: scope.key, raw: scope.raw_prompt })),
+    ).toEqual([
       { key: 'base:prompt', raw: '2girls, outdoors' },
       { key: 'character:character-1:prompt', raw: 'red hair, smile' },
     ]);

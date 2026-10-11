@@ -23,7 +23,12 @@ function fixture(id = 'workbench-1', imagePath = 'C:\\images\\source.png') {
     image_path: imagePath,
     metadata: { prompt_raw: '1girl', negative_prompt: '' },
     tags: [{ id: 'tag-1', tag: '1girl', weight: 1, category: 'Subject' }],
-    prompt_structure: { base_undesired_tags: [], characters: [], use_coords: false, use_order: true },
+    prompt_structure: {
+      base_undesired_tags: [],
+      characters: [],
+      use_coords: false,
+      use_order: true,
+    },
     vibes: [],
   };
 }
@@ -48,16 +53,22 @@ describe('workbench session v2', () => {
 
   it('does not mark an unchanged restored prompt as modified when parser identities change', () => {
     const original = fixture();
-    original.prompt_structure.characters = [{
-      id: 'character-before-restart',
-      label: 'Character 1',
-      prompt_raw: 'blue eyes',
-      undesired_raw: '',
-      prompt_tags: [{ id: 'character-tag-before-restart', tag: 'blue eyes', weight: 1, category: 'Body' }],
-      undesired_tags: [],
-      center: { x: 0.5, y: 0.5 },
-    }];
-    const saved = parseWorkbenchSession(serializeWorkbenchSession(createWorkbenchSession(original)));
+    original.prompt_structure.characters = [
+      {
+        id: 'character-before-restart',
+        label: 'Character 1',
+        prompt_raw: 'blue eyes',
+        undesired_raw: '',
+        prompt_tags: [
+          { id: 'character-tag-before-restart', tag: 'blue eyes', weight: 1, category: 'Body' },
+        ],
+        undesired_tags: [],
+        center: { x: 0.5, y: 0.5 },
+      },
+    ];
+    const saved = parseWorkbenchSession(
+      serializeWorkbenchSession(createWorkbenchSession(original)),
+    );
     const reparsed = structuredClone(original);
     reparsed.tags[0].id = 'base-tag-after-restart';
     reparsed.prompt_structure.characters[0].id = 'character-after-restart';
@@ -140,9 +151,13 @@ describe('workbench session v2', () => {
   });
 
   it('deduplicates stable sources and activates the existing tab', () => {
-    let session = createWorkbenchSession(fixture(), { source: { type: 'library', projectId: 'library-1', path: 'C:\\assets\\one.png' } });
+    let session = createWorkbenchSession(fixture(), {
+      source: { type: 'library', projectId: 'library-1', path: 'C:\\assets\\one.png' },
+    });
     const existing = session.tabs[0].id;
-    session = addWorkbenchTab(session, fixture('workbench-2', 'C:\\assets\\one.png'), { source: { type: 'library', projectId: 'library-1', path: 'C:\\assets\\one.png' } });
+    session = addWorkbenchTab(session, fixture('workbench-2', 'C:\\assets\\one.png'), {
+      source: { type: 'library', projectId: 'library-1', path: 'C:\\assets\\one.png' },
+    });
     expect(session.tabs).toHaveLength(1);
     expect(session.activeTabId).toBe(existing);
   });
@@ -168,7 +183,9 @@ describe('workbench session v2', () => {
 
     expect(reordered.tabs.map((tab) => tab.id)).toEqual([second, third, first]);
     expect(reordered.activeTabId).toBe(second);
-    expect(parseWorkbenchSession(serializeWorkbenchSession(reordered)).tabs.map((tab) => tab.id)).toEqual([second, third, first]);
+    expect(
+      parseWorkbenchSession(serializeWorkbenchSession(reordered)).tabs.map((tab) => tab.id),
+    ).toEqual([second, third, first]);
   });
 
   it('ignores invalid or unchanged tab reorder requests', () => {
@@ -178,11 +195,13 @@ describe('workbench session v2', () => {
   });
 
   it('migrates a v1 session into one v2 tab', () => {
-    const migrated = parseWorkbenchSession(JSON.stringify({
-      sourcePath: 'C:\\legacy.png',
-      draft: { tags: [{ id: 'tag', tag: 'legacy' }], prompt_structure: {} },
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    }));
+    const migrated = parseWorkbenchSession(
+      JSON.stringify({
+        sourcePath: 'C:\\legacy.png',
+        draft: { tags: [{ id: 'tag', tag: 'legacy' }], prompt_structure: {} },
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      }),
+    );
     expect(migrated).toMatchObject({
       version: 2,
       tabs: [{ source: { type: 'file', path: 'C:\\legacy.png' } }],

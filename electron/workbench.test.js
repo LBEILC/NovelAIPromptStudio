@@ -26,24 +26,33 @@ function workbenchPng(filePath) {
     qualityToggle: true,
     ucPreset: 0,
   });
-  fs.writeFileSync(filePath, Buffer.concat([
-    Buffer.from('89504e470d0a1a0a', 'hex'),
-    chunk('IHDR', ihdr),
-    chunk('tEXt', Buffer.concat([Buffer.from('Description'), Buffer.from([0]), Buffer.from(description)])),
-    chunk('IEND'),
-  ]));
+  fs.writeFileSync(
+    filePath,
+    Buffer.concat([
+      Buffer.from('89504e470d0a1a0a', 'hex'),
+      chunk('IHDR', ihdr),
+      chunk(
+        'tEXt',
+        Buffer.concat([Buffer.from('Description'), Buffer.from([0]), Buffer.from(description)]),
+      ),
+      chunk('IEND'),
+    ]),
+  );
 }
 
 afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
+  for (const directory of temporaryDirectories.splice(0))
+    fs.rmSync(directory, { recursive: true, force: true });
 });
 
 describe('workbench image reader', () => {
   it('uses the library title and thumbnail for library-backed workbench tabs', () => {
-    expect(applyWorkbenchLibraryDetails(
-      { name: 'internal-asset-id', thumbnail_path: '' },
-      { name: '图库标题', thumbnail_path: 'thumbnail.webp' },
-    )).toMatchObject({ name: '图库标题', thumbnail_path: 'thumbnail.webp' });
+    expect(
+      applyWorkbenchLibraryDetails(
+        { name: 'internal-asset-id', thumbnail_path: '' },
+        { name: '图库标题', thumbnail_path: 'thumbnail.webp' },
+      ),
+    ).toMatchObject({ name: '图库标题', thumbnail_path: 'thumbnail.webp' });
   });
 
   it('parses a source image without copying it into the library', async () => {
@@ -53,17 +62,26 @@ describe('workbench image reader', () => {
     workbenchPng(filePath);
 
     const project = await readWorkbenchImage(filePath, {
-      enrichProjectTags: (value) => ({ ...value, tags: value.tags.map((tag) => ({ ...tag, translation: '缓存翻译' })) }),
+      enrichProjectTags: (value) => ({
+        ...value,
+        tags: value.tags.map((tag) => ({ ...tag, translation: '缓存翻译' })),
+      }),
     });
 
     expect(project).toMatchObject({
       name: 'source',
       image_path: filePath,
       metadata: { width: 832, height: 1216 },
-      tags: [{ tag: '1girl', translation: '缓存翻译' }, { tag: 'silver hair', translation: '缓存翻译' }],
+      tags: [
+        { tag: '1girl', translation: '缓存翻译' },
+        { tag: 'silver hair', translation: '缓存翻译' },
+      ],
       vibes: [{ name: 'Vibe 1', strength: 0.45 }],
     });
-    expect(project.prompt_structure.novelai_auto).toMatchObject({ quality_toggle: true, uc_preset: 0 });
+    expect(project.prompt_structure.novelai_auto).toMatchObject({
+      quality_toggle: true,
+      uc_preset: 0,
+    });
     expect(fs.readdirSync(directory)).toEqual(['source.png']);
   });
 

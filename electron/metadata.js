@@ -23,10 +23,16 @@ function parsePngText(buffer) {
     try {
       if (type === 'tEXt') {
         const separator = data.indexOf(0);
-        if (separator > -1) text[data.subarray(0, separator).toString('utf8')] = data.subarray(separator + 1).toString('utf8');
+        if (separator > -1)
+          text[data.subarray(0, separator).toString('utf8')] = data
+            .subarray(separator + 1)
+            .toString('utf8');
       } else if (type === 'zTXt') {
         const separator = data.indexOf(0);
-        if (separator > -1) text[data.subarray(0, separator).toString('utf8')] = zlib.inflateSync(data.subarray(separator + 2)).toString('utf8');
+        if (separator > -1)
+          text[data.subarray(0, separator).toString('utf8')] = zlib
+            .inflateSync(data.subarray(separator + 2))
+            .toString('utf8');
       } else if (type === 'iTXt') {
         let cursor = data.indexOf(0);
         const key = data.subarray(0, cursor).toString('utf8');
@@ -35,7 +41,9 @@ function parsePngText(buffer) {
         cursor = data.indexOf(0, cursor) + 1;
         cursor = data.indexOf(0, cursor) + 1;
         const payload = data.subarray(cursor);
-        text[key] = compressed ? zlib.inflateSync(payload).toString('utf8') : payload.toString('utf8');
+        text[key] = compressed
+          ? zlib.inflateSync(payload).toString('utf8')
+          : payload.toString('utf8');
       }
     } catch {
       // Preserve all other metadata if one optional text chunk is malformed.
@@ -48,10 +56,10 @@ function parsePngText(buffer) {
 function readAlphaLsbByte(data, width, height, byteIndex) {
   let value = 0;
   for (let bit = 0; bit < 8; bit += 1) {
-    const streamIndex = (byteIndex * 8) + bit;
+    const streamIndex = byteIndex * 8 + bit;
     const x = Math.floor(streamIndex / height);
     const y = streamIndex % height;
-    value = (value << 1) | (data[((y * width) + x) * 4 + 3] & 1);
+    value = (value << 1) | (data[(y * width + x) * 4 + 3] & 1);
   }
   return value;
 }
@@ -59,7 +67,10 @@ function readAlphaLsbByte(data, width, height, byteIndex) {
 async function parseStealthPngText(buffer) {
   if (buffer.subarray(0, 8).toString('hex') !== PNG_SIGNATURE) return {};
   try {
-    const { data, info } = await sharp(buffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { data, info } = await sharp(buffer)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
     const capacity = Math.floor((info.width * info.height) / 8);
     if (capacity < STEALTH_HEADER_BYTES) return {};
 
@@ -73,17 +84,26 @@ async function parseStealthPngText(buffer) {
     const bitLength = header.readUInt32BE(STEALTH_MAGIC_LENGTH);
     if (bitLength % 8 !== 0) return {};
     const payloadLength = bitLength / 8;
-    if (payloadLength <= 0
-      || payloadLength > capacity - STEALTH_HEADER_BYTES
-      || payloadLength > MAX_STEALTH_METADATA_BYTES) return {};
+    if (
+      payloadLength <= 0 ||
+      payloadLength > capacity - STEALTH_HEADER_BYTES ||
+      payloadLength > MAX_STEALTH_METADATA_BYTES
+    )
+      return {};
 
     const payload = Buffer.alloc(payloadLength);
     for (let index = 0; index < payload.length; index += 1) {
-      payload[index] = readAlphaLsbByte(data, info.width, info.height, STEALTH_HEADER_BYTES + index);
+      payload[index] = readAlphaLsbByte(
+        data,
+        info.width,
+        info.height,
+        STEALTH_HEADER_BYTES + index,
+      );
     }
-    const decoded = magic === 'stealth_pngcomp'
-      ? zlib.gunzipSync(payload, { maxOutputLength: MAX_STEALTH_METADATA_BYTES })
-      : payload;
+    const decoded =
+      magic === 'stealth_pngcomp'
+        ? zlib.gunzipSync(payload, { maxOutputLength: MAX_STEALTH_METADATA_BYTES })
+        : payload;
     const parsed = safeJson(decoded.toString('utf8'));
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
@@ -92,7 +112,8 @@ async function parseStealthPngText(buffer) {
 }
 
 function parsePngDimensions(buffer) {
-  if (buffer.length < 24 || buffer.subarray(0, 8).toString('hex') !== PNG_SIGNATURE) return { width: 0, height: 0 };
+  if (buffer.length < 24 || buffer.subarray(0, 8).toString('hex') !== PNG_SIGNATURE)
+    return { width: 0, height: 0 };
   if (buffer.subarray(12, 16).toString('ascii') !== 'IHDR') return { width: 0, height: 0 };
   return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
 }
@@ -120,9 +141,11 @@ export async function readNovelAIMetadata(filePath) {
     const parsed = safeJson(value);
     return parsed && typeof parsed === 'object';
   });
-  if (!hasStandardGenerationMetadata) text = { ...await parseStealthPngText(buffer), ...text };
+  if (!hasStandardGenerationMetadata) text = { ...(await parseStealthPngText(buffer)), ...text };
   const dimensions = parsePngDimensions(buffer);
-  const candidates = Object.values(text).map(safeJson).filter((value) => value && typeof value === 'object');
+  const candidates = Object.values(text)
+    .map(safeJson)
+    .filter((value) => value && typeof value === 'object');
   const raw = candidates.reduce((merged, item) => ({ ...merged, ...item }), {});
   const legacyPrompt = first(raw, ['prompt', 'description'], text.Description || '');
   const legacyNegative = first(raw, ['uc', 'negative_prompt', 'negativePrompt'], '');

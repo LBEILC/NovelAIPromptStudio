@@ -16,7 +16,13 @@ export function reconcileArchiveImportSelection(entries = [], selectedIds = []) 
   return selectedIds.filter((id) => selectable.has(id));
 }
 
-export function toggleArchiveImportSelection(entries = [], selectedIds = [], targetId = '', event = {}, anchorId = '') {
+export function toggleArchiveImportSelection(
+  entries = [],
+  selectedIds = [],
+  targetId = '',
+  event = {},
+  anchorId = '',
+) {
   const selectable = selectableArchiveEntries(entries);
   const selectableIds = selectable.map((entry) => entry.id);
   const targetIndex = selectableIds.indexOf(targetId);

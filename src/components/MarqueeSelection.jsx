@@ -12,7 +12,8 @@ import {
   rectanglesIntersect,
 } from '../lib/marqueeSelection.js';
 
-const INTERACTIVE_SELECTOR = 'a[href], button, input, select, textarea, [contenteditable="true"], [data-marquee-ignore]';
+const INTERACTIVE_SELECTOR =
+  'a[href], button, input, select, textarea, [contenteditable="true"], [data-marquee-ignore]';
 
 function sameKeys(first, second) {
   return first.length === second.length && first.every((key, index) => key === second[index]);
@@ -22,17 +23,28 @@ function pointerOnScrollbar(container, event) {
   const bounds = container.getBoundingClientRect();
   const verticalScrollbar = container.offsetWidth - container.clientWidth;
   const horizontalScrollbar = container.offsetHeight - container.clientHeight;
-  return (verticalScrollbar > 0 && event.clientX >= bounds.right - verticalScrollbar)
-    || (horizontalScrollbar > 0 && event.clientY >= bounds.bottom - horizontalScrollbar);
+  return (
+    (verticalScrollbar > 0 && event.clientX >= bounds.right - verticalScrollbar) ||
+    (horizontalScrollbar > 0 && event.clientY >= bounds.bottom - horizontalScrollbar)
+  );
 }
 
 export function MarqueeSelectionOverlay({ rect, zIndex }) {
   if (!rect || typeof document === 'undefined') return null;
-  return createPortal(<div
-    aria-hidden="true"
-    className="marquee-selection-box"
-    style={{ height: rect.height, left: rect.left, top: rect.top, width: rect.width, ...(zIndex == null ? {} : { zIndex }) }}
-  />, document.body);
+  return createPortal(
+    <div
+      aria-hidden="true"
+      className="marquee-selection-box"
+      style={{
+        height: rect.height,
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        ...(zIndex == null ? {} : { zIndex }),
+      }}
+    />,
+    document.body,
+  );
 }
 
 export function useMarqueeSelection({
@@ -72,10 +84,12 @@ export function useMarqueeSelection({
     const contentPoint = pointInScrollableContent(point, viewport, scroll);
     const contentRect = marqueeRect(drag.contentStart, contentPoint);
     const hitKeys = [...container.querySelectorAll(itemSelector)]
-      .filter((element) => rectanglesIntersect(
-        contentRect,
-        rectInScrollableContent(element.getBoundingClientRect(), viewport, scroll),
-      ))
+      .filter((element) =>
+        rectanglesIntersect(
+          contentRect,
+          rectInScrollableContent(element.getBoundingClientRect(), viewport, scroll),
+        ),
+      )
       .map((element) => decodeMarqueeKey(element.getAttribute('data-marquee-key')))
       .filter(Boolean);
     const nextSelection = marqueeSelection(drag.initialKeys, hitKeys, drag.mode);
@@ -93,7 +107,9 @@ export function useMarqueeSelection({
     if (!canceled) updateSelection({ x: event.clientX, y: event.clientY });
     if (drag.active) {
       suppressClickRef.current = true;
-      window.setTimeout(() => { suppressClickRef.current = false; }, 0);
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
       event.preventDefault();
       event.stopPropagation();
     } else if (!canceled && !drag.startKey && drag.mode === 'replace') {
@@ -107,9 +123,12 @@ export function useMarqueeSelection({
     }
   };
 
-  useEffect(() => () => {
-    document.documentElement.classList.remove('is-marquee-selecting');
-  }, []);
+  useEffect(
+    () => () => {
+      document.documentElement.classList.remove('is-marquee-selecting');
+    },
+    [],
+  );
 
   const handlers = {
     onClickCapture: (event) => {
@@ -134,11 +153,10 @@ export function useMarqueeSelection({
       const viewport = container.getBoundingClientRect();
       dragRef.current = {
         active: false,
-        contentStart: pointInScrollableContent(
-          { x: event.clientX, y: event.clientY },
-          viewport,
-          { left: container.scrollLeft, top: container.scrollTop },
-        ),
+        contentStart: pointInScrollableContent({ x: event.clientX, y: event.clientY }, viewport, {
+          left: container.scrollLeft,
+          top: container.scrollTop,
+        }),
         initialKeys: [...selectedKeysRef.current],
         lastSelection: [...selectedKeysRef.current],
         mode: marqueeMode(event),

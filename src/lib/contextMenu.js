@@ -1,4 +1,13 @@
-const TEXT_INPUT_TYPES = new Set(['', 'text', 'search', 'email', 'url', 'tel', 'password', 'number']);
+const TEXT_INPUT_TYPES = new Set([
+  '',
+  'text',
+  'search',
+  'email',
+  'url',
+  'tel',
+  'password',
+  'number',
+]);
 
 export function isTextEditingTarget(target) {
   if (!target || typeof target.closest !== 'function') return false;

@@ -3,14 +3,29 @@ import { fileURLToPath } from 'node:url';
 import { danbooruLookupName } from './danbooru.js';
 
 const DICTIONARY_PATH = fileURLToPath(new URL('./data/dso-dictionary.json', import.meta.url));
-const EXPECTED_CATEGORIES = ['Unsorted', 'ArtistEra', 'Subject', 'Identity', 'Body', 'Clothing', 'Action', 'Environment', 'Composition', 'StyleQuality'];
+const EXPECTED_CATEGORIES = [
+  'Unsorted',
+  'ArtistEra',
+  'Subject',
+  'Identity',
+  'Body',
+  'Clothing',
+  'Action',
+  'Environment',
+  'Composition',
+  'StyleQuality',
+];
 
 let cachedDictionary;
 
 function dictionary() {
   if (cachedDictionary) return cachedDictionary;
   const parsed = JSON.parse(fs.readFileSync(DICTIONARY_PATH, 'utf8'));
-  if (parsed?.schema_version !== 1 || JSON.stringify(parsed.categories) !== JSON.stringify(EXPECTED_CATEGORIES) || !parsed.entries) {
+  if (
+    parsed?.schema_version !== 1 ||
+    JSON.stringify(parsed.categories) !== JSON.stringify(EXPECTED_CATEGORIES) ||
+    !parsed.entries
+  ) {
     throw new Error('内置 DSO Tag 词典格式无效');
   }
   cachedDictionary = parsed;

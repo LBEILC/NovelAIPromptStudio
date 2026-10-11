@@ -3,40 +3,69 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { exportEmbeddedVibeFile, extractEmbeddedVibes, fingerprintVibe, fingerprintVibes } from './vibes.js';
+import {
+  exportEmbeddedVibeFile,
+  extractEmbeddedVibes,
+  fingerprintVibe,
+  fingerprintVibes,
+} from './vibes.js';
 
 const temporaryDirectories = [];
 
 afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
+  for (const directory of temporaryDirectories.splice(0))
+    fs.rmSync(directory, { recursive: true, force: true });
 });
 
 describe('embedded Vibe parsing', () => {
   it('fingerprints the copied encoding deterministically', () => {
-    expect(fingerprintVibe('encoded-vibe')).toBe(crypto.createHash('sha256').update('encoded-vibe').digest('hex'));
+    expect(fingerprintVibe('encoded-vibe')).toBe(
+      crypto.createHash('sha256').update('encoded-vibe').digest('hex'),
+    );
   });
 
   it('reads Vibe encodings without creating an editable library entry', () => {
     const encoding = 'x'.repeat(200);
-    expect(extractEmbeddedVibes({
-      reference_image_multiple: [encoding],
-      reference_strength_multiple: [0.45],
-      reference_information_extracted_multiple: [0.8],
-    }, 'curated')).toEqual([{
-      encoding,
-      strength: 0.45,
-      information_extracted: 0.8,
-      model: 'nai-diffusion-4-5-curated',
-    }]);
+    expect(
+      extractEmbeddedVibes(
+        {
+          reference_image_multiple: [encoding],
+          reference_strength_multiple: [0.45],
+          reference_information_extracted_multiple: [0.8],
+        },
+        'curated',
+      ),
+    ).toEqual([
+      {
+        encoding,
+        strength: 0.45,
+        information_extracted: 0.8,
+        model: 'nai-diffusion-4-5-curated',
+      },
+    ]);
   });
 
   it('includes Vibe order, encoding, strength, Information Extracted, and model in the group fingerprint', () => {
-    const first = { encoding: 'a'.repeat(200), strength: 0.4, information_extracted: 0.8, model: 'curated' };
-    const second = { encoding: 'b'.repeat(200), strength: 0.6, information_extracted: 1, model: 'full' };
+    const first = {
+      encoding: 'a'.repeat(200),
+      strength: 0.4,
+      information_extracted: 0.8,
+      model: 'curated',
+    };
+    const second = {
+      encoding: 'b'.repeat(200),
+      strength: 0.6,
+      information_extracted: 1,
+      model: 'full',
+    };
     expect(fingerprintVibes([first, second])).toBe(fingerprintVibes([first, second]));
     expect(fingerprintVibes([second, first])).not.toBe(fingerprintVibes([first, second]));
-    expect(fingerprintVibes([{ ...first, strength: 0.5 }, second])).not.toBe(fingerprintVibes([first, second]));
-    expect(fingerprintVibes([{ ...first, model: 'full' }, second])).not.toBe(fingerprintVibes([first, second]));
+    expect(fingerprintVibes([{ ...first, strength: 0.5 }, second])).not.toBe(
+      fingerprintVibes([first, second]),
+    );
+    expect(fingerprintVibes([{ ...first, model: 'full' }, second])).not.toBe(
+      fingerprintVibes([first, second]),
+    );
     expect(fingerprintVibes([])).toBe('');
   });
 
@@ -44,13 +73,16 @@ describe('embedded Vibe parsing', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'novelai-vibe-export-'));
     temporaryDirectories.push(directory);
     const encoding = 'v'.repeat(240);
-    const filePath = exportEmbeddedVibeFile({
-      encoding,
-      information_extracted: 0.72,
-      model: 'nai-diffusion-4-5-curated',
-      name: 'Vibe 1',
-      strength: 0.45,
-    }, directory);
+    const filePath = exportEmbeddedVibeFile(
+      {
+        encoding,
+        information_extracted: 0.72,
+        model: 'nai-diffusion-4-5-curated',
+        name: 'Vibe 1',
+        strength: 0.45,
+      },
+      directory,
+    );
     const document = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
     expect(path.extname(filePath)).toBe('.naiv4vibe');

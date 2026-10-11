@@ -88,5 +88,14 @@ export function getIconComponent(name) {
 
 export default function Icon({ name, size = 17, strokeWidth = 1.8, ...props }) {
   const Component = getIconComponent(name);
-  return <LobeIcon aria-hidden="true" focusable="false" icon={Component} size={size} strokeWidth={strokeWidth} {...props}/>;
+  return (
+    <LobeIcon
+      aria-hidden="true"
+      focusable="false"
+      icon={Component}
+      size={size}
+      strokeWidth={strokeWidth}
+      {...props}
+    />
+  );
 }

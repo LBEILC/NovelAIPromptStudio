@@ -32,7 +32,10 @@ const CATEGORY_SIMILARITY_WEIGHTS = {
 };
 
 function normalizedModel(value) {
-  return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('en-US');
 }
 
 export function normalizeGalleryGrouping(value = {}) {
@@ -41,7 +44,9 @@ export function normalizeGalleryGrouping(value = {}) {
     : DEFAULT_GALLERY_GROUPING.promptScope;
   const numericThreshold = Number(value?.similarityThreshold);
   const similarityThreshold = Number.isFinite(numericThreshold)
-    ? Math.round(Math.min(GALLERY_SIMILARITY_MAX, Math.max(GALLERY_SIMILARITY_MIN, numericThreshold)))
+    ? Math.round(
+        Math.min(GALLERY_SIMILARITY_MAX, Math.max(GALLERY_SIMILARITY_MIN, numericThreshold)),
+      )
     : GALLERY_SIMILARITY_DEFAULT;
   return { promptScope, mergeVibes: Boolean(value?.mergeVibes), similarityThreshold };
 }
@@ -73,9 +78,10 @@ export function galleryGroupingFingerprint(project = {}, value = DEFAULT_GALLERY
   const grouping = normalizeGalleryGrouping(value);
   if (grouping.promptScope === 'separate' || grouping.promptScope === 'similar') return '';
 
-  const prompt = grouping.promptScope === 'base'
-    ? String(project.base_prompt_fingerprint || basePromptFingerprint(project))
-    : String(project.prompt_fingerprint || promptFingerprint(project));
+  const prompt =
+    grouping.promptScope === 'base'
+      ? String(project.base_prompt_fingerprint || basePromptFingerprint(project))
+      : String(project.prompt_fingerprint || promptFingerprint(project));
   if (!prompt) return '';
 
   return JSON.stringify({
@@ -83,7 +89,9 @@ export function galleryGroupingFingerprint(project = {}, value = DEFAULT_GALLERY
     promptScope: grouping.promptScope,
     prompt,
     model: normalizedModel(project.metadata?.model),
-    ...(!grouping.mergeVibes ? { vibe: String(project.vibe_fingerprint || project.metadata?.vibe_fingerprint || '') } : {}),
+    ...(!grouping.mergeVibes
+      ? { vibe: String(project.vibe_fingerprint || project.metadata?.vibe_fingerprint || '') }
+      : {}),
   });
 }
 
@@ -92,17 +100,24 @@ export function galleryGroupingBoundaryFingerprint(project = {}, value = DEFAULT
   return JSON.stringify({
     version: 1,
     model: normalizedModel(project.metadata?.model),
-    ...(!grouping.mergeVibes ? { vibe: String(project.vibe_fingerprint || project.metadata?.vibe_fingerprint || '') } : {}),
+    ...(!grouping.mergeVibes
+      ? { vibe: String(project.vibe_fingerprint || project.metadata?.vibe_fingerprint || '') }
+      : {}),
   });
 }
 
 function normalizedSimilarityTag(tag = {}) {
-  const key = String(tag.tag || '').trim().replace(/[_\s]+/g, ' ').toLocaleLowerCase('en-US');
+  const key = String(tag.tag || '')
+    .trim()
+    .replace(/[_\s]+/g, ' ')
+    .toLocaleLowerCase('en-US');
   if (!key) return null;
   const promptWeight = Math.min(2, Math.max(0.5, Math.abs(Number(tag.weight) || 1)));
   return {
     key,
-    value: (CATEGORY_SIMILARITY_WEIGHTS[tag.category] || CATEGORY_SIMILARITY_WEIGHTS.Unsorted) * promptWeight,
+    value:
+      (CATEGORY_SIMILARITY_WEIGHTS[tag.category] || CATEGORY_SIMILARITY_WEIGHTS.Unsorted) *
+      promptWeight,
   };
 }
 
@@ -118,7 +133,11 @@ function similarityTagMap(tags = []) {
 
 export function galleryBasePromptSimilarityPayload(project = {}) {
   let id = 0;
-  const structure = normalizePromptStructure(project.prompt_structure, project.metadata, () => `similarity-${id++}`);
+  const structure = normalizePromptStructure(
+    project.prompt_structure,
+    project.metadata,
+    () => `similarity-${id++}`,
+  );
   return {
     prompt: similarityTagMap(project.tags),
     undesired: similarityTagMap(structure.base_undesired_tags),
@@ -144,7 +163,7 @@ export function galleryBasePromptPayloadSimilarity(left, right) {
   if (promptScore === null) return 0;
   const undesiredScore = weightedJaccard(left.undesired, right.undesired);
   if (undesiredScore === null) return promptScore;
-  return (promptScore * 0.8) + (undesiredScore * 0.2);
+  return promptScore * 0.8 + undesiredScore * 0.2;
 }
 
 export function galleryBasePromptSimilarity(leftProject = {}, rightProject = {}) {
@@ -163,7 +182,10 @@ export function galleryGroupingStatusLabel(value = DEFAULT_GALLERY_GROUPING) {
 }
 
 export function exactGalleryGroupFingerprint(project = {}) {
-  return String(project.exact_group_fingerprint || galleryGroupingFingerprint(project, DEFAULT_GALLERY_GROUPING));
+  return String(
+    project.exact_group_fingerprint ||
+      galleryGroupingFingerprint(project, DEFAULT_GALLERY_GROUPING),
+  );
 }
 
 export function galleryProjectGroupingFingerprints(project = {}) {

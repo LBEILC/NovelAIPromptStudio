@@ -6,7 +6,8 @@ contextBridge.exposeInMainWorld('studio', {
   createCollection: (collection) => ipcRenderer.invoke('library:collections:create', collection),
   updateCollection: (id, patch) => ipcRenderer.invoke('library:collections:update', { id, patch }),
   deleteCollection: (id) => ipcRenderer.invoke('library:collections:delete', id),
-  updateCollectionProjects: (id, projectIds, action = 'add') => ipcRenderer.invoke('library:collections:projects', { id, projectIds, action }),
+  updateCollectionProjects: (id, projectIds, action = 'add') =>
+    ipcRenderer.invoke('library:collections:projects', { id, projectIds, action }),
   getLibraryStorage: () => ipcRenderer.invoke('library:storage:get'),
   changeLibraryStorage: () => ipcRenderer.invoke('library:storage:change'),
   revealLibraryStorage: () => ipcRenderer.invoke('library:storage:reveal'),
@@ -15,24 +16,32 @@ contextBridge.exposeInMainWorld('studio', {
     ipcRenderer.on('library:storage-progress', (_event, progress) => callback(progress));
   },
   offLibraryStorageProgress: () => ipcRenderer.removeAllListeners('library:storage-progress'),
-  openWorkbenchImage: (filePath = '', source = null) => ipcRenderer.invoke('workbench:image:open', { filePath, source }),
+  openWorkbenchImage: (filePath = '', source = null) =>
+    ipcRenderer.invoke('workbench:image:open', { filePath, source }),
   openClipboardWorkbenchImage: () => ipcRenderer.invoke('workbench:image:clipboard'),
-  syncWorkbenchTemporaryImages: (referencedPaths) => ipcRenderer.invoke('workbench:temp:sync', referencedPaths),
-  openDroppedWorkbenchImages: (files) => ipcRenderer.invoke('workbench:images:open-dropped', {
-    filePaths: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean),
-  }),
+  syncWorkbenchTemporaryImages: (referencedPaths) =>
+    ipcRenderer.invoke('workbench:temp:sync', referencedPaths),
+  openDroppedWorkbenchImages: (files) =>
+    ipcRenderer.invoke('workbench:images:open-dropped', {
+      filePaths: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean),
+    }),
   importImages: () => ipcRenderer.invoke('library:import-images'),
   importClipboardImage: () => ipcRenderer.invoke('library:import-images', { fromClipboard: true }),
-  importDroppedFiles: (files) => ipcRenderer.invoke('library:import-images', {
-    filePaths: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean),
-  }),
+  importDroppedFiles: (files) =>
+    ipcRenderer.invoke('library:import-images', {
+      filePaths: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean),
+    }),
   prepareImport: () => ipcRenderer.invoke('library:import-prepare'),
-  prepareDroppedImport: (files) => ipcRenderer.invoke('library:import-prepare', {
-    filePaths: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean),
-  }),
-  startPreparedImportPreviews: (sessionId) => ipcRenderer.invoke('library:import-previews:start', sessionId),
-  cancelPreparedImport: (sessionId) => ipcRenderer.invoke('library:import-prepared:cancel', sessionId),
-  commitPreparedImport: (sessionId, entryIds) => ipcRenderer.invoke('library:import-prepared:commit', { sessionId, entryIds }),
+  prepareDroppedImport: (files) =>
+    ipcRenderer.invoke('library:import-prepare', {
+      filePaths: Array.from(files || [], (file) => webUtils.getPathForFile(file)).filter(Boolean),
+    }),
+  startPreparedImportPreviews: (sessionId) =>
+    ipcRenderer.invoke('library:import-previews:start', sessionId),
+  cancelPreparedImport: (sessionId) =>
+    ipcRenderer.invoke('library:import-prepared:cancel', sessionId),
+  commitPreparedImport: (sessionId, entryIds) =>
+    ipcRenderer.invoke('library:import-prepared:commit', { sessionId, entryIds }),
   onPreparedImportPreview: (callback) => {
     ipcRenderer.removeAllListeners('library:import-preview');
     ipcRenderer.on('library:import-preview', (_event, update) => callback(update));
@@ -49,15 +58,18 @@ contextBridge.exposeInMainWorld('studio', {
   restoreProjects: (ids) => ipcRenderer.invoke('project:restore', ids),
   permanentlyDeleteProjects: (ids) => ipcRenderer.invoke('project:permanent-delete', ids),
   getTrashSummary: () => ipcRenderer.invoke('project:trash-summary'),
-  setGroupCover: (fingerprint, projectId) => ipcRenderer.invoke('project:group-cover:set', fingerprint, projectId),
+  setGroupCover: (fingerprint, projectId) =>
+    ipcRenderer.invoke('project:group-cover:set', fingerprint, projectId),
   copyProjectImage: (id) => ipcRenderer.invoke('image:copy', id),
   downloadProjectImage: (id) => ipcRenderer.invoke('image:download', id),
   copyWorkbenchImage: (filePath) => ipcRenderer.invoke('workbench:image:copy-current', filePath),
-  downloadWorkbenchImage: (filePath, name) => ipcRenderer.invoke('workbench:image:download-current', { filePath, name }),
+  downloadWorkbenchImage: (filePath, name) =>
+    ipcRenderer.invoke('workbench:image:download-current', { filePath, name }),
   saveTagAnnotations: (entries) => ipcRenderer.invoke('tag:annotations:save', entries),
   listTagCache: (request) => ipcRenderer.invoke('tag-cache:list', request),
   updateTagCache: (tag, patch) => ipcRenderer.invoke('tag-cache:update', { tag, patch }),
-  updateTagCacheMany: (tags, category) => ipcRenderer.invoke('tag-cache:update-many', { tags, category }),
+  updateTagCacheMany: (tags, category) =>
+    ipcRenderer.invoke('tag-cache:update-many', { tags, category }),
   deleteTagCache: (tag) => ipcRenderer.invoke('tag-cache:delete', tag),
   deleteTagCacheMany: (tags) => ipcRenderer.invoke('tag-cache:delete-many', tags),
   revealEmbeddedVibe: (vibe) => ipcRenderer.invoke('vibe:embedded:reveal', vibe),
@@ -67,7 +79,8 @@ contextBridge.exposeInMainWorld('studio', {
   getAppearanceSettings: () => ipcRenderer.invoke('appearance:settings:get'),
   saveAppearanceSettings: (settings) => ipcRenderer.invoke('appearance:settings:save', settings),
   getProductivitySettings: () => ipcRenderer.invoke('productivity:settings:get'),
-  saveProductivitySettings: (settings) => ipcRenderer.invoke('productivity:settings:save', settings),
+  saveProductivitySettings: (settings) =>
+    ipcRenderer.invoke('productivity:settings:save', settings),
   getUpdateStatus: () => ipcRenderer.invoke('updates:status'),
   checkForUpdates: () => ipcRenderer.invoke('updates:check'),
   downloadUpdate: () => ipcRenderer.invoke('updates:download'),

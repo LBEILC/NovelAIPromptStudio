@@ -27,9 +27,19 @@ describe('tag annotation orchestration', () => {
     expect(translateMissing).not.toHaveBeenCalled();
     expect(result.items).toEqual([
       { translation: '蓝发', category: 'Body', translation_source: 'dso', category_source: 'dso' },
-      { translation: '校服', category: 'Clothing', translation_source: 'dso', category_source: 'dso' },
+      {
+        translation: '校服',
+        category: 'Clothing',
+        translation_source: 'dso',
+        category_source: 'dso',
+      },
     ]);
-    expect(result).toMatchObject({ aiCount: 0, dsoTranslationCount: 2, dsoCategoryCount: 2, unresolvedCount: 0 });
+    expect(result).toMatchObject({
+      aiCount: 0,
+      dsoTranslationCount: 2,
+      dsoCategoryCount: 2,
+      unresolvedCount: 0,
+    });
   });
 
   it('returns partial local results when AI is not configured', async () => {
@@ -53,15 +63,17 @@ describe('tag annotation orchestration', () => {
 
   it('keeps user corrections above DSO translations and categories', async () => {
     const result = await annotateTags(['blue hair'], {
-      dictionary: dictionary([{
-        tag: 'blue hair',
-        translation: '我常用的蓝发译名',
-        category: 'StyleQuality',
-        has_translation: 1,
-        has_classification: 1,
-        translation_source: 'manual',
-        category_source: 'manual',
-      }]),
+      dictionary: dictionary([
+        {
+          tag: 'blue hair',
+          translation: '我常用的蓝发译名',
+          category: 'StyleQuality',
+          has_translation: 1,
+          has_classification: 1,
+          translation_source: 'manual',
+          category_source: 'manual',
+        },
+      ]),
       dsoDictionary: new Map([['blue_hair', { translation: '蓝发', category: 'Body' }]]),
       danbooruCache: new Map(),
       lookupDanbooru: vi.fn(),
@@ -78,31 +90,54 @@ describe('tag annotation orchestration', () => {
   });
 
   it('classifies prefixed and bare Danbooru artist tags without sending them to AI', async () => {
-    const lookupDanbooru = vi.fn(async () => new Map([
-      ['yamamoto_souichirou', { canonical_tag: 'yamamoto_souichirou', category: 1, is_deprecated: false, post_count: 2028 }],
-      ['red_hair', { canonical_tag: 'red_hair', category: 0, is_deprecated: false, post_count: 100 }],
-    ]));
+    const lookupDanbooru = vi.fn(
+      async () =>
+        new Map([
+          [
+            'yamamoto_souichirou',
+            {
+              canonical_tag: 'yamamoto_souichirou',
+              category: 1,
+              is_deprecated: false,
+              post_count: 2028,
+            },
+          ],
+          [
+            'red_hair',
+            { canonical_tag: 'red_hair', category: 0, is_deprecated: false, post_count: 100 },
+          ],
+        ]),
+    );
     const translateMissing = vi.fn(async (tags) => ({
       model: 'test-model',
       items: tags.map(() => ({ translation: '红发', category: 'Body' })),
     }));
-    const result = await annotateTags([
-      'artist:shion(mirudakemann)',
-      'yamamoto souichirou',
-      'red hair',
-    ], {
-      dictionary: new Map(),
-      danbooruCache: new Map(),
-      lookupDanbooru,
-      translateMissing,
-      now,
-    });
+    const result = await annotateTags(
+      ['artist:shion(mirudakemann)', 'yamamoto souichirou', 'red hair'],
+      {
+        dictionary: new Map(),
+        danbooruCache: new Map(),
+        lookupDanbooru,
+        translateMissing,
+        now,
+      },
+    );
 
     expect(lookupDanbooru).toHaveBeenCalledWith(['yamamoto souichirou', 'red hair']);
     expect(translateMissing).toHaveBeenCalledWith(['red hair']);
     expect(result.items).toEqual([
-      { translation: '画师:shion(mirudakemann)', category: 'ArtistEra', translation_source: 'danbooru', category_source: 'danbooru' },
-      { translation: '画师:yamamoto souichirou', category: 'ArtistEra', translation_source: 'danbooru', category_source: 'danbooru' },
+      {
+        translation: '画师:shion(mirudakemann)',
+        category: 'ArtistEra',
+        translation_source: 'danbooru',
+        category_source: 'danbooru',
+      },
+      {
+        translation: '画师:yamamoto souichirou',
+        category: 'ArtistEra',
+        translation_source: 'danbooru',
+        category_source: 'danbooru',
+      },
       { translation: '红发', category: 'Body', translation_source: 'ai', category_source: 'rule' },
     ]);
     expect(result.danbooruChecks).toHaveLength(2);
@@ -110,19 +145,25 @@ describe('tag annotation orchestration', () => {
 
   it('replaces an old AI Unsorted result when Danbooru confirms an artist', async () => {
     const result = await annotateTags(['yamamoto souichirou'], {
-      dictionary: dictionary([{
-        tag: 'yamamoto souichirou',
-        translation: '山本宗一郎',
-        category: 'Unsorted',
-        has_translation: 1,
-        has_classification: 1,
-        translation_source: 'ai',
-        category_source: 'ai',
-      }]),
-      danbooruCache: new Map(),
-      lookupDanbooru: async () => new Map([
-        ['yamamoto_souichirou', { canonical_tag: 'yamamoto_souichirou', category: 1, is_deprecated: false }],
+      dictionary: dictionary([
+        {
+          tag: 'yamamoto souichirou',
+          translation: '山本宗一郎',
+          category: 'Unsorted',
+          has_translation: 1,
+          has_classification: 1,
+          translation_source: 'ai',
+          category_source: 'ai',
+        },
       ]),
+      danbooruCache: new Map(),
+      lookupDanbooru: async () =>
+        new Map([
+          [
+            'yamamoto_souichirou',
+            { canonical_tag: 'yamamoto_souichirou', category: 1, is_deprecated: false },
+          ],
+        ]),
       translateMissing: vi.fn(),
       now,
     });
@@ -143,12 +184,18 @@ describe('tag annotation orchestration', () => {
     const result = await annotateTags(['bagpipe (arknights)'], {
       dictionary: new Map(),
       danbooruCache: new Map(),
-      lookupDanbooru: async () => new Map([['bagpipe_(arknights)', {
-        canonical_tag: 'bagpipe_(arknights)',
-        category: 4,
-        is_deprecated: false,
-        post_count: 1102,
-      }]]),
+      lookupDanbooru: async () =>
+        new Map([
+          [
+            'bagpipe_(arknights)',
+            {
+              canonical_tag: 'bagpipe_(arknights)',
+              category: 4,
+              is_deprecated: false,
+              post_count: 1102,
+            },
+          ],
+        ]),
       translateMissing,
       now,
     });
@@ -165,20 +212,27 @@ describe('tag annotation orchestration', () => {
   it('repairs a cached Unsorted character tag without another AI request', async () => {
     const translateMissing = vi.fn();
     const result = await annotateTags(['bagpipe (arknights)'], {
-      dictionary: dictionary([{
-        tag: 'bagpipe (arknights)',
-        translation: '风笛（明日方舟）',
-        category: 'Unsorted',
-        has_translation: 1,
-        has_classification: 1,
-        translation_source: 'ai',
-        category_source: 'ai',
-      }]),
-      danbooruCache: new Map([['bagpipe_(arknights)', {
-        category: 4,
-        is_deprecated: 0,
-        checked_at: '2026-08-12T00:00:00.000Z',
-      }]]),
+      dictionary: dictionary([
+        {
+          tag: 'bagpipe (arknights)',
+          translation: '风笛（明日方舟）',
+          category: 'Unsorted',
+          has_translation: 1,
+          has_classification: 1,
+          translation_source: 'ai',
+          category_source: 'ai',
+        },
+      ]),
+      danbooruCache: new Map([
+        [
+          'bagpipe_(arknights)',
+          {
+            category: 4,
+            is_deprecated: 0,
+            checked_at: '2026-08-12T00:00:00.000Z',
+          },
+        ],
+      ]),
       lookupDanbooru: vi.fn(),
       translateMissing,
       now,
@@ -191,19 +245,26 @@ describe('tag annotation orchestration', () => {
   it('repairs an old AI Unsorted clothing result with the deterministic rule', async () => {
     const translateMissing = vi.fn();
     const result = await annotateTags(['light gray ribbed knit sleeveless turtleneck top'], {
-      dictionary: dictionary([{
-        tag: 'light gray ribbed knit sleeveless turtleneck top',
-        translation: '浅灰色罗纹针织无袖高领上衣',
-        category: 'Unsorted',
-        has_translation: 1,
-        has_classification: 1,
-        translation_source: 'ai',
-        category_source: 'ai',
-      }]),
-      danbooruCache: new Map([['light_gray_ribbed_knit_sleeveless_turtleneck_top', {
-        category: 0,
-        checked_at: '2026-08-12T00:00:00.000Z',
-      }]]),
+      dictionary: dictionary([
+        {
+          tag: 'light gray ribbed knit sleeveless turtleneck top',
+          translation: '浅灰色罗纹针织无袖高领上衣',
+          category: 'Unsorted',
+          has_translation: 1,
+          has_classification: 1,
+          translation_source: 'ai',
+          category_source: 'ai',
+        },
+      ]),
+      danbooruCache: new Map([
+        [
+          'light_gray_ribbed_knit_sleeveless_turtleneck_top',
+          {
+            category: 0,
+            checked_at: '2026-08-12T00:00:00.000Z',
+          },
+        ],
+      ]),
       lookupDanbooru: vi.fn(),
       translateMissing,
       now,
@@ -222,21 +283,28 @@ describe('tag annotation orchestration', () => {
     const lookupDanbooru = vi.fn();
     const translateMissing = vi.fn();
     const result = await annotateTags(['yamamoto souichirou'], {
-      dictionary: dictionary([{
-        tag: 'yamamoto souichirou',
-        translation: '我常用的画师名',
-        category: 'Identity',
-        has_translation: 1,
-        has_classification: 1,
-        translation_source: 'manual',
-        category_source: 'manual',
-      }]),
-      danbooruCache: new Map([['yamamoto_souichirou', {
-        tag: 'yamamoto_souichirou',
-        category: 1,
-        is_deprecated: 0,
-        checked_at: '2026-08-12T00:00:00.000Z',
-      }]]),
+      dictionary: dictionary([
+        {
+          tag: 'yamamoto souichirou',
+          translation: '我常用的画师名',
+          category: 'Identity',
+          has_translation: 1,
+          has_classification: 1,
+          translation_source: 'manual',
+          category_source: 'manual',
+        },
+      ]),
+      danbooruCache: new Map([
+        [
+          'yamamoto_souichirou',
+          {
+            tag: 'yamamoto_souichirou',
+            category: 1,
+            is_deprecated: 0,
+            checked_at: '2026-08-12T00:00:00.000Z',
+          },
+        ],
+      ]),
       lookupDanbooru,
       translateMissing,
       now,
@@ -256,8 +324,12 @@ describe('tag annotation orchestration', () => {
     const result = await annotateTags(['unknown name'], {
       dictionary: new Map(),
       danbooruCache: new Map(),
-      lookupDanbooru: async () => { throw new Error('offline'); },
-      translateMissing: async () => ({ items: [{ translation: '未知名称', category: 'Unsorted' }] }),
+      lookupDanbooru: async () => {
+        throw new Error('offline');
+      },
+      translateMissing: async () => ({
+        items: [{ translation: '未知名称', category: 'Unsorted' }],
+      }),
       now,
     });
 

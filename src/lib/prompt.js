@@ -1,4 +1,15 @@
-export const CATEGORY_OPTIONS = ['ArtistEra', 'Subject', 'Identity', 'Body', 'Clothing', 'Action', 'Environment', 'Composition', 'StyleQuality', 'Unsorted'];
+export const CATEGORY_OPTIONS = [
+  'ArtistEra',
+  'Subject',
+  'Identity',
+  'Body',
+  'Clothing',
+  'Action',
+  'Environment',
+  'Composition',
+  'StyleQuality',
+  'Unsorted',
+];
 export const CATEGORY_LABELS = {
   ArtistEra: '画师年代',
   Subject: '角色组成',
@@ -13,15 +24,42 @@ export const CATEGORY_LABELS = {
 };
 
 const categoryRules = [
-  ['ArtistEra', /(?:^|[\s{[(,:])(?:artist\s*[:_]|by\s+artist\b|artist\b)|\byear\s*\d{4}\b|\b(?:19|20)\d0s\s*\(style\)/i],
-  ['Subject', /\b(?:\d+girls?|\d+boys?|\d+others?|girl|boy|woman|man|male|female|other|solo|multiple girls|multiple boys)\b/i],
-  ['Identity', /\b(?:elf|demon|angel|human|android|robot|catgirl|doggirl|kemonomimi|witch|magical girl|maid|nurse|knight|warrior|student|original character)\b/i],
-  ['Clothing', /\b(?:clothing|clothes|outfit|attire|dress(?:es)?|shirts?|blouses?|tops?(?!(?:\s+|-)(?:view|down|angle)\b)|tank tops?|crop tops?|tube tops?|halter tops?|sweaters?|turtlenecks?|hoodies?|jackets?|coats?|cardigans?|vests?|waistcoats?|uniforms?|robes?|kimonos?|yukatas?|cheongsams?|qipaos?|bodysuits?|leotards?|swimsuits?|bikinis?|lingerie|underwear|bras?|pant(?:ie)?s|skirts?|trousers?|shorts?|leggings?|stockings?|socks?|tights?|shoes?|boots?|sandals?|heels?|hats?|caps?|headwear|gloves?|scarves?|ties?|bowties?|belts?|bags?|purses?|backpacks?|armor|necklaces?|earrings?|bracelets?|wristbands?|chokers?|collars?|sleeveless|short sleeves?|long sleeves?|off shoulder|ribbed knit)\b/i],
-  ['Action', /\b(?:smile|frown|crying|laughing|blush|expression|pose|looking|standing|sitting|lying|kneeling|walking|running|jumping|dancing|holding|pointing|hugging|kissing|hand up|arms crossed|open mouth|closed mouth)\b/i],
-  ['Environment', /\b(?:city|street|room|forest|beach|sky|background|location|indoors|outdoors|weather|rain|snow|night|day|sunset|ocean|sea|mountain|building|furniture|vehicle|weapon|tree|flower|water|wave)\b/i],
-  ['Composition', /\b(?:lighting|camera|lens|angle|perspective|pov|view|from above|from below|from behind|from side|close-up|portrait|landscape|full body|upper body|cowboy shot|depth of field|bokeh|focus|backlighting|rim light|light rays?|foreshortening|dutch angle|fisheye)\b/i],
-  ['Body', /\b(?:hair|eyes?|face|skin|body|hands?|fingers?|arms?|legs?|feet|breasts?|hips?|waist|navel|anatomy|proportions?|muscles?|fangs?|horns?|wings?|tail|detailed face|detailed hands?)\b/i],
-  ['StyleQuality', /\b(?:chibi|lineart|line art|style|illustration|anime|cinematic|rendering|medium|watercolor|oil painting|graphite|3d|2d|flat color|masterpiece|quality|aesthetic|highres|absurdres|lowres|artifact|error|blurry|detailed)\b/i],
+  [
+    'ArtistEra',
+    /(?:^|[\s{[(,:])(?:artist\s*[:_]|by\s+artist\b|artist\b)|\byear\s*\d{4}\b|\b(?:19|20)\d0s\s*\(style\)/i,
+  ],
+  [
+    'Subject',
+    /\b(?:\d+girls?|\d+boys?|\d+others?|girl|boy|woman|man|male|female|other|solo|multiple girls|multiple boys)\b/i,
+  ],
+  [
+    'Identity',
+    /\b(?:elf|demon|angel|human|android|robot|catgirl|doggirl|kemonomimi|witch|magical girl|maid|nurse|knight|warrior|student|original character)\b/i,
+  ],
+  [
+    'Clothing',
+    /\b(?:clothing|clothes|outfit|attire|dress(?:es)?|shirts?|blouses?|tops?(?!(?:\s+|-)(?:view|down|angle)\b)|tank tops?|crop tops?|tube tops?|halter tops?|sweaters?|turtlenecks?|hoodies?|jackets?|coats?|cardigans?|vests?|waistcoats?|uniforms?|robes?|kimonos?|yukatas?|cheongsams?|qipaos?|bodysuits?|leotards?|swimsuits?|bikinis?|lingerie|underwear|bras?|pant(?:ie)?s|skirts?|trousers?|shorts?|leggings?|stockings?|socks?|tights?|shoes?|boots?|sandals?|heels?|hats?|caps?|headwear|gloves?|scarves?|ties?|bowties?|belts?|bags?|purses?|backpacks?|armor|necklaces?|earrings?|bracelets?|wristbands?|chokers?|collars?|sleeveless|short sleeves?|long sleeves?|off shoulder|ribbed knit)\b/i,
+  ],
+  [
+    'Action',
+    /\b(?:smile|frown|crying|laughing|blush|expression|pose|looking|standing|sitting|lying|kneeling|walking|running|jumping|dancing|holding|pointing|hugging|kissing|hand up|arms crossed|open mouth|closed mouth)\b/i,
+  ],
+  [
+    'Environment',
+    /\b(?:city|street|room|forest|beach|sky|background|location|indoors|outdoors|weather|rain|snow|night|day|sunset|ocean|sea|mountain|building|furniture|vehicle|weapon|tree|flower|water|wave)\b/i,
+  ],
+  [
+    'Composition',
+    /\b(?:lighting|camera|lens|angle|perspective|pov|view|from above|from below|from behind|from side|close-up|portrait|landscape|full body|upper body|cowboy shot|depth of field|bokeh|focus|backlighting|rim light|light rays?|foreshortening|dutch angle|fisheye)\b/i,
+  ],
+  [
+    'Body',
+    /\b(?:hair|eyes?|face|skin|body|hands?|fingers?|arms?|legs?|feet|breasts?|hips?|waist|navel|anatomy|proportions?|muscles?|fangs?|horns?|wings?|tail|detailed face|detailed hands?)\b/i,
+  ],
+  [
+    'StyleQuality',
+    /\b(?:chibi|lineart|line art|style|illustration|anime|cinematic|rendering|medium|watercolor|oil painting|graphite|3d|2d|flat color|masterpiece|quality|aesthetic|highres|absurdres|lowres|artifact|error|blurry|detailed)\b/i,
+  ],
 ];
 
 const legacyCategoryMap = {
@@ -42,8 +80,8 @@ const dictionary = {
   'futuristic city': '未来城市',
   'cinematic lighting': '电影感光照',
   'ribbed knit sweater': '罗纹针织毛衣',
-  'solo': '单人',
-  'chibi': 'Q版',
+  solo: '单人',
+  chibi: 'Q版',
   'chibi only': '仅Q版',
   'thick lineart': '粗线稿',
   'simple background': '简单背景',
@@ -174,8 +212,9 @@ function scanPromptSegments(source, state) {
       const contentEnd = source.indexOf('::', contentStart);
       if (contentEnd !== -1) {
         const weight = Number(weighted[1]);
-        scanPromptSegments(source.slice(contentStart, contentEnd), state)
-          .forEach((segment) => segments.push({ ...segment, weight }));
+        scanPromptSegments(source.slice(contentStart, contentEnd), state).forEach((segment) =>
+          segments.push({ ...segment, weight }),
+        );
         cursor = contentEnd + 2;
         continue;
       }
@@ -185,12 +224,14 @@ function scanPromptSegments(source, state) {
     if (braceGroup) {
       const group = `brace-${state.nextGroup++}`;
       const trailingComma = /,\s*$/.test(braceGroup.content);
-      scanPromptSegments(braceGroup.content, state).forEach((segment) => segments.push({
-        ...segment,
-        brace_depth: braceGroup.depth + Number(segment.brace_depth || 0),
-        brace_group: group,
-        brace_trailing_comma: trailingComma,
-      }));
+      scanPromptSegments(braceGroup.content, state).forEach((segment) =>
+        segments.push({
+          ...segment,
+          brace_depth: braceGroup.depth + Number(segment.brace_depth || 0),
+          brace_group: group,
+          brace_trailing_comma: trailingComma,
+        }),
+      );
       cursor = braceGroup.end;
       continue;
     }
@@ -198,7 +239,13 @@ function scanPromptSegments(source, state) {
     const textStart = textBlockStart(source, cursor);
     if (textStart === cursor) {
       const rawSegment = source.slice(cursor).trim();
-      if (rawSegment) segments.push({ tag: rawSegment, weight: 1, raw_segment: rawSegment, segment_type: 'text_block' });
+      if (rawSegment)
+        segments.push({
+          tag: rawSegment,
+          weight: 1,
+          raw_segment: rawSegment,
+          segment_type: 'text_block',
+        });
       break;
     }
 
@@ -207,7 +254,12 @@ function scanPromptSegments(source, state) {
     const rawSegment = source.slice(cursor, end).trim();
     if (rawSegment) {
       if (rawSegment === '::') {
-        segments.push({ tag: '::', weight: 1, raw_segment: rawSegment, syntax_issue: 'control_only' });
+        segments.push({
+          tag: '::',
+          weight: 1,
+          raw_segment: rawSegment,
+          syntax_issue: 'control_only',
+        });
       } else {
         const leadingCloser = rawSegment.startsWith('::');
         const trailingCloser = rawSegment.endsWith('::');
@@ -215,11 +267,14 @@ function scanPromptSegments(source, state) {
           .replace(/^::\s*/, '')
           .replace(/\s*::$/, '')
           .trim();
-        if (tag) segments.push({
-          tag,
-          weight: 1,
-          ...(leadingCloser || trailingCloser ? { raw_segment: rawSegment, syntax_issue: 'emphasis_closer' } : {}),
-        });
+        if (tag)
+          segments.push({
+            tag,
+            weight: 1,
+            ...(leadingCloser || trailingCloser
+              ? { raw_segment: rawSegment, syntax_issue: 'emphasis_closer' }
+              : {}),
+          });
       }
     }
     cursor = end === textStart ? end : end + 1;
@@ -228,7 +283,9 @@ function scanPromptSegments(source, state) {
 }
 
 function promptSegments(prompt) {
-  const source = String(prompt || '').replace(/\r\n?/g, '\n').replace(/，/g, ',');
+  const source = String(prompt || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/，/g, ',');
   return scanPromptSegments(source, { nextGroup: 0 });
 }
 
@@ -241,8 +298,20 @@ function hasBraceGroups(value) {
 }
 
 export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
-  return promptSegments(prompt)
-    .map(({ tag, weight, raw_segment = '', syntax_issue = '', segment_type = 'tag', brace_depth = 0, brace_group = '', brace_trailing_comma = false }, position) => {
+  return promptSegments(prompt).map(
+    (
+      {
+        tag,
+        weight,
+        raw_segment = '',
+        syntax_issue = '',
+        segment_type = 'tag',
+        brace_depth = 0,
+        brace_group = '',
+        brace_trailing_comma = false,
+      },
+      position,
+    ) => {
       return {
         id: createId(),
         tag,
@@ -260,13 +329,20 @@ export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
         position,
         note: '',
       };
-    });
+    },
+  );
 }
 
-export function parsePromptPreservingEdits(prompt = '', existingTags = [], createId = () => crypto.randomUUID()) {
+export function parsePromptPreservingEdits(
+  prompt = '',
+  existingTags = [],
+  createId = () => crypto.randomUUID(),
+) {
   const existingByTag = new Map();
   for (const existing of existingTags) {
-    const key = String(existing.tag || '').trim().toLocaleLowerCase('en-US');
+    const key = String(existing.tag || '')
+      .trim()
+      .toLocaleLowerCase('en-US');
     if (!key) continue;
     if (!existingByTag.has(key)) existingByTag.set(key, []);
     existingByTag.get(key).push(existing);
@@ -279,35 +355,59 @@ export function parsePromptPreservingEdits(prompt = '', existingTags = [], creat
     return {
       ...parsed,
       id: existing.id || parsed.id,
-      translation: Object.hasOwn(existing, 'translation') ? existing.translation : parsed.translation,
-      translation_source: Object.hasOwn(existing, 'translation_source') ? existing.translation_source : parsed.translation_source,
+      translation: Object.hasOwn(existing, 'translation')
+        ? existing.translation
+        : parsed.translation,
+      translation_source: Object.hasOwn(existing, 'translation_source')
+        ? existing.translation_source
+        : parsed.translation_source,
       category: normalizeCategory(existing.category, parsed.tag) || parsed.category,
-      category_source: Object.hasOwn(existing, 'category_source') ? existing.category_source : parsed.category_source,
+      category_source: Object.hasOwn(existing, 'category_source')
+        ? existing.category_source
+        : parsed.category_source,
       note: Object.hasOwn(existing, 'note') ? existing.note : parsed.note,
     };
   });
 }
 
-export function repairLegacyPromptTags(tags = [], prompt = '', createId = () => crypto.randomUUID()) {
-  const hasLegacyFragments = tags.some((item) => /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)::/.test(item.tag) || /::$/.test(item.tag) || /[{}]/.test(item.tag))
-    || (hasBraceGroups(prompt) && !tags.some((item) => Number(item.brace_depth) > 0));
+export function repairLegacyPromptTags(
+  tags = [],
+  prompt = '',
+  createId = () => crypto.randomUUID(),
+) {
+  const hasLegacyFragments =
+    tags.some(
+      (item) =>
+        /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)::/.test(item.tag) ||
+        /::$/.test(item.tag) ||
+        /[{}]/.test(item.tag),
+    ) ||
+    (hasBraceGroups(prompt) && !tags.some((item) => Number(item.brace_depth) > 0));
   if (!hasLegacyFragments || !prompt.trim()) return tags;
 
   const existingByTag = new Map();
   for (const item of tags) {
-    const key = item.tag.trim().replace(/^\{+\s*/, '').replace(/\s*\}+$/, '').toLowerCase();
+    const key = item.tag
+      .trim()
+      .replace(/^\{+\s*/, '')
+      .replace(/\s*\}+$/, '')
+      .toLowerCase();
     if (!existingByTag.has(key)) existingByTag.set(key, []);
     existingByTag.get(key).push(item);
   }
   return parsePrompt(prompt, createId).map((parsed) => {
-    const existing = existingByTag.get(String(parsed.raw_segment || parsed.tag).toLowerCase())?.shift()
-      || existingByTag.get(parsed.tag.toLowerCase())?.shift();
+    const existing =
+      existingByTag.get(String(parsed.raw_segment || parsed.tag).toLowerCase())?.shift() ||
+      existingByTag.get(parsed.tag.toLowerCase())?.shift();
     if (!existing) return parsed;
     return {
       ...parsed,
       id: existing.id,
       translation: existing.translation || parsed.translation,
-      category: existing.category && existing.category !== 'Unsorted' ? normalizeCategory(existing.category, parsed.tag) : parsed.category,
+      category:
+        existing.category && existing.category !== 'Unsorted'
+          ? normalizeCategory(existing.category, parsed.tag)
+          : parsed.category,
       note: existing.note || '',
     };
   });
@@ -317,8 +417,15 @@ function formatTagContent(tag) {
   const parsedWeight = Number(tag.weight);
   const value = Number.isFinite(parsedWeight) ? parsedWeight : 1;
   const hasNumericWeight = Math.abs(value - 1) >= 0.001;
-  if (tag.syntax_issue && tag.raw_segment && !(tag.syntax_issue === 'emphasis_closer' && hasNumericWeight)) return tag.raw_segment.trim();
-  return Math.abs(value - 1) < 0.001 ? tag.tag.trim() : `${Number(value.toFixed(2))}::${tag.tag.trim()} ::`;
+  if (
+    tag.syntax_issue &&
+    tag.raw_segment &&
+    !(tag.syntax_issue === 'emphasis_closer' && hasNumericWeight)
+  )
+    return tag.raw_segment.trim();
+  return Math.abs(value - 1) < 0.001
+    ? tag.tag.trim()
+    : `${Number(value.toFixed(2))}::${tag.tag.trim()} ::`;
 }
 
 export function formatTagLabel(tag, value = tag.tag) {
@@ -332,12 +439,27 @@ export function formatTag(tag) {
 }
 
 export function formatPrompt(tags = []) {
-  return tags.filter((tag) => tag.tag.trim()).map(formatTag).join(',\n');
+  return tags
+    .filter((tag) => tag.tag.trim())
+    .map(formatTag)
+    .join(',\n');
 }
 
-export function analyzePromptBatch(prompt = '', existingTags = [], createId = () => crypto.randomUUID()) {
+export function analyzePromptBatch(
+  prompt = '',
+  existingTags = [],
+  createId = () => crypto.randomUUID(),
+) {
   const tags = parsePrompt(prompt, createId);
-  const seen = new Set(existingTags.map((item) => String(item?.tag ?? item).trim().toLocaleLowerCase('en-US')).filter(Boolean));
+  const seen = new Set(
+    existingTags
+      .map((item) =>
+        String(item?.tag ?? item)
+          .trim()
+          .toLocaleLowerCase('en-US'),
+      )
+      .filter(Boolean),
+  );
   let duplicateCount = 0;
   for (const tag of tags) {
     const key = tag.tag.trim().toLocaleLowerCase('en-US');
@@ -352,12 +474,15 @@ export function analyzePromptBatch(prompt = '', existingTags = [], createId = ()
 }
 
 export function formatPromptInline(tags = []) {
-  return tags.filter((tag) => tag.tag.trim()).map(formatTag).join(', ');
+  return tags
+    .filter((tag) => tag.tag.trim())
+    .map(formatTag)
+    .join(', ');
 }
 
 export function formatPromptGroupedInline(tags = []) {
   const values = [];
-  for (let index = 0; index < tags.length;) {
+  for (let index = 0; index < tags.length; ) {
     const tag = tags[index];
     if (!tag.tag.trim()) {
       index += 1;
@@ -371,7 +496,11 @@ export function formatPromptGroupedInline(tags = []) {
     }
     const members = [];
     let cursor = index;
-    while (cursor < tags.length && tags[cursor].brace_group === tag.brace_group && Number(tags[cursor].brace_depth) === depth) {
+    while (
+      cursor < tags.length &&
+      tags[cursor].brace_group === tag.brace_group &&
+      Number(tags[cursor].brace_depth) === depth
+    ) {
       if (tags[cursor].tag.trim()) members.push(formatTagContent(tags[cursor]));
       cursor += 1;
     }
@@ -387,10 +516,10 @@ export function normalizeSearch(value = '') {
 }
 
 const searchAliases = {
-  '银发': ['银色头发', '白色头发', 'silver hair', 'white hair'],
-  '白发': ['银色头发', '白色头发', 'silver hair', 'white hair'],
-  '军装': ['military uniform', '军服', '制服'],
-  '夜景': ['night', 'nighttime', '夜晚', '夜间'],
+  银发: ['银色头发', '白色头发', 'silver hair', 'white hair'],
+  白发: ['银色头发', '白色头发', 'silver hair', 'white hair'],
+  军装: ['military uniform', '军服', '制服'],
+  夜景: ['night', 'nighttime', '夜晚', '夜间'],
 };
 
 export function expandSearch(value = '') {

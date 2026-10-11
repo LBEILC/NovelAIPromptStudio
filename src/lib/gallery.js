@@ -13,10 +13,11 @@ function galleryProjectDate(project) {
 }
 
 function completeLinkSimilarityClusters(projects, threshold) {
-  const ordered = [...projects].sort((left, right) => (
-    galleryProjectDate(left) - galleryProjectDate(right)
-    || String(left.id).localeCompare(String(right.id))
-  ));
+  const ordered = [...projects].sort(
+    (left, right) =>
+      galleryProjectDate(left) - galleryProjectDate(right) ||
+      String(left.id).localeCompare(String(right.id)),
+  );
   const payloads = ordered.map(galleryBasePromptSimilarityPayload);
   const similarities = Array.from({ length: ordered.length }, () => Array(ordered.length).fill(0));
   const edges = [];
@@ -50,13 +51,17 @@ function completeLinkSimilarityClusters(projects, threshold) {
     if (leftRoot === rightRoot) continue;
     const leftMembers = clusterMembers.get(leftRoot);
     const rightMembers = clusterMembers.get(rightRoot);
-    const compatible = [...leftMembers].every((left) => (
-      [...rightMembers].every((right) => similarities[left][right] >= threshold)
-    ));
+    const compatible = [...leftMembers].every((left) =>
+      [...rightMembers].every((right) => similarities[left][right] >= threshold),
+    );
     if (!compatible) continue;
-    const [nextRoot, mergedRoot] = leftRoot < rightRoot ? [leftRoot, rightRoot] : [rightRoot, leftRoot];
+    const [nextRoot, mergedRoot] =
+      leftRoot < rightRoot ? [leftRoot, rightRoot] : [rightRoot, leftRoot];
     parents[mergedRoot] = nextRoot;
-    clusterMembers.set(nextRoot, new Set([...clusterMembers.get(nextRoot), ...clusterMembers.get(mergedRoot)]));
+    clusterMembers.set(
+      nextRoot,
+      new Set([...clusterMembers.get(nextRoot), ...clusterMembers.get(mergedRoot)]),
+    );
     clusterMembers.delete(mergedRoot);
   }
 
@@ -64,7 +69,9 @@ function completeLinkSimilarityClusters(projects, threshold) {
 }
 
 function finalizeGalleryGroup(group, grouping, exact = false) {
-  const members = [...group.members].sort((left, right) => galleryProjectDate(right) - galleryProjectDate(left));
+  const members = [...group.members].sort(
+    (left, right) => galleryProjectDate(right) - galleryProjectDate(left),
+  );
   const requestedCover = exact
     ? members.find((project) => members.some((member) => member.group_cover_id === project.id))
     : null;
@@ -89,13 +96,22 @@ function groupSimilarGalleryProjects(projects, grouping) {
     buckets.get(boundary).push(project);
   }
   const threshold = grouping.similarityThreshold / 100;
-  return [...buckets.entries()].flatMap(([boundary, members]) => (
-    completeLinkSimilarityClusters(members, threshold).map((cluster) => finalizeGalleryGroup({
-      key: `similar:${grouping.similarityThreshold}:${boundary}:${cluster.map((project) => project.id).sort().join('|')}`,
-      fingerprint: '',
-      members: cluster,
-    }, grouping, false))
-  ));
+  return [...buckets.entries()].flatMap(([boundary, members]) =>
+    completeLinkSimilarityClusters(members, threshold).map((cluster) =>
+      finalizeGalleryGroup(
+        {
+          key: `similar:${grouping.similarityThreshold}:${boundary}:${cluster
+            .map((project) => project.id)
+            .sort()
+            .join('|')}`,
+          fingerprint: '',
+          members: cluster,
+        },
+        grouping,
+        false,
+      ),
+    ),
+  );
 }
 
 export function groupGalleryProjects(projects = [], groupingValue) {
@@ -115,19 +131,32 @@ export function groupGalleryProjects(projects = [], groupingValue) {
 export function sortGalleryGroups(groups = [], sort = 'recent') {
   return [...groups].sort((left, right) => {
     if (sort === 'oldest') return new Date(left.latestAt || 0) - new Date(right.latestAt || 0);
-    if (sort === 'name') return String(left.cover?.name || '').localeCompare(String(right.cover?.name || ''), 'zh-CN', { numeric: true });
+    if (sort === 'name')
+      return String(left.cover?.name || '').localeCompare(
+        String(right.cover?.name || ''),
+        'zh-CN',
+        { numeric: true },
+      );
     return new Date(right.latestAt || 0) - new Date(left.latestAt || 0);
   });
 }
 
-export function galleryViewGroups(projects = [], filters, grouping, sort = 'recent', nowValue = new Date()) {
+export function galleryViewGroups(
+  projects = [],
+  filters,
+  grouping,
+  sort = 'recent',
+  nowValue = new Date(),
+) {
   const filteredProjects = filterGalleryProjects(projects, filters, nowValue);
   return sortGalleryGroups(groupGalleryProjects(filteredProjects, grouping), sort);
 }
 
 export function gallerySelectionProjectIds(groups = [], selectedGroupIds = []) {
   const selected = new Set(selectedGroupIds);
-  return groups.filter((group) => selected.has(group.id)).flatMap((group) => group.members.map((project) => project.id));
+  return groups
+    .filter((group) => selected.has(group.id))
+    .flatMap((group) => group.members.map((project) => project.id));
 }
 
 export function galleryScrubMemberIndex(pointerX, boundsLeft, boundsWidth, memberCount) {
@@ -176,29 +205,50 @@ export function gallerySelectionMenuItems({
   view = 'all',
 }) {
   const scopeLabel = `${groupCount} 组 · ${imageCount} 张图片`;
-  if (view === 'trash') return [
-    { key: 'restore-selection', label: `恢复已选 ${scopeLabel}`, onClick: () => onRestore?.() },
-    { key: 'permanent-selection', label: `永久删除已选 ${scopeLabel}`, danger: true, onClick: () => onPermanentDelete?.() },
-  ];
+  if (view === 'trash')
+    return [
+      { key: 'restore-selection', label: `恢复已选 ${scopeLabel}`, onClick: () => onRestore?.() },
+      {
+        key: 'permanent-selection',
+        label: `永久删除已选 ${scopeLabel}`,
+        danger: true,
+        onClick: () => onPermanentDelete?.(),
+      },
+    ];
   const manualCollections = collections.filter((collection) => collection.kind === 'manual');
   return [
-    ...(manualCollections.length ? [{
-      children: manualCollections.map((collection) => ({
-        key: `add-selection-to-${collection.id}`,
-        label: collection.name,
-        onClick: () => onCollectionProjectsChange?.(collection.id, projectIds, 'add'),
-      })),
-      key: 'add-selection-to-collection',
-      label: `将已选 ${groupCount} 组加入收藏集`,
-      type: 'submenu',
-    }] : []),
-    ...(activeCollection?.kind === 'manual' ? [{
-      key: 'remove-selection-from-collection',
-      label: `将已选 ${groupCount} 组移出“${activeCollection.name}”`,
-      onClick: () => onCollectionProjectsChange?.(activeCollection.id, projectIds, 'remove'),
-    }] : []),
-    ...((manualCollections.length || activeCollection?.kind === 'manual') ? [{ key: 'selection-divider', type: 'divider' }] : []),
-    { key: 'trash-selection', label: `将已选 ${scopeLabel} 移入回收站`, danger: true, onClick: () => onTrash?.() },
+    ...(manualCollections.length
+      ? [
+          {
+            children: manualCollections.map((collection) => ({
+              key: `add-selection-to-${collection.id}`,
+              label: collection.name,
+              onClick: () => onCollectionProjectsChange?.(collection.id, projectIds, 'add'),
+            })),
+            key: 'add-selection-to-collection',
+            label: `将已选 ${groupCount} 组加入收藏集`,
+            type: 'submenu',
+          },
+        ]
+      : []),
+    ...(activeCollection?.kind === 'manual'
+      ? [
+          {
+            key: 'remove-selection-from-collection',
+            label: `将已选 ${groupCount} 组移出“${activeCollection.name}”`,
+            onClick: () => onCollectionProjectsChange?.(activeCollection.id, projectIds, 'remove'),
+          },
+        ]
+      : []),
+    ...(manualCollections.length || activeCollection?.kind === 'manual'
+      ? [{ key: 'selection-divider', type: 'divider' }]
+      : []),
+    {
+      key: 'trash-selection',
+      label: `将已选 ${scopeLabel} 移入回收站`,
+      danger: true,
+      onClick: () => onTrash?.(),
+    },
   ];
 }
 

@@ -22,7 +22,9 @@ function createTransitionDocument({ themeMode = 'dark', visible = true } = {}) {
     startViewTransition: vi.fn((update) => {
       let finish;
       const transition = {
-        finished: new Promise((resolve) => { finish = resolve; }),
+        finished: new Promise((resolve) => {
+          finish = resolve;
+        }),
         finish,
         skipTransition: vi.fn(),
       };
@@ -57,7 +59,9 @@ describe('theme transition', () => {
     expect(shouldAnimateThemeTransition(base)).toBe(true);
     expect(shouldAnimateThemeTransition({ ...base, nextTheme: 'dark' })).toBe(false);
     expect(shouldAnimateThemeTransition({ ...base, motionMode: 'off' })).toBe(false);
-    expect(shouldAnimateThemeTransition({ ...base, motionMode: 'reduced', systemReducedMotion: true })).toBe(false);
+    expect(
+      shouldAnimateThemeTransition({ ...base, motionMode: 'reduced', systemReducedMotion: true }),
+    ).toBe(false);
     expect(shouldAnimateThemeTransition({ ...base, supported: false })).toBe(false);
     expect(shouldAnimateThemeTransition({ ...base, visible: false })).toBe(false);
   });
@@ -108,14 +112,18 @@ describe('theme transition', () => {
     const first = commitThemeAppearance({
       currentAppearance: { themeMode: 'dark', motion: 'full' },
       nextAppearance: { themeMode: 'light', motion: 'full' },
-      update: () => { documentRef.documentElement.dataset.themeMode = 'light'; },
+      update: () => {
+        documentRef.documentElement.dataset.themeMode = 'light';
+      },
       documentRef,
       windowRef,
     });
     const second = commitThemeAppearance({
       currentAppearance: { themeMode: 'light', motion: 'full' },
       nextAppearance: { themeMode: 'dark', motion: 'full' },
-      update: () => { documentRef.documentElement.dataset.themeMode = 'dark'; },
+      update: () => {
+        documentRef.documentElement.dataset.themeMode = 'dark';
+      },
       documentRef,
       windowRef,
     });

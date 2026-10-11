@@ -60,7 +60,11 @@ describe('DSO dictionary build', () => {
       'same_tag,首选,说明,20,0,0',
       'same_tag,重复,说明,20,0,0',
     ].join('\n');
-    const dictionary = buildDsoDictionary(csv, { tag_to_groups: {}, group_to_tags: {}, group_cn_names: {} }, {});
+    const dictionary = buildDsoDictionary(
+      csv,
+      { tag_to_groups: {}, group_to_tags: {}, group_cn_names: {} },
+      {},
+    );
     expect(dictionary.entries.same_tag).toEqual(['首选', 0]);
     expect(dictionary.stats).toMatchObject({ entries: 1, source_rows: 2, duplicate_rows: 1 });
   });

@@ -134,14 +134,23 @@ export function parseCsv(source) {
 }
 
 function primaryTranslation(value) {
-  return String(value || '').split(',').map((item) => item.trim()).find(Boolean) || '';
+  return (
+    String(value || '')
+      .split(',')
+      .map((item) => item.trim())
+      .find(Boolean) || ''
+  );
 }
 
 function groupCategory(groups = []) {
-  return groups
-    .map((group) => ({ group, rule: GROUP_RULES[group] }))
-    .filter((entry) => entry.rule)
-    .sort((left, right) => right.rule[1] - left.rule[1] || left.group.localeCompare(right.group))[0]?.rule[0] || 'Unsorted';
+  return (
+    groups
+      .map((group) => ({ group, rule: GROUP_RULES[group] }))
+      .filter((entry) => entry.rule)
+      .sort(
+        (left, right) => right.rule[1] - left.rule[1] || left.group.localeCompare(right.group),
+      )[0]?.rule[0] || 'Unsorted'
+  );
 }
 
 function studioCategory(danbooruCategory, groups) {
@@ -153,18 +162,25 @@ export function buildDsoDictionary(csvSource, groupsSource, sourceMetadata) {
   const rows = parseCsv(csvSource);
   const header = rows.shift();
   const expectedHeader = ['name', 'cn_name', 'wiki', 'post_count', 'category', 'nsfw'];
-  if (JSON.stringify(header) !== JSON.stringify(expectedHeader)) throw new Error(`无法识别 DSO CSV 字段：${header?.join(',') || '空文件'}`);
+  if (JSON.stringify(header) !== JSON.stringify(expectedHeader))
+    throw new Error(`无法识别 DSO CSV 字段：${header?.join(',') || '空文件'}`);
   const groups = typeof groupsSource === 'string' ? JSON.parse(groupsSource) : groupsSource;
-  if (!groups?.tag_to_groups || !groups?.group_to_tags || !groups?.group_cn_names) throw new Error('DSO Tag Group 数据结构无效');
+  if (!groups?.tag_to_groups || !groups?.group_to_tags || !groups?.group_cn_names)
+    throw new Error('DSO Tag Group 数据结构无效');
 
   const entries = {};
-  const categoryCounts = Object.fromEntries(Object.keys(CATEGORY_CODES).map((category) => [category, 0]));
+  const categoryCounts = Object.fromEntries(
+    Object.keys(CATEGORY_CODES).map((category) => [category, 0]),
+  );
   let translated = 0;
   let duplicateRows = 0;
   for (const row of rows) {
-    if (row.length !== expectedHeader.length) throw new Error(`DSO CSV 行字段数量无效：${row[0] || '未知 Tag'}`);
+    if (row.length !== expectedHeader.length)
+      throw new Error(`DSO CSV 行字段数量无效：${row[0] || '未知 Tag'}`);
     const [name, cnName, , , rawCategory] = row;
-    const tag = String(name || '').trim().toLocaleLowerCase('en-US');
+    const tag = String(name || '')
+      .trim()
+      .toLocaleLowerCase('en-US');
     if (!tag) throw new Error('DSO Tag 不能为空');
     if (Object.hasOwn(entries, tag)) {
       duplicateRows += 1;

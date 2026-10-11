@@ -1,4 +1,9 @@
-import { isPromptAnnotationField, promptSnapshot, restorePromptSnapshot, syncProjectPromptMetadata } from './promptStructure.js';
+import {
+  isPromptAnnotationField,
+  promptSnapshot,
+  restorePromptSnapshot,
+  syncProjectPromptMetadata,
+} from './promptStructure.js';
 import { CATEGORY_OPTIONS } from './prompt.js';
 
 export const WORKBENCH_SESSION_KEY = 'novelai-prompt-studio.workbench-session.v2';
@@ -25,13 +30,26 @@ export function normalizeWorkbenchViewState(value = {}) {
   const filters = value?.filters || {};
   return {
     filters: {
-      category: OVERVIEW_CATEGORIES.has(filters.category) ? filters.category : DEFAULT_WORKBENCH_VIEW_STATE.filters.category,
-      polarity: OVERVIEW_POLARITIES.has(filters.polarity) ? filters.polarity : DEFAULT_WORKBENCH_VIEW_STATE.filters.polarity,
-      domain: OVERVIEW_DOMAINS.has(filters.domain) ? filters.domain : DEFAULT_WORKBENCH_VIEW_STATE.filters.domain,
-      query: typeof filters.query === 'string' ? filters.query : DEFAULT_WORKBENCH_VIEW_STATE.filters.query,
+      category: OVERVIEW_CATEGORIES.has(filters.category)
+        ? filters.category
+        : DEFAULT_WORKBENCH_VIEW_STATE.filters.category,
+      polarity: OVERVIEW_POLARITIES.has(filters.polarity)
+        ? filters.polarity
+        : DEFAULT_WORKBENCH_VIEW_STATE.filters.polarity,
+      domain: OVERVIEW_DOMAINS.has(filters.domain)
+        ? filters.domain
+        : DEFAULT_WORKBENCH_VIEW_STATE.filters.domain,
+      query:
+        typeof filters.query === 'string'
+          ? filters.query
+          : DEFAULT_WORKBENCH_VIEW_STATE.filters.query,
     },
-    language: OVERVIEW_LANGUAGES.has(value?.language) ? value.language : DEFAULT_WORKBENCH_VIEW_STATE.language,
-    viewMode: OVERVIEW_VIEW_MODES.has(value?.viewMode) ? value.viewMode : DEFAULT_WORKBENCH_VIEW_STATE.viewMode,
+    language: OVERVIEW_LANGUAGES.has(value?.language)
+      ? value.language
+      : DEFAULT_WORKBENCH_VIEW_STATE.language,
+    viewMode: OVERVIEW_VIEW_MODES.has(value?.viewMode)
+      ? value.viewMode
+      : DEFAULT_WORKBENCH_VIEW_STATE.viewMode,
   };
 }
 
@@ -41,14 +59,21 @@ export function workbenchSourceIdentity(source = {}, project = {}) {
   if (source.type === 'library' && source.projectId) return `library:${source.projectId}`;
   if (source.type === 'clipboard' && source.fingerprint) return `clipboard:${source.fingerprint}`;
   const sourcePath = String(source.path || project.image_path || '').replaceAll('\\', '/');
-  const isWindows = typeof navigator === 'undefined' ? /^[A-Za-z]:\//.test(sourcePath) : navigator.platform.startsWith('Win');
-  return sourcePath ? `file:${isWindows ? sourcePath.toLocaleLowerCase('en-US') : sourcePath}` : `session:${source.id || project.id || ''}`;
+  const isWindows =
+    typeof navigator === 'undefined'
+      ? /^[A-Za-z]:\//.test(sourcePath)
+      : navigator.platform.startsWith('Win');
+  return sourcePath
+    ? `file:${isWindows ? sourcePath.toLocaleLowerCase('en-US') : sourcePath}`
+    : `session:${source.id || project.id || ''}`;
 }
 
 export function createWorkbenchTab(project, options = {}) {
   const originalProject = syncProjectPromptMetadata(structuredClone(project));
   const draft = options.draft
-    ? syncProjectPromptMetadata(restorePromptSnapshot(structuredClone(originalProject), options.draft))
+    ? syncProjectPromptMetadata(
+        restorePromptSnapshot(structuredClone(originalProject), options.draft),
+      )
     : structuredClone(originalProject);
   const source = {
     type: options.source?.type || 'file',
@@ -92,9 +117,13 @@ export function addWorkbenchTab(session, project, options = {}) {
 export function updateWorkbenchTab(session, tabId, updater) {
   return {
     ...session,
-    tabs: session.tabs.map((tab) => tab.id === tabId
-      ? (typeof updater === 'function' ? updater(tab) : { ...tab, ...updater })
-      : tab),
+    tabs: session.tabs.map((tab) =>
+      tab.id === tabId
+        ? typeof updater === 'function'
+          ? updater(tab)
+          : { ...tab, ...updater }
+        : tab,
+    ),
   };
 }
 
@@ -120,7 +149,10 @@ export function closeWorkbenchTab(session, tabId) {
 
 export function cycleWorkbenchTab(session, direction = 1) {
   if (!session?.tabs?.length) return session;
-  const index = Math.max(0, session.tabs.findIndex((tab) => tab.id === session.activeTabId));
+  const index = Math.max(
+    0,
+    session.tabs.findIndex((tab) => tab.id === session.activeTabId),
+  );
   const next = (index + direction + session.tabs.length) % session.tabs.length;
   return { ...session, activeTabId: session.tabs[next].id };
 }
@@ -151,13 +183,21 @@ function migrateV1(parsed) {
   return {
     version: 2,
     activeTabId: id,
-    tabs: [{
-      id,
-      source: { type: 'file', path: parsed.sourcePath, projectId: '', temporaryId: '', fingerprint: '' },
-      displayName: '',
-      updatedAt: parsed.updatedAt || now(),
-      draft: parsed.draft,
-    }],
+    tabs: [
+      {
+        id,
+        source: {
+          type: 'file',
+          path: parsed.sourcePath,
+          projectId: '',
+          temporaryId: '',
+          fingerprint: '',
+        },
+        displayName: '',
+        updatedAt: parsed.updatedAt || now(),
+        draft: parsed.draft,
+      },
+    ],
   };
 }
 
@@ -168,14 +208,16 @@ export function parseWorkbenchSession(value) {
     if (parsed?.version !== 2) return migrateV1(parsed);
     const tabs = Array.isArray(parsed.tabs)
       ? parsed.tabs
-        .filter((tab) => tab?.id && tab?.source && tab?.draft)
-        .map((tab) => ({ ...tab, viewState: normalizeWorkbenchViewState(tab.viewState) }))
+          .filter((tab) => tab?.id && tab?.source && tab?.draft)
+          .map((tab) => ({ ...tab, viewState: normalizeWorkbenchViewState(tab.viewState) }))
       : [];
     if (!tabs.length) return null;
     return {
       version: 2,
       tabs,
-      activeTabId: tabs.some((tab) => tab.id === parsed.activeTabId) ? parsed.activeTabId : tabs[0].id,
+      activeTabId: tabs.some((tab) => tab.id === parsed.activeTabId)
+        ? parsed.activeTabId
+        : tabs[0].id,
     };
   } catch {
     return null;
@@ -184,7 +226,8 @@ export function parseWorkbenchSession(value) {
 
 export function workbenchTabHasChanges(tab) {
   if (!tab?.project || !tab?.originalProject) return false;
-  const comparableSnapshot = (project) => JSON.stringify(normalizePromptChangeValue(promptSnapshot(project)));
+  const comparableSnapshot = (project) =>
+    JSON.stringify(normalizePromptChangeValue(promptSnapshot(project)));
   return comparableSnapshot(tab.project) !== comparableSnapshot(tab.originalProject);
 }
 

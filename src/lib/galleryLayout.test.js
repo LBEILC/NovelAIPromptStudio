@@ -47,7 +47,22 @@ describe('gallery card sizing', () => {
     expect(writeGalleryCardSize(storage, 204)).toBe(204);
     expect(storage.setItem).toHaveBeenCalledWith(GALLERY_CARD_SIZE_KEY, '204');
 
-    expect(readGalleryCardSize({ getItem: () => { throw new Error('blocked'); } })).toBe(GALLERY_CARD_SIZE_DEFAULT);
-    expect(writeGalleryCardSize({ setItem: () => { throw new Error('blocked'); } }, 176)).toBe(176);
+    expect(
+      readGalleryCardSize({
+        getItem: () => {
+          throw new Error('blocked');
+        },
+      }),
+    ).toBe(GALLERY_CARD_SIZE_DEFAULT);
+    expect(
+      writeGalleryCardSize(
+        {
+          setItem: () => {
+            throw new Error('blocked');
+          },
+        },
+        176,
+      ),
+    ).toBe(176);
   });
 });

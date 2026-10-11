@@ -64,7 +64,10 @@ export function copyOriginalAsset(assetsDirectory, sourcePath, destinationPath) 
   return copyOriginalImage(resolveManagedAsset(assetsDirectory, sourcePath), destinationPath);
 }
 
-export function copyImageToClipboard(filePath, { nativeImage, clipboard, platform = process.platform }) {
+export function copyImageToClipboard(
+  filePath,
+  { nativeImage, clipboard, platform = process.platform },
+) {
   const source = resolveImageFile(filePath);
   const image = nativeImage.createFromPath(source);
   if (image.isEmpty()) throw new Error('图片无法读取');

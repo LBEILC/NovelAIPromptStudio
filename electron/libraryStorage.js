@@ -57,20 +57,31 @@ async function ensureEmptyWritableDirectory(directory) {
 
 async function removeCreatedEntries(targetDirectory, names) {
   for (const name of names) {
-    await promises.rm(path.join(targetDirectory, name), { recursive: true, force: true }).catch(() => {});
+    await promises
+      .rm(path.join(targetDirectory, name), { recursive: true, force: true })
+      .catch(() => {});
   }
 }
 
-export async function migrateAssetDirectory({ sourceDirectory, targetDirectory, commit, onProgress = () => {} }) {
+export async function migrateAssetDirectory({
+  sourceDirectory,
+  targetDirectory,
+  commit,
+  onProgress = () => {},
+}) {
   const source = path.resolve(String(sourceDirectory || ''));
   const target = path.resolve(String(targetDirectory || ''));
   if (path.relative(source, target) === '' && path.relative(target, source) === '') {
     return { ...(await describeAssetDirectory(source)), noChange: true, cleanupWarning: '' };
   }
-  if (source === path.parse(source).root || target === path.parse(target).root) throw new Error('不能把磁盘根目录直接用作资源库位置');
-  if (isPathInside(source, target) || isPathInside(target, source)) throw new Error('新旧资源库位置不能互相嵌套');
+  if (source === path.parse(source).root || target === path.parse(target).root)
+    throw new Error('不能把磁盘根目录直接用作资源库位置');
+  if (isPathInside(source, target) || isPathInside(target, source))
+    throw new Error('新旧资源库位置不能互相嵌套');
 
-  const sourceStat = await promises.lstat(source).catch((error) => error?.code === 'ENOENT' ? null : Promise.reject(error));
+  const sourceStat = await promises
+    .lstat(source)
+    .catch((error) => (error?.code === 'ENOENT' ? null : Promise.reject(error)));
   if (!sourceStat) throw new Error('当前资源库不存在或不可访问，请先恢复原磁盘或文件夹');
   if (sourceStat?.isSymbolicLink()) throw new Error('当前资源库是符号链接，无法安全迁移');
   if (sourceStat && !sourceStat.isDirectory()) throw new Error('当前资源库位置不是文件夹');
@@ -119,5 +130,11 @@ export async function migrateAssetDirectory({ sourceDirectory, targetDirectory, 
     }
   }
   onProgress({ phase: 'complete', completed, total: files.length, bytesCopied, totalBytes });
-  return { assetsDirectory: target, fileCount: files.length, totalBytes, noChange: false, cleanupWarning };
+  return {
+    assetsDirectory: target,
+    fileCount: files.length,
+    totalBytes,
+    noChange: false,
+    cleanupWarning,
+  };
 }

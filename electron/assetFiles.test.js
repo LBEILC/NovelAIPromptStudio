@@ -22,7 +22,8 @@ function makeTemporaryDirectory() {
 }
 
 afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
+  for (const directory of temporaryDirectories.splice(0))
+    fs.rmSync(directory, { recursive: true, force: true });
 });
 
 describe('managed asset file operations', () => {
@@ -39,7 +40,9 @@ describe('managed asset file operations', () => {
   it('rejects external paths and the asset root itself', () => {
     const root = makeTemporaryDirectory();
     expect(() => resolveManagedAsset(root, root)).toThrow(/资源路径/);
-    expect(() => resolveManagedAsset(root, path.join(root, '..', 'external.png'))).toThrow(/资源路径/);
+    expect(() => resolveManagedAsset(root, path.join(root, '..', 'external.png'))).toThrow(
+      /资源路径/,
+    );
   });
 
   it('copies original bytes without re-encoding', () => {
@@ -76,8 +79,12 @@ describe('managed asset file operations', () => {
     const image = { isEmpty: () => false };
     let written = null;
     copyManagedImageToClipboard(root, asset, {
-      nativeImage: { createFromPath: (filePath) => filePath === asset ? image : null },
-      clipboard: { writeBuffer: (format, bytes) => { written = { format, bytes }; } },
+      nativeImage: { createFromPath: (filePath) => (filePath === asset ? image : null) },
+      clipboard: {
+        writeBuffer: (format, bytes) => {
+          written = { format, bytes };
+        },
+      },
       platform: 'win32',
     });
     expect(written).toEqual({ format: 'PNG', bytes: original });
@@ -99,8 +106,12 @@ describe('managed asset file operations', () => {
     const image = { isEmpty: () => false };
     let writtenImage = null;
     copyImageToClipboard(source, {
-      nativeImage: { createFromPath: (filePath) => filePath === source ? image : null },
-      clipboard: { writeImage: (value) => { writtenImage = value; } },
+      nativeImage: { createFromPath: (filePath) => (filePath === source ? image : null) },
+      clipboard: {
+        writeImage: (value) => {
+          writtenImage = value;
+        },
+      },
     });
     expect(writtenImage).toBe(image);
   });

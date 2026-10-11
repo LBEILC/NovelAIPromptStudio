@@ -47,21 +47,26 @@ function isSymbolicLink(entry) {
 }
 
 export function isPngSignature(buffer) {
-  return Buffer.isBuffer(buffer) && buffer.length >= PNG_SIGNATURE.length
-    && buffer.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE);
+  return (
+    Buffer.isBuffer(buffer) &&
+    buffer.length >= PNG_SIGNATURE.length &&
+    buffer.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)
+  );
 }
 
 export function decodeZipEntryFileName(entry) {
   if (!Buffer.isBuffer(entry?.fileNameRaw)) return String(entry?.fileName || '');
   const rawName = entry.fileNameRaw;
-  const hasUnicodePath = entry.extraFields?.some((field) => field.id === ZIP_UNICODE_PATH_EXTRA_FIELD);
+  const hasUnicodePath = entry.extraFields?.some(
+    (field) => field.id === ZIP_UNICODE_PATH_EXTRA_FIELD,
+  );
   const standardName = yauzl.getFileNameLowLevel(
     entry.generalPurposeBitFlag,
     rawName,
     entry.extraFields || [],
     false,
   );
-  if ((entry.generalPurposeBitFlag & ZIP_UTF8_FLAG) || hasUnicodePath) return standardName;
+  if (entry.generalPurposeBitFlag & ZIP_UTF8_FLAG || hasUnicodePath) return standardName;
 
   // Finder/ditto and some NovelAI ZIP exporters write UTF-8 bytes without setting
   // the language flag. CP437 decoding turns those valid bytes into mojibake.
@@ -73,29 +78,52 @@ export function decodeZipEntryFileName(entry) {
 export function validateZipImageEntry(entry, totals = { expandedBytes: 0, imageCount: 0 }) {
   const fileName = decodeZipEntryFileName(entry).replaceAll('\\', '/');
   const parts = fileName.split('/');
-  if (!fileName || fileName.startsWith('/') || /^[a-zA-Z]:\//.test(fileName) || parts.includes('..')) {
+  if (
+    !fileName ||
+    fileName.startsWith('/') ||
+    /^[a-zA-Z]:\//.test(fileName) ||
+    parts.includes('..')
+  ) {
     return { action: 'reject', reason: `ZIP 包含不安全路径：${fileName || '(空路径)'}` };
   }
-  if (fileName.endsWith('/') || isHiddenArchiveEntry(fileName)) return { action: 'skip', reason: '系统目录或隐藏文件' };
-  if (path.posix.extname(fileName).toLowerCase() !== '.png') return { action: 'skip', reason: '不是 PNG' };
-  if (typeof entry.isEncrypted === 'function' ? entry.isEncrypted() : Boolean(entry.generalPurposeBitFlag & 0x1)) {
+  if (fileName.endsWith('/') || isHiddenArchiveEntry(fileName))
+    return { action: 'skip', reason: '系统目录或隐藏文件' };
+  if (path.posix.extname(fileName).toLowerCase() !== '.png')
+    return { action: 'skip', reason: '不是 PNG' };
+  if (
+    typeof entry.isEncrypted === 'function'
+      ? entry.isEncrypted()
+      : Boolean(entry.generalPurposeBitFlag & 0x1)
+  ) {
     return { action: 'reject', reason: `ZIP 中的 PNG 已加密：${fileName}` };
   }
-  if (isSymbolicLink(entry)) return { action: 'reject', reason: `ZIP 中不允许符号链接：${fileName}` };
-  if (![0, 8].includes(Number(entry.compressionMethod))) return { action: 'reject', reason: `ZIP 使用了不支持的压缩方式：${fileName}` };
-  if (!Number.isSafeInteger(entry.uncompressedSize) || entry.uncompressedSize <= 0) return { action: 'skip', reason: 'PNG 条目为空或大小无效' };
+  if (isSymbolicLink(entry))
+    return { action: 'reject', reason: `ZIP 中不允许符号链接：${fileName}` };
+  if (![0, 8].includes(Number(entry.compressionMethod)))
+    return { action: 'reject', reason: `ZIP 使用了不支持的压缩方式：${fileName}` };
+  if (!Number.isSafeInteger(entry.uncompressedSize) || entry.uncompressedSize <= 0)
+    return { action: 'skip', reason: 'PNG 条目为空或大小无效' };
   if (entry.uncompressedSize > IMPORT_LIMITS.maxImageBytes) {
-    return { action: 'reject', reason: `${fileName} 展开后超过 ${readableBytes(IMPORT_LIMITS.maxImageBytes)}` };
+    return {
+      action: 'reject',
+      reason: `${fileName} 展开后超过 ${readableBytes(IMPORT_LIMITS.maxImageBytes)}`,
+    };
   }
   const ratio = entry.uncompressedSize / Math.max(1, entry.compressedSize);
   if (entry.uncompressedSize > 10 * 1024 * 1024 && ratio > IMPORT_LIMITS.maxCompressionRatio) {
     return { action: 'reject', reason: `${fileName} 的压缩比异常，已阻止导入` };
   }
   if (totals.imageCount + 1 > IMPORT_LIMITS.maxImagesPerArchive) {
-    return { action: 'reject', reason: `单个 ZIP 最多导入 ${IMPORT_LIMITS.maxImagesPerArchive} 张 PNG` };
+    return {
+      action: 'reject',
+      reason: `单个 ZIP 最多导入 ${IMPORT_LIMITS.maxImagesPerArchive} 张 PNG`,
+    };
   }
   if (totals.expandedBytes + entry.uncompressedSize > IMPORT_LIMITS.maxArchiveExpandedBytes) {
-    return { action: 'reject', reason: `ZIP 展开总大小超过 ${readableBytes(IMPORT_LIMITS.maxArchiveExpandedBytes)}` };
+    return {
+      action: 'reject',
+      reason: `ZIP 展开总大小超过 ${readableBytes(IMPORT_LIMITS.maxArchiveExpandedBytes)}`,
+    };
   }
   return { action: 'accept', fileName, ratio };
 }
@@ -143,14 +171,29 @@ export async function inspectLibraryImportFiles(filePaths, { onProgress, signal 
   const plans = [];
   const errors = [];
   let skipped = 0;
-  const uniquePaths = [...new Map((filePaths || []).filter((filePath) => String(filePath || '').trim()).map((filePath) => {
-    const resolved = path.resolve(String(filePath));
-    return [process.platform === 'win32' ? resolved.toLocaleLowerCase('en-US') : resolved, resolved];
-  }).filter(([, filePath]) => filePath)).values()];
+  const uniquePaths = [
+    ...new Map(
+      (filePaths || [])
+        .filter((filePath) => String(filePath || '').trim())
+        .map((filePath) => {
+          const resolved = path.resolve(String(filePath));
+          return [
+            process.platform === 'win32' ? resolved.toLocaleLowerCase('en-US') : resolved,
+            resolved,
+          ];
+        })
+        .filter(([, filePath]) => filePath),
+    ).values(),
+  ];
 
   for (const [index, filePath] of uniquePaths.entries()) {
     if (signal?.aborted) break;
-    onProgress?.({ phase: 'preparing', current: path.basename(filePath), prepared: index, sourceCount: uniquePaths.length });
+    onProgress?.({
+      phase: 'preparing',
+      current: path.basename(filePath),
+      prepared: index,
+      sourceCount: uniquePaths.length,
+    });
     try {
       const stat = fs.statSync(filePath);
       if (!stat.isFile()) throw new Error('只支持本地文件，暂不支持文件夹');
@@ -161,16 +204,29 @@ export async function inspectLibraryImportFiles(filePaths, { onProgress, signal 
         plans.push({ kind: 'zip', filePath, ...inspection });
         skipped += inspection.skipped;
       } else if (DIRECT_IMAGE_EXTENSIONS.has(extension)) {
-        if (stat.size > IMPORT_LIMITS.maxImageBytes) throw new Error(`单张图片不能超过 ${readableBytes(IMPORT_LIMITS.maxImageBytes)}`);
-        plans.push({ kind: 'image', filePath, entries: [{ fileName: path.basename(filePath), uncompressedSize: stat.size }] });
+        if (stat.size > IMPORT_LIMITS.maxImageBytes)
+          throw new Error(`单张图片不能超过 ${readableBytes(IMPORT_LIMITS.maxImageBytes)}`);
+        plans.push({
+          kind: 'image',
+          filePath,
+          entries: [{ fileName: path.basename(filePath), uncompressedSize: stat.size }],
+        });
       } else {
         throw new Error('仅支持 PNG、JPG、WEBP 或 ZIP');
       }
     } catch (error) {
-      errors.push({ file: path.basename(filePath), error: error instanceof Error ? error.message : String(error) });
+      errors.push({
+        file: path.basename(filePath),
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
-  return { plans, errors, skipped, total: plans.reduce((sum, plan) => sum + plan.entries.length, 0) };
+  return {
+    plans,
+    errors,
+    skipped,
+    total: plans.reduce((sum, plan) => sum + plan.entries.length, 0),
+  };
 }
 
 async function firstBytes(filePath, length) {
@@ -212,7 +268,11 @@ async function processZipPlan(plan, temporaryDirectory, processSource, recordFai
           if (!isPngSignature(await firstBytes(temporaryPath, PNG_SIGNATURE.length))) {
             throw new Error('扩展名是 PNG，但文件签名不匹配');
           }
-          await processSource(temporaryPath, `${path.basename(plan.filePath)} / ${fileName}`, path.basename(fileName));
+          await processSource(
+            temporaryPath,
+            `${path.basename(plan.filePath)} / ${fileName}`,
+            path.basename(fileName),
+          );
         } catch (error) {
           recordFailure(`${path.basename(plan.filePath)} / ${fileName}`, error);
         }
@@ -273,7 +333,10 @@ export async function generateZipEntryPreviews({
         });
       } catch (error) {
         fs.rmSync(previewPath, { force: true });
-        onPreview?.({ id: requested.id, error: error instanceof Error ? error.message : String(error) });
+        onPreview?.({
+          id: requested.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
       } finally {
         fs.rmSync(sourcePath, { force: true });
       }
@@ -287,7 +350,8 @@ export async function backfillProjectContentHashes(database) {
   const repaired = [];
   for (const project of database.projectHashCandidates()) {
     try {
-      if (fs.existsSync(project.image_path)) repaired.push({ id: project.id, content_hash: await hashFile(project.image_path) });
+      if (fs.existsSync(project.image_path))
+        repaired.push({ id: project.id, content_hash: await hashFile(project.image_path) });
     } catch {
       // Missing or unreadable legacy assets stay importable; their repair is a separate library concern.
     }
@@ -301,7 +365,8 @@ export async function backfillProjectDimensions(database) {
     try {
       if (!fs.existsSync(project.image_path)) continue;
       const metadata = await sharp(project.image_path).metadata();
-      if (metadata.width && metadata.height) repaired.push({ id: project.id, width: metadata.width, height: metadata.height });
+      if (metadata.width && metadata.height)
+        repaired.push({ id: project.id, width: metadata.width, height: metadata.height });
     } catch {
       // Missing or unreadable legacy assets remain available with unknown dimensions.
     }
@@ -318,7 +383,9 @@ export async function importLibraryFiles({
   signal,
   onProgress,
 }) {
-  const temporaryDirectory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'novelai-prompt-studio-import-'));
+  const temporaryDirectory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), 'novelai-prompt-studio-import-'),
+  );
   const imported = [];
   const duplicates = [];
   const resultErrors = [];
@@ -336,34 +403,49 @@ export async function importLibraryFiles({
       plan.total = plan.plans.reduce((sum, item) => sum + item.entries.length, 0);
     }
     resultErrors.push(...plan.errors);
-    const report = (patch = {}) => onProgress?.({
-      phase: 'importing',
-      total: plan.total,
-      processed,
-      imported: imported.length,
-      duplicates: duplicates.length,
-      failed: resultErrors.length,
-      skipped: plan.skipped,
-      ...patch,
-    });
+    const report = (patch = {}) =>
+      onProgress?.({
+        phase: 'importing',
+        total: plan.total,
+        processed,
+        imported: imported.length,
+        duplicates: duplicates.length,
+        failed: resultErrors.length,
+        skipped: plan.skipped,
+        ...patch,
+      });
     report();
 
-    const processSource = async (sourcePath, displayName, projectName = path.basename(sourcePath)) => {
+    const processSource = async (
+      sourcePath,
+      displayName,
+      projectName = path.basename(sourcePath),
+    ) => {
       if (signal?.aborted) return;
       report({ current: displayName });
       try {
         const contentHash = await hashFile(sourcePath);
         const duplicate = database.findProjectByContentHash(contentHash);
         if (duplicate) {
-          duplicates.push({ file: displayName, projectId: duplicate.id, projectName: duplicate.name });
+          duplicates.push({
+            file: displayName,
+            projectId: duplicate.id,
+            projectName: duplicate.name,
+          });
           return;
         }
-        let project = await importImage(sourcePath, assetsDirectory, { name: projectName, contentHash });
+        let project = await importImage(sourcePath, assetsDirectory, {
+          name: projectName,
+          contentHash,
+        });
         project = await prepareProject(project);
         database.insertProject(project);
         imported.push(project);
       } catch (error) {
-        resultErrors.push({ file: displayName, error: error instanceof Error ? error.message : String(error) });
+        resultErrors.push({
+          file: displayName,
+          error: error instanceof Error ? error.message : String(error),
+        });
       } finally {
         processed += 1;
         report({ current: displayName });
@@ -371,7 +453,10 @@ export async function importLibraryFiles({
     };
 
     const recordFailure = (displayName, error) => {
-      resultErrors.push({ file: displayName, error: error instanceof Error ? error.message : String(error) });
+      resultErrors.push({
+        file: displayName,
+        error: error instanceof Error ? error.message : String(error),
+      });
       processed += 1;
       report({ current: displayName });
     };
@@ -384,8 +469,14 @@ export async function importLibraryFiles({
         try {
           await processZipPlan(item, temporaryDirectory, processSource, recordFailure, signal);
         } catch (error) {
-          resultErrors.push({ file: path.basename(item.filePath), error: error instanceof Error ? error.message : String(error) });
-          const unprocessed = Math.max(0, item.entries.length - (processed - processedBeforeArchive));
+          resultErrors.push({
+            file: path.basename(item.filePath),
+            error: error instanceof Error ? error.message : String(error),
+          });
+          const unprocessed = Math.max(
+            0,
+            item.entries.length - (processed - processedBeforeArchive),
+          );
           processed += unprocessed;
           report({ current: path.basename(item.filePath) });
         }

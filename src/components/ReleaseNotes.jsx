@@ -14,23 +14,32 @@ const releaseNotesSchema = {
 };
 
 export default function ReleaseNotes({ children, onOpenLink }) {
-  const components = useMemo(() => ({
-    a: ({ node: _node, href = '', ...props }) => <a
-      {...props}
-      href={href}
-      onClick={(event) => {
-        if (!onOpenLink) return;
-        event.preventDefault();
-        onOpenLink(href);
-      }}
-    />,
-  }), [onOpenLink]);
+  const components = useMemo(
+    () => ({
+      a: ({ node: _node, href = '', ...props }) => (
+        <a
+          {...props}
+          href={href}
+          onClick={(event) => {
+            if (!onOpenLink) return;
+            event.preventDefault();
+            onOpenLink(href);
+          }}
+        />
+      ),
+    }),
+    [onOpenLink],
+  );
 
-  return <article className="settings-release-notes-content">
-    <ReactMarkdown
-      components={components}
-      rehypePlugins={[rehypeRaw, [rehypeSanitize, releaseNotesSchema]]}
-      remarkPlugins={[remarkGfm]}
-    >{String(children || '')}</ReactMarkdown>
-  </article>;
+  return (
+    <article className="settings-release-notes-content">
+      <ReactMarkdown
+        components={components}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, releaseNotesSchema]]}
+        remarkPlugins={[remarkGfm]}
+      >
+        {String(children || '')}
+      </ReactMarkdown>
+    </article>
+  );
 }

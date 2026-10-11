@@ -1,5 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { Alert as LobeAlert, Collapse as LobeCollapse, ColorSwatches as LobeColorSwatches, DraggablePanel as LobeDraggablePanel } from '@lobehub/ui';
+import {
+  Alert as LobeAlert,
+  Collapse as LobeCollapse,
+  ColorSwatches as LobeColorSwatches,
+  DraggablePanel as LobeDraggablePanel,
+} from '@lobehub/ui';
 import {
   AutoComplete as LobeAutoComplete,
   Button as LobeButton,
@@ -19,17 +24,24 @@ import { fontStack, partitionFontFamilies, quoteFontFamily } from './lib/fonts.j
 const ReleaseNotes = lazy(() => import('./components/ReleaseNotes.jsx'));
 
 const PRIMARY_COLOR_OPTIONS = [
-  ['red', '红色'], ['volcano', '火山橙'], ['orange', '橙色'], ['gold', '金色'],
-  ['yellow', '黄色'], ['lime', '青柠'], ['green', '绿色'], ['cyan', '青色'],
-  ['blue', '蓝色'], ['geekblue', '靛蓝'], ['purple', '紫色'], ['magenta', '洋红'],
+  ['red', '红色'],
+  ['volcano', '火山橙'],
+  ['orange', '橙色'],
+  ['gold', '金色'],
+  ['yellow', '黄色'],
+  ['lime', '青柠'],
+  ['green', '绿色'],
+  ['cyan', '青色'],
+  ['blue', '蓝色'],
+  ['geekblue', '靛蓝'],
+  ['purple', '紫色'],
+  ['magenta', '洋红'],
 ].map(([key, title]) => ({ color: primaryColors[key], key, title }));
 
 const SETTINGS_NAV_GROUPS = [
   {
     label: '偏好',
-    items: [
-      { id: 'appearance', icon: 'palette', label: '外观' },
-    ],
+    items: [{ id: 'appearance', icon: 'palette', label: '外观' }],
   },
   {
     label: '数据与服务',
@@ -48,7 +60,8 @@ const SETTINGS_NAV_GROUPS = [
   },
 ];
 
-const fontLabel = (family) => family === 'system-ui' ? '系统界面字体' : family === 'monospace' ? '系统等宽字体' : family;
+const fontLabel = (family) =>
+  family === 'system-ui' ? '系统界面字体' : family === 'monospace' ? '系统等宽字体' : family;
 const formatBytes = (bytes) => {
   const value = Math.max(0, Number(bytes) || 0);
   if (value < 1024) return `${value} B`;
@@ -56,20 +69,31 @@ const formatBytes = (bytes) => {
   if (value < 1024 * 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
   return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
 };
-const formatDate = (value) => value
-  ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium' }).format(new Date(value))
-  : '';
+const formatDate = (value) =>
+  value ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium' }).format(new Date(value)) : '';
 
 function FontOption({ family, role }) {
-  return <span className="font-option" style={{ fontFamily: fontStack(family, role) }}>
-    <span>{fontLabel(family)}</span>
-    <small>Aa 中文 0123</small>
-  </span>;
+  return (
+    <span className="font-option" style={{ fontFamily: fontStack(family, role) }}>
+      <span>{fontLabel(family)}</span>
+      <small>Aa 中文 0123</small>
+    </span>
+  );
 }
 
-export default function SettingsPage({ appearance, onAppearanceChange, onConfirm, onInstallUpdate, onLibraryChange, showToast, studio }) {
+export default function SettingsPage({
+  appearance,
+  onAppearanceChange,
+  onConfirm,
+  onInstallUpdate,
+  onLibraryChange,
+  showToast,
+  studio,
+}) {
   const [section, setSection] = useState('appearance');
-  const [navExpanded, setNavExpanded] = useState(() => typeof window === 'undefined' || window.innerWidth >= 900);
+  const [navExpanded, setNavExpanded] = useState(
+    () => typeof window === 'undefined' || window.innerWidth >= 900,
+  );
   const [navTouched, setNavTouched] = useState(false);
   const [aiSettings, setAISettings] = useState({
     baseUrl: 'https://api.openai.com/v1',
@@ -84,7 +108,14 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
   const [models, setModels] = useState([]);
   const [busy, setBusy] = useState('');
   const [systemFonts, setSystemFonts] = useState({ fonts: [], loading: true, error: '' });
-  const [libraryStorage, setLibraryStorage] = useState({ assetsDirectory: '', fileCount: 0, totalBytes: 0, loading: true, migrating: false, progress: null });
+  const [libraryStorage, setLibraryStorage] = useState({
+    assetsDirectory: '',
+    fileCount: 0,
+    totalBytes: 0,
+    loading: true,
+    migrating: false,
+    progress: null,
+  });
   const [updateState, setUpdateState] = useState({
     currentVersion: '—',
     latestVersion: '',
@@ -110,15 +141,17 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
   }, [navTouched]);
 
   useEffect(() => {
-    Promise.all([studio.getUpdateStatus(), studio.getProductivitySettings()]).then(([status, settings]) => {
-      setUpdateState((current) => ({
-        ...current,
-        ...(status?.ok ? status : {}),
-        currentVersion: status?.currentVersion || '—',
-        packaged: Boolean(status?.packaged),
-        autoCheckUpdates: settings?.autoCheckUpdates !== false,
-      }));
-    }).catch(() => {});
+    Promise.all([studio.getUpdateStatus(), studio.getProductivitySettings()])
+      .then(([status, settings]) => {
+        setUpdateState((current) => ({
+          ...current,
+          ...(status?.ok ? status : {}),
+          currentVersion: status?.currentVersion || '—',
+          packaged: Boolean(status?.packaged),
+          autoCheckUpdates: settings?.autoCheckUpdates !== false,
+        }));
+      })
+      .catch(() => {});
   }, [studio]);
 
   useEffect(() => {
@@ -134,21 +167,39 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
   }, [studio]);
 
   useEffect(() => {
-    studio.getAISettings().then((settings) => setAISettings((current) => ({ ...current, ...settings, apiKey: '' }))).catch(() => {});
+    studio
+      .getAISettings()
+      .then((settings) => setAISettings((current) => ({ ...current, ...settings, apiKey: '' })))
+      .catch(() => {});
   }, [studio]);
 
   useEffect(() => {
     let active = true;
-    studio.getLibraryStorage().then((result) => {
-      if (!active) return;
-      setLibraryStorage((current) => result?.ok
-        ? { ...current, ...result, loading: false }
-        : { ...current, loading: false, error: result?.error || '无法读取资源库位置' });
-    }).catch((error) => {
-      if (active) setLibraryStorage((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : String(error) }));
-    });
+    studio
+      .getLibraryStorage()
+      .then((result) => {
+        if (!active) return;
+        setLibraryStorage((current) =>
+          result?.ok
+            ? { ...current, ...result, loading: false }
+            : { ...current, loading: false, error: result?.error || '无法读取资源库位置' },
+        );
+      })
+      .catch((error) => {
+        if (active)
+          setLibraryStorage((current) => ({
+            ...current,
+            loading: false,
+            error: error instanceof Error ? error.message : String(error),
+          }));
+      });
     studio.onLibraryStorageProgress((progress) => {
-      if (active) setLibraryStorage((current) => ({ ...current, migrating: progress?.phase !== 'complete', progress }));
+      if (active)
+        setLibraryStorage((current) => ({
+          ...current,
+          migrating: progress?.phase !== 'complete',
+          progress,
+        }));
     });
     return () => {
       active = false;
@@ -158,37 +209,66 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
 
   useEffect(() => {
     let active = true;
-    studio.listSystemFonts().then((result) => {
-      if (!active) return;
-      setSystemFonts(result?.ok
-        ? { fonts: result.fonts || [], loading: false, error: '' }
-        : { fonts: [], loading: false, error: result?.error || '无法读取系统字体' });
-    }).catch((error) => {
-      if (active) setSystemFonts({ fonts: [], loading: false, error: error instanceof Error ? error.message : String(error) });
-    });
-    return () => { active = false; };
+    studio
+      .listSystemFonts()
+      .then((result) => {
+        if (!active) return;
+        setSystemFonts(
+          result?.ok
+            ? { fonts: result.fonts || [], loading: false, error: '' }
+            : { fonts: [], loading: false, error: result?.error || '无法读取系统字体' },
+        );
+      })
+      .catch((error) => {
+        if (active)
+          setSystemFonts({
+            fonts: [],
+            loading: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+      });
+    return () => {
+      active = false;
+    };
   }, [studio]);
 
   const fontFamilies = useMemo(() => {
-    const context = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
-    const measureText = context ? (family, sample) => {
-      context.font = `24px ${quoteFontFamily(family)}, sans-serif`;
-      return context.measureText(sample).width;
-    } : undefined;
-    return partitionFontFamilies([
-      ...systemFonts.fonts,
-      { family: appearance.sansFont, monospace: false },
-      { family: appearance.monoFont, monospace: true },
-    ], measureText);
+    const context =
+      typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+    const measureText = context
+      ? (family, sample) => {
+          context.font = `24px ${quoteFontFamily(family)}, sans-serif`;
+          return context.measureText(sample).width;
+        }
+      : undefined;
+    return partitionFontFamilies(
+      [
+        ...systemFonts.fonts,
+        { family: appearance.sansFont, monospace: false },
+        { family: appearance.monoFont, monospace: true },
+      ],
+      measureText,
+    );
   }, [appearance.monoFont, appearance.sansFont, systemFonts.fonts]);
 
-  const sansFontOptions = useMemo(() => fontFamilies.proportional.map((family) => ({ label: fontLabel(family), value: family })), [fontFamilies.proportional]);
-  const monoFontOptions = useMemo(() => fontFamilies.monospace.map((family) => ({ label: fontLabel(family), value: family })), [fontFamilies.monospace]);
+  const sansFontOptions = useMemo(
+    () => fontFamilies.proportional.map((family) => ({ label: fontLabel(family), value: family })),
+    [fontFamilies.proportional],
+  );
+  const monoFontOptions = useMemo(
+    () => fontFamilies.monospace.map((family) => ({ label: fontLabel(family), value: family })),
+    [fontFamilies.monospace],
+  );
   const fontSelectProps = (role) => ({
-    filterOption: (input, option) => String(option?.value || '').toLocaleLowerCase().includes(input.toLocaleLowerCase()),
-    labelRender: ({ value }) => <span style={{ fontFamily: fontStack(value, role) }}>{fontLabel(value)}</span>,
+    filterOption: (input, option) =>
+      String(option?.value || '')
+        .toLocaleLowerCase()
+        .includes(input.toLocaleLowerCase()),
+    labelRender: ({ value }) => (
+      <span style={{ fontFamily: fontStack(value, role) }}>{fontLabel(value)}</span>
+    ),
     listHeight: 360,
-    optionRender: (option) => <FontOption family={option.value} role={role}/>,
+    optionRender: (option) => <FontOption family={option.value} role={role} />,
     popupMatchSelectWidth: 360,
     showSearch: true,
   });
@@ -219,7 +299,10 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
     setBusy('models');
     const result = await studio.listAIModels();
     setBusy('');
-    if (!result?.ok) { showToast(result?.error || '无法读取模型列表'); return; }
+    if (!result?.ok) {
+      showToast(result?.error || '无法读取模型列表');
+      return;
+    }
     setModels(result.models || []);
     showToast(`已读取 ${result.models?.length || 0} 个模型`);
   };
@@ -229,7 +312,11 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
     setBusy('test');
     const result = await studio.testAIModel();
     setBusy('');
-    showToast(result?.ok ? `连接成功 · ${result.model || aiSettings.model}` : result?.error || '连接测试失败');
+    showToast(
+      result?.ok
+        ? `连接成功 · ${result.model || aiSettings.model}`
+        : result?.error || '连接测试失败',
+    );
   };
 
   const changeLibraryStorage = async () => {
@@ -241,8 +328,17 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
         return;
       }
       if (result.canceled) return;
-      setLibraryStorage((current) => ({ ...current, ...result, loading: false, migrating: false, progress: null, error: '' }));
-      await Promise.resolve(onLibraryChange?.()).catch(() => showToast('资源库已移动；图片列表将在下次打开时刷新'));
+      setLibraryStorage((current) => ({
+        ...current,
+        ...result,
+        loading: false,
+        migrating: false,
+        progress: null,
+        error: '',
+      }));
+      await Promise.resolve(onLibraryChange?.()).catch(() =>
+        showToast('资源库已移动；图片列表将在下次打开时刷新'),
+      );
       showToast(result.cleanupWarning || `资源库已移动，共 ${result.fileCount || 0} 个文件`);
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error));
@@ -259,9 +355,11 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
   const runUpdateCheck = async () => {
     setUpdateState((current) => ({ ...current, loading: true, error: '' }));
     const result = await studio.checkForUpdates();
-    setUpdateState((current) => result?.ok
-      ? { ...current, ...result, loading: false, error: '' }
-      : { ...current, loading: false, error: result?.error || '无法检查更新' });
+    setUpdateState((current) =>
+      result?.ok
+        ? { ...current, ...result, loading: false, error: '' }
+        : { ...current, loading: false, error: result?.error || '无法检查更新' },
+    );
   };
 
   const changeAutoCheck = async (checked) => {
@@ -279,9 +377,10 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
     if (!result?.ok) showToast(result?.error || '更新没有开始下载');
   };
 
-  const isManualMacUpdate = updateState.packaged
-    && updateState.platform === 'darwin'
-    && updateState.updateMode === 'manual';
+  const isManualMacUpdate =
+    updateState.packaged &&
+    updateState.platform === 'darwin' &&
+    updateState.updateMode === 'manual';
   const buildDescription = !updateState.packaged
     ? '开发模式'
     : isManualMacUpdate
@@ -290,156 +389,477 @@ export default function SettingsPage({ appearance, onAppearanceChange, onConfirm
         ? '支持应用内更新'
         : '手动更新';
 
-  return <main className="settings-page">
-    <LobeDraggablePanel
-      className="settings-nav-shell"
-      defaultSize={{ width: 236 }}
-      expand={navExpanded}
-      expandable
-      mode="fixed"
-      onExpandChange={(expanded) => { setNavTouched(true); setNavExpanded(expanded); }}
-      placement="left"
-      resize={false}
-      showHandleWhenCollapsed
-      size={{ height: '100%', width: 236 }}
-      stableLayout
-    >
-      <LobeDraggablePanel.Body className="settings-nav">
-        <header><h1>设置</h1><p>偏好、本地数据与支持</p></header>
-        <nav aria-label="设置分类">
-          {SETTINGS_NAV_GROUPS.map((group) => <div className="settings-nav-group" key={group.label}>
-            <span>{group.label}</span>
-            {group.items.map((item) => <LobeButton
-              aria-current={section === item.id ? 'page' : undefined}
-              block
-              className={section === item.id ? 'active' : ''}
-              icon={<Icon name={item.icon}/>}
-              key={item.id}
-              onClick={() => setSection(item.id)}
-              title={item.label}
-              type="text"
-            ><strong>{item.label}</strong></LobeButton>)}
-          </div>)}
-        </nav>
-      </LobeDraggablePanel.Body>
-    </LobeDraggablePanel>
-    <section className={`settings-content${section === 'tags' ? ' tag-cache-settings-content' : ''}`}>
-      {section === 'appearance' ? <>
-        <header className="settings-heading"><h2>外观</h2><p>调整界面主题、字体和动效；更改会立即应用。</p></header>
-        <div className="settings-group">
-          <div className="settings-row"><strong>主题</strong><LobeSegmented aria-label="界面主题" className="settings-segment" options={[{ label: '跟随系统', value: 'auto' }, { label: '浅色', value: 'light' }, { label: '深色', value: 'dark' }]} value={appearance.themeMode} onChange={(value) => onAppearanceChange({ themeMode: value })}/></div>
-          <div className="settings-row settings-color-row">
-            <span><strong>主题色</strong><small>用于主要操作与选中状态</small></span>
-            <LobeColorSwatches
-              aria-label="界面主题色"
-              colors={PRIMARY_COLOR_OPTIONS}
-              onChange={(color) => {
-                const primaryColor = findCustomThemeName('primary', color);
-                if (primaryColor) onAppearanceChange({ primaryColor });
-              }}
-              size={26}
-              value={primaryColors[appearance.primaryColor] || primaryColors.blue}
+  return (
+    <main className="settings-page">
+      <LobeDraggablePanel
+        className="settings-nav-shell"
+        defaultSize={{ width: 236 }}
+        expand={navExpanded}
+        expandable
+        mode="fixed"
+        onExpandChange={(expanded) => {
+          setNavTouched(true);
+          setNavExpanded(expanded);
+        }}
+        placement="left"
+        resize={false}
+        showHandleWhenCollapsed
+        size={{ height: '100%', width: 236 }}
+        stableLayout
+      >
+        <LobeDraggablePanel.Body className="settings-nav">
+          <header>
+            <h1>设置</h1>
+            <p>偏好、本地数据与支持</p>
+          </header>
+          <nav aria-label="设置分类">
+            {SETTINGS_NAV_GROUPS.map((group) => (
+              <div className="settings-nav-group" key={group.label}>
+                <span>{group.label}</span>
+                {group.items.map((item) => (
+                  <LobeButton
+                    aria-current={section === item.id ? 'page' : undefined}
+                    block
+                    className={section === item.id ? 'active' : ''}
+                    icon={<Icon name={item.icon} />}
+                    key={item.id}
+                    onClick={() => setSection(item.id)}
+                    title={item.label}
+                    type="text"
+                  >
+                    <strong>{item.label}</strong>
+                  </LobeButton>
+                ))}
+              </div>
+            ))}
+          </nav>
+        </LobeDraggablePanel.Body>
+      </LobeDraggablePanel>
+      <section
+        className={`settings-content${section === 'tags' ? ' tag-cache-settings-content' : ''}`}
+      >
+        {section === 'appearance' ? (
+          <>
+            <header className="settings-heading">
+              <h2>外观</h2>
+              <p>调整界面主题、字体和动效；更改会立即应用。</p>
+            </header>
+            <div className="settings-group">
+              <div className="settings-row">
+                <strong>主题</strong>
+                <LobeSegmented
+                  aria-label="界面主题"
+                  className="settings-segment"
+                  options={[
+                    { label: '跟随系统', value: 'auto' },
+                    { label: '浅色', value: 'light' },
+                    { label: '深色', value: 'dark' },
+                  ]}
+                  value={appearance.themeMode}
+                  onChange={(value) => onAppearanceChange({ themeMode: value })}
+                />
+              </div>
+              <div className="settings-row settings-color-row">
+                <span>
+                  <strong>主题色</strong>
+                  <small>用于主要操作与选中状态</small>
+                </span>
+                <LobeColorSwatches
+                  aria-label="界面主题色"
+                  colors={PRIMARY_COLOR_OPTIONS}
+                  onChange={(color) => {
+                    const primaryColor = findCustomThemeName('primary', color);
+                    if (primaryColor) onAppearanceChange({ primaryColor });
+                  }}
+                  size={26}
+                  value={primaryColors[appearance.primaryColor] || primaryColors.blue}
+                />
+              </div>
+              <div className="settings-row">
+                <span>
+                  <strong>非衬线字体</strong>
+                  <small>
+                    {systemFonts.loading
+                      ? '正在读取系统字体…'
+                      : systemFonts.error
+                        ? '用于界面与说明文字 · 仅显示内置字体'
+                        : `用于界面与说明文字 · ${fontFamilies.proportional.length} 款`}
+                  </small>
+                </span>
+                <LobeSelect
+                  {...fontSelectProps('sans')}
+                  aria-label="非衬线字体"
+                  className="settings-font-select"
+                  loading={systemFonts.loading}
+                  options={sansFontOptions}
+                  value={appearance.sansFont}
+                  onChange={(value) => onAppearanceChange({ sansFont: value })}
+                />
+              </div>
+              <div className="settings-row">
+                <span>
+                  <strong>等宽字体</strong>
+                  <small>
+                    {systemFonts.loading
+                      ? '正在识别等宽字体…'
+                      : `用于 Tag、Prompt 与参数 · ${fontFamilies.monospace.length} 款`}
+                  </small>
+                </span>
+                <LobeSelect
+                  {...fontSelectProps('mono')}
+                  aria-label="等宽字体"
+                  className="settings-font-select"
+                  loading={systemFonts.loading}
+                  options={monoFontOptions}
+                  value={appearance.monoFont}
+                  onChange={(value) => onAppearanceChange({ monoFont: value })}
+                />
+              </div>
+              <div className="settings-row">
+                <strong>动效</strong>
+                <LobeSegmented
+                  aria-label="界面动效"
+                  className="settings-segment"
+                  options={[
+                    { label: '完整', value: 'full' },
+                    { label: '跟随系统', value: 'reduced' },
+                    { label: '关闭', value: 'off' },
+                  ]}
+                  value={appearance.motion}
+                  onChange={(value) => onAppearanceChange({ motion: value })}
+                />
+              </div>
+            </div>
+          </>
+        ) : section === 'storage' ? (
+          <>
+            <header className="settings-heading">
+              <h2>资源库</h2>
+              <p>管理图片、缩略图和导出的 Vibe 文件。</p>
+            </header>
+            <div className="settings-group">
+              <div className="settings-row settings-storage-row">
+                <span className="settings-storage-copy">
+                  <strong>图片资源位置</strong>
+                  <small className="settings-storage-path" title={libraryStorage.assetsDirectory}>
+                    {libraryStorage.loading
+                      ? '正在读取…'
+                      : libraryStorage.assetsDirectory || '位置不可用'}
+                  </small>
+                  {!libraryStorage.loading && (
+                    <small>
+                      {libraryStorage.fileCount} 个文件 · {formatBytes(libraryStorage.totalBytes)}
+                    </small>
+                  )}
+                </span>
+                <div className="settings-storage-actions">
+                  <LobeButton
+                    disabled={libraryStorage.loading || libraryStorage.migrating}
+                    icon={<Icon name="folder" size={14} />}
+                    onClick={revealLibraryStorage}
+                  >
+                    打开文件夹
+                  </LobeButton>
+                  <LobeButton
+                    disabled={libraryStorage.loading || libraryStorage.migrating}
+                    onClick={changeLibraryStorage}
+                    type="primary"
+                  >
+                    {libraryStorage.migrating
+                      ? libraryStorage.progress?.total
+                        ? `正在移动 ${libraryStorage.progress.completed}/${libraryStorage.progress.total}`
+                        : '准备迁移…'
+                      : '更改位置'}
+                  </LobeButton>
+                </div>
+              </div>
+            </div>
+            <LobeAlert
+              className="settings-warning"
+              message="更改位置会自动移动现有资源；复制和校验完成前，旧文件不会被删除。"
+              type="info"
+              variant="outlined"
             />
-          </div>
-          <div className="settings-row"><span><strong>非衬线字体</strong><small>{systemFonts.loading ? '正在读取系统字体…' : systemFonts.error ? '用于界面与说明文字 · 仅显示内置字体' : `用于界面与说明文字 · ${fontFamilies.proportional.length} 款`}</small></span><LobeSelect {...fontSelectProps('sans')} aria-label="非衬线字体" className="settings-font-select" loading={systemFonts.loading} options={sansFontOptions} value={appearance.sansFont} onChange={(value) => onAppearanceChange({ sansFont: value })}/></div>
-          <div className="settings-row"><span><strong>等宽字体</strong><small>{systemFonts.loading ? '正在识别等宽字体…' : `用于 Tag、Prompt 与参数 · ${fontFamilies.monospace.length} 款`}</small></span><LobeSelect {...fontSelectProps('mono')} aria-label="等宽字体" className="settings-font-select" loading={systemFonts.loading} options={monoFontOptions} value={appearance.monoFont} onChange={(value) => onAppearanceChange({ monoFont: value })}/></div>
-          <div className="settings-row"><strong>动效</strong><LobeSegmented aria-label="界面动效" className="settings-segment" options={[{ label: '完整', value: 'full' }, { label: '跟随系统', value: 'reduced' }, { label: '关闭', value: 'off' }]} value={appearance.motion} onChange={(value) => onAppearanceChange({ motion: value })}/></div>
-        </div>
-      </> : section === 'storage' ? <>
-        <header className="settings-heading"><h2>资源库</h2><p>管理图片、缩略图和导出的 Vibe 文件。</p></header>
-        <div className="settings-group">
-          <div className="settings-row settings-storage-row">
-            <span className="settings-storage-copy">
-              <strong>图片资源位置</strong>
-              <small className="settings-storage-path" title={libraryStorage.assetsDirectory}>{libraryStorage.loading ? '正在读取…' : libraryStorage.assetsDirectory || '位置不可用'}</small>
-              {!libraryStorage.loading && <small>{libraryStorage.fileCount} 个文件 · {formatBytes(libraryStorage.totalBytes)}</small>}
-            </span>
-            <div className="settings-storage-actions">
-              <LobeButton disabled={libraryStorage.loading || libraryStorage.migrating} icon={<Icon name="folder" size={14}/>} onClick={revealLibraryStorage}>打开文件夹</LobeButton>
-              <LobeButton disabled={libraryStorage.loading || libraryStorage.migrating} onClick={changeLibraryStorage} type="primary">
-                {libraryStorage.migrating
-                  ? libraryStorage.progress?.total ? `正在移动 ${libraryStorage.progress.completed}/${libraryStorage.progress.total}` : '准备迁移…'
-                  : '更改位置'}
+            {libraryStorage.error && (
+              <LobeAlert
+                className="settings-warning"
+                message={libraryStorage.error}
+                type="error"
+                variant="outlined"
+              />
+            )}
+          </>
+        ) : section === 'ai' ? (
+          <>
+            <header className="settings-heading">
+              <h2>AI 服务</h2>
+              <p>用于补全内置词典尚未覆盖的 Tag 翻译和分类。</p>
+            </header>
+            <div className="settings-group ai-settings-group">
+              <label>
+                <span>
+                  <strong>API Base URL</strong>
+                  <small>兼容 OpenAI API 格式的服务地址</small>
+                </span>
+                <LobeInput
+                  value={aiSettings.baseUrl}
+                  onChange={(event) =>
+                    setAISettings((current) => ({ ...current, baseUrl: event.target.value }))
+                  }
+                  placeholder="https://api.openai.com/v1"
+                />
+              </label>
+              <label>
+                <span>
+                  <strong>API Key</strong>
+                  <small>
+                    {aiSettings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}
+                  </small>
+                </span>
+                <LobeInputPassword
+                  value={aiSettings.apiKey}
+                  onChange={(event) =>
+                    setAISettings((current) => ({ ...current, apiKey: event.target.value }))
+                  }
+                  placeholder={aiSettings.hasApiKey ? '已安全保存' : '输入 API Key'}
+                />
+              </label>
+              <label>
+                <span>
+                  <strong>默认模型</strong>
+                  <small>翻译与分类任务共用</small>
+                </span>
+                <div className="settings-model-input">
+                  <LobeAutoComplete
+                    options={models.map((model) => ({ value: model }))}
+                    value={aiSettings.model}
+                    onChange={(value) => setAISettings((current) => ({ ...current, model: value }))}
+                    placeholder="输入或读取模型 ID"
+                  />
+                  <LobeButton
+                    disabled={Boolean(busy)}
+                    icon={<Icon name="refresh" size={14} />}
+                    onClick={loadModels}
+                  >
+                    {busy === 'models' ? '读取中' : '读取模型'}
+                  </LobeButton>
+                </div>
+              </label>
+            </div>
+            <LobeCollapse
+              className="ai-advanced-settings"
+              items={[
+                {
+                  key: 'prompts',
+                  label: '高级设置',
+                  desc: '自定义翻译与分类 Prompt',
+                  children: (
+                    <div className="ai-prompt-settings">
+                      <label>
+                        <span>
+                          <strong>翻译 Prompt</strong>
+                          <small>定义 Tag 的翻译语言、风格和术语处理</small>
+                        </span>
+                        <LobeTextArea
+                          autoSize={{ minRows: 5, maxRows: 12 }}
+                          onChange={(event) =>
+                            setAISettings((current) => ({
+                              ...current,
+                              translationPrompt: event.target.value,
+                            }))
+                          }
+                          value={aiSettings.translationPrompt}
+                        />
+                        <LobeButton
+                          onClick={() =>
+                            setAISettings((current) => ({
+                              ...current,
+                              translationPrompt: current.defaultPrompts.translation,
+                            }))
+                          }
+                          size="small"
+                          type="text"
+                        >
+                          恢复默认
+                        </LobeButton>
+                      </label>
+                      <label>
+                        <span>
+                          <strong>分类 Prompt</strong>
+                          <small>定义画师年代、角色组成、身份物种、外貌身体等 10 类边界</small>
+                        </span>
+                        <LobeTextArea
+                          autoSize={{ minRows: 6, maxRows: 14 }}
+                          onChange={(event) =>
+                            setAISettings((current) => ({
+                              ...current,
+                              classificationPrompt: event.target.value,
+                            }))
+                          }
+                          value={aiSettings.classificationPrompt}
+                        />
+                        <LobeButton
+                          onClick={() =>
+                            setAISettings((current) => ({
+                              ...current,
+                              classificationPrompt: current.defaultPrompts.classification,
+                            }))
+                          }
+                          size="small"
+                          type="text"
+                        >
+                          恢复默认
+                        </LobeButton>
+                      </label>
+                      <small className="ai-prompt-contract">
+                        程序会固定附加 JSON 格式、数量和顺序约束。
+                      </small>
+                    </div>
+                  ),
+                },
+              ]}
+              variant="outlined"
+            />
+            <div className="settings-actions">
+              <LobeButton onClick={testConnection} disabled={Boolean(busy)}>
+                测试连接
+              </LobeButton>
+              <LobeButton type="primary" onClick={saveAI} disabled={Boolean(busy)}>
+                {busy === 'save' ? '保存中…' : '保存 AI 设置'}
               </LobeButton>
             </div>
-          </div>
-        </div>
-        <LobeAlert className="settings-warning" message="更改位置会自动移动现有资源；复制和校验完成前，旧文件不会被删除。" type="info" variant="outlined"/>
-        {libraryStorage.error && <LobeAlert className="settings-warning" message={libraryStorage.error} type="error" variant="outlined"/>}
-      </> : section === 'ai' ? <>
-        <header className="settings-heading"><h2>AI 服务</h2><p>用于补全内置词典尚未覆盖的 Tag 翻译和分类。</p></header>
-        <div className="settings-group ai-settings-group">
-          <label><span><strong>API Base URL</strong><small>兼容 OpenAI API 格式的服务地址</small></span><LobeInput value={aiSettings.baseUrl} onChange={(event) => setAISettings((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.openai.com/v1"/></label>
-          <label><span><strong>API Key</strong><small>{aiSettings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}</small></span><LobeInputPassword value={aiSettings.apiKey} onChange={(event) => setAISettings((current) => ({ ...current, apiKey: event.target.value }))} placeholder={aiSettings.hasApiKey ? '已安全保存' : '输入 API Key'}/></label>
-          <label><span><strong>默认模型</strong><small>翻译与分类任务共用</small></span><div className="settings-model-input"><LobeAutoComplete options={models.map((model) => ({ value: model }))} value={aiSettings.model} onChange={(value) => setAISettings((current) => ({ ...current, model: value }))} placeholder="输入或读取模型 ID"/><LobeButton disabled={Boolean(busy)} icon={<Icon name="refresh" size={14}/>} onClick={loadModels}>{busy === 'models' ? '读取中' : '读取模型'}</LobeButton></div></label>
-        </div>
-        <LobeCollapse
-          className="ai-advanced-settings"
-          items={[{
-            key: 'prompts',
-            label: '高级设置',
-            desc: '自定义翻译与分类 Prompt',
-            children: <div className="ai-prompt-settings">
-              <label>
-                <span><strong>翻译 Prompt</strong><small>定义 Tag 的翻译语言、风格和术语处理</small></span>
-                <LobeTextArea autoSize={{ minRows: 5, maxRows: 12 }} onChange={(event) => setAISettings((current) => ({ ...current, translationPrompt: event.target.value }))} value={aiSettings.translationPrompt}/>
-                <LobeButton onClick={() => setAISettings((current) => ({ ...current, translationPrompt: current.defaultPrompts.translation }))} size="small" type="text">恢复默认</LobeButton>
-              </label>
-              <label>
-                <span><strong>分类 Prompt</strong><small>定义画师年代、角色组成、身份物种、外貌身体等 10 类边界</small></span>
-                <LobeTextArea autoSize={{ minRows: 6, maxRows: 14 }} onChange={(event) => setAISettings((current) => ({ ...current, classificationPrompt: event.target.value }))} value={aiSettings.classificationPrompt}/>
-                <LobeButton onClick={() => setAISettings((current) => ({ ...current, classificationPrompt: current.defaultPrompts.classification }))} size="small" type="text">恢复默认</LobeButton>
-              </label>
-              <small className="ai-prompt-contract">程序会固定附加 JSON 格式、数量和顺序约束。</small>
-            </div>,
-          }]}
-          variant="outlined"
-        />
-        <div className="settings-actions"><LobeButton onClick={testConnection} disabled={Boolean(busy)}>测试连接</LobeButton><LobeButton type="primary" onClick={saveAI} disabled={Boolean(busy)}>{busy === 'save' ? '保存中…' : '保存 AI 设置'}</LobeButton></div>
-        {!aiSettings.encryptionAvailable && <LobeAlert className="settings-warning" message="当前系统安全存储不可用，应用不会以明文保存 API Key。" type="warning" variant="outlined"/>}
-      </> : section === 'tags' ? <TagCacheSettings onConfirm={onConfirm} showToast={showToast} studio={studio}/> : section === 'support' ? <FeedbackCenter
-        currentVersion={updateState.currentVersion}
-        platform={updateState.platform}
-        showToast={showToast}
-        studio={studio}
-      /> : <>
-        <header className="settings-heading"><h2>关于与更新</h2><p>检查 NovelAI Prompt Studio 的官方稳定版本。</p></header>
-        <div className="settings-group update-settings-group">
-          <div className="settings-row">
-            <span><strong>当前版本</strong><small>{buildDescription}</small></span>
-            <code>v{updateState.currentVersion}</code>
-          </div>
-          <div className="settings-row">
-            <span><strong>自动检查更新</strong><small>应用启动稳定后检查一次，不会强制安装。</small></span>
-            <LobeSwitch checked={updateState.autoCheckUpdates} onChange={changeAutoCheck}/>
-          </div>
-          <div className="settings-row settings-update-row">
-            <span>
-              <strong>{updateState.hasUpdate ? `发现 v${updateState.latestVersion}` : updateState.latestVersion ? `已是最新版本 · v${updateState.latestVersion}` : '官方稳定版本'}</strong>
-              <small>{updateState.publishedAt ? formatDate(updateState.publishedAt) : '从 GitHub Release 获取'}</small>
-            </span>
-            <div className="settings-storage-actions">
-              <LobeButton loading={updateState.loading} onClick={runUpdateCheck}>{updateState.loading ? '正在检查…' : '检查更新'}</LobeButton>
-              {updateState.hasUpdate && updateState.canDownloadUpdate && !['downloading', 'downloaded'].includes(updateState.phase) && <LobeButton onClick={downloadUpdate} type="primary">下载更新</LobeButton>}
-              {updateState.phase === 'downloaded' && updateState.canInstallUpdate && <LobeButton onClick={onInstallUpdate} type="primary">重启并安装</LobeButton>}
-              {updateState.hasUpdate && <LobeButton onClick={() => studio.openReleasePage(updateState.releaseUrl)} type={isManualMacUpdate ? 'primary' : 'default'}>{isManualMacUpdate ? '下载 macOS 安装包' : '打开官方 Release'}</LobeButton>}
+            {!aiSettings.encryptionAvailable && (
+              <LobeAlert
+                className="settings-warning"
+                message="当前系统安全存储不可用，应用不会以明文保存 API Key。"
+                type="warning"
+                variant="outlined"
+              />
+            )}
+          </>
+        ) : section === 'tags' ? (
+          <TagCacheSettings onConfirm={onConfirm} showToast={showToast} studio={studio} />
+        ) : section === 'support' ? (
+          <FeedbackCenter
+            currentVersion={updateState.currentVersion}
+            platform={updateState.platform}
+            showToast={showToast}
+            studio={studio}
+          />
+        ) : (
+          <>
+            <header className="settings-heading">
+              <h2>关于与更新</h2>
+              <p>检查 NovelAI Prompt Studio 的官方稳定版本。</p>
+            </header>
+            <div className="settings-group update-settings-group">
+              <div className="settings-row">
+                <span>
+                  <strong>当前版本</strong>
+                  <small>{buildDescription}</small>
+                </span>
+                <code>v{updateState.currentVersion}</code>
+              </div>
+              <div className="settings-row">
+                <span>
+                  <strong>自动检查更新</strong>
+                  <small>应用启动稳定后检查一次，不会强制安装。</small>
+                </span>
+                <LobeSwitch checked={updateState.autoCheckUpdates} onChange={changeAutoCheck} />
+              </div>
+              <div className="settings-row settings-update-row">
+                <span>
+                  <strong>
+                    {updateState.hasUpdate
+                      ? `发现 v${updateState.latestVersion}`
+                      : updateState.latestVersion
+                        ? `已是最新版本 · v${updateState.latestVersion}`
+                        : '官方稳定版本'}
+                  </strong>
+                  <small>
+                    {updateState.publishedAt
+                      ? formatDate(updateState.publishedAt)
+                      : '从 GitHub Release 获取'}
+                  </small>
+                </span>
+                <div className="settings-storage-actions">
+                  <LobeButton loading={updateState.loading} onClick={runUpdateCheck}>
+                    {updateState.loading ? '正在检查…' : '检查更新'}
+                  </LobeButton>
+                  {updateState.hasUpdate &&
+                    updateState.canDownloadUpdate &&
+                    !['downloading', 'downloaded'].includes(updateState.phase) && (
+                      <LobeButton onClick={downloadUpdate} type="primary">
+                        下载更新
+                      </LobeButton>
+                    )}
+                  {updateState.phase === 'downloaded' && updateState.canInstallUpdate && (
+                    <LobeButton onClick={onInstallUpdate} type="primary">
+                      重启并安装
+                    </LobeButton>
+                  )}
+                  {updateState.hasUpdate && (
+                    <LobeButton
+                      onClick={() => studio.openReleasePage(updateState.releaseUrl)}
+                      type={isManualMacUpdate ? 'primary' : 'default'}
+                    >
+                      {isManualMacUpdate ? '下载 macOS 安装包' : '打开官方 Release'}
+                    </LobeButton>
+                  )}
+                </div>
+              </div>
+              {updateState.phase === 'downloading' && (
+                <div className="settings-update-progress">
+                  <span>
+                    <strong>正在下载更新</strong>
+                    <small>
+                      {Math.round(updateState.progress || 0)}%
+                      {updateState.total
+                        ? ` · ${formatBytes(updateState.transferred)} / ${formatBytes(updateState.total)}`
+                        : ''}
+                    </small>
+                  </span>
+                  <progress max="100" value={updateState.progress || 0} />
+                </div>
+              )}
+              {updateState.notes && (
+                <div className="settings-release-notes">
+                  <strong>更新说明</strong>
+                  <Suspense fallback={null}>
+                    <ReleaseNotes onOpenLink={studio.openReleasePage}>
+                      {updateState.notes}
+                    </ReleaseNotes>
+                  </Suspense>
+                </div>
+              )}
             </div>
-          </div>
-          {updateState.phase === 'downloading' && <div className="settings-update-progress">
-            <span><strong>正在下载更新</strong><small>{Math.round(updateState.progress || 0)}%{updateState.total ? ` · ${formatBytes(updateState.transferred)} / ${formatBytes(updateState.total)}` : ''}</small></span>
-            <progress max="100" value={updateState.progress || 0}/>
-          </div>}
-          {updateState.notes && <div className="settings-release-notes">
-            <strong>更新说明</strong>
-            <Suspense fallback={null}>
-              <ReleaseNotes onOpenLink={studio.openReleasePage}>{updateState.notes}</ReleaseNotes>
-            </Suspense>
-          </div>}
-        </div>
-        {updateState.error && <LobeAlert className="settings-warning" message={`${updateState.error}。本地功能不受影响，可以稍后重试。`} type="warning" variant="outlined"/>}
-        {isManualMacUpdate && <LobeAlert className="settings-warning" message="当前 macOS 版本未签名，无法在应用内直接安装更新。发现新版本后，请从官方 Release 下载对应安装包并手动替换应用。" type="info" variant="outlined"/>}
-        {!updateState.packaged && <LobeAlert className="settings-warning" message="开发模式只检查官方稳定版本，不会下载或安装更新。" type="info" variant="outlined"/>}
-      </>}
-    </section>
-  </main>;
+            {updateState.error && (
+              <LobeAlert
+                className="settings-warning"
+                message={`${updateState.error}。本地功能不受影响，可以稍后重试。`}
+                type="warning"
+                variant="outlined"
+              />
+            )}
+            {isManualMacUpdate && (
+              <LobeAlert
+                className="settings-warning"
+                message="当前 macOS 版本未签名，无法在应用内直接安装更新。发现新版本后，请从官方 Release 下载对应安装包并手动替换应用。"
+                type="info"
+                variant="outlined"
+              />
+            )}
+            {!updateState.packaged && (
+              <LobeAlert
+                className="settings-warning"
+                message="开发模式只检查官方稳定版本，不会下载或安装更新。"
+                type="info"
+                variant="outlined"
+              />
+            )}
+          </>
+        )}
+      </section>
+    </main>
+  );
 }

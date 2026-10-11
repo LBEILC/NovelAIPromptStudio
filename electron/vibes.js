@@ -14,7 +14,10 @@ export function fingerprintVibes(vibes = []) {
     encoding: fingerprintVibe(vibe?.encoding),
     strength: finiteNumber(vibe?.strength, 0.6),
     informationExtracted: finiteNumber(vibe?.information_extracted),
-    model: String(vibe?.model || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US'),
+    model: String(vibe?.model || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLocaleLowerCase('en-US'),
   }));
   return payload.length ? fingerprintVibe(JSON.stringify(payload)) : '';
 }
@@ -42,7 +45,8 @@ export function createEmbeddedVibeDocument(vibe = {}) {
   const informationExtracted = finiteNumber(vibe.information_extracted);
   const model = normalizedModel(vibe.model);
   const variant = { encoding };
-  if (informationExtracted !== null) variant.params = { information_extracted: informationExtracted };
+  if (informationExtracted !== null)
+    variant.params = { information_extracted: informationExtracted };
   return {
     identifier: VIBE_IDENTIFIER,
     version: 1,
@@ -69,13 +73,21 @@ export function exportEmbeddedVibeFile(vibe, assetsDirectory) {
 }
 
 export function extractEmbeddedVibes(raw, modelLabel = '') {
-  const encodings = Array.isArray(raw?.reference_image_multiple) ? raw.reference_image_multiple : [];
-  const strengths = Array.isArray(raw?.reference_strength_multiple) ? raw.reference_strength_multiple : [];
-  const information = Array.isArray(raw?.reference_information_extracted_multiple) ? raw.reference_information_extracted_multiple : [];
-  return encodings.filter((encoding) => typeof encoding === 'string' && encoding.length > 100).map((encoding, index) => ({
-    encoding,
-    strength: finiteNumber(strengths[index], 0.6),
-    information_extracted: finiteNumber(information[index]),
-    model: normalizedModel(modelLabel),
-  }));
+  const encodings = Array.isArray(raw?.reference_image_multiple)
+    ? raw.reference_image_multiple
+    : [];
+  const strengths = Array.isArray(raw?.reference_strength_multiple)
+    ? raw.reference_strength_multiple
+    : [];
+  const information = Array.isArray(raw?.reference_information_extracted_multiple)
+    ? raw.reference_information_extracted_multiple
+    : [];
+  return encodings
+    .filter((encoding) => typeof encoding === 'string' && encoding.length > 100)
+    .map((encoding, index) => ({
+      encoding,
+      strength: finiteNumber(strengths[index], 0.6),
+      information_extracted: finiteNumber(information[index]),
+      model: normalizedModel(modelLabel),
+    }));
 }

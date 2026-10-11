@@ -12,7 +12,9 @@ const clipboardMock = vi.hoisted(() => ({
 }));
 vi.mock('electron', () => ({ clipboard: clipboardMock }));
 
-const { cleanupWorkbenchTemporaryImages, readClipboardImageSource } = await import('./clipboardImages.js');
+const { cleanupWorkbenchTemporaryImages, readClipboardImageSource } = await import(
+  './clipboardImages.js'
+);
 const temporaryDirectories = [];
 
 afterEach(() => {
@@ -20,7 +22,8 @@ afterEach(() => {
   clipboardMock.read.mockReset().mockReturnValue('');
   clipboardMock.readBuffer.mockReset().mockReturnValue(Buffer.alloc(0));
   clipboardMock.readImage.mockReset();
-  for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
+  for (const directory of temporaryDirectories.splice(0))
+    fs.rmSync(directory, { recursive: true, force: true });
 });
 
 describe('clipboard image reading', () => {
@@ -29,7 +32,9 @@ describe('clipboard image reading', () => {
     temporaryDirectories.push(directory);
     const imagePath = path.join(directory, 'metadata image.png');
     fs.writeFileSync(imagePath, 'png bytes');
-    clipboardMock.read.mockImplementation((format) => format === 'public.file-url' ? pathToFileURL(imagePath).toString() : '');
+    clipboardMock.read.mockImplementation((format) =>
+      format === 'public.file-url' ? pathToFileURL(imagePath).toString() : '',
+    );
 
     expect(readClipboardImageSource(path.join(directory, 'temporary'))).toEqual({
       filePath: imagePath,
@@ -46,9 +51,11 @@ describe('clipboard image reading', () => {
     const imagePath = path.join(directory, 'Finder image.png');
     fs.writeFileSync(imagePath, 'png bytes');
     clipboardMock.availableFormats.mockReturnValue(['public.file-url']);
-    clipboardMock.readBuffer.mockImplementation((format) => format === 'public.file-url'
-      ? Buffer.from(pathToFileURL(imagePath).toString())
-      : Buffer.alloc(0));
+    clipboardMock.readBuffer.mockImplementation((format) =>
+      format === 'public.file-url'
+        ? Buffer.from(pathToFileURL(imagePath).toString())
+        : Buffer.alloc(0),
+    );
 
     expect(readClipboardImageSource(path.join(directory, 'temporary'))).toMatchObject({
       filePath: imagePath,
@@ -80,8 +87,20 @@ describe('clipboard image reading', () => {
     temporaryDirectories.push(directory);
     const original = Buffer.from('89504e470d0a1a0a744558744e6f76656c41493a70726f6d7074', 'hex');
     // Each platform exposes a different raw PNG format name (PNG / public.png / image/png).
-    const rawImageFormats = ['PNG', 'JFIF', 'WebP', 'public.png', 'public.jpeg', 'public.webp', 'image/png', 'image/jpeg', 'image/webp'];
-    clipboardMock.readBuffer.mockImplementation((format) => rawImageFormats.includes(format) ? original : Buffer.alloc(0));
+    const rawImageFormats = [
+      'PNG',
+      'JFIF',
+      'WebP',
+      'public.png',
+      'public.jpeg',
+      'public.webp',
+      'image/png',
+      'image/jpeg',
+      'image/webp',
+    ];
+    clipboardMock.readBuffer.mockImplementation((format) =>
+      rawImageFormats.includes(format) ? original : Buffer.alloc(0),
+    );
 
     const source = readClipboardImageSource(directory);
     expect(source).toMatchObject({ fromBitmap: false, temporaryId: source.fingerprint });

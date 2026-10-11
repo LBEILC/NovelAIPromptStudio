@@ -22,7 +22,9 @@ export function parseAppProfile(argv = []) {
   }
 
   if (values.length > 1) throw new Error('参数 --profile 只能指定一次');
-  const profile = String(values[0] || DEFAULT_APP_PROFILE).trim().toLowerCase();
+  const profile = String(values[0] || DEFAULT_APP_PROFILE)
+    .trim()
+    .toLowerCase();
   if (!PROFILE_PATTERN.test(profile)) {
     throw new Error('Profile 名称只能包含小写字母、数字和连字符，长度为 1 至 32 个字符');
   }
@@ -32,7 +34,10 @@ export function parseAppProfile(argv = []) {
 export function appProfileDirectories(appDataDirectory, appName, profile) {
   const normalizedProfile = parseAppProfile([`${PROFILE_OPTION}=${profile}`]);
   if (normalizedProfile === DEFAULT_APP_PROFILE) return null;
-  const rootDirectory = path.join(path.resolve(appDataDirectory), `${String(appName || '').trim()}-${normalizedProfile}`);
+  const rootDirectory = path.join(
+    path.resolve(appDataDirectory),
+    `${String(appName || '').trim()}-${normalizedProfile}`,
+  );
   return {
     rootDirectory,
     sessionDataDirectory: path.join(rootDirectory, 'session'),

@@ -1,5 +1,10 @@
 import { CATEGORY_OPTIONS, formatTag, normalizeSearch } from './prompt.js';
-import { getPromptScopes, isPromptAnnotationPatch, updatePromptScope, updatePromptScopeAnnotations } from './promptStructure.js';
+import {
+  getPromptScopes,
+  isPromptAnnotationPatch,
+  updatePromptScope,
+  updatePromptScopeAnnotations,
+} from './promptStructure.js';
 
 export const DEFAULT_OVERVIEW_FILTERS = {
   category: 'All',
@@ -17,7 +22,11 @@ export function isOverviewTagVisible(entries = [], scopeKey, tagId) {
   return entries.some((entry) => entry.key === targetKey);
 }
 
-export function overviewTagInteractionState(selectedCount = 0, filtered = false, selectionMode = false) {
+export function overviewTagInteractionState(
+  selectedCount = 0,
+  filtered = false,
+  selectionMode = false,
+) {
   const selectionActive = selectedCount > 0;
   const selectionModeActive = selectionMode || selectionActive;
   return {
@@ -58,17 +67,22 @@ export function filterOverviewScopes(project, filters = DEFAULT_OVERVIEW_FILTERS
       tags: scope.tags.filter((tag) => {
         if (filters.category !== 'All' && tag.category !== filters.category) return false;
         if (!query) return true;
-        return [tag.tag, tag.translation, tag.note].some((value) => normalizeSearch(value).includes(query));
+        return [tag.tag, tag.translation, tag.note].some((value) =>
+          normalizeSearch(value).includes(query),
+        );
       }),
     }));
 }
 
 export function isAutomaticPromptCollapsible(automation) {
-  return ['confirmed', 'inferred'].includes(automation?.status) && Boolean(automation?.tagIds?.length);
+  return (
+    ['confirmed', 'inferred'].includes(automation?.status) && Boolean(automation?.tagIds?.length)
+  );
 }
 
 export function filterCollapsedAutomaticScopes(scopes = [], expandedScopeKeys = []) {
-  const expanded = expandedScopeKeys instanceof Set ? expandedScopeKeys : new Set(expandedScopeKeys);
+  const expanded =
+    expandedScopeKeys instanceof Set ? expandedScopeKeys : new Set(expandedScopeKeys);
   return scopes.map((scope) => {
     if (!isAutomaticPromptCollapsible(scope.automation) || expanded.has(scope.key)) {
       return { ...scope, automaticCollapsed: false };
@@ -84,15 +98,17 @@ export function filterCollapsedAutomaticScopes(scopes = [], expandedScopeKeys = 
 }
 
 export function overviewEntries(scopes) {
-  return scopes.flatMap((scope) => scope.tags.map((tag) => ({
-    automation: scope.automation?.tagIds?.includes(tag.id) ? scope.automation : null,
-    key: overviewTagKey(scope.key, tag.id),
-    scopeKey: scope.key,
-    scopeLabel: scope.label,
-    scopeKind: scope.kind,
-    scopePolarity: scope.polarity,
-    tag,
-  })));
+  return scopes.flatMap((scope) =>
+    scope.tags.map((tag) => ({
+      automation: scope.automation?.tagIds?.includes(tag.id) ? scope.automation : null,
+      key: overviewTagKey(scope.key, tag.id),
+      scopeKey: scope.key,
+      scopeLabel: scope.label,
+      scopeKind: scope.kind,
+      scopePolarity: scope.polarity,
+      tag,
+    })),
+  );
 }
 
 export function overviewCategoryGroups(entries) {
@@ -102,9 +118,10 @@ export function overviewCategoryGroups(entries) {
     if (!groups.has(category)) groups.set(category, []);
     groups.get(category).push(entry);
   }
-  const known = CATEGORY_OPTIONS
-    .filter((category) => groups.has(category))
-    .map((category) => ({ category, entries: groups.get(category) }));
+  const known = CATEGORY_OPTIONS.filter((category) => groups.has(category)).map((category) => ({
+    category,
+    entries: groups.get(category),
+  }));
   const other = [...groups.entries()]
     .filter(([category]) => !CATEGORY_OPTIONS.includes(category))
     .map(([category, categoryEntries]) => ({ category, entries: categoryEntries }));
@@ -127,13 +144,17 @@ export function overviewCopyContext(project, visibleScopes, selectedKeys = []) {
     ? overviewEntries(getPromptScopes(project)).filter((entry) => selected.has(entry.key))
     : overviewEntries(visibleScopes);
   const promptEntries = source.filter((entry) => entry.scopePolarity === 'prompt');
-  const positive = promptEntries.filter((entry) => !['confirmed', 'inferred'].includes(entry.automation?.status));
+  const positive = promptEntries.filter(
+    (entry) => !['confirmed', 'inferred'].includes(entry.automation?.status),
+  );
   const ignored = source.length - promptEntries.length;
   const automaticIgnored = promptEntries.length - positive.length;
   const groups = selected.size ? overviewCategoryGroups(positive) : [];
   return {
     text: selected.size
-      ? groups.map((group) => group.entries.map((entry) => formatTag(entry.tag)).join(', ')).join('\n')
+      ? groups
+          .map((group) => group.entries.map((entry) => formatTag(entry.tag)).join(', '))
+          .join('\n')
       : positive.map((entry) => formatTag(entry.tag)).join(', '),
     count: positive.length,
     ignored,
@@ -191,14 +212,26 @@ export function moveOverviewTags(project, selectedKeys = [], targetScopeKey = ''
   let nextProject = getPromptScopes(project).reduce((current, scope) => {
     if (scope.key === target.key) return current;
     const nextTags = scope.tags.filter((tag) => !selected.has(overviewTagKey(scope.key, tag.id)));
-    return nextTags.length === scope.tags.length ? current : updatePromptScope(current, scope.key, nextTags);
+    return nextTags.length === scope.tags.length
+      ? current
+      : updatePromptScope(current, scope.key, nextTags);
   }, project);
 
   const targetTags = [...target.tags];
-  const seen = new Set(targetTags.map((tag) => String(tag.tag || '').trim().toLocaleLowerCase('en-US')).filter(Boolean));
+  const seen = new Set(
+    targetTags
+      .map((tag) =>
+        String(tag.tag || '')
+          .trim()
+          .toLocaleLowerCase('en-US'),
+      )
+      .filter(Boolean),
+  );
   let mergedCount = 0;
   for (const entry of movingEntries) {
-    const key = String(entry.tag.tag || '').trim().toLocaleLowerCase('en-US');
+    const key = String(entry.tag.tag || '')
+      .trim()
+      .toLocaleLowerCase('en-US');
     if (key && seen.has(key)) {
       mergedCount += 1;
       continue;
@@ -232,7 +265,12 @@ export function overviewSelectionMenuItems({
     ? `复制可用 ${copyCount} 个 Prompt Tag（忽略 ${ignoredLabels.join('、')}）`
     : `复制已选 ${copyCount} 个 Prompt Tag`;
   return [
-    { key: 'copy-selected-tags', label: copyLabel, disabled: copyCount < 1, onClick: () => onCopy?.() },
+    {
+      key: 'copy-selected-tags',
+      label: copyLabel,
+      disabled: copyCount < 1,
+      onClick: () => onCopy?.(),
+    },
     {
       key: 'translate-selected-tags',
       label: translating ? '正在整理已选 Tag…' : `翻译与分类已选 ${count} 个 Tag`,
@@ -265,7 +303,12 @@ export function overviewSelectionMenuItems({
       })),
     },
     { key: 'selected-tags-divider', type: 'divider' },
-    { key: 'delete-selected-tags', label: `删除已选 ${count} 个 Tag`, danger: true, onClick: () => onDelete?.() },
+    {
+      key: 'delete-selected-tags',
+      label: `删除已选 ${count} 个 Tag`,
+      danger: true,
+      onClick: () => onDelete?.(),
+    },
   ].filter(Boolean);
 }
 
@@ -289,6 +332,8 @@ export function deleteOverviewTags(project, selectedKeys = []) {
   const selected = new Set(selectedKeys);
   return getPromptScopes(project).reduce((current, scope) => {
     const nextTags = scope.tags.filter((tag) => !selected.has(overviewTagKey(scope.key, tag.id)));
-    return nextTags.length === scope.tags.length ? current : updatePromptScope(current, scope.key, nextTags);
+    return nextTags.length === scope.tags.length
+      ? current
+      : updatePromptScope(current, scope.key, nextTags);
   }, project);
 }

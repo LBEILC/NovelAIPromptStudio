@@ -19,11 +19,15 @@ async function renderPng(size) {
 }
 
 const pngSizes = [16, 24, 32, 48, 64, 128, 256, 512, 1024];
-const pngs = new Map(await Promise.all(pngSizes.map(async (size) => [size, await renderPng(size)])));
+const pngs = new Map(
+  await Promise.all(pngSizes.map(async (size) => [size, await renderPng(size)])),
+);
 
 await Promise.all([
   fs.writeFile(path.join(outputDirectory, 'icon.png'), pngs.get(512)),
-  ...pngSizes.map((size) => fs.writeFile(path.join(outputDirectory, `icon-${size}.png`), pngs.get(size))),
+  ...pngSizes.map((size) =>
+    fs.writeFile(path.join(outputDirectory, `icon-${size}.png`), pngs.get(size)),
+  ),
 ]);
 
 function createIco(images) {
@@ -49,7 +53,10 @@ function createIco(images) {
 }
 
 const icoSizes = [16, 24, 32, 48, 64, 128, 256];
-await fs.writeFile(path.join(outputDirectory, 'icon.ico'), createIco(icoSizes.map((size) => ({ size, data: pngs.get(size) }))));
+await fs.writeFile(
+  path.join(outputDirectory, 'icon.ico'),
+  createIco(icoSizes.map((size) => ({ size, data: pngs.get(size) }))),
+);
 
 function icnsChunk(type, data) {
   const header = Buffer.alloc(8);
@@ -70,6 +77,9 @@ const icnsEntries = [
 const icnsHeader = Buffer.alloc(8);
 icnsHeader.write('icns', 0, 4, 'ascii');
 icnsHeader.writeUInt32BE(8 + icnsEntries.reduce((total, chunk) => total + chunk.length, 0), 4);
-await fs.writeFile(path.join(outputDirectory, 'icon.icns'), Buffer.concat([icnsHeader, ...icnsEntries]));
+await fs.writeFile(
+  path.join(outputDirectory, 'icon.icns'),
+  Buffer.concat([icnsHeader, ...icnsEntries]),
+);
 
 console.log(`Generated app icons in ${path.relative(projectRoot, outputDirectory)}`);

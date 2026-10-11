@@ -10,7 +10,9 @@ import { inferCategory } from '../src/lib/prompt.js';
 const DANBOORU_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 function dictionaryKey(value) {
-  return String(value || '').trim().toLocaleLowerCase('en-US');
+  return String(value || '')
+    .trim()
+    .toLocaleLowerCase('en-US');
 }
 
 function freshDanbooruEntry(entry, now) {
@@ -61,34 +63,52 @@ export async function annotateTags(texts, options) {
     }
   }
 
-  const checkedByName = new Map(danbooruChecks.map((entry) => [danbooruLookupName(entry.tag), entry]));
+  const checkedByName = new Map(
+    danbooruChecks.map((entry) => [danbooruLookupName(entry.tag), entry]),
+  );
   const danbooruEntry = (tag) => {
     if (isExplicitArtistTag(tag)) return { category: 1, is_deprecated: false };
     const lookupName = danbooruLookupName(tag);
-    return checkedByName.get(lookupName) || (freshDanbooruEntry(danbooruCache.get(lookupName), nowMs) ? danbooruCache.get(lookupName) : null);
+    return (
+      checkedByName.get(lookupName) ||
+      (freshDanbooruEntry(danbooruCache.get(lookupName), nowMs)
+        ? danbooruCache.get(lookupName)
+        : null)
+    );
   };
   const dsoEntry = (tag) => dsoDictionary.get(danbooruLookupName(tag)) || null;
 
-  const missing = cleaned.map((tag, index) => {
-    const cached = dictionary.get(dictionaryKey(tag));
-    const remoteEntry = danbooruEntry(tag);
-    const offlineEntry = dsoEntry(tag);
-    const artist = isDanbooruArtist(remoteEntry);
-    const remoteCategory = danbooruStudioCategory(remoteEntry);
-    const offlineCategory = offlineEntry?.category && offlineEntry.category !== 'Unsorted' ? offlineEntry.category : '';
-    const ruleCategory = inferCategory(tag);
-    const manualCategory = cached?.has_classification && cached.category_source === 'manual';
-    const hasTranslation = artist || Boolean(offlineEntry?.translation) || Boolean(cached?.has_translation);
-    const hasClassification = Boolean(remoteCategory) || manualCategory || Boolean(offlineCategory) || ruleCategory !== 'Unsorted'
-      || (cached?.has_classification && cached.category !== 'Unsorted');
-    return hasTranslation && hasClassification ? null : { tag, index };
-  }).filter(Boolean);
+  const missing = cleaned
+    .map((tag, index) => {
+      const cached = dictionary.get(dictionaryKey(tag));
+      const remoteEntry = danbooruEntry(tag);
+      const offlineEntry = dsoEntry(tag);
+      const artist = isDanbooruArtist(remoteEntry);
+      const remoteCategory = danbooruStudioCategory(remoteEntry);
+      const offlineCategory =
+        offlineEntry?.category && offlineEntry.category !== 'Unsorted' ? offlineEntry.category : '';
+      const ruleCategory = inferCategory(tag);
+      const manualCategory = cached?.has_classification && cached.category_source === 'manual';
+      const hasTranslation =
+        artist || Boolean(offlineEntry?.translation) || Boolean(cached?.has_translation);
+      const hasClassification =
+        Boolean(remoteCategory) ||
+        manualCategory ||
+        Boolean(offlineCategory) ||
+        ruleCategory !== 'Unsorted' ||
+        (cached?.has_classification && cached.category !== 'Unsorted');
+      return hasTranslation && hasClassification ? null : { tag, index };
+    })
+    .filter(Boolean);
 
-  const generated = missing.length && typeof options.translateMissing === 'function'
-    ? await options.translateMissing(missing.map((entry) => entry.tag))
-    : null;
+  const generated =
+    missing.length && typeof options.translateMissing === 'function'
+      ? await options.translateMissing(missing.map((entry) => entry.tag))
+      : null;
   const generatedItems = generated?.items || [];
-  const generatedByIndex = new Map(missing.map((entry, index) => [entry.index, generatedItems[index] || {}]));
+  const generatedByIndex = new Map(
+    missing.map((entry, index) => [entry.index, generatedItems[index] || {}]),
+  );
   const items = cleaned.map((tag, index) => {
     const cached = dictionary.get(dictionaryKey(tag));
     const ai = generatedByIndex.get(index) || {};
@@ -97,7 +117,8 @@ export async function annotateTags(texts, options) {
     const artist = isDanbooruArtist(remoteEntry);
     const remoteCategory = danbooruStudioCategory(remoteEntry);
     const offlineTranslation = String(offlineEntry?.translation || '').trim();
-    const offlineCategory = offlineEntry?.category && offlineEntry.category !== 'Unsorted' ? offlineEntry.category : '';
+    const offlineCategory =
+      offlineEntry?.category && offlineEntry.category !== 'Unsorted' ? offlineEntry.category : '';
     const ruleCategory = inferCategory(tag);
     const manualTranslation = cached?.has_translation && cached.translation_source === 'manual';
     const manualCategory = cached?.has_classification && cached.category_source === 'manual';
@@ -157,7 +178,8 @@ export async function annotateTags(texts, options) {
     cacheHits: cleaned.length - missing.length,
     dsoTranslationCount: items.filter((item) => item.translation_source === 'dso').length,
     dsoCategoryCount: items.filter((item) => item.category_source === 'dso').length,
-    unresolvedCount: items.filter((item) => !item.translation || item.category === 'Unsorted').length,
+    unresolvedCount: items.filter((item) => !item.translation || item.category === 'Unsorted')
+      .length,
   };
 }
 

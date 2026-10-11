@@ -123,7 +123,9 @@ function safeJson(value, fallback = {}) {
 }
 
 function dictionaryKey(value) {
-  return String(value || '').trim().toLocaleLowerCase('en-US');
+  return String(value || '')
+    .trim()
+    .toLocaleLowerCase('en-US');
 }
 
 function projectTags(project) {
@@ -131,7 +133,10 @@ function projectTags(project) {
   return [
     ...(project.tags || []),
     ...(structure.base_undesired_tags || []),
-    ...(structure.characters || []).flatMap((character) => [...(character.prompt_tags || []), ...(character.undesired_tags || [])]),
+    ...(structure.characters || []).flatMap((character) => [
+      ...(character.prompt_tags || []),
+      ...(character.undesired_tags || []),
+    ]),
   ];
 }
 
@@ -140,50 +145,148 @@ function tableColumns(database, table) {
 }
 
 function ensureColumn(database, table, columns, name, definition) {
-  if (!columns.includes(name)) database.run(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+  if (!columns.includes(name))
+    database.run(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
 }
 
 export async function openDatabase(dataDirectory) {
   fs.mkdirSync(dataDirectory, { recursive: true });
   const filePath = path.join(dataDirectory, 'studio.sqlite');
   const backupPath = path.join(dataDirectory, 'studio.pre-phase2.sqlite');
-  if (fs.existsSync(filePath) && !fs.existsSync(backupPath)) fs.copyFileSync(filePath, backupPath, fs.constants.COPYFILE_EXCL);
+  if (fs.existsSync(filePath) && !fs.existsSync(backupPath))
+    fs.copyFileSync(filePath, backupPath, fs.constants.COPYFILE_EXCL);
 
   const wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm');
   const SQL = await initSqlJs({ locateFile: () => wasmPath });
-  const database = fs.existsSync(filePath) ? new SQL.Database(fs.readFileSync(filePath)) : new SQL.Database();
+  const database = fs.existsSync(filePath)
+    ? new SQL.Database(fs.readFileSync(filePath))
+    : new SQL.Database();
   database.run(CORE_SCHEMA);
 
   const projectColumns = tableColumns(database, 'projects');
   ensureColumn(database, 'projects', projectColumns, 'content_hash', "TEXT NOT NULL DEFAULT ''");
-  ensureColumn(database, 'projects', projectColumns, 'prompt_fingerprint', "TEXT NOT NULL DEFAULT ''");
-  ensureColumn(database, 'projects', projectColumns, 'base_prompt_fingerprint', "TEXT NOT NULL DEFAULT ''");
-  ensureColumn(database, 'projects', projectColumns, 'vibe_fingerprint', "TEXT NOT NULL DEFAULT ''");
-  ensureColumn(database, 'projects', projectColumns, 'exact_group_fingerprint', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(
+    database,
+    'projects',
+    projectColumns,
+    'prompt_fingerprint',
+    "TEXT NOT NULL DEFAULT ''",
+  );
+  ensureColumn(
+    database,
+    'projects',
+    projectColumns,
+    'base_prompt_fingerprint',
+    "TEXT NOT NULL DEFAULT ''",
+  );
+  ensureColumn(
+    database,
+    'projects',
+    projectColumns,
+    'vibe_fingerprint',
+    "TEXT NOT NULL DEFAULT ''",
+  );
+  ensureColumn(
+    database,
+    'projects',
+    projectColumns,
+    'exact_group_fingerprint',
+    "TEXT NOT NULL DEFAULT ''",
+  );
   ensureColumn(database, 'projects', projectColumns, 'is_favorite', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn(database, 'projects', projectColumns, 'deleted_at', "TEXT NOT NULL DEFAULT ''");
-  database.run("CREATE INDEX IF NOT EXISTS idx_projects_content_hash ON projects(content_hash) WHERE content_hash != ''");
-  database.run("CREATE INDEX IF NOT EXISTS idx_projects_prompt_fingerprint ON projects(prompt_fingerprint) WHERE prompt_fingerprint != ''");
-  database.run("CREATE INDEX IF NOT EXISTS idx_projects_base_prompt_fingerprint ON projects(base_prompt_fingerprint) WHERE base_prompt_fingerprint != ''");
-  database.run("CREATE INDEX IF NOT EXISTS idx_projects_exact_group_fingerprint ON projects(exact_group_fingerprint) WHERE exact_group_fingerprint != ''");
+  database.run(
+    "CREATE INDEX IF NOT EXISTS idx_projects_content_hash ON projects(content_hash) WHERE content_hash != ''",
+  );
+  database.run(
+    "CREATE INDEX IF NOT EXISTS idx_projects_prompt_fingerprint ON projects(prompt_fingerprint) WHERE prompt_fingerprint != ''",
+  );
+  database.run(
+    "CREATE INDEX IF NOT EXISTS idx_projects_base_prompt_fingerprint ON projects(base_prompt_fingerprint) WHERE base_prompt_fingerprint != ''",
+  );
+  database.run(
+    "CREATE INDEX IF NOT EXISTS idx_projects_exact_group_fingerprint ON projects(exact_group_fingerprint) WHERE exact_group_fingerprint != ''",
+  );
   const tagColumns = tableColumns(database, 'prompt_tags');
   ensureColumn(database, 'prompt_tags', tagColumns, 'raw_segment', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(database, 'prompt_tags', tagColumns, 'syntax_issue', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(database, 'prompt_tags', tagColumns, 'brace_depth', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn(database, 'prompt_tags', tagColumns, 'brace_group', "TEXT NOT NULL DEFAULT ''");
-  ensureColumn(database, 'prompt_tags', tagColumns, 'brace_trailing_comma', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(
+    database,
+    'prompt_tags',
+    tagColumns,
+    'brace_trailing_comma',
+    'INTEGER NOT NULL DEFAULT 0',
+  );
   const metadataColumns = tableColumns(database, 'generation_metadata');
-  ensureColumn(database, 'generation_metadata', metadataColumns, 'prompt_structure_json', "TEXT NOT NULL DEFAULT '{}'");
-  ensureColumn(database, 'generation_metadata', metadataColumns, 'width', 'INTEGER NOT NULL DEFAULT 0');
-  ensureColumn(database, 'generation_metadata', metadataColumns, 'height', 'INTEGER NOT NULL DEFAULT 0');
-  ensureColumn(database, 'generation_metadata', metadataColumns, 'generation_mode', "TEXT NOT NULL DEFAULT 'unknown'");
+  ensureColumn(
+    database,
+    'generation_metadata',
+    metadataColumns,
+    'prompt_structure_json',
+    "TEXT NOT NULL DEFAULT '{}'",
+  );
+  ensureColumn(
+    database,
+    'generation_metadata',
+    metadataColumns,
+    'width',
+    'INTEGER NOT NULL DEFAULT 0',
+  );
+  ensureColumn(
+    database,
+    'generation_metadata',
+    metadataColumns,
+    'height',
+    'INTEGER NOT NULL DEFAULT 0',
+  );
+  ensureColumn(
+    database,
+    'generation_metadata',
+    metadataColumns,
+    'generation_mode',
+    "TEXT NOT NULL DEFAULT 'unknown'",
+  );
   const dictionaryColumns = tableColumns(database, 'tag_dictionary');
-  ensureColumn(database, 'tag_dictionary', dictionaryColumns, 'display_tag', "TEXT NOT NULL DEFAULT ''");
-  ensureColumn(database, 'tag_dictionary', dictionaryColumns, 'has_translation', 'INTEGER NOT NULL DEFAULT 0');
-  ensureColumn(database, 'tag_dictionary', dictionaryColumns, 'has_classification', 'INTEGER NOT NULL DEFAULT 0');
-  ensureColumn(database, 'tag_dictionary', dictionaryColumns, 'translation_source', "TEXT NOT NULL DEFAULT ''");
-  ensureColumn(database, 'tag_dictionary', dictionaryColumns, 'category_source', "TEXT NOT NULL DEFAULT ''");
-  database.run("INSERT OR REPLACE INTO app_meta (key, value) VALUES ('runtime_schema', 'phase2-core')");
+  ensureColumn(
+    database,
+    'tag_dictionary',
+    dictionaryColumns,
+    'display_tag',
+    "TEXT NOT NULL DEFAULT ''",
+  );
+  ensureColumn(
+    database,
+    'tag_dictionary',
+    dictionaryColumns,
+    'has_translation',
+    'INTEGER NOT NULL DEFAULT 0',
+  );
+  ensureColumn(
+    database,
+    'tag_dictionary',
+    dictionaryColumns,
+    'has_classification',
+    'INTEGER NOT NULL DEFAULT 0',
+  );
+  ensureColumn(
+    database,
+    'tag_dictionary',
+    dictionaryColumns,
+    'translation_source',
+    "TEXT NOT NULL DEFAULT ''",
+  );
+  ensureColumn(
+    database,
+    'tag_dictionary',
+    dictionaryColumns,
+    'category_source',
+    "TEXT NOT NULL DEFAULT ''",
+  );
+  database.run(
+    "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('runtime_schema', 'phase2-core')",
+  );
 
   const persist = () => {
     const temporaryPath = `${filePath}.tmp`;
@@ -212,7 +315,10 @@ export async function openDatabase(dataDirectory) {
         params[parameter] = key;
         return parameter;
       });
-      for (const row of query(`SELECT * FROM tag_dictionary WHERE tag IN (${placeholders.join(', ')})`, params)) {
+      for (const row of query(
+        `SELECT * FROM tag_dictionary WHERE tag IN (${placeholders.join(', ')})`,
+        params,
+      )) {
         const original = requested.get(row.tag) || row.display_tag || row.tag;
         found.set(row.tag, { ...row, category: normalizeCategory(row.category, original) });
       }
@@ -252,22 +358,41 @@ export async function openDatabase(dataDirectory) {
     }
   };
 
-  const knowledgePriority = (source) => ({ manual: 5, danbooru: 4, dso: 3, rule: 2, ai: 1, cache: 0, builtin: 0, heuristic: 0 }[source] || 0);
+  const knowledgePriority = (source) =>
+    ({ manual: 5, danbooru: 4, dso: 3, rule: 2, ai: 1, cache: 0, builtin: 0, heuristic: 0 })[
+      source
+    ] || 0;
   const upsertTagDictionary = (entries = [], updatedAt = new Date().toISOString()) => {
     for (const entry of entries) {
       const key = dictionaryKey(entry.tag);
       if (!key) continue;
-      const current = query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0] || {};
+      const current =
+        query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0] || {};
       const incomingTranslation = String(entry.translation || '').trim();
       const incomingCategory = normalizeCategory(entry.category, entry.tag);
-      const incomingTranslationSource = String(entry.translation_source || (entry.has_translation ? 'ai' : ''));
-      const incomingCategorySource = String(entry.category_source || (entry.has_classification ? 'ai' : ''));
+      const incomingTranslationSource = String(
+        entry.translation_source || (entry.has_translation ? 'ai' : ''),
+      );
+      const incomingCategorySource = String(
+        entry.category_source || (entry.has_classification ? 'ai' : ''),
+      );
       const hasIncomingTranslation = entry.has_translation ?? Boolean(incomingTranslation);
       const hasIncomingClassification = entry.has_classification ?? Boolean(entry.category);
-      const replaceTranslation = hasIncomingTranslation && (!current.has_translation || knowledgePriority(incomingTranslationSource) >= knowledgePriority(current.translation_source));
-      const replaceClassification = hasIncomingClassification && (!current.has_classification || knowledgePriority(incomingCategorySource) >= knowledgePriority(current.category_source));
-      const translation = replaceTranslation ? incomingTranslation : String(current.translation || '');
-      const category = replaceClassification ? incomingCategory : normalizeCategory(current.category, entry.tag);
+      const replaceTranslation =
+        hasIncomingTranslation &&
+        (!current.has_translation ||
+          knowledgePriority(incomingTranslationSource) >=
+            knowledgePriority(current.translation_source));
+      const replaceClassification =
+        hasIncomingClassification &&
+        (!current.has_classification ||
+          knowledgePriority(incomingCategorySource) >= knowledgePriority(current.category_source));
+      const translation = replaceTranslation
+        ? incomingTranslation
+        : String(current.translation || '');
+      const category = replaceClassification
+        ? incomingCategory
+        : normalizeCategory(current.category, entry.tag);
       const hasTranslation = Boolean(current.has_translation || hasIncomingTranslation);
       const hasClassification = Boolean(current.has_classification || hasIncomingClassification);
       if (!hasTranslation && !hasClassification) continue;
@@ -285,8 +410,12 @@ export async function openDatabase(dataDirectory) {
           $category: category,
           $has_translation: hasTranslation ? 1 : 0,
           $has_classification: hasClassification ? 1 : 0,
-          $translation_source: replaceTranslation ? incomingTranslationSource : String(current.translation_source || ''),
-          $category_source: replaceClassification ? incomingCategorySource : String(current.category_source || ''),
+          $translation_source: replaceTranslation
+            ? incomingTranslationSource
+            : String(current.translation_source || ''),
+          $category_source: replaceClassification
+            ? incomingCategorySource
+            : String(current.category_source || ''),
           $updated_at: updatedAt,
         },
       );
@@ -297,9 +426,16 @@ export async function openDatabase(dataDirectory) {
     const key = dictionaryKey(tag);
     if (!key) throw new Error('Tag 不能为空');
     const current = query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0] || {};
-    const translation = patch.translation === undefined ? String(current.translation || '') : String(patch.translation || '').trim();
-    const category = patch.category === undefined ? normalizeCategory(current.category, tag) : String(patch.category || 'Unsorted');
-    if (patch.category !== undefined && !TAG_CATEGORIES.has(category)) throw new Error('Tag 分类无效');
+    const translation =
+      patch.translation === undefined
+        ? String(current.translation || '')
+        : String(patch.translation || '').trim();
+    const category =
+      patch.category === undefined
+        ? normalizeCategory(current.category, tag)
+        : String(patch.category || 'Unsorted');
+    if (patch.category !== undefined && !TAG_CATEGORIES.has(category))
+      throw new Error('Tag 分类无效');
     if (translation.length > 240) throw new Error('Tag 翻译不能超过 240 个字符');
     database.run(
       `INSERT INTO tag_dictionary (tag, display_tag, translation, category, has_translation, has_classification, translation_source, category_source, updated_at)
@@ -312,10 +448,22 @@ export async function openDatabase(dataDirectory) {
         $display_tag: String(current.display_tag || tag).trim(),
         $translation: translation,
         $category: category,
-        $has_translation: patch.translation === undefined ? Number(current.has_translation || 0) : translation ? 1 : 0,
-        $has_classification: patch.category === undefined ? Number(current.has_classification || 0) : 1,
-        $translation_source: patch.translation === undefined ? String(current.translation_source || '') : translation ? 'manual' : '',
-        $category_source: patch.category === undefined ? String(current.category_source || '') : 'manual',
+        $has_translation:
+          patch.translation === undefined
+            ? Number(current.has_translation || 0)
+            : translation
+              ? 1
+              : 0,
+        $has_classification:
+          patch.category === undefined ? Number(current.has_classification || 0) : 1,
+        $translation_source:
+          patch.translation === undefined
+            ? String(current.translation_source || '')
+            : translation
+              ? 'manual'
+              : '',
+        $category_source:
+          patch.category === undefined ? String(current.category_source || '') : 'manual',
         $updated_at: new Date().toISOString(),
       },
     );
@@ -324,9 +472,21 @@ export async function openDatabase(dataDirectory) {
   };
 
   const listTagDictionary = (filters = {}) => {
-    const search = String(filters.query || '').trim().toLowerCase().slice(0, 240);
+    const search = String(filters.query || '')
+      .trim()
+      .toLowerCase()
+      .slice(0, 240);
     const category = TAG_CATEGORIES.has(filters.category) ? filters.category : '';
-    const allowedSources = new Set(['manual', 'danbooru', 'dso', 'rule', 'ai', 'cache', 'builtin', 'heuristic']);
+    const allowedSources = new Set([
+      'manual',
+      'danbooru',
+      'dso',
+      'rule',
+      'ai',
+      'cache',
+      'builtin',
+      'heuristic',
+    ]);
     const source = allowedSources.has(filters.source) ? filters.source : '';
     const limit = Math.min(200, Math.max(1, Number.parseInt(filters.limit, 10) || 50));
     const offset = Math.max(0, Number.parseInt(filters.offset, 10) || 0);
@@ -401,7 +561,8 @@ export async function openDatabase(dataDirectory) {
       for (const key of existing.keys()) {
         database.run('DELETE FROM tag_dictionary WHERE tag = $tag', { $tag: key });
         const danbooruTag = danbooruLookupName(key);
-        if (danbooruTag) database.run('DELETE FROM danbooru_tag_cache WHERE tag = $tag', { $tag: danbooruTag });
+        if (danbooruTag)
+          database.run('DELETE FROM danbooru_tag_cache WHERE tag = $tag', { $tag: danbooruTag });
       }
       database.run('COMMIT');
     } catch (error) {
@@ -422,20 +583,35 @@ export async function openDatabase(dataDirectory) {
       const ruleCategory = inferCategory(tag.tag);
       const useRule = tag.category_source !== 'manual' && ruleCategory !== 'Unsorted';
       const category = useRule ? ruleCategory : normalizedCategory;
-      const migrated = category === tag.category
-        ? tag
-        : { ...tag, category, category_source: useRule ? 'rule' : tag.category_source || 'migration' };
+      const migrated =
+        category === tag.category
+          ? tag
+          : {
+              ...tag,
+              category,
+              category_source: useRule ? 'rule' : tag.category_source || 'migration',
+            };
       if (!entry) return migrated;
-      const cachedCategoryWins = entry.has_classification && (
-        entry.category_source === 'manual'
-        || entry.category_source === 'danbooru'
-        || entry.category_source === 'dso'
-        || !useRule
-      );
+      const cachedCategoryWins =
+        entry.has_classification &&
+        (entry.category_source === 'manual' ||
+          entry.category_source === 'danbooru' ||
+          entry.category_source === 'dso' ||
+          !useRule);
       return {
         ...migrated,
-        ...(entry.has_translation ? { translation: entry.translation, translation_source: entry.translation_source || 'cache' } : {}),
-        ...(cachedCategoryWins ? { category: normalizeCategory(entry.category, tag.tag), category_source: entry.category_source || 'cache' } : {}),
+        ...(entry.has_translation
+          ? {
+              translation: entry.translation,
+              translation_source: entry.translation_source || 'cache',
+            }
+          : {}),
+        ...(cachedCategoryWins
+          ? {
+              category: normalizeCategory(entry.category, tag.tag),
+              category_source: entry.category_source || 'cache',
+            }
+          : {}),
       };
     };
     const structure = project.prompt_structure || {};
@@ -456,32 +632,49 @@ export async function openDatabase(dataDirectory) {
 
   const hydrateProject = (project) => {
     if (!project) return null;
-    const metadata = query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] || {};
+    const metadata =
+      query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] ||
+      {};
     const hydrated = enrichProjectTags({
       ...project,
-      tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', { $id: project.id }),
+      tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', {
+        $id: project.id,
+      }),
       metadata,
       prompt_structure: safeJson(metadata.prompt_structure_json),
     });
     const cover = project.exact_group_fingerprint
-      ? query('SELECT project_id FROM prompt_group_covers WHERE prompt_fingerprint = $fingerprint', { $fingerprint: project.exact_group_fingerprint })[0]
+      ? query(
+          'SELECT project_id FROM prompt_group_covers WHERE prompt_fingerprint = $fingerprint',
+          { $fingerprint: project.exact_group_fingerprint },
+        )[0]
       : null;
     return { ...hydrated, group_cover_id: cover?.project_id || '' };
   };
 
-  const loadProject = (projectId) => hydrateProject(query('SELECT * FROM projects WHERE id = $id', { $id: String(projectId || '') })[0]);
+  const loadProject = (projectId) =>
+    hydrateProject(
+      query('SELECT * FROM projects WHERE id = $id', { $id: String(projectId || '') })[0],
+    );
   const loadLibrary = (view = 'all') => {
-    const where = view === 'trash'
-      ? "projects.deleted_at != ''"
-      : view === 'favorites' ? "projects.deleted_at = '' AND projects.is_favorite = 1" : "projects.deleted_at = ''";
-    const projects = query(`SELECT projects.* FROM projects WHERE ${where} ORDER BY projects.created_at DESC`);
+    const where =
+      view === 'trash'
+        ? "projects.deleted_at != ''"
+        : view === 'favorites'
+          ? "projects.deleted_at = '' AND projects.is_favorite = 1"
+          : "projects.deleted_at = ''";
+    const projects = query(
+      `SELECT projects.* FROM projects WHERE ${where} ORDER BY projects.created_at DESC`,
+    );
     if (!projects.length) return [];
 
-    const metadataByProject = new Map(query(
-      `SELECT generation_metadata.* FROM generation_metadata
+    const metadataByProject = new Map(
+      query(
+        `SELECT generation_metadata.* FROM generation_metadata
        JOIN projects ON projects.id = generation_metadata.project_id
        WHERE ${where}`,
-    ).map((metadata) => [metadata.project_id, metadata]));
+      ).map((metadata) => [metadata.project_id, metadata]),
+    );
     const tagsByProject = new Map();
     for (const tag of query(
       `SELECT prompt_tags.* FROM prompt_tags
@@ -492,12 +685,14 @@ export async function openDatabase(dataDirectory) {
       if (!tagsByProject.has(tag.project_id)) tagsByProject.set(tag.project_id, []);
       tagsByProject.get(tag.project_id).push(tag);
     }
-    const covers = new Map(query(
-      `SELECT prompt_group_covers.prompt_fingerprint, prompt_group_covers.project_id
+    const covers = new Map(
+      query(
+        `SELECT prompt_group_covers.prompt_fingerprint, prompt_group_covers.project_id
        FROM prompt_group_covers
        JOIN projects ON projects.exact_group_fingerprint = prompt_group_covers.prompt_fingerprint
        WHERE ${where}`,
-    ).map((cover) => [cover.prompt_fingerprint, cover.project_id]));
+      ).map((cover) => [cover.prompt_fingerprint, cover.project_id]),
+    );
     const hydrated = projects.map((project) => {
       const metadata = metadataByProject.get(project.id) || {};
       return {
@@ -508,7 +703,9 @@ export async function openDatabase(dataDirectory) {
         group_cover_id: covers.get(project.exact_group_fingerprint) || '',
       };
     });
-    const cached = lookupTagDictionary(hydrated.flatMap((project) => projectTags(project).map((tag) => tag.tag)));
+    const cached = lookupTagDictionary(
+      hydrated.flatMap((project) => projectTags(project).map((tag) => tag.tag)),
+    );
     return hydrated.map((project) => enrichProjectTags(project, cached));
   };
 
@@ -525,9 +722,13 @@ export async function openDatabase(dataDirectory) {
     return serialized;
   };
   const migrateLegacyFavorites = () => {
-    const migrated = query('SELECT value FROM app_meta WHERE key = $key', { $key: FAVORITES_COLLECTION_MIGRATION_KEY })[0];
+    const migrated = query('SELECT value FROM app_meta WHERE key = $key', {
+      $key: FAVORITES_COLLECTION_MIGRATION_KEY,
+    })[0];
     if (migrated?.value === 'complete') return { migrated: false, projectIds: [] };
-    const favoriteIds = query('SELECT id FROM projects WHERE is_favorite = 1 ORDER BY created_at ASC').map((project) => project.id);
+    const favoriteIds = query(
+      'SELECT id FROM projects WHERE is_favorite = 1 ORDER BY created_at ASC',
+    ).map((project) => project.id);
     const nowValue = new Date().toISOString();
     database.run('BEGIN');
     try {
@@ -541,15 +742,20 @@ export async function openDatabase(dataDirectory) {
           $updated_at: nowValue,
         },
       );
-      for (const projectId of favoriteIds) database.run(
-        `INSERT OR IGNORE INTO gallery_collection_projects (collection_id, project_id, created_at)
+      for (const projectId of favoriteIds)
+        database.run(
+          `INSERT OR IGNORE INTO gallery_collection_projects (collection_id, project_id, created_at)
          VALUES ($collection_id, $project_id, $created_at)`,
-        { $collection_id: DEFAULT_GALLERY_COLLECTION_ID, $project_id: projectId, $created_at: nowValue },
-      );
-      database.run(
-        'INSERT OR REPLACE INTO app_meta (key, value) VALUES ($key, $value)',
-        { $key: FAVORITES_COLLECTION_MIGRATION_KEY, $value: 'complete' },
-      );
+          {
+            $collection_id: DEFAULT_GALLERY_COLLECTION_ID,
+            $project_id: projectId,
+            $created_at: nowValue,
+          },
+        );
+      database.run('INSERT OR REPLACE INTO app_meta (key, value) VALUES ($key, $value)', {
+        $key: FAVORITES_COLLECTION_MIGRATION_KEY,
+        $value: 'complete',
+      });
       database.run('COMMIT');
       persist();
       return { migrated: true, projectIds: favoriteIds };
@@ -561,7 +767,7 @@ export async function openDatabase(dataDirectory) {
   const listCollections = () => {
     migrateLegacyFavorites();
     return query(
-    `SELECT gallery_collections.*,
+      `SELECT gallery_collections.*,
       (SELECT COUNT(*) FROM gallery_collection_projects
        JOIN projects ON projects.id = gallery_collection_projects.project_id
        WHERE gallery_collection_projects.collection_id = gallery_collections.id AND projects.deleted_at = '') AS active_member_count
@@ -570,15 +776,17 @@ export async function openDatabase(dataDirectory) {
     ).map((collection) => ({
       ...collection,
       filters: safeJson(collection.filter_json),
-      member_ids: collection.kind === 'manual'
-        ? query(
-          'SELECT project_id FROM gallery_collection_projects WHERE collection_id = $id ORDER BY created_at ASC',
-          { $id: collection.id },
-        ).map((row) => row.project_id)
-        : [],
+      member_ids:
+        collection.kind === 'manual'
+          ? query(
+              'SELECT project_id FROM gallery_collection_projects WHERE collection_id = $id ORDER BY created_at ASC',
+              { $id: collection.id },
+            ).map((row) => row.project_id)
+          : [],
     }));
   };
-  const loadCollection = (id) => listCollections().find((collection) => collection.id === String(id || '')) || null;
+  const loadCollection = (id) =>
+    listCollections().find((collection) => collection.id === String(id || '')) || null;
   const createCollection = (value = {}) => {
     const id = String(value.id || '').trim();
     if (!id) throw new Error('收藏集 ID 不能为空');
@@ -601,31 +809,45 @@ export async function openDatabase(dataDirectory) {
     return loadCollection(id);
   };
   const updateCollection = (id, patch = {}) => {
-    const collection = query('SELECT * FROM gallery_collections WHERE id = $id', { $id: String(id || '') })[0];
+    const collection = query('SELECT * FROM gallery_collections WHERE id = $id', {
+      $id: String(id || ''),
+    })[0];
     if (!collection) throw new Error('收藏集不存在');
     const name = patch.name === undefined ? collection.name : cleanCollectionName(patch.name);
-    const filterJson = collection.kind === 'smart' && patch.filters !== undefined
-      ? collectionFilters(patch.filters)
-      : collection.filter_json;
+    const filterJson =
+      collection.kind === 'smart' && patch.filters !== undefined
+        ? collectionFilters(patch.filters)
+        : collection.filter_json;
     database.run(
       `UPDATE gallery_collections SET name = $name, filter_json = $filter_json, updated_at = $updated_at WHERE id = $id`,
-      { $id: collection.id, $name: name, $filter_json: filterJson, $updated_at: new Date().toISOString() },
+      {
+        $id: collection.id,
+        $name: name,
+        $filter_json: filterJson,
+        $updated_at: new Date().toISOString(),
+      },
     );
     persist();
     return loadCollection(collection.id);
   };
   const deleteCollection = (id) => {
     const collectionId = String(id || '');
-    const exists = Boolean(query('SELECT id FROM gallery_collections WHERE id = $id', { $id: collectionId })[0]);
+    const exists = Boolean(
+      query('SELECT id FROM gallery_collections WHERE id = $id', { $id: collectionId })[0],
+    );
     if (!exists) return false;
-    database.run('DELETE FROM gallery_collection_projects WHERE collection_id = $id', { $id: collectionId });
+    database.run('DELETE FROM gallery_collection_projects WHERE collection_id = $id', {
+      $id: collectionId,
+    });
     database.run('DELETE FROM gallery_collections WHERE id = $id', { $id: collectionId });
     persist();
     return true;
   };
   const updateCollectionProjects = (collectionId, projectIds = [], action = 'add') => {
     const id = String(collectionId || '');
-    const collection = query('SELECT id, kind FROM gallery_collections WHERE id = $id', { $id: id })[0];
+    const collection = query('SELECT id, kind FROM gallery_collections WHERE id = $id', {
+      $id: id,
+    })[0];
     if (!collection) throw new Error('收藏集不存在');
     if (collection.kind !== 'manual') throw new Error('智能收藏集由筛选条件自动管理');
     const uniqueIds = [...new Set(projectIds.map(String).filter(Boolean))];
@@ -744,33 +966,51 @@ export async function openDatabase(dataDirectory) {
     }
   };
 
-  const findProjectByContentHash = (contentHash) => query(
-    "SELECT id, name, image_path, thumbnail_path, deleted_at FROM projects WHERE content_hash = $content_hash LIMIT 1",
-    { $content_hash: String(contentHash || '') },
-  )[0] || null;
-  const projectHashCandidates = () => query("SELECT id, image_path FROM projects WHERE content_hash = '' AND deleted_at = ''");
-  const projectDimensionCandidates = () => query(
-    `SELECT projects.id, projects.image_path FROM projects JOIN generation_metadata ON generation_metadata.project_id = projects.id
+  const findProjectByContentHash = (contentHash) =>
+    query(
+      'SELECT id, name, image_path, thumbnail_path, deleted_at FROM projects WHERE content_hash = $content_hash LIMIT 1',
+      { $content_hash: String(contentHash || '') },
+    )[0] || null;
+  const projectHashCandidates = () =>
+    query("SELECT id, image_path FROM projects WHERE content_hash = '' AND deleted_at = ''");
+  const projectDimensionCandidates = () =>
+    query(
+      `SELECT projects.id, projects.image_path FROM projects JOIN generation_metadata ON generation_metadata.project_id = projects.id
      WHERE projects.deleted_at = '' AND (generation_metadata.width <= 0 OR generation_metadata.height <= 0)`,
-  );
+    );
   const setProjectContentHashes = (items = []) => {
     database.run('BEGIN');
     try {
-      for (const item of items) database.run("UPDATE projects SET content_hash = $hash WHERE id = $id AND content_hash = ''", { $id: String(item.id || ''), $hash: String(item.content_hash || '') });
+      for (const item of items)
+        database.run(
+          "UPDATE projects SET content_hash = $hash WHERE id = $id AND content_hash = ''",
+          { $id: String(item.id || ''), $hash: String(item.content_hash || '') },
+        );
       database.run('COMMIT');
       persist();
-    } catch (error) { database.run('ROLLBACK'); throw error; }
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
   };
   const setProjectDimensions = (items = []) => {
     database.run('BEGIN');
     try {
-      for (const item of items) database.run(
-        'UPDATE generation_metadata SET width = $width, height = $height WHERE project_id = $id AND (width <= 0 OR height <= 0)',
-        { $id: String(item.id || ''), $width: Math.max(0, Math.round(Number(item.width || 0))), $height: Math.max(0, Math.round(Number(item.height || 0))) },
-      );
+      for (const item of items)
+        database.run(
+          'UPDATE generation_metadata SET width = $width, height = $height WHERE project_id = $id AND (width <= 0 OR height <= 0)',
+          {
+            $id: String(item.id || ''),
+            $width: Math.max(0, Math.round(Number(item.width || 0))),
+            $height: Math.max(0, Math.round(Number(item.height || 0))),
+          },
+        );
       database.run('COMMIT');
       persist();
-    } catch (error) { database.run('ROLLBACK'); throw error; }
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
   };
   const relocateAssetPaths = (sourceDirectory, targetDirectory) => {
     const source = path.resolve(String(sourceDirectory || ''));
@@ -778,7 +1018,8 @@ export async function openDatabase(dataDirectory) {
     const relocate = (filePath) => {
       const absolutePath = path.resolve(String(filePath || ''));
       const relative = path.relative(source, absolutePath);
-      if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return String(filePath || '');
+      if (!relative || relative.startsWith('..') || path.isAbsolute(relative))
+        return String(filePath || '');
       return path.join(target, relative);
     };
     let updated = 0;
@@ -804,7 +1045,9 @@ export async function openDatabase(dataDirectory) {
   };
   const deleteProject = (id) => {
     const projectId = String(id || '');
-    database.run('DELETE FROM gallery_collection_projects WHERE project_id = $id', { $id: projectId });
+    database.run('DELETE FROM gallery_collection_projects WHERE project_id = $id', {
+      $id: projectId,
+    });
     database.run('DELETE FROM prompt_group_covers WHERE project_id = $id', { $id: projectId });
     database.run('DELETE FROM projects WHERE id = $id', { $id: projectId });
     persist();
@@ -814,13 +1057,16 @@ export async function openDatabase(dataDirectory) {
     const cleaned = String(name || '').trim();
     if (!cleaned) throw new Error('图片名称不能为空');
     if (cleaned.length > 160) throw new Error('图片名称不能超过 160 个字符');
-    const project = query('SELECT id, deleted_at FROM projects WHERE id = $id', { $id: String(id || '') })[0];
+    const project = query('SELECT id, deleted_at FROM projects WHERE id = $id', {
+      $id: String(id || ''),
+    })[0];
     if (!project) throw new Error('图片不存在');
     if (project.deleted_at) throw new Error('请先从回收站恢复图片');
-    database.run(
-      'UPDATE projects SET name = $name, updated_at = $updated_at WHERE id = $id',
-      { $id: project.id, $name: cleaned, $updated_at: new Date().toISOString() },
-    );
+    database.run('UPDATE projects SET name = $name, updated_at = $updated_at WHERE id = $id', {
+      $id: project.id,
+      $name: cleaned,
+      $updated_at: new Date().toISOString(),
+    });
     persist();
     return loadProject(project.id);
   };
@@ -832,14 +1078,25 @@ export async function openDatabase(dataDirectory) {
     database.run('BEGIN');
     try {
       for (const id of uniqueIds) {
-        const project = query('SELECT id, is_favorite, deleted_at FROM projects WHERE id = $id', { $id: id })[0];
+        const project = query('SELECT id, is_favorite, deleted_at FROM projects WHERE id = $id', {
+          $id: id,
+        })[0];
         if (!project) {
           results.failed.push({ id, error: '图片不存在' });
           continue;
         }
-        const favorite = patch.isFavorite === undefined ? Number(project.is_favorite) : patch.isFavorite ? 1 : 0;
-        const deletedAt = patch.deleted === undefined ? String(project.deleted_at || '') : patch.deleted ? nowValue : '';
-        if (favorite === Number(project.is_favorite) && deletedAt === String(project.deleted_at || '')) {
+        const favorite =
+          patch.isFavorite === undefined ? Number(project.is_favorite) : patch.isFavorite ? 1 : 0;
+        const deletedAt =
+          patch.deleted === undefined
+            ? String(project.deleted_at || '')
+            : patch.deleted
+              ? nowValue
+              : '';
+        if (
+          favorite === Number(project.is_favorite) &&
+          deletedAt === String(project.deleted_at || '')
+        ) {
           results.skipped.push(id);
           continue;
         }
@@ -888,15 +1145,25 @@ export async function openDatabase(dataDirectory) {
 
   const backfillPromptFingerprints = () => {
     let changed = 0;
-    for (const row of query('SELECT id, prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint, exact_group_fingerprint FROM projects')) {
+    for (const row of query(
+      'SELECT id, prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint, exact_group_fingerprint FROM projects',
+    )) {
       const project = hydrateProject(row);
       const raw = safeJson(project.metadata?.extra_json);
-      const vibeFingerprint = fingerprintVibes(extractEmbeddedVibes(raw.parsed || raw, project.metadata?.model));
-      const fingerprints = galleryProjectGroupingFingerprints({ ...project, vibe_fingerprint: vibeFingerprint });
-      if (fingerprints.promptFingerprint === row.prompt_fingerprint
-        && fingerprints.basePromptFingerprint === row.base_prompt_fingerprint
-        && vibeFingerprint === row.vibe_fingerprint
-        && fingerprints.exactGroupFingerprint === row.exact_group_fingerprint) continue;
+      const vibeFingerprint = fingerprintVibes(
+        extractEmbeddedVibes(raw.parsed || raw, project.metadata?.model),
+      );
+      const fingerprints = galleryProjectGroupingFingerprints({
+        ...project,
+        vibe_fingerprint: vibeFingerprint,
+      });
+      if (
+        fingerprints.promptFingerprint === row.prompt_fingerprint &&
+        fingerprints.basePromptFingerprint === row.base_prompt_fingerprint &&
+        vibeFingerprint === row.vibe_fingerprint &&
+        fingerprints.exactGroupFingerprint === row.exact_group_fingerprint
+      )
+        continue;
       database.run(
         `UPDATE projects
          SET prompt_fingerprint = $prompt_fingerprint,
@@ -920,24 +1187,30 @@ export async function openDatabase(dataDirectory) {
         { $id: cover.project_id },
       )[0];
       if (!project || cover.prompt_fingerprint === project.exact_group_fingerprint) continue;
-      if (cover.prompt_fingerprint === project.prompt_fingerprint && project.exact_group_fingerprint) {
+      if (
+        cover.prompt_fingerprint === project.prompt_fingerprint &&
+        project.exact_group_fingerprint
+      ) {
         database.run(
           `INSERT INTO prompt_group_covers (prompt_fingerprint, project_id) VALUES ($fingerprint, $project_id)
            ON CONFLICT(prompt_fingerprint) DO NOTHING`,
           { $fingerprint: project.exact_group_fingerprint, $project_id: cover.project_id },
         );
       }
-      database.run('DELETE FROM prompt_group_covers WHERE prompt_fingerprint = $fingerprint', { $fingerprint: cover.prompt_fingerprint });
+      database.run('DELETE FROM prompt_group_covers WHERE prompt_fingerprint = $fingerprint', {
+        $fingerprint: cover.prompt_fingerprint,
+      });
     }
     clearInvalidGroupCovers();
     if (changed) persist();
     return changed;
   };
 
-  const loadTrashSummary = () => query(
-    `SELECT id, name, image_path, thumbnail_path, is_favorite, deleted_at
+  const loadTrashSummary = () =>
+    query(
+      `SELECT id, name, image_path, thumbnail_path, is_favorite, deleted_at
      FROM projects WHERE deleted_at != '' ORDER BY deleted_at DESC`,
-  );
+    );
 
   backfillPromptFingerprints();
   persist();

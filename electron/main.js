@@ -3,7 +3,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, net, protocol, safeStorage, screen, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  ipcMain,
+  Menu,
+  nativeImage,
+  net,
+  protocol,
+  safeStorage,
+  screen,
+  shell,
+} from 'electron';
 import electronUpdater from 'electron-updater';
 import { openDatabase } from './database.js';
 import {
@@ -40,7 +53,12 @@ const { autoUpdater } = electronUpdater;
 app.setName('NovelAI Prompt Studio');
 configureAppProfile(app);
 if (process.platform === 'win32') app.setAppUserModelId('studio.novelai.prompt');
-protocol.registerSchemesAsPrivileged([{ scheme: 'novelai-media', privileges: { secure: true, standard: true, supportFetchAPI: true, stream: true } }]);
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'novelai-media',
+    privileges: { secure: true, standard: true, supportFetchAPI: true, stream: true },
+  },
+]);
 
 let database;
 let assetsDirectory;
@@ -49,10 +67,23 @@ let contentBackfill = Promise.resolve();
 let storageMigrationActive = false;
 let permanentDeletionActive = false;
 let workbenchTemporaryDirectory;
-let updateState = { phase: 'idle', progress: 0, currentVersion: '', latestVersion: '', error: '', releaseUrl: '' };
+let updateState = {
+  phase: 'idle',
+  progress: 0,
+  currentVersion: '',
+  latestVersion: '',
+  error: '',
+  releaseUrl: '',
+};
 const activeImports = new Map();
 const preparedImports = new Map();
-const appIconPath = path.join(import.meta.dirname, '..', 'build', 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+const appIconPath = path.join(
+  import.meta.dirname,
+  '..',
+  'build',
+  'icons',
+  process.platform === 'win32' ? 'icon.ico' : 'icon.png',
+);
 
 function cleanupPreviewDirectory(directory) {
   if (!directory) return;
@@ -100,9 +131,15 @@ function createWindow() {
     autoHideMenuBar: process.platform === 'win32',
     icon: appIconPath,
     backgroundColor: '#10151b',
-    webPreferences: { preload: path.join(import.meta.dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+    webPreferences: {
+      preload: path.join(import.meta.dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
   });
-  const developmentUrl = process.env.NOVELAI_DEV_URL || (process.argv.includes('--dev') ? 'http://127.0.0.1:5173' : '');
+  const developmentUrl =
+    process.env.NOVELAI_DEV_URL || (process.argv.includes('--dev') ? 'http://127.0.0.1:5173' : '');
   if (developmentUrl) window.loadURL(developmentUrl);
   else window.loadFile(path.join(import.meta.dirname, '..', 'dist', 'index.html'));
 }
@@ -121,7 +158,11 @@ function notifyUpdateState(patch = {}) {
 }
 
 function releaseNotesText(notes) {
-  if (Array.isArray(notes)) return notes.map((item) => `${item.version || ''}\n${item.note || ''}`.trim()).filter(Boolean).join('\n\n');
+  if (Array.isArray(notes))
+    return notes
+      .map((item) => `${item.version || ''}\n${item.note || ''}`.trim())
+      .filter(Boolean)
+      .join('\n\n');
   return String(notes || '').trim();
 }
 
@@ -130,44 +171,56 @@ function configureAutoUpdater() {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
-  autoUpdater.on('checking-for-update', () => notifyUpdateState({ phase: 'checking', error: '', progress: 0 }));
-  autoUpdater.on('update-available', (info) => notifyUpdateState({
-    phase: 'available',
-    hasUpdate: true,
-    latestVersion: info.version,
-    publishedAt: info.releaseDate || '',
-    notes: releaseNotesText(info.releaseNotes).slice(0, 4_000),
-    progress: 0,
-    error: '',
-  }));
-  autoUpdater.on('update-not-available', (info) => notifyUpdateState({
-    phase: 'current',
-    hasUpdate: false,
-    latestVersion: info.version || app.getVersion(),
-    publishedAt: info.releaseDate || '',
-    notes: '',
-    progress: 0,
-    error: '',
-  }));
-  autoUpdater.on('download-progress', (progress) => notifyUpdateState({
-    phase: 'downloading',
-    progress: Math.max(0, Math.min(100, Number(progress.percent) || 0)),
-    transferred: Number(progress.transferred) || 0,
-    total: Number(progress.total) || 0,
-    bytesPerSecond: Number(progress.bytesPerSecond) || 0,
-    error: '',
-  }));
-  autoUpdater.on('update-downloaded', (info) => notifyUpdateState({
-    phase: 'downloaded',
-    hasUpdate: true,
-    latestVersion: info.version,
-    progress: 100,
-    error: '',
-  }));
-  autoUpdater.on('error', (error) => notifyUpdateState({
-    phase: 'error',
-    error: error instanceof Error ? error.message : String(error),
-  }));
+  autoUpdater.on('checking-for-update', () =>
+    notifyUpdateState({ phase: 'checking', error: '', progress: 0 }),
+  );
+  autoUpdater.on('update-available', (info) =>
+    notifyUpdateState({
+      phase: 'available',
+      hasUpdate: true,
+      latestVersion: info.version,
+      publishedAt: info.releaseDate || '',
+      notes: releaseNotesText(info.releaseNotes).slice(0, 4_000),
+      progress: 0,
+      error: '',
+    }),
+  );
+  autoUpdater.on('update-not-available', (info) =>
+    notifyUpdateState({
+      phase: 'current',
+      hasUpdate: false,
+      latestVersion: info.version || app.getVersion(),
+      publishedAt: info.releaseDate || '',
+      notes: '',
+      progress: 0,
+      error: '',
+    }),
+  );
+  autoUpdater.on('download-progress', (progress) =>
+    notifyUpdateState({
+      phase: 'downloading',
+      progress: Math.max(0, Math.min(100, Number(progress.percent) || 0)),
+      transferred: Number(progress.transferred) || 0,
+      total: Number(progress.total) || 0,
+      bytesPerSecond: Number(progress.bytesPerSecond) || 0,
+      error: '',
+    }),
+  );
+  autoUpdater.on('update-downloaded', (info) =>
+    notifyUpdateState({
+      phase: 'downloaded',
+      hasUpdate: true,
+      latestVersion: info.version,
+      progress: 100,
+      error: '',
+    }),
+  );
+  autoUpdater.on('error', (error) =>
+    notifyUpdateState({
+      phase: 'error',
+      error: error instanceof Error ? error.message : String(error),
+    }),
+  );
 }
 
 function imageDialogDefaultPath() {
@@ -176,7 +229,8 @@ function imageDialogDefaultPath() {
 }
 
 function rememberImageDirectory(filePaths = []) {
-  if (filePaths[0]) preferences.saveProductivitySettings({ recentImageDirectory: path.dirname(filePaths[0]) });
+  if (filePaths[0])
+    preferences.saveProductivitySettings({ recentImageDirectory: path.dirname(filePaths[0]) });
 }
 
 function batchSummary(results = {}) {
@@ -209,11 +263,18 @@ app.whenReady().then(async () => {
   try {
     fs.mkdirSync(assetsDirectory, { recursive: true });
   } catch (error) {
-    dialog.showErrorBox('资源库位置不可用', `无法访问：${assetsDirectory}\n\n请检查磁盘或文件夹权限，然后在设置中更改位置。\n\n${error instanceof Error ? error.message : String(error)}`);
+    dialog.showErrorBox(
+      '资源库位置不可用',
+      `无法访问：${assetsDirectory}\n\n请检查磁盘或文件夹权限，然后在设置中更改位置。\n\n${error instanceof Error ? error.message : String(error)}`,
+    );
   }
   contentBackfill = Promise.all([
-    backfillProjectContentHashes(database).catch((error) => console.error('Unable to backfill image fingerprints', error)),
-    backfillProjectDimensions(database).catch((error) => console.error('Unable to backfill image dimensions', error)),
+    backfillProjectContentHashes(database).catch((error) =>
+      console.error('Unable to backfill image fingerprints', error),
+    ),
+    backfillProjectDimensions(database).catch((error) =>
+      console.error('Unable to backfill image dimensions', error),
+    ),
   ]);
 
   protocol.handle('novelai-media', (request) => {
@@ -222,18 +283,28 @@ app.whenReady().then(async () => {
     return net.fetch(pathToFileURL(filePath).toString());
   });
 
-  ipcMain.handle('library:load', async (_event, request = {}) => { await contentBackfill; return database.loadLibrary(request.view); });
+  ipcMain.handle('library:load', async (_event, request = {}) => {
+    await contentBackfill;
+    return database.loadLibrary(request.view);
+  });
   ipcMain.handle('library:collections:list', async () => {
     try {
       await contentBackfill;
       return { ok: true, collections: database.listCollections() };
     } catch (error) {
-      return { ok: false, collections: [], error: error instanceof Error ? error.message : String(error) };
+      return {
+        ok: false,
+        collections: [],
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   });
   ipcMain.handle('library:collections:create', (_event, request = {}) => {
     try {
-      return { ok: true, collection: database.createCollection({ ...request, id: crypto.randomUUID() }) };
+      return {
+        ok: true,
+        collection: database.createCollection({ ...request, id: crypto.randomUUID() }),
+      };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
@@ -254,7 +325,11 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle('library:collections:projects', (_event, request = {}) => {
     try {
-      const results = database.updateCollectionProjects(request.id, request.projectIds, request.action);
+      const results = database.updateCollectionProjects(
+        request.id,
+        request.projectIds,
+        request.action,
+      );
       return { ok: true, results, summary: batchSummary(results) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -288,12 +363,14 @@ app.whenReady().then(async () => {
     });
     if (selection.canceled || !selection.filePaths[0]) return { ok: true, canceled: true };
     const targetDirectory = path.resolve(selection.filePaths[0]);
-    if (targetDirectory === path.resolve(assetsDirectory)) return { ok: true, canceled: true, noChange: true };
+    if (targetDirectory === path.resolve(assetsDirectory))
+      return { ok: true, canceled: true, noChange: true };
     try {
       const current = await describeAssetDirectory(assetsDirectory);
-      const size = current.totalBytes < 1024 * 1024
-        ? `${Math.max(0.1, current.totalBytes / 1024).toFixed(1)} KB`
-        : `${(current.totalBytes / 1024 / 1024).toFixed(1)} MB`;
+      const size =
+        current.totalBytes < 1024 * 1024
+          ? `${Math.max(0.1, current.totalBytes / 1024).toFixed(1)} KB`
+          : `${(current.totalBytes / 1024 / 1024).toFixed(1)} MB`;
       const confirmation = await dialog.showMessageBox(owner, {
         type: 'question',
         title: '更改资源库位置',
@@ -311,7 +388,9 @@ app.whenReady().then(async () => {
       const result = await migrateAssetDirectory({
         sourceDirectory: previousDirectory,
         targetDirectory,
-        onProgress: (progress) => { if (!event.sender.isDestroyed()) event.sender.send('library:storage-progress', progress); },
+        onProgress: (progress) => {
+          if (!event.sender.isDestroyed()) event.sender.send('library:storage-progress', progress);
+        },
         commit: async ({ sourceDirectory, targetDirectory: nextDirectory }) => {
           database.relocateAssetPaths(sourceDirectory, nextDirectory);
           try {
@@ -332,11 +411,13 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle('workbench:image:open', async (_event, request = {}) => {
     let filePath = String(request.filePath || '');
-    const libraryProject = request.source?.type === 'library' && request.source.projectId
-      ? database.loadProject(request.source.projectId)
-      : null;
+    const libraryProject =
+      request.source?.type === 'library' && request.source.projectId
+        ? database.loadProject(request.source.projectId)
+        : null;
     if (libraryProject?.image_path) filePath = libraryProject.image_path;
-    if (request.fromDrop && !filePath) return { ok: false, project: null, error: '无法读取拖入文件的本地路径' };
+    if (request.fromDrop && !filePath)
+      return { ok: false, project: null, error: '无法读取拖入文件的本地路径' };
     if (!filePath) {
       const result = await dialog.showOpenDialog({
         title: '在工作台中打开 NovelAI 图片',
@@ -349,7 +430,9 @@ app.whenReady().then(async () => {
       rememberImageDirectory(result.filePaths);
     }
     try {
-      const project = await readWorkbenchImage(filePath, { enrichProjectTags: database.enrichProjectTags });
+      const project = await readWorkbenchImage(filePath, {
+        enrichProjectTags: database.enrichProjectTags,
+      });
       return {
         ok: true,
         project: applyWorkbenchLibraryDetails(project, libraryProject),
@@ -358,34 +441,53 @@ app.whenReady().then(async () => {
           : { type: 'file', path: filePath },
       };
     } catch (error) {
-      return { ok: false, project: null, error: error instanceof Error ? error.message : String(error) };
+      return {
+        ok: false,
+        project: null,
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   });
   ipcMain.handle('workbench:images:open-dropped', async (_event, request = {}) => {
-    const filePaths = Array.isArray(request.filePaths) ? request.filePaths.map(String).filter(Boolean) : [];
+    const filePaths = Array.isArray(request.filePaths)
+      ? request.filePaths.map(String).filter(Boolean)
+      : [];
     if (!filePaths.length) return { ok: false, items: [], error: '无法读取拖入文件的本地路径' };
     const items = [];
     for (const filePath of filePaths) {
       try {
         items.push({
           ok: true,
-          project: await readWorkbenchImage(filePath, { enrichProjectTags: database.enrichProjectTags }),
+          project: await readWorkbenchImage(filePath, {
+            enrichProjectTags: database.enrichProjectTags,
+          }),
           source: { type: 'file', path: filePath },
         });
       } catch (error) {
-        items.push({ ok: false, filePath, error: error instanceof Error ? error.message : String(error) });
+        items.push({
+          ok: false,
+          filePath,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
-    return { ok: items.some((item) => item.ok), items, error: items.every((item) => !item.ok) ? items[0]?.error : '' };
+    return {
+      ok: items.some((item) => item.ok),
+      items,
+      error: items.every((item) => !item.ok) ? items[0]?.error : '',
+    };
   });
   ipcMain.handle('workbench:image:clipboard', async () => {
     try {
       const source = readClipboardImageSource(workbenchTemporaryDirectory);
-      const project = await readWorkbenchImage(source.filePath, { enrichProjectTags: database.enrichProjectTags });
+      const project = await readWorkbenchImage(source.filePath, {
+        enrichProjectTags: database.enrichProjectTags,
+      });
       return {
         ok: true,
         project,
-        metadataMissing: source.fromBitmap && !project.metadata?.prompt_raw && !project.metadata?.negative_prompt,
+        metadataMissing:
+          source.fromBitmap && !project.metadata?.prompt_raw && !project.metadata?.negative_prompt,
         source: {
           type: 'clipboard',
           path: source.filePath,
@@ -394,12 +496,19 @@ app.whenReady().then(async () => {
         },
       };
     } catch (error) {
-      return { ok: false, project: null, error: error instanceof Error ? error.message : String(error) };
+      return {
+        ok: false,
+        project: null,
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   });
   ipcMain.handle('workbench:temp:sync', (_event, referencedPaths = []) => {
     try {
-      return { ok: true, removed: cleanupWorkbenchTemporaryImages(workbenchTemporaryDirectory, referencedPaths) };
+      return {
+        ok: true,
+        removed: cleanupWorkbenchTemporaryImages(workbenchTemporaryDirectory, referencedPaths),
+      };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
@@ -427,19 +536,25 @@ app.whenReady().then(async () => {
     try {
       const inspection = await inspectLibraryImportFiles(filePaths);
       const sessionId = crypto.randomUUID();
-      const archives = inspection.plans.filter((item) => item.kind === 'zip').map((plan) => {
-        const archiveId = crypto.randomUUID();
-        return {
-          archiveId,
-          filePath: plan.filePath,
-          name: path.basename(plan.filePath),
-          signature: (() => {
-            const stat = fs.statSync(plan.filePath);
-            return { mtimeMs: stat.mtimeMs, size: stat.size };
-          })(),
-          entries: plan.entries.map((entry) => ({ ...entry, archiveId, id: crypto.randomUUID() })),
-        };
-      });
+      const archives = inspection.plans
+        .filter((item) => item.kind === 'zip')
+        .map((plan) => {
+          const archiveId = crypto.randomUUID();
+          return {
+            archiveId,
+            filePath: plan.filePath,
+            name: path.basename(plan.filePath),
+            signature: (() => {
+              const stat = fs.statSync(plan.filePath);
+              return { mtimeMs: stat.mtimeMs, size: stat.size };
+            })(),
+            entries: plan.entries.map((entry) => ({
+              ...entry,
+              archiveId,
+              id: crypto.randomUUID(),
+            })),
+          };
+        });
       const previewDirectory = archives.length
         ? await fs.promises.mkdtemp(path.join(os.tmpdir(), 'novelai-prompt-studio-preview-'))
         : '';
@@ -451,9 +566,14 @@ app.whenReady().then(async () => {
         previewDirectory,
         previewPromise: null,
       };
-      session.expiryTimer = setTimeout(() => {
-        releasePreparedImport(sessionId).catch((error) => console.warn('Unable to expire import preview', error));
-      }, 30 * 60 * 1000);
+      session.expiryTimer = setTimeout(
+        () => {
+          releasePreparedImport(sessionId).catch((error) =>
+            console.warn('Unable to expire import preview', error),
+          );
+        },
+        30 * 60 * 1000,
+      );
       session.expiryTimer.unref?.();
       preparedImports.set(sessionId, session);
       return {
@@ -463,17 +583,23 @@ app.whenReady().then(async () => {
         directImageCount: inspection.plans.filter((item) => item.kind === 'image').length,
         skippedCount: inspection.skipped,
         problemCount: inspection.errors.length,
-        archives: archives.map((archive) => ({ id: archive.archiveId, name: archive.name, count: archive.entries.length })),
-        entries: archives.flatMap((archive) => archive.entries.map((entry) => ({
-          archiveId: archive.archiveId,
-          compressedSize: entry.compressedSize,
-          fileName: entry.fileName,
-          id: entry.id,
-          previewHeight: 0,
-          previewPath: '',
-          previewWidth: 0,
-          uncompressedSize: entry.uncompressedSize,
-        }))),
+        archives: archives.map((archive) => ({
+          id: archive.archiveId,
+          name: archive.name,
+          count: archive.entries.length,
+        })),
+        entries: archives.flatMap((archive) =>
+          archive.entries.map((entry) => ({
+            archiveId: archive.archiveId,
+            compressedSize: entry.compressedSize,
+            fileName: entry.fileName,
+            id: entry.id,
+            previewHeight: 0,
+            previewPath: '',
+            previewWidth: 0,
+            uncompressedSize: entry.uncompressedSize,
+          })),
+        ),
       };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -510,32 +636,57 @@ app.whenReady().then(async () => {
             },
           });
         }
-        if (!session.controller.signal.aborted) sendPreparedImportUpdate(event.sender, { sessionId: session.id, phase: 'complete', completed, total });
+        if (!session.controller.signal.aborted)
+          sendPreparedImportUpdate(event.sender, {
+            sessionId: session.id,
+            phase: 'complete',
+            completed,
+            total,
+          });
       } catch (error) {
-        if (!session.controller.signal.aborted) sendPreparedImportUpdate(event.sender, {
-          sessionId: session.id,
-          phase: 'complete',
-          completed,
-          total,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        if (!session.controller.signal.aborted)
+          sendPreparedImportUpdate(event.sender, {
+            sessionId: session.id,
+            phase: 'complete',
+            completed,
+            total,
+            error: error instanceof Error ? error.message : String(error),
+          });
       }
     })();
     return { ok: true };
   });
-  ipcMain.handle('library:import-prepared:cancel', async (_event, sessionId) => ({ ok: Boolean(await releasePreparedImport(sessionId)) }));
+  ipcMain.handle('library:import-prepared:cancel', async (_event, sessionId) => ({
+    ok: Boolean(await releasePreparedImport(sessionId)),
+  }));
   ipcMain.handle('library:import-prepared:commit', async (event, request = {}) => {
     if (storageMigrationActive) {
       await releasePreparedImport(request.sessionId).catch(() => {});
-      return { ok: false, imported: [], duplicates: [], errors: [], error: '资源库正在迁移，请稍候' };
+      return {
+        ok: false,
+        imported: [],
+        duplicates: [],
+        errors: [],
+        error: '资源库正在迁移，请稍候',
+      };
     }
     await contentBackfill;
     const session = preparedImports.get(String(request.sessionId || ''));
-    if (!session) return { ok: false, imported: [], duplicates: [], errors: [], error: '导入预览已过期，请重新选择压缩包' };
+    if (!session)
+      return {
+        ok: false,
+        imported: [],
+        duplicates: [],
+        errors: [],
+        error: '导入预览已过期，请重新选择压缩包',
+      };
     const batchId = crypto.randomUUID();
     const controller = new AbortController();
     activeImports.set(batchId, controller);
-    const notify = (progress) => { if (!event.sender.isDestroyed()) event.sender.send('library:import-progress', { batchId, ...progress }); };
+    const notify = (progress) => {
+      if (!event.sender.isDestroyed())
+        event.sender.send('library:import-progress', { batchId, ...progress });
+    };
     notify({ phase: 'preparing', processed: 0, total: 0, current: '准备所选图片' });
     try {
       for (const archive of session.archives) {
@@ -544,11 +695,19 @@ app.whenReady().then(async () => {
           throw new Error(`${archive.name} 在预览后发生了变化，请重新选择压缩包`);
         }
       }
-      const selectedIds = new Set(Array.isArray(request.entryIds) ? request.entryIds.map(String) : []);
-      const selectedArchiveEntries = new Map(session.archives.map((archive) => [
-        archive.filePath,
-        new Set(archive.entries.filter((entry) => selectedIds.has(entry.id)).map((entry) => entry.entryIndex)),
-      ]));
+      const selectedIds = new Set(
+        Array.isArray(request.entryIds) ? request.entryIds.map(String) : [],
+      );
+      const selectedArchiveEntries = new Map(
+        session.archives.map((archive) => [
+          archive.filePath,
+          new Set(
+            archive.entries
+              .filter((entry) => selectedIds.has(entry.id))
+              .map((entry) => entry.entryIndex),
+          ),
+        ]),
+      );
       const released = await releasePreparedImport(session.id);
       const imported = await importLibraryFiles({
         filePaths: released.filePaths,
@@ -563,13 +722,36 @@ app.whenReady().then(async () => {
     } catch (error) {
       await releasePreparedImport(session.id).catch(() => {});
       const message = error instanceof Error ? error.message : String(error);
-      return { ok: false, batchId, imported: [], duplicates: [], errors: [{ file: '导入批次', error: message }], summary: { total: 0, processed: 0, imported: 0, duplicates: 0, failed: 1, skipped: 0, remaining: 0, cancelled: false } };
+      return {
+        ok: false,
+        batchId,
+        imported: [],
+        duplicates: [],
+        errors: [{ file: '导入批次', error: message }],
+        summary: {
+          total: 0,
+          processed: 0,
+          imported: 0,
+          duplicates: 0,
+          failed: 1,
+          skipped: 0,
+          remaining: 0,
+          cancelled: false,
+        },
+      };
     } finally {
       activeImports.delete(batchId);
     }
   });
   ipcMain.handle('library:import-images', async (event, request = {}) => {
-    if (storageMigrationActive) return { ok: false, imported: [], duplicates: [], errors: [], error: '资源库正在迁移，请稍候' };
+    if (storageMigrationActive)
+      return {
+        ok: false,
+        imported: [],
+        duplicates: [],
+        errors: [],
+        error: '资源库正在迁移，请稍候',
+      };
     await contentBackfill;
     let clipboardSource = null;
     let filePaths = Array.isArray(request.filePaths) ? request.filePaths : [];
@@ -578,7 +760,15 @@ app.whenReady().then(async () => {
         clipboardSource = readClipboardImageSource(workbenchTemporaryDirectory);
         filePaths = [clipboardSource.filePath];
       } catch (error) {
-        return { ok: false, imported: [], duplicates: [], errors: [{ file: '剪贴板', error: error instanceof Error ? error.message : String(error) }], error: error instanceof Error ? error.message : String(error) };
+        return {
+          ok: false,
+          imported: [],
+          duplicates: [],
+          errors: [
+            { file: '剪贴板', error: error instanceof Error ? error.message : String(error) },
+          ],
+          error: error instanceof Error ? error.message : String(error),
+        };
       }
     }
     if (!filePaths.length) {
@@ -592,14 +782,25 @@ app.whenReady().then(async () => {
           { name: 'ZIP archives', extensions: ['zip'] },
         ],
       });
-      if (result.canceled) return { ok: true, canceled: true, imported: [], duplicates: [], errors: [], summary: null };
+      if (result.canceled)
+        return {
+          ok: true,
+          canceled: true,
+          imported: [],
+          duplicates: [],
+          errors: [],
+          summary: null,
+        };
       filePaths = result.filePaths;
       rememberImageDirectory(result.filePaths);
     }
     const batchId = crypto.randomUUID();
     const controller = new AbortController();
     activeImports.set(batchId, controller);
-    const notify = (progress) => { if (!event.sender.isDestroyed()) event.sender.send('library:import-progress', { batchId, ...progress }); };
+    const notify = (progress) => {
+      if (!event.sender.isDestroyed())
+        event.sender.send('library:import-progress', { batchId, ...progress });
+    };
     try {
       const imported = await importLibraryFiles({
         filePaths,
@@ -612,11 +813,33 @@ app.whenReady().then(async () => {
       return {
         batchId,
         ...imported,
-        metadataMissing: Boolean(request.fromClipboard && clipboardSource?.fromBitmap && imported.imported?.some((project) => !project.metadata?.prompt_raw && !project.metadata?.negative_prompt)),
+        metadataMissing: Boolean(
+          request.fromClipboard &&
+            clipboardSource?.fromBitmap &&
+            imported.imported?.some(
+              (project) => !project.metadata?.prompt_raw && !project.metadata?.negative_prompt,
+            ),
+        ),
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return { ok: false, batchId, imported: [], duplicates: [], errors: [{ file: '导入批次', error: message }], summary: { total: 0, processed: 0, imported: 0, duplicates: 0, failed: 1, skipped: 0, remaining: 0, cancelled: false } };
+      return {
+        ok: false,
+        batchId,
+        imported: [],
+        duplicates: [],
+        errors: [{ file: '导入批次', error: message }],
+        summary: {
+          total: 0,
+          processed: 0,
+          imported: 0,
+          duplicates: 0,
+          failed: 1,
+          skipped: 0,
+          remaining: 0,
+          cancelled: false,
+        },
+      };
     } finally {
       activeImports.delete(batchId);
     }
@@ -675,7 +898,8 @@ app.whenReady().then(async () => {
           continue;
         }
         try {
-          for (const filePath of [project.thumbnail_path, project.image_path]) removeManagedAsset(assetsDirectory, filePath);
+          for (const filePath of [project.thumbnail_path, project.image_path])
+            removeManagedAsset(assetsDirectory, filePath);
           database.deleteProject(id);
           results.success.push(id);
         } catch (error) {
@@ -686,7 +910,11 @@ app.whenReady().then(async () => {
               return false;
             }
           });
-          results.failed.push({ id, error: error instanceof Error ? error.message : String(error), remainingFiles });
+          results.failed.push({
+            id,
+            error: error instanceof Error ? error.message : String(error),
+            remainingFiles,
+          });
         }
       }
       return { ok: true, results, summary: batchSummary(results) };
@@ -701,10 +929,19 @@ app.whenReady().then(async () => {
       let sizeKnown = true;
       for (const project of projects) {
         for (const filePath of [project.image_path, project.thumbnail_path]) {
-          try { totalBytes += fs.statSync(filePath).size; } catch { sizeKnown = false; }
+          try {
+            totalBytes += fs.statSync(filePath).size;
+          } catch {
+            sizeKnown = false;
+          }
         }
       }
-      return { ok: true, projects, count: projects.length, totalBytes: sizeKnown ? totalBytes : null };
+      return {
+        ok: true,
+        projects,
+        count: projects.length,
+        totalBytes: sizeKnown ? totalBytes : null,
+      };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
@@ -724,7 +961,10 @@ app.whenReady().then(async () => {
       const project = database.loadProject(projectId);
       if (!project) throw new Error('图片不存在');
       const extension = path.extname(project.image_path).toLowerCase() || '.png';
-      const safeBaseName = String(project.name || 'NovelAI image').replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').trim() || 'NovelAI image';
+      const safeBaseName =
+        String(project.name || 'NovelAI image')
+          .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
+          .trim() || 'NovelAI image';
       const owner = BrowserWindow.fromWebContents(event.sender);
       const result = await dialog.showSaveDialog(owner, {
         title: '下载图片',
@@ -750,9 +990,10 @@ app.whenReady().then(async () => {
     try {
       const sourcePath = resolveImageFile(request.filePath);
       const extension = path.extname(sourcePath).toLowerCase() || '.png';
-      const safeBaseName = String(request.name || path.basename(sourcePath, extension) || 'NovelAI image')
-        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
-        .trim() || 'NovelAI image';
+      const safeBaseName =
+        String(request.name || path.basename(sourcePath, extension) || 'NovelAI image')
+          .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
+          .trim() || 'NovelAI image';
       const owner = BrowserWindow.fromWebContents(event.sender);
       const result = await dialog.showSaveDialog(owner, {
         title: '下载图片',
@@ -770,9 +1011,12 @@ app.whenReady().then(async () => {
     try {
       for (const entry of entries || []) {
         const patch = {};
-        if (entry?.translation_source === 'manual') patch.translation = String(entry.translation || '');
-        if (entry?.category_source === 'manual') patch.category = String(entry.category || 'Unsorted');
-        if (Object.keys(patch).length) database.updateTagDictionary(String(entry?.tag || ''), patch);
+        if (entry?.translation_source === 'manual')
+          patch.translation = String(entry.translation || '');
+        if (entry?.category_source === 'manual')
+          patch.category = String(entry.category || 'Unsorted');
+        if (Object.keys(patch).length)
+          database.updateTagDictionary(String(entry?.tag || ''), patch);
       }
       return { ok: true };
     } catch (error) {
@@ -807,7 +1051,10 @@ app.whenReady().then(async () => {
     try {
       return {
         ok: true,
-        items: database.updateTagDictionaryCategory(request.tags || [], String(request.category || '')),
+        items: database.updateTagDictionaryCategory(
+          request.tags || [],
+          String(request.category || ''),
+        ),
       };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -840,9 +1087,13 @@ app.whenReady().then(async () => {
   ipcMain.handle('ai:settings:get', () => preferences.publicSettings());
   ipcMain.handle('ai:settings:save', (_event, settings) => preferences.saveAISettings(settings));
   ipcMain.handle('appearance:settings:get', () => preferences.appearanceSettings());
-  ipcMain.handle('appearance:settings:save', (_event, settings) => preferences.saveAppearanceSettings(settings));
+  ipcMain.handle('appearance:settings:save', (_event, settings) =>
+    preferences.saveAppearanceSettings(settings),
+  );
   ipcMain.handle('productivity:settings:get', () => preferences.productivitySettings());
-  ipcMain.handle('productivity:settings:save', (_event, settings) => preferences.saveProductivitySettings(settings));
+  ipcMain.handle('productivity:settings:save', (_event, settings) =>
+    preferences.saveProductivitySettings(settings),
+  );
   ipcMain.handle('updates:status', () => ({
     ok: true,
     ...updateState,
@@ -884,31 +1135,39 @@ app.whenReady().then(async () => {
   ipcMain.handle('updates:download', async () => {
     const capabilities = getUpdateCapabilities(process.platform, app.isPackaged);
     if (!capabilities.canDownloadUpdate) {
-      const error = capabilities.manualUpdateReason === 'unsigned-macos'
-        ? '当前 macOS 版本未签名，请从官方 Release 手动更新'
-        : '当前环境不支持应用内下载更新';
+      const error =
+        capabilities.manualUpdateReason === 'unsigned-macos'
+          ? '当前 macOS 版本未签名，请从官方 Release 手动更新'
+          : '当前环境不支持应用内下载更新';
       return { ok: false, error };
     }
-    if (storageMigrationActive || activeImports.size || permanentDeletionActive) return { ok: false, error: '请等待导入、迁移或删除操作完成后再下载更新' };
-    if (updateState.phase !== 'available' && updateState.phase !== 'error') return { ok: false, error: '请先检查并确认有可用更新' };
+    if (storageMigrationActive || activeImports.size || permanentDeletionActive)
+      return { ok: false, error: '请等待导入、迁移或删除操作完成后再下载更新' };
+    if (updateState.phase !== 'available' && updateState.phase !== 'error')
+      return { ok: false, error: '请先检查并确认有可用更新' };
     try {
       notifyUpdateState({ phase: 'downloading', progress: 0, error: '' });
       await autoUpdater.downloadUpdate();
       return { ok: true };
     } catch (error) {
-      notifyUpdateState({ phase: 'error', error: error instanceof Error ? error.message : String(error) });
+      notifyUpdateState({
+        phase: 'error',
+        error: error instanceof Error ? error.message : String(error),
+      });
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
   ipcMain.handle('updates:install', () => {
     const capabilities = getUpdateCapabilities(process.platform, app.isPackaged);
     if (!capabilities.canInstallUpdate) {
-      const error = capabilities.manualUpdateReason === 'unsigned-macos'
-        ? '当前 macOS 版本未签名，请从官方 Release 手动更新'
-        : '当前环境不支持应用内安装更新';
+      const error =
+        capabilities.manualUpdateReason === 'unsigned-macos'
+          ? '当前 macOS 版本未签名，请从官方 Release 手动更新'
+          : '当前环境不支持应用内安装更新';
       return { ok: false, error };
     }
-    if (storageMigrationActive || activeImports.size || permanentDeletionActive) return { ok: false, error: '请等待导入、迁移或删除操作完成后再安装更新' };
+    if (storageMigrationActive || activeImports.size || permanentDeletionActive)
+      return { ok: false, error: '请等待导入、迁移或删除操作完成后再安装更新' };
     if (updateState.phase !== 'downloaded') return { ok: false, error: '更新尚未下载完成' };
     setImmediate(() => autoUpdater.quitAndInstall(false, true));
     return { ok: true };
@@ -916,7 +1175,9 @@ app.whenReady().then(async () => {
   ipcMain.handle('updates:open-release', async (_event, releaseUrl) => {
     const fallback = 'https://github.com/LBEILC/NovelAIPromptStudio/releases/latest';
     const candidate = String(releaseUrl || fallback);
-    const url = candidate.startsWith('https://github.com/LBEILC/NovelAIPromptStudio/') ? candidate : fallback;
+    const url = candidate.startsWith('https://github.com/LBEILC/NovelAIPromptStudio/')
+      ? candidate
+      : fallback;
     await shell.openExternal(url);
     return { ok: true };
   });
@@ -924,16 +1185,26 @@ app.whenReady().then(async () => {
     try {
       return { ok: true, fonts: await listSystemFonts() };
     } catch (error) {
-      return { ok: false, fonts: [], error: error instanceof Error ? error.message : String(error) };
+      return {
+        ok: false,
+        fonts: [],
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   });
   ipcMain.handle('ai:models:list', async () => {
-    try { return { ok: true, models: await listModels(preferences.credentials(), net.fetch) }; }
-    catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error) }; }
+    try {
+      return { ok: true, models: await listModels(preferences.credentials(), net.fetch) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
   });
   ipcMain.handle('ai:model:test', async () => {
-    try { return { ok: true, ...(await testModel(preferences.credentials(), net.fetch)) }; }
-    catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error) }; }
+    try {
+      return { ok: true, ...(await testModel(preferences.credentials(), net.fetch)) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
   });
   ipcMain.handle('translation:tags', async (_event, tags) => {
     try {
@@ -950,12 +1221,14 @@ app.whenReady().then(async () => {
       });
       const { items, generated, danbooruChecks } = resolved;
       database.upsertDanbooruTagCache(danbooruChecks);
-      database.upsertTagDictionary(cleaned.map((tag, index) => ({
-        tag,
-        ...items[index],
-        has_translation: Boolean(items[index].translation),
-        has_classification: Boolean(items[index].category_source),
-      })));
+      database.upsertTagDictionary(
+        cleaned.map((tag, index) => ({
+          tag,
+          ...items[index],
+          has_translation: Boolean(items[index].translation),
+          has_classification: Boolean(items[index].category_source),
+        })),
+      );
       database.persist();
       return {
         ok: true,
@@ -969,7 +1242,9 @@ app.whenReady().then(async () => {
         dso_category_count: resolved.dsoCategoryCount,
         unresolved_count: resolved.unresolvedCount,
         danbooru_category_count: items.filter((item) => item.category_source === 'danbooru').length,
-        danbooru_artist_count: items.filter((item) => item.category_source === 'danbooru' && item.category === 'ArtistEra').length,
+        danbooru_artist_count: items.filter(
+          (item) => item.category_source === 'danbooru' && item.category === 'ArtistEra',
+        ).length,
       };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -977,10 +1252,14 @@ app.whenReady().then(async () => {
   });
 
   createWindow();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
 });
 
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
 app.on('before-quit', () => {
   for (const sessionId of preparedImports.keys()) releasePreparedImport(sessionId).catch(() => {});
 });

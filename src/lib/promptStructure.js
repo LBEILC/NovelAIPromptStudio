@@ -1,4 +1,11 @@
-import { formatPrompt, formatPromptGroupedInline, formatPromptInline, normalizeCategory, parsePrompt, repairLegacyPromptTags } from './prompt.js';
+import {
+  formatPrompt,
+  formatPromptGroupedInline,
+  formatPromptInline,
+  normalizeCategory,
+  parsePrompt,
+  repairLegacyPromptTags,
+} from './prompt.js';
 import { analyzeNovelAIAutomaticPrompts, extractNovelAIAutoSettings } from './novelaiAutoPrompt.js';
 
 const createId = () => crypto.randomUUID();
@@ -48,18 +55,33 @@ function firstCenter(...candidates) {
   return { x: 0.5, y: 0.5 };
 }
 
-export function extractV4PromptData(raw = {}, fallbackPrompt = '', fallbackUndesired = '', model = '') {
+export function extractV4PromptData(
+  raw = {},
+  fallbackPrompt = '',
+  fallbackUndesired = '',
+  model = '',
+) {
   const positive = safeObject(raw.v4_prompt);
   const negative = safeObject(raw.v4_negative_prompt);
   const positiveCaption = promptCaption(positive);
   const negativeCaption = promptCaption(negative);
-  const positiveCharacters = Array.isArray(positiveCaption.char_captions) ? positiveCaption.char_captions : [];
-  const negativeCharacters = Array.isArray(negativeCaption.char_captions) ? negativeCaption.char_captions : [];
+  const positiveCharacters = Array.isArray(positiveCaption.char_captions)
+    ? positiveCaption.char_captions
+    : [];
+  const negativeCharacters = Array.isArray(negativeCaption.char_captions)
+    ? negativeCaption.char_captions
+    : [];
   const characterCount = Math.max(positiveCharacters.length, negativeCharacters.length);
 
   return {
-    base_prompt_raw: typeof positiveCaption.base_caption === 'string' ? positiveCaption.base_caption : String(fallbackPrompt || ''),
-    base_undesired_raw: typeof negativeCaption.base_caption === 'string' ? negativeCaption.base_caption : String(fallbackUndesired || ''),
+    base_prompt_raw:
+      typeof positiveCaption.base_caption === 'string'
+        ? positiveCaption.base_caption
+        : String(fallbackPrompt || ''),
+    base_undesired_raw:
+      typeof negativeCaption.base_caption === 'string'
+        ? negativeCaption.base_caption
+        : String(fallbackUndesired || ''),
     use_coords: Boolean(positive.use_coords),
     use_order: positive.use_order !== false,
     novelai_auto: extractNovelAIAutoSettings(raw, model),
@@ -98,20 +120,26 @@ function normalizeTag(tag, idFactory) {
 }
 
 function normalizeTags(tags, rawPrompt, idFactory) {
-  const source = Array.isArray(tags) ? repairLegacyPromptTags(tags, rawPrompt || '', idFactory) : parsePrompt(rawPrompt || '', idFactory);
+  const source = Array.isArray(tags)
+    ? repairLegacyPromptTags(tags, rawPrompt || '', idFactory)
+    : parsePrompt(rawPrompt || '', idFactory);
   return source.map((tag) => normalizeTag(tag, idFactory));
 }
 
 export function normalizePromptStructure(structure, metadata = {}, idFactory = createId) {
   const parsedStructure = safeObject(structure);
   const metadataStructure = rawStructureFromMetadata(metadata);
-  const storedAutomaticSettings = Object.prototype.hasOwnProperty.call(parsedStructure, 'novelai_auto')
+  const storedAutomaticSettings = Object.prototype.hasOwnProperty.call(
+    parsedStructure,
+    'novelai_auto',
+  )
     ? safeObject(parsedStructure.novelai_auto)
     : safeObject(metadataStructure.novelai_auto);
   const hasStoredCharacters = Object.prototype.hasOwnProperty.call(parsedStructure, 'characters');
-  const sourceCharacters = hasStoredCharacters && Array.isArray(parsedStructure.characters)
-    ? parsedStructure.characters
-    : metadataStructure.characters;
+  const sourceCharacters =
+    hasStoredCharacters && Array.isArray(parsedStructure.characters)
+      ? parsedStructure.characters
+      : metadataStructure.characters;
 
   return {
     base_prompt_raw: Object.prototype.hasOwnProperty.call(parsedStructure, 'base_prompt_raw')
@@ -134,8 +162,12 @@ export function normalizePromptStructure(structure, metadata = {}, idFactory = c
     novelai_auto: { ...extractNovelAIAutoSettings({}, metadata.model), ...storedAutomaticSettings },
     characters: (sourceCharacters || []).map((character, index) => {
       const metadataCharacter = metadataStructure.characters[index] || {};
-      const promptRaw = Object.prototype.hasOwnProperty.call(character, 'prompt_raw') ? character.prompt_raw : metadataCharacter.prompt_raw;
-      const undesiredRaw = Object.prototype.hasOwnProperty.call(character, 'undesired_raw') ? character.undesired_raw : metadataCharacter.undesired_raw;
+      const promptRaw = Object.prototype.hasOwnProperty.call(character, 'prompt_raw')
+        ? character.prompt_raw
+        : metadataCharacter.prompt_raw;
+      const undesiredRaw = Object.prototype.hasOwnProperty.call(character, 'undesired_raw')
+        ? character.undesired_raw
+        : metadataCharacter.undesired_raw;
       return {
         id: character.id || idFactory(),
         label: String(character.label || `Character ${index + 1}`),
@@ -156,29 +188,76 @@ export function createPromptStructure(metadata = {}, idFactory = createId) {
 export function getPromptScopes(project) {
   const structure = project.prompt_structure || normalizePromptStructure(null, project.metadata);
   const scopes = [
-    { key: 'base:prompt', kind: 'base', polarity: 'prompt', label: 'Base Prompt', raw_prompt: structure.base_prompt_raw ?? project.metadata?.prompt_raw ?? '', tags: project.tags || [] },
-    { key: 'base:undesired', kind: 'base', polarity: 'undesired', label: 'Base Undesired Content', raw_prompt: structure.base_undesired_raw ?? project.metadata?.negative_prompt ?? '', tags: structure.base_undesired_tags || [] },
+    {
+      key: 'base:prompt',
+      kind: 'base',
+      polarity: 'prompt',
+      label: 'Base Prompt',
+      raw_prompt: structure.base_prompt_raw ?? project.metadata?.prompt_raw ?? '',
+      tags: project.tags || [],
+    },
+    {
+      key: 'base:undesired',
+      kind: 'base',
+      polarity: 'undesired',
+      label: 'Base Undesired Content',
+      raw_prompt: structure.base_undesired_raw ?? project.metadata?.negative_prompt ?? '',
+      tags: structure.base_undesired_tags || [],
+    },
     ...structure.characters.flatMap((character, index) => [
-      { key: `character:${character.id}:prompt`, kind: 'character', polarity: 'prompt', characterId: character.id, characterIndex: index, character, label: `${character.label} Prompt`, raw_prompt: character.prompt_raw || '', tags: character.prompt_tags },
-      { key: `character:${character.id}:undesired`, kind: 'character', polarity: 'undesired', characterId: character.id, characterIndex: index, character, label: `${character.label} Undesired Content`, raw_prompt: character.undesired_raw || '', tags: character.undesired_tags },
+      {
+        key: `character:${character.id}:prompt`,
+        kind: 'character',
+        polarity: 'prompt',
+        characterId: character.id,
+        characterIndex: index,
+        character,
+        label: `${character.label} Prompt`,
+        raw_prompt: character.prompt_raw || '',
+        tags: character.prompt_tags,
+      },
+      {
+        key: `character:${character.id}:undesired`,
+        kind: 'character',
+        polarity: 'undesired',
+        characterId: character.id,
+        characterIndex: index,
+        character,
+        label: `${character.label} Undesired Content`,
+        raw_prompt: character.undesired_raw || '',
+        tags: character.undesired_tags,
+      },
     ]),
   ];
-  const automatic = analyzeNovelAIAutomaticPrompts({ ...project, prompt_structure: structure }, scopes);
+  const automatic = analyzeNovelAIAutomaticPrompts(
+    { ...project, prompt_structure: structure },
+    scopes,
+  );
   return scopes.map((scope) => ({ ...scope, automation: automatic.scopes[scope.key] || null }));
 }
 
 export function getPromptScope(project, scopeKey = 'base:prompt') {
-  return getPromptScopes(project).find((scope) => scope.key === scopeKey) || getPromptScopes(project)[0];
+  return (
+    getPromptScopes(project).find((scope) => scope.key === scopeKey) || getPromptScopes(project)[0]
+  );
 }
 
 export function updatePromptScope(project, scopeKey, tags, rawPrompt) {
   const structure = normalizePromptStructure(project.prompt_structure, project.metadata);
-  const nextRawPrompt = rawPrompt === undefined ? formatPromptGroupedInline(tags) : String(rawPrompt || '');
+  const nextRawPrompt =
+    rawPrompt === undefined ? formatPromptGroupedInline(tags) : String(rawPrompt || '');
   if (scopeKey === 'base:prompt') {
     return { ...project, tags, prompt_structure: { ...structure, base_prompt_raw: nextRawPrompt } };
   }
   if (scopeKey === 'base:undesired') {
-    return { ...project, prompt_structure: { ...structure, base_undesired_raw: nextRawPrompt, base_undesired_tags: tags } };
+    return {
+      ...project,
+      prompt_structure: {
+        ...structure,
+        base_undesired_raw: nextRawPrompt,
+        base_undesired_tags: tags,
+      },
+    };
   }
   const [, characterId, polarity] = scopeKey.split(':');
   const field = polarity === 'undesired' ? 'undesired_tags' : 'prompt_tags';
@@ -187,7 +266,11 @@ export function updatePromptScope(project, scopeKey, tags, rawPrompt) {
     ...project,
     prompt_structure: {
       ...structure,
-      characters: structure.characters.map((character) => character.id === characterId ? { ...character, [field]: tags, [rawField]: nextRawPrompt } : character),
+      characters: structure.characters.map((character) =>
+        character.id === characterId
+          ? { ...character, [field]: tags, [rawField]: nextRawPrompt }
+          : character,
+      ),
     },
   };
 }
@@ -203,7 +286,9 @@ export function updatePromptCharacter(project, characterId, patch) {
     ...project,
     prompt_structure: {
       ...structure,
-      characters: structure.characters.map((character) => character.id === characterId ? { ...character, ...patch } : character),
+      characters: structure.characters.map((character) =>
+        character.id === characterId ? { ...character, ...patch } : character,
+      ),
     },
   };
 }
@@ -218,12 +303,21 @@ export function addPromptCharacter(project, idFactory = createId) {
     undesired_tags: [],
     center: { x: 0.5, y: 0.5 },
   };
-  return { ...project, prompt_structure: { ...structure, characters: [...structure.characters, character] } };
+  return {
+    ...project,
+    prompt_structure: { ...structure, characters: [...structure.characters, character] },
+  };
 }
 
 export function removePromptCharacter(project, characterId) {
   const structure = normalizePromptStructure(project.prompt_structure, project.metadata);
-  return { ...project, prompt_structure: { ...structure, characters: structure.characters.filter((character) => character.id !== characterId) } };
+  return {
+    ...project,
+    prompt_structure: {
+      ...structure,
+      characters: structure.characters.filter((character) => character.id !== characterId),
+    },
+  };
 }
 
 export function allPromptTags(project) {
@@ -236,24 +330,30 @@ export function countPromptTags(project) {
 
 export function formatPositivePrompt(project) {
   const scopes = getPromptScopes(project).filter((scope) => scope.polarity === 'prompt');
-  return scopes.map((scope) => formatPrompt(scope.tags)).filter(Boolean).join('\n|\n');
+  return scopes
+    .map((scope) => formatPrompt(scope.tags))
+    .filter(Boolean)
+    .join('\n|\n');
 }
 
 export function formatPositivePromptForCopy(project, { includeAutomatic = false } = {}) {
   return getPromptScopes(project)
     .filter((scope) => scope.polarity === 'prompt')
     .map((scope) => {
-      if (!includeAutomatic && ['confirmed', 'inferred'].includes(scope.automation?.status)) return scope.automation.cleanedRaw;
-      return String(scope.raw_prompt || '').trim() ? scope.raw_prompt : formatPromptInline(scope.tags);
+      if (!includeAutomatic && ['confirmed', 'inferred'].includes(scope.automation?.status))
+        return scope.automation.cleanedRaw;
+      return String(scope.raw_prompt || '').trim()
+        ? scope.raw_prompt
+        : formatPromptInline(scope.tags);
     })
     .filter(Boolean)
     .join('\n|\n');
 }
 
 export function positiveRawPromptScopes(project) {
-  return getPromptScopes(project).filter((scope) => (
-    scope.polarity === 'prompt' && String(scope.raw_prompt || '').trim()
-  ));
+  return getPromptScopes(project).filter(
+    (scope) => scope.polarity === 'prompt' && String(scope.raw_prompt || '').trim(),
+  );
 }
 
 export function formatPositiveScopeForCopy(project, scopeKey) {
@@ -264,16 +364,24 @@ export function formatPositiveScopeForCopy(project, scopeKey) {
 export function positivePromptCopyOptions(project, { includeAutomatic = false } = {}) {
   const scopes = getPromptScopes(project).filter((scope) => scope.polarity === 'prompt');
   return scopes.map((scope) => {
-    const excludeAutomatic = !includeAutomatic && ['confirmed', 'inferred'].includes(scope.automation?.status);
-    const automaticCount = ['confirmed', 'inferred'].includes(scope.automation?.status) ? scope.automation.tagIds.length : 0;
+    const excludeAutomatic =
+      !includeAutomatic && ['confirmed', 'inferred'].includes(scope.automation?.status);
+    const automaticCount = ['confirmed', 'inferred'].includes(scope.automation?.status)
+      ? scope.automation.tagIds.length
+      : 0;
     return {
       key: scope.key,
-      label: scope.kind === 'base'
-        ? excludeAutomatic ? '复制 Base Prompt（不含自动质量词）' : '复制完整 Base Prompt'
-        : `复制角色 ${(scope.characterIndex ?? 0) + 1} Prompt`,
+      label:
+        scope.kind === 'base'
+          ? excludeAutomatic
+            ? '复制 Base Prompt（不含自动质量词）'
+            : '复制完整 Base Prompt'
+          : `复制角色 ${(scope.characterIndex ?? 0) + 1} Prompt`,
       text: excludeAutomatic
         ? scope.automation.cleanedRaw
-        : String(scope.raw_prompt || '').trim() ? scope.raw_prompt : formatPromptInline(scope.tags),
+        : String(scope.raw_prompt || '').trim()
+          ? scope.raw_prompt
+          : formatPromptInline(scope.tags),
       count: scope.tags.length - (excludeAutomatic ? scope.automation.tagIds.length : 0),
       automaticCount,
     };
@@ -282,7 +390,10 @@ export function positivePromptCopyOptions(project, { includeAutomatic = false } 
 
 export function syncProjectPromptMetadata(project) {
   const structure = normalizePromptStructure(project.prompt_structure, project.metadata);
-  const tags = (project.tags || []).map((tag) => ({ ...tag, category: normalizeCategory(tag.category, tag.tag) }));
+  const tags = (project.tags || []).map((tag) => ({
+    ...tag,
+    category: normalizeCategory(tag.category, tag.tag),
+  }));
   return {
     ...project,
     tags,
@@ -296,7 +407,10 @@ export function syncProjectPromptMetadata(project) {
 }
 
 export function promptSnapshot(project) {
-  return { tags: project.tags || [], prompt_structure: normalizePromptStructure(project.prompt_structure, project.metadata) };
+  return {
+    tags: project.tags || [],
+    prompt_structure: normalizePromptStructure(project.prompt_structure, project.metadata),
+  };
 }
 
 export function restorePromptSnapshot(project, snapshot) {

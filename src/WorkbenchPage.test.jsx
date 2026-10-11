@@ -28,12 +28,9 @@ vi.mock('@lobehub/ui/base-ui', () => {
 
 describe('WorkbenchTabDragOverlay', () => {
   it('renders independently from the Base UI tabs context', () => {
-    const markup = renderToStaticMarkup(<WorkbenchTabDragOverlay
-      active
-      dirty
-      imageSrc="novelai-media:///example.png"
-      position={3}
-    />);
+    const markup = renderToStaticMarkup(
+      <WorkbenchTabDragOverlay active dirty imageSrc="novelai-media:///example.png" position={3} />,
+    );
 
     expect(markup).toContain('workbench-tab-drag-overlay active');
     expect(markup).toContain('workbench-tab-dirty');
@@ -47,11 +44,21 @@ describe('WorkbenchTabLabel', () => {
     const element = WorkbenchTabLabel({
       onClose: () => {},
       position: 2,
-      tab: { displayName: 'example.png', id: 'tab-1', project: { image_path: 'C:\\images\\example.png' } },
+      tab: {
+        displayName: 'example.png',
+        id: 'tab-1',
+        project: { image_path: 'C:\\images\\example.png' },
+      },
     });
 
     expect(element.props.styles).toEqual({ root: { pointerEvents: 'none' } });
-    expect(element.props.children.props.children.some((child) => child?.props?.className === 'workbench-tab-thumbnail')).toBe(true);
-    expect(element.props.children.props.children.some((child) => child?.props?.children === 2)).toBe(true);
+    expect(
+      element.props.children.props.children.some(
+        (child) => child?.props?.className === 'workbench-tab-thumbnail',
+      ),
+    ).toBe(true);
+    expect(
+      element.props.children.props.children.some((child) => child?.props?.children === 2),
+    ).toBe(true);
   });
 });

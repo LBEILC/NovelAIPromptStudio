@@ -13,7 +13,9 @@ function platformLabel(platform) {
 }
 
 export function feedbackDiagnostics(currentVersion = '—', platform = '') {
-  return [`NovelAI Prompt Studio v${currentVersion}`, `平台：${platformLabel(platform)}`].join('\n');
+  return [`NovelAI Prompt Studio v${currentVersion}`, `平台：${platformLabel(platform)}`].join(
+    '\n',
+  );
 }
 
 export default function FeedbackCenter({ currentVersion = '—', platform = '', showToast, studio }) {
@@ -35,22 +37,43 @@ export default function FeedbackCenter({ currentVersion = '—', platform = '', 
     }
   };
 
-  return <>
-    <header className="settings-heading">
-      <h2>反馈与支持</h2>
-      <p>报告问题、提出建议，或复制不含个人内容的诊断信息。</p>
-    </header>
-    <section aria-labelledby="settings-feedback-title" className="help-feedback" style={{ marginTop: 0 }}>
-      <div>
-        <span>GitHub</span>
-        <h3 id="settings-feedback-title">帮助我们改进 NovelAI Prompt Studio</h3>
-        <p>反馈不会自动包含图片、Prompt、文件路径、API 地址、API Key 或日志；诊断信息仅包含应用版本和系统平台。</p>
-      </div>
-      <div className="help-feedback-actions">
-        <LobeButton icon={<Icon name="copy" size={14}/>} onClick={copyDiagnostics}>复制诊断信息</LobeButton>
-        <LobeButton icon={<Icon name="externalLink" size={14}/>} onClick={() => openProjectLink(REPORT_URL)}>报告问题</LobeButton>
-        <LobeButton icon={<Icon name="externalLink" size={14}/>} onClick={() => openProjectLink(SUGGEST_URL)}>提出建议</LobeButton>
-      </div>
-    </section>
-  </>;
+  return (
+    <>
+      <header className="settings-heading">
+        <h2>反馈与支持</h2>
+        <p>报告问题、提出建议，或复制不含个人内容的诊断信息。</p>
+      </header>
+      <section
+        aria-labelledby="settings-feedback-title"
+        className="help-feedback"
+        style={{ marginTop: 0 }}
+      >
+        <div>
+          <span>GitHub</span>
+          <h3 id="settings-feedback-title">帮助我们改进 NovelAI Prompt Studio</h3>
+          <p>
+            反馈不会自动包含图片、Prompt、文件路径、API 地址、API Key
+            或日志；诊断信息仅包含应用版本和系统平台。
+          </p>
+        </div>
+        <div className="help-feedback-actions">
+          <LobeButton icon={<Icon name="copy" size={14} />} onClick={copyDiagnostics}>
+            复制诊断信息
+          </LobeButton>
+          <LobeButton
+            icon={<Icon name="externalLink" size={14} />}
+            onClick={() => openProjectLink(REPORT_URL)}
+          >
+            报告问题
+          </LobeButton>
+          <LobeButton
+            icon={<Icon name="externalLink" size={14} />}
+            onClick={() => openProjectLink(SUGGEST_URL)}
+          >
+            提出建议
+          </LobeButton>
+        </div>
+      </section>
+    </>
+  );
 }

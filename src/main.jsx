@@ -9,7 +9,13 @@ import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT } from './lib/fonts.js';
 import './fonts.css';
 import './styles.css';
 
-const DEFAULT_APPEARANCE = { themeMode: 'dark', primaryColor: 'blue', sansFont: DEFAULT_SANS_FONT, monoFont: DEFAULT_MONO_FONT, motion: 'full' };
+const DEFAULT_APPEARANCE = {
+  themeMode: 'dark',
+  primaryColor: 'blue',
+  sansFont: DEFAULT_SANS_FONT,
+  monoFont: DEFAULT_MONO_FONT,
+  motion: 'full',
+};
 
 function ThemedToastHost({ appearance }) {
   const [portalRoot, setPortalRoot] = useState(null);
@@ -30,7 +36,7 @@ function ThemedToastHost({ appearance }) {
       sansFont={appearance.sansFont}
       themeMode={appearance.themeMode}
     >
-      <ToastHost duration={2200} position="top"/>
+      <ToastHost duration={2200} position="top" />
     </LobeProvider>,
     portalRoot,
   );
@@ -40,15 +46,21 @@ function StudioRoot() {
   const [appearance, setAppearance] = useState(DEFAULT_APPEARANCE);
 
   useEffect(() => {
-    window.studio?.getAppearanceSettings?.().then(setAppearance).catch(() => {});
+    window.studio
+      ?.getAppearanceSettings?.()
+      .then(setAppearance)
+      .catch(() => {});
   }, []);
 
   useLayoutEffect(() => {
     const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
     const applyTheme = () => {
-      const resolvedTheme = appearance.themeMode === 'auto'
-        ? (systemTheme.matches ? 'dark' : 'light')
-        : appearance.themeMode;
+      const resolvedTheme =
+        appearance.themeMode === 'auto'
+          ? systemTheme.matches
+            ? 'dark'
+            : 'light'
+          : appearance.themeMode;
       const scale = colorScales[appearance.primaryColor] || colorScales.blue;
       document.documentElement.dataset.themeMode = resolvedTheme;
       document.documentElement.style.setProperty('--accent', scale[resolvedTheme][9]);
@@ -59,19 +71,28 @@ function StudioRoot() {
     return () => systemTheme.removeEventListener('change', applyTheme);
   }, [appearance.primaryColor, appearance.themeMode]);
 
-  return <LobeProvider monoFont={appearance.monoFont} primaryColor={appearance.primaryColor} sansFont={appearance.sansFont} themeMode={appearance.themeMode}>
-    <App appearance={appearance} setAppearance={setAppearance}/>
-    <ContextMenuHost/>
-    <ThemedToastHost appearance={appearance}/>
-  </LobeProvider>;
+  return (
+    <LobeProvider
+      monoFont={appearance.monoFont}
+      primaryColor={appearance.primaryColor}
+      sansFont={appearance.sansFont}
+      themeMode={appearance.themeMode}
+    >
+      <App appearance={appearance} setAppearance={setAppearance} />
+      <ContextMenuHost />
+      <ThemedToastHost appearance={appearance} />
+    </LobeProvider>
+  );
 }
 
 document.documentElement.dataset.platform = navigator.platform.startsWith('Win')
   ? 'windows'
-  : navigator.platform.startsWith('Mac') ? 'macos' : 'other';
+  : navigator.platform.startsWith('Mac')
+    ? 'macos'
+    : 'other';
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <StudioRoot/>
+    <StudioRoot />
   </React.StrictMode>,
 );

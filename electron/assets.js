@@ -19,7 +19,12 @@ export async function hashFile(filePath) {
 }
 
 function safeName(filePath) {
-  return path.basename(filePath, path.extname(filePath)).replace(/[^\p{L}\p{N}._-]+/gu, ' ').trim() || 'Untitled';
+  return (
+    path
+      .basename(filePath, path.extname(filePath))
+      .replace(/[^\p{L}\p{N}._-]+/gu, ' ')
+      .trim() || 'Untitled'
+  );
 }
 
 async function copyWithThumbnail(sourcePath, assetsDirectory) {
@@ -33,7 +38,11 @@ async function copyWithThumbnail(sourcePath, assetsDirectory) {
   const thumbnailPath = path.join(thumbnailDirectory, `${id}.webp`);
   try {
     fs.copyFileSync(sourcePath, targetPath);
-    await sharp(sourcePath).rotate().resize(480, 480, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toFile(thumbnailPath);
+    await sharp(sourcePath)
+      .rotate()
+      .resize(480, 480, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toFile(thumbnailPath);
     return { targetPath, thumbnailPath };
   } catch (error) {
     fs.rmSync(targetPath, { force: true });
@@ -59,7 +68,7 @@ export async function importImage(sourcePath, assetsDirectory, options = {}) {
       name: safeName(options.name || sourcePath),
       image_path: targetPath,
       thumbnail_path: thumbnailPath,
-      content_hash: options.contentHash || await hashFile(sourcePath),
+      content_hash: options.contentHash || (await hashFile(sourcePath)),
       created_at: now,
       updated_at: now,
       metadata,

@@ -27,12 +27,16 @@ export function galleryCardSizeFromWheel(value, deltaY) {
   const size = normalizeGalleryCardSize(value) ?? GALLERY_CARD_SIZE_DEFAULT;
   const numericDelta = Number(deltaY);
   if (!Number.isFinite(numericDelta) || numericDelta === 0) return size;
-  return normalizeGalleryCardSize(size + (numericDelta < 0 ? GALLERY_CARD_SIZE_STEP : -GALLERY_CARD_SIZE_STEP));
+  return normalizeGalleryCardSize(
+    size + (numericDelta < 0 ? GALLERY_CARD_SIZE_STEP : -GALLERY_CARD_SIZE_STEP),
+  );
 }
 
 export function readGalleryCardSize(storage) {
   try {
-    return normalizeGalleryCardSize(storage?.getItem(GALLERY_CARD_SIZE_KEY)) ?? GALLERY_CARD_SIZE_DEFAULT;
+    return (
+      normalizeGalleryCardSize(storage?.getItem(GALLERY_CARD_SIZE_KEY)) ?? GALLERY_CARD_SIZE_DEFAULT
+    );
   } catch {
     return GALLERY_CARD_SIZE_DEFAULT;
   }

@@ -25,18 +25,27 @@ describe('Danbooru artist tag lookup', () => {
   it('queries exact tag names in batches and keeps Danbooru categories', async () => {
     const fetcher = vi.fn(async (url) => {
       const names = new URL(url).searchParams.getAll('search[name][]');
-      return jsonResponse(names.map((name) => ({
-        name,
-        category: name === 'yamamoto_souichirou' ? 1 : 0,
-        is_deprecated: false,
-        post_count: 10,
-      })));
+      return jsonResponse(
+        names.map((name) => ({
+          name,
+          category: name === 'yamamoto_souichirou' ? 1 : 0,
+          is_deprecated: false,
+          post_count: 10,
+        })),
+      );
     });
-    const values = ['yamamoto souichirou', 'red hair', ...Array.from({ length: 50 }, (_, index) => `tag ${index}`)];
+    const values = [
+      'yamamoto souichirou',
+      'red hair',
+      ...Array.from({ length: 50 }, (_, index) => `tag ${index}`),
+    ];
     const found = await lookupDanbooruTags(values, fetcher);
 
     expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(found.get('yamamoto_souichirou')).toMatchObject({ category: 1, canonical_tag: 'yamamoto_souichirou' });
+    expect(found.get('yamamoto_souichirou')).toMatchObject({
+      category: 1,
+      canonical_tag: 'yamamoto_souichirou',
+    });
     expect(isDanbooruArtist(found.get('yamamoto_souichirou'))).toBe(true);
     expect(isDanbooruArtist(found.get('red_hair'))).toBe(false);
     expect(danbooruStudioCategory(found.get('yamamoto_souichirou'))).toBe('ArtistEra');

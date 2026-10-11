@@ -23,8 +23,6 @@ files:
 path: 'NovelAI%20Prompt%20Studio-0.4.1-arm64.zip'
 `;
 
-    expect(referencedArtifactNames(metadata)).toEqual([
-      'NovelAI Prompt Studio-0.4.1-arm64.zip',
-    ]);
+    expect(referencedArtifactNames(metadata)).toEqual(['NovelAI Prompt Studio-0.4.1-arm64.zip']);
   });
 });
