@@ -39,7 +39,10 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
   );
   await click('图片库', 'document.querySelector(".studio-titlebar")');
   await shortcut('k');
-  await check('图库 Mod+K 聚焦搜索', 'document.activeElement.matches(".gallery-search input")');
+  await h.checkSoon(
+    '图库 Mod+K 聚焦搜索',
+    'document.activeElement.matches(".gallery-search input")',
+  );
   const before = database.loadLibrary('all').length;
   await e('document.querySelector(".gallery-search input").focus()');
   const allowed = await shortcut('v', {}, 'document.activeElement');

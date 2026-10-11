@@ -27,9 +27,9 @@ export async function dictionaryChecks({ h, database }) {
   await input(search, 'acceptance_');
   await wait(`${rows}.length === 200`);
   await click('按 Tag 分类筛选');
-  await check(
+  await h.checkSoon(
     '分类选项有圆点和文字',
-    '[...document.querySelectorAll(".nps-layer [role=option]")].slice(1).every(e=>!!e.querySelector(".settings-category-dot") && !!e.textContent.trim())',
+    'document.querySelectorAll(".nps-layer [role=option]").length>1 && [...document.querySelectorAll(".nps-layer [role=option]")].slice(1).every(e=>!!e.querySelector(".settings-category-dot") && !!e.textContent.trim())',
   );
   await key('Home');
   // Navigate the actual option list instead of assigning the filter in state.

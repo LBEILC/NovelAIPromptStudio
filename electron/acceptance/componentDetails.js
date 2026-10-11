@@ -1,3 +1,4 @@
+import { TOOLTIP_SCROLL_CLOSE_MS } from './feedback.js';
 // Supplementary checks converted from the archived 004/004a verification lists.
 export async function componentDetails(h) {
   const { evaluate: e, wait, check, key, click, input } = h;
@@ -16,7 +17,7 @@ export async function componentDetails(h) {
   await click('采样器');
   await key('End');
   await key('Enter');
-  await check(
+  await h.checkSoon(
     '下拉 End 和 Enter 选择最后一项',
     'document.querySelector("button[aria-label=采样器]").textContent.includes("DPM++ 2M")',
   );
@@ -24,28 +25,28 @@ export async function componentDetails(h) {
   await key('Home');
   await key('e');
   await key('Enter');
-  await check(
+  await h.checkSoon(
     '下拉首字母跳转选择 Euler',
     'document.querySelector("button[aria-label=采样器]").textContent.trim()==="Euler"',
   );
   await click('采样器');
   await key('End');
   await key('Escape');
-  await check(
+  await h.checkSoon(
     '下拉 Esc 不提交高亮且焦点归还',
     'document.activeElement.matches("button[aria-label=采样器]") && document.activeElement.textContent.trim()==="Euler"',
   );
   await e('document.querySelector("[role=radiogroup] [aria-checked=true]").focus()');
   await key('Home');
   await key('ArrowRight');
-  await check(
+  await h.checkSoon(
     '选项组方向键选中相邻项且只有一个 Tab 停靠点',
     '[...document.querySelectorAll("[role=radio]")].filter(e=>e.tabIndex===0).length===1 && document.activeElement.textContent.trim()==="译文" && document.activeElement.getAttribute("aria-checked")==="true"',
   );
   await e('document.querySelector("[role=tab][aria-selected=true]").focus()');
   await key('ArrowRight');
   await h.nativeKey('Tab');
-  await check(
+  await h.checkSoon(
     '页签方向键切换后 Tab 进入对应面板',
     'document.activeElement.matches("[role=tabpanel]:not([hidden])") && document.querySelector("[role=tab][aria-selected=true]").textContent==="参数"',
   );
@@ -53,7 +54,7 @@ export async function componentDetails(h) {
     await e(`document.querySelector('[role=${role}]:not(:disabled)').focus()`);
     const old = await e('document.activeElement.getAttribute("aria-checked")');
     await h.nativeKey(' ');
-    await check(
+    await h.checkSoon(
       `${role} Space 切换`,
       `document.activeElement.getAttribute('aria-checked')!==${JSON.stringify(old)}`,
     );
@@ -64,39 +65,54 @@ export async function componentDetails(h) {
   }
   await input('[role=spinbutton]', '99');
   await key('Enter');
-  await check(
+  await h.checkSoon(
     '步进器越界输入提交后限制到最大值',
     'document.querySelector("[role=spinbutton]").value==="5.00" && document.querySelector("[role=spinbutton]").getAttribute("aria-valuenow")==="5"',
   );
   await key('ArrowDown');
-  await check(
+  await h.checkSoon(
     '步进器下方向键按步长减小',
     'document.querySelector("[role=spinbutton]").value==="4.95"',
   );
   await click('减少权重');
-  await check('步进器减号按钮更新值', 'document.querySelector("[role=spinbutton]").value==="4.90"');
+  await h.checkSoon(
+    '步进器减号按钮更新值',
+    'document.querySelector("[role=spinbutton]").value==="4.90"',
+  );
   await click('增加权重');
-  await check('步进器加号按钮更新值', 'document.querySelector("[role=spinbutton]").value==="4.95"');
+  await h.checkSoon(
+    '步进器加号按钮更新值',
+    'document.querySelector("[role=spinbutton]").value==="4.95"',
+  );
   await click('右键菜单');
   await key('End');
   await key('ArrowUp');
-  await check('菜单键盘跳过不可用项', 'document.activeElement.textContent.trim()==="翻译与分类"');
+  await h.checkSoon(
+    '菜单键盘跳过不可用项',
+    'document.activeElement.textContent.trim()==="翻译与分类"',
+  );
   await key('ArrowUp');
   await key('ArrowRight');
-  await check(
+  await h.checkSoon(
     '菜单右方向键进入子菜单',
     'document.activeElement.textContent.trim()==="Prompt" && document.querySelectorAll(".nps-layer [role=menu]").length>=2',
   );
   await key('ArrowLeft');
-  await check('菜单左方向键返回父菜单', 'document.activeElement.textContent.trim()==="移动到"');
+  await h.checkSoon(
+    '菜单左方向键返回父菜单',
+    'document.activeElement.textContent.trim()==="移动到"',
+  );
   await key('Tab');
-  await check(
+  await h.checkSoon(
     '菜单 Tab 关闭并归还焦点',
     'document.activeElement.textContent.trim()==="右键菜单" && !document.querySelector(".nps-layer [role=menu]")',
   );
   await e('document.querySelector(".nps-menu-trigger[tabindex]").focus()');
   await key('F10', { shiftKey: true });
-  await check('Shift+F10 打开 Tag 右键菜单', '!!document.querySelector(".nps-layer [role=menu]")');
+  await h.checkSoon(
+    'Shift+F10 打开 Tag 右键菜单',
+    '!!document.querySelector(".nps-layer [role=menu]")',
+  );
   await key('Escape');
   await e(
     `document.querySelector('.nps-menu-trigger[tabindex]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:innerWidth-2,clientY:innerHeight-2}))`,
@@ -109,7 +125,7 @@ export async function componentDetails(h) {
   await key('Home');
   for (let i = 0; i < 4; i++) await key('ArrowDown');
   await key('ArrowRight');
-  await check(
+  await h.checkSoon(
     '边缘子菜单翻转或限制在视口内',
     `[...document.querySelectorAll('.nps-layer')].length===2 && [...document.querySelectorAll('.nps-layer')].every(node=>{const r=node.getBoundingClientRect();return r.x>=0 && r.right<=innerWidth+1 && r.bottom<=innerHeight+1})`,
   );
@@ -131,7 +147,7 @@ export async function componentDetails(h) {
   await check('点击外部关闭整组菜单', '!document.querySelector(".nps-layer [role=menu]")');
   await click('编辑一个 Tag');
   await h.nativeKey('Tab', 8);
-  await check(
+  await h.checkSoon(
     '编辑浮层 Shift+Tab 保持焦点在内部',
     'document.querySelector(".nps-layer[role=dialog]").contains(document.activeElement)',
   );
@@ -155,7 +171,10 @@ export async function componentDetails(h) {
     'document.activeElement.textContent.trim()==="编辑一个 Tag"',
   );
   await click('关闭已修改的标签？');
-  await check('破坏性对话框默认焦点为取消', 'document.activeElement.textContent.trim()==="取消"');
+  await h.checkSoon(
+    '破坏性对话框默认焦点为取消',
+    'document.activeElement.textContent.trim()==="取消"',
+  );
   await e('document.querySelector("dialog .nps-actions button:last-child").focus()');
   await h.nativeKey('Enter');
   await check('破坏性确认阻止 Enter 误触', '!!document.querySelector("dialog[open]")');
@@ -176,13 +195,17 @@ export async function componentDetails(h) {
     '提示在键盘聚焦后出现',
     'document.querySelector(".nps-layer[role=tooltip]").textContent.includes("复制当前筛选")',
   );
-  await e('window.dispatchEvent(new Event("scroll"))');
-  await check('滚动立即关闭提示', '!document.querySelector(".nps-layer[role=tooltip]")');
+  await h.checkSoon(
+    '滚动立即关闭提示',
+    '!document.querySelector(".nps-layer[role=tooltip]")',
+    TOOLTIP_SCROLL_CLOSE_MS,
+    'window.dispatchEvent(new Event("scroll"))',
+  );
   const before = await e(
     'document.querySelector(".nps-demo-selection").getBoundingClientRect().height',
   );
   await click('取消', 'document.querySelector(".nps-demo-selection")');
-  await check(
+  await h.checkSoon(
     '取消多选条不推动布局',
     `document.querySelector('.nps-demo-selection').getBoundingClientRect().height===${before} && !document.querySelector('.nps-demo-selection').innerText.includes('已选 3 个 Tag')`,
   );

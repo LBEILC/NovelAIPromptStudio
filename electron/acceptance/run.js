@@ -195,7 +195,7 @@ export async function runAcceptance(context) {
         await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
           features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
         });
-        await check(
+        await h.checkSoon(
           '系统减少动态效果时组件所有过渡时长不超过 1 毫秒',
           'matchMedia("(prefers-reduced-motion: reduce)").matches && Array.from(document.querySelectorAll(".nps-button")).length > 0 && Array.from(document.querySelectorAll(".nps-button")).every(button => getComputedStyle(button).transitionDuration.split(",").every(duration => parseFloat(duration) <= 0.001))',
         );

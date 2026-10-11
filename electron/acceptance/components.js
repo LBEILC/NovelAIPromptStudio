@@ -19,7 +19,7 @@ export async function componentChecks({ h, mode }) {
       ['ArrowRight', {}, '1'],
     ]) {
       await key(name, options);
-      await check(
+      await h.checkSoon(
         `滑块 ${options.shiftKey ? 'Shift+' : ''}${name} 数值及 ARIA 为 ${value}`,
         `document.querySelector('${slider}').value==='${value}' && document.querySelector('${slider}').getAttribute('aria-valuetext')===Number('${value}').toFixed(2)`,
       );
@@ -67,11 +67,11 @@ export async function componentChecks({ h, mode }) {
       });
     };
     await pointer(slider, 0);
-    await check('滑块指针拖到左端为零', `document.querySelector('${slider}').value==='0'`);
+    await h.checkSoon('滑块指针拖到左端为零', `document.querySelector('${slider}').value==='0'`);
     await pointer(slider, 1);
-    await check('滑块指针拖到右端为一', `document.querySelector('${slider}').value==='1'`);
+    await h.checkSoon('滑块指针拖到右端为一', `document.querySelector('${slider}').value==='1'`);
     await pointer(slider, 0.5);
-    await check(
+    await h.checkSoon(
       '点击滑块轨道更新数值',
       `Math.abs(Number(document.querySelector('${slider}').value)-.5)<.03`,
     );
@@ -84,7 +84,7 @@ export async function componentChecks({ h, mode }) {
       ['End', {}, '520'],
     ]) {
       await key(name, options);
-      await check(
+      await h.checkSoon(
         `面板 ${options.shiftKey ? 'Shift+' : ''}${name} 宽度 ${value}`,
         `document.querySelector('[role=separator]').getAttribute('aria-valuenow')==='${value}'`,
       );
@@ -92,12 +92,12 @@ export async function componentChecks({ h, mode }) {
     await e(
       'document.querySelector("[role=separator]").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
     );
-    await check(
+    await h.checkSoon(
       '面板双击恢复默认宽度',
       'document.querySelector("[role=separator]").getAttribute("aria-valuenow")==="340"',
     );
     await pointer('[role=separator]', 20);
-    await check(
+    await h.checkSoon(
       '面板指针拖动改变宽度',
       'Number(document.querySelector("[role=separator]").getAttribute("aria-valuenow"))>340',
     );
@@ -152,7 +152,7 @@ export async function componentChecks({ h, mode }) {
     );
     await key('ArrowDown');
     await key('Enter');
-    await check(
+    await h.checkSoon(
       '组合输入结束后 Enter 采用补全',
       'document.querySelector("input[role=combobox]").value.includes("copper")',
     );

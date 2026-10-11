@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { UI_FEEDBACK_MS, waitForFeedback } from './feedback.js';
 
 export function harness(window, mode, checks) {
   const evaluate = (code) =>
@@ -49,6 +50,14 @@ export function harness(window, mode, checks) {
       console.error(`FAIL [${category}] ${label}\n${record.error}\n${record.context}`);
     }
   };
+  const checkSoon = (label, expression, timeoutMs = UI_FEEDBACK_MS, action = '') =>
+    check(label, () =>
+      typeof expression === 'string'
+        ? evaluate(
+            `(${waitForFeedback.toString()})(()=>(${expression}),${timeoutMs},()=>{${action}})`,
+          )
+        : waitForFeedback(expression, timeoutMs),
+    );
   const click = async (text, scope = 'document', index = 0) => {
     console.log(`操作：点击 ${text}`);
     await wait(
@@ -139,6 +148,7 @@ export function harness(window, mode, checks) {
     wait,
     until,
     check,
+    checkSoon,
     click,
     input,
     key,

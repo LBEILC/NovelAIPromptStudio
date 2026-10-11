@@ -36,12 +36,12 @@ export async function settingsChecks(context, restart) {
     else h.uncovered('重启验证安全存储', '本平台 safeStorage 不可用');
     if (mode.phase === 1) {
       await click('恢复默认', 'document', 0);
-      await check(
+      await h.checkSoon(
         '仅恢复翻译规则，分类草稿保持',
         `(()=>{const areas=[...document.querySelectorAll('textarea')];return areas[0].value===${JSON.stringify(preferences.publicSettings().defaultPrompts.translation)} && areas[1].value==='验收分类规则'})()`,
       );
       await click('恢复默认', 'document', 1);
-      await check(
+      await h.checkSoon(
         '分类规则恢复到默认内容',
         `[...document.querySelectorAll('textarea')][1].value===${JSON.stringify(preferences.publicSettings().defaultPrompts.classification)}`,
       );
@@ -215,7 +215,7 @@ export async function settingsChecks(context, restart) {
   {
     await wait('document.body.innerText.includes("已读取 2 个模型")');
     await select('模型列表', 'acceptance-other');
-    await check(
+    await h.checkSoon(
       '选择模型列表会修改模型输入',
       'document.querySelector("input[aria-label=模型]").value === "acceptance-other"',
     );
@@ -277,7 +277,7 @@ export async function settingsChecks(context, restart) {
     ['提出建议', 'enhancement'],
   ]) {
     await click(label);
-    await check(`${label}链接只包含项目表单参数`, () => {
+    await h.checkSoon(`${label}链接只包含项目表单参数`, () => {
       const url = new URL(doubles.calls.at(-1).value);
       return (
         url.origin === 'https://github.com' &&
@@ -296,7 +296,7 @@ export async function settingsChecks(context, restart) {
       `NovelAI Prompt Studio v${app.getVersion()}\n平台：${{ win32: 'Windows', darwin: 'macOS', linux: 'Linux' }[process.platform]}`,
   );
   await click('查看声明');
-  await check(
+  await h.checkSoon(
     '声明包含三种字体和 Remix Icon 完整许可',
     '["MiSans VF 4.003","Newsreader","IBM Plex Mono","Remix Icon"].every(name=>[...document.querySelectorAll("dialog details")].some(d=>d.querySelector("summary").textContent===name && d.querySelector("pre").textContent.length>500))',
   );
@@ -312,7 +312,7 @@ export async function settingsChecks(context, restart) {
     ['段落字体', 'MiSans'],
   ]) {
     await click(label);
-    await check(
+    await h.checkSoon(
       `${label}三种内置字体排在最前`,
       '[...document.querySelectorAll(".nps-layer [role=option]")].slice(0,3).map(e=>e.textContent.trim()).join("|") === "MiSans（内置）|IBM Plex Mono（内置）|Newsreader（内置）"',
     );
@@ -322,7 +322,7 @@ export async function settingsChecks(context, restart) {
     await wait(
       `document.querySelector('[aria-label="${label}"]').textContent.includes('${family}')`,
     );
-    await check(
+    await h.checkSoon(
       `${label}键盘选择立即应用`,
       `getComputedStyle(document.documentElement).getPropertyValue('--font-${label === '界面字体' ? 'ui' : label === '等宽字体' ? 'mono' : 'prose'}').includes('${family}')`,
     );

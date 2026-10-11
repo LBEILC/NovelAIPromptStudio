@@ -14,7 +14,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prepare-fonts:
+    name: Prepare verified MiSans cache
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Restore pinned MiSans VF
+        id: misans-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .local/fonts/MiSansVF.ttf
+          enableCrossOsArchive: true
+          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
+      - name: Download MiSans on cache miss
+        if: steps.misans-cache.outputs.cache-hit != 'true'
+        run: npm run fonts
+      - run: npm run fonts:check
+      - name: Save verified MiSans for dependent jobs in this ref
+        if: steps.misans-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .local/fonts/MiSansVF.ttf
+          enableCrossOsArchive: true
+          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
+
   check:
+    needs: prepare-fonts
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -36,24 +64,17 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run audit:ui
-      - name: Cache pinned MiSans VF
+      - name: Restore prepared MiSans cache (no download)
         id: misans-cache
         uses: actions/cache/restore@v5
         with:
           path: .local/fonts/MiSansVF.ttf
           enableCrossOsArchive: true
           key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
-      - name: Acquire and verify MiSans (required for screenshots and packaging)
+      - name: Fail if font cache was not prepared
         if: steps.misans-cache.outputs.cache-hit != 'true'
-        run: npm run fonts
+        run: node -e "console.error('MiSans font cache was not prepared; check the prepare-fonts job. Matrix jobs never download fonts.'); process.exit(1)"
       - run: npm run fonts:check
-      - name: Save verified MiSans for all platforms
-        if: steps.misans-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: .local/fonts/MiSansVF.ttf
-          enableCrossOsArchive: true
-          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
       - run: npm run verify:app
       - name: Upload acceptance checks and screenshots
         if: always()
