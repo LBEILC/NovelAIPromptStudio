@@ -1,7 +1,8 @@
 /* 界面稿样式（第四部分）：图片库的各个状态。只取 tokens.css 的值。 */
 
 .lib { position: relative; }
-.lib .grid { grid-template-columns: repeat(auto-fill, minmax(var(--thumb-min), 1fr)); gap: var(--thumb-gap); }
+/* 其余状态的示意图全是竖图，等高排列的结果和等宽网格一样，界面稿里就用网格近似；真正的排法见"横竖混排" */
+.lib .grid { gap: var(--thumb-gap); }
 .lib .tools { padding: 0 var(--sp-5); }
 .lib .count { padding: 0 var(--sp-5) var(--sp-4); }
 

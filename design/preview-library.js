@@ -1,6 +1,6 @@
 // 界面稿（第四部分）：图片库的各个状态。依赖 preview.js 和 preview-pages.js。
 // 地址参数：preview.html?page=lib&sub=filter
-const LIB_STATES = [['home', '默认'], ['group', '一组图片'], ['mixed', '横竖混排'], ['square', '方格（对比）'], ['filter', '筛选'], ['view', '视图'], ['select', '多选'], ['collect', '加入收藏集'], ['smart', '智能收藏集'],
+const LIB_STATES = [['home', '默认'], ['group', '一组图片'], ['mixed', '横竖混排'], ['filter', '筛选'], ['view', '视图'], ['select', '多选'], ['collect', '加入收藏集'], ['smart', '智能收藏集'],
   ['import', '导入'], ['zip', '导入 ZIP'], ['drop', '拖入'], ['viewer', '大图'], ['trash', '回收站'], ['purge', '永久删除'], ['empty', '空图片库'], ['nomatch', '没有结果']];
 const LIB_PICS = ['雨后候车亭-02', '夜间书店-01', '夜间书店-02', '玻璃花房-01', '海边写生-01', '玻璃花房-02', '玻璃花房-03', '夜间书店-03', '玻璃花房-04', '海边写生-02'];
 const libState = () => (LIB_STATES.some(([k]) => k === S.sub) ? S.sub : 'home');
@@ -46,10 +46,6 @@ function libJust() {
   const row = (items, last) => `<div class="jrow ${last ? 'last' : ''}">${items.map(([p, r, n], i) => `<div class="card ${p === '雨后候车亭-02' ? 'on' : ''}" style="--r:${r}"><img src="${IMG(p)}" alt="">${n ? `<span class="stack">${n}</span>` : ''}</div>`).join('')}</div>`;
   return `<div class="scroll"><div class="just">${row(MIXED.slice(0, 4))}${row(MIXED.slice(4, 7))}${row(MIXED.slice(7), true)}</div><div class="label count">142 组 · 159 张</div></div>`;
 }
-function libSquare() {
-  return `<div class="scroll"><div class="grid sq">${MIXED.map(([p, r, n]) => `<div class="card ${p === '雨后候车亭-02' ? 'on' : ''}"><img src="${IMG(p)}" alt="" style="aspect-ratio:1">${n ? `<span class="stack">${n}</span>` : ''}</div>`).join('')}</div><div class="label count">142 组 · 159 张</div></div>`;
-}
-
 // 详情栏里的只读 Prompt，显示方式和工作台相同
 function libDoc() {
   return `<div class="doc selectable" style="padding-top:0">
@@ -138,7 +134,6 @@ VIEWS.lib = () => {
   let side = libSide('all'), tools = libTools(), mid = libGrid(), detail = libDetail('one'), over = '', inGrid = '';
   if (st === 'group') detail = libDetail('group');
   if (st === 'mixed') mid = libJust();
-  if (st === 'square') mid = libSquare();
   if (st === 'filter') { tools = libTools(5, 'filter'); mid = filterChips + libGrid({ pics: few, count: '4 组 · 7 张，共 159 张' }); inGrid = libFilter('<button class="btn quiet sm">清除</button><span class="sp"></span><button class="btn sm">存为智能收藏集</button>'); }
   if (st === 'view') { tools = libTools(0, 'view'); inGrid = libView(); }
   if (st === 'select') { mid = libGrid({ on: -1, picked: [0, 2, 5] }); detail = libDetail('multi');
@@ -162,6 +157,7 @@ VIEWS.lib = () => {
 
 Object.assign(NOTES, {
   lib: ['上面"图片库的状态"可以切换这一页的各个状态。',
+        '图片等高排列：每行一样高，图片按自己的宽高比占宽度，不裁切。看"横竖混排"这个状态；其余状态的示意图全是竖图，所以看起来像等宽网格。',
         '单击选中，详情栏显示它；双击或按 Enter 在工作台打开；按空格看大图。原来的"鼠标悬停弹出大图"去掉了，因为详情栏一直在。',
         '两种外框：朱砂是"当前这一张"，墨色加勾是"多选选中的"。Ctrl 或 Shift 加单击、拖动框选、Ctrl A 进入多选，Esc 退出。',
         '一摞图片选中后，详情栏的图片下面出现一排小图，可以逐张看、换封面；下面带一条线的是封面。',
