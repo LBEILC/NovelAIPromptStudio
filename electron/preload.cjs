@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld(
     updateCollectionProjects: (id, projectIds, action = 'add') =>
       invoke('library:collections:projects', { id, projectIds, action }),
     getLibraryStorage: () => invoke('library:storage:get'),
+    getDatabaseStorage: () => invoke('database:storage:get'),
+    listDatabaseBackups: () => invoke('database:backups:list'),
+    revealDatabaseFile: (fileName) => invoke('database:storage:reveal', fileName),
     changeLibraryStorage: () => invoke('library:storage:change'),
     revealLibraryStorage: () => invoke('library:storage:reveal'),
     onLibraryStorageProgress: (callback) => {

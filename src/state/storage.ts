@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { StorageDetails } from '../shared/ipc';
+import type { StorageDetails, DatabaseStorageLocation, DatabaseBackup } from '../shared/ipc';
 import type { LibraryStorageProgress } from '../shared/types';
 export function useStorage(onLibraryChange: () => Promise<unknown>) {
   const [details, setDetails] = useState<StorageDetails | null>(null);
+  const [database, setDatabase] = useState<DatabaseStorageLocation | null>(null);
+  const [backups, setBackups] = useState<DatabaseBackup[] | null>(null);
+  const [databaseError, setDatabaseError] = useState('');
   const [progress, setProgress] = useState<LibraryStorageProgress | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -10,6 +13,17 @@ export function useStorage(onLibraryChange: () => Promise<unknown>) {
     const studio = window.studio;
     if (!studio) return;
     let active = true;
+    void Promise.all([studio.getDatabaseStorage(), studio.listDatabaseBackups()])
+      .then(([location, listing]) => {
+        if (!active) return;
+        if (location.ok) setDatabase(location);
+        if (listing.ok) setBackups(listing.backups);
+        if (!location.ok) setDatabaseError(location.error);
+        else if (!listing.ok) setDatabaseError(listing.error);
+      })
+      .catch((e: Error) => {
+        if (active) setDatabaseError(e.message);
+      });
     studio
       .getLibraryStorage()
       .then((result) => {
@@ -52,5 +66,25 @@ export function useStorage(onLibraryChange: () => Promise<unknown>) {
       setError(String(e));
     }
   };
-  return { details, progress, busy, error, change, reveal };
+  const revealDatabase = async (fileName: string) => {
+    setDatabaseError('');
+    try {
+      const result = await window.studio?.revealDatabaseFile(fileName);
+      if (result && !result.ok) throw new Error(result.error);
+    } catch (e) {
+      setDatabaseError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return {
+    details,
+    progress,
+    busy,
+    error,
+    change,
+    reveal,
+    database,
+    backups,
+    databaseError,
+    revealDatabase,
+  };
 }

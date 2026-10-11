@@ -35,7 +35,11 @@ import { annotateTags } from './tagAnnotations.js';
 import { exportEmbeddedVibeFile } from './vibes.js';
 import { applyWorkbenchLibraryDetails, readWorkbenchImage } from './workbench.js';
 import { listSystemFonts } from './fonts.js';
-import { describeAssetDirectory, migrateAssetDirectory } from './libraryStorage.js';
+import {
+  createDatabaseStorage,
+  describeAssetDirectory,
+  migrateAssetDirectory,
+} from './libraryStorage.js';
 import { cleanupWorkbenchTemporaryImages, readClipboardImageSource } from './clipboardImages.js';
 import {
   checkForUpdates as checkReleaseUpdates,
@@ -412,6 +416,23 @@ app.whenReady().then(async () => {
         request.action,
       );
       return { ok: true, results, summary: batchSummary(results) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  const databaseStorage = createDatabaseStorage(dataDirectory);
+  ipcMain.handle('database:storage:get', () => ({ ok: true, ...databaseStorage.location() }));
+  ipcMain.handle('database:backups:list', async () => {
+    try {
+      return { ok: true, ...(await databaseStorage.listBackups()) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('database:storage:reveal', async (_event, fileName) => {
+    try {
+      await databaseStorage.reveal(fileName, (file) => shell.showItemInFolder(file));
+      return { ok: true };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }

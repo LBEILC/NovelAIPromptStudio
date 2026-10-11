@@ -147,7 +147,9 @@ export function Dictionary() {
                     {CATEGORY_LABELS[item.category || 'Unsorted']}
                   </Button>
                 </td>
-                <td>{sourceLabel(item.translation_source || item.category_source)}</td>
+                <td className="settings-source">
+                  {sourceLabel(item.translation_source || item.category_source)}
+                </td>
                 <td>
                   <Button
                     size="small"
@@ -219,7 +221,6 @@ export function Dictionary() {
           </Button>
         </div>
       )}
-      {/* TODO(design): The reference omits the expanded editor; preserve the old anchored editor using the accepted Popover. */}
       <Popover open={!!editing} label={editing} anchor={editAnchor} onClose={() => setEditing('')}>
         <div className="settings-edit-fields">
           <strong>编辑缓存</strong>

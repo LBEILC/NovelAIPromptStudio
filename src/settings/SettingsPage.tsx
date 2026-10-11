@@ -289,6 +289,38 @@ function Storage({
       )}
       {s.error && <p role="alert">{s.error}</p>}
       <h2>数据与备份</h2>
+      <Row
+        title="数据库"
+        help={
+          s.database
+            ? `${s.database.directory}${s.database.directory.includes('\\') ? '\\' : '/'}${s.database.fileName}`
+            : '正在读取…'
+        }
+      >
+        <Button
+          disabled={!s.database}
+          onClick={() => s.database && void s.revealDatabase(s.database.fileName)}
+        >
+          打开文件夹
+        </Button>
+      </Row>
+      {s.backups?.map((backup) => (
+        <Row
+          key={backup.fileName}
+          title="升级前的备份"
+          help={`软件在升级数据格式之前自动留下的一份副本 · ${backup.fileName} · ${bytes(backup.size)} · ${new Date(backup.modifiedAt).toLocaleString()}`}
+        >
+          <Button variant="quiet" onClick={() => void s.revealDatabase(backup.fileName)}>
+            在文件夹中显示
+          </Button>
+        </Row>
+      ))}
+      {s.backups?.length === 0 && (
+        <Row title="升级前的备份" help="【文案待定：没有升级前的备份】">
+          {null}
+        </Row>
+      )}
+      {s.databaseError && <p role="alert">{s.databaseError}</p>}
       <Row title="回收站" help={`${trash} 张图片 · 永久删除后无法恢复`}>
         <Button
           variant="danger-outline"

@@ -4,6 +4,60 @@ import path from 'node:path';
 
 const promises = fs.promises;
 
+// Only metadata is inspected; database and backup contents are never opened.
+export function createDatabaseStorage(dataDirectory) {
+  const directory = path.resolve(dataDirectory);
+  const fileName = 'studio.sqlite';
+  let listedNames = new Set();
+  const backupName = (name) => /^studio\.pre-[^/\\:]+\.sqlite$/.test(name);
+  const resolveFile = async (name) => {
+    if (
+      typeof name !== 'string' ||
+      /[/\\:\0]/.test(name) ||
+      (name !== fileName && !backupName(name))
+    )
+      throw new Error('【文案待定：无法定位数据目录以外或未列出的文件】');
+    const candidate = path.resolve(directory, name);
+    const stat = await promises.lstat(candidate);
+    const realDirectory = await promises.realpath(directory);
+    const realFile = await promises.realpath(candidate);
+    if (!stat.isFile() || stat.isSymbolicLink() || path.dirname(realFile) !== realDirectory)
+      throw new Error('【文案待定：无法定位数据目录以外或未列出的文件】');
+    return { candidate, stat };
+  };
+  return {
+    location: () => ({ directory, fileName }),
+    async listBackups() {
+      const backups = [];
+      for (const entry of await promises.readdir(directory, { withFileTypes: true })) {
+        if (!entry.isFile() || !backupName(entry.name)) continue;
+        try {
+          const { stat } = await resolveFile(entry.name);
+          backups.push({
+            fileName: entry.name,
+            size: stat.size,
+            modifiedAt: stat.mtime.toISOString(),
+          });
+        } catch (error) {
+          if (error.code === 'ENOENT') continue;
+          throw error;
+        }
+      }
+      backups.sort(
+        (a, b) => b.modifiedAt.localeCompare(a.modifiedAt) || a.fileName.localeCompare(b.fileName),
+      );
+      listedNames = new Set(backups.map((backup) => backup.fileName));
+      return { backups };
+    },
+    async reveal(name, showItemInFolder) {
+      if (name !== fileName && !listedNames.has(name))
+        throw new Error('【文案待定：无法定位数据目录以外或未列出的文件】');
+      const { candidate } = await resolveFile(name);
+      showItemInFolder(candidate);
+    },
+  };
+}
+
 function isPathInside(parentDirectory, candidate) {
   const relative = path.relative(parentDirectory, candidate);
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));

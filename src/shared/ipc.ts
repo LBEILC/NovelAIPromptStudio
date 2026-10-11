@@ -68,6 +68,15 @@ export type PreparedImportResult = Result<
     }
 >;
 export type StorageDetails = LibrarySettings & { fileCount: number; totalBytes: number };
+export interface DatabaseStorageLocation {
+  directory: string;
+  fileName: string;
+}
+export interface DatabaseBackup {
+  fileName: string;
+  size: number;
+  modifiedAt: string;
+}
 export type StorageChangeResult = Result<
   | { canceled: true; noChange?: true }
   | (StorageDetails & { noChange: boolean; cleanupWarning: string })
@@ -129,6 +138,9 @@ export interface StudioApi {
     action?: 'add' | 'remove',
   ): Promise<BatchResult>;
   getLibraryStorage(): Promise<Result<StorageDetails>>;
+  getDatabaseStorage(): Promise<Result<DatabaseStorageLocation>>;
+  listDatabaseBackups(): Promise<Result<{ backups: DatabaseBackup[] }>>;
+  revealDatabaseFile(fileName: string): Promise<Result>;
   changeLibraryStorage(): Promise<StorageChangeResult>;
   revealLibraryStorage(): Promise<Result>;
   onLibraryStorageProgress(callback: (progress: LibraryStorageProgress) => void): void;

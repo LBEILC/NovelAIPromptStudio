@@ -46,3 +46,4 @@
 .settings-release-notes-content pre { white-space: pre-wrap; }
 .settings-release-notes-content table { display: block; overflow: auto; }
 .settings-release-notes-content :is(h1,h2,h3,h4,h5,h6) { font: var(--fw-strong) var(--fs-title)/var(--lh-title) var(--font-ui); }
+.settings-table td.settings-source { color: var(--text-3); font-size: var(--fs-small); font-weight: var(--fw-regular); }

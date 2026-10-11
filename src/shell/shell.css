@@ -12,6 +12,5 @@
 .studio-titlebar i { font-size: var(--icon); }
 .studio-titlebar-space { flex: 1; align-self: stretch; }
 .studio-window-controls { align-self: stretch; }
-/* TODO(design): Confirm native traffic-light inset and Windows control reserve against platform screenshots. */
 html[data-platform="macos"] .studio-titlebar { padding-left: 80px; }
 html[data-platform="windows"] .studio-window-controls { width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px))); }
