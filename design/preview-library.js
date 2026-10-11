@@ -120,7 +120,7 @@ const libPurge = () => `<div class="scrim"><div class="dialog"><h3>永久删除�
   <div class="acts"><button class="btn is-focus">取消</button><button class="btn line-danger">永久删除</button></div></div></div>`;
 
 const libEmpty = (kind) => kind === 'empty'
-  ? `<div class="empty"><span class="mark">{<i></i>}</span><h3>图片库里还没有图片</h3>
+  ? `<div class="empty"><span class="mark">${LOGO_EMPTY_SVG}</span><h3>图片库里还没有图片</h3>
       <p>把图片或 NovelAI 导出的 ZIP 拖到这里。软件会复制一份保存，并读出每张图的 Prompt 和参数。</p>
       <div class="acts"><button class="btn ink">导入图片</button><button class="btn">从剪贴板导入</button><span class="kbd" style="align-self:center">Ctrl V</span></div>
       <p class="fine">导入不会修改或移动你原来的文件。</p></div>`

@@ -70,8 +70,8 @@
 
 /* ---------- 空状态 ---------- */
 .empty { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-2); padding: 32px; text-align: center; color: var(--text-2); }
-.empty .mark { display: inline-flex; align-items: center; gap: 0.16em; margin-bottom: var(--sp-4); font: var(--fw-strong) var(--empty-mark)/1 var(--font-prose); color: var(--text-off); }
-.empty .mark i { width: 0.34em; height: 0.34em; border: 1.5px dashed var(--text-off); }
+.empty .mark { display: block; margin-bottom: var(--sp-4); color: var(--text-off); }
+.empty .mark svg { display: block; width: var(--empty-mark); height: var(--empty-mark); }
 .empty h3 { margin: 0; font: var(--fw-strong) var(--fs-title)/22px var(--font-ui); color: var(--text); }
 .empty p { margin: 0; max-width: var(--empty-w); }
 .empty .acts { display: flex; gap: var(--sp-2); margin-top: var(--sp-4); }

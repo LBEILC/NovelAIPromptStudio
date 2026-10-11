@@ -33,7 +33,11 @@ button { font: inherit; color: inherit; cursor: default; }
 /* 标题栏：标志、导航、系列标签都在这一行 */
 .tb { height: var(--titlebar-h); flex: 0 0 auto; display: flex; align-items: center; gap: 2px; padding: 0 0 0 14px; background: var(--pane); border-bottom: 1px solid var(--border); }
 .logo { display: inline-flex; align-items: center; margin-right: 10px; color: var(--text); }
-.logo svg { width: 26px; height: 22px; }
+.logo svg { display: block; width: var(--logo); height: var(--logo); }
+/* 标志的两种颜色：括号跟随文字色，方块用朱砂 */
+[data-kind^="symbol"] [data-color="text"] { fill: currentColor; }
+[data-kind^="symbol"] [data-color="primary"] { fill: var(--cinnabar-seal); }
+[data-kind^="symbol"] [data-color="empty"] { stroke: currentColor; }
 .nav { display: flex; gap: 2px; }
 .nav button { height: 28px; padding: 0 10px; border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--text-2); transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
 .nav button:hover { background: var(--hover); color: var(--text); }

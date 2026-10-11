@@ -13,10 +13,7 @@ for (const [k, v] of new URLSearchParams(location.search)) if (k in S) S[k] = v;
 const gen = () => S.stage !== '1.0';
 const ic = (name) => `<i class="ri-${name}" aria-hidden="true"></i>`;
 
-const LOGO = `<span class="logo" aria-label="NovelAI Prompt Studio"><svg viewBox="0 0 26 22" aria-hidden="true">
-  <text x="1" y="17" font-family="Newsreader, Georgia, serif" font-weight="500" font-size="21" fill="currentColor">{</text>
-  <rect x="9.5" y="7.5" width="7" height="7" fill="var(--cinnabar-seal)"/>
-  <text x="17.5" y="17" font-family="Newsreader, Georgia, serif" font-weight="500" font-size="21" fill="currentColor">}</text></svg></span>`;
+const LOGO = `<span class="logo" aria-label="NovelAI Prompt Studio">${LOGO_SVG}</span>`;
 
 function titlebar(cur) {
   const nav = [['wb', '工作台'], ['lib', '图片库'], ['assets', '素材']].filter(([k]) => k !== 'assets' || gen());

@@ -52,6 +52,7 @@
   --prompt-w: 520px;    /* 工作台右侧的 Prompt 栏，可拖宽 */
   --side-w: 196px;      /* 图片库、素材、设置的侧栏 */
   --detail-w: 340px;    /* 图片库的详情栏，可拖宽 */
+  --logo: 22px;          /* 标题栏里的标志。一律用 design/identity/logo/ 的路径，不用字体去拼 */
   --mark: 6px;          /* "当前这一张"的朱砂方块 */
 
   /* 图标：Remix Icon 的线条风格（-line）。只在帮助扫读或代替文字节省空间的地方用 */
@@ -107,7 +108,7 @@
   --cat-dot: 5px;         /* 分类圆点，是一个元素，不是字符；和英文那一行垂直居中 */
 
   /* 空状态 */
-  --empty-mark: 64px;     /* 中间图形的字号；括号里的虚线方块边长 0.34em */
+  --empty-mark: 64px;     /* 空状态图形的边长，用 design/identity/logo/symbol-empty.svg，颜色 --text-off */
   --empty-w: 380px;       /* 说明文字的最大宽度。标题到说明 --sp-2，图形下方和按钮上方 --sp-4，小字上方 --sp-5 */
 
   /* 多行输入、表格、关于页 */
@@ -116,7 +117,7 @@
   --table-row-h: 36px;
   --table-head-h: 30px;       /* 表头用 --fs-caption、--text-3，滚动时停在顶部 */
   --table-check-w: 52px;      /* 表格第一列（勾选）的宽度 */
-  --about-mark: 44px;         /* 关于页标志的字号 */
+  --about-mark: 44px;         /* 关于页标志的边长，用 master-symbol.svg */
   --fs-brand: 20px;           /* 关于页的产品名，行高 26px，字体 --font-prose */
   --lh-brand: 26px;
 

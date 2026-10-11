@@ -52,7 +52,7 @@ VIEWS.acct = () => `${titlebar('')}<div class="body">${setNav('acct')}
 
 VIEWS.empty = () => `${titlebar('wb').replace(/<span class="tb-sep">[\s\S]*?<\/div><span class="sp">/, '<span class="sp">')}<div class="body">
   <div class="col" style="flex:1 1 0"><div class="empty">
-    <span class="mark">{<i></i>}</span>
+    <span class="mark">${LOGO_EMPTY_SVG}</span>
     <h3>把一张 NovelAI 图片拖到这里</h3>
     <p>软件会读出它的 Prompt 和参数。可以同时打开多张，每张一个标签。</p>
     <div class="acts"><button class="btn ink">打开图片</button><button class="btn">从剪贴板打开</button><span class="kbd" style="align-self:center">Ctrl V</span></div>

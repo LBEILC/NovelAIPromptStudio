@@ -26,6 +26,6 @@
 
 /* 关于 */
 .about-head { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-2) 0 var(--sp-4); }
-.about-mark { display: inline-flex; align-items: center; gap: 0.14em; font: var(--fw-strong) var(--about-mark)/1 var(--font-prose); color: var(--text); }
-.about-mark i { width: 0.34em; height: 0.34em; background: var(--cinnabar-seal); }
+.about-mark { display: block; color: var(--text); }
+.about-mark svg { display: block; width: var(--about-mark); height: var(--about-mark); }
 .about-name { font: var(--fw-strong) var(--fs-brand)/var(--lh-brand) var(--font-prose); }

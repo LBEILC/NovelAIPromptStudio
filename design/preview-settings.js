@@ -66,7 +66,7 @@ const SET_BODY = {
   },
 
   about: () => `<div class="set">
-    <div class="about-head"><span class="about-mark">{<i></i>}</span><div><div class="about-name">NovelAI Prompt Studio</div><div class="muted mono">版本 1.0.0</div></div></div>
+    <div class="about-head"><span class="about-mark">${LOGO_SVG}</span><div><div class="about-name">NovelAI Prompt Studio</div><div class="muted mono">版本 1.0.0</div></div></div>
     <div class="help">非官方工具，与 NovelAI 没有隶属关系。</div>
     <h2>更新</h2>
     <div class="setrow"><div>自动检查更新<small>启动稳定后检查一次，不会自动安装</small></div><span class="switch on"></span></div>
