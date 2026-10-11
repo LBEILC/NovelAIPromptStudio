@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  analyzePromptBatch,
+  analyzePromptBatch as legacyAnalyzePromptBatch,
   expandSearch,
   formatPrompt,
   formatPromptGroupedInline,
@@ -8,10 +8,42 @@ import {
   formatTag,
   inferCategory,
   normalizeCategory,
-  parsePrompt,
-  parsePromptPreservingEdits,
-  repairLegacyPromptTags,
+  parsePrompt as legacyParsePrompt,
+  parsePromptPreservingEdits as legacyParsePromptPreservingEdits,
+  repairLegacyPromptTags as legacyRepairLegacyPromptTags,
 } from './prompt.js';
+import { parsePromptSection, serializePromptSection } from './promptDocument';
+
+// Exercise every existing parser fixture through the new codec without copying fixture strings.
+function assertBlockCompatibility(source) {
+  const section = parsePromptSection(source, { createId: () => 'compatibility' });
+  expect(serializePromptSection(section)).toBe(source);
+  if (!/(?:\r\n|\r|\n)[^\S\r\n]*(?:\r\n|\r|\n)/.test(source)) {
+    expect(section.blocks).toHaveLength(1);
+    expect(section.blocks[0].type).toBe('tags');
+    expect(section.blocks[0].tags).toEqual(legacyParsePrompt(source, () => 'compatibility'));
+  }
+  for (const block of section.blocks.filter((block) => block.type === 'tags')) {
+    expect(block.tags).toEqual(legacyParsePrompt(block.content, () => 'compatibility'));
+  }
+}
+
+function parsePrompt(source, createId) {
+  assertBlockCompatibility(source);
+  return legacyParsePrompt(source, createId);
+}
+function analyzePromptBatch(source, tags, createId) {
+  assertBlockCompatibility(source);
+  return legacyAnalyzePromptBatch(source, tags, createId);
+}
+function parsePromptPreservingEdits(source, tags, createId) {
+  assertBlockCompatibility(source);
+  return legacyParsePromptPreservingEdits(source, tags, createId);
+}
+function repairLegacyPromptTags(tags, source, createId) {
+  assertBlockCompatibility(source);
+  return legacyRepairLegacyPromptTags(tags, source, createId);
+}
 
 describe('NovelAI prompt codec', () => {
   it('parses numeric weights and exports the same NovelAI syntax', () => {

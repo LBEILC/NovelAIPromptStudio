@@ -199,7 +199,7 @@ export function findPromptTextBlockStart(source = '') {
   return textBlockStart(String(source || ''), 0);
 }
 
-function scanPromptSegments(source, state) {
+function scanPromptSegments(source, state, offset = 0, wrappers = []) {
   const segments = [];
   let cursor = 0;
   while (cursor < source.length) {
@@ -212,9 +212,17 @@ function scanPromptSegments(source, state) {
       const contentEnd = source.indexOf('::', contentStart);
       if (contentEnd !== -1) {
         const weight = Number(weighted[1]);
-        scanPromptSegments(source.slice(contentStart, contentEnd), state).forEach((segment) =>
-          segments.push({ ...segment, weight }),
-        );
+        const wrapper = {
+          kind: 'weight',
+          start: offset + cursor,
+          end: offset + contentEnd + 2,
+          open: weighted[0],
+          close: '::',
+        };
+        scanPromptSegments(source.slice(contentStart, contentEnd), state, offset + contentStart, [
+          ...wrappers,
+          wrapper,
+        ]).forEach((segment) => segments.push({ ...segment, weight }));
         cursor = contentEnd + 2;
         continue;
       }
@@ -224,7 +232,17 @@ function scanPromptSegments(source, state) {
     if (braceGroup) {
       const group = `brace-${state.nextGroup++}`;
       const trailingComma = /,\s*$/.test(braceGroup.content);
-      scanPromptSegments(braceGroup.content, state).forEach((segment) =>
+      const wrapper = {
+        kind: 'brace',
+        start: offset + cursor,
+        end: offset + braceGroup.end,
+        open: '{'.repeat(braceGroup.depth),
+        close: '}'.repeat(braceGroup.depth),
+      };
+      scanPromptSegments(braceGroup.content, state, offset + cursor + braceGroup.depth, [
+        ...wrappers,
+        wrapper,
+      ]).forEach((segment) =>
         segments.push({
           ...segment,
           brace_depth: braceGroup.depth + Number(segment.brace_depth || 0),
@@ -245,6 +263,7 @@ function scanPromptSegments(source, state) {
           weight: 1,
           raw_segment: rawSegment,
           segment_type: 'text_block',
+          source_range: { start: offset + cursor, end: offset + source.trimEnd().length, wrappers },
         });
       break;
     }
@@ -252,6 +271,14 @@ function scanPromptSegments(source, state) {
     const regularBoundary = scanPromptBoundary(source, cursor);
     const end = textStart > cursor ? Math.min(regularBoundary, textStart) : regularBoundary;
     const rawSegment = source.slice(cursor, end).trim();
+    const source_range = {
+      start: offset + cursor,
+      end:
+        offset +
+        end -
+        (source.slice(cursor, end).length - source.slice(cursor, end).trimEnd().length),
+      wrappers,
+    };
     if (rawSegment) {
       if (rawSegment === '::') {
         segments.push({
@@ -259,6 +286,7 @@ function scanPromptSegments(source, state) {
           weight: 1,
           raw_segment: rawSegment,
           syntax_issue: 'control_only',
+          source_range,
         });
       } else {
         const leadingCloser = rawSegment.startsWith('::');
@@ -271,6 +299,7 @@ function scanPromptSegments(source, state) {
           segments.push({
             tag,
             weight: 1,
+            source_range,
             ...(leadingCloser || trailingCloser
               ? { raw_segment: rawSegment, syntax_issue: 'emphasis_closer' }
               : {}),
@@ -289,6 +318,32 @@ function promptSegments(prompt) {
   return scanPromptSegments(source, { nextGroup: 0 });
 }
 
+// Ranges use UTF-16 offsets into the original string, including CRLF and fullwidth commas.
+// Keep range collection in the same scanner as parsePrompt so editing cannot drift from parsing.
+export function promptTagRanges(prompt = '') {
+  const original = String(prompt || '');
+  const boundaries = [0];
+  let source = '';
+  for (let index = 0; index < original.length; index += 1) {
+    let character = original[index];
+    if (character === '\r') {
+      if (original[index + 1] === '\n') index += 1;
+      character = '\n';
+    }
+    source += character === '，' ? ',' : character;
+    boundaries.push(index + 1);
+  }
+  return scanPromptSegments(source, { nextGroup: 0 }).map(({ source_range: range }) => ({
+    start: boundaries[range.start],
+    end: boundaries[range.end],
+    wrappers: range.wrappers.map((wrapper) => ({
+      ...wrapper,
+      start: boundaries[wrapper.start],
+      end: boundaries[wrapper.end],
+    })),
+  }));
+}
+
 function hasBraceGroups(value) {
   const source = String(value || '');
   for (let cursor = 0; cursor < source.length; cursor += 1) {
@@ -297,6 +352,7 @@ function hasBraceGroups(value) {
   return false;
 }
 
+/** @param {string} prompt @param {() => string} createId @returns {import('../shared/types').Tag[]} */
 export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
   return promptSegments(prompt).map(
     (
@@ -333,6 +389,7 @@ export function parsePrompt(prompt = '', createId = () => crypto.randomUUID()) {
   );
 }
 
+/** @param {string} prompt @param {import('../shared/types').Tag[]} existingTags @param {() => string} createId */
 export function parsePromptPreservingEdits(
   prompt = '',
   existingTags = [],

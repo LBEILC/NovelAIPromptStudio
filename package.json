@@ -9,6 +9,7 @@
   "author": "LBEILC",
   "main": "electron/main.js",
   "scripts": {
+    "check:prompt-blocks": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-prompt-blocks.mjs",
     "benchmark:data-layer": "node scripts/benchmark-data-layer.mjs",
     "dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
     "dev:demo": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron . --dev --profile=demo\"",
@@ -88,6 +89,7 @@
       "!electron/**/*.test.js",
       "!electron/fixtures/**/*",
       "!src/lib/**/*.test.js",
+      "!src/lib/**/*.test.ts",
       "build/**/*",
       "package.json"
     ],
