@@ -57,17 +57,16 @@ NovelAI Prompt Studio is a cross-platform desktop application. Windows and macOS
 - Run `npm ci`, `npm test`, and `npm run build` only when the task makes explicit code changes, including source code, test code, shared scripts, build configuration, or dependency manifests. Do not run these commands for documentation-only changes, content or media asset changes, Skill/plugin installation, repository inspection, or other read-only/non-code operations.
 - Startup, window behavior, shortcuts, file dialogs, and secure storage must be verified on the affected operating system when they change. Unless the user explicitly requests computer use, follow the manual verification workflow below.
 
-## Manual application verification
+## Application verification
 
-- Do not use computer use, GUI automation, or simulated mouse and keyboard input for verification unless the user explicitly requests it in the current task.
-- When code changes are present, continue to run applicable non-GUI checks such as linting, unit tests, integration tests, and production builds. This restriction applies to interactive application verification, not command-line checks, and does not require checks for non-code-only work.
-- When a change needs interactive verification, create `doc/manual-verification-YYYYMMDD-<topic>.md` before handing the change back to the user. Do not claim that the interactive behavior has been verified.
-- Write all manual verification documents in Chinese.
-- The manual verification document must include the change or commit under test, target operating system, prerequisites, numbered verification steps, the expected result for every step, and empty fields for the observed result, overall result, and discovered issues.
-- Tell the user which manual verification document to follow and wait for their result. Do not perform the listed steps automatically unless they subsequently request computer use.
-- After the user reports that manual verification is complete, record the result they provide and move the document into `doc/archive/`. Preserve the filename unless it would collide with an existing archived document.
-- Do not create a manual verification document when no interactive verification is needed.
-- A screenshot script that launches the app with an isolated profile and saves page images through Electron's own capture API, without simulating mouse or keyboard input, counts as a command-line check, not GUI automation. It may be used to review appearance. It does not replace manual verification of interactive behavior.
+**Interactive behavior is verified by automated acceptance scripts, not by the user (user decision, 2026-10-11).** Do not write new `doc/manual-verification-*.md` documents and do not ask the user to perform verification steps.
+
+- The acceptance harness launches the real application (built, not the dev server) in an isolated temporary profile with demo data, drives it from Electron's main process, and asserts the result of every step. This follows the approach of the user's other project DispatchDock (`app/src/main/shots.ts`): DOM-level actions through `webContents.executeJavaScript` (clicks, input and keyboard events, scrolling), Electron APIs for windows, menus and native theme, and the Chrome DevTools Protocol for emulation (for example `prefers-reduced-motion`) and for checking the fonts actually used.
+- Every check has a readable label and a single boolean assertion; a failed check fails the command. Screenshots are taken from the same run for visual review.
+- The harness runs in CI on Windows and macOS. A packaged-app check launches the unsigned packaged build once and verifies that it starts, opens the database and renders with the bundled fonts.
+- Never touch the user's real data directory. Never simulate OS-level mouse or keyboard input, and do not use computer use, unless the user explicitly asks for it in the current task.
+- What automation cannot cover (for example dragging the window by its title bar, native file dialogs, the actual colors of native window buttons, OS-level shortcuts outside the app window) is listed in the task report under "not covered by automation". It is not turned into a manual checklist. Problems found by users are handled through GitHub issues.
+- Code changes still run the applicable non-GUI checks: format, typecheck, unit tests, production build.
 
 ## Cross-platform handoff
 
