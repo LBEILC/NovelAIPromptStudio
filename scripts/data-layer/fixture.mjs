@@ -19,13 +19,40 @@ export function project(index) {
     updated_at: '2026-01-01T00:00:00.000Z',
     tags: Array.from({ length: 59 }, (_, position) => ({
       id: `${id}-${position}`,
-      tag: `synthetic_${(index * 59 + position) % 2400}`,
+      tag:
+        index === 0 && position === 0
+          ? 'benchmark_unique'
+          : position === 1 && index % 5 !== 4
+            ? '1girl'
+            : `synthetic_${(index * 59 + position) % 2400}`,
       category: 'Unsorted',
       weight: 1,
     })),
     prompt_structure: JSON.parse(jsonOfSize(structureBytes)),
     metadata: { model: 'synthetic', seed: String(index), extra_json: jsonOfSize(extraBytes) },
   };
+}
+
+// Upgrade only explicitly supplied synthetic fixtures from 010a. Keep 59 tags
+// per image and the original metadata sizes; never modify the source fixture.
+export function ensureCardBenchmarkTags(directory, count) {
+  const raw = new DatabaseSync(path.join(directory, 'studio.sqlite'));
+  try {
+    raw.exec('BEGIN');
+    const update = raw.prepare(
+      'UPDATE prompt_tags SET tag = ? WHERE project_id = ? AND position = ? AND tag != ?',
+    );
+    update.run('benchmark_unique', 'image-0', 0, 'benchmark_unique');
+    for (let i = 0; i < count; i++) if (i % 5 !== 4) update.run('1girl', `image-${i}`, 1, '1girl');
+    raw.exec('COMMIT');
+    const uses = raw.prepare(
+      'SELECT count(DISTINCT project_id) AS n FROM prompt_tags WHERE tag = ?',
+    );
+    if (uses.get('benchmark_unique').n !== 1 || uses.get('1girl').n !== Math.ceil(count * 0.8))
+      throw Error('Benchmark unique/common tag distribution mismatch');
+  } finally {
+    raw.close();
+  }
 }
 
 function query(raw, sql) {

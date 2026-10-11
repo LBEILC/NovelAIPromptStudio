@@ -30,6 +30,10 @@ export interface Failure {
   ok: false;
   error: string;
 }
+export interface LibraryCardCacheProgress {
+  readonly completed: number;
+  readonly total: number;
+}
 export type Result<T = object> = ({ ok: true } & T) | Failure;
 export type BatchResult = Result<{ results: BatchResults; summary: BatchSummary }>;
 export type DownloadResult = Result<{ canceled: true } | { filePath: string }>;
@@ -125,6 +129,8 @@ export type DroppedFiles = Iterable<File> | ArrayLike<File> | null;
 export interface StudioApi {
   loadLibrary(view?: 'all' | 'favorites' | 'trash'): Promise<ImageRecord[]>;
   loadLibraryCards(view?: 'all' | 'favorites' | 'trash'): Promise<LibraryCard[]>;
+  onLibraryCardCacheProgress(callback: (progress: LibraryCardCacheProgress) => void): void;
+  offLibraryCardCacheProgress(): Electron.IpcRenderer;
   loadLibraryDetail(id: string): Promise<ImageRecord | null>;
   loadCollections(): Promise<
     { ok: true; collections: Collection[] } | (Failure & { collections: Collection[] })

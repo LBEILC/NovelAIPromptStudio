@@ -16,6 +16,11 @@ contextBridge.exposeInMainWorld(
   /** @satisfies {import('../src/shared/ipc').StudioApi} */ ({
     loadLibrary: (view = 'all') => invoke('library:load', { view }),
     loadLibraryCards: (view = 'all') => invoke('library:cards', { view }),
+    onLibraryCardCacheProgress: (callback) => {
+      ipcRenderer.removeAllListeners('library:cards-progress');
+      ipcRenderer.on('library:cards-progress', (_event, progress) => callback(progress));
+    },
+    offLibraryCardCacheProgress: () => ipcRenderer.removeAllListeners('library:cards-progress'),
     loadLibraryDetail: (id) => invoke('library:detail', id),
     loadCollections: () => invoke('library:collections:list'),
     createCollection: (collection) => invoke('library:collections:create', collection),

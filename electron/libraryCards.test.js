@@ -2,10 +2,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { fork } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { afterEach, expect, it, vi } from 'vitest';
 import { openDatabase } from './database.js';
 import { galleryViewGroups } from '../src/lib/gallery.js';
-import { galleryBasePromptSimilarity } from '../src/lib/galleryGrouping.js';
+import {
+  galleryBasePromptSimilarity,
+  galleryBasePromptSimilarityPayload,
+} from '../src/lib/galleryGrouping.js';
 import { filterGalleryProjects, galleryFilterOptions } from '../src/lib/galleryFilters.js';
 import { galleryCollectionScope } from '../src/lib/galleryCollections.js';
 
@@ -117,7 +122,7 @@ it('preserves every grouping, score, filter, collection, view and detail with co
     groups.map((g) => ({ ...g, members: projectIds(g.members), cover: g.cover.id }));
   for (const view of ['all', 'favorites', 'trash']) {
     const full = api.loadLibrary(view);
-    const cards = structuredClone(api.loadLibraryCards(view));
+    const cards = structuredClone(await api.loadLibraryCards(view));
     expect(projectIds(cards)).toEqual(projectIds(full));
     expect(galleryFilterOptions(cards)).toEqual(galleryFilterOptions(full));
     for (const item of full) {
@@ -165,18 +170,21 @@ it('preserves every grouping, score, filter, collection, view and detail with co
         projectIds(galleryCollectionScope(full, collection)),
       );
   }
-  expect(filterGalleryProjects(api.loadLibraryCards(), { query: 'zephyr' }).length).toBeGreaterThan(
-    0,
-  );
   expect(
-    filterGalleryProjects(api.loadLibraryCards(), { query: 'character prose' }).length,
+    filterGalleryProjects(await api.loadLibraryCards(), { query: 'zephyr' }).length,
+  ).toBeGreaterThan(0);
+  expect(
+    filterGalleryProjects(await api.loadLibraryCards(), { query: 'character prose' }).length,
   ).toBeGreaterThan(0);
   expect(api.loadProject('missing')).toBeNull();
-  expect(api.loadLibraryCards().some((card) => card.base_prompt_fingerprint === null)).toBe(true);
+  expect((await api.loadLibraryCards()).some((card) => card.base_prompt_fingerprint === null)).toBe(
+    true,
+  );
   expect(
-    galleryViewGroups(api.loadLibraryCards(), {}, { promptScope: 'full', mergeVibes: true }).length,
+    galleryViewGroups(await api.loadLibraryCards(), {}, { promptScope: 'full', mergeVibes: true })
+      .length,
   ).toBeLessThan(
-    galleryViewGroups(api.loadLibraryCards(), {}, { promptScope: 'full', mergeVibes: false })
+    galleryViewGroups(await api.loadLibraryCards(), {}, { promptScope: 'full', mergeVibes: false })
       .length,
   );
 });
@@ -202,20 +210,24 @@ it('aliases only identical base fingerprints and preserves independent or malfor
   const directory = temporary();
   const api = await open(directory);
   api.insertProject(sample(0));
-  expect(api.loadLibraryCards()[0].base_prompt_fingerprint).toBeNull();
+  expect((await api.loadLibraryCards())[0].base_prompt_fingerprint).toBeNull();
   edit(directory, (raw) =>
     raw.exec(
       "UPDATE projects SET base_prompt_fingerprint = 'independent', prompt_fingerprint = 'legacy non-JSON'",
     ),
   );
-  expect(api.loadLibraryCards()[0].base_prompt_fingerprint).toBe('independent');
+  expect((await api.loadLibraryCards())[0].base_prompt_fingerprint).toBe('independent');
   for (const promptScope of ['full', 'base']) {
     expect(
-      galleryViewGroups(api.loadLibraryCards(), {}, { promptScope }).map((group) => group.key),
+      galleryViewGroups(await api.loadLibraryCards(), {}, { promptScope }).map(
+        (group) => group.key,
+      ),
     ).toEqual(galleryViewGroups(api.loadLibrary(), {}, { promptScope }).map((group) => group.key));
   }
   api.insertProject({ ...sample(1), tags: [], prompt_structure: {}, metadata: {} });
-  expect(api.loadLibraryCards().find((card) => card.id === 'p1').base_prompt_fingerprint).toBe('');
+  expect(
+    (await api.loadLibraryCards()).find((card) => card.id === 'p1').base_prompt_fingerprint,
+  ).toBe('');
 });
 
 it('skips clean rows and renames, detects new imports and legacy edits, and agrees with full recomputation', async () => {
@@ -281,7 +293,8 @@ it('keeps dictionary enrichment live, invalidates algorithm upgrades and missing
   api = await open(directory);
   expect(hydrated).toEqual([]);
   expect(
-    api.loadLibraryCards()[0].filter_tags.find((tag) => tag.tag === 'landscape').translation,
+    (await api.loadLibraryCards())[0].filter_tags.find((tag) => tag.tag === 'landscape')
+      .translation,
   ).toBe('风景');
   expect(api.backfillPromptFingerprints()).toBe(0);
   api.close();
@@ -335,13 +348,34 @@ it('preserves dirty markers and previous fingerprints when startup repair fails'
   expect(api.backfillPromptFingerprints()).toBe(0);
 });
 
-function expectLiveCardSemantics(api) {
+async function expectLiveCardSemantics(api) {
   for (const view of ['all', 'favorites', 'trash']) {
     const full = api.loadLibrary(view);
-    const cards = structuredClone(api.loadLibraryCards(view));
+    const cards = structuredClone(await api.loadLibraryCards(view));
     expect(galleryFilterOptions(cards)).toEqual(galleryFilterOptions(full));
     for (const [index, card] of cards.entries()) {
       expect(card.id).toBe(full[index].id);
+      const source = full[index];
+      const structure = source.prompt_structure;
+      expect(card.filter_tags).toEqual(
+        [
+          ...source.tags,
+          ...(structure.base_undesired_tags || []),
+          ...(structure.characters || []).flatMap((character) => [
+            ...(character.prompt_tags || []),
+            ...(character.undesired_tags || []),
+          ]),
+        ].map(({ tag, translation, category }) => ({
+          tag,
+          translation: translation || '',
+          category,
+        })),
+      );
+      const similarity = galleryBasePromptSimilarityPayload(source);
+      expect(card.base_prompt_similarity).toEqual({
+        prompt: [...similarity.prompt],
+        undesired: [...similarity.undesired],
+      });
       for (let other = 0; other < cards.length; other++)
         expect(galleryBasePromptSimilarity(card, cards[other])).toBe(
           galleryBasePromptSimilarity(full[index], full[other]),
@@ -364,7 +398,7 @@ it('rebuilds a dropped derived table without changing cards or any original rows
   let api = await open(directory);
   for (let i = 0; i < 3; i++) api.insertProject(sample(i));
   api.backfillPromptFingerprints();
-  const before = structuredClone(api.loadLibraryCards());
+  const before = structuredClone(await api.loadLibraryCards());
   const original = () =>
     edit(directory, (raw) =>
       Object.fromEntries(
@@ -378,14 +412,14 @@ it('rebuilds a dropped derived table without changing cards or any original rows
     );
   const rows = original();
   edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
-  expect(api.loadLibraryCards()).toEqual(before);
+  expect(await api.loadLibraryCards()).toEqual(before);
   expect(original()).toEqual(rows);
   api.close();
   edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
   api = await open(directory);
-  expect(api.loadLibraryCards()).toEqual(before);
+  expect(await api.loadLibraryCards()).toEqual(before);
   expect(original()).toEqual(rows);
-  expectLiveCardSemantics(api);
+  await expectLiveCardSemantics(api);
 });
 
 it('invalidates dictionary translations, classification weights and deletions in memory and across reopen', async () => {
@@ -394,12 +428,12 @@ it('invalidates dictionary translations, classification weights and deletions in
   api.insertProject(sample(0));
   api.insertProject(sample(1));
   api.backfillPromptFingerprints();
-  const before = structuredClone(api.loadLibraryCards());
+  const before = structuredClone(await api.loadLibraryCards());
   api.updateTagDictionary('landscape', { translation: '风景', category: 'ArtistEra' });
-  const changed = structuredClone(api.loadLibraryCards());
+  const changed = structuredClone(await api.loadLibraryCards());
   expect(changed[0].base_prompt_similarity).not.toEqual(before[0].base_prompt_similarity);
   expect(changed[0].filter_tags.find((t) => t.tag === 'landscape').translation).toBe('风景');
-  expectLiveCardSemantics(api);
+  await expectLiveCardSemantics(api);
   api.close();
   edit(directory, (raw) =>
     raw.exec(
@@ -407,13 +441,38 @@ it('invalidates dictionary translations, classification weights and deletions in
     ),
   );
   api = await open(directory);
-  expect(api.loadLibraryCards()[0].filter_tags.find((t) => t.tag === 'landscape').translation).toBe(
-    '旧引擎译文',
-  );
-  expectLiveCardSemantics(api);
+  expect(
+    (await api.loadLibraryCards())[0].filter_tags.find((t) => t.tag === 'landscape').translation,
+  ).toBe('旧引擎译文');
+  await expectLiveCardSemantics(api);
   api.deleteTagDictionary('landscape');
-  expect(api.loadLibraryCards()).toEqual(before);
-  expectLiveCardSemantics(api);
+  expect(await api.loadLibraryCards()).toEqual(before);
+  await expectLiveCardSemantics(api);
+});
+
+it('replaces the 010a cache format without altering original rows or public card values', async () => {
+  const directory = temporary();
+  let api = await open(directory);
+  api.insertProject(sample(0));
+  api.backfillPromptFingerprints();
+  const before = await api.loadLibraryCards();
+  const original = api.loadLibrary();
+  api.close();
+  edit(directory, (raw) =>
+    raw.exec(`
+    DROP TABLE library_card_cache;
+    CREATE TABLE library_card_cache (
+      project_id TEXT PRIMARY KEY, project_order INTEGER NOT NULL,
+      created_at TEXT NOT NULL, is_favorite INTEGER NOT NULL,
+      deleted_at TEXT NOT NULL, payload TEXT NOT NULL
+    );
+    INSERT INTO library_card_cache VALUES ('p0', 1, '', 0, '', 'obsolete payload');
+    UPDATE app_meta SET value = '4:old-dictionary-signature' WHERE key = 'library_cards_version';
+  `),
+  );
+  api = await open(directory);
+  expect(await api.loadLibraryCards()).toEqual(before);
+  expect(api.loadLibrary()).toEqual(original);
 });
 
 it('recomputes only dirty derivations and keeps live fields and covers current', async () => {
@@ -421,7 +480,7 @@ it('recomputes only dirty derivations and keeps live fields and covers current',
   let api = await open(directory);
   for (let i = 0; i < 3; i++) api.insertProject(sample(i));
   api.backfillPromptFingerprints();
-  api.loadLibraryCards();
+  await api.loadLibraryCards();
   api.close();
   api = await open(directory);
   const prepare = DatabaseSync.prototype.prepare;
@@ -438,26 +497,26 @@ it('recomputes only dirty derivations and keeps live fields and covers current',
     }
     return prepare.call(this, sql);
   });
-  api.loadLibraryCards();
-  api.loadLibraryCards();
+  await api.loadLibraryCards();
+  await api.loadLibraryCards();
   expect(reads).toEqual([]);
   edit(directory, (raw) =>
     raw.exec(
       "UPDATE tag_dictionary SET updated_at = 'timestamp-only', display_tag = 'display-only'",
     ),
   );
-  api.loadLibraryCards();
+  await api.loadLibraryCards();
   expect(reads).toEqual([]);
   api.insertProject(sample(3));
   reads.length = 0;
-  api.loadLibraryCards();
+  await api.loadLibraryCards();
   expect([...new Set(reads)]).toEqual(['p3']);
   reads.length = 0;
   api.updateProjectName('p0', 'Current name');
   api.updateProjects(['p1'], { deleted: true });
   api.setGroupCover(api.loadProject('p0').exact_group_fingerprint, 'p0');
   reads.length = 0;
-  const cards = api.loadLibraryCards();
+  const cards = await api.loadLibraryCards();
   expect([...new Set(reads)].sort()).toEqual(['p0', 'p1']);
   expect(cards.find((p) => p.id === 'p0')).toMatchObject({
     name: 'Current name',
@@ -466,21 +525,21 @@ it('recomputes only dirty derivations and keeps live fields and covers current',
   expect(cards.some((p) => p.id === 'p1')).toBe(false);
   reads.length = 0;
   edit(directory, (raw) => raw.exec("UPDATE prompt_tags SET weight = 1.8 WHERE project_id = 'p0'"));
-  api.loadLibraryCards();
+  await api.loadLibraryCards();
   expect([...new Set(reads)]).toEqual(['p0']);
   reads.length = 0;
   // Repeated changes must not be hidden by an unconsumed fingerprint marker.
   edit(directory, (raw) => raw.exec("UPDATE prompt_tags SET weight = 0.6 WHERE project_id = 'p0'"));
-  api.loadLibraryCards();
+  await api.loadLibraryCards();
   expect([...new Set(reads)]).toEqual(['p0']);
   reads.length = 0;
   edit(directory, (raw) =>
     raw.exec("BEGIN; UPDATE prompt_tags SET weight = 9 WHERE project_id = 'p2'; ROLLBACK"),
   );
-  api.loadLibraryCards();
+  await api.loadLibraryCards();
   expect(reads).toEqual([]);
   vi.restoreAllMocks();
-  expectLiveCardSemantics(api);
+  await expectLiveCardSemantics(api);
 });
 
 it('reads and sets existing exact-group covers while the derived cards stay cached', async () => {
@@ -493,15 +552,17 @@ it('reads and sets existing exact-group covers while the derived cards stay cach
     tags: first.tags.map((tag) => ({ ...tag, id: `mirror-${tag.id}` })),
   });
   api.backfillPromptFingerprints();
-  const before = api.loadLibraryCards();
+  const before = await api.loadLibraryCards();
   expect(before.every((card) => card.group_cover_id === '')).toBe(true);
   const fingerprint = api.loadProject('p0').exact_group_fingerprint;
   api.setGroupCover(fingerprint, 'mirror');
-  expect(api.loadLibraryCards().every((card) => card.group_cover_id === 'mirror')).toBe(true);
-  expectLiveCardSemantics(api);
+  expect((await api.loadLibraryCards()).every((card) => card.group_cover_id === 'mirror')).toBe(
+    true,
+  );
+  await expectLiveCardSemantics(api);
   api.setGroupCover(fingerprint, 'p0');
-  expect(api.loadLibraryCards().every((card) => card.group_cover_id === 'p0')).toBe(true);
-  expectLiveCardSemantics(api);
+  expect((await api.loadLibraryCards()).every((card) => card.group_cover_id === 'p0')).toBe(true);
+  await expectLiveCardSemantics(api);
 });
 
 it('invalidates populated caches after old-writer changes and original 010 trigger writes', async () => {
@@ -510,7 +571,7 @@ it('invalidates populated caches after old-writer changes and original 010 trigg
   api.insertProject(sample(0));
   api.insertProject(sample(1));
   api.backfillPromptFingerprints();
-  const before = structuredClone(api.loadLibraryCards());
+  const before = structuredClone(await api.loadLibraryCards());
   api.close();
   edit(directory, (raw) => {
     raw.exec(
@@ -525,13 +586,13 @@ it('invalidates populated caches after old-writer changes and original 010 trigg
     );
   });
   api = await open(directory);
-  expect(api.loadLibraryCards()).not.toEqual(before);
-  expect(api.loadLibraryCards()).toHaveLength(1);
-  expect(api.loadLibraryCards()[0].name).toBe('Old name');
-  expectLiveCardSemantics(api);
-  const after = structuredClone(api.loadLibraryCards());
+  expect(await api.loadLibraryCards()).not.toEqual(before);
+  expect(await api.loadLibraryCards()).toHaveLength(1);
+  expect((await api.loadLibraryCards())[0].name).toBe('Old name');
+  await expectLiveCardSemantics(api);
+  const after = structuredClone(await api.loadLibraryCards());
   api.backfillPromptFingerprints();
-  expect(api.loadLibraryCards()).toEqual(after);
+  expect(await api.loadLibraryCards()).toEqual(after);
 });
 
 it('rolls cache writes and consumed markers back on failure and retries without stale memory', async () => {
@@ -539,19 +600,208 @@ it('rolls cache writes and consumed markers back on failure and retries without 
   const api = await open(directory);
   api.insertProject(sample(0));
   api.backfillPromptFingerprints();
-  api.loadLibraryCards();
+  await api.loadLibraryCards();
   edit(directory, (raw) =>
     raw.exec(`
     UPDATE prompt_tags SET weight = 1.8 WHERE project_id = 'p0';
     CREATE TRIGGER fail_card BEFORE INSERT ON library_card_cache BEGIN SELECT RAISE(ABORT, 'cache failure'); END;
   `),
   );
-  expect(() => api.loadLibraryCards()).toThrow('cache failure');
+  await expect(api.loadLibraryCards()).rejects.toThrow('cache failure');
   edit(directory, (raw) => {
     expect(
       raw.prepare("SELECT value FROM app_meta WHERE key = 'library_cards_dirty:p0'").get().value,
     ).toBe('1');
     raw.exec('DROP TRIGGER fail_card');
   });
-  expectLiveCardSemantics(api);
+  await expectLiveCardSemantics(api);
 });
+
+it('applies dictionary changes without reading metadata or rewriting persistent cards', async () => {
+  const directory = temporary();
+  const api = await open(directory);
+  for (let i = 0; i < 6; i++) api.insertProject(sample(i));
+  await api.loadLibraryCards();
+  const payloads = () =>
+    edit(directory, (raw) =>
+      raw.prepare('SELECT * FROM library_card_cache ORDER BY project_id').all(),
+    );
+  const before = payloads();
+  const statements = [];
+  const prepare = DatabaseSync.prototype.prepare;
+  vi.spyOn(DatabaseSync.prototype, 'prepare').mockImplementation(function (sql) {
+    statements.push(sql);
+    return prepare.call(this, sql);
+  });
+  api.updateTagDictionary('landscape', { translation: '新的译文', category: 'ArtistEra' });
+  const cards = await api.loadLibraryCards();
+  expect(statements.some((sql) => /FROM (generation_metadata|prompt_tags)/.test(sql))).toBe(false);
+  expect(statements.some((sql) => /INSERT.*library_card_cache/.test(sql))).toBe(false);
+  vi.restoreAllMocks();
+  expect(payloads()).toEqual(before);
+  expect(
+    cards.every((card) => card.filter_tags.some((tag) => tag.translation === '新的译文')),
+  ).toBe(true);
+  await expectLiveCardSemantics(api);
+  edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
+  expect(await api.loadLibraryCards()).toEqual(cards);
+});
+
+it('preserves the full reader weight clamp for non-finite legacy SQLite values', async () => {
+  const directory = temporary();
+  const api = await open(directory);
+  api.insertProject(sample(0));
+  for (const weight of [Infinity, -Infinity]) {
+    edit(directory, (raw) =>
+      raw.prepare("UPDATE prompt_tags SET weight = ? WHERE tag = 'red_hair'").run(weight),
+    );
+    await expectLiveCardSemantics(api);
+  }
+});
+
+it('shares one complete build across views and reconciles every write between batches', async () => {
+  const directory = temporary();
+  const api = await open(directory);
+  api.insertProjects(Array.from({ length: 80 }, (_, i) => sample(i)));
+  const insertions = [];
+  const prepare = DatabaseSync.prototype.prepare;
+  vi.spyOn(DatabaseSync.prototype, 'prepare').mockImplementation(function (sql) {
+    const statement = prepare.call(this, sql);
+    if (sql.includes('INSERT OR REPLACE INTO library_card_cache')) {
+      const run = statement.run.bind(statement);
+      statement.run = (params) => {
+        insertions.push(params.$id);
+        return run(params);
+      };
+    }
+    return statement;
+  });
+  const progress = [];
+  let scheduled = false;
+  let wrote = false;
+  const first = api
+    .loadLibraryCards('all', (value) => {
+      progress.push(value);
+      if (!scheduled && value.completed > 0 && value.completed < value.total) {
+        scheduled = true;
+        setImmediate(() => {
+          api.insertProject(sample(100));
+          api.updateProjectName('p0', 'Changed during build');
+          api.updateProjects(['p2'], { deleted: true });
+          edit(directory, (raw) => {
+            raw.exec("DELETE FROM projects WHERE id = 'p1'");
+            raw.exec("UPDATE prompt_tags SET weight = 1.7 WHERE project_id = 'p79'");
+          });
+          api.updateTagDictionary('landscape', {
+            category: 'ArtistEra',
+            translation: '建立期间修改',
+          });
+          wrote = true;
+        });
+      }
+    })
+    .then((cards) => {
+      expect(wrote).toBe(true);
+      return cards;
+    });
+  const [cards, same, trash] = await Promise.all([
+    first,
+    api.loadLibraryCards(),
+    api.loadLibraryCards('trash'),
+  ]);
+  expect(same).toEqual(cards);
+  expect(cards).toHaveLength(79);
+  expect(trash.map((card) => card.id)).toEqual(['p2']);
+  expect(cards.find((card) => card.id === 'p0').name).toBe('Changed during build');
+  expect(cards.find((card) => card.id === 'p100')).toBeDefined();
+  expect(
+    cards
+      .flatMap((card) => card.filter_tags)
+      .filter((tag) => tag.tag === 'landscape')
+      .every((tag) => tag.translation === '建立期间修改'),
+  ).toBe(true);
+  expect(insertions.filter((id) => id === 'p50')).toHaveLength(1);
+  expect(progress.at(-1)).toEqual({ completed: 80, total: 80 });
+  expect(progress.every((value) => value.completed >= 0 && value.completed <= value.total)).toBe(
+    true,
+  );
+  vi.restoreAllMocks();
+  edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
+  expect(await api.loadLibraryCards()).toEqual(cards);
+  expect(await api.loadLibraryCards('trash')).toEqual(trash);
+});
+
+it('rejects pending readers on close and resumes committed batches on reopen', async () => {
+  const directory = temporary();
+  let api = await open(directory);
+  api.insertProjects(Array.from({ length: 60 }, (_, i) => sample(i)));
+  let interrupted = false;
+  await expect(
+    api.loadLibraryCards('all', ({ completed, total }) => {
+      if (completed > 0 && completed < total && !interrupted) {
+        interrupted = true;
+        api.close();
+      }
+    }),
+  ).rejects.toThrow('Database closed during card cache build');
+  expect(interrupted).toBe(true);
+  const saved = edit(
+    directory,
+    (raw) => raw.prepare('SELECT count(*) AS n FROM library_card_cache').get().n,
+  );
+  expect(saved).toBeGreaterThan(0);
+  expect(saved).toBeLessThan(60);
+  api = await open(directory);
+  const cards = await api.loadLibraryCards();
+  expect(cards).toHaveLength(60);
+  edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
+  expect(await api.loadLibraryCards()).toEqual(cards);
+});
+
+it.each(['committed', 'in-flight'])(
+  'recovers a cache build after its own worker is killed at %s',
+  async (mode) => {
+    const directory = temporary();
+    let api = await open(directory);
+    api.insertProjects(Array.from({ length: 60 }, (_, i) => sample(i)));
+    api.close();
+    await new Promise((resolve, reject) => {
+      const child = fork(
+        fileURLToPath(
+          new URL('../scripts/data-layer/card-cache-crash-worker.mjs', import.meta.url),
+        ),
+        [directory, mode],
+        { silent: true, execArgv: [] },
+      );
+      let ready = false;
+      let stderr = '';
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk;
+      });
+      child.stdout.resume();
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        reject(Error('cache crash worker timeout'));
+      }, 15000);
+      child.on('message', (message) => {
+        if (message.ready) {
+          ready = true;
+          child.kill('SIGKILL');
+        }
+      });
+      child.on('error', reject);
+      child.on('exit', () => {
+        clearTimeout(timer);
+        ready ? resolve() : reject(Error(stderr));
+      });
+    });
+    api = await open(directory);
+    expect(
+      edit(directory, (raw) => raw.prepare('PRAGMA integrity_check').get().integrity_check),
+    ).toBe('ok');
+    const cards = await api.loadLibraryCards();
+    expect(cards).toHaveLength(60);
+    edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
+    expect(await api.loadLibraryCards()).toEqual(cards);
+  },
+);

@@ -385,9 +385,14 @@ app.whenReady().then(async () => {
     await contentBackfill;
     return database.loadLibrary(request.view);
   });
+  const reportCardCacheProgress = (progress) => {
+    for (const window of BrowserWindow.getAllWindows())
+      if (!window.webContents.isDestroyed())
+        window.webContents.send('library:cards-progress', progress);
+  };
   ipcMain.handle('library:cards', async (_event, request = {}) => {
     await contentBackfill;
-    return database.loadLibraryCards(request.view);
+    return database.loadLibraryCards(request.view, reportCardCacheProgress);
   });
   ipcMain.handle('library:detail', async (_event, id) => {
     await contentBackfill;

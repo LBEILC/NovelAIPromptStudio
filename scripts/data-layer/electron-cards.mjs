@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { openDatabase } from '../../electron/database.js';
+import { DatabaseSync } from 'node:sqlite';
 
 // This standalone benchmark uses the production database and preload bridge,
 // with an empty renderer so gallery rendering doesn't pollute IPC timings.
@@ -24,21 +25,44 @@ async function run() {
     // a separate process prepares the table, so even the first request's JIT and
     // process-local caches are cold in its newly launched Electron process.
     if (!process.argv.includes('--prepared')) {
-      api.loadLibraryCards();
+      await api.loadLibraryCards();
       api.close();
       api = await openDatabase(directory);
     }
     const mainMs = [];
     const mainBlockingMs = [];
-    ipcMain.handle('library:cards', (_event, request = {}) => {
+    const mainBlockingStages = [];
+    ipcMain.handle('library:cards', async (_event, request = {}) => {
       const start = performance.now();
-      // The next main-process turn includes the reply's structured-clone work,
-      // which is not visible in the database-call duration alone.
-      setImmediate(() => mainBlockingMs.push(performance.now() - start));
-      const cards = api.loadLibraryCards(request.view);
+      let previous = start;
+      let longest = 0;
+      let active = true;
+      let stage = 'read';
+      let peakStage = stage;
+      const tick = () => {
+        const now = performance.now();
+        if (now - previous > longest) peakStage = stage;
+        longest = Math.max(longest, now - previous);
+        previous = now;
+        if (active) setImmediate(tick);
+      };
+      setImmediate(tick);
+      const cards = await api.loadLibraryCards(request.view, (progress) => {
+        stage = `build:${progress.completed}/${progress.total}`;
+        window.webContents.send('library:cards-progress', progress);
+      });
+      stage = 'reply';
       mainMs.push(performance.now() - start);
+      // Keep measuring through the final reply's structured clone, too.
+      setImmediate(() => {
+        active = false;
+        tick();
+        mainBlockingMs.push(longest);
+        mainBlockingStages.push(peakStage);
+      });
       return cards;
     });
+    ipcMain.handle('database:storage:get', () => ({ ok: true }));
     window = new BrowserWindow({
       show: false,
       webPreferences: {
@@ -64,6 +88,37 @@ async function run() {
     return results;
     })()`);
     await new Promise((resolve) => setImmediate(resolve));
+    const raw = new DatabaseSync(api.filePath);
+    raw.exec('DROP TABLE library_card_cache');
+    raw.close();
+    const firstBuild = await window.webContents.executeJavaScript(`(async () => {
+      const progress = [];
+      let pending = true;
+      let responsiveRequests = 0;
+      let clickCount = 0;
+      const button = document.createElement('button');
+      button.textContent = 'Probe';
+      button.onclick = () => clickCount++;
+      document.body.append(button);
+      const probes = [];
+      window.studio.onLibraryCardCacheProgress(value => {
+        progress.push(value);
+        if (value.completed < value.total) {
+          button.click();
+          probes.push(window.studio.getDatabaseStorage().then(() => { if (pending) responsiveRequests++; }));
+        }
+      });
+      const start = performance.now();
+      const cards = await window.studio.loadLibraryCards();
+      const ms = performance.now() - start;
+      pending = false;
+      await Promise.all(probes);
+      window.studio.offLibraryCardCacheProgress();
+      button.remove();
+      if (cards.length !== ${count} || !responsiveRequests || !clickCount) throw Error('First build did not keep renderer/main requests responsive');
+      return { ms, responsiveRequests, clickCount, progress };
+    })()`);
+    await new Promise((resolve) => setImmediate(resolve));
     fs.writeFileSync(
       output,
       JSON.stringify({
@@ -71,6 +126,8 @@ async function run() {
         samples,
         mainMs,
         mainBlockingMs,
+        mainBlockingStages,
+        firstBuild,
         electron: process.versions.electron,
         ok: true,
       }),

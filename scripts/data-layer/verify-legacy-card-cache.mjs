@@ -39,13 +39,16 @@ try {
   api.insertProject(project(0));
   api.insertProject(project(1));
   api.backfillPromptFingerprints();
-  const before = structuredClone(api.loadLibraryCards());
+  const before = structuredClone(await api.loadLibraryCards());
   api.close();
   const oldApi = await old.openDatabase(directory);
   oldApi.insertProject(project(2));
   oldApi.updateProjectName('image-0', 'Old writer renamed');
   oldApi.updateProjects(['image-1'], { deleted: true });
-  oldApi.updateTagDictionary('synthetic_0', { translation: '旧引擎译文', category: 'ArtistEra' });
+  oldApi.updateTagDictionary('benchmark_unique', {
+    translation: '旧引擎译文',
+    category: 'ArtistEra',
+  });
   oldApi.persist();
   oldApi.close?.();
   const raw = new DatabaseSync(path.join(directory, 'studio.sqlite'));
@@ -66,7 +69,7 @@ try {
     raw.close();
   }
   api = await openDatabase(directory);
-  const cards = api.loadLibraryCards();
+  const cards = await api.loadLibraryCards();
   assert.equal(cards.length, 2);
   assert.equal(cards.find((p) => p.id === 'image-0').name, 'Old writer renamed');
   assert.equal(cards.find((p) => p.id === 'image-0').filter_tags[0].translation, '旧引擎译文');
@@ -76,7 +79,7 @@ try {
   );
   for (const view of ['all', 'favorites', 'trash']) {
     const full = api.loadLibrary(view);
-    const compact = api.loadLibraryCards(view);
+    const compact = await api.loadLibraryCards(view);
     assert.deepEqual(
       compact.map((p) => p.id),
       full.map((p) => p.id),
@@ -90,7 +93,7 @@ try {
         );
   }
   assert.equal(api.backfillPromptFingerprints(), 0);
-  assert.deepEqual(api.loadLibraryCards(), cards);
+  assert.deepEqual(await api.loadLibraryCards(), cards);
   const output = path.resolve('.codex-runs/data-layer/legacy-card-cache.json');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   fs.writeFileSync(

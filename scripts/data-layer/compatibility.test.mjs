@@ -11,6 +11,10 @@ it('keeps the synthetic metadata distribution and tag count at the baseline size
   const extra = samples.map((item) => Buffer.byteLength(item.metadata.extra_json));
   const structure = samples.map((item) => Buffer.byteLength(JSON.stringify(item.prompt_structure)));
   expect(samples.every((item) => item.tags.length === 59)).toBe(true);
+  expect(
+    samples.filter((item) => item.tags.some((tag) => tag.tag === 'benchmark_unique')),
+  ).toHaveLength(1);
+  expect(samples.filter((item) => item.tags.some((tag) => tag.tag === '1girl'))).toHaveLength(80);
   expect(Math.max(...extra)).toBe(271 * 1024);
   expect(Math.max(...structure)).toBe(41 * 1024);
   expect(Math.abs(extra.reduce((a, b) => a + b) / 100 - 62 * 1024)).toBeLessThan(1);

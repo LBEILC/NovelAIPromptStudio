@@ -5,8 +5,10 @@ import { createHash } from 'node:crypto';
 import { CATEGORY_OPTIONS, inferCategory, normalizeCategory } from '../src/lib/prompt.js';
 import {
   galleryProjectGroupingFingerprints,
-  galleryBasePromptSimilarityPayload,
+  normalizedSimilarityTag,
+  similarityTagMap,
 } from '../src/lib/galleryGrouping.js';
+import { extractV4PromptData, normalizePromptStructure } from '../src/lib/promptStructure.js';
 import { danbooruLookupName } from './danbooru.js';
 import { extractEmbeddedVibes, fingerprintVibes } from './vibes.js';
 
@@ -791,61 +793,194 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
   const cardCacheVersionKey = 'library_cards_version';
   const cardMemory = new Map();
   const sharedCardTags = new Map();
+  const sharedUndesired = new Map();
+  const sharedCardProjections = new Map();
   const sharedSimilarityTags = new Map();
   const sharedCardMetadata = new Map();
   const sharedSearchPrompts = new Map();
+  let cardDictionary = new Map();
+  let cardDictionarySignature = '';
+  let cardDictionaryRevision = 0;
+  let cardInputId = 0;
   const clearCardMemory = () => {
     for (const cache of [
       cardMemory,
       sharedCardTags,
+      sharedUndesired,
+      sharedCardProjections,
       sharedSimilarityTags,
       sharedCardMetadata,
       sharedSearchPrompts,
     ])
       cache.clear();
+    cardInputId = 0;
   };
   const sharedValue = (cache, key, parse = JSON.parse) => {
     if (!cache.has(key)) cache.set(key, parse(key));
     return cache.get(key);
   };
-  // Intern repeated read-only values. Electron structured cloning then sends a
-  // shared object once rather than hundreds of thousands of identical copies.
-  // The public card fields and their values remain exactly the same.
-  const encodeCardCache = (entry) =>
-    JSON.stringify({
-      ...entry,
-      card: {
-        ...entry.card,
-        metadata: JSON.stringify(entry.card.metadata),
-        search_prompts: JSON.stringify(entry.card.search_prompts),
-        filter_tags: entry.card.filter_tags.map(({ tag, translation, category }) =>
-          JSON.stringify(
-            tag === undefined ? [null, translation, category, true] : [tag, translation, category],
-          ),
-        ),
-        base_prompt_similarity: Object.fromEntries(
-          Object.entries(entry.card.base_prompt_similarity).map(([scope, tags]) => [
-            scope,
-            tags.map((tag) => JSON.stringify(tag)),
-          ]),
-        ),
-      },
+  // Persist only original enrichment inputs. Dictionary changes never rewrite
+  // image projections, and old engines need no knowledge of this cache format.
+  const cardTagDefaults = [undefined, '', 'Unsorted', null, 1, false, 0];
+  const encodeCardTag = (tag) => {
+    const values = [
+      tag.tag,
+      tag.translation || '',
+      tag.category,
+      tag.category_source || null,
+      typeof tag.weight === 'number' && !Number.isFinite(tag.weight)
+        ? String(tag.weight)
+        : tag.weight,
+      tag.tag === undefined,
+      tag.brace_depth ?? 0,
+    ];
+    // Omit only trailing defaults; explicit nulls and missing-tag markers keep
+    // their meaning. Common unannotated tags become a one-element tuple.
+    while (values.length > 1 && values.at(-1) === cardTagDefaults[values.length - 1]) values.pop();
+    return JSON.stringify(values);
+  };
+  const decodeCardTag = (key) =>
+    sharedValue(sharedCardTags, key, (value) => {
+      const [
+        tag,
+        translation = '',
+        category = 'Unsorted',
+        category_source = null,
+        weight = 1,
+        missing = false,
+        brace_depth = 0,
+      ] = JSON.parse(value);
+      const source = {
+        tag: missing ? undefined : tag,
+        translation,
+        category,
+        category_source,
+        weight,
+        brace_depth,
+      };
+      return { source, key: dictionaryKey(source.tag), revision: -1, id: cardInputId++ };
     });
-  const decodeCardCache = (serialized) => {
-    const entry = JSON.parse(serialized);
-    const card = entry.card;
-    card.metadata = sharedValue(sharedCardMetadata, card.metadata);
-    card.search_prompts = sharedValue(sharedSearchPrompts, card.search_prompts);
-    card.filter_tags = card.filter_tags.map((key) =>
-      sharedValue(sharedCardTags, key, (value) => {
-        const [tag, translation, category, missingTag] = JSON.parse(value);
-        return { tag: missingTag ? undefined : tag, translation, category };
-      }),
-    );
-    for (const scope of ['prompt', 'undesired'])
-      card.base_prompt_similarity[scope] = card.base_prompt_similarity[scope].map((key) =>
-        sharedValue(sharedSimilarityTags, key),
+  const refreshCardTag = (input) => {
+    if (input.revision === cardDictionaryRevision) return;
+    const entry = cardDictionary.get(input.key);
+    if (input.revision < 0 || input.dictionary !== entry) {
+      const tag = enrichProjectTags({ tags: [input.source] }, cardDictionary).tags[0];
+      input.enriched = tag;
+      input.filter = { tag: tag.tag, translation: tag.translation || '', category: tag.category };
+      input.similarity = normalizedSimilarityTag(tag);
+      input.pair = input.similarity
+        ? sharedValue(
+            sharedSimilarityTags,
+            JSON.stringify([input.similarity.key, input.similarity.value]),
+          )
+        : null;
+      input.changed = cardDictionaryRevision;
+      input.dictionary = entry;
+    }
+    input.revision = cardDictionaryRevision;
+  };
+  const similarityPairs = (values) =>
+    [...values].map((pair) => sharedValue(sharedSimilarityTags, JSON.stringify(pair)));
+  const refreshUndesired = (input) => {
+    if (input.revision === cardDictionaryRevision) return;
+    for (const tag of input.tags || []) refreshCardTag(tag);
+    if (input.revision < 0 || input.tags?.some((tag) => tag.changed > input.revision)) {
+      // Enrichment precedes legacy-fragment repair, just as in the full reader.
+      // Raw fallback tags are deliberately not dictionary-enriched afterwards.
+      const structure = normalizePromptStructure(
+        { base_undesired_tags: input.tags?.map((tag) => tag.enriched) },
+        { negative_prompt: input.raw },
+        () => '',
       );
+      input.pairs = similarityPairs(similarityTagMap(structure.base_undesired_tags));
+      input.changed = cardDictionaryRevision;
+    }
+    input.revision = cardDictionaryRevision;
+  };
+  const refreshCardProjection = (entry) => {
+    if (entry.revision === cardDictionaryRevision) return;
+    for (const tag of entry.inputs) refreshCardTag(tag);
+    refreshUndesired(entry.undesired);
+    if (
+      entry.revision < 0 ||
+      entry.undesired.changed > entry.revision ||
+      entry.inputs.some((tag) => tag.changed > entry.revision)
+    ) {
+      const prompt = new Map();
+      for (let i = 0; i < entry.promptCount; i++) {
+        const pair = entry.inputs[i].pair;
+        if (pair && (!prompt.has(pair[0]) || pair[1] > prompt.get(pair[0])[1]))
+          prompt.set(pair[0], pair);
+      }
+      entry.card.filter_tags = entry.inputs.map((tag) => tag.filter);
+      entry.card.base_prompt_similarity = {
+        prompt: [...prompt.values()],
+        undesired: entry.undesired.pairs,
+      };
+    }
+    entry.revision = cardDictionaryRevision;
+  };
+  const refreshCard = (entry) => {
+    if (entry.revision === cardDictionaryRevision) return;
+    refreshCardProjection(entry.projection);
+    entry.card.filter_tags = entry.projection.card.filter_tags;
+    entry.card.base_prompt_similarity = entry.projection.card.base_prompt_similarity;
+    entry.revision = cardDictionaryRevision;
+  };
+  const syncCardDictionary = () => {
+    const dictionary = query(`SELECT tag, translation, category, has_translation,
+      has_classification, translation_source, category_source FROM tag_dictionary ORDER BY tag`);
+    const signature = JSON.stringify(dictionary);
+    if (signature === cardDictionarySignature) return false;
+    const next = new Map();
+    for (const row of dictionary) {
+      const previous = cardDictionary.get(row.tag);
+      next.set(
+        row.tag,
+        previous && JSON.stringify(previous) === JSON.stringify(row) ? previous : row,
+      );
+    }
+    cardDictionary = next;
+    cardDictionarySignature = signature;
+    cardDictionaryRevision++;
+    return true;
+  };
+  const decodeCardCache = (row) => {
+    const {
+      inputs: encodedInputs,
+      undesired: encodedUndesired,
+      promptCount,
+      ...entry
+    } = JSON.parse(row.payload);
+    // Fingerprints are already serialized strings. Separate columns avoid
+    // decoding an additional JSON escaping layer on every cold read.
+    entry.card.prompt_fingerprint = row.prompt_fingerprint;
+    entry.card.base_prompt_fingerprint = row.base_prompt_fingerprint;
+    entry.card.vibe_fingerprint = row.vibe_fingerprint;
+    entry.card.metadata = sharedValue(sharedCardMetadata, entry.card.metadata);
+    entry.card.search_prompts = sharedValue(sharedSearchPrompts, entry.card.search_prompts);
+    const inputs = encodedInputs.map(decodeCardTag);
+    const undesired = sharedValue(sharedUndesired, encodedUndesired, (value) => {
+      const recipe = JSON.parse(value);
+      return {
+        raw: recipe.raw,
+        tags: recipe.tags?.map(decodeCardTag),
+        revision: -1,
+        id: cardInputId++,
+      };
+    });
+    // Identical prompt inputs share the complete projection, not just its tags.
+    // This also reduces Electron's structured clone work without changing values.
+    const key = `${inputs.map((input) => input.id).join(',')}|${promptCount}|${undesired.id}`;
+    entry.projection = sharedValue(sharedCardProjections, key, () => ({
+      inputs,
+      undesired,
+      promptCount,
+      card: {},
+      revision: -1,
+    }));
+    entry.revision = -1;
+    refreshCard(entry);
     return entry;
   };
   const coverKey = (fingerprint) =>
@@ -856,7 +991,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
   const hasCardCache = () =>
     query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'library_card_cache'")
       .length > 0;
-  const invalidateCards = (full = false, includeFingerprints = false) => {
+  const invalidateCards = (full = false, includeFingerprints = false, consume = true) => {
     const dirty = query(`SELECT substr(key, ${cardDirtyPrefix.length + 1}) AS id
       FROM app_meta WHERE key GLOB '${cardDirtyPrefix}*'
       ${includeFingerprints ? `UNION SELECT substr(key, ${fingerprintDirtyPrefix.length + 1}) FROM app_meta WHERE key GLOB '${fingerprintDirtyPrefix}*'` : ''}`);
@@ -869,64 +1004,55 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
         for (const { id } of dirty) remove.run({ $id: id });
       }
     }
-    database.run(`DELETE FROM app_meta WHERE key GLOB '${cardDirtyPrefix}*'`);
+    database.run(`DELETE FROM app_meta WHERE key GLOB '${cardDirtyPrefix}*'
+      ${consume ? '' : `AND NOT EXISTS (SELECT 1 FROM projects WHERE id = substr(key, ${cardDirtyPrefix.length + 1}))`}`);
   };
 
-  const loadLibraryCards = (view = 'all') => {
-    try {
-      return atomic(readLibraryCards)(view);
-    } catch (error) {
-      // SQLite rolls back derived writes and markers together. Never retain an
-      // in-memory result from an operation whose transaction did not commit.
-      clearCardMemory();
-      throw error;
-    }
-  };
-  const readLibraryCards = (view) => {
-    const dictionary = query(`SELECT tag, translation, category, has_translation,
-      has_classification, translation_source, category_source FROM tag_dictionary ORDER BY tag`);
-    // Covers every enrichment input, including deletion and old-engine writes.
-    // Importing unchanged knowledge updates timestamps, not card semantics.
-    // Bump the prefix whenever the derivation algorithms/protocol change.
-    const version = `4:${createHash('sha256').update(JSON.stringify(dictionary)).digest('hex')}`;
+  const prepareCardCache = () => {
+    const version = '5:dictionary-independent-columns';
     const previousVersion = query('SELECT value FROM app_meta WHERE key = $key', {
       $key: cardCacheVersionKey,
     })[0]?.value;
-    // One disposable table; no trigger refers to it, so dropping it also remains
-    // safe for old writers. schema_version detects a drop/recreate in this run.
     if (version !== previousVersion) database.run('DROP TABLE IF EXISTS library_card_cache');
     database.run(`CREATE TABLE IF NOT EXISTS library_card_cache (
       project_id TEXT PRIMARY KEY, project_order INTEGER NOT NULL,
       created_at TEXT NOT NULL, is_favorite INTEGER NOT NULL,
-      deleted_at TEXT NOT NULL, payload TEXT NOT NULL
+      deleted_at TEXT NOT NULL, payload TEXT NOT NULL,
+      prompt_fingerprint TEXT NOT NULL, base_prompt_fingerprint TEXT,
+      vibe_fingerprint TEXT NOT NULL
     )`);
     database.run(`CREATE INDEX IF NOT EXISTS idx_library_card_order ON library_card_cache
       (created_at DESC, project_order, project_id, is_favorite, deleted_at)`);
     const schemaVersion = query('PRAGMA schema_version')[0].schema_version;
     if (schemaVersion !== cardSchemaVersion) clearCardMemory();
     cardSchemaVersion = schemaVersion;
-    invalidateCards(version !== previousVersion);
+    invalidateCards(version !== previousVersion, false, false);
     if (version !== previousVersion)
       database.run('INSERT OR REPLACE INTO app_meta(key, value) VALUES ($key, $value)', {
         $key: cardCacheVersionKey,
         $value: version,
       });
-    // Scan only ids, not the large original project records. Sorting a narrow
-    // projection avoids SQLite materializing long fingerprints in its sorter.
-    const rebuild = query(`SELECT p.id, p.rowid AS project_order FROM projects p
+    return query(`SELECT p.id, p.rowid AS project_order FROM projects p
       WHERE NOT EXISTS (SELECT 1 FROM library_card_cache c WHERE c.project_id = p.id)`);
-    const cached = new Map(dictionary.map((row) => [row.tag, row]));
+  };
+  const buildCardBatch = (rebuild, offset) => {
+    const start = performance.now();
     const save = database.prepare(
       `INSERT OR REPLACE INTO library_card_cache(project_id, project_order, created_at,
-        is_favorite, deleted_at, payload) VALUES ($id, $order, $created, $favorite, $deleted, $payload)`,
+        is_favorite, deleted_at, payload, prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint)
+        VALUES ($id, $order, $created, $favorite, $deleted, $payload, $prompt, $base, $vibe)`,
     );
-    for (const row of rebuild) {
+    let index = offset;
+    for (; index < rebuild.length && index < offset + 25; index++) {
+      if (index > offset && performance.now() - start >= 12) break;
+      const row = rebuild[index];
       const fingerprints = query(
-        `SELECT id, name, image_path, thumbnail_path, created_at, is_favorite, deleted_at,
+        `SELECT rowid AS project_order, id, name, image_path, thumbnail_path, created_at, is_favorite, deleted_at,
         prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint, exact_group_fingerprint
         FROM projects WHERE id = $id`,
         { $id: row.id },
       )[0];
+      if (!fingerprints) continue;
       // Legacy prompt repair needs extra_json only when this image is dirty.
       const metadata =
         query(
@@ -934,39 +1060,36 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
         prompt_structure_json, extra_json FROM generation_metadata WHERE project_id = $id`,
           { $id: row.id },
         )[0] || {};
-      const project = enrichProjectTags(
-        {
-          tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', {
-            $id: row.id,
-          }),
-          metadata,
-          prompt_structure: safeJson(metadata.prompt_structure_json),
-        },
-        cached,
-      );
-      const similarity = galleryBasePromptSimilarityPayload(project);
+      const project = {
+        tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', {
+          $id: row.id,
+        }),
+        metadata,
+        prompt_structure: safeJson(metadata.prompt_structure_json),
+      };
       const structure = project.prompt_structure;
       // Full fingerprints already embed their base payload. Use a lossless alias
       // only after proving it equals the separately stored base fingerprint.
       const embeddedBase = JSON.stringify(safeJson(fingerprints.prompt_fingerprint).base);
-      const { exact_group_fingerprint, ...cardFields } = fingerprints;
+      const {
+        exact_group_fingerprint,
+        project_order,
+        prompt_fingerprint,
+        base_prompt_fingerprint,
+        vibe_fingerprint,
+        ...cardFields
+      } = fingerprints;
+      const baseFingerprint =
+        base_prompt_fingerprint && base_prompt_fingerprint === embeddedBase
+          ? null
+          : base_prompt_fingerprint;
       const payload = {
         ...cardFields,
-        base_prompt_fingerprint:
-          fingerprints.base_prompt_fingerprint &&
-          fingerprints.base_prompt_fingerprint === embeddedBase
-            ? null
-            : fingerprints.base_prompt_fingerprint,
         metadata: {
           model: metadata.model || '',
           width: metadata.width || 0,
           height: metadata.height || 0,
         },
-        filter_tags: projectTags(project).map(({ tag, translation, category }) => ({
-          tag,
-          translation: translation || '',
-          category,
-        })),
         search_prompts: [
           ...new Set(
             [
@@ -981,23 +1104,160 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
             ].filter(Boolean),
           ),
         ],
-        base_prompt_similarity: {
-          prompt: [...similarity.prompt],
-          undesired: [...similarity.undesired],
-        },
       };
-      const entry = { card: payload, coverKey: coverKey(exact_group_fingerprint) };
-      const serialized = encodeCardCache(entry);
+      const raw =
+        extractV4PromptData(
+          safeJson(metadata.extra_json).parsed || {},
+          metadata.prompt_raw,
+          metadata.negative_prompt,
+          metadata.model,
+        ).base_undesired_raw ||
+        metadata.negative_prompt ||
+        '';
+      const serialized = JSON.stringify({
+        card: {
+          ...payload,
+          metadata: JSON.stringify(payload.metadata),
+          search_prompts: JSON.stringify(payload.search_prompts),
+        },
+        coverKey: coverKey(exact_group_fingerprint),
+        inputs: projectTags(project).map(encodeCardTag),
+        promptCount: project.tags.length,
+        undesired: JSON.stringify({
+          raw,
+          tags: (structure.base_undesired_tags || []).map(encodeCardTag),
+        }),
+      });
       save.run({
         $id: row.id,
-        $order: row.project_order,
+        $order: project_order,
         $created: payload.created_at,
         $favorite: payload.is_favorite,
         $deleted: payload.deleted_at,
         $payload: serialized,
+        $prompt: prompt_fingerprint,
+        $base: baseFingerprint,
+        $vibe: vibe_fingerprint,
       });
-      cardMemory.set(row.id, decodeCardCache(serialized));
+      database.run('DELETE FROM app_meta WHERE key = $key', { $key: cardDirtyPrefix + row.id });
+      cardMemory.set(
+        row.id,
+        decodeCardCache({
+          payload: serialized,
+          prompt_fingerprint,
+          base_prompt_fingerprint: baseFingerprint,
+          vibe_fingerprint,
+        }),
+      );
     }
+    return index;
+  };
+  let cardBuild;
+  const cardProgressListeners = new Map();
+  const reportCardProgress = () => {
+    const { total, completed } = query(`SELECT count(*) AS total,
+      count(c.project_id) AS completed FROM projects p
+      LEFT JOIN library_card_cache c ON c.project_id = p.id`)[0];
+    for (const listener of cardProgressListeners.keys()) listener({ completed, total });
+  };
+  const yieldCardBuild = () => new Promise((resolve) => setImmediate(resolve));
+  const ensureLibraryCards = async () => {
+    let worked = false;
+    try {
+      for (;;) {
+        if (closed) throw Error('Database closed during card cache build');
+        const rebuild = atomic(prepareCardCache)();
+        syncCardDictionary();
+        if (rebuild.length) {
+          worked = true;
+          reportCardProgress();
+          for (let offset = 0; offset < rebuild.length; ) {
+            if (closed) throw Error('Database closed during card cache build');
+            offset = atomic(buildCardBatch)(rebuild, offset);
+            reportCardProgress();
+            await yieldCardBuild();
+          }
+          // Writes between batches have durable dirty markers. Consume them in
+          // a new transaction, including rows already built in an earlier batch.
+          continue;
+        }
+        const missing = query('SELECT project_id FROM library_card_cache').filter(
+          (row) => !cardMemory.has(row.project_id),
+        );
+        let decodeStart = performance.now();
+        for (let offset = 0; offset < missing.length; offset += 100) {
+          if (closed) throw Error('Database closed during card cache build');
+          const params = Object.fromEntries(
+            missing.slice(offset, offset + 100).map((row, i) => [`$id${i}`, row.project_id]),
+          );
+          for (const entry of query(
+            `SELECT project_id, payload, prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint FROM library_card_cache
+            WHERE project_id IN (${Object.keys(params).join(',')})`,
+            params,
+          ))
+            cardMemory.set(entry.project_id, decodeCardCache(entry));
+          // Reopening a cache is much cheaper than building it. Yield by work
+          // time, not every small SQL read: Electron's event-loop handoff can
+          // otherwise dominate the cold request's total latency.
+          if (offset + 100 < missing.length && performance.now() - decodeStart >= 48) {
+            await yieldCardBuild();
+            decodeStart = performance.now();
+          }
+        }
+        let start = performance.now();
+        for (const entry of cardMemory.values()) {
+          refreshCard(entry);
+          if (performance.now() - start >= 12) {
+            await yieldCardBuild();
+            if (closed) throw Error('Database closed during card cache build');
+            start = performance.now();
+          }
+        }
+        // A final synchronous fence covers imports, renames, deletions and
+        // dictionary edits that arrived while decoding or refreshing cards.
+        // Give the IPC reply its own turn: its structured clone must not share
+        // the last build batch's time budget.
+        if (worked) await yieldCardBuild();
+        if (closed) throw Error('Database closed during card cache build');
+        if (worked) reportCardProgress();
+        if (
+          syncCardDictionary() ||
+          query(`SELECT 1 FROM app_meta
+          WHERE key GLOB '${cardDirtyPrefix}*' LIMIT 1`).length
+        )
+          continue;
+        return;
+      }
+    } catch (error) {
+      // Committed batches remain reusable after interruption; the failed batch
+      // rolls back and missing rows/dirty markers guarantee a safe retry.
+      clearCardMemory();
+      throw error;
+    }
+  };
+  const loadLibraryCards = async (view = 'all', onProgress) => {
+    if (onProgress)
+      cardProgressListeners.set(onProgress, (cardProgressListeners.get(onProgress) || 0) + 1);
+    try {
+      if (!cardBuild)
+        cardBuild = ensureLibraryCards().finally(() => {
+          cardBuild = null;
+        });
+      await cardBuild;
+      const cards = readLibraryCards(view);
+      // Return the complete snapshot on a fresh turn so IPC serialization does
+      // not extend the synchronous database/read work, including hot reads.
+      await yieldCardBuild();
+      return cards;
+    } finally {
+      if (onProgress) {
+        const remaining = cardProgressListeners.get(onProgress) - 1;
+        if (remaining) cardProgressListeners.set(onProgress, remaining);
+        else cardProgressListeners.delete(onProgress);
+      }
+    }
+  };
+  const readLibraryCards = (view) => {
     const where =
       view === 'trash'
         ? "deleted_at != ''"
@@ -1007,16 +1267,6 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
     // Original ORDER BY created_at ties followed the projects table's row order.
     const rows = query(`SELECT project_id FROM library_card_cache WHERE ${where}
       ORDER BY created_at DESC, project_order`);
-    const missing = rows.filter((row) => !cardMemory.has(row.project_id));
-    for (let offset = 0; offset < missing.length; offset += 400) {
-      const chunk = missing.slice(offset, offset + 400);
-      const params = Object.fromEntries(chunk.map((row, i) => [`$id${i}`, row.project_id]));
-      for (const entry of query(
-        `SELECT project_id, payload FROM library_card_cache WHERE project_id IN (${Object.keys(params).join(',')})`,
-        params,
-      ))
-        cardMemory.set(entry.project_id, decodeCardCache(entry.payload));
-    }
     const covers = new Map(
       query('SELECT prompt_fingerprint, project_id FROM prompt_group_covers').map((cover) => [
         coverKey(cover.prompt_fingerprint),

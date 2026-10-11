@@ -119,7 +119,7 @@ export function galleryGroupingBoundaryFingerprint(project = {}, value = DEFAULT
   });
 }
 
-function normalizedSimilarityTag(tag = {}) {
+export function normalizedSimilarityTag(tag = {}) {
   const key = String(tag.tag || '')
     .trim()
     .replace(/[_\s]+/g, ' ')
@@ -134,7 +134,7 @@ function normalizedSimilarityTag(tag = {}) {
   };
 }
 
-function similarityTagMap(tags = []) {
+export function similarityTagMap(tags = []) {
   const map = new Map();
   for (const tag of tags) {
     const normalized = normalizedSimilarityTag(tag);

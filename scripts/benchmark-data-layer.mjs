@@ -5,6 +5,7 @@ import { fork, spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { ensureCardBenchmarkTags } from './data-layer/fixture.mjs';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-data-benchmark-'));
 const args = process.argv.slice(2);
@@ -131,6 +132,7 @@ try {
       results.push(seeded);
       continue;
     }
+    ensureCardBenchmarkTags(fixture, count);
     for (const kind of ['node:sqlite']) {
       const directory = path.join(root, `${count}-${kind.replace(':', '-')}`);
       fs.mkdirSync(directory);
@@ -156,17 +158,40 @@ try {
           ? [
               {
                 label: '无变更重开后的首次列表',
-                ms: Math.max(result.cardsMs, result.ipc.mainBlockingMs?.[0] ?? 0),
+                ms: Math.max(
+                  result.cardsMs,
+                  result.ipc.mainMs?.[0] ?? 0,
+                  result.ipc.mainBlockingMs?.[0] ?? 0,
+                ),
                 limitMs: 400,
               },
               {
                 label: '无变更热列表',
                 ms: Math.max(
                   ...(result.warmCardsMs || []),
-                  ...(result.ipc.mainBlockingMs?.slice(1) || []),
+                  ...(result.ipc.mainBlockingMs?.slice(1, 3) || []),
                 ),
-                limitMs: 400,
+                limitMs: 100,
               },
+              {
+                label: '首次建立最大事件循环阻塞',
+                ms: Math.max(
+                  result.firstCacheMaxBlockingMs,
+                  result.ipc.mainBlockingMs?.[3] ?? Infinity,
+                ),
+                limitMs: 100,
+              },
+              ...Object.entries({
+                uniqueTranslation: 400,
+                uniqueCategory: 400,
+                commonCategory: 1500,
+                import200: 1500,
+                metadataOnly: 100,
+              }).map(([name, limitMs]) => ({
+                label: `词典变化及列表：${name}`,
+                ms: result.dictionaryScenarios?.[name]?.ms,
+                limitMs,
+              })),
               ...['tag', 'rename', 'trash'].map((change) => ({
                 label: `单图改动后列表：${change}`,
                 ms: result.afterEditCardsMs?.[change],
@@ -193,7 +218,7 @@ try {
 }
 const number = (value) => (!Number.isFinite(value) ? '—' : value.toFixed(2));
 const table = [
-  '| 图片 | 引擎 | 首次打开 ms | 再次打开 ms | 卡片 ms | 卡片 MiB | 单张详情 ms | 最长同步段 ms | loadLibrary ms | JSON MiB | 写入中位 ms | 写入最大 ms | 导入100 ms | DB MiB | 峰值RSS MiB | 状态 |',
+  '| 图片 | 引擎 | 首次打开 ms | 再次打开 ms | 卡片 ms | 卡片 MiB | 单张详情 ms | 最大调用耗时 ms | loadLibrary ms | JSON MiB | 写入中位 ms | 写入最大 ms | 导入100 ms | DB MiB | 峰值RSS MiB | 状态 |',
   '|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|',
   ...results.map(
     (r) =>
@@ -230,6 +255,16 @@ const scenarios = [
 ].join('\n');
 fs.appendFileSync('.codex-runs/data-layer/benchmark.md', '\n\n' + scenarios);
 console.log(scenarios);
+const dictionaryScenarios = [
+  '| 图片 | 稀有 Tag 译文 ms | 稀有 Tag 分类 ms | 八成 Tag 分类 ms | 导入200条 ms | 无语义变化 ms | 首建最大阻塞 ms（Node / Electron，含回复） | 首建期间成功 IPC 次数 |',
+  '|---:|---:|---:|---:|---:|---:|---|---:|',
+  ...results.map(
+    (r) =>
+      `| ${r.count} | ${number(r.dictionaryScenarios?.uniqueTranslation?.ms)} | ${number(r.dictionaryScenarios?.uniqueCategory?.ms)} | ${number(r.dictionaryScenarios?.commonCategory?.ms)} | ${number(r.dictionaryScenarios?.import200?.ms)} | ${number(r.dictionaryScenarios?.metadataOnly?.ms)} | ${number(r.firstCacheMaxBlockingMs)} / ${number(r.ipc?.mainBlockingMs?.[3])} | ${r.ipc?.firstBuild?.responsiveRequests ?? '—'} |`,
+  ),
+].join('\n');
+fs.appendFileSync('.codex-runs/data-layer/benchmark.md', '\n\n' + dictionaryScenarios);
+console.log(dictionaryScenarios);
 for (const result of results)
   for (const check of result.performanceChecks || [])
     console.log(

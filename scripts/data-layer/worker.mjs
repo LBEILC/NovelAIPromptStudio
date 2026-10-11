@@ -4,6 +4,7 @@ import { performance } from 'node:perf_hooks';
 import { DatabaseSync } from 'node:sqlite';
 import { openDatabase } from '../../electron/database.js';
 import { project, seed } from './fixture.mjs';
+import { observeTurns } from './observe-turns.mjs';
 
 const [mode, kind, directory, size] = process.argv.slice(2);
 const count = Number(size);
@@ -19,7 +20,7 @@ try {
   } else if (mode === 'prepare-cards') {
     const api = await openDatabase(directory);
     try {
-      api.loadLibraryCards();
+      await api.loadLibraryCards();
     } finally {
       api.close();
     }
@@ -38,15 +39,19 @@ try {
     await new Promise((resolve) => setImmediate(resolve));
     progress('loadLibraryCards');
     start = performance.now();
-    let cards = api.loadLibraryCards();
-    result.firstCacheMs = performance.now() - start;
+    let initial = await observeTurns(() => api.loadLibraryCards());
+    let cards = initial.value;
+    result.firstCacheMs = initial.ms;
+    result.firstCacheMaxBlockingMs = initial.maxBlockingMs;
+    result.firstCacheTurns = initial.turns;
+    initial = null;
     cards = null;
     api.close();
     api = await openDatabase(directory);
     global.gc?.();
     await new Promise((resolve) => setImmediate(resolve));
     start = performance.now();
-    cards = api.loadLibraryCards();
+    cards = await api.loadLibraryCards();
     result.cardsMs = performance.now() - start;
     start = performance.now();
     result.cardsBytes = 2 + Math.max(0, cards.length - 1);
@@ -58,8 +63,67 @@ try {
     for (let i = 0; i < 3; i++) {
       await new Promise((resolve) => setImmediate(resolve));
       start = performance.now();
-      api.loadLibraryCards();
+      await api.loadLibraryCards();
       result.warmCardsMs.push(performance.now() - start);
+    }
+    progress('010b dictionary scenarios');
+    const distribution = new DatabaseSync(api.filePath);
+    try {
+      const uses = distribution.prepare(
+        'SELECT count(DISTINCT project_id) AS n FROM prompt_tags WHERE tag = ?',
+      );
+      const usedImportTags = Array.from({ length: 200 }, (_, i) =>
+        i < 20 ? `synthetic_${i}` : `unused_benchmark_${i}`,
+      ).filter((tag) => uses.get(tag).n > 0).length;
+      result.dictionaryDistribution = {
+        unique: uses.get('benchmark_unique').n,
+        common: uses.get('1girl').n,
+        usedImportTags,
+      };
+      if (
+        result.dictionaryDistribution.unique !== 1 ||
+        result.dictionaryDistribution.common !== Math.ceil(count * 0.8) ||
+        (count >= 5000 && usedImportTags !== 20)
+      )
+        throw Error('010b dictionary benchmark distribution mismatch');
+    } finally {
+      distribution.close();
+    }
+    result.dictionaryScenarios = {};
+    const mutations = {
+      uniqueTranslation: () =>
+        api.updateTagDictionary('benchmark_unique', { translation: '唯一译文' }),
+      uniqueCategory: () => api.updateTagDictionary('benchmark_unique', { category: 'ArtistEra' }),
+      commonCategory: () => api.updateTagDictionary('1girl', { category: 'ArtistEra' }),
+      import200: () =>
+        api.upsertTagDictionary(
+          Array.from({ length: 200 }, (_, i) => ({
+            tag: i < 20 ? `synthetic_${i}` : `unused_benchmark_${i}`,
+            translation: `导入译文 ${i}`,
+            category: 'Clothing',
+            translation_source: 'manual',
+            category_source: 'manual',
+          })),
+        ),
+      metadataOnly: () => {
+        const raw = new DatabaseSync(api.filePath);
+        try {
+          raw.exec(
+            "UPDATE tag_dictionary SET updated_at = 'changed', display_tag = 'display only'",
+          );
+        } finally {
+          raw.close();
+        }
+      },
+    };
+    for (const [name, mutate] of Object.entries(mutations)) {
+      await new Promise((resolve) => setImmediate(resolve));
+      const measured = await observeTurns(async () => {
+        mutate();
+        return api.loadLibraryCards();
+      });
+      if (measured.value.length !== count) throw Error(`Incomplete list: ${name}`);
+      result.dictionaryScenarios[name] = { ms: measured.ms, maxBlockingMs: measured.maxBlockingMs };
     }
     result.afterEditCardsMs = {};
     for (const change of ['tag', 'rename', 'trash']) {
@@ -74,7 +138,7 @@ try {
       else api.updateProjects([detailId], { deleted: true });
       await new Promise((resolve) => setImmediate(resolve));
       start = performance.now();
-      api.loadLibraryCards();
+      await api.loadLibraryCards();
       result.afterEditCardsMs[change] = performance.now() - start;
     }
     api.updateProjects([detailId], { deleted: false });
@@ -84,6 +148,8 @@ try {
     start = performance.now();
     api.loadProject(detailId);
     result.detailMs = performance.now() - start;
+    // Historical aggregate field; asynchronous list durations are operation
+    // times, not blocking. firstCacheMaxBlockingMs/IPC probes measure blocking.
     result.maxBlockingMs = Math.max(
       result.openMs,
       result.secondOpenMs,
@@ -116,7 +182,7 @@ try {
     // subsequent 100-image import measurement.
     progress('dictionary invalidation');
     start = performance.now();
-    api.loadLibraryCards();
+    await api.loadLibraryCards();
     result.dictionaryRefreshMs = performance.now() - start;
     progress('import100');
     start = performance.now();
@@ -129,7 +195,7 @@ try {
     result.importMs = performance.now() - start;
     await new Promise((resolve) => setImmediate(resolve));
     start = performance.now();
-    const importedCards = api.loadLibraryCards();
+    const importedCards = await api.loadLibraryCards();
     result.afterImportCardsMs = performance.now() - start;
     if (importedCards.length !== count + 100) throw Error('Import list count mismatch');
     result.maxBlockingMs = Math.max(

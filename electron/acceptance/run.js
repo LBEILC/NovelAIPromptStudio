@@ -8,6 +8,7 @@ import { settingsChecks } from './settings.js';
 import { componentChecks } from './components.js';
 import { shortcutChecks } from './shortcuts.js';
 import { preserveClipboard } from './clipboard.js';
+import { cardCacheChecks } from './cardCache.js';
 
 export async function runAcceptance(context) {
   const { app, mode, database, assetsDirectory, preferences, createWindow } = context;
@@ -121,13 +122,14 @@ export async function runAcceptance(context) {
       })()`,
     );
     if (mode.phase === 0) {
-      const cacheProbe = database.loadLibraryCards()[0];
+      const cacheProbe = (await database.loadLibraryCards())[0];
       database.updateProjectName(cacheProbe.id, `${cacheProbe.name} cache probe`);
       await check(
         '卡片缓存命中时，重命名通过 IPC 立即可见',
         `(async () => (await window.studio.loadLibraryCards()).find(p => p.id === ${JSON.stringify(cacheProbe.id)}).name === ${JSON.stringify(`${cacheProbe.name} cache probe`)})()`,
       );
       database.updateProjectName(cacheProbe.id, cacheProbe.name);
+      await cardCacheChecks({ database, h });
     }
     if (mode.packaged) {
       await check('正在运行真正的打包程序', () => app.isPackaged === true);
