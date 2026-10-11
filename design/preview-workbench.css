@@ -1,0 +1,59 @@
+/* 界面稿样式（第五部分）：工作台的各个状态。只取 tokens.css 的值。 */
+
+.prompt { position: relative; }
+.wb-body { position: relative; }
+
+/* 节标题和块标题右边的操作：平时只显示淡色图标，悬停这一节或这一块时变清楚 */
+.sec-h { align-items: center; }
+.sec-h .acts, .blk-h .acts { margin-left: auto; display: flex; align-items: center; gap: var(--sp-0); }
+.sec-h .acts .btn, .blk-h .acts .btn { color: var(--text-3); }
+.sec-h .chev { color: var(--text-3); font-size: var(--icon); margin-left: calc(-1 * var(--sp-1)); }
+.sec-h .field { font-weight: var(--fw-regular); }
+.blk.on { background: var(--bg); margin: 0 calc(-1 * var(--sp-4)); padding-left: var(--sp-4); padding-right: var(--sp-4); }
+.blk-add { display: flex; align-items: center; gap: var(--sp-2); height: var(--sp-5); margin: calc(-1 * var(--sp-3)) 0 calc(-1 * var(--sp-2)); color: var(--text-3); font-size: var(--fs-caption); }
+.blk-add::before, .blk-add::after { content: ""; flex: 1 1 0; height: var(--bw); background: var(--border); }
+
+/* 正在输入的 Tag：虚线框变成实线输入框，下面跟一行说明 */
+.tag.input { border-style: solid; border-color: var(--text); padding: var(--tag-pad-y) var(--tag-pad-x) calc(var(--tag-pad-y) + 1px); min-width: var(--tag-input-min); font: var(--fs-small)/var(--lh-small) var(--font-mono); color: var(--text); }
+.tag.input .caret { width: var(--bw); height: var(--lh-small); background: var(--text); margin-left: var(--sp-0); }
+.tags + .help { margin-top: var(--sp-2); }
+.tag.sel .w, .tag.sel .en { color: var(--text); }
+.tag.editing { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
+
+/* NovelAI 自动添加的内容：一行说明，默认收起 */
+.auto { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0 0; padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3); border: var(--bw) dashed var(--border); border-radius: var(--r-ctl); color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small); }
+.auto .btn { margin-left: auto; }
+
+/* 段落的双语编辑：上面英文（衬线），下面中文，中间两个按钮互相转换 */
+.editor { display: flex; flex-direction: column; gap: var(--sp-2); }
+.editor .swap { display: flex; align-items: center; gap: var(--sp-2); }
+.editor .swap .help { margin-left: auto; }
+.editor .foot { display: flex; align-items: center; gap: var(--sp-2); }
+.area.raw { font: var(--fs-small)/var(--lh-small) var(--font-mono); min-height: var(--area-raw-min-h); color: var(--text); white-space: pre-wrap; }
+.area .caret { display: inline-block; width: var(--bw); height: 1em; background: var(--text); vertical-align: text-bottom; }
+
+/* 筛选生效时，Prompt 栏顶部下面的条件条 */
+.prompt .chips { padding: var(--sp-2) var(--sp-4); border-bottom: var(--bw) solid var(--divider); }
+.catrow { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); }
+.catrow .opt { gap: var(--ctl-gap); }
+.catrow .opt .n { font: var(--fs-caption)/1 var(--font-mono); color: var(--text-3); }
+
+/* 多选操作条：浮在 Prompt 栏底部操作栏的上方 */
+.prompt .dock { bottom: calc(var(--bar-h) + var(--sp-3)); }
+
+/* 图片下方：还没存、已修改 */
+.stage-acts .btn.keep { color: var(--text); font-weight: var(--fw-strong); border-color: var(--border); background: var(--surface); }
+.caption .dirty-line { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-2); font-size: var(--fs-small); }
+.caption .dirty-line .btn { margin-left: calc(-1 * var(--sp-1)); }
+
+/* 标签很多时两头的翻页按钮 */
+.tabs.clip { overflow: hidden; flex: 0 1 auto; mask-image: linear-gradient(to right, transparent 0, #000 var(--sp-5), #000 calc(100% - var(--sp-5)), transparent 100%); }
+.tab.lift { background: var(--surface); box-shadow: var(--shadow-pop); transform: translateY(var(--sp-0)); }
+
+/* 底栏里合在一起的两个按钮 */
+.split { display: inline-flex; gap: var(--bw); }
+.split .btn:first-child { border-radius: var(--r-ctl) 0 0 var(--r-ctl); }
+.split .btn:last-child { border-radius: 0 var(--r-ctl) var(--r-ctl) 0; padding: 0 var(--sp-1); margin-left: calc(-1 * var(--bw)); }
+
+/* 虚线的"输入"框不跟着旁边两行高的 Tag 拉高 */
+.tags .tag.ghost { align-self: flex-start; }
