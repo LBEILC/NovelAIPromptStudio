@@ -700,27 +700,34 @@ describe('Panel, placement and platform', () => {
     expect(document.documentElement.dataset.theme).toBe('dark');
     expect(document.documentElement.dataset.motion).toBe('off');
   });
-  it('follows live system theme and reduction changes even in full-motion mode', () => {
-    const dark = new EventTarget() as MediaQueryList;
-    const reduced = new EventTarget() as MediaQueryList;
-    Object.defineProperty(dark, 'matches', { value: false, writable: true });
-    Object.defineProperty(reduced, 'matches', { value: false, writable: true });
-    vi.spyOn(globalThis, 'matchMedia').mockImplementation((query) =>
-      query.includes('color-scheme') ? dark : reduced,
-    );
-    render(
-      <ThemeProvider theme="system" motion="full">
-        Content
-      </ThemeProvider>,
-    );
-    expect(document.documentElement.dataset.theme).toBe('light');
-    Object.assign(dark, { matches: true });
-    act(() => dark.dispatchEvent(new Event('change')));
-    expect(document.documentElement.dataset.theme).toBe('dark');
-    Object.assign(reduced, { matches: true });
-    act(() => reduced.dispatchEvent(new Event('change')));
-    expect(document.documentElement.dataset.motion).toBe('off');
-  });
+  it.each(['full', 'system', 'off'] as const)(
+    'follows live system theme and respects %s motion priority',
+    (motion) => {
+      const dark = new EventTarget() as MediaQueryList;
+      const reduced = new EventTarget() as MediaQueryList;
+      Object.defineProperty(dark, 'matches', { value: false, writable: true });
+      Object.defineProperty(reduced, 'matches', { value: false, writable: true });
+      vi.spyOn(globalThis, 'matchMedia').mockImplementation((query) =>
+        query.includes('color-scheme') ? dark : reduced,
+      );
+      render(
+        <ThemeProvider theme="system" motion={motion}>
+          Content
+        </ThemeProvider>,
+      );
+      expect(document.documentElement.dataset.theme).toBe('light');
+      expect(document.documentElement.dataset.motion).toBe(motion === 'off' ? 'off' : 'full');
+      Object.assign(dark, { matches: true });
+      act(() => dark.dispatchEvent(new Event('change')));
+      expect(document.documentElement.dataset.theme).toBe('dark');
+      Object.assign(reduced, { matches: true });
+      act(() => reduced.dispatchEvent(new Event('change')));
+      expect(document.documentElement.dataset.motion).toBe(motion === 'full' ? 'full' : 'off');
+      Object.assign(reduced, { matches: false });
+      act(() => reduced.dispatchEvent(new Event('change')));
+      expect(document.documentElement.dataset.motion).toBe(motion === 'off' ? 'off' : 'full');
+    },
+  );
   it('switches and checkboxes expose accessible names and checked state', () => {
     const change = vi.fn();
     render(

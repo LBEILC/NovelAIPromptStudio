@@ -21,67 +21,73 @@ it('keeps the synthetic metadata distribution and tag count at the baseline size
   expect(Math.abs(structure.reduce((a, b) => a + b) / 100 - 21 * 1024)).toBeLessThan(1);
 });
 
-it('seeds through production, preserves all 21 tables and orphans, and reopens a single file', async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-fixture-test-'));
-  let api;
-  try {
-    const snapshot = await seed(directory, 3);
-    expect(Object.keys(snapshot)).toHaveLength(21);
-    const before = new DatabaseSync(path.join(directory, 'studio.sqlite'));
+// Still exercises durable production startup, inserts and reopen after shrinking
+// only synthetic padding/cache volume; allow shared CI disk latency (was 9.9s).
+it(
+  'seeds through production, preserves all 21 tables and orphans, and reopens a single file',
+  { timeout: 20000 },
+  async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-fixture-test-'));
+    let api;
     try {
-      for (const [table, rows] of Object.entries(snapshot)) {
-        expect(rows.length, table).toBeGreaterThan(0);
-        expect(before.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all(), table).toEqual(
-          rows,
-        );
-      }
-    } finally {
-      before.close();
-    }
-    api = await openDatabase(directory);
-    expect(
-      api
-        .loadLibrary()
-        .map((item) => item.id)
-        .sort(),
-    ).toEqual(['image-0', 'image-1', 'image-2']);
-    api.close();
-    const raw = new DatabaseSync(path.join(directory, 'studio.sqlite'));
-    try {
-      expect(raw.prepare('PRAGMA integrity_check').get().integrity_check).toBe('ok');
-      expect(
-        raw
-          .prepare('PRAGMA foreign_key_check')
-          .all()
-          .map((row) => row.table),
-      ).toEqual(['generation_metadata', 'generation_metadata', 'generation_metadata']);
-      // Opening repairs legacy cover fingerprints; retired tables and orphans stay intact.
-      for (const [table, rows] of Object.entries(snapshot)) {
-        if (table === 'prompt_group_covers') {
-          expect(raw.prepare('SELECT * FROM prompt_group_covers').all()).toEqual([]);
-          continue;
-        }
-        if (table === 'app_meta') {
-          expect(raw.prepare('SELECT * FROM app_meta ORDER BY rowid').all()).toEqual(
-            rows.filter(
-              (row) =>
-                !row.key.startsWith('prompt_fingerprints_dirty:') &&
-                !row.key.startsWith('library_cards_dirty:'),
-            ),
+      const snapshot = await seed(directory, 3, undefined, { compact: true });
+      expect(Object.keys(snapshot)).toHaveLength(21);
+      const before = new DatabaseSync(path.join(directory, 'studio.sqlite'));
+      try {
+        for (const [table, rows] of Object.entries(snapshot)) {
+          expect(rows.length, table).toBeGreaterThan(0);
+          expect(before.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all(), table).toEqual(
+            rows,
           );
-          continue;
         }
-        expect(raw.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all(), table).toEqual(rows);
+      } finally {
+        before.close();
       }
+      api = await openDatabase(directory);
+      expect(
+        api
+          .loadLibrary()
+          .map((item) => item.id)
+          .sort(),
+      ).toEqual(['image-0', 'image-1', 'image-2']);
+      api.close();
+      const raw = new DatabaseSync(path.join(directory, 'studio.sqlite'));
+      try {
+        expect(raw.prepare('PRAGMA integrity_check').get().integrity_check).toBe('ok');
+        expect(
+          raw
+            .prepare('PRAGMA foreign_key_check')
+            .all()
+            .map((row) => row.table),
+        ).toEqual(['generation_metadata', 'generation_metadata', 'generation_metadata']);
+        // Opening repairs legacy cover fingerprints; retired tables and orphans stay intact.
+        for (const [table, rows] of Object.entries(snapshot)) {
+          if (table === 'prompt_group_covers') {
+            expect(raw.prepare('SELECT * FROM prompt_group_covers').all()).toEqual([]);
+            continue;
+          }
+          if (table === 'app_meta') {
+            expect(raw.prepare('SELECT * FROM app_meta ORDER BY rowid').all()).toEqual(
+              rows.filter(
+                (row) =>
+                  !row.key.startsWith('prompt_fingerprints_dirty:') &&
+                  !row.key.startsWith('library_cards_dirty:'),
+              ),
+            );
+            continue;
+          }
+          expect(raw.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all(), table).toEqual(rows);
+        }
+      } finally {
+        raw.close();
+      }
+      expect(fs.existsSync(path.join(directory, 'studio.sqlite-wal'))).toBe(false);
     } finally {
-      raw.close();
+      api?.close();
+      fs.rmSync(directory, { recursive: true, force: true });
     }
-    expect(fs.existsSync(path.join(directory, 'studio.sqlite-wal'))).toBe(false);
-  } finally {
-    api?.close();
-    fs.rmSync(directory, { recursive: true, force: true });
-  }
-});
+  },
+);
 
 it('supports native rollback, prepared statements, FTS5 and online backup', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-features-test-'));

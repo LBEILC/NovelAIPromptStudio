@@ -143,7 +143,7 @@
 .nps-sr { position: absolute; width: 0; height: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 [data-motion="off"] .nps-root *, [data-motion="off"] .nps-root *::after, [data-motion="off"] .nps-layer *, [data-motion="off"] .nps-dialog * { transition: none; animation: none; }
 @media (prefers-reduced-motion: reduce) {
-  .nps-root *, .nps-root *::after, .nps-layer *, .nps-dialog * { transition: none; animation: none; }
+  html:not([data-motion="full"]) .nps-root *, html:not([data-motion="full"]) .nps-root *::after, html:not([data-motion="full"]) .nps-layer *, html:not([data-motion="full"]) .nps-dialog * { transition: none; animation: none; }
 }
 .nps-empty-mark { display:block; width:var(--empty-mark); height:var(--empty-mark); color:var(--text-off); }
 .nps-empty-mark svg { display:block; width:100%; height:100%; }

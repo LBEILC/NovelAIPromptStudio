@@ -13,7 +13,11 @@ const startedAt = Date.now();
 const theme = process.argv.includes('--theme=light') ? 'light' : 'dark';
 const output = path.resolve(
   '.codex-runs',
-  packaged ? 'acceptance-packaged' : 'acceptance',
+  packaged
+    ? 'acceptance-packaged'
+    : process.argv.includes('--reduced-motion')
+      ? 'acceptance-reduced'
+      : 'acceptance',
   ...(packaged ? [] : [theme]),
 );
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nai-acceptance-'));
@@ -122,7 +126,14 @@ try {
   for (const phase of packaged ? [0] : [0, 1, 2]) {
     await fs.writeFile(
       path.join(root, 'run.json'),
-      JSON.stringify({ output, phase, packaged, baseUrl, theme }),
+      JSON.stringify({
+        output,
+        phase,
+        packaged,
+        baseUrl,
+        theme,
+        reducedMotion: process.argv.includes('--reduced-motion'),
+      }),
     );
     let failure;
     try {

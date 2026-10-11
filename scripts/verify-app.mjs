@@ -6,18 +6,25 @@ import { spawn } from 'node:child_process';
 const runner = fileURLToPath(new URL('./verify-app-profile.mjs', import.meta.url));
 const run = (args) =>
   new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [runner, ...args], {
-      stdio: 'inherit',
-      windowsHide: true,
-      shell: false,
-    });
+    const child = spawn(
+      process.execPath,
+      [runner, ...args, ...(process.argv.includes('--reduced-motion') ? ['--reduced-motion'] : [])],
+      {
+        stdio: 'inherit',
+        windowsHide: true,
+        shell: false,
+      },
+    );
     child.once('error', reject);
     child.once('exit', (code) => resolve(code));
   });
 if (process.argv.includes('--packaged')) {
   process.exitCode = (await run(['--packaged'])) === 0 ? 0 : 1;
 } else {
-  const output = path.resolve('.codex-runs/acceptance');
+  const output = path.resolve(
+    '.codex-runs',
+    process.argv.includes('--reduced-motion') ? 'acceptance-reduced' : 'acceptance',
+  );
   await fs.mkdir(output, { recursive: true });
   await fs.rm(path.join(output, 'manifest.json'), { force: true });
   const started = Date.now();

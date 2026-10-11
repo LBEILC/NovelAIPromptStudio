@@ -30,7 +30,8 @@ export function ThemeProvider({
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     const update = () => {
       html.dataset.theme = theme === 'system' ? (dark.matches ? 'dark' : 'light') : theme;
-      html.dataset.motion = motion === 'off' || reduced.matches ? 'off' : 'full';
+      html.dataset.motion =
+        motion === 'off' || (motion === 'system' && reduced.matches) ? 'off' : 'full';
     };
     update();
     dark.addEventListener('change', update);

@@ -12,6 +12,7 @@ import { formatPositivePromptForCopy, getPromptScopes } from '../../src/lib/prom
 import { importLibraryFiles } from '../importer.js';
 import { extraLibraryChecks } from './libraryExtras.js';
 import { libraryImportExtras } from './libraryImportExtras.js';
+import { motionDetails } from './motion.js';
 const require = createRequire(import.meta.url);
 
 export async function libraryChecks(env) {
@@ -97,6 +98,13 @@ export async function libraryChecks(env) {
       `window.studio.saveAppearanceSettings({motion:${JSON.stringify(reduced ? 'off' : 'full')}})`,
     );
     await refresh();
+    await h.checkSoon(
+      '图片库应用保存的动效模式',
+      `document.documentElement.dataset.motion === '${reduced ? 'off' : 'full'}'`,
+      12000,
+      '',
+      motionDetails,
+    );
     await wait(`document.documentElement.dataset.motion === '${reduced ? 'off' : 'full'}'`);
     await all();
     await setGrouping('不合并');

@@ -22,6 +22,8 @@ export function configureAcceptanceMode(app, argv = process.argv) {
   }
   app.disableHardwareAcceleration();
   app.commandLine.appendSwitch('force-device-scale-factor', '1');
+  // Process-local platform preference: survives reload and CDP override cleanup.
+  if (config.reducedMotion) app.commandLine.appendSwitch('force-prefers-reduced-motion');
   return { ...config, root };
 }
 

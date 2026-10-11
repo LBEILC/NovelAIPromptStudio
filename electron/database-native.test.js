@@ -78,49 +78,55 @@ describe('native engine upgrade', () => {
     );
   });
 
-  it('opens the fixed old file without changing tables, rows or library payloads', async () => {
-    const directory = temporary(true);
-    const before = fs.readFileSync(fixture);
-    const database = await open(directory);
-    expect(fs.readFileSync(database.engineBackupPath)).toEqual(before);
-    expect(fs.readFileSync(database.backupPath)).toEqual(before);
-    expect(database.loadLibrary()).toEqual(expected.library);
-    expect(database.loadLibrary('trash')).toEqual(expected.trash);
-    inspect(directory, (raw) => {
-      expect(
-        raw
-          .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-          .all()
-          .map((r) => r.name),
-      ).toEqual(Object.keys(expected.tables));
-      for (const [name, rows] of Object.entries(expected.tables)) {
-        const actual = raw.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all();
+  // The fixed legacy bytes, two real backups and reopen are the assertion:
+  // do not replace them with a smaller/new database (shared Windows CI: 6.2s).
+  it(
+    'opens the fixed old file without changing tables, rows or library payloads',
+    { timeout: 20000 },
+    async () => {
+      const directory = temporary(true);
+      const before = fs.readFileSync(fixture);
+      const database = await open(directory);
+      expect(fs.readFileSync(database.engineBackupPath)).toEqual(before);
+      expect(fs.readFileSync(database.backupPath)).toEqual(before);
+      expect(database.loadLibrary()).toEqual(expected.library);
+      expect(database.loadLibrary('trash')).toEqual(expected.trash);
+      inspect(directory, (raw) => {
         expect(
-          name === 'app_meta'
-            ? actual.filter((row) => row.key !== 'prompt_fingerprints_version')
-            : actual,
-          name,
-        ).toEqual(rows);
-      }
-      expect(
-        raw.prepare("SELECT value FROM app_meta WHERE key = 'prompt_fingerprints_version'").get()
-          .value,
-      ).toBe('1');
-      expect(raw.prepare('PRAGMA journal_mode').get().journal_mode).toBe('delete');
-    });
-    database.updateTagDictionary('girl', { translation: '修改后' });
-    database.close();
-    const reopened = await open(directory);
-    expect(reopened.lookupTagDictionary(['girl']).get('girl').translation).toBe('修改后');
-    expect(fs.readFileSync(reopened.engineBackupPath)).toEqual(before);
-    expect(fs.readFileSync(reopened.backupPath)).toEqual(before);
-    reopened.close();
-    expect(fs.readdirSync(directory).sort()).toEqual([
-      'studio.pre-node-sqlite.sqlite',
-      'studio.pre-phase2.sqlite',
-      'studio.sqlite',
-    ]);
-  });
+          raw
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            .all()
+            .map((r) => r.name),
+        ).toEqual(Object.keys(expected.tables));
+        for (const [name, rows] of Object.entries(expected.tables)) {
+          const actual = raw.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all();
+          expect(
+            name === 'app_meta'
+              ? actual.filter((row) => row.key !== 'prompt_fingerprints_version')
+              : actual,
+            name,
+          ).toEqual(rows);
+        }
+        expect(
+          raw.prepare("SELECT value FROM app_meta WHERE key = 'prompt_fingerprints_version'").get()
+            .value,
+        ).toBe('1');
+        expect(raw.prepare('PRAGMA journal_mode').get().journal_mode).toBe('delete');
+      });
+      database.updateTagDictionary('girl', { translation: '修改后' });
+      database.close();
+      const reopened = await open(directory);
+      expect(reopened.lookupTagDictionary(['girl']).get('girl').translation).toBe('修改后');
+      expect(fs.readFileSync(reopened.engineBackupPath)).toEqual(before);
+      expect(fs.readFileSync(reopened.backupPath)).toEqual(before);
+      reopened.close();
+      expect(fs.readdirSync(directory).sort()).toEqual([
+        'studio.pre-node-sqlite.sqlite',
+        'studio.pre-phase2.sqlite',
+        'studio.sqlite',
+      ]);
+    },
+  );
 
   it('does not open or change the old file if the engine backup fails, and retries cleanly', async () => {
     const directory = temporary(true);

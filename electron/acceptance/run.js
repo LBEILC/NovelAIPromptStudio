@@ -1,4 +1,5 @@
 import { libraryChecks } from './library.js';
+import { motionChecks } from './motion.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { clipboard, nativeTheme, safeStorage } from 'electron';
@@ -85,6 +86,11 @@ export async function runAcceptance(context) {
       );
     });
     await wait('!!document.querySelector(".studio-titlebar") && !!window.studio');
+    if (mode.reducedMotion)
+      await check(
+        '进程级系统减少动态效果已启用（未使用 CDP）',
+        "matchMedia('(prefers-reduced-motion: reduce)').matches",
+      );
     await check(
       '验收启动仍使用正常渲染器，无额外控制接口',
       'window.studioScreenshot === undefined && window.studioAcceptance === undefined && typeof require === "undefined"',
@@ -232,23 +238,8 @@ export async function runAcceptance(context) {
           );
           await overlayCheck(`跟随系统 ${theme} 时标题栏令牌同步`);
         }
-        await click('关闭', 'document.querySelector("[role=radiogroup][aria-label=动效]")');
-        await wait('document.documentElement.dataset.motion === "off"');
-        await check(
-          '关闭动效时组件所有过渡时长不超过 1 毫秒',
-          'Array.from(document.querySelectorAll(".nps-button")).length > 0 && Array.from(document.querySelectorAll(".nps-button")).every(button => getComputedStyle(button).transitionDuration.split(",").every(duration => parseFloat(duration) <= 0.001))',
-        );
-        await click('跟随系统', 'document.querySelector("[role=radiogroup][aria-label=动效]")');
-        await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
-          features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
-        });
-        await h.checkSoon(
-          '系统减少动态效果时组件所有过渡时长不超过 1 毫秒',
-          'matchMedia("(prefers-reduced-motion: reduce)").matches && Array.from(document.querySelectorAll(".nps-button")).length > 0 && Array.from(document.querySelectorAll(".nps-button")).every(button => getComputedStyle(button).transitionDuration.split(",").every(duration => parseFloat(duration) <= 0.001))',
-        );
-        await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
-          features: [],
-        });
+        await motionChecks(h);
+        await section('外观');
         window.showInactive();
         window.maximize();
         await new Promise((resolve) => setTimeout(resolve, 300));

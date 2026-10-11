@@ -59,13 +59,23 @@ function query(raw, sql) {
   return raw.prepare(sql).all();
 }
 
-export async function seed(directory, count, progress = () => {}) {
+export async function seed(directory, count, progress = () => {}, { compact = false } = {}) {
+  // Compatibility checks need table/row semantics, not benchmark-sized padding
+  // or thousands of cache entries. Benchmark callers retain the original data.
+  const sample = (index) => {
+    const value = project(index);
+    if (compact) {
+      value.metadata.extra_json = '{}';
+      value.prompt_structure = {};
+    }
+    return value;
+  };
   fs.mkdirSync(directory, { recursive: true });
   const api = await openDatabase(directory);
   try {
     for (let index = 0; index < count; index += 25) {
       const results = api.insertProjects(
-        Array.from({ length: Math.min(25, count - index) }, (_, offset) => project(index + offset)),
+        Array.from({ length: Math.min(25, count - index) }, (_, offset) => sample(index + offset)),
       );
       if (results.some((result) => result.error)) throw Error('Fixture insert failed');
       if (index % 100 === 0) progress(`seed:${index}/${count}`);
@@ -85,7 +95,7 @@ export async function seed(directory, count, progress = () => {}) {
     progress('seed:orphan-metadata');
     raw.run('BEGIN');
     for (let index = 0; index < Math.round((count * 147) / 159); index++) {
-      const value = project(index);
+      const value = sample(index);
       raw.run(
         'INSERT INTO generation_metadata (project_id, extra_json, prompt_structure_json) VALUES (?, ?, ?)',
         [`orphan-${index}`, value.metadata.extra_json, JSON.stringify(value.prompt_structure)],
@@ -96,11 +106,11 @@ export async function seed(directory, count, progress = () => {}) {
         raw.run('BEGIN');
       }
     }
-    for (let index = 0; index < 2400; index++)
+    for (let index = 0; index < (compact ? 3 : 2400); index++)
       raw.run("INSERT OR IGNORE INTO tag_dictionary (tag, updated_at) VALUES (?, '')", [
         `synthetic_${index}`,
       ]);
-    for (let index = 0; index < 750; index++)
+    for (let index = 0; index < (compact ? 3 : 750); index++)
       raw.run("INSERT INTO danbooru_tag_cache (tag, checked_at) VALUES (?, '')", [
         `synthetic_${index}`,
       ]);

@@ -76,12 +76,16 @@ jobs:
         run: node -e "console.error('MiSans font cache was not prepared; check the prepare-fonts job. Matrix jobs never download fonts.'); process.exit(1)"
       - run: npm run fonts:check
       - run: npm run verify:app
+      - name: Verify with process-local system reduced motion enabled
+        run: npm run verify:app -- --reduced-motion
       - name: Upload acceptance checks and screenshots
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: acceptance-${{ matrix.os }}-node${{ matrix.node }}
-          path: .codex-runs/acceptance/
+          path: |
+            .codex-runs/acceptance/
+            .codex-runs/acceptance-reduced/
           if-no-files-found: error
       - run: npm run screenshots:app -- --constrain-window
       - name: Upload application screenshots
