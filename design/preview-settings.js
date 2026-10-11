@@ -61,7 +61,7 @@ const SET_BODY = {
       ${rows.map(([en, zh, [cz, cc], src, cls]) => `<div class="${cls}"><span class="check ${cls ? 'on' : ''}">${cls ? ic('check-line') : ''}</span></div><div class="${cls}"><span class="en">${en}</span></div>
         <div class="${cls}">${zh || '<span class="muted">点击填写</span>'}</div><div class="${cls}">${cat(cz, cc)}</div><div class="${cls}"><span class="src">${src}</span></div><div class="${cls}"><button class="btn quiet sm">删除</button></div>`).join('')}
     </div>
-    <div style="padding:14px var(--sp-5);display:flex;justify-content:center"><span class="selbar"><span class="n">已选 2 条</span><button class="btn quiet sm">设置分类</button><button class="btn quiet sm">重新翻译</button><button class="btn danger sm">删除</button><button class="btn quiet sm">取消</button></span></div>
+    <div style="padding:14px var(--sp-5);display:flex;justify-content:center"><span class="selbar"><span class="n">已选 2 条</span><button class="btn quiet sm">设置分类</button><button class="btn danger sm">删除</button><button class="btn quiet sm">取消</button></span></div>
     </div>`;
   },
 

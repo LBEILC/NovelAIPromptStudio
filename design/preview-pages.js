@@ -36,9 +36,6 @@ VIEWS.set = () => `${titlebar('')}<div class="body">${setNav('set')}
     <div class="setrow"><div>等宽字体<small>用于 Tag、权重和参数</small></div>${sel('IBM Plex Mono（内置）')}</div>
     <div class="setrow"><div>段落字体<small>用于成段的自然语言</small></div>${sel('Newsreader（内置）')}</div>
     <div class="setrow"><div>动效<small>关闭后，所有位置变化都立刻完成</small></div>${opts(['完整', '跟随系统', '关闭'], 1)}</div>
-    <h2>Prompt 的显示</h2>
-    <div class="setrow"><div>默认显示<small>打开一张图时先看到什么</small></div>${opts(['原文', '译文', '对照'], 2)}</div>
-    <div class="setrow"><div>自动翻译新出现的 Tag 和段落<small>优先使用内置词典；词典没有的才交给 AI 服务</small></div><span class="switch on"></span></div>
   </div></div></div></div>`;
 
 VIEWS.acct = () => `${titlebar('')}<div class="body">${setNav('acct')}
