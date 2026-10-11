@@ -73,6 +73,76 @@ function syntheticProject(prompt = mixed, model = 'nai-diffusion-4-5-full') {
 }
 
 describe('lossless block document', () => {
+  it('keeps a 61-item synthetic list with one 13-word item and two periods as tags', () => {
+    const longItem = 'a small red kite on a thin line by an old oak tree';
+    const items = Array.from({ length: 58 }, (_, index) => `synthetic detail ${index}`);
+    items.push(longItem + '.', 'soft edges.', '1::paper texture, muted ink::');
+    const source = items.join(', ');
+    expect(items).toHaveLength(61);
+    expect(longItem.split(/\s+/)).toHaveLength(13);
+    expect(source.match(/\./g)).toHaveLength(2);
+    expect(source.match(/1::.*?::/g)).toHaveLength(1);
+    expect(source).not.toMatch(/[\r\n\p{Script=Han}]/u);
+    const section = parsePromptSection(source, { createId: () => 'synthetic' });
+    expect(section.blocks).toHaveLength(1);
+    expect(section.blocks[0].type).toBe('tags');
+    expect(section.blocks[0].tags).toEqual(parsePrompt(source, () => 'synthetic'));
+    expect(section.blocks[0].tags.some((tag) => tag.tag === longItem + '.')).toBe(true);
+    expect(serializePromptSection(section)).toBe(source);
+  });
+
+  it.each([
+    [9, 1, 'paragraph'],
+    [10, 1, 'tags'],
+    [11, 2, 'paragraph'],
+    [19, 2, 'paragraph'],
+    [20, 2, 'tags'],
+    [20, 3, 'paragraph'],
+    [61, 6, 'tags'],
+    [61, 7, 'paragraph'],
+  ])('classifies %i items with %i long items as %s', (count, longCount, expected) => {
+    const items = Array.from({ length: count }, (_, index) =>
+      index < longCount ? paragraphs[0] : `synthetic detail ${index}`,
+    );
+    expect(classifyPromptBlock(items.join(', '))).toBe(expected);
+  });
+
+  it.each([
+    'word '.repeat(12) + 'word',
+    'x'.repeat(101),
+    'One two three four five six seven eight.',
+  ])('counts each non-tag criterion once: %s', (outlier) => {
+    expect(classifyPromptBlock([...Array(9).fill('sky'), outlier].join(', '))).toBe('tags');
+    expect(classifyPromptBlock([...Array(8).fill('sky'), outlier, outlier].join(', '))).toBe(
+      'paragraph',
+    );
+  });
+
+  it('counts weight groups as one item and requires commas for the new list rule', () => {
+    const items = [...Array(7).fill('sky'), '1::red, green, blue::', paragraphs[0]];
+    expect(classifyPromptBlock(items.join(', '))).toBe('paragraph');
+    items.push('soft light');
+    expect(classifyPromptBlock(items.join(', '))).toBe('tags');
+    expect(classifyPromptBlock(items.join('，'))).toBe('tags');
+    expect(classifyPromptBlock(items.join('\n'))).toBe('paragraph');
+  });
+
+  it.each([
+    Array(4)
+      .fill(
+        'The traveler stops beside the river, watching the boats drift slowly downstream, listening to birds in the trees, while the evening light settles across the quiet hills.',
+      )
+      .join(' '),
+    [...Array(9).fill('soft light'), paragraphs[0], paragraphs[1]].join(', '),
+    '清晨的阳光穿过窗户洒在桌面的花瓶上，远处的山峦被薄雾覆盖。行人走过安静的街道，沿着河流慢慢向城外走去。',
+  ])('keeps genuine prose as a paragraph: %s', (source) => {
+    const section = parsePromptSection(source);
+    expect(section.blocks).toHaveLength(1);
+    expect(section.blocks[0].type).toBe('paragraph');
+    expect(section.blocks[0].tags).toEqual([]);
+    expect(serializePromptSection(section)).toBe(source);
+  });
+
   it('classifies synthetic tags, paragraphs, labels and descriptive phrases', () => {
     const section = parsePromptSection(mixed);
     expect(section.blocks.map((block) => block.type)).toEqual([
@@ -314,7 +384,7 @@ describe('lossless block document', () => {
         }
       }
     }
-    expect(checked).toBeGreaterThanOrEqual(28);
+    expect(checked).toBe(42);
   });
 });
 

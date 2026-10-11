@@ -54,6 +54,9 @@ export const MAX_TAG_PHRASE_WORDS = 12;
 export const MAX_TAG_PHRASE_CHARACTERS = 100;
 export const MIN_SENTENCE_CLAUSE_WORDS = 8;
 export const MIN_PARAGRAPH_HAN_CHARACTERS = 16;
+export const MIN_LONG_TAG_LIST_ITEMS = 10;
+export const MAX_LONG_TAG_LIST_OUTLIER_RATIO = 0.1;
+export const MIN_LONG_TAG_LIST_ALLOWED_OUTLIERS = 1;
 
 function blockLabel(content: string): string {
   const angle = content.match(/^<[\p{L}][\p{L}\p{N}_ -]*>/u)?.[0];
@@ -67,6 +70,28 @@ function blockLabel(content: string): string {
 export function classifyPromptBlock(content: string): BlockType {
   // Weight groups count as one item regardless of the number of inner commas.
   const items = content.replace(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)::[\s\S]*?::/g, 'weighted_group');
+  const commaItems = items
+    .split(/[,，]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (commaItems.length >= MIN_LONG_TAG_LIST_ITEMS) {
+    const outliers = commaItems.filter((item) => {
+      const words = item.split(/\s+/).length;
+      return (
+        words > MAX_TAG_PHRASE_WORDS ||
+        item.length > MAX_TAG_PHRASE_CHARACTERS ||
+        (/[.!?。！？](?:["'”’)]|\s|$)/.test(item) && words >= MIN_SENTENCE_CLAUSE_WORDS)
+      );
+    }).length;
+    if (
+      outliers <=
+      Math.max(
+        MIN_LONG_TAG_LIST_ALLOWED_OUTLIERS,
+        Math.floor(commaItems.length * MAX_LONG_TAG_LIST_OUTLIER_RATIO),
+      )
+    )
+      return 'tags';
+  }
   const phrases = items
     .split(/[,，\r\n]+/)
     .map((item) => item.trim())
