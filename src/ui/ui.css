@@ -1,0 +1,142 @@
+.nps-root, .nps-layer, .nps-dialog, .nps-notifications {
+  color: var(--text);
+  font: var(--fw-regular) var(--fs-body)/var(--lh-body) var(--font-ui);
+}
+.nps-root *, .nps-layer *, .nps-dialog * { box-sizing: border-box; }
+.nps-root :where(button, input), .nps-layer :where(button), .nps-dialog :where(button) { font: inherit; color: inherit; }
+.nps-root [hidden] { display: none; }
+/* TODO(design): border/focus widths and offsets (1/2px) have no tokens. Use CSS thin/medium, omit offset. */
+.nps-root :focus-visible, .nps-layer :focus-visible, .nps-dialog :focus-visible { outline: medium solid var(--focus); }
+.nps-button {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  height: var(--ctl); padding: 0 var(--sp-3); border: thin solid var(--border); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text); font-weight: var(--fw-strong); white-space: nowrap;
+  transition: background-color var(--dur-1) var(--ease-out);
+}
+.nps-button:hover { background: var(--hover); }
+.nps-button:active:not([aria-disabled="true"]) { transform: scale(0.98); }
+.nps-button.nps-button-ink { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+.nps-button-ink:hover { background: var(--ink-hover); border-color: var(--ink-hover); }
+.nps-button.nps-button-cinnabar { background: var(--cinnabar); border-color: var(--cinnabar); color: var(--on-cinnabar); padding: 0 var(--sp-5); }
+.nps-button-cinnabar:hover { background: var(--cinnabar-hover); border-color: var(--cinnabar-hover); }
+.nps-button.nps-button-quiet { background: transparent; border-color: transparent; color: var(--text-2); font-weight: var(--fw-regular); }
+.nps-button-quiet:hover { background: var(--hover); color: var(--text); }
+.nps-button.nps-button-danger { background: transparent; border-color: transparent; color: var(--danger); font-weight: var(--fw-regular); }
+.nps-button-danger:hover, .nps-button-danger-outline:hover { background: var(--danger-wash); }
+.nps-button.nps-button-danger-outline { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
+.nps-button[aria-disabled="true"]:not([aria-busy="true"]) { background: var(--hover); border-color: transparent; color: var(--text-off); }
+.nps-button.nps-small, .nps-field.nps-small { height: var(--ctl-sm); padding: 0 var(--sp-2); font-size: var(--fs-small); }
+.nps-loading-label { opacity: 0; }
+/* TODO(design): spinner rotation duration 0.9s is absent. Keep a static loading icon until specified. */
+.nps-loader { position: absolute; }
+.nps-input-group { display: inline-flex; flex-direction: column; min-width: 0; }
+.nps-field { height: var(--ctl); display: inline-flex; align-items: center; min-width: 0; border: thin solid var(--border); border-radius: var(--r-ctl); background: var(--surface); color: var(--text); }
+/* TODO(design): field horizontal padding 10px and icon gap 6px are absent; use only specified small padding. */
+.nps-field input { width: 100%; min-width: 0; height: 100%; border: 0; padding: 0; background: transparent; outline: none; }
+.nps-field:focus-within { outline: medium solid var(--focus); }
+.nps-field input:focus-visible { outline: none; }
+.nps-field input::placeholder { color: var(--text-3); }
+.nps-field-error { border-color: var(--danger); }
+.nps-help { color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); }
+.nps-error, .nps-help.nps-error { color: var(--danger); }
+.nps-off, .nps-root :disabled, .nps-menu-item[aria-disabled="true"] { color: var(--text-off); }
+.nps-select { justify-content: space-between; }
+.nps-options { display: inline-flex; gap: var(--sp-2); }
+/* TODO(design): option horizontal padding 9px has no token. */
+.nps-option { display: inline-flex; align-items: center; border: thin solid var(--border); border-radius: var(--r-ctl); background: transparent; color: var(--text-2); padding: 0; height: var(--ctl-sm); font-size: var(--fs-small); }
+.nps-option[aria-checked="true"] { border-color: var(--text); color: var(--text); background: var(--selected); }
+.nps-tablist { display: inline-flex; }
+/* TODO(design): tabs 18px gap and 28px height have no tokens; preserve content sizing. */
+.nps-tablist button { border: 0; border-bottom: medium solid transparent; background: transparent; padding: 0; color: var(--text-3); }
+.nps-tablist button[aria-selected="true"] { border-bottom-color: var(--text); color: var(--text); font-weight: var(--fw-strong); }
+.nps-tablist button:hover { color: var(--text); }
+/* TODO(design): switch 18px track / 14px thumb / 2px inset and checkbox 15px dimensions have no size tokens.
+   Keep native checkbox/switch-like intrinsic control geometry rather than invent derived tokens. */
+.nps-switch { display: inline-flex; align-items: center; width: var(--sp-8); border: 0; border-radius: var(--r-pill); background: var(--border); padding: 0; transition: background-color var(--dur-3) var(--ease-move); }
+.nps-switch::after { content: ' '; display: block; width: 50%; aspect-ratio: 1; border-radius: var(--r-pill); background: var(--surface); transition: transform var(--dur-3) var(--ease-move); }
+.nps-switch[aria-checked="true"] { background: var(--ink); }
+.nps-switch[aria-checked="true"]::after { transform: translateX(100%); background: var(--on-ink); }
+.nps-switch:disabled, .nps-checkbox:disabled { opacity: 0.4; }
+.nps-checkbox { display: inline-grid; place-items: center; padding: 0; min-width: 1em; min-height: 1em; border: thin solid var(--text-3); border-radius: var(--sp-1); background: transparent; }
+.nps-checkbox[aria-checked="true"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+/* TODO(design): slider 168px track, 2px line and 12px thumb need semantic size tokens. Native range preserves keyboard/pointer semantics. */
+.nps-slider { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.nps-slider input { accent-color: var(--text); min-width: 0; }
+.nps-slider output, .nps-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.nps-stepper { display: inline-flex; height: var(--ctl-sm); border: thin solid var(--border); border-radius: var(--r-ctl); overflow: hidden; }
+.nps-stepper > button { display: grid; place-items: center; width: var(--sp-6); border: 0; padding: 0; background: transparent; }
+.nps-stepper .nps-input-group { width: var(--titlebar-h); }
+.nps-stepper .nps-field { height: 100%; border-radius: 0; border-top: 0; border-bottom: 0; }
+.nps-stepper input { text-align: center; font-family: var(--font-mono); font-size: var(--fs-small); }
+.nps-layer { position: fixed; inset: auto; margin: 0; border: 0; max-width: 100vw; max-height: 100vh; overflow: auto; box-sizing: border-box; }
+.nps-menu { padding: var(--sp-1); border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--shadow-pop); }
+/* TODO(design): menu min-width 208/250px, row height 28px and horizontal padding 10px have no tokens. */
+.nps-menu-item { display: flex; width: 100%; align-items: center; gap: var(--sp-2); border: 0; border-radius: var(--r-tag); background: transparent; text-align: left; white-space: nowrap; }
+.nps-menu-item:hover:not([aria-disabled="true"]), .nps-menu-item.nps-current { background: var(--hover); }
+.nps-menu-trailing { display: inline-flex; align-items: center; margin-left: auto; padding-left: var(--sp-4); }
+.nps-menu-separator { width: 100%; border: 0; border-top: thin solid var(--divider); margin: var(--sp-1) 0; }
+.nps-menu-trigger, .nps-autocomplete, .nps-tooltip-anchor { display: inline-flex; }
+.nps-popover { display: flex; flex-direction: column; padding: var(--sp-3); border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--shadow-pop); }
+/* TODO(design): popover width 300px/gap 10px; dialog width 420px/title line-height 22px/spacing 6,10,18px are absent. */
+.nps-dialog { box-sizing: border-box; padding: var(--sp-5); border: 0; border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--shadow-pop); max-width: 100vw; max-height: 100vh; overflow: auto; }
+.nps-dialog::backdrop { background: var(--scrim); }
+.nps-dialog-title { margin: 0; font-size: var(--fs-title); font-weight: var(--fw-strong); }
+.nps-dialog-body { color: var(--text-2); }
+.nps-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); }
+.nps-quote { padding-left: var(--sp-3); border-left: medium solid var(--border); color: var(--text-2); font: var(--fs-body)/var(--lh-body) var(--font-prose); }
+.nps-notifications { position: fixed; inset: auto; bottom: var(--sp-6); left: 50%; transform: translateX(-50%); padding: 0; border: 0; margin: 0; background: transparent; overflow: visible; }
+/* TODO(design): toast 36px height / 14px and 6px padding; notification screen position unspecified (temporary sp-6 bottom). */
+.nps-toast { display: inline-flex; align-items: center; gap: var(--sp-3); border-radius: var(--r-ctl); background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-pop); }
+.nps-toast button { height: var(--sp-6); padding: 0 var(--sp-2); border: 0; border-radius: var(--r-tag); background: transparent; color: inherit; text-decoration: underline; }
+.nps-tip { padding: var(--sp-1) var(--sp-2); border-radius: var(--r-tag); background: var(--ink); color: var(--on-ink); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.nps-banner { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); font-size: var(--fs-small); line-height: var(--lh-small); }
+.nps-banner-info { background: var(--info-wash); color: var(--info); }
+.nps-banner-warn { background: var(--warn-wash); color: var(--warn); }
+.nps-banner-danger { background: var(--danger-wash); color: var(--danger); }
+.nps-banner-ok { background: var(--ok-wash); color: var(--ok); }
+/* TODO(design): progress 2px height and 1px radius have no tokens; thin border gives the conservative line. */
+.nps-progress { background: var(--border); overflow: hidden; }
+.nps-progress > span { display: block; border-top: thin solid var(--cinnabar); }
+.nps-tag { display: inline-flex; align-items: center; border: thin solid var(--border); border-radius: var(--r-tag); background: var(--surface); text-align: left; padding: 0 var(--sp-2) var(--sp-1); }
+/* TODO(design): tag 7px gap / 3px top padding / category 5px dot and 6px top offset lack tokens; dot uses text bullet. */
+.nps-dot { align-self: flex-start; }
+.nps-dot::before { content: '•'; }
+.nps-cat-artist-era { color: var(--cat-artist-era); } .nps-cat-subject { color: var(--cat-subject); }
+.nps-cat-identity { color: var(--cat-identity); } .nps-cat-body { color: var(--cat-body); }
+.nps-cat-clothing { color: var(--cat-clothing); } .nps-cat-action { color: var(--cat-action); }
+.nps-cat-environment { color: var(--cat-environment); } .nps-cat-composition { color: var(--cat-composition); }
+.nps-cat-style { color: var(--cat-style); } .nps-cat-unsorted { color: var(--cat-unsorted); }
+.nps-tag-text { display: flex; flex-direction: column; }
+.nps-tag-en { font: var(--fs-small)/var(--lh-small) var(--font-mono); color: var(--text); }
+.nps-tag-zh { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-3); }
+.nps-tag-weight { font: var(--fs-caption)/var(--lh-small) var(--font-mono); color: var(--text-2); align-self: flex-start; }
+.nps-tag:hover { background: var(--hover); }
+.nps-tag-selected { border-color: var(--text); background: var(--selected); }
+.nps-tag-translating .nps-tag-zh { color: var(--text-off); }
+.nps-tag-syntax { border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); }
+.nps-tag-syntax .nps-tag-zh { color: var(--warn); }
+.nps-tag-added { border-color: var(--add); background: var(--add-wash); }
+.nps-tag-removed { border-color: var(--remove); background: var(--remove-wash); }
+.nps-tag-removed .nps-tag-en { text-decoration: line-through; color: var(--remove); }
+.nps-tag-filtered { opacity: 0.4; }
+.nps-tag-dragging { box-shadow: var(--shadow-pop); transform: rotate(-1.5deg); }
+.nps-tag-add { border-style: dashed; color: var(--text-3); }
+/* TODO(design): selection toolbar 38px height / 2px gap / 5px and 14px padding have no tokens. Use an overlay slot, intrinsic height. */
+.nps-selection-slot { position: relative; height: 0; }
+.nps-selection { position: absolute; display: inline-flex; align-items: center; white-space: nowrap; border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--shadow-pop); }
+.nps-selection > span { margin-right: var(--sp-2); color: var(--text-2); }
+.nps-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--sp-8); text-align: center; color: var(--text-2); }
+/* TODO(design): empty-state graphic 64px, text 380px width, 6/14/18px gaps absent; graphic remains caller-owned. */
+.nps-empty h3 { margin: 0; font-size: var(--fs-title); font-weight: var(--fw-strong); color: var(--text); }
+.nps-empty p { margin: 0; }
+.nps-kbd { font: var(--fs-caption)/1 var(--font-mono); color: var(--text-3); border: thin solid var(--border); border-radius: var(--sp-1); padding: 0 var(--sp-1); }
+/* TODO(design): shortcut vertical padding 2px absent; resizer visual/hit-area unspecified. */
+.nps-resizable { position: relative; max-width: 100%; }
+.nps-panel-content { overflow: auto; }
+.nps-resizer { position: absolute; top: 0; bottom: 0; width: var(--sp-1); background: var(--divider); cursor: col-resize; touch-action: none; }
+.nps-resizer-right { right: 0; } .nps-resizer-left { left: 0; }
+.nps-sr { position: absolute; width: 0; height: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+[data-motion="off"] .nps-root *, [data-motion="off"] .nps-root *::after, [data-motion="off"] .nps-layer *, [data-motion="off"] .nps-dialog * { transition: none; animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .nps-root *, .nps-root *::after, .nps-layer *, .nps-dialog * { transition: none; animation: none; }
+}

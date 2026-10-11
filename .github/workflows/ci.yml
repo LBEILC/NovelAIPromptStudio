@@ -34,6 +34,17 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npm run audit:ui
+      - run: npm run screenshots:ui
+      - name: Upload component screenshots and native evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-004-${{ matrix.os }}-node${{ matrix.node }}
+          path: |
+            .codex-runs/004/*.png
+            .codex-runs/004/*.json
+          if-no-files-found: ignore
       - name: Probe SQLite in Electron main process
         run: node scripts/probe-data-layer-electron.mjs --dev-only
       - name: Upload SQLite main process evidence
