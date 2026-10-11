@@ -12,4 +12,4 @@
 | [005](./005-更换数据引擎.md) | 把 `sql.js` 换成 `node:sqlite`：增量写入、旧数据原样可用、关闭后仍是单文件；对外接口不变 | 工程（Codex） | 已验收（`7c5fd7f`，2026-10-11）· [汇报](./reports/005.md)。待用户用真实图库做 [手动验证](../manual-verification-20261011-data-engine.md) |
 | [006](./006-应用截图工具.md) | 在隔离环境里启动真正的应用并截取各页面，不模拟输入；加进 CI | 工程（Codex） | 已验收（`d6f0c2f`，2026-10-11）· [汇报](./reports/006.md)。`npm run screenshots:app` 产出 22 张画面 |
 | [006a](./006a-截图工具在Windows-CI上失败.md) | 修复截图工具在 Windows CI 上因窗口尺寸失败 | 工程（Codex） | 已验收（`2271e0a`，2026-10-11）· [汇报](./reports/006a.md) |
-| [007](./007-应用外壳与设置页.md) | 新的应用外壳（令牌、主题、标题栏、导航）与设置页；状态拆分与 TypeScript。分支 `rebuild/ui-1.0` | 工程（Codex） | 已派发（2026-10-11） |
+| [007](./007-应用外壳与设置页.md) | 新的应用外壳（令牌、主题、标题栏、导航）与设置页；状态拆分与 TypeScript。分支 `rebuild/ui-1.0` | 工程（Codex） | 已验收（`ef7d429`、`73fd2c8`，2026-10-11）· [汇报](./reports/007.md)。待用户做 [手动验证](../manual-verification-20261011-shell-settings.md) |
