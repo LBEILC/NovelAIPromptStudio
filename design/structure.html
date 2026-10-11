@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NovelAI Prompt Studio 结构稿</title>
+<style>
+/* 结构稿：只表达有什么、放在哪、先后主次。不代表最终的颜色、字体和细节。 */
+:root {
+  --bg: #f4f4f2; --win: #ffffff; --pane: #fafaf8; --fill: #eeeeeb; --fill-2: #e2e2de;
+  --line: #d9d9d4; --text: #1c1c1a; --text-2: #63635e; --text-3: #9a9a94;
+  --mark: #2f5fd0; --mark-bg: #e8eefc; --add: #2f7d4f; --add-bg: #e6f3ea; --del: #b0453c; --del-bg: #f8e9e7;
+  --later: #8a6a14; --later-bg: #f7efd8;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121211; --win: #1b1b1a; --pane: #171716; --fill: #262624; --fill-2: #31312f;
+    --line: #333331; --text: #efeeea; --text-2: #a5a49f; --text-3: #71706b;
+    --mark: #8aa6ff; --mark-bg: #212a45; --add: #8fc7a2; --add-bg: #1c2e23; --del: #e39088; --del-bg: #3a2220;
+    --later: #d9b65a; --later-bg: #332b14;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 13px/1.5 "MiSans VF", "MiSans", "Segoe UI", "Microsoft YaHei UI", sans-serif; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.pv-bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 10px 20px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.pv-bar b { font-weight: 500; }
+.pv-group { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
+.seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--fill); border-radius: 8px; }
+.seg button { height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); }
+.seg button.on { background: var(--win); color: var(--text); box-shadow: 0 0 0 1px var(--line); }
+.pv-stage { padding: 20px; overflow-x: auto; }
+.pv-notes { max-width: 1160px; margin: 0 auto; padding: 0 20px 40px; color: var(--text-2); }
+.pv-notes h4 { margin: 0 0 8px; font-weight: 500; color: var(--text); }
+.pv-notes ul { margin: 0; padding-left: 18px; }
+.pv-notes li { margin: 4px 0; }
+
+.win { width: 1160px; height: 700px; margin: 0 auto; display: flex; flex-direction: column; background: var(--win); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.tb { height: 44px; flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 14px; background: var(--pane); border-bottom: 1px solid var(--line); }
+.logo { font: 500 13px ui-monospace, Consolas, monospace; margin-right: 8px; }
+.nav button, .stab { height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.nav button.on, .stab.on { background: var(--fill); color: var(--text); }
+.sep { width: 1px; height: 18px; background: var(--line); margin: 0 6px; }
+.th { width: 18px; height: 22px; border-radius: 3px; background: var(--fill-2); flex: 0 0 auto; }
+.sp { flex: 1 1 0; }
+.chip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--win); color: var(--text-2); white-space: nowrap; }
+.chip.on { background: var(--fill); color: var(--text); }
+.chip.pri { background: var(--text); border-color: var(--text); color: var(--win); }
+.chip.sm { height: 22px; padding: 0 7px; font-size: 12px; }
+.wc { display: flex; gap: 14px; margin-left: 10px; color: var(--text-3); }
+.body { flex: 1 1 auto; min-height: 0; display: flex; }
+.col { min-width: 0; min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+.col:last-child { border-right: 0; }
+.col-h { height: 40px; flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 12px; color: var(--text-2); }
+.col-h b { color: var(--text); font-weight: 500; }
+.scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.ph { background: var(--fill); border-radius: 8px; display: grid; place-items: center; color: var(--text-3); }
+.muted { color: var(--text-3); }
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.later { display: inline-block; padding: 0 5px; border-radius: 4px; background: var(--later-bg); color: var(--later); font-size: 11px; line-height: 16px; }
+.note { color: var(--mark); font-size: 12px; }
+
+.ver { padding: 7px 8px; border-radius: 8px; display: flex; flex-direction: column; gap: 5px; }
+.ver.on { background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); }
+.ver .ths { display: flex; gap: 4px; }
+.ver .ths i { width: 24px; height: 32px; border-radius: 3px; background: var(--fill-2); }
+.ver.on .ths i.cur { box-shadow: 0 0 0 2px var(--mark); }
+.add { color: var(--add); } .del { color: var(--del); }
+
+.sec { display: flex; flex-direction: column; gap: 8px; }
+.sec-h { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 500; padding-top: 4px; }
+.blk { border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; display: flex; flex-direction: column; gap: 7px; }
+.blk-h { display: flex; align-items: center; gap: 6px; color: var(--text-3); font-size: 12px; }
+.blk-h .kind { color: var(--text-2); }
+.tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { display: inline-flex; flex-direction: column; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; font: 12px/1.4 ui-monospace, Consolas, monospace; }
+.tag small { color: var(--text-3); font: 11px/1.3 "MiSans VF", "Microsoft YaHei UI", sans-serif; }
+.tag.new { border-color: var(--add); background: var(--add-bg); color: var(--add); }
+.tag.gone { border-color: var(--del); background: var(--del-bg); color: var(--del); text-decoration: line-through; }
+.prose { margin: 0; color: var(--text); }
+.prose + .prose { color: var(--text-2); padding-top: 6px; border-top: 1px dashed var(--line); }
+.blk.new { border-color: var(--add); background: var(--add-bg); }
+.blk.gone { border-color: var(--del); background: var(--del-bg); }
+.blk.gone .prose { text-decoration: line-through; color: var(--del); }
+.bar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--pane); }
+.banner { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px; background: var(--mark-bg); color: var(--mark); }
+.kv { display: grid; grid-template-columns: 96px 1fr; gap: 8px 12px; align-items: center; }
+.kv > span:nth-child(odd) { color: var(--text-2); }
+.grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.grid .ph { aspect-ratio: 3 / 4; position: relative; }
+.grid .ph.on { box-shadow: 0 0 0 2px var(--mark); }
+.badge { position: absolute; right: 6px; top: 6px; padding: 0 6px; border-radius: 5px; background: var(--win); color: var(--text-2); font-size: 11px; line-height: 18px; }
+.side { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; }
+.side .it { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 6px; color: var(--text-2); }
+.side .it.on { background: var(--fill); color: var(--text); }
+.side .it span { margin-left: auto; color: var(--text-3); font-size: 12px; }
+.side .lb { padding: 12px 10px 4px; color: var(--text-3); font-size: 12px; }
+.card { border: 1px solid var(--line); border-radius: 9px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.setrow { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.setrow > div { flex: 1 1 auto; }
+.setrow small { display: block; color: var(--text-3); }
+
+/* 版本阶段：只看 1.0 时隐藏 1.1、1.2 的内容；只看 1.1 时隐藏 1.2 */
+[data-stage="1.0"] [data-v="1.1"], [data-stage="1.0"] [data-v="1.2"], [data-stage="1.1"] [data-v="1.2"] { display: none !important; }
+</style>
+</head>
+<body data-stage="1.2">
+<header class="pv-bar">
+  <b>结构稿</b>
+  <div class="pv-group"><span>页面</span><div class="seg" id="pv-page"></div></div>
+  <div class="pv-group"><span>看到哪一期</span><div class="seg" id="pv-stage"></div></div>
+  <span class="muted">只表达有什么、放在哪、谁主谁次，不代表最终的颜色和字体</span>
+</header>
+<main class="pv-stage"><div class="win" id="win"></div></main>
+<section class="pv-notes" id="pv-notes"></section>
+
+<script>
+const PAGES = [['wb', '工作台'], ['params', '工作台 · 更多参数'], ['ai', '工作台 · AI 提案'], ['lib', '图片库'], ['assets', '素材'], ['set', '设置']];
+const STAGES = [['1.0', '1.0'], ['1.1', '1.1 生成'], ['1.2', '1.2 完整参数']];
+const S = { page: 'wb', stage: '1.2' };
+const L = (v) => `<span class="later" data-v="${v}">${v}</span>`;
+
+function titlebar(cur) {
+  const nav = [['wb', '工作台'], ['lib', '图片库'], ['assets', '素材', '1.1']];
+  const tabs = cur === 'wb'
+    ? `<span class="sep"></span>
+       <span class="stab"><span class="th"></span>雨后候车亭</span>
+       <span class="stab on"><span class="th"></span>麦田<span data-v="1.1"> · 3 版</span><span class="muted">●</span></span>
+       <span class="stab"><span class="th"></span>会议室合影</span>
+       <span class="stab muted">＋</span>` : '';
+  return `<div class="tb">
+    <span class="logo">{N}</span>
+    <span class="nav">${nav.map(([k, t, v]) => `<button class="${k === cur ? 'on' : ''}" ${v ? `data-v="${v}"` : ''}>${t}</button>`).join('')}</span>
+    ${tabs}<span class="sp"></span>
+    <span class="chip sm" data-v="1.1">Anlas 余额</span>
+    <span class="chip sm">设置</span>
+    <span class="wc"><span>—</span><span>☐</span><span>✕</span></span>
+  </div>`;
+}
+
+function versions() {
+  return `<div class="col" style="width:196px" data-v="1.1">
+    <div class="col-h"><b>版本</b><span class="sp"></span><span class="muted">收起</span></div>
+    <div class="scroll">
+      <div class="ver"><span>原图</span><div class="ths"><i></i></div></div>
+      <div class="ver" style="margin-left:12px"><span><span class="add">＋ 风吹起头发</span></span><div class="ths"><i></i><i></i><i></i></div></div>
+      <div class="ver on" style="margin-left:24px"><span>构图段落改写</span><div class="ths"><i></i><i class="cur"></i></div></div>
+      <div class="ver" style="margin-left:12px"><span><span class="add">＋ 黄昏</span> <span class="del">− 晴空</span></span><div class="ths"><i></i></div></div>
+      <span class="note">缩进表示从哪一版改出来的。回到任何一版继续改，就分出一条岔路</span>
+    </div>
+  </div>`;
+}
+
+function stage() {
+  return `<div class="col" style="flex:1 1 0">
+    <div class="scroll" style="padding-top:12px">
+      <div class="ph" style="flex:1 1 auto;min-height:300px">当前图片<br>滚轮缩放 · 拖动平移</div>
+      <div class="row" data-v="1.1"><span class="muted">这一版的图</span><span class="th"></span><span class="th" style="box-shadow:0 0 0 2px var(--mark)"></span><span class="chip sm">设为头图</span></div>
+      <div class="row"><b style="font-weight:500">麦田-02</b><span class="muted">832 × 1216 · V5 · 28 步 · 引导 5 · Seed 1506844432</span></div>
+      <div class="row"><span class="chip sm on">已存入图片库</span><span class="chip sm">在文件夹中显示</span><span class="chip sm">复制图片</span><span class="muted">没有检测到 Vibe</span></div>
+      <span class="note">新增：生成参数一直可见；从外面打开的图在这里一键存入图片库</span>
+    </div>
+  </div>`;
+}
+
+function genbar() {
+  return `<div class="bar">
+    <span data-v="1.1" class="row"><span class="muted">Seed</span><span class="chip sm">随机</span><span class="muted">张数</span><span class="chip sm">1</span></span>
+    <span class="chip sm" data-v="1.2">更多参数</span>
+    <span class="sp"></span>
+    <span class="chip">复制 Prompt</span>
+    <span class="muted" data-v="1.1">预计 0 Anlas</span>
+    <span class="chip pri" data-v="1.1">生成</span>
+  </div>`;
+}
+
+function promptTabs(cur) {
+  return `<div class="col-h">
+    <span class="seg"><button class="${cur === 'p' ? 'on' : ''}">Prompt</button><button class="${cur === 'a' ? 'on' : ''}" data-v="1.2">参数</button><button data-v="1.2">参考</button></span>
+    <span class="sp"></span>
+    ${cur === 'p' ? '<span class="chip sm">搜索</span><span class="chip sm">对照 · 按分类</span><span class="chip sm">AI</span>' : ''}
+  </div>`;
+}
+
+function promptDoc() {
+  return `<div class="sec">
+      <div class="sec-h">基础 Prompt</div>
+      <div class="blk">
+        <div class="blk-h"><span class="kind">Tag 块</span>· 风格与画师 · 16 个<span class="sp"></span><span>存为常用 ${L('1.1')}</span></div>
+        <div class="tags">
+          <span class="tag">artist:konya_karasue 1.0<small>画师</small></span>
+          <span class="tag">artist:yoneyama_mai 1.3<small>画师</small></span>
+          <span class="tag">cinematic composition 2<small>电影感构图</small></span>
+          <span class="tag">flat color −2<small>平涂</small></span>
+          <span class="tag muted">＋ 输入中文或英文<small>Tag 提示</small></span>
+        </div>
+      </div>
+      <div class="blk">
+        <div class="blk-h"><span class="kind">段落</span>· 构图<span class="sp"></span><span>转为 Tag ${L('1.1')}</span></div>
+        <p class="prose">A vertical full illustration of Shu sitting peacefully in a golden wheat field under a clear pale blue sky. She occupies the center-right portion of the composition…</p>
+        <p class="prose">竖幅全身插画：黍安静地坐在金色麦田里，头顶是晴朗的淡蓝天空。她位于画面中间偏右…</p>
+      </div>
+      <div class="blk">
+        <div class="blk-h"><span class="kind">段落</span>· 主体</div>
+        <p class="prose">Shu is sitting casually among the wheat, with her body turned slightly toward the viewer…</p>
+        <p class="prose">黍随意地坐在麦子中间，身体略微转向观看者…</p>
+      </div>
+      <span class="muted">＋ 添加块</span>
+    </div>
+    <div class="sec">
+      <div class="sec-h">角色<span class="muted" style="font-weight:400">暂无 · 添加后可以分别写每个角色</span></div>
+    </div>
+    <div class="sec">
+      <div class="sec-h">排除内容<span class="muted" style="font-weight:400">预设 Heavy · 另有 12 个 Tag · 点击展开</span></div>
+    </div>`;
+}
+
+const VIEWS = {
+  wb: () => titlebar('wb') + `<div class="body">${versions()}${stage()}
+    <div class="col" style="width:500px">${promptTabs('p')}<div class="scroll">${promptDoc()}</div>${genbar()}</div></div>`,
+
+  params: () => titlebar('wb') + `<div class="body">${versions()}${stage()}
+    <div class="col" style="width:500px">${promptTabs('a')}<div class="scroll">
+      <div class="banner">参数取自原图，改过的会标出来；没有列出的 38 项原样保留</div>
+      <div class="sec"><div class="sec-h">画面</div><div class="kv"><span>尺寸</span><span class="row"><span class="chip sm on">竖 832×1216</span><span class="chip sm">横</span><span class="chip sm">方</span><span class="chip sm">自定义</span></span></div></div>
+      <div class="sec"><div class="sec-h">采样</div><div class="kv"><span>步数</span><span class="chip sm">28</span><span>引导强度</span><span class="chip sm">5</span><span>采样器</span><span class="chip sm">Euler Ancestral</span><span>引导重缩放</span><span class="chip sm">0</span></div></div>
+      <div class="sec"><div class="sec-h">提示词处理</div><div class="kv"><span>质量 Tag</span><span class="chip sm on">开</span><span>排除预设</span><span class="chip sm">Heavy</span></div></div>
+      <div class="sec"><div class="sec-h">角色位置</div><div class="ph" style="height:90px">5 × 5 的位置格，每个角色点一格</div></div>
+      <div class="sec"><div class="sec-h">原样保留的参数<span class="muted" style="font-weight:400">38 项 · 点击查看</span></div></div>
+      <span class="note">这一页的具体条目要等 V5 调研结果。原则已定：只把常用的列出来，其余原样带过去</span>
+    </div>${genbar()}</div></div>`,
+
+  ai: () => titlebar('wb') + `<div class="body">${versions()}${stage()}
+    <div class="col" style="width:500px">${promptTabs('p')}<div class="scroll">
+      <div class="banner"><span>AI 提案：拆分角色</span><span class="sp"></span><span class="chip sm">逐项查看</span><span class="chip sm">放弃</span><span class="chip sm pri">接受</span></div>
+      <div class="sec"><div class="sec-h">基础 Prompt</div>
+        <div class="blk"><div class="blk-h"><span class="kind">段落</span>· 构图</div><p class="prose">A vertical full illustration … She occupies the center-right portion of the composition…</p></div>
+        <div class="blk gone"><div class="blk-h"><span class="kind">段落</span>· 主体 · 移到"角色 1"</div><p class="prose">Shu has very long flowing pale blonde hair with white and light golden sections…</p></div>
+      </div>
+      <div class="sec"><div class="sec-h">角色 1 · 黍<span class="chip sm">位置 C3</span></div>
+        <div class="blk new"><div class="blk-h"><span class="kind">段落</span>· 外貌 · 新建</div><p class="prose">Shu has very long flowing pale blonde hair with white and light golden sections…</p></div>
+        <div class="tags"><span class="tag new">dragon girl<small>龙娘</small></span><span class="tag new">Shu (Arknights)<small>黍（明日方舟）</small></span></div>
+      </div>
+      <span class="note">AI 不直接改，只给出改动；显示方式和两个版本之间的差异相同</span>
+    </div>${genbar()}</div></div>`,
+
+  lib: () => titlebar('lib') + `<div class="body">
+    <div class="col" style="width:190px"><div class="side">
+      <div class="it on">全部图片<span>159</span></div>
+      <div class="it" data-v="1.1">生成记录<span>24</span></div>
+      <div class="lb">收藏集</div>
+      <div class="it">本周精选<span>4</span></div><div class="it">构图研究<span>5</span></div>
+      <div class="lb">智能收藏集</div>
+      <div class="it">最近 7 天<span>31</span></div><div class="it">V5<span>34</span></div>
+      <div class="sp" style="min-height:60px"></div>
+      <div class="it">回收站<span>2</span></div>
+    </div></div>
+    <div class="col" style="flex:1 1 0">
+      <div class="col-h"><span class="chip" style="flex:1">搜索文件名、Tag、译名或段落里的词</span><span class="chip">筛选</span><span class="chip">视图</span><span class="chip pri">导入</span></div>
+      <div class="scroll">
+        <div class="grid">
+          <div class="ph on"><span class="badge" data-v="1.1">3 版 · 6 张</span></div><div class="ph"><span class="badge">4 张</span></div><div class="ph"></div><div class="ph"></div><div class="ph"></div>
+          <div class="ph"></div><div class="ph"><span class="badge" data-v="1.1">2 版 · 2 张</span></div><div class="ph"></div><div class="ph"></div><div class="ph"></div>
+        </div>
+        <span class="muted">142 组 · 159 张</span>
+        <span class="note">排序、分组方式、缩略图大小收进"视图"。一个系列折叠成一摞</span>
+      </div>
+    </div>
+    <div class="col" style="width:330px">
+      <div class="scroll" style="padding-top:12px">
+        <div class="ph" style="height:200px">图片 2 / 6</div>
+        <div><b style="font-weight:500">麦田-02</b><br><span class="muted">832 × 1216 · V5 · 2026-10-11</span></div>
+        <div class="blk"><div class="blk-h"><span class="kind">Tag 块</span>· 风格与画师 · 16 个</div><div class="tags"><span class="tag">artist:konya_karasue 1.0</span><span class="tag">…</span></div></div>
+        <div class="blk"><div class="blk-h"><span class="kind">段落</span>· 构图</div><p class="prose">竖幅全身插画：黍安静地坐在金色麦田里…</p></div>
+        <span class="note">和工作台同一种显示方式，只读，带译文</span>
+      </div>
+      <div class="bar"><span class="chip sm">收藏集</span><span class="chip sm">重命名</span><span class="chip sm">删除</span><span class="sp"></span><span class="chip">复制 Prompt</span><span class="chip pri">在工作台打开</span></div>
+    </div></div>`,
+
+  assets: () => titlebar('assets') + `<div class="body">
+    <div class="col" style="width:190px"><div class="side">
+      <div class="it on">常用块<span>6</span></div>
+      <div class="it">角色<span>9</span></div>
+      <div class="it" data-v="1.2">Vibe<span>10</span></div>
+    </div></div>
+    <div class="col" style="flex:1 1 0">
+      <div class="col-h"><span class="chip" style="flex:1">搜索</span><span class="chip">新建</span></div>
+      <div class="scroll"><div class="cards">
+        <div class="card"><b style="font-weight:500">常用画师组合</b><span class="muted">Tag 块 · 风格与画师 · 16 个 · 用在 31 张图里</span><div class="tags"><span class="tag">artist:konya_karasue 1.0</span><span class="tag">…</span></div></div>
+        <div class="card"><b style="font-weight:500">电影感打光</b><span class="muted">Tag 块 · 风格 · 8 个</span></div>
+        <div class="card"><b style="font-weight:500">四格漫画页</b><span class="muted">段落 · 分镜 · Panel 1 到 4</span></div>
+      </div>
+      <span class="note">依据：你最近的 V5 图里，多张图开头的风格与画师块一模一样。存一次，以后一键插入</span></div>
+    </div></div>`,
+
+  set: () => titlebar('') + `<div class="body">
+    <div class="col" style="width:210px"><div class="side">
+      <div class="it">外观</div><div class="it">图片库</div>
+      <div class="it on" data-v="1.1">NovelAI 账号</div>
+      <div class="it">AI 服务</div><div class="it">翻译词典</div>
+      <div class="it" data-v="1.1">Agent 接入</div>
+      <div class="it">关于与更新</div>
+    </div></div>
+    <div class="col" style="flex:1 1 0"><div class="scroll" style="padding:20px 32px;max-width:720px">
+      <b style="font-weight:500;font-size:16px">NovelAI 账号 ${L('1.1')}</b>
+      <div class="setrow"><div>API Key<small>存在系统的安全存储里，软件不会以明文保存</small></div><span class="chip">已保存 · 更换</span></div>
+      <div class="setrow"><div>Anlas 余额<small>每次生成前都会显示这次要花多少</small></div><span class="chip">刷新</span></div>
+      <div class="setrow"><div>一次最多连续生成<small>请求一个接一个地发，可以随时取消</small></div><span class="chip">8 张</span></div>
+      <div class="setrow"><div>Agent 每天最多花费<small>超出后停下来等你确认</small></div><span class="chip">200 Anlas</span></div>
+      <div class="banner" style="margin-top:14px">这里是通过你自己的账号调用 NovelAI。是否符合它的服务条款，由你自行判断并承担。</div>
+    </div></div></div>`,
+};
+
+const NOTES = {
+  wb: ['一个标签是一个"系列"：一张原图，加上从它改出来的各个版本。没配置 API Key 时它就是一张图，左边的版本栏不出现。',
+       'Prompt 按"块"显示：Tag 块和现在一样是一组 Tag；段落块是整段文字，下面跟着整段译文。',
+       '原来顶部的四组切换合并成右上角一个"对照 · 按分类"菜单；区域变成文档里的小节标题；排除内容默认收起。',
+       '底部一条固定的操作栏：复制 Prompt 永远在；配置 Key 之后多出 Seed、张数和生成。'],
+  params: ['"更多参数"是右栏的第二个页签，不是另一个页面，生成栏和图片都还在原位。',
+           '只列出常用的几组，其余参数原样从原图带过去，可以展开查看。',
+           '这一页的具体内容等 V5 调研回来再定。'],
+  ai: ['AI 不做聊天框。它给出一份改动，绿色是新增、红色是移走，你接受、放弃，或者逐项挑。',
+       '这里演示的是"拆分角色"：把基础 Prompt 里描述角色的段落移出去，自动建成角色。'],
+  lib: ['左边是常驻侧栏：全部图片、收藏集、智能收藏集，回收站在最底下。',
+        '详情栏里的 Prompt 和工作台是同一种显示方式，并且可以直接复制，不用先进工作台。',
+        '生成出来的图自动进"生成记录"，同一个系列折叠成一摞。'],
+  assets: ['新增的入口，放可以反复使用的东西：常用块、角色、Vibe。',
+           '这一项还没有和你确认，是我根据你的图提出的建议。'],
+  set: ['新增两页："NovelAI 账号"和"Agent 接入"。原来的"Tag 缓存"改叫"翻译词典"。',
+        '连续生成和 Agent 花费都有上限，对应"请求串行、不做无人值守"的原则。'],
+};
+
+function seg(id, items, cur, key) {
+  const el = document.getElementById(id);
+  el.innerHTML = items.map(([k, t]) => `<button data-k="${k}" class="${k === cur ? 'on' : ''}">${t}</button>`).join('');
+  el.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; S[key] = b.dataset.k; render(); };
+}
+function render() {
+  document.body.dataset.stage = S.stage;
+  seg('pv-page', PAGES, S.page, 'page');
+  seg('pv-stage', STAGES, S.stage, 'stage');
+  document.getElementById('win').innerHTML = VIEWS[S.page]();
+  document.getElementById('pv-notes').innerHTML = `<h4>这一页的要点（讨论用，不是产品文案）</h4><ul>${NOTES[S.page].map((n) => `<li>${n}</li>`).join('')}</ul>`;
+}
+render();
+</script>
+</body>
+</html>
