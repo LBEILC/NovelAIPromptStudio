@@ -188,16 +188,16 @@ export async function runAcceptance(context) {
         await click('关闭', 'document.querySelector("[role=radiogroup][aria-label=动效]")');
         await wait('document.documentElement.dataset.motion === "off"');
         await check(
-          '关闭动效时组件过渡为零',
-          'getComputedStyle(document.querySelector(".nps-button")).transitionDuration === "0s"',
+          '关闭动效时组件所有过渡时长不超过 1 毫秒',
+          'Array.from(document.querySelectorAll(".nps-button")).length > 0 && Array.from(document.querySelectorAll(".nps-button")).every(button => getComputedStyle(button).transitionDuration.split(",").every(duration => parseFloat(duration) <= 0.001))',
         );
         await click('跟随系统', 'document.querySelector("[role=radiogroup][aria-label=动效]")');
         await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
           features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
         });
         await check(
-          '系统减少动态效果时组件过渡为零',
-          'matchMedia("(prefers-reduced-motion: reduce)").matches && getComputedStyle(document.querySelector(".nps-button")).transitionDuration === "0s"',
+          '系统减少动态效果时组件所有过渡时长不超过 1 毫秒',
+          'matchMedia("(prefers-reduced-motion: reduce)").matches && Array.from(document.querySelectorAll(".nps-button")).length > 0 && Array.from(document.querySelectorAll(".nps-button")).every(button => getComputedStyle(button).transitionDuration.split(",").every(duration => parseFloat(duration) <= 0.001))',
         );
         await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
           features: [],

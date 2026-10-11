@@ -89,11 +89,9 @@ export async function componentDetails(h) {
   );
   await key('ArrowLeft');
   await check('菜单左方向键返回父菜单', 'document.activeElement.textContent.trim()==="移动到"');
-  // TODO(design): 009 says menus trap Tab, while the accepted 004 component
-  // explicitly closes a menu on Tab. Preserve 004 behavior pending reconciliation.
   await key('Tab');
   await check(
-    '现有菜单 Tab 关闭并归还焦点（004 既有规则）',
+    '菜单 Tab 关闭并归还焦点',
     'document.activeElement.textContent.trim()==="右键菜单" && !document.querySelector(".nps-layer [role=menu]")',
   );
   await e('document.querySelector(".nps-menu-trigger[tabindex]").focus()');
