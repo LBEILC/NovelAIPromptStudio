@@ -307,8 +307,8 @@ const VIEWS = {
       <b style="font-weight:500;font-size:16px">NovelAI 账号 ${L('1.1')}</b>
       <div class="setrow"><div>API Key<small>存在系统的安全存储里，软件不会以明文保存</small></div><span class="chip">已保存 · 更换</span></div>
       <div class="setrow"><div>Anlas 余额<small>每次生成前都会显示这次要花多少</small></div><span class="chip">刷新</span></div>
-      <div class="setrow"><div>一次最多连续生成<small>请求一个接一个地发，可以随时取消</small></div><span class="chip">8 张</span></div>
-      <div class="setrow"><div>Agent 每天最多花费<small>超出后停下来等你确认</small></div><span class="chip">200 Anlas</span></div>
+      <div class="setrow"><div>无人值守连续生成<small>默认关闭。请求仍然一个接一个地发；打开时会先说明风险</small></div><span class="chip">关</span></div>
+      <div class="setrow"><div>Agent 花费上限<small>默认不启用。可以设置单次和单日最多花多少 Anlas</small></div><span class="chip">未启用</span></div>
       <div class="banner" style="margin-top:14px">这里是通过你自己的账号调用 NovelAI。是否符合它的服务条款，由你自行判断并承担。</div>
     </div></div></div>`,
 };
@@ -329,7 +329,7 @@ const NOTES = {
   assets: ['新增的入口，放可以反复使用的东西：常用块、角色、Vibe。',
            '这一项还没有和你确认，是我根据你的图提出的建议。'],
   set: ['新增两页："NovelAI 账号"和"Agent 接入"。原来的"Tag 缓存"改叫"翻译词典"。',
-        '连续生成和 Agent 花费都有上限，对应"请求串行、不做无人值守"的原则。'],
+        '无人值守连续生成和 Agent 花费上限都由用户自己决定开不开，默认都是关的；打开无人值守时提示一次风险。'],
 };
 
 function seg(id, items, cur, key) {
