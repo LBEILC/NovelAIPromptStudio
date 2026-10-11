@@ -28,7 +28,7 @@
 
 - 生成工具的字库不含中文字体。三套方案对比时，中文覆盖是单独用 MiSans 验证的。
 - 手册的 PDF 里，MiSans 是以轮廓形式嵌入的（工具报告的 `pdf-type3-font`），不影响阅读。
-- 字标里写的是全名 "NovelAI Prompt Studio"，NovelAI 是第三方的商标。是否在字标里只写 "Prompt Studio"，待用户决定。
+- 字标里写的是全名 "NovelAI Prompt Studio"（用户 2026-10-11 确认保留）。NovelAI 是第三方的商标，产品的"关于"页和 README 要写明这是非官方工具。
 
 ## 怎么重新生成
 
