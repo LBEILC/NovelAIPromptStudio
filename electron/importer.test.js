@@ -5,8 +5,8 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import sharp from 'sharp';
 import yazl from 'yazl';
-import { afterEach, describe, expect, it } from 'vitest';
-import { openDatabase } from './database.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { openDatabase as openActualDatabase } from './database.js';
 import {
   decodeZipEntryFileName,
   generateZipEntryPreviews,
@@ -16,9 +16,16 @@ import {
   validateZipImageEntry,
 } from './importer.js';
 
+const connections = [];
+async function openDatabase(directory) {
+  const database = await openActualDatabase(directory);
+  connections.push(database);
+  return database;
+}
 const temporaryDirectories = [];
 
 afterEach(() => {
+  for (const database of connections.splice(0)) database.close();
   for (const directory of temporaryDirectories.splice(0))
     fs.rmSync(directory, { recursive: true, force: true, maxRetries: 4, retryDelay: 50 });
 });
@@ -208,6 +215,67 @@ describe('safe ZIP import', () => {
       file: 'mixed.zip / fake.png',
       error: expect.stringContaining('文件签名'),
     });
+  });
+
+  it('batches real image imports and keeps successful images around a database failure', async () => {
+    const directory = temporaryWorkspace();
+    const filePaths = [];
+    for (let index = 0; index < 30; index++) {
+      const file = path.join(directory, `${index}.png`);
+      fs.writeFileSync(file, await pngBuffer({ r: index, g: 80, b: 150, alpha: 1 }));
+      filePaths.push(file);
+    }
+    const database = await openDatabase(path.join(directory, 'data'));
+    const insert = vi.spyOn(database, 'insertProjects');
+    let prepared = 0;
+    const result = await importLibraryFiles({
+      filePaths,
+      assetsDirectory: path.join(directory, 'assets'),
+      database,
+      prepareProject: async (project) =>
+        ++prepared === 13
+          ? {
+              ...project,
+              tags: [
+                { id: 'duplicate', tag: 'first' },
+                { id: 'duplicate', tag: 'second' },
+              ],
+            }
+          : project,
+    });
+    expect(insert.mock.calls.map(([batch]) => batch.length)).toEqual([25, 5]);
+    expect(result.summary).toMatchObject({ processed: 30, imported: 29, failed: 1 });
+    expect(result.errors[0].file).toBe('12.png');
+    database.close();
+    expect((await openDatabase(path.join(directory, 'data'))).loadLibrary()).toHaveLength(29);
+  });
+
+  it('commits the prepared partial chunk when cancellation arrives between images', async () => {
+    const directory = temporaryWorkspace();
+    const filePaths = [];
+    for (let index = 0; index < 4; index++) {
+      const file = path.join(directory, `${index}.png`);
+      fs.writeFileSync(file, await pngBuffer({ r: index, g: 80, b: 150, alpha: 1 }));
+      filePaths.push(file);
+    }
+    const database = await openDatabase(path.join(directory, 'data'));
+    const controller = new AbortController();
+    const result = await importLibraryFiles({
+      filePaths,
+      assetsDirectory: path.join(directory, 'assets'),
+      database,
+      signal: controller.signal,
+      onProgress: (progress) => {
+        if (progress.phase === 'importing' && progress.processed === 3) controller.abort();
+      },
+    });
+    expect(result.summary).toMatchObject({
+      processed: 3,
+      imported: 3,
+      remaining: 1,
+      cancelled: true,
+    });
+    expect(database.loadLibrary()).toHaveLength(3);
   });
 
   it('can stop before starting another import item', async () => {

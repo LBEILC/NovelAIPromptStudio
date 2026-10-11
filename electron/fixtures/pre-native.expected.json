@@ -1,0 +1,799 @@
+{
+  "library": [
+    {
+      "id": "image-0",
+      "name": "Synthetic 0",
+      "image_path": "0.png",
+      "thumbnail_path": "0.webp",
+      "content_hash": "",
+      "prompt_fingerprint": "{\"base\":{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]},\"useCoords\":false,\"useOrder\":true,\"characters\":[]}",
+      "base_prompt_fingerprint": "{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]}",
+      "vibe_fingerprint": "",
+      "exact_group_fingerprint": "{\"version\":1,\"promptScope\":\"full\",\"prompt\":\"{\\\"base\\\":{\\\"prompt\\\":[{\\\"tag\\\":\\\"girl\\\",\\\"weight\\\":1,\\\"raw\\\":\\\"\\\",\\\"braceDepth\\\":0,\\\"braceGroup\\\":\\\"\\\",\\\"trailingComma\\\":false}],\\\"undesired\\\":[]},\\\"useCoords\\\":false,\\\"useOrder\\\":true,\\\"characters\\\":[]}\",\"model\":\"nai-v4\",\"vibe\":\"\"}",
+      "is_favorite": 0,
+      "deleted_at": "",
+      "created_at": "2026-01-01",
+      "updated_at": "2026-01-01",
+      "tags": [
+        {
+          "id": "tag-0",
+          "project_id": "image-0",
+          "tag": "girl",
+          "translation": "女孩",
+          "category": "Subject",
+          "weight": 1,
+          "position": 0,
+          "note": "",
+          "raw_segment": "",
+          "syntax_issue": "",
+          "brace_depth": 0,
+          "brace_group": "",
+          "brace_trailing_comma": 0,
+          "translation_source": "manual"
+        }
+      ],
+      "metadata": {
+        "project_id": "image-0",
+        "prompt_raw": "",
+        "negative_prompt": "",
+        "prompt_structure_json": "{}",
+        "model": "nai-v4",
+        "seed": "",
+        "steps": null,
+        "sampler": "",
+        "guidance": null,
+        "width": 0,
+        "height": 0,
+        "generation_mode": "unknown",
+        "extra_json": "{}"
+      },
+      "prompt_structure": {
+        "base_undesired_tags": [],
+        "characters": []
+      },
+      "group_cover_id": ""
+    },
+    {
+      "id": "image-1",
+      "name": "Synthetic 1",
+      "image_path": "1.png",
+      "thumbnail_path": "1.webp",
+      "content_hash": "",
+      "prompt_fingerprint": "{\"base\":{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]},\"useCoords\":false,\"useOrder\":true,\"characters\":[]}",
+      "base_prompt_fingerprint": "{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]}",
+      "vibe_fingerprint": "",
+      "exact_group_fingerprint": "{\"version\":1,\"promptScope\":\"full\",\"prompt\":\"{\\\"base\\\":{\\\"prompt\\\":[{\\\"tag\\\":\\\"girl\\\",\\\"weight\\\":1,\\\"raw\\\":\\\"\\\",\\\"braceDepth\\\":0,\\\"braceGroup\\\":\\\"\\\",\\\"trailingComma\\\":false}],\\\"undesired\\\":[]},\\\"useCoords\\\":false,\\\"useOrder\\\":true,\\\"characters\\\":[]}\",\"model\":\"nai-v4\",\"vibe\":\"\"}",
+      "is_favorite": 0,
+      "deleted_at": "",
+      "created_at": "2026-01-01",
+      "updated_at": "2026-01-01",
+      "tags": [
+        {
+          "id": "tag-1",
+          "project_id": "image-1",
+          "tag": "girl",
+          "translation": "女孩",
+          "category": "Subject",
+          "weight": 1,
+          "position": 0,
+          "note": "",
+          "raw_segment": "",
+          "syntax_issue": "",
+          "brace_depth": 0,
+          "brace_group": "",
+          "brace_trailing_comma": 0,
+          "translation_source": "manual"
+        }
+      ],
+      "metadata": {
+        "project_id": "image-1",
+        "prompt_raw": "",
+        "negative_prompt": "",
+        "prompt_structure_json": "{}",
+        "model": "nai-v4",
+        "seed": "",
+        "steps": null,
+        "sampler": "",
+        "guidance": null,
+        "width": 0,
+        "height": 0,
+        "generation_mode": "unknown",
+        "extra_json": "{}"
+      },
+      "prompt_structure": {
+        "base_undesired_tags": [],
+        "characters": []
+      },
+      "group_cover_id": ""
+    }
+  ],
+  "trash": [
+    {
+      "id": "image-2",
+      "name": "Synthetic 2",
+      "image_path": "2.png",
+      "thumbnail_path": "2.webp",
+      "content_hash": "",
+      "prompt_fingerprint": "{\"base\":{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]},\"useCoords\":false,\"useOrder\":true,\"characters\":[]}",
+      "base_prompt_fingerprint": "{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]}",
+      "vibe_fingerprint": "",
+      "exact_group_fingerprint": "{\"version\":1,\"promptScope\":\"full\",\"prompt\":\"{\\\"base\\\":{\\\"prompt\\\":[{\\\"tag\\\":\\\"girl\\\",\\\"weight\\\":1,\\\"raw\\\":\\\"\\\",\\\"braceDepth\\\":0,\\\"braceGroup\\\":\\\"\\\",\\\"trailingComma\\\":false}],\\\"undesired\\\":[]},\\\"useCoords\\\":false,\\\"useOrder\\\":true,\\\"characters\\\":[]}\",\"model\":\"nai-v4\",\"vibe\":\"\"}",
+      "is_favorite": 0,
+      "deleted_at": "2026-10-11T06:29:21.616Z",
+      "created_at": "2026-01-01",
+      "updated_at": "2026-10-11T06:29:21.616Z",
+      "tags": [
+        {
+          "id": "tag-2",
+          "project_id": "image-2",
+          "tag": "girl",
+          "translation": "女孩",
+          "category": "Subject",
+          "weight": 1,
+          "position": 0,
+          "note": "",
+          "raw_segment": "",
+          "syntax_issue": "",
+          "brace_depth": 0,
+          "brace_group": "",
+          "brace_trailing_comma": 0,
+          "translation_source": "manual"
+        }
+      ],
+      "metadata": {
+        "project_id": "image-2",
+        "prompt_raw": "",
+        "negative_prompt": "",
+        "prompt_structure_json": "{}",
+        "model": "nai-v4",
+        "seed": "",
+        "steps": null,
+        "sampler": "",
+        "guidance": null,
+        "width": 0,
+        "height": 0,
+        "generation_mode": "unknown",
+        "extra_json": "{}"
+      },
+      "prompt_structure": {
+        "base_undesired_tags": [],
+        "characters": []
+      },
+      "group_cover_id": ""
+    }
+  ],
+  "tables": {
+    "app_meta": [
+      {
+        "key": "gallery_favorites_collection_v1",
+        "value": "complete"
+      },
+      {
+        "key": "runtime_schema",
+        "value": "phase2-core"
+      }
+    ],
+    "branch_recipes": [
+      {
+        "id": "synthetic-0",
+        "source_project_id": "image-0",
+        "parent_branch_id": null,
+        "name": "synthetic-0",
+        "status": "synthetic-0",
+        "snapshot_json": "{}",
+        "change_summary": "synthetic-0",
+        "created_at": "synthetic-0",
+        "updated_at": "synthetic-0"
+      },
+      {
+        "id": "synthetic-1",
+        "source_project_id": "image-1",
+        "parent_branch_id": null,
+        "name": "synthetic-1",
+        "status": "synthetic-1",
+        "snapshot_json": "{}",
+        "change_summary": "synthetic-1",
+        "created_at": "synthetic-1",
+        "updated_at": "synthetic-1"
+      },
+      {
+        "id": "synthetic-2",
+        "source_project_id": "image-2",
+        "parent_branch_id": null,
+        "name": "synthetic-2",
+        "status": "synthetic-2",
+        "snapshot_json": "{}",
+        "change_summary": "synthetic-2",
+        "created_at": "synthetic-2",
+        "updated_at": "synthetic-2"
+      }
+    ],
+    "branch_results": [
+      {
+        "branch_id": "synthetic-0",
+        "project_id": "image-0",
+        "match_status": "synthetic-0",
+        "differences_json": "{}",
+        "details_json": "{}",
+        "actual_branch_id": "synthetic-0",
+        "linked_at": "synthetic-0"
+      },
+      {
+        "branch_id": "synthetic-1",
+        "project_id": "image-1",
+        "match_status": "synthetic-1",
+        "differences_json": "{}",
+        "details_json": "{}",
+        "actual_branch_id": "synthetic-1",
+        "linked_at": "synthetic-1"
+      },
+      {
+        "branch_id": "synthetic-2",
+        "project_id": "image-2",
+        "match_status": "synthetic-2",
+        "differences_json": "{}",
+        "details_json": "{}",
+        "actual_branch_id": "synthetic-2",
+        "linked_at": "synthetic-2"
+      }
+    ],
+    "collection_members": [
+      {
+        "collection_id": "synthetic-0",
+        "project_id": "image-0",
+        "position": 0,
+        "added_at": "synthetic-0"
+      },
+      {
+        "collection_id": "synthetic-1",
+        "project_id": "image-1",
+        "position": 1,
+        "added_at": "synthetic-1"
+      },
+      {
+        "collection_id": "synthetic-2",
+        "project_id": "image-2",
+        "position": 2,
+        "added_at": "synthetic-2"
+      }
+    ],
+    "collections": [
+      {
+        "id": "synthetic-0",
+        "name": "synthetic-0",
+        "color": "synthetic-0",
+        "created_at": "synthetic-0",
+        "updated_at": "synthetic-0"
+      },
+      {
+        "id": "synthetic-1",
+        "name": "synthetic-1",
+        "color": "synthetic-1",
+        "created_at": "synthetic-1",
+        "updated_at": "synthetic-1"
+      },
+      {
+        "id": "synthetic-2",
+        "name": "synthetic-2",
+        "color": "synthetic-2",
+        "created_at": "synthetic-2",
+        "updated_at": "synthetic-2"
+      }
+    ],
+    "danbooru_tag_cache": [
+      {
+        "tag": "girl",
+        "canonical_tag": "",
+        "category": -1,
+        "is_deprecated": 0,
+        "post_count": 0,
+        "checked_at": "2026-01-01"
+      }
+    ],
+    "experiment_members": [
+      {
+        "experiment_id": "synthetic-0",
+        "project_id": "image-0",
+        "position": 0,
+        "added_at": "synthetic-0"
+      },
+      {
+        "experiment_id": "synthetic-1",
+        "project_id": "image-1",
+        "position": 1,
+        "added_at": "synthetic-1"
+      },
+      {
+        "experiment_id": "synthetic-2",
+        "project_id": "image-2",
+        "position": 2,
+        "added_at": "synthetic-2"
+      }
+    ],
+    "experiments": [
+      {
+        "id": "synthetic-0",
+        "name": "synthetic-0",
+        "baseline_project_id": "image-0",
+        "analysis_status": "synthetic-0",
+        "fixed_fields_json": "{}",
+        "variable_fields_json": "{}",
+        "incomplete_fields_json": "{}",
+        "created_at": "synthetic-0",
+        "updated_at": "synthetic-0"
+      },
+      {
+        "id": "synthetic-1",
+        "name": "synthetic-1",
+        "baseline_project_id": "image-1",
+        "analysis_status": "synthetic-1",
+        "fixed_fields_json": "{}",
+        "variable_fields_json": "{}",
+        "incomplete_fields_json": "{}",
+        "created_at": "synthetic-1",
+        "updated_at": "synthetic-1"
+      },
+      {
+        "id": "synthetic-2",
+        "name": "synthetic-2",
+        "baseline_project_id": "image-2",
+        "analysis_status": "synthetic-2",
+        "fixed_fields_json": "{}",
+        "variable_fields_json": "{}",
+        "incomplete_fields_json": "{}",
+        "created_at": "synthetic-2",
+        "updated_at": "synthetic-2"
+      }
+    ],
+    "gallery_collection_projects": [
+      {
+        "collection_id": "manual",
+        "project_id": "image-0",
+        "created_at": "2026-10-11T06:29:21.613Z"
+      }
+    ],
+    "gallery_collections": [
+      {
+        "id": "manual",
+        "name": "Synthetic collection",
+        "kind": "manual",
+        "filter_json": "{}",
+        "created_at": "2026-10-11T06:29:21.603Z",
+        "updated_at": "2026-10-11T06:29:21.603Z"
+      },
+      {
+        "id": "default-gallery-collection",
+        "name": "默认收藏夹",
+        "kind": "manual",
+        "filter_json": "{}",
+        "created_at": "2026-10-11T06:29:21.608Z",
+        "updated_at": "2026-10-11T06:29:21.608Z"
+      }
+    ],
+    "generation_metadata": [
+      {
+        "project_id": "image-0",
+        "prompt_raw": "",
+        "negative_prompt": "",
+        "prompt_structure_json": "{}",
+        "model": "nai-v4",
+        "seed": "",
+        "steps": null,
+        "sampler": "",
+        "guidance": null,
+        "width": 0,
+        "height": 0,
+        "generation_mode": "unknown",
+        "extra_json": "{}"
+      },
+      {
+        "project_id": "image-1",
+        "prompt_raw": "",
+        "negative_prompt": "",
+        "prompt_structure_json": "{}",
+        "model": "nai-v4",
+        "seed": "",
+        "steps": null,
+        "sampler": "",
+        "guidance": null,
+        "width": 0,
+        "height": 0,
+        "generation_mode": "unknown",
+        "extra_json": "{}"
+      },
+      {
+        "project_id": "image-2",
+        "prompt_raw": "",
+        "negative_prompt": "",
+        "prompt_structure_json": "{}",
+        "model": "nai-v4",
+        "seed": "",
+        "steps": null,
+        "sampler": "",
+        "guidance": null,
+        "width": 0,
+        "height": 0,
+        "generation_mode": "unknown",
+        "extra_json": "{}"
+      },
+      {
+        "project_id": "orphan-0",
+        "prompt_raw": "",
+        "negative_prompt": "",
+        "prompt_structure_json": "{}",
+        "model": "",
+        "seed": "",
+        "steps": null,
+        "sampler": "",
+        "guidance": null,
+        "width": 0,
+        "height": 0,
+        "generation_mode": "unknown",
+        "extra_json": "{\"synthetic\":true}"
+      },
+      {
+        "project_id": "orphan-1",
+        "prompt_raw": "",
+        "negative_prompt": "",
+        "prompt_structure_json": "{}",
+        "model": "",
+        "seed": "",
+        "steps": null,
+        "sampler": "",
+        "guidance": null,
+        "width": 0,
+        "height": 0,
+        "generation_mode": "unknown",
+        "extra_json": "{\"synthetic\":true}"
+      },
+      {
+        "project_id": "orphan-2",
+        "prompt_raw": "",
+        "negative_prompt": "",
+        "prompt_structure_json": "{}",
+        "model": "",
+        "seed": "",
+        "steps": null,
+        "sampler": "",
+        "guidance": null,
+        "width": 0,
+        "height": 0,
+        "generation_mode": "unknown",
+        "extra_json": "{\"synthetic\":true}"
+      }
+    ],
+    "projects": [
+      {
+        "id": "image-0",
+        "name": "Synthetic 0",
+        "image_path": "0.png",
+        "thumbnail_path": "0.webp",
+        "content_hash": "",
+        "prompt_fingerprint": "{\"base\":{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]},\"useCoords\":false,\"useOrder\":true,\"characters\":[]}",
+        "base_prompt_fingerprint": "{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]}",
+        "vibe_fingerprint": "",
+        "exact_group_fingerprint": "{\"version\":1,\"promptScope\":\"full\",\"prompt\":\"{\\\"base\\\":{\\\"prompt\\\":[{\\\"tag\\\":\\\"girl\\\",\\\"weight\\\":1,\\\"raw\\\":\\\"\\\",\\\"braceDepth\\\":0,\\\"braceGroup\\\":\\\"\\\",\\\"trailingComma\\\":false}],\\\"undesired\\\":[]},\\\"useCoords\\\":false,\\\"useOrder\\\":true,\\\"characters\\\":[]}\",\"model\":\"nai-v4\",\"vibe\":\"\"}",
+        "is_favorite": 0,
+        "deleted_at": "",
+        "created_at": "2026-01-01",
+        "updated_at": "2026-01-01"
+      },
+      {
+        "id": "image-1",
+        "name": "Synthetic 1",
+        "image_path": "1.png",
+        "thumbnail_path": "1.webp",
+        "content_hash": "",
+        "prompt_fingerprint": "{\"base\":{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]},\"useCoords\":false,\"useOrder\":true,\"characters\":[]}",
+        "base_prompt_fingerprint": "{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]}",
+        "vibe_fingerprint": "",
+        "exact_group_fingerprint": "{\"version\":1,\"promptScope\":\"full\",\"prompt\":\"{\\\"base\\\":{\\\"prompt\\\":[{\\\"tag\\\":\\\"girl\\\",\\\"weight\\\":1,\\\"raw\\\":\\\"\\\",\\\"braceDepth\\\":0,\\\"braceGroup\\\":\\\"\\\",\\\"trailingComma\\\":false}],\\\"undesired\\\":[]},\\\"useCoords\\\":false,\\\"useOrder\\\":true,\\\"characters\\\":[]}\",\"model\":\"nai-v4\",\"vibe\":\"\"}",
+        "is_favorite": 0,
+        "deleted_at": "",
+        "created_at": "2026-01-01",
+        "updated_at": "2026-01-01"
+      },
+      {
+        "id": "image-2",
+        "name": "Synthetic 2",
+        "image_path": "2.png",
+        "thumbnail_path": "2.webp",
+        "content_hash": "",
+        "prompt_fingerprint": "{\"base\":{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]},\"useCoords\":false,\"useOrder\":true,\"characters\":[]}",
+        "base_prompt_fingerprint": "{\"prompt\":[{\"tag\":\"girl\",\"weight\":1,\"raw\":\"\",\"braceDepth\":0,\"braceGroup\":\"\",\"trailingComma\":false}],\"undesired\":[]}",
+        "vibe_fingerprint": "",
+        "exact_group_fingerprint": "{\"version\":1,\"promptScope\":\"full\",\"prompt\":\"{\\\"base\\\":{\\\"prompt\\\":[{\\\"tag\\\":\\\"girl\\\",\\\"weight\\\":1,\\\"raw\\\":\\\"\\\",\\\"braceDepth\\\":0,\\\"braceGroup\\\":\\\"\\\",\\\"trailingComma\\\":false}],\\\"undesired\\\":[]},\\\"useCoords\\\":false,\\\"useOrder\\\":true,\\\"characters\\\":[]}\",\"model\":\"nai-v4\",\"vibe\":\"\"}",
+        "is_favorite": 0,
+        "deleted_at": "2026-10-11T06:29:21.616Z",
+        "created_at": "2026-01-01",
+        "updated_at": "2026-10-11T06:29:21.616Z"
+      }
+    ],
+    "prompt_group_covers": [],
+    "prompt_tags": [
+      {
+        "id": "tag-0",
+        "project_id": "image-0",
+        "tag": "girl",
+        "translation": "",
+        "category": "Subject",
+        "weight": 1,
+        "position": 0,
+        "note": "",
+        "raw_segment": "",
+        "syntax_issue": "",
+        "brace_depth": 0,
+        "brace_group": "",
+        "brace_trailing_comma": 0
+      },
+      {
+        "id": "tag-1",
+        "project_id": "image-1",
+        "tag": "girl",
+        "translation": "",
+        "category": "Subject",
+        "weight": 1,
+        "position": 0,
+        "note": "",
+        "raw_segment": "",
+        "syntax_issue": "",
+        "brace_depth": 0,
+        "brace_group": "",
+        "brace_trailing_comma": 0
+      },
+      {
+        "id": "tag-2",
+        "project_id": "image-2",
+        "tag": "girl",
+        "translation": "",
+        "category": "Subject",
+        "weight": 1,
+        "position": 0,
+        "note": "",
+        "raw_segment": "",
+        "syntax_issue": "",
+        "brace_depth": 0,
+        "brace_group": "",
+        "brace_trailing_comma": 0
+      }
+    ],
+    "prompt_versions": [
+      {
+        "id": "synthetic-0",
+        "project_id": "image-0",
+        "label": "synthetic-0",
+        "prompt_text": "synthetic-0",
+        "snapshot_json": "{}",
+        "change_summary": "synthetic-0",
+        "image_path": "synthetic-0",
+        "created_at": "synthetic-0"
+      },
+      {
+        "id": "synthetic-1",
+        "project_id": "image-1",
+        "label": "synthetic-1",
+        "prompt_text": "synthetic-1",
+        "snapshot_json": "{}",
+        "change_summary": "synthetic-1",
+        "image_path": "synthetic-1",
+        "created_at": "synthetic-1"
+      },
+      {
+        "id": "synthetic-2",
+        "project_id": "image-2",
+        "label": "synthetic-2",
+        "prompt_text": "synthetic-2",
+        "snapshot_json": "{}",
+        "change_summary": "synthetic-2",
+        "image_path": "synthetic-2",
+        "created_at": "synthetic-2"
+      }
+    ],
+    "series": [
+      {
+        "id": "synthetic-0",
+        "name": "synthetic-0",
+        "color": "synthetic-0",
+        "created_at": "synthetic-0",
+        "updated_at": "synthetic-0"
+      },
+      {
+        "id": "synthetic-1",
+        "name": "synthetic-1",
+        "color": "synthetic-1",
+        "created_at": "synthetic-1",
+        "updated_at": "synthetic-1"
+      },
+      {
+        "id": "synthetic-2",
+        "name": "synthetic-2",
+        "color": "synthetic-2",
+        "created_at": "synthetic-2",
+        "updated_at": "synthetic-2"
+      }
+    ],
+    "series_members": [
+      {
+        "series_id": "synthetic-0",
+        "project_id": "image-0",
+        "position": 0,
+        "added_at": "synthetic-0"
+      },
+      {
+        "series_id": "synthetic-1",
+        "project_id": "image-1",
+        "position": 1,
+        "added_at": "synthetic-1"
+      },
+      {
+        "series_id": "synthetic-2",
+        "project_id": "image-2",
+        "position": 2,
+        "added_at": "synthetic-2"
+      }
+    ],
+    "tag_dictionary": [
+      {
+        "tag": "girl",
+        "display_tag": "girl",
+        "translation": "女孩",
+        "category": "Subject",
+        "has_translation": 1,
+        "has_classification": 1,
+        "translation_source": "manual",
+        "category_source": "",
+        "updated_at": "2026-10-11T06:29:21.620Z"
+      }
+    ],
+    "vibe_encoding_index": [
+      {
+        "fingerprint": "synthetic-0",
+        "library_id": "synthetic-0"
+      },
+      {
+        "fingerprint": "synthetic-1",
+        "library_id": "synthetic-1"
+      },
+      {
+        "fingerprint": "synthetic-2",
+        "library_id": "synthetic-2"
+      }
+    ],
+    "vibe_library": [
+      {
+        "id": "synthetic-0",
+        "name": "synthetic-0",
+        "source_kind": "synthetic-0",
+        "original_vibe_id": "synthetic-0",
+        "reference_image": "synthetic-0",
+        "vibe_file": "synthetic-0",
+        "thumbnail_path": "synthetic-0",
+        "model": "synthetic-0",
+        "strength": 0,
+        "information_extracted": 0,
+        "information_extracted_known": 0,
+        "information_extracted_source": "synthetic-0",
+        "encoded_values_json": "{}",
+        "encoding_variants_json": "{}",
+        "encoding_count": 0,
+        "has_source_image": 0,
+        "source_image_hash": "synthetic-0",
+        "category": "synthetic-0",
+        "archived_at": "synthetic-0",
+        "created_at": "synthetic-0"
+      },
+      {
+        "id": "synthetic-1",
+        "name": "synthetic-1",
+        "source_kind": "synthetic-1",
+        "original_vibe_id": "synthetic-1",
+        "reference_image": "synthetic-1",
+        "vibe_file": "synthetic-1",
+        "thumbnail_path": "synthetic-1",
+        "model": "synthetic-1",
+        "strength": 1,
+        "information_extracted": 1,
+        "information_extracted_known": 1,
+        "information_extracted_source": "synthetic-1",
+        "encoded_values_json": "{}",
+        "encoding_variants_json": "{}",
+        "encoding_count": 1,
+        "has_source_image": 1,
+        "source_image_hash": "synthetic-1",
+        "category": "synthetic-1",
+        "archived_at": "synthetic-1",
+        "created_at": "synthetic-1"
+      },
+      {
+        "id": "synthetic-2",
+        "name": "synthetic-2",
+        "source_kind": "synthetic-2",
+        "original_vibe_id": "synthetic-2",
+        "reference_image": "synthetic-2",
+        "vibe_file": "synthetic-2",
+        "thumbnail_path": "synthetic-2",
+        "model": "synthetic-2",
+        "strength": 2,
+        "information_extracted": 2,
+        "information_extracted_known": 2,
+        "information_extracted_source": "synthetic-2",
+        "encoded_values_json": "{}",
+        "encoding_variants_json": "{}",
+        "encoding_count": 2,
+        "has_source_image": 2,
+        "source_image_hash": "synthetic-2",
+        "category": "synthetic-2",
+        "archived_at": "synthetic-2",
+        "created_at": "synthetic-2"
+      }
+    ],
+    "vibe_transfers": [
+      {
+        "id": "synthetic-0",
+        "project_id": "image-0",
+        "library_id": "synthetic-0",
+        "name": "synthetic-0",
+        "source_kind": "synthetic-0",
+        "reference_image": "synthetic-0",
+        "vibe_file": "synthetic-0",
+        "thumbnail_path": "synthetic-0",
+        "model": "synthetic-0",
+        "strength": 0,
+        "information_extracted": 0,
+        "information_extracted_known": 0,
+        "information_extracted_source": "synthetic-0",
+        "information_extracted_dirty": 0,
+        "information_extracted_origin": 0,
+        "encoded_values_json": "{}",
+        "source_image_hash": "synthetic-0",
+        "has_source_image": 0,
+        "enabled": 0,
+        "position": 0
+      },
+      {
+        "id": "synthetic-1",
+        "project_id": "image-1",
+        "library_id": "synthetic-1",
+        "name": "synthetic-1",
+        "source_kind": "synthetic-1",
+        "reference_image": "synthetic-1",
+        "vibe_file": "synthetic-1",
+        "thumbnail_path": "synthetic-1",
+        "model": "synthetic-1",
+        "strength": 1,
+        "information_extracted": 1,
+        "information_extracted_known": 1,
+        "information_extracted_source": "synthetic-1",
+        "information_extracted_dirty": 1,
+        "information_extracted_origin": 1,
+        "encoded_values_json": "{}",
+        "source_image_hash": "synthetic-1",
+        "has_source_image": 1,
+        "enabled": 1,
+        "position": 1
+      },
+      {
+        "id": "synthetic-2",
+        "project_id": "image-2",
+        "library_id": "synthetic-2",
+        "name": "synthetic-2",
+        "source_kind": "synthetic-2",
+        "reference_image": "synthetic-2",
+        "vibe_file": "synthetic-2",
+        "thumbnail_path": "synthetic-2",
+        "model": "synthetic-2",
+        "strength": 2,
+        "information_extracted": 2,
+        "information_extracted_known": 2,
+        "information_extracted_source": "synthetic-2",
+        "information_extracted_dirty": 2,
+        "information_extracted_origin": 2,
+        "encoded_values_json": "{}",
+        "source_image_hash": "synthetic-2",
+        "has_source_image": 2,
+        "enabled": 2,
+        "position": 2
+      }
+    ]
+  }
+}

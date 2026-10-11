@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { openDatabase } from '../../electron/database.js';
-import { openNative, researchDatabase } from './adapters.mjs';
+import { DatabaseSync } from 'node:sqlite';
 
 const jsonOfSize = (bytes) => JSON.stringify({ padding: 'x'.repeat(bytes - 14) });
 
@@ -29,96 +29,101 @@ export function project(index) {
 }
 
 function query(raw, sql) {
-  const result = raw.exec(sql)[0];
-  return result
-    ? result.values.map((row) =>
-        Object.fromEntries(result.columns.map((name, i) => [name, row[i]])),
-      )
-    : [];
+  return raw.prepare(sql).all();
 }
 
-export async function seed(directory, count, progress = () => {}, kind = 'sql.js') {
+export async function seed(directory, count, progress = () => {}) {
   fs.mkdirSync(directory, { recursive: true });
-  // Establish the on-disk schema through the unmodified production entry point.
-  await openDatabase(directory);
-  const native =
-    kind === 'sql.js' ? null : await openNative(kind, path.join(directory, 'studio.sqlite'));
-  const api = await researchDatabase(directory, { seed: true, native });
-  for (let index = 0; index < count; index++) {
-    api.insertProject(project(index));
-    if (index % 100 === 0) progress(`seed:${index}/${count}`);
-  }
-  const raw = api.raw;
-  raw.run('PRAGMA foreign_keys=OFF');
-  progress('seed:orphan-metadata');
-  raw.run('BEGIN');
-  for (let index = 0; index < Math.round((count * 147) / 159); index++) {
-    const value = project(index);
-    raw.run(
-      'INSERT INTO generation_metadata (project_id, extra_json, prompt_structure_json) VALUES (?, ?, ?)',
-      [`orphan-${index}`, value.metadata.extra_json, JSON.stringify(value.prompt_structure)],
-    );
-    if (index % 100 === 0) {
-      progress(`seed:orphan-${index}`);
-      raw.run('COMMIT');
-      raw.run('BEGIN');
+  const api = await openDatabase(directory);
+  try {
+    for (let index = 0; index < count; index += 25) {
+      const results = api.insertProjects(
+        Array.from({ length: Math.min(25, count - index) }, (_, offset) => project(index + offset)),
+      );
+      if (results.some((result) => result.error)) throw Error('Fixture insert failed');
+      if (index % 100 === 0) progress(`seed:${index}/${count}`);
     }
+  } finally {
+    api.close();
   }
-  for (let index = 0; index < 2400; index++)
-    raw.run("INSERT OR IGNORE INTO tag_dictionary (tag, updated_at) VALUES (?, '')", [
-      `synthetic_${index}`,
-    ]);
-  for (let index = 0; index < 750; index++)
-    raw.run("INSERT INTO danbooru_tag_cache (tag, checked_at) VALUES (?, '')", [
-      `synthetic_${index}`,
-    ]);
-  raw.run(fs.readFileSync(new URL('./legacy-schema.sql', import.meta.url), 'utf8'));
-  const legacy = query(raw, "SELECT name FROM sqlite_master WHERE type='table'")
-    .map((row) => row.name)
-    .filter(
-      (name) =>
-        ![
-          'projects',
-          'prompt_tags',
-          'generation_metadata',
-          'tag_dictionary',
-          'danbooru_tag_cache',
-          'app_meta',
-        ].includes(name),
-    );
-  for (const table of legacy) {
-    const columns = query(raw, `PRAGMA table_info("${table}")`);
-    for (let index = 0; index < 3; index++) {
-      const values = columns.map((column) => {
-        if (column.name === 'kind') return 'manual';
-        if (column.name === 'parent_branch_id') return null;
-        if (column.name === 'project_id' || column.name.endsWith('_project_id'))
-          return `image-${index % count}`;
-        if (
-          ['collection_id', 'series_id', 'experiment_id', 'library_id', 'branch_id'].includes(
-            column.name,
+  const connection = new DatabaseSync(path.join(directory, 'studio.sqlite'));
+  const raw = {
+    prepare: (sql) => connection.prepare(sql),
+    run(sql, params) {
+      return params ? connection.prepare(sql).run(...params) : connection.exec(sql);
+    },
+  };
+  try {
+    raw.run('PRAGMA foreign_keys=OFF');
+    progress('seed:orphan-metadata');
+    raw.run('BEGIN');
+    for (let index = 0; index < Math.round((count * 147) / 159); index++) {
+      const value = project(index);
+      raw.run(
+        'INSERT INTO generation_metadata (project_id, extra_json, prompt_structure_json) VALUES (?, ?, ?)',
+        [`orphan-${index}`, value.metadata.extra_json, JSON.stringify(value.prompt_structure)],
+      );
+      if (index % 100 === 0) {
+        progress(`seed:orphan-${index}`);
+        raw.run('COMMIT');
+        raw.run('BEGIN');
+      }
+    }
+    for (let index = 0; index < 2400; index++)
+      raw.run("INSERT OR IGNORE INTO tag_dictionary (tag, updated_at) VALUES (?, '')", [
+        `synthetic_${index}`,
+      ]);
+    for (let index = 0; index < 750; index++)
+      raw.run("INSERT INTO danbooru_tag_cache (tag, checked_at) VALUES (?, '')", [
+        `synthetic_${index}`,
+      ]);
+    raw.run(fs.readFileSync(new URL('./legacy-schema.sql', import.meta.url), 'utf8'));
+    const legacy = query(raw, "SELECT name FROM sqlite_master WHERE type='table'")
+      .map((row) => row.name)
+      .filter(
+        (name) =>
+          ![
+            'projects',
+            'prompt_tags',
+            'generation_metadata',
+            'tag_dictionary',
+            'danbooru_tag_cache',
+            'app_meta',
+          ].includes(name),
+      );
+    for (const table of legacy) {
+      const columns = query(raw, `PRAGMA table_info("${table}")`);
+      for (let index = 0; index < 3; index++) {
+        const values = columns.map((column) => {
+          if (column.name === 'kind') return 'manual';
+          if (column.name === 'parent_branch_id') return null;
+          if (column.name === 'project_id' || column.name.endsWith('_project_id'))
+            return `image-${index % count}`;
+          if (
+            ['collection_id', 'series_id', 'experiment_id', 'library_id', 'branch_id'].includes(
+              column.name,
+            )
           )
-        )
-          return `id-${index}`;
-        if (column.name.endsWith('_json')) return JSON.stringify({ fixture: index });
-        if (column.type.includes('INT') || column.type.includes('REAL')) return index;
-        return `${column.name}-${index}`;
-      });
-      raw.run(`INSERT INTO "${table}" VALUES (${values.map(() => '?').join(',')})`, values);
+            return `id-${index}`;
+          if (column.name.endsWith('_json')) return JSON.stringify({ fixture: index });
+          if (column.type.includes('INT') || column.type.includes('REAL')) return index;
+          return `${column.name}-${index}`;
+        });
+        raw.run(`INSERT INTO "${table}" VALUES (${values.map(() => '?').join(',')})`, values);
+      }
     }
+    raw.run('COMMIT');
+    const snapshot =
+      count <= 10
+        ? Object.fromEntries(
+            query(raw, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").map(
+              ({ name }) => [name, query(raw, `SELECT * FROM "${name}" ORDER BY rowid`)],
+            ),
+          )
+        : null;
+    // The full snapshot is only needed by small compatibility fixtures.
+    return count <= 10 ? snapshot : null;
+  } finally {
+    connection.close();
   }
-  raw.run('COMMIT');
-  const snapshot =
-    count <= 10
-      ? Object.fromEntries(
-          query(raw, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").map(
-            ({ name }) => [name, query(raw, `SELECT * FROM "${name}" ORDER BY rowid`)],
-          ),
-        )
-      : null;
-  // The full snapshot is only needed by small compatibility fixtures.
-  progress('seed:export');
-  api.flush();
-  raw.close();
-  return count <= 10 ? snapshot : null;
 }

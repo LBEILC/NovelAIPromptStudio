@@ -36,7 +36,11 @@ import { applyWorkbenchLibraryDetails, readWorkbenchImage } from './workbench.js
 import { listSystemFonts } from './fonts.js';
 import { describeAssetDirectory, migrateAssetDirectory } from './libraryStorage.js';
 import { cleanupWorkbenchTemporaryImages, readClipboardImageSource } from './clipboardImages.js';
-import { checkForUpdates as checkReleaseUpdates, getUpdateCapabilities } from './updates.js';
+import {
+  checkForUpdates as checkReleaseUpdates,
+  getUpdateCapabilities,
+  installUpdateAfterClosingDatabase,
+} from './updates.js';
 import { configureAppProfile } from './appProfile.js';
 import {
   copyImageToClipboard,
@@ -51,7 +55,16 @@ import {
 const { autoUpdater } = electronUpdater;
 
 app.setName('NovelAI Prompt Studio');
-configureAppProfile(app);
+const databaseProbeOutput = process.argv
+  .find((argument) => argument.startsWith('--database-probe-output='))
+  ?.slice('--database-probe-output='.length);
+const databaseProbeDirectory = databaseProbeOutput
+  ? fs.mkdtempSync(path.join(os.tmpdir(), 'nai-database-probe-'))
+  : null;
+if (databaseProbeDirectory) {
+  app.setPath('userData', databaseProbeDirectory);
+  app.setPath('sessionData', databaseProbeDirectory);
+} else configureAppProfile(app);
 if (process.platform === 'win32') app.setAppUserModelId('studio.novelai.prompt');
 protocol.registerSchemesAsPrivileged([
   {
@@ -61,6 +74,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let database;
+let quitting = false;
 let assetsDirectory;
 let preferences;
 let contentBackfill = Promise.resolve();
@@ -157,6 +171,14 @@ function notifyUpdateState(patch = {}) {
   }
 }
 
+function reportDatabaseOpenError(dataDirectory, error) {
+  dialog.showErrorBox(
+    '无法升级图片库',
+    `应用已停止写入数据。请保留 ${path.join(dataDirectory, 'studio.pre-phase2.sqlite')}，并检查数据库后重试。\n\n${error instanceof Error ? error.message : String(error)}`,
+  );
+  app.quit();
+}
+
 function releaseNotesText(notes) {
   if (Array.isArray(notes))
     return notes
@@ -242,6 +264,19 @@ function batchSummary(results = {}) {
 }
 
 app.whenReady().then(async () => {
+  if (databaseProbeDirectory) {
+    try {
+      const { runDatabaseProbe } = await import('./databaseProbe.js');
+      await runDatabaseProbe(databaseProbeDirectory, databaseProbeOutput, app.isPackaged);
+      app.quit();
+    } catch (error) {
+      console.error(error);
+      app.exit(1);
+    } finally {
+      fs.rmSync(databaseProbeDirectory, { recursive: true, force: true });
+    }
+    return;
+  }
   if (process.platform === 'win32') Menu.setApplicationMenu(null);
   if (process.platform === 'darwin' && app.dock) app.dock.setIcon(appIconPath);
   const dataDirectory = path.join(app.getPath('userData'), 'data');
@@ -249,11 +284,7 @@ app.whenReady().then(async () => {
   try {
     database = await openDatabase(dataDirectory);
   } catch (error) {
-    dialog.showErrorBox(
-      '无法升级图片库',
-      `应用已停止写入数据。请保留 ${path.join(dataDirectory, 'studio.pre-phase2.sqlite')}，并检查数据库后重试。\n\n${error instanceof Error ? error.message : String(error)}`,
-    );
-    app.quit();
+    reportDatabaseOpenError(dataDirectory, error);
     return;
   }
   preferences = openPreferences(dataDirectory, safeStorage, { defaultAssetsDirectory });
@@ -1169,7 +1200,30 @@ app.whenReady().then(async () => {
     if (storageMigrationActive || activeImports.size || permanentDeletionActive)
       return { ok: false, error: '请等待导入、迁移或删除操作完成后再安装更新' };
     if (updateState.phase !== 'downloaded') return { ok: false, error: '更新尚未下载完成' };
-    setImmediate(() => autoUpdater.quitAndInstall(false, true));
+    setImmediate(() => {
+      try {
+        installUpdateAfterClosingDatabase(autoUpdater, database, async (error) => {
+          if (quitting) return;
+          try {
+            const reopened = await openDatabase(dataDirectory);
+            if (quitting) reopened.close();
+            else database = reopened;
+          } catch (databaseError) {
+            reportDatabaseOpenError(dataDirectory, databaseError);
+            return;
+          }
+          notifyUpdateState({
+            phase: 'error',
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      } catch (error) {
+        notifyUpdateState({
+          phase: 'error',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
     return { ok: true };
   });
   ipcMain.handle('updates:open-release', async (_event, releaseUrl) => {
@@ -1261,5 +1315,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 app.on('before-quit', () => {
+  quitting = true;
+  database?.close();
   for (const sessionId of preparedImports.keys()) releasePreparedImport(sessionId).catch(() => {});
 });

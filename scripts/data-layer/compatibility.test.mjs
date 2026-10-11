@@ -1,24 +1,12 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { DatabaseSync, backup } from 'node:sqlite';
+import { expect, it } from 'vitest';
 import { openDatabase } from '../../electron/database.js';
-import { openNative, researchDatabase } from './adapters.mjs';
 import { project, seed } from './fixture.mjs';
 
-const directories = [];
-const temporary = () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-sqlite-compat-'));
-  directories.push(directory);
-  return directory;
-};
-afterEach(() =>
-  directories
-    .splice(0)
-    .forEach((directory) => fs.rmSync(directory, { recursive: true, force: true })),
-);
-
-it('keeps the synthetic metadata distribution and tag count at the requested sizes', () => {
+it('keeps the synthetic metadata distribution and tag count at the baseline sizes', () => {
   const samples = Array.from({ length: 100 }, (_, index) => project(index));
   const extra = samples.map((item) => Buffer.byteLength(item.metadata.extra_json));
   const structure = samples.map((item) => Buffer.byteLength(JSON.stringify(item.prompt_structure)));
@@ -29,103 +17,82 @@ it('keeps the synthetic metadata distribution and tag count at the requested siz
   expect(Math.abs(structure.reduce((a, b) => a + b) / 100 - 21 * 1024)).toBeLessThan(1);
 });
 
-describe.each(['node:sqlite', 'better-sqlite3'])('%s compatibility', (kind) => {
-  it('closes and checkpoints a native fallback fixture before the baseline reads it', async () => {
-    const directory = temporary();
-    await seed(directory, 3, () => {}, kind);
-    expect(fs.existsSync(path.join(directory, 'studio.sqlite-wal'))).toBe(false);
-    const original = await openDatabase(directory);
+it('seeds through production, preserves all 21 tables and orphans, and reopens a single file', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-fixture-test-'));
+  let api;
+  try {
+    const snapshot = await seed(directory, 3);
+    expect(Object.keys(snapshot)).toHaveLength(21);
+    const before = new DatabaseSync(path.join(directory, 'studio.sqlite'));
+    try {
+      for (const [table, rows] of Object.entries(snapshot)) {
+        expect(rows.length, table).toBeGreaterThan(0);
+        expect(before.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all(), table).toEqual(
+          rows,
+        );
+      }
+    } finally {
+      before.close();
+    }
+    api = await openDatabase(directory);
     expect(
-      original
+      api
         .loadLibrary()
         .map((item) => item.id)
         .sort(),
     ).toEqual(['image-0', 'image-1', 'image-2']);
-  });
-  it('reads every current and retired table directly, preserving orphan metadata after WAL writes', async () => {
-    const directory = temporary();
-    const expected = await seed(directory, 3);
-    expect(Object.keys(expected)).toHaveLength(21);
-    const file = path.join(directory, 'studio.sqlite');
-    const db = await openNative(kind, file);
+    api.close();
+    const raw = new DatabaseSync(path.join(directory, 'studio.sqlite'));
     try {
-      expect(Object.values(db.prepare('PRAGMA integrity_check').get())).toEqual(['ok']);
+      expect(raw.prepare('PRAGMA integrity_check').get().integrity_check).toBe('ok');
       expect(
-        db
+        raw
           .prepare('PRAGMA foreign_key_check')
           .all()
           .map((row) => row.table),
       ).toEqual(['generation_metadata', 'generation_metadata', 'generation_metadata']);
-      for (const [table, rows] of Object.entries(expected)) {
-        expect(rows.length, table).toBeGreaterThan(0);
-        expect(db.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all(), table).toEqual(rows);
+      // Opening repairs legacy cover fingerprints; retired tables and orphans stay intact.
+      for (const [table, rows] of Object.entries(snapshot)) {
+        if (table === 'prompt_group_covers') {
+          expect(raw.prepare('SELECT * FROM prompt_group_covers').all()).toEqual([]);
+          continue;
+        }
+        expect(raw.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all(), table).toEqual(rows);
       }
-      expect(
-        db
-          .prepare("SELECT COUNT(*) n FROM generation_metadata WHERE project_id LIKE 'orphan-%'")
-          .get().n,
-      ).toBe(3);
-      db.exec("UPDATE app_meta SET value=value WHERE key='runtime_schema'");
-      expect(fs.existsSync(`${file}-wal`)).toBe(true);
-      expect(fs.existsSync(`${file}-shm`)).toBe(true);
     } finally {
-      db.close();
+      raw.close();
     }
-    const reopened = await openNative(kind, file);
-    try {
-      for (const [table, rows] of Object.entries(expected))
-        expect(reopened.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all()).toEqual(rows);
-    } finally {
-      reopened.close();
-    }
-  });
+    expect(fs.existsSync(path.join(directory, 'studio.sqlite-wal'))).toBe(false);
+  } finally {
+    api?.close();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
 
-  it('matches production loadLibrary and import/translation behavior for measured operations', async () => {
-    const directory = temporary();
-    const current = await openDatabase(directory);
-    current.insertProject(project(0));
-    const baseline = current.loadLibrary();
-    const candidateDirectory = temporary();
-    fs.copyFileSync(current.filePath, path.join(candidateDirectory, 'studio.sqlite'));
-    const db = await openNative(kind, path.join(candidateDirectory, 'studio.sqlite'));
+it('supports native rollback, prepared statements, FTS5 and online backup', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-features-test-'));
+  const db = new DatabaseSync(path.join(directory, 'features.sqlite'));
+  try {
+    db.exec('CREATE TABLE sample(id INTEGER PRIMARY KEY,value TEXT); BEGIN');
+    db.prepare('INSERT INTO sample VALUES (?,?)').run(1, 'before');
+    db.exec('ROLLBACK');
+    expect(db.prepare('SELECT count(*) n FROM sample').get().n).toBe(0);
+    db.exec(
+      "INSERT INTO sample VALUES(2,'after'); CREATE VIRTUAL TABLE search USING fts5(content); INSERT INTO search VALUES('sqlite research')",
+    );
+    expect(
+      db.prepare("SELECT content FROM search WHERE search MATCH 'research'").get().content,
+    ).toBe('sqlite research');
+    const destination = path.join(directory, 'backup.sqlite');
+    await backup(db, destination);
+    const restored = new DatabaseSync(destination);
     try {
-      const candidate = await researchDatabase(candidateDirectory, { native: db });
-      expect(candidate.loadLibrary()).toEqual(baseline);
-      for (const api of [current, candidate]) {
-        api.updateTagDictionary('synthetic_0', { translation: '测试' });
-        api.insertProject(project(1));
-      }
-      expect(candidate.loadLibrary()).toEqual(current.loadLibrary());
+      expect(restored.prepare('SELECT * FROM sample').all()).toEqual([{ id: 2, value: 'after' }]);
     } finally {
-      db.close();
+      restored.close();
     }
-  });
-
-  it('supports transactions, prepared statements, FTS5 and online backup', async () => {
-    const directory = temporary();
-    const db = await openNative(kind, path.join(directory, 'features.sqlite'));
-    try {
-      db.exec('CREATE TABLE sample (id INTEGER PRIMARY KEY, value TEXT); BEGIN');
-      db.prepare('INSERT INTO sample VALUES (?, ?)').run(1, 'before');
-      db.exec('ROLLBACK');
-      expect(db.prepare('SELECT COUNT(*) n FROM sample').get().n).toBe(0);
-      db.exec(
-        "BEGIN; INSERT INTO sample VALUES (2, 'after'); COMMIT; CREATE VIRTUAL TABLE search USING fts5(content); INSERT INTO search VALUES ('sqlite research')",
-      );
-      expect(
-        db.prepare("SELECT content FROM search WHERE search MATCH 'research'").get().content,
-      ).toBe('sqlite research');
-      const backup = path.join(directory, 'backup.sqlite');
-      if (kind === 'node:sqlite') await (await import('node:sqlite')).backup(db, backup);
-      else await db.backup(backup);
-      const restored = await openNative(kind, backup);
-      try {
-        expect(restored.prepare('SELECT * FROM sample').all()).toEqual([{ id: 2, value: 'after' }]);
-      } finally {
-        restored.close();
-      }
-    } finally {
-      db.close();
-    }
-  });
+  } finally {
+    db.close();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });

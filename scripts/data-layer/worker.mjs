@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { openDatabase } from '../../electron/database.js';
-import { openNative, researchDatabase } from './adapters.mjs';
 import { project, seed } from './fixture.mjs';
 
 const [mode, kind, directory, size] = process.argv.slice(2);
@@ -20,11 +19,7 @@ try {
     result.fileBytes = fs.statSync(path.join(directory, 'studio.sqlite')).size;
     progress('open');
     let start = performance.now();
-    const native =
-      kind === 'sql.js' ? null : await openNative(kind, path.join(directory, 'studio.sqlite'));
-    const api = native
-      ? await researchDatabase(directory, { native })
-      : await openDatabase(directory);
+    const api = await openDatabase(directory);
     result.openMs = performance.now() - start;
     result.fileBytes = fs.statSync(path.join(directory, 'studio.sqlite')).size;
     progress('loadLibrary');
@@ -49,7 +44,12 @@ try {
     result.writeMaxMs = sorted[6];
     progress('import100');
     start = performance.now();
-    for (let i = count; i < count + 100; i++) api.insertProject(project(i));
+    for (let i = count; i < count + 100; i += 25) {
+      const results = api.insertProjects(
+        Array.from({ length: 25 }, (_, offset) => project(i + offset)),
+      );
+      if (results.some((result) => result.error)) throw Error('Benchmark import failed');
+    }
     result.importMs = performance.now() - start;
     result.diskBytesAfterImport = ['', '-wal', '-shm'].reduce(
       (sum, suffix) =>
@@ -59,7 +59,7 @@ try {
           : 0),
       0,
     );
-    native?.close();
+    api.close();
   }
   result.peakRssBytes = process.resourceUsage().maxRSS * 1024;
   process.send?.({ result });

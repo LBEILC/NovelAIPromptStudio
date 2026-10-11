@@ -1,5 +1,51 @@
-import { describe, expect, it } from 'vitest';
-import { checkForUpdates, compareVersions, getUpdateCapabilities } from './updates.js';
+import { EventEmitter } from 'node:events';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  checkForUpdates,
+  compareVersions,
+  getUpdateCapabilities,
+  installUpdateAfterClosingDatabase,
+} from './updates.js';
+
+describe('database lifecycle during installation', () => {
+  it('closes before invoking the installer and forwards its arguments', () => {
+    const updater = new EventEmitter();
+    const close = vi.fn();
+    updater.quitAndInstall = vi.fn(() => expect(close).toHaveBeenCalledOnce());
+    installUpdateAfterClosingDatabase(updater, { close }, vi.fn());
+    expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
+  });
+
+  it('requests recovery only once if installation emits an error and throws', () => {
+    const updater = new EventEmitter();
+    const failure = Error('installer unavailable');
+    updater.quitAndInstall = () => {
+      updater.emit('error', failure);
+      throw failure;
+    };
+    const recover = vi.fn();
+    installUpdateAfterClosingDatabase(updater, { close: vi.fn() }, recover);
+    expect(recover).toHaveBeenCalledExactlyOnceWith(failure);
+    expect(updater.listenerCount('error')).toBe(0);
+  });
+
+  it('does not invoke the installer if closing the database fails', () => {
+    const updater = new EventEmitter();
+    updater.quitAndInstall = vi.fn();
+    expect(() =>
+      installUpdateAfterClosingDatabase(
+        updater,
+        {
+          close: () => {
+            throw Error('close failed');
+          },
+        },
+        vi.fn(),
+      ),
+    ).toThrow('close failed');
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
+  });
+});
 
 describe('release update checks', () => {
   it('uses automatic updates only where the packaged build can install them', () => {

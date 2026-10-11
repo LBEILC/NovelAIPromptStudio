@@ -2,10 +2,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { DEFAULT_GALLERY_COLLECTION_ID, openDatabase } from './database.js';
+import { DEFAULT_GALLERY_COLLECTION_ID, openDatabase as openActualDatabase } from './database.js';
 
+const connections = [];
+async function openDatabase(directory) {
+  const database = await openActualDatabase(directory);
+  connections.push(database);
+  return database;
+}
 const temporaryDirectories = [];
 afterEach(() => {
+  for (const database of connections.splice(0)) database.close();
   for (const directory of temporaryDirectories.splice(0))
     fs.rmSync(directory, { recursive: true, force: true });
 });

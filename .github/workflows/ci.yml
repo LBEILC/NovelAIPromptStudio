@@ -32,6 +32,7 @@ jobs:
       - run: npm ci
       - run: npm run format:check
       - run: npm run typecheck
+      # Includes database-native.test.js: fixed legacy fixture, atomic writes and crash recovery.
       - run: npm test
       - run: npm run build
       - run: npm run audit:ui

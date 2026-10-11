@@ -1,3 +1,22 @@
+// The installer may fail without quitting the app. Let the caller reopen its
+// database on failure, but never start the installer with an open connection.
+export function installUpdateAfterClosingDatabase(updater, database, onInstallError) {
+  database.close();
+  let handled = false;
+  const failed = (error) => {
+    if (handled) return;
+    handled = true;
+    updater.removeListener('error', failed);
+    onInstallError(error);
+  };
+  updater.once('error', failed);
+  try {
+    updater.quitAndInstall(false, true);
+  } catch (error) {
+    failed(error);
+  }
+}
+
 export function getUpdateCapabilities(platform, packaged, macAutomaticUpdates = false) {
   const automaticUpdates =
     Boolean(packaged) && (platform === 'win32' || (platform === 'darwin' && macAutomaticUpdates));

@@ -1,19 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import initSqlJs from 'sql.js';
+import { DatabaseSync } from 'node:sqlite';
 import { CATEGORY_OPTIONS, inferCategory, normalizeCategory } from '../src/lib/prompt.js';
 import { galleryProjectGroupingFingerprints } from '../src/lib/galleryGrouping.js';
 import { danbooruLookupName } from './danbooru.js';
 import { extractEmbeddedVibes, fingerprintVibes } from './vibes.js';
 
-const require = createRequire(import.meta.url);
 const TAG_CATEGORIES = new Set(CATEGORY_OPTIONS);
 export const DEFAULT_GALLERY_COLLECTION_ID = 'default-gallery-collection';
 const FAVORITES_COLLECTION_MIGRATION_KEY = 'gallery_favorites_collection_v1';
 
 const CORE_SCHEMA = `
-PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS projects (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -106,13 +103,6 @@ CREATE TABLE IF NOT EXISTS gallery_collection_projects (
 CREATE INDEX IF NOT EXISTS idx_gallery_collection_projects_project ON gallery_collection_projects(project_id);
 `;
 
-function rows(statement) {
-  const output = [];
-  while (statement.step()) output.push(statement.getAsObject());
-  statement.free();
-  return output;
-}
-
 function safeJson(value, fallback = {}) {
   try {
     const parsed = JSON.parse(value || '');
@@ -141,7 +131,10 @@ function projectTags(project) {
 }
 
 function tableColumns(database, table) {
-  return database.exec(`PRAGMA table_info(${table})`)[0]?.values.map((row) => row[1]) || [];
+  return database
+    .prepare(`PRAGMA table_info(${table})`)
+    .all()
+    .map((row) => row.name);
 }
 
 function ensureColumn(database, table, columns, name, definition) {
@@ -156,11 +149,88 @@ export async function openDatabase(dataDirectory) {
   if (fs.existsSync(filePath) && !fs.existsSync(backupPath))
     fs.copyFileSync(filePath, backupPath, fs.constants.COPYFILE_EXCL);
 
-  const wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm');
-  const SQL = await initSqlJs({ locateFile: () => wasmPath });
-  const database = fs.existsSync(filePath)
-    ? new SQL.Database(fs.readFileSync(filePath))
-    : new SQL.Database();
+  const engineBackupPath = path.join(dataDirectory, 'studio.pre-node-sqlite.sqlite');
+  if (fs.existsSync(filePath) && !fs.existsSync(engineBackupPath)) {
+    // Never open the original if its first native-engine backup cannot be completed.
+    const temporaryBackup = `${engineBackupPath}.${process.pid}.tmp`;
+    try {
+      fs.copyFileSync(filePath, temporaryBackup, fs.constants.COPYFILE_EXCL);
+      const handle = fs.openSync(temporaryBackup, 'r+');
+      try {
+        fs.fsyncSync(handle);
+      } finally {
+        fs.closeSync(handle);
+      }
+      // Publish the completed copy without overwriting another process's backup.
+      // This links the temporary COPY, never the live database, then removes its old name.
+      fs.linkSync(temporaryBackup, engineBackupPath);
+      fs.unlinkSync(temporaryBackup);
+    } catch (error) {
+      fs.rmSync(temporaryBackup, { force: true });
+      throw error;
+    }
+  }
+  // The previous engine's export/reopen reset foreign_keys to OFF. Enabling native
+  // cascades here would delete historical rows in retired tables on project removal.
+  const connection = new DatabaseSync(filePath, { enableForeignKeyConstraints: false });
+  try {
+    return initializeDatabase(connection, filePath, backupPath, engineBackupPath);
+  } catch (error) {
+    connection.close();
+    throw error;
+  }
+}
+
+function initializeDatabase(connection, filePath, backupPath, engineBackupPath) {
+  const transactions = [];
+  let sequence = 0;
+  let closed = false;
+  const begin = () => {
+    const name = `operation_${sequence++}`;
+    connection.exec(`SAVEPOINT ${name}`);
+    transactions.push(name);
+  };
+  const commit = () => {
+    connection.exec(`RELEASE ${transactions.at(-1)}`);
+    transactions.pop();
+  };
+  const rollback = () => {
+    const name = transactions.pop();
+    connection.exec(`ROLLBACK TO ${name}; RELEASE ${name}`);
+  };
+  const atomic =
+    (operation) =>
+    (...args) => {
+      begin();
+      try {
+        const result = operation(...args);
+        commit();
+        return result;
+      } catch (error) {
+        rollback();
+        throw error;
+      }
+    };
+  const database = {
+    prepare: (sql) => connection.prepare(sql),
+    run(sql, params) {
+      if (sql === 'BEGIN') return begin();
+      if (sql === 'COMMIT') return commit();
+      if (sql === 'ROLLBACK') return rollback();
+      if (params) return connection.prepare(sql).run(params);
+      connection.exec(sql);
+    },
+  };
+  const close = () => {
+    if (closed) return;
+    connection.close();
+    closed = true;
+  };
+  // EXTRA also syncs the directory after deleting a rollback journal. No WAL sidecars.
+  connection.exec(
+    'PRAGMA journal_mode=DELETE; PRAGMA synchronous=EXTRA; PRAGMA fullfsync=ON; PRAGMA foreign_keys=OFF',
+  );
+  begin();
   database.run(CORE_SCHEMA);
 
   const projectColumns = tableColumns(database, 'projects');
@@ -288,15 +358,19 @@ export async function openDatabase(dataDirectory) {
     "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('runtime_schema', 'phase2-core')",
   );
 
-  const persist = () => {
-    const temporaryPath = `${filePath}.tmp`;
-    fs.writeFileSync(temporaryPath, Buffer.from(database.export()));
-    fs.renameSync(temporaryPath, filePath);
-  };
+  // Writes commit before their public API returns. Kept for existing callers.
+  const persist = () => {};
   const query = (sql, params = {}) => {
     const statement = database.prepare(sql);
-    statement.bind(params);
-    return rows(statement);
+    // Preserve the previous Number-valued API even for legacy 64-bit integers;
+    // the native default would throw when an integer exceeds Number's safe range.
+    statement.setReadBigInts(true);
+    return statement.all(params).map((row) => {
+      const result = { ...row };
+      for (const key of Object.keys(result))
+        if (typeof result[key] === 'bigint') result[key] = Number(result[key]);
+      return result;
+    });
   };
 
   const lookupTagDictionary = (tags = []) => {
@@ -1213,41 +1287,53 @@ export async function openDatabase(dataDirectory) {
     );
 
   backfillPromptFingerprints();
-  persist();
+  commit();
   return {
     loadLibrary,
     loadProject,
-    listCollections,
-    migrateLegacyFavorites,
-    createCollection,
-    updateCollection,
-    deleteCollection,
-    updateCollectionProjects,
+    listCollections: atomic(listCollections),
+    migrateLegacyFavorites: atomic(migrateLegacyFavorites),
+    createCollection: atomic(createCollection),
+    updateCollection: atomic(updateCollection),
+    deleteCollection: atomic(deleteCollection),
+    updateCollectionProjects: atomic(updateCollectionProjects),
     findProjectByContentHash,
     projectHashCandidates,
     projectDimensionCandidates,
-    setProjectContentHashes,
-    setProjectDimensions,
-    relocateAssetPaths,
+    setProjectContentHashes: atomic(setProjectContentHashes),
+    setProjectDimensions: atomic(setProjectDimensions),
+    relocateAssetPaths: atomic(relocateAssetPaths),
     lookupTagDictionary,
     lookupDanbooruTagCache,
-    upsertTagDictionary,
-    upsertDanbooruTagCache,
-    updateTagDictionary,
+    upsertTagDictionary: atomic(upsertTagDictionary),
+    upsertDanbooruTagCache: atomic(upsertDanbooruTagCache),
+    updateTagDictionary: atomic(updateTagDictionary),
     listTagDictionary,
-    deleteTagDictionary,
-    updateTagDictionaryCategory,
-    deleteTagDictionaries,
+    deleteTagDictionary: atomic(deleteTagDictionary),
+    updateTagDictionaryCategory: atomic(updateTagDictionaryCategory),
+    deleteTagDictionaries: atomic(deleteTagDictionaries),
     enrichProjectTags,
-    insertProject,
-    deleteProject,
-    updateProjectName,
-    updateProjects,
-    setGroupCover,
+    insertProject: atomic(insertProject),
+    deleteProject: atomic(deleteProject),
+    updateProjectName: atomic(updateProjectName),
+    updateProjects: atomic(updateProjects),
+    setGroupCover: atomic(setGroupCover),
     loadTrashSummary,
-    backfillPromptFingerprints,
+    backfillPromptFingerprints: atomic(backfillPromptFingerprints),
+    // One synchronous chunk, with an independent savepoint for each image.
+    insertProjects: atomic((projects) =>
+      projects.map((project) => {
+        try {
+          return { project: atomic(insertProject)(project) };
+        } catch (error) {
+          return { error: error instanceof Error ? error.message : String(error) };
+        }
+      }),
+    ),
+    close,
     persist,
     filePath,
     backupPath,
+    engineBackupPath,
   };
 }

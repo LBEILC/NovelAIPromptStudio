@@ -37,7 +37,6 @@
     "rehype-sanitize": "6.0.0",
     "remark-gfm": "4.0.1",
     "sharp": "0.35.3",
-    "sql.js": "1.14.1",
     "yauzl": "3.4.0"
   },
   "devDependencies": {
@@ -54,7 +53,6 @@
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "6.0.3",
-    "better-sqlite3": "13.0.3",
     "concurrently": "9.2.4",
     "dayjs": "1.11.21",
     "electron": "43.1.1",
@@ -82,6 +80,7 @@
       "electron/**/*",
       "src/lib/**/*",
       "!electron/**/*.test.js",
+      "!electron/fixtures/**/*",
       "!src/lib/**/*.test.js",
       "build/**/*",
       "package.json"

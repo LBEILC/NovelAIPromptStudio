@@ -32,7 +32,7 @@ const run = (mode, kind, directory, count) =>
       }
       if (message.result) result = message.result;
     });
-    const timeoutMs = (mode === 'seed' && kind === 'sql.js' && count >= 20000 ? 5 : 20) * 60 * 1000;
+    const timeoutMs = 20 * 60 * 1000;
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
@@ -57,17 +57,12 @@ const run = (mode, kind, directory, count) =>
 try {
   for (const count of sizes) {
     const fixture = path.join(root, `fixture-${count}`);
-    const seeded = await run('seed', 'sql.js', fixture, count);
+    const seeded = await run('seed', 'node:sqlite', fixture, count);
     if (seeded.error) {
-      results.push({ ...seeded, kind: 'sql.js (fixture)', phase: `fixture/${seeded.phase}` });
-      fs.rmSync(fixture, { recursive: true, force: true });
-      const fallback = await run('seed', 'node:sqlite', fixture, count);
-      if (fallback.error) {
-        results.push({ ...fallback, phase: `fixture/${fallback.phase}` });
-        continue;
-      }
+      results.push(seeded);
+      continue;
     }
-    for (const kind of ['sql.js', 'node:sqlite', 'better-sqlite3']) {
+    for (const kind of ['node:sqlite']) {
       const directory = path.join(root, `${count}-${kind.replace(':', '-')}`);
       fs.mkdirSync(directory);
       fs.copyFileSync(path.join(fixture, 'studio.sqlite'), path.join(directory, 'studio.sqlite'));
@@ -108,4 +103,4 @@ fs.writeFileSync(
 );
 fs.writeFileSync('.codex-runs/data-layer/benchmark.md', table);
 console.log(table);
-if (results.some((r) => r.count <= 5000 && r.error)) process.exitCode = 1;
+if (results.some((r) => r.error)) process.exitCode = 1;

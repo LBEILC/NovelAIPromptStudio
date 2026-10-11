@@ -35,6 +35,8 @@ npm run dev:demo
 NovelAI Prompt Studio-demo/
 ├─ data/
 │  ├─ studio.sqlite
+│  ├─ studio.pre-phase2.sqlite       # 已有数据库首次重开时的历史备份
+│  ├─ studio.pre-node-sqlite.sqlite  # 新数据引擎首次打开已有文件前的备份
 │  └─ preferences.json
 ├─ assets/
 │  ├─ images/
@@ -44,6 +46,8 @@ NovelAI Prompt Studio-demo/
 ```
 
 `userData` 隔离数据库、偏好、托管资源与工作台临时文件；`sessionData` 隔离 localStorage、Cookie 和 Chromium 缓存。演示环境内重新选择资源库位置时，选择结果也只写入该 Profile 的 `preferences.json`。
+
+两份数据库备份各创建一次，不随日常写入更新；全新环境第一次创建数据库时尚无备份。数据库采用 DELETE 回滚日志：写事务期间可能暂时出现 `studio.sqlite-journal`，正常关闭后 `studio.sqlite` 是包含全部已提交数据的单文件，不依赖 WAL/SHM。异常退出若留下日志，保留主文件和日志，让新版先打开完成恢复并正常关闭，再复制单文件或回退旧版；旧版不能处理新引擎留下的热回滚日志。
 
 ## 准备 v0.9 演示图库
 

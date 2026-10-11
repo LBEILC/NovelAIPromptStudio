@@ -389,6 +389,28 @@ export async function importLibraryFiles({
   const imported = [];
   const duplicates = [];
   const resultErrors = [];
+  const pending = [];
+  const pendingHashes = new Set();
+  const flushProjects = () => {
+    if (!pending.length) return;
+    const batch = pending.splice(0);
+    pendingHashes.clear();
+    try {
+      const results = database.insertProjects(batch.map((item) => item.project));
+      for (const [index, result] of results.entries()) {
+        if ('error' in result)
+          resultErrors.push({ file: batch[index].displayName, error: result.error });
+        else imported.push(batch[index].project);
+      }
+    } catch (error) {
+      // A failed commit rolls back this chunk, never an earlier committed chunk.
+      for (const item of batch)
+        resultErrors.push({
+          file: item.displayName,
+          error: error instanceof Error ? error.message : String(error),
+        });
+    }
+  };
   let processed = 0;
   try {
     const plan = await inspectLibraryImportFiles(filePaths, { onProgress, signal });
@@ -425,6 +447,8 @@ export async function importLibraryFiles({
       report({ current: displayName });
       try {
         const contentHash = await hashFile(sourcePath);
+        // Resolve a pending duplicate only after the first image's commit succeeds.
+        if (pendingHashes.has(contentHash)) flushProjects();
         const duplicate = database.findProjectByContentHash(contentHash);
         if (duplicate) {
           duplicates.push({
@@ -439,8 +463,9 @@ export async function importLibraryFiles({
           contentHash,
         });
         project = await prepareProject(project);
-        database.insertProject(project);
-        imported.push(project);
+        pending.push({ project, displayName });
+        pendingHashes.add(contentHash);
+        if (pending.length >= 25) flushProjects();
       } catch (error) {
         resultErrors.push({
           file: displayName,
@@ -483,6 +508,7 @@ export async function importLibraryFiles({
       }
     }
 
+    flushProjects();
     const summary = {
       total: plan.total,
       processed,
