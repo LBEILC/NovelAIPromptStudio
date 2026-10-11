@@ -109,6 +109,26 @@ export async function runAcceptance(context) {
       return await window.studio.loadLibraryDetail('missing-acceptance-image') === null;
     })()`,
     );
+    await check(
+      '持久缓存和热缓存经过真实 IPC 返回逐项一致的卡片',
+      `(async () => {
+        for (const view of ['all', 'favorites', 'trash']) {
+          const first = await window.studio.loadLibraryCards(view);
+          const second = await window.studio.loadLibraryCards(view);
+          if (JSON.stringify(first) !== JSON.stringify(second)) return false;
+        }
+        return true;
+      })()`,
+    );
+    if (mode.phase === 0) {
+      const cacheProbe = database.loadLibraryCards()[0];
+      database.updateProjectName(cacheProbe.id, `${cacheProbe.name} cache probe`);
+      await check(
+        '卡片缓存命中时，重命名通过 IPC 立即可见',
+        `(async () => (await window.studio.loadLibraryCards()).find(p => p.id === ${JSON.stringify(cacheProbe.id)}).name === ${JSON.stringify(`${cacheProbe.name} cache probe`)})()`,
+      );
+      database.updateProjectName(cacheProbe.id, cacheProbe.name);
+    }
     if (mode.packaged) {
       await check('正在运行真正的打包程序', () => app.isPackaged === true);
       await check(

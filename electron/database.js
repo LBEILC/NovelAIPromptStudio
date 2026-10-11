@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { createHash } from 'node:crypto';
 import { CATEGORY_OPTIONS, inferCategory, normalizeCategory } from '../src/lib/prompt.js';
 import {
   galleryProjectGroupingFingerprints,
@@ -786,30 +787,147 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
     return hydrated.map((project) => enrichProjectTags(project, cached));
   };
 
-  const loadLibraryCards = (view = 'all') => {
-    const where =
-      view === 'trash'
-        ? "p.deleted_at != ''"
-        : view === 'favorites'
-          ? "p.deleted_at = '' AND p.is_favorite = 1"
-          : "p.deleted_at = ''";
-    // Legacy prompt fallback can depend on extra_json. Read it one image at a time,
-    // derive only the filter/similarity inputs, and never include it in the result.
-    const rows = query(`SELECT p.id, p.name, p.image_path, p.thumbnail_path,
-      p.created_at, p.is_favorite, p.deleted_at, p.prompt_fingerprint,
-      p.base_prompt_fingerprint, p.vibe_fingerprint,
-      COALESCE(c.project_id, '') AS group_cover_id
-      FROM projects p LEFT JOIN prompt_group_covers c
-      ON c.prompt_fingerprint = p.exact_group_fingerprint
-      WHERE ${where} ORDER BY p.created_at DESC`);
-    const tagsByProject = new Map();
-    for (const tag of query(`SELECT t.* FROM prompt_tags t JOIN projects p ON p.id = t.project_id
-      WHERE ${where} ORDER BY t.project_id, t.position`)) {
-      if (!tagsByProject.has(tag.project_id)) tagsByProject.set(tag.project_id, []);
-      tagsByProject.get(tag.project_id).push(tag);
+  const cardDirtyPrefix = 'library_cards_dirty:';
+  const cardCacheVersionKey = 'library_cards_version';
+  const cardMemory = new Map();
+  const sharedCardTags = new Map();
+  const sharedSimilarityTags = new Map();
+  const sharedCardMetadata = new Map();
+  const sharedSearchPrompts = new Map();
+  const clearCardMemory = () => {
+    for (const cache of [
+      cardMemory,
+      sharedCardTags,
+      sharedSimilarityTags,
+      sharedCardMetadata,
+      sharedSearchPrompts,
+    ])
+      cache.clear();
+  };
+  const sharedValue = (cache, key, parse = JSON.parse) => {
+    if (!cache.has(key)) cache.set(key, parse(key));
+    return cache.get(key);
+  };
+  // Intern repeated read-only values. Electron structured cloning then sends a
+  // shared object once rather than hundreds of thousands of identical copies.
+  // The public card fields and their values remain exactly the same.
+  const encodeCardCache = (entry) =>
+    JSON.stringify({
+      ...entry,
+      card: {
+        ...entry.card,
+        metadata: JSON.stringify(entry.card.metadata),
+        search_prompts: JSON.stringify(entry.card.search_prompts),
+        filter_tags: entry.card.filter_tags.map(({ tag, translation, category }) =>
+          JSON.stringify(
+            tag === undefined ? [null, translation, category, true] : [tag, translation, category],
+          ),
+        ),
+        base_prompt_similarity: Object.fromEntries(
+          Object.entries(entry.card.base_prompt_similarity).map(([scope, tags]) => [
+            scope,
+            tags.map((tag) => JSON.stringify(tag)),
+          ]),
+        ),
+      },
+    });
+  const decodeCardCache = (serialized) => {
+    const entry = JSON.parse(serialized);
+    const card = entry.card;
+    card.metadata = sharedValue(sharedCardMetadata, card.metadata);
+    card.search_prompts = sharedValue(sharedSearchPrompts, card.search_prompts);
+    card.filter_tags = card.filter_tags.map((key) =>
+      sharedValue(sharedCardTags, key, (value) => {
+        const [tag, translation, category, missingTag] = JSON.parse(value);
+        return { tag: missingTag ? undefined : tag, translation, category };
+      }),
+    );
+    for (const scope of ['prompt', 'undesired'])
+      card.base_prompt_similarity[scope] = card.base_prompt_similarity[scope].map((key) =>
+        sharedValue(sharedSimilarityTags, key),
+      );
+    return entry;
+  };
+  const coverKey = (fingerprint) =>
+    createHash('sha256')
+      .update(String(fingerprint || ''))
+      .digest('hex');
+  let cardSchemaVersion;
+  const hasCardCache = () =>
+    query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'library_card_cache'")
+      .length > 0;
+  const invalidateCards = (full = false, includeFingerprints = false) => {
+    const dirty = query(`SELECT substr(key, ${cardDirtyPrefix.length + 1}) AS id
+      FROM app_meta WHERE key GLOB '${cardDirtyPrefix}*'
+      ${includeFingerprints ? `UNION SELECT substr(key, ${fingerprintDirtyPrefix.length + 1}) FROM app_meta WHERE key GLOB '${fingerprintDirtyPrefix}*'` : ''}`);
+    if (full) clearCardMemory();
+    else for (const { id } of dirty) cardMemory.delete(id);
+    if (hasCardCache()) {
+      if (full) database.run('DELETE FROM library_card_cache');
+      else {
+        const remove = database.prepare('DELETE FROM library_card_cache WHERE project_id = $id');
+        for (const { id } of dirty) remove.run({ $id: id });
+      }
     }
-    const cached = new Map(query('SELECT * FROM tag_dictionary').map((row) => [row.tag, row]));
-    return rows.map((row) => {
+    database.run(`DELETE FROM app_meta WHERE key GLOB '${cardDirtyPrefix}*'`);
+  };
+
+  const loadLibraryCards = (view = 'all') => {
+    try {
+      return atomic(readLibraryCards)(view);
+    } catch (error) {
+      // SQLite rolls back derived writes and markers together. Never retain an
+      // in-memory result from an operation whose transaction did not commit.
+      clearCardMemory();
+      throw error;
+    }
+  };
+  const readLibraryCards = (view) => {
+    const dictionary = query(`SELECT tag, translation, category, has_translation,
+      has_classification, translation_source, category_source FROM tag_dictionary ORDER BY tag`);
+    // Covers every enrichment input, including deletion and old-engine writes.
+    // Importing unchanged knowledge updates timestamps, not card semantics.
+    // Bump the prefix whenever the derivation algorithms/protocol change.
+    const version = `4:${createHash('sha256').update(JSON.stringify(dictionary)).digest('hex')}`;
+    const previousVersion = query('SELECT value FROM app_meta WHERE key = $key', {
+      $key: cardCacheVersionKey,
+    })[0]?.value;
+    // One disposable table; no trigger refers to it, so dropping it also remains
+    // safe for old writers. schema_version detects a drop/recreate in this run.
+    if (version !== previousVersion) database.run('DROP TABLE IF EXISTS library_card_cache');
+    database.run(`CREATE TABLE IF NOT EXISTS library_card_cache (
+      project_id TEXT PRIMARY KEY, project_order INTEGER NOT NULL,
+      created_at TEXT NOT NULL, is_favorite INTEGER NOT NULL,
+      deleted_at TEXT NOT NULL, payload TEXT NOT NULL
+    )`);
+    database.run(`CREATE INDEX IF NOT EXISTS idx_library_card_order ON library_card_cache
+      (created_at DESC, project_order, project_id, is_favorite, deleted_at)`);
+    const schemaVersion = query('PRAGMA schema_version')[0].schema_version;
+    if (schemaVersion !== cardSchemaVersion) clearCardMemory();
+    cardSchemaVersion = schemaVersion;
+    invalidateCards(version !== previousVersion);
+    if (version !== previousVersion)
+      database.run('INSERT OR REPLACE INTO app_meta(key, value) VALUES ($key, $value)', {
+        $key: cardCacheVersionKey,
+        $value: version,
+      });
+    // Scan only ids, not the large original project records. Sorting a narrow
+    // projection avoids SQLite materializing long fingerprints in its sorter.
+    const rebuild = query(`SELECT p.id, p.rowid AS project_order FROM projects p
+      WHERE NOT EXISTS (SELECT 1 FROM library_card_cache c WHERE c.project_id = p.id)`);
+    const cached = new Map(dictionary.map((row) => [row.tag, row]));
+    const save = database.prepare(
+      `INSERT OR REPLACE INTO library_card_cache(project_id, project_order, created_at,
+        is_favorite, deleted_at, payload) VALUES ($id, $order, $created, $favorite, $deleted, $payload)`,
+    );
+    for (const row of rebuild) {
+      const fingerprints = query(
+        `SELECT id, name, image_path, thumbnail_path, created_at, is_favorite, deleted_at,
+        prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint, exact_group_fingerprint
+        FROM projects WHERE id = $id`,
+        { $id: row.id },
+      )[0];
+      // Legacy prompt repair needs extra_json only when this image is dirty.
       const metadata =
         query(
           `SELECT model, width, height, prompt_raw, negative_prompt,
@@ -818,7 +936,9 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
         )[0] || {};
       const project = enrichProjectTags(
         {
-          tags: tagsByProject.get(row.id) || [],
+          tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', {
+            $id: row.id,
+          }),
           metadata,
           prompt_structure: safeJson(metadata.prompt_structure_json),
         },
@@ -828,13 +948,15 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
       const structure = project.prompt_structure;
       // Full fingerprints already embed their base payload. Use a lossless alias
       // only after proving it equals the separately stored base fingerprint.
-      const embeddedBase = JSON.stringify(safeJson(row.prompt_fingerprint).base);
-      return {
-        ...row,
+      const embeddedBase = JSON.stringify(safeJson(fingerprints.prompt_fingerprint).base);
+      const { exact_group_fingerprint, ...cardFields } = fingerprints;
+      const payload = {
+        ...cardFields,
         base_prompt_fingerprint:
-          row.base_prompt_fingerprint && row.base_prompt_fingerprint === embeddedBase
+          fingerprints.base_prompt_fingerprint &&
+          fingerprints.base_prompt_fingerprint === embeddedBase
             ? null
-            : row.base_prompt_fingerprint,
+            : fingerprints.base_prompt_fingerprint,
         metadata: {
           model: metadata.model || '',
           width: metadata.width || 0,
@@ -864,6 +986,46 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
           undesired: [...similarity.undesired],
         },
       };
+      const entry = { card: payload, coverKey: coverKey(exact_group_fingerprint) };
+      const serialized = encodeCardCache(entry);
+      save.run({
+        $id: row.id,
+        $order: row.project_order,
+        $created: payload.created_at,
+        $favorite: payload.is_favorite,
+        $deleted: payload.deleted_at,
+        $payload: serialized,
+      });
+      cardMemory.set(row.id, decodeCardCache(serialized));
+    }
+    const where =
+      view === 'trash'
+        ? "deleted_at != ''"
+        : view === 'favorites'
+          ? "deleted_at = '' AND is_favorite = 1"
+          : "deleted_at = ''";
+    // Original ORDER BY created_at ties followed the projects table's row order.
+    const rows = query(`SELECT project_id FROM library_card_cache WHERE ${where}
+      ORDER BY created_at DESC, project_order`);
+    const missing = rows.filter((row) => !cardMemory.has(row.project_id));
+    for (let offset = 0; offset < missing.length; offset += 400) {
+      const chunk = missing.slice(offset, offset + 400);
+      const params = Object.fromEntries(chunk.map((row, i) => [`$id${i}`, row.project_id]));
+      for (const entry of query(
+        `SELECT project_id, payload FROM library_card_cache WHERE project_id IN (${Object.keys(params).join(',')})`,
+        params,
+      ))
+        cardMemory.set(entry.project_id, decodeCardCache(entry.payload));
+    }
+    const covers = new Map(
+      query('SELECT prompt_fingerprint, project_id FROM prompt_group_covers').map((cover) => [
+        coverKey(cover.prompt_fingerprint),
+        cover.project_id,
+      ]),
+    );
+    return rows.map((row) => {
+      const entry = cardMemory.get(row.project_id);
+      return { ...entry.card, group_cover_id: covers.get(entry.coverKey) || '' };
     });
   };
 
@@ -1322,7 +1484,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
       trackingTriggers.push({
         name,
         sql: `CREATE TRIGGER IF NOT EXISTS ${name} AFTER ${update} ON ${table} BEGIN
-        ${references.map((reference) => `INSERT OR REPLACE INTO app_meta(key, value) VALUES ('${fingerprintDirtyPrefix}' || ${reference}.${idColumn}, '1');`).join('\n')}
+        ${references.map((reference) => [fingerprintDirtyPrefix, cardDirtyPrefix].map((prefix) => `INSERT OR REPLACE INTO app_meta(key, value) VALUES ('${prefix}' || ${reference}.${idColumn}, '1');`).join('\n')).join('\n')}
         END`,
       });
     }
@@ -1331,7 +1493,20 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
     query("SELECT name FROM sqlite_master WHERE type = 'trigger'").map((row) => row.name),
   );
   const trackingMissing = trackingTriggers.some(({ name }) => !existingTriggers.has(name));
-  for (const { sql } of trackingTriggers) database.run(sql);
+  const cardTrackingMissing = !existingTriggers.has('track_library_projects_update');
+  // These fields do not affect prompt fingerprints, but they do affect a card.
+  database.run(`CREATE TRIGGER IF NOT EXISTS track_library_projects_update
+    AFTER UPDATE OF name, image_path, thumbnail_path, created_at, is_favorite, deleted_at ON projects BEGIN
+      INSERT OR REPLACE INTO app_meta(key, value) VALUES ('${cardDirtyPrefix}' || NEW.id, '1');
+    END`);
+  for (const { name, sql } of trackingTriggers) {
+    const previous = query(
+      "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = $name",
+      { $name: name },
+    )[0]?.sql;
+    if (previous && !previous.includes(cardDirtyPrefix)) database.run(`DROP TRIGGER ${name}`);
+    database.run(sql);
+  }
 
   const backfillPromptFingerprints = (force = true) => {
     let changed = 0;
@@ -1402,6 +1577,9 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
       $key: fingerprintVersionKey,
       $value: fingerprintVersion,
     });
+    // Consume the old fingerprint markers only after invalidating their cached
+    // derivations. This also handles writes made by the original 010 triggers.
+    invalidateCards(full || cardTrackingMissing, true);
     database.run(`DELETE FROM app_meta WHERE key GLOB '${fingerprintDirtyPrefix}*'`);
     if (changed) persist();
     return changed;

@@ -1,16 +1,64 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fork } from 'node:child_process';
+import { fork, spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { DatabaseSync } from 'node:sqlite';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-data-benchmark-'));
-const sizes = process.argv.slice(2).length
-  ? process.argv.slice(2).map(Number)
-  : [1000, 5000, 20000];
+const args = process.argv.slice(2);
+const fixtureOption = args.find((arg) => arg.startsWith('--fixtures-root='));
+const fixtureRoot = fixtureOption
+  ? path.resolve(fixtureOption.slice('--fixtures-root='.length))
+  : null;
+const sizeArgs = args.filter((arg) => arg !== fixtureOption);
+const sizes = sizeArgs.length ? sizeArgs.map(Number) : [1000, 5000, 20000];
 if (sizes.some((size) => !Number.isSafeInteger(size) || size < 1))
   throw Error('Sizes must be positive integers');
 const results = [];
+const require = createRequire(import.meta.url);
+const runIpc = (directory, count) =>
+  new Promise((resolve) => {
+    const output = path.join(directory, 'ipc.json');
+    const env = { ...process.env };
+    delete env.ELECTRON_RUN_AS_NODE;
+    const child = spawn(
+      require('electron'),
+      [
+        fileURLToPath(new URL('./data-layer/electron-cards.mjs', import.meta.url)),
+        directory,
+        output,
+        String(count),
+        '--prepared',
+      ],
+      {
+        env,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: false,
+      },
+    );
+    let log = '';
+    child.stdout.on('data', (data) => {
+      log = (log + data).slice(-6000);
+    });
+    child.stderr.on('data', (data) => {
+      log = (log + data).slice(-6000);
+    });
+    const timer = setTimeout(() => child.kill(), 20 * 60 * 1000);
+    child.on('error', (error) => {
+      log += error.message;
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve(
+        code === 0 && fs.existsSync(output)
+          ? JSON.parse(fs.readFileSync(output, 'utf8'))
+          : { ok: false, error: `exit=${code}: ${log}` },
+      );
+    });
+  });
 const run = (mode, kind, directory, count) =>
   new Promise((resolve) => {
     const child = fork(
@@ -57,7 +105,28 @@ const run = (mode, kind, directory, count) =>
 try {
   for (const count of sizes) {
     const fixture = path.join(root, `fixture-${count}`);
-    const seeded = await run('seed', 'node:sqlite', fixture, count);
+    let seeded;
+    if (fixtureRoot) {
+      // Reuse only benchmark-generated snapshots for iteration. The supplied
+      // source is read-only; all measurements still use a fresh temporary copy.
+      const source = path.join(fixtureRoot, `fixture-${count}`);
+      const manifest = JSON.parse(fs.readFileSync(path.join(source, 'fixture.json'), 'utf8'));
+      if (manifest.kind !== 'synthetic-data-layer' || manifest.count !== count)
+        throw Error('Expected a matching synthetic benchmark fixture');
+      fs.mkdirSync(fixture);
+      fs.copyFileSync(path.join(source, 'studio.sqlite'), path.join(fixture, 'studio.sqlite'));
+      const raw = new DatabaseSync(path.join(fixture, 'studio.sqlite'));
+      try {
+        if (raw.prepare('SELECT count(*) n FROM projects').get().n !== count)
+          throw Error('Fixture project count mismatch');
+        raw.exec(
+          "DROP TABLE IF EXISTS library_card_cache; DELETE FROM app_meta WHERE key = 'library_cards_version'",
+        );
+      } finally {
+        raw.close();
+      }
+      seeded = {};
+    } else seeded = await run('seed', 'node:sqlite', fixture, count);
     if (seeded.error) {
       results.push(seeded);
       continue;
@@ -66,7 +135,55 @@ try {
       const directory = path.join(root, `${count}-${kind.replace(':', '-')}`);
       fs.mkdirSync(directory);
       fs.copyFileSync(path.join(fixture, 'studio.sqlite'), path.join(directory, 'studio.sqlite'));
-      results.push(await run('measure', kind, directory, count));
+      const result = await run('measure', kind, directory, count);
+      const ipcDirectory = path.join(root, `ipc-${count}`);
+      fs.mkdirSync(ipcDirectory);
+      fs.copyFileSync(
+        path.join(fixture, 'studio.sqlite'),
+        path.join(ipcDirectory, 'studio.sqlite'),
+      );
+      console.error(`Electron/${count}: renderer IPC`);
+      const prepared = await run('prepare-cards', kind, ipcDirectory, count);
+      result.ipc = prepared.error
+        ? { ok: false, error: prepared.error }
+        : await runIpc(ipcDirectory, count);
+      if (!result.ipc.ok) {
+        result.phase = 'Electron IPC';
+        result.error = result.ipc.error;
+      }
+      result.performanceChecks =
+        count === 5000
+          ? [
+              {
+                label: '无变更重开后的首次列表',
+                ms: Math.max(result.cardsMs, result.ipc.mainBlockingMs?.[0] ?? 0),
+                limitMs: 400,
+              },
+              {
+                label: '无变更热列表',
+                ms: Math.max(
+                  ...(result.warmCardsMs || []),
+                  ...(result.ipc.mainBlockingMs?.slice(1) || []),
+                ),
+                limitMs: 400,
+              },
+              ...['tag', 'rename', 'trash'].map((change) => ({
+                label: `单图改动后列表：${change}`,
+                ms: result.afterEditCardsMs?.[change],
+                limitMs: 400,
+              })),
+              { label: '导入 100 张后列表', ms: result.afterImportCardsMs, limitMs: 1000 },
+              {
+                label: '渲染器到渲染器真实 IPC',
+                ms: Math.max(...(result.ipc.samples || [])),
+                limitMs: 1000,
+              },
+            ].map((check) => ({
+              ...check,
+              passed: Number.isFinite(check.ms) && check.ms <= check.limitMs,
+            }))
+          : [];
+      results.push(result);
       fs.rmSync(directory, { recursive: true, force: true });
     }
     fs.rmSync(fixture, { recursive: true, force: true });
@@ -80,7 +197,7 @@ const table = [
   '|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|',
   ...results.map(
     (r) =>
-      `| ${r.count} | ${r.kind} | ${number(r.openMs)} | ${number(r.secondOpenMs)} | ${number(r.cardsMs)} | ${number(r.cardsBytes / 1048576)} | ${number(r.detailMs)} | ${number(r.maxBlockingMs)} | ${number(r.loadMs)} | ${number(r.payloadBytes / 1048576)} | ${number(r.writeMedianMs)} | ${number(r.writeMaxMs)} | ${number(r.importMs)} | ${number(r.fileBytes / 1048576)} | ${number(r.peakRssBytes / 1048576)} | ${r.error ? `失败：${r.phase}` : '通过'} |`,
+      `| ${r.count} | ${r.kind} | ${number(r.openMs)} | ${number(r.secondOpenMs)} | ${number(r.cardsMs)} | ${number(r.cardsBytes / 1048576)} | ${number(r.detailMs)} | ${number(r.maxBlockingMs)} | ${number(r.loadMs)} | ${number(r.payloadBytes / 1048576)} | ${number(r.writeMedianMs)} | ${number(r.writeMaxMs)} | ${number(r.importMs)} | ${number(r.fileBytes / 1048576)} | ${number(r.peakRssBytes / 1048576)} | ${r.error ? `失败：${r.phase}` : r.performanceChecks?.some((c) => !c.passed) ? '性能未达标' : '完成'} |`,
   ),
 ].join('\n');
 fs.mkdirSync('.codex-runs/data-layer', { recursive: true });
@@ -103,4 +220,20 @@ fs.writeFileSync(
 );
 fs.writeFileSync('.codex-runs/data-layer/benchmark.md', table);
 console.log(table);
-if (results.some((r) => r.error)) process.exitCode = 1;
+const scenarios = [
+  '| 图片 | 首建缓存 ms | 重开首次列表 ms | 热列表最大 ms | 改 Tag 后 ms | 改名后 ms | 回收站后 ms | 导入100后列表 ms | Electron IPC 首次 ms | Electron IPC 热最大 ms |',
+  '|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
+  ...results.map(
+    (r) =>
+      `| ${r.count} | ${number(r.firstCacheMs)} | ${number(r.cardsMs)} | ${number(Math.max(...(r.warmCardsMs || [])))} | ${number(r.afterEditCardsMs?.tag)} | ${number(r.afterEditCardsMs?.rename)} | ${number(r.afterEditCardsMs?.trash)} | ${number(r.afterImportCardsMs)} | ${number(r.ipc?.samples?.[0])} | ${number(Math.max(...(r.ipc?.samples?.slice(1) || [])))} |`,
+  ),
+].join('\n');
+fs.appendFileSync('.codex-runs/data-layer/benchmark.md', '\n\n' + scenarios);
+console.log(scenarios);
+for (const result of results)
+  for (const check of result.performanceChecks || [])
+    console.log(
+      `${check.passed ? 'PASS' : 'FAIL'} ${check.label}: ${number(check.ms)} ms <= ${check.limitMs} ms`,
+    );
+if (results.some((r) => r.error || r.performanceChecks?.some((check) => !check.passed)))
+  process.exitCode = 1;

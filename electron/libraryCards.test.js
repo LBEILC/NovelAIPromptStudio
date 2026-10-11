@@ -334,3 +334,224 @@ it('preserves dirty markers and previous fingerprints when startup repair fails'
   expect(api.loadProject('p0').prompt_fingerprint).not.toBe(original);
   expect(api.backfillPromptFingerprints()).toBe(0);
 });
+
+function expectLiveCardSemantics(api) {
+  for (const view of ['all', 'favorites', 'trash']) {
+    const full = api.loadLibrary(view);
+    const cards = structuredClone(api.loadLibraryCards(view));
+    expect(galleryFilterOptions(cards)).toEqual(galleryFilterOptions(full));
+    for (const [index, card] of cards.entries()) {
+      expect(card.id).toBe(full[index].id);
+      for (let other = 0; other < cards.length; other++)
+        expect(galleryBasePromptSimilarity(card, cards[other])).toBe(
+          galleryBasePromptSimilarity(full[index], full[other]),
+        );
+    }
+    for (const promptScope of ['separate', 'full', 'base', 'similar']) {
+      const shape = (items) =>
+        galleryViewGroups(items, {}, { promptScope }).map((group) => ({
+          ...group,
+          members: group.members.map((item) => item.id),
+          cover: group.cover.id,
+        }));
+      expect(shape(cards)).toEqual(shape(full));
+    }
+  }
+}
+
+it('rebuilds a dropped derived table without changing cards or any original rows', async () => {
+  const directory = temporary();
+  let api = await open(directory);
+  for (let i = 0; i < 3; i++) api.insertProject(sample(i));
+  api.backfillPromptFingerprints();
+  const before = structuredClone(api.loadLibraryCards());
+  const original = () =>
+    edit(directory, (raw) =>
+      Object.fromEntries(
+        raw
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('library_card_cache', 'app_meta') ORDER BY name",
+          )
+          .all()
+          .map(({ name }) => [name, raw.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all()]),
+      ),
+    );
+  const rows = original();
+  edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
+  expect(api.loadLibraryCards()).toEqual(before);
+  expect(original()).toEqual(rows);
+  api.close();
+  edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
+  api = await open(directory);
+  expect(api.loadLibraryCards()).toEqual(before);
+  expect(original()).toEqual(rows);
+  expectLiveCardSemantics(api);
+});
+
+it('invalidates dictionary translations, classification weights and deletions in memory and across reopen', async () => {
+  const directory = temporary();
+  let api = await open(directory);
+  api.insertProject(sample(0));
+  api.insertProject(sample(1));
+  api.backfillPromptFingerprints();
+  const before = structuredClone(api.loadLibraryCards());
+  api.updateTagDictionary('landscape', { translation: '风景', category: 'ArtistEra' });
+  const changed = structuredClone(api.loadLibraryCards());
+  expect(changed[0].base_prompt_similarity).not.toEqual(before[0].base_prompt_similarity);
+  expect(changed[0].filter_tags.find((t) => t.tag === 'landscape').translation).toBe('风景');
+  expectLiveCardSemantics(api);
+  api.close();
+  edit(directory, (raw) =>
+    raw.exec(
+      "UPDATE tag_dictionary SET category = 'Subject', translation = '旧引擎译文' WHERE tag = 'landscape'",
+    ),
+  );
+  api = await open(directory);
+  expect(api.loadLibraryCards()[0].filter_tags.find((t) => t.tag === 'landscape').translation).toBe(
+    '旧引擎译文',
+  );
+  expectLiveCardSemantics(api);
+  api.deleteTagDictionary('landscape');
+  expect(api.loadLibraryCards()).toEqual(before);
+  expectLiveCardSemantics(api);
+});
+
+it('recomputes only dirty derivations and keeps live fields and covers current', async () => {
+  const directory = temporary();
+  let api = await open(directory);
+  for (let i = 0; i < 3; i++) api.insertProject(sample(i));
+  api.backfillPromptFingerprints();
+  api.loadLibraryCards();
+  api.close();
+  api = await open(directory);
+  const prepare = DatabaseSync.prototype.prepare;
+  const reads = [];
+  vi.spyOn(DatabaseSync.prototype, 'prepare').mockImplementation(function (sql) {
+    if (/FROM (generation_metadata|prompt_tags) WHERE project_id/.test(sql)) {
+      const statement = prepare.call(this, sql);
+      const all = statement.all.bind(statement);
+      statement.all = (params) => {
+        reads.push(params.$id);
+        return all(params);
+      };
+      return statement;
+    }
+    return prepare.call(this, sql);
+  });
+  api.loadLibraryCards();
+  api.loadLibraryCards();
+  expect(reads).toEqual([]);
+  edit(directory, (raw) =>
+    raw.exec(
+      "UPDATE tag_dictionary SET updated_at = 'timestamp-only', display_tag = 'display-only'",
+    ),
+  );
+  api.loadLibraryCards();
+  expect(reads).toEqual([]);
+  api.insertProject(sample(3));
+  reads.length = 0;
+  api.loadLibraryCards();
+  expect([...new Set(reads)]).toEqual(['p3']);
+  reads.length = 0;
+  api.updateProjectName('p0', 'Current name');
+  api.updateProjects(['p1'], { deleted: true });
+  api.setGroupCover(api.loadProject('p0').exact_group_fingerprint, 'p0');
+  reads.length = 0;
+  const cards = api.loadLibraryCards();
+  expect([...new Set(reads)].sort()).toEqual(['p0', 'p1']);
+  expect(cards.find((p) => p.id === 'p0')).toMatchObject({
+    name: 'Current name',
+    group_cover_id: 'p0',
+  });
+  expect(cards.some((p) => p.id === 'p1')).toBe(false);
+  reads.length = 0;
+  edit(directory, (raw) => raw.exec("UPDATE prompt_tags SET weight = 1.8 WHERE project_id = 'p0'"));
+  api.loadLibraryCards();
+  expect([...new Set(reads)]).toEqual(['p0']);
+  reads.length = 0;
+  // Repeated changes must not be hidden by an unconsumed fingerprint marker.
+  edit(directory, (raw) => raw.exec("UPDATE prompt_tags SET weight = 0.6 WHERE project_id = 'p0'"));
+  api.loadLibraryCards();
+  expect([...new Set(reads)]).toEqual(['p0']);
+  reads.length = 0;
+  edit(directory, (raw) =>
+    raw.exec("BEGIN; UPDATE prompt_tags SET weight = 9 WHERE project_id = 'p2'; ROLLBACK"),
+  );
+  api.loadLibraryCards();
+  expect(reads).toEqual([]);
+  vi.restoreAllMocks();
+  expectLiveCardSemantics(api);
+});
+
+it('reads and sets existing exact-group covers while the derived cards stay cached', async () => {
+  const api = await open(temporary());
+  const first = sample(0);
+  api.insertProject(first);
+  api.insertProject({
+    ...first,
+    id: 'mirror',
+    tags: first.tags.map((tag) => ({ ...tag, id: `mirror-${tag.id}` })),
+  });
+  api.backfillPromptFingerprints();
+  const before = api.loadLibraryCards();
+  expect(before.every((card) => card.group_cover_id === '')).toBe(true);
+  const fingerprint = api.loadProject('p0').exact_group_fingerprint;
+  api.setGroupCover(fingerprint, 'mirror');
+  expect(api.loadLibraryCards().every((card) => card.group_cover_id === 'mirror')).toBe(true);
+  expectLiveCardSemantics(api);
+  api.setGroupCover(fingerprint, 'p0');
+  expect(api.loadLibraryCards().every((card) => card.group_cover_id === 'p0')).toBe(true);
+  expectLiveCardSemantics(api);
+});
+
+it('invalidates populated caches after old-writer changes and original 010 trigger writes', async () => {
+  const directory = temporary();
+  let api = await open(directory);
+  api.insertProject(sample(0));
+  api.insertProject(sample(1));
+  api.backfillPromptFingerprints();
+  const before = structuredClone(api.loadLibraryCards());
+  api.close();
+  edit(directory, (raw) => {
+    raw.exec(
+      "UPDATE prompt_tags SET weight = 1.8 WHERE project_id = 'p0'; UPDATE projects SET name = 'Old name' WHERE id = 'p0'; DELETE FROM projects WHERE id = 'p1'",
+    );
+    // A database first written by 010 has fingerprint-only tracking triggers.
+    raw.exec(
+      "DROP TRIGGER track_prompt_generation_metadata_update; CREATE TRIGGER track_prompt_generation_metadata_update AFTER UPDATE ON generation_metadata BEGIN INSERT OR REPLACE INTO app_meta(key,value) VALUES ('prompt_fingerprints_dirty:' || NEW.project_id, '1'); END;",
+    );
+    raw.exec(
+      "UPDATE generation_metadata SET negative_prompt = 'new negative', prompt_structure_json = '{}' WHERE project_id = 'p0'",
+    );
+  });
+  api = await open(directory);
+  expect(api.loadLibraryCards()).not.toEqual(before);
+  expect(api.loadLibraryCards()).toHaveLength(1);
+  expect(api.loadLibraryCards()[0].name).toBe('Old name');
+  expectLiveCardSemantics(api);
+  const after = structuredClone(api.loadLibraryCards());
+  api.backfillPromptFingerprints();
+  expect(api.loadLibraryCards()).toEqual(after);
+});
+
+it('rolls cache writes and consumed markers back on failure and retries without stale memory', async () => {
+  const directory = temporary();
+  const api = await open(directory);
+  api.insertProject(sample(0));
+  api.backfillPromptFingerprints();
+  api.loadLibraryCards();
+  edit(directory, (raw) =>
+    raw.exec(`
+    UPDATE prompt_tags SET weight = 1.8 WHERE project_id = 'p0';
+    CREATE TRIGGER fail_card BEFORE INSERT ON library_card_cache BEGIN SELECT RAISE(ABORT, 'cache failure'); END;
+  `),
+  );
+  expect(() => api.loadLibraryCards()).toThrow('cache failure');
+  edit(directory, (raw) => {
+    expect(
+      raw.prepare("SELECT value FROM app_meta WHERE key = 'library_cards_dirty:p0'").get().value,
+    ).toBe('1');
+    raw.exec('DROP TRIGGER fail_card');
+  });
+  expectLiveCardSemantics(api);
+});

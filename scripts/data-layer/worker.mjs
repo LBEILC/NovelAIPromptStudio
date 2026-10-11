@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { DatabaseSync } from 'node:sqlite';
 import { openDatabase } from '../../electron/database.js';
 import { project, seed } from './fixture.mjs';
 
@@ -15,6 +16,13 @@ const result = { kind, count };
 try {
   if (mode === 'seed') {
     await seed(directory, count, progress, kind);
+  } else if (mode === 'prepare-cards') {
+    const api = await openDatabase(directory);
+    try {
+      api.loadLibraryCards();
+    } finally {
+      api.close();
+    }
   } else {
     result.fileBytes = fs.statSync(path.join(directory, 'studio.sqlite')).size;
     progress('open');
@@ -31,6 +39,14 @@ try {
     progress('loadLibraryCards');
     start = performance.now();
     let cards = api.loadLibraryCards();
+    result.firstCacheMs = performance.now() - start;
+    cards = null;
+    api.close();
+    api = await openDatabase(directory);
+    global.gc?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    start = performance.now();
+    cards = api.loadLibraryCards();
     result.cardsMs = performance.now() - start;
     start = performance.now();
     result.cardsBytes = 2 + Math.max(0, cards.length - 1);
@@ -38,6 +54,30 @@ try {
     result.cardsSerializationMs = performance.now() - start;
     const detailId = cards[0]?.id;
     cards = null;
+    result.warmCardsMs = [];
+    for (let i = 0; i < 3; i++) {
+      await new Promise((resolve) => setImmediate(resolve));
+      start = performance.now();
+      api.loadLibraryCards();
+      result.warmCardsMs.push(performance.now() - start);
+    }
+    result.afterEditCardsMs = {};
+    for (const change of ['tag', 'rename', 'trash']) {
+      if (change === 'tag') {
+        const raw = new DatabaseSync(api.filePath);
+        try {
+          raw.prepare('UPDATE prompt_tags SET weight = 1.5 WHERE project_id = ?').run(detailId);
+        } finally {
+          raw.close();
+        }
+      } else if (change === 'rename') api.updateProjectName(detailId, 'Benchmark renamed');
+      else api.updateProjects([detailId], { deleted: true });
+      await new Promise((resolve) => setImmediate(resolve));
+      start = performance.now();
+      api.loadLibraryCards();
+      result.afterEditCardsMs[change] = performance.now() - start;
+    }
+    api.updateProjects([detailId], { deleted: false });
     global.gc?.();
     await new Promise((resolve) => setImmediate(resolve));
     progress('loadLibraryDetail');
@@ -72,6 +112,12 @@ try {
     const sorted = [...result.writeSamples].sort((a, b) => a - b);
     result.writeMedianMs = sorted[3];
     result.writeMaxMs = sorted[6];
+    // Dictionary updates are a separate invalidation scenario, not part of the
+    // subsequent 100-image import measurement.
+    progress('dictionary invalidation');
+    start = performance.now();
+    api.loadLibraryCards();
+    result.dictionaryRefreshMs = performance.now() - start;
     progress('import100');
     start = performance.now();
     for (let i = count; i < count + 100; i += 25) {
@@ -81,6 +127,19 @@ try {
       if (results.some((result) => result.error)) throw Error('Benchmark import failed');
     }
     result.importMs = performance.now() - start;
+    await new Promise((resolve) => setImmediate(resolve));
+    start = performance.now();
+    const importedCards = api.loadLibraryCards();
+    result.afterImportCardsMs = performance.now() - start;
+    if (importedCards.length !== count + 100) throw Error('Import list count mismatch');
+    result.maxBlockingMs = Math.max(
+      result.maxBlockingMs,
+      result.firstCacheMs,
+      result.dictionaryRefreshMs,
+      result.afterImportCardsMs,
+      ...result.warmCardsMs,
+      ...Object.values(result.afterEditCardsMs),
+    );
     result.diskBytesAfterImport = ['', '-wal', '-shm'].reduce(
       (sum, suffix) =>
         sum +
