@@ -56,8 +56,8 @@ const tag = (en, zh, cat, w, cls = '') => `<span class="tag ${cls}"><span class=
 
 function promptHead(cur) {
   const tabs = gen() ? [['p', 'Prompt'], ['a', '参数'], ['r', '参考']] : [['p', 'Prompt']];
-  return `<div class="col-h"><div class="seg">${tabs.map(([k, t]) => `<button class="${k === cur ? 'on' : ''}">${t}</button>`).join('')}</div><span class="sp"></span>
-    ${cur === 'p' ? `<span class="field sm">${ic('search-line')}<span class="ph">搜索 Tag 或译名</span><span class="kbd">Ctrl K</span></span><button class="btn quiet sm">对照 · 按分类${ic('arrow-down-s-line')}</button><button class="btn quiet sm">AI</button>` : ''}</div>`;
+  return `<div class="col-h"><div class="seg">${tabs.map(([k, t]) => `<button class="${k === cur ? 'on' : ''}">${t}</button>`).join('')}</div>
+    ${cur === 'p' ? `<span class="field sm grow" title="搜索 Tag 或译名">${ic('search-line')}<span class="ph">搜索 Tag</span><span class="sp"></span><span class="kbd">Ctrl K</span></span><button class="btn quiet sm">对照 · 按分类${ic('arrow-down-s-line')}</button><button class="btn quiet sm">AI</button>` : '<span class="sp"></span>'}</div>`;
 }
 
 function bar() {

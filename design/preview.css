@@ -73,7 +73,10 @@ button { font: inherit; color: inherit; cursor: default; }
 .btn.sm { height: var(--ctl-sm); padding: 0 var(--sp-2); font-size: var(--fs-small); }
 .field { height: var(--ctl); display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface); color: var(--text); }
 .field.sm { height: var(--ctl-sm); padding: 0 8px; font-size: var(--fs-small); }
-.field .ph { color: var(--text-3); }
+.field .ph { color: var(--text-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* 一行里的控件不换行。空间不够时由输入框让出宽度，占位文字用省略号截断 */
+.field { white-space: nowrap; min-width: 0; }
+.kbd, .seg, .seg button { flex: 0 0 auto; white-space: nowrap; }
 .field.grow { flex: 1 1 0; min-width: 0; }
 .seg { display: inline-flex; gap: var(--tab-gap); }
 .seg button { height: 28px; padding: 0; border: 0; background: transparent; color: var(--text-3); border-bottom: 2px solid transparent; }
@@ -86,6 +89,7 @@ button { font: inherit; color: inherit; cursor: default; }
 .body { flex: 1 1 auto; min-height: 0; display: flex; }
 .col { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .col-h { height: 44px; flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 var(--sp-4); }
+.col-h > .seg { margin-right: var(--sp-2); }
 .scroll { flex: 1 1 auto; min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 
 /* 版本栏 */
