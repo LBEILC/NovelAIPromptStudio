@@ -200,6 +200,8 @@ npm run package   # 生成当前平台安装包
 
 ## 许可证
 
+MiSans VF 不包含在仓库中；开发者运行 `npm run fonts` 从小米官方下载并校验，发布打包必须包含该字体及许可。
+
 当前开发分支及 `v0.9.2` 之后发布的版本采用 [GNU GPLv3](./LICENSE)（`GPL-3.0-only`）。你可以使用、研究、修改和再分发本项目；分发修改版本或安装包时，需要同时按 GPLv3 提供对应源代码并保留许可证声明。
 
 `v0.9.2` 及更早的已发布版本继续适用原 Apache License 2.0。完整的授权边界与历史说明见 [`LICENSES/README.md`](./LICENSES/README.md)。用户导入的图片、Prompt 与其他个人数据不因使用本应用而改用 GPLv3。

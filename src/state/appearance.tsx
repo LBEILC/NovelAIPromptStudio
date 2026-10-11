@@ -11,8 +11,8 @@ export const defaultProseFont = tokenFont('prose').split(',')[0].trim().replaceA
 export const defaultAppearance: AppearanceSettings = {
   themeMode: 'auto',
   primaryColor: 'blue',
-  sansFont: 'Geist',
-  monoFont: 'Geist Mono',
+  sansFont: 'MiSans',
+  monoFont: 'IBM Plex Mono',
   proseFont: defaultProseFont,
   motion: 'full',
 };
@@ -60,6 +60,10 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     html.style.setProperty(
       '--font-mono',
       `${quoteFontFamily(appearance.monoFont)}, ${tokenFont('mono')}`,
+    );
+    html.style.setProperty(
+      '--font-prose',
+      `${quoteFontFamily(appearance.proseFont)}, ${tokenFont('prose')}`,
     );
     html.dataset.themeMode = resolvedTheme;
   }, [appearance, resolvedTheme]);

@@ -1,8 +1,8 @@
 :root {
   color-scheme: dark;
   font-size: 17px;
-  --legacy-font-ui: "Geist", "HarmonyOS Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --legacy-font-mono: "Geist Mono", "HarmonyOS Sans SC", ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, Menlo, monospace;
+  --legacy-font-ui: var(--font-ui);
+  --legacy-font-mono: var(--font-mono);
   --text-micro: .6875rem;
   --text-caption: .75rem;
   --text-secondary: .8125rem;

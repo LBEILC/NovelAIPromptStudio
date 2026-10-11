@@ -1,63 +1,21 @@
 @font-face {
-  font-family: "Geist";
-  src: url("@lobehub/webfont-geist/fonts/Geist-Regular.woff2") format("woff2");
+  font-family: "Newsreader";
+  src: url("@fontsource-variable/newsreader/files/newsreader-latin-standard-normal.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400 500;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
   font-display: swap;
   font-style: normal;
   font-weight: 400;
 }
-
 @font-face {
-  font-family: "Geist";
-  src: url("@lobehub/webfont-geist/fonts/Geist-Medium.woff2") format("woff2");
+  font-family: "IBM Plex Mono";
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2") format("woff2");
   font-display: swap;
   font-style: normal;
   font-weight: 500;
-}
-
-@font-face {
-  font-family: "Geist";
-  src: url("@lobehub/webfont-geist/fonts/Geist-Bold.woff2") format("woff2");
-  font-display: swap;
-  font-style: normal;
-  font-weight: 700;
-}
-
-@font-face {
-  font-family: "HarmonyOS Sans SC";
-  src: url("@lobehub/webfont-harmony-sans-sc/fonts/HarmonyOS_Sans_SC_Regular.woff2") format("woff2");
-  font-display: swap;
-  font-style: normal;
-  font-weight: 400;
-}
-
-@font-face {
-  font-family: "HarmonyOS Sans SC";
-  src: url("@lobehub/webfont-harmony-sans-sc/fonts/HarmonyOS_Sans_SC_Medium.woff2") format("woff2");
-  font-display: swap;
-  font-style: normal;
-  font-weight: 500;
-}
-
-@font-face {
-  font-family: "HarmonyOS Sans SC";
-  src: url("@lobehub/webfont-harmony-sans-sc/fonts/HarmonyOS_Sans_SC_Bold.woff2") format("woff2");
-  font-display: swap;
-  font-style: normal;
-  font-weight: 700;
-}
-
-@font-face {
-  font-family: "Geist Mono";
-  src: url("@lobehub/webfont-geist-mono/fonts/GeistMono-Regular.otf") format("opentype");
-  font-display: swap;
-  font-style: normal;
-  font-weight: 400;
-}
-
-@font-face {
-  font-family: "Geist Mono";
-  src: url("@lobehub/webfont-geist-mono/fonts/GeistMono-Bold.otf") format("opentype");
-  font-display: swap;
-  font-style: normal;
-  font-weight: 700;
 }

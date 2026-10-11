@@ -4,9 +4,12 @@ import { useAppearance } from '../state/appearance';
 import { useAISettings } from '../state/ai';
 import { useStorage } from '../state/storage';
 import { useUpdates } from '../state/updates';
-import { partitionFontFamilies, quoteFontFamily } from '../lib/fonts.js';
+import { BUNDLED_FONTS, partitionFontFamilies, quoteFontFamily } from '../lib/fonts.js';
 import { Dictionary } from './Dictionary';
 import { BrandMark } from '../shell/Titlebar';
+import misansLicense from '../../LICENSES/MiSans/LICENSE?raw';
+import newsreaderLicense from '../../LICENSES/Newsreader/LICENSE?raw';
+import plexLicense from '../../LICENSES/IBMPlexMono/LICENSE?raw';
 import projectLicense from '../../LICENSE?raw';
 import remixLicense from '../../LICENSES/RemixIcon/LICENSE?raw';
 import dictionaryLicense from '../../third_party/DanbooruSearchOnline/LICENSE?raw';
@@ -104,8 +107,9 @@ function Appearance() {
             options={(key === 'monoFont' ? groups.monospace : groups.proportional).map(
               (family: string) => ({
                 value: family,
-                label:
-                  family === 'system-ui'
+                label: BUNDLED_FONTS.includes(family)
+                  ? `${family}（内置）`
+                  : family === 'system-ui'
                     ? '系统界面字体'
                     : family === 'monospace'
                       ? '系统等宽字体'
@@ -316,7 +320,7 @@ function Storage({
         </Row>
       ))}
       {s.backups?.length === 0 && (
-        <Row title="升级前的备份" help="【文案待定：没有升级前的备份】">
+        <Row title="升级前的备份" help="还没有升级前的备份。软件在升级数据格式之前会自动留一份。">
           {null}
         </Row>
       )}
@@ -482,8 +486,15 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           </Suspense>
         ) : (
           <>
-            <p>【文案待定：本次未随包分发的 MiSans、Newsreader 与 IBM Plex Mono 字体说明】</p>
+            <p>
+              界面字体 MiSans VF（版本
+              4.003），版权归北京小米移动软件有限公司所有，按其许可协议随本软件原样分发。段落字体
+              Newsreader 与等宽字体 IBM Plex Mono 按 SIL Open Font License 1.1 分发。
+            </p>
             {[
+              ['MiSans VF 4.003', misansLicense],
+              ['Newsreader', newsreaderLicense],
+              ['IBM Plex Mono', plexLicense],
               ['NovelAI Prompt Studio', projectLicense],
               ['Remix Icon', remixLicense],
               ['DanbooruSearchOnline', dictionaryLicense],

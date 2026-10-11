@@ -6,3 +6,5 @@ release/
 .codex-runs/
 design/brand/
 design/shots/
+
+.local/fonts/

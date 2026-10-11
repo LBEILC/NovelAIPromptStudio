@@ -5,6 +5,7 @@ import { AppearanceProvider } from './state/appearance';
 import { LegacyProviders } from './legacy/LegacyProviders';
 import { NotificationProvider } from './ui';
 import './fonts.css';
+import 'virtual:misans.css';
 import './styles.css';
 
 if (window.studioScreenshot) {

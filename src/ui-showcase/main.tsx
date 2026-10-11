@@ -37,6 +37,8 @@ import {
   type ButtonProps,
 } from '../ui';
 import './showcase.css';
+import '../fonts.css';
+import 'virtual:misans.css';
 
 const params = new URLSearchParams(location.search);
 const theme =

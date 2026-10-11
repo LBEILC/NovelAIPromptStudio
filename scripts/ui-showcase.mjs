@@ -1,5 +1,6 @@
 import { createServer, build, preview } from 'vite';
 import react from '@vitejs/plugin-react';
+import { bundledMiSans } from './font-vite.mjs';
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile, copyFile, readFile } from 'node:fs/promises';
 import { createServer as createHttpServer } from 'node:http';
@@ -25,7 +26,7 @@ if (serve) {
     configFile: false,
     root,
     base: './',
-    plugins: [react()],
+    plugins: [react(), bundledMiSans()],
     build: {
       outDir,
       emptyOutDir: true,

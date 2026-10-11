@@ -4,6 +4,30 @@ import { ipcMain, nativeImage, screen } from 'electron';
 import { importLibraryFiles } from './importer.js';
 import { screenshotScenes } from '../scripts/app-screenshot-scenes.mjs';
 
+async function renderedFonts(webContents, selectors) {
+  const cdp = webContents.debugger;
+  await cdp.sendCommand('DOM.enable');
+  await cdp.sendCommand('CSS.enable');
+  const { root } = await cdp.sendCommand('DOM.getDocument');
+  const result = {};
+  for (const [role, selector, expected] of selectors) {
+    const { nodeId } = await cdp.sendCommand('DOM.querySelector', {
+      nodeId: root.nodeId,
+      selector,
+    });
+    if (!nodeId) throw new Error(`Missing font evidence node: ${selector}`);
+    const { fonts } = await cdp.sendCommand('CSS.getPlatformFontsForNode', { nodeId });
+    if (
+      !fonts.some(
+        (font) => font.isCustomFont && font.glyphCount > 0 && font.familyName.includes(expected),
+      )
+    )
+      throw new Error(`Unexpected rendered font (${role}): ${JSON.stringify(fonts)}`);
+    result[role] = { selector, fonts };
+  }
+  return result;
+}
+
 export async function runAppScreenshots({
   app,
   mode,
@@ -56,6 +80,7 @@ export async function runAppScreenshots({
     userData: app.getPath('userData'),
     sessionData: app.getPath('sessionData'),
     screenshots: [],
+    fontProof: [],
   };
   try {
     for (const theme of ['light', 'dark']) {
@@ -186,6 +211,11 @@ export async function runAppScreenshots({
             throw new Error(`Unexpected capture size: ${size.width}x${size.height}`);
           const file = `${scene.name}-${theme}.png`;
           await fs.writeFile(path.join(mode.output, file), image.toPNG());
+          const fontSelectors = [['ui', '.studio-titlebar nav button', 'MiSans']];
+          if (scene.name === 'workbench')
+            fontSelectors.push(['tag', '.overview-tag-copy', 'IBM Plex Mono']);
+          if (scene.name === 'settings-updates')
+            fontSelectors.push(['proseBrand', '.settings-about-name', 'Newsreader']);
           manifest.screenshots.push({
             file,
             ...scene,
@@ -193,6 +223,7 @@ export async function runAppScreenshots({
             version: app.getVersion(),
             size,
             overlayUpdates,
+            renderedFonts: await renderedFonts(window.webContents, fontSelectors),
             appearance: await window.webContents.executeJavaScript(`(() => {
               const selectors = ['html', '.lobe-root', '.studio-titlebar', '.workbench-source-shell', '.workbench-tabs-list', '.studio-settings'];
               return Object.fromEntries(selectors.map(selector => {
@@ -205,6 +236,39 @@ export async function runAppScreenshots({
             })()`),
           });
           console.log(`Captured ${file}`);
+          if (scene.name === 'settings-updates') {
+            // Screenshot-only specimens: no UI input, saved settings or production layout changes.
+            // The legacy workbench has no prose block yet, so verify the real prose token here.
+            await window.webContents.executeJavaScript(`(async () => {
+              const host = document.querySelector('.settings-about-name').closest('.settings-copy');
+              host.innerHTML = '<h2 id="font-ui">界面字体 MiSans · 中文与 English 012345</h2>' +
+                '<p id="font-tag" style="font-family:var(--font-mono)">blue_hair, school_uniform, 1.25</p>' +
+                '<blockquote id="font-prose" class="nps-quote">A quiet studio filled with soft morning light. 一间洒满晨光的画室。</blockquote>' +
+                '<p id="font-mono-500" style="font-family:var(--font-mono);font-weight:var(--fw-strong)">Weight 500: 012345</p>' +
+                '<p id="font-prose-500" style="font-family:var(--font-prose);font-weight:var(--fw-strong)">Newsreader weight 500 with optical sizing.</p>';
+              await document.fonts.ready;
+              await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            })()`);
+            const proof = await renderedFonts(window.webContents, [
+              ['ui', '#font-ui', 'MiSans'],
+              ['tag', '#font-tag', 'IBM Plex Mono'],
+              ['prose', '#font-prose', 'Newsreader'],
+              ['proseChinese', '#font-prose', 'MiSans'],
+              ['mono500', '#font-mono-500', 'IBM Plex Mono'],
+              ['prose500', '#font-prose-500', 'Newsreader'],
+            ]);
+            const { data: proofData } = await window.webContents.debugger.sendCommand(
+              'Page.captureScreenshot',
+              {
+                format: 'png',
+                captureBeyondViewport: false,
+                clip: { x: 0, y: 0, width: 1240, height: 760, scale: 1 },
+              },
+            );
+            const proofFile = `fonts-${theme}.png`;
+            await fs.writeFile(path.join(mode.output, proofFile), Buffer.from(proofData, 'base64'));
+            manifest.fontProof.push({ file: proofFile, theme, renderedFonts: proof });
+          }
         } finally {
           window.destroy();
         }

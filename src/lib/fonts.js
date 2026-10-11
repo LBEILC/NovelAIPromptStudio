@@ -1,5 +1,7 @@
-export const DEFAULT_SANS_FONT = 'Geist';
-export const DEFAULT_MONO_FONT = 'Geist Mono';
+export const DEFAULT_SANS_FONT = 'MiSans';
+export const DEFAULT_MONO_FONT = 'IBM Plex Mono';
+
+export const BUNDLED_FONTS = ['MiSans', 'IBM Plex Mono', 'Newsreader'];
 
 const GENERIC_FONTS = new Set(['system-ui', 'sans-serif', 'serif', 'monospace', 'ui-monospace']);
 const MONO_NAME_PATTERN =
@@ -17,9 +19,7 @@ export function fontStack(family, role = 'sans') {
   const selected = quoteFontFamily(
     family || (role === 'mono' ? DEFAULT_MONO_FONT : DEFAULT_SANS_FONT),
   );
-  return role === 'mono'
-    ? `${selected}, "HarmonyOS Sans SC", ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, Menlo, monospace`
-    : `${selected}, "HarmonyOS Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  return `${selected}, var(--font-${role === 'mono' ? 'mono' : 'ui'})`;
 }
 
 export function isMonospaceFont(font, measureText) {
@@ -34,11 +34,12 @@ export function isMonospaceFont(font, measureText) {
 }
 
 export function partitionFontFamilies(fonts = [], measureText) {
-  const proportional = new Set([DEFAULT_SANS_FONT, 'HarmonyOS Sans SC', 'system-ui']);
-  const monospace = new Set([DEFAULT_MONO_FONT, 'monospace']);
+  const proportional = new Set([...BUNDLED_FONTS, 'system-ui']);
+  const monospace = new Set([...BUNDLED_FONTS, 'monospace']);
   for (const font of fonts) {
     const family = String(font?.family || '').trim();
-    if (!family) continue;
+    if (!family || BUNDLED_FONTS.some((name) => name.toLowerCase() === family.toLowerCase()))
+      continue;
     (isMonospaceFont(font, measureText) ? monospace : proportional).add(family);
   }
   const sort = (values, preferred) =>
@@ -52,7 +53,7 @@ export function partitionFontFamilies(fonts = [], measureText) {
       return left.localeCompare(right, undefined, { sensitivity: 'base' });
     });
   return {
-    proportional: sort(proportional, [DEFAULT_SANS_FONT, 'HarmonyOS Sans SC', 'system-ui']),
-    monospace: sort(monospace, [DEFAULT_MONO_FONT, 'monospace']),
+    proportional: sort(proportional, [...BUNDLED_FONTS, 'system-ui']),
+    monospace: sort(monospace, [...BUNDLED_FONTS, 'monospace']),
   };
 }

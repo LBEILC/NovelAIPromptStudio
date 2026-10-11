@@ -16,7 +16,7 @@
     "dso:update": "node scripts/update-dso-dictionary.mjs",
     "dso:verify": "node scripts/update-dso-dictionary.mjs --check",
     "icons:generate": "node scripts/generate-app-icons.mjs",
-    "package": "npm run build && electron-builder --publish never",
+    "package": "npm run fonts:check && npm run build && electron-builder --publish never",
     "screenshots:app": "npm run build && node scripts/app-screenshots.mjs",
     "screenshots:readme": "node scripts/render-readme-artwork.mjs",
     "dev:ui": "node scripts/ui-showcase.mjs --serve",
@@ -28,7 +28,10 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write \"{src,electron,scripts}/**/*.{js,jsx,ts,tsx,cjs,mjs}\" \"vite.config.js\"",
-    "format:check": "prettier --check \"{src,electron,scripts}/**/*.{js,jsx,ts,tsx,cjs,mjs}\" \"vite.config.js\""
+    "format:check": "prettier --check \"{src,electron,scripts}/**/*.{js,jsx,ts,tsx,cjs,mjs}\" \"vite.config.js\"",
+    "fonts": "node scripts/fonts.mjs",
+    "fonts:check": "node scripts/fonts.mjs --check",
+    "verify:fonts:package": "node scripts/verify-font-package.mjs"
   },
   "dependencies": {
     "electron-updater": "6.8.9",
@@ -47,10 +50,9 @@
     "@dnd-kit/modifiers": "9.0.0",
     "@dnd-kit/sortable": "10.0.0",
     "@dnd-kit/utilities": "3.2.2",
+    "@fontsource-variable/newsreader": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
     "@lobehub/ui": "5.20.3",
-    "@lobehub/webfont-geist": "1.0.0",
-    "@lobehub/webfont-geist-mono": "1.0.0",
-    "@lobehub/webfont-harmony-sans-sc": "1.0.0",
     "@types/node": "24.13.3",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.2",
@@ -132,6 +134,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    }
+    },
+    "beforePack": "scripts/font-before-pack.mjs"
   }
 }

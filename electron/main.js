@@ -341,7 +341,14 @@ app.whenReady().then(async () => {
     reportDatabaseOpenError(dataDirectory, error);
     return;
   }
-  preferences = openPreferences(dataDirectory, safeStorage, { defaultAssetsDirectory });
+  const systemFonts = await listSystemFonts().catch((error) => {
+    console.warn('Unable to enumerate system fonts; preserving font preferences:', error.message);
+    return undefined;
+  });
+  preferences = openPreferences(dataDirectory, safeStorage, {
+    defaultAssetsDirectory,
+    systemFonts,
+  });
   configureAutoUpdater();
   workbenchTemporaryDirectory = path.join(app.getPath('userData'), 'workbench-temp');
   assetsDirectory = preferences.librarySettings().assetsDirectory;

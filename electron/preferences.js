@@ -10,8 +10,8 @@ import {
 const APPEARANCE_DEFAULTS = Object.freeze({
   themeMode: 'auto',
   primaryColor: 'blue',
-  sansFont: 'Geist',
-  monoFont: 'Geist Mono',
+  sansFont: 'MiSans',
+  monoFont: 'IBM Plex Mono',
   proseFont: 'Newsreader',
   motion: 'full',
 });
@@ -124,6 +124,18 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
 
   const credentials = () => ({ ...publicSettings(), apiKey: decryptKey(read()) });
 
+  const resolveFont = (value, fallback) => {
+    const family = normalizeFontFamily(value, fallback);
+    // Failed enumeration is unknown, not proof of absence.
+    const installed = options.systemFonts;
+    if (
+      Array.isArray(installed) &&
+      ['geist', 'geist mono', 'harmonyos sans sc'].includes(family.toLowerCase()) &&
+      !installed.some((font) => font.family.toLowerCase() === family.toLowerCase())
+    )
+      return fallback;
+    return family;
+  };
   const appearanceSettings = () => {
     const stored = read().appearance || {};
     return {
@@ -133,9 +145,9 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       primaryColor: APPEARANCE_VALUES.primaryColor.has(stored.primaryColor)
         ? stored.primaryColor
         : APPEARANCE_DEFAULTS.primaryColor,
-      sansFont: normalizeFontFamily(stored.sansFont, APPEARANCE_DEFAULTS.sansFont),
-      monoFont: normalizeFontFamily(stored.monoFont, APPEARANCE_DEFAULTS.monoFont),
-      proseFont: normalizeFontFamily(stored.proseFont, APPEARANCE_DEFAULTS.proseFont),
+      sansFont: resolveFont(stored.sansFont, APPEARANCE_DEFAULTS.sansFont),
+      monoFont: resolveFont(stored.monoFont, APPEARANCE_DEFAULTS.monoFont),
+      proseFont: resolveFont(stored.proseFont, APPEARANCE_DEFAULTS.proseFont),
       motion: APPEARANCE_VALUES.motion.has(stored.motion)
         ? stored.motion
         : APPEARANCE_DEFAULTS.motion,

@@ -91,21 +91,22 @@ function pageHtml(config, assets) {
     <head>
       <meta charset="utf-8">
       <style>
+        ${fs.readFileSync(path.join(projectRoot, 'design/tokens.css'), 'utf8')}
         @font-face {
-          font-family: "HarmonyOS Sans SC";
-          src: url("${assets.harmonyRegular}") format("woff2");
+          font-family: "MiSans";
+          src: url("${assets.misansRegular}") format("truetype");
           font-style: normal;
           font-weight: 400;
         }
         @font-face {
-          font-family: "HarmonyOS Sans SC";
-          src: url("${assets.harmonyBold}") format("woff2");
+          font-family: "MiSans";
+          src: url("${assets.misansBold}") format("truetype");
           font-style: normal;
           font-weight: 700;
         }
         @font-face {
-          font-family: "Geist Mono";
-          src: url("${assets.geistMono}") format("opentype");
+          font-family: "IBM Plex Mono";
+          src: url("${assets.plexMono}") format("woff2");
           font-style: normal;
           font-weight: 400;
         }
@@ -118,7 +119,7 @@ function pageHtml(config, assets) {
           background: #101113;
         }
         body {
-          font-family: "HarmonyOS Sans SC", sans-serif;
+          font-family: var(--font-ui);
           text-rendering: geometricPrecision;
           -webkit-font-smoothing: antialiased;
         }
@@ -216,7 +217,7 @@ function pageHtml(config, assets) {
         .eyebrow,
         .figure,
         .index {
-          font-family: "Geist Mono", monospace;
+          font-family: var(--font-mono);
           font-variant-ligatures: none;
           text-transform: uppercase;
         }
@@ -286,20 +287,16 @@ function pageHtml(config, assets) {
 }
 
 function fontAssets() {
-  const fontRoot = path.join(projectRoot, 'node_modules', '@lobehub');
+  const fontRoot = path.join(projectRoot, 'node_modules', '@fontsource');
   const noiseSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240">
     <filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".74" numOctaves="4" seed="23"/></filter>
     <rect width="100%" height="100%" filter="url(#n)" opacity=".72"/>
   </svg>`;
   return {
-    harmonyRegular: pathToFileURL(
-      path.join(fontRoot, 'webfont-harmony-sans-sc', 'fonts', 'HarmonyOS_Sans_SC_Regular.woff2'),
-    ).href,
-    harmonyBold: pathToFileURL(
-      path.join(fontRoot, 'webfont-harmony-sans-sc', 'fonts', 'HarmonyOS_Sans_SC_Bold.woff2'),
-    ).href,
-    geistMono: pathToFileURL(
-      path.join(fontRoot, 'webfont-geist-mono', 'fonts', 'GeistMono-Regular.otf'),
+    misansRegular: pathToFileURL(path.join(projectRoot, '.local/fonts/MiSansVF.ttf')).href,
+    misansBold: pathToFileURL(path.join(projectRoot, '.local/fonts/MiSansVF.ttf')).href,
+    plexMono: pathToFileURL(
+      path.join(fontRoot, 'ibm-plex-mono', 'files', 'ibm-plex-mono-latin-400-normal.woff2'),
     ).href,
     noise: `data:image/svg+xml;base64,${Buffer.from(noiseSvg).toString('base64')}`,
   };

@@ -110,8 +110,8 @@ describe('AI preferences', () => {
     expect(preferences.appearanceSettings()).toEqual({
       themeMode: 'auto',
       primaryColor: 'blue',
-      sansFont: 'Geist',
-      monoFont: 'Geist Mono',
+      sansFont: 'MiSans',
+      monoFont: 'IBM Plex Mono',
       proseFont: 'Newsreader',
       motion: 'full',
     });
@@ -196,5 +196,71 @@ describe('AI preferences', () => {
     expect(() =>
       preferences.saveProductivitySettings({ recentImageDirectory: 'relative' }),
     ).toThrow('绝对路径');
+  });
+});
+
+describe('removed bundled font compatibility', () => {
+  const open = (appearance, systemFonts) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-font-migration-'));
+    temporaryDirectories.push(directory);
+    const file = path.join(directory, 'preferences.json');
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ appearance, aiModel: 'unchanged', library: { untouched: true } }),
+    );
+    return openPreferences(directory, safeStorage, { systemFonts });
+  };
+  it.each(['Geist', 'Geist Mono', 'HarmonyOS Sans SC', 'geist', 'geist-mono', 'harmony'])(
+    'falls back by role for absent removed family %s without rewriting stored data',
+    (family) => {
+      const p = open({ sansFont: family, monoFont: family, proseFont: family }, []);
+      const before = fs.readFileSync(p.filePath, 'utf8');
+      expect(p.appearanceSettings()).toMatchObject({
+        sansFont: 'MiSans',
+        monoFont: 'IBM Plex Mono',
+        proseFont: 'Newsreader',
+      });
+      expect(fs.readFileSync(p.filePath, 'utf8')).toBe(before);
+    },
+  );
+  it.each(['Geist', 'Geist Mono', 'HarmonyOS Sans SC'])(
+    'preserves %s when installed (case insensitive)',
+    (family) => {
+      const p = open({ sansFont: family, monoFont: family, proseFont: family }, [
+        { family: family.toLowerCase() },
+      ]);
+      expect(p.appearanceSettings()).toMatchObject({
+        sansFont: family,
+        monoFont: family,
+        proseFont: family,
+      });
+    },
+  );
+  it('preserves custom and generic choices even when absent, and unknown inventory', () => {
+    expect(
+      open(
+        { sansFont: 'Custom Missing', monoFont: 'monospace', proseFont: 'Georgia' },
+        [],
+      ).appearanceSettings(),
+    ).toMatchObject({ sansFont: 'Custom Missing', monoFont: 'monospace', proseFont: 'Georgia' });
+    expect(open({ sansFont: 'Geist' }, undefined).appearanceSettings().sansFont).toBe('Geist');
+  });
+  it('only persists resolved font settings when the user saves appearance', () => {
+    const p = open(
+      { sansFont: 'Geist', monoFont: 'Geist Mono', primaryColor: 'legacy-custom' },
+      [],
+    );
+    p.saveAppearanceSettings({ proseFont: 'Georgia' });
+    const stored = JSON.parse(fs.readFileSync(p.filePath, 'utf8'));
+    expect(stored).toMatchObject({
+      aiModel: 'unchanged',
+      library: { untouched: true },
+      appearance: {
+        sansFont: 'MiSans',
+        monoFont: 'IBM Plex Mono',
+        proseFont: 'Georgia',
+        primaryColor: 'legacy-custom',
+      },
+    });
   });
 });

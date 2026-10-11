@@ -4,6 +4,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import electron from 'electron';
 import { screenshotScenes } from './app-screenshot-scenes.mjs';
+import { requireFont } from './fonts.mjs';
+
+await requireFont();
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nai-app-screens-'));
 let child;
@@ -33,6 +36,7 @@ try {
     });
     if (code !== 0) throw new Error(`Application screenshots failed (${code})`);
     const manifest = JSON.parse(await fs.readFile(path.join(output, 'manifest.json'), 'utf8'));
+    if (manifest.fontProof?.length !== 2) throw new Error('Missing actual rendered font evidence');
     const expected = screenshotScenes
       .flatMap((scene) => ['light', 'dark'].map((theme) => `${scene.name}-${theme}.png`))
       .sort();

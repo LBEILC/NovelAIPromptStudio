@@ -59,6 +59,14 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Cache pinned MiSans VF
+        uses: actions/cache@v5
+        with:
+          path: .local/fonts/
+          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
+      - name: Acquire and verify MiSans (required for screenshots and packaging)
+        run: npm run fonts
+      - run: npm run fonts:check
       - name: Package application
         if: runner.os != 'macOS'
         run: npm run package -- ${{ matrix.package_args }}
@@ -79,6 +87,8 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - run: npm run verify:fonts:package
 
       - name: Verify updater metadata matches packaged artifacts
         run: npm run verify:update-artifacts

@@ -26,9 +26,11 @@ describe('font preferences', () => {
       { family: 'Example Sans', monospace: false },
       { family: 'Example Mono', monospace: true },
     ]);
+    expect(result.proportional.slice(0, 3)).toEqual(['MiSans', 'IBM Plex Mono', 'Newsreader']);
+    expect(result.monospace.slice(0, 3)).toEqual(['MiSans', 'IBM Plex Mono', 'Newsreader']);
     expect(result.proportional).toEqual(
-      expect.arrayContaining(['Geist', 'HarmonyOS Sans SC', 'Example Sans']),
+      expect.arrayContaining(['MiSans', 'Newsreader', 'Example Sans']),
     );
-    expect(result.monospace).toEqual(expect.arrayContaining(['Geist Mono', 'Example Mono']));
+    expect(result.monospace).toEqual(expect.arrayContaining(['IBM Plex Mono', 'Example Mono']));
   });
 });

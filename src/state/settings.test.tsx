@@ -119,7 +119,7 @@ describe('settings domain state', () => {
     expect(state.total).toBe(2);
     expect(state.filters.query).toBe('new');
   });
-  it('shares the resolved theme and saves prose without applying it', async () => {
+  it('shares the resolved theme and applies the saved prose font', async () => {
     const media = new Map<
       string,
       {
@@ -172,6 +172,6 @@ describe('settings domain state', () => {
     expect(document.documentElement.dataset.theme).toBe('dark');
     await act(async () => state.changeAppearance({ proseFont: 'Georgia' }));
     expect(state.appearance.proseFont).toBe('Georgia');
-    expect(document.documentElement.style.getPropertyValue('--font-prose')).toBe('');
+    expect(document.documentElement.style.getPropertyValue('--font-prose')).toContain('"Georgia"');
   });
 });
