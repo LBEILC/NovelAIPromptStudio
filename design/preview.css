@@ -8,7 +8,7 @@ button { font: inherit; color: inherit; cursor: default; }
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .muted { color: var(--text-3); }
 .sp { flex: 1 1 0; }
-:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
 
 /* ---------- 预览外框 ---------- */
 .pv-bar { position: sticky; top: 0; z-index: 9; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 10px 20px; background: var(--pane); border-bottom: 1px solid var(--border); }
@@ -65,7 +65,7 @@ button { font: inherit; color: inherit; cursor: default; }
 .field.sm { height: var(--ctl-sm); padding: 0 8px; font-size: var(--fs-small); }
 .field .ph { color: var(--text-3); }
 .field.grow { flex: 1 1 0; min-width: 0; }
-.seg { display: inline-flex; gap: 18px; }
+.seg { display: inline-flex; gap: var(--tab-gap); }
 .seg button { height: 28px; padding: 0; border: 0; background: transparent; color: var(--text-3); border-bottom: 2px solid transparent; }
 .seg button:hover { color: var(--text); }
 .seg button.on { color: var(--text); font-weight: var(--fw-strong); border-bottom-color: var(--text); }
@@ -120,7 +120,7 @@ button { font: inherit; color: inherit; cursor: default; }
 .blk-h { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
 .blk-h .act { margin-left: auto; color: var(--text-3); font-size: var(--fs-caption); }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; }
-.tag { display: inline-flex; align-items: center; gap: 7px; padding: 3px 8px 4px; border: 1px solid var(--border); border-radius: var(--r-tag); background: var(--surface); }
+.tag { display: inline-flex; align-items: center; gap: var(--ctl-gap); padding: var(--tag-pad-y) var(--tag-pad-x) calc(var(--tag-pad-y) + 1px); border: 1px solid var(--border); border-radius: var(--r-tag); background: var(--surface); }
 .tag:hover { background: var(--hover); }
 .tag .dot { width: 5px; height: 5px; border-radius: 50%; flex: 0 0 auto; align-self: flex-start; margin-top: 6px; }
 .tag .t { display: flex; flex-direction: column; }
@@ -149,7 +149,7 @@ button { font: inherit; color: inherit; cursor: default; }
 .kv { display: grid; grid-template-columns: 104px 1fr; gap: 10px 12px; align-items: center; padding: 6px 0 4px; }
 .kv > span:nth-child(odd) { color: var(--text-2); }
 .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.opt { height: var(--ctl-sm); display: inline-flex; align-items: center; padding: 0 9px; border: 1px solid var(--border); border-radius: var(--r-ctl); color: var(--text-2); font-size: var(--fs-small); }
+.opt { height: var(--ctl-sm); display: inline-flex; align-items: center; padding: 0 var(--ctl-pad-x); border: 1px solid var(--border); border-radius: var(--r-ctl); color: var(--text-2); font-size: var(--fs-small); }
 .opt.on { border-color: var(--text); color: var(--text); background: var(--selected); }
 .note { display: flex; gap: 8px; padding: 9px 12px; margin-top: 12px; border-radius: var(--r-ctl); background: var(--bg); border: 1px solid var(--divider); color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small); }
 .posgrid { display: grid; grid-template-columns: repeat(5, 22px); gap: 3px; }
