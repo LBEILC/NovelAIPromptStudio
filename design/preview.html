@@ -9,16 +9,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.9.1/fonts/remixicon.css">
-<link rel="stylesheet" href="tokens.css">
-<link rel="stylesheet" href="preview.css">
-<link rel="stylesheet" href="preview-components.css">
-<link rel="stylesheet" href="preview-settings.css">
-<link rel="stylesheet" href="preview-library.css">
-<script src="preview-logo.js" defer></script>
-<script src="preview.js" defer></script>
-<script src="preview-pages.js" defer></script>
-<script src="preview-settings.js" defer></script>
-<script src="preview-library.js" defer></script>
+<!-- 预览服务不发缓存响应头，浏览器会一直用旧的样式和脚本。这里每次打开都带上时间戳，保证刷新就是最新的 -->
+<script>
+  const PV_V = Date.now();
+  for (const f of ['tokens.css', 'preview.css', 'preview-components.css', 'preview-settings.css', 'preview-library.css'])
+    document.write(`<link rel="stylesheet" href="${f}?v=${PV_V}">`);
+  for (const f of ['preview-logo.js', 'preview.js', 'preview-pages.js', 'preview-settings.js', 'preview-library.js'])
+    document.write(`<script src="${f}?v=${PV_V}" defer><\/script>`);
+</script>
 </head>
 <body>
 <header class="pv-bar">
