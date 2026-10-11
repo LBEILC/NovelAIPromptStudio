@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { hash } from 'node:crypto';
-import { clipboard, nativeImage } from 'electron';
+import { clipboard, nativeImage, ipcMain } from 'electron';
 import { describeAssetDirectory } from '../libraryStorage.js';
 import { dictionaryChecks } from './dictionary.js';
 import { createTrashDraft } from './shortcuts.js';
@@ -199,23 +199,62 @@ export async function settingsChecks(context, restart) {
   await check('已清空的草稿图片不再存在', () => database.loadProject(draftProjectId) == null);
   await h.screenshot('storage');
   h.category('设置·AI 服务');
-  await section('AI 服务');
-  await wait('!!document.querySelector("input[type=password]")');
-  await input(aiInput(0), mode.baseUrl);
-  if (encrypted) await input(aiInput(1), 'acceptance-local-key');
-  else
-    h.uncovered('保存与恢复安全存储 Key', '本平台 safeStorage.isEncryptionAvailable() 返回 false');
-  await input(aiInput(2), 'acceptance-model');
-  await input('textarea', '验收翻译规则');
-  await e(
-    `(() => {const e=[...document.querySelectorAll('textarea')][1]; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'验收分类规则');e.dispatchEvent(new Event('input',{bubbles:true}))})()`,
-  );
-  await section('外观');
-  await section('AI 服务');
-  await check(
-    '分页切换保留 AI 草稿',
-    `document.querySelector(${JSON.stringify(aiInput(0))}).value === ${JSON.stringify(mode.baseUrl)} && document.querySelector('[aria-label="模型"]').value==='acceptance-model' && document.querySelector('input[type=password]').value===${JSON.stringify(encrypted ? 'acceptance-local-key' : '')} && [...document.querySelectorAll('textarea')].map(e=>e.value).join('|') === '验收翻译规则|验收分类规则'`,
-  );
+  // Hold real saved snapshots until after editing and switching sections. This
+  // acceptance-only gate reproduces a slow read without relying on a sleep.
+  const slowAIRead = process.env.NPS_ACCEPTANCE_SLOW_AI_READ === '1';
+  let releaseAIRead;
+  let aiReads = 0;
+  if (slowAIRead) {
+    const gate = new Promise((resolve) => {
+      releaseAIRead = resolve;
+    });
+    ipcMain.removeHandler('ai:settings:get');
+    ipcMain.handle('ai:settings:get', async () => {
+      const saved = preferences.publicSettings();
+      aiReads++;
+      await gate;
+      return saved;
+    });
+  }
+  const aiDraftMatches = `document.querySelector(${JSON.stringify(aiInput(0))})?.value === ${JSON.stringify(mode.baseUrl)} && document.querySelector('[aria-label="模型"]')?.value==='acceptance-model' && document.querySelector('input[type=password]')?.value===${JSON.stringify(encrypted ? 'acceptance-local-key' : '')} && [...document.querySelectorAll('textarea')].map(e=>e.value).join('|') === '验收翻译规则|验收分类规则'`;
+  const aiDraftDetails = `(()=>{const key=document.querySelector('input[type=password]'); const areas=[...document.querySelectorAll('textarea')]; return {baseUrl:document.querySelector(${JSON.stringify(aiInput(0))})?.value, model:document.querySelector('[aria-label="模型"]')?.value, apiKey:{empty:!key?.value,length:key?.value.length ?? 0}, translationPrompt:areas[0]?.value, classificationPrompt:areas[1]?.value}})()`;
+  try {
+    await section('AI 服务');
+    await wait('!!document.querySelector("input[type=password]")');
+    if (slowAIRead) await h.until(() => aiReads === 1, '首次设置读取已挂起');
+    await input(aiInput(0), mode.baseUrl);
+    if (encrypted) await input(aiInput(1), 'acceptance-local-key');
+    else
+      h.uncovered(
+        '保存与恢复安全存储 Key',
+        '本平台 safeStorage.isEncryptionAvailable() 返回 false',
+      );
+    await input(aiInput(2), 'acceptance-model');
+    await input('textarea', '验收翻译规则');
+    await e(
+      `(() => {const e=[...document.querySelectorAll('textarea')][1]; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'验收分类规则');e.dispatchEvent(new Event('input',{bubbles:true}))})()`,
+    );
+    await section('外观');
+    await section('AI 服务');
+    await check('分页切换保留 AI 草稿', aiDraftMatches, aiDraftDetails);
+    if (slowAIRead) {
+      await h.until(() => aiReads >= 2, '切回分页重新读取设置');
+      releaseAIRead();
+      // A subsequent IPC round trip and React paint drain the released replies.
+      await e(
+        '(async()=>{await window.studio.getAISettings(); await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})()',
+      );
+      await check('晚到的已保存 AI 设置不覆盖五个草稿字段', aiDraftMatches, aiDraftDetails);
+      if (!(await e(aiDraftMatches)))
+        throw new Error('AI 草稿已丢失，停止后续连接测试，避免访问被覆盖后的服务地址');
+    }
+  } finally {
+    if (slowAIRead) {
+      releaseAIRead();
+      ipcMain.removeHandler('ai:settings:get');
+      ipcMain.handle('ai:settings:get', () => preferences.publicSettings());
+    }
+  }
   await click('重新读取模型列表');
   {
     await wait('document.body.innerText.includes("已读取 2 个模型")');

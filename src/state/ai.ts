@@ -1,17 +1,45 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react';
 import type { AISettings } from '../shared/types';
 
+type SettingsDraft = AISettings & { apiKey: string };
+const editableFields = [
+  'baseUrl',
+  'apiKey',
+  'model',
+  'translationPrompt',
+  'classificationPrompt',
+] as const;
+type EditableField = (typeof editableFields)[number];
+
 export function useAISettings() {
-  const [settings, setSettings] = useState<AISettings & { apiKey: string }>({
-    baseUrl: 'https://api.openai.com/v1',
-    model: '',
-    apiKey: '',
-    translationPrompt: '',
-    classificationPrompt: '',
-    defaultPrompts: { translation: '', classification: '' },
-    hasApiKey: false,
-    encryptionAvailable: true,
+  const [draft, updateDraft] = useState<{ settings: SettingsDraft; edited: EditableField[] }>({
+    edited: [],
+    settings: {
+      baseUrl: 'https://api.openai.com/v1',
+      model: '',
+      apiKey: '',
+      translationPrompt: '',
+      classificationPrompt: '',
+      defaultPrompts: { translation: '', classification: '' },
+      hasApiKey: false,
+      encryptionAvailable: true,
+    },
   });
+  const settings = draft.settings;
+  const setSettings = useCallback((action: SetStateAction<SettingsDraft>) => {
+    updateDraft((current) => {
+      const next = typeof action === 'function' ? action(current.settings) : action;
+      return {
+        settings: next,
+        edited: [
+          ...new Set([
+            ...current.edited,
+            ...editableFields.filter((key) => next[key] !== current.settings[key]),
+          ]),
+        ],
+      };
+    });
+  }, []);
   const [models, setModels] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -22,9 +50,18 @@ export function useAISettings() {
     window.studio
       ?.getAISettings()
       .then((saved) => {
-        if (active) {
+        if (active && !loaded.current) {
           loaded.current = true;
-          setSettings({ ...saved, apiKey: '' });
+          // Keep edits made while the initial read was pending, including edits
+          // retained by Activity while this effect was disconnected.
+          updateDraft((current) => ({
+            ...current,
+            settings: {
+              ...saved,
+              apiKey: '',
+              ...Object.fromEntries(current.edited.map((key) => [key, current.settings[key]])),
+            },
+          }));
         }
       })
       .catch((e: Error) => {
@@ -40,7 +77,8 @@ export function useAISettings() {
     try {
       // Preserve the existing API contract: model discovery and testing use saved credentials.
       const saved = await window.studio.saveAISettings(settings);
-      setSettings({ ...saved, apiKey: '' });
+      loaded.current = true;
+      updateDraft({ settings: { ...saved, apiKey: '' }, edited: [] });
       if (action === 'models') {
         const result = await window.studio.listAIModels();
         if (!result.ok) throw new Error(result.error);

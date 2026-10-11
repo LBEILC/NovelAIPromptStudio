@@ -34,6 +34,45 @@ const ai = {
   encryptionAvailable: true,
 };
 describe('settings domain state', () => {
+  it.each([false, true])(
+    'preserves drafts when the initial AI read arrives late (switch=%s)',
+    async (switchSection) => {
+      const pending: ((value: typeof ai) => void)[] = [];
+      window.studio = {
+        getAISettings: () => new Promise((resolve) => pending.push(resolve)),
+      } as unknown as StudioApi;
+      let state!: ReturnType<typeof useAISettings>;
+      function Harness() {
+        state = useAISettings();
+        return null;
+      }
+      const render = async (mode: 'visible' | 'hidden') => {
+        await act(async () =>
+          root.render(
+            <Activity mode={mode}>
+              <Harness />
+            </Activity>,
+          ),
+        );
+      };
+      await render('visible');
+      const draft = {
+        baseUrl: 'https://draft.test/v1',
+        model: 'draft',
+        apiKey: 'secret',
+        translationPrompt: 'draft translation',
+        classificationPrompt: 'draft classification',
+      };
+      act(() => state.setSettings((s) => ({ ...s, ...draft })));
+      if (switchSection) {
+        await render('hidden');
+        await render('visible');
+      }
+      expect(pending).toHaveLength(switchSection ? 2 : 1);
+      await act(async () => pending.toReversed().forEach((resolve) => resolve(ai)));
+      expect(state.settings).toMatchObject({ ...ai, ...draft });
+    },
+  );
   it('retains AI drafts across hidden settings sections and clears the key only after saving', async () => {
     const getAISettings = vi.fn(async () => ai);
     const saveAISettings = vi.fn(async () => ({ ...ai, model: 'draft' }));
@@ -73,6 +112,30 @@ describe('settings domain state', () => {
     );
     expect(state.settings.apiKey).toBe('');
   });
+  it.each([false, true])(
+    'keeps cleared fields and newer saves ahead of an initial read (save=%s)',
+    async (saveFirst) => {
+      let resolveRead!: (value: typeof ai) => void;
+      window.studio = {
+        getAISettings: () =>
+          new Promise((resolve) => {
+            resolveRead = resolve;
+          }),
+        saveAISettings: async () => ({ ...ai, model: '' }),
+      } as unknown as StudioApi;
+      let state!: ReturnType<typeof useAISettings>;
+      function Harness() {
+        state = useAISettings();
+        return null;
+      }
+      await act(async () => root.render(<Harness />));
+      act(() => state.setSettings((s) => ({ ...s, model: 'temporary', apiKey: 'secret' })));
+      act(() => state.setSettings((s) => ({ ...s, model: '' })));
+      if (saveFirst) await act(async () => state.run('save'));
+      await act(async () => resolveRead(ai));
+      expect(state.settings).toEqual({ ...ai, model: '', apiKey: saveFirst ? '' : 'secret' });
+    },
+  );
   it('does not test a model after failed secure credential saving', async () => {
     const testAIModel = vi.fn();
     window.studio = {
