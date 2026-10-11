@@ -2,6 +2,8 @@
 
 Only current actionable macOS requests are kept here. Earlier completed, superseded, and overlapping checks are preserved in [`archive/MACOS-through-20260812.md`](./archive/MACOS-through-20260812.md).
 
+> **Suspended, 2026-10-11 (user decision).** Nobody is currently available to run manual checks on macOS. The items below remain unverified on macOS and are not being worked; they do not block development or releases. macOS is covered by GitHub CI on a macOS runner instead, and macOS problems that reach users are handled through GitHub issues. Do not add new items here until this note is removed. See `AGENTS.md`, "Cross-platform handoff".
+
 ## Verify feedback-only Settings support page
 
 - Status: Pending

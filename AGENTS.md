@@ -67,6 +67,7 @@ NovelAI Prompt Studio is a cross-platform desktop application. Windows and macOS
 - Tell the user which manual verification document to follow and wait for their result. Do not perform the listed steps automatically unless they subsequently request computer use.
 - After the user reports that manual verification is complete, record the result they provide and move the document into `doc/archive/`. Preserve the filename unless it would collide with an existing archived document.
 - Do not create a manual verification document when no interactive verification is needed.
+- A screenshot script that launches the app with an isolated profile and saves page images through Electron's own capture API, without simulating mouse or keyboard input, counts as a command-line check, not GUI automation. It may be used to review appearance. It does not replace manual verification of interactive behavior.
 
 ## Cross-platform handoff
 
@@ -76,6 +77,13 @@ Read `coordination/README.md` before platform-sensitive work. Check the file for
 - macOS Codex writes requests that require Windows to `coordination/WINDOWS.md`.
 
 Only add a handoff when the work genuinely requires the other platform. Include the commit, exact action, expected result, and observed result. Mark completed items in place so both environments retain the history.
+
+**macOS interactive verification is suspended (user decision, 2026-10-11).** Nobody is currently available to run manual checks on macOS. Until this note is removed:
+
+- Do not add new macOS handoffs to `coordination/MACOS.md`, and do not block work or releases on the pending ones.
+- macOS is covered by GitHub CI on a macOS runner instead (`.github/workflows/ci.yml`). When a change is platform-sensitive, make sure CI exercises it on macOS as far as an automated run can, and state in the report what CI cannot cover.
+- Windows interactive verification still follows the manual verification workflow above.
+- macOS problems that reach users are handled through GitHub issues.
 
 Keep `coordination/MACOS.md` and `coordination/WINDOWS.md` focused on current actionable requests. Before archiving a completed item, record its final status and observed result. Periodically move completed, superseded, or consolidated entries into `coordination/archive/` without deleting their history; archived entries are not active requests.
 
