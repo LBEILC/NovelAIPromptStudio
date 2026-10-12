@@ -1,7 +1,7 @@
 export const motionDetails = `(async()=>({motion:document.documentElement.dataset.motion,appearance:await window.studio.getAppearanceSettings(),systemReduced:matchMedia('(prefers-reduced-motion: reduce)').matches,transitions:[...document.querySelectorAll('.nps-button')].map(b=>getComputedStyle(b).transitionDuration)}))()`;
 
 export async function motionChecks(h) {
-  const { evaluate: e, checkSoon, click, wait, window } = h;
+  const { evaluate: e, checkSoon, wait, check, window } = h;
   const cdp = window.webContents.debugger;
   const baseline = await e("matchMedia('(prefers-reduced-motion: reduce)').matches");
   try {
@@ -15,30 +15,43 @@ export async function motionChecks(h) {
         ['关闭', 'off'],
         ['完整', 'full'],
       ]) {
-        await click(label, 'document.querySelector("[role=radiogroup][aria-label=动效]")');
+        const button = `[...document.querySelectorAll('[role=radiogroup][aria-label=动效] button')].find(b=>b.textContent.trim()===${JSON.stringify(label)})`;
+        await wait(`!!(${button}) && !(${button}).disabled`, '动效选项可操作：' + label);
         const off = motion === 'off' || (motion === 'reduced' && reduced);
         await checkSoon(
-          `系统减少动态效果=${reduced}，${label}的保存值、有效模式和实际过渡一致`,
-          `(async()=>{const s=await window.studio.getAppearanceSettings();const durations=[...document.querySelectorAll('.nps-button')].flatMap(b=>getComputedStyle(b).transitionDuration.split(',').map(parseFloat));return s.motion===${JSON.stringify(motion)} && document.documentElement.dataset.motion===${JSON.stringify(off ? 'off' : 'full')} && durations.length>0 && ${off ? 'durations.every(d=>d<=0.001)' : 'durations.some(d=>d>0.001)'}})()`,
+          `系统减少动态效果=${reduced}，${label}的有效模式和实际过渡一致`,
+          `(()=>{const durations=[...document.querySelectorAll('.nps-button')].flatMap(b=>getComputedStyle(b).transitionDuration.split(',').map(parseFloat));return document.documentElement.dataset.motion===${JSON.stringify(off ? 'off' : 'full')} && durations.length>0 && ${off ? 'durations.every(d=>d<=0.001)' : 'durations.some(d=>d>0.001)'}})()`,
           undefined,
-          '',
+          `(${button}).click()`,
           motionDetails,
+          'both',
+        );
+        // Persistence is real disk I/O, not part of the visual feedback budget.
+        const saved = `(async()=>(await window.studio.getAppearanceSettings()).motion===${JSON.stringify(motion)})()`;
+        await wait(saved, '动效偏好保存完成：' + motion);
+        await check(
+          `系统减少动态效果=${reduced}，${label}的偏好已保存`,
+          saved,
+          motionDetails,
+          'once',
         );
       }
       // Deliberately keep CDP reduction enabled across reload, as in the reported
       // leaked-emulation scenario. Persisted Full must still win.
       if (reduced) {
-        await new Promise((resolve) => {
-          window.webContents.once('did-finish-load', resolve);
-          window.webContents.reload();
-        });
+        await h.reload();
         await wait('!!document.querySelector(".studio-titlebar")');
+        await wait(
+          `(async()=>(await window.studio.getAppearanceSettings()).motion==='full')()`,
+          '刷新后读取已保存的完整动效偏好',
+        );
         await checkSoon(
           '未撤销的 CDP 减少动态效果在刷新后仍不能覆盖完整',
-          `(async()=>{const s=await window.studio.getAppearanceSettings();return s.motion==='full' && matchMedia('(prefers-reduced-motion: reduce)').matches && document.documentElement.dataset.motion==='full'})()`,
+          `matchMedia('(prefers-reduced-motion: reduce)').matches && document.documentElement.dataset.motion==='full'`,
           undefined,
           '',
           motionDetails,
+          'both',
         );
       }
     }
@@ -51,5 +64,6 @@ export async function motionChecks(h) {
     undefined,
     '',
     motionDetails,
+    'both',
   );
 }

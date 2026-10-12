@@ -2,7 +2,62 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { it, expect, vi } from 'vitest';
-import { configureAcceptanceMode, installAcceptanceDoubles } from './acceptanceMode.js';
+import {
+  configureAcceptanceMode,
+  installAcceptanceDoubles,
+  installAcceptanceLatency,
+} from './acceptanceMode.js';
+
+it('delays real disk-backed handlers only inside slow acceptance and preserves results', async () => {
+  vi.useFakeTimers();
+  try {
+    const handlers = new Map();
+    const ipc = { handle: (channel, callback) => handlers.set(channel, callback) };
+    const original = ipc.handle;
+    installAcceptanceLatency(null, ipc);
+    expect(ipc.handle).toBe(original);
+    installAcceptanceLatency({ slow: 4 }, ipc);
+    const read = vi.fn(() => ({ actual: 42 }));
+    ipc.handle('workbench:image:open', read);
+    const pending = handlers.get('workbench:image:open')('event', 'file');
+    await vi.advanceTimersByTimeAsync(159);
+    expect(read).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toEqual({ actual: 42 });
+    expect(read).toHaveBeenCalledWith('event', 'file');
+    ipc.handle('updates:status', read);
+    await handlers.get('updates:status')();
+    ipc.handle('library:import-cancel', read);
+    await handlers.get('library:import-cancel')();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('slows each real temporary-profile file operation without delaying other paths', async () => {
+  vi.useFakeTimers();
+  try {
+    const methods = Object.fromEntries(
+      ['open', 'readFile', 'writeFile', 'copyFile', 'rename'].map((key) => [
+        key,
+        vi.fn(async () => 'real result'),
+      ]),
+    );
+    const read = methods.readFile;
+    const profile = path.resolve(os.tmpdir(), 'nai-acceptance-unit');
+    installAcceptanceLatency({ slow: 6, root: profile }, { handle: vi.fn() }, methods);
+    const pending = methods.readFile(path.join(profile, 'image.png'));
+    await vi.advanceTimersByTimeAsync(49);
+    expect(read).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toBe('real result');
+    expect(await methods.readFile(path.resolve('dist/index.html'))).toBe('real result');
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
 
 it('normal startup changes no paths and installs no doubles', () => {
   const app = { setPath: vi.fn(), disableHardwareAcceleration: vi.fn() };

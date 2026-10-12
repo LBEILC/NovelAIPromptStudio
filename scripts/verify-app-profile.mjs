@@ -8,16 +8,14 @@ import { build } from 'vite';
 import react from '@vitejs/plugin-react';
 import { bundledMiSans } from './font-vite.mjs';
 
+import { acceptanceOptions } from './acceptance-options.mjs';
+const options = acceptanceOptions();
 const packaged = process.argv.includes('--packaged');
 const startedAt = Date.now();
-const theme = process.argv.includes('--theme=light') ? 'light' : 'dark';
+const theme = process.argv.includes('--theme=dark') ? 'dark' : 'light';
 const output = path.resolve(
   '.codex-runs',
-  packaged
-    ? 'acceptance-packaged'
-    : process.argv.includes('--reduced-motion')
-      ? 'acceptance-reduced'
-      : 'acceptance',
+  packaged ? 'acceptance-packaged' : options.outputName,
   ...(packaged ? [] : [theme]),
 );
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nai-acceptance-'));
@@ -55,7 +53,7 @@ const server = createServer((request, response) => {
     ),
   );
 });
-async function run(executable, args, timeout = 600_000) {
+async function run(executable, args, timeout = options.processTimeoutMs) {
   const env = { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false' };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NOVELAI_DEV_URL;
@@ -68,7 +66,7 @@ async function run(executable, args, timeout = 600_000) {
     });
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error('Acceptance process timeout'));
+      reject(new Error(`Acceptance process timeout after ${timeout} ms (slow=${options.slow})`));
     }, timeout);
     child.once('error', (error) => {
       clearTimeout(timer);
@@ -83,16 +81,30 @@ async function run(executable, args, timeout = 600_000) {
 try {
   await fs.mkdir(output, { recursive: true });
   for (const file of await fs.readdir(output)) {
-    if (file.endsWith('.png') || /^(?:checks-[012]|manifest)\.json$/.test(file))
+    if (
+      file.endsWith('.png') ||
+      /^(?:checks-(?:progress-)?[012]|timeout-\d+-\d+|manifest)\.json$/.test(file)
+    )
       await fs.unlink(path.join(output, file));
   }
   await fs.writeFile(path.join(root, 'owner'), 'verify:app');
-  await fs.cp(path.resolve('demo/promo-v090/final'), path.join(root, 'fixtures'), {
-    recursive: true,
-  });
+  await fs.mkdir(path.join(root, 'fixtures'));
+  if (options.category === '图片库·复制') {
+    const source = path.resolve('demo/promo-v090/final');
+    // Full-suite library order starts with the last imported fixture. Keep that
+    // same image (also present in the recorded CI-timeout screenshot) here.
+    const file = (await fs.readdir(source))
+      .filter((file) => file.endsWith('.png'))
+      .sort()
+      .at(-1);
+    await fs.copyFile(path.join(source, file), path.join(root, 'fixtures', file));
+  } else if (options.needsLibrary)
+    await fs.cp(path.resolve('demo/promo-v090/final'), path.join(root, 'fixtures'), {
+      recursive: true,
+    });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
-  if (!packaged)
+  if (!packaged && ['全部', '基础组件'].includes(options.category))
     await build({
       configFile: false,
       base: './',
@@ -123,10 +135,11 @@ try {
           : path.resolve('release/linux-unpacked/novelai-prompt-studio');
   }
   const manifests = [];
-  for (const phase of packaged ? [0] : [0, 1, 2]) {
+  for (const phase of packaged || options.category !== '全部' ? [0] : [0, 1, 2]) {
     await fs.writeFile(
       path.join(root, 'run.json'),
       JSON.stringify({
+        ...options,
         output,
         phase,
         packaged,
@@ -144,18 +157,27 @@ try {
     const evidence = await fs
       .readFile(path.join(output, `checks-${phase}.json`), 'utf8')
       .then(JSON.parse)
-      .catch(() => ({
-        phase,
-        durationMs: 0,
-        checks: [
-          {
-            category: '运行',
-            label: '进程输出完整验收清单',
-            status: 'failed',
-            error: String(failure || 'Missing checklist'),
-          },
-        ],
-      }));
+      .catch(async () => {
+        const progress = await fs
+          .readFile(path.join(output, `checks-progress-${phase}.json`), 'utf8')
+          .then(JSON.parse)
+          .catch(() => null);
+        return {
+          phase,
+          durationMs: 0,
+          ...progress,
+          partial: true,
+          checks: [
+            ...(progress?.checks || []),
+            {
+              category: '运行',
+              label: '进程输出完整验收清单',
+              status: 'failed',
+              error: String(failure || 'Missing checklist'),
+            },
+          ],
+        };
+      });
     if (failure && !evidence.checks.some((item) => item.status === 'failed'))
       evidence.checks.push({
         category: '运行',
@@ -180,6 +202,9 @@ try {
       {
         packaged,
         theme,
+        slow: options.slow,
+        diskDelayMs: options.slow > 1 ? 40 * options.slow : 0,
+        category: options.category,
         platform: process.platform,
         durationMs: manifests.reduce((sum, item) => sum + item.durationMs, 0),
         checks,

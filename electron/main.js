@@ -48,7 +48,11 @@ import {
 } from './updates.js';
 import { configureAppProfile } from './appProfile.js';
 import { configureScreenshotMode } from './screenshotMode.js';
-import { configureAcceptanceMode, installAcceptanceDoubles } from './acceptanceMode.js';
+import {
+  configureAcceptanceMode,
+  installAcceptanceDoubles,
+  installAcceptanceLatency,
+} from './acceptanceMode.js';
 import {
   copyImageToClipboard,
   copyManagedImageToClipboard,
@@ -63,6 +67,7 @@ const { autoUpdater } = electronUpdater;
 
 app.setName('NovelAI Prompt Studio');
 const acceptanceMode = configureAcceptanceMode(app);
+installAcceptanceLatency(acceptanceMode, ipcMain);
 const acceptanceDoubles = installAcceptanceDoubles(acceptanceMode, { dialog, shell });
 const screenshotMode = configureScreenshotMode(app);
 const databaseProbeOutput = process.argv

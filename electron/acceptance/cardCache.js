@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
+import { UI_FEEDBACK_MS, waitForFeedback } from './feedback.js';
 
-export async function cardCacheChecks({ database, h }) {
+export async function cardCacheChecks({ database, h, mode = {} }) {
   h.category('卡片缓存');
   const ids = Array.from({ length: 300 }, (_, i) => `cache-acceptance-${i}`);
   const raw = new DatabaseSync(database.filePath);
@@ -46,10 +47,18 @@ export async function cardCacheChecks({ database, h }) {
       window.studio.onLibraryCardCacheProgress(value => {
         state.progress.push(value);
         if (!state.clicked && value.completed < value.total) {
+          const started = performance.now();
+          const clickedWhilePending = state.pending;
           document.querySelector('.studio-titlebar [aria-label="设置"]').click();
           state.clicked = true;
-          probe = window.studio.getAppearanceSettings().then(() => {
-            state.responsive = state.pending && !!document.querySelector('.studio-settings');
+          // Probe the main event loop without deliberately delayed disk I/O.
+          // A fast build may legitimately finish before the response returns.
+          probe = window.studio.getUpdateStatus().then(async () => {
+            state.responseMs = performance.now() - started;
+            state.responsive = clickedWhilePending && await (${waitForFeedback.toString()})(
+              () => !!document.querySelector('.studio-settings')?.getClientRects().length,
+              ${UI_FEEDBACK_MS * (mode.slow || 1)} - state.responseMs,
+            );
           });
         }
       });
@@ -68,14 +77,16 @@ export async function cardCacheChecks({ database, h }) {
     contents.send = send;
     for (const deliver of delayed) deliver();
     await h.check(
-      '建立期间仍能切换设置页面并完成主进程请求',
+      '建立期间发起切页与主进程请求，在反馈期限内完成',
       'window.__cardCacheAcceptance.clicked && window.__cardCacheAcceptance.responsive',
       'window.__cardCacheAcceptance',
+      'once',
     );
     await h.check(
       '并发卡片 IPC 等待同一建立过程并返回完整视图',
       'window.__cardCacheAcceptance.same && window.__cardCacheAcceptance.complete',
       `({ expected: ${JSON.stringify(counts)}, actual: window.__cardCacheAcceptance })`,
+      'once',
     );
     await h.check(
       '中间进度形状正确且已完成张数不回退，列表返回即完成',
@@ -86,6 +97,7 @@ export async function cardCacheChecks({ database, h }) {
         window.__cardCacheAcceptance.complete && !window.__cardCacheAcceptance.pending;
     })()`,
       'window.__cardCacheAcceptance',
+      'once',
     );
     await h.check(
       '末尾进度晚于列表回复时取消监听，仍取得完整列表',
@@ -94,6 +106,7 @@ export async function cardCacheChecks({ database, h }) {
         (await h.evaluate(`window.__cardCacheAcceptance.complete &&
         window.__cardCacheAcceptance.progress.every(p => p.completed < p.total)`)),
       'window.__cardCacheAcceptance',
+      'once',
     );
     if (timing !== 'normal')
       await h.check(
@@ -104,6 +117,7 @@ export async function cardCacheChecks({ database, h }) {
           return deltas.length > 0 && deltas.every(n => n === ${timing === 'slow' ? 1 : 25});
         })()`,
         'window.__cardCacheAcceptance.progress',
+        'once',
       );
     await h.screenshot('card-cache-settings-responsive');
     await h.evaluate('delete window.__cardCacheAcceptance');

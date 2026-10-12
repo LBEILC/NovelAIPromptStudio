@@ -6,10 +6,20 @@ export async function dictionaryChecks({ h, database }) {
   const rows = 'document.querySelectorAll(".settings-table tbody tr")';
   await input(search, 'acceptance_');
   await wait(`${rows}.length === 200`);
-  await check('超过一页显示分页', 'document.body.innerText.includes("第 1/2 页")');
+  await check(
+    '超过一页显示分页',
+    'document.body.innerText.includes("第 1/2 页")',
+    undefined,
+    'once',
+  );
   await click('下一页');
   await wait(`${rows}.length === 5`);
-  await check('下一页显示剩余条目', 'document.body.innerText.includes("第 2/2 页")');
+  await check(
+    '下一页显示剩余条目',
+    'document.body.innerText.includes("第 2/2 页")',
+    undefined,
+    'once',
+  );
   await click('上一页');
   await wait(`${rows}.length === 200`);
   await input(search, 'acceptance_004');
@@ -17,12 +27,16 @@ export async function dictionaryChecks({ h, database }) {
   await check(
     '搜索原 Tag',
     'document.querySelector(".settings-tag").textContent === "acceptance_004"',
+    undefined,
+    'once',
   );
   await input(search, '验收译文4');
   await wait(`${rows}.length === 11`);
   await check(
     '搜索译文只返回匹配结果',
     `[...${rows}].every(row=>row.cells[2].textContent.includes('验收译文4'))`,
+    undefined,
+    'once',
   );
   await input(search, 'acceptance_');
   await wait(`${rows}.length === 200`);
@@ -33,6 +47,7 @@ export async function dictionaryChecks({ h, database }) {
     undefined,
     '',
     '[...document.querySelectorAll(".nps-layer [role=option]")].map(e=>({text:e.textContent, dot:!!e.querySelector(".settings-category-dot")}))',
+    'both',
   );
   await key('Home');
   // Navigate the actual option list instead of assigning the filter in state.
@@ -45,18 +60,24 @@ export async function dictionaryChecks({ h, database }) {
   await check(
     '按分类筛选后只剩外貌身体',
     `[...${rows}].every(row=>row.cells[3].textContent.trim()==='外貌身体')`,
+    undefined,
+    'once',
   );
   await select('按缓存来源筛选', 'AI');
   await wait(`${rows}.length === 0`);
   await check(
     '来源与分类组合筛选显示空状态',
     'document.body.innerText.includes("没有匹配的 Tag 数据")',
+    undefined,
+    'once',
   );
   await select('按 Tag 分类筛选', '全部分类');
   await wait(`${rows}.length === 102`);
   await check(
     '来源筛选仅显示 AI',
     `[...${rows}].every(row=>row.cells[4].textContent.trim()==='AI')`,
+    undefined,
+    'once',
   );
   await select('按缓存来源筛选', '全部来源');
   await input(search, 'acceptance_004');
@@ -69,6 +90,8 @@ export async function dictionaryChecks({ h, database }) {
     () =>
       database.lookupTagDictionary(['acceptance_004']).get('acceptance_004').translation ===
       '验收译文4',
+    undefined,
+    'once',
   );
   await click('验收译文4');
   await input('[aria-label="译文"]', '已修改译文');
@@ -78,6 +101,8 @@ export async function dictionaryChecks({ h, database }) {
   await check(
     '保存单条译文与分类后列表更新',
     'document.querySelector(".settings-table tbody").textContent.includes("服装配饰")',
+    undefined,
+    'once',
   );
   await input(search, 'acceptance_00');
   await wait(`${rows}.length === 10`);
@@ -86,10 +111,14 @@ export async function dictionaryChecks({ h, database }) {
   await select('批量设置 Tag 分类', '环境背景');
   await click('设置分类');
   await wait(`[...${rows}].slice(0,2).every(row=>row.cells[3].textContent.trim()==='环境背景')`);
-  await check('批量分类仅修改所选两条', () =>
-    [...database.lookupTagDictionary(['acceptance_000', 'acceptance_001']).values()].every(
-      (item) => item.category === 'Environment',
-    ),
+  await check(
+    '批量分类仅修改所选两条',
+    () =>
+      [...database.lookupTagDictionary(['acceptance_000', 'acceptance_001']).values()].every(
+        (item) => item.category === 'Environment',
+      ),
+    undefined,
+    'once',
   );
   await click('acceptance_000');
   await click('acceptance_001');
@@ -100,11 +129,15 @@ export async function dictionaryChecks({ h, database }) {
   await check(
     '删除说明明确不修改原图 Prompt',
     'document.querySelector("dialog").textContent.includes("不会修改图片中已经保存的 Prompt")',
+    undefined,
+    'once',
   );
   await click('取消', 'document.querySelector("dialog")');
   await check(
     '批量删除取消保留数据',
     () => database.lookupTagDictionary(['acceptance_000', 'acceptance_001']).size === 2,
+    undefined,
+    'once',
   );
   await e(
     `document.querySelector('.settings-dictionary > .settings-actions .nps-button-danger').click()`,
@@ -114,6 +147,8 @@ export async function dictionaryChecks({ h, database }) {
   await check(
     '批量删除确认删除所选条目',
     () => database.lookupTagDictionary(['acceptance_000', 'acceptance_001']).size === 0,
+    undefined,
+    'once',
   );
   await h.screenshot('dictionary');
 }

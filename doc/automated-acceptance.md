@@ -1,12 +1,44 @@
 # 自动化验收
 
-`npm run verify:app` 构建正式页面，按浅色、深色依次在各自新的临时数据目录中启动真实 Electron，操作界面、断言结果并截图；每套主题随后关闭整个进程，用同一目录重启两次，验证偏好、数据及恢复默认提示词的持久化。`npm run verify:packaged` 构建未签名目录包并实际启动包内可执行文件，检查数据库、演示图片、页面和随包字体。`npm run screenshots:app` 保留原来的固定场景截图用途。
+`npm run verify:app` 构建正式页面，在新的临时数据目录中启动真实 Electron，操作界面、断言结果并截图。数据、复制、键盘等行为只执行一次；外观断言在相同业务状态下通过 `nativeTheme` 切换实际系统主题，检查浅色和深色，不改 DOM 主题属性或 React 状态。之后关闭整个进程，用同一目录重启两次，验证偏好、数据及恢复默认提示词的持久化。`npm run verify:packaged` 构建未签名目录包并实际启动包内可执行文件，检查数据库、演示图片、页面和随包字体。`npm run screenshots:app` 保留原来的固定场景截图用途。
 
-结果分别位于 `.codex-runs/acceptance/` 和 `.codex-runs/acceptance-packaged/`。`manifest.json` 汇总每条中文标签、分类、结果、截图文件和耗时；应用验收的 `light/`、`dark/` 子目录下，`checks-0.json`、`checks-1.json`、`checks-2.json` 保存各进程的结果。断言失败或操作超时使命令失败，并保留页面文字上下文及失败截图。这些产物由 Windows/macOS CI 上传，不提交进 Git。
+普通结果位于 `.codex-runs/acceptance/`，减少动态效果、慢速 4 倍、慢速 6 倍分别使用 `acceptance-reduced/`、`acceptance-slow-4/`、`acceptance-slow-6/`，目录包使用 `acceptance-packaged/`。`manifest.json` 汇总每条中文标签、分类、主题范围 `themeScope`、实际主题、结果和耗时；`light/` 是主运行目录，其中同时保存深浅截图及 `checks-0.json`、`checks-1.json`、`checks-2.json`。断言失败或操作超时使命令失败。等待超时会立即保存 `timeout-阶段-序号.png` 和同名 JSON（分类、上一条通过的断言、当前操作、控制元素角色/名称/可见性/禁用状态），不采集输入值或完整页面正文。渲染器不可响应时会记录诊断采集失败原因。产物由 Windows/macOS CI 上传，不提交进 Git；尚未执行的截图或打包步骤没有产物时，上传步骤跳过。
+
+## 执行范围与慢机器模式
+
+```sh
+npm run verify:app
+npm run verify:app -- --slow=4
+npm run verify:app -- --slow=6
+npm run verify:app -- --reduced-motion
+npm run verify:app -- --category="图片库" --slow=6
+npm run verify:app -- --category="图片库·复制" --slow=6
+npm run verify:app -- --category="设置·AI 服务" --slow=4
+```
+
+可选分类：`全部`、`图片库`、`图片库·复制`、`图片库·导入`、`图片库·收尾`、`设置`、`设置·AI 服务`、`基础组件`、`卡片缓存`、`外壳·快捷键`、`动效`、`诊断`、`诊断·渲染器`。分类运行只执行单进程的相关场景：AI 服务不导入图库或词典；复制回归只导入原全套倒序先检查的最后一张演示图，并先打开一个工作台标签，覆盖已有菜单随页面隐藏/显示的情况；收尾分类只执行模型别名、智能规则和清空说明等 012a 检查；组件展示页只在全套和组件分类构建。全套复制仍逐字比较全部 14 张演示图及各自排除内容。持久化的两次进程重启只在全套执行。分类输出在相应模式目录名后追加分类，防止覆盖全套清单。
+
+`--slow` 只接受 1、4、6。慢模式在页面加载前设置 CDP `Emulation.setCPUThrottlingRate`；受临时 Profile 校验保护的主进程 IPC 注册器，在图库、工作台、数据库、词典及偏好等磁盘相关请求前增加 `40 × 倍数` 毫秒延迟，随后仍执行原处理器并返回真实结果。临时 Profile 内的异步文件 `open/readFile/writeFile/copyFile/rename` 每次额外等待 `10 × (倍数 − 1)` 毫秒，其他路径不受影响；取消导入的控制请求不加磁盘延迟。它模拟响应时序差距，不是物理磁盘或整个主进程 CPU 的性能模拟，也不会人为阻塞主进程事件循环。普通运行不安装延迟。页面重载仍保留 CPU 限速。
+
+导入取消场景在第一批 25 张提交后，通过真实文件读取的暂停点稳定保留进行中的状态，拍完深浅截图、点击取消并确认请求经过主进程后放行；无论成功或失败都恢复原文件读取接口。不替换文件字节、导入器结果、数据库数据或取消逻辑，也不依赖截图必须比整个导入更快。
+
+界面反馈的 200 ms / 100 ms 基准不变，慢模式分别折算为 `200 × 倍数` / `100 × 倍数`。动效检查从实际点击开始计时，检查有效模式及 CSS 过渡；真实偏好保存另用有上限的等待检查，不把诊断读取本身的磁盘延迟算进界面反馈。`--category="动效"` 可独立执行这组检查。普通条件等待 12 秒、渲染求值 15 秒；慢模式按倍数增加但最多 60 秒。超时信息含实际等待时间和上限。`h.click`、`h.input` 先等控件可操作，图片切换等待目标 ID；页面刷新通过 `h.reload()` 等待新文档完成，不用旧文档上尚未消失的元素判定成功。
+
+`npm run verify:app -- --category="诊断"` 故意等待一个永远不成立的条件；`--category="诊断·渲染器"` 故意求值一个不会完成的 Promise。两者预期退出码为 1，用于核验超时清单、截图和结构摘要；不属于成功验收，也不加入常规 CI。
+
+## 交付前验证频率
+
+改动界面或验收脚本的任务，本机全套普通模式一次、慢机器模式一次（默认 6 倍）、减少动态效果一次；任务另外明确要求 4 倍时，再跑 4 倍一次。修偶发失败的任务，额外把对应的最小分类在慢模式下运行 10 次。每次使用新的临时 Profile，并保留各次清单与耗时。不要要求全套连续多次；碰到与当前任务无关的失败记入汇报，不为它重跑全套。
+
+CI 的 Windows/macOS × Node 22/24 都保留普通和减少动态效果验收，只在 Windows + Node 24 增加 6 倍慢机器全套。远端 CI 由设计负责人推送后确认。
+
+单个 Electron 进程的总预算独立于单项等待：普通模式最多 10 分钟，慢模式按倍数折算但最多 30 分钟。每 25 条断言及每次失败都会原子保存 `checks-progress-阶段.json`；如果进程被总预算中止，runner 将最近保存的结果与“未输出完整清单”的失败合并，而不会显示为成功。两次保存之间尚未落盘的检查可能丢失；强制退出无法再采集退出瞬间的新截图，已有截图和超时诊断仍会上传。
 
 ## 给后续任务添加断言
 
 在 `electron/acceptance/` 对应场景模块增加操作与检查，从 `run.js` 接入新场景即可。使用 `h.category('中文分类')`、`h.click()`、`h.input()`、`h.key()`、`h.select()` 操作实际页面；异步变化先 `await h.wait('布尔表达式', '中文等待标签')`，再 `await h.check('中文验收标签', '布尔表达式')`。主进程状态可用 `h.check('标签', () => 布尔值)` 检查，严格要求结果为 `true`。完成关键状态后调用 `h.screenshot('文件名')`。
+
+每条 `h.check` 第四个参数、`h.checkSoon` 第六个参数必须标出主题范围：`'once'` 表示数据、键盘、复制内容等行为；`'both'` 表示颜色、布局、字体或无法确定与主题无关的断言，省略时保守地按 `both`。外观检查读取同一个状态在另一主题的表现，不重复触发写入、复制、删除等动作；反馈期限只测交互本身。`h.font` 在两主题下分别通过 CDP 读取实际字体，`h.screenshot` 同状态拍两张。检查固定主题按钮和原生标题栏令牌的外壳场景显式各跑一遍，其余场景使用产品已有的“跟随系统”。
 
 ```js
 await h.section('翻译词典');
@@ -15,6 +47,8 @@ await h.wait('document.querySelectorAll(".settings-table tbody tr").length > 0',
 await h.check(
   '搜索译文仅显示匹配条目',
   '[...document.querySelectorAll(".settings-table tbody tr")].every(row => row.cells[2].textContent.includes("验收译文"))',
+  undefined,
+  'once',
 );
 await h.screenshot('dictionary-search');
 ```
@@ -23,7 +57,7 @@ await h.screenshot('dictionary-search');
 
 原生对话框的预定响应写入主进程 `doubles.selections` / `doubles.messages` 队列；未预定的调用直接失败。外部打开请求检查 `doubles.calls`。AI 使用 runner 启动的回环 HTTP 服务，可通过 `/control/success`、`/control/fail`、`/control/timeout` 切换响应；不会使用真实账户。更新检查仅在验收模式返回固定发布信息。除回环测试服务外的 HTTP 请求会被阻止并使隔离断言失败。
 
-`h.key()` 派发 DOM 键盘事件，平台修饰键在快捷键场景中取 Ctrl/Cmd。需要浏览器默认行为的 Tab、Esc、Space，以及原生 range 和指针捕获，使用 Chromium CDP 输入管线；它们只作用于当前 `webContents`，不是操作系统鼠标键盘模拟。减少动态效果用 CDP 媒体仿真，系统主题用 `nativeTheme`，窗口状态用 `BrowserWindow`。`h.font()` 等待字体和布局完成后，用 `CSS.getPlatformFontsForNode` 检查实际绘制字体。
+`h.key()` 派发 DOM 键盘事件，平台修饰键在快捷键场景中取 Ctrl/Cmd。需要浏览器默认行为的 Tab、Esc、Space，以及原生 range 和指针捕获，使用 Chromium CDP 输入管线；它们只作用于当前 `webContents`，不是操作系统鼠标键盘模拟。整轮减少动态效果使用进程级 `force-prefers-reduced-motion` 开关，动效组合断言另用 CDP 媒体仿真并及时恢复；系统主题用 `nativeTheme`，窗口状态用 `BrowserWindow`。`h.font()` 等待字体和布局完成后，用 `CSS.getPlatformFontsForNode` 检查实际绘制字体。
 
 持久化检查放入后续进程阶段，并与前一阶段保存的期望值比较。必须保留整进程重启，不能用刷新页面代替。安全存储不可用时，用 `h.uncovered('相关检查', '本平台的具体原因')` 明确记录；普通失败不得改成未覆盖或静默跳过。
 

@@ -1,3 +1,4 @@
+import { libraryCopyChecks } from './libraryCopy.js';
 import { libraryChecks } from './library.js';
 import { motionChecks } from './motion.js';
 import fs from 'node:fs/promises';
@@ -38,22 +39,25 @@ export async function runAcceptance(context) {
     });
   try {
     if (mode.phase === 0) {
-      const imported = await importLibraryFiles({ filePaths: files, database, assetsDirectory });
-      if (imported.errors.length || imported.imported.length !== 14)
-        throw Error('演示图片导入失败');
-      const projects = database.loadLibrary('all');
-      database.createCollection({ id: 'acceptance', name: '验收收藏集', kind: 'manual' });
-      database.updateCollectionProjects('acceptance', [projects[0].id]);
-      database.updateProjects([projects.at(-1).id], { deleted: true });
-      database.upsertTagDictionary(
-        Array.from({ length: 205 }, (_, i) => ({
-          tag: `acceptance_${String(i).padStart(3, '0')}`,
-          translation: `验收译文${i}`,
-          category: i % 2 ? 'Clothing' : 'Body',
-          translation_source: i % 2 ? 'ai' : 'manual',
-          category_source: 'manual',
-        })),
-      );
+      if (mode.needsLibrary !== false) {
+        const imported = await importLibraryFiles({ filePaths: files, database, assetsDirectory });
+        if (imported.errors.length || imported.imported.length !== files.length)
+          throw Error('演示图片导入失败');
+        const projects = database.loadLibrary('all');
+        database.createCollection({ id: 'acceptance', name: '验收收藏集', kind: 'manual' });
+        database.updateCollectionProjects('acceptance', [projects[0].id]);
+        if (projects.length > 1) database.updateProjects([projects.at(-1).id], { deleted: true });
+      }
+      if (mode.needsDictionary !== false)
+        database.upsertTagDictionary(
+          Array.from({ length: 205 }, (_, i) => ({
+            tag: `acceptance_${String(i).padStart(3, '0')}`,
+            translation: `验收译文${i}`,
+            category: i % 2 ? 'Clothing' : 'Body',
+            translation_source: i % 2 ? 'ai' : 'manual',
+            category_source: 'manual',
+          })),
+        );
     }
     window = createWindow();
     const overlays = [];
@@ -64,6 +68,13 @@ export async function runAcceptance(context) {
         return original(value);
       };
     }
+    mode.themeDriver = {
+      get: () => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'),
+      set: (theme) => {
+        nativeTheme.themeSource = theme;
+      },
+    };
+    nativeTheme.themeSource = 'light';
     h = harness(window, mode, checks);
     const { evaluate: e, wait, check, click, section, font } = h;
     const blockedRequests = [];
@@ -76,6 +87,9 @@ export async function runAcceptance(context) {
       },
     );
     window.webContents.debugger.attach('1.3');
+    await window.webContents.debugger.sendCommand('Emulation.setCPUThrottlingRate', {
+      rate: mode.slow || 1,
+    });
     await window.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', {
       enabled: true,
     });
@@ -86,24 +100,41 @@ export async function runAcceptance(context) {
       );
     });
     await wait('!!document.querySelector(".studio-titlebar") && !!window.studio');
+    h.dualThemes(true);
     if (mode.reducedMotion)
       await check(
         '进程级系统减少动态效果已启用（未使用 CDP）',
         "matchMedia('(prefers-reduced-motion: reduce)').matches",
+        undefined,
+        'once',
       );
     await check(
       '验收启动仍使用正常渲染器，无额外控制接口',
       'window.studioScreenshot === undefined && window.studioAcceptance === undefined && typeof require === "undefined"',
+      undefined,
+      'once',
     );
-    await check('所有用户路径位于临时目录', () =>
-      ['userData', 'sessionData', 'logs', 'crashDumps'].every((name) =>
-        app.getPath(name).startsWith(mode.root + path.sep),
-      ),
-    );
-    await check('SQLite 已打开且演示图库可读', () => database.loadLibrary('all').length >= 13);
     await check(
-      '卡片 IPC 保留所有视图、图片宽高并移除完整元数据',
-      `(async () => {
+      '所有用户路径位于临时目录',
+      () =>
+        ['userData', 'sessionData', 'logs', 'crashDumps'].every((name) =>
+          app.getPath(name).startsWith(mode.root + path.sep),
+        ),
+      undefined,
+      'once',
+    );
+    await check(
+      'SQLite 已打开且演示图库可读',
+      () =>
+        database.loadLibrary('all').length >=
+        (mode.needsLibrary === false ? 0 : Math.min(files.length, 13)),
+      undefined,
+      'once',
+    );
+    if (!mode.category || mode.category === '全部') {
+      await check(
+        '卡片 IPC 保留所有视图、图片宽高并移除完整元数据',
+        `(async () => {
       for (const view of ['all', 'favorites', 'trash']) {
         const full = await window.studio.loadLibrary(view);
         const cards = await window.studio.loadLibraryCards(view);
@@ -112,18 +143,22 @@ export async function runAcceptance(context) {
       }
       return true;
     })()`,
-    );
-    await check(
-      '详情 IPC 与旧列表逐项一致，缺失图片返回 null',
-      `(async () => {
+        undefined,
+        'once',
+      );
+      await check(
+        '详情 IPC 与旧列表逐项一致，缺失图片返回 null',
+        `(async () => {
       const full = [...await window.studio.loadLibrary(), ...await window.studio.loadLibrary('trash')];
       for (const p of full) if (JSON.stringify(await window.studio.loadLibraryDetail(p.id)) !== JSON.stringify(p)) return false;
       return await window.studio.loadLibraryDetail('missing-acceptance-image') === null;
     })()`,
-    );
-    await check(
-      '持久缓存和热缓存经过真实 IPC 返回逐项一致的卡片',
-      `(async () => {
+        undefined,
+        'once',
+      );
+      await check(
+        '持久缓存和热缓存经过真实 IPC 返回逐项一致的卡片',
+        `(async () => {
         for (const view of ['all', 'favorites', 'trash']) {
           const first = await window.studio.loadLibraryCards(view);
           const second = await window.studio.loadLibraryCards(view);
@@ -131,24 +166,31 @@ export async function runAcceptance(context) {
         }
         return true;
       })()`,
-    );
-    if (mode.phase === 0) {
-      const cacheProbe = (await database.loadLibraryCards())[0];
-      database.updateProjectName(cacheProbe.id, `${cacheProbe.name} cache probe`);
-      await check(
-        '卡片缓存命中时，重命名通过 IPC 立即可见',
-        `(async () => (await window.studio.loadLibraryCards()).find(p => p.id === ${JSON.stringify(cacheProbe.id)}).name === ${JSON.stringify(`${cacheProbe.name} cache probe`)})()`,
+        undefined,
+        'once',
       );
-      database.updateProjectName(cacheProbe.id, cacheProbe.name);
-      await cardCacheChecks({ database, h });
+      if (mode.phase === 0) {
+        const cacheProbe = (await database.loadLibraryCards())[0];
+        database.updateProjectName(cacheProbe.id, `${cacheProbe.name} cache probe`);
+        await check(
+          '卡片缓存命中时，重命名通过 IPC 立即可见',
+          `(async () => (await window.studio.loadLibraryCards()).find(p => p.id === ${JSON.stringify(cacheProbe.id)}).name === ${JSON.stringify(`${cacheProbe.name} cache probe`)})()`,
+          undefined,
+          'once',
+        );
+        database.updateProjectName(cacheProbe.id, cacheProbe.name);
+        await cardCacheChecks({ database, h, mode });
+      }
     }
     if (mode.packaged) {
-      await check('正在运行真正的打包程序', () => app.isPackaged === true);
+      await check('正在运行真正的打包程序', () => app.isPackaged === true, undefined, 'once');
       await check(
         '渲染页面来自目录包内部',
         () =>
           window.webContents.getURL() ===
           pathToFileURL(path.join(app.getAppPath(), 'dist', 'index.html')).href,
+        undefined,
+        'once',
       );
     }
     const overlayCheck = async (label) => {
@@ -167,6 +209,8 @@ export async function runAcceptance(context) {
         () =>
           overlays.at(-1)?.color === tokens.color &&
           overlays.at(-1)?.symbolColor === tokens.symbolColor,
+        undefined,
+        'both',
       );
     };
     const environment = {
@@ -177,16 +221,41 @@ export async function runAcceptance(context) {
       snapshot,
       encrypted: safeStorage.isEncryptionAvailable(),
     };
-    if (mode.phase > 0) {
+    if (mode.category && mode.category !== '全部') {
+      h.dualThemes(true);
+      if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
+      else if (['图片库', '图片库·导入', '图片库·收尾'].includes(mode.category))
+        await libraryChecks(environment);
+      else if (mode.category.startsWith('设置')) await settingsChecks(environment, false);
+      else if (mode.category === '基础组件') await componentChecks(environment);
+      else if (mode.category === '卡片缓存') await cardCacheChecks(environment);
+      else if (mode.category === '外壳·快捷键') await shortcutChecks(environment);
+      else if (mode.category === '动效') {
+        h.category('外壳·动效');
+        await section('外观');
+        await motionChecks(h);
+      } else if (mode.category === '诊断') {
+        h.category('诊断');
+        await h.wait('false', '人为制造等待超时', 50);
+      } else if (mode.category === '诊断·渲染器') {
+        h.category('诊断·渲染器');
+        await e('new Promise(() => {})', '人为制造未完成的渲染求值');
+      }
+    } else if (mode.phase > 0) {
+      h.dualThemes(true);
       h.category('数据');
       await check(
         '跨进程重启保留图库、收藏集、回收站和词典全部内容',
         async () =>
           snapshot() === (await fs.readFile(path.join(mode.root, 'snapshot.json'), 'utf8')),
+        undefined,
+        'once',
       );
       await settingsChecks(environment, true);
     } else {
-      for (const theme of mode.packaged ? ['light', 'dark'] : [mode.theme]) {
+      h.dualThemes(false);
+      for (const theme of ['light', 'dark']) {
+        nativeTheme.themeSource = theme;
         h.category(`外壳·${theme}`);
         await section('外观');
         await click(theme === 'light' ? '浅色' : '深色');
@@ -194,6 +263,8 @@ export async function runAcceptance(context) {
         await check(
           '主题应用到新旧页面',
           `document.documentElement.dataset.theme === '${theme}' && document.documentElement.dataset.themeMode === '${theme}'`,
+          undefined,
+          'both',
         );
         await overlayCheck('标题栏覆盖层参数与当前令牌一致');
         for (const name of ['工作台', '图片库', '设置']) {
@@ -204,6 +275,8 @@ export async function runAcceptance(context) {
           await check(
             `导航 ${name} 当前项样式与旧竖栏移除`,
             `(() => {const e=document.querySelector('.studio-titlebar [aria-current=page]');return getComputedStyle(e).fontWeight === getComputedStyle(e).getPropertyValue('--fw-strong').trim() && !document.querySelector('.app-sidebar')})()`,
+            undefined,
+            'both',
           );
         }
         await section('关于与更新');
@@ -226,6 +299,8 @@ export async function runAcceptance(context) {
         await check(
           '快速主题切换保留最后选择',
           () => preferences.appearanceSettings().themeMode === 'dark',
+          undefined,
+          'once',
         );
         await overlayCheck('快速切换后标题栏采用最后主题令牌');
         await click('跟随系统', 'document.querySelector("[role=radiogroup][aria-label=主题]")');
@@ -235,24 +310,36 @@ export async function runAcceptance(context) {
           await check(
             `跟随系统响应 ${theme}`,
             `document.documentElement.dataset.themeMode === '${theme}'`,
+            undefined,
+            'both',
           );
           await overlayCheck(`跟随系统 ${theme} 时标题栏令牌同步`);
         }
+        h.dualThemes(true);
         await motionChecks(h);
         await section('外观');
         window.showInactive();
         window.maximize();
         await new Promise((resolve) => setTimeout(resolve, 300));
-        await check('BrowserWindow 确实进入最大化状态', () => window.isMaximized());
+        await check(
+          'BrowserWindow 确实进入最大化状态',
+          () => window.isMaximized(),
+          undefined,
+          'once',
+        );
         await check(
           '最大化后内容与标题栏不重叠，设置不被覆盖',
           `(() => {const bar=document.querySelector('.studio-titlebar').getBoundingClientRect(),body=document.querySelector('.studio-settings').getBoundingClientRect(),settings=document.querySelector('.studio-titlebar [aria-label="设置"]').getBoundingClientRect(),controls=document.querySelector('.studio-window-controls').getBoundingClientRect();return body.top>=bar.bottom-1 && settings.right<=controls.left+1 && settings.bottom<=bar.bottom})()`,
+          undefined,
+          'both',
         );
         window.unmaximize();
         window.hide();
         await section('外观');
-        await click(mode.theme === 'light' ? '浅色' : '深色');
-        await wait(`document.documentElement.dataset.theme === '${mode.theme}'`);
+        await click('跟随系统');
+        nativeTheme.themeSource = 'light';
+        await wait(`document.documentElement.dataset.theme === 'light'`);
+        h.dualThemes(true);
         await shortcutChecks(environment);
         await libraryChecks(environment);
         await settingsChecks(environment, false);
@@ -261,7 +348,7 @@ export async function runAcceptance(context) {
       }
     }
     h.category('隔离');
-    await check('验收运行没有请求外部网络', () => blockedRequests.length === 0);
+    await check('验收运行没有请求外部网络', () => blockedRequests.length === 0, undefined, 'once');
     if (checks.some((item) => item.status === 'failed'))
       throw Object.assign(Error('验收存在失败断言，详见检查清单'), { summary: true });
   } catch (error) {
@@ -271,6 +358,7 @@ export async function runAcceptance(context) {
         category: '运行',
         label: '操作与等待完成',
         status: 'failed',
+        themeScope: 'once',
         error: String(error),
         context: await h?.evaluate('document.body.innerText.slice(-8000)').catch(() => ''),
       });
@@ -289,6 +377,7 @@ export async function runAcceptance(context) {
       category: '隔离',
       label: '恢复运行前剪贴板内容',
       status: restored ? 'passed' : 'failed',
+      themeScope: 'once',
       details: { immediate, ...restoreClipboard.details() },
     });
     nativeTheme.themeSource = previousTheme;

@@ -76,6 +76,9 @@ jobs:
         run: node -e "console.error('MiSans font cache was not prepared; check the prepare-fonts job. Matrix jobs never download fonts.'); process.exit(1)"
       - run: npm run fonts:check
       - run: npm run verify:app
+      - name: Verify slow machine on one matrix combination
+        if: matrix.os == 'windows-latest' && matrix.node == 24
+        run: npm run verify:app -- --slow=6
       - name: Verify reduced motion and delayed AI settings reads
         run: npm run verify:app -- --reduced-motion
         env:
@@ -88,26 +91,27 @@ jobs:
           path: |
             .codex-runs/acceptance/
             .codex-runs/acceptance-reduced/
-          if-no-files-found: error
+            .codex-runs/acceptance-slow-6/
+          if-no-files-found: ignore
       - run: npm run screenshots:app -- --constrain-window
       - name: Upload application screenshots
-        if: always()
+        if: always() && hashFiles('.codex-runs/screens/**') != ''
         uses: actions/upload-artifact@v7
         with:
           name: app-screens-${{ matrix.os }}-node${{ matrix.node }}
           path: .codex-runs/screens/
-          if-no-files-found: error
+          if-no-files-found: ignore
       - name: Verify unsigned directory package
         run: npm run verify:packaged
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Upload packaged acceptance
-        if: always()
+        if: always() && hashFiles('.codex-runs/acceptance-packaged/**') != ''
         uses: actions/upload-artifact@v7
         with:
           name: acceptance-packaged-${{ matrix.os }}-node${{ matrix.node }}
           path: .codex-runs/acceptance-packaged/
-          if-no-files-found: error
+          if-no-files-found: ignore
       - run: npm run verify:fonts:package
       - run: npm run screenshots:ui
       - name: Upload component screenshots and native evidence

@@ -17,31 +17,54 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
   await check(
     'Mod+I 使用打开对话框并生成三个工作台标签',
     'document.querySelectorAll(".workbench-tab").length===3',
+    undefined,
+    'once',
   );
   const active =
     'document.querySelector(".workbench-tab[data-active]")?.getAttribute("data-workbench-tab-id")';
   const last = await e(active);
   await shortcut('Tab');
   await wait(`${active} !== ${JSON.stringify(last)}`);
-  await check('Mod+Tab 切换到下一个标签', `${active} !== ${JSON.stringify(last)}`);
+  await check(
+    'Mod+Tab 切换到下一个标签',
+    `${active} !== ${JSON.stringify(last)}`,
+    undefined,
+    'once',
+  );
   await shortcut('Tab', { shiftKey: true });
   await wait(`${active} === ${JSON.stringify(last)}`);
-  await check('Mod+Shift+Tab 切回前一个标签', `${active} === ${JSON.stringify(last)}`);
+  await check(
+    'Mod+Shift+Tab 切回前一个标签',
+    `${active} === ${JSON.stringify(last)}`,
+    undefined,
+    'once',
+  );
   await shortcut('w');
   await wait('document.querySelectorAll(".workbench-tab").length===2');
-  await check('Mod+W 关闭当前标签', 'document.querySelectorAll(".workbench-tab").length===2');
+  await check(
+    'Mod+W 关闭当前标签',
+    'document.querySelectorAll(".workbench-tab").length===2',
+    undefined,
+    'once',
+  );
   clipboard.writeImage(nativeImage.createFromPath(files[3]));
   await shortcut('v');
   await wait('document.querySelectorAll(".workbench-tab").length===3');
   await check(
     'Mod+V 从真实剪贴板打开工作台图片',
     'document.querySelectorAll(".workbench-tab").length===3',
+    undefined,
+    'once',
   );
   await click('图片库', 'document.querySelector(".studio-titlebar")');
   await shortcut('k');
   await h.checkSoon(
     '图库 Mod+K 聚焦搜索',
     'document.activeElement.matches(".gallery-search input")',
+    undefined,
+    undefined,
+    undefined,
+    'once',
   );
   const before = database.loadLibrary('all').length;
   await e('document.querySelector(".gallery-search input").focus()');
@@ -49,6 +72,8 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
   await check(
     '文本框 Mod+V 保留浏览器普通粘贴且不导入图片',
     () => allowed === true && database.loadLibrary('all').length === before,
+    undefined,
+    'once',
   );
   const plainImage = path.join(mode.root, 'shortcut-import.png');
   await fs.writeFile(plainImage, nativeImage.createFromPath(files[4]).toPNG());
@@ -56,13 +81,20 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
   await shortcut('i');
   await h.until(() => database.loadLibrary('all').length === before + 1, '图库快捷键导入文件');
   await wait('document.body.innerText.includes("导入 1 张")');
-  await check('图库 Mod+I 导入指定图片', () => database.loadLibrary('all').length === before + 1);
+  await check(
+    '图库 Mod+I 导入指定图片',
+    () => database.loadLibrary('all').length === before + 1,
+    undefined,
+    'once',
+  );
   clipboard.writeImage(nativeImage.createFromPath(files[5]));
   await shortcut('v');
   await h.until(() => database.loadLibrary('all').length === before + 2, '图库快捷键导入剪贴板');
   await check(
     '图库 Mod+V 导入真实剪贴板图片',
     () => database.loadLibrary('all').length === before + 2,
+    undefined,
+    'once',
   );
   await h.screenshot('shortcuts-gallery');
 }
@@ -86,7 +118,12 @@ export async function createTrashDraft({ h, database }) {
     `Object.values(localStorage).map(value=>{try{return JSON.parse(value)}catch{return null}}).find(value=>value?.version===2 && value?.tabs?.some(tab=>tab.source?.type==='library'))`,
   );
   const projectId = session.tabs.find((tab) => tab.id === session.activeTabId)?.source?.projectId;
-  await check('草稿来自真实图库标签', () => Boolean(projectId && database.loadProject(projectId)));
+  await check(
+    '草稿来自真实图库标签',
+    () => Boolean(projectId && database.loadProject(projectId)),
+    undefined,
+    'once',
+  );
   database.updateProjects([projectId], { deleted: true });
   return projectId;
 }

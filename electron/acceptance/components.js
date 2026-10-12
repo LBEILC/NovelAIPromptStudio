@@ -6,7 +6,7 @@ export async function componentChecks({ h, mode }) {
   for (const theme of [mode.theme]) {
     h.category(`基础组件·${theme}`);
     await h.window.loadFile(path.join(mode.root, 'showcase', 'ui-showcase.html'), {
-      query: { theme },
+      query: { theme: 'system' },
     });
     await wait('!!document.querySelector("[data-showcase]")');
     const slider = 'input[type=range]';
@@ -22,6 +22,10 @@ export async function componentChecks({ h, mode }) {
       await h.checkSoon(
         `滑块 ${options.shiftKey ? 'Shift+' : ''}${name} 数值及 ARIA 为 ${value}`,
         `document.querySelector('${slider}').value==='${value}' && document.querySelector('${slider}').getAttribute('aria-valuetext')===Number('${value}').toFixed(2)`,
+        undefined,
+        undefined,
+        undefined,
+        'once',
       );
     }
     // Dispatch through Chromium's page input pipeline to obtain real pointer capture.
@@ -67,13 +71,31 @@ export async function componentChecks({ h, mode }) {
       });
     };
     await pointer(slider, 0);
-    await h.checkSoon('滑块指针拖到左端为零', `document.querySelector('${slider}').value==='0'`);
+    await h.checkSoon(
+      '滑块指针拖到左端为零',
+      `document.querySelector('${slider}').value==='0'`,
+      undefined,
+      undefined,
+      undefined,
+      'once',
+    );
     await pointer(slider, 1);
-    await h.checkSoon('滑块指针拖到右端为一', `document.querySelector('${slider}').value==='1'`);
+    await h.checkSoon(
+      '滑块指针拖到右端为一',
+      `document.querySelector('${slider}').value==='1'`,
+      undefined,
+      undefined,
+      undefined,
+      'once',
+    );
     await pointer(slider, 0.5);
     await h.checkSoon(
       '点击滑块轨道更新数值',
       `Math.abs(Number(document.querySelector('${slider}').value)-.5)<.03`,
+      undefined,
+      undefined,
+      undefined,
+      'once',
     );
     await e('document.querySelector("[role=separator]").focus()');
     for (const [name, options, value] of [
@@ -87,6 +109,10 @@ export async function componentChecks({ h, mode }) {
       await h.checkSoon(
         `面板 ${options.shiftKey ? 'Shift+' : ''}${name} 宽度 ${value}`,
         `document.querySelector('[role=separator]').getAttribute('aria-valuenow')==='${value}'`,
+        undefined,
+        undefined,
+        undefined,
+        'both',
       );
     }
     await e(
@@ -95,11 +121,19 @@ export async function componentChecks({ h, mode }) {
     await h.checkSoon(
       '面板双击恢复默认宽度',
       'document.querySelector("[role=separator]").getAttribute("aria-valuenow")==="340"',
+      undefined,
+      undefined,
+      undefined,
+      'both',
     );
     await pointer('[role=separator]', 20);
     await h.checkSoon(
       '面板指针拖动改变宽度',
       'Number(document.querySelector("[role=separator]").getAttribute("aria-valuenow"))>340',
+      undefined,
+      undefined,
+      undefined,
+      'both',
     );
     for (const [label, selector] of [
       ['右键菜单', '.nps-layer [role=menu]'],
@@ -111,6 +145,8 @@ export async function componentChecks({ h, mode }) {
       await check(
         `${label}打开焦点进入`,
         `document.querySelector('${selector}').contains(document.activeElement)`,
+        undefined,
+        'once',
       );
       if (label !== '右键菜单') {
         await e(
@@ -120,6 +156,8 @@ export async function componentChecks({ h, mode }) {
         await check(
           `${label} Tab 焦点循环`,
           `document.querySelector('${selector}').contains(document.activeElement)`,
+          undefined,
+          'once',
         );
       }
       if (label === '关闭已修改的标签？') {
@@ -129,6 +167,8 @@ export async function componentChecks({ h, mode }) {
         await check(
           '模态对话框阻止背景获取焦点',
           'document.querySelector("dialog").contains(document.activeElement)',
+          undefined,
+          'once',
         );
       }
       await h.nativeKey('Escape');
@@ -136,6 +176,8 @@ export async function componentChecks({ h, mode }) {
       await check(
         `${label} Esc 关闭归还焦点`,
         `document.activeElement.textContent.trim()===${JSON.stringify(label)}`,
+        undefined,
+        'once',
       );
     }
     await e('document.querySelector("input[role=combobox]").focus()');
@@ -146,6 +188,8 @@ export async function componentChecks({ h, mode }) {
     await check(
       '输入法候选 Enter 不采用补全',
       'document.querySelector("input[role=combobox]").value==="铜色"',
+      undefined,
+      'once',
     );
     await e(
       `document.activeElement.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:'铜色'}))`,
@@ -155,6 +199,10 @@ export async function componentChecks({ h, mode }) {
     await h.checkSoon(
       '组合输入结束后 Enter 采用补全',
       'document.querySelector("input[role=combobox]").value.includes("copper")',
+      undefined,
+      undefined,
+      undefined,
+      'once',
     );
     await click('复制 Prompt', 'document', 1);
     await wait('!!document.querySelector(".nps-notifications .nps-toast")');
@@ -165,21 +213,30 @@ export async function componentChecks({ h, mode }) {
     await check(
       '通知悬停超过寿命仍保留',
       '!!document.querySelector(".nps-notifications .nps-toast")',
+      undefined,
+      'once',
     );
     await e(
       `document.querySelector('.nps-notifications .nps-toast').dispatchEvent(new PointerEvent('pointerout',{bubbles:true,relatedTarget:document.body}))`,
     );
     await wait('!document.querySelector(".nps-notifications .nps-toast")');
-    await check('通知离开后消失', '!document.querySelector(".nps-notifications .nps-toast")');
+    await check(
+      '通知离开后消失',
+      '!document.querySelector(".nps-notifications .nps-toast")',
+      undefined,
+      'once',
+    );
     await componentDetails(h);
     await h.screenshot(`components-${theme}`);
     await h.window.loadFile(path.join(mode.root, 'showcase', 'ui-showcase.html'), {
-      query: { theme, motion: 'off' },
+      query: { theme: 'system', motion: 'off' },
     });
     await wait('!!document.querySelector("[data-showcase]")');
     await check(
       '关闭动效加载圆环静止',
       '[...document.querySelectorAll(".nps-loader")].length>0 && [...document.querySelectorAll(".nps-loader")].every(e=>getComputedStyle(e).animationName==="none")',
+      undefined,
+      'both',
     );
   }
 }
