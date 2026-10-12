@@ -149,7 +149,7 @@ function ensureColumn(database, table, columns, name, definition) {
     database.run(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
 }
 
-export async function openDatabase(dataDirectory) {
+export async function openDatabase(dataDirectory, { cardBuildSchedule } = {}) {
   fs.mkdirSync(dataDirectory, { recursive: true });
   const filePath = path.join(dataDirectory, 'studio.sqlite');
   const backupPath = path.join(dataDirectory, 'studio.pre-phase2.sqlite');
@@ -181,14 +181,20 @@ export async function openDatabase(dataDirectory) {
   // cascades here would delete historical rows in retired tables on project removal.
   const connection = new DatabaseSync(filePath, { enableForeignKeyConstraints: false });
   try {
-    return initializeDatabase(connection, filePath, backupPath, engineBackupPath);
+    return initializeDatabase(
+      connection,
+      filePath,
+      backupPath,
+      engineBackupPath,
+      cardBuildSchedule,
+    );
   } catch (error) {
     connection.close();
     throw error;
   }
 }
 
-function initializeDatabase(connection, filePath, backupPath, engineBackupPath) {
+function initializeDatabase(connection, filePath, backupPath, engineBackupPath, cardBuildSchedule) {
   const transactions = [];
   let sequence = 0;
   let closed = false;
@@ -1100,6 +1106,8 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
       WHERE NOT EXISTS (SELECT 1 FROM library_card_cache c WHERE c.project_id = p.id)`);
   };
   const buildCardBatch = (rebuild, offset) => {
+    // Optional acceptance scheduler controls work size, not the process clock.
+    const fixedRows = cardBuildSchedule?.rowsPerBatch;
     const start = performance.now();
     const save = database.prepare(
       `INSERT OR REPLACE INTO library_card_cache(project_id, project_order, created_at,
@@ -1107,8 +1115,8 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
         VALUES ($id, $order, $created, $favorite, $deleted, $payload, $prompt, $base, $vibe)`,
     );
     let index = offset;
-    for (; index < rebuild.length && index < offset + 25; index++) {
-      if (index > offset && performance.now() - start >= 12) break;
+    for (; index < rebuild.length && index < offset + (fixedRows ?? 25); index++) {
+      if (fixedRows === undefined && index > offset && performance.now() - start >= 12) break;
       const row = rebuild[index];
       const fingerprints = query(
         `SELECT rowid AS project_order, id, name, image_path, thumbnail_path, created_at, is_favorite, deleted_at,

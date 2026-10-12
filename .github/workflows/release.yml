@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: 24
       - name: Restore pinned MiSans VF
+        # Tags can read the default branch cache. Wait for main's prepare-fonts
+        # before pushing a release tag; a feature branch cache is not visible.
         id: misans-cache
         uses: actions/cache/restore@v5
         with:
@@ -36,6 +38,19 @@ jobs:
           path: .local/fonts/MiSansVF.ttf
           enableCrossOsArchive: true
           key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
+
+  check:
+    name: Release tests and types
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
 
   package:
     needs: prepare-fonts
@@ -87,15 +102,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Test
-        run: npm test
-
       - name: Verify release tag
         if: github.ref_type == 'tag'
         run: node scripts/verify-release-tag.mjs "${{ github.ref_name }}"
-
-      - name: Type check
-        run: npm run typecheck
 
       - name: Restore prepared MiSans cache (no download)
         id: misans-cache
@@ -146,7 +155,7 @@ jobs:
 
   release:
     name: Verify combined artifacts and publish tagged releases
-    needs: package
+    needs: [check, package]
     runs-on: ubuntu-latest
 
     steps:

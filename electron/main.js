@@ -57,6 +57,7 @@ import { configureAppProfile } from './appProfile.js';
 import { configureScreenshotMode } from './screenshotMode.js';
 import {
   configureAcceptanceMode,
+  createAcceptanceCardCache,
   installAcceptanceDoubles,
   installAcceptanceLatency,
 } from './acceptanceMode.js';
@@ -74,6 +75,7 @@ const { autoUpdater } = electronUpdater;
 
 app.setName('NovelAI Prompt Studio');
 const acceptanceMode = configureAcceptanceMode(app);
+const acceptanceCardCache = createAcceptanceCardCache(acceptanceMode);
 installAcceptanceLatency(acceptanceMode, ipcMain);
 const acceptanceDoubles = installAcceptanceDoubles(acceptanceMode, { dialog, shell });
 const screenshotMode = configureScreenshotMode(app);
@@ -354,7 +356,9 @@ app.whenReady().then(async () => {
   const dataDirectory = path.join(app.getPath('userData'), 'data');
   const defaultAssetsDirectory = path.join(app.getPath('userData'), 'assets');
   try {
-    database = await openDatabase(dataDirectory);
+    database = await openDatabase(dataDirectory, {
+      cardBuildSchedule: acceptanceCardCache?.schedule,
+    });
   } catch (error) {
     reportDatabaseOpenError(dataDirectory, error);
     return;
@@ -397,10 +401,14 @@ app.whenReady().then(async () => {
     await contentBackfill;
     return database.loadLibrary(request.view);
   });
-  const reportCardCacheProgress = (progress) => {
+  const sendCardCacheProgress = (progress) => {
     for (const window of BrowserWindow.getAllWindows())
       if (!window.webContents.isDestroyed())
         window.webContents.send('library:cards-progress', progress);
+  };
+  const reportCardCacheProgress = (progress) => {
+    if (acceptanceCardCache) acceptanceCardCache.report(progress, sendCardCacheProgress);
+    else sendCardCacheProgress(progress);
   };
   ipcMain.handle('library:cards', async (_event, request = {}) => {
     await contentBackfill;
@@ -1594,6 +1602,7 @@ app.whenReady().then(async () => {
         app,
         mode: acceptanceMode,
         doubles: acceptanceDoubles,
+        cardCacheControl: acceptanceCardCache,
         database,
         assetsDirectory,
         preferences,

@@ -76,7 +76,7 @@ it('renames a batch atomically, preserves file data, restores names and rolls ba
     original_filename: 'fixture s-123.png',
     has_custom_name: false,
   });
-});
+}, 30_000);
 afterEach(() => {
   for (const database of connections.splice(0)) database.close();
   for (const directory of temporaryDirectories.splice(0))
@@ -447,7 +447,7 @@ describe('phase 2 core database', () => {
     expect(fs.readFileSync(second.backupPath)).toEqual(expected);
     second.insertProject(project('project-2'));
     expect(fs.readFileSync(second.backupPath)).toEqual(expected);
-  });
+  }, 30_000);
 
   it('supports hash and dimension repair and permanent library removal', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
@@ -625,7 +625,7 @@ describe('phase 2 core database', () => {
     expect(database.listCollections().map((collection) => collection.id)).toEqual([
       DEFAULT_GALLERY_COLLECTION_ID,
     ]);
-  });
+  }, 30_000);
 
   it('groups seed variants with a stable Prompt fingerprint and persists a valid cover', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));

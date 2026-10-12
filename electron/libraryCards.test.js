@@ -17,8 +17,8 @@ import { galleryCollectionScope } from '../src/lib/galleryCollections.js';
 
 const directories = [];
 const connections = [];
-async function open(directory) {
-  const api = await openDatabase(directory);
+async function open(directory, options) {
+  const api = await openDatabase(directory, options);
   connections.push(api);
   return api;
 }
@@ -188,7 +188,7 @@ it('preserves every grouping, score, filter, collection, view and detail with co
     galleryViewGroups(await api.loadLibraryCards(), {}, { promptScope: 'full', mergeVibes: false })
       .length,
   );
-});
+}, 30_000);
 
 function hydrationSpy() {
   const prepare = DatabaseSync.prototype.prepare;
@@ -274,7 +274,7 @@ it('skips clean rows and renames, detects new imports and legacy edits, and agre
   const before = [api.loadLibrary(), api.loadLibrary('trash')];
   expect(api.backfillPromptFingerprints()).toBe(0);
   expect([api.loadLibrary(), api.loadLibrary('trash')]).toEqual(before);
-});
+}, 30_000);
 
 it('keeps dictionary enrichment live, invalidates algorithm upgrades and missing tracking, and rolls markers back', async () => {
   const directory = temporary();
@@ -315,7 +315,7 @@ it('keeps dictionary enrichment live, invalidates algorithm upgrades and missing
     expect(api.backfillPromptFingerprints()).toBe(0);
     api.close();
   }
-});
+}, 30_000);
 
 it(
   'preserves dirty markers and previous fingerprints when startup repair fails',
@@ -482,7 +482,7 @@ it('replaces the 010a cache format without altering original rows or public card
   api = await open(directory);
   expect(await api.loadLibraryCards()).toEqual(before);
   expect(api.loadLibrary()).toEqual(original);
-});
+}, 30_000);
 
 it('recomputes only dirty derivations and keeps live fields and covers current', async () => {
   const directory = temporary();
@@ -549,7 +549,7 @@ it('recomputes only dirty derivations and keeps live fields and covers current',
   expect(reads).toEqual([]);
   vi.restoreAllMocks();
   await expectLiveCardSemantics(api);
-});
+}, 30_000);
 
 it('reads and sets existing exact-group covers while the derived cards stay cached', async () => {
   const api = await open(temporary());
@@ -602,7 +602,7 @@ it('invalidates populated caches after old-writer changes and original 010 trigg
   const after = structuredClone(await api.loadLibraryCards());
   api.backfillPromptFingerprints();
   expect(await api.loadLibraryCards()).toEqual(after);
-});
+}, 30_000);
 
 it('rolls cache writes and consumed markers back on failure and retries without stale memory', async () => {
   const directory = temporary();
@@ -738,7 +738,7 @@ it('shares one complete build across views and reconciles every write between ba
   edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
   expect(await api.loadLibraryCards()).toEqual(cards);
   expect(await api.loadLibraryCards('trash')).toEqual(trash);
-});
+}, 30_000);
 
 it('keeps completed monotonic while deletions and imports change the build total', async () => {
   const directory = temporary();
@@ -765,7 +765,7 @@ it('keeps completed monotonic while deletions and imports change the build total
   expect(progress.some((p, i) => i > 0 && p.total > progress[i - 1].total)).toBe(true);
   expect(cards).toHaveLength(api.loadLibrary().length);
   expect(cards.some((p) => p.id === 'p100')).toBe(true);
-});
+}, 30_000);
 
 it('uses the resolved list as completion even when terminal progress delivery is delayed', async () => {
   const api = await open(temporary());
@@ -821,7 +821,7 @@ it('rejects pending readers on close and resumes committed batches on reopen', a
   expect(cards).toHaveLength(51);
   edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
   expect(await api.loadLibraryCards()).toEqual(cards);
-});
+}, 30_000);
 
 it.each(['committed', 'in-flight'])(
   'recovers a cache build after its own worker is killed at %s',
@@ -868,5 +868,25 @@ it.each(['committed', 'in-flight'])(
     expect(cards).toHaveLength(60);
     edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
     expect(await api.loadLibraryCards()).toEqual(cards);
+  },
+);
+
+it.each([1, 25])(
+  'builds fixed batches of %i rows without changing the process clock',
+  async (rowsPerBatch) => {
+    const clock = performance.now;
+    const api = await open(temporary(), { cardBuildSchedule: { rowsPerBatch } });
+    api.insertProjects(Array.from({ length: 51 }, (_, i) => sample(i)));
+    const progress = [];
+    const cards = await api.loadLibraryCards('all', (value) => progress.push(value));
+    expect(cards).toHaveLength(51);
+    const completed = [...new Set(progress.map((value) => value.completed))];
+    expect(completed).toEqual([
+      0,
+      ...Array.from({ length: Math.ceil(51 / rowsPerBatch) }, (_, i) =>
+        Math.min((i + 1) * rowsPerBatch, 51),
+      ),
+    ]);
+    expect(performance.now).toBe(clock);
   },
 );

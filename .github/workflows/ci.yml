@@ -58,15 +58,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm run format:check
-      - run: npm run typecheck
-      # Includes database-native.test.js: fixed legacy fixture, atomic writes and crash recovery.
-      - run: npm test
-      - run: npm run build
-      - if: matrix.node == 24
-        run: npm run audit:ui
       - name: Restore prepared MiSans cache (no download)
-        if: matrix.node == 24
         id: misans-cache
         uses: actions/cache/restore@v5
         with:
@@ -74,70 +66,199 @@ jobs:
           enableCrossOsArchive: true
           key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
       - name: Fail if font cache was not prepared
-        if: matrix.node == 24 && steps.misans-cache.outputs.cache-hit != 'true'
+        if: steps.misans-cache.outputs.cache-hit != 'true'
         run: node -e "console.error('MiSans font cache was not prepared; check the prepare-fonts job. Matrix jobs never download fonts.'); process.exit(1)"
+      - run: npm run fonts:check
+      - run: npm run format:check
+      - run: npm run typecheck
+      # Includes database-native.test.js: fixed legacy fixture, atomic writes and crash recovery.
+      - run: npm test
+      - run: npm run build
       - if: matrix.node == 24
-        run: npm run fonts:check
-      - if: matrix.node == 24
-        run: npm run verify:app
+        run: npm run audit:ui
+      - name: Upload check UI audit evidence
+        if: always() && matrix.node == 24
+        uses: actions/upload-artifact@v7
+        with:
+          name: check-ui-audit-${{ matrix.os }}-node${{ matrix.node }}
+          path: .codex-runs/004/production-files.json
+          if-no-files-found: ignore
+
+  acceptance:
+    needs: prepare-fonts
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Restore prepared MiSans cache (no download)
+        id: misans-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .local/fonts/MiSansVF.ttf
+          enableCrossOsArchive: true
+          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
+      - name: Fail if font cache was not prepared
+        if: steps.misans-cache.outputs.cache-hit != 'true'
+        run: node -e "console.error('MiSans font cache was not prepared; check the prepare-fonts job. Matrix jobs never download fonts.'); process.exit(1)"
+      - run: npm run fonts:check
+      - run: npm run build
+      - run: npm run verify:app
+      - name: Upload acceptance-checks
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: acceptance-checks-${{ matrix.os }}-node24
+          path: |
+            .codex-runs/acceptance/
+          if-no-files-found: ignore
+
+  reduced-motion:
+    needs: prepare-fonts
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Restore prepared MiSans cache (no download)
+        id: misans-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .local/fonts/MiSansVF.ttf
+          enableCrossOsArchive: true
+          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
+      - name: Fail if font cache was not prepared
+        if: steps.misans-cache.outputs.cache-hit != 'true'
+        run: node -e "console.error('MiSans font cache was not prepared; check the prepare-fonts job. Matrix jobs never download fonts.'); process.exit(1)"
+      - run: npm run fonts:check
+      - run: npm run build
       - name: Verify reduced motion and delayed AI settings reads
-        if: matrix.node == 24
         run: npm run verify:app -- --reduced-motion --category="减少动态效果"
         env:
           NPS_ACCEPTANCE_SLOW_AI_READ: '1'
-      - name: Upload acceptance checks and screenshots
-        if: always() && matrix.node == 24
+      - name: Upload reduced-motion-checks
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: acceptance-${{ matrix.os }}-node${{ matrix.node }}
+          name: reduced-motion-checks-${{ matrix.os }}-node24
           path: |
-            .codex-runs/acceptance/
             .codex-runs/acceptance-reduced-减少动态效果/
           if-no-files-found: ignore
-      - if: matrix.node == 24 && matrix.os == 'windows-latest'
-        run: npm run screenshots:app -- --constrain-window
-      - name: Upload application screenshots
-        if: always() && matrix.node == 24 && matrix.os == 'windows-latest' && hashFiles('.codex-runs/screens/**') != ''
-        uses: actions/upload-artifact@v7
+
+  packaged:
+    needs: prepare-fonts
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
         with:
-          name: app-screens-${{ matrix.os }}-node${{ matrix.node }}
-          path: .codex-runs/screens/
-          if-no-files-found: ignore
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Restore prepared MiSans cache (no download)
+        id: misans-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .local/fonts/MiSansVF.ttf
+          enableCrossOsArchive: true
+          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
+      - name: Fail if font cache was not prepared
+        if: steps.misans-cache.outputs.cache-hit != 'true'
+        run: node -e "console.error('MiSans font cache was not prepared; check the prepare-fonts job. Matrix jobs never download fonts.'); process.exit(1)"
+      - run: npm run fonts:check
+      - run: npm run build
       - name: Verify unsigned directory package
-        if: matrix.node == 24
         run: npm run verify:packaged
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Upload packaged acceptance
-        if: always() && matrix.node == 24 && hashFiles('.codex-runs/acceptance-packaged/**') != ''
+      - name: Upload packaged-acceptance
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: acceptance-packaged-${{ matrix.os }}-node${{ matrix.node }}
-          path: .codex-runs/acceptance-packaged/
-          if-no-files-found: ignore
-      - if: matrix.node == 24
-        run: npm run verify:fonts:package
-      - if: matrix.node == 24 && matrix.os == 'windows-latest'
-        run: npm run screenshots:ui
-      - name: Upload component screenshots and native evidence
-        if: always() && matrix.node == 24 && matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v7
-        with:
-          name: ui-004a-${{ matrix.os }}-node${{ matrix.node }}
+          name: packaged-acceptance-${{ matrix.os }}-node24
           path: |
-            .codex-runs/004a/*.png
-            .codex-runs/004a/*.json
-            .codex-runs/004/production-files.json
+            .codex-runs/acceptance-packaged/
+          if-no-files-found: ignore
+      - run: npm run verify:fonts:package
+      - name: Upload packaged font evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packaged-fonts-${{ matrix.os }}-node24
+          path: .codex-runs/008/package-fonts.json
           if-no-files-found: ignore
       - name: Probe SQLite in Electron main process
-        if: matrix.node == 24
         run: node scripts/probe-data-layer-electron.mjs --dev-only
-      - name: Upload SQLite main process evidence
-        if: always() && matrix.node == 24
+      - name: Upload packaged-sqlite-probe
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: sqlite-probe-${{ matrix.os }}-node${{ matrix.node }}
+          name: packaged-sqlite-probe-${{ matrix.os }}-node24
           path: |
             .codex-runs/data-layer/electron/development.json
             .codex-runs/data-layer/electron/development.log
+          if-no-files-found: ignore
+
+  screenshots:
+    needs: prepare-fonts
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Restore prepared MiSans cache (no download)
+        id: misans-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .local/fonts/MiSansVF.ttf
+          enableCrossOsArchive: true
+          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
+      - name: Fail if font cache was not prepared
+        if: steps.misans-cache.outputs.cache-hit != 'true'
+        run: node -e "console.error('MiSans font cache was not prepared; check the prepare-fonts job. Matrix jobs never download fonts.'); process.exit(1)"
+      - run: npm run fonts:check
+      - run: npm run build
+      - run: npm run screenshots:app -- --constrain-window
+      - name: Upload screenshots-app
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshots-app-${{ matrix.os }}-node24
+          path: |
+            .codex-runs/screens/
+          if-no-files-found: ignore
+      - run: npm run screenshots:ui
+      - name: Upload screenshots-ui
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshots-ui-${{ matrix.os }}-node24
+          path: |
+            .codex-runs/004a/*.png
+            .codex-runs/004a/*.json
           if-no-files-found: ignore

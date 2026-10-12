@@ -133,7 +133,7 @@ export async function runAcceptance(context) {
       undefined,
       'once',
     );
-    if (!mode.category || mode.category === '全部') {
+    if (!mode.packaged && (!mode.category || mode.category === '全部')) {
       await check(
         '卡片 IPC 保留所有视图、图片宽高并移除完整元数据',
         `(async () => {
@@ -181,7 +181,7 @@ export async function runAcceptance(context) {
           'once',
         );
         database.updateProjectName(cacheProbe.id, cacheProbe.name);
-        await cardCacheChecks({ database, h, mode });
+        await cardCacheChecks({ database, h, mode, cardCacheControl: context.cardCacheControl });
       }
     }
     if (mode.packaged) {
@@ -223,6 +223,15 @@ export async function runAcceptance(context) {
       snapshot,
       encrypted: safeStorage.isEncryptionAvailable(),
     };
+    const fontChecks = async () => {
+      await font('.studio-titlebar nav button .nps-button-label', 'MiSans');
+      await font('.settings-about-name', 'Newsreader');
+      await e(
+        `(() => { const p=document.createElement('p'); p.id='acceptance-font-mono';p.style.fontFamily='var(--font-mono)';p.textContent='blue_hair 1.25';document.querySelector('.settings-about-head').append(p) })()`,
+      );
+      await font('#acceptance-font-mono', 'IBM Plex Mono');
+      await e('document.querySelector("#acceptance-font-mono").remove()');
+    };
     const shellChecks = async () => {
       h.dualThemes(false);
       for (const theme of ['light', 'dark']) {
@@ -251,13 +260,7 @@ export async function runAcceptance(context) {
           );
         }
         await section('关于与更新');
-        await font('.studio-titlebar nav button .nps-button-label', 'MiSans');
-        await font('.settings-about-name', 'Newsreader');
-        await e(
-          `(() => { const p=document.createElement('p'); p.id='acceptance-font-mono';p.style.fontFamily='var(--font-mono)';p.textContent='blue_hair 1.25';document.querySelector('.settings-about-head').append(p) })()`,
-        );
-        await font('#acceptance-font-mono', 'IBM Plex Mono');
-        await e('document.querySelector("#acceptance-font-mono").remove()');
+        await fontChecks();
         await h.screenshot(`about-${theme}`);
       }
       if (!mode.packaged) {
@@ -326,7 +329,25 @@ export async function runAcceptance(context) {
         h.dualThemes(true);
       }
     };
-    if (mode.category && mode.category !== '全部') {
+    if (mode.packaged) {
+      h.category('安装包');
+      const { default: sharp } = await import('sharp');
+      await check(
+        '包内 sharp 与 libvips 能加载并处理图片',
+        async () => {
+          const { info } = await sharp(files[0])
+            .resize(1, 1)
+            .png()
+            .toBuffer({ resolveWithObject: true });
+          return !!sharp.versions.vips && info.width === 1 && info.height === 1;
+        },
+        undefined,
+        'once',
+      );
+      await section('关于与更新');
+      await fontChecks();
+      await h.screenshot('packaged-fonts');
+    } else if (mode.category && mode.category !== '全部') {
       h.dualThemes(true);
       if (mode.category === '减少动态效果') {
         await shellChecks();

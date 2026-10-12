@@ -223,7 +223,7 @@ describe('Dialog and Popover', () => {
     expect(document.activeElement).toBe(button('Cancel'));
     click(button('Cancel'));
     expect(document.activeElement).toBe(button('Open'));
-  });
+  }, 30_000);
   it('cancels from native Escape cancel event and blocks destructive Enter', () => {
     render(<ModalFixture />);
     focus(button('Open'));

@@ -35,7 +35,30 @@ npm run verify:app -- --reduced-motion --category="减少动态效果"
 
 任务说明指定了分类或次数时，以任务说明为准，不额外运行全套，也不为无关失败重跑。慢机器模式只在本机复现时序问题，CI 拒绝 `--slow=4/6`。
 
-CI 保留 Windows/macOS × Node 22/24 四个组合。Node 22 只执行安装、格式、类型、单元测试和生产构建；Node 24 在两个平台执行普通全套、减少动态效果、目录包、字体与 SQLite 检查。`screenshots:app` 和 `screenshots:ui` 及其上传仅在 Windows + Node 24 执行；实际字体绘制、基础组件键盘和对话框断言、打包字体仍由两个平台的验收覆盖。组件截图脚本中的 Chromium 原生语义探针随截图只在 Windows 执行。远端 CI 耗时由推送后确认。
+CI 先执行 `prepare-fonts`，恢复或下载并校验固定 SHA-256 的 MiSans 缓存，再并行执行下面的作业。各作业只依赖字体准备，彼此不依赖，各自安装依赖和构建，不传递构建产物。
+
+| 作业 | 平台与 Node | 内容与证据 |
+| --- | --- | --- |
+| `check` | Windows、macOS × Node 22、24 | `npm ci`、格式、类型、单元测试、生产构建；Node 24 加 `audit:ui`，上传 `check-ui-audit-*` |
+| `acceptance` | Windows、macOS，Node 24 | `verify:app` 普通全套，上传 `acceptance-checks-*` |
+| `reduced-motion` | Windows、macOS，Node 24 | 减少动态效果分类与延迟 AI 设置读取，上传 `reduced-motion-checks-*` |
+| `packaged` | Windows、macOS，Node 24 | `verify:packaged`、`verify:fonts:package`、SQLite 主进程探针，上传 `packaged-acceptance-*`、`packaged-fonts-*`、`packaged-sqlite-probe-*` |
+| `screenshots` | Windows，Node 24 | `screenshots:app`、`screenshots:ui`，上传 `screenshots-app-*`、`screenshots-ui-*` |
+
+产物名还包含平台和 Node 版本；断言失败时仍上传已有证据。原先随组件截图上传的 `production-files.json` 改由产生它的 `check` 作业上传。实际字体绘制、基础组件键盘和对话框断言、打包字体仍由两个平台覆盖。组件截图脚本中的 Chromium 原生语义探针只在 Windows 执行。
+
+安装包检查仅验证打包程序身份、包内页面、临时用户路径、SQLite 和演示图库、sharp/libvips 实际处理图片、三种随包字体在两套主题中的实际绘制；同时保留网络与剪贴板隔离检查。不执行卡片缓存压力、计时、主题连续切换和导航行为检查。这些行为断言仍在普通界面验收里执行，发版的 `--packaged --existing-package` 使用相同的轻量检查。
+
+卡片缓存分类默认每批建立 25 行，每批仍让出主进程事件循环。调度参数只从通过临时目录校验的验收模式注入；正常启动和安装包验收不启用。末尾进度在报告源头暂存，待列表回复、渲染器取消监听后显式释放，继续通过真实 IPC/preload 发送，不替换 `performance.now` 或 `webContents.send`。`NPS_ACCEPTANCE_CARD_TIMING=slow` 使用每批 1 行，`fast` 使用每批 25 行，`normal` 使用产品原本的 12 ms / 最多 25 行策略；三者保留相同的并发、响应、单调进度和完整列表断言，受控模式另检查批次大小。
+
+偶发失败时先查看失败作业的日志和对应产物，只重跑失败作业：
+
+```sh
+gh run view <id> --log-failed
+gh run rerun <id> --failed
+```
+
+GitHub 页面也可选择 “Re-run failed jobs”。已经成功的作业无需重跑；若代码需要修复，推送修复后创建新运行，旧运行重跑仍使用原提交。没有加入失败自动重试。目标为整轮 6 分钟以内、单作业重跑 4 分钟以内；实际远端耗时需在推送后检查，不能用本地耗时代替。
 
 减少动态效果使用 `--reduced-motion --category="减少动态效果"`，单进程运行外壳（含动效组合）、基础组件、设置版式、词典滚动条及 AI 服务（保留 `NPS_ACCEPTANCE_SLOW_AI_READ=1` 的延迟读取验证），以及图库的“关闭动效”和“导入与永久删除·关闭动效”场景。图库正常动效那一轮、起名、复制、收尾、工作台、快捷键、词典数据操作、存储管理、关于与更新及持久化重启不在此子集中重复；普通全套中的这些检查保持。设置外观中的动效选择由外壳的动效场景覆盖。
 

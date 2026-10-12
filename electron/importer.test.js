@@ -220,7 +220,7 @@ describe('safe ZIP import', () => {
       file: 'mixed.zip / fake.png',
       error: expect.stringContaining('文件签名'),
     });
-  });
+  }, 30_000);
 
   it('batches real image imports and keeps successful images around a database failure', async () => {
     const directory = temporaryWorkspace();

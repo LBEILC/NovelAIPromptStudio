@@ -172,13 +172,11 @@ git push origin refs/tags/v0.3.0
 
 推送 `v*` 标签后，[`Package and release`](../.github/workflows/release.yml) 会：
 
-1. 在 Windows 和 macOS runner 上执行 `npm ci`、`npm test`。
-2. 校验标签是否与 `package.json` 版本一致。
-3. 构建 Windows x64 安装程序。
-4. Intel 版和 Apple 芯片版的 macOS 包分别在对应架构的 runner 上构建（DMG、ZIP 和更新元数据），各自检查包里的原生模块并启动一次打好的应用，然后合并两份更新元数据。
-5. 汇总产物并生成 `SHA256SUMS.txt`。
-6. checkout 完整标签历史，读取 annotated tag 中的更新说明。
-7. 创建 GitHub Release 并上传产物。
+1. `check` 在 Windows + Node 22 单独执行 `npm ci`、类型检查和单元测试，与 `prepare-fonts` 及后续打包并行。
+2. `prepare-fonts` 恢复或下载并校验固定版本的 MiSans；三个 `package` 作业只依赖它，各自安装依赖、校验标签与版本一致、恢复并校验字体、构建打包。
+3. `package` 分别构建 Windows x64、macOS Intel、macOS Apple Silicon。每个作业保留原生模块检查、启动真实打包程序的轻量验收、包内字体检查和更新元数据检查，不重复执行类型和单元测试。
+4. `release` 同时等待 `check` 和三个 `package` 全部成功，合并两个 macOS 架构的更新元数据，校验产物并生成 `SHA256SUMS.txt`。
+5. checkout 完整标签历史，读取 annotated tag 中的更新说明；只有标签推送事件才创建 GitHub Release 并上传产物。
 
 当前发布产物包括：
 
@@ -189,6 +187,16 @@ git push origin refs/tags/v0.3.0
 - GitHub 根据发布标签自动提供的完整源码 ZIP 与 TAR.GZ；它们必须和安装包指向同一标签。
 
 `workflow_dispatch` 可手动验证云端打包，但因为它不是标签事件，不会创建 GitHub Release。
+
+```sh
+gh workflow run release.yml --ref <待验证分支>
+```
+
+### MiSans 缓存与标签
+
+CI 和发版使用完全相同的缓存键（版本与 SHA-256）、`.local/fonts/MiSansVF.ttf` 路径以及 `enableCrossOsArchive: true`。根据 [GitHub 缓存作用域规则](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching)，标签运行可以回退读取默认分支 `main` 的缓存，不能读取其他功能分支或其他标签的缓存；相同键还必须匹配缓存版本（路径和压缩方式）。
+
+发布前先等待 `main` 上 CI 的 `prepare-fonts` 成功，再推送标签。只有功能分支已绿、或同时推送 main 和标签，都不能保证标签启动时 main 缓存已保存。1.0 发版的字体恢复发生于 2026-10-12 07:36:58 UTC，main 的匹配缓存到 07:37:09 UTC 才保存，所以两边同时未命中；后续标签可复用已保存的 main 缓存。缓存被淘汰或版本变化时，先在 main 运行 CI 预热；若仍未命中，`prepare-fonts` 保留从官方来源下载并校验的回退，打包矩阵不各自下载。
 
 ## macOS 签名与公证
 
@@ -209,6 +217,15 @@ git push origin refs/tags/v0.3.0
 修改 `package.json` 和 `package-lock.json`，提交后创建新的正确标签。不要强制移动已经推送的标签。
 
 ### 测试或打包失败
+
+先检查失败作业日志与 CI 的对应证据，偶发基础设施失败只重跑失败的作业：
+
+```sh
+gh run view <id> --log-failed
+gh run rerun <id> --failed
+```
+
+GitHub 页面上的 “Re-run failed jobs” 等价。一个平台打包失败不必重跑另两个已成功的平台；`check` 失败不必重跑已成功的打包。下游发布仍须等所有依赖成功。日常 CI 也已拆成检查、界面验收、减少动态效果、安装包和截图作业，详见[自动化验收](./automated-acceptance.md)。没有加入失败自动重试。
 
 在 `main` 修复问题、重新验证并递增 patch 版本，然后创建新标签。正式标签一旦推送，应保留历史，不要 force-push。
 

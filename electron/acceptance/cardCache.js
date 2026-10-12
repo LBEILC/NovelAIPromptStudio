@@ -1,17 +1,15 @@
 import { DatabaseSync } from 'node:sqlite';
 import { UI_FEEDBACK_MS, measureFeedback } from './feedback.js';
 
-export async function cardCacheChecks({ database, h, mode = {} }) {
+export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl }) {
   h.category('卡片缓存');
   const ids = Array.from({ length: 300 }, (_, i) => `cache-acceptance-${i}`);
+  const timing = process.env.NPS_ACCEPTANCE_CARD_TIMING || 'fast';
+  if (!cardCacheControl) throw Error('Card cache checks require guarded acceptance mode');
   const raw = new DatabaseSync(database.filePath);
-  const contents = h.window.webContents;
-  const send = contents.send;
-  const now = performance.now;
-  const timing = process.env.NPS_ACCEPTANCE_CARD_TIMING || 'normal';
-  let tick = now.call(performance);
-  const delayed = [];
   try {
+    await h.click('工作台', 'document.querySelector(".studio-titlebar")');
+    await database.loadLibraryCards();
     database.insertProjects(
       ids.map((id) => ({
         id,
@@ -28,19 +26,9 @@ export async function cardCacheChecks({ database, h, mode = {} }) {
       sum(CASE WHEN deleted_at != '' THEN 1 ELSE 0 END) AS trash FROM projects`,
       )
       .get();
-    await h.click('工作台', 'document.querySelector(".studio-titlebar")');
-    // Acceptance-only scheduling: force terminal events behind the list reply.
-    // Exercise the real send/preload path when the queued events are released.
-    contents.send = function (channel, ...args) {
-      if (channel === 'library:cards-progress' && args[0].completed === args[0].total)
-        delayed.push(() => send.call(this, channel, ...args));
-      else return send.call(this, channel, ...args);
-    };
-    // Only the main-process build clock is controlled, never product defaults.
-    // Slow: one row per 12ms budget; fast: reach the hard cap of 25 rows/batch.
-    if (timing === 'slow') performance.now = () => (tick += 13);
-    else if (timing === 'fast') performance.now = () => tick;
-    else if (timing !== 'normal') throw Error(`Unknown card timing: ${timing}`);
+    // Hold terminal reports at their source until the renderer receives its list.
+    // The actual webContents.send, preload and main-process clock stay untouched.
+    cardCacheControl.begin(timing);
     await h.evaluate(`(async () => {
       const state = window.__cardCacheAcceptance = { progress: [], pending: true, clicked: false, responsive: false };
       let probe;
@@ -74,9 +62,7 @@ export async function cardCacheChecks({ database, h, mode = {} }) {
         state.complete = first.length === ${counts.active} && trash.length === ${counts.trash};
       } finally { window.studio.offLibraryCardCacheProgress(); }
     })()`);
-    performance.now = now;
-    contents.send = send;
-    for (const deliver of delayed) deliver();
+    const delayedCount = cardCacheControl.flush();
     await h.check(
       '建立期间发起切页与主进程请求并完成',
       'window.__cardCacheAcceptance.clicked && window.__cardCacheAcceptance.clickedWhilePending && window.__cardCacheAcceptance.feedbackMs !== null',
@@ -110,7 +96,7 @@ export async function cardCacheChecks({ database, h, mode = {} }) {
     await h.check(
       '末尾进度晚于列表回复时取消监听，仍取得完整列表',
       async () =>
-        delayed.length > 0 &&
+        delayedCount > 0 &&
         (await h.evaluate(`window.__cardCacheAcceptance.complete &&
         window.__cardCacheAcceptance.progress.every(p => p.completed < p.total)`)),
       'window.__cardCacheAcceptance',
@@ -130,8 +116,7 @@ export async function cardCacheChecks({ database, h, mode = {} }) {
     await h.screenshot('card-cache-settings-responsive');
     await h.evaluate('delete window.__cardCacheAcceptance');
   } finally {
-    performance.now = now;
-    contents.send = send;
+    cardCacheControl.reset();
     await h.evaluate('window.studio.offLibraryCardCacheProgress()').catch(() => {});
     for (const id of ids) database.deleteProject(id);
     raw.exec('BEGIN');

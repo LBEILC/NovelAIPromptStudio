@@ -4,9 +4,34 @@ import path from 'node:path';
 import { it, expect, vi } from 'vitest';
 import {
   configureAcceptanceMode,
+  createAcceptanceCardCache,
   installAcceptanceDoubles,
   installAcceptanceLatency,
 } from './acceptanceMode.js';
+
+it('keeps card scheduling out of normal and packaged launches and releases terminal reports explicitly', () => {
+  expect(createAcceptanceCardCache(null)).toBeUndefined();
+  expect(createAcceptanceCardCache({ packaged: true })).toBeUndefined();
+  const control = createAcceptanceCardCache({});
+  const deliver = vi.fn();
+  const clock = performance.now;
+  control.begin('slow');
+  expect(control.schedule.rowsPerBatch).toBe(1);
+  control.report({ completed: 1, total: 2 }, deliver);
+  control.report({ completed: 2, total: 2 }, deliver);
+  expect(deliver.mock.calls).toEqual([[{ completed: 1, total: 2 }]]);
+  expect(control.flush()).toBe(1);
+  expect(deliver).toHaveBeenLastCalledWith({ completed: 2, total: 2 });
+  expect(control.flush()).toBe(0);
+  control.begin('fast');
+  expect(control.schedule.rowsPerBatch).toBe(25);
+  control.reset();
+  expect(control.schedule.rowsPerBatch).toBeUndefined();
+  control.report({ completed: 2, total: 2 }, deliver);
+  expect(deliver).toHaveBeenCalledTimes(3);
+  expect(performance.now).toBe(clock);
+  expect(() => control.begin('unknown')).toThrow('Unknown card timing');
+});
 
 it('delays real disk-backed handlers only inside slow acceptance and preserves results', async () => {
   vi.useFakeTimers();

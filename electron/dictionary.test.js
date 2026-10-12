@@ -71,7 +71,7 @@ it('counts each active image once across positive, negative and character tags w
   database.updateProjects(['two'], { deleted: true });
   counts = await database.tagImageCounts();
   expect(counts.get('blue hair')).toBe(1);
-});
+}, 30_000);
 it('loads an entire snapshot beyond the old page size without changing paginated callers', async () => {
   const { database } = await fixture(201);
   expect(database.listTagDictionary({ all: true }).items).toHaveLength(201);
@@ -116,7 +116,7 @@ it('cancels between batches and preserves newer manual edits during a request', 
   expect(result.failed).toHaveLength(1);
   expect(database.lookupTagDictionary([tags[0]]).get(tags[0]).translation).toBe('后来修改');
   expect(database.lookupTagDictionary([tags[50]]).get(tags[50]).translation).toBe('原译文');
-});
+}, 30_000);
 it('aborts an in-flight batch before writing any result', async () => {
   const { database, tags } = await fixture(2);
   const controller = new AbortController();

@@ -2,6 +2,38 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+// Created only after the temporary-profile guard; never exposed to the renderer.
+export function createAcceptanceCardCache(mode) {
+  if (!mode || mode.packaged) return undefined;
+  const schedule = {};
+  let active = false;
+  let terminal = [];
+  return {
+    schedule,
+    begin(timing) {
+      if (!['normal', 'slow', 'fast'].includes(timing))
+        throw Error(`Unknown card timing: ${timing}`);
+      schedule.rowsPerBatch = timing === 'normal' ? undefined : timing === 'slow' ? 1 : 25;
+      active = true;
+    },
+    report(progress, deliver) {
+      if (active && progress.completed === progress.total) terminal.push(() => deliver(progress));
+      else deliver(progress);
+    },
+    flush() {
+      const queued = terminal;
+      terminal = [];
+      for (const deliver of queued) deliver();
+      return queued.length;
+    },
+    reset() {
+      active = false;
+      terminal = [];
+      delete schedule.rowsPerBatch;
+    },
+  };
+}
+
 // No paths, hooks or renderer bridges are changed without this guarded opt-in.
 export function configureAcceptanceMode(app, argv = process.argv) {
   const option = argv.find((value) => value.startsWith('--verify-app='));

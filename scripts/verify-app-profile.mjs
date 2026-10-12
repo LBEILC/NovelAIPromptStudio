@@ -13,6 +13,10 @@ import { acceptanceOptions } from './acceptance-options.mjs';
 import { timingSummary, logTimings } from '../electron/acceptance/timing.js';
 const options = acceptanceOptions();
 const packaged = process.argv.includes('--packaged');
+if (packaged) {
+  options.needsLibrary = true;
+  options.needsDictionary = false;
+}
 const startedAt = Date.now();
 const theme = process.argv.includes('--theme=dark') ? 'dark' : 'light';
 const output = path.resolve(
