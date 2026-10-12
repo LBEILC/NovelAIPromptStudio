@@ -17,7 +17,7 @@
   </p>
 </div>
 
-![NovelAI Prompt Studio 工作台](./doc/screenshots/readme-hero-v100.webp)
+![NovelAI Prompt Studio：工作台、图片库和翻译词典](./doc/screenshots/readme-cover-v100.webp)
 
 <p align="center">
   <a href="https://github.com/LBEILC/NovelAIPromptStudio/releases/latest"><img src="https://img.shields.io/github/v/release/LBEILC/NovelAIPromptStudio?display_name=tag&style=flat-square&label=Release" alt="最新版本"></a>
@@ -42,7 +42,7 @@ NovelAI Prompt Studio 把这些信息从图片里重新带回可读、可编辑�
 
 ## 工作台：把 Prompt 看清楚
 
-![按块显示的 Prompt，段落可以中英对照着改](./doc/screenshots/readme-workbench-v100.webp)
+![工作台：左边是图片，右边是按块显示的 Prompt](./doc/screenshots/readme-hero-v100.webp)
 
 ### Prompt 按"块"组织
 
@@ -53,6 +53,8 @@ NovelAI V5 的 Prompt 常常是 Tag 和成段的自然语言混在一起。工�
 ### 段落：对着中文改英文
 
 点开一个段落，上面是英文、下面是中文，两边都能改。配置了 AI 服务后，可以让它把英文译成中文，或者按你改过的中文重写英文。发给 NovelAI 的始终是上面那一栏英文。
+
+![段落正在编辑：上面英文，下面中文](./doc/screenshots/readme-workbench-v100.webp)
 
 ### Tag：输入时有提示
 
@@ -252,5 +254,6 @@ MiSans VF 不包含在仓库中；开发者运行 `npm run fonts` 从小米官�
 ---
 
 <div align="center">
-  <sub>一张图片，是一次创作留下的完整线索。</sub>
+  <sub>一张图片，是一次创作留下的完整线索。</sub><br>
+  <sub>封面由 <a href="https://github.com/LBEILC/Multiplane">Multiplane</a> 渲染。</sub>
 </div>
