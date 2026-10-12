@@ -8,6 +8,7 @@ import sharp from 'sharp';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import electron from 'electron';
+import referenceSupport from './reference-availability.cjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const serve = process.argv.includes('--serve');
@@ -80,6 +81,10 @@ if (serve) {
     path.join(root, 'scripts', 'ui-screenshot.cjs'),
     path.join(appDirectory, 'main.cjs'),
   );
+  await copyFile(
+    path.join(root, 'scripts', 'reference-availability.cjs'),
+    path.join(appDirectory, 'reference-availability.cjs'),
+  );
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   try {
@@ -114,7 +119,9 @@ if (serve) {
         code === 0 ? resolve() : reject(new Error(`Electron exited ${code}`));
       });
     });
-    for (const theme of ['light', 'dark']) {
+    for (const theme of referenceSupport.referenceAvailability(root).available
+      ? ['light', 'dark']
+      : []) {
       const paths = ['reference', 'showcase'].map((name) =>
         path.join(output, `${name}-${theme}.png`),
       );

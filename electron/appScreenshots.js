@@ -7,6 +7,7 @@ import { createWorkbenchFixtures } from './acceptance/workbenchFixtures.js';
 import { prepareWorkbenchScreenshot } from './workbenchScreenshots.js';
 import { workbenchReferenceRenderer } from './workbenchReference.js';
 import { prepareLibraryScreenshot } from './libraryScreenshots.js';
+import referenceSupport from '../scripts/reference-availability.cjs';
 
 async function renderedFonts(webContents, selectors) {
   const cdp = webContents.debugger;
@@ -87,6 +88,8 @@ export async function runAppScreenshots({
     manyWorkbenchFiles.push(file);
   }
   let reference;
+  const referenceStatus = referenceSupport.referenceAvailability();
+  if (!referenceStatus.available) console.log(referenceStatus.reason);
   const errors = [];
   const onError = (_event, error) => errors.push(error);
   ipcMain.on('screenshot:error', onError);
@@ -100,6 +103,7 @@ export async function runAppScreenshots({
     screenshots: [],
     fontProof: [],
     comparisons: [],
+    referenceStatus,
   };
   try {
     for (const theme of ['light', 'dark']) {
@@ -288,7 +292,7 @@ export async function runAppScreenshots({
             })()`),
           });
           console.log(`Captured ${file}`);
-          if (scene.workbenchState) {
+          if (scene.workbenchState && referenceStatus.available) {
             reference ||= await workbenchReferenceRenderer(mode.output);
             manifest.comparisons.push(
               await reference.capture(

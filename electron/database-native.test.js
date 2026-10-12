@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import './fixtures/databaseTestBudget.js';
 import os from 'node:os';
 import path from 'node:path';
 import { fork } from 'node:child_process';

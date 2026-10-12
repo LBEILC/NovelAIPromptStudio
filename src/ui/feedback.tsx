@@ -52,6 +52,9 @@ export function Notification({ notice, onDismiss }: { notice: Notice; onDismiss:
   const dismiss = useRef(onDismiss);
   dismiss.current = onDismiss;
   useEffect(() => {
+    remaining.current = notice.duration ?? 4000;
+  }, [notice.id, notice.duration]);
+  useEffect(() => {
     if (hover || focused) return;
     const start = Date.now();
     const timer = setTimeout(() => dismiss.current(), remaining.current);
@@ -59,7 +62,7 @@ export function Notification({ notice, onDismiss }: { notice: Notice; onDismiss:
       clearTimeout(timer);
       remaining.current = Math.max(0, remaining.current - (Date.now() - start));
     };
-  }, [hover, focused]);
+  }, [hover, focused, notice.id, notice.duration]);
   return (
     <div
       className="nps-toast"
@@ -75,23 +78,15 @@ export function Notification({ notice, onDismiss }: { notice: Notice; onDismiss:
   );
 }
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const [queue, setQueue] = useState<Notice[]>([]);
+  const [current, setCurrent] = useState<Notice | null>(null);
   const next = useRef(0);
   const layer = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (queue.length) layer.current?.showPopover();
+    if (current) layer.current?.showPopover();
     else layer.current?.hidePopover();
-  }, [queue.length]);
+  }, [current]);
   return (
-    <NoticeContext.Provider
-      value={(notice) =>
-        setQueue((previous) => {
-          const nextNotice = { ...notice, id: ++next.current };
-          // An expiring action (such as trash undo) must be available immediately.
-          return notice.action ? [nextNotice, ...previous] : [...previous, nextNotice];
-        })
-      }
-    >
+    <NoticeContext.Provider value={(notice) => setCurrent({ ...notice, id: ++next.current })}>
       {children}
       <div
         ref={layer}
@@ -101,13 +96,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         aria-live="polite"
         aria-atomic="true"
       >
-        {queue[0] && (
-          <Notification
-            key={queue[0].id}
-            notice={queue[0]}
-            onDismiss={() => setQueue((previous) => previous.slice(1))}
-          />
-        )}
+        {current && <Notification notice={current} onDismiss={() => setCurrent(null)} />}
       </div>
     </NoticeContext.Provider>
   );

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, session } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { referenceAvailability } = require('./reference-availability.cjs');
 
 const url = process.argv.find((value) => value.startsWith('--origin=')).slice('--origin='.length);
 const referenceOrigin = process.argv
@@ -38,6 +39,8 @@ async function paint(window) {
   });
 }
 async function run() {
+  const referenceStatus = referenceAvailability();
+  if (!referenceStatus.available) console.log(referenceStatus.reason);
   await app.whenReady();
   session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
     if (details.url.startsWith('https://fonts.googleapis.com/')) {
@@ -86,7 +89,7 @@ async function run() {
     })`);
   };
   for (const theme of ['light', 'dark']) {
-    for (const reference of [true, false]) {
+    for (const reference of referenceStatus.available ? [true, false] : [false]) {
       captureWindow.setContentSize(1280, 760);
       const page = reference
         ? `${referenceOrigin}/design/preview.html?page=comps&theme=${theme}`
@@ -157,6 +160,7 @@ async function run() {
         fontPolicy:
           'Offline: declared system fallbacks on both pages; Google Fonts stylesheet redirected to empty local CSS. No design source modified.',
         captures: comparison,
+        referenceStatus,
       },
       null,
       2,

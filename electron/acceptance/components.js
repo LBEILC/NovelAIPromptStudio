@@ -206,6 +206,18 @@ export async function componentChecks({ h, mode }) {
     );
     await click('复制 Prompt', 'document', 1);
     await wait('!!document.querySelector(".nps-notifications .nps-toast")');
+    await click(
+      '删除',
+      '[...document.querySelectorAll("section")].find(node=>node.textContent.includes("可以实际操作的示例"))',
+    );
+    await h.checkSoon(
+      '连续通知立即显示后一条且只有一条',
+      'document.querySelectorAll(".nps-notifications .nps-toast").length===1 && document.querySelector(".nps-notifications .nps-toast").textContent.includes("已移入回收站")',
+      undefined,
+      undefined,
+      undefined,
+      'once',
+    );
     await e(
       `document.querySelector('.nps-notifications .nps-toast').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
     );

@@ -529,7 +529,7 @@ describe('Feedback', () => {
     act(() => vi.advanceTimersByTime(1));
     expect(dismiss).toHaveBeenCalledTimes(1);
   });
-  it('queues notifications at one polite live region without taking focus', () => {
+  it('replaces consecutive notifications at one polite live region without taking focus', () => {
     vi.useFakeTimers();
     function Fixture() {
       const notify = useNotifications();
@@ -551,14 +551,12 @@ describe('Feedback', () => {
     );
     focus(button('Notify'));
     click(button('Notify'));
-    expect(query('[role="status"]').textContent).toBe('First');
-    expect(document.activeElement).toBe(button('Notify'));
-    act(() => vi.advanceTimersByTime(100));
     expect(query('[role="status"]').textContent).toBe('Second');
+    expect(document.activeElement).toBe(button('Notify'));
     act(() => vi.advanceTimersByTime(100));
     expect(query('[role="status"]').textContent).toBe('');
   });
-  it('shows undo immediately ahead of queued notices and resumes the queue after acting', () => {
+  it('replaces the previous notice with undo without restoring stale notices after acting', () => {
     const undo = vi.fn();
     function Fixture() {
       const notify = useNotifications();
@@ -584,7 +582,36 @@ describe('Feedback', () => {
     expect(document.activeElement).toBe(button('Notify'));
     click(button('Undo'));
     expect(undo).toHaveBeenCalledOnce();
-    expect(query('[role="status"]').textContent).toBe('Saved');
+    expect(query('[role="status"]').textContent).toBe('');
+  });
+  it('replaces a paused notice and gives its replacement a fresh lifetime', () => {
+    vi.useFakeTimers();
+    function Fixture() {
+      const notify = useNotifications();
+      return (
+        <>
+          <Button onClick={() => notify({ text: 'First', duration: 100 })}>First</Button>
+          <Button onClick={() => notify({ text: 'Second', duration: 100 })}>Second</Button>
+        </>
+      );
+    }
+    render(
+      <NotificationProvider>
+        <Fixture />
+      </NotificationProvider>,
+    );
+    click(button('First'));
+    act(() => vi.advanceTimersByTime(80));
+    pointer(query('.nps-toast'), 'pointerover');
+    click(button('Second'));
+    expect(query('[role="status"]').textContent).toBe('Second');
+    act(() => vi.advanceTimersByTime(1000));
+    expect(query('[role="status"]').textContent).toBe('Second');
+    pointer(query('.nps-toast'), 'pointerout');
+    act(() => vi.advanceTimersByTime(99));
+    expect(query('[role="status"]').textContent).toBe('Second');
+    act(() => vi.advanceTimersByTime(1));
+    expect(query('[role="status"]').textContent).toBe('');
   });
   it('tooltip delays hover, opens for keyboard focus and hides on scroll/press', () => {
     vi.useFakeTimers();
