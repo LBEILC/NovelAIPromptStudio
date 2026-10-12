@@ -211,6 +211,11 @@
   --ink-hover: #36352f;
   --on-ink: #ffffff;
 
+  /* 悬停提示：两套主题下都是深色的小块。它是界面里最不该抢眼的东西，深色主题下不能是最亮的一块 */
+  --tip-bg: #1c1c1c;
+  --tip-text: #ffffff;
+  --tip-border: transparent;
+
   /* 朱砂 */
   --cinnabar: #d4351c;        /* 实心：生成按钮、当前标记 */
   --cinnabar-hover: #bd2e17;
@@ -274,6 +279,10 @@
   --ink: #f1efea;
   --ink-hover: #ffffff;
   --on-ink: #161514;
+
+  --tip-bg: #302e2b;        /* 比浮层再高一档的深色；文字在上面 11:1 */
+  --tip-text: #f1efea;
+  --tip-border: #46433f;
 
   --cinnabar: #d4351c;        /* 实心部分两套主题同色，标志不变色 */
   --cinnabar-hover: #e2452b;
