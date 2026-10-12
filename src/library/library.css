@@ -134,3 +134,16 @@
 .library-view-vibe { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); }
 .library-row-end { margin-left:auto; }
 .library-side .nps-menu-trigger { display:flex; width:100%; }
+
+.library-file { display:flex; white-space:nowrap; min-width:0; }
+.library-file-start { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.library-file-end { flex-shrink:0; }
+.library-file > span:first-child { flex-shrink:0; white-space:pre; }
+.nps-dialog:has(.library-rename-description) { top:var(--titlebar-h); }
+.nps-dialog:has(.library-rename-description)::backdrop { top:var(--titlebar-h); }
+.library-rename-row { display:grid; grid-template-columns:44px 1fr; align-items:center; gap:var(--sp-2); margin-top:var(--sp-2); }
+.library-rename-description { margin:0; }
+.library-rename-description + .library-rename-row { margin-top:var(--sp-4); }
+.library-rename-row > span:first-child { color:var(--text-3); font-size:var(--fs-small); }
+.library-rename-result { color:var(--text-3); overflow-wrap:anywhere; min-width:0; }
+.library-rename-current { display:flex; align-items:center; gap:var(--sp-2); margin-top:var(--sp-4); }

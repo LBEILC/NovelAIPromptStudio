@@ -1,3 +1,4 @@
+import { LibraryRename } from './Rename';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, EmptyState, EmptyMark, Progress, ResizablePanel } from '../ui';
 import { useLibraryDetail } from '../state/libraryDetail';
@@ -49,6 +50,7 @@ export default function LibraryPage(
   const [panelWidth, setPanelWidth] = useState(
     () => stored(GALLERY_PREVIEW_PANEL_WIDTH_KEY) || token('--detail-w'),
   );
+  const [renaming, setRenaming] = useState(false);
   const [viewer, setViewer] = useState(false);
   const { detail, error } = useLibraryDetail(p.preview?.id || '', p.preview);
   const ids = useMemo(
@@ -163,6 +165,10 @@ export default function LibraryPage(
               ) : (
                 <>
                   <CollectionPicker p={p} ids={ids} />
+                  <Button size="small" variant="quiet" onClick={() => setRenaming(true)}>
+                    <i className="ri-edit-line" />
+                    起名
+                  </Button>
                   {p.activeCollection?.kind === 'manual' && (
                     <Button
                       size="small"
@@ -230,6 +236,7 @@ export default function LibraryPage(
           <LibraryDetail p={p} detail={detail} onViewer={() => setViewer(true)} />
         </ResizablePanel>
       )}
+      {renaming && <LibraryRename p={p} ids={ids} onClose={() => setRenaming(false)} />}
       {viewer && (
         <LibraryViewer
           p={p}

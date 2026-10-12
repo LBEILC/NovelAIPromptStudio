@@ -1,6 +1,8 @@
 import { dimensions, generationParameters, modelDisplayName } from './presentation';
 import { useState } from 'react';
-import { Button, Dialog, Input } from '../ui';
+import { Button } from '../ui';
+import { LibraryRename } from './Rename';
+import { hasImageName, imageFileName, imageAccessibleName } from '../lib/imageNaming.js';
 import { mediaUrl } from '../lib/imageStage.js';
 import { LibraryPrompt, libraryPositivePrompt } from './Prompt';
 import { CollectionPicker } from './Collections';
@@ -17,7 +19,6 @@ export function LibraryDetail({
   onViewer: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
-  const [name, setName] = useState('');
   if (p.selectedGroupIds.length)
     return (
       <aside className="library-detail">
@@ -39,13 +40,19 @@ export function LibraryDetail({
     );
   if (!detail) return <aside className="library-detail" />;
   const group = p.previewGroup;
+  const filename = imageFileName(detail);
+  const filenameCharacters = Array.from(filename);
   const pending = p.preview?.id !== detail.id;
   const parameters = generationParameters(detail.metadata);
   return (
     <aside className="library-detail" data-detail-id={detail.id} aria-busy={pending}>
       <div className="library-detail-scroll">
         <div className="library-detail-picture">
-          <img src={mediaUrl(detail.image_path)} alt={detail.name} onDoubleClick={onViewer} />
+          <img
+            src={mediaUrl(detail.image_path)}
+            alt={imageAccessibleName(detail)}
+            onDoubleClick={onViewer}
+          />
         </div>
         {group && group.members.length > 1 && (
           <div className="library-strip">
@@ -53,7 +60,7 @@ export function LibraryDetail({
               <button
                 key={member.id}
                 className={`${member.id === detail.id ? 'is-current' : ''} ${member.id === group.cover.id ? 'is-cover' : ''}`}
-                aria-label={member.name}
+                aria-label={imageAccessibleName(member)}
                 onClick={() => p.onPreview(group, member)}
               >
                 <img src={mediaUrl(member.thumbnail_path)} alt="" />
@@ -66,7 +73,7 @@ export function LibraryDetail({
           </div>
         )}
         <div className="library-caption">
-          <b>{detail.name}</b>
+          {hasImageName(detail) && <b>{detail.name}</b>}
           <span className="library-mono">
             {dimensions(detail.metadata)}
             {detail.metadata.model && (
@@ -86,6 +93,15 @@ export function LibraryDetail({
             {(p.view === 'trash' ? detail.deleted_at : detail.created_at).slice(0, 10)}{' '}
             {p.view === 'trash' ? '移入回收站' : '导入'}
           </span>
+          {!hasImageName(detail) && (
+            <span className="library-mono library-file" title={filename}>
+              <span>文件 </span>
+              <span className="library-file-start">
+                {filenameCharacters.slice(0, -20).join('')}
+              </span>
+              <span className="library-file-end">{filenameCharacters.slice(-20).join('')}</span>
+            </span>
+          )}
         </div>
         <div className="library-detail-actions">
           {p.view === 'trash' ? (
@@ -113,12 +129,11 @@ export function LibraryDetail({
                 variant="quiet"
                 size="small"
                 onClick={() => {
-                  setName(detail.name);
                   setRenaming(true);
                 }}
               >
                 <i className="ri-edit-line" />
-                重命名
+                {hasImageName(detail) ? '重命名' : '起名'}
               </Button>
               {group && group.members.length > 1 && group.canSetCover && (
                 <Button variant="quiet" size="small" onClick={() => p.onSetCover(group, detail)}>
@@ -157,22 +172,18 @@ export function LibraryDetail({
           </Button>
         )}
       </div>
-      <Dialog
-        open={renaming}
-        title="重命名"
-        cancelLabel="取消"
-        confirmLabel="重命名"
-        onCancel={() => setRenaming(false)}
-        onConfirm={async () => {
-          if (name.trim() && (await p.onRename(detail, name.trim()))) setRenaming(false);
-        }}
-      >
-        <Input
-          aria-label="图片名称"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
+      {/* TODO(design): 界面稿未展示单张和整摞初始态；单张沿用原名预填，整摞暂留空。 */}
+      {renaming && (
+        <LibraryRename
+          p={p}
+          ids={group?.members.map((member) => member.id) || [detail.id]}
+          currentId={detail.id}
+          initialName={
+            hasImageName(detail) && (!group || group.members.length === 1) ? detail.name : ''
+          }
+          onClose={() => setRenaming(false)}
         />
-      </Dialog>
+      )}
     </aside>
   );
 }

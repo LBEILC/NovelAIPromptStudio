@@ -11,6 +11,7 @@ import {
 import { extractV4PromptData, normalizePromptStructure } from '../src/lib/promptStructure.js';
 import { danbooruLookupName } from './danbooru.js';
 import { extractEmbeddedVibes, fingerprintVibes } from './vibes.js';
+import { imageFileName } from '../src/lib/imageNaming.js';
 
 const TAG_CATEGORIES = new Set(CATEGORY_OPTIONS);
 export const DEFAULT_GALLERY_COLLECTION_ID = 'default-gallery-collection';
@@ -729,7 +730,24 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
           { $fingerprint: project.exact_group_fingerprint },
         )[0]
       : null;
-    return { ...hydrated, group_cover_id: cover?.project_id || '' };
+    return {
+      ...hydrated,
+      ...namingFields(project, metadata),
+      group_cover_id: cover?.project_id || '',
+    };
+  };
+
+  const namingFields = (project, metadata) => {
+    const saved = query('SELECT value FROM app_meta WHERE key = $key', {
+      $key: 'image_naming:' + project.id,
+    })[0];
+    const naming = saved
+      ? safeJson(saved.value)
+      : safeJson(metadata.extra_json).studio_naming || {};
+    return {
+      original_filename: naming.original_filename || imageFileName(project),
+      has_custom_name: naming.has_custom_name === true,
+    };
   };
 
   const loadProject = (projectId) =>
@@ -780,6 +798,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
         tags: tagsByProject.get(project.id) || [],
         metadata,
         prompt_structure: safeJson(metadata.prompt_structure_json),
+        ...namingFields(project, metadata),
         group_cover_id: covers.get(project.exact_group_fingerprint) || '',
       };
     });
@@ -1009,7 +1028,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
   };
 
   const prepareCardCache = () => {
-    const version = '5:dictionary-independent-columns';
+    const version = '6:image-naming';
     const previousVersion = query('SELECT value FROM app_meta WHERE key = $key', {
       $key: cardCacheVersionKey,
     })[0]?.value;
@@ -1085,6 +1104,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
           : base_prompt_fingerprint;
       const payload = {
         ...cardFields,
+        ...namingFields(cardFields, metadata),
         metadata: {
           model: metadata.model || '',
           width: metadata.width || 0,
@@ -1628,18 +1648,27 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
     });
     database.run('DELETE FROM prompt_group_covers WHERE project_id = $id', { $id: projectId });
     database.run('DELETE FROM projects WHERE id = $id', { $id: projectId });
+    database.run('DELETE FROM app_meta WHERE key = $key', { $key: 'image_naming:' + projectId });
     persist();
   };
 
-  const updateProjectName = (id, name) => {
-    const cleaned = String(name || '').trim();
+  const updateProjectName = (id, name, hasCustomName = true, restoring = false) => {
+    const cleaned = restoring ? String(name || '') : String(name || '').trim();
     if (!cleaned) throw new Error('图片名称不能为空');
-    if (cleaned.length > 160) throw new Error('图片名称不能超过 160 个字符');
+    if (!restoring && cleaned.length > 160) throw new Error('图片名称不能超过 160 个字符');
     const project = query('SELECT id, deleted_at FROM projects WHERE id = $id', {
       $id: String(id || ''),
     })[0];
     if (!project) throw new Error('图片不存在');
     if (project.deleted_at) throw new Error('请先从回收站恢复图片');
+    const previous = loadProject(project.id);
+    database.run('INSERT OR REPLACE INTO app_meta (key, value) VALUES ($key, $value)', {
+      $key: 'image_naming:' + project.id,
+      $value: JSON.stringify({
+        original_filename: previous.original_filename,
+        has_custom_name: hasCustomName,
+      }),
+    });
     database.run('UPDATE projects SET name = $name, updated_at = $updated_at WHERE id = $id', {
       $id: project.id,
       $name: cleaned,
@@ -1880,6 +1909,27 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
     insertProject: atomic(insertProject),
     deleteProject: atomic(deleteProject),
     updateProjectName: atomic(updateProjectName),
+    updateProjectNames: atomic((changes) => {
+      if (
+        !Array.isArray(changes) ||
+        !changes.length ||
+        new Set(changes.map((c) => c.id)).size !== changes.length
+      )
+        throw new Error('图片名称没有修改');
+      const previous = changes.map(({ id }) => {
+        const record = loadProject(id);
+        if (!record) throw new Error('图片不存在');
+        return { id, name: record.name, has_custom_name: record.has_custom_name };
+      });
+      for (const change of changes)
+        updateProjectName(
+          change.id,
+          change.name,
+          change.has_custom_name !== false,
+          typeof change.has_custom_name === 'boolean',
+        );
+      return previous;
+    }),
     updateProjects: atomic(updateProjects),
     setGroupCover: atomic(setGroupCover),
     loadTrashSummary,

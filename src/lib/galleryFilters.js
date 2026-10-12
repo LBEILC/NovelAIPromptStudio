@@ -82,6 +82,7 @@ function projectFilterIndex(project) {
     })),
     searchValues: [
       project.name,
+      project.original_filename,
       ...(project.search_prompts || []),
       ...tags.flatMap((tag) => [tag.tag, tag.translation]),
     ]

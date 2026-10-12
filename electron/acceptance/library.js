@@ -1,3 +1,4 @@
+import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import {
   checkLibraryButtonGaps,
@@ -71,6 +72,7 @@ export async function libraryChecks(env) {
     wait(
       'document.querySelector(".library-card.current")?.dataset.projectId === document.querySelector(".library-detail")?.dataset.detailId',
     );
+  if (mode.category === '图片库') await libraryNamingChecks(env);
   if (mode.category === '图片库·收尾') {
     await libraryFinishChecks({ h, database, refresh, click, input, selectCard, waitDetail });
     return;

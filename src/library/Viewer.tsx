@@ -1,3 +1,4 @@
+import { hasImageName, imageAccessibleName } from '../lib/imageNaming.js';
 import { dimensions } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -77,7 +78,7 @@ export function LibraryViewer({ p, onClose }: { p: LibraryProps; onClose: () => 
       }}
     >
       <div className="library-viewer-top">
-        <b>{image.name}</b>
+        {hasImageName(image) && <b>{image.name}</b>}
         <span className="library-help library-mono">
           {dimensions(image.metadata)}
           {p.previewGroup &&
@@ -120,7 +121,7 @@ export function LibraryViewer({ p, onClose }: { p: LibraryProps; onClose: () => 
       >
         <img
           src={mediaUrl(image.image_path)}
-          alt={image.name}
+          alt={imageAccessibleName(image)}
           draggable={false}
           style={{
             transform: `rotate(${rotation}deg) scaleX(${flip ? -1 : 1})`,
@@ -158,7 +159,7 @@ export function LibraryViewer({ p, onClose }: { p: LibraryProps; onClose: () => 
               <button
                 key={member.id}
                 className={member.id === image.id ? 'is-current' : ''}
-                aria-label={member.name}
+                aria-label={imageAccessibleName(member)}
                 onClick={() => p.onPreview(p.previewGroup!, member)}
               >
                 <img src={mediaUrl(member.thumbnail_path)} alt="" />

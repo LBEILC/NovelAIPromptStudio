@@ -1,3 +1,4 @@
+import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import { libraryChecks } from './library.js';
 import { motionChecks } from './motion.js';
@@ -223,7 +224,8 @@ export async function runAcceptance(context) {
     };
     if (mode.category && mode.category !== '全部') {
       h.dualThemes(true);
-      if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
+      if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
+      else if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
       else if (['图片库', '图片库·导入', '图片库·收尾'].includes(mode.category))
         await libraryChecks(environment);
       else if (mode.category.startsWith('设置')) await settingsChecks(environment, false);
@@ -341,6 +343,7 @@ export async function runAcceptance(context) {
         await wait(`document.documentElement.dataset.theme === 'light'`);
         h.dualThemes(true);
         await shortcutChecks(environment);
+        await libraryNamingChecks(environment);
         await libraryChecks(environment);
         await settingsChecks(environment, false);
         await componentChecks(environment);

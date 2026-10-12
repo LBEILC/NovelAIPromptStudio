@@ -89,8 +89,14 @@ describe('native engine upgrade', () => {
       const database = await open(directory);
       expect(fs.readFileSync(database.engineBackupPath)).toEqual(before);
       expect(fs.readFileSync(database.backupPath)).toEqual(before);
-      expect(database.loadLibrary()).toEqual(expected.library);
-      expect(database.loadLibrary('trash')).toEqual(expected.trash);
+      const withNaming = (records) =>
+        records.map((record) => ({
+          ...record,
+          original_filename: record.name + (path.extname(record.image_path) || '.png'),
+          has_custom_name: false,
+        }));
+      expect(database.loadLibrary()).toEqual(withNaming(expected.library));
+      expect(database.loadLibrary('trash')).toEqual(withNaming(expected.trash));
       inspect(directory, (raw) => {
         expect(
           raw

@@ -1,3 +1,4 @@
+import { imageAccessibleName } from '../lib/imageNaming.js';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { adjacentRowIndex, fallbackRatio, layoutLibraryRows } from './layout';
 import { mediaUrl } from '../lib/imageStage.js';
@@ -282,7 +283,7 @@ export function LibraryGrid({
                 <div
                   role="option"
                   aria-selected={selected || group.id === p.previewGroup?.id}
-                  aria-label={group.cover.name}
+                  aria-label={imageAccessibleName(group.cover)}
                   tabIndex={
                     group.id === p.previewGroup?.id || (selectedIndex < 0 && index === 0) ? 0 : -1
                   }

@@ -1,3 +1,4 @@
+import { numberedImageNames } from './lib/imageNaming.js';
 import { deletionDetail } from './library/presentation';
 import { useLibraryComputation } from './state/libraryComputation';
 import { useLibraryState } from './state/library';
@@ -1411,6 +1412,33 @@ export default function App() {
     );
   };
 
+  const renameProjects = async (ids, name) => {
+    const names = numberedImageNames(name, ids.length);
+    const result = await studio.updateProjectNames(
+      ids.map((id, index) => ({ id, name: names[index] })),
+    );
+    if (!result?.ok) {
+      showToast(result?.error || '图片名称没有修改', 'error');
+      return false;
+    }
+    await reloadLibrary(galleryView);
+    notify({
+      text: '已给 ' + ids.length + ' 张图片起名',
+      action: {
+        label: '撤销',
+        onClick: async () => {
+          const restored = await studio.updateProjectNames(result.previous);
+          if (!restored?.ok) {
+            showToast(restored?.error || '图片名称没有修改', 'error');
+            return;
+          }
+          await reloadLibrary(galleryView);
+        },
+      },
+    });
+    return true;
+  };
+
   const renameProject = async (project, name) => {
     const result = await studio.updateProjectName(project.id, name);
     if (!result?.ok) {
@@ -1806,6 +1834,7 @@ export default function App() {
               onPreview={previewGalleryGroup}
               onQueryChange={(query) => updateGalleryFilters({ query })}
               onRename={renameProject}
+              onRenameMany={renameProjects}
               onRestore={restoreProjects}
               onReveal={(project) => studio.revealFile(project.image_path)}
               onSelectionChange={(groupIds) => {

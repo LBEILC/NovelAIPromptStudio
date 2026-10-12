@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld(
     },
     offImportProgress: () => ipcRenderer.removeAllListeners('library:import-progress'),
     updateProjectName: (id, name) => invoke('project:update-name', id, name),
+    updateProjectNames: (changes) => invoke('project:update-names', changes),
     moveProjectsToTrash: (ids) => invoke('project:move-to-trash', ids),
     restoreProjects: (ids) => invoke('project:restore', ids),
     permanentlyDeleteProjects: (ids) => invoke('project:permanent-delete', ids),

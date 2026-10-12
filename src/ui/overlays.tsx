@@ -136,6 +136,7 @@ export function DialogContent({
   onCancel,
   onConfirm,
   destructive = false,
+  confirmDisabled = false,
   cancelRef,
 }: {
   title: string;
@@ -146,6 +147,7 @@ export function DialogContent({
   onCancel: () => void;
   onConfirm: () => void;
   destructive?: boolean;
+  confirmDisabled?: boolean;
   cancelRef?: RefObject<HTMLButtonElement | null>;
 }) {
   return (
@@ -161,6 +163,7 @@ export function DialogContent({
           type="button"
           className={cx('nps-button', destructive ? 'nps-button-danger-outline' : 'nps-button-ink')}
           onClick={onConfirm}
+          disabled={confirmDisabled}
         >
           {confirmLabel}
         </button>

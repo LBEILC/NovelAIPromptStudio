@@ -197,7 +197,7 @@ describe('safe ZIP import', () => {
       assetsDirectory: path.join(directory, 'assets'),
       database,
     });
-    expect(result.imported[0].name).toBe('第三张 同组');
+    expect(result.imported[0].name).toBe('第三张 (同组)');
   });
 
   it('reports a fake PNG without blocking the rest of a batch', async () => {

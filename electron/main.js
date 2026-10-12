@@ -1,3 +1,4 @@
+import { hasImageName, imageFileName } from '../src/lib/imageNaming.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -985,6 +986,13 @@ app.whenReady().then(async () => {
     controller.abort();
     return { ok: true };
   });
+  ipcMain.handle('project:update-names', (_event, changes) => {
+    try {
+      return { ok: true, previous: database.updateProjectNames(changes) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle('project:update-name', (_event, id, name) => {
     try {
       return { ok: true, project: database.updateProjectName(id, name) };
@@ -1097,13 +1105,16 @@ app.whenReady().then(async () => {
       if (!project) throw new Error('图片不存在');
       const extension = path.extname(project.image_path).toLowerCase() || '.png';
       const safeBaseName =
-        String(project.name || 'NovelAI image')
+        String(hasImageName(project) ? project.name : imageFileName(project))
           .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
           .trim() || 'NovelAI image';
       const owner = BrowserWindow.fromWebContents(event.sender);
       const result = await dialog.showSaveDialog(owner, {
         title: '下载图片',
-        defaultPath: `${safeBaseName}${extension}`,
+        defaultPath:
+          hasImageName(project) && !safeBaseName.toLowerCase().endsWith(extension)
+            ? `${safeBaseName}${extension}`
+            : safeBaseName,
         filters: [{ name: 'Image', extensions: [extension.slice(1)] }],
       });
       if (result.canceled || !result.filePath) return { ok: true, canceled: true };

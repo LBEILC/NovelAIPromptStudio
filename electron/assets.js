@@ -18,15 +18,6 @@ export async function hashFile(filePath) {
   return hash.digest('hex');
 }
 
-function safeName(filePath) {
-  return (
-    path
-      .basename(filePath, path.extname(filePath))
-      .replace(/[^\p{L}\p{N}._-]+/gu, ' ')
-      .trim() || 'Untitled'
-  );
-}
-
 async function copyWithThumbnail(sourcePath, assetsDirectory) {
   const id = crypto.randomUUID();
   const extension = path.extname(sourcePath).toLowerCase() || '.png';
@@ -55,6 +46,13 @@ export async function importImage(sourcePath, assetsDirectory, options = {}) {
   const { targetPath, thumbnailPath } = await copyWithThumbnail(sourcePath, assetsDirectory);
   try {
     const metadata = await readNovelAIMetadata(sourcePath);
+    metadata.extra_json = JSON.stringify({
+      ...JSON.parse(metadata.extra_json || '{}'),
+      studio_naming: {
+        original_filename: path.basename(options.name || sourcePath),
+        has_custom_name: false,
+      },
+    });
     if (!metadata.width || !metadata.height) {
       const imageMetadata = await sharp(sourcePath).metadata();
       metadata.width = Number(imageMetadata.width || 0);
@@ -65,7 +63,7 @@ export async function importImage(sourcePath, assetsDirectory, options = {}) {
     const now = new Date().toISOString();
     return {
       id,
-      name: safeName(options.name || sourcePath),
+      name: path.basename(options.name || sourcePath, path.extname(options.name || sourcePath)),
       image_path: targetPath,
       thumbnail_path: thumbnailPath,
       content_hash: options.contentHash || (await hashFile(sourcePath)),

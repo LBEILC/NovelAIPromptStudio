@@ -153,7 +153,7 @@ export async function extraLibraryChecks({
   const original = database.loadProject(id).name;
   await click('重命名', 'document.querySelector(".library-detail-actions")');
   await input('input[aria-label="图片名称"]', original + ' 012');
-  await click('重命名', dialog);
+  await click('起名', dialog);
   await h.until(() => database.loadProject(id).name === original + ' 012', '图片重命名');
   await waitDetail();
   await check(
@@ -178,7 +178,7 @@ export async function extraLibraryChecks({
   );
   await click('重命名', 'document.querySelector(".library-detail-actions")');
   await input('input[aria-label="图片名称"]', original);
-  await click('重命名', dialog);
+  await click('起名', dialog);
   await h.until(() => database.loadProject(id).name === original, '恢复测试名称');
   await selectCard(0, { ctrlKey: true });
   await selectCard(1, { ctrlKey: true });

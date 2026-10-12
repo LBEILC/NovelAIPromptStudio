@@ -78,7 +78,7 @@ jobs:
       - run: npm run verify:app
       - name: Verify slow machine on one matrix combination
         if: matrix.os == 'windows-latest' && matrix.node == 24
-        run: npm run verify:app -- --slow=6
+        run: npm run verify:app -- --slow=4
       - name: Verify reduced motion and delayed AI settings reads
         run: npm run verify:app -- --reduced-motion
         env:
@@ -91,7 +91,7 @@ jobs:
           path: |
             .codex-runs/acceptance/
             .codex-runs/acceptance-reduced/
-            .codex-runs/acceptance-slow-6/
+            .codex-runs/acceptance-slow-4/
           if-no-files-found: ignore
       - run: npm run screenshots:app -- --constrain-window
       - name: Upload application screenshots

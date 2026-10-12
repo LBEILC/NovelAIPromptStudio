@@ -12,6 +12,7 @@ export function acceptanceOptions(argv = process.argv.slice(2)) {
     ![
       '全部',
       '图片库',
+      '图片库·起名',
       '图片库·复制',
       '图片库·导入',
       '图片库·收尾',
@@ -31,6 +32,7 @@ export function acceptanceOptions(argv = process.argv.slice(2)) {
   const needsLibrary = [
     '全部',
     '图片库',
+    '图片库·起名',
     '图片库·复制',
     '图片库·导入',
     '图片库·收尾',

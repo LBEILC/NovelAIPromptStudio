@@ -61,6 +61,7 @@ export interface LibraryProps {
   onReveal: (project: LibraryCard | ImageRecord) => void;
   onSetCover: (group: LibraryGroup, project: LibraryCard | ImageRecord) => Promise<unknown>;
   onRename: (project: LibraryCard | ImageRecord, name: string) => Promise<boolean>;
+  onRenameMany: (ids: string[], name: string) => Promise<boolean>;
   onToggleSelect: (group: LibraryGroup, event: Pick<MouseEvent, 'shiftKey'>) => void;
   onSelectionChange: (ids: string[]) => void;
   onSelectAll: () => void;

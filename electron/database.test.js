@@ -11,6 +11,71 @@ async function openDatabase(directory) {
   return database;
 }
 const temporaryDirectories = [];
+
+it('renames a batch atomically, preserves file data, restores names and rolls back partial writes', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-naming-'));
+  temporaryDirectories.push(directory);
+  const database = await openDatabase(directory);
+  for (const id of ['naming-a', 'naming-b'])
+    database.insertProject({
+      ...project(id),
+      name: 'fixture s-123',
+      tags: [],
+      prompt_structure: {},
+      metadata: { extra_json: '{}' },
+    });
+  const original = database.loadProject('naming-a');
+  expect(JSON.stringify(original)).toBe(
+    JSON.stringify(database.loadLibrary().find((p) => p.id === original.id)),
+  );
+  await database.loadLibraryCards();
+  expect(() =>
+    database.updateProjectNames([
+      { id: 'naming-a', name: 'Changed' },
+      { id: 'naming-b', name: '' },
+    ]),
+  ).toThrow();
+  expect(database.loadProject('naming-a')).toEqual(original);
+  expect((await database.loadLibraryCards()).find((p) => p.id === 'naming-a').name).toBe(
+    original.name,
+  );
+  const previous = database.updateProjectNames([
+    { id: 'naming-a', name: 's-123' },
+    { id: 'naming-b', name: 's-123' },
+  ]);
+  expect(database.loadProject('naming-a')).toMatchObject({
+    name: 's-123',
+    has_custom_name: true,
+    original_filename: 'fixture s-123.png',
+    image_path: original.image_path,
+  });
+  expect(JSON.stringify(database.loadProject('naming-a'))).toBe(
+    JSON.stringify(database.loadLibrary().find((p) => p.id === 'naming-a')),
+  );
+  expect((await database.loadLibraryCards()).find((p) => p.id === 'naming-a')).toMatchObject({
+    name: 's-123',
+    has_custom_name: true,
+    original_filename: 'fixture s-123.png',
+  });
+  database.updateProjectNames(previous);
+  expect(database.loadProject('naming-a')).toMatchObject({
+    name: original.name,
+    has_custom_name: false,
+  });
+  const longName = ' synthetic ' + 'x'.repeat(180) + ' s-123 ';
+  database.insertProject({ ...project('naming-long'), name: longName });
+  const longPrevious = database.updateProjectNames([{ id: 'naming-long', name: 'Short' }]);
+  database.updateProjectNames(longPrevious);
+  expect(database.loadProject('naming-long').name).toBe(longName);
+  database.close();
+  connections.splice(connections.indexOf(database), 1);
+  const reopened = await openDatabase(directory);
+  expect(reopened.loadProject('naming-a')).toMatchObject({
+    name: original.name,
+    original_filename: 'fixture s-123.png',
+    has_custom_name: false,
+  });
+});
 afterEach(() => {
   for (const database of connections.splice(0)) database.close();
   for (const directory of temporaryDirectories.splice(0))

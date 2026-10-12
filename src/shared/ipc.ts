@@ -181,6 +181,9 @@ export interface StudioApi {
   onImportProgress(callback: (progress: ImportProgress) => void): void;
   offImportProgress(): Electron.IpcRenderer;
   updateProjectName(id: string, name: string): Promise<Result<{ project: ImageRecord | null }>>;
+  updateProjectNames(
+    changes: { id: string; name: string; has_custom_name?: boolean }[],
+  ): Promise<Result<{ previous: { id: string; name: string; has_custom_name: boolean }[] }>>;
   moveProjectsToTrash(ids: string[]): Promise<BatchResult>;
   restoreProjects(ids: string[]): Promise<BatchResult>;
   permanentlyDeleteProjects(ids?: string[]): Promise<BatchResult>;

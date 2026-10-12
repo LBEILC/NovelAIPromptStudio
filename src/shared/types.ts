@@ -131,6 +131,8 @@ export interface StoredGenerationParameters extends GenerationParameters {
   extra_json: string;
 }
 export interface ImageProject {
+  original_filename?: string;
+  has_custom_name?: boolean;
   id: string;
   name: string;
   image_path: string;
@@ -166,6 +168,8 @@ export interface LibraryCard
     ImageRecord,
     | 'id'
     | 'name'
+    | 'original_filename'
+    | 'has_custom_name'
     | 'image_path'
     | 'thumbnail_path'
     | 'created_at'
