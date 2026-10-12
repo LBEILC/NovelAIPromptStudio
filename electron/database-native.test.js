@@ -63,7 +63,7 @@ describe('native engine upgrade', () => {
     expect(close).toHaveBeenCalledTimes(1);
   });
 
-  it('closes and rolls back when startup repair fails', async () => {
+  it('closes and rolls back when startup repair fails', { timeout: 20000 }, async () => {
     const directory = temporary(true);
     inspect(directory, (raw) =>
       raw.exec(

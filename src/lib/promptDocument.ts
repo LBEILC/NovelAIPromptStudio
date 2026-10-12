@@ -1,18 +1,24 @@
-import { parsePrompt, parsePromptPreservingEdits, promptTagRanges } from './prompt.js';
+import { parsePrompt, parsePromptPreservingEdits, promptTagRanges, formatTag } from './prompt.js';
 import {
   getPromptScopes,
   normalizePromptStructure,
   formatPositivePromptForCopy,
   positivePromptCopyOptions,
-  formatPositiveScopeForCopy,
 } from './promptStructure.js';
 import {
   overviewCopyContext,
+  overviewEntries,
   filterOverviewScopes,
   filterCollapsedAutomaticScopes,
   DEFAULT_OVERVIEW_FILTERS,
 } from './promptOverview.js';
-import type { GenerationParameters, PromptStructure, Tag, PromptScope } from '../shared/types';
+import type {
+  GenerationParameters,
+  PromptStructure,
+  Tag,
+  PromptScope,
+  PromptAutomation,
+} from '../shared/types';
 
 export type BlockType = 'tags' | 'paragraph';
 /** Half-open UTF-16 offsets, suitable for String.slice (not encoded byte offsets). */
@@ -439,7 +445,8 @@ export function promptDocumentCopyOptions(
   return positivePromptCopyOptions(promptDocumentProject(document), options);
 }
 export function copyPromptDocumentScope(document: PromptDocument, key: string) {
-  return formatPositiveScopeForCopy(promptDocumentProject(document), key);
+  const section = document.scopes.find((section) => section.scope.key === key);
+  return section ? serializePromptSection(section) : '';
 }
 /** Visible/selected entries retain the established category ordering and automatic/negative exclusions. */
 export function copyVisiblePromptDocument(
@@ -455,5 +462,27 @@ export function copyVisiblePromptDocument(
     filterOverviewScopes(project, options.filters),
     options.expandedScopeKeys,
   );
+  const selected = new Set(options.selectedKeys || []);
+  const allEntries: {
+    key: string;
+    scopePolarity: string;
+    tag: Tag;
+    automation: PromptAutomation | null;
+  }[] = overviewEntries(selected.size ? getPromptScopes(project) : visible);
+  const entries = allEntries.filter((entry) => !selected.size || selected.has(entry.key));
+  if (entries.length && entries.every((entry) => entry.scopePolarity === 'undesired')) {
+    const copyable = entries.filter(
+      (entry) => !['confirmed', 'inferred'].includes(entry.automation?.status || ''),
+    );
+    return {
+      text: copyable.map((entry) => formatTag(entry.tag)).join(', '),
+      count: copyable.length,
+      ignored: 0,
+      automaticIgnored: entries.length - copyable.length,
+      selected: selected.size > 0,
+      categoryCount: 0,
+      entries: copyable,
+    };
+  }
   return overviewCopyContext(project, visible, options.selectedKeys);
 }

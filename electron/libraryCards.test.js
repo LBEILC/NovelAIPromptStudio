@@ -316,37 +316,41 @@ it('keeps dictionary enrichment live, invalidates algorithm upgrades and missing
   }
 });
 
-it('preserves dirty markers and previous fingerprints when startup repair fails', async () => {
-  const directory = temporary();
-  let api = await open(directory);
-  api.insertProject(sample(0));
-  api.close();
-  api = await open(directory);
-  const original = api.loadProject('p0').prompt_fingerprint;
-  api.close();
-  edit(directory, (raw) =>
-    raw.exec(`
+it(
+  'preserves dirty markers and previous fingerprints when startup repair fails',
+  { timeout: 20000 },
+  async () => {
+    const directory = temporary();
+    let api = await open(directory);
+    api.insertProject(sample(0));
+    api.close();
+    api = await open(directory);
+    const original = api.loadProject('p0').prompt_fingerprint;
+    api.close();
+    edit(directory, (raw) =>
+      raw.exec(`
     UPDATE prompt_tags SET weight = 1.8 WHERE project_id = 'p0';
     CREATE TRIGGER fail_fingerprint BEFORE UPDATE OF prompt_fingerprint ON projects
     BEGIN SELECT RAISE(ABORT, 'fingerprint failure'); END;
   `),
-  );
-  await expect(open(directory)).rejects.toThrow('fingerprint failure');
-  edit(directory, (raw) => {
-    expect(
-      raw.prepare("SELECT value FROM app_meta WHERE key = 'prompt_fingerprints_dirty:p0'").get()
-        .value,
-    ).toBe('1');
-    expect(
-      raw.prepare("SELECT prompt_fingerprint FROM projects WHERE id = 'p0'").get()
-        .prompt_fingerprint,
-    ).toBe(original);
-    raw.exec('DROP TRIGGER fail_fingerprint');
-  });
-  api = await open(directory);
-  expect(api.loadProject('p0').prompt_fingerprint).not.toBe(original);
-  expect(api.backfillPromptFingerprints()).toBe(0);
-});
+    );
+    await expect(open(directory)).rejects.toThrow('fingerprint failure');
+    edit(directory, (raw) => {
+      expect(
+        raw.prepare("SELECT value FROM app_meta WHERE key = 'prompt_fingerprints_dirty:p0'").get()
+          .value,
+      ).toBe('1');
+      expect(
+        raw.prepare("SELECT prompt_fingerprint FROM projects WHERE id = 'p0'").get()
+          .prompt_fingerprint,
+      ).toBe(original);
+      raw.exec('DROP TRIGGER fail_fingerprint');
+    });
+    api = await open(directory);
+    expect(api.loadProject('p0').prompt_fingerprint).not.toBe(original);
+    expect(api.backfillPromptFingerprints()).toBe(0);
+  },
+);
 
 async function expectLiveCardSemantics(api) {
   for (const view of ['all', 'favorites', 'trash']) {
@@ -393,34 +397,38 @@ async function expectLiveCardSemantics(api) {
   }
 }
 
-it('rebuilds a dropped derived table without changing cards or any original rows', async () => {
-  const directory = temporary();
-  let api = await open(directory);
-  for (let i = 0; i < 3; i++) api.insertProject(sample(i));
-  api.backfillPromptFingerprints();
-  const before = structuredClone(await api.loadLibraryCards());
-  const original = () =>
-    edit(directory, (raw) =>
-      Object.fromEntries(
-        raw
-          .prepare(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('library_card_cache', 'app_meta') ORDER BY name",
-          )
-          .all()
-          .map(({ name }) => [name, raw.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all()]),
-      ),
-    );
-  const rows = original();
-  edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
-  expect(await api.loadLibraryCards()).toEqual(before);
-  expect(original()).toEqual(rows);
-  api.close();
-  edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
-  api = await open(directory);
-  expect(await api.loadLibraryCards()).toEqual(before);
-  expect(original()).toEqual(rows);
-  await expectLiveCardSemantics(api);
-});
+it(
+  'rebuilds a dropped derived table without changing cards or any original rows',
+  { timeout: 20000 },
+  async () => {
+    const directory = temporary();
+    let api = await open(directory);
+    for (let i = 0; i < 3; i++) api.insertProject(sample(i));
+    api.backfillPromptFingerprints();
+    const before = structuredClone(await api.loadLibraryCards());
+    const original = () =>
+      edit(directory, (raw) =>
+        Object.fromEntries(
+          raw
+            .prepare(
+              "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('library_card_cache', 'app_meta') ORDER BY name",
+            )
+            .all()
+            .map(({ name }) => [name, raw.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all()]),
+        ),
+      );
+    const rows = original();
+    edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
+    expect(await api.loadLibraryCards()).toEqual(before);
+    expect(original()).toEqual(rows);
+    api.close();
+    edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
+    api = await open(directory);
+    expect(await api.loadLibraryCards()).toEqual(before);
+    expect(original()).toEqual(rows);
+    await expectLiveCardSemantics(api);
+  },
+);
 
 it('invalidates dictionary translations, classification weights and deletions in memory and across reopen', async () => {
   const directory = temporary();

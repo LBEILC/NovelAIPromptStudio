@@ -74,6 +74,27 @@ function syntheticProject(prompt = mixed, model = 'nai-diffusion-4-5-full') {
 
 const rainyParagraph =
   '雨刚停，女孩站在候车亭下，手里握着一把透明的伞，伞面上还挂着水珠，远处的路灯一盏一盏亮起来，地上的积水映出灯光，她低头看着手机，耳机线垂在胸前，风把她的头发吹乱了，她却没有在意。';
+
+it('copies exclusively negative selections and reports negative omissions in mixed selections', () => {
+  const project = syntheticProject('sky');
+  const document = createPromptDocument(project);
+  const entries = overviewEntries(getPromptScopes(project));
+  const negative = entries.filter(
+    (entry: { scopePolarity: string }) => entry.scopePolarity === 'undesired',
+  );
+  const result = copyVisiblePromptDocument(document, {
+    selectedKeys: negative.map((entry: { key: string }) => entry.key),
+  });
+  expect(result.text).toBe('blur, noise, hat');
+  expect(result.count).toBe(3);
+  expect(result.ignored).toBe(0);
+  const mixedResult = copyVisiblePromptDocument(document, {
+    selectedKeys: entries.map((entry: { key: string }) => entry.key),
+  });
+  expect(mixedResult.text).not.toContain('blur');
+  expect(mixedResult.ignored).toBe(3);
+  expect(copyPromptDocumentScope(document, 'base:undesired')).toBe('blur, noise');
+});
 const shortEnglishParagraph =
   'A quiet street after the rain, puddles everywhere, the girl waits under the shelter, holding a clear umbrella, droplets on its surface, streetlights turning on, one by one, reflections in the water, she looks at her phone, earphones hanging, wind in her hair.';
 const syntheticParagraphCases = [
@@ -698,9 +719,7 @@ describe('block document structure and legacy copy policy', () => {
         );
       }
       for (const scope of getPromptScopes(project))
-        expect(copyPromptDocumentScope(document, scope.key)).toBe(
-          formatPositiveScopeForCopy(project, scope.key),
-        );
+        expect(copyPromptDocumentScope(document, scope.key)).toBe(scope.raw_prompt);
       const filters = [
         DEFAULT_OVERVIEW_FILTERS,
         { ...DEFAULT_OVERVIEW_FILTERS, category: 'Environment' },
@@ -718,6 +737,17 @@ describe('block document structure and legacy copy policy', () => {
               filterOverviewScopes(project, filter),
               expandedScopeKeys,
             );
+            if (filter.polarity === 'undesired' && !selectedKeys.length) {
+              expect(
+                copyVisiblePromptDocument(document, {
+                  filters: filter,
+                  expandedScopeKeys,
+                }).entries.every(
+                  (entry: { scopePolarity: string }) => entry.scopePolarity === 'undesired',
+                ),
+              ).toBe(true);
+              continue;
+            }
             expect(
               copyVisiblePromptDocument(document, {
                 filters: filter,

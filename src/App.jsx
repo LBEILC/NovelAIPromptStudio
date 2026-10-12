@@ -45,6 +45,7 @@ import { Titlebar } from './shell/Titlebar';
 import { useAppearance } from './state/appearance';
 import { Dialog, useNotifications } from './ui';
 import WorkbenchPage from './WorkbenchPage.jsx';
+import { useWorkbenchState } from './state/workbench';
 import { ZipImport } from './library/ZipImport';
 import Icon from './components/Icon.jsx';
 import {
@@ -412,15 +413,18 @@ export default function App() {
     selectedGroupIds,
     setSelectedGroupIds,
   } = useLibraryState(window.studioScreenshot?.view);
-  const [workbenchSession, setWorkbenchSession] = useState({
-    version: 2,
-    tabs: [],
-    activeTabId: '',
-  });
-  const [workbenchSessionReady, setWorkbenchSessionReady] = useState(false);
-  const [workbenchLoading, setWorkbenchLoading] = useState(false);
-  const [workbenchError, setWorkbenchError] = useState('');
-  const [workbenchFocus, setWorkbenchFocus] = useState({ scopeKey: 'base:prompt', tagId: null });
+  const {
+    workbenchSession,
+    setWorkbenchSession,
+    workbenchSessionReady,
+    setWorkbenchSessionReady,
+    workbenchLoading,
+    setWorkbenchLoading,
+    workbenchError,
+    setWorkbenchError,
+    workbenchFocus,
+    setWorkbenchFocus,
+  } = useWorkbenchState();
   const [dragState, setDragState] = useState({ active: false, valid: false });
   const [importProgress, setImportProgress] = useState(null);
   const [importResult, setImportResult] = useState(null);
