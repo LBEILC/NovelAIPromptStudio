@@ -526,6 +526,7 @@ export function WorkbenchDocument(p: DocumentProps) {
                   variant="quiet"
                   size="small"
                   aria-expanded={!collapsed.includes(sectionKey)}
+                  data-disclosure=""
                   onClick={() =>
                     setCollapsed(
                       collapsed.includes(sectionKey)

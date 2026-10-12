@@ -148,12 +148,13 @@
   transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
 }
 /* Expanded triggers retain their own button variant. */
-.nps-button-default:is(:active,[aria-expanded="true"]) { background:var(--hover); }
-.nps-button-quiet:is(:active,[aria-expanded="true"]) { background:var(--selected); color:var(--text); }
-.nps-button.nps-button-ink:is(:hover,:active,[aria-expanded="true"]) { background:var(--ink-hover); border-color:var(--ink-hover); color:var(--on-ink); }
-.nps-button.nps-button-cinnabar:is(:hover,:active,[aria-expanded="true"]) { background:var(--cinnabar-hover); border-color:var(--cinnabar-hover); color:var(--on-cinnabar); }
-.nps-button:is(.nps-button-danger,.nps-button-danger-outline):is(:active,[aria-expanded="true"]) { background:var(--danger-wash); color:var(--danger); }
-.nps-button:is([aria-disabled="true"],:disabled):not([aria-busy="true"]):is(:hover,:active,[aria-expanded="true"]) { background:var(--hover); border-color:transparent; color:var(--text-off); }
+/* The pressed look is for popup triggers; disclosure toggles (collapse/expand) opt out. */
+.nps-button-default:is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--hover); }
+.nps-button-quiet:is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--selected); color:var(--text); }
+.nps-button.nps-button-ink:is(:hover,:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--ink-hover); border-color:var(--ink-hover); color:var(--on-ink); }
+.nps-button.nps-button-cinnabar:is(:hover,:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--cinnabar-hover); border-color:var(--cinnabar-hover); color:var(--on-cinnabar); }
+.nps-button:is(.nps-button-danger,.nps-button-danger-outline):is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--danger-wash); color:var(--danger); }
+.nps-button:is([aria-disabled="true"],:disabled):not([aria-busy="true"]):is(:hover,:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--hover); border-color:transparent; color:var(--text-off); }
 .nps-split-button { display:inline-flex; align-items:stretch; gap:0; }
 .nps-split-button > .nps-button:first-child { border-radius:var(--r-ctl) 0 0 var(--r-ctl); border-right:0; }
 .nps-split-button > .nps-button:last-child,.nps-split-button > .nps-menu-trigger:last-child > .nps-button { border-radius:0 var(--r-ctl) var(--r-ctl) 0; border-left:var(--bw) solid var(--border); padding:0 var(--sp-1); }

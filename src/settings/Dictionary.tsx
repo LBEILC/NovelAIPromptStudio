@@ -415,6 +415,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
               <Button
                 variant="quiet"
                 aria-expanded={showFailures}
+                data-disclosure=""
                 aria-controls="dictionary-failures"
                 onClick={() => setShowFailures((open) => !open)}
               >
