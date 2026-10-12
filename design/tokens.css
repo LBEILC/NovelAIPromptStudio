@@ -217,6 +217,11 @@
   --tip-text: #1c1c1c;
   --tip-border: #d9d8d3;
 
+  /* 分段选择：一条槽，里面一个滑块停在当前项下面；换选项时滑块滑过去（--dur-3、--ease-move） */
+  --seg-track: #ecebe7;
+  --seg-thumb: #ffffff;
+  --seg-pad: 2px;           /* 槽到滑块的距离；滑块的圆角 = --r-ctl 减去它 */
+
   /* 朱砂 */
   --cinnabar: #d4351c;        /* 实心：生成按钮、当前标记 */
   --cinnabar-hover: #bd2e17;
@@ -284,6 +289,9 @@
   --tip-bg: #302e2b;        /* 比浮层再高一档的深色；文字在上面 11:1 */
   --tip-text: #f1efea;
   --tip-border: #46433f;
+
+  --seg-track: #121110;
+  --seg-thumb: #302e2b;
 
   --cinnabar: #d4351c;        /* 实心部分两套主题同色，标志不变色 */
   --cinnabar-hover: #e2452b;
