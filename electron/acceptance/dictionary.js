@@ -202,11 +202,45 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   );
   await scrollChecks(h, '.settings-table-scroll');
   await h.screenshot('dictionary');
+  await e(`(() => {
+    const region = document.querySelector('.settings-table-scroll');
+    const originalHeight = region.scrollHeight;
+    window.dictionaryShrinkTiming = new Promise(resolve => {
+      let started;
+      let frame;
+      const finish = value => {
+        observer.disconnect(); cancelAnimationFrame(frame); clearTimeout(timeout); resolve(value);
+      };
+      const sample = () => {
+        if (started === undefined && region.scrollHeight < originalHeight) started = performance.now();
+        if (started !== undefined && region.querySelector('.nps-scroll-thumb').hidden) {
+          finish(performance.now() - started);
+          return true;
+        }
+        return false;
+      };
+      const observer = new MutationObserver(sample);
+      observer.observe(region, { childList: true, subtree: true, attributes: true });
+      const tick = () => { if (!sample()) frame = requestAnimationFrame(tick); };
+      const timeout = setTimeout(() => finish(null), 12000);
+      frame = requestAnimationFrame(tick);
+    });
+  })()`);
   await input(search, 'acceptance_204');
   await wait(`${count}===1`);
-  await h.checkSoon(
+  const shrinkElapsed = await e('window.dictionaryShrinkTiming');
+  await check(
+    '内容高度变短后细条在 100 毫秒内隐藏（页面内部计时）',
+    () => shrinkElapsed !== null && shrinkElapsed <= 100 * (mode.slow || 1),
+    undefined,
+    'once',
+  );
+  console.log(`词典细条隐藏耗时：${shrinkElapsed} ms（页面内部）`);
+  await check(
     '筛选缩短内容后细条隐藏且不保留虚假滚动高度',
     `(()=>{const n=document.querySelector('.settings-table-scroll');return n.querySelector('.nps-scroll-thumb').hidden && n.scrollHeight===n.clientHeight && n.scrollTop===0})()`,
+    undefined,
+    'both',
   );
   database.updateTagDictionary('view_fixture_empty', { translation: '', category: 'Body' });
   database.updateTagDictionary('view_fixture_unsorted', {
