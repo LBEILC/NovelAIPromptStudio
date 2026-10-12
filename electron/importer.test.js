@@ -253,7 +253,7 @@ describe('safe ZIP import', () => {
     expect(result.errors[0].file).toBe('12.png');
     database.close();
     expect((await openDatabase(path.join(directory, 'data'))).loadLibrary()).toHaveLength(29);
-  });
+  }, 30_000); // 30 real images through sharp exceed the 5s default on Windows CI.
 
   it('commits the prepared partial chunk when cancellation arrives between images', async () => {
     const directory = temporaryWorkspace();
