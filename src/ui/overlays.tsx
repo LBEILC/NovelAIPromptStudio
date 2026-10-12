@@ -15,7 +15,7 @@ import { useScrollArea } from './useScrollArea';
 /** Keep native top-layer nodes mounted until their CSS exit transitions finish. */
 function usePresence(open: boolean, ref: RefObject<HTMLElement | null>) {
   const [mounted, setMounted] = useState(open);
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false;
     if (open) setMounted(true);
     else {
@@ -64,6 +64,18 @@ export function Layer({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const present = usePresence(open, ref);
+  const wasPresent = useRef(present);
+  useLayoutEffect(() => {
+    if (
+      wasPresent.current &&
+      !present &&
+      focus &&
+      document.activeElement === document.body &&
+      anchor.current?.isConnected
+    )
+      anchor.current.focus();
+    wasPresent.current = present;
+  }, [present, focus, anchor]);
   useScrollArea(ref, { enabled: open });
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -101,10 +113,14 @@ export function Layer({
     const toggle = (event: Event) => {
       if ((event as ToggleEvent).newState === 'closed') closeRef.current();
     };
+    // Native toggle is queued: an older menu can otherwise restore focus after
+    // the next popover has already opened and closed.
+    node.addEventListener('beforetoggle', toggle);
     node.addEventListener('toggle', toggle);
     return () => {
       if (enterFrame !== undefined) cancelAnimationFrame(enterFrame);
       node.removeAttribute('data-entering');
+      node.removeEventListener('beforetoggle', toggle);
       node.removeEventListener('toggle', toggle);
       observer.disconnect();
       window.removeEventListener('resize', position);

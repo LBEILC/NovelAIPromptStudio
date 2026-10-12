@@ -229,6 +229,7 @@ export async function componentDetails(h) {
     'once',
   );
   await click('编辑一个 Tag');
+  const popoverHasMotion = await e('document.documentElement.dataset.motion === "full"');
   await h.nativeKey('Tab', 8);
   await h.checkSoon(
     '编辑浮层 Shift+Tab 保持焦点在内部',
@@ -255,8 +256,8 @@ export async function componentDetails(h) {
   await wait('!document.querySelector(".nps-layer[role=dialog]")');
   await check(
     '编辑浮层外部点击关闭并归还焦点',
-    'document.activeElement.textContent.trim()==="编辑一个 Tag"',
-    undefined,
+    `document.activeElement.textContent.trim()==="编辑一个 Tag" && !document.querySelector('.nps-layer.nps-popover:popover-open') && (${popoverHasMotion} || !document.querySelector('.nps-layer.nps-popover'))`,
+    `({active:document.activeElement.outerHTML.slice(0,400),layers:[...document.querySelectorAll('.nps-layer.nps-popover')].map(node=>({html:node.outerHTML.slice(0,200),animations:node.getAnimations().length}))})`,
     'once',
   );
   await click('关闭已修改的标签？');

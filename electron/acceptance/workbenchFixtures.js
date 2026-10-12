@@ -18,7 +18,10 @@ function chunk(type, content) {
   checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
   return Buffer.concat([length, bytes, checksum]);
 }
-export async function createWorkbenchFixtures(directory) {
+export async function createWorkbenchFixtures(
+  directory,
+  { prefix = 'synthetic-study', seed = 42000 } = {},
+) {
   await fs.mkdir(directory, { recursive: true });
   const files = [];
   for (const [index, [width, height]] of [
@@ -26,7 +29,7 @@ export async function createWorkbenchFixtures(directory) {
     [1216, 832],
     [832, 832],
   ].entries()) {
-    const file = path.join(directory, `synthetic-study-s-${42000 + index}.png`);
+    const file = path.join(directory, `${prefix}-s-${seed + index}.png`);
     const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#ccd5d8"/><rect x="${width * 0.15}" y="${height * 0.12}" width="${width * 0.7}" height="${height * 0.76}" fill="#f1ece2"/><circle cx="${width * 0.5}" cy="${height * 0.4}" r="${width * 0.16}" fill="#80989d"/><path d="M ${width * 0.23} ${height * 0.85} L ${width * 0.5} ${height * 0.43} L ${width * 0.77} ${height * 0.85}" fill="#ad7971"/></svg>`;
     const png = await sharp(Buffer.from(svg)).png().toBuffer();
     const comment = {
@@ -34,7 +37,7 @@ export async function createWorkbenchFixtures(directory) {
       uc: workbenchNegative,
       steps: 28,
       scale: 6,
-      seed: 42000 + index,
+      seed: seed + index,
       width,
       height,
       model: 'nai-diffusion-4-5-full',

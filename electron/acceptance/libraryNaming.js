@@ -115,12 +115,17 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await card(0);
     const id = await e('document.querySelector(".library-detail").dataset.detailId');
     const original = database.loadProject(id);
+    await e(
+      `document.querySelector('.library-file').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
+    );
+    await wait('!!document.querySelector("[role=tooltip]:popover-open")');
     await check(
       '未起名详情省略标题，文件行保留完整悬停名称',
-      `!document.querySelector('.library-caption b') && document.querySelector('.library-file')?.title === ${JSON.stringify(original.original_filename)}`,
+      `!document.querySelector('.library-caption b') && !document.querySelector('.library-file').hasAttribute('title') && document.querySelector('[role=tooltip]:popover-open')?.textContent === ${JSON.stringify(original.original_filename)}`,
       undefined,
       'both',
     );
+    await h.key('Escape');
     await check(
       '未起名卡片使用导入日期作为无障碍名称',
       'document.querySelector(".library-card.current").getAttribute("aria-label").startsWith("图片，导入于 ")',

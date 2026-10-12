@@ -37,7 +37,7 @@ export async function checkCollectionContext(h, id) {
   await h.wait('!!document.querySelector(".nps-menu:popover-open")');
   await h.check(
     '收藏集右键菜单包含重命名和危险色删除',
-    `(()=>{const items=[...document.querySelectorAll('.nps-menu:popover-open [role=menuitem]')];return items.length===2&&items[0].textContent.trim()==='重命名'&&items[1].textContent.trim()==='删除收藏集'&&getComputedStyle(items[1]).color===getComputedStyle(document.querySelector('.library-collection-row .nps-button-danger')).color})()`,
+    `(async()=>{const menu=document.querySelector('.nps-menu:popover-open'),items=[...menu.querySelectorAll('[role=menuitem]')];await Promise.allSettled(items.flatMap(item=>item.getAnimations().map(animation=>animation.finished)));const probe=document.createElement('span');probe.style.color='var(--danger)';menu.append(probe);const danger=getComputedStyle(probe).color;probe.remove();return items.length===2&&items[0].textContent.trim()==='重命名'&&items[1].textContent.trim()==='删除收藏集'&&getComputedStyle(items[1]).color===danger})()`,
     undefined,
     'both',
   );
@@ -134,16 +134,25 @@ export async function libraryFinishChecks({
     undefined,
     'both',
   );
+  await e(
+    `document.querySelector('.library-caption [data-tip]').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
+  );
+  await wait('!!document.querySelector("[role=tooltip]:popover-open")');
   await check(
     '详情显示短模型名并提供原名悬停提示',
-    `(()=>{const model=document.querySelector('.library-caption [title]');return model?.textContent==='V5'&&${JSON.stringify(models)}.includes(model.title)})()`,
+    `(()=>{const model=document.querySelector('.library-caption [data-tip]');return model?.textContent==='V5'&&!model.hasAttribute('title')&&${JSON.stringify(models)}.includes(document.querySelector('[role=tooltip]:popover-open')?.textContent)})()`,
     undefined,
     'both',
   );
+  await key('Escape');
   await click('筛选', scope);
+  await e(
+    `[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
+  );
+  await wait('!!document.querySelector("[role=tooltip]:popover-open")');
   await check(
     '同短名模型合为一个复选项且保留全部原名提示',
-    `(()=>{const labels=[...document.querySelectorAll('.library-filter-options label')].filter(n=>n.textContent.trim()==='V5');return labels.length===1&&${JSON.stringify(models)}.every(v=>labels[0].title.includes(v))})()`,
+    `(()=>{const labels=[...document.querySelectorAll('.library-filter-options label')].filter(n=>n.textContent.trim()==='V5');return labels.length===1&&!labels[0].hasAttribute('title')&&${JSON.stringify(models)}.every(v=>document.querySelector('[role=tooltip]:popover-open')?.textContent.includes(v))})()`,
     undefined,
     'both',
   );

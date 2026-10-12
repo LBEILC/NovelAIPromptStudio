@@ -1,4 +1,5 @@
 import path from 'node:path';
+import fs from 'node:fs/promises';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { importLibraryFiles } from '../importer.js';
 import { parsePrompt } from '../../src/lib/prompt.js';
@@ -22,22 +23,35 @@ function pointerDriver(h) {
   };
 }
 
-async function prepare(env) {
+async function prepare(env, isolated = false) {
   env.h.window.setContentSize(1240, 760);
-  const files = await createWorkbenchFixtures(path.join(env.mode.root, 'polish-fixtures'));
+  const prefix = isolated ? 'workbench-polish-fixture' : 'synthetic-study';
+  const files = await createWorkbenchFixtures(path.join(env.mode.root, 'polish-fixtures'), {
+    prefix,
+    seed: isolated ? 43000 : 42000,
+  });
   const result = await importLibraryFiles({
     filePaths: files,
     database: env.database,
-    assetsDirectory: env.assetsDirectory,
+    assetsDirectory: env.preferences.librarySettings().assetsDirectory,
   });
   if (result.errors.length) throw Error('细节验收夹具导入失败');
   await env.h.reload();
   await env.h.click('图片库', 'document.querySelector(".studio-titlebar")');
+  await env.h.click('全部图片', 'document.querySelector(".library-page")');
   await env.h.wait('document.querySelectorAll(".library-card").length > 0');
   await env.h.click('视图', 'document.querySelector(".library-page")');
   await env.h.click('不合并', 'document.querySelector("[aria-label=合并方式]")');
   await env.h.key('Escape', {}, 'document.activeElement');
-  await env.h.input('[aria-label="搜索图片库"]', 'synthetic-study');
+  await env.h.input('[aria-label="搜索图片库"]', prefix);
+  if (isolated) {
+    if (result.imported.length !== files.length) throw Error('工作台细节夹具必须独立导入');
+    const ids = result.imported.map((project) => project.id);
+    const matches = `(()=>{const cards=[...document.querySelectorAll('.library-card')];return cards.length===${ids.length}&&cards.every(card=>${JSON.stringify(ids)}.includes(card.dataset.projectId))})()`;
+    await env.h.wait(matches, '仅显示本分类独立导入的图片');
+    await env.h.check('工作台细节仅使用本分类导入的图片 ID', matches, undefined, 'once');
+    return result.imported;
+  }
   await env.h.wait('document.querySelectorAll(".library-card").length === 3');
   return env.database.loadLibrary('all').filter((p) => p.name.startsWith('synthetic-study-s-'));
 }
@@ -269,118 +283,165 @@ export async function workbenchPolishChecks(env) {
   const { h } = env;
   const { evaluate: e, click, wait, check } = h;
   h.category('工作台·细节');
-  const projects = await prepare(env);
-  await selectImage(h, projects[0].id);
-  await e(
-    `document.querySelector('[data-project-id="${projects[0].id}"]').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
-  );
-  await wait('!!document.querySelector(".wb-editor .nps-tag")');
-  await e(`document.querySelector('.wb-tags [data-wb-tag]:last-of-type .nps-tag').click()`);
-  await wait('!!document.querySelector(".wb-tag-editor")');
-  await h.input('[aria-label="译文"]', '合成验收用的较长译文');
-  await click('完成', 'document.querySelector(".wb-tag-editor")');
-  await wait('!document.querySelector(".wb-tag-editor")');
-  await click('显示', 'document.querySelector(".wb-prompt-head")');
-  await h.select('语言', '对照');
-  await h.key('Escape', {}, 'document.activeElement');
-  await wait('!!document.querySelector(".wb-tags .nps-tag-zh")');
-  await h.screenshot('polish-tag-translation');
-  await check(
-    'Tag 的文字位于自己的边框内',
-    `(()=>{const tags=[...document.querySelectorAll('.wb-tags .nps-tag')];return tags.length>0 && tags.every(t=>{const r=t.getBoundingClientRect();return [...t.querySelectorAll('.nps-tag-en,.nps-tag-zh')].every(c=>{const b=c.getBoundingClientRect();return b.top>=r.top&&b.bottom<=r.bottom+1&&b.left>=r.left&&b.right<=r.right+1})})})()`,
-  );
-  await check(
-    '同一行 Tag 高度一致，输入按钮和 Tag 底部对齐',
-    `(()=>{const groups=[...document.querySelectorAll('.wb-tags')];return groups.every(g=>{const tags=[...g.querySelectorAll('.nps-tag')].map(t=>t.getBoundingClientRect());return tags.every(a=>tags.filter(b=>Math.abs(a.top-b.top)<1).every(b=>Math.abs(a.height-b.height)<1)) && [...g.querySelectorAll('.wb-add-tags')].every(a=>{const r=a.getBoundingClientRect(),row=tags.filter(t=>t.top<r.bottom&&t.bottom>r.top);return !row.length||row.every(t=>Math.abs(t.bottom-r.bottom)<1)})})})()`,
-  );
-  await e(
-    `document.querySelectorAll('.wb-tags')[1].querySelector('[data-wb-tag]:last-of-type .nps-tag').click()`,
-  );
-  await h.input('[aria-label="译文"]', '光线');
-  await click('完成', 'document.querySelector(".wb-tag-editor")');
-  await click('输入中文或英文', 'document.querySelectorAll(".wb-tags")[1]');
-  await check(
-    '块尾带译文的 Tag 紧邻输入框时仍完整包裹且底部对齐',
-    `(()=>{const g=document.querySelectorAll('.wb-tags')[1],t=[...g.querySelectorAll('[data-wb-tag]')].at(-1).querySelector('.nps-tag'),r=t.getBoundingClientRect(),z=t.querySelector('.nps-tag-zh').getBoundingClientRect(),a=g.querySelector('.wb-add-tags').getBoundingClientRect();return z.bottom<=r.bottom && z.top>=r.top && Math.abs(a.bottom-r.bottom)<1})()`,
-  );
-  await h.screenshot('polish-tag-adjacent-input');
-  await h.key('Escape', {}, 'document.activeElement');
-  await e(
-    `document.querySelectorAll('.wb-tags')[1].querySelector('[data-wb-tag]:last-of-type .nps-tag').click()`,
-  );
-  await h.input('[aria-label="译文"]', '合成译文'.repeat(30));
-  await click('完成', 'document.querySelector(".wb-tag-editor")');
-  await check(
-    '远长于英文的译文换行后仍在 Tag 边框内',
-    `(()=>{const t=document.querySelectorAll('.wb-tags')[1].querySelector('[data-wb-tag]:last-of-type .nps-tag'),r=t.getBoundingClientRect(),z=t.querySelector('.nps-tag-zh').getBoundingClientRect();return z.height>16 && z.bottom<=r.bottom && z.right<=r.right && z.left>=r.left})()`,
-  );
-  await click('更多', 'document.querySelector(".wb-section")');
-  await click('编辑原始文本', 'document.querySelector(".nps-layer [role=menu]")');
-  const raw = Array.from({ length: 160 }, (_, i) => `marquee_fixture_${i}`).join(', ');
-  await h.input('[aria-label="原始文本"]', raw);
-  await click('保存', 'document.querySelector(".wb-raw-editor")');
-  await wait('document.querySelectorAll(".wb-tags .nps-tag").length>150');
-  const scroll = 'document.querySelector(".wb-document-scroll")';
-  const pointer = pointerDriver(h);
-  await e(`${scroll}.scrollTop=0`);
-  const pos = await e(
-    `(()=>{const r=${scroll}.getBoundingClientRect(),t=${scroll}.querySelector('.nps-tag').getBoundingClientRect();return {x:r.left+10,y:t.top+1,toX:r.right-20,toY:t.bottom-1}})()`,
-  );
-  await pointer('mousePressed', pos.x, pos.y);
-  await pointer('mouseMoved', pos.toX, pos.toY);
-  await wait('document.querySelectorAll(".wb-tags .nps-tag-selected").length>0');
-  const original = await e(
-    `[...document.querySelectorAll('.wb-tags .nps-tag-selected')].map(t=>t.closest('[data-marquee-key]').dataset.marqueeKey)`,
-  );
-  for (const delta of [100, 150, 90]) {
-    await e(`${scroll}.scrollTop+=${delta}`);
-    await e(frame);
+  const previousSize = h.window.getContentSize();
+  const previousIds = env.database
+    .loadLibrary('all')
+    .map((project) => project.id)
+    .sort();
+  const projects = await prepare(env, true);
+  let tabId;
+  try {
+    await selectImage(h, projects[0].id);
+    await e(
+      `document.querySelector('[data-project-id="${projects[0].id}"]').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
+    );
+    await wait('!!document.querySelector(".wb-editor .nps-tag")');
+    tabId = await e('document.querySelector(".wb-tab[data-active]").dataset.workbenchTabId');
+    await e(`document.querySelector('.wb-tags [data-wb-tag]:last-of-type .nps-tag').click()`);
+    await wait('!!document.querySelector(".wb-tag-editor")');
+    await h.input('[aria-label="译文"]', '合成验收用的较长译文');
+    await click('完成', 'document.querySelector(".wb-tag-editor")');
+    await wait('!document.querySelector(".wb-tag-editor")');
+    await click('显示', 'document.querySelector(".wb-prompt-head")');
+    await h.select('语言', '对照');
+    await h.key('Escape', {}, 'document.activeElement');
+    await wait('!!document.querySelector(".wb-tags .nps-tag-zh")');
+    await h.screenshot('polish-tag-translation');
     await check(
-      '工作台框选中多次滚动仍保留起点附近的 Tag',
-      `${JSON.stringify(original)}.every(k=>document.querySelector('[data-marquee-key="'+k+'"] .nps-tag-selected'))`,
+      'Tag 的文字位于自己的边框内',
+      `(()=>{const tags=[...document.querySelectorAll('.wb-tags .nps-tag')];return tags.length>0 && tags.every(t=>{const r=t.getBoundingClientRect();return [...t.querySelectorAll('.nps-tag-en,.nps-tag-zh')].every(c=>{const b=c.getBoundingClientRect();return b.top>=r.top&&b.bottom<=r.bottom+1&&b.left>=r.left&&b.right<=r.right+1})})})()`,
+    );
+    await check(
+      '同一行 Tag 高度一致，输入按钮和 Tag 底部对齐',
+      `(()=>{const groups=[...document.querySelectorAll('.wb-tags')];return groups.every(g=>{const tags=[...g.querySelectorAll('.nps-tag')].map(t=>t.getBoundingClientRect());return tags.every(a=>tags.filter(b=>Math.abs(a.top-b.top)<1).every(b=>Math.abs(a.height-b.height)<1)) && [...g.querySelectorAll('.wb-add-tags')].every(a=>{const r=a.getBoundingClientRect(),row=tags.filter(t=>t.top<r.bottom&&t.bottom>r.top);return !row.length||row.every(t=>Math.abs(t.bottom-r.bottom)<1)})})})()`,
+    );
+    await e(
+      `document.querySelectorAll('.wb-tags')[1].querySelector('[data-wb-tag]:last-of-type .nps-tag').click()`,
+    );
+    await h.input('[aria-label="译文"]', '光线');
+    await click('完成', 'document.querySelector(".wb-tag-editor")');
+    await click('输入中文或英文', 'document.querySelectorAll(".wb-tags")[1]');
+    await check(
+      '块尾带译文的 Tag 紧邻输入框时仍完整包裹且底部对齐',
+      `(()=>{const g=document.querySelectorAll('.wb-tags')[1],t=[...g.querySelectorAll('[data-wb-tag]')].at(-1).querySelector('.nps-tag'),r=t.getBoundingClientRect(),z=t.querySelector('.nps-tag-zh').getBoundingClientRect(),a=g.querySelector('.wb-add-tags').getBoundingClientRect();return z.bottom<=r.bottom && z.top>=r.top && Math.abs(a.bottom-r.bottom)<1})()`,
+    );
+    await h.screenshot('polish-tag-adjacent-input');
+    await h.key('Escape', {}, 'document.activeElement');
+    await e(
+      `document.querySelectorAll('.wb-tags')[1].querySelector('[data-wb-tag]:last-of-type .nps-tag').click()`,
+    );
+    await h.input('[aria-label="译文"]', '合成译文'.repeat(30));
+    await click('完成', 'document.querySelector(".wb-tag-editor")');
+    await check(
+      '远长于英文的译文换行后仍在 Tag 边框内',
+      `(()=>{const t=document.querySelectorAll('.wb-tags')[1].querySelector('[data-wb-tag]:last-of-type .nps-tag'),r=t.getBoundingClientRect(),z=t.querySelector('.nps-tag-zh').getBoundingClientRect();return z.height>16 && z.bottom<=r.bottom && z.right<=r.right && z.left>=r.left})()`,
+    );
+    await click('更多', 'document.querySelector(".wb-section")');
+    await click('编辑原始文本', 'document.querySelector(".nps-layer [role=menu]")');
+    const raw = Array.from({ length: 160 }, (_, i) => `marquee_fixture_${i}`).join(', ');
+    await h.input('[aria-label="原始文本"]', raw);
+    await click('保存', 'document.querySelector(".wb-raw-editor")');
+    await wait('document.querySelectorAll(".wb-tags .nps-tag").length>150');
+    const scroll = 'document.querySelector(".wb-document-scroll")';
+    const pointer = pointerDriver(h);
+    await e(`${scroll}.scrollTop=0`);
+    const pos = await e(
+      `(()=>{const r=${scroll}.getBoundingClientRect(),t=${scroll}.querySelector('.nps-tag').getBoundingClientRect();return {x:r.left+10,y:t.top+1,toX:r.right-20,toY:t.bottom-1}})()`,
+    );
+    await pointer('mousePressed', pos.x, pos.y);
+    await pointer('mouseMoved', pos.toX, pos.toY);
+    await wait('document.querySelectorAll(".wb-tags .nps-tag-selected").length>0');
+    const original = await e(
+      `[...document.querySelectorAll('.wb-tags .nps-tag-selected')].map(t=>t.closest('[data-marquee-key]').dataset.marqueeKey)`,
+    );
+    for (const delta of [100, 150, 90]) {
+      await e(`${scroll}.scrollTop+=${delta}`);
+      await e(frame);
+      await check(
+        '工作台框选中多次滚动仍保留起点附近的 Tag',
+        `${JSON.stringify(original)}.every(k=>document.querySelector('[data-marquee-key="'+k+'"] .nps-tag-selected'))`,
+        undefined,
+        'once',
+      );
+    }
+    const edge = await e(
+      `(()=>{const r=${scroll}.getBoundingClientRect();return {x:r.right-20,y:r.bottom-2,top:${scroll}.scrollTop}})()`,
+    );
+    await pointer('mouseMoved', edge.x, edge.y);
+    await wait(`${scroll}.scrollTop>${edge.top}+60`, '工作台停在下边缘持续自动滚动');
+    await pointer('mouseReleased', edge.x, edge.y);
+    await check(
+      '松开后选择恰好等于内容坐标矩形覆盖的 Tag',
+      `(()=>{const n=${scroll},r=n.getBoundingClientRect(),top=${pos.y}-r.top,bottom=${edge.y}-r.top+n.scrollTop;return [...n.querySelectorAll('[data-marquee-key]')].every(t=>{const b=t.getBoundingClientRect(),inside=b.bottom-r.top+n.scrollTop>=top&&b.top-r.top+n.scrollTop<=bottom&&b.right>=${pos.x}&&b.left<=${edge.x};return t.querySelector('.nps-tag').classList.contains('nps-tag-selected')===inside})})()`,
       undefined,
       'once',
     );
+    const selection = await e(`document.querySelectorAll('.wb-tags .nps-tag-selected').length`);
+    await e(`${scroll}.scrollTop=0`);
+    await e(frame);
+    await check(
+      '松开后的普通滚动不改变已选 Tag',
+      `document.querySelectorAll('.wb-tags .nps-tag-selected').length===${selection}`,
+      undefined,
+      'once',
+    );
+    await e(`${scroll}.scrollTop=300`);
+    await e(frame);
+    const upper = await e(
+      `(()=>{const r=${scroll}.getBoundingClientRect();return {x:r.left+10,y:r.top+r.height/2,toX:r.right-20,toY:r.top+2,top:${scroll}.scrollTop}})()`,
+    );
+    await pointer('mousePressed', upper.x, upper.y);
+    await pointer('mouseMoved', upper.toX, upper.toY);
+    await wait(`${scroll}.scrollTop<${upper.top}-60`, '工作台停在上边缘持续自动滚动');
+    await check(
+      '工作台上边缘自动向上滚动',
+      `${scroll}.scrollTop<${upper.top}-60`,
+      undefined,
+      'once',
+    );
+    await pointer('mouseReleased', upper.toX, upper.toY);
+    // Structural overflow fixture exercises the actual hook without changing application state.
+    await e(
+      `(()=>{const n=${scroll},p=document.createElement('div');p.id='polish-overflow';p.style.width=(n.clientWidth*3)+'px';p.style.height=(n.clientHeight*3)+'px';n.append(p);n.scrollLeft=120;n.scrollTop=120})()`,
+    );
+    await e(frame);
+    await check(
+      '横竖同时滚动时细条保持在可见区域右边缘',
+      `(()=>{const n=${scroll},t=n.querySelector('.nps-scroll-thumb'),a=n.getBoundingClientRect(),b=t.getBoundingClientRect(),inset=parseFloat(getComputedStyle(n).getPropertyValue('--sb-inset'));return n.scrollLeft>0 && n.scrollTop>0 && Math.abs(a.right-b.right-inset)<1 && b.top>=a.top && b.bottom<=a.bottom+1})()`,
+    );
+    await e(`document.querySelector('#polish-overflow').remove();${scroll}.scrollLeft=0`);
+  } finally {
+    if (tabId) {
+      await e(
+        `document.querySelector('[data-workbench-tab-id="${tabId}"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:280,clientY:25}))`,
+      );
+      await click('关闭', 'document.querySelector(".nps-menu:popover-open")');
+      if (await e('!!document.querySelector("dialog[open]")'))
+        await click('丢弃并关闭', 'document.querySelector("dialog[open]")');
+      await wait(`!document.querySelector('[data-workbench-tab-id="${tabId}"]')`);
+    }
+    for (const project of projects) {
+      env.database.deleteProject(project.id);
+      for (const file of [project.image_path, project.thumbnail_path]) {
+        const relative = path.relative(env.mode.root, file);
+        if (!relative || relative.startsWith('..') || path.isAbsolute(relative))
+          throw Error('细节验收只清理本次临时目录内的夹具资源');
+        await fs.rm(file, { force: true });
+      }
+    }
+    await h.reload();
+    h.window.setContentSize(...previousSize);
   }
-  const edge = await e(
-    `(()=>{const r=${scroll}.getBoundingClientRect();return {x:r.right-20,y:r.bottom-2,top:${scroll}.scrollTop}})()`,
-  );
-  await pointer('mouseMoved', edge.x, edge.y);
-  await wait(`${scroll}.scrollTop>${edge.top}+60`, '工作台停在下边缘持续自动滚动');
-  await pointer('mouseReleased', edge.x, edge.y);
   await check(
-    '松开后选择恰好等于内容坐标矩形覆盖的 Tag',
-    `(()=>{const n=${scroll},r=n.getBoundingClientRect(),top=${pos.y}-r.top,bottom=${edge.y}-r.top+n.scrollTop;return [...n.querySelectorAll('[data-marquee-key]')].every(t=>{const b=t.getBoundingClientRect(),inside=b.bottom-r.top+n.scrollTop>=top&&b.top-r.top+n.scrollTop<=bottom&&b.right>=${pos.x}&&b.left<=${edge.x};return t.querySelector('.nps-tag').classList.contains('nps-tag-selected')===inside})})()`,
+    '工作台细节清理夹具后保留原有图库图片',
+    () =>
+      JSON.stringify(
+        env.database
+          .loadLibrary('all')
+          .map((project) => project.id)
+          .sort(),
+      ) === JSON.stringify(previousIds),
     undefined,
     'once',
   );
-  const selection = await e(`document.querySelectorAll('.wb-tags .nps-tag-selected').length`);
-  await e(`${scroll}.scrollTop=0`);
-  await e(frame);
-  await check(
-    '松开后的普通滚动不改变已选 Tag',
-    `document.querySelectorAll('.wb-tags .nps-tag-selected').length===${selection}`,
-    undefined,
-    'once',
-  );
-  await e(`${scroll}.scrollTop=300`);
-  await e(frame);
-  const upper = await e(
-    `(()=>{const r=${scroll}.getBoundingClientRect();return {x:r.left+10,y:r.top+r.height/2,toX:r.right-20,toY:r.top+2,top:${scroll}.scrollTop}})()`,
-  );
-  await pointer('mousePressed', upper.x, upper.y);
-  await pointer('mouseMoved', upper.toX, upper.toY);
-  await wait(`${scroll}.scrollTop<${upper.top}-60`, '工作台停在上边缘持续自动滚动');
-  await check('工作台上边缘自动向上滚动', `${scroll}.scrollTop<${upper.top}-60`, undefined, 'once');
-  await pointer('mouseReleased', upper.toX, upper.toY);
-  // Structural overflow fixture exercises the actual hook without changing application state.
-  await e(
-    `(()=>{const n=${scroll},p=document.createElement('div');p.id='polish-overflow';p.style.width=(n.clientWidth*3)+'px';p.style.height=(n.clientHeight*3)+'px';n.append(p);n.scrollLeft=120;n.scrollTop=120})()`,
-  );
-  await e(frame);
-  await check(
-    '横竖同时滚动时细条保持在可见区域右边缘',
-    `(()=>{const n=${scroll},t=n.querySelector('.nps-scroll-thumb'),a=n.getBoundingClientRect(),b=t.getBoundingClientRect(),inset=parseFloat(getComputedStyle(n).getPropertyValue('--sb-inset'));return n.scrollLeft>0 && n.scrollTop>0 && Math.abs(a.right-b.right-inset)<1 && b.top>=a.top && b.bottom<=a.bottom+1})()`,
-  );
-  await e(`document.querySelector('#polish-overflow').remove();${scroll}.scrollLeft=0`);
 }

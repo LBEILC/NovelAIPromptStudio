@@ -174,15 +174,25 @@ describe('Menu', () => {
     expect(action).toHaveBeenCalledTimes(1);
     expect(document.activeElement).toBe(button('Open'));
   });
-  it('reacts to native light-dismiss toggle and restores focus', () => {
-    render(<Menu label="Open" items={menuItems} />);
-    click(button('Open'));
-    act(() =>
-      query('[popover]').dispatchEvent(Object.assign(new Event('toggle'), { newState: 'closed' })),
-    );
-    expect(host.querySelector('[role="menu"]')).toBeNull();
-    expect(document.activeElement).toBe(button('Open'));
-  });
+  it.each(['beforetoggle', 'toggle'])(
+    'reacts to native light-dismiss %s without stale focus restoration',
+    (eventType) => {
+      render(
+        <>
+          <Menu label="Open" items={menuItems} />
+          <Button>Next</Button>
+        </>,
+      );
+      click(button('Open'));
+      const layer = query('[popover]');
+      act(() => layer.dispatchEvent(Object.assign(new Event(eventType), { newState: 'closed' })));
+      expect(host.querySelector('[role="menu"]')).toBeNull();
+      expect(document.activeElement).toBe(button('Open'));
+      focus(button('Next'));
+      act(() => layer.dispatchEvent(Object.assign(new Event('toggle'), { newState: 'closed' })));
+      expect(document.activeElement).toBe(button('Next'));
+    },
+  );
   it('opens a context menu from the keyboard', () => {
     render(
       <ContextMenu label="Context" items={menuItems}>
@@ -248,7 +258,7 @@ describe('Dialog and Popover', () => {
     click(button('Confirm'));
     expect(host.querySelector('dialog')).toBeNull();
   });
-  it('focuses popover content, traps Tab and restores the trigger after Escape', () => {
+  it('leaves a closed popover unfocused, traps Tab when open and restores focus after Escape', () => {
     function Fixture() {
       const [open, setOpen] = useState(false);
       const anchor = useRef<HTMLButtonElement>(null);
@@ -269,6 +279,7 @@ describe('Dialog and Popover', () => {
       );
     }
     render(<Fixture />);
+    expect(document.activeElement).toBe(document.body);
     click(button('Open'));
     expect(document.activeElement).toBe(button('First'));
     key(button('First'), 'Tab', { shiftKey: true });
