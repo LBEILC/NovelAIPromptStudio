@@ -178,7 +178,7 @@ function render() {
 }
 render();
 
-// 自绘滚动条（借鉴 ClaudeDock）：隐藏系统滚动条，每个 .scroll 配一条浮在上面的细条。
+// 自绘滚动条：隐藏系统滚动条，每个 .scroll 配一条浮在上面的细条。
 // 滚动或指针在滚动区域里移动时出现，停下 --sb-idle 后淡出；可以拖动；避开吊顶的页头和吊底的页脚。
 (() => {
   const layer = document.createElement('div');
