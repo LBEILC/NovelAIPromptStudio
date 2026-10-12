@@ -228,8 +228,14 @@ export function Tag({
         <span className={cx('nps-dot', `nps-cat-${category}`)} />
       )}
       <span className="nps-tag-text">
-        <span className="nps-tag-en">{text}</span>
-        {translation && <span className="nps-tag-zh">{translation}</span>}
+        <span className="nps-tag-en" data-tip-overflow={text}>
+          {text}
+        </span>
+        {translation && (
+          <span className="nps-tag-zh" data-tip-overflow={translation}>
+            {translation}
+          </span>
+        )}
       </span>
       {weight && <span className="nps-tag-weight">{weight}</span>}
     </button>

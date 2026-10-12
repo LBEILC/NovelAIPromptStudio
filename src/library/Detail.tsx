@@ -82,7 +82,9 @@ export function LibraryDetail({
               <>
                 {' '}
                 ·{' '}
-                <span title={detail.metadata.model}>{modelDisplayName(detail.metadata.model)}</span>
+                <span data-tip={detail.metadata.model}>
+                  {modelDisplayName(detail.metadata.model)}
+                </span>
               </>
             )}
           </span>
@@ -96,9 +98,9 @@ export function LibraryDetail({
             {p.view === 'trash' ? '移入回收站' : '导入'}
           </span>
           {!hasImageName(detail) && (
-            <span className="library-mono library-file" title={filename}>
+            <span className="library-mono library-file" data-tip-overflow={filename}>
               <span>文件 </span>
-              <span className="library-file-start">
+              <span className="library-file-start" data-tip-measure>
                 {filenameCharacters.slice(0, -20).join('')}
               </span>
               <span className="library-file-end">{filenameCharacters.slice(-20).join('')}</span>
@@ -175,17 +177,16 @@ export function LibraryDetail({
         )}
       </div>
       {/* TODO(design): 界面稿未展示单张和整摞初始态；单张沿用原名预填，整摞暂留空。 */}
-      {renaming && (
-        <LibraryRename
-          p={p}
-          ids={group?.members.map((member) => member.id) || [detail.id]}
-          currentId={detail.id}
-          initialName={
-            hasImageName(detail) && (!group || group.members.length === 1) ? detail.name : ''
-          }
-          onClose={() => setRenaming(false)}
-        />
-      )}
+      <LibraryRename
+        open={renaming}
+        p={p}
+        ids={group?.members.map((member) => member.id) || [detail.id]}
+        currentId={detail.id}
+        initialName={
+          hasImageName(detail) && (!group || group.members.length === 1) ? detail.name : ''
+        }
+        onClose={() => setRenaming(false)}
+      />
     </aside>
   );
 }

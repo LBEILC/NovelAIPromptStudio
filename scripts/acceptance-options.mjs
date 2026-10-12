@@ -32,6 +32,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
       '设置·翻译词典',
       '设置·版式',
       '基础组件',
+      '基础组件·细节',
       '卡片缓存',
       '外壳',
       '外壳·快捷键',

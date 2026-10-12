@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { Check, Minus, Plus, ChevronDown } from 'lucide-react';
 import { cx, composing, quantize } from './internal';
-import { Layer, Tooltip } from './overlays';
+import { Layer } from './overlays';
 import { useScrollArea } from './useScrollArea';
 
 export const iconProps = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
@@ -19,6 +19,8 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   size?: 'default' | 'small';
   loading?: boolean;
   disabledReason?: string;
+  tip?: string;
+  'data-tip'?: string;
   ref?: React.Ref<HTMLButtonElement>;
 };
 export function Button({
@@ -27,14 +29,19 @@ export function Button({
   loading,
   disabled,
   disabledReason,
+  tip,
+  'data-tip': dataTip,
   children,
   className,
   onClick,
   ...props
 }: ButtonProps) {
-  const button = (
+  return (
     <button
       {...props}
+      data-tip={
+        disabled && disabledReason ? disabledReason : (tip ?? dataTip ?? props['aria-label'])
+      }
       type={props.type ?? 'button'}
       className={cx(
         'nps-button',
@@ -55,7 +62,6 @@ export function Button({
       <span className="nps-button-label">{children}</span>
     </button>
   );
-  return disabled && disabledReason ? <Tooltip text={disabledReason}>{button}</Tooltip> : button;
 }
 
 export type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'prefix'> & {
@@ -431,6 +437,7 @@ export function Toggle({
       role={kind}
       aria-checked={checked}
       aria-label={label}
+      data-tip={label}
       disabled={disabled}
       className={cx(`nps-${kind}`, className)}
       onClick={() => onChange(!checked)}
@@ -543,6 +550,7 @@ export function Stepper({
       <button
         type="button"
         aria-label={decreaseLabel}
+        data-tip={decreaseLabel}
         disabled={disabled || (min !== undefined && value <= min)}
         onClick={() => change(value - step)}
       >
@@ -574,6 +582,7 @@ export function Stepper({
       <button
         type="button"
         aria-label={increaseLabel}
+        data-tip={increaseLabel}
         disabled={disabled || (max !== undefined && value >= max)}
         onClick={() => change(value + step)}
       >

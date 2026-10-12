@@ -14,7 +14,7 @@ import {
   Checkbox,
 } from './controls';
 import { Menu, ContextMenu, type MenuItem } from './Menu';
-import { Popover, Dialog, Tooltip } from './overlays';
+import { Popover, Dialog, Tooltip, TooltipRoot } from './overlays';
 import { Autocomplete } from './Autocomplete';
 import {
   Notification,
@@ -61,7 +61,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 function render(node: ReactNode) {
-  act(() => root.render(node));
+  act(() =>
+    root.render(
+      <>
+        {node}
+        <TooltipRoot />
+      </>,
+    ),
+  );
 }
 function query<T extends HTMLElement = HTMLElement>(selector: string): T {
   const result = host.querySelector<T>(selector);
@@ -760,6 +767,35 @@ describe('Feedback', () => {
     expect(action).not.toHaveBeenCalled();
     expect(button('Loading').getAttribute('aria-busy')).toBe('true');
   });
+  it('shares tooltip warmth, restores dwell after leaving and preserves existing descriptions', () => {
+    vi.useFakeTimers();
+    render(
+      <>
+        <Button tip="First" aria-describedby="help">
+          A
+        </Button>
+        <Button tip="Second">B</Button>
+      </>,
+    );
+    pointer(button('A'), 'pointerover');
+    act(() => vi.advanceTimersByTime(500));
+    expect(query('[role="tooltip"]').textContent).toBe('First');
+    expect(button('A').getAttribute('aria-describedby')).toContain('help');
+    pointer(button('B'), 'pointerover');
+    expect(query('[role="tooltip"]').textContent).toBe('Second');
+    expect(button('A').getAttribute('aria-describedby')).toBe('help');
+    pointer(button('B'), 'pointerout');
+    act(() => vi.advanceTimersByTime(300));
+    pointer(button('A'), 'pointerover');
+    expect(host.querySelector('[role="tooltip"]')).toBeNull();
+    act(() => vi.advanceTimersByTime(499));
+    expect(host.querySelector('[role="tooltip"]')).toBeNull();
+    act(() => vi.advanceTimersByTime(1));
+    expect(query('[role="tooltip"]').textContent).toBe('First');
+    key(button('A'), 'Escape');
+    expect(host.querySelector('[role="tooltip"]')).toBeNull();
+    expect(button('A').getAttribute('aria-describedby')).toBe('help');
+  });
   it('exposes clamped progress and keeps the selection slot mounted', () => {
     render(
       <>
@@ -810,13 +846,13 @@ describe('Panel, placement and platform', () => {
   });
   it('flips layers at right and bottom edges and clamps oversized geometry', () => {
     const layer = document.createElement('div');
-    vi.spyOn(layer, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 200, 100));
+    vi.spyOn(layer, 'offsetWidth', 'get').mockReturnValue(200);
+    vi.spyOn(layer, 'offsetHeight', 'get').mockReturnValue(100);
     placeLayer(layer, new DOMRect(innerWidth - 20, innerHeight - 20, 10, 10), true);
     expect(parseFloat(layer.style.left)).toBe(innerWidth - 220);
     expect(parseFloat(layer.style.top)).toBe(innerHeight - 120);
-    vi.spyOn(layer, 'getBoundingClientRect').mockReturnValue(
-      new DOMRect(0, 0, innerWidth + 10, innerHeight + 10),
-    );
+    vi.spyOn(layer, 'offsetWidth', 'get').mockReturnValue(innerWidth + 10);
+    vi.spyOn(layer, 'offsetHeight', 'get').mockReturnValue(innerHeight + 10);
     placeLayer(layer, new DOMRect(-10, -10, 0, 0));
     expect(layer.style.left).toBe('0px');
     expect(layer.style.top).toBe('0px');

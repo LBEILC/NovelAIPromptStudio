@@ -125,9 +125,8 @@
 .library-zip-preview { display:block; max-width:100%; max-height:var(--win-min-h); object-fit:contain; }
 .library-page > .nps-resizable { flex-shrink:0; }
 .library-page .nps-panel-content { height:100%; }
-.library-search kbd { white-space:nowrap; font:var(--fs-caption)/1 var(--font-mono); color:var(--text-3); border:var(--bw) solid var(--border); border-radius:var(--sp-1); padding:var(--sp-0) var(--sp-1); }
 .library-middle { container-type:inline-size; }
-@container (max-width:560px) { .library-search kbd { display:none; } }
+@container (max-width:560px) { .library-search .nps-kbd { display:none; } }
 @container (max-width:420px) { .library-tools > .nps-button > .nps-button-label > span:not(.library-condition-count) { display:none; } }
 .library-tags-more-measure { position:absolute; top:0; max-height:0; overflow:hidden; visibility:hidden; pointer-events:none; }
 .nps-popover:has(.library-filter-panel) { width:var(--popover-w-wide); }

@@ -236,7 +236,7 @@ export default function LibraryPage(
           <LibraryDetail p={p} detail={detail} onViewer={() => setViewer(true)} />
         </ResizablePanel>
       )}
-      {renaming && <LibraryRename p={p} ids={ids} onClose={() => setRenaming(false)} />}
+      <LibraryRename open={renaming} p={p} ids={ids} onClose={() => setRenaming(false)} />
       {viewer && (
         <LibraryViewer
           p={p}

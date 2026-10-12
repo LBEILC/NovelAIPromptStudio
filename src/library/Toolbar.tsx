@@ -1,5 +1,15 @@
 import { useMemo, useRef, useState } from 'react';
-import { Button, Input, OptionGroup, Popover, Select, Slider, Switch, Dialog } from '../ui';
+import {
+  Shortcut,
+  Button,
+  Input,
+  OptionGroup,
+  Popover,
+  Select,
+  Slider,
+  Switch,
+  Dialog,
+} from '../ui';
 import {
   DEFAULT_GALLERY_FILTERS,
   GALLERY_DATE_PRESETS,
@@ -65,7 +75,7 @@ export function FilterChips({
         <button
           className="library-chip"
           key={chip.id}
-          title={chip.title}
+          data-tip={chip.title}
           onClick={chip.clear}
           aria-label={`移除${chip.label} ${chip.value}`}
         >
@@ -199,7 +209,7 @@ export function LibraryToolbar({
             prefix={<i className="ri-search-line" />}
             value={filters.query}
             onChange={(event) => p.onQueryChange(event.target.value)}
-            suffix={<kbd>{navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} K</kbd>}
+            suffix={<Shortcut keys={['Mod', 'K']} />}
           />
         </div>
         <Button
@@ -345,7 +355,7 @@ export function LibraryToolbar({
                 ).map((option) => (
                   <label
                     key={key === 'models' ? option.label : option.values[0]}
-                    title={
+                    data-tip={
                       key === 'models'
                         ? option.values
                             .map(

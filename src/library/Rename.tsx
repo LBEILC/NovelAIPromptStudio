@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Checkbox, Dialog, Input } from '../ui';
 import { numberedImageNames } from '../lib/imageNaming.js';
 import type { LibraryProps } from './types';
 
 export function LibraryRename({
+  open,
   p,
   ids,
   currentId,
   initialName = '',
   onClose,
 }: {
+  open: boolean;
   p: LibraryProps;
   ids: string[];
   currentId?: string;
@@ -19,11 +21,18 @@ export function LibraryRename({
   const [name, setName] = useState(initialName);
   const [onlyCurrent, setOnlyCurrent] = useState(false);
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (open) {
+      setName(initialName);
+      setOnlyCurrent(false);
+      setBusy(false);
+    }
+  }, [open, initialName]);
   const targets = onlyCurrent && currentId ? [currentId] : ids;
   const names = numberedImageNames(name, targets.length);
   return (
     <Dialog
-      open
+      open={open}
       title={`给这 ${targets.length} 张图片起名`}
       cancelLabel="取消"
       confirmLabel="起名"

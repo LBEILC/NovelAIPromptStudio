@@ -56,6 +56,10 @@ export async function libraryPolishChecks(env) {
   const { evaluate: e, check, wait, click, key } = h;
   h.category('图片库·细节');
   const projects = await prepare(env);
+  await check(
+    '图片库搜索快捷键使用共享 Shortcut 并按平台显示',
+    `document.querySelector('.library-search .nps-kbd')?.textContent === ${JSON.stringify(process.platform === 'darwin' ? '⌘ K' : 'Ctrl K')}`,
+  );
   const pointer = pointerDriver(h);
   for (const shape of ['portrait', 'landscape']) {
     const project = projects.find((p) =>
@@ -66,6 +70,10 @@ export async function libraryPolishChecks(env) {
     await selectImage(h, project.id);
     await key(' ', {}, 'document.querySelector("[data-library-grid]")');
     await wait(`${canvas} && ${canvas}.querySelector('img').naturalWidth > 0`);
+    await check(
+      '大图 Esc 使用共享 Shortcut 字体与样式',
+      `${viewer}.querySelector('.nps-kbd')?.textContent==='Esc'&&getComputedStyle(${viewer}.querySelector('.nps-kbd')).fontFamily.includes('IBM Plex Mono')`,
+    );
     await e(frame);
     await check(
       `${shape} 默认适合窗口且图片居中`,

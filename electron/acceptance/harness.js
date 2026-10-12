@@ -272,7 +272,7 @@ export function harness(window, mode, checks) {
     // Find and act in one renderer turn: a temporary control can disappear
     // between separate wait/evaluate calls (for example Cancel during import).
     await wait(
-      `(() => { const e = [...(${scope})?.querySelectorAll('button') || []].filter(e => e.getClientRects().length && !e.matches(':disabled') && e.getAttribute('aria-disabled') !== 'true' && (e.textContent.trim() === ${JSON.stringify(text)} || e.getAttribute('aria-label') === ${JSON.stringify(text)}))[${index}]; if(!e) return false; e.focus(); e.click(); return true; })()`,
+      `(() => { const e = [...(${scope})?.querySelectorAll('button') || []].filter(e => e.getClientRects().length && !e.closest('[inert], [aria-hidden="true"]') && !e.matches(':disabled') && e.getAttribute('aria-disabled') !== 'true' && (e.textContent.trim() === ${JSON.stringify(text)} || e.getAttribute('aria-label') === ${JSON.stringify(text)}))[${index}]; if(!e) return false; e.focus(); e.click(); return true; })()`,
       '等待并点击可操作按钮：' + text,
     );
   };

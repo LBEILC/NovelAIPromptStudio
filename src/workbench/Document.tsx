@@ -551,7 +551,7 @@ export function WorkbenchDocument(p: DocumentProps) {
                       {!!sectionEntries.filter((entry) => entry.automatic).length && (
                         <div
                           className="wb-automatic"
-                          title="元数据与官方预设模板均匹配；默认复制时会排除这些自动内容。"
+                          data-tip="元数据与官方预设模板均匹配；默认复制时会排除这些自动内容。"
                         >
                           {section.scope.automation?.sourceLabel ||
                             `NovelAI 自动添加 · ${section.scope.automation?.tagCount}`}

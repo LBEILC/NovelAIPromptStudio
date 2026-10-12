@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ChevronRight, Check } from 'lucide-react';
 import { Layer } from './overlays';
 import { Button, iconProps } from './controls';
@@ -39,22 +39,30 @@ export function MenuItems({
     .filter((index) => index >= 0);
   const [localActive, setLocalActive] = useState(enabled[0] ?? -1);
   const [sub, setSub] = useState<number | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [subFocus, setSubFocus] = useState(true);
+  const cancelHover = () => clearTimeout(hoverTimer.current);
+  useEffect(() => () => clearTimeout(hoverTimer.current), []);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const subAnchor = useRef<HTMLElement | null>(null);
   const active = controlledActive ?? localActive;
   const move = (index: number) => {
+    cancelHover();
     setSub(null);
     setLocalActive(index);
     onActiveChange?.(index);
     refs.current[index]?.focus();
   };
-  const enter = (index: number) => {
+  const enter = (index: number, focus = true) => {
+    cancelHover();
+    setSubFocus(focus);
     subAnchor.current = refs.current[index];
     setSub(index);
   };
   return (
     <div
       role="menu"
+      onPointerEnter={cancelHover}
       aria-label={label}
       onKeyDown={(event) => {
         if (composing(event)) return;
@@ -124,9 +132,18 @@ export function MenuItems({
                 if (!item.disabled) {
                   setLocalActive(index);
                   onActiveChange?.(index);
-                  if (sub !== index) setSub(null);
+                  cancelHover();
+                  if (sub !== index)
+                    hoverTimer.current = setTimeout(
+                      () => {
+                        if (item.children?.length) enter(index, false);
+                        else setSub(null);
+                      },
+                      sub === null ? 150 : 300,
+                    );
                 }
               }}
+              onPointerLeave={cancelHover}
               onClick={() => {
                 if (item.disabled) return;
                 if (item.children) enter(index);
@@ -149,19 +166,21 @@ export function MenuItems({
                 open={sub === index}
                 onClose={() => setSub(null)}
                 anchor={subAnchor}
-                focus
+                focus={subFocus}
                 side
                 className="nps-menu"
               >
-                <MenuItems
-                  items={item.children}
-                  label={item.label}
-                  closeAll={closeAll}
-                  closeLevel={() => {
-                    setSub(null);
-                    refs.current[index]?.focus();
-                  }}
-                />
+                <div onPointerEnter={cancelHover}>
+                  <MenuItems
+                    items={item.children}
+                    label={item.label}
+                    closeAll={closeAll}
+                    closeLevel={() => {
+                      setSub(null);
+                      refs.current[index]?.focus();
+                    }}
+                  />
+                </div>
               </Layer>
             )}
           </div>
@@ -176,7 +195,7 @@ export function Menu({
   children,
   context = false,
   trigger,
-  buttonVariant = 'default',
+  buttonVariant = 'quiet',
   className,
   menuClassName,
 }: {

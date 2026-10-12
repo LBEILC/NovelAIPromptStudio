@@ -143,9 +143,37 @@
 .nps-resizer:hover::after, .nps-resizer:focus-visible::after, .nps-resizer[data-dragging="true"]::after { width: var(--rule-w); background: var(--text); }
 .nps-resizer-right { right: 0; } .nps-resizer-left { left: 0; }
 .nps-sr { position: absolute; width: 0; height: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-[data-motion="off"] .nps-root *, [data-motion="off"] .nps-root *::after, [data-motion="off"] .nps-layer *, [data-motion="off"] .nps-dialog * { transition: none; animation: none; }
+
+/* Shared hover feedback; only surface colors interpolate. */
+:where(.nps-root, .nps-layer, dialog.nps-dialog) :is(button, [role="tab"], [role="option"], [role="row"], .settings-table td, .library-card, .nps-tag) {
+  transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
+}
+.nps-menu-trigger > .nps-button[aria-expanded="true"] { background: var(--selected); color: var(--text); }
+.nps-layer, dialog.nps-dialog, dialog.nps-dialog::backdrop {
+  opacity: 0;
+  transform: none;
+  transition: opacity var(--dur-1) var(--ease-out), display var(--dur-1) allow-discrete, overlay var(--dur-1) allow-discrete;
+}
+.nps-layer:not(:popover-open), dialog.nps-dialog:not([open]) { display: none; }
+.nps-layer:popover-open, dialog.nps-dialog[open], dialog.nps-dialog[open]::backdrop {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out), display var(--dur-2) allow-discrete, overlay var(--dur-2) allow-discrete;
+}
+.nps-tip { pointer-events: none; white-space: pre-line; overflow-wrap: anywhere; }
+.nps-layer:popover-open[data-entering] { opacity: 0; transform: translateY(calc(-1 * var(--sp-1))) scale(0.98); transition: none; }
+.nps-layer[data-placement="top"]:popover-open[data-entering] { transform: translateY(var(--sp-1)) scale(0.98); }
+.nps-layer[data-placement="right"]:popover-open[data-entering] { transform: translateX(calc(-1 * var(--sp-1))) scale(0.98); }
+.nps-layer[data-placement="left"]:popover-open[data-entering] { transform: translateX(var(--sp-1)) scale(0.98); }
+.nps-layer.nps-tip:popover-open[data-entering] { transform: none; }
+@starting-style {
+  dialog.nps-dialog[open] { opacity: 0; transform: scale(0.98); }
+  dialog.nps-dialog[open]::backdrop { opacity: 0; }
+}
+
+[data-motion="off"] dialog.nps-dialog, [data-motion="off"] dialog.nps-dialog::backdrop, [data-motion="off"] :is(.nps-layer, .nps-dialog), [data-motion="off"] .nps-root *, [data-motion="off"] .nps-root *::after, [data-motion="off"] .nps-layer *, [data-motion="off"] .nps-dialog * { transition: none; animation: none; }
 @media (prefers-reduced-motion: reduce) {
-  html:not([data-motion="full"]) .nps-root *, html:not([data-motion="full"]) .nps-root *::after, html:not([data-motion="full"]) .nps-layer *, html:not([data-motion="full"]) .nps-dialog * { transition: none; animation: none; }
+  html:not([data-motion="full"]) dialog.nps-dialog::backdrop, html:not([data-motion="full"]) :is(.nps-layer, .nps-dialog), html:not([data-motion="full"]) .nps-root *, html:not([data-motion="full"]) .nps-root *::after, html:not([data-motion="full"]) .nps-layer *, html:not([data-motion="full"]) .nps-dialog * { transition: none; animation: none; }
 }
 .nps-empty-mark { display:block; width:var(--empty-mark); height:var(--empty-mark); color:var(--text-off); }
 .nps-empty-mark svg { display:block; width:100%; height:100%; }

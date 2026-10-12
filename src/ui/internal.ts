@@ -46,12 +46,24 @@ export function trapTab(event: KeyboardEvent, root: HTMLElement) {
 
 /** Coordinates are measured viewport geometry, never design constants. */
 export function placeLayer(layer: HTMLElement, anchor: DOMRect, side = false) {
-  const bounds = layer.getBoundingClientRect();
+  const bounds = { width: layer.offsetWidth, height: layer.offsetHeight };
   let left = side ? anchor.right : anchor.left;
   let top = side ? anchor.top : anchor.bottom;
   if (left + bounds.width > innerWidth)
     left = side ? anchor.left - bounds.width : anchor.right - bounds.width;
   if (top + bounds.height > innerHeight) top = anchor.top - bounds.height;
+  layer.dataset.placement = side
+    ? left < anchor.left
+      ? 'left'
+      : 'right'
+    : top < anchor.top
+      ? 'top'
+      : 'bottom';
+  const finalLeft = clamp(left, 0, Math.max(0, innerWidth - bounds.width));
+  const finalTop = clamp(top, 0, Math.max(0, innerHeight - bounds.height));
+  layer.style.transformOrigin = side
+    ? `${left < anchor.left ? bounds.width : 0}px ${clamp(anchor.top + anchor.height / 2 - finalTop, 0, bounds.height)}px`
+    : `${clamp(anchor.left + anchor.width / 2 - finalLeft, 0, bounds.width)}px ${top < anchor.top ? bounds.height : 0}px`;
   layer.style.left = `${clamp(left, 0, Math.max(0, innerWidth - bounds.width))}px`;
   layer.style.top = `${clamp(top, 0, Math.max(0, innerHeight - bounds.height))}px`;
 }

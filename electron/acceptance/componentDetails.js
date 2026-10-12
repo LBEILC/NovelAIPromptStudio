@@ -147,7 +147,7 @@ export async function componentDetails(h) {
   await key('ArrowRight');
   await h.checkSoon(
     '菜单右方向键进入子菜单',
-    'document.activeElement.textContent.trim()==="Prompt" && document.querySelectorAll(".nps-layer [role=menu]").length>=2',
+    'document.activeElement.textContent.trim()==="Prompt" && document.querySelectorAll(".nps-layer:popover-open [role=menu]").length>=2',
     undefined,
     undefined,
     undefined,
@@ -165,7 +165,7 @@ export async function componentDetails(h) {
   await key('Tab');
   await h.checkSoon(
     '菜单 Tab 关闭并归还焦点',
-    'document.activeElement.textContent.trim()==="右键菜单" && !document.querySelector(".nps-layer [role=menu]")',
+    'document.activeElement.textContent.trim()==="右键菜单" && !document.querySelector(".nps-layer:popover-open [role=menu]")',
     undefined,
     undefined,
     undefined,
@@ -175,7 +175,7 @@ export async function componentDetails(h) {
   await key('F10', { shiftKey: true });
   await h.checkSoon(
     'Shift+F10 打开 Tag 右键菜单',
-    '!!document.querySelector(".nps-layer [role=menu]")',
+    '!!document.querySelector(".nps-layer:popover-open [role=menu]")',
     undefined,
     undefined,
     undefined,
@@ -185,10 +185,14 @@ export async function componentDetails(h) {
   await e(
     `document.querySelector('.nps-menu-trigger[tabindex]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:innerWidth-2,clientY:innerHeight-2}))`,
   );
-  await wait('!!document.querySelector(".nps-layer [role=menu]")');
+  await wait('!!document.querySelector(".nps-layer:popover-open [role=menu]")');
+  await wait('!document.querySelector(".nps-layer:popover-open[data-entering]")');
+  await e(
+    'Promise.allSettled([...document.querySelectorAll(".nps-layer:popover-open")].flatMap(n=>n.getAnimations().map(a=>a.finished))).then(()=>undefined)',
+  );
   await check(
     '右下边缘的右键菜单限制在视口内',
-    `(()=>{const r=document.querySelector('.nps-layer').getBoundingClientRect();return r.x>=0 && r.y>=0 && r.right<=innerWidth+1 && r.bottom<=innerHeight+1})()`,
+    `(()=>{const r=document.querySelector('.nps-layer:popover-open:not(.nps-tip)').getBoundingClientRect();return r.x>=0 && r.y>=0 && r.right<=innerWidth+1 && r.bottom<=innerHeight+1})()`,
     undefined,
     'both',
   );
@@ -197,7 +201,7 @@ export async function componentDetails(h) {
   await key('ArrowRight');
   await h.checkSoon(
     '边缘子菜单翻转或限制在视口内',
-    `[...document.querySelectorAll('.nps-layer')].length===2 && [...document.querySelectorAll('.nps-layer')].every(node=>{const r=node.getBoundingClientRect();return r.x>=0 && r.right<=innerWidth+1 && r.bottom<=innerHeight+1})`,
+    `[...document.querySelectorAll('.nps-layer:popover-open:not(.nps-tip)')].length===2 && [...document.querySelectorAll('.nps-layer:popover-open:not(.nps-tip)')].every(node=>{const r=node.getBoundingClientRect();return r.x>=0 && r.right<=innerWidth+1 && r.bottom<=innerHeight+1})`,
     undefined,
     undefined,
     undefined,
@@ -217,10 +221,10 @@ export async function componentDetails(h) {
     button: 'left',
     clickCount: 1,
   });
-  await wait('!document.querySelector(".nps-layer [role=menu]")');
+  await wait('!document.querySelector(".nps-layer:popover-open [role=menu]")');
   await check(
     '点击外部关闭整组菜单',
-    '!document.querySelector(".nps-layer [role=menu]")',
+    '!document.querySelector(".nps-layer:popover-open [role=menu]")',
     undefined,
     'once',
   );
@@ -287,7 +291,7 @@ export async function componentDetails(h) {
     'once',
   );
   await e(
-    `[...document.querySelectorAll('.nps-tooltip-anchor button')].find(button=>button.textContent.trim()==='复制 Prompt').focus()`,
+    `[...document.querySelectorAll('button[data-tip]')].find(button=>button.textContent.trim()==='复制 Prompt').focus()`,
   );
   await wait(
     'document.querySelector(".nps-layer[role=tooltip]")?.textContent.includes("复制当前筛选")',

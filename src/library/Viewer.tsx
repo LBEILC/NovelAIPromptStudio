@@ -2,7 +2,7 @@
 import { dimensions } from './presentation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Button } from '../ui';
+import { Shortcut, Button } from '../ui';
 import { mediaUrl } from '../lib/imageStage.js';
 import type { ImageProject } from '../shared/types';
 import type { LibraryProps } from './types';
@@ -173,7 +173,7 @@ export function LibraryViewer({
         </span>
         <Button variant="quiet" size="small" onClick={onClose}>
           <i className="ri-close-line" />
-          关闭 <kbd>Esc</kbd>
+          关闭 <Shortcut keys={['Esc']} />
         </Button>
       </div>
       <div

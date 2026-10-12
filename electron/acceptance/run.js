@@ -12,6 +12,7 @@ import { importLibraryFiles } from '../importer.js';
 import { harness } from './harness.js';
 import { settingsChecks } from './settings.js';
 import { componentChecks } from './components.js';
+import { uiPolishChecks } from './uiPolish.js';
 import { shortcutChecks } from './shortcuts.js';
 import { preserveClipboard } from './clipboard.js';
 import { cardCacheChecks } from './cardCache.js';
@@ -26,7 +27,9 @@ export async function runAcceptance(context) {
   mode.screenshots = [];
   const started = Date.now();
   // These focused scenarios never invoke copy/paste; leave every clipboard format untouched.
-  const restoreClipboard = ['图片库·细节', '工作台·细节'].includes(mode.category)
+  const restoreClipboard = ['图片库·细节', '工作台·细节', '基础组件·细节', '基础组件'].includes(
+    mode.category,
+  )
     ? null
     : preserveClipboard(clipboard);
   const previousTheme = nativeTheme.themeSource;
@@ -378,6 +381,7 @@ export async function runAcceptance(context) {
         await libraryChecks(environment);
       else if (mode.category.startsWith('设置')) await settingsChecks(environment, false);
       else if (mode.category === '基础组件') await componentChecks(environment);
+      else if (mode.category === '基础组件·细节') await uiPolishChecks(environment);
       else if (mode.category === '卡片缓存') await cardCacheChecks(environment);
       else if (mode.category === '外壳·快捷键') await shortcutChecks(environment);
       else if (mode.category === '动效') {
@@ -410,9 +414,10 @@ export async function runAcceptance(context) {
         await libraryNamingChecks(environment);
         await libraryChecks(environment);
         await settingsChecks(environment, false);
-        await componentChecks(environment);
         await libraryPolishChecks(environment);
         await workbenchPolishChecks(environment);
+        await uiPolishChecks(environment);
+        await componentChecks(environment);
         await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());
       }
     }

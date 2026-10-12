@@ -192,6 +192,30 @@ function Showcase() {
   const notify = useNotifications();
   return (
     <main className="nps-demo-sheet" data-showcase="004">
+      <Section title="提示与浮层验收">
+        <div data-polish-probe>
+          <Button tip="验收提示一" aria-label="验收控件一">
+            <Search {...iconProps} />
+          </Button>
+          <Button tip="验收提示二" aria-label="验收控件二">
+            <X {...iconProps} />
+          </Button>
+          <span
+            data-tip-overflow="Synthetic overflowing name"
+            style={{
+              display: 'inline-block',
+              width: 60,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            Synthetic overflowing name
+          </span>
+          <span data-tip-overflow="Short">Short</span>
+          <Menu label="验收菜单" items={menu} />
+        </div>
+      </Section>
       <Section title="按钮">
         <Row label="默认">
           <Button>复制 Prompt</Button>

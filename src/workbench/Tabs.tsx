@@ -65,7 +65,7 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
         role="tab"
         aria-selected={tab.id === p.session.activeTabId}
         aria-label={name || '没有起名'}
-        title={`${name || '没有起名'} · ${image?.created_at || tab.updatedAt}`}
+        data-tip={!name ? `没有起名 · ${image?.created_at || tab.updatedAt}` : undefined}
         onClick={() => p.onActivateTab(tab.id)}
         style={
           {
@@ -80,7 +80,11 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
           alt=""
           src={mediaUrl(image?.thumbnail_path || image?.image_path || '')}
         />
-        {name && <span className="wb-tab-name">{name}</span>}
+        {name && (
+          <span className="wb-tab-name" data-tip-overflow={name}>
+            {name}
+          </span>
+        )}
         {workbenchTabHasChanges(tab) && <span className="wb-dirty" aria-label="Prompt 已修改" />}
       </button>
     </ContextMenu>

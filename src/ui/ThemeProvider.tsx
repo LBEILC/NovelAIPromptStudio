@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import '../../design/tokens.css';
 import './ui.css';
+import { TooltipRoot } from './overlays';
 
 export type Platform = 'windows' | 'macos' | 'linux';
 const PlatformContext = createContext<Platform>('windows');
@@ -47,7 +48,10 @@ export function ThemeProvider({
   }, [theme, motion]);
   return (
     <PlatformContext.Provider value={platform}>
-      <div className="nps-root">{children}</div>
+      <div className="nps-root">
+        {children}
+        <TooltipRoot />
+      </div>
     </PlatformContext.Provider>
   );
 }

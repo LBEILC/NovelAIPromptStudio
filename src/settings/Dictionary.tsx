@@ -296,7 +296,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
                   />
                 </td>
                 <td>
-                  <span className="settings-tag" title={item.display_tag || item.tag}>
+                  <span className="settings-tag" data-tip-overflow={item.display_tag || item.tag}>
                     {(item.display_tag || item.tag).replaceAll('_', ' ')}
                   </span>
                 </td>
