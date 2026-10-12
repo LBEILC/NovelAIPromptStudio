@@ -54,8 +54,8 @@ export function generationParameters(metadata: {
 
 export function deletionDetail(impact: { open: number; dirty: number }, space: string) {
   return [
-    impact.open ? `${impact.open} 张正在工作台打开，删除后这些标签会关闭。` : '',
-    impact.dirty ? `其中 ${impact.dirty} 个标签里有还没保存的改动，会一起丢弃。` : '',
+    impact.open ? `${impact.open} 张正在工作台打开，删除后这些标签页会关闭。` : '',
+    impact.dirty ? `其中 ${impact.dirty} 个标签页里有还没保存的改动，会一起丢弃。` : '',
     space ? `会释放 ${space}。` : '',
   ]
     .filter(Boolean)

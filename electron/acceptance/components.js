@@ -138,7 +138,7 @@ export async function componentChecks({ h, mode }) {
     for (const [label, selector] of [
       ['右键菜单', '.nps-layer [role=menu]'],
       ['编辑一个 Tag', '.nps-layer[role=dialog]'],
-      ['关闭已修改的标签？', 'dialog[open]'],
+      ['关闭已修改的标签页？', 'dialog[open]'],
     ]) {
       await click(label);
       await wait(`!!document.querySelector('${selector}')`);
@@ -160,7 +160,7 @@ export async function componentChecks({ h, mode }) {
           'once',
         );
       }
-      if (label === '关闭已修改的标签？') {
+      if (label === '关闭已修改的标签页？') {
         await e(
           'document.querySelector(".studio-titlebar button, .nps-demo-sheet button").focus()',
         );
@@ -204,7 +204,7 @@ export async function componentChecks({ h, mode }) {
       undefined,
       'once',
     );
-    await click('复制 Prompt', 'document', 1);
+    await click('复制提示词', 'document', 1);
     await wait('!!document.querySelector(".nps-notifications .nps-toast")');
     await click(
       '删除',

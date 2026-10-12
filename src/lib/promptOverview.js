@@ -177,7 +177,7 @@ export function overviewMoveContext(project, selectedKeys = []) {
   if (polarities.size !== 1) {
     return {
       disabled: true,
-      description: 'Prompt 与 Undesired Tag 不能混合移动',
+      description: '正面与负面 Tag 不能混合移动',
       options: [],
     };
   }
@@ -258,12 +258,12 @@ export function overviewSelectionMenuItems({
   translating = false,
 }) {
   const ignoredLabels = [
-    ignored ? `${ignored} 个排除 Tag` : '',
+    ignored ? `${ignored} 个负面 Tag` : '',
     automaticIgnored ? `${automaticIgnored} 个 NovelAI 自动 Tag` : '',
   ].filter(Boolean);
   const copyLabel = ignoredLabels.length
-    ? `复制可用 ${copyCount} 个 Prompt Tag（忽略 ${ignoredLabels.join('、')}）`
-    : `复制已选 ${copyCount} 个 Prompt Tag`;
+    ? `复制可用 ${copyCount} 个提示词 Tag（忽略 ${ignoredLabels.join('、')}）`
+    : `复制已选 ${copyCount} 个提示词 Tag`;
   return [
     {
       key: 'copy-selected-tags',
@@ -273,7 +273,7 @@ export function overviewSelectionMenuItems({
     },
     {
       key: 'translate-selected-tags',
-      label: translating ? '正在整理已选 Tag…' : `翻译与分类已选 ${count} 个 Tag`,
+      label: translating ? '正在整理已选 Tag…' : `翻译并分类已选 ${count} 个 Tag`,
       disabled: count < 1 || translating,
       onClick: () => onTranslate?.(),
     },

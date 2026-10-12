@@ -60,6 +60,7 @@ export interface DocumentProps {
   renderParagraph?: (section: number, block: number, content: ReactNode) => ReactNode;
   renderAdd?: (section: number, block: number) => ReactNode;
   onRawEdit?: (section: number, initial?: string) => void;
+  onTranslateParagraph?: (section: number, block: number) => void;
   selectedKeys?: string[];
   children?: ReactNode;
   characterActions?: ReactNode;
@@ -88,7 +89,7 @@ export function WorkbenchDocument(p: DocumentProps) {
         root.current?.getClientRects().length
       ) {
         event.preventDefault();
-        root.current.querySelector<HTMLInputElement>('[aria-label="搜索 Tag 或译名"]')?.focus();
+        root.current.querySelector<HTMLInputElement>('[aria-label="搜索 Tag 或译文"]')?.focus();
       }
     };
     window.addEventListener('keydown', key);
@@ -119,12 +120,12 @@ export function WorkbenchDocument(p: DocumentProps) {
       (entry: { scopePolarity: string }) => entry.scopePolarity === 'undesired',
     );
   const copyLabel = negativeOnly
-    ? `复制排除内容 · ${copyContext.count}`
+    ? `复制负面提示词 · ${copyContext.count}`
     : p.selectedKeys?.length
       ? `复制选中的 · ${copyContext.count}`
       : filtered
         ? `复制可见的 · ${copyContext.count}`
-        : '复制 Prompt';
+        : '复制提示词';
   const negativeText = doc.scopes
     .filter((section) => section.scope.polarity === 'undesired')
     .map(serializePromptSection)
@@ -149,28 +150,27 @@ export function WorkbenchDocument(p: DocumentProps) {
   const copyItems: MenuItem[] = [
     {
       id: 'all',
-      label: '复制全部 Prompt',
+      label: '复制全部提示词',
       trailing: summary(doc.scopes.filter((section) => section.scope.polarity === 'prompt')),
-      onSelect: () => copy(copyPromptDocument(doc), '全部 Prompt'),
+      onSelect: () => copy(copyPromptDocument(doc), '全部提示词'),
     },
     ...(automaticCount > 0
       ? [
           {
             id: 'automatic',
-            label: `复制全部 Prompt，含 NovelAI 自动加的 ${automaticCount} 个`,
-            onSelect: () =>
-              copy(copyPromptDocument(doc, { includeAutomatic: true }), '全部 Prompt'),
+            label: `复制全部提示词，含 NovelAI 自动加的 ${automaticCount} 个`,
+            onSelect: () => copy(copyPromptDocument(doc, { includeAutomatic: true }), '全部提示词'),
           },
         ]
       : []),
     {
       id: 'negative',
-      label: '复制全部排除内容',
+      label: '复制全部负面提示词',
       trailing: summary(
         doc.scopes.filter((section) => section.scope.polarity === 'undesired'),
         true,
       ),
-      onSelect: () => copy(negativeText, '排除内容'),
+      onSelect: () => copy(negativeText, '负面提示词'),
     },
     { id: 'scope-separator', separator: true },
     ...doc.scopes.map((section) => ({
@@ -194,7 +194,7 @@ export function WorkbenchDocument(p: DocumentProps) {
   )
     copyItems.splice(1, 0, {
       id: 'selected-negative',
-      label: '复制其中的排除内容',
+      label: '复制其中的负面 Tag',
       trailing: `${copyContext.ignored} 个 Tag`,
       onSelect: () => {
         const negativeKeys = entries
@@ -204,7 +204,7 @@ export function WorkbenchDocument(p: DocumentProps) {
               (p.selectedKeys?.length ? p.selectedKeys.includes(entry.key) : matches(entry)),
           )
           .map((entry) => entry.key);
-        copy(copyVisiblePromptDocument(doc, { selectedKeys: negativeKeys }).text, '排除内容');
+        copy(copyVisiblePromptDocument(doc, { selectedKeys: negativeKeys }).text, '负面提示词');
       },
     });
   const blockMenu = (si: number, bi: number): MenuItem[] => {
@@ -234,13 +234,17 @@ export function WorkbenchDocument(p: DocumentProps) {
             ),
           ),
       },
+      { id: 'type-separator', separator: true },
       {
         id: 'translate',
-        label: '翻译与分类这一块',
-        onSelect: () =>
-          translate(entries.filter((entry) => entry.section === si && entry.block === bi)),
+        label: block.type === 'tags' ? '翻译并分类' : '译成中文',
+        onSelect: () => {
+          if (block.type === 'paragraph') p.onTranslateParagraph?.(si, bi);
+          else translate(entries.filter((entry) => entry.section === si && entry.block === bi));
+        },
       },
-      { id: 'copy', label: '复制这一块', onSelect: () => copy(block.raw) },
+      { id: 'copy', label: '复制', onSelect: () => copy(block.raw) },
+      { id: 'copy-separator', separator: true },
       {
         id: 'up',
         label: '上移',
@@ -255,10 +259,10 @@ export function WorkbenchDocument(p: DocumentProps) {
         disabled: bi === section.blocks.length - 1,
         onSelect: () => move(1),
       },
-      { id: 'save', label: '存为常用块', disabled: true },
+      { id: 'delete-separator', separator: true },
       {
         id: 'delete',
-        label: '删除这一块',
+        label: '删除',
         danger: true,
         onSelect: () => {
           const raw = serializePromptSection(section);
@@ -301,13 +305,12 @@ export function WorkbenchDocument(p: DocumentProps) {
     );
   };
   return (
-    <section className="wb-prompt" aria-label="Prompt 文档" ref={root}>
+    <section className="wb-prompt" aria-label="提示词" ref={root}>
       <div className="wb-prompt-head">
-        <strong>Prompt</strong>
         <Input
           size="small"
-          aria-label="搜索 Tag 或译名"
-          placeholder="搜索 Tag"
+          aria-label="搜索 Tag 或译文"
+          placeholder="搜索 Tag 或译文"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           prefix={<i className="ri-search-line" />}
@@ -327,8 +330,15 @@ export function WorkbenchDocument(p: DocumentProps) {
               ` ${[!!query, polarity !== 'all', category !== 'All'].filter(Boolean).length}`}
           </span>
         </Button>
-        <Button variant="quiet" size="small" onClick={() => translate(entries)}>
-          AI
+        <Button
+          variant="quiet"
+          size="small"
+          aria-label="翻译"
+          data-tip="把全部 Tag 翻译并分类"
+          onClick={() => translate(entries)}
+        >
+          <i className="ri-translate-2" />
+          <span className="wb-responsive-label">翻译</span>
         </Button>
       </div>
       <Popover
@@ -371,8 +381,8 @@ export function WorkbenchDocument(p: DocumentProps) {
               onChange={setPolarity}
               options={[
                 { value: 'all', label: '全部' },
-                { value: 'prompt', label: '正向内容' },
-                { value: 'undesired', label: '排除内容' },
+                { value: 'prompt', label: '正面' },
+                { value: 'undesired', label: '负面提示词' },
               ]}
             />
           </label>
@@ -399,7 +409,7 @@ export function WorkbenchDocument(p: DocumentProps) {
           )}
           {polarity !== 'all' && (
             <Button variant="quiet" size="small" onClick={() => setPolarity('all')}>
-              只看 {polarity === 'prompt' ? '正向内容' : '排除内容'} ×
+              只看 {polarity === 'prompt' ? '正面' : '负面提示词'} ×
             </Button>
           )}
           {category !== 'All' && (
@@ -418,7 +428,7 @@ export function WorkbenchDocument(p: DocumentProps) {
           >
             清除
           </Button>
-          <span className="nps-help wb-filter-note">复制的内容跟着筛选变</span>
+          <span className="nps-help wb-filter-note">复制时只包含筛选出的内容</span>
         </div>
       )}
       <div className="wb-document-scroll" ref={scroll}>
@@ -467,11 +477,11 @@ export function WorkbenchDocument(p: DocumentProps) {
                 <header>
                   <span>
                     {block.type === 'tags'
-                      ? `TAG 块${block.label ? ` · ${block.label}` : ''} · ${tags.length} 个`
+                      ? `Tag 块${block.label ? ` · ${block.label}` : ''} · ${tags.length} 个`
                       : `段落${block.label ? ` · ${block.label}` : ''}`}
                   </span>
                   <Menu
-                    label="这一块的操作"
+                    label="块操作"
                     trigger={<i className="ri-more-line" />}
                     items={blockMenu(si, bi)}
                   />
@@ -545,7 +555,7 @@ export function WorkbenchDocument(p: DocumentProps) {
                       { id: 'raw', label: '编辑原始文本', onSelect: () => p.onRawEdit?.(si) },
                       {
                         id: 'translate',
-                        label: '全部翻译与分类',
+                        label: '翻译并分类',
                         onSelect: () => translate(sectionEntries),
                       },
                     ]}
@@ -559,7 +569,7 @@ export function WorkbenchDocument(p: DocumentProps) {
                       {!!sectionEntries.filter((entry) => entry.automatic).length && (
                         <div
                           className="wb-automatic"
-                          data-tip="元数据与官方预设模板均匹配；默认复制时会排除这些自动内容。"
+                          data-tip="这些是 NovelAI 按官方预设自动加的 Tag，默认复制时不包含。"
                         >
                           {section.scope.automation?.sourceLabel ||
                             `NovelAI 自动添加 · ${section.scope.automation?.tagCount}`}
@@ -622,7 +632,7 @@ export function WorkbenchDocument(p: DocumentProps) {
               copyContext.count,
               !!p.selectedKeys?.length,
               copyContext.ignored,
-              negativeOnly ? '排除 Tag' : '',
+              negativeOnly ? '负面 Tag' : '',
               copyContext.automaticIgnored,
             )
           }

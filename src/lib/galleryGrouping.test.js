@@ -64,7 +64,7 @@ describe('gallery grouping settings', () => {
 
   it('summarizes combined settings without making users decode them', () => {
     expect(galleryGroupingStatusLabel({ promptScope: 'full', mergeVibes: false })).toBe('精确');
-    expect(galleryGroupingStatusLabel({ promptScope: 'full', mergeVibes: true })).toBe('同 Prompt');
+    expect(galleryGroupingStatusLabel({ promptScope: 'full', mergeVibes: true })).toBe('同提示词');
     expect(
       galleryGroupingStatusLabel({
         promptScope: 'similar',

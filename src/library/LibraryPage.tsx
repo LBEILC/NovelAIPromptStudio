@@ -114,7 +114,7 @@ export default function LibraryPage(
               title={noImages ? '图片库里还没有图片' : '没有符合条件的图片'}
               description={
                 noImages
-                  ? '把图片或 NovelAI 导出的 ZIP 拖到这里。软件会复制一份保存，并读出每张图的 Prompt 和参数。'
+                  ? '把图片或 NovelAI 导出的 ZIP 拖到这里。软件会复制一份保存，并读出每张图的提示词和参数。'
                   : `图片库里有 ${p.allCount ?? p.filterCacheSource.length} 张图片，但没有一张同时满足现在的搜索和筛选。`
               }
               actions={

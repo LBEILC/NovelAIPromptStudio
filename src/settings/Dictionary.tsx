@@ -160,7 +160,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
     { id: 'sep', separator: true },
     {
       id: 'delete',
-      label: dictionarySource(item) === 'manual' ? '还原' : '删除这一条',
+      label: dictionarySource(item) === 'manual' ? '还原' : '删除',
       danger: true,
       onSelect: () => setDeleting([item.tag]),
     },
@@ -176,7 +176,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
           <p>
             软件认识的 Tag
             和它们的译文、分类。工作台和图片库里显示的译文都来自这里；改了只影响显示，不会改动图片里的
-            Prompt。
+            提示词。
           </p>
         </div>
       </header>
@@ -355,7 +355,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
                       {item.image_count}
                     </Button>
                   ) : (
-                    <span>没用到</span>
+                    <span>未使用</span>
                   )}
                 </td>
                 <td className="settings-source">{sourceLabel(item)}</td>
@@ -403,10 +403,10 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
           <div className="settings-dictionary-progress-line">
             <span>
               {d.running
-                ? `正在用 AI 翻译 · 已完成 ${d.progress.completed} / ${d.progress.total}${d.progress.failed.length ? ` · ${d.progress.failed.length} 条没有成功` : ''}`
+                ? `正在用 AI 翻译 · 已完成 ${d.progress.completed} / ${d.progress.total}${d.progress.failed.length ? ` · 没能翻译 ${d.progress.failed.length} 条` : ''}`
                 : d.progress.canceled
                   ? `已取消。完成了 ${d.progress.translated} 条，其余没有改动`
-                  : `已翻译 ${d.progress.translated} 条，${d.progress.failed.length} 条没有成功，保持原样`}
+                  : `已翻译 ${d.progress.translated} 条，没能翻译 ${d.progress.failed.length} 条，保持原样`}
             </span>
             {!d.running && !!d.progress.failed.length && (
               <Button
@@ -528,10 +528,10 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
       >
         <p>
           {reverting
-            ? '会删掉你对这个 Tag 的修改。它再次出现时，软件会重新查内置词典；内置词典里没有的，要再做一次"翻译与分类"才有译文。'
-            : '这些 Tag 再次出现时，软件会重新查内置词典；内置词典里没有的，要再做一次"翻译与分类"才有译文。'}
+            ? '会删掉你对这个 Tag 的修改。它再次出现时，软件会重新查内置词典；内置词典里没有的，要再翻译并分类一次才有译文。'
+            : '这些 Tag 再次出现时，软件会重新查内置词典；内置词典里没有的，要再翻译并分类一次才有译文。'}
         </p>
-        <p>不会改动图片里的 Prompt。</p>
+        <p>不会改动图片里的提示词。</p>
       </Dialog>
     </div>
   );

@@ -93,8 +93,8 @@ export function useAISettings() {
       } else if (action === 'test') {
         const result = await window.studio.testAIModel();
         if (!result.ok) throw new Error(result.error);
-        setMessage(`连接成功 · ${result.model || saved.model}`);
-      } else setMessage('AI 服务设置已安全保存');
+        setMessage(`已连接 · ${result.model || saved.model}`);
+      } else setMessage('已保存 AI 服务设置');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {

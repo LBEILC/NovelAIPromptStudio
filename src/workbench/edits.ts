@@ -68,7 +68,7 @@ export function moveTags(
   if (!entries.length) return document;
   const polarity = document.scopes[target.section].scope.polarity;
   if (entries.some((entry) => document.scopes[entry.section].scope.polarity !== polarity))
-    throw new RangeError('Prompt 与 Undesired Tag 不能混合移动');
+    throw new RangeError('正面与负面 Tag 不能混合移动');
   if (
     entries.some(
       (entry) =>

@@ -134,7 +134,7 @@ export function useLibraryComputation({
       if (groupingRequestRef.current !== requestId) return;
       setSimilarGroupingState({ groups: [], loading: false, requestId });
       showToast(
-        `相似 Prompt 分组没有完成：${error instanceof Error ? error.message : String(error)}`,
+        `没能合并相似提示词图片：${error instanceof Error ? error.message : String(error)}`,
         'error',
       );
     };

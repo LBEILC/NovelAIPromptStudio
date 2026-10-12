@@ -60,6 +60,7 @@
 .wb-insertion-slot { display:inline-flex; flex-shrink:0; border:var(--bw) dashed var(--focus); border-radius:var(--r-tag); background:var(--selected); }
 .wb-block:has(.wb-insertion-slot), .wb-block:has(.wb-tag-target), .wb-block:has([data-drop-active=true]) { outline:var(--bw) solid var(--focus); }
 .wb-tab-preview { display:flex; flex-direction:column; gap:var(--sp-2); max-width:var(--popover-w); }
+.nps-tip.wb-tab-preview { padding:var(--sp-3); border-radius:var(--r-panel); background:var(--surface); color:var(--text); box-shadow:var(--shadow-pop); }
 .wb-tab-preview img { max-width:calc(var(--thumb-row-zip) * 2); max-height:calc(var(--thumb-row-zip) * 2); object-fit:contain; align-self:center; border-radius:var(--r-thumb); }
 .wb-editor .nps-selection-slot { position:absolute; bottom:calc(var(--bar-h) + var(--sp-3)); left:var(--sp-3); right:var(--sp-3); }
 .wb-editor .nps-selection { width:100%; bottom:0; white-space:nowrap; }

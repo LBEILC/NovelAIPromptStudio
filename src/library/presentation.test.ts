@@ -67,7 +67,7 @@ it('preserves explicit zero parameters from retained source metadata', () => {
 it('assembles only applicable permanent deletion sentences', () => {
   expect(deletionDetail({ open: 0, dirty: 0 }, '')).toBe('');
   expect(deletionDetail({ open: 2, dirty: 1 }, '12.4 MB')).toBe(
-    '2 张正在工作台打开，删除后这些标签会关闭。其中 1 个标签里有还没保存的改动，会一起丢弃。会释放 12.4 MB。',
+    '2 张正在工作台打开，删除后这些标签页会关闭。其中 1 个标签页里有还没保存的改动，会一起丢弃。会释放 12.4 MB。',
   );
   expect(deletionDetail({ open: 0, dirty: 0 }, '1.0 KB')).toBe('会释放 1.0 KB。');
 });

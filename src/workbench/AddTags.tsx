@@ -78,7 +78,7 @@ export function AddTags({
             items={items}
             onSelect={(item) => add(item.text)}
             directAdd={{
-              label: `将添加 ${analysis.tags.length} 个 · ${analysis.duplicateCount} 个重复`,
+              label: `会添加 ${analysis.tags.length} 个 · ${analysis.duplicateCount} 个重复`,
               onSelect: () => add(analysis.tags.map(formatTag).join(', ')),
             }}
           />
@@ -101,7 +101,7 @@ export function AddTags({
       )}
       {editing && value && (
         <span className="nps-help wb-add-help">
-          将添加 {analysis.tags.length} 个 · {analysis.duplicateCount} 个重复
+          会添加 {analysis.tags.length} 个 · {analysis.duplicateCount} 个重复
         </span>
       )}
     </>

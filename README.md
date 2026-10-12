@@ -3,8 +3,8 @@
 
   <h1>NovelAI Prompt Studio</h1>
 
-  <p><strong>让 Prompt 回到创作流程。</strong></p>
-  <p>从 NovelAI 图片里找回、整理并再次使用 Prompt 的本地桌面软件。</p>
+  <p><strong>让提示词回到创作流程。</strong></p>
+  <p>从 NovelAI 图片里找回、整理并再次使用提示词的本地桌面软件。</p>
 
   <p>
     <a href="https://github.com/LBEILC/NovelAIPromptStudio/releases/latest"><strong>下载最新版</strong></a>
@@ -17,7 +17,7 @@
   </p>
 </div>
 
-![NovelAI Prompt Studio：让 Prompt 回到创作流程](./doc/screenshots/readme-cover-v100.webp)
+![NovelAI Prompt Studio：让提示词回到创作流程](./doc/screenshots/readme-cover-v100.webp)
 
 <p align="center">
   <a href="https://github.com/LBEILC/NovelAIPromptStudio/releases/latest"><img src="https://img.shields.io/github/v/release/LBEILC/NovelAIPromptStudio?display_name=tag&style=flat-square&label=Release" alt="最新版本"></a>
@@ -28,27 +28,27 @@
 
 ## 从一张图片，回到完整创作上下文
 
-一张生成图不只是最终结果。它还保存着当时使用的基础 Prompt、每个角色的 Prompt、排除内容、模型参数，以及可能内嵌的 Vibe。
+一张生成图不只是最终结果。它还保存着当时使用的基础提示词、每个角色的提示词、负面提示词、模型参数，以及可能内嵌的 Vibe。
 
-NovelAI Prompt Studio 把这些信息从图片里重新带回可读、可编辑的工作区：看清 Prompt 的结构，整理真正属于自己的内容，再把需要的部分准确复制回下一次创作。
+NovelAI Prompt Studio 把这些信息从图片里重新带回可读、可编辑的工作区：看清提示词的结构，整理真正属于自己的内容，再把需要的部分准确复制回下一次创作。
 
 | 打开 | 整理 | 复用 |
 | --- | --- | --- |
-| 从文件、拖放或剪贴板打开图片 | Prompt 按"块"显示：Tag 一块一块，成段的文字单独成段 | 复制全部、当前可见的、选中的，或者只复制某一节 |
-| 多张图片保留为独立的标签 | 翻译、分类、搜索、调整权重、拖动换位置 | 原始的顺序、权重、换行和特殊写法原样保留 |
+| 从文件、拖放或剪贴板打开图片 | 提示词按"块"显示：Tag 一块一块，成段的文字单独成段 | 复制全部、当前可见的、选中的，或者只复制某一节 |
+| 多张图片保留为独立的标签页 | 翻译、分类、搜索、调整权重、拖动换位置 | 原始的顺序、权重、换行和特殊写法原样保留 |
 | 识别 NovelAI V4、V4.5 与 V5 | 区分自己写的内容和 NovelAI 自动加的内容 | 存进本地图片库，以后随时找回来 |
 
 > NovelAI Prompt Studio 目前不生成图片，也不替代 NovelAI。它专注于图片生成之后、下一次创作之前的整理工作。接下来的打算见[下面](#接下来)。
 
-## 工作台：把 Prompt 看清楚
+## 工作台：把提示词看清楚
 
-![工作台：Prompt，一块一块看清楚](./doc/screenshots/readme-feature-workbench-v100.webp)
+![工作台：提示词，一块一块看清楚](./doc/screenshots/readme-feature-workbench-v100.webp)
 
-### Prompt 按"块"组织
+### 提示词按"块"组织
 
-NovelAI V5 的 Prompt 常常是 Tag 和成段的自然语言混在一起。工作台把它们分开：一串 Tag 是一个 Tag 块，一段话是一个段落块，各用各的方式显示和编辑。分块只影响显示，复制出去的文字和原来一个字符都不差。分得不对时，可以手动把一块转成另一种，软件会记住。
+NovelAI V5 的提示词常常是 Tag 和成段的自然语言混在一起。工作台把它们分开：一串 Tag 是一个 Tag 块，一段话是一个段落块，各用各的方式显示和编辑。分块只影响显示，复制出去的文字和原来一个字符都不差。分得不对时，可以手动把一块转成另一种，软件会记住。
 
-基础 Prompt、每个角色、各自的排除内容分成不同的节，可以单独收起、单独复制。角色可以添加、改名、移除，最多 22 个。
+基础提示词、每个角色、各自的负面提示词分成不同的节，可以单独收起、单独复制。角色可以添加、改名、移除，最多 22 个。
 
 ### 段落：对着中文改英文
 
@@ -64,31 +64,31 @@ NovelAI V5 的 Prompt 常常是 Tag 和成段的自然语言混在一起。工�
 
 ### 只复制这一次真正需要的内容
 
-"复制 Prompt"复制的是你现在看到的：筛选了就复制筛选出来的，选了几个就复制选中的。旁边的菜单里还有复制全部、只复制某一节、带上 NovelAI 自动加的内容。
+"复制提示词"复制的是你现在看到的：筛选了就复制筛选出来的，选了几个就复制选中的。旁边的菜单里还有复制全部、只复制某一节、带上 NovelAI 自动加的内容。
 
-译文不会混进复制的内容。排除内容也不会意外进到正向 Prompt 里：两种都选了的时候只复制正向的，并告诉你没有包含几个排除 Tag。
+译文不会混进复制的内容。负面提示词也不会意外进到正面提示词里：两种都选了的时候只复制正面的，并告诉你没有包含几个负面 Tag。
 
 ### 把 NovelAI 自动添加的内容与自己的创作区分开
 
-对于可以确认的 NovelAI V4.5 / V5 自动质量词和排除内容预设，工作台会把它们收成一行说明。普通复制不带它们；需要完整复现时，可以选择带上。和官方模板不完全一致的内容，软件不会擅自当成自动内容处理。
+对于可以确认的 NovelAI V4.5 / V5 自动质量词和负面提示词预设，工作台会把它们收成一行说明。普通复制不带它们；需要完整复现时，可以选择带上。和官方模板不完全一致的内容，软件不会擅自当成自动内容处理。
 
-### 离线词典优先，AI 是可选的补全助手
+### 内置词典优先，AI 是可选的补全助手
 
-软件内置由 [DanbooruSearchOnline（DSO）](https://github.com/SuzumiyaAkizuki/DanbooruSearchOnline) 固定版本转换而来的 52,475 条中文 Tag 译名，并用它的 93 个 Danbooru Tag Group 给常见的外貌、服装、动作、环境、构图和风格 Tag 分类。点"翻译与分类"时，先用你自己改过的结果，再查内置词典和本地规则；内置词典里没有的 Tag 会到 Danbooru 查它属于哪一类（比如是不是画师）；最后还没有译文、而你又配置了 AI 服务的，才交给 AI 补全。
+软件内置由 [DanbooruSearchOnline（DSO）](https://github.com/SuzumiyaAkizuki/DanbooruSearchOnline) 固定版本转换而来的 52,475 条中文 Tag 译文，并用它的 93 个 Danbooru Tag Group 给常见的外貌、服装、动作、环境、构图和风格 Tag 分类。点"翻译"时，先用你自己改过的结果，再查内置词典和本地规则；内置词典里没有的 Tag 会到 Danbooru 查它属于哪一类（比如是不是画师）；最后还没有译文、而你又配置了 AI 服务的，才交给 AI 补全。
 
 内置词典命中的翻译与分类不需要 AI，也不需要联网。所有结果都记在本机的翻译词典里，可以随时修改，你改过的始终优先。内置数据的版本、生成方式和原始许可证见[第三方数据说明](./third_party/DanbooruSearchOnline/README.md)。
 
-每张打开的图片都有独立的草稿。标签的顺序、当前看的图片和没改完的内容在重启后都会恢复，原图不会被覆盖或改写。
+每张打开的图片都有独立的草稿。标签页的顺序、当前看的图片和没改完的内容在重启后都会恢复，原图不会被覆盖或改写。
 
-## 图片库：让用过的 Prompt 重新找得到
+## 图片库：让用过的提示词重新找得到
 
-![图片库：用过的 Prompt，重新找得到](./doc/screenshots/readme-feature-library-v100.webp)
+![图片库：用过的提示词，重新找得到](./doc/screenshots/readme-feature-library-v100.webp)
 
 - 导入 `PNG`、`JPG`、`JPEG`、`WEBP` 或 NovelAI 导出的 `ZIP`，支持多选、拖放和剪贴板。内容相同的图片会自动跳过。
 - 图片按原来的比例等高排列，横图竖图放在一起也整齐。
-- 选中一张，右边直接显示它的 Prompt，可以当场复制，也可以送到工作台里细看。
-- 按文件名、Tag、译名或段落里的词搜索，并结合包含 / 排除 Tag、模型、Vibe 与导入日期筛选。
-- Prompt 完全相同、只是 Seed 不同的图片可以合成一摞，也可以按"只有少量 Tag 不同"来合并。
+- 选中一张，右边直接显示它的提示词，可以当场复制，也可以送到工作台里细看。
+- 按文件名、Tag、译文或段落里的词搜索，并结合包含 / 排除 Tag、模型、Vibe 与导入日期筛选。
+- 提示词完全相同、只是 Seed 不同的图片可以合成一摞，也可以按"只有少量 Tag 不同"来合并。
 - 用收藏集手动整理，或者把当前的搜索和筛选存成会自动更新的智能收藏集。
 - 没有起过名字的图片不显示那一长串文件名。可以给一张或一批图片起名，成批起名会按顺序编号，图片文件本身不改名。
 - 支持框选、`Ctrl / Cmd` 加减选择、`Shift` 连选，成批加入收藏集、起名或移入回收站。
@@ -108,7 +108,7 @@ NovelAI V5 的 Prompt 常常是 Tag 和成段的自然语言混在一起。工�
 <details>
 <summary><strong>工作台</strong></summary>
 
-![工作台：左边是图片，右边是按块显示的 Prompt](./doc/screenshots/readme-hero-v100.webp)
+![工作台：左边是图片，右边是按块显示的提示词](./doc/screenshots/readme-hero-v100.webp)
 </details>
 
 <details>
@@ -120,7 +120,7 @@ NovelAI V5 的 Prompt 常常是 Tag 和成段的自然语言混在一起。工�
 <details>
 <summary><strong>图片库</strong></summary>
 
-![图片库：等高排列的图片，右边是选中图片的 Prompt](./doc/screenshots/readme-library-v100.webp)
+![图片库：等高排列的图片，右边是选中图片的提示词](./doc/screenshots/readme-library-v100.webp)
 </details>
 
 <details>
@@ -137,7 +137,7 @@ NovelAI V5 的 Prompt 常常是 Tag 和成段的自然语言混在一起。工�
 | --- | --- | --- |
 | 打开到工作台 | 只读，不复制、不改写 | 不会 |
 | 存入或导入图片库 | 另存一份由软件管理的副本 | 不会 |
-| 编辑、筛选或复制 Prompt | 只改本机的草稿 | 不会 |
+| 编辑、筛选或复制提示词 | 只改本机的草稿 | 不会 |
 | 翻译与分类：内置词典里有的 Tag | 不改原图 | 不会 |
 | 翻译与分类：内置词典里没有的 Tag | 不改原图 | 把 Tag 的名字发给 Danbooru 查类别；配置了 AI 服务时，还没有译文的再发给你配置的服务 |
 | 段落的"译成中文""按中文改写英文" | 不改原图 | 把这一段文字发给你配置的 AI 服务 |
@@ -156,20 +156,20 @@ NovelAI V5 的 Prompt 常常是 Tag 和成段的自然语言混在一起。工�
 | 类别 | 当前支持 |
 | --- | --- |
 | 操作系统 | Windows x64、macOS Apple 芯片、macOS Intel |
-| NovelAI Prompt | Diffusion V4、V4.5、V5 |
+| NovelAI 提示词 | Diffusion V4、V4.5、V5 |
 | 工作台图片 | PNG、JPG / JPEG、WEBP |
 | 图片库导入 | PNG、JPG / JPEG、WEBP、NovelAI ZIP |
 | 图片里的生成信息 | NovelAI 写在 PNG 里的文本信息，以及可以识别的 Stealth PNG 信息 |
 | Vibe | 只读识别，可以导出能恢复的 `.naiv4vibe`；不能在本地编辑或预览效果 |
 
-JPG、WEBP、截图以及被社交平台压缩过的图片仍然可以打开和收藏，但如果里面的生成信息已经丢了，就恢复不出完整的 Prompt。
+JPG、WEBP、截图以及被社交平台压缩过的图片仍然可以打开和收藏，但如果里面的生成信息已经丢了，就恢复不出完整的提示词。
 
 ## 快速开始
 
 1. 前往 [Releases](https://github.com/LBEILC/NovelAIPromptStudio/releases/latest)。
 2. 下载适合自己系统的安装包并安装。
 3. 启动软件，把一张 NovelAI 生成的图片拖进窗口。
-4. 整理、翻译或筛选，然后点 **复制 Prompt**。
+4. 整理、翻译或筛选，然后点 **复制提示词**。
 
 | 平台 | 安装包 |
 | --- | --- |
@@ -192,8 +192,8 @@ macOS 上 `Ctrl` 对应 `Command`，`Alt` 对应 `Option`。
 | `Ctrl + I` | 打开图片；在图片库里是导入 |
 | `Ctrl + V` | 从剪贴板打开或导入图片（在输入框里仍然是普通的粘贴） |
 | `Ctrl + K` | 聚焦搜索框 |
-| `Ctrl + Tab` / `Ctrl + Shift + Tab` | 下一个 / 上一个标签 |
-| `Ctrl + W` | 关闭当前标签 |
+| `Ctrl + Tab` / `Ctrl + Shift + Tab` | 下一个 / 上一个标签页 |
+| `Ctrl + W` | 关闭当前标签页 |
 | `Alt + 方向键` | 移动当前 Tag |
 | 方向键 | 在图片库的图片之间移动 |
 | `Enter` / `Space` | 在工作台打开 / 看大图 |
@@ -212,11 +212,11 @@ macOS 上 `Ctrl` 对应 `Command`，`Alt` 对应 `Option`。
 <details>
 <summary><strong>必须配置 AI 服务才能用吗？</strong></summary>
 
-不需要。内置词典可以离线翻译和分类它收录的 Tag；AI 只用来补全词典里没有的，以及翻译成段的文字。查看、编辑、筛选、复制 Prompt 和图片库都不依赖 AI。
+不需要。内置词典可以离线翻译和分类它收录的 Tag；AI 只用来补全词典里没有的，以及翻译成段的文字。查看、编辑、筛选、复制提示词和图片库都不依赖 AI。
 </details>
 
 <details>
-<summary><strong>为什么从剪贴板打开后没有 Prompt？</strong></summary>
+<summary><strong>为什么从剪贴板打开后没有提示词？</strong></summary>
 
 软件会优先读取剪贴板里的原始图片数据。但网页上的"复制图片"、截图工具和一部分软件只提供重新编码后的画面，这时图片里的生成信息已经没有了。
 </details>
@@ -237,12 +237,12 @@ macOS 上 `Ctrl` 对应 `Command`，`Alt` 对应 `Option`。
 
 1.0 把界面和底子重做了一遍。接下来的方向是：软件的能力不只在界面里用，也能交给 AI Agent 用。大致按这个顺序：
 
-- **命令行和 Agent 接入**：读写 Prompt、搜索图片库、查翻译词典，这些能力都可以通过命令行调用，并附一份教 Agent 怎么用的说明。Claude Code、Codex 这类能运行命令的 Agent，就能帮你整理 Prompt、批量处理图片库。
-- **在软件里直接生成**：用你自己的 NovelAI 账号，改完 Prompt 就地出图，把每次的修改和结果对应起来。界面和 Agent 同时可用；Agent 发起的生成默认要你确认后才发出，请求一个接一个地发，可以设 Anlas 上限。会把账号、费用和使用条款上的风险说清楚再上线。
-- **AI 起名与整理**：根据 Prompt 给图片起名；让 AI 重新分块、修正写法有问题的 Tag。改动先列出来给你看，确认后才生效。
-- **常用块**：把常用的一组 Tag 或一段话存下来，随时插进 Prompt。
+- **命令行和 Agent 接入**：读写提示词、搜索图片库、查翻译词典，这些能力都可以通过命令行调用，并附一份教 Agent 怎么用的说明。Claude Code、Codex 这类能运行命令的 Agent，就能帮你整理提示词、批量处理图片库。
+- **在软件里直接生成**：用你自己的 NovelAI 账号，改完提示词就地出图，把每次的修改和结果对应起来。界面和 Agent 同时可用；Agent 发起的生成默认要你确认后才发出，请求一个接一个地发，可以设 Anlas 上限。会把账号、费用和使用条款上的风险说清楚再上线。
+- **AI 起名与整理**：根据提示词给图片起名；让 AI 重新分块、修正写法有问题的 Tag。改动先列出来给你看，确认后才生效。
+- **常用块**：把常用的一组 Tag 或一段话存下来，随时插进提示词。
 - **完整参数与 Vibe 库**：在软件里调整全部生成参数和角色位置；把图片里带的 Vibe 收集起来，方便再用。
-- **版本对比**：并排比较两次生成的 Prompt 和结果。
+- **版本对比**：并排比较两次生成的提示词和结果。
 
 这些是方向，不是时间表，顺序和做法都可能调整。想要什么功能，或者觉得哪里不顺手，欢迎在 [Issues](https://github.com/LBEILC/NovelAIPromptStudio/issues) 里说。
 
@@ -276,7 +276,7 @@ MiSans VF 不包含在仓库中；开发者运行 `npm run fonts` 从小米官�
 
 当前开发分支及 `v0.9.2` 之后发布的版本采用 [GNU GPLv3](./LICENSE)（`GPL-3.0-only`）。你可以使用、研究、修改和再分发本项目；分发修改版本或安装包时，需要同时按 GPLv3 提供对应源代码并保留许可证声明。
 
-`v0.9.2` 及更早的已发布版本继续适用原 Apache License 2.0。完整的授权边界与历史说明见 [`LICENSES/README.md`](./LICENSES/README.md)。用户导入的图片、Prompt 与其他个人数据不因使用本应用而改用 GPLv3。
+`v0.9.2` 及更早的已发布版本继续适用原 Apache License 2.0。完整的授权边界与历史说明见 [`LICENSES/README.md`](./LICENSES/README.md)。用户导入的图片、提示词与其他个人数据不因使用本应用而改用 GPLv3。
 
 内置中文 Tag 数据来自 GPLv3 项目 [DanbooruSearchOnline](https://github.com/SuzumiyaAkizuki/DanbooruSearchOnline)，固定来源、原始数据、许可证与转换说明保存在 [`third_party/DanbooruSearchOnline`](./third_party/DanbooruSearchOnline/README.md)。
 

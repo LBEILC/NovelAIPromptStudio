@@ -39,7 +39,7 @@ export async function prepareLibraryScreenshot({
   };
   const group = async () => {
     await click('视图', scope);
-    await click('Prompt 完全相同');
+    await click('提示词完全相同');
     await key('Escape');
     await settle();
     await e(

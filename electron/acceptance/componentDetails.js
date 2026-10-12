@@ -137,7 +137,7 @@ export async function componentDetails(h) {
   await key('ArrowUp');
   await h.checkSoon(
     '菜单键盘跳过不可用项',
-    'document.activeElement.textContent.trim()==="翻译与分类"',
+    'document.activeElement.textContent.trim()==="翻译并分类"',
     undefined,
     undefined,
     undefined,
@@ -147,7 +147,7 @@ export async function componentDetails(h) {
   await key('ArrowRight');
   await h.checkSoon(
     '菜单右方向键进入子菜单',
-    'document.activeElement.textContent.trim()==="Prompt" && document.querySelectorAll(".nps-layer:popover-open [role=menu]").length>=2',
+    'document.activeElement.textContent.trim()==="提示词" && document.querySelectorAll(".nps-layer:popover-open [role=menu]").length>=2',
     undefined,
     undefined,
     undefined,
@@ -260,7 +260,7 @@ export async function componentDetails(h) {
     `({active:document.activeElement.outerHTML.slice(0,400),layers:[...document.querySelectorAll('.nps-layer.nps-popover')].map(node=>({html:node.outerHTML.slice(0,200),animations:node.getAnimations().length}))})`,
     'once',
   );
-  await click('关闭已修改的标签？');
+  await click('关闭已修改的标签页？');
   await h.checkSoon(
     '破坏性对话框默认焦点为取消',
     'document.activeElement.textContent.trim()==="取消"',
@@ -292,7 +292,7 @@ export async function componentDetails(h) {
     'once',
   );
   await e(
-    `[...document.querySelectorAll('button[data-tip]')].find(button=>button.textContent.trim()==='复制 Prompt').focus()`,
+    `[...document.querySelectorAll('button[data-tip]')].find(button=>button.textContent.trim()==='复制提示词').focus()`,
   );
   await wait(
     'document.querySelector(".nps-layer[role=tooltip]")?.textContent.includes("复制当前筛选")',

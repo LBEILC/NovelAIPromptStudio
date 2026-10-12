@@ -215,7 +215,7 @@ export function getPromptScopes(project) {
       key: 'base:prompt',
       kind: 'base',
       polarity: 'prompt',
-      label: 'Base Prompt',
+      label: structure.characters.length ? '基础提示词' : '提示词',
       raw_prompt: structure.base_prompt_raw ?? project.metadata?.prompt_raw ?? '',
       tags: project.tags || [],
     },
@@ -223,7 +223,7 @@ export function getPromptScopes(project) {
       key: 'base:undesired',
       kind: 'base',
       polarity: 'undesired',
-      label: 'Base Undesired Content',
+      label: '负面提示词',
       raw_prompt: structure.base_undesired_raw ?? project.metadata?.negative_prompt ?? '',
       tags: structure.base_undesired_tags || [],
     },
@@ -235,7 +235,10 @@ export function getPromptScopes(project) {
         characterId: character.id,
         characterIndex: index,
         character,
-        label: `${character.label} Prompt`,
+        label:
+          /^Character \d+$/i.test(character.label) || !character.label
+            ? `角色 ${index + 1}`
+            : character.label,
         raw_prompt: character.prompt_raw || '',
         tags: character.prompt_tags,
       },
@@ -246,7 +249,7 @@ export function getPromptScopes(project) {
         characterId: character.id,
         characterIndex: index,
         character,
-        label: `${character.label} Undesired Content`,
+        label: `${/^Character \d+$/i.test(character.label) || !character.label ? `角色 ${index + 1}` : character.label} 的负面提示词`,
         raw_prompt: character.undesired_raw || '',
         tags: character.undesired_tags,
       },
@@ -397,9 +400,9 @@ export function positivePromptCopyOptions(project, { includeAutomatic = false } 
       label:
         scope.kind === 'base'
           ? excludeAutomatic
-            ? '复制 Base Prompt（不含自动质量词）'
-            : '复制完整 Base Prompt'
-          : `复制角色 ${(scope.characterIndex ?? 0) + 1} Prompt`,
+            ? '复制基础提示词（不含自动质量词）'
+            : '复制完整基础提示词'
+          : `复制角色 ${(scope.characterIndex ?? 0) + 1} 提示词`,
       text: excludeAutomatic
         ? scope.automation.cleanedRaw
         : String(scope.raw_prompt || '').trim()

@@ -332,8 +332,8 @@ describe('Prompt overview operations', () => {
 
     expect(moveContext.disabled).toBe(false);
     expect(moveContext.options.map((option) => [option.label, option.disabled])).toEqual([
-      ['Base Prompt', true],
-      ['Character 1 Prompt', false],
+      ['基础提示词', true],
+      ['角色 1', false],
     ]);
     expect(
       overviewMoveContext(project, [artist.key, character.key]).options.every(
@@ -342,7 +342,7 @@ describe('Prompt overview operations', () => {
     ).toBe(true);
     expect(overviewMoveContext(project, [artist.key, undesired.key])).toMatchObject({
       disabled: true,
-      description: 'Prompt 与 Undesired Tag 不能混合移动',
+      description: '正面与负面 Tag 不能混合移动',
       options: [],
     });
   });
@@ -415,7 +415,7 @@ describe('Prompt overview operations', () => {
     const moveMenu = items.find((item) => item.key === 'move-selected-tags');
 
     expect(items.find((item) => item.key === 'copy-selected-tags').label).toContain(
-      '忽略 1 个排除 Tag',
+      '忽略 1 个负面 Tag',
     );
     expect(categoryMenu.label).toContain('已选 3 个');
     expect(moveMenu.children[0].label).toBe('Character 1 Prompt');

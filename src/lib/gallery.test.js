@@ -95,7 +95,7 @@ describe('gallery grouping and selection', () => {
   it('uses single-image wording unless the card represents a real group', () => {
     expect(galleryGroupMenuLabels({ count: 1 })).toEqual({ rename: '重命名' });
     expect(galleryGroupMenuLabels({ canSetCover: true, count: 2 })).toEqual({
-      rename: '重命名头图',
+      rename: '重命名封面',
     });
   });
 

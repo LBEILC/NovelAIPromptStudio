@@ -188,7 +188,7 @@ export function reconcileGallerySelection(groups = [], selectedGroupIds = []) {
 export function galleryGroupMenuLabels(group) {
   const grouped = Number(group?.count || group?.members?.length || 0) > 1;
   return {
-    rename: grouped ? (group?.canSetCover ? '重命名头图' : '重命名当前图片') : '重命名',
+    rename: grouped ? (group?.canSetCover ? '重命名封面' : '重命名当前图片') : '重命名',
   };
 }
 
@@ -226,7 +226,7 @@ export function gallerySelectionMenuItems({
               onClick: () => onCollectionProjectsChange?.(collection.id, projectIds, 'add'),
             })),
             key: 'add-selection-to-collection',
-            label: `将已选 ${groupCount} 组加入收藏集`,
+            label: `把已选 ${groupCount} 组加入收藏集`,
             type: 'submenu',
           },
         ]
@@ -235,7 +235,7 @@ export function gallerySelectionMenuItems({
       ? [
           {
             key: 'remove-selection-from-collection',
-            label: `将已选 ${groupCount} 组移出“${activeCollection.name}”`,
+            label: `把已选 ${groupCount} 组移出“${activeCollection.name}”`,
             onClick: () => onCollectionProjectsChange?.(activeCollection.id, projectIds, 'remove'),
           },
         ]
@@ -245,7 +245,7 @@ export function gallerySelectionMenuItems({
       : []),
     {
       key: 'trash-selection',
-      label: `将已选 ${scopeLabel} 移入回收站`,
+      label: `把已选 ${scopeLabel} 移入回收站`,
       danger: true,
       onClick: () => onTrash?.(),
     },

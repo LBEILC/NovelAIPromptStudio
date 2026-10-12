@@ -28,7 +28,7 @@ export function WorkbenchImage({ tab, ...p }: ImageProps) {
     <section className="wb-stage" aria-label="当前图片">
       {(missing || !image) && (
         <Banner tone="warn">
-          这张图片已被移动或删除。Prompt 还在，可以继续编辑和复制；关闭这个标签不影响其他标签。
+          这张图片已被移动或删除。提示词还在，可以继续编辑和复制；关闭这个标签页不影响其他标签页。
         </Banner>
       )}
       <div className="wb-canvas">
@@ -75,9 +75,9 @@ export function WorkbenchImage({ tab, ...p }: ImageProps) {
             </span>
             {tab.originalProject && workbenchTabHasChanges(tab) && (
               <span className="wb-dirty-line">
-                Prompt 已经和原图不一样
+                提示词已经和原图不一样
                 <Button variant="quiet" size="small" onClick={p.onReset}>
-                  还原成原图的 Prompt
+                  还原成原图的提示词
                 </Button>
               </span>
             )}

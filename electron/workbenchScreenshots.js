@@ -33,7 +33,7 @@ export async function prepareWorkbenchScreenshot({ window, scene, mode, filePath
     await e('document.querySelector("[aria-label=编辑段落]").click()');
     await input('[aria-label="中文段落"]', '合成场景：旅人在窗边等待，晚光照进房间。');
   }
-  if (state === 'block') await click('这一块的操作', 'document.querySelector(".wb-block")');
+  if (state === 'block') await click('块操作', 'document.querySelector(".wb-block")');
   if (state === 'raw' || state === 'unsaved') {
     await click('更多', scope);
     await click('编辑原始文本');
@@ -42,7 +42,7 @@ export async function prepareWorkbenchScreenshot({ window, scene, mode, filePath
       await click('保存', 'document.querySelector(".wb-raw-editor")');
     }
   }
-  if (state === 'filter') await input('[aria-label="搜索 Tag 或译名"]', 'blue');
+  if (state === 'filter') await input('[aria-label="搜索 Tag 或译文"]', 'blue');
   if (state === 'view') await click('显示');
   if (state === 'copy') await click('其他复制方式');
   if (state === 'tabs')

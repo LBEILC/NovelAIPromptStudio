@@ -1,4 +1,4 @@
-﻿import fs from 'node:fs/promises';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { clipboard, nativeImage } from 'electron';
 import { createWorkbenchFixtures, workbenchRaw, workbenchNegative } from './workbenchFixtures.js';
@@ -28,14 +28,14 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   };
   const reset = async () => {
     if (await e('!!document.querySelector(".wb-dirty-line")')) {
-      await click('还原成原图的 Prompt');
+      await click('还原成原图的提示词');
       await click('恢复', 'document.querySelector("dialog[open]")');
       await wait(`${raw}===${JSON.stringify(workbenchRaw)}`);
     }
     // Reload establishes a remembered block type as the original view. Normalize
     // the fixture through its public menu before subsequent Tag interactions.
     if (await e('document.querySelector(".wb-block > header")?.textContent.includes("段落")'))
-      await menu('这一块的操作', '转为 Tag 块', 'document.querySelector(".wb-block")');
+      await menu('块操作', '转为 Tag 块', 'document.querySelector(".wb-block")');
   };
   const checkCopy = async (label, predicate) => {
     await h.until(predicate, label);
@@ -80,11 +80,23 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await click('打开图片', 'document.querySelector(".studio-titlebar")');
   await wait('document.querySelectorAll(".wb-block").length===4');
   await check(
-    '文件打开恢复三个正向块与一个排除块',
+    '无角色时节标题为提示词，顶部只保留搜索、显示与翻译动作',
+    `document.querySelector('.wb-section-head > button').textContent.trim()==='提示词' && !document.querySelector('.wb-prompt-head strong') && document.querySelector('.wb-prompt').getAttribute('aria-label')==='提示词' && document.querySelector('.wb-prompt-head input').placeholder==='搜索 Tag 或译文' && document.querySelector('.wb-prompt-head [aria-label="翻译"]').getAttribute('data-tip')==='把全部 Tag 翻译并分类'`,
+  );
+  await shot('copy-header');
+  await click('块操作', 'document.querySelector(".wb-block")');
+  await check(
+    'Tag 块菜单使用定稿动作、三个分隔线且没有未实现项目',
+    `(()=>{const m=document.querySelector('.nps-layer [role=menu]');return [...m.querySelectorAll('[role=menuitem]')].map(n=>n.getAttribute('aria-label')).join('|')==='转为段落|翻译并分类|复制|上移|下移|删除' && m.querySelectorAll('.nps-menu-separator').length===3})()`,
+  );
+  await shot('copy-tag-menu');
+  await key('Escape');
+  await check(
+    '文件打开恢复三个正面块与一个排除块',
     `${raw}===${JSON.stringify(workbenchRaw)} && document.querySelectorAll('.wb-block').length===4`,
   );
   await check(
-    '默认标签仅显示缩略图且竖图宽度符合令牌',
+    '默认标签页仅显示缩略图且竖图宽度符合令牌',
     `(()=>{const t=document.querySelector('.wb-tab'),i=t.querySelector('img'),s=getComputedStyle(i);return !t.querySelector('.wb-tab-name') && Math.abs(i.width-Math.max(parseFloat(s.getPropertyValue('--tab-thumb-min-w')),i.height*832/1216))<2})()`,
   );
   await check(
@@ -96,19 +108,19 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await shot('home');
   await click('其他复制方式');
   await check(
-    '工作台复制菜单可交互且提供正向、排除和逐节复制',
-    `[...document.querySelectorAll('[role=menuitem]')].some(x=>x.getAttribute('aria-label')==='复制全部排除内容')`,
+    '工作台复制菜单可交互且提供正面、排除和逐节复制',
+    `[...document.querySelectorAll('[role=menuitem]')].some(x=>x.getAttribute('aria-label')==='复制全部负面提示词')`,
   );
   await shot('copy');
-  await click('复制全部 Prompt');
+  await click('复制全部提示词');
   await checkCopy(
-    '默认全部复制与原始正向文本逐字一致',
+    '默认全部复制与原始正面文本逐字一致',
     () => clipboard.readText().replaceAll('\r\n', '\n') === workbenchRaw,
     undefined,
     'once',
   );
   await click('其他复制方式');
-  await click('复制全部排除内容');
+  await click('复制全部负面提示词');
   await checkCopy(
     '排除菜单复制原始排除文本',
     () => clipboard.readText() === workbenchNegative,
@@ -124,11 +136,11 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   );
   await click('显示');
   await shot('view');
-  await h.select('只看', '排除内容');
+  await h.select('只看', '负面提示词');
   await key('Escape');
-  await click('复制排除内容 · 2');
+  await click('复制负面提示词 · 2');
   await checkCopy(
-    '仅看排除内容时主按钮复制排除 Tag',
+    '仅看负面提示词时主按钮复制负面 Tag',
     () => clipboard.readText() === workbenchNegative,
     undefined,
     'once',
@@ -138,11 +150,11 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await key('k', modifier);
   await check(
     'Mod K 聚焦工作台搜索',
-    'document.activeElement.getAttribute("aria-label")==="搜索 Tag 或译名"',
+    'document.activeElement.getAttribute("aria-label")==="搜索 Tag 或译文"',
     undefined,
     'once',
   );
-  await input('[aria-label="搜索 Tag 或译名"]', 'blue');
+  await input('.wb-prompt [aria-label="搜索 Tag 或译文"]', 'blue');
   await check(
     '搜索使不匹配 Tag 变淡并收起无匹配块',
     '!!document.querySelector(".wb-filters") && document.body.innerText.includes("已经收起")',
@@ -165,23 +177,23 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   );
   await click('显示');
   await h.select('排列', '按块');
-  await h.select('只看', '正向内容');
+  await h.select('只看', '正面');
   await key('Escape');
-  await check('只看正向内容隐藏排除节', 'document.querySelectorAll(".wb-section").length===1');
+  await check('只看正面隐藏排除节', 'document.querySelectorAll(".wb-section").length===1');
   await click('清除');
-  await menu('这一块的操作', '复制这一块', 'document.querySelector(".wb-block")');
+  await menu('块操作', '复制', 'document.querySelector(".wb-block")');
   await checkCopy(
     '块菜单复制原文保留权重语法',
     () => clipboard.readText() === workbenchRaw.split('\n\n')[0],
   );
-  await menu('这一块的操作', '下移', 'document.querySelector(".wb-block")');
+  await menu('块操作', '下移', 'document.querySelector(".wb-block")');
   await check(
     '块菜单下移保持每块原文',
     `${raw}===${JSON.stringify([workbenchRaw.split('\n\n')[1], workbenchRaw.split('\n\n')[0], workbenchRaw.split('\n\n')[2]].join('\n\n'))}`,
   );
-  await menu('这一块的操作', '上移', 'document.querySelectorAll(".wb-block")[1]');
+  await menu('块操作', '上移', 'document.querySelectorAll(".wb-block")[1]');
   await check('块菜单上移恢复逐字原文', `${raw}===${JSON.stringify(workbenchRaw)}`);
-  await menu('这一块的操作', '删除这一块', 'document.querySelectorAll(".wb-block")[2]');
+  await menu('块操作', '删除', 'document.querySelectorAll(".wb-block")[2]');
   await check(
     '块菜单只删除目标块',
     `${raw}.includes(${JSON.stringify(workbenchRaw.split('\n\n')[1])}) && !${raw}.includes('glass window')`,
@@ -211,7 +223,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   );
   await shot('unsaved');
   await reset();
-  await click('这一块的操作', 'document.querySelector(".wb-block")');
+  await click('块操作', 'document.querySelector(".wb-block")');
   await shot('block');
   await click('转为段落');
   await check(
@@ -224,7 +236,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     '重新加载从持久化草稿恢复手动块类型',
     `document.querySelector('.wb-block header').textContent.includes('段落')`,
   );
-  await menu('这一块的操作', '转为 Tag 块', 'document.querySelector(".wb-block")');
+  await menu('块操作', '转为 Tag 块', 'document.querySelector(".wb-block")');
   await key('ArrowRight', { altKey: true }, 'document.querySelector(".wb-tags .nps-tag")');
   await wait(`(${draft})?.tags[0].tag==='red coat'`);
   await check(
@@ -277,7 +289,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   );
   await key('Home', {}, 'document.querySelector(".wb-body .nps-resizer")');
   await check(
-    '最窄 Prompt 栏的多选按钮不换行且不溢出',
+    '最窄提示词栏的多选按钮不换行且不溢出',
     `(()=>{const n=document.querySelector('.nps-selection'),r=n.getBoundingClientRect();return [...n.children].every(x=>{const b=x.getBoundingClientRect();return b.top>=r.top&&b.bottom<=r.bottom+1&&b.right<=r.right+1})})()`,
   );
   await e(
@@ -301,12 +313,12 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   );
   await click('复制', 'document.querySelector(".nps-selection")');
   await checkCopy(
-    '正负混选只复制正向内容',
+    '正负混选只复制正面',
     () => clipboard.readText().includes('blue hair') && !clipboard.readText().includes('lowres'),
   );
   await click('其他复制方式');
-  await click('复制其中的排除内容');
-  await checkCopy('混选菜单单独复制其中的排除内容', () => clipboard.readText() === 'lowres');
+  await click('复制其中的负面 Tag');
+  await checkCopy('混选菜单单独复制其中的负面 Tag', () => clipboard.readText() === 'lowres');
   await click('取消', 'document.querySelector(".nps-selection")');
   const marquee = await e(
     `(()=>{const r=document.querySelector('.wb-tags').getBoundingClientRect();const t=[...document.querySelectorAll('.wb-tags .nps-tag')].slice(0,3).map(n=>n.getBoundingClientRect());return {x:r.left-2,y:t[0].top-3,endX:t[2].right+2,endY:t[0].bottom+2}})()`,
@@ -341,7 +353,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await wait('document.querySelector(".nps-suggestions")?.textContent.includes("blue hair")');
   await shot('add');
   await check(
-    '中文输入从离线词典找到英文候选',
+    '中文输入从内置词典找到英文候选',
     'document.querySelector(".nps-suggestions")?.textContent.includes("blue hair")',
   );
   await key('Enter', { isComposing: true }, 'document.activeElement');
@@ -353,7 +365,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   );
   await key('Escape', {}, 'document.activeElement');
   await input('.wb-add-tags input', 'synthetic_tag_one, synthetic_tag_two');
-  await wait('document.querySelector(".nps-suggestions")?.textContent.includes("将添加 2 个")');
+  await wait('document.querySelector(".nps-suggestions")?.textContent.includes("会添加 2 个")');
   await key('Enter', {}, 'document.activeElement');
   await wait(`${raw}?.includes('synthetic_tag_two')`);
   await check(
@@ -377,11 +389,26 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await shot('prose');
   await click('完成', 'document.querySelector(".wb-paragraph-editor")');
   await check(
-    '段落译文保存在原有 Prompt 结构中',
+    '段落译文保存在原有提示词结构中',
     `Object.values((${draft}).prompt_structure.block_annotations).flat().some(b=>b.translation==='合成验收译文')`,
   );
   const prior = preferences.credentials();
   preferences.saveAISettings({ baseUrl: mode.baseUrl, model: 'acceptance-model' });
+  await click('块操作', 'document.querySelector("[aria-label=编辑段落]").closest(".wb-block")');
+  await check(
+    '段落块菜单使用译成中文动作',
+    `!!document.querySelector('.nps-layer [role=menu] [aria-label="译成中文"]') && !document.querySelector('.nps-layer [role=menu] [aria-label="翻译并分类"]')`,
+  );
+  await shot('copy-paragraph-menu');
+  await click('译成中文', 'document.querySelector(".nps-layer [role=menu]")');
+  await wait('document.querySelector("[aria-label=中文段落]")?.value==="OK"');
+  await check(
+    '段落菜单调用段落翻译并在同一编辑器保留英文、展示译文',
+    `document.querySelector('[aria-label=中文段落]').value==='OK' && document.querySelector('[aria-label=英文段落]').value!=='OK'`,
+    undefined,
+    'once',
+  );
+  await click('完成', 'document.querySelector(".wb-paragraph-editor")');
   await e('document.querySelector("[aria-label=编辑段落]").click()');
   await wait(
     '[...document.querySelectorAll(".wb-paragraph-editor button")].some(b=>b.textContent.includes("译成中文")&&!b.disabled)',
@@ -427,6 +454,10 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   preferences.saveAISettings({ ...prior, clearApiKey: !prior.apiKey });
   await click('添加角色');
   await wait('document.querySelectorAll(".wb-section").length===4');
+  await check(
+    '有角色时基础节标题为基础提示词，另一节使用负面提示词',
+    `[...document.querySelectorAll('.wb-section-head > button')].some(n=>n.textContent.trim()==='基础提示词') && [...document.querySelectorAll('.wb-section-head > button')].some(n=>n.textContent.trim()==='负面提示词')`,
+  );
   await shot('chars');
   await e(
     'document.querySelector(".wb-tags .nps-tag").dispatchEvent(new MouseEvent("click",{bubbles:true,ctrlKey:true}))',
@@ -436,7 +467,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     '移动到只提供同种正负的节',
     '[...document.querySelectorAll(".nps-layer [role=menuitem]")].every(n=>!n.textContent.includes("排除"))',
   );
-  await click('Character 1', 'document.querySelector(".nps-layer [role=menu]")');
+  await click('角色 1', 'document.querySelector(".nps-layer [role=menu]")');
   await check(
     '多选移动到空角色节保留原 Tag 权重',
     `(${draft}).prompt_structure.characters[0].prompt_tags.some(t=>t.tag==='blue hair'&&t.weight===1.25)`,
@@ -445,8 +476,8 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await input('[aria-label="角色名称"]', '合成角色');
   await key('Enter', {}, 'document.activeElement');
   await check(
-    '角色重命名同步正向和排除节',
-    'document.body.innerText.includes("合成角色 的排除内容")',
+    '角色重命名同步正面和排除节',
+    'document.body.innerText.includes("合成角色 的负面提示词")',
   );
   await menu('角色操作', '移除角色', 'document.querySelectorAll(".wb-section")[2]');
   await click('移除角色', 'document.querySelector("dialog[open]")');
@@ -454,7 +485,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await reset();
   await key('Home', {}, 'document.querySelector(".wb-body .nps-resizer")');
   await check(
-    'Prompt 栏最窄时头部控件保持单行',
+    '提示词栏最窄时头部控件保持单行',
     `(()=>{const p=document.querySelector('.wb-prompt-head'),r=p.getBoundingClientRect();return [...p.children].every(x=>{const b=x.getBoundingClientRect();return b.top>=r.top&&b.bottom<=r.bottom&&b.right<=r.right+1})})()`,
   );
   await e(
@@ -475,7 +506,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await key('v', modifier);
   await wait('document.querySelectorAll(".wb-tab").length===3');
   await check(
-    '从剪贴板打开生成独立标签',
+    '从剪贴板打开生成独立标签页',
     'document.querySelectorAll(".wb-tab").length===3',
     undefined,
     'once',
@@ -489,7 +520,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await wait(`(${session}).tabs[1].id===${JSON.stringify(order[0])}`);
   await wait('!document.querySelector(".wb-drag-feedback")');
   await check(
-    '标签键盘空格拿起、方向键移动、空格放下',
+    '标签页键盘空格拿起、方向键移动、空格放下',
     `(${session}).tabs[1].id===${JSON.stringify(order[0])}`,
     undefined,
     'once',
@@ -500,14 +531,14 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await key('Escape', { code: 'Escape' });
   await wait('!document.querySelector(".wb-drag-feedback")');
   await check(
-    '标签键盘 Esc 取消排序',
+    '标签页键盘 Esc 取消排序',
     `(${session}).tabs[1].id===${JSON.stringify(order[0])}`,
     undefined,
     'once',
   );
   await drag('document.querySelectorAll(".wb-tab")[1]', 'document.querySelectorAll(".wb-tab")[0]');
   await check(
-    '标签支持指针拖动换位',
+    '标签页支持指针拖动换位',
     `(${session}).tabs[0].id===${JSON.stringify(order[0])}`,
     undefined,
     'once',
@@ -533,10 +564,10 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await e(
     'document.querySelectorAll(".wb-tab")[2].dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,clientX:280,clientY:25}))',
   );
-  await click('关闭右边的标签');
+  await click('关闭右侧标签页');
   await wait('document.querySelectorAll(".wb-tab").length===3');
   await check(
-    '标签右键关闭右侧标签',
+    '标签页右键关闭右侧标签页',
     'document.querySelectorAll(".wb-tab").length===3',
     undefined,
     'once',
@@ -547,13 +578,13 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await wait('document.body.innerText.includes("这张图片已被移动或删除")');
   await shot('missing');
   await check(
-    '文件缺失时 Prompt 仍然可编辑和复制',
+    '文件缺失时提示词仍然可编辑和复制',
     '!!document.querySelector(".wb-block") && document.body.innerText.includes("这张图片已被移动或删除")',
   );
   await menu('更多', '编辑原始文本');
   await input('[aria-label="原始文本"]', 'missing file editable');
   await click('保存', 'document.querySelector(".wb-raw-editor")');
-  await click('复制 Prompt');
+  await click('复制提示词');
   await checkCopy(
     '缺失图片草稿仍可编辑并复制',
     () => clipboard.readText() === 'missing file editable',

@@ -195,7 +195,7 @@ export async function extraLibraryChecks({
   );
   await h.checkSoon(
     '多张回收通知使用数量文案',
-    'document.querySelector(".nps-notifications").textContent.includes("已将 2 张图片移入回收站")',
+    'document.querySelector(".nps-notifications").textContent.includes("已移入回收站 2 张图片")',
     undefined,
     undefined,
     undefined,

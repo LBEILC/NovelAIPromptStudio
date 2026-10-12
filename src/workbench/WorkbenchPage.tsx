@@ -40,7 +40,7 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
         <EmptyState
           graphic={<EmptyMark />}
           title="把一张 NovelAI 图片拖到这里"
-          description="软件会读出它的 Prompt 和参数。可以同时打开多张，每张一个标签。"
+          description="软件会读出它的提示词和参数。可以同时打开多张，每张一个标签页。"
           actions={
             <>
               <Button variant="ink" loading={p.loading} onClick={p.onChooseImage}>
@@ -77,7 +77,7 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
           min={280}
           max={Math.max(defaultWidth, window.innerWidth - 280)}
           edge="left"
-          label="Prompt 栏宽度"
+          label="提示词栏宽度"
           onWidthChange={(value) => {
             setWidth(value);
             localStorage.setItem(WORKBENCH_SOURCE_PANEL_WIDTH_KEY, String(value));

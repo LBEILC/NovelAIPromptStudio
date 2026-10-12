@@ -88,6 +88,17 @@ async function closeAddedTabs(h, previous) {
     await h.wait(`!document.querySelector('[data-workbench-tab-id="${id}"]')`);
   }
 }
+async function restoredTabs(h) {
+  const previous = await h.evaluate(`${session}?.tabs?.map(t=>t.id) ?? []`);
+  await h.click('工作台', 'document.querySelector(".studio-titlebar")');
+  // The full suite leaves tabs open. Reload finishes before their async file
+  // reads; observe the saved IDs before opening or cleaning up our own tabs.
+  await h.wait(
+    `JSON.stringify([...${tabs}].map(t=>t.dataset.workbenchTabId).sort())===${JSON.stringify(JSON.stringify([...previous].sort()))}`,
+    '已有标签页恢复后再开始交互验收',
+  );
+  return previous;
+}
 async function cleanup(env, records) {
   for (const record of records) {
     const current = env.database.loadProject(record.id);
@@ -112,8 +123,7 @@ export async function libraryInteractionChecks(env) {
     ...(await prepare(env, 'interaction-fixture-dark', true)),
   ];
   await h.reload();
-  await h.click('工作台', 'document.querySelector(".studio-titlebar")');
-  const previousTabs = await e(`[...${tabs}].map(t=>t.dataset.workbenchTabId)`);
+  const previousTabs = await restoredTabs(h);
   const card = (id) => `document.querySelector('[data-project-id="${id}"]')`;
   let collectionId;
   try {
@@ -239,7 +249,7 @@ export async function libraryInteractionChecks(env) {
       undefined,
       'once',
     );
-    await library(h, 'interaction-fixture-light', 'Prompt 完全相同');
+    await library(h, 'interaction-fixture-light', '提示词完全相同');
     await wait('document.querySelectorAll(".library-card").length===1');
     const stack = 'document.querySelector(".library-card")';
     await e(`${stack}.click()`);
@@ -350,8 +360,7 @@ export async function workbenchInteractionChecks(env) {
   h.window.setContentSize(1240, 760);
   const records = await prepare(env, 'workbench-interaction-fixture');
   await h.reload();
-  await click('工作台', 'document.querySelector(".studio-titlebar")');
-  const previousTabs = await e(`[...${tabs}].map(t=>t.dataset.workbenchTabId)`);
+  const previousTabs = await restoredTabs(h);
   const originalStorage = env.preferences.librarySettings().assetsDirectory;
   const originalMotion = env.preferences.appearanceSettings().motion;
   const move = pointer(h);
@@ -377,6 +386,7 @@ export async function workbenchInteractionChecks(env) {
     );
     await library(h, 'workbench-interaction-fixture');
     for (const [index, record] of records.slice(0, 2).entries()) {
+      await wait(`!!document.querySelector('[data-project-id="${record.id}"]')`);
       await e(
         `document.querySelector('[data-project-id="${record.id}"]').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
       );
@@ -398,6 +408,10 @@ export async function workbenchInteractionChecks(env) {
     await check(
       '预览图片最长边受限且保留原比例',
       `(()=>{const i=document.querySelector('.wb-tab-preview img'),r=i.getBoundingClientRect();return Math.max(r.width,r.height)<=240&&Math.abs(r.width/r.height-i.naturalWidth/i.naturalHeight)<0.01})()`,
+    );
+    await check(
+      '标签页预览使用浮层纸色与阴影而非普通文字提示底色',
+      `(()=>{const p=document.querySelector('.wb-tab-preview'),probe=document.createElement('span');probe.style.background='var(--surface)';document.body.append(probe);const expected=getComputedStyle(probe).backgroundColor;probe.remove();const s=getComputedStyle(p);return s.backgroundColor===expected&&s.boxShadow!=='none'})()`,
     );
     await h.screenshot('interaction-tab-preview');
     await move('mouseMoved', await center(h, tab(1)));

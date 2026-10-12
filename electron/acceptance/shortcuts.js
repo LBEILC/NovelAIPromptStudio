@@ -15,7 +15,7 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
     await wait(`document.querySelectorAll('.workbench-tab').length===${index + 1}`);
   }
   await check(
-    'Mod+I 使用打开对话框并生成三个工作台标签',
+    'Mod+I 使用打开对话框并生成三个工作台标签页',
     'document.querySelectorAll(".workbench-tab").length===3',
     undefined,
     'once',
@@ -26,7 +26,7 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
   await shortcut('Tab');
   await wait(`${active} !== ${JSON.stringify(last)}`);
   await check(
-    'Mod+Tab 切换到下一个标签',
+    'Mod+Tab 切换到下一个标签页',
     `${active} !== ${JSON.stringify(last)}`,
     undefined,
     'once',
@@ -34,7 +34,7 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
   await shortcut('Tab', { shiftKey: true });
   await wait(`${active} === ${JSON.stringify(last)}`);
   await check(
-    'Mod+Shift+Tab 切回前一个标签',
+    'Mod+Shift+Tab 切回前一个标签页',
     `${active} === ${JSON.stringify(last)}`,
     undefined,
     'once',
@@ -42,7 +42,7 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
   await shortcut('w');
   await wait('document.querySelectorAll(".workbench-tab").length===2');
   await check(
-    'Mod+W 关闭当前标签',
+    'Mod+W 关闭当前标签页',
     'document.querySelectorAll(".workbench-tab").length===2',
     undefined,
     'once',
@@ -120,7 +120,7 @@ export async function createTrashDraft({ h, database }) {
   );
   const projectId = session.tabs.find((tab) => tab.id === session.activeTabId)?.source?.projectId;
   await check(
-    '草稿来自真实图库标签',
+    '草稿来自真实图库标签页',
     () => Boolean(projectId && database.loadProject(projectId)),
     undefined,
     'once',

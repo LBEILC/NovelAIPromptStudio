@@ -5,9 +5,9 @@ export const GALLERY_GROUPING_KEY = 'novelai-prompt-studio.gallery-grouping.v1';
 export const GALLERY_PROMPT_SCOPES = ['separate', 'full', 'base', 'similar'];
 export const GALLERY_PROMPT_SCOPE_LABELS = {
   separate: '全部分开',
-  full: '完整 Prompt',
-  base: '基础 Prompt',
-  similar: '相似 Prompt',
+  full: '完整提示词',
+  base: '基础提示词',
+  similar: '相似提示词',
 };
 export const GALLERY_SIMILARITY_MIN = 70;
 export const GALLERY_SIMILARITY_MAX = 95;
@@ -195,7 +195,7 @@ export function galleryBasePromptSimilarity(leftProject = {}, rightProject = {})
 export function galleryGroupingStatusLabel(value = DEFAULT_GALLERY_GROUPING) {
   const grouping = normalizeGalleryGrouping(value);
   if (grouping.promptScope === 'separate') return '全部分开';
-  if (grouping.promptScope === 'full') return grouping.mergeVibes ? '同 Prompt' : '精确';
+  if (grouping.promptScope === 'full') return grouping.mergeVibes ? '同提示词' : '精确';
   if (grouping.promptScope === 'base') return grouping.mergeVibes ? '基础 · 跨 Vibe' : '基础';
   return `相似 ${grouping.similarityThreshold}%${grouping.mergeVibes ? ' · 跨 Vibe' : ''}`;
 }

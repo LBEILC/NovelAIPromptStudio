@@ -150,7 +150,7 @@ export async function uiPolishChecks({ h, mode }) {
     `${parent}.getAttribute('aria-expanded')==='true'&&document.querySelectorAll('.nps-menu:popover-open').length===2`,
   );
   await e(
-    `${menu}.querySelector('[aria-label="翻译与分类"]').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}));document.querySelectorAll('.nps-menu:popover-open')[1].firstElementChild.dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
+    `${menu}.querySelector('[aria-label="翻译并分类"]').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}));document.querySelectorAll('.nps-menu:popover-open')[1].firstElementChild.dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
   );
   await e('new Promise(r=>setTimeout(r,350))');
   await check(
@@ -188,7 +188,7 @@ export async function uiPolishChecks({ h, mode }) {
   await disarm();
   await wait('!document.querySelector(".nps-popover[popover]")');
   await arm('dialog.nps-dialog');
-  await click('关闭已修改的标签？');
+  await click('关闭已修改的标签页？');
   await wait('window.polishAnimations.some(a=>a.transitionProperty==="transform")');
   await check(
     '对话框从 0.98 淡入放大且没有位移',
@@ -243,7 +243,7 @@ export async function uiPolishChecks({ h, mode }) {
     '[...document.querySelectorAll(".nps-menu:popover-open")].every(n=>n.getAnimations().length===0&&getComputedStyle(n).opacity==="1")',
   );
   await close();
-  await click('关闭已修改的标签？');
+  await click('关闭已修改的标签页？');
   await wait('!!document.querySelector("dialog[open]")');
   await check(
     '关闭动效时对话框与遮罩没有动画',

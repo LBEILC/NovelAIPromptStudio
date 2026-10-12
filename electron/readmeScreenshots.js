@@ -234,8 +234,8 @@ export async function runReadmeScreenshots({
     );
     if (name === 'hero' || name === 'workbench')
       await h.check(
-        `${name} Prompt 栏宽度为 700 像素`,
-        `document.querySelector('[aria-label="Prompt 栏宽度"]').parentElement.getBoundingClientRect().width===700`,
+        `${name} 提示词栏宽度为 700 像素`,
+        `document.querySelector('[aria-label="提示词栏宽度"]').parentElement.getBoundingClientRect().width===700`,
         undefined,
         'once',
       );

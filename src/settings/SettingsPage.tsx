@@ -198,7 +198,7 @@ function AI() {
           placeholder={a.settings.hasApiKey ? '已安全保存' : '输入 API Key'}
           onChange={(e) => a.setSettings((s) => ({ ...s, apiKey: e.target.value }))}
         />
-        <small>{a.settings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}</small>
+        <small>{a.settings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '还未保存'}</small>
         <small>加密后保存在这台电脑上，软件不保存明文</small>
       </label>
       <div className="settings-column">
@@ -308,7 +308,7 @@ function Storage({
             更改位置
           </Button>
         </div>
-        <small>更改位置会把现有文件移过去。复制并校验完成之前，原来的文件不会被删除。</small>
+        <small>更改位置会把现有文件移过去。确认文件完整复制之前，原来的文件不会被删除。</small>
       </div>
       {s.busy && (
         <div className="settings-column">
@@ -383,9 +383,9 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       await navigator.clipboard.writeText(
         feedbackDiagnostics(state?.currentVersion, state?.platform),
       );
-      setMessage('诊断信息已复制');
+      setMessage('已复制诊断信息');
     } catch {
-      setMessage('无法复制诊断信息');
+      setMessage('没能复制诊断信息');
     }
   };
   const hasUpdate =
@@ -402,7 +402,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       </div>
       <p>非官方工具，与 NovelAI 没有隶属关系。</p>
       <h2>更新</h2>
-      <Row title="自动检查更新" help="启动稳定后检查一次，不会自动安装">
+      <Row title="自动检查更新" help="启动后检查一次，不会自动安装">
         <Switch
           label="自动检查更新"
           checked={u.autoCheck}
@@ -471,13 +471,13 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         ['从剪贴板打开或导入图片', [['Mod', 'V']]],
         ['聚焦搜索框', [['Mod', 'K']]],
         [
-          '下一个 / 上一个标签',
+          '下一个 / 上一个标签页',
           [
             ['Mod', 'Tab'],
             ['Mod', 'Shift', 'Tab'],
           ],
         ],
-        ['关闭当前标签', [['Mod', 'W']]],
+        ['关闭当前标签页', [['Mod', 'W']]],
         ['移动当前 Tag', [['Alt', '方向键']]],
         ['在图片之间移动', [['方向键']]],
         ['在一摞图片里切换', [['←'], ['→']]],
@@ -511,7 +511,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           '检查和下载更新：访问 GitHub。自动检查可以在上面关掉；更新说明里带图片时，会从图片所在的网站加载',
           '翻译与分类：内置词典里没有的 Tag，会把 Tag 的名字发给 Danbooru，查它属于哪一类；配置了 AI 服务时，还没有译文的 Tag 会再发给你配置的服务',
           '段落的"译成中文""按中文改写英文"：把这一段文字发给你配置的 AI 服务',
-          '读取模型列表、测试连接：只和你配置的 AI 服务通信，不带你的 Prompt',
+          '读取模型列表、测试连接：只和你配置的 AI 服务通信，不带你的提示词',
           '报告问题、提出建议：在浏览器里打开 GitHub，不自动附带任何数据',
         ]}
       >
@@ -546,7 +546,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           </Button>
         </div>
       </Row>
-      <Row title="诊断信息" help="只包含软件版本和操作系统，不包含图片、Prompt 和路径">
+      <Row title="诊断信息" help="只包含软件版本和操作系统，不包含图片、提示词和路径">
         <Button variant="quiet" onClick={() => void copy()}>
           复制
         </Button>

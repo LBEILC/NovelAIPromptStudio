@@ -123,7 +123,7 @@ function TagFilter({
         ))}
         <Input
           aria-label={`${label} Tag`}
-          placeholder="输入 Tag 或译名"
+          placeholder="搜索 Tag 或译文"
           value={text}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={(event) => {
@@ -205,7 +205,7 @@ export function LibraryToolbar({
         <div className="gallery-search library-search">
           <Input
             aria-label="搜索图片库"
-            placeholder="搜索文件名、Tag、译名或段落里的词"
+            placeholder="搜索文件名、Tag、译文或段落里的词"
             prefix={<i className="ri-search-line" />}
             value={filters.query}
             onChange={(event) => p.onQueryChange(event.target.value)}
@@ -484,16 +484,16 @@ export function LibraryToolbar({
               onChange={(promptScope) => p.onGroupingChange({ promptScope })}
               options={[
                 { value: 'separate', label: '不合并' },
-                { value: 'full', label: 'Prompt 完全相同' },
-                { value: 'base', label: '基础 Prompt 相同' },
-                { value: 'similar', label: 'Prompt 相似' },
+                { value: 'full', label: '提示词完全相同' },
+                { value: 'base', label: '基础提示词相同' },
+                { value: 'similar', label: '提示词相似' },
               ]}
             />
           </div>
           {p.grouping.promptScope === 'similar' && (
             <>
               <p className="library-help">
-                基础 Prompt 的 Tag 足够接近的图片叠成一摞，不看角色 Prompt 和位置。
+                基础提示词的 Tag 足够接近的图片叠成一摞，不看角色提示词和位置。
               </p>
               <div className="library-filter-row">
                 <span>相似度</span>

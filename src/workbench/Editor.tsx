@@ -113,6 +113,11 @@ export function WorkbenchEditor(p: EditorProps) {
   const doc = useMemo(() => createPromptDocument(p.project), [p.project]);
   const entries = useMemo(() => documentTags(doc), [doc]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [paragraphTranslation, setParagraphTranslation] = useState({
+    section: -1,
+    block: -1,
+    request: 0,
+  });
   const [raw, setRaw] = useState<{ section: number; value: string } | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [editing, setEditing] = useState<DocumentTag | null>(null);
@@ -332,6 +337,13 @@ export function WorkbenchEditor(p: EditorProps) {
           }}
           scrollRef={scroll}
           selectedKeys={selected}
+          onTranslateParagraph={(section, block) =>
+            setParagraphTranslation((previous) => ({
+              section,
+              block,
+              request: previous.request + 1,
+            }))
+          }
           onRawEdit={(section, initial) =>
             setRaw({ section, value: initial ?? serializePromptSection(doc.scopes[section]) })
           }
@@ -434,8 +446,7 @@ export function WorkbenchEditor(p: EditorProps) {
                         if (
                           await p.onConfirm({
                             title: `移除“${character.label}”？`,
-                            message:
-                              '该角色的 Prompt、Undesired Content 和已整理的 Tag 将一并移除。',
+                            message: '这个角色的提示词、负面提示词和整理过的 Tag 会一起移除。',
                             detail: `共包含 ${character.prompt_tags.length + character.undesired_tags.length} 个 Tag。`,
                             okText: '移除角色',
                             danger: true,
@@ -451,6 +462,11 @@ export function WorkbenchEditor(p: EditorProps) {
           renderParagraph={(section, block, content) => (
             <ParagraphEditor
               block={doc.scopes[section].blocks[block]}
+              translateRequest={
+                paragraphTranslation.section === section && paragraphTranslation.block === block
+                  ? paragraphTranslation.request
+                  : 0
+              }
               onSave={(text, translation) =>
                 guard(() => {
                   const next = editPromptParagraph(doc.scopes[section], block, text);
@@ -484,7 +500,7 @@ export function WorkbenchEditor(p: EditorProps) {
                 },
                 {
                   id: 'translate',
-                  label: '翻译与分类',
+                  label: '翻译并分类',
                   onSelect: () => translate(selected.includes(entry.key) ? chosen : [entry]),
                 },
                 {
@@ -586,7 +602,7 @@ export function WorkbenchEditor(p: EditorProps) {
                   result.entries.every(
                     (entry: { scopePolarity: string }) => entry.scopePolarity === 'undesired',
                   )
-                    ? '排除 Tag'
+                    ? '负面 Tag'
                     : '',
                 );
               }}
@@ -605,12 +621,12 @@ export function WorkbenchEditor(p: EditorProps) {
               }
             />
             <Button
-              aria-label="翻译与分类"
+              aria-label="翻译并分类"
               variant="quiet"
               size="small"
               onClick={() => translate(chosen)}
             >
-              <span className="wb-responsive-label">翻译与分类</span>
+              <span className="wb-responsive-label">翻译并分类</span>
             </Button>
             <Button
               aria-label="删除"
@@ -694,7 +710,7 @@ export function WorkbenchEditor(p: EditorProps) {
                 if (editing) translate([editing]);
               }}
             >
-              翻译与分类
+              翻译并分类
             </Button>
             <Button className="wb-editor-cancel" variant="quiet" onClick={() => setEditing(null)}>
               取消

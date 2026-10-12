@@ -36,7 +36,7 @@ export function LibraryDetail({
           <b>
             已选 {p.selectedGroupIds.length} 组 · {p.selectedImageCount} 张
           </b>
-          <span className="library-help">选中一张时，这里显示它的 Prompt。</span>
+          <span className="library-help">选中一张时，这里显示它的提示词。</span>
         </div>
       </aside>
     );
@@ -168,7 +168,7 @@ export function LibraryDetail({
       <div className="library-detail-bar">
         <Button onClick={() => navigator.clipboard.writeText(libraryPositivePrompt(detail))}>
           <i className="ri-file-copy-line" />
-          复制 Prompt
+          复制提示词
         </Button>
         {p.view !== 'trash' && (
           <Button variant="ink" onClick={() => p.onOpenWorkbench(detail)}>

@@ -361,6 +361,7 @@ export async function runAcceptance(context) {
         await shellChecks();
         await libraryChecks(environment);
         await settingsChecks(environment, false);
+        await workbenchInteractionChecks(environment);
         await componentChecks(environment);
       } else if (mode.category === '诊断·计时') {
         h.category('诊断·计时');

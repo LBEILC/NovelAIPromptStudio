@@ -6,10 +6,12 @@ export function ParagraphEditor({
   block,
   children,
   onSave,
+  translateRequest = 0,
 }: {
   block: PromptBlock;
   children: ReactNode;
   onSave: (text: string, translation: string) => void;
+  translateRequest?: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [english, setEnglish] = useState(block.content);
@@ -19,6 +21,7 @@ export function ParagraphEditor({
   const [error, setError] = useState('');
   const [changedChinese, setChangedChinese] = useState(false);
   const request = useRef('');
+  const handledTranslation = useRef(0);
   useEffect(() => {
     let active = true;
     window.studio
@@ -38,7 +41,7 @@ export function ParagraphEditor({
     request.current = '';
     setBusy('');
   };
-  const transform = async (direction: 'translate' | 'rewrite') => {
+  const transform = async (direction: 'translate' | 'rewrite', text?: string) => {
     const id = crypto.randomUUID();
     request.current = id;
     setBusy(direction);
@@ -46,7 +49,7 @@ export function ParagraphEditor({
     try {
       const result = await window.studio!.transformParagraph({
         id,
-        text: direction === 'translate' ? english : chinese,
+        text: text ?? (direction === 'translate' ? english : chinese),
         direction,
       });
       if (request.current !== id) return;
@@ -63,6 +66,29 @@ export function ParagraphEditor({
       }
     }
   };
+  useEffect(() => {
+    if (!translateRequest || handledTranslation.current === translateRequest) return;
+    handledTranslation.current = translateRequest;
+    const text = editing ? english : block.content;
+    // TODO(design): 无 AI 配置时块菜单是否直接禁用待定；当前打开编辑器并沿用已有禁用提示。
+    if (!editing) {
+      setEnglish(block.content);
+      setChinese(block.translation || '');
+    }
+    setEditing(true);
+    let active = true;
+    void window.studio
+      ?.getAISettings()
+      .then((settings) => {
+        if (!active) return;
+        setConfigured(!!settings.model);
+        if (settings.model && !busy) void transform('translate', text);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [translateRequest]);
   if (!editing)
     return (
       <div
@@ -128,7 +154,7 @@ export function ParagraphEditor({
       {error && <Banner tone="danger">{error}</Banner>}
       <div className="wb-editor-actions">
         {changedChinese && (
-          <span className="nps-help wb-editor-warning">改了中文还没有改写英文</span>
+          <span className="nps-help wb-editor-warning">中文已修改，英文还没有更新</span>
         )}
         <Button
           variant="quiet"

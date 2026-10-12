@@ -222,7 +222,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     );
     await undo();
     await input('input[aria-label="搜索图片库"]', 'synthetic sample');
-    await grouping('Prompt 完全相同');
+    await grouping('提示词完全相同');
     await wait('document.querySelectorAll(".library-card").length === 3');
     for (const i of [2, 0, 1]) await card(i, true);
     await check(

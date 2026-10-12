@@ -78,10 +78,10 @@ describe('NovelAI V4 prompt structure', () => {
       prompt_structure: createPromptStructure(metadata, idFactory),
     };
     expect(getPromptScopes(project).map((scope) => scope.label)).toEqual([
-      'Base Prompt',
-      'Base Undesired Content',
-      'Character 1 Prompt',
-      'Character 1 Undesired Content',
+      '基础提示词',
+      '负面提示词',
+      '角色 1',
+      '角色 1 的负面提示词',
     ]);
     const characterScope = getPromptScopes(project)[2];
     const updated = updatePromptScope(

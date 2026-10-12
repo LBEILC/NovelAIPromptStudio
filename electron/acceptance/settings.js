@@ -75,7 +75,7 @@ export async function settingsChecks(context, restart) {
         'once',
       );
       await click('保存');
-      await wait('document.body.innerText.includes("AI 服务设置已安全保存")');
+      await wait('document.body.innerText.includes("已保存 AI 服务设置")');
       await check(
         '两种提示词分别恢复默认',
         () => {
@@ -98,7 +98,7 @@ export async function settingsChecks(context, restart) {
   if (mode.category === '减少动态效果') {
     h.category('设置·翻译词典·关闭动效');
     await section('翻译词典');
-    await input('[aria-label="搜索 Tag 或译文"]', 'acceptance_');
+    await input('.settings-dictionary [aria-label="搜索 Tag 或译文"]', 'acceptance_');
     await wait(
       'Number(document.querySelector(".settings-table").getAttribute("aria-rowcount"))===206',
     );
@@ -365,10 +365,10 @@ export async function settingsChecks(context, restart) {
     );
     await select('模型列表', 'acceptance-model');
     await click('测试连接');
-    await wait('document.body.innerText.includes("连接成功")');
+    await wait('document.body.innerText.includes("已连接")');
     await check(
       '本地兼容服务读取模型并成功连接',
-      'document.body.innerText.includes("连接成功 · acceptance-model")',
+      'document.body.innerText.includes("已连接 · acceptance-model")',
       undefined,
       'once',
     );
@@ -383,17 +383,12 @@ export async function settingsChecks(context, restart) {
     );
     await fetch(mode.baseUrl.replace('/v1', '/control/success'));
     await click('测试连接');
-    await wait('document.body.innerText.includes("连接成功")');
-    await check(
-      '失败后重试成功',
-      'document.body.innerText.includes("连接成功")',
-      undefined,
-      'once',
-    );
+    await wait('document.body.innerText.includes("已连接")');
+    await check('失败后重试成功', 'document.body.innerText.includes("已连接")', undefined, 'once');
   }
   await input('textarea', '验收翻译规则（已保存）');
   await click('保存');
-  await wait('document.body.innerText.includes("AI 服务设置已安全保存")');
+  await wait('document.body.innerText.includes("已保存 AI 服务设置")');
   if (encrypted)
     await check(
       '空 Key 再保存保留加密 Key',
@@ -465,7 +460,7 @@ export async function settingsChecks(context, restart) {
     );
   }
   await click('复制');
-  await wait('document.body.innerText.includes("诊断信息已复制")');
+  await wait('document.body.innerText.includes("已复制诊断信息")');
   await check(
     '剪贴板诊断只包含版本和平台',
     () =>
@@ -528,7 +523,7 @@ export async function settingsChecks(context, restart) {
   await wait('!!document.querySelector(".settings-tag")');
   await h.font('.settings-tag', 'MiSans');
   await check(
-    '改字体不改变图片、Prompt、Tag 和收藏状态',
+    '改字体不改变图片、提示词、Tag 和收藏状态',
     () => JSON.stringify(database.loadLibrary('all')) === libraryBefore,
     undefined,
     'once',

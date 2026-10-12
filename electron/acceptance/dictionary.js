@@ -11,7 +11,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       category: 'Body',
     });
   await section('翻译词典');
-  const search = '[aria-label="搜索 Tag 或译文"]';
+  const search = '.settings-dictionary [aria-label="搜索 Tag 或译文"]';
   const rows = 'document.querySelectorAll(".settings-table tr[data-tag]")';
   const count = 'Number(document.querySelector(".settings-table").getAttribute("aria-rowcount"))-1';
   const tab = async (label) => {
@@ -174,7 +174,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   await click('还原', 'document.querySelector(".nps-layer")');
   await check(
     '还原确认逐字说明删除修改和重新获取译文',
-    `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='还原"acceptance_004"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['会删掉你对这个 Tag 的修改。它再次出现时，软件会重新查内置词典；内置词典里没有的，要再做一次"翻译与分类"才有译文。', '不会改动图片里的 Prompt。']))}})()`,
+    `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='还原"acceptance_004"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['会删掉你对这个 Tag 的修改。它再次出现时，软件会重新查内置词典；内置词典里没有的，要再翻译并分类一次才有译文。', '不会改动图片里的提示词。']))}})()`,
     undefined,
     'once',
   );
@@ -365,10 +365,10 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       'once',
     );
     await click('更多：dictionary_fixture_000');
-    await click('删除这一条', 'document.querySelector(".nps-layer")');
+    await click('删除', 'document.querySelector(".nps-layer")');
     await check(
       '单条删除确认使用定稿标题、正文与按钮',
-      `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='删除"dictionary_fixture_000"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['这些 Tag 再次出现时，软件会重新查内置词典；内置词典里没有的，要再做一次"翻译与分类"才有译文。', '不会改动图片里的 Prompt。']))} && [...dialog.querySelectorAll('.nps-actions button')].map(b=>b.textContent).join('|')==='取消|删除'})()`,
+      `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='删除"dictionary_fixture_000"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['这些 Tag 再次出现时，软件会重新查内置词典；内置词典里没有的，要再翻译并分类一次才有译文。', '不会改动图片里的提示词。']))} && [...dialog.querySelectorAll('.nps-actions button')].map(b=>b.textContent).join('|')==='取消|删除'})()`,
       undefined,
       'once',
     );
@@ -394,18 +394,18 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     await click('用 AI 重新翻译');
     await click('开始翻译', 'document.querySelector("dialog[open]")');
     await wait(
-      'document.querySelector(".settings-dictionary-progress-line > span")?.textContent === "正在用 AI 翻译 · 已完成 50 / 55 · 50 条没有成功"',
+      'document.querySelector(".settings-dictionary-progress-line > span")?.textContent === "正在用 AI 翻译 · 已完成 50 / 55 · 没能翻译 50 条"',
     );
     await check(
       '进行中的失败数量采用定稿且取消按钮靠右',
-      `(()=>{const row=document.querySelector('.settings-dictionary-progress-line'),button=row.querySelector('button');return row.firstElementChild.textContent==='正在用 AI 翻译 · 已完成 50 / 55 · 50 条没有成功' && button.textContent==='取消' && Math.abs(button.getBoundingClientRect().right-row.getBoundingClientRect().right)<1})()`,
+      `(()=>{const row=document.querySelector('.settings-dictionary-progress-line'),button=row.querySelector('button');return row.firstElementChild.textContent==='正在用 AI 翻译 · 已完成 50 / 55 · 没能翻译 50 条' && button.textContent==='取消' && Math.abs(button.getBoundingClientRect().right-row.getBoundingClientRect().right)<1})()`,
       undefined,
       'both',
     );
     await h.screenshot('dictionary-retranslate-progress');
     await fetch(mode.baseUrl.replace('/v1', '/control/dictionary-continue'));
     await wait(
-      'document.querySelector(".settings-dictionary-progress-line > span")?.textContent === "已翻译 5 条，50 条没有成功，保持原样"',
+      'document.querySelector(".settings-dictionary-progress-line > span")?.textContent === "已翻译 5 条，没能翻译 50 条，保持原样"',
     );
     await check(
       'AI 部分失败保留前 50 条并提交最后 5 条',

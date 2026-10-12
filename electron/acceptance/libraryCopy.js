@@ -12,7 +12,7 @@ export async function libraryCopyChecks(env) {
     await click('工作台', 'document.querySelector(".studio-titlebar")');
     doubles.selections.push({ canceled: false, filePaths: [files[0]] });
     await click('打开图片', 'document.querySelector(".workbench-page")');
-    await wait('document.querySelectorAll(".workbench-tab").length===1', '准备已有工作台标签');
+    await wait('document.querySelectorAll(".workbench-tab").length===1', '准备已有工作台标签页');
   }
   const refresh = async () => {
     await h.reload();
@@ -55,13 +55,13 @@ export async function libraryCopyChecks(env) {
     );
     await selectCard(0);
     await waitDetail();
-    await click('复制 Prompt', 'document.querySelector(".library-detail-bar")');
+    await click('复制提示词', 'document.querySelector(".library-detail-bar")');
     await h.until(
       async () =>
         (await e('window.__libraryCopy')) === formatPositivePromptForCopy(record) &&
         clipboard.readText().replaceAll('\r\n', '\n') ===
           formatPositivePromptForCopy(record).replaceAll('\r\n', '\n'),
-      '复制完整正向 Prompt',
+      '复制完整正面提示词',
     );
     const libraryText = await e('window.__libraryCopy');
     await e('window.__libraryCopy=null');
@@ -84,14 +84,14 @@ export async function libraryCopyChecks(env) {
     );
     await e(
       `(() => { const button = ${copyButton}; button.focus(); button.click(); })()`,
-      '打开 Prompt 复制菜单',
+      '打开提示词复制菜单',
     );
     await wait(
-      `!![...document.querySelectorAll('[role=menuitem]')].find(item=>item.getClientRects().length && item.getAttribute('aria-disabled') !== 'true' && item.textContent.startsWith('复制全部 Prompt'))`,
-      '复制菜单显示可用的“复制全部 Prompt”',
+      `!![...document.querySelectorAll('[role=menuitem]')].find(item=>item.getClientRects().length && item.getAttribute('aria-disabled') !== 'true' && item.textContent.startsWith('复制全部提示词'))`,
+      '复制菜单显示可用的“复制全部提示词”',
     );
     await e(
-      `[...document.querySelectorAll('[role=menuitem]')].find(item=>item.textContent.startsWith('复制全部 Prompt')).click()`,
+      `[...document.querySelectorAll('[role=menuitem]')].find(item=>item.textContent.startsWith('复制全部提示词')).click()`,
     );
     await h.until(
       async () => (await e('window.__libraryCopy')) === libraryText,
@@ -109,13 +109,13 @@ export async function libraryCopyChecks(env) {
           (await e('window.__libraryCopy')) === negative[index].raw_prompt &&
           clipboard.readText().replaceAll('\r\n', '\n') ===
             negative[index].raw_prompt.replaceAll('\r\n', '\n'),
-        '复制原始排除内容',
+        '复制原始负面提示词',
       );
     }
     copied++;
   }
   await check(
-    '每张演示图正向复制与工作台一致、排除内容与原文一致',
+    '每张演示图正面复制与工作台一致、负面提示词与原文一致',
     () => copied === originals.length && copied === files.length,
     undefined,
     'once',

@@ -152,7 +152,7 @@ const studio = window.studio || {
   restoreProjects: unavailable('请在桌面应用中管理回收站'),
   permanentlyDeleteProjects: unavailable('请在桌面应用中管理回收站'),
   getTrashSummary: async () => ({ ok: true, projects: [], count: 0, totalBytes: 0 }),
-  setGroupCover: unavailable('请在桌面应用中设置头图'),
+  setGroupCover: unavailable('请在桌面应用中设置封面'),
   copyProjectImage: unavailable('请在桌面应用中复制图片'),
   downloadProjectImage: unavailable('请在桌面应用中下载图片'),
   copyWorkbenchImage: unavailable('请在桌面应用中复制图片'),
@@ -316,13 +316,13 @@ function ImportExperience({ dragState, progress, result, target, onCancel, onDis
             <strong>
               {dragState.valid
                 ? workbench
-                  ? '松开以打开为工作台标签'
+                  ? '松开，在工作台打开'
                   : '松开以保存到图片库'
                 : '这些文件暂不支持'}
             </strong>
             <span>
               {workbench
-                ? 'PNG / JPG / WEBP，每张图片创建一个标签'
+                ? 'PNG / JPG / WEBP，每张图片一个标签页'
                 : 'PNG / JPG / WEBP / ZIP，可批量导入'}
             </span>
           </div>
@@ -346,8 +346,8 @@ function ImportExperience({ dragState, progress, result, target, onCancel, onDis
         <div className="import-result">
           <i className={result.errors?.length ? 'ri-alert-line' : 'ri-check-line'} />
           <span>
-            导入 {result.imported?.length || 0} 张 · 跳过重复 {result.duplicates?.length || 0} 张
-            {result.errors?.length ? ` · 失败 ${result.errors.length} 张` : ''}
+            已导入 {result.imported?.length || 0} 张 · 跳过重复 {result.duplicates?.length || 0} 张
+            {result.errors?.length ? ` · 没能导入 ${result.errors.length} 张` : ''}
           </span>
           <Button onClick={onDismiss} size="small" variant="quiet">
             关闭
@@ -500,7 +500,7 @@ export default function App() {
     async (source = 'user') => {
       const result = await studio.loadCollections();
       if (!result?.ok) {
-        showToast(result?.error || '收藏集没有加载', 'error', source);
+        showToast(result?.error || '没能加载收藏集', 'error', source);
         return [];
       }
       const next = (result.collections || []).map(normalizeGalleryCollection);
@@ -680,7 +680,7 @@ export default function App() {
             ? {
                 ...current,
                 previewComplete: true,
-                previewError: result?.error || '压缩包预览没有启动',
+                previewError: result?.error || '没能打开压缩包预览',
               }
             : current,
         );
@@ -718,7 +718,7 @@ export default function App() {
       const editable = event.target.closest('textarea, input, [contenteditable="true"]');
       const selection = captureTextSelection(editable);
       const invoke = (action) =>
-        runTextEditAction(selection, action).catch(() => showToast('文本操作没有完成', 'error'));
+        runTextEditAction(selection, action).catch(() => showToast('没能完成文本操作', 'error'));
       openContextMenu(event, [
         { key: 'undo', label: '撤销', icon: Undo2, onClick: () => invoke('undo') },
         { key: 'redo', label: '重做', icon: Redo2, onClick: () => invoke('redo') },
@@ -769,9 +769,9 @@ export default function App() {
       try {
         const result = await studio.openWorkbenchImage(filePath, source);
         if (result?.canceled) return false;
-        if (!result?.ok || !result.project) throw new Error(result?.error || '图片没有打开');
+        if (!result?.ok || !result.project) throw new Error(result?.error || '没能打开图片');
         acceptWorkbenchProject(result.project, result.source || source);
-        showToast('图片已在新工作台标签中打开');
+        showToast('已在工作台打开');
         return true;
       } catch (error) {
         setWorkbenchError(error instanceof Error ? error.message : String(error));
@@ -788,12 +788,12 @@ export default function App() {
     setWorkbenchError('');
     try {
       const result = await studio.openClipboardWorkbenchImage();
-      if (!result?.ok || !result.project) throw new Error(result?.error || '剪贴板图片没有打开');
+      if (!result?.ok || !result.project) throw new Error(result?.error || '没能打开剪贴板图片');
       acceptWorkbenchProject(result.project, result.source);
       showToast(
         result.metadataMissing
-          ? '已读取剪贴板图片，但只包含像素，未检测到 NovelAI Prompt 元数据'
-          : '剪贴板图片已在工作台中打开',
+          ? '剪贴板里的图片没有提示词信息。截图或转存过的图片通常会丢掉这些信息。'
+          : '已在工作台打开',
         result.metadataMissing ? 'warning' : 'success',
       );
     } catch (error) {
@@ -812,15 +812,15 @@ export default function App() {
       setWorkbenchLoading(true);
       try {
         const result = await studio.openDroppedWorkbenchImages(files);
-        if (!result?.ok) throw new Error(result?.error || '图片没有打开');
+        if (!result?.ok) throw new Error(result?.error || '没能打开图片');
         for (const item of result.items || []) {
           if (item.ok && item.project) acceptWorkbenchProject(item.project, item.source);
         }
         const failures = (result.items || []).filter((item) => !item.ok);
         if (failures.length)
-          setWorkbenchError(`${failures.length} 张图片没有打开：${failures[0].error}`);
+          setWorkbenchError(`没能打开 ${failures.length} 张图片：${failures[0].error}`);
         if (result.items?.some((item) => item.ok))
-          showToast(`已打开 ${result.items.filter((item) => item.ok).length} 个工作台标签`);
+          showToast(`已打开 ${result.items.filter((item) => item.ok).length} 个工作台标签页`);
       } catch (error) {
         setWorkbenchError(error instanceof Error ? error.message : String(error));
       } finally {
@@ -836,12 +836,15 @@ export default function App() {
       if (!result?.ok && result?.error) showToast(result.error, 'error');
       if (result?.summary)
         showToast(
-          `导入 ${result.summary.imported} 张 · 跳过重复 ${result.summary.duplicates} 张 · 失败 ${result.summary.failed} 张`,
+          `已导入 ${result.summary.imported} 张 · 跳过重复 ${result.summary.duplicates} 张 · 没能导入 ${result.summary.failed} 张`,
         );
       await reloadLibrary('all');
       if (result?.imported?.length) setPreviewProjectId(result.imported.at(-1).id);
       if (result?.metadataMissing)
-        showToast('已读取剪贴板图片，但只包含像素，未检测到 NovelAI Prompt 元数据', 'warning');
+        showToast(
+          '剪贴板里的图片没有提示词信息。截图或转存过的图片通常会丢掉这些信息。',
+          'warning',
+        );
     },
     [reloadLibrary, showToast],
   );
@@ -868,7 +871,7 @@ export default function App() {
           ? await studio.prepareDroppedImport(files)
           : await studio.prepareImport();
         if (preparation?.canceled) return;
-        if (!preparation?.ok) throw new Error(preparation?.error || '文件没有准备完成');
+        if (!preparation?.ok) throw new Error(preparation?.error || '没能准备文件');
         preparedSessionId = preparation.sessionId;
         if (preparation.requiresSelection) {
           setArchiveImport({
@@ -936,9 +939,9 @@ export default function App() {
       if (
         workbenchTabHasChanges(tab) &&
         !(await requestConfirmation({
-          title: '关闭已修改的标签？',
-          message: `“${tab.displayName}”的 Prompt 已相对原图修改。`,
-          detail: '关闭后会丢弃这个标签的草稿，其他标签不受影响。',
+          title: '关闭已修改的标签页？',
+          message: `“${tab.displayName}”的提示词改过了。`,
+          detail: '关闭后这些修改会丢失，其他标签页不受影响。',
           okText: '丢弃并关闭',
           danger: true,
         }))
@@ -1065,7 +1068,7 @@ export default function App() {
     if (!entries.length) return;
     annotationTimer.current = window.setTimeout(async () => {
       const result = await studio.saveTagAnnotations(entries);
-      if (!result?.ok) showToast(result?.error || 'Tag 翻译与分类没有保存', 'error');
+      if (!result?.ok) showToast(result?.error || '没能保存 Tag 译文和分类', 'error');
     }, 500);
   };
 
@@ -1090,7 +1093,7 @@ export default function App() {
         activeTab.source.projectId,
       )
       .then((result) => {
-        if (!result.ok) showToast(result.error || '块类型与译文没有保存', 'error');
+        if (!result.ok) showToast(result.error || '没能保存块类型和译文', 'error');
       });
   };
 
@@ -1099,7 +1102,7 @@ export default function App() {
     const tabId = activeTab.id;
     const result = await studio.translateTags(entries.map((entry) => entry.tag.tag));
     if (!result?.ok) {
-      showToast(result?.error || '翻译与分类没有完成', 'error');
+      showToast(result?.error || '没能完成翻译和分类', 'error');
       return;
     }
     setWorkbenchSession((current) =>
@@ -1135,20 +1138,20 @@ export default function App() {
     if (result.ai_count)
       showToast(`已整理 ${entries.length} 个 Tag，其中 ${result.ai_count} 个由 AI 补全`);
     else if (result.unresolved_count)
-      showToast(`已应用离线结果，${result.unresolved_count} 个 Tag 仍缺少译文或分类`);
-    else showToast(`已通过离线词典整理 ${entries.length} 个 Tag`);
+      showToast(`已用内置词典整理，还有 ${result.unresolved_count} 个 Tag 没有译文或分类`);
+    else showToast(`已用内置词典整理 ${entries.length} 个 Tag`);
   };
 
   const summarizeBatch = (result, action, groupCount = 0) => {
     if (!result?.ok) {
-      showToast(result?.error || `${action}没有完成`, 'error');
+      showToast(result?.error || `没能${action}`, 'error');
       return false;
     }
     const summary = result.summary || {};
     const imageCount = (summary.success || 0) + (summary.skipped || 0) + (summary.failed || 0);
-    const scope = groupCount ? `${groupCount} 组、${imageCount} 张图片；` : '';
+    const scope = groupCount ? `共 ${groupCount} 组、${imageCount} 张图片` : '';
     showToast(
-      `${action}：${scope}成功 ${summary.success || 0}，跳过 ${summary.skipped || 0}，失败 ${summary.failed || 0}`,
+      `已${action} ${summary.success || 0} 张${scope ? `（${scope}）` : ''}，跳过 ${summary.skipped || 0} 张，没能${action} ${summary.failed || 0} 张`,
       summary.failed ? 'warning' : 'success',
     );
     return true;
@@ -1187,7 +1190,7 @@ export default function App() {
     }
     await reloadAfterGalleryAction();
     notify({
-      text: ids.length === 1 ? '已移入回收站' : `已将 ${ids.length} 张图片移入回收站`,
+      text: ids.length === 1 ? '已移入回收站' : `已移入回收站 ${ids.length} 张图片`,
       action: { label: '撤销', onClick: () => restoreProjects(result.results?.success || ids) },
     });
   };
@@ -1234,7 +1237,7 @@ export default function App() {
         detail:
           page === 'gallery'
             ? deletionDetail(impact, formatBytes(knownBytes))
-            : `${impact.open ? `${impact.open} 张仍在工作台打开。` : ''}${impact.dirty ? `其中 ${impact.dirty} 个标签包含工作区草稿，继续会丢弃。` : ''} 此操作不可撤销。`,
+            : `${impact.open ? `${impact.open} 张仍在工作台打开。` : ''}${impact.dirty ? `其中 ${impact.dirty} 个标签页包含工作区草稿，继续会丢弃。` : ''} 这个操作不可撤销。`,
         okText: '永久删除',
         danger: true,
         primaryDanger: true,
@@ -1253,7 +1256,7 @@ export default function App() {
   const emptyTrash = async () => {
     const summary = await studio.getTrashSummary();
     if (!summary?.ok) {
-      showToast(summary?.error || '无法读取回收站', 'error');
+      showToast(summary?.error || '没能读取回收站', 'error');
       return;
     }
     if (!summary.projects?.length) return;
@@ -1269,7 +1272,7 @@ export default function App() {
       ids.map((id, index) => ({ id, name: names[index] })),
     );
     if (!result?.ok) {
-      showToast(result?.error || '图片名称没有修改', 'error');
+      showToast(result?.error || '没能修改图片名称', 'error');
       return false;
     }
     await reloadLibrary(galleryView);
@@ -1280,7 +1283,7 @@ export default function App() {
         onClick: async () => {
           const restored = await studio.updateProjectNames(result.previous);
           if (!restored?.ok) {
-            showToast(restored?.error || '图片名称没有修改', 'error');
+            showToast(restored?.error || '没能修改图片名称', 'error');
             return;
           }
           await reloadLibrary(galleryView);
@@ -1293,10 +1296,10 @@ export default function App() {
   const renameProject = async (project, name) => {
     const result = await studio.updateProjectName(project.id, name);
     if (!result?.ok) {
-      showToast(result?.error || '图片名称没有修改', 'error');
+      showToast(result?.error || '没能修改图片名称', 'error');
       return false;
     }
-    showToast('图片名称已修改');
+    showToast('已修改图片名称');
     await reloadLibrary(galleryView);
     return true;
   };
@@ -1304,10 +1307,10 @@ export default function App() {
   const setGroupCover = async (group, project) => {
     const result = await studio.setGroupCover(group.fingerprint, project.id);
     if (!result?.ok) {
-      showToast(result?.error || '头图没有更新', 'error');
+      showToast(result?.error || '没能设为封面', 'error');
       return;
     }
-    showToast('已设为图片组头图');
+    showToast('已设为封面');
     await reloadLibrary(galleryView);
   };
 
@@ -1378,23 +1381,23 @@ export default function App() {
       filters: kind === 'smart' ? normalizeGalleryFilters(galleryFilters) : undefined,
     });
     if (!result?.ok) {
-      showToast(result?.error || '收藏集没有创建', 'error');
+      showToast(result?.error || '没能新建收藏集', 'error');
       return false;
     }
     await reloadCollections();
     selectGalleryCollection(result.collection.id);
-    showToast(kind === 'smart' ? '智能收藏集已保存' : '普通收藏集已创建');
+    showToast(kind === 'smart' ? '已保存智能收藏集' : '已新建收藏集');
     return result.collection;
   };
 
   const renameGalleryCollection = async (collection, name) => {
     const result = await studio.updateCollection(collection.id, { name });
     if (!result?.ok) {
-      showToast(result?.error || '收藏集名称没有修改', 'error');
+      showToast(result?.error || '没能修改收藏集名称', 'error');
       return false;
     }
     await reloadCollections();
-    showToast('收藏集名称已修改');
+    showToast('已修改收藏集名称');
     return true;
   };
 
@@ -1428,12 +1431,12 @@ export default function App() {
       filters: normalizeGalleryFilters(galleryFilters),
     });
     if (!result?.ok) {
-      showToast(result?.error || '智能收藏集规则没有更新', 'error');
+      showToast(result?.error || '没能更新智能收藏集规则', 'error');
       return false;
     }
     await reloadCollections();
     selectGalleryCollection(collection.id);
-    showToast('智能收藏集规则已更新');
+    showToast('已更新智能收藏集规则');
     return true;
   };
 
@@ -1447,9 +1450,8 @@ export default function App() {
         title: `删除“${collection.name}”？`,
         message:
           collection.kind === 'smart'
-            ? '将删除这组自动筛选规则。'
-            : '将删除收藏集及其中的成员关系。',
-        detail: '图片文件与图库中的图片不会被删除。',
+            ? '只删除筛选规则，图片不受影响。'
+            : '里面的图片还在图片库里。',
         okText: '删除收藏集',
         danger: true,
       }))
@@ -1457,13 +1459,13 @@ export default function App() {
       return false;
     const result = await studio.deleteCollection(collection.id);
     if (!result?.ok) {
-      showToast(result?.error || '收藏集没有删除', 'error');
+      showToast(result?.error || '没能删除收藏集', 'error');
       return false;
     }
     if (activeCollectionId === collection.id || editingSmartCollectionId === collection.id)
       selectGalleryCollection('');
     await reloadCollections();
-    showToast('收藏集已删除');
+    showToast('已删除收藏集');
     return true;
   };
 
@@ -1472,7 +1474,7 @@ export default function App() {
     if (!projectIds.length) return false;
     const result = await studio.updateCollectionProjects(collectionId, projectIds, action);
     if (!result?.ok) {
-      showToast(result?.error || '收藏集成员没有更新', 'error');
+      showToast(result?.error || '没能更新收藏集里的图片', 'error');
       return false;
     }
     await reloadCollections();
@@ -1490,9 +1492,9 @@ export default function App() {
     if (
       workbenchTabHasChanges(activeTab) &&
       !(await requestConfirmation({
-        title: '恢复图片中的 Prompt？',
-        message: '当前标签中的修改将被清除。',
-        detail: '图片文件本身不会被修改，其他标签不受影响。',
+        title: '恢复图片里原来的提示词？',
+        message: '这个标签页里的修改会被清除。',
+        detail: '图片文件本身不会被修改，其他标签页不受影响。',
         okText: '恢复',
         danger: true,
       }))
@@ -1505,7 +1507,7 @@ export default function App() {
         updatedAt: new Date().toISOString(),
       })),
     );
-    showToast('已恢复图片中的原始 Prompt');
+    showToast('已恢复图片中的原始提示词');
   };
 
   const installDownloadedUpdate = async () => {
@@ -1514,15 +1516,15 @@ export default function App() {
       if (serialized) {
         window.localStorage.setItem(WORKBENCH_SESSION_KEY, serialized);
         if (window.localStorage.getItem(WORKBENCH_SESSION_KEY) !== serialized)
-          throw new Error('工作台会话校验失败');
+          throw new Error('没能保存当前打开的标签页，更新安装已暂停');
       } else {
         window.localStorage.removeItem(WORKBENCH_SESSION_KEY);
       }
       const result = await studio.installUpdate();
-      if (!result?.ok) throw new Error(result?.error || '更新没有开始安装');
+      if (!result?.ok) throw new Error(result?.error || '没能开始安装更新');
       return true;
     } catch (error) {
-      showToast(`无法重启安装：${error instanceof Error ? error.message : String(error)}`, 'error');
+      showToast(`没能重启安装：${error instanceof Error ? error.message : String(error)}`, 'error');
       return false;
     }
   };
@@ -1567,7 +1569,7 @@ export default function App() {
               onCopyImage={async (project) => {
                 const result = await studio.copyWorkbenchImage(project.image_path);
                 showToast(
-                  result?.ok ? '图片已复制到系统剪贴板' : result?.error || '图片复制失败',
+                  result?.ok ? '已复制图片' : result?.error || '没能复制图片',
                   result?.ok ? 'success' : 'error',
                 );
               }}
@@ -1582,16 +1584,16 @@ export default function App() {
                 if (!text) return;
                 await navigator.clipboard.writeText(text);
                 const ignoredLabels = [
-                  ignored ? `${ignored} 个排除 Tag` : '',
+                  ignored ? `${ignored} 个负面 Tag` : '',
                   automaticIgnored ? `${automaticIgnored} 个 NovelAI 自动 Tag` : '',
                 ].filter(Boolean);
                 const copiedLabel = label
                   ? ` ${label}`
                   : selected
-                    ? '已选 Prompt Tag'
-                    : '可见 Prompt Tag';
+                    ? '已选提示词 Tag'
+                    : '可见提示词 Tag';
                 showToast(
-                  `${count ? `已复制 ${count} 个${copiedLabel}` : `已复制${label || 'Prompt'}`}${ignoredLabels.length ? `，忽略 ${ignoredLabels.join('、')}` : ''}`,
+                  `${count ? `已复制 ${count} 个${copiedLabel}` : `已复制${label || '提示词'}`}${ignoredLabels.length ? `，忽略 ${ignoredLabels.join('、')}` : ''}`,
                 );
               }}
               onConfirm={requestConfirmation}
@@ -1602,9 +1604,7 @@ export default function App() {
                 );
                 if (!result?.canceled)
                   showToast(
-                    result?.ok
-                      ? '图片已下载，原始格式与元数据已保留'
-                      : result?.error || '图片下载失败',
+                    result?.ok ? '已下载原图' : result?.error || '没能下载原图',
                     result?.ok ? 'success' : 'error',
                   );
               }}
@@ -1648,7 +1648,7 @@ export default function App() {
               onRevealVibe={async (vibe) => {
                 const result = await studio.revealEmbeddedVibe(vibe);
                 showToast(
-                  result?.ok ? '已在文件夹中显示 Vibe 文件' : result?.error || 'Vibe 文件没有生成',
+                  result?.ok ? '已在文件夹中显示 Vibe 文件' : result?.error || '没能生成 Vibe 文件',
                   result?.ok ? 'success' : 'error',
                 );
               }}
@@ -1706,7 +1706,7 @@ export default function App() {
               onCopyImage={async (project) => {
                 const result = await studio.copyProjectImage(project.id);
                 showToast(
-                  result?.ok ? '图片已复制到系统剪贴板' : result?.error || '图片复制失败',
+                  result?.ok ? '已复制图片' : result?.error || '没能复制图片',
                   result?.ok ? 'success' : 'error',
                 );
               }}
@@ -1714,9 +1714,7 @@ export default function App() {
                 const result = await studio.downloadProjectImage(project.id);
                 if (!result?.canceled)
                   showToast(
-                    result?.ok
-                      ? '图片已下载，原始格式与元数据已保留'
-                      : result?.error || '图片下载失败',
+                    result?.ok ? '已下载原图' : result?.error || '没能下载原图',
                     result?.ok ? 'success' : 'error',
                   );
               }}

@@ -147,7 +147,7 @@ export async function libraryChecks(env) {
     );
     await check(
       '横竖方图每行等高、非末行铺满、比例准确',
-      `(()=>{const rows=[...document.querySelectorAll('.library-row')];const cards=rows.flatMap(row=>[...row.querySelectorAll('.library-card')]);return rows.length>1 && rows.every((row,i)=>{const rect=row.getBoundingClientRect();const items=[...row.children];return items.every(c=>Math.abs(c.getBoundingClientRect().height-rect.height)<=1) && (i===rows.length-1 || Math.abs(items.at(-1).getBoundingClientRect().right-rect.right)<=1)}) && cards.every(c=>{const image=c.querySelector('img');const rect=c.getBoundingClientRect();return !image.complete||!image.naturalWidth||Math.abs(rect.width/rect.height-Math.min(2.5,Math.max(.5,image.naturalWidth/image.naturalHeight)))<.02})})()`,
+      `(()=>{const rows=[...document.querySelectorAll('.library-row')];const cards=rows.flatMap(row=>[...row.querySelectorAll('.library-card')]);return rows.length>1 && rows.every((row,i)=>{const rect=row.getBoundingClientRect();const items=[...row.querySelectorAll('.library-card')];return items.every(c=>Math.abs(c.getBoundingClientRect().height-rect.height)<=1) && (i===rows.length-1 || Math.abs(items.at(-1).getBoundingClientRect().right-rect.right)<=1)}) && cards.every(c=>{const image=c.querySelector('img');const rect=c.getBoundingClientRect();return !image.complete||!image.naturalWidth||Math.abs(rect.width/rect.height-Math.min(2.5,Math.max(.5,image.naturalWidth/image.naturalHeight)))<.02})})()`,
       undefined,
       'both',
     );
@@ -464,7 +464,7 @@ export async function libraryChecks(env) {
     // Changing collection may unmount the original picker; Escape is safe in either case.
     await key('Escape');
     await all();
-    await setGrouping('Prompt 完全相同');
+    await setGrouping('提示词完全相同');
     await e(
       `(()=>{const c=[...document.querySelectorAll('.library-card')].find(c=>c.querySelector('.library-stack'));c.focus();c.click()})()`,
     );

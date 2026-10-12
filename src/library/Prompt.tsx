@@ -118,14 +118,14 @@ export function LibraryPrompt({ project }: { project: ImageRecord }) {
         const title =
           scope.kind === 'base'
             ? negative
-              ? '排除内容'
-              : '基础 Prompt'
-            : `${/^Character \d+$/i.test(scope.character.label) || !scope.character.label ? `角色 ${scope.characterIndex + 1}` : scope.character.label}${negative ? ' · 排除内容' : ''}`;
+              ? '负面提示词'
+              : scope.label
+            : `${/^Character \d+$/i.test(scope.character.label) || !scope.character.label ? `角色 ${scope.characterIndex + 1}` : scope.character.label}${negative ? ' · 负面提示词' : ''}`;
         const content = section.blocks.map((block, index) => (
           <div className="library-block" key={index}>
             <div className="library-block-label">
               {block.type === 'tags'
-                ? `TAG 块${block.label ? ` · ${block.label}` : ''} · ${block.tags.length} 个`
+                ? `Tag 块${block.label ? ` · ${block.label}` : ''} · ${block.tags.length} 个`
                 : `段落${block.label ? ` · ${block.label}` : ''}`}
             </div>
             {block.type === 'tags' ? (

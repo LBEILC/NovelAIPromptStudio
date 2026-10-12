@@ -25,11 +25,7 @@ export const categoryColors: Record<string, TagCategory> = {
 export const categoryLabel = (category: string) =>
   CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS] || category;
 export function scopeLabel(section: PromptDocumentScope) {
-  if (section.scope.kind === 'base')
-    return section.scope.polarity === 'prompt' ? '基础 Prompt' : '排除内容';
-  return section.scope.polarity === 'prompt'
-    ? section.scope.character?.label || section.scope.label
-    : `${section.scope.character?.label} 的排除内容`;
+  return section.scope.label;
 }
 export interface DocumentTag {
   key: string;

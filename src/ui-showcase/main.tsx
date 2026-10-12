@@ -68,12 +68,11 @@ const menu: MenuItem[] = [
     id: 'move',
     label: '移动到',
     children: [
-      { id: 'prompt', label: 'Prompt' },
+      { id: 'prompt', label: '提示词' },
       { id: 'reference', label: '参考' },
     ],
   },
-  { id: 'translate', label: '翻译与分类' },
-  { id: 'save', label: '存为常用块', disabled: true },
+  { id: 'translate', label: '翻译并分类' },
   { id: 's2', separator: true },
   { id: 'delete', label: '删除', danger: true, shortcut: ['Del'] },
 ];
@@ -168,16 +167,16 @@ function EditContent({ close }: { close: () => void }) {
   );
 }
 const closeDialog = {
-  title: '关闭已修改的标签？',
+  title: '关闭已修改的标签页？',
   cancelLabel: '取消',
   confirmLabel: '丢弃并关闭',
   destructive: true,
-  children: '关闭后会丢弃这个标签里还没生成的改动，其他标签不受影响。图片文件本身不会被修改。',
+  children: '关闭后会丢弃这个标签页里还没生成的改动，其他标签页不受影响。图片文件本身不会被修改。',
 };
 function Showcase() {
   const [sampler, setSampler] = useState('Euler Ancestral');
   const [display, setDisplay] = useState('对照');
-  const [tab, setTab] = useState('Prompt');
+  const [tab, setTab] = useState('提示词');
   const [off, setOff] = useState(false);
   const [on, setOn] = useState(true);
   const [checkOff, setCheckOff] = useState(false);
@@ -218,7 +217,7 @@ function Showcase() {
       </Section>
       <Section title="按钮">
         <Row label="默认">
-          <Button>复制 Prompt</Button>
+          <Button>复制提示词</Button>
           <Button className="nps-demo-hover">悬停</Button>
           <Button className="nps-demo-focus">焦点</Button>
           <Button disabled disabledReason="余额不足，暂时不能生成">
@@ -282,8 +281,8 @@ function Showcase() {
         </Row>
         <Row label="页签">
           <Tabs
-            label="Prompt 的页签"
-            items={['Prompt', '参数', '参考'].map((label) => ({
+            label="提示词的页签"
+            items={['提示词', '参数', '参考'].map((label) => ({
               value: label,
               label,
               content: null,
@@ -439,7 +438,7 @@ function Showcase() {
           </span>
         </Row>
         <Row>
-          <span className="nps-tip">复制当前筛选后可见的正向 Prompt</span>
+          <span className="nps-tip">复制当前筛选后可见的正面提示词</span>
           <span className="nps-tip">
             <Shortcut keys={['Mod', 'K']} />
           </span>
@@ -453,7 +452,7 @@ function Showcase() {
               移动到
             </Button>
             <Button variant="quiet" size="small">
-              翻译与分类
+              翻译并分类
             </Button>
             <Button variant="danger" size="small">
               删除
@@ -469,7 +468,9 @@ function Showcase() {
           <Banner>这张图里没有检测到 Vibe。</Banner>
         </Row>
         <Row>
-          <Banner tone="warn">这张图片已被移动或删除。可以关闭这个标签，其他标签不受影响。</Banner>
+          <Banner tone="warn">
+            这张图片已被移动或删除。可以关闭这个标签页，其他标签页不受影响。
+          </Banner>
         </Row>
         <Row>
           <Banner
@@ -508,15 +509,15 @@ function Showcase() {
           >
             <EditContent close={() => setPopover(false)} />
           </Popover>
-          <Button onClick={() => setDialog(true)}>关闭已修改的标签？</Button>
+          <Button onClick={() => setDialog(true)}>关闭已修改的标签页？</Button>
           <Dialog
             open={dialog}
             {...closeDialog}
             onCancel={() => setDialog(false)}
             onConfirm={() => setDialog(false)}
           />
-          <Tooltip text="复制当前筛选后可见的正向 Prompt">
-            <Button onClick={() => notify({ text: '已复制 52 个 Tag' })}>复制 Prompt</Button>
+          <Tooltip text="复制当前筛选后可见的正面提示词">
+            <Button onClick={() => notify({ text: '已复制 52 个 Tag' })}>复制提示词</Button>
           </Tooltip>
           <Button
             onClick={() =>
@@ -605,7 +606,7 @@ function Showcase() {
         <EmptyState
           graphic={<EmptyMark />}
           title="把一张 NovelAI 图片拖到这里"
-          description="软件会读出它的 Prompt 和参数。可以同时打开多张，每张一个标签。"
+          description="软件会读出它的提示词和参数。可以同时打开多张，每张一个标签页。"
           actions={
             <>
               <Button variant="ink">打开图片</Button>
@@ -623,7 +624,7 @@ function Showcase() {
           defaultWidth={340}
           min={196}
           max={520}
-          label="Prompt"
+          label="提示词"
         >
           <Input aria-label="Tag" defaultValue="long copper hair" />
           <Row>

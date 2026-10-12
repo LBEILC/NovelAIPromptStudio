@@ -43,12 +43,12 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
     { id: 'close', label: '关闭', onSelect: () => void p.onCloseTab(tab.id) },
     {
       id: 'others',
-      label: '关闭其他标签',
+      label: '关闭其他标签页',
       onSelect: () => void closeMany(p.session.tabs.filter((item) => item.id !== tab.id)),
     },
     {
       id: 'right',
-      label: '关闭右边的标签',
+      label: '关闭右侧标签页',
       disabled: index === p.session.tabs.length - 1,
       onSelect: () => void closeMany(p.session.tabs.slice(index + 1)),
     },
@@ -86,7 +86,7 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
           src={mediaUrl(image?.thumbnail_path || image?.image_path || '')}
         />
         {name && <span className="wb-tab-name">{name}</span>}
-        {workbenchTabHasChanges(tab) && <span className="wb-dirty" aria-label="Prompt 已修改" />}
+        {workbenchTabHasChanges(tab) && <span className="wb-dirty" aria-label="提示词已修改" />}
       </button>
     </ContextMenu>
   );
@@ -143,7 +143,7 @@ export function WorkbenchTabs(p: TabsProps) {
           items={p.session.tabs.map((tab) => tab.id)}
           strategy={horizontalListSortingStrategy}
         >
-          <div className="wb-tabs-scroll" role="tablist" aria-label="图片标签" ref={list}>
+          <div className="wb-tabs-scroll" role="tablist" aria-label="图片标签页" ref={list}>
             {p.session.tabs.map((tab) => (
               <Tab key={tab.id} tab={tab} p={p} />
             ))}
