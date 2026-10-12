@@ -166,6 +166,11 @@ export interface StudioApi {
     filePath: string,
     annotations: import('./types').PromptStructure['block_annotations'],
   ): Promise<Result<{ project: ImageRecord }>>;
+  saveWorkbenchStructure(
+    filePath: string,
+    structure: import('./types').PromptStructure,
+    projectId?: string,
+  ): Promise<Result>;
   openClipboardWorkbenchImage(): Promise<Exclude<WorkbenchResult, { canceled: true }>>;
   syncWorkbenchTemporaryImages(referencedPaths: string[]): Promise<Result<{ removed: string[] }>>;
   openDroppedWorkbenchImages(

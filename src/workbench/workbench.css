@@ -27,13 +27,13 @@
 .wb-section-head { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-3) 0; white-space:nowrap; }
 .wb-section-actions { display:flex; margin-left:auto; }
 .wb-section-actions .nps-menu-trigger > button,.wb-block header .nps-menu-trigger > button { border-color:transparent; background:transparent; color:var(--text-3); }
-.wb-block { position:relative; padding:var(--sp-3) 0; }
+.wb-block { position:relative; padding:var(--sp-3) 0; border-bottom:var(--bw) solid var(--divider); }
 .wb-block > header { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); color:var(--text-3); font-size:var(--fs-caption); }
 .wb-tags { display:flex; flex-wrap:wrap; align-items:flex-start; gap:var(--ctl-gap); padding-top:var(--sp-2); }
 .wb-prose { font:var(--fs-prose)/var(--lh-prose) var(--font-prose); white-space:pre-wrap; }
 .wb-prose p { margin:var(--sp-2) 0; }
 .wb-translation { color:var(--text-2); font:var(--fs-small)/var(--lh-small) var(--font-ui); }
-.wb-add-block { opacity:0; width:100%; }
+.wb-add-block { opacity:0; width:100%; position:absolute; bottom:calc(-1 * var(--sp-2)); left:0; height:var(--sp-5); }
 .wb-block:hover > .wb-add-block,.wb-add-block:focus-visible { opacity:1; }
 .wb-automatic { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-1) var(--sp-3); border:var(--bw) dashed var(--border); border-radius:var(--r-ctl); color:var(--text-2); font-size:var(--fs-small); }
 .wb-automatic button { margin-left:auto; }
@@ -48,7 +48,13 @@
 .wb-add-tags[data-drop-active=true] { outline:var(--focus-w) solid var(--focus); }
 .wb-tag-dragging .nps-tag { box-shadow:var(--shadow-pop); }
 .wb-editor .nps-selection-slot { position:absolute; bottom:calc(var(--bar-h) + var(--sp-3)); left:var(--sp-3); right:var(--sp-3); }
-.wb-editor .nps-selection { width:100%; }
+.wb-editor .nps-selection { width:100%; bottom:0; white-space:nowrap; }
+@container (max-width: 420px) {
+  .nps-selection .wb-responsive-label { display:none; }
+  .wb-editor .nps-selection { padding:0 var(--sp-2); }
+  .wb-editor .nps-selection .nps-button { width:var(--ctl-sm); height:var(--ctl-sm); padding:0; flex-shrink:0; }
+  .wb-editor .nps-selection > .nps-menu-trigger { margin-right:0; }
+}
 .wb-paragraph-editor,.wb-raw-editor { display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-2) 0 var(--sp-3); }
 .wb-paragraph-editor .nps-textarea { min-height:var(--area-prose-min-h); }
 .wb-prose-input { font:var(--fs-prose)/var(--lh-prose) var(--font-prose); }

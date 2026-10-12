@@ -35,7 +35,11 @@ import { lookupDanbooruTags } from './danbooru.js';
 import { lookupDsoTags, searchDsoTags } from './dsoDictionary.js';
 import { annotateTags } from './tagAnnotations.js';
 import { exportEmbeddedVibeFile } from './vibes.js';
-import { applyWorkbenchLibraryDetails, readWorkbenchImage } from './workbench.js';
+import {
+  applyWorkbenchLibraryDetails,
+  readWorkbenchImage,
+  applyWorkbenchStructure,
+} from './workbench.js';
 import { listSystemFonts } from './fonts.js';
 import {
   createDatabaseStorage,
@@ -570,7 +574,10 @@ app.whenReady().then(async () => {
       });
       return {
         ok: true,
-        project: applyWorkbenchLibraryDetails(project, libraryProject),
+        project: applyWorkbenchLibraryDetails(
+          applyWorkbenchStructure(project, database.loadWorkbenchStructure(filePath)),
+          libraryProject,
+        ),
         source: request.source
           ? { ...request.source, path: filePath }
           : { type: 'file', path: filePath },
@@ -593,9 +600,12 @@ app.whenReady().then(async () => {
       try {
         items.push({
           ok: true,
-          project: await readWorkbenchImage(filePath, {
-            enrichProjectTags: database.enrichProjectTags,
-          }),
+          project: applyWorkbenchStructure(
+            await readWorkbenchImage(filePath, {
+              enrichProjectTags: database.enrichProjectTags,
+            }),
+            database.loadWorkbenchStructure(filePath),
+          ),
           source: { type: 'file', path: filePath },
         });
       } catch (error) {
@@ -1198,6 +1208,14 @@ app.whenReady().then(async () => {
       return { ok: false, error: error.message };
     }
   });
+  ipcMain.handle('workbench:structure:save', (_event, request) => {
+    try {
+      database.rememberWorkbenchStructure(request.filePath, request.structure, request.projectId);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
   ipcMain.handle('workbench:save-library', async (_event, request = {}) => {
     try {
       if (storageMigrationActive) throw new Error('资源库正在迁移，请稍候');
@@ -1217,6 +1235,12 @@ app.whenReady().then(async () => {
       });
       const id = result.imported[0]?.id || result.duplicates[0]?.projectId;
       if (!id) throw new Error(result.errors[0]?.error || '图片没有存入图片库');
+      const saved = database.loadProject(id);
+      database.rememberWorkbenchStructure(
+        saved.image_path,
+        { ...saved.prompt_structure, block_annotations: request.annotations },
+        id,
+      );
       return { ok: true, project: database.loadProject(id) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };

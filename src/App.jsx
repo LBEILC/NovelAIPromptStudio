@@ -1110,6 +1110,15 @@ export default function App() {
       })),
     );
     scheduleAnnotations(updated);
+    void studio
+      .saveWorkbenchStructure(
+        activeTab.source.path,
+        updated.prompt_structure,
+        activeTab.source.projectId,
+      )
+      .then((result) => {
+        if (!result.ok) showToast(result.error || '块类型与译文没有保存', 'error');
+      });
   };
 
   const translateWorkbenchTags = async (entries) => {

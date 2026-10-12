@@ -1,3 +1,4 @@
+import { workbenchChecks } from './workbench.js';
 import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import { libraryChecks } from './library.js';
@@ -224,7 +225,8 @@ export async function runAcceptance(context) {
     };
     if (mode.category && mode.category !== '全部') {
       h.dualThemes(true);
-      if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
+      if (mode.category === '工作台') await workbenchChecks(environment);
+      else if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
       else if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
       else if (['图片库', '图片库·导入', '图片库·收尾'].includes(mode.category))
         await libraryChecks(environment);
@@ -342,6 +344,7 @@ export async function runAcceptance(context) {
         nativeTheme.themeSource = 'light';
         await wait(`document.documentElement.dataset.theme === 'light'`);
         h.dualThemes(true);
+        await workbenchChecks(environment);
         await shortcutChecks(environment);
         await libraryNamingChecks(environment);
         await libraryChecks(environment);

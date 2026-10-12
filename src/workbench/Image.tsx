@@ -19,7 +19,7 @@ export interface ImageProps {
   onRevealVibe: (vibe: Vibe) => void;
 }
 export function WorkbenchImage({ tab, ...p }: ImageProps) {
-  const [missing, setMissing] = useState(false);
+  const [missing, setMissing] = useState(!!tab.error);
   const [preview, setPreview] = useState(false);
   const image = tab.project;
   const metadata = image?.metadata;
@@ -72,7 +72,7 @@ export function WorkbenchImage({ tab, ...p }: ImageProps) {
                 .filter(Boolean)
                 .join(' · ')}
             </span>
-            {workbenchTabHasChanges(tab) && (
+            {tab.originalProject && workbenchTabHasChanges(tab) && (
               <span className="wb-dirty-line">
                 Prompt 已经和原图不一样
                 <Button variant="quiet" size="small" onClick={p.onReset}>

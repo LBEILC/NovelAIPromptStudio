@@ -62,6 +62,7 @@ export function AddTags({
     <div className="wb-add-tags" ref={drop.setNodeRef} data-drop-active={drop.isOver || undefined}>
       <Autocomplete
         label="输入中文或英文"
+        placeholder="输入中文或英文"
         value={value}
         onChange={setValue}
         items={items}

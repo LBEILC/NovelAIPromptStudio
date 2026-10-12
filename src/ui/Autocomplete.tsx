@@ -71,6 +71,7 @@ export function Autocomplete({
   onChange,
   onSelect,
   label,
+  placeholder,
   directAdd,
 }: {
   items: Suggestion[];
@@ -78,6 +79,7 @@ export function Autocomplete({
   onChange: (value: string) => void;
   onSelect: (item: Suggestion) => void;
   label: string;
+  placeholder?: string;
   directAdd?: { label: string; onSelect: () => void };
 }) {
   const anchor = useRef<HTMLSpanElement>(null);
@@ -104,6 +106,7 @@ export function Autocomplete({
       <Input
         role="combobox"
         aria-label={label}
+        placeholder={placeholder}
         aria-autocomplete="list"
         aria-expanded={open && count > 0}
         aria-controls={open ? id : undefined}

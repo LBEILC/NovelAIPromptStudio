@@ -155,7 +155,7 @@ export function WorkbenchEditor(p: EditorProps) {
       );
     else if (event.shiftKey) {
       const a = entries.findIndex((item) => item.key === last.current);
-      const b = entries.indexOf(entry);
+      const b = entries.findIndex((item) => item.key === entry.key);
       setSelected([
         ...new Set([
           ...selected,
@@ -402,12 +402,50 @@ export function WorkbenchEditor(p: EditorProps) {
                   disabled: !entry.tag.translation,
                   onSelect: () => p.onCopyText(entry.tag.translation, 1, false),
                 },
-                { id: 'translate', label: '翻译与分类', onSelect: () => translate([entry]) },
+                {
+                  id: 'translate',
+                  label: '翻译与分类',
+                  onSelect: () => translate(selected.includes(entry.key) ? chosen : [entry]),
+                },
+                {
+                  id: 'category',
+                  label: '设置分类',
+                  children: CATEGORY_OPTIONS.map((category) => ({
+                    id: category,
+                    label: categoryLabel(category),
+                    onSelect: () => {
+                      const targets = selected.includes(entry.key) ? chosen : [entry];
+                      let project = p.project;
+                      for (const section of doc.scopes) {
+                        const ids = new Set(
+                          targets
+                            .filter((item) => doc.scopes[item.section] === section)
+                            .map((item) => item.tag.id),
+                        );
+                        if (ids.size)
+                          project = updatePromptScopeAnnotations(
+                            project,
+                            section.scope.key,
+                            section.scope.tags.map((tag) =>
+                              ids.has(tag.id)
+                                ? { ...tag, category, category_source: 'manual' }
+                                : tag,
+                            ),
+                          );
+                      }
+                      p.onUpdateProject(project);
+                    },
+                  })),
+                },
                 {
                   id: 'delete',
                   label: '删除',
                   danger: true,
-                  onSelect: () => guard(() => save(deleteTags(doc, [entry]))),
+                  onSelect: () =>
+                    guard(() => {
+                      save(deleteTags(doc, selected.includes(entry.key) ? chosen : [entry]));
+                      setSelected([]);
+                    }),
                 },
               ]}
             >
@@ -455,6 +493,7 @@ export function WorkbenchEditor(p: EditorProps) {
         >
           <SelectionBar visible={!!chosen.length} label={`已选 ${chosen.length} 个 Tag`}>
             <Button
+              aria-label="复制"
               variant="quiet"
               size="small"
               onClick={() => {
@@ -472,13 +511,30 @@ export function WorkbenchEditor(p: EditorProps) {
                 );
               }}
             >
-              复制
+              <i className="ri-file-copy-line" aria-hidden="true" />
+              <span className="wb-responsive-label">复制</span>
             </Button>
-            <Menu label="移动到" items={moveItems} />
-            <Button variant="quiet" size="small" onClick={() => translate(chosen)}>
-              翻译与分类
+            <Menu
+              label="移动到"
+              items={moveItems}
+              trigger={
+                <>
+                  <i className="ri-drag-move-line" aria-hidden="true" />
+                  <span className="wb-responsive-label">移动到</span>
+                </>
+              }
+            />
+            <Button
+              aria-label="翻译与分类"
+              variant="quiet"
+              size="small"
+              onClick={() => translate(chosen)}
+            >
+              <i className="ri-translate-2" aria-hidden="true" />
+              <span className="wb-responsive-label">翻译与分类</span>
             </Button>
             <Button
+              aria-label="删除"
               variant="quiet"
               size="small"
               onClick={() =>
@@ -488,10 +544,12 @@ export function WorkbenchEditor(p: EditorProps) {
                 })
               }
             >
-              删除
+              <i className="ri-delete-bin-line" aria-hidden="true" />
+              <span className="wb-responsive-label">删除</span>
             </Button>
-            <Button variant="quiet" size="small" onClick={() => setSelected([])}>
-              取消
+            <Button aria-label="取消" variant="quiet" size="small" onClick={() => setSelected([])}>
+              <i className="ri-close-line" aria-hidden="true" />
+              <span className="wb-responsive-label">取消</span>
             </Button>
           </SelectionBar>
           {p.children}

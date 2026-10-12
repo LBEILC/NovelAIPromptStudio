@@ -39,6 +39,11 @@ try {
   };
   api = await openDatabase(directory);
   api.insertProject(image);
+  api.rememberWorkbenchStructure(
+    path.join(directory, 'synthetic.png'),
+    image.prompt_structure,
+    image.id,
+  );
   api.close();
   const legacy = await old.openDatabase(directory);
   const loaded = legacy.loadProject(image.id);
@@ -51,6 +56,10 @@ try {
   legacy.persist();
   legacy.close?.();
   api = await openDatabase(directory);
+  assert.deepEqual(
+    api.loadWorkbenchStructure(path.join(directory, 'synthetic.png')).block_annotations,
+    image.prompt_structure.block_annotations,
+  );
   assert.deepEqual(
     api.loadProject(image.id).prompt_structure.block_annotations,
     image.prompt_structure.block_annotations,

@@ -1909,6 +1909,34 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
     insertProject: atomic(insertProject),
     deleteProject: atomic(deleteProject),
     updateProjectName: atomic(updateProjectName),
+    loadWorkbenchStructure: (filePath) => {
+      const key = 'workbench_structure:' + path.resolve(String(filePath || ''));
+      return safeJson(query('SELECT value FROM app_meta WHERE key = $key', { $key: key })[0]?.value)
+        .prompt_structure;
+    },
+    rememberWorkbenchStructure: atomic((filePath, structure, projectId = '') => {
+      // TODO(design): External images have no library row; retain their existing structure in app_meta, keyed by path.
+      const normalized = normalizePromptStructure(structure);
+      database.run('INSERT OR REPLACE INTO app_meta (key, value) VALUES ($key, $value)', {
+        $key: 'workbench_structure:' + path.resolve(String(filePath || '')),
+        $value: JSON.stringify({ prompt_structure: normalized }),
+      });
+      if (projectId) {
+        const project = loadProject(projectId);
+        if (project)
+          database.run(
+            'UPDATE generation_metadata SET prompt_structure_json = $structure WHERE project_id = $id',
+            {
+              $id: projectId,
+              $structure: JSON.stringify({
+                ...project.prompt_structure,
+                block_annotations: normalized.block_annotations || {},
+              }),
+            },
+          );
+      }
+      persist();
+    }),
     updateProjectNames: atomic((changes) => {
       if (
         !Array.isArray(changes) ||

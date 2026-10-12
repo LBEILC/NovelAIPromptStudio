@@ -5,7 +5,27 @@ import sharp from 'sharp';
 import { readNovelAIMetadata } from './metadata.js';
 import { fingerprintVibe } from './vibes.js';
 import { parsePrompt } from '../src/lib/prompt.js';
-import { createPromptStructure } from '../src/lib/promptStructure.js';
+import { createPromptStructure, normalizePromptStructure } from '../src/lib/promptStructure.js';
+
+export function applyWorkbenchStructure(project, remembered) {
+  if (!remembered || !project?.prompt_structure) return project;
+  const current = normalizePromptStructure(project.prompt_structure, project.metadata);
+  const stored = normalizePromptStructure(remembered);
+  const annotations = { ...stored.block_annotations };
+  current.characters.forEach((character, index) => {
+    const previous = stored.characters[index];
+    if (!previous) return;
+    for (const polarity of ['prompt', 'undesired']) {
+      const oldKey = `character:${previous.id}:${polarity}`;
+      const newKey = `character:${character.id}:${polarity}`;
+      if (oldKey !== newKey && annotations[oldKey]) {
+        annotations[newKey] = annotations[oldKey];
+        delete annotations[oldKey];
+      }
+    }
+  });
+  return { ...project, prompt_structure: { ...current, block_annotations: annotations } };
+}
 
 const SUPPORTED_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 const MAX_IMAGE_BYTES = 100 * 1024 * 1024;
@@ -22,7 +42,7 @@ function safeName(filePath) {
 export function applyWorkbenchLibraryDetails(project, libraryProject) {
   if (!project || !libraryProject) return project;
   return {
-    ...project,
+    ...applyWorkbenchStructure(project, libraryProject.prompt_structure),
     name: String(libraryProject.name || '').trim() || project.name,
     thumbnail_path: String(libraryProject.thumbnail_path || '').trim(),
   };

@@ -1,6 +1,28 @@
 // Keep page/state coverage here as the application migrates.
 export const screenshotScenes = [
   { name: 'workbench', page: 'workbench', workbench: true },
+  ...[
+    'home',
+    'edit',
+    'add',
+    'select',
+    'negsel',
+    'prose',
+    'block',
+    'raw',
+    'filter',
+    'view',
+    'copy',
+    'chars',
+    'unsaved',
+    'missing',
+    'tabs',
+  ].map((workbenchState) => ({
+    name: `workbench-${workbenchState}`,
+    page: 'workbench',
+    workbench: true,
+    workbenchState,
+  })),
   { name: 'workbench-empty', page: 'workbench' },
   { name: 'gallery', page: 'gallery', select: true },
   { name: 'gallery-collections', page: 'gallery', collections: true },

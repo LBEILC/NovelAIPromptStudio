@@ -225,10 +225,15 @@ export function parseWorkbenchSession(value) {
 }
 
 export function workbenchTabHasChanges(tab) {
-  if (!tab?.project || !tab?.originalProject) return false;
+  if (!tab?.project || (!tab?.originalProject && !tab?.savedDraft)) return false;
   const comparableSnapshot = (project) =>
     JSON.stringify(normalizePromptChangeValue(promptSnapshot(project)));
-  return comparableSnapshot(tab.project) !== comparableSnapshot(tab.originalProject);
+  return (
+    comparableSnapshot(tab.project) !==
+    (tab.originalProject
+      ? comparableSnapshot(tab.originalProject)
+      : JSON.stringify(normalizePromptChangeValue(tab.savedDraft)))
+  );
 }
 
 function normalizePromptChangeValue(value) {

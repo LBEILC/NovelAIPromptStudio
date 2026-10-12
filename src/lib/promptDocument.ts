@@ -510,6 +510,114 @@ export function copyVisiblePromptDocument(
   } = {},
 ) {
   const project = promptDocumentProject(document);
+  const filters = { ...DEFAULT_OVERVIEW_FILTERS, ...options.filters };
+  // A filter is a view of the block document: prose must not be flattened into
+  // comma-separated pseudo tags, and a fully visible block keeps its raw text.
+  if (
+    !options.selectedKeys?.length &&
+    (filters.query ||
+      filters.category !== 'All' ||
+      filters.polarity !== 'all' ||
+      filters.domain !== 'all')
+  ) {
+    type CopyEntry = {
+      key: string;
+      scopeKey: string;
+      scopePolarity: string;
+      tag: Tag;
+      automation: PromptAutomation | null;
+    };
+    const all: CopyEntry[] = overviewEntries(getPromptScopes(project));
+    const visibleKeys = new Set(
+      overviewEntries(
+        filterCollapsedAutomaticScopes(
+          filterOverviewScopes(project, filters),
+          options.expandedScopeKeys,
+        ),
+      ).map((entry: CopyEntry) => entry.key),
+    );
+    const parts = document.scopes.flatMap((section) => {
+      if (
+        (filters.polarity !== 'all' && filters.polarity !== section.scope.polarity) ||
+        (filters.domain !== 'all' && filters.domain !== section.scope.kind)
+      )
+        return [];
+      const ranges = promptTagRanges(serializePromptSection(section));
+      return section.blocks.flatMap((block) => {
+        if (block.type === 'paragraph') {
+          if (
+            filters.category !== 'All' ||
+            !`${block.content}\n${block.translation || ''}`
+              .toLocaleLowerCase()
+              .includes(filters.query.trim().toLocaleLowerCase())
+          )
+            return [];
+          return [
+            {
+              polarity: section.scope.polarity,
+              scope: section.scope.key,
+              text: block.raw,
+              entries: [] as typeof all,
+            },
+          ];
+        }
+        const local = promptTagRanges(block.content);
+        const entries = local.flatMap((range) => {
+          const tag =
+            section.scope.tags[
+              ranges.findIndex((item) => item.start === block.contentRange.start + range.start)
+            ];
+          const entry = all.find(
+            (item) => item.scopeKey === section.scope.key && item.tag.id === tag?.id,
+          );
+          return entry &&
+            visibleKeys.has(entry.key) &&
+            !['confirmed', 'inferred'].includes(entry.automation?.status || '')
+            ? [entry]
+            : [];
+        });
+        if (!entries.length) return [];
+        return [
+          {
+            polarity: section.scope.polarity,
+            scope: section.scope.key,
+            text:
+              entries.length === block.tags.length
+                ? block.raw
+                : entries.map((entry) => formatTag(entry.tag)).join(', '),
+            entries,
+          },
+        ];
+      });
+    });
+    const polarity = parts.some((part) => part.polarity === 'prompt') ? 'prompt' : 'undesired';
+    const copied = parts.filter((part) => part.polarity === polarity);
+    const entries = copied.flatMap((part) => part.entries);
+    const scopes = [...new Set(copied.map((part) => part.scope))];
+    return {
+      text: scopes
+        .map((scope) =>
+          copied
+            .filter((part) => part.scope === scope)
+            .map((part) => part.text)
+            .join('\n\n'),
+        )
+        .join(polarity === 'prompt' ? '\n|\n' : '\n'),
+      count: entries.length,
+      ignored: parts
+        .filter((part) => part.polarity !== polarity)
+        .reduce((sum, part) => sum + part.entries.length, 0),
+      automaticIgnored: all.filter(
+        (entry) =>
+          visibleKeys.has(entry.key) &&
+          entry.scopePolarity === polarity &&
+          ['confirmed', 'inferred'].includes(entry.automation?.status || ''),
+      ).length,
+      selected: false,
+      categoryCount: 0,
+      entries,
+    };
+  }
   const visible = filterCollapsedAutomaticScopes(
     filterOverviewScopes(project, options.filters),
     options.expandedScopeKeys,

@@ -2,7 +2,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { applyWorkbenchLibraryDetails, readWorkbenchImage } from './workbench.js';
+import {
+  applyWorkbenchLibraryDetails,
+  applyWorkbenchStructure,
+  readWorkbenchImage,
+} from './workbench.js';
+import { openDatabase } from './database.js';
 
 const temporaryDirectories = [];
 
@@ -46,6 +51,42 @@ afterEach(() => {
 });
 
 describe('workbench image reader', () => {
+  it('remembers block annotations across close/reopen without replacing the source prompt', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-workbench-'));
+    temporaryDirectories.push(directory);
+    const filePath = path.join(directory, 'synthetic.png');
+    workbenchPng(filePath);
+    const project = await readWorkbenchImage(filePath);
+    const structure = {
+      ...project.prompt_structure,
+      block_annotations: {
+        'base:prompt': [
+          { raw: '1girl, silver hair', start: 0, type: 'paragraph', translation: '合成译文' },
+        ],
+      },
+    };
+    const database = await openDatabase(directory);
+    database.insertProject({ ...project, content_hash: 'synthetic-memory' });
+    database.rememberWorkbenchStructure(filePath, structure, project.id);
+    database.close();
+    const reopened = await openDatabase(directory);
+    try {
+      const read = applyWorkbenchStructure(
+        await readWorkbenchImage(filePath),
+        reopened.loadWorkbenchStructure(filePath),
+      );
+      expect(read.prompt_structure.block_annotations).toEqual(structure.block_annotations);
+      expect(reopened.loadProject(project.id).prompt_structure.block_annotations).toEqual(
+        structure.block_annotations,
+      );
+      expect(read.metadata.prompt_raw).toBe(project.metadata.prompt_raw);
+      expect(reopened.loadProject(project.id).metadata.prompt_raw).toBe(
+        project.metadata.prompt_raw,
+      );
+    } finally {
+      reopened.close();
+    }
+  });
   it('uses the library title and thumbnail for library-backed workbench tabs', () => {
     expect(
       applyWorkbenchLibraryDetails(

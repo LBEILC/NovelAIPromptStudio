@@ -3,6 +3,9 @@ import path from 'node:path';
 import { ipcMain, nativeImage, screen } from 'electron';
 import { importLibraryFiles } from './importer.js';
 import { screenshotScenes } from '../scripts/app-screenshot-scenes.mjs';
+import { createWorkbenchFixtures } from './acceptance/workbenchFixtures.js';
+import { prepareWorkbenchScreenshot } from './workbenchScreenshots.js';
+import { workbenchReferenceRenderer } from './workbenchReference.js';
 import { prepareLibraryScreenshot } from './libraryScreenshots.js';
 
 async function renderedFonts(webContents, selectors) {
@@ -70,6 +73,20 @@ export async function runAppScreenshots({
     filters: { query: '1girl' },
   });
   database.updateProjects([projects.at(-1).id], { deleted: true });
+  const workbenchFiles = await createWorkbenchFixtures(
+    path.join(app.getPath('userData'), 'synthetic-workbench'),
+  );
+  const manyWorkbenchFiles = [...workbenchFiles];
+  for (let i = 0; i < 24; i++) {
+    const file = path.join(
+      app.getPath('userData'),
+      'synthetic-workbench',
+      `synthetic-s-${50000 + i}.png`,
+    );
+    await fs.copyFile(workbenchFiles[i % 3], file);
+    manyWorkbenchFiles.push(file);
+  }
+  let reference;
   const errors = [];
   const onError = (_event, error) => errors.push(error);
   ipcMain.on('screenshot:error', onError);
@@ -82,10 +99,14 @@ export async function runAppScreenshots({
     sessionData: app.getPath('sessionData'),
     screenshots: [],
     fontProof: [],
+    comparisons: [],
   };
   try {
     for (const theme of ['light', 'dark']) {
-      for (const scene of screenshotScenes) {
+      for (const scene of screenshotScenes.filter(
+        (scene) =>
+          !process.argv.includes('--app-screenshot-workbench') || scene.page === 'workbench',
+      )) {
         preferences.saveAppearanceSettings({ themeMode: theme, motion: 'off' });
         const state = {
           ...scene,
@@ -93,10 +114,15 @@ export async function runAppScreenshots({
           collections: Boolean(scene.collections),
           animationsDisabled: true,
           selectedProjectId: scene.select ? projects[0].id : '',
-          workbenchPaths: scene.workbench ? filePaths.slice(0, 3) : [],
+          workbenchPaths: scene.workbench
+            ? scene.workbenchState === 'tabs'
+              ? manyWorkbenchFiles
+              : workbenchFiles
+            : [],
         };
         const window = createWindow(state);
         let cleanupLibraryScene = async () => {};
+        let cleanupWorkbenchScene = async () => {};
         const overlayUpdates = [];
         if (process.platform === 'win32' && window.setTitleBarOverlay) {
           const applyOverlay = window.setTitleBarOverlay.bind(window);
@@ -185,6 +211,12 @@ export async function runAppScreenshots({
             assetsDirectory,
             filePaths,
           });
+          cleanupWorkbenchScene = await prepareWorkbenchScreenshot({
+            window,
+            scene,
+            mode,
+            filePaths: workbenchFiles,
+          });
           if (
             process.platform === 'win32' &&
             window.setTitleBarOverlay &&
@@ -222,8 +254,18 @@ export async function runAppScreenshots({
           const file = `${scene.name}-${theme}.png`;
           await fs.writeFile(path.join(mode.output, file), image.toPNG());
           const fontSelectors = [['ui', '.studio-titlebar nav button .nps-button-label', 'MiSans']];
-          if (scene.name === 'workbench')
-            fontSelectors.push(['tag', '.overview-tag-copy', 'IBM Plex Mono']);
+          if (scene.name === 'workbench') {
+            fontSelectors.push(['tag', '.wb-prompt .nps-tag-en', 'IBM Plex Mono']);
+            if (process.argv.includes('--app-screenshot-workbench'))
+              manifest.fontProof.push({
+                theme,
+                file,
+                renderedFonts: await renderedFonts(window.webContents, [
+                  ...fontSelectors,
+                  ['prose', '.wb-prose p', 'Newsreader'],
+                ]),
+              });
+          }
           if (scene.name === 'settings-updates')
             fontSelectors.push(['proseBrand', '.settings-about-name', 'Newsreader']);
           manifest.screenshots.push({
@@ -246,6 +288,17 @@ export async function runAppScreenshots({
             })()`),
           });
           console.log(`Captured ${file}`);
+          if (scene.workbenchState) {
+            reference ||= await workbenchReferenceRenderer(mode.output);
+            manifest.comparisons.push(
+              await reference.capture(
+                scene.workbenchState,
+                theme,
+                path.join(mode.output, file),
+                window,
+              ),
+            );
+          }
           if (scene.name === 'settings-updates') {
             // Screenshot-only specimens: no UI input, saved settings or production layout changes.
             // The legacy workbench has no prose block yet, so verify the real prose token here.
@@ -280,6 +333,7 @@ export async function runAppScreenshots({
             manifest.fontProof.push({ file: proofFile, theme, renderedFonts: proof });
           }
         } finally {
+          await cleanupWorkbenchScene();
           await cleanupLibraryScene();
           window.destroy();
         }
@@ -291,6 +345,7 @@ export async function runAppScreenshots({
       `Imported 14 images in ${importMilliseconds}ms; captured ${manifest.screenshots.length} screens`,
     );
   } finally {
+    await reference?.close();
     ipcMain.removeListener('screenshot:error', onError);
   }
 }

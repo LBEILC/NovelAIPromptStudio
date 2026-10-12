@@ -411,6 +411,7 @@ export function WorkbenchDocument(p: DocumentProps) {
                   variant="quiet"
                   size="small"
                   onClick={() => {
+                    // TODO(design): No empty-block editor is specified; use the existing raw editor at this separator.
                     const raw = serializePromptSection(section);
                     const at = block.range.end;
                     p.onRawEdit?.(si, raw.slice(0, at) + '\n\n' + raw.slice(at));

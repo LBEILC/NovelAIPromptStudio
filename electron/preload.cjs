@@ -85,6 +85,8 @@ contextBridge.exposeInMainWorld(
     copyProjectImage: (id) => invoke('image:copy', id),
     downloadProjectImage: (id) => invoke('image:download', id),
     copyWorkbenchImage: (filePath) => invoke('workbench:image:copy-current', filePath),
+    saveWorkbenchStructure: (filePath, structure, projectId = '') =>
+      invoke('workbench:structure:save', { filePath, structure, projectId }),
     saveWorkbenchToLibrary: (filePath, annotations) =>
       invoke('workbench:save-library', { filePath, annotations }),
     downloadWorkbenchImage: (filePath, name) =>

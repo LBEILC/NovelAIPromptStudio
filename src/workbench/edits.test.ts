@@ -51,4 +51,13 @@ describe('minimal workbench tag edits', () => {
     );
     expect(serializePromptSection(doc.scopes[0])).toBe('sky, river');
   });
+  it('keeps translation and category attached to the moved leaf', () => {
+    const doc = fixture('sky, river\n\nsoft light, fog');
+    doc.scopes[0].scope.tags[1].translation = '河流';
+    doc.scopes[0].scope.tags[1].category = 'Environment';
+    const next = moveTags(doc, [documentTags(doc)[1]], { section: 0, block: 1 });
+    const moved = promptDocumentProject(next).tags?.find((tag) => tag.tag === 'river');
+    expect(moved).toMatchObject({ translation: '河流', category: 'Environment' });
+    expect(serializePromptSection(next.scopes[0])).toBe('sky, \n\nsoft light, fog, river');
+  });
 });

@@ -11,6 +11,7 @@ export function acceptanceOptions(argv = process.argv.slice(2)) {
   if (
     ![
       '全部',
+      '工作台',
       '图片库',
       '图片库·起名',
       '图片库·复制',

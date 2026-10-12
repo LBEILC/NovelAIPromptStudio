@@ -19,6 +19,7 @@ try {
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NOVELAI_DEV_URL;
   const args = ['.', `--app-screenshots=${root}`];
+  if (process.argv.includes('--workbench')) args.push('--app-screenshot-workbench');
   if (process.argv.includes('--constrain-window')) args.push('--app-screenshot-constrain-window');
   child = spawn(electron, args, {
     env,
@@ -38,6 +39,7 @@ try {
     const manifest = JSON.parse(await fs.readFile(path.join(output, 'manifest.json'), 'utf8'));
     if (manifest.fontProof?.length !== 2) throw new Error('Missing actual rendered font evidence');
     const expected = screenshotScenes
+      .filter((scene) => !process.argv.includes('--workbench') || scene.page === 'workbench')
       .flatMap((scene) => ['light', 'dark'].map((theme) => `${scene.name}-${theme}.png`))
       .sort();
     if (

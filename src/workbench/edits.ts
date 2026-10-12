@@ -2,6 +2,8 @@ import {
   editPromptBlockText,
   editPromptTag,
   serializePromptSection,
+  createPromptDocument,
+  promptDocumentProject,
   type PromptDocument,
 } from '../lib/promptDocument';
 import { formatTag, promptTagRanges } from '../lib/prompt.js';
@@ -87,5 +89,34 @@ export function moveTags(
             entry.index < target.index!,
         ).length;
   const text = entries.map((entry) => formatTag(entry.tag)).join(', ');
-  return insertTags(deleteTags(document, entries), target.section, target.block, text, before);
+  const deleted = deleteTags(document, entries);
+  const insertionIndex =
+    before ??
+    (target.block < 0
+      ? 0
+      : promptTagRanges(deleted.scopes[target.section].blocks[target.block].content).length);
+  const next = insertTags(deleted, target.section, target.block, text, before);
+  const section = next.scopes[target.section];
+  const block = section.blocks[target.block < 0 ? section.blocks.length - 1 : target.block];
+  const position = block.contentRange.start + promptTagRanges(block.content)[insertionIndex].start;
+  const offset = promptTagRanges(serializePromptSection(section)).findIndex(
+    (range) => range.start === position,
+  );
+  const result = createPromptDocument(promptDocumentProject(next));
+  result.scopes[target.section].scope.tags = result.scopes[target.section].scope.tags.map(
+    (tag, index) => {
+      const moved = entries[index - offset]?.tag;
+      return moved
+        ? {
+            ...tag,
+            translation: moved.translation,
+            translation_source: moved.translation_source,
+            category: moved.category,
+            category_source: moved.category_source,
+            note: moved.note,
+          }
+        : tag;
+    },
+  );
+  return result;
 }

@@ -239,19 +239,21 @@ export function LibraryViewer({
             <i className="ri-download-line" />
             另存为
           </Button>
-          <span className="library-separator" />
-          <Button
-            variant="quiet"
-            size="small"
-            onClick={() => {
-              p.onOpenWorkbench?.(
-                image as Parameters<NonNullable<LibraryProps['onOpenWorkbench']>>[0],
-              );
-              onClose();
-            }}
-          >
-            在工作台打开
-          </Button>
+          {p.onOpenWorkbench && <span className="library-separator" />}
+          {p.onOpenWorkbench && (
+            <Button
+              variant="quiet"
+              size="small"
+              onClick={() => {
+                p.onOpenWorkbench?.(
+                  image as Parameters<NonNullable<LibraryProps['onOpenWorkbench']>>[0],
+                );
+                onClose();
+              }}
+            >
+              在工作台打开
+            </Button>
+          )}
         </div>
       </div>
     </div>,
