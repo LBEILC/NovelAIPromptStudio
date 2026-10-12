@@ -71,6 +71,16 @@ const SET_BODY = {
     <h2>更新</h2>
     <div class="setrow"><div>自动检查更新<small>启动稳定后检查一次，不会自动安装</small></div><span class="switch on"></span></div>
     <div class="setrow"><div>发现新版本 1.0.1<small>已下载完成 · 重启后安装，工作台里的标签和草稿会保留</small></div><span class="row"><button class="btn quiet sm">更新说明</button><button class="btn ink sm">重启并安装</button></span></div>
+    <h2>快捷键</h2>
+    <div class="help">macOS 上 Ctrl 对应 Command。在输入框里，Ctrl V 仍然是普通的粘贴。</div>
+    ${[['打开图片；在图片库里是导入', ['Ctrl', 'I']], ['从剪贴板打开或导入图片', ['Ctrl', 'V']], ['聚焦搜索框', ['Ctrl', 'K']],
+       ['下一个 / 上一个标签', ['Ctrl', 'Tab'], ['Ctrl', 'Shift', 'Tab']], ['关闭当前标签', ['Ctrl', 'W']],
+       ['移动当前 Tag', ['Alt', '方向键']], ['在一摞图片里切换', ['←'], ['→']]]
+      .map(([t, ...ks]) => `<div class="setrow"><div>${t}</div><span class="row">${ks.map((k) => k.map((x) => `<span class="kbd">${x}</span>`).join('')).join('<span class="muted">/</span>')}</span></div>`).join('')}
+    <h2>数据与隐私</h2>
+    <div class="setrow"><div>图片和图库数据只存在这台电脑上<small>位置见"图片库"那一页。软件不会把图片上传到任何地方</small></div></div>
+    <div class="setrow"><div>只在这几种情况下联网<small>检查更新（可以关掉）；你配置了 AI 服务并点了翻译、分类或段落的 AI 按钮时，把这几个 Tag 或这一段文字发给你配置的服务，不发图片；点"报告问题"时在浏览器里打开 GitHub</small></div></div>
+    <div class="setrow"><div>AI 服务的密钥加密保存在本机<small>诊断信息和报告问题都不会带上它</small></div></div>
     <h2>反馈与支持</h2>
     <div class="setrow"><div>报告问题或提出建议<small>会在浏览器里打开 GitHub，不会自动附带任何数据</small></div><span class="row"><button class="btn sm">报告问题</button><button class="btn sm">提出建议</button></span></div>
     <div class="setrow"><div>诊断信息<small>只包含软件版本和操作系统，不包含图片、Prompt 和路径</small></div><button class="btn quiet sm">复制</button></div>
@@ -94,7 +104,8 @@ Object.assign(NOTES, {
         '图片库：除了存放位置，还把数据库位置、升级前的备份和回收站放在一起，"我的数据在哪、怎么备份"一页看完。',
         'AI 服务：这一块是一张表单，有明确的"保存"，因为"测试连接"要用还没保存的值。其余设置都是改了立刻生效。',
         '翻译词典：原来叫"Tag 缓存"，是按 Tag 芯片排列的；现在改成表格，一行一条，方便成批查看和修正。',
-        '关于：有"非官方工具"的声明，以及字体的署名（MiSans 的授权要求在软件里注明）。'],
+        '关于：有"非官方工具"的声明，以及字体的署名（MiSans 的授权要求在软件里注明）。',
+        '1.0 不做帮助中心（2026-10-12）。原来帮助中心里真正有用的两块挪到这里：快捷键列表，以及"数据存在哪、什么时候联网"的说明。其余的引导放在用的地方：空状态、悬停提示、Tag 提示。'],
 });
 
 document.getElementById('win').addEventListener('click', (e) => {
