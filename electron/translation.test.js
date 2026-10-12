@@ -1,11 +1,44 @@
 import { describe, expect, it, vi } from 'vitest';
-import { listModels, normalizeBaseUrl, testModel, translateTags } from './translation.js';
+import {
+  listModels,
+  normalizeBaseUrl,
+  testModel,
+  translateTags,
+  transformParagraph,
+} from './translation.js';
 
 function jsonResponse(body, { ok = true, status = 200 } = {}) {
   return { ok, status, json: async () => body };
 }
 
 describe('OpenAI-compatible AI translation', () => {
+  it('translates whole paragraphs and cancels the actual pending request', async () => {
+    const settings = { baseUrl: 'http://localhost:1234/v1', model: 'synthetic-model' };
+    const fetcher = vi.fn(async () =>
+      jsonResponse({ choices: [{ message: { content: '合成段落译文' } }] }),
+    );
+    expect(await transformParagraph('Synthetic paragraph.', 'translate', settings, fetcher)).toBe(
+      '合成段落译文',
+    );
+    expect(JSON.parse(fetcher.mock.calls[0][1].body).messages[1].content).toBe(
+      'Synthetic paragraph.',
+    );
+    const controller = new AbortController();
+    const pending = transformParagraph(
+      '合成段落',
+      'rewrite',
+      settings,
+      async (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          );
+        }),
+      controller.signal,
+    );
+    controller.abort();
+    await expect(pending).rejects.toThrow();
+  });
   it('loads and sorts models with bearer authentication', async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({ data: [{ id: 'qwen-plus' }, { id: 'gpt-4.1-mini' }] }),

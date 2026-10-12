@@ -49,3 +49,7 @@
 .wb-tag-dragging .nps-tag { box-shadow:var(--shadow-pop); }
 .wb-editor .nps-selection-slot { position:absolute; bottom:calc(var(--bar-h) + var(--sp-3)); left:var(--sp-3); right:var(--sp-3); }
 .wb-editor .nps-selection { width:100%; }
+.wb-paragraph-editor,.wb-raw-editor { display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-2) 0 var(--sp-3); }
+.wb-paragraph-editor .nps-textarea { min-height:var(--area-prose-min-h); }
+.wb-prose-input { font:var(--fs-prose)/var(--lh-prose) var(--font-prose); }
+.wb-raw-editor .nps-textarea { min-height:var(--area-raw-min-h); font:var(--fs-small)/var(--lh-small) var(--font-mono); }

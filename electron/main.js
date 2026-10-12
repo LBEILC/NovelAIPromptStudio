@@ -29,7 +29,7 @@ import {
   inspectLibraryImportFiles,
 } from './importer.js';
 import { openPreferences } from './preferences.js';
-import { listModels, testModel, translateTags } from './translation.js';
+import { listModels, testModel, translateTags, transformParagraph } from './translation.js';
 import { lookupDanbooruTags } from './danbooru.js';
 import { lookupDsoTags, searchDsoTags } from './dsoDictionary.js';
 import { annotateTags } from './tagAnnotations.js';
@@ -1403,6 +1403,34 @@ app.whenReady().then(async () => {
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
+  });
+  const paragraphRequests = new Map();
+  ipcMain.handle('paragraph:transform', async (event, request = {}) => {
+    const key = `${event.sender.id}:${String(request.id)}`;
+    const controller = new AbortController();
+    paragraphRequests.get(key)?.abort();
+    paragraphRequests.set(key, controller);
+    const cancel = () => controller.abort();
+    event.sender.once('destroyed', cancel);
+    try {
+      const text = await transformParagraph(
+        request.text,
+        request.direction,
+        preferences.credentials(),
+        net.fetch,
+        controller.signal,
+      );
+      return { ok: true, text };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      if (paragraphRequests.get(key) === controller) paragraphRequests.delete(key);
+      event.sender.removeListener('destroyed', cancel);
+    }
+  });
+  ipcMain.handle('paragraph:cancel', (event, id) => {
+    paragraphRequests.get(`${event.sender.id}:${String(id)}`)?.abort();
+    return { ok: true };
   });
   ipcMain.handle('ai:model:test', async () => {
     try {

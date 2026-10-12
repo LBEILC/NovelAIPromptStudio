@@ -46,6 +46,8 @@ export interface DocumentProps {
   selectedKeys?: string[];
   children?: ReactNode;
   characterActions?: ReactNode;
+  sectionActions?: (section: number) => ReactNode;
+  sectionEditor?: { section: number; content: ReactNode };
 }
 export function WorkbenchDocument(p: DocumentProps) {
   const doc = useMemo(() => createPromptDocument(p.project), [p.project]);
@@ -445,6 +447,7 @@ export function WorkbenchDocument(p: DocumentProps) {
                 </Button>
                 <span className="nps-help">{section.blocks.length} 块</span>
                 <span className="wb-section-actions">
+                  {p.sectionActions?.(si)}
                   <Button
                     variant="quiet"
                     size="small"
@@ -469,46 +472,49 @@ export function WorkbenchDocument(p: DocumentProps) {
                   />
                 </span>
               </header>
-              {!collapsed.includes(sectionKey) && (
-                <>
-                  {!!sectionEntries.filter((entry) => entry.automatic).length && (
-                    <div
-                      className="wb-automatic"
-                      title="元数据与官方预设模板均匹配；默认复制时会排除这些自动内容。"
-                    >
-                      {section.scope.automation?.sourceLabel ||
-                        `NovelAI 自动添加 · ${section.scope.automation?.tagCount}`}
-                      <Button
-                        variant="quiet"
-                        size="small"
-                        onClick={() =>
-                          setAutomatic(
-                            automatic.includes(sectionKey)
-                              ? automatic.filter((key) => key !== sectionKey)
-                              : [...automatic, sectionKey],
-                          )
-                        }
-                      >
-                        {automatic.includes(sectionKey) ? '隐藏' : '显示'}
-                      </Button>
-                    </div>
+              {p.sectionEditor?.section === si
+                ? p.sectionEditor.content
+                : !collapsed.includes(sectionKey) && (
+                    <>
+                      {!!sectionEntries.filter((entry) => entry.automatic).length && (
+                        <div
+                          className="wb-automatic"
+                          title="元数据与官方预设模板均匹配；默认复制时会排除这些自动内容。"
+                        >
+                          {section.scope.automation?.sourceLabel ||
+                            `NovelAI 自动添加 · ${section.scope.automation?.tagCount}`}
+                          <Button
+                            variant="quiet"
+                            size="small"
+                            onClick={() =>
+                              setAutomatic(
+                                automatic.includes(sectionKey)
+                                  ? automatic.filter((key) => key !== sectionKey)
+                                  : [...automatic, sectionKey],
+                              )
+                            }
+                          >
+                            {automatic.includes(sectionKey) ? '隐藏' : '显示'}
+                          </Button>
+                        </div>
+                      )}
+                      {p.viewState.viewMode === 'category' &&
+                        CATEGORY_OPTIONS.map((cat) => {
+                          const tags = visibleEntries.filter((entry) => entry.tag.category === cat);
+                          return (
+                            tags.some(matches) && (
+                              <div key={cat} className="wb-block">
+                                <header>{categoryLabel(cat)}</header>
+                                <div className="wb-tags">{tags.map(drawTag)}</div>
+                              </div>
+                            )
+                          );
+                        })}
+                      {section.blocks.map((_, bi) => renderBlock(bi))}
+                      {!section.blocks.length && p.renderAdd?.(si, -1)}
+                      {!!hiddenBlocks && <p className="nps-help">{hiddenBlocks} 块被收起</p>}
+                    </>
                   )}
-                  {p.viewState.viewMode === 'category' &&
-                    CATEGORY_OPTIONS.map((cat) => {
-                      const tags = visibleEntries.filter((entry) => entry.tag.category === cat);
-                      return (
-                        tags.some(matches) && (
-                          <div key={cat} className="wb-block">
-                            <header>{categoryLabel(cat)}</header>
-                            <div className="wb-tags">{tags.map(drawTag)}</div>
-                          </div>
-                        )
-                      );
-                    })}
-                  {section.blocks.map((_, bi) => renderBlock(bi))}
-                  {!!hiddenBlocks && <p className="nps-help">{hiddenBlocks} 块被收起</p>}
-                </>
-              )}
             </section>
           );
         })}

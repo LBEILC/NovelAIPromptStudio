@@ -116,6 +116,8 @@ contextBridge.exposeInMainWorld(
     listAIModels: () => invoke('ai:models:list'),
     testAIModel: () => invoke('ai:model:test'),
     translateTags: (tags) => invoke('translation:tags', tags),
+    transformParagraph: (request) => invoke('paragraph:transform', request),
+    cancelParagraph: (id) => invoke('paragraph:cancel', id),
   }),
 );
 

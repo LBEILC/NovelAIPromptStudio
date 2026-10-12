@@ -244,6 +244,12 @@ export interface StudioApi {
   listAIModels(): Promise<Result<{ models: string[] }>>;
   testAIModel(): Promise<Result<{ model: string; latencyMs: number; response: string }>>;
   translateTags(tags: string[]): Promise<Result<TranslationResult>>;
+  transformParagraph(request: {
+    id: string;
+    text: string;
+    direction: 'translate' | 'rewrite';
+  }): Promise<Result<{ text: string }>>;
+  cancelParagraph(id: string): Promise<Result>;
   suggestTags(
     query: string,
   ): Promise<Result<{ items: { tag: string; translation: string; category: TagCategory }[] }>>;

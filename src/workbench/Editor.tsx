@@ -8,22 +8,38 @@ import {
   useSensors,
   pointerWithin,
 } from '@dnd-kit/core';
-import { Button, Input, Menu, Popover, Select, SelectionBar, type MenuItem } from '../ui';
+import { Button, Input, Menu, Popover, Select, SelectionBar, TextArea, type MenuItem } from '../ui';
 import {
   createPromptDocument,
   promptDocumentProject,
   editPromptTag,
+  editPromptParagraph,
+  serializePromptSection,
   copyVisiblePromptDocument,
   type PromptDocument,
 } from '../lib/promptDocument';
-import { updatePromptScopeAnnotations } from '../lib/promptStructure.js';
+import {
+  updatePromptScopeAnnotations,
+  addPromptCharacter,
+  updatePromptCharacter,
+  removePromptCharacter,
+  MAX_PROMPT_CHARACTERS,
+} from '../lib/promptStructure.js';
 import { CATEGORY_OPTIONS } from '../lib/prompt.js';
 import { encodeMarqueeKey } from '../lib/marqueeSelection.js';
 import { useMarqueeSelection, MarqueeSelectionOverlay } from '../components/MarqueeSelection.jsx';
 import { WorkbenchDocument, type DocumentProps } from './Document';
-import { documentTags, replaceSection, scopeLabel, categoryLabel, type DocumentTag } from './model';
+import {
+  documentTags,
+  replaceSection,
+  reparseSection,
+  scopeLabel,
+  categoryLabel,
+  type DocumentTag,
+} from './model';
 import { deleteTags, insertTags, moveTags } from './edits';
 import { AddTags } from './AddTags';
+import { ParagraphEditor } from './Paragraph';
 import type { ImageProject, TagCategory } from '../shared/types';
 
 function EditableTag({
@@ -69,10 +85,21 @@ function EditableTag({
     </span>
   );
 }
-export function WorkbenchEditor(p: DocumentProps) {
+export interface EditorProps extends DocumentProps {
+  onConfirm: (options: {
+    title: string;
+    message: string;
+    detail?: string;
+    okText: string;
+    danger?: boolean;
+  }) => Promise<boolean>;
+}
+export function WorkbenchEditor(p: EditorProps) {
   const doc = useMemo(() => createPromptDocument(p.project), [p.project]);
   const entries = useMemo(() => documentTags(doc), [doc]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [raw, setRaw] = useState<{ section: number; value: string } | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [editing, setEditing] = useState<DocumentTag | null>(null);
   const [draft, setDraft] = useState({
     tag: '',
@@ -216,6 +243,136 @@ export function WorkbenchEditor(p: DocumentProps) {
         <WorkbenchDocument
           {...p}
           selectedKeys={selected}
+          onRawEdit={(section) =>
+            setRaw({ section, value: serializePromptSection(doc.scopes[section]) })
+          }
+          sectionEditor={
+            raw
+              ? {
+                  section: raw.section,
+                  content: (
+                    <div className="wb-raw-editor">
+                      <TextArea
+                        aria-label="原始文本"
+                        value={raw.value}
+                        onChange={(event) => setRaw({ ...raw, value: event.target.value })}
+                      />
+                      <p className="nps-help">
+                        空一行就是新的一块。保存后重新分块，译文和分类会保留。
+                      </p>
+                      <div className="wb-editor-actions">
+                        <Button variant="quiet" onClick={() => setRaw(null)}>
+                          取消
+                        </Button>
+                        <Button
+                          variant="ink"
+                          onClick={() =>
+                            guard(() => {
+                              save(
+                                replaceSection(
+                                  doc,
+                                  raw.section,
+                                  reparseSection(doc.scopes[raw.section], raw.value),
+                                ),
+                              );
+                              setRaw(null);
+                            })
+                          }
+                        >
+                          保存
+                        </Button>
+                      </div>
+                    </div>
+                  ),
+                }
+              : undefined
+          }
+          characterActions={
+            <div className="wb-section-head">
+              <strong>角色</strong>
+              <span className="nps-help">
+                {p.project.prompt_structure.characters.length || '暂无'}
+              </span>
+              <Button
+                variant="quiet"
+                size="small"
+                disabled={p.project.prompt_structure.characters.length >= MAX_PROMPT_CHARACTERS}
+                onClick={() => p.onUpdateProject(addPromptCharacter(p.project))}
+              >
+                添加角色
+              </Button>
+            </div>
+          }
+          sectionActions={(si) => {
+            const scope = doc.scopes[si].scope;
+            if (scope.kind !== 'character' || scope.polarity !== 'prompt') return null;
+            const character = scope.character;
+            if (renaming?.id === character.id)
+              return (
+                <Input
+                  aria-label="角色名称"
+                  value={renaming.name}
+                  onChange={(event) => setRenaming({ ...renaming, name: event.target.value })}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setRenaming(null);
+                    if (event.key === 'Enter' && renaming.name.trim()) {
+                      p.onUpdateProject(
+                        updatePromptCharacter(p.project, character.id, {
+                          label: renaming.name.trim(),
+                        }),
+                      );
+                      setRenaming(null);
+                    }
+                  }}
+                />
+              );
+            return (
+              <Menu
+                label="角色操作"
+                trigger={<i className="ri-edit-line" />}
+                items={[
+                  {
+                    id: 'rename',
+                    label: '重命名',
+                    onSelect: () => setRenaming({ id: character.id, name: character.label }),
+                  },
+                  {
+                    id: 'remove',
+                    label: '移除角色',
+                    danger: true,
+                    onSelect: () =>
+                      void (async () => {
+                        if (
+                          await p.onConfirm({
+                            title: `移除“${character.label}”？`,
+                            message:
+                              '该角色的 Prompt、Undesired Content 和已整理的 Tag 将一并移除。',
+                            detail: `共包含 ${character.prompt_tags.length + character.undesired_tags.length} 个 Tag。`,
+                            okText: '移除角色',
+                            danger: true,
+                          })
+                        )
+                          p.onUpdateProject(removePromptCharacter(p.project, character.id));
+                      })(),
+                  },
+                ]}
+              />
+            );
+          }}
+          renderParagraph={(section, block, content) => (
+            <ParagraphEditor
+              block={doc.scopes[section].blocks[block]}
+              onSave={(text, translation) =>
+                guard(() => {
+                  const next = editPromptParagraph(doc.scopes[section], block, text);
+                  next.blocks[block] = { ...next.blocks[block], translation };
+                  save(replaceSection(doc, section, next));
+                })
+              }
+            >
+              {content}
+            </ParagraphEditor>
+          )}
           renderTag={(entry, content) => (
             <EditableTag
               entry={entry}
@@ -246,7 +403,15 @@ export function WorkbenchEditor(p: DocumentProps) {
               section={section}
               block={block}
               tags={doc.scopes[section].scope.tags}
-              onAdd={(text) => guard(() => save(insertTags(doc, section, block, text)))}
+              onAdd={(text) =>
+                guard(() =>
+                  save(
+                    block < 0
+                      ? replaceSection(doc, section, reparseSection(doc.scopes[section], text))
+                      : insertTags(doc, section, block, text),
+                  ),
+                )
+              }
             />
           )}
         >

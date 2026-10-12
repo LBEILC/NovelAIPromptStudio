@@ -33,6 +33,9 @@ function requestHeaders(apiKey) {
 
 async function requestJson(url, options, fetcher, timeoutMs = 30000) {
   const controller = new AbortController();
+  const cancel = () => controller.abort();
+  if (options.signal?.aborted) controller.abort();
+  options.signal?.addEventListener('abort', cancel, { once: true });
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
@@ -42,6 +45,7 @@ async function requestJson(url, options, fetcher, timeoutMs = 30000) {
     throw new Error(`无法连接 API：${error instanceof Error ? error.message : String(error)}`);
   } finally {
     clearTimeout(timeout);
+    options.signal?.removeEventListener('abort', cancel);
   }
 
   let body;
@@ -76,6 +80,39 @@ function chatContent(body) {
 
 function chatBody(model, messages) {
   return { model, messages };
+}
+
+export async function transformParagraph(
+  text,
+  direction,
+  settings,
+  fetcher = globalThis.fetch,
+  signal,
+) {
+  if (!['translate', 'rewrite'].includes(direction)) throw new Error('Invalid paragraph direction');
+  const model = requireModel(settings);
+  const body = await requestJson(
+    `${normalizeBaseUrl(settings.baseUrl)}/chat/completions`,
+    {
+      method: 'POST',
+      headers: requestHeaders(settings.apiKey),
+      signal,
+      body: JSON.stringify(
+        chatBody(model, [
+          {
+            role: 'system',
+            content:
+              direction === 'translate'
+                ? 'Translate the supplied image prompt paragraph into Simplified Chinese. Preserve its meaning and details. Return only the translated paragraph.'
+                : 'Rewrite the supplied Chinese image prompt as an English image prompt paragraph. Preserve all details and intent. Return only the English paragraph.',
+          },
+          { role: 'user', content: String(text) },
+        ]),
+      ),
+    },
+    fetcher,
+  );
+  return chatContent(body);
 }
 
 export async function listModels(settings, fetcher = globalThis.fetch) {
