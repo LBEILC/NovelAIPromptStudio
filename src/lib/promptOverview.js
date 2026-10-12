@@ -262,8 +262,8 @@ export function overviewSelectionMenuItems({
     automaticIgnored ? `${automaticIgnored} 个 NovelAI 自动 Tag` : '',
   ].filter(Boolean);
   const copyLabel = ignoredLabels.length
-    ? `复制可用 ${copyCount} 个提示词 Tag（忽略 ${ignoredLabels.join('、')}）`
-    : `复制已选 ${copyCount} 个提示词 Tag`;
+    ? `复制 ${copyCount} 个正面 Tag（忽略 ${ignoredLabels.join('、')}）`
+    : `复制选中的 ${copyCount} 个 Tag`;
   return [
     {
       key: 'copy-selected-tags',

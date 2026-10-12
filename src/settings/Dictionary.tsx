@@ -175,8 +175,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
           <h1>翻译词典</h1>
           <p>
             软件认识的 Tag
-            和它们的译文、分类。工作台和图片库里显示的译文都来自这里；改了只影响显示，不会改动图片里的
-            提示词。
+            和它们的译文、分类。工作台和图片库里显示的译文都来自这里；改了只影响显示，不会改动图片里的提示词。
           </p>
         </div>
       </header>

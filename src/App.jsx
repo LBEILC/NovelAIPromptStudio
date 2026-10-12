@@ -1190,7 +1190,7 @@ export default function App() {
     }
     await reloadAfterGalleryAction();
     notify({
-      text: ids.length === 1 ? '已移入回收站' : `已移入回收站 ${ids.length} 张图片`,
+      text: ids.length === 1 ? '已移入回收站' : `已把 ${ids.length} 张图片移入回收站`,
       action: { label: '撤销', onClick: () => restoreProjects(result.results?.success || ids) },
     });
   };
@@ -1587,11 +1587,7 @@ export default function App() {
                   ignored ? `${ignored} 个负面 Tag` : '',
                   automaticIgnored ? `${automaticIgnored} 个 NovelAI 自动 Tag` : '',
                 ].filter(Boolean);
-                const copiedLabel = label
-                  ? ` ${label}`
-                  : selected
-                    ? '已选提示词 Tag'
-                    : '可见提示词 Tag';
+                const copiedLabel = label ? ` ${label}` : selected ? '选中的 Tag' : '可见的 Tag';
                 showToast(
                   `${count ? `已复制 ${count} 个${copiedLabel}` : `已复制${label || '提示词'}`}${ignoredLabels.length ? `，忽略 ${ignoredLabels.join('、')}` : ''}`,
                 );
