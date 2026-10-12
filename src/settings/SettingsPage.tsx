@@ -481,6 +481,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         ['移动当前 Tag', [['Alt', '方向键']]],
         ['在图片之间移动', [['方向键']]],
         ['在一摞图片里切换', [['←'], ['→']]],
+        ['上一组 / 下一组', [['↑'], ['↓']]],
         ['在工作台打开', [['Enter']]],
         ['看大图', [['Space']]],
         ['全选图片', [['Mod', 'A']]],

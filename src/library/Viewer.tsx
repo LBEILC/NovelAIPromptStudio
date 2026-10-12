@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { Shortcut, Button } from '../ui';
 import { mediaUrl } from '../lib/imageStage.js';
 import type { ImageProject } from '../shared/types';
-import type { LibraryProps } from './types';
+import type { LibraryGroup, LibraryProps } from './types';
 
 export function LibraryViewer({
   p,
@@ -23,6 +23,20 @@ export function LibraryViewer({
   const [zoom, setZoom] = useState<number | null>(null);
   const [rotation, setRotation] = useState(0);
   const [flip, setFlip] = useState(false);
+  // Keep the opening order even if background library work completes while viewing.
+  const [groups] = useState(() =>
+    p.groups.map((group) => ({ ...group, members: [...group.members] })),
+  );
+  const [image, setImage] = useState(p.preview);
+  const group = groups.find((item) => item.members.some((member) => member.id === image?.id));
+  const sequence = groups.flatMap((item) =>
+    item.members.map((member) => ({ group: item, member })),
+  );
+  const position = sequence.findIndex((item) => item.member.id === image?.id);
+  const show = (nextGroup: LibraryGroup, next: LibraryGroup['cover']) => {
+    setImage(next);
+    p.onPreview(nextGroup, next);
+  };
   const root = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0, dpr: window.devicePixelRatio });
@@ -49,7 +63,6 @@ export function LibraryViewer({
     };
   }, []);
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
-  const image = p.preview;
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
     root.current?.focus();
@@ -64,13 +77,14 @@ export function LibraryViewer({
     setFlip(false);
   }, [image?.id]);
   const navigate = (delta: number) => {
-    const group = p.previewGroup;
-    if (!group || !image) return;
-    const members = group.members.length > 1 ? group.members : p.groups.map((g) => g.cover);
-    const index = members.findIndex((member) => member.id === image.id);
-    const next = members[(index + delta + members.length) % members.length];
-    const nextGroup = p.groups.find((g) => g.members.some((member) => member.id === next.id));
-    if (nextGroup) p.onPreview(nextGroup, next);
+    if (position < 0) return;
+    const next = sequence[position + delta];
+    if (next) show(next.group, next.member);
+  };
+  const navigateGroup = (delta: number) => {
+    if (!group) return;
+    const next = groups[groups.indexOf(group) + delta];
+    if (next) show(next, next.cover);
   };
   const width = natural.width || image?.metadata.width || 1;
   const height = natural.height || image?.metadata.height || 1;
@@ -136,6 +150,7 @@ export function LibraryViewer({
       role="dialog"
       aria-modal="true"
       aria-label="大图"
+      data-viewer-project-id={image.id}
       ref={root}
       tabIndex={-1}
       onKeyDown={(event) => {
@@ -146,10 +161,18 @@ export function LibraryViewer({
         }
         if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
           event.preventDefault();
+          event.stopPropagation();
           navigate(event.key === 'ArrowLeft' ? -1 : 1);
         }
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+          event.preventDefault();
+          event.stopPropagation();
+          navigateGroup(event.key === 'ArrowUp' ? -1 : 1);
+        }
         if (event.key === 'Tab') {
-          const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button')];
+          const items = [
+            ...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'),
+          ];
           if (
             event.shiftKey &&
             (document.activeElement === items[0] || document.activeElement === root.current)
@@ -167,9 +190,9 @@ export function LibraryViewer({
         {hasImageName(image) && <b>{image.name}</b>}
         <span className="library-help library-mono">
           {dimensions(image.metadata)}
-          {p.previewGroup &&
-            p.previewGroup.members.length > 1 &&
-            ` · ${p.previewGroup.members.findIndex((member) => member.id === image.id) + 1} / ${p.previewGroup.members.length}`}
+          {group &&
+            group.members.length > 1 &&
+            ` · ${group.members.findIndex((member) => member.id === image.id) + 1} / ${group.members.length}`}
         </span>
         <Button variant="quiet" size="small" onClick={onClose}>
           <i className="ri-close-line" />
@@ -231,6 +254,8 @@ export function LibraryViewer({
         className="library-viewer-prev"
         variant="quiet"
         aria-label="上一张"
+        disabled={position <= 0}
+        data-tip={position <= 0 ? '已经是第一张' : '上一张'}
         onClick={() => navigate(-1)}
       >
         <i className="ri-arrow-left-s-line" />
@@ -239,19 +264,21 @@ export function LibraryViewer({
         className="library-viewer-next"
         variant="quiet"
         aria-label="下一张"
+        disabled={position < 0 || position >= sequence.length - 1}
+        data-tip={position < 0 || position >= sequence.length - 1 ? '已经是最后一张' : '下一张'}
         onClick={() => navigate(1)}
       >
         <i className="ri-arrow-right-s-line" />
       </Button>
       <div className="library-viewer-foot">
-        {p.previewGroup && p.previewGroup.members.length > 1 && (
+        {group && group.members.length > 1 && (
           <div className="library-strip">
-            {p.previewGroup.members.map((member) => (
+            {group.members.map((member) => (
               <button
                 key={member.id}
                 className={member.id === image.id ? 'is-current' : ''}
                 aria-label={imageAccessibleName(member)}
-                onClick={() => p.onPreview(p.previewGroup!, member)}
+                onClick={() => show(group, member)}
               >
                 <img src={mediaUrl(member.thumbnail_path)} alt="" />
               </button>

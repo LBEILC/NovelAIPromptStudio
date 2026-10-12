@@ -1,5 +1,6 @@
 import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryGroupingChecks } from './libraryGrouping.js';
+import { libraryViewerChecks } from './libraryViewer.js';
 import { scrollChecks } from './scroll.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import {
@@ -76,6 +77,7 @@ export async function libraryChecks(env) {
     );
   if (mode.category === '图片库') await libraryNamingChecks(env);
   if (!['图片库·导入', '图片库·收尾'].includes(mode.category)) await libraryGroupingChecks(env);
+  if (!['图片库·导入', '图片库·收尾'].includes(mode.category)) await libraryViewerChecks(env);
   if (mode.category === '图片库·收尾') {
     await libraryFinishChecks({ h, database, refresh, click, input, selectCard, waitDetail });
     return;

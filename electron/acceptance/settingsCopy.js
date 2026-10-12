@@ -18,6 +18,7 @@ export async function settingsCopyChecks(h) {
     ['移动当前 Tag', [[process.platform === 'darwin' ? '⌥' : 'Alt', '方向键']]],
     ['在图片之间移动', [['方向键']]],
     ['在一摞图片里切换', [['←'], ['→']]],
+    ['上一组 / 下一组', [['↑'], ['↓']]],
     ['在工作台打开', [['Enter']]],
     ['看大图', [['Space']]],
     ['全选图片', [[modifier, 'A']]],
