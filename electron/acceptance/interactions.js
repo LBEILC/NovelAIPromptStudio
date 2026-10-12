@@ -32,9 +32,9 @@ function pointer(h) {
     }
   };
 }
-async function center(h, selector, block = 'nearest') {
+async function center(h, selector, block = 'nearest', thumbnail = true) {
   return h.evaluate(
-    `(async()=>{const n=${selector};n.scrollIntoView({block:${JSON.stringify(block)},inline:'nearest'});await ${frame};const r=n.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`,
+    `(async()=>{const n=${selector};n.scrollIntoView({block:${JSON.stringify(block)},inline:'nearest'});await ${frame};const target=${thumbnail}&&n.matches('.wb-tab')?n.querySelector('img')||n:n;const r=target.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`,
   );
 }
 async function context(h, selector) {
@@ -451,7 +451,7 @@ export async function workbenchInteractionChecks(env) {
       return start;
     };
     let start = await dragStart(tab(0));
-    await move('mouseMoved', await center(h, tab(1)), true);
+    await move('mouseMoved', await center(h, tab(1), 'nearest', false), true);
     await wait('!document.querySelector(".wb-tab-preview:popover-open")');
     await check(
       '标签页拖动有副本和原位占位且没有悬停预览',
@@ -471,8 +471,11 @@ export async function workbenchInteractionChecks(env) {
       undefined,
       'once',
     );
+    await e(
+      `Promise.all([...${tabs}].flatMap(n=>n.getAnimations()).map(a=>a.finished.catch(()=>{})))`,
+    );
     start = await dragStart(tab(0));
-    const target = await center(h, tab(1));
+    const target = await center(h, tab(1), 'nearest', false);
     await move('mouseMoved', target, true);
     await move('mouseReleased', target);
     await wait('!document.querySelector(".wb-drag-feedback")');

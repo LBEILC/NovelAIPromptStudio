@@ -54,7 +54,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   const drag = async (source, target) => {
     const center = async (selector) =>
       e(
-        `(()=>{const n=${selector};n.scrollIntoView({block:'nearest',inline:'nearest'});const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`,
+        `(()=>{const n=${selector};n.scrollIntoView({block:'nearest',inline:'nearest'});const r=(n.matches('.wb-tab')?n.querySelector('img'):n).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`,
       );
     const from = await center(source);
     await pointer('mouseMoved', from.x, from.y);
@@ -76,6 +76,30 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     '!!document.querySelector(".wb-empty") && document.body.innerText.includes("把一张 NovelAI 图片拖到这里")',
   );
   await shot('empty');
+  doubles.selections.push({ canceled: false, filePaths: [files[0]] });
+  await click('打开图片', 'document.querySelector(".studio-titlebar")');
+  await wait('document.querySelectorAll(".wb-block").length===4');
+  await e(
+    `(()=>{const tab=document.querySelector('.wb-tab');window.__middlePrevented=!tab.dispatchEvent(new MouseEvent('mousedown',{button:1,bubbles:true,cancelable:true}));tab.dispatchEvent(new MouseEvent('auxclick',{button:1,bubbles:true,cancelable:true}))})()`,
+  );
+  await wait('document.querySelectorAll(".wb-tab").length===0');
+  await check(
+    '中键直接关闭干净标签页并阻止自动滚动默认动作',
+    'window.__middlePrevented && !document.querySelector("dialog[open]") && !document.querySelector(".wb-tab")',
+    undefined,
+    'once',
+  );
+  doubles.selections.push({ canceled: false, filePaths: [files[0]] });
+  await click('打开图片', 'document.querySelector(".studio-titlebar")');
+  await wait('document.querySelectorAll(".wb-block").length===4');
+  await click('关闭 标签', 'document.querySelector(".wb-tab")');
+  await wait('document.querySelectorAll(".wb-tab").length===0');
+  await check(
+    '标签页直接关闭入口沿用关闭命令',
+    '!document.querySelector(".wb-tab")',
+    undefined,
+    'once',
+  );
   doubles.selections.push({ canceled: false, filePaths: [files[0]] });
   await click('打开图片', 'document.querySelector(".studio-titlebar")');
   await wait('document.querySelectorAll(".wb-block").length===4');
@@ -512,6 +536,32 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     'once',
   );
   await shot('tabs');
+  await e(
+    `(()=>{const list=document.querySelector('.wb-tabs-scroll');list.style.maxWidth='120px';list.scrollLeft=0})()`,
+  );
+  await wait(
+    'document.querySelector(".wb-tabs-scroll").scrollWidth>document.querySelector(".wb-tabs-scroll").clientWidth',
+  );
+  await e(
+    `document.querySelector('.wb-tabs').dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:100}))`,
+  );
+  await check(
+    '标签栏纵向滚轮转换为横向滚动',
+    'document.querySelector(".wb-tabs-scroll").scrollLeft>0',
+    undefined,
+    'once',
+  );
+  await e(
+    `document.querySelector('.wb-tabs-scroll').style.maxWidth='';document.querySelector('.wb-tab').focus()`,
+  );
+  await key('ArrowRight');
+  await wait('document.querySelectorAll(".wb-tab")[1].getAttribute("aria-selected")==="true"');
+  await check(
+    '标签栏方向键切换并移动焦点',
+    'document.activeElement===document.querySelectorAll(".wb-tab")[1] && document.activeElement.getAttribute("aria-selected")==="true"',
+    undefined,
+    'once',
+  );
   const order = await e(`(${session}).tabs.map(t=>t.id)`);
   await e('document.querySelector(".wb-tab").focus()');
   await key(' ', { code: 'Space' });
@@ -592,6 +642,17 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     'once',
   );
   // Close only the disposable test tabs via the normal close command.
+  await e(
+    'document.querySelector(".wb-tab[aria-selected=true]").dispatchEvent(new MouseEvent("auxclick",{button:1,bubbles:true,cancelable:true}))',
+  );
+  await wait('!!document.querySelector("dialog[open]")');
+  await check(
+    '中键关闭修改过的标签页先确认且未丢失草稿',
+    'document.querySelectorAll(".wb-tab").length===3 && document.querySelector("dialog[open]").textContent.includes("丢弃并关闭")',
+    undefined,
+    'once',
+  );
+  await click('取消', 'document.querySelector("dialog[open]")');
   for (let i = 0; i < 3; i++) {
     const count = await e('document.querySelectorAll(".wb-tab").length');
     await key('w', modifier);
