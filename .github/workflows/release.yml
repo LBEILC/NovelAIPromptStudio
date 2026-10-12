@@ -53,10 +53,20 @@ jobs:
               release/*.exe
               release/*.exe.blockmap
               release/latest.yml
-          - name: macOS Intel and Apple Silicon
+          - name: macOS Intel
             os: macos-15-intel
-            package_args: --mac --x64 --arm64
-            artifact: macos
+            package_args: --mac --x64
+            artifact: macos-x64
+            artifact_glob: |
+              release/*.dmg
+              release/*.dmg.blockmap
+              release/*.zip
+              release/*.zip.blockmap
+              release/latest-mac.yml
+          - name: macOS Apple Silicon
+            os: macos-15
+            package_args: --mac --arm64
+            artifact: macos-arm64
             artifact_glob: |
               release/*.dmg
               release/*.dmg.blockmap
@@ -119,6 +129,9 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
+      - name: Launch the exact packaged application and verify native modules
+        run: node scripts/verify-app.mjs --packaged --existing-package
+
       - run: npm run verify:fonts:package
 
       - name: Verify updater metadata matches packaged artifacts
@@ -132,8 +145,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish GitHub Release
-    if: github.ref_type == 'tag'
+    name: Verify combined artifacts and publish tagged releases
     needs: package
     runs-on: ubuntu-latest
 
@@ -147,19 +159,33 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: release-artifacts
-          merge-multiple: true
+          merge-multiple: false
+
+      - name: Merge updater metadata across architectures
+        run: node scripts/merge-release-artifacts.mjs release-artifacts release-combined
+
+      - name: Verify combined update metadata
+        run: node scripts/verify-update-artifacts.mjs release-combined
 
       - name: Create checksums
-        working-directory: release-artifacts
+        working-directory: release-combined
         run: sha256sum * > SHA256SUMS.txt
 
+      - name: Retain verified combined artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: verified-release-artifacts
+          path: release-combined/*
+          if-no-files-found: error
+
       - name: Create GitHub Release
+        if: github.event_name == 'push' && github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: >-
           gh release create "${{ github.ref_name }}"
-          release-artifacts/*
+          release-combined/*
           --verify-tag
           --notes-from-tag
           --fail-on-no-commits

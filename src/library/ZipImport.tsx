@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Button, Dialog } from '../ui';
+import { Button, Dialog, useScrollArea } from '../ui';
 import { mediaUrl } from '../lib/imageStage.js';
 import { layoutLibraryRows, fallbackRatio } from './layout';
 import type { PreparedImportEntry } from '../shared/types';
@@ -32,6 +32,7 @@ export function ZipImport({
   const [width, setWidth] = useState(0);
   const [tokens, setTokens] = useState({ height: 120, gap: 8, min: 0.5, max: 2.5 });
   const grid = useRef<HTMLDivElement>(null);
+  useScrollArea(grid, { enabled: !!importSession });
   const anchor = useRef('');
   const drag = useRef<{ x: number; y: number; initial: string[]; active: boolean } | null>(null);
   const suppressClick = useRef(false);

@@ -20,6 +20,7 @@ try {
   delete env.NOVELAI_DEV_URL;
   const args = ['.', `--app-screenshots=${root}`];
   if (process.argv.includes('--workbench')) args.push('--app-screenshot-workbench');
+  if (process.argv.includes('--finish')) args.push('--app-screenshot-finish');
   if (process.argv.includes('--constrain-window')) args.push('--app-screenshot-constrain-window');
   child = spawn(electron, args, {
     env,
@@ -40,6 +41,10 @@ try {
     if (manifest.fontProof?.length !== 2) throw new Error('Missing actual rendered font evidence');
     const expected = screenshotScenes
       .filter((scene) => !process.argv.includes('--workbench') || scene.page === 'workbench')
+      .filter(
+        (scene) =>
+          !process.argv.includes('--finish') || ['workbench', 'settings'].includes(scene.page),
+      )
       .flatMap((scene) => ['light', 'dark'].map((theme) => `${scene.name}-${theme}.png`))
       .sort();
     if (

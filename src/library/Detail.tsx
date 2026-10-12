@@ -1,6 +1,6 @@
 import { dimensions, generationParameters, modelDisplayName } from './presentation';
-import { useState } from 'react';
-import { Button } from '../ui';
+import { useRef, useState } from 'react';
+import { Button, useScrollArea } from '../ui';
 import { LibraryRename } from './Rename';
 import { hasImageName, imageFileName, imageAccessibleName } from '../lib/imageNaming.js';
 import { mediaUrl } from '../lib/imageStage.js';
@@ -19,6 +19,8 @@ export function LibraryDetail({
   onViewer: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
+  const scroll = useRef<HTMLDivElement>(null);
+  useScrollArea(scroll, { enabled: !!detail && !p.selectedGroupIds.length });
   if (p.selectedGroupIds.length)
     return (
       <aside className="library-detail">
@@ -46,7 +48,7 @@ export function LibraryDetail({
   const parameters = generationParameters(detail.metadata);
   return (
     <aside className="library-detail" data-detail-id={detail.id} aria-busy={pending}>
-      <div className="library-detail-scroll">
+      <div className="library-detail-scroll" ref={scroll}>
         <div className="library-detail-picture">
           <img
             src={mediaUrl(detail.image_path)}

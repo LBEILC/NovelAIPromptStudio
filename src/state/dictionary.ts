@@ -1,86 +1,188 @@
-import { useEffect, useState } from 'react';
-import type { TagCacheRequest, TagCachePatch } from '../shared/ipc';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { TagCachePatch, DictionaryTranslationProgress } from '../shared/ipc';
 import type { TagDictionaryEntry, TagCategory } from '../shared/types';
-export const PAGE_SIZE = 200;
+
+export type DictionaryView = 'all' | 'untranslated' | 'unsorted' | 'ai' | 'manual';
+export type DictionarySort = 'usage' | 'tag' | 'recent';
+export const dictionarySource = (item: TagDictionaryEntry) =>
+  [item.translation_source, item.category_source].includes('manual')
+    ? 'manual'
+    : [item.translation_source, item.category_source].includes('ai')
+      ? 'ai'
+      : 'builtin';
+export const inDictionaryView = (item: TagDictionaryEntry, view: DictionaryView) =>
+  view === 'all' ||
+  (view === 'untranslated' && !item.translation.trim()) ||
+  (view === 'unsorted' && (!item.category || item.category === 'Unsorted')) ||
+  (view === 'ai' && dictionarySource(item) === 'ai') ||
+  (view === 'manual' && dictionarySource(item) === 'manual');
+
 export function useDictionary() {
-  const [filters, setFilters] = useState<TagCacheRequest>({
-    query: '',
-    category: '',
-    offset: 0,
-    limit: PAGE_SIZE,
-  });
-  const [items, setItems] = useState<TagDictionaryEntry[]>([]);
-  const [total, setTotal] = useState(0);
+  const [allItems, setAllItems] = useState<TagDictionaryEntry[]>([]);
+  const [filters, setFilters] = useState<{
+    query: string;
+    category: TagCategory | '';
+    view: DictionaryView;
+    sort: DictionarySort;
+  }>({ query: '', category: '', view: 'all', sort: 'usage' });
   const [selected, setSelected] = useState<string[]>([]);
-  const [revision, setRevision] = useState(0);
-  const [busy, setBusy] = useState(false);
+  const [held, setHeld] = useState<string[]>([]);
+  const [pending, setPending] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [aiReady, setAiReady] = useState(false);
+  const [progress, setProgress] = useState<DictionaryTranslationProgress | null>(null);
+  const requestId = useRef('');
+  const revision = useRef(0);
   const [error, setError] = useState('');
+  const refresh = useCallback(async () => {
+    const sequence = ++revision.current;
+    const result = await window.studio?.listTagCache({ all: true });
+    if (sequence !== revision.current || !result) return;
+    if (!result.ok) throw Error(result.error);
+    setAllItems(result.items);
+  }, []);
   useEffect(() => {
     let active = true;
-    setSelected([]);
-    const timer = setTimeout(() => {
-      setBusy(true);
-      window.studio
-        ?.listTagCache(filters)
-        .then((result) => {
-          if (!active) return;
-          if (!result.ok) throw new Error(result.error);
-          setItems(result.items);
-          setTotal(result.total);
-          setError('');
-        })
-        .catch((e: Error) => {
-          if (active) setError(e.message);
-        })
-        .finally(() => {
-          if (active) setBusy(false);
-        });
-    }, 220);
+    setPending(true);
+    void refresh()
+      .catch((e: Error) => {
+        if (active) setError(e.message);
+      })
+      .finally(() => {
+        if (active) setPending(false);
+      });
+    void window.studio
+      ?.getAISettings?.()
+      .then((settings) => {
+        if (active) setAiReady(!!settings.model.trim());
+      })
+      .catch((e: Error) => {
+        if (active) setError(e.message);
+      });
+    window.studio?.onTagRetranslationProgress?.((value) => {
+      if (value.id === requestId.current) setProgress(value);
+    });
     return () => {
       active = false;
-      clearTimeout(timer);
+      revision.current++;
+      window.studio?.offTagRetranslationProgress?.();
     };
-  }, [filters, revision]);
-  const mutate = async (action: () => Promise<{ ok: boolean; error?: string }>) => {
-    setBusy(true);
+  }, [refresh]);
+  useEffect(() => {
+    setHeld([]);
+  }, [filters.view]);
+  useEffect(() => {
+    setSelected([]);
+  }, [filters.query, filters.category, filters.view]);
+  const counts = useMemo(
+    () =>
+      Object.fromEntries(
+        (['all', 'untranslated', 'unsorted', 'ai', 'manual'] as const).map((view) => [
+          view,
+          allItems.filter((item) => inDictionaryView(item, view)).length,
+        ]),
+      ) as Record<DictionaryView, number>,
+    [allItems],
+  );
+  const items = useMemo(() => {
+    const query = filters.query.trim().toLocaleLowerCase().replaceAll('_', ' ');
+    return allItems
+      .filter(
+        (item) =>
+          (inDictionaryView(item, filters.view) || held.includes(item.tag)) &&
+          (!filters.category || item.category === filters.category) &&
+          (!query ||
+            `${item.tag}\n${item.display_tag}\n${item.translation}`
+              .toLocaleLowerCase()
+              .replaceAll('_', ' ')
+              .includes(query)),
+      )
+      .sort(
+        (a, b) =>
+          (filters.sort === 'usage'
+            ? (b.image_count || 0) - (a.image_count || 0)
+            : filters.sort === 'recent'
+              ? b.updated_at.localeCompare(a.updated_at)
+              : 0) || a.tag.localeCompare(b.tag, 'en'),
+      );
+  }, [allItems, filters, held]);
+  const mutate = async (
+    tags: string[],
+    action: () => Promise<{ ok: boolean; error?: string }>,
+    keep = false,
+  ) => {
+    setPending(true);
+    setError('');
     try {
       const result = await action();
-      if (!result.ok) throw new Error(result.error);
+      if (!result.ok) throw Error(result.error);
+      if (keep && ['untranslated', 'unsorted'].includes(filters.view))
+        setHeld((current) => [...new Set([...current, ...tags])]);
+      await refresh();
       setSelected([]);
-      setRevision((n) => n + 1);
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       return false;
     } finally {
-      setBusy(false);
+      setPending(false);
     }
   };
   const save = (tag: string, patch: TagCachePatch) =>
-    mutate(() => window.studio!.updateTagCache(tag, patch));
+    mutate([tag], () => window.studio!.updateTagCache(tag, patch), true);
   const categorize = (category: TagCategory) =>
-    mutate(() => window.studio!.updateTagCacheMany(selected, category));
-  const remove = async (tags: string[]) => {
-    const result = await mutate(() =>
-      tags.length === 1
-        ? window.studio!.deleteTagCache(tags[0])
-        : window.studio!.deleteTagCacheMany(tags),
-    );
-    if (result && tags.length >= items.length && filters.offset)
-      setFilters((f) => ({ ...f, offset: Math.max(0, (f.offset ?? 0) - PAGE_SIZE) }));
-    return result;
+    mutate(selected, () => window.studio!.updateTagCacheMany(selected, category), true);
+  const remove = (tags: string[]) => mutate(tags, () => window.studio!.deleteTagCacheMany(tags));
+  const retranslate = async () => {
+    if (running || !selected.length || !aiReady) return;
+    const id = crypto.randomUUID();
+    requestId.current = id;
+    setRunning(true);
+    setError('');
+    setProgress({
+      id,
+      total: selected.length,
+      completed: 0,
+      translated: 0,
+      failed: [],
+      canceled: false,
+    });
+    try {
+      const result = await window.studio!.retranslateTagCache(id, selected);
+      if (!result.ok) throw Error(result.error);
+      setProgress(result);
+      if (['untranslated', 'unsorted'].includes(filters.view))
+        setHeld((current) => [...new Set([...current, ...selected])]);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRunning(false);
+      requestId.current = '';
+    }
+  };
+  const cancel = () => {
+    if (requestId.current) void window.studio?.cancelTagRetranslation(requestId.current);
   };
   return {
+    items,
+    allItems,
     filters,
     setFilters,
-    items,
-    total,
+    counts,
+    total: items.length,
     selected,
     setSelected,
-    busy,
+    busy: pending || running,
+    running,
+    aiReady,
+    progress,
     error,
     save,
     categorize,
     remove,
+    retranslate,
+    cancel,
+    refresh,
   };
 }

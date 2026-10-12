@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Button, Input, Menu, Popover, Select, Tag, type MenuItem } from '../ui';
+import {
+  Button,
+  Input,
+  Menu,
+  Popover,
+  Select,
+  Tag,
+  Shortcut,
+  useScrollArea,
+  type MenuItem,
+} from '../ui';
 import { CATEGORY_OPTIONS } from '../lib/prompt.js';
 import {
   copyPromptDocument,
@@ -50,6 +60,8 @@ export interface DocumentProps {
   sectionEditor?: { section: number; content: ReactNode };
 }
 export function WorkbenchDocument(p: DocumentProps) {
+  const scroll = useRef<HTMLDivElement>(null);
+  useScrollArea(scroll);
   const doc = useMemo(() => createPromptDocument(p.project), [p.project]);
   const entries = useMemo(() => documentTags(doc), [doc]);
   const [query, setQuery] = useState('');
@@ -110,33 +122,72 @@ export function WorkbenchDocument(p: DocumentProps) {
     .map(serializePromptSection)
     .filter(Boolean)
     .join('\n');
+  const summary = (scopes: typeof doc.scopes, includeAutomatic = false) => {
+    const tags = entries.filter(
+      (entry) =>
+        scopes.includes(doc.scopes[entry.section]) && (includeAutomatic || !entry.automatic),
+    ).length;
+    const paragraphs = scopes.reduce(
+      (sum, section) => sum + section.blocks.filter((block) => block.type === 'paragraph').length,
+      0,
+    );
+    return [tags ? `${tags} 个 Tag` : '', paragraphs ? `${paragraphs} 段` : '']
+      .filter(Boolean)
+      .join(' · ');
+  };
+  const automaticCount = entries.filter(
+    (entry) => entry.automatic && doc.scopes[entry.section].scope.polarity === 'prompt',
+  ).length;
   const copyItems: MenuItem[] = [
     {
       id: 'all',
       label: '复制全部 Prompt',
+      trailing: summary(doc.scopes.filter((section) => section.scope.polarity === 'prompt')),
       onSelect: () => copy(copyPromptDocument(doc), '全部 Prompt'),
     },
-    ...(doc.scopes.some((section) => section.scope.automation?.tagIds.length)
+    ...(automaticCount > 0
       ? [
           {
             id: 'automatic',
-            label: '含 NovelAI 自动加的',
+            label: `复制全部 Prompt，含 NovelAI 自动加的 ${automaticCount} 个`,
             onSelect: () =>
               copy(copyPromptDocument(doc, { includeAutomatic: true }), '全部 Prompt'),
           },
         ]
       : []),
-    { id: 'negative', label: '复制全部排除内容', onSelect: () => copy(negativeText, '排除内容') },
+    {
+      id: 'negative',
+      label: '复制全部排除内容',
+      trailing: summary(
+        doc.scopes.filter((section) => section.scope.polarity === 'undesired'),
+        true,
+      ),
+      onSelect: () => copy(negativeText, '排除内容'),
+    },
+    { id: 'scope-separator', separator: true },
     ...doc.scopes.map((section) => ({
       id: section.scope.key,
       label: `只复制${scopeLabel(section)}`,
+      trailing: summary([section]),
       onSelect: () => copy(copyPromptDocumentScope(doc, section.scope.key), scopeLabel(section)),
     })),
   ];
-  if (copyContext.ignored)
+  if (
+    p.selectedKeys?.some((key) =>
+      entries.some(
+        (entry) => entry.key === key && doc.scopes[entry.section].scope.polarity === 'prompt',
+      ),
+    ) &&
+    p.selectedKeys?.some((key) =>
+      entries.some(
+        (entry) => entry.key === key && doc.scopes[entry.section].scope.polarity === 'undesired',
+      ),
+    )
+  )
     copyItems.splice(1, 0, {
       id: 'selected-negative',
-      label: `复制其中的排除内容 · ${copyContext.ignored}`,
+      label: '复制其中的排除内容',
+      trailing: `${copyContext.ignored} 个 Tag`,
       onSelect: () => {
         const negativeKeys = entries
           .filter(
@@ -182,13 +233,21 @@ export function WorkbenchDocument(p: DocumentProps) {
           translate(entries.filter((entry) => entry.section === si && entry.block === bi)),
       },
       { id: 'copy', label: '复制这一块', onSelect: () => copy(block.raw) },
-      { id: 'up', label: '上移', disabled: bi === 0, onSelect: () => move(-1) },
+      {
+        id: 'up',
+        label: '上移',
+        shortcut: ['Alt', '↑'],
+        disabled: bi === 0,
+        onSelect: () => move(-1),
+      },
       {
         id: 'down',
         label: '下移',
+        shortcut: ['Alt', '↓'],
         disabled: bi === section.blocks.length - 1,
         onSelect: () => move(1),
       },
+      { id: 'save', label: '存为常用块', disabled: true },
       {
         id: 'delete',
         label: '删除这一块',
@@ -198,7 +257,6 @@ export function WorkbenchDocument(p: DocumentProps) {
           replace(raw.slice(0, block.range.start) + raw.slice(block.range.end));
         },
       },
-      { id: 'save', label: '存为常用块', disabled: true },
     ];
   };
   const drawTag = (entry: DocumentTag) => {
@@ -244,7 +302,8 @@ export function WorkbenchDocument(p: DocumentProps) {
           placeholder="搜索 Tag"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          suffix={<kbd>Ctrl K</kbd>}
+          prefix={<i className="ri-search-line" />}
+          suffix={<Shortcut keys={['Mod', 'K']} />}
         />
         <Button
           variant="quiet"
@@ -254,7 +313,11 @@ export function WorkbenchDocument(p: DocumentProps) {
           onClick={() => setViewOpen(!viewOpen)}
         >
           <i className="ri-equalizer-line" />
-          <span className="wb-responsive-label">显示</span>
+          <span className="wb-responsive-label">
+            显示
+            {filtered &&
+              ` ${[!!query, polarity !== 'all', category !== 'All'].filter(Boolean).length}`}
+          </span>
         </Button>
         <Button variant="quiet" size="small" onClick={() => translate(entries)}>
           AI
@@ -321,13 +384,21 @@ export function WorkbenchDocument(p: DocumentProps) {
       </Popover>
       {filtered && (
         <div className="wb-filters">
-          {[
-            query && `搜索：${query}`,
-            polarity !== 'all' && `只看：${polarity === 'prompt' ? '正向内容' : '排除内容'}`,
-            category !== 'All' && `分类：${categoryLabel(category)}`,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
+          {query && (
+            <Button variant="quiet" size="small" onClick={() => setQuery('')}>
+              搜索 {query} ×
+            </Button>
+          )}
+          {polarity !== 'all' && (
+            <Button variant="quiet" size="small" onClick={() => setPolarity('all')}>
+              只看 {polarity === 'prompt' ? '正向内容' : '排除内容'} ×
+            </Button>
+          )}
+          {category !== 'All' && (
+            <Button variant="quiet" size="small" onClick={() => setCategory('All')}>
+              分类 {categoryLabel(category)} ×
+            </Button>
+          )}
           <Button
             variant="quiet"
             size="small"
@@ -339,9 +410,10 @@ export function WorkbenchDocument(p: DocumentProps) {
           >
             清除
           </Button>
+          <span className="nps-help wb-filter-note">复制的内容跟着筛选变</span>
         </div>
       )}
-      <div className="wb-document-scroll">
+      <div className="wb-document-scroll" ref={scroll}>
         {p.viewState.viewMode === 'category' && (
           <p className="nps-help">按分类排列时不能拖动排序</p>
         )}
@@ -439,7 +511,11 @@ export function WorkbenchDocument(p: DocumentProps) {
                 >
                   {scopeLabel(section)}
                 </Button>
-                <span className="nps-help">{section.blocks.length} 块</span>
+                <span className="nps-help">
+                  {filtered
+                    ? `${visibleEntries.filter(matches).length} 个符合，共 ${visibleEntries.length} 个`
+                    : `${section.blocks.length} 块`}
+                </span>
                 <span className="wb-section-actions">
                   {p.sectionActions?.(si)}
                   <Button
@@ -506,7 +582,11 @@ export function WorkbenchDocument(p: DocumentProps) {
                         })}
                       {section.blocks.map((_, bi) => renderBlock(bi))}
                       {!section.blocks.length && p.renderAdd?.(si, -1)}
-                      {!!hiddenBlocks && <p className="nps-help">{hiddenBlocks} 块被收起</p>}
+                      {!!hiddenBlocks && (
+                        <p className="nps-help">
+                          另外 {hiddenBlocks} 块里没有符合的内容，已经收起。
+                        </p>
+                      )}
                     </>
                   )}
             </section>
@@ -528,10 +608,12 @@ export function WorkbenchDocument(p: DocumentProps) {
             )
           }
         >
+          <i className="ri-file-copy-line" />
           {copyLabel}
         </Button>
         <Menu
           label="其他复制方式"
+          menuClassName="wb-copy-menu"
           trigger={<i className="ri-arrow-down-s-line" />}
           items={copyItems}
         />

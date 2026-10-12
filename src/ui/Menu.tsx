@@ -13,6 +13,7 @@ export type MenuItem =
       danger?: boolean;
       current?: boolean;
       shortcut?: string[];
+      trailing?: ReactNode;
       onSelect?: () => void;
       children?: MenuItem[];
       separator?: false;
@@ -104,6 +105,7 @@ export function MenuItems({
               }}
               type="button"
               role={item.current !== undefined ? 'menuitemcheckbox' : 'menuitem'}
+              aria-label={item.label}
               aria-checked={item.current}
               aria-disabled={item.disabled || undefined}
               aria-haspopup={item.children ? 'menu' : undefined}
@@ -137,6 +139,7 @@ export function MenuItems({
               {item.current && <Check {...iconProps} />}
               {item.label}
               <span className="nps-menu-trailing">
+                {item.trailing}
                 {item.shortcut && <Shortcut keys={item.shortcut} />}
                 {item.children && <ChevronRight {...iconProps} />}
               </span>
@@ -173,12 +176,18 @@ export function Menu({
   children,
   context = false,
   trigger,
+  buttonVariant = 'default',
+  className,
+  menuClassName,
 }: {
   items: MenuItem[];
   label: string;
   children?: ReactNode;
   context?: boolean;
   trigger?: ReactNode;
+  buttonVariant?: 'default' | 'quiet';
+  className?: string;
+  menuClassName?: string;
 }) {
   const ref = useRef<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -186,7 +195,7 @@ export function Menu({
   const close = () => setOpen(false);
   return (
     <span
-      className="nps-menu-trigger"
+      className={cx('nps-menu-trigger', className)}
       ref={context ? (ref as RefObject<HTMLSpanElement | null>) : undefined}
       tabIndex={context ? 0 : undefined}
       aria-label={context ? label : undefined}
@@ -208,6 +217,7 @@ export function Menu({
         children
       ) : (
         <Button
+          variant={buttonVariant}
           ref={ref as RefObject<HTMLButtonElement | null>}
           aria-haspopup="menu"
           aria-label={label}
@@ -220,7 +230,14 @@ export function Menu({
           {trigger ?? label}
         </Button>
       )}
-      <Layer open={open} onClose={close} anchor={ref} focus point={point} className="nps-menu">
+      <Layer
+        open={open}
+        onClose={close}
+        anchor={ref}
+        focus
+        point={point}
+        className={cx('nps-menu', menuClassName)}
+      >
         <MenuItems items={items} label={label} closeAll={close} closeLevel={close} />
       </Layer>
     </span>

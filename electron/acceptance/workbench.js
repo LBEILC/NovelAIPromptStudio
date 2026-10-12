@@ -87,7 +87,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await click('其他复制方式');
   await check(
     '工作台复制菜单可交互且提供正向、排除和逐节复制',
-    `[...document.querySelectorAll('[role=menuitem]')].some(x=>x.textContent==='复制全部排除内容')`,
+    `[...document.querySelectorAll('[role=menuitem]')].some(x=>x.getAttribute('aria-label')==='复制全部排除内容')`,
   );
   await shot('copy');
   await click('复制全部 Prompt');
@@ -135,7 +135,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await input('[aria-label="搜索 Tag 或译名"]', 'blue');
   await check(
     '搜索使不匹配 Tag 变淡并收起无匹配块',
-    '!!document.querySelector(".wb-filters") && document.body.innerText.includes("块被收起")',
+    '!!document.querySelector(".wb-filters") && document.body.innerText.includes("已经收起")',
   );
   await shot('filter');
   await click('清除');
@@ -185,10 +185,15 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await click('取消', 'document.querySelector(".wb-raw-editor")');
   await e('document.querySelector(".wb-tags .nps-tag").click()');
   await wait('!!document.querySelector("[aria-label=Tag]")');
+  await check(
+    'Tag 编辑使用两列并提供取消与权重步进器',
+    `(()=>{const p=document.querySelector('.wb-tag-editor');return [...p.querySelectorAll('label')].every(l=>getComputedStyle(l).gridTemplateColumns.split(' ').length===2) && !!p.querySelector('[aria-label="减小权重"]') && !!p.querySelector('[aria-label="增加权重"]') && [...p.querySelectorAll('button')].some(b=>b.textContent==='取消')})()`,
+  );
   await shot('edit');
   await input('[aria-label="Tag"]', 'silver hair');
   await input('[aria-label="译文"]', '银色头发');
   await input('[aria-label="权重"]', '1.4');
+  await key('Enter', {}, 'document.activeElement');
   await click('完成', 'document.querySelector(".wb-tag-editor")');
   await check(
     '改 Tag 与权重只改变目标叶片，保留其余段落和空行',
@@ -216,6 +221,24 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     'Alt 加方向键移动 Tag 并保留其他块原文',
     `${raw}.endsWith(${JSON.stringify(workbenchRaw.slice(workbenchRaw.indexOf('\n\n')))}) && (${draft}).tags[1].weight===1.25`,
   );
+  for (const [direction, index, expected] of [
+    ['ArrowLeft', 1, 'blue hair'],
+    ['ArrowDown', 0, 'red coat'],
+    ['ArrowUp', 1, 'blue hair'],
+  ]) {
+    await key(
+      direction,
+      { altKey: true },
+      `document.querySelectorAll('.wb-tags .nps-tag')[${index}]`,
+    );
+    await wait(`(${draft})?.tags[0].tag===${JSON.stringify(expected)}`);
+    await check(
+      `关于页列出的 Alt+${direction} 能移动 Tag`,
+      `(${draft})?.tags[0].tag===${JSON.stringify(expected)}`,
+      undefined,
+      'once',
+    );
+  }
   await reset();
   await drag(
     'document.querySelector(".wb-tags .nps-tag")',
@@ -272,7 +295,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     () => clipboard.readText().includes('blue hair') && !clipboard.readText().includes('lowres'),
   );
   await click('其他复制方式');
-  await click('复制其中的排除内容 · 1');
+  await click('复制其中的排除内容');
   await checkCopy('混选菜单单独复制其中的排除内容', () => clipboard.readText() === 'lowres');
   await click('取消', 'document.querySelector(".nps-selection")');
   const marquee = await e(
@@ -291,12 +314,25 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     `${raw}.includes(${JSON.stringify(workbenchRaw.split('\n\n')[1])}) && !${raw}.includes('blue hair')`,
   );
   await reset();
+  await check(
+    '添加 Tag 默认是虚线按钮',
+    'getComputedStyle(document.querySelector(".wb-add-trigger")).borderTopStyle==="dashed" && !document.querySelector(".wb-add-tags input")',
+  );
+  await click('输入中文或英文', 'document.querySelector(".wb-add-tags")');
+  const initialInputWidth = await e(
+    'document.querySelector(".wb-add-tags input").getBoundingClientRect().width',
+  );
+  await input('.wb-add-tags input', 'synthetic long descriptive tag with many characters');
+  await check(
+    'Tag 输入框随输入内容变宽',
+    `document.querySelector('.wb-add-tags input').getBoundingClientRect().width>${initialInputWidth}`,
+  );
   await input('.wb-add-tags input', '蓝发');
-  await wait('document.querySelector(".nps-suggestions")?.textContent.includes("blue_hair")');
+  await wait('document.querySelector(".nps-suggestions")?.textContent.includes("blue hair")');
   await shot('add');
   await check(
     '中文输入从离线词典找到英文候选',
-    'document.querySelector(".nps-suggestions")?.textContent.includes("blue_hair")',
+    'document.querySelector(".nps-suggestions")?.textContent.includes("blue hair")',
   );
   await key('Enter', { isComposing: true }, 'document.activeElement');
   await check(

@@ -26,6 +26,10 @@ export function useAISettings() {
     },
   });
   const settings = draft.settings;
+  const baseline = useRef<SettingsDraft | null>(null);
+  const dirty = baseline.current
+    ? editableFields.some((key) => settings[key] !== baseline.current![key])
+    : draft.edited.length > 0;
   const setSettings = useCallback((action: SetStateAction<SettingsDraft>) => {
     updateDraft((current) => {
       const next = typeof action === 'function' ? action(current.settings) : action;
@@ -52,6 +56,7 @@ export function useAISettings() {
       .then((saved) => {
         if (active && !loaded.current) {
           loaded.current = true;
+          baseline.current = { ...saved, apiKey: '' };
           // Keep edits made while the initial read was pending, including edits
           // retained by Activity while this effect was disconnected.
           updateDraft((current) => ({
@@ -78,6 +83,7 @@ export function useAISettings() {
       // Preserve the existing API contract: model discovery and testing use saved credentials.
       const saved = await window.studio.saveAISettings(settings);
       loaded.current = true;
+      baseline.current = { ...saved, apiKey: '' };
       updateDraft({ settings: { ...saved, apiKey: '' }, edited: [] });
       if (action === 'models') {
         const result = await window.studio.listAIModels();
@@ -95,5 +101,5 @@ export function useAISettings() {
       setBusy(false);
     }
   };
-  return { settings, setSettings, models, busy, message, run };
+  return { settings, setSettings, models, busy, message, run, dirty };
 }

@@ -1,3 +1,4 @@
+import { settingsLayoutChecks } from './settingsLayout.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { hash } from 'node:crypto';
@@ -7,6 +8,7 @@ import { dictionaryChecks } from './dictionary.js';
 import { createTrashDraft } from './shortcuts.js';
 
 export async function settingsChecks(context, restart) {
+  if (context.mode.category === '设置·版式') return settingsLayoutChecks(context.h);
   const { h, mode, app, database, preferences, doubles, files, encrypted } = context;
   const { evaluate: e, wait, check, click, input, select, section } = h;
   const aiInput = (index) =>
@@ -91,8 +93,10 @@ export async function settingsChecks(context, restart) {
     await h.screenshot(`restart-${mode.phase}`);
     return;
   }
+  if (['全部', '设置'].includes(mode.category)) await settingsLayoutChecks(h);
   if (mode.category !== '设置·AI 服务') {
     await dictionaryChecks(context);
+    if (mode.category === '设置·翻译词典') return;
     h.category('设置·图片库');
     await section('图片库');
     await wait(
@@ -374,6 +378,7 @@ export async function settingsChecks(context, restart) {
       'once',
     );
   }
+  await input('textarea', '验收翻译规则（已保存）');
   await click('保存');
   await wait('document.body.innerText.includes("AI 服务设置已安全保存")');
   if (encrypted)

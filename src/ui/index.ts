@@ -5,3 +5,4 @@ export * from './Menu';
 export * from './Autocomplete';
 export * from './feedback';
 export * from './ResizablePanel';
+export * from './useScrollArea';

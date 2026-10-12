@@ -2,7 +2,7 @@
 import { dimensions } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Button } from '../ui';
+import { Button, useScrollArea } from '../ui';
 import { mediaUrl } from '../lib/imageStage.js';
 import type { ImageProject } from '../shared/types';
 import type { LibraryProps } from './types';
@@ -25,6 +25,7 @@ export function LibraryViewer({
   const [flip, setFlip] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLDivElement>(null);
+  useScrollArea(canvas);
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const image = p.preview;
   useEffect(() => {

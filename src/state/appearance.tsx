@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { AppearanceSettings } from '../shared/types';
 import { ThemeProvider } from '../ui';
-import { fontStack, quoteFontFamily } from '../lib/fonts.js';
+import { quoteFontFamily } from '../lib/fonts.js';
 import tokenSource from '../../design/tokens.css?raw';
 
 const tokenFont = (role: string) =>
@@ -51,8 +51,6 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     const html = document.documentElement;
-    html.style.setProperty('--legacy-font-ui', fontStack(appearance.sansFont, 'sans'));
-    html.style.setProperty('--legacy-font-mono', fontStack(appearance.monoFont, 'mono'));
     html.style.setProperty(
       '--font-ui',
       `${quoteFontFamily(appearance.sansFont)}, ${tokenFont('ui')}`,

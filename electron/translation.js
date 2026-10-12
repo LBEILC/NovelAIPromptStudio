@@ -159,7 +159,7 @@ export async function testModel(settings, fetcher = globalThis.fetch) {
   return { model, latencyMs: Date.now() - startedAt, response: chatContent(body) };
 }
 
-const TAG_TRANSLATION_BATCH_SIZE = 50;
+export const TAG_TRANSLATION_BATCH_SIZE = 50;
 
 function parseTranslationJson(content, expectedLength) {
   const withoutFence = content
@@ -193,7 +193,7 @@ function parseTranslationJson(content, expectedLength) {
   return cleaned;
 }
 
-async function translateTagBatch(cleaned, baseUrl, model, settings, fetcher) {
+async function translateTagBatch(cleaned, baseUrl, model, settings, fetcher, signal) {
   const translationPrompt =
     String(settings.translationPrompt || DEFAULT_TRANSLATION_PROMPT).trim() ||
     DEFAULT_TRANSLATION_PROMPT;
@@ -205,6 +205,7 @@ async function translateTagBatch(cleaned, baseUrl, model, settings, fetcher) {
     {
       method: 'POST',
       headers: requestHeaders(settings.apiKey),
+      signal,
       body: JSON.stringify(
         chatBody(model, [
           {
@@ -227,7 +228,7 @@ async function translateTagBatch(cleaned, baseUrl, model, settings, fetcher) {
   return parseTranslationJson(chatContent(body), cleaned.length);
 }
 
-export async function translateTags(texts, settings, fetcher = globalThis.fetch) {
+export async function translateTags(texts, settings, fetcher = globalThis.fetch, signal) {
   if (!Array.isArray(texts)) throw new Error('翻译内容格式无效');
   const cleaned = texts.map((text) => String(text || '').trim());
   if (!cleaned.length || cleaned.some((text) => !text)) throw new Error('没有可翻译的 Tag');
@@ -237,7 +238,8 @@ export async function translateTags(texts, settings, fetcher = globalThis.fetch)
   const items = [];
   for (let offset = 0; offset < cleaned.length; offset += TAG_TRANSLATION_BATCH_SIZE) {
     const batch = cleaned.slice(offset, offset + TAG_TRANSLATION_BATCH_SIZE);
-    items.push(...(await translateTagBatch(batch, baseUrl, model, settings, fetcher)));
+    if (signal?.aborted) throw new Error('翻译已取消');
+    items.push(...(await translateTagBatch(batch, baseUrl, model, settings, fetcher, signal)));
   }
   return {
     model,

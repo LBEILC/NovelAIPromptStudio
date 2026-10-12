@@ -11,12 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import {
-  dropTargetForExternal,
-  monitorForExternal,
-} from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
-import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
-import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
+import { installFileDrop } from './lib/fileDrop.js';
 import {
   Check,
   ClipboardPaste,
@@ -919,39 +914,11 @@ export default function App() {
 
   useEffect(() => {
     if (!appShellRef.current || !['workbench', 'gallery'].includes(page)) return undefined;
-    const cleanupMonitor = monitorForExternal({
-      canMonitor: containsFiles,
-      onDragStart: () => preventUnhandled.start(),
-      onDrop: () => setDragState((current) => ({ ...current, active: false })),
+    return installFileDrop(appShellRef.current, {
+      assess: page === 'workbench' ? assessWorkbenchDroppedFiles : assessDroppedFiles,
+      onChange: setDragState,
+      onDrop: (files) => dropHandlerRef.current?.(files),
     });
-    const cleanupTarget = dropTargetForExternal({
-      element: appShellRef.current,
-      canDrop: containsFiles,
-      onDragEnter: ({ source }) =>
-        setDragState({
-          active: true,
-          ...(page === 'workbench'
-            ? assessWorkbenchDroppedFiles(getFiles({ source }))
-            : assessDroppedFiles(getFiles({ source }))),
-        }),
-      onDrag: ({ source }) =>
-        setDragState({
-          active: true,
-          ...(page === 'workbench'
-            ? assessWorkbenchDroppedFiles(getFiles({ source }))
-            : assessDroppedFiles(getFiles({ source }))),
-        }),
-      onDragLeave: () => setDragState((current) => ({ ...current, active: false })),
-      onDrop: ({ source }) => {
-        const files = getFiles({ source });
-        setDragState((current) => ({ ...current, active: false }));
-        if (files.length) dropHandlerRef.current?.(files);
-      },
-    });
-    return () => {
-      cleanupTarget();
-      cleanupMonitor();
-    };
   }, [page]);
 
   dropHandlerRef.current = page === 'workbench' ? openDroppedWorkbenchImages : importImages;
@@ -1799,6 +1766,11 @@ export default function App() {
         <Activity mode={page === 'settings' ? 'visible' : 'hidden'}>
           <div className="app-page-surface">
             <SettingsPage
+              onFindTag={(tag) => {
+                selectGalleryCollection('');
+                setGalleryFilters({ ...DEFAULT_GALLERY_FILTERS, query: tag });
+                setPage('gallery');
+              }}
               onEmptyTrash={emptyTrash}
               onInstallUpdate={installDownloadedUpdate}
               onLibraryChange={() => Promise.all([reloadLibrary('all'), reloadLibrary('trash')])}

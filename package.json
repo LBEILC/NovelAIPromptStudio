@@ -48,20 +48,16 @@
     "yauzl": "3.4.0"
   },
   "devDependencies": {
-    "@atlaskit/pragmatic-drag-and-drop": "2.0.1",
     "@dnd-kit/core": "6.3.1",
-    "@dnd-kit/modifiers": "9.0.0",
     "@dnd-kit/sortable": "10.0.0",
     "@dnd-kit/utilities": "3.2.2",
     "@fontsource-variable/newsreader": "5.3.0",
     "@fontsource/ibm-plex-mono": "5.3.0",
-    "@lobehub/ui": "5.20.3",
     "@types/node": "24.13.3",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "6.0.3",
     "concurrently": "9.2.4",
-    "dayjs": "1.11.21",
     "electron": "43.1.1",
     "electron-builder": "26.15.3",
     "happy-dom": "20.14.5",
@@ -139,6 +135,10 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
-    "beforePack": "scripts/font-before-pack.mjs"
+    "beforePack": "scripts/font-before-pack.mjs",
+    "asarUnpack": [
+      "node_modules/sharp/**/*",
+      "node_modules/@img/**/*"
+    ]
   }
 }

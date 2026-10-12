@@ -11,6 +11,7 @@ import {
 import { Check, Minus, Plus, ChevronDown } from 'lucide-react';
 import { cx, composing, quantize } from './internal';
 import { Layer, Tooltip } from './overlays';
+import { useScrollArea } from './useScrollArea';
 
 export const iconProps = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -129,7 +130,14 @@ export interface Option {
   disabled?: boolean;
 }
 export function TextArea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cx('nps-textarea', className)} />;
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const overlay = useRef<HTMLSpanElement>(null);
+  useScrollArea(ref, { overlayRef: overlay });
+  return (
+    <span className="nps-textarea-wrap" ref={overlay}>
+      <textarea {...props} ref={ref} className={cx('nps-textarea', className)} />
+    </span>
+  );
 }
 export function Select({
   options,
@@ -506,13 +514,23 @@ export function Stepper({
   decreaseLabel,
   increaseLabel,
   precision,
-}: NumericProps & { decreaseLabel: string; increaseLabel: string; precision?: number }) {
+  snapToStep = true,
+}: Omit<NumericProps, 'min' | 'max'> & {
+  min?: number;
+  max?: number;
+  decreaseLabel: string;
+  increaseLabel: string;
+  precision?: number;
+  snapToStep?: boolean;
+}) {
   const format = (number: number) =>
     precision === undefined ? String(number) : number.toFixed(Math.max(0, Math.min(20, precision)));
   const [draft, setDraft] = useState(format(value));
   useEffect(() => setDraft(format(value)), [value, precision]);
   const change = (number: number) => {
-    const next = quantize(number, min, max, step);
+    const next = snapToStep
+      ? quantize(number, min ?? 0, max ?? Number.MAX_VALUE, step)
+      : Math.max(min ?? -Number.MAX_VALUE, Math.min(max ?? Number.MAX_VALUE, number));
     setDraft(format(next));
     onChange(next);
   };
@@ -525,7 +543,7 @@ export function Stepper({
       <button
         type="button"
         aria-label={decreaseLabel}
-        disabled={disabled || value <= min}
+        disabled={disabled || (min !== undefined && value <= min)}
         onClick={() => change(value - step)}
       >
         <Minus {...iconProps} />
@@ -556,7 +574,7 @@ export function Stepper({
       <button
         type="button"
         aria-label={increaseLabel}
-        disabled={disabled || value >= max}
+        disabled={disabled || (max !== undefined && value >= max)}
         onClick={() => change(value + step)}
       >
         <Plus {...iconProps} />

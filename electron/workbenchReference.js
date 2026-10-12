@@ -3,7 +3,10 @@ import path from 'node:path';
 import { createServer } from 'node:http';
 import sharp from 'sharp';
 
-export async function workbenchReferenceRenderer(output) {
+export async function workbenchReferenceRenderer(
+  output,
+  { page = 'wb', folder = 'workbench-comparisons' } = {},
+) {
   const root = path.resolve('.');
   const server = createServer(async (request, response) => {
     try {
@@ -45,16 +48,16 @@ export async function workbenchReferenceRenderer(output) {
     face('Newsreader', 'newsreader-latin-standard-normal-s-') +
     face('IBM Plex Mono', 'ibm-plex-mono-latin-400-') +
     `@import url('${base}/node_modules/remixicon/fonts/remixicon.css');.pv-bar,.pv-notes{display:none}.pv-stage{padding:0}.win{width:1240px;height:760px;margin:0;border:0;border-radius:0;box-shadow:none}html,body{margin:0;overflow:hidden}`;
-  const directory = path.join(output, 'workbench-comparisons');
+  const directory = path.join(output, folder);
   await fs.mkdir(directory, { recursive: true });
   return {
-    async capture(state, theme, applicationFile, window) {
+    async capture(state, theme, applicationFile, window, name = state) {
       window.webContents.session.webRequest.onBeforeRequest(
         { urls: ['http://*/*', 'https://*/*'] },
         (request, callback) => callback({ cancel: !request.url.startsWith(base + '/') }),
       );
       await window.loadURL(
-        `${base}/design/preview.html?page=wb&sub=${state}&theme=${theme}&stage=1.0`,
+        `${base}/design/preview.html?page=${page}&sub=${state}&theme=${theme}&stage=1.0`,
       );
       await window.webContents.insertCSS(css);
       await window.webContents.insertCSS(
@@ -74,8 +77,8 @@ export async function workbenchReferenceRenderer(output) {
         clip: { x: 0, y: 0, width: 1240, height: 760, scale: 1 },
       });
       const reference = Buffer.from(data, 'base64');
-      await fs.writeFile(path.join(directory, `${state}-${theme}-reference.png`), reference);
-      const file = `${state}-${theme}.png`;
+      await fs.writeFile(path.join(directory, `${name}-${theme}-reference.png`), reference);
+      const file = `${name}-${theme}.png`;
       await sharp({ create: { width: 2480, height: 760, channels: 3, background: '#ffffff' } })
         .composite([
           { input: reference, left: 0, top: 0 },
@@ -86,7 +89,7 @@ export async function workbenchReferenceRenderer(output) {
       return {
         state,
         theme,
-        file: 'workbench-comparisons/' + file,
+        file: folder + '/' + file,
         reference: 'left',
         application: 'right',
       };

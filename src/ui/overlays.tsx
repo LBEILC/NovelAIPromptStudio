@@ -10,6 +10,7 @@ import {
   type RefObject,
 } from 'react';
 import { cx, focusables, placeLayer, trapTab } from './internal';
+import { useScrollArea } from './useScrollArea';
 
 export function Layer({
   open,
@@ -41,6 +42,7 @@ export function Layer({
   mode?: 'auto' | 'manual';
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  useScrollArea(ref, { enabled: open });
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useLayoutEffect(() => {
@@ -176,6 +178,7 @@ export function Dialog({
   ...props
 }: { open: boolean } & React.ComponentProps<typeof DialogContent>) {
   const ref = useRef<HTMLDialogElement>(null);
+  useScrollArea(ref, { enabled: open });
   const cancel = useRef<HTMLButtonElement>(null);
   const id = useId();
   useLayoutEffect(() => {

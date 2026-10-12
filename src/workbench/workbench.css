@@ -66,3 +66,20 @@
 
 .wb-body > .nps-resizable { flex-shrink:0; height:100%; min-height:0; }
 .wb-body > .nps-resizable > .nps-panel-content { height:100%; overflow:hidden; }
+
+.wb-section-head > .nps-button:first-child,.wb-section-head > strong { font-size:var(--fs-title); font-weight:var(--fw-strong); padding-left:0; }
+.wb-add-tags .wb-add-trigger.nps-button { border:var(--bw) dashed var(--border); color:var(--text-3); }
+.wb-add-tags { min-width:0; }
+.wb-add-tags:has(.nps-autocomplete) { min-width:var(--tag-input-min); }
+.wb-add-tags .nps-autocomplete input { field-sizing:content; width:auto; min-width:var(--tag-input-min); max-width:100%; }
+.wb-tag-editor label { flex-direction:row; align-items:center; display:grid; grid-template-columns:calc(var(--sp-8) + var(--sp-3)) 1fr; gap:var(--sp-2); }
+.wb-weight { display:flex; align-items:center; gap:var(--sp-2); }
+.wb-editor-cancel,.wb-editor-note { margin-left:auto; }
+.wb-editor-warning { margin-right:auto; }
+.wb-paragraph-editor > .wb-editor-actions { justify-content:flex-start; }
+.wb-block:has(.wb-paragraph-editor) > header > span:first-child::after { content:' · 编辑中'; }
+.wb-copy-menu { min-width:var(--menu-wide-min-w); }
+.wb-filters { flex-wrap:wrap; }
+.wb-filter-note { flex-basis:100%; }
+
+.wb-section-head > .nps-button:first-child { color:var(--text); }

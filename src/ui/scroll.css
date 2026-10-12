@@ -1,0 +1,9 @@
+.nps-scroll-host { scrollbar-width: none; }
+.nps-textarea-wrap { display: block; position: relative; min-width: 0; }
+.nps-textarea-wrap > textarea { display: block; }
+.nps-scroll-host::-webkit-scrollbar { width: 0; height: 0; }
+.nps-scroll-thumb { position: absolute; right: var(--sb-inset); width: var(--sb-w); min-height: 0; border-radius: var(--r-pill); background: var(--border); opacity: 0; pointer-events: none; z-index: 3; cursor: default; touch-action: none; transition: opacity var(--dur-2) var(--ease-out), width var(--dur-1) var(--ease-out), background-color var(--dur-1) var(--ease-out); }
+.nps-scroll-thumb[data-visible="true"] { opacity: 1; pointer-events: auto; }
+.nps-scroll-thumb:hover, .nps-scroll-thumb[data-dragging="true"] { width: var(--sb-w-hover); background: var(--text-3); }
+html[data-motion="off"] .nps-scroll-thumb { transition: none; }
+@media (prefers-reduced-motion: reduce) { .nps-scroll-thumb { transition: none; } }

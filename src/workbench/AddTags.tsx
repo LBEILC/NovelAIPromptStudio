@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { Autocomplete, type Suggestion } from '../ui';
+import { Autocomplete, Button, type Suggestion } from '../ui';
 import { analyzePromptBatch, formatTag } from '../lib/prompt.js';
 import type { Tag } from '../shared/types';
 
@@ -15,6 +15,7 @@ export function AddTags({
   tags: Tag[];
   onAdd: (text: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
   const [items, setItems] = useState<Suggestion[]>([]);
   const analysis = useMemo(() => analyzePromptBatch(value, tags), [value, tags]);
@@ -38,8 +39,7 @@ export function AddTags({
                 id: item.tag,
                 text: item.tag,
                 translation: item.translation,
-                // TODO(design): Neither existing dictionary stores usage counts; define the missing-value presentation.
-                count: '',
+                count: item.count ? String(item.count) : '',
               })),
             );
         })
@@ -60,22 +60,43 @@ export function AddTags({
   };
   return (
     <div className="wb-add-tags" ref={drop.setNodeRef} data-drop-active={drop.isOver || undefined}>
-      <Autocomplete
-        label="输入中文或英文"
-        placeholder="输入中文或英文"
-        value={value}
-        onChange={setValue}
-        items={items}
-        onSelect={(item) => add(item.text)}
-        directAdd={{
-          label: `将添加 ${analysis.tags.length} 个 · ${analysis.duplicateCount} 个重复`,
-          onSelect: () => add(analysis.tags.map(formatTag).join(', ')),
-        }}
-      />
-      {value && (
-        <span className="nps-help">
-          将添加 {analysis.tags.length} 个 · {analysis.duplicateCount} 个重复
-        </span>
+      {editing ? (
+        <>
+          <Autocomplete
+            autoFocus
+            onDismiss={() => {
+              if (!value.trim()) setEditing(false);
+            }}
+            label="输入中文或英文"
+            placeholder="输入中文或英文"
+            value={value}
+            onChange={setValue}
+            items={items}
+            onSelect={(item) => add(item.text)}
+            directAdd={{
+              label: `将添加 ${analysis.tags.length} 个 · ${analysis.duplicateCount} 个重复`,
+              onSelect: () => add(analysis.tags.map(formatTag).join(', ')),
+            }}
+          />
+          <span className="nps-help">
+            回车添加。用逗号或换行可以一次添加多个；输入中文会找对应的英文 Tag。
+          </span>
+          {value && (
+            <span className="nps-help">
+              将添加 {analysis.tags.length} 个 · {analysis.duplicateCount} 个重复
+            </span>
+          )}
+        </>
+      ) : (
+        <Button
+          className="wb-add-trigger"
+          variant="quiet"
+          size="small"
+          onClick={() => setEditing(true)}
+        >
+          <i className="ri-add-line" />
+          输入中文或英文
+        </Button>
       )}
     </div>
   );

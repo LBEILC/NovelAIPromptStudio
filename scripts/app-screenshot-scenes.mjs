@@ -50,4 +50,10 @@ export const screenshotScenes = [
     page: 'settings',
     section,
   })),
+  ...['edit', 'selection', 'more'].map((settingsState) => ({
+    name: `settings-dictionary-${settingsState}`,
+    page: 'settings',
+    section: 'tags',
+    settingsState,
+  })),
 ];

@@ -101,6 +101,7 @@ export function ParagraphEditor({
           loading={busy === 'translate'}
           onClick={() => void transform('translate')}
         >
+          <i className="ri-arrow-down-line" />
           译成中文
         </Button>
         <Button
@@ -111,10 +112,11 @@ export function ParagraphEditor({
           loading={busy === 'rewrite'}
           onClick={() => void transform('rewrite')}
         >
+          <i className="ri-arrow-up-line" />
           按中文改写英文
         </Button>
+        <span className="nps-help wb-editor-note">发给 NovelAI 的是上面的英文</span>
       </div>
-      <span className="nps-help">发给 NovelAI 的是上面的英文</span>
       <TextArea
         aria-label="中文段落"
         value={chinese}
@@ -123,9 +125,11 @@ export function ParagraphEditor({
           setChangedChinese(true);
         }}
       />
-      {changedChinese && <span className="nps-help">改了中文还没有改写英文</span>}
       {error && <Banner tone="danger">{error}</Banner>}
       <div className="wb-editor-actions">
+        {changedChinese && (
+          <span className="nps-help wb-editor-warning">改了中文还没有改写英文</span>
+        )}
         <Button
           variant="quiet"
           onClick={() => {

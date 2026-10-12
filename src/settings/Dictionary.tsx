@@ -1,9 +1,27 @@
-import { useRef, useState } from 'react';
-import { Button, Input, Select, Checkbox, Dialog, Popover, EmptyState } from '../ui';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  Button,
+  Input,
+  Select,
+  Checkbox,
+  Dialog,
+  EmptyState,
+  Menu,
+  Layer,
+  MenuItems,
+  Shortcut,
+  Progress,
+  useScrollArea,
+  type MenuItem,
+} from '../ui';
 import { CATEGORY_LABELS, CATEGORY_OPTIONS } from '../lib/prompt.js';
-import type { TagCategory } from '../shared/types';
-import type { TagCacheRequest } from '../shared/ipc';
-import { PAGE_SIZE, useDictionary } from '../state/dictionary';
+import type { TagCategory, TagDictionaryEntry } from '../shared/types';
+import {
+  useDictionary,
+  dictionarySource,
+  type DictionarySort,
+  type DictionaryView,
+} from '../state/dictionary';
 const categoryTokens: Record<string, string> = {
   ArtistEra: 'artist-era',
   Composition: 'composition',
@@ -25,246 +43,426 @@ const categories = CATEGORY_OPTIONS.map((value: string) => ({
     />
   ),
 }));
-const sources = [
-  { value: '', label: '全部来源' },
-  ...Object.entries({
-    manual: '用户修改',
-    danbooru: 'Danbooru',
-    dso: 'DSO 内置词典',
-    ai: 'AI',
-    rule: '本地规则',
-    builtin: '内置词典',
-    heuristic: '本地推断',
-  }).map(([value, label]) => ({ value, label })),
+const views: [DictionaryView, string][] = [
+  ['all', '全部'],
+  ['untranslated', '没有译文'],
+  ['unsorted', '未分类'],
+  ['ai', 'AI 翻译的'],
+  ['manual', '你改过的'],
 ];
-const sourceLabel = (source: string) =>
-  sources.find((item) => item.value && item.value === source)?.label ||
-  (source === 'cache' ? '缓存' : '未记录');
-const formatUpdatedAt = (value?: string) =>
-  value && !Number.isNaN(Date.parse(value))
-    ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(
-        new Date(value),
-      )
-    : '';
-export function Dictionary() {
+const sourceLabel = (item: TagDictionaryEntry) =>
+  ({ manual: '你改过', ai: 'AI', builtin: '内置' })[dictionarySource(item)];
+
+export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void }) {
   const d = useDictionary();
-  const editAnchor = useRef<HTMLElement | null>(null);
-  const [editing, setEditing] = useState('');
+  const scroll = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const failures = useRef<HTMLDetailsElement>(null);
+  useScrollArea(failures, { enabled: !!d.progress?.failed.length });
+  useScrollArea(scroll, { topInset: '--table-head-h' });
+  const [viewport, setViewport] = useState({ top: 0, height: 0, row: 36, head: 30 });
+  const [editing, setEditing] = useState<string | null>(null);
   const [translation, setTranslation] = useState('');
-  const [category, setCategory] = useState<TagCategory>('Unsorted');
-  const [batchCategory, setBatchCategory] = useState<TagCategory>('Unsorted');
   const [deleting, setDeleting] = useState<string[]>([]);
-  const editedItem = d.items.find((item) => item.tag === editing);
-  const filter = (patch: TagCacheRequest) =>
-    d.setFilters((current) => ({ ...current, ...patch, offset: 0 }));
+  const [menu, setMenu] = useState<{
+    item: TagDictionaryEntry;
+    point?: { x: number; y: number };
+  } | null>(null);
+  const menuAnchor = useRef<HTMLElement | null>(null);
+  const [message, setMessage] = useState('');
+  useLayoutEffect(() => {
+    const node = scroll.current!;
+    const measure = () => {
+      const css = getComputedStyle(node);
+      setViewport({
+        top: node.scrollTop,
+        height: node.clientHeight,
+        row: parseFloat(css.getPropertyValue('--table-row-h')),
+        head: parseFloat(css.getPropertyValue('--table-head-h')),
+      });
+    };
+    const resize = new ResizeObserver(measure);
+    resize.observe(node);
+    measure();
+    return () => resize.disconnect();
+  }, []);
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 'k' &&
+        root.current?.getClientRects().length
+      ) {
+        event.preventDefault();
+        root.current.querySelector<HTMLInputElement>('[aria-label="搜索 Tag 或译文"]')?.focus();
+      }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, []);
+  useEffect(() => {
+    if (scroll.current) scroll.current.scrollTop = 0;
+  }, [d.filters]);
+  const start = Math.max(0, Math.floor((viewport.top - viewport.head) / viewport.row) - 4);
+  const end = Math.min(d.items.length, start + Math.ceil(viewport.height / viewport.row) + 10);
+  const beginEdit = (item: TagDictionaryEntry) => {
+    setEditing(item.tag);
+    setTranslation(item.translation);
+  };
+  const focusCategory = (tag: string) =>
+    requestAnimationFrame(() => {
+      const row = [...root.current!.querySelectorAll<HTMLTableRowElement>('tr[data-tag]')].find(
+        (row) => row.dataset.tag === tag,
+      );
+      row?.querySelector<HTMLButtonElement>('.settings-table-category button')?.focus();
+    });
+  const saveTranslation = async (item: TagDictionaryEntry, next: 'next' | 'category') => {
+    const following = d.items[d.items.findIndex((row) => row.tag === item.tag) + 1];
+    if (!(await d.save(item.tag, { translation }))) return;
+    setEditing(null);
+    if (next === 'category') focusCategory(item.tag);
+    else if (following) {
+      const index = d.items.findIndex((row) => row.tag === following.tag);
+      if (scroll.current && (index < start || index >= end))
+        scroll.current.scrollTop = index * viewport.row;
+      beginEdit(following);
+    }
+  };
+  const moreItems = (item: TagDictionaryEntry): MenuItem[] => [
+    {
+      id: 'find',
+      label: '在图片库里查找',
+      trailing: item.image_count ? `${item.image_count} 张` : undefined,
+      onSelect: () => onFindTag?.(item.display_tag || item.tag),
+    },
+    {
+      id: 'copy',
+      label: '复制 Tag',
+      onSelect: () => {
+        void navigator.clipboard
+          .writeText((item.display_tag || item.tag).replaceAll('_', ' '))
+          .then(
+            () => setMessage('已复制 Tag'),
+            (error) => setMessage(String(error)),
+          );
+      },
+    },
+    { id: 'sep', separator: true },
+    {
+      id: 'delete',
+      label: dictionarySource(item) === 'manual' ? '还原' : '删除，下次重新翻译',
+      danger: true,
+      onSelect: () => setDeleting([item.tag]),
+    },
+  ];
+  const reverting =
+    deleting.length === 1 &&
+    d.allItems.some((item) => item.tag === deleting[0] && dictionarySource(item) === 'manual');
   return (
-    <div className="settings-dictionary">
-      <header className="settings-copy">
-        <h2>翻译词典</h2>
-        <p>这里是软件记住的 Tag 译文和分类。修改只影响显示，不会改动图片里保存的 Prompt。</p>
+    <div className="settings-dictionary settings-page" ref={root}>
+      <header className="settings-page-head">
+        <div>
+          <h1>翻译词典</h1>
+          <p>
+            软件认识的 Tag
+            和它们的译文、分类。工作台和图片库里显示的译文都来自这里；改了只影响显示，不会改动图片里的
+            Prompt。
+          </p>
+        </div>
       </header>
       <div className="settings-table-toolbar">
-        <Input
-          aria-label="搜索 Tag 或译文"
-          placeholder="搜索 Tag 或译文"
-          value={d.filters.query}
-          onChange={(e) => filter({ query: e.target.value })}
-        />
-        <Select
-          label="按 Tag 分类筛选"
-          options={[{ value: '', label: '全部分类' }, ...categories]}
-          value={d.filters.category || ''}
-          onChange={(value) => filter({ category: value as TagCategory | '' })}
-        />
-        <Select
-          label="按缓存来源筛选"
-          options={sources}
-          value={d.filters.source || ''}
-          onChange={(value) => filter({ source: value as TagCacheRequest['source'] })}
-        />
-        <span>{d.busy ? '正在读取…' : `${d.total} 条`}</span>
+        <div>
+          <Input
+            className="settings-dictionary-search"
+            aria-label="搜索 Tag 或译文"
+            placeholder="搜索 Tag 或译文"
+            prefix={<i className="ri-search-line" />}
+            suffix={<Shortcut keys={['Mod', 'K']} />}
+            value={d.filters.query}
+            onChange={(e) => d.setFilters((f) => ({ ...f, query: e.target.value }))}
+          />
+          <Select
+            label="按 Tag 分类筛选"
+            options={[{ value: '', label: '全部分类' }, ...categories]}
+            value={d.filters.category}
+            onChange={(value) =>
+              d.setFilters((f) => ({ ...f, category: value as TagCategory | '' }))
+            }
+          />
+          <Select
+            label="排序"
+            options={[
+              { value: 'usage', label: '用到的图片' },
+              { value: 'tag', label: '按 Tag' },
+              { value: 'recent', label: '最近修改' },
+            ]}
+            value={d.filters.sort}
+            onChange={(sort) => d.setFilters((f) => ({ ...f, sort: sort as DictionarySort }))}
+          />
+        </div>
+        <div className="settings-dictionary-views" role="tablist" aria-label="词典分页签">
+          {views.map(([view, label]) => (
+            <button
+              key={view}
+              type="button"
+              role="tab"
+              aria-selected={d.filters.view === view}
+              onClick={() => {
+                setEditing(null);
+                d.setFilters((f) => ({ ...f, view }));
+              }}
+            >
+              {label}
+              <span>{d.counts[view].toLocaleString()}</span>
+            </button>
+          ))}
+        </div>
       </div>
-      {d.error && <p role="alert">{d.error}</p>}
-      <div className="settings-table-scroll">
-        <table className="settings-table">
+      {(d.error || message) && <p role={d.error ? 'alert' : 'status'}>{d.error || message}</p>}
+      <div
+        className="settings-table-scroll settings-scroll"
+        ref={scroll}
+        onScroll={(event) => {
+          const top = event.currentTarget.scrollTop;
+          setViewport((v) => ({ ...v, top }));
+        }}
+      >
+        <table className="settings-table" aria-rowcount={d.items.length + 1}>
           <thead>
             <tr>
               <th>
                 <Checkbox
-                  label="选择本页"
-                  checked={!!d.items.length && d.selected.length === d.items.length}
-                  onChange={(checked) => d.setSelected(checked ? d.items.map((i) => i.tag) : [])}
+                  label="选择当前分页签"
+                  checked={
+                    !!d.items.length && d.items.every((item) => d.selected.includes(item.tag))
+                  }
+                  onChange={(checked) =>
+                    d.setSelected(checked ? d.items.map((item) => item.tag) : [])
+                  }
                 />
               </th>
               <th>Tag</th>
               <th>译文</th>
               <th>分类</th>
+              <th className="settings-usage">用到的图片</th>
               <th>来源</th>
               <th />
             </tr>
           </thead>
           <tbody>
-            {d.items.map((item) => (
-              <tr key={item.tag} aria-selected={d.selected.includes(item.tag)}>
+            {!!start && (
+              <tr
+                className="settings-table-spacer"
+                aria-hidden="true"
+                style={{ height: start * viewport.row }}
+              >
+                <td colSpan={7} />
+              </tr>
+            )}
+            {d.items.slice(start, end).map((item, offset) => (
+              <tr
+                key={item.tag}
+                data-tag={item.tag}
+                aria-rowindex={start + offset + 2}
+                aria-selected={d.selected.includes(item.tag)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  if (d.busy) return;
+                  menuAnchor.current = event.currentTarget;
+                  setMenu({ item, point: { x: event.clientX, y: event.clientY } });
+                }}
+              >
                 <td>
                   <Checkbox
                     label={item.tag}
                     checked={d.selected.includes(item.tag)}
                     onChange={(checked) =>
                       d.setSelected((current) =>
-                        checked ? [...current, item.tag] : current.filter((t) => t !== item.tag),
+                        checked
+                          ? [...current, item.tag]
+                          : current.filter((tag) => tag !== item.tag),
                       )
                     }
                   />
                 </td>
                 <td>
-                  <span className="settings-tag">{item.display_tag || item.tag}</span>
+                  <span className="settings-tag" title={item.display_tag || item.tag}>
+                    {(item.display_tag || item.tag).replaceAll('_', ' ')}
+                  </span>
                 </td>
                 <td>
+                  {editing === item.tag ? (
+                    <Input
+                      size="small"
+                      aria-label="译文"
+                      autoFocus
+                      value={translation}
+                      onChange={(event) => setTranslation(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.nativeEvent.isComposing) return;
+                        if (event.key === 'Escape') {
+                          event.preventDefault();
+                          setEditing(null);
+                        }
+                        if (event.key === 'Enter' || (event.key === 'Tab' && !event.shiftKey)) {
+                          event.preventDefault();
+                          void saveTranslation(item, event.key === 'Enter' ? 'next' : 'category');
+                        }
+                      }}
+                    />
+                  ) : (
+                    <Button variant="quiet" disabled={d.busy} onClick={() => beginEdit(item)}>
+                      {item.translation || '点击填写'}
+                    </Button>
+                  )}
+                </td>
+                <td>
+                  <Menu
+                    className="settings-table-category"
+                    buttonVariant="quiet"
+                    label={`分类：${item.tag}`}
+                    trigger={
+                      <>
+                        {categories.find((c) => c.value === item.category)?.prefix}
+                        {CATEGORY_LABELS[item.category || 'Unsorted']}
+                      </>
+                    }
+                    items={categories.map((category) => ({
+                      id: category.value,
+                      label: category.label,
+                      disabled: d.busy,
+                      onSelect: () =>
+                        void d.save(item.tag, { category: category.value as TagCategory }),
+                    }))}
+                  />
+                </td>
+                <td className="settings-usage">
+                  {item.image_count ? (
+                    <Button
+                      variant="quiet"
+                      onClick={() => onFindTag?.(item.display_tag || item.tag)}
+                    >
+                      {item.image_count}
+                    </Button>
+                  ) : (
+                    <span>没用到</span>
+                  )}
+                </td>
+                <td className="settings-source">{sourceLabel(item)}</td>
+                <td className="settings-row-more">
                   <Button
                     variant="quiet"
-                    onClick={(event) => {
-                      editAnchor.current = event.currentTarget;
-                      setEditing(item.tag);
-                      setTranslation(item.translation || '');
-                      setCategory(item.category || 'Unsorted');
-                    }}
-                  >
-                    {item.translation || '点击填写'}
-                  </Button>
-                </td>
-                <td>
-                  <Button
-                    variant="quiet"
-                    onClick={(event) => {
-                      editAnchor.current = event.currentTarget;
-                      setEditing(item.tag);
-                      setTranslation(item.translation || '');
-                      setCategory(item.category || 'Unsorted');
-                    }}
-                  >
-                    {categories.find((c) => c.value === item.category)?.prefix}
-                    {CATEGORY_LABELS[item.category || 'Unsorted']}
-                  </Button>
-                </td>
-                <td className="settings-source">
-                  {sourceLabel(item.translation_source || item.category_source)}
-                </td>
-                <td>
-                  <Button
                     size="small"
-                    variant="quiet"
+                    aria-label={`更多：${item.tag}`}
                     disabled={d.busy}
-                    onClick={() => setDeleting([item.tag])}
+                    onClick={(event) => {
+                      menuAnchor.current = event.currentTarget;
+                      setMenu({ item });
+                    }}
                   >
-                    删除
+                    <i className="ri-more-line" />
                   </Button>
                 </td>
               </tr>
             ))}
+            {end < d.items.length && (
+              <tr
+                className="settings-table-spacer"
+                aria-hidden="true"
+                style={{ height: (d.items.length - end) * viewport.row }}
+              >
+                <td colSpan={7} />
+              </tr>
+            )}
           </tbody>
         </table>
         {!d.busy && !d.items.length && (
           <EmptyState
             graphic={null}
             actions={null}
-            title={
-              d.filters.query || d.filters.category || d.filters.source
-                ? '没有匹配的 Tag 数据'
-                : '还没有 Tag 数据'
-            }
-            description={
-              d.filters.query || d.filters.category || d.filters.source
-                ? '试试更换搜索词或筛选条件。'
-                : '整理或翻译 Tag 后，全局数据会显示在这里。'
-            }
+            title="没有匹配的 Tag 数据"
+            description="试试更换搜索词或筛选条件。"
           />
         )}
+        <div className="settings-dictionary-count">
+          {d.busy ? '正在读取…' : `${d.items.length} 条`}
+        </div>
       </div>
-      {!!d.selected.length && (
-        <div className="settings-actions">
-          <span>已选 {d.selected.length} 条</span>
-          <Select
-            label="批量设置 Tag 分类"
-            options={categories}
-            value={batchCategory}
-            onChange={(v) => setBatchCategory(v as TagCategory)}
-          />
-          <Button disabled={d.busy} onClick={() => void d.categorize(batchCategory)}>
-            设置分类
-          </Button>
-          <Button variant="danger" disabled={d.busy} onClick={() => setDeleting(d.selected)}>
-            删除
-          </Button>
-          <Button variant="quiet" onClick={() => d.setSelected([])}>
-            取消
-          </Button>
-        </div>
-      )}
-      {d.total > PAGE_SIZE && (
-        <div className="settings-actions">
-          <Button
-            disabled={!d.filters.offset || d.busy}
-            onClick={() => d.setFilters((f) => ({ ...f, offset: (f.offset || 0) - PAGE_SIZE }))}
-          >
-            上一页
-          </Button>
+      {d.progress && (
+        <div className="settings-dictionary-progress" role="status">
+          {/* TODO(design): Confirm progress, cancellation and failure copy for batch AI translation. */}
           <span>
-            第 {Math.floor((d.filters.offset || 0) / PAGE_SIZE) + 1}/
-            {Math.ceil(d.total / PAGE_SIZE)} 页
+            【文案待定：{d.progress.canceled ? '已取消' : 'AI 翻译进度'}】{d.progress.completed} /{' '}
+            {d.progress.total} · {d.progress.failed.length} 条失败，保留原值
           </span>
-          <Button
-            disabled={(d.filters.offset || 0) + PAGE_SIZE >= d.total || d.busy}
-            onClick={() => d.setFilters((f) => ({ ...f, offset: (f.offset || 0) + PAGE_SIZE }))}
-          >
-            下一页
-          </Button>
+          <Progress value={d.progress.completed} max={d.progress.total} label="AI 翻译进度" />
+          {!!d.progress.failed.length && (
+            <details ref={failures}>
+              <summary>【文案待定：查看失败条目】</summary>
+              {d.progress.failed.map((item) => (
+                <p key={item.tag}>
+                  {item.tag}：{item.error}
+                </p>
+              ))}
+            </details>
+          )}
         </div>
       )}
-      <Popover open={!!editing} label={editing} anchor={editAnchor} onClose={() => setEditing('')}>
-        <div className="settings-edit-fields">
-          <strong>编辑缓存</strong>
-          <small>原 Tag 只读 · 保存到全局缓存</small>
-          <code>{editing}</code>
-          <Input
-            aria-label="译文"
-            value={translation}
-            onChange={(e) => setTranslation(e.target.value)}
-          />
-          <Select
-            label="分类"
-            options={categories}
-            value={category}
-            onChange={(v) => setCategory(v as TagCategory)}
-          />
-          <small>
-            译文：{sourceLabel(editedItem?.translation_source || '')} · 分类：
-            {sourceLabel(editedItem?.category_source || '')}
-          </small>
-          <small>{formatUpdatedAt(editedItem?.updated_at)}</small>
-          {d.error && <p role="alert">{d.error}</p>}
-          <div className="settings-actions">
-            <Button onClick={() => setEditing('')}>取消</Button>
+      {!!d.selected.length && (
+        <div className="settings-dictionary-selection">
+          <div className="nps-selection" role="group" aria-label="词典多选操作">
+            <span>已选 {d.selected.length} 条</span>
+            <Menu
+              label="设置分类"
+              buttonVariant="quiet"
+              items={categories.map((category) => ({
+                id: category.value,
+                label: category.label,
+                disabled: d.busy,
+                onSelect: () => void d.categorize(category.value as TagCategory),
+              }))}
+            />
             <Button
-              variant="ink"
-              disabled={d.busy}
-              onClick={() =>
-                void d.save(editing, { translation, category }).then((ok) => {
-                  if (ok) setEditing('');
-                })
-              }
+              variant="quiet"
+              disabled={d.busy || !d.aiReady}
+              disabledReason={!d.aiReady ? '请先在设置里配置 AI 服务' : undefined}
+              onClick={() => void d.retranslate()}
             >
-              保存
+              用 AI 重新翻译
+            </Button>
+            <Button variant="danger" disabled={d.busy} onClick={() => setDeleting(d.selected)}>
+              删除
+            </Button>
+            <Button variant="quiet" onClick={() => (d.running ? d.cancel() : d.setSelected([]))}>
+              取消
             </Button>
           </div>
         </div>
-      </Popover>
+      )}
+      <Layer
+        open={!!menu}
+        anchor={menuAnchor}
+        point={menu?.point}
+        onClose={() => setMenu(null)}
+        className="nps-menu"
+        focus
+      >
+        {menu && (
+          <MenuItems
+            label="词典更多"
+            items={moreItems(menu.item)}
+            closeAll={() => setMenu(null)}
+            closeLevel={() => setMenu(null)}
+          />
+        )}
+      </Layer>
       <Dialog
         open={!!deleting.length}
-        title="删除 Tag 缓存？"
+        title={reverting ? '还原？' : '删除？'}
         destructive
         cancelLabel="取消"
-        confirmLabel={deleting.length === 1 ? '删除缓存' : `删除 ${deleting.length} 条`}
+        confirmLabel={reverting ? '还原' : `删除 ${deleting.length} 条`}
+        confirmDisabled={d.busy}
         onCancel={() => setDeleting([])}
         onConfirm={() => {
           if (!d.busy)
@@ -273,9 +471,9 @@ export function Dictionary() {
             });
         }}
       >
-        <p>确定删除选中的 {deleting.length} 条 Tag 缓存吗？</p>
-        <p>不会修改图片中已经保存的 Prompt；再次整理这些 Tag 时，系统可能重新生成缓存。</p>
-        {d.error && <p role="alert">{d.error}</p>}
+        {/* TODO(design): Existing deletion has no prior AI/manual history to restore. */}
+        <p>【文案待定：删除本地记录后没有译文；下次整理时重新获取，不会恢复之前的 AI 结果】</p>
+        <p>不会修改图片中已经保存的 Prompt。</p>
       </Dialog>
     </div>
   );

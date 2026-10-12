@@ -1,4 +1,5 @@
 import { libraryNamingChecks } from './libraryNaming.js';
+import { scrollChecks } from './scroll.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import {
   checkLibraryButtonGaps,
@@ -116,6 +117,14 @@ export async function libraryChecks(env) {
     await wait(`document.documentElement.dataset.motion === '${reduced ? 'off' : 'full'}'`);
     await all();
     await setGrouping('不合并');
+    // Constrain the viewport so this small synthetic fixture exercises virtual scrolling.
+    await e(`${grid}.style.maxHeight='200px'`);
+    await settled();
+    await scrollChecks(h, '[data-library-grid]');
+    await e(`${grid}.style.maxHeight=''`);
+    await e(`${grid}.scrollTop=0`);
+    await settled();
+    if (mode.category === '图片库·滚动条') return;
     await selectCard();
     await waitDetail();
     await check(
@@ -153,6 +162,14 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
+    await key('ArrowLeft', {}, grid);
+    await check(
+      '关于页列出的左键返回上一张卡片',
+      'document.querySelector(".library-card.current").dataset.libraryIndex==="1"',
+      undefined,
+      'once',
+    );
+    await key('ArrowRight', {}, grid);
     await key('ArrowDown', {}, grid);
     await check(
       '下键移动到相邻行水平位置最近的一张',

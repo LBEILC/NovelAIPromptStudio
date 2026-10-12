@@ -93,6 +93,14 @@ contextBridge.exposeInMainWorld(
       invoke('workbench:image:download-current', { filePath, name }),
     saveTagAnnotations: (entries) => invoke('tag:annotations:save', entries),
     listTagCache: (request) => invoke('tag-cache:list', request),
+    retranslateTagCache: (id, tags) => invoke('tag-cache:retranslate', { id, tags }),
+    cancelTagRetranslation: (id) => invoke('tag-cache:retranslate:cancel', id),
+    onTagRetranslationProgress: (callback) => {
+      ipcRenderer.removeAllListeners('tag-cache:retranslate:progress');
+      ipcRenderer.on('tag-cache:retranslate:progress', (_event, progress) => callback(progress));
+    },
+    offTagRetranslationProgress: () =>
+      ipcRenderer.removeAllListeners('tag-cache:retranslate:progress'),
     suggestTags: (query) => invoke('tag:suggest', query),
     updateTagCache: (tag, patch) => invoke('tag-cache:update', { tag, patch }),
     updateTagCacheMany: (tags, category) => invoke('tag-cache:update-many', { tags, category }),

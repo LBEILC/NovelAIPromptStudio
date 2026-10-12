@@ -12,17 +12,5 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    rolldownOptions: {
-      output: {
-        codeSplitting: {
-          groups: [
-            {
-              name: 'lobe-runtime',
-              test: /node_modules[\\/]@lobehub[\\/]ui[\\/]/,
-            },
-          ],
-        },
-      },
-    },
   },
 });

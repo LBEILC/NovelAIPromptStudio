@@ -133,7 +133,7 @@
 .nps-empty p { margin: 0; max-width: var(--empty-w); }
 .nps-empty .nps-actions { margin-top: var(--sp-4); }
 .nps-empty .nps-help { margin-top: var(--sp-5); }
-.nps-kbd { font: var(--fs-caption)/1 var(--font-mono); color: var(--text-3); border: var(--bw) solid var(--border); border-radius: var(--sp-1); padding: var(--sp-0) var(--sp-1); }
+.nps-kbd { font: var(--fs-caption)/1 var(--font-mono); color: var(--text-3); border: var(--bw) solid var(--border); border-radius: var(--sp-1); padding: var(--sp-0) var(--sp-1); white-space: nowrap; }
 .nps-resizable { position: relative; max-width: 100%; }
 .nps-panel-content { overflow: auto; }
 .nps-resizer { position: absolute; top: 0; bottom: 0; width: var(--split-hit); background: transparent; cursor: col-resize; touch-action: none; }

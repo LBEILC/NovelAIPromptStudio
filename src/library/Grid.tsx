@@ -3,6 +3,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { adjacentRowIndex, fallbackRatio, layoutLibraryRows } from './layout';
 import { mediaUrl } from '../lib/imageStage.js';
 import type { LibraryProps } from './types';
+import { useScrollArea } from '../ui';
 
 export function LibraryGrid({
   p,
@@ -16,6 +17,7 @@ export function LibraryGrid({
   onViewer: () => void;
 }) {
   const scroll = useRef<HTMLDivElement>(null);
+  useScrollArea(scroll);
   const [viewport, setViewport] = useState({
     width: 0,
     height: 0,
@@ -197,6 +199,7 @@ export function LibraryGrid({
       }}
       onPointerDown={(event) => {
         if (event.button !== 0 || event.pointerType === 'touch') return;
+        if ((event.target as Element).closest('[data-marquee-ignore]')) return;
         const rect = event.currentTarget.getBoundingClientRect();
         if (event.clientX >= rect.left + event.currentTarget.clientWidth) return;
         drag.current = {

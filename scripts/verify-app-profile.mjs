@@ -4,6 +4,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import electron from 'electron';
+import { verifyNativePackage } from './verify-native-package.mjs';
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
 import { bundledMiSans } from './font-vite.mjs';
@@ -43,6 +44,44 @@ const server = createServer((request, response) => {
   if (failure) {
     response.writeHead(503);
     response.end(JSON.stringify({ error: { message: '验收服务暂时失败' } }));
+    return;
+  }
+  if (request.method === 'POST') {
+    let body = '';
+    request.on('data', (chunk) => {
+      body += chunk;
+    });
+    request.on('end', () => {
+      const parsed = JSON.parse(body);
+      if (parsed.model === 'dictionary-cancel') return;
+      if (String(parsed.model).startsWith('dictionary-')) {
+        const tags = JSON.parse(parsed.messages[1].content).tags;
+        if (parsed.model === 'dictionary-partial' && tags.some((tag) => tag.endsWith('000'))) {
+          response.writeHead(503);
+          response.end(JSON.stringify({ error: { message: 'synthetic batch failure' } }));
+          return;
+        }
+        response.end(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    items: tags.map(() => ({
+                      translation: '合成重译结果',
+                      category: 'Environment',
+                    })),
+                  }),
+                },
+              },
+            ],
+          }),
+        );
+      } else
+        response.end(
+          JSON.stringify({ model: 'acceptance-model', choices: [{ message: { content: 'OK' } }] }),
+        );
+    });
     return;
   }
   response.end(
@@ -117,14 +156,15 @@ try {
     });
   let executable = electron;
   if (packaged) {
-    await run(process.execPath, [
-      'node_modules/electron-builder/cli.js',
-      '--dir',
-      '--publish',
-      'never',
-      '-c.win.signAndEditExecutable=false',
-      '-c.mac.identity=null',
-    ]);
+    if (!process.argv.includes('--existing-package'))
+      await run(process.execPath, [
+        'node_modules/electron-builder/cli.js',
+        '--dir',
+        '--publish',
+        'never',
+        '-c.win.signAndEditExecutable=false',
+        '-c.mac.identity=null',
+      ]);
     executable =
       process.platform === 'win32'
         ? path.resolve('release/win-unpacked/NovelAI Prompt Studio.exe')
@@ -134,6 +174,7 @@ try {
             )
           : path.resolve('release/linux-unpacked/novelai-prompt-studio');
   }
+  if (packaged) await verifyNativePackage(executable);
   const manifests = [];
   for (const phase of packaged || options.category !== '全部' ? [0] : [0, 1, 2]) {
     await fs.writeFile(

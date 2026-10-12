@@ -601,8 +601,8 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
        FROM tag_dictionary
        ${whereClause}
        ORDER BY updated_at DESC, tag ASC
-       LIMIT $limit OFFSET $offset`,
-      { ...params, $limit: limit, $offset: offset },
+       ${filters.all === true ? '' : 'LIMIT $limit OFFSET $offset'}`,
+      filters.all === true ? params : { ...params, $limit: limit, $offset: offset },
     );
 
     return { items, total: Number(total) || 0, limit, offset };
@@ -655,6 +655,51 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
   };
 
   const deleteTagDictionary = (tag) => deleteTagDictionaries([tag]) > 0;
+
+  const replaceTagDictionaryAI = (tag, annotation, expected) => {
+    const key = dictionaryKey(tag);
+    const current = lookupTagDictionary([key]).get(key);
+    if (
+      !current ||
+      [
+        'updated_at',
+        'translation',
+        'category',
+        'translation_source',
+        'category_source',
+        'has_translation',
+        'has_classification',
+      ].some((field) => current[field] !== expected[field])
+    )
+      return false;
+    database.run(
+      `UPDATE tag_dictionary SET translation = $translation, category = $category,
+      has_translation = 1, has_classification = 1, translation_source = 'ai', category_source = 'ai', updated_at = $updated_at
+      WHERE tag = $tag`,
+      {
+        $tag: key,
+        $translation: annotation.translation,
+        $category: annotation.category,
+        $updated_at: new Date().toISOString(),
+      },
+    );
+    persist();
+    return true;
+  };
+
+  const imageTagKeys = new WeakMap();
+  const tagImageCounts = async () => {
+    const counts = new Map();
+    for (const card of await loadLibraryCards('all')) {
+      let keys = imageTagKeys.get(card.filter_tags);
+      if (!keys) {
+        keys = new Set(card.filter_tags.map((tag) => dictionaryKey(tag.tag).replaceAll('_', ' ')));
+        imageTagKeys.set(card.filter_tags, keys);
+      }
+      for (const key of keys) if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  };
 
   const enrichProjectTags = (project, cachedEntries = null) => {
     const cached = cachedEntries || lookupTagDictionary(projectTags(project).map((tag) => tag.tag));
@@ -1902,6 +1947,8 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath) 
     upsertDanbooruTagCache: atomic(upsertDanbooruTagCache),
     updateTagDictionary: atomic(updateTagDictionary),
     listTagDictionary,
+    tagImageCounts,
+    replaceTagDictionaryAI: atomic(replaceTagDictionaryAI),
     deleteTagDictionary: atomic(deleteTagDictionary),
     updateTagDictionaryCategory: atomic(updateTagDictionaryCategory),
     deleteTagDictionaries: atomic(deleteTagDictionaries),

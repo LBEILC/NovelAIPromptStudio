@@ -230,6 +230,7 @@ export interface Collection {
   updated_at: string;
 }
 export interface TagDictionaryEntry extends TagAnnotation {
+  image_count?: number;
   tag: string;
   display_tag: string;
   has_translation: 0 | 1;

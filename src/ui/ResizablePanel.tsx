@@ -1,5 +1,6 @@
 import { useRef, type ReactNode } from 'react';
 import { clamp } from './internal';
+import { useScrollArea } from './useScrollArea';
 
 export function ResizablePanel({
   width,
@@ -23,10 +24,14 @@ export function ResizablePanel({
   edge?: 'left' | 'right';
 }) {
   const drag = useRef<{ x: number; width: number } | null>(null);
+  const scroll = useRef<HTMLDivElement>(null);
+  useScrollArea(scroll);
   const direction = edge === 'right' ? 1 : -1;
   return (
     <div className="nps-resizable" style={{ width: clamp(width, min, max) }}>
-      <div className="nps-panel-content">{children}</div>
+      <div className="nps-panel-content" ref={scroll}>
+        {children}
+      </div>
       <div
         className={`nps-resizer nps-resizer-${edge}`}
         role="separator"

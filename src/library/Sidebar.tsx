@@ -1,13 +1,15 @@
-import { useState } from 'react';
-import { Button, Dialog, Input, ContextMenu } from '../ui';
+import { useRef, useState } from 'react';
+import { Button, Dialog, Input, ContextMenu, useScrollArea } from '../ui';
 import type { Collection } from '../shared/types';
 import type { LibraryProps } from './types';
 
 export function LibrarySidebar({ p }: { p: LibraryProps }) {
+  const scroll = useRef<HTMLElement>(null);
+  useScrollArea(scroll);
   const [naming, setNaming] = useState<Collection | 'new' | null>(null);
   const [name, setName] = useState('');
   return (
-    <aside className="library-side" aria-label="图片库导航">
+    <aside className="library-side" aria-label="图片库导航" ref={scroll}>
       <button
         aria-label="全部图片"
         className={`library-side-item ${p.view === 'all' && !p.activeCollection ? 'on' : ''}`}

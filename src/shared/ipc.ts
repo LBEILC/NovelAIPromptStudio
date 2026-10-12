@@ -103,6 +103,7 @@ export interface CollectionPatch {
   filters?: Partial<GalleryFilters>;
 }
 export interface TagCacheRequest {
+  all?: boolean;
   query?: string;
   category?: TagCategory | '';
   source?: Exclude<TagDictionaryEntry['translation_source'], 'migration'>;
@@ -112,6 +113,14 @@ export interface TagCacheRequest {
 export interface TagCachePatch {
   translation?: string;
   category?: TagCategory;
+}
+export interface DictionaryTranslationProgress {
+  id: string;
+  total: number;
+  completed: number;
+  translated: number;
+  failed: { tag: string; error: string }[];
+  canceled: boolean;
 }
 export interface TagAnnotationInput extends Partial<TagAnnotation> {
   tag: string;
@@ -228,6 +237,10 @@ export interface StudioApi {
   ): Promise<Result<{ items: TagDictionaryEntry[] }>>;
   deleteTagCache(tag: string): Promise<Result<{ deleted: boolean }>>;
   deleteTagCacheMany(tags: string[]): Promise<Result<{ deleted: number }>>;
+  retranslateTagCache(id: string, tags: string[]): Promise<Result<DictionaryTranslationProgress>>;
+  cancelTagRetranslation(id: string): Promise<Result>;
+  onTagRetranslationProgress(callback: (progress: DictionaryTranslationProgress) => void): void;
+  offTagRetranslationProgress(): void;
   revealEmbeddedVibe(
     vibe: Pick<Vibe, 'encoding'> & Partial<Omit<Vibe, 'encoding'>>,
   ): Promise<Result<{ filePath: string }>>;
@@ -261,5 +274,7 @@ export interface StudioApi {
   cancelParagraph(id: string): Promise<Result>;
   suggestTags(
     query: string,
-  ): Promise<Result<{ items: { tag: string; translation: string; category: TagCategory }[] }>>;
+  ): Promise<
+    Result<{ items: { tag: string; translation: string; category: TagCategory; count?: number }[] }>
+  >;
 }

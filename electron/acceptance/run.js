@@ -57,7 +57,7 @@ export async function runAcceptance(context) {
             translation: `验收译文${i}`,
             category: i % 2 ? 'Clothing' : 'Body',
             translation_source: i % 2 ? 'ai' : 'manual',
-            category_source: 'manual',
+            category_source: i % 2 ? 'ai' : 'manual',
           })),
         );
     }
@@ -228,7 +228,7 @@ export async function runAcceptance(context) {
       if (mode.category === '工作台') await workbenchChecks(environment);
       else if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
       else if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
-      else if (['图片库', '图片库·导入', '图片库·收尾'].includes(mode.category))
+      else if (['图片库', '图片库·导入', '图片库·收尾', '图片库·滚动条'].includes(mode.category))
         await libraryChecks(environment);
       else if (mode.category.startsWith('设置')) await settingsChecks(environment, false);
       else if (mode.category === '基础组件') await componentChecks(environment);

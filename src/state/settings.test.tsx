@@ -69,7 +69,7 @@ describe('settings domain state', () => {
         await render('visible');
       }
       expect(pending).toHaveLength(switchSection ? 2 : 1);
-      await act(async () => pending.toReversed().forEach((resolve) => resolve(ai)));
+      await act(async () => [...pending].reverse().forEach((resolve) => resolve(ai)));
       expect(state.settings).toMatchObject({ ...ai, ...draft });
     },
   );
@@ -156,7 +156,7 @@ describe('settings domain state', () => {
     expect(state.busy).toBe(false);
     expect(state.message).toBe('安全存储不可用');
   });
-  it('ignores an outdated dictionary response after a new search', async () => {
+  it('ignores an outdated dictionary snapshot and keeps local search without another query', async () => {
     vi.useFakeTimers();
     let finishOld!: (result: unknown) => void;
     const listTagCache = vi
@@ -176,10 +176,11 @@ describe('settings domain state', () => {
     }
     act(() => root.render(<Harness />));
     await act(async () => vi.advanceTimersByTimeAsync(220));
+    await act(async () => state.refresh());
     act(() => state.setFilters((f) => ({ ...f, query: 'new' })));
-    await act(async () => vi.advanceTimersByTimeAsync(220));
     await act(async () => finishOld({ ok: true, items: [], total: 99 }));
-    expect(state.total).toBe(2);
+    expect(state.total).toBe(0);
+    expect(listTagCache).toHaveBeenCalledTimes(2);
     expect(state.filters.query).toBe('new');
   });
   it('shares the resolved theme and applies the saved prose font', async () => {

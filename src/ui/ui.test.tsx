@@ -435,6 +435,29 @@ describe('Numeric controls', () => {
     key(field, 'Enter');
     expect(field.value).toBe('0');
   });
+  it('unbounded prompt weights retain exact typed values without snapping', () => {
+    function Fixture() {
+      const [value, setValue] = useState(1.25);
+      return (
+        <Stepper
+          value={value}
+          onChange={setValue}
+          step={0.1}
+          snapToStep={false}
+          label="Weight"
+          decreaseLabel="Minus"
+          increaseLabel="Plus"
+        />
+      );
+    }
+    render(<Fixture />);
+    const field = query<HTMLInputElement>('input');
+    key(field, 'Enter');
+    expect(field.value).toBe('1.25');
+    input(field, '-2.375');
+    key(field, 'Enter');
+    expect(field.value).toBe('-2.375');
+  });
 });
 
 describe('IME and autocomplete', () => {

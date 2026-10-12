@@ -72,6 +72,8 @@ export function Autocomplete({
   onSelect,
   label,
   placeholder,
+  autoFocus,
+  onDismiss,
   directAdd,
 }: {
   items: Suggestion[];
@@ -80,6 +82,8 @@ export function Autocomplete({
   onSelect: (item: Suggestion) => void;
   label: string;
   placeholder?: string;
+  autoFocus?: boolean;
+  onDismiss?: () => void;
   directAdd?: { label: string; onSelect: () => void };
 }) {
   const anchor = useRef<HTMLSpanElement>(null);
@@ -104,6 +108,7 @@ export function Autocomplete({
   return (
     <span ref={anchor} className="nps-autocomplete">
       <Input
+        autoFocus={autoFocus}
         role="combobox"
         aria-label={label}
         placeholder={placeholder}
@@ -118,7 +123,10 @@ export function Autocomplete({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
+        onBlur={() => {
+          setOpen(false);
+          onDismiss?.();
+        }}
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
@@ -130,10 +138,11 @@ export function Autocomplete({
             if (current === items.length) add?.onSelect();
             else select(items[current]);
           }
-          if (event.key === 'Escape' && open) {
+          if (event.key === 'Escape') {
             event.preventDefault();
             event.stopPropagation();
             setOpen(false);
+            onDismiss?.();
           }
         }}
       />

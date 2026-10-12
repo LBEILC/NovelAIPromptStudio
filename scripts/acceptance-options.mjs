@@ -17,8 +17,11 @@ export function acceptanceOptions(argv = process.argv.slice(2)) {
       '图片库·复制',
       '图片库·导入',
       '图片库·收尾',
+      '图片库·滚动条',
       '设置',
       '设置·AI 服务',
+      '设置·翻译词典',
+      '设置·版式',
       '基础组件',
       '卡片缓存',
       '外壳·快捷键',
@@ -37,10 +40,12 @@ export function acceptanceOptions(argv = process.argv.slice(2)) {
     '图片库·复制',
     '图片库·导入',
     '图片库·收尾',
+    '图片库·滚动条',
     '设置',
+    '设置·翻译词典',
     '外壳·快捷键',
   ].includes(category);
-  const needsDictionary = ['全部', '设置'].includes(category);
+  const needsDictionary = ['全部', '设置', '设置·翻译词典'].includes(category);
   return {
     slow,
     processTimeoutMs: Math.min(600_000 * slow, 1_800_000),

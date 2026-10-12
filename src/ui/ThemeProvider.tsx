@@ -55,7 +55,17 @@ export function Shortcut({ keys }: { keys: string[] }) {
   const platform = useContext(PlatformContext);
   return (
     <kbd className="nps-kbd">
-      {keys.map((key) => (key === 'Mod' ? (platform === 'macos' ? '⌘' : 'Ctrl') : key)).join(' ')}
+      {keys
+        .map((key) =>
+          key === 'Mod'
+            ? platform === 'macos'
+              ? '⌘'
+              : 'Ctrl'
+            : key === 'Alt' && platform === 'macos'
+              ? '⌥'
+              : key,
+        )
+        .join(' ')}
     </kbd>
   );
 }

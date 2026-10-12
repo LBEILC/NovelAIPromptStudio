@@ -11,6 +11,7 @@ import {
 import {
   Button,
   Input,
+  Stepper,
   Menu,
   ContextMenu,
   Popover,
@@ -511,16 +512,16 @@ export function WorkbenchEditor(p: EditorProps) {
                 );
               }}
             >
-              <i className="ri-file-copy-line" aria-hidden="true" />
               <span className="wb-responsive-label">复制</span>
             </Button>
             <Menu
               label="移动到"
+              buttonVariant="quiet"
               items={moveItems}
               trigger={
                 <>
-                  <i className="ri-drag-move-line" aria-hidden="true" />
                   <span className="wb-responsive-label">移动到</span>
+                  <i className="ri-arrow-down-s-line" />
                 </>
               }
             />
@@ -530,7 +531,6 @@ export function WorkbenchEditor(p: EditorProps) {
               size="small"
               onClick={() => translate(chosen)}
             >
-              <i className="ri-translate-2" aria-hidden="true" />
               <span className="wb-responsive-label">翻译与分类</span>
             </Button>
             <Button
@@ -544,11 +544,9 @@ export function WorkbenchEditor(p: EditorProps) {
                 })
               }
             >
-              <i className="ri-delete-bin-line" aria-hidden="true" />
               <span className="wb-responsive-label">删除</span>
             </Button>
             <Button aria-label="取消" variant="quiet" size="small" onClick={() => setSelected([])}>
-              <i className="ri-close-line" aria-hidden="true" />
               <span className="wb-responsive-label">取消</span>
             </Button>
           </SelectionBar>
@@ -560,6 +558,7 @@ export function WorkbenchEditor(p: EditorProps) {
           <label>
             Tag
             <Input
+              className="nps-mono"
               aria-label="Tag"
               value={draft.tag}
               onChange={(event) => setDraft({ ...draft, tag: event.target.value })}
@@ -584,13 +583,18 @@ export function WorkbenchEditor(p: EditorProps) {
           </label>
           <label>
             权重
-            <Input
-              aria-label="权重"
-              type="number"
-              step="0.1"
-              value={draft.weight}
-              onChange={(event) => setDraft({ ...draft, weight: event.target.value })}
-            />
+            <span className="wb-weight">
+              <Stepper
+                label="权重"
+                value={Number(draft.weight)}
+                onChange={(weight) => setDraft({ ...draft, weight: String(weight) })}
+                step={0.1}
+                snapToStep={false}
+                decreaseLabel="减小权重"
+                increaseLabel="增加权重"
+              />
+              <span className="nps-help">1 是普通权重</span>
+            </span>
           </label>
           <div className="wb-editor-actions">
             <Button
@@ -611,6 +615,9 @@ export function WorkbenchEditor(p: EditorProps) {
               }}
             >
               翻译与分类
+            </Button>
+            <Button className="wb-editor-cancel" variant="quiet" onClick={() => setEditing(null)}>
+              取消
             </Button>
             <Button variant="ink" onClick={saveTag}>
               完成

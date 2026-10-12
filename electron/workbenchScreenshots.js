@@ -8,13 +8,17 @@ export async function prepareWorkbenchScreenshot({ window, scene, mode, filePath
   const h = harness(window, { ...mode, slow: 1, screenshots: [] }, checks);
   const { evaluate: e, click, input, wait, key } = h;
   const state = scene.workbenchState;
+  await click('显示');
+  await h.select('语言', '对照');
+  await key('Escape');
   const scope = 'document.querySelector(".wb-section")';
   const select = async (selector) =>
     e(`${selector}.dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}))`);
   if (state === 'edit') await e('document.querySelector(".wb-tags .nps-tag").click()');
   if (state === 'add') {
+    await click('输入中文或英文', 'document.querySelector(".wb-add-tags")');
     await input('.wb-add-tags input', '蓝发');
-    await wait('document.querySelector(".nps-suggestions")?.textContent.includes("blue_hair")');
+    await wait('document.querySelector(".nps-suggestions")?.textContent.includes("blue hair")');
   }
   if (state === 'select') {
     await select('document.querySelectorAll(".wb-tags .nps-tag")[0]');

@@ -1,5 +1,25 @@
-import { Activity, lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Button, Input, TextArea, Select, OptionGroup, Switch, Dialog } from '../ui';
+import {
+  Activity,
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import {
+  Button,
+  Input,
+  TextArea,
+  Select,
+  OptionGroup,
+  Switch,
+  Dialog,
+  Shortcut,
+  useScrollArea,
+} from '../ui';
+import { SettingsFrame } from './PageFrame';
 import { useAppearance } from '../state/appearance';
 import { useAISettings } from '../state/ai';
 import { useStorage } from '../state/storage';
@@ -78,9 +98,7 @@ function Appearance() {
   const save = (patch: Partial<AppearanceSettings>) =>
     void changeAppearance(patch).catch((e: Error) => setError(e.message));
   return (
-    <div className="settings-copy">
-      <h2>外观</h2>
-      <p>更改会立刻应用到整个界面。</p>
+    <SettingsFrame title="外观" description="更改会立刻应用到整个界面。">
       <Row title="主题">
         <OptionGroup
           label="主题"
@@ -133,15 +151,27 @@ function Appearance() {
         />
       </Row>
       {error && <p role="alert">{error}</p>}
-    </div>
+    </SettingsFrame>
   );
 }
 function AI() {
   const a = useAISettings();
   return (
-    <div className="settings-copy">
-      <h2>AI 服务</h2>
-      <p>用来补全内置词典没有的 Tag 翻译和分类、翻译段落。不配置也能使用软件的其他功能。</p>
+    <SettingsFrame
+      title="AI 服务"
+      description="用来补全内置词典没有的 Tag 翻译和分类、翻译段落。不配置也能使用软件的其他功能。"
+      footer={
+        <>
+          <span role="status">{a.dirty ? '有未保存的修改' : a.message}</span>
+          <Button disabled={a.busy} onClick={() => void a.run('test')}>
+            测试连接
+          </Button>
+          <Button variant="ink" disabled={a.busy || !a.dirty} onClick={() => void a.run('save')}>
+            保存
+          </Button>
+        </>
+      }
+    >
       <label className="settings-column">
         服务地址
         <Input
@@ -183,15 +213,6 @@ function AI() {
           </Button>
         </div>
       </div>
-      <div className="settings-actions settings-ai-actions">
-        <Button disabled={a.busy} onClick={() => void a.run('test')}>
-          测试连接
-        </Button>
-        <span role="status">{a.message}</span>
-        <Button variant="ink" disabled={a.busy} onClick={() => void a.run('save')}>
-          保存
-        </Button>
-      </div>
       {!a.settings.encryptionAvailable && (
         <p role="alert">当前系统安全存储不可用，应用不会以明文保存 API Key。</p>
       )}
@@ -225,7 +246,7 @@ function AI() {
           </Button>
         </label>
       ))}
-    </div>
+    </SettingsFrame>
   );
 }
 function Storage({
@@ -261,9 +282,7 @@ function Storage({
     }
   };
   return (
-    <div className="settings-copy">
-      <h2>图片库</h2>
-      <p>导入的图片、缩略图和导出的 Vibe 文件都存在这里。</p>
+    <SettingsFrame title="图片库" description="导入的图片、缩略图和导出的 Vibe 文件都存在这里。">
       <div className="settings-column">
         <div>图片存放位置</div>
         <code>{s.details?.assetsDirectory || '正在读取…'}</code>
@@ -335,7 +354,7 @@ function Storage({
         </Button>
       </Row>
       {trashError && <p role="alert">{trashError}</p>}
-    </div>
+    </SettingsFrame>
   );
 }
 export function feedbackDiagnostics(version = '—', platform = '') {
@@ -362,7 +381,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
     !!state &&
     (state.hasUpdate || ['available', 'downloading', 'downloaded'].includes(state.phase));
   return (
-    <div className="settings-copy">
+    <SettingsFrame title="关于与更新" description="">
       <div className="settings-about-head">
         <BrandMark />
         <div>
@@ -434,6 +453,61 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           下载对应安装包并手动替换应用。
         </p>
       )}
+      <h2>快捷键</h2>
+      <p>macOS 上 Ctrl 对应 Command。在输入框里，Ctrl V 仍然是普通的粘贴。</p>
+      {[
+        ['打开图片；在图片库里是导入', [['Mod', 'I']]],
+        ['从剪贴板打开或导入图片', [['Mod', 'V']]],
+        ['聚焦搜索框', [['Mod', 'K']]],
+        [
+          '下一个 / 上一个标签',
+          [
+            ['Mod', 'Tab'],
+            ['Mod', 'Shift', 'Tab'],
+          ],
+        ],
+        ['关闭当前标签', [['Mod', 'W']]],
+        [
+          '移动当前 Tag',
+          [
+            ['Alt', '←'],
+            ['Alt', '→'],
+            ['Alt', '↑'],
+            ['Alt', '↓'],
+          ],
+        ],
+        ['在一摞图片里切换', [['←'], ['→']]],
+        // TODO(design): Confirm captions for existing shortcuts absent from the reference.
+        ['【文案待定：图片库与导入列表全选】', [['Mod', 'A']]],
+        ['【文案待定：图片库取消多选与关闭大图】', [['Esc']]],
+        ['在工作台打开', [['Enter']]],
+        ['大图', [['Space']]],
+        ['【文案待定：图片库网格方向键选择】', [['←'], ['→'], ['↑'], ['↓']]],
+      ].map(([title, bindings]) => (
+        <Row key={title as string} title={title as string}>
+          <span className="settings-shortcuts">
+            {(bindings as string[][]).map((keys) => (
+              <Shortcut key={keys.join('-')} keys={keys} />
+            ))}
+          </span>
+        </Row>
+      ))}
+      {/* TODO(design): Privacy wording omits Danbooru lookup, model discovery and connection testing. */}
+      <h2>数据与隐私</h2>
+      <Row
+        title="图片和图库数据只存在这台电脑上"
+        help="位置见“图片库”那一页。软件不会把图片上传到任何地方"
+      >
+        {null}
+      </Row>
+      <Row title="【文案待定：实际联网情况】">{null}</Row>
+      {/* TODO(design): safeStorage encrypts the key, but ciphertext lives in the local preferences file. */}
+      <Row
+        title="【文案待定：API Key 的加密存储方式】"
+        help="软件不会以明文保存，诊断信息和报告问题都不会带上它"
+      >
+        {null}
+      </Row>
       <h2>反馈与支持</h2>
       <Row title="报告问题或提出建议" help="会在浏览器里打开 GitHub，不会自动附带任何数据">
         <div className="settings-actions">
@@ -507,21 +581,24 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           </>
         )}
       </Dialog>
-    </div>
+    </SettingsFrame>
   );
 }
 export default function SettingsPage(props: {
+  onFindTag?: (tag: string) => void;
   onInstallUpdate: () => Promise<unknown>;
   onLibraryChange: () => Promise<unknown>;
   onEmptyTrash: () => Promise<unknown>;
 }) {
+  const sidebar = useRef<HTMLElement>(null);
+  useScrollArea(sidebar);
   const [section, setSection] = useState(
     (window as Window & { studioScreenshot?: { section?: string } }).studioScreenshot?.section ||
       'appearance',
   );
   return (
     <main className="studio-settings">
-      <nav className="settings-sidebar" aria-label="设置分类">
+      <nav className="settings-sidebar" aria-label="设置分类" ref={sidebar}>
         {sections.map(([key, label, icon]) => (
           <Button
             key={key}
@@ -545,7 +622,7 @@ export default function SettingsPage(props: {
           <AI />
         </Activity>
         <Activity mode={section === 'tags' ? 'visible' : 'hidden'}>
-          <Dictionary />
+          <Dictionary onFindTag={props.onFindTag} />
         </Activity>
         <Activity mode={section === 'updates' ? 'visible' : 'hidden'}>
           <About {...props} />

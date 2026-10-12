@@ -22,6 +22,7 @@ import {
 } from 'electron';
 import electronUpdater from 'electron-updater';
 import { openDatabase } from './database.js';
+import { retranslateDictionary } from './dictionaryTranslation.js';
 import {
   backfillProjectContentHashes,
   backfillProjectDimensions,
@@ -1180,14 +1181,55 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('tag-cache:list', (_event, request = {}) => {
+  const dictionaryTranslations = new Map();
+  ipcMain.handle('tag-cache:retranslate', async (event, request = {}) => {
+    const id = String(request.id || '');
+    const key = `${event.sender.id}:${id}`;
+    const controller = new AbortController();
+    dictionaryTranslations.get(key)?.abort();
+    dictionaryTranslations.set(key, controller);
+    const cancel = () => controller.abort();
+    event.sender.once('destroyed', cancel);
     try {
-      return { ok: true, ...database.listTagDictionary(request) };
+      const result = await retranslateDictionary({
+        tags: Array.isArray(request.tags) ? request.tags : [],
+        database,
+        settings: preferences.credentials(),
+        fetcher: net.fetch,
+        signal: controller.signal,
+        progress: (progress) => {
+          if (!event.sender.isDestroyed())
+            event.sender.send('tag-cache:retranslate:progress', { id, ...progress });
+        },
+      });
+      return { ok: true, id, ...result };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      if (dictionaryTranslations.get(key) === controller) dictionaryTranslations.delete(key);
+      event.sender.removeListener('destroyed', cancel);
+    }
+  });
+  ipcMain.handle('tag-cache:retranslate:cancel', (event, id) => {
+    dictionaryTranslations.get(`${event.sender.id}:${String(id)}`)?.abort();
+    return { ok: true };
+  });
+  ipcMain.handle('tag-cache:list', async (_event, request = {}) => {
+    try {
+      const result = database.listTagDictionary(request);
+      if (request.all) {
+        const counts = await database.tagImageCounts();
+        result.items = result.items.map((item) => ({
+          ...item,
+          image_count: counts.get(item.tag.toLowerCase().replaceAll('_', ' ')) || 0,
+        }));
+      }
+      return { ok: true, ...result };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('tag:suggest', (_event, query) => {
+  ipcMain.handle('tag:suggest', async (_event, query) => {
     try {
       const search = String(query || '')
         .trim()
@@ -1203,7 +1245,18 @@ app.whenReady().then(async () => {
           category: entry.category,
         });
       }
-      return { ok: true, items: [...items.values()].reverse().slice(0, 30) };
+      const counts = await database.tagImageCounts();
+      return {
+        ok: true,
+        items: [...items.values()]
+          .reverse()
+          .slice(0, 30)
+          .map((item) => ({
+            ...item,
+            tag: item.tag.replaceAll('_', ' '),
+            count: counts.get(item.tag.toLowerCase().replaceAll('_', ' ')) || 0,
+          })),
+      };
     } catch (error) {
       return { ok: false, error: error.message };
     }

@@ -3,8 +3,10 @@ import path from 'node:path';
 import { ipcMain, nativeImage, screen } from 'electron';
 import { importLibraryFiles } from './importer.js';
 import { screenshotScenes } from '../scripts/app-screenshot-scenes.mjs';
-import { createWorkbenchFixtures } from './acceptance/workbenchFixtures.js';
+import { createWorkbenchFixtures, workbenchRaw } from './acceptance/workbenchFixtures.js';
+import { readWorkbenchImage } from './workbench.js';
 import { prepareWorkbenchScreenshot } from './workbenchScreenshots.js';
+import { prepareSettingsScreenshot } from './settingsScreenshots.js';
 import { workbenchReferenceRenderer } from './workbenchReference.js';
 import { prepareLibraryScreenshot } from './libraryScreenshots.js';
 import referenceSupport from '../scripts/reference-availability.cjs';
@@ -87,7 +89,44 @@ export async function runAppScreenshots({
     await fs.copyFile(workbenchFiles[i % 3], file);
     manyWorkbenchFiles.push(file);
   }
+  for (const [tag, translation, category] of [
+    ['blue hair', '蓝发', 'Body'],
+    ['red coat', '红色外套', 'Clothing'],
+    ['standing', '站立', 'Action'],
+    ['glass window', '玻璃窗', 'Environment'],
+    ['soft light', '柔和光线', 'Composition'],
+    ['lowres', '低分辨率', 'StyleQuality'],
+    ['blurry', '模糊', 'StyleQuality'],
+  ])
+    database.updateTagDictionary(tag, { translation, category });
+  const paragraph = workbenchRaw.split('\n\n')[1];
+  for (const file of manyWorkbenchFiles) {
+    const project = await readWorkbenchImage(file);
+    database.rememberWorkbenchStructure(file, {
+      ...project.prompt_structure,
+      block_annotations: {
+        'base:prompt': [
+          {
+            raw: paragraph,
+            start: workbenchRaw.indexOf(paragraph),
+            type: 'paragraph',
+            translation: '一位安静的旅人站在窗边，傍晚的光洒进房间。',
+          },
+        ],
+      },
+    });
+  }
+  database.upsertTagDictionary(
+    Array.from({ length: 60 }, (_, i) => ({
+      tag: `synthetic_dictionary_${String(i).padStart(3, '0')}`,
+      translation: `合成译文 ${i}`,
+      category: i % 2 ? 'Body' : 'Clothing',
+      translation_source: 'ai',
+      category_source: 'ai',
+    })),
+  );
   let reference;
+  let settingsReference;
   const referenceStatus = referenceSupport.referenceAvailability();
   if (!referenceStatus.available) console.log(referenceStatus.reason);
   const errors = [];
@@ -109,7 +148,9 @@ export async function runAppScreenshots({
     for (const theme of ['light', 'dark']) {
       for (const scene of screenshotScenes.filter(
         (scene) =>
-          !process.argv.includes('--app-screenshot-workbench') || scene.page === 'workbench',
+          (!process.argv.includes('--app-screenshot-workbench') || scene.page === 'workbench') &&
+          (!process.argv.includes('--app-screenshot-finish') ||
+            ['workbench', 'settings'].includes(scene.page)),
       )) {
         preferences.saveAppearanceSettings({ themeMode: theme, motion: 'off' });
         const state = {
@@ -221,6 +262,7 @@ export async function runAppScreenshots({
             mode,
             filePaths: workbenchFiles,
           });
+          await prepareSettingsScreenshot({ window, scene, mode });
           if (
             process.platform === 'win32' &&
             window.setTitleBarOverlay &&
@@ -336,6 +378,28 @@ export async function runAppScreenshots({
             await fs.writeFile(path.join(mode.output, proofFile), Buffer.from(proofData, 'base64'));
             manifest.fontProof.push({ file: proofFile, theme, renderedFonts: proof });
           }
+          if (scene.page === 'settings' && referenceStatus.available) {
+            settingsReference ||= await workbenchReferenceRenderer(mode.output, {
+              page: 'set',
+              folder: 'settings-comparisons',
+            });
+            const state = {
+              appearance: 'look',
+              storage: 'lib',
+              ai: 'ai',
+              tags: 'dict',
+              updates: 'about',
+            }[scene.section];
+            manifest.comparisons.push(
+              await settingsReference.capture(
+                state,
+                theme,
+                path.join(mode.output, file),
+                window,
+                scene.name,
+              ),
+            );
+          }
         } finally {
           await cleanupWorkbenchScene();
           await cleanupLibraryScene();
@@ -350,6 +414,7 @@ export async function runAppScreenshots({
     );
   } finally {
     await reference?.close();
+    await settingsReference?.close();
     ipcMain.removeListener('screenshot:error', onError);
   }
 }
