@@ -1,4 +1,5 @@
 import { hasImageName, imageFileName } from '../src/lib/imageNaming.js';
+import { normalizePromptStructure } from '../src/lib/promptStructure.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -1192,9 +1193,33 @@ app.whenReady().then(async () => {
           category: entry.category,
         });
       }
-      return { ok: true, items: [...items.values()].slice(0, 30) };
+      return { ok: true, items: [...items.values()].reverse().slice(0, 30) };
     } catch (error) {
       return { ok: false, error: error.message };
+    }
+  });
+  ipcMain.handle('workbench:save-library', async (_event, request = {}) => {
+    try {
+      if (storageMigrationActive) throw new Error('资源库正在迁移，请稍候');
+      await contentBackfill;
+      const result = await importLibraryFiles({
+        filePaths: [String(request.filePath)],
+        assetsDirectory,
+        database,
+        prepareProject: async (project) =>
+          database.enrichProjectTags({
+            ...project,
+            prompt_structure: normalizePromptStructure(
+              { ...project.prompt_structure, block_annotations: request.annotations },
+              project.metadata,
+            ),
+          }),
+      });
+      const id = result.imported[0]?.id || result.duplicates[0]?.projectId;
+      if (!id) throw new Error(result.errors[0]?.error || '图片没有存入图片库');
+      return { ok: true, project: database.loadProject(id) };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
   ipcMain.handle('tag-cache:update', (_event, request = {}) => {

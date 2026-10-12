@@ -42,7 +42,7 @@ export interface DocumentProps {
   renderTag?: (entry: DocumentTag, content: ReactNode) => ReactNode;
   renderParagraph?: (section: number, block: number, content: ReactNode) => ReactNode;
   renderAdd?: (section: number, block: number) => ReactNode;
-  onRawEdit?: (section: number) => void;
+  onRawEdit?: (section: number, initial?: string) => void;
   selectedKeys?: string[];
   children?: ReactNode;
   characterActions?: ReactNode;
@@ -413,14 +413,7 @@ export function WorkbenchDocument(p: DocumentProps) {
                   onClick={() => {
                     const raw = serializePromptSection(section);
                     const at = block.range.end;
-                    update(
-                      replaceSection(
-                        doc,
-                        si,
-                        reparseSection(section, raw.slice(0, at) + '\n\n' + raw.slice(at)),
-                      ),
-                    );
-                    p.onRawEdit?.(si);
+                    p.onRawEdit?.(si, raw.slice(0, at) + '\n\n' + raw.slice(at));
                   }}
                 >
                   在这里加一块

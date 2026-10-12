@@ -106,12 +106,13 @@ export async function createTrashDraft({ h, database }) {
   await e(
     'document.querySelector(".library-card").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
   );
-  await wait('!!document.querySelector(".workbench-editor-panel")');
-  await click('原始 Prompt');
-  await wait('!!document.querySelector(".raw-prompt-textarea-input")');
-  await h.input('.raw-prompt-textarea-input', 'acceptance_draft_tag, 1girl');
-  await click('保存并解析');
-  await wait('!!document.querySelector(".workbench-tab-dirty")');
+  await wait('!!document.querySelector(".wb-prompt")');
+  await click('更多', 'document.querySelector(".wb-section")');
+  await click('编辑原始文本');
+  await wait('!!document.querySelector("[aria-label=原始文本]")');
+  await h.input('[aria-label=原始文本]', 'acceptance_draft_tag, 1girl');
+  await click('保存', 'document.querySelector(".wb-raw-editor")');
+  await wait('!!document.querySelector(".wb-dirty")');
   // Read the application's own persisted session to identify the opened library
   // project; setup moves only this disposable fixture into the recycle bin.
   const session = await e(

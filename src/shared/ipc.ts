@@ -162,6 +162,10 @@ export interface StudioApi {
   onLibraryStorageProgress(callback: (progress: LibraryStorageProgress) => void): void;
   offLibraryStorageProgress(): Electron.IpcRenderer;
   openWorkbenchImage(filePath?: string, source?: WorkbenchSource | null): Promise<WorkbenchResult>;
+  saveWorkbenchToLibrary(
+    filePath: string,
+    annotations: import('./types').PromptStructure['block_annotations'],
+  ): Promise<Result<{ project: ImageRecord }>>;
   openClipboardWorkbenchImage(): Promise<Exclude<WorkbenchResult, { canceled: true }>>;
   syncWorkbenchTemporaryImages(referencedPaths: string[]): Promise<Result<{ removed: string[] }>>;
   openDroppedWorkbenchImages(

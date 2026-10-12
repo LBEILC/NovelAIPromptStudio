@@ -1,6 +1,11 @@
-import { editPromptBlockText, editPromptTag, type PromptDocument } from '../lib/promptDocument';
+import {
+  editPromptBlockText,
+  editPromptTag,
+  serializePromptSection,
+  type PromptDocument,
+} from '../lib/promptDocument';
 import { formatTag, promptTagRanges } from '../lib/prompt.js';
-import { replaceSection, type DocumentTag } from './model';
+import { replaceSection, reparseSection, type DocumentTag } from './model';
 
 export function insertTags(
   document: PromptDocument,
@@ -10,6 +15,15 @@ export function insertTags(
   before?: number,
 ): PromptDocument {
   const section = document.scopes[sectionIndex];
+  if (blockIndex < 0)
+    return replaceSection(
+      document,
+      sectionIndex,
+      reparseSection(
+        section,
+        serializePromptSection(section) + (section.blocks.length ? '\n\n' : '') + text,
+      ),
+    );
   const block = section.blocks[blockIndex];
   const ranges = promptTagRanges(block.content);
   const range = before == null ? undefined : ranges[before];

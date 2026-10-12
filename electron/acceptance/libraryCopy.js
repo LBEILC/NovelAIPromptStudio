@@ -4,7 +4,7 @@ import { formatPositivePromptForCopy, getPromptScopes } from '../../src/lib/prom
 export async function libraryCopyChecks(env) {
   const { h, database, files, mode, doubles } = env;
   const { evaluate: e, wait, click, input, check } = h;
-  const copyButton = `([...document.querySelectorAll('.workbench-header-actions button[aria-haspopup="menu"]')].find(button=>button.parentElement.textContent.includes('复制可见 Prompt')))`;
+  const copyButton = `document.querySelector('.wb-copy-bar [aria-label="其他复制方式"]')`;
   h.category('图片库·复制');
   if (mode.category === '图片库·复制') {
     // Exercise the resident legacy menu across Activity hide/show, matching the
@@ -75,7 +75,7 @@ export async function libraryCopyChecks(env) {
           const page = document.querySelector('.workbench-active-page');
           const button = ${copyButton};
           const surface = page?.closest('.app-page-surface');
-          return page?.querySelector('figcaption strong')?.textContent === ${JSON.stringify(record.name)} &&
+          return page?.dataset.projectId === ${JSON.stringify(record.id)} &&
             !!button?.getClientRects().length && !button.disabled &&
             button.getAttribute('aria-disabled') !== 'true' &&
             (!surface || Number(getComputedStyle(surface).opacity) === 1);

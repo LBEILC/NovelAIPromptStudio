@@ -18,12 +18,6 @@ import {
 import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import {
-  Button as LobeButton,
-  Modal as LobeModal,
-  showContextMenu as showLobeContextMenu,
-  toast as lobeToast,
-} from '@lobehub/ui/base-ui';
-import {
   Check,
   ClipboardPaste,
   Copy,
@@ -43,11 +37,11 @@ import { useLibraryCacheProgress } from './state/libraryCacheProgress';
 import SettingsPage from './settings/SettingsPage';
 import { Titlebar } from './shell/Titlebar';
 import { useAppearance } from './state/appearance';
-import { Dialog, useNotifications } from './ui';
-import WorkbenchPage from './WorkbenchPage.jsx';
+import { Dialog, Button, Layer, MenuItems, useNotifications } from './ui';
+import WorkbenchPage from './workbench/WorkbenchPage';
+import { WorkbenchTabs } from './workbench/Tabs';
 import { useWorkbenchState } from './state/workbench';
 import { ZipImport } from './library/ZipImport';
-import Icon from './components/Icon.jsx';
 import {
   allPromptTags,
   getPromptScope,
@@ -219,12 +213,6 @@ const TAG_CONTEXT_CATEGORIES = CATEGORY_OPTIONS.map((category) => [
   CATEGORY_LABELS[category],
 ]);
 
-function openContextMenu(event, items) {
-  event.preventDefault();
-  event.stopPropagation();
-  showLobeContextMenu(items, { iconSpaceMode: 'global' });
-}
-
 function dispatchInput(editable, inputType, data = null) {
   const event =
     typeof InputEvent === 'function'
@@ -329,7 +317,7 @@ function ImportExperience({ dragState, progress, result, target, onCancel, onDis
       {dragState.active && (
         <div className={`file-drop-overlay ${dragState.valid ? 'accept' : 'reject'}`}>
           <div className="file-drop-target">
-            <Icon name={dragState.valid ? 'upload' : 'close'} size={30} />
+            <i className={dragState.valid ? 'ri-upload-line' : 'ri-close-line'} />
             <strong>
               {dragState.valid
                 ? workbench
@@ -354,21 +342,21 @@ function ImportExperience({ dragState, progress, result, target, onCancel, onDis
             </span>
           </div>
           <progress max="100" value={percent} />
-          <LobeButton onClick={onCancel} size="small">
+          <Button onClick={onCancel} size="small">
             取消
-          </LobeButton>
+          </Button>
         </div>
       )}
       {result && (
         <div className="import-result">
-          <Icon name={result.errors?.length ? 'warning' : 'check'} size={17} />
+          <i className={result.errors?.length ? 'ri-alert-line' : 'ri-check-line'} />
           <span>
             导入 {result.imported?.length || 0} 张 · 跳过重复 {result.duplicates?.length || 0} 张
             {result.errors?.length ? ` · 失败 ${result.errors.length} 张` : ''}
           </span>
-          <LobeButton onClick={onDismiss} size="small" type="text">
+          <Button onClick={onDismiss} size="small" variant="quiet">
             关闭
-          </LobeButton>
+          </Button>
         </div>
       )}
     </>
@@ -430,6 +418,19 @@ export default function App() {
   const [importResult, setImportResult] = useState(null);
   const [archiveImport, setArchiveImport] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  const openContextMenu = (event, items) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      point: { x: event.clientX, y: event.clientY },
+      items: items.map((item) =>
+        item.type === 'divider'
+          ? { id: item.key, separator: true }
+          : { id: item.key, label: item.label, disabled: item.disabled, onSelect: item.onClick },
+      ),
+    });
+  };
   const appShellRef = useRef(null);
   const dropHandlerRef = useRef(null);
   const annotationTimer = useRef(null);
@@ -443,13 +444,8 @@ export default function App() {
   const cacheProgress = useLibraryCacheProgress(libraryLoading);
   const reduceMotion = useStudioReducedMotion(appearance.motion);
 
-  const showToast = useCallback((message, type = 'success') => {
-    if (['settings', 'gallery'].includes(notificationTarget.current.page)) {
-      notificationTarget.current.notify({ text: message });
-      return;
-    }
-    const method = lobeToast[type] || lobeToast.success;
-    method({ description: message, duration: 2600, placement: 'bottom' });
+  const showToast = useCallback((message) => {
+    notificationTarget.current.notify({ text: message });
   }, []);
 
   const requestConfirmation = useCallback(
@@ -567,7 +563,17 @@ export default function App() {
               displayName: stored.displayName || '不可用图片',
               source: stored.source,
               originalProject: null,
-              project: null,
+              project: syncProjectPromptMetadata({
+                id: stored.id,
+                name: stored.displayName || '',
+                image_path: stored.source.path || '',
+                thumbnail_path: '',
+                created_at: stored.updatedAt,
+                updated_at: stored.updatedAt,
+                metadata: {},
+                tags: stored.draft.tags || [],
+                prompt_structure: stored.draft.prompt_structure,
+              }),
               savedDraft: stored.draft,
               viewState: normalizeWorkbenchViewState(stored.viewState),
               updatedAt: stored.updatedAt,
@@ -1151,147 +1157,6 @@ export default function App() {
     else showToast(`已通过离线词典整理 ${entries.length} 个 Tag`);
   };
 
-  const tagContextMenu = (event, scopeKey, tag, selectionContext = null) => {
-    if (!activeTab?.project) return;
-    if (selectionContext?.count) {
-      const items = overviewSelectionMenuItems({
-        categories: TAG_CONTEXT_CATEGORIES,
-        ...selectionContext,
-        onDelete: async () => {
-          if (
-            !(await requestConfirmation({
-              title: `删除已选 ${selectionContext.count} 个 Tag？`,
-              message: '这些 Tag 将从当前工作台草稿的 Prompt 结构中删除。',
-              okText: '删除已选 Tag',
-              danger: true,
-            }))
-          )
-            return;
-          selectionContext.onDelete?.();
-        },
-      }).map((item) => {
-        if (item.key === 'copy-selected-tags') return { ...item, icon: Copy };
-        if (item.key === 'translate-selected-tags') return { ...item, icon: Sparkles };
-        if (item.key === 'move-selected-tags') return { ...item, icon: MoveRight };
-        if (item.key === 'set-selected-tags-category') return { ...item, icon: Tags };
-        if (item.key === 'delete-selected-tags') return { ...item, icon: Trash2 };
-        return item;
-      });
-      openContextMenu(event, items);
-      return;
-    }
-    const project = activeTab.project;
-    const scope = getPromptScope(project, scopeKey);
-    const setCategory = (category) =>
-      updateWorkbenchProject(
-        updatePromptScopeAnnotations(
-          project,
-          scope.key,
-          scope.tags.map((item) =>
-            item.id === tag.id ? { ...item, category, category_source: 'manual' } : item,
-          ),
-        ),
-      );
-    const moveContext = overviewMoveContext(project, [overviewTagKey(scopeKey, tag.id)]);
-    const moveTagTo = (targetScopeKey) => {
-      const target = moveContext.options.find((option) => option.key === targetScopeKey);
-      const result = moveOverviewTags(project, [overviewTagKey(scopeKey, tag.id)], targetScopeKey);
-      if (!result.movedCount) return;
-      updateWorkbenchProject(result.project);
-      showToast(
-        `已移动 Tag 到 ${target?.label || '目标区域'}${result.mergedCount ? '，并合并目标中的重复项' : ''}`,
-      );
-    };
-    openContextMenu(event, [
-      {
-        key: 'copy-tag',
-        label: '复制 Tag',
-        icon: Copy,
-        onClick: async () => {
-          await navigator.clipboard.writeText(tag.tag);
-          showToast('Tag 已复制');
-        },
-      },
-      {
-        key: 'copy-weighted-tag',
-        label: '复制 Tag（含权重）',
-        icon: Copy,
-        onClick: async () => {
-          await navigator.clipboard.writeText(formatTag(tag));
-          showToast('Tag 已复制（含权重）');
-        },
-      },
-      {
-        key: 'copy-translation',
-        label: '复制翻译',
-        icon: Copy,
-        disabled: !tag.translation?.trim(),
-        onClick: async () => {
-          await navigator.clipboard.writeText(tag.translation || '');
-          showToast('翻译已复制');
-        },
-      },
-      {
-        key: 'edit-tag',
-        label: '编辑',
-        icon: Pencil,
-        onClick: () => {
-          setWorkbenchFocus({ scopeKey, tagId: null });
-          requestAnimationFrame(() => setWorkbenchFocus({ scopeKey, tagId: tag.id }));
-        },
-      },
-      {
-        key: 'translate-tag',
-        label: '翻译与分类',
-        icon: Sparkles,
-        onClick: () => translateWorkbenchTags([{ scopeKey, tag }]),
-      },
-      {
-        key: 'move-tag',
-        label: '移动到',
-        desc: moveContext.description || undefined,
-        icon: MoveRight,
-        disabled: moveContext.disabled,
-        type: 'submenu',
-        openOnHover: true,
-        children: moveContext.options.map((option) => ({
-          key: `move-tag-${option.key}`,
-          label: option.label,
-          disabled: option.disabled,
-          onClick: () => moveTagTo(option.key),
-        })),
-      },
-      {
-        key: 'set-category',
-        label: '设置分类',
-        icon: Tags,
-        type: 'submenu',
-        openOnHover: true,
-        children: TAG_CONTEXT_CATEGORIES.map(([category, label]) => ({
-          key: `category-${category}`,
-          label,
-          icon: (tag.category || 'Unsorted') === category ? Check : undefined,
-          onClick: () => setCategory(category),
-        })),
-      },
-      { key: 'tag-divider', type: 'divider' },
-      {
-        key: 'delete-tag',
-        label: '删除 Tag',
-        icon: Trash2,
-        danger: true,
-        onClick: () =>
-          updateWorkbenchProject(
-            updatePromptScope(
-              project,
-              scope.key,
-              scope.tags.filter((item) => item.id !== tag.id),
-            ),
-          ),
-      },
-    ]);
-  };
-
   const summarizeBatch = (result, action, groupCount = 0) => {
     if (!result?.ok) {
       showToast(result?.error || `${action}没有完成`, 'error');
@@ -1682,7 +1547,27 @@ export default function App() {
 
   return (
     <div className="app-shell" ref={appShellRef}>
-      <Titlebar onNavigate={setPage} page={page} />
+      <Titlebar onNavigate={setPage} page={page}>
+        {page === 'workbench' && (
+          <WorkbenchTabs
+            session={workbenchSession}
+            onActivateTab={(id) =>
+              setWorkbenchSession((current) => ({ ...current, activeTabId: id }))
+            }
+            onCloseTab={closeTab}
+            onReorderTab={(id, target) =>
+              setWorkbenchSession((current) => reorderWorkbenchTabs(current, id, target))
+            }
+            onChooseImage={() => openWorkbenchPath()}
+            onShowLibrary={(tab) => {
+              setGalleryView('all');
+              setGalleryFilters({ ...DEFAULT_GALLERY_FILTERS, query: tab.project?.name || '' });
+              setPreviewProjectId(tab.source.projectId);
+              setPage('gallery');
+            }}
+          />
+        )}
+      </Titlebar>
       <div className="app-content">
         <Activity mode={page === 'workbench' ? 'visible' : 'hidden'}>
           <PageSurface active={page === 'workbench'} motionMode={appearance.motion}>
@@ -1724,7 +1609,7 @@ export default function App() {
                     ? '已选 Prompt Tag'
                     : '可见 Prompt Tag';
                 showToast(
-                  `已复制 ${count} 个${copiedLabel}${ignoredLabels.length ? `，忽略 ${ignoredLabels.join('、')}` : ''}`,
+                  `${count ? `已复制 ${count} 个${copiedLabel}` : `已复制${label || 'Prompt'}`}${ignoredLabels.length ? `，忽略 ${ignoredLabels.join('、')}` : ''}`,
                 );
               }}
               onConfirm={requestConfirmation}
@@ -1743,6 +1628,38 @@ export default function App() {
               }}
               onNotify={showToast}
               onReset={resetWorkbench}
+              onReveal={() => activeTab?.project && studio.revealFile(activeTab.project.image_path)}
+              onSaveLibrary={async () => {
+                if (!activeTab?.project) return;
+                const tabId = activeTab.id;
+                const result = await studio.saveWorkbenchToLibrary(
+                  activeTab.project.image_path,
+                  activeTab.project.prompt_structure.block_annotations,
+                );
+                if (!result.ok) {
+                  showToast(result.error);
+                  return;
+                }
+                setWorkbenchSession((current) =>
+                  updateWorkbenchTab(current, tabId, (tab) => ({
+                    ...tab,
+                    source: {
+                      ...tab.source,
+                      type: 'library',
+                      projectId: result.project.id,
+                      path: result.project.image_path,
+                    },
+                    project: {
+                      ...tab.project,
+                      id: result.project.id,
+                      image_path: result.project.image_path,
+                      thumbnail_path: result.project.thumbnail_path,
+                    },
+                  })),
+                );
+                await reloadLibrary('all');
+                showToast('已存入图片库');
+              }}
               onReorderTab={(tabId, targetTabId) =>
                 setWorkbenchSession((current) => reorderWorkbenchTabs(current, tabId, targetTabId))
               }
@@ -1753,7 +1670,6 @@ export default function App() {
                   result?.ok ? 'success' : 'error',
                 );
               }}
-              onTagContextMenu={tagContextMenu}
               onTranslateTags={translateWorkbenchTags}
               onUpdateProject={updateWorkbenchProject}
               onUpdateViewState={(tabId, viewState) =>
@@ -1897,40 +1813,34 @@ export default function App() {
         onCancel={cancelArchiveImport}
         onImport={commitArchiveImport}
       />
-      {['settings', 'gallery'].includes(page) ? (
-        <Dialog
-          open={Boolean(confirmation)}
-          title={confirmation?.title || ''}
-          cancelLabel="取消"
-          confirmLabel={confirmation?.okText || '确定'}
-          destructive={Boolean(confirmation?.danger)}
-          onCancel={() => resolveConfirmation(false)}
-          onConfirm={() => resolveConfirmation(true)}
-        >
-          <p>{confirmation?.message}</p>
-          {confirmation?.detail && <p>{confirmation.detail}</p>}
-        </Dialog>
-      ) : (
-        <LobeModal
-          cancelText="取消"
-          destroyOnHidden
-          okButtonProps={{
-            danger: Boolean(confirmation?.danger),
-            type: confirmation?.primaryDanger ? 'primary' : 'default',
-          }}
-          okText={confirmation?.okText || '确定'}
-          onCancel={() => resolveConfirmation(false)}
-          onOk={() => resolveConfirmation(true)}
-          open={Boolean(confirmation)}
-          title={confirmation?.title}
-          width={440}
-        >
-          <div className="confirmation-copy">
-            <p>{confirmation?.message}</p>
-            {confirmation?.detail && <span>{confirmation.detail}</span>}
-          </div>
-        </LobeModal>
-      )}
+
+      <Dialog
+        open={Boolean(confirmation)}
+        title={confirmation?.title || ''}
+        cancelLabel="取消"
+        confirmLabel={confirmation?.okText || '确定'}
+        destructive={Boolean(confirmation?.danger)}
+        onCancel={() => resolveConfirmation(false)}
+        onConfirm={() => resolveConfirmation(true)}
+      >
+        <p>{confirmation?.message}</p>
+        {confirmation?.detail && <p>{confirmation.detail}</p>}
+      </Dialog>
+      <Layer
+        open={!!contextMenu}
+        onClose={() => setContextMenu(null)}
+        anchor={appShellRef}
+        point={contextMenu?.point}
+        focus
+        className="nps-menu"
+      >
+        <MenuItems
+          items={contextMenu?.items || []}
+          label="文本操作"
+          closeAll={() => setContextMenu(null)}
+          closeLevel={() => setContextMenu(null)}
+        />
+      </Layer>
     </div>
   );
 }

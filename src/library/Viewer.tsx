@@ -1,12 +1,25 @@
-import { hasImageName, imageAccessibleName } from '../lib/imageNaming.js';
+﻿import { hasImageName, imageAccessibleName } from '../lib/imageNaming.js';
 import { dimensions } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../ui';
 import { mediaUrl } from '../lib/imageStage.js';
+import type { ImageProject } from '../shared/types';
 import type { LibraryProps } from './types';
 
-export function LibraryViewer({ p, onClose }: { p: LibraryProps; onClose: () => void }) {
+export function LibraryViewer({
+  p,
+  onClose,
+}: {
+  p: Pick<
+    LibraryProps,
+    'previewGroup' | 'groups' | 'onPreview' | 'onCopyImage' | 'onDownloadImage'
+  > & {
+    preview: ImageProject | LibraryProps['preview'];
+    onOpenWorkbench?: LibraryProps['onOpenWorkbench'];
+  };
+  onClose: () => void;
+}) {
   const [zoom, setZoom] = useState<number | null>(null);
   const [rotation, setRotation] = useState(0);
   const [flip, setFlip] = useState(false);
@@ -208,11 +221,21 @@ export function LibraryViewer({ p, onClose }: { p: LibraryProps; onClose: () => 
             <i className="ri-flip-horizontal-line" />
           </Button>
           <span className="library-separator" />
-          <Button variant="quiet" size="small" onClick={() => p.onCopyImage(image)}>
+          <Button
+            variant="quiet"
+            size="small"
+            onClick={() => p.onCopyImage(image as Parameters<LibraryProps['onCopyImage']>[0])}
+          >
             <i className="ri-file-copy-line" />
             复制图片
           </Button>
-          <Button variant="quiet" size="small" onClick={() => p.onDownloadImage(image)}>
+          <Button
+            variant="quiet"
+            size="small"
+            onClick={() =>
+              p.onDownloadImage(image as Parameters<LibraryProps['onDownloadImage']>[0])
+            }
+          >
             <i className="ri-download-line" />
             另存为
           </Button>
@@ -221,7 +244,9 @@ export function LibraryViewer({ p, onClose }: { p: LibraryProps; onClose: () => 
             variant="quiet"
             size="small"
             onClick={() => {
-              p.onOpenWorkbench(image);
+              p.onOpenWorkbench?.(
+                image as Parameters<NonNullable<LibraryProps['onOpenWorkbench']>>[0],
+              );
               onClose();
             }}
           >

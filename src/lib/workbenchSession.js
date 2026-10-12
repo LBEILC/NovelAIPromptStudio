@@ -235,7 +235,7 @@ function normalizePromptChangeValue(value) {
   if (Array.isArray(value)) return value.map(normalizePromptChangeValue);
   if (!value || typeof value !== 'object') return value;
   return Object.keys(value)
-    .filter((key) => key !== 'id' && !isPromptAnnotationField(key))
+    .filter((key) => key !== 'id' && key !== 'block_annotations' && !isPromptAnnotationField(key))
     .sort()
     .reduce((normalized, key) => {
       normalized[key] = normalizePromptChangeValue(value[key]);

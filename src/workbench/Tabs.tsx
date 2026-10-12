@@ -59,7 +59,9 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
         ref={sortable.setNodeRef}
         {...sortable.attributes}
         {...sortable.listeners}
-        className="wb-tab"
+        className="wb-tab workbench-tab"
+        data-workbench-tab-id={tab.id}
+        data-active={tab.id === p.session.activeTabId || undefined}
         role="tab"
         aria-selected={tab.id === p.session.activeTabId}
         aria-label={name || '没有起名'}

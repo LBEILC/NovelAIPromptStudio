@@ -8,7 +8,17 @@ import {
   useSensors,
   pointerWithin,
 } from '@dnd-kit/core';
-import { Button, Input, Menu, Popover, Select, SelectionBar, TextArea, type MenuItem } from '../ui';
+import {
+  Button,
+  Input,
+  Menu,
+  ContextMenu,
+  Popover,
+  Select,
+  SelectionBar,
+  TextArea,
+  type MenuItem,
+} from '../ui';
 import {
   createPromptDocument,
   promptDocumentProject,
@@ -25,7 +35,7 @@ import {
   removePromptCharacter,
   MAX_PROMPT_CHARACTERS,
 } from '../lib/promptStructure.js';
-import { CATEGORY_OPTIONS } from '../lib/prompt.js';
+import { CATEGORY_OPTIONS, formatTag } from '../lib/prompt.js';
 import { encodeMarqueeKey } from '../lib/marqueeSelection.js';
 import { useMarqueeSelection, MarqueeSelectionOverlay } from '../components/MarqueeSelection.jsx';
 import { WorkbenchDocument, type DocumentProps } from './Document';
@@ -215,7 +225,6 @@ export function WorkbenchEditor(p: EditorProps) {
       {
         id: section.scope.key,
         label: scopeLabel(section),
-        disabled: block < 0,
         onSelect: () =>
           guard(() => {
             save(moveTags(doc, chosen, { section: si, block }));
@@ -243,8 +252,8 @@ export function WorkbenchEditor(p: EditorProps) {
         <WorkbenchDocument
           {...p}
           selectedKeys={selected}
-          onRawEdit={(section) =>
-            setRaw({ section, value: serializePromptSection(doc.scopes[section]) })
+          onRawEdit={(section, initial) =>
+            setRaw({ section, value: initial ?? serializePromptSection(doc.scopes[section]) })
           }
           sectionEditor={
             raw
@@ -374,29 +383,58 @@ export function WorkbenchEditor(p: EditorProps) {
             </ParagraphEditor>
           )}
           renderTag={(entry, content) => (
-            <EditableTag
-              entry={entry}
-              disabled={p.viewState.viewMode === 'category'}
-              onClick={(event) => clickTag(entry, event)}
-              onMove={(delta) =>
-                guard(() => {
-                  const siblings = entries.filter(
-                    (item) => item.section === entry.section && item.block === entry.block,
-                  );
-                  const target = entry.index + delta;
-                  if (target >= 0 && target < siblings.length)
-                    save(
-                      moveTags(doc, [entry], {
-                        section: entry.section,
-                        block: entry.block,
-                        index: delta > 0 ? target + 1 : target,
-                      }),
-                    );
-                })
-              }
+            <ContextMenu
+              label="Tag 操作"
+              items={[
+                {
+                  id: 'copy',
+                  label: '复制 Tag',
+                  onSelect: () => p.onCopyText(entry.tag.tag, 1, false),
+                },
+                {
+                  id: 'weight',
+                  label: '复制带权重的 Tag',
+                  onSelect: () => p.onCopyText(formatTag(entry.tag), 1, false),
+                },
+                {
+                  id: 'translation',
+                  label: '复制译文',
+                  disabled: !entry.tag.translation,
+                  onSelect: () => p.onCopyText(entry.tag.translation, 1, false),
+                },
+                { id: 'translate', label: '翻译与分类', onSelect: () => translate([entry]) },
+                {
+                  id: 'delete',
+                  label: '删除',
+                  danger: true,
+                  onSelect: () => guard(() => save(deleteTags(doc, [entry]))),
+                },
+              ]}
             >
-              {content}
-            </EditableTag>
+              <EditableTag
+                entry={entry}
+                disabled={p.viewState.viewMode === 'category'}
+                onClick={(event) => clickTag(entry, event)}
+                onMove={(delta) =>
+                  guard(() => {
+                    const siblings = entries.filter(
+                      (item) => item.section === entry.section && item.block === entry.block,
+                    );
+                    const target = entry.index + delta;
+                    if (target >= 0 && target < siblings.length)
+                      save(
+                        moveTags(doc, [entry], {
+                          section: entry.section,
+                          block: entry.block,
+                          index: delta > 0 ? target + 1 : target,
+                        }),
+                      );
+                  })
+                }
+              >
+                {content}
+              </EditableTag>
+            </ContextMenu>
           )}
           renderAdd={(section, block) => (
             <AddTags

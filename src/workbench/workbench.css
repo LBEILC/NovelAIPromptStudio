@@ -53,3 +53,10 @@
 .wb-paragraph-editor .nps-textarea { min-height:var(--area-prose-min-h); }
 .wb-prose-input { font:var(--fs-prose)/var(--lh-prose) var(--font-prose); }
 .wb-raw-editor .nps-textarea { min-height:var(--area-raw-min-h); font:var(--fs-small)/var(--lh-small) var(--font-mono); }
+.workbench-page.wb-page { display:flex; flex-direction:column; height:100%; min-height:0; padding:0; background:var(--bg); }
+.wb-body { display:flex; flex:1 1 0; min-height:0; overflow:hidden; }
+.workbench-page.wb-empty { height:100%; display:flex; align-items:center; justify-content:center; background:var(--bg); }
+.studio-titlebar > .wb-tabs { flex:0 1 auto; max-width:100%; overflow:hidden; }
+
+.wb-body > .nps-resizable { flex-shrink:0; height:100%; min-height:0; }
+.wb-body > .nps-resizable > .nps-panel-content { height:100%; overflow:hidden; }

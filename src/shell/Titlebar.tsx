@@ -1,4 +1,5 @@
 import { Button } from '../ui';
+import type { ReactNode } from 'react';
 import logo from '../../design/identity/logo/master-symbol.svg?raw';
 import 'remixicon/fonts/remixicon.css';
 import './shell.css';
@@ -14,9 +15,11 @@ export function BrandMark() {
 export function Titlebar({
   page,
   onNavigate,
+  children,
 }: {
   page: string;
   onNavigate: (page: string) => void;
+  children?: ReactNode;
 }) {
   return (
     <header className="studio-titlebar">
@@ -42,6 +45,7 @@ export function Titlebar({
           </Button>
         ))}
       </nav>
+      {children}
       <div className="studio-titlebar-space" />
       <Button
         variant="quiet"

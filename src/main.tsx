@@ -2,7 +2,6 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import { AppearanceProvider } from './state/appearance';
-import { LegacyProviders } from './legacy/LegacyProviders';
 import { NotificationProvider } from './ui';
 import './fonts.css';
 import 'virtual:misans.css';
@@ -23,9 +22,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppearanceProvider>
       <NotificationProvider>
-        <LegacyProviders>
-          <App />
-        </LegacyProviders>
+        <App />
       </NotificationProvider>
     </AppearanceProvider>
   </StrictMode>,

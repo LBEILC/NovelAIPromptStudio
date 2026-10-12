@@ -15,7 +15,9 @@ async function files(directory) {
 }
 const violations = [];
 for (const file of (
-  await Promise.all(['src/ui', 'src/settings', 'src/shell', 'src/library'].map(files))
+  await Promise.all(
+    ['src/ui', 'src/settings', 'src/shell', 'src/library', 'src/workbench'].map(files),
+  )
 ).flat()) {
   const source = await readFile(file, 'utf8');
   if (/from\s*['"](?:@lobehub\/ui|antd)|!important/.test(source))
