@@ -299,10 +299,12 @@ export function WorkbenchEditor(p: EditorProps) {
                   ? { ...target, index: target.index + 1 }
                   : target;
               const next = moveTags(doc, selected.includes(entry.key) ? chosen : [entry], adjusted);
-              const slot = root.current
-                ?.querySelector('.wb-insertion-slot')
-                ?.getBoundingClientRect();
-              dragFeedback.finish(() => save(next), slot ?? over.rect);
+              dragFeedback.finish(
+                () => save(next),
+                () =>
+                  root.current?.querySelector('.wb-insertion-slot')?.getBoundingClientRect() ??
+                  over.rect,
+              );
             } else dragFeedback.end();
           })
         }

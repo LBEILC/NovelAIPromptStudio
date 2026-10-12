@@ -73,8 +73,9 @@ export function useDragFeedback() {
     null,
   );
   const [timing, setTiming] = useState({ duration: 0, easing: 'linear' });
-  const landing = useRef<{ rect: { left: number; top: number }; commit: () => void } | null>(null);
+  const landing = useRef<{ left: number; top: number } | null>(null);
   const start = (event: DragStartEvent, node: HTMLElement | null) => {
+    landing.current = null;
     if (!node) return;
     const style = getComputedStyle(document.documentElement);
     setTiming({
@@ -101,10 +102,16 @@ export function useDragFeedback() {
   };
   return {
     start,
-    end: () => setSnapshot(null),
-    finish: (commit: () => void, rect: { left: number; top: number }) => {
-      if (!timing.duration) commit();
-      else landing.current = { rect, commit };
+    end: () => {
+      landing.current = null;
+      setSnapshot(null);
+    },
+    finish: (commit: () => void, measure: () => { left: number; top: number }) => {
+      // Dropping changes the document immediately. The overlay is only visual:
+      // dnd-kit can skip its animation (including identical start/end frames).
+      landing.current =
+        document.documentElement.dataset.motion === 'off' || !timing.duration ? null : measure();
+      commit();
       setSnapshot(null);
     },
     overlay: (
@@ -118,8 +125,8 @@ export function useDragFeedback() {
                 landing.current
                   ? {
                       ...transform.final,
-                      x: transform.initial.x + landing.current.rect.left - dragOverlay.rect.left,
-                      y: transform.initial.y + landing.current.rect.top - dragOverlay.rect.top,
+                      x: transform.initial.x + landing.current.left - dragOverlay.rect.left,
+                      y: transform.initial.y + landing.current.top - dragOverlay.rect.top,
                     }
                   : transform.final,
               ),
@@ -131,9 +138,7 @@ export function useDragFeedback() {
             })(args);
             return () => {
               cleanup?.();
-              const result = landing.current;
               landing.current = null;
-              result?.commit();
             };
           },
         }}

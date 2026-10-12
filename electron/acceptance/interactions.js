@@ -32,9 +32,9 @@ function pointer(h) {
     }
   };
 }
-async function center(h, selector) {
+async function center(h, selector, block = 'nearest') {
   return h.evaluate(
-    `(()=>{const n=${selector};n.scrollIntoView({block:'nearest',inline:'nearest'});const r=n.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`,
+    `(async()=>{const n=${selector};n.scrollIntoView({block:${JSON.stringify(block)},inline:'nearest'});await ${frame};const r=n.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`,
   );
 }
 async function context(h, selector) {
@@ -399,8 +399,21 @@ export async function workbenchInteractionChecks(env) {
       `[...${tabs}].map(t=>t.dataset.workbenchTabId).filter(id=>!${JSON.stringify(previousTabs)}.includes(id))`,
     );
     const tab = (index) => `document.querySelector('[data-workbench-tab-id="${ids[index]}"]')`;
-    await move('mouseMoved', await center(h, tab(0)));
+    // Reload and DOM clicks do not reset Chromium's pointer position. Enter the
+    // tab from outside after scrolling, with no held button or open menu.
+    await h.nativeKey('Escape');
+    await move('mouseReleased', { x: 20, y: 300 });
+    await move('mouseMoved', { x: 20, y: 300 });
+    const previewPoint = await center(h, tab(0));
+    await check(
+      '标签页预览前置状态为无菜单且指针目标可见',
+      `!document.querySelector('.nps-menu:popover-open,dialog[open]')&&${tab(0)}.contains(document.elementFromPoint(${previewPoint.x},${previewPoint.y}))`,
+      undefined,
+      'once',
+    );
+    await move('mouseMoved', previewPoint);
     await wait('!!document.querySelector(".wb-tab-preview:popover-open img")');
+    await wait('document.querySelector(".wb-tab-preview:popover-open img")?.naturalWidth>0');
     await check(
       '标签页预览包含缩略图、未命名提示和导入时间',
       `(()=>{const p=document.querySelector('.wb-tab-preview:popover-open'),t=${tab(0)},i=p?.querySelector('img');return !!i&&i.src===t.querySelector('img').src&&p.textContent.includes('没有起名')&&p.textContent.includes(${JSON.stringify(records[0].created_at)})&&i.naturalWidth>0})()`,
@@ -518,11 +531,10 @@ export async function workbenchInteractionChecks(env) {
     );
     await click('添加角色');
     await wait(`${draft}.prompt_structure.characters.length===1`);
+    const characterAdd = `document.querySelectorAll('.wb-section')[2].querySelector('.wb-add-trigger')`;
+    await e(`${characterAdd}.scrollIntoView({block:'center'});${frame}`);
     start = await dragStart(source);
-    const character = await center(
-      h,
-      `document.querySelectorAll('.wb-section')[2].querySelector('.wb-add-trigger')`,
-    );
+    const character = await center(h, characterAdd, 'center');
     await move('mouseMoved', character, true);
     await wait('!!document.querySelector(".wb-insertion-slot")');
     await check(
@@ -531,7 +543,11 @@ export async function workbenchInteractionChecks(env) {
       undefined,
       'once',
     );
-    await move('mouseReleased', character);
+    // Inserting the slot and edge auto-scroll can move the original add button.
+    // Release over the displayed destination, not its pre-insertion coordinates.
+    const landing = await center(h, 'document.querySelector(".wb-insertion-slot")', 'center');
+    await move('mouseMoved', landing, true);
+    await move('mouseReleased', landing);
     await wait(`${draft}.prompt_structure.characters[0].prompt_tags.some(t=>t.tag==='red coat')`);
     await check(
       '跨角色放下将 Tag 移入目标角色并保留其他内容',
@@ -539,33 +555,49 @@ export async function workbenchInteractionChecks(env) {
       undefined,
       'once',
     );
-    const changed = await e(`${draft}.prompt_structure.base_prompt_raw`);
-    await h.section('外观');
-    await click('关闭', 'document.querySelector("[aria-label=动效]")');
-    await click('工作台', 'document.querySelector(".studio-titlebar")');
-    await wait('document.documentElement.dataset.motion==="off"');
-    start = await dragStart(source);
-    await check(
-      '关闭动效时拖动不放大、不使用位移过渡',
-      `getComputedStyle(document.querySelector('.wb-drag-feedback')).transform==='none'&&getComputedStyle(document.querySelector('.wb-sortable-tag')).transitionDuration==='0s'`,
-    );
-    await h.nativeKey('Escape');
-    await move('mouseReleased', start);
-    await wait('!document.querySelector(".wb-drag-feedback")');
-    await h.section('外观');
-    await click('跟随系统', 'document.querySelector("[aria-label=动效]")');
-    await click('工作台', 'document.querySelector(".studio-titlebar")');
     await h.window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
       features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
     });
-    await wait('document.documentElement.dataset.motion==="off"');
-    start = await dragStart(source);
-    await check(
-      '跟随系统减少动态效果时不放大也不过渡',
-      `getComputedStyle(document.querySelector('.wb-drag-feedback')).transform==='none'&&getComputedStyle(document.querySelector('.wb-sortable-tag')).transitionDuration==='0s'`,
-    );
-    await h.nativeKey('Escape');
-    await move('mouseReleased', start);
+    for (const mode of ['跟随系统', '关闭']) {
+      await h.section('外观');
+      await click(mode, 'document.querySelector("[aria-label=动效]")');
+      await click('工作台', 'document.querySelector(".studio-titlebar")');
+      await wait('document.documentElement.dataset.motion==="off"');
+      await click('角色操作', 'document.querySelectorAll(".wb-section")[2]');
+      await click('移除角色', menu);
+      await wait('!!document.querySelector("dialog[open]")');
+      await click('移除角色', 'document.querySelector("dialog[open]")');
+      await wait(`${draft}.prompt_structure.characters.length===0`);
+      await click('添加角色');
+      await wait(`${draft}.prompt_structure.characters.length===1`);
+      const index = 0;
+      const section = 2 + index * 2;
+      const add = `document.querySelectorAll('.wb-section')[${section}].querySelector('.wb-add-trigger')`;
+      await e(`${add}.scrollIntoView({block:'center'});${frame}`);
+      const tag = mode === '跟随系统' ? 'standing' : 'glass window';
+      start = await dragStart(source);
+      await check(
+        `系统减少动态效果且${mode}时拖动不放大也不过渡`,
+        `matchMedia('(prefers-reduced-motion: reduce)').matches&&getComputedStyle(document.querySelector('.wb-drag-feedback')).transform==='none'&&getComputedStyle(document.querySelector('.wb-sortable-tag')).transitionDuration==='0s'`,
+      );
+      await move('mouseMoved', await center(h, add, 'center'), true);
+      await wait(
+        `!!document.querySelectorAll('.wb-section')[${section}].querySelector('.wb-insertion-slot')`,
+      );
+      const point = await center(h, 'document.querySelector(".wb-insertion-slot")', 'center');
+      await move('mouseMoved', point, true);
+      await move('mouseReleased', point);
+      await wait(
+        `${draft}.prompt_structure.characters[${index}].prompt_tags.some(t=>t.tag===${JSON.stringify(tag)})`,
+      );
+      await check(
+        `系统减少动态效果且${mode}时跨角色放下写入草稿并清理拖动状态`,
+        `${draft}.prompt_structure.characters[${index}].prompt_tags.some(t=>t.tag===${JSON.stringify(tag)})&&!${draft}.tags.some(t=>t.tag===${JSON.stringify(tag)})&&!document.querySelector('.wb-drag-feedback,.wb-insertion-slot,.wb-tag-dragging')`,
+        undefined,
+        'once',
+      );
+    }
+    const changed = await e(`${draft}.prompt_structure.base_prompt_raw`);
     await h.window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
     const targetStorage = path.join(env.mode.root, 'interaction-moved-assets');
     await migrate(targetStorage);
