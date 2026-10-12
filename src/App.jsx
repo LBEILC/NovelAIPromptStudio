@@ -439,8 +439,8 @@ export default function App() {
   const cacheProgress = useLibraryCacheProgress(libraryLoading);
   const reduceMotion = useStudioReducedMotion(appearance.motion);
 
-  const showToast = useCallback((message) => {
-    notificationTarget.current.notify({ text: message });
+  const showToast = useCallback((message, _tone, source = 'user') => {
+    notificationTarget.current.notify({ text: message, source });
   }, []);
 
   const requestConfirmation = useCallback(
@@ -470,7 +470,7 @@ export default function App() {
   );
 
   const reloadLibrary = useCallback(
-    async (view = 'all') => {
+    async (view = 'all', source = 'user') => {
       const targetView = view === 'trash' ? 'trash' : 'all';
       const requestId = (libraryRequestsRef.current[targetView] || 0) + 1;
       libraryRequestsRef.current[targetView] = requestId;
@@ -484,7 +484,7 @@ export default function App() {
         return hydrated;
       } catch (error) {
         if (libraryRequestsRef.current[targetView] === requestId) {
-          showToast(error instanceof Error ? error.message : String(error), 'error');
+          showToast(error instanceof Error ? error.message : String(error), 'error', source);
         }
         return [];
       } finally {
@@ -496,31 +496,34 @@ export default function App() {
     [hydrateProject, showToast],
   );
 
-  const reloadCollections = useCallback(async () => {
-    const result = await studio.loadCollections();
-    if (!result?.ok) {
-      showToast(result?.error || '收藏集没有加载', 'error');
-      return [];
-    }
-    const next = (result.collections || []).map(normalizeGalleryCollection);
-    setGalleryCollections(next);
-    setActiveCollectionId((current) => {
-      const restored =
-        current && next.some((collection) => collection.id === current)
-          ? current
-          : readActiveGalleryCollection(globalThis.localStorage, next);
-      return writeActiveGalleryCollection(globalThis.localStorage, restored);
-    });
-    return next;
-  }, [showToast]);
+  const reloadCollections = useCallback(
+    async (source = 'user') => {
+      const result = await studio.loadCollections();
+      if (!result?.ok) {
+        showToast(result?.error || '收藏集没有加载', 'error', source);
+        return [];
+      }
+      const next = (result.collections || []).map(normalizeGalleryCollection);
+      setGalleryCollections(next);
+      setActiveCollectionId((current) => {
+        const restored =
+          current && next.some((collection) => collection.id === current)
+            ? current
+            : readActiveGalleryCollection(globalThis.localStorage, next);
+        return writeActiveGalleryCollection(globalThis.localStorage, restored);
+      });
+      return next;
+    },
+    [showToast],
+  );
 
   useEffect(() => {
-    if (!loadedLibraryViewsRef.current.has(galleryView)) reloadLibrary(galleryView);
-    if (!loadedLibraryViewsRef.current.has('trash')) reloadLibrary('trash');
+    if (!loadedLibraryViewsRef.current.has(galleryView)) reloadLibrary(galleryView, 'background');
+    if (!loadedLibraryViewsRef.current.has('trash')) reloadLibrary('trash', 'background');
   }, [galleryView, reloadLibrary]);
 
   useEffect(() => {
-    reloadCollections();
+    reloadCollections('background');
   }, [reloadCollections]);
 
   useEffect(() => {
@@ -701,7 +704,10 @@ export default function App() {
       if (!settings?.autoCheckUpdates) return;
       const result = await studio.checkForUpdates().catch(() => null);
       if (result?.ok && result.hasUpdate)
-        showToast(`发现新版本 v${result.latestVersion}，可在“关于与更新”中查看`);
+        notificationTarget.current.notify({
+          text: `发现新版本 v${result.latestVersion}，可在“关于与更新”中查看`,
+          source: 'background',
+        });
     }, 6000);
     return () => window.clearTimeout(timer);
   }, [showToast]);

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppearanceSettings } from '../shared/types';
 import { ThemeProvider } from '../ui';
 import { quoteFontFamily } from '../lib/fonts.js';
@@ -25,6 +25,7 @@ export const useAppearance = () => useContext(AppearanceContext);
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const [appearance, setAppearance] = useState(defaultAppearance);
+  const revision = useRef(0);
   const [systemDark, setSystemDark] = useState(
     () => matchMedia('(prefers-color-scheme: dark)').matches,
   );
@@ -39,10 +40,12 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     let active = true;
+    const request = revision.current;
     window.studio
       ?.getAppearanceSettings()
       .then((saved) => {
-        if (active) setAppearance({ ...defaultAppearance, ...saved, primaryColor: 'blue' });
+        if (active && request === revision.current)
+          setAppearance({ ...defaultAppearance, ...saved, primaryColor: 'blue' });
       })
       .catch(() => {});
     return () => {
@@ -66,8 +69,11 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     html.dataset.themeMode = resolvedTheme;
   }, [appearance, resolvedTheme]);
   const changeAppearance = async (patch: Partial<AppearanceSettings>) => {
+    const request = ++revision.current;
     const saved = await window.studio?.saveAppearanceSettings(patch);
-    setAppearance((current) => ({ ...current, ...(saved ?? patch), primaryColor: 'blue' }));
+    // A reply contains the whole snapshot at that save, not the latest choice.
+    if (request === revision.current)
+      setAppearance((current) => ({ ...current, ...(saved ?? patch), primaryColor: 'blue' }));
   };
   return (
     <AppearanceContext.Provider value={{ appearance, resolvedTheme, changeAppearance }}>

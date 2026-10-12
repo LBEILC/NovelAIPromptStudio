@@ -524,6 +524,90 @@ describe('IME and autocomplete', () => {
 });
 
 describe('Feedback', () => {
+  it.each(['timeout', 'action', 'replacement'])(
+    'keeps only the latest background notice behind an action until %s',
+    (dismissal) => {
+      vi.useFakeTimers();
+      const undo = vi.fn();
+      function Fixture() {
+        const notify = useNotifications();
+        return (
+          <>
+            <Button
+              onClick={() => {
+                notify({ text: 'Moved', duration: 100, action: { label: 'Undo', onClick: undo } });
+                notify({ text: 'Old update', source: 'background' });
+                notify({ text: 'Latest update', source: 'background', duration: 100 });
+              }}
+            >
+              Notify
+            </Button>
+            <Button onClick={() => notify({ text: 'Copied', duration: 100 })}>Copy</Button>
+          </>
+        );
+      }
+      render(
+        <NotificationProvider>
+          <Fixture />
+        </NotificationProvider>,
+      );
+      click(button('Notify'));
+      expect(query('[role="status"]').textContent).toBe('MovedUndo');
+      if (dismissal === 'action') {
+        click(button('Undo'));
+        expect(undo).toHaveBeenCalledOnce();
+      } else {
+        if (dismissal === 'replacement') {
+          click(button('Copy'));
+          expect(query('[role="status"]').textContent).toBe('Copied');
+        }
+        act(() => vi.advanceTimersByTime(100));
+      }
+      expect(query('[role="status"]').textContent).toBe('Latest update');
+      act(() => vi.advanceTimersByTime(100));
+      expect(query('[role="status"]').textContent).toBe('');
+    },
+  );
+  it('background replaces a plain notice and action callbacks can publish a new notice', () => {
+    function Fixture() {
+      const notify = useNotifications();
+      return (
+        <>
+          <Button
+            onClick={() => {
+              notify({ text: 'Copied' });
+              notify({ text: 'Update', source: 'background' });
+            }}
+          >
+            Notify
+          </Button>
+          <Button
+            onClick={() =>
+              notify({
+                text: 'Moved',
+                action: {
+                  label: 'Undo',
+                  onClick: () => notify({ text: 'Restored' }),
+                },
+              })
+            }
+          >
+            Move
+          </Button>
+        </>
+      );
+    }
+    render(
+      <NotificationProvider>
+        <Fixture />
+      </NotificationProvider>,
+    );
+    click(button('Notify'));
+    expect(query('[role="status"]').textContent).toBe('Update');
+    click(button('Move'));
+    click(button('Undo'));
+    expect(query('[role="status"]').textContent).toBe('Restored');
+  });
   it('notification pauses remaining lifetime while hovered and focused', () => {
     vi.useFakeTimers();
     const dismiss = vi.fn();

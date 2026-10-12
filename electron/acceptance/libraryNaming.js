@@ -1,7 +1,7 @@
 import { parsePrompt } from '../../src/lib/prompt.js';
 import { createPromptStructure } from '../../src/lib/promptStructure.js';
 
-export async function libraryNamingChecks({ h, database, doubles, preferences }) {
+export async function libraryNamingChecks({ h, database, doubles }) {
   h.category('图片库·起名');
   const { evaluate: e, wait, check, click, input } = h;
   const dialog = 'document.querySelector("dialog[open]")';
@@ -16,7 +16,15 @@ export async function libraryNamingChecks({ h, database, doubles, preferences })
     );
   };
   const fixtureIds = [];
-  const autoCheckUpdates = preferences.productivitySettings().autoCheckUpdates;
+  let updateRequested = false;
+  let releaseUpdate;
+  const updateReady = new Promise((resolve) => {
+    releaseUpdate = resolve;
+  });
+  doubles.beforeUpdateCheck = () => {
+    updateRequested = true;
+    return updateReady;
+  };
   const previousSize = h.window.getContentSize();
   h.window.setContentSize(1240, 760);
   const source = database.loadLibrary()[0];
@@ -95,9 +103,6 @@ export async function libraryNamingChecks({ h, database, doubles, preferences })
     );
   };
   try {
-    // Each reload schedules an automatic update notice after six seconds. Keep
-    // that unrelated fixture notification out of the short-lived undo scenario.
-    preferences.saveProductivitySettings({ autoCheckUpdates: false });
     for (let i = 0; i < 6; i++) make(i);
     await refresh();
     await check(
@@ -165,7 +170,32 @@ export async function libraryNamingChecks({ h, database, doubles, preferences })
       undefined,
       'once',
     );
+    await e(
+      `document.querySelector('.nps-toast').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
+    );
+    await h.until(() => updateRequested, '自动更新请求已到达固定发布信息夹具');
+    releaseUpdate();
+    await e('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+    await check(
+      '后台更新通知不替换带撤销的起名通知',
+      'document.querySelector(".nps-toast button")?.textContent === "撤销" && !document.querySelector(".nps-toast").textContent.includes("发现新版本")',
+      undefined,
+      'once',
+    );
     await undo();
+    await wait(
+      'document.querySelector(".nps-toast")?.textContent.includes("发现新版本 v99.0.0")',
+      '撤销后显示等待中的后台更新通知',
+    );
+    await check(
+      '撤销恢复数据后显示后台通知',
+      () => !database.loadProject(id).has_custom_name,
+      undefined,
+      'once',
+    );
+    await e(
+      `document.querySelector('.nps-toast').dispatchEvent(new PointerEvent('pointerout',{bubbles:true,relatedTarget:document.body}))`,
+    );
     await wait('!document.querySelector(".library-caption b")');
     await click('起名', actions);
     await input('input[aria-label="图片名称"]', '命名验收.png');
@@ -333,7 +363,8 @@ export async function libraryNamingChecks({ h, database, doubles, preferences })
     await undo();
     await click('取消', bar);
   } finally {
-    preferences.saveProductivitySettings({ autoCheckUpdates });
+    releaseUpdate();
+    delete doubles.beforeUpdateCheck;
     for (const id of fixtureIds) database.deleteProject(id);
     await h.reload();
     await click('图片库', 'document.querySelector(".studio-titlebar")');

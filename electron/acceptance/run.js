@@ -223,40 +223,7 @@ export async function runAcceptance(context) {
       snapshot,
       encrypted: safeStorage.isEncryptionAvailable(),
     };
-    if (mode.category && mode.category !== '全部') {
-      h.dualThemes(true);
-      if (mode.category === '工作台') await workbenchChecks(environment);
-      else if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
-      else if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
-      else if (['图片库', '图片库·导入', '图片库·收尾', '图片库·滚动条'].includes(mode.category))
-        await libraryChecks(environment);
-      else if (mode.category.startsWith('设置')) await settingsChecks(environment, false);
-      else if (mode.category === '基础组件') await componentChecks(environment);
-      else if (mode.category === '卡片缓存') await cardCacheChecks(environment);
-      else if (mode.category === '外壳·快捷键') await shortcutChecks(environment);
-      else if (mode.category === '动效') {
-        h.category('外壳·动效');
-        await section('外观');
-        await motionChecks(h);
-      } else if (mode.category === '诊断') {
-        h.category('诊断');
-        await h.wait('false', '人为制造等待超时', 50);
-      } else if (mode.category === '诊断·渲染器') {
-        h.category('诊断·渲染器');
-        await e('new Promise(() => {})', '人为制造未完成的渲染求值');
-      }
-    } else if (mode.phase > 0) {
-      h.dualThemes(true);
-      h.category('数据');
-      await check(
-        '跨进程重启保留图库、收藏集、回收站和词典全部内容',
-        async () =>
-          snapshot() === (await fs.readFile(path.join(mode.root, 'snapshot.json'), 'utf8')),
-        undefined,
-        'once',
-      );
-      await settingsChecks(environment, true);
-    } else {
+    const shellChecks = async () => {
       h.dualThemes(false);
       for (const theme of ['light', 'dark']) {
         nativeTheme.themeSource = theme;
@@ -307,6 +274,19 @@ export async function runAcceptance(context) {
           'once',
         );
         await overlayCheck('快速切换后标题栏采用最后主题令牌');
+        for (const finalTheme of ['light', 'dark']) {
+          await e(
+            `(() => { const group=document.querySelector('[role=radiogroup][aria-label="主题"]'); const names=${JSON.stringify(finalTheme === 'dark' ? ['浅色', '深色'] : ['深色', '浅色'])}; for(let i=0;i<20;i++) [...group.querySelectorAll('button')].find(b=>b.textContent.trim()===names[i%2]).click() })()`,
+          );
+          await wait(`document.documentElement.dataset.theme === '${finalTheme}'`);
+          await check(
+            `连续切换 20 次保留最后选择 ${finalTheme}`,
+            () => preferences.appearanceSettings().themeMode === finalTheme,
+            undefined,
+            'once',
+          );
+          await overlayCheck(`连续切换 20 次后标题栏采用最后主题 ${finalTheme} 的令牌`);
+        }
         await click('跟随系统', 'document.querySelector("[role=radiogroup][aria-label=主题]")');
         for (const theme of ['light', 'dark']) {
           nativeTheme.themeSource = theme;
@@ -344,6 +324,45 @@ export async function runAcceptance(context) {
         nativeTheme.themeSource = 'light';
         await wait(`document.documentElement.dataset.theme === 'light'`);
         h.dualThemes(true);
+      }
+    };
+    if (mode.category && mode.category !== '全部') {
+      h.dualThemes(true);
+      if (mode.category === '外壳') await shellChecks();
+      else if (mode.category === '工作台') await workbenchChecks(environment);
+      else if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
+      else if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
+      else if (['图片库', '图片库·导入', '图片库·收尾', '图片库·滚动条'].includes(mode.category))
+        await libraryChecks(environment);
+      else if (mode.category.startsWith('设置')) await settingsChecks(environment, false);
+      else if (mode.category === '基础组件') await componentChecks(environment);
+      else if (mode.category === '卡片缓存') await cardCacheChecks(environment);
+      else if (mode.category === '外壳·快捷键') await shortcutChecks(environment);
+      else if (mode.category === '动效') {
+        h.category('外壳·动效');
+        await section('外观');
+        await motionChecks(h);
+      } else if (mode.category === '诊断') {
+        h.category('诊断');
+        await h.wait('false', '人为制造等待超时', 50);
+      } else if (mode.category === '诊断·渲染器') {
+        h.category('诊断·渲染器');
+        await e('new Promise(() => {})', '人为制造未完成的渲染求值');
+      }
+    } else if (mode.phase > 0) {
+      h.dualThemes(true);
+      h.category('数据');
+      await check(
+        '跨进程重启保留图库、收藏集、回收站和词典全部内容',
+        async () =>
+          snapshot() === (await fs.readFile(path.join(mode.root, 'snapshot.json'), 'utf8')),
+        undefined,
+        'once',
+      );
+      await settingsChecks(environment, true);
+    } else {
+      await shellChecks();
+      if (!mode.packaged) {
         await workbenchChecks(environment);
         await shortcutChecks(environment);
         await libraryNamingChecks(environment);

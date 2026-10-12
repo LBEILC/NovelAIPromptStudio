@@ -19,6 +19,7 @@ export interface Notice {
   text: string;
   action?: { label: string; onClick: () => void };
   duration?: number;
+  source?: 'user' | 'background';
 }
 const NoticeContext = createContext<((notice: Omit<Notice, 'id'>) => void) | null>(null);
 export function NotificationContent({
@@ -78,7 +79,10 @@ export function Notification({ notice, onDismiss }: { notice: Notice; onDismiss:
   );
 }
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const [current, setCurrent] = useState<Notice | null>(null);
+  const [{ current }, setNotices] = useState<{
+    current: Notice | null;
+    pending: Notice | null;
+  }>({ current: null, pending: null });
   const next = useRef(0);
   const layer = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -86,7 +90,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     else layer.current?.hidePopover();
   }, [current]);
   return (
-    <NoticeContext.Provider value={(notice) => setCurrent({ ...notice, id: ++next.current })}>
+    <NoticeContext.Provider
+      value={(notice) => {
+        const incoming = { ...notice, id: ++next.current };
+        setNotices((state) => {
+          if (incoming.source === 'background') {
+            if (state.current?.action) return { ...state, pending: incoming };
+            return { current: incoming, pending: null };
+          }
+          return { ...state, current: incoming };
+        });
+      }}
+    >
       {children}
       <div
         ref={layer}
@@ -96,7 +111,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         aria-live="polite"
         aria-atomic="true"
       >
-        {current && <Notification notice={current} onDismiss={() => setCurrent(null)} />}
+        {current && (
+          <Notification
+            notice={current}
+            onDismiss={() =>
+              setNotices((state) =>
+                state.current?.id === current.id
+                  ? { current: state.pending, pending: null }
+                  : state,
+              )
+            }
+          />
+        )}
       </div>
     </NoticeContext.Provider>
   );

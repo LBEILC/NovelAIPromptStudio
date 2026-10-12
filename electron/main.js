@@ -1377,6 +1377,7 @@ app.whenReady().then(async () => {
   }));
   ipcMain.handle('updates:check', async () => {
     if (acceptanceMode) {
+      await acceptanceDoubles.beforeUpdateCheck?.();
       notifyUpdateState({
         phase: 'available',
         hasUpdate: true,

@@ -34,6 +34,54 @@ const ai = {
   encryptionAvailable: true,
 };
 describe('settings domain state', () => {
+  it('ignores stale appearance saves and the initial read after a newer choice', async () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    type Settings = typeof defaultAppearance;
+    let load!: (settings: Settings) => void;
+    const saves: ((settings: Settings) => void)[] = [];
+    window.studio = {
+      getAppearanceSettings: () =>
+        new Promise<Settings>((resolve) => {
+          load = resolve;
+        }),
+      saveAppearanceSettings: () =>
+        new Promise<Settings>((resolve) => {
+          saves.push(resolve);
+        }),
+    } as unknown as StudioApi;
+    let state!: ReturnType<typeof useAppearance>;
+    function Harness() {
+      state = useAppearance();
+      return null;
+    }
+    await act(async () =>
+      root.render(
+        <AppearanceProvider>
+          <Harness />
+        </AppearanceProvider>,
+      ),
+    );
+    let first!: Promise<void>, last!: Promise<void>;
+    act(() => {
+      first = state.changeAppearance({ themeMode: 'light' });
+      last = state.changeAppearance({ themeMode: 'dark' });
+    });
+    await act(async () => {
+      saves[1]({ ...defaultAppearance, themeMode: 'dark' });
+      await last;
+    });
+    await act(async () => {
+      saves[0]({ ...defaultAppearance, themeMode: 'light' });
+      load({ ...defaultAppearance, themeMode: 'light' });
+      await first;
+    });
+    expect(state.appearance.themeMode).toBe('dark');
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
   it.each([false, true])(
     'preserves drafts when the initial AI read arrives late (switch=%s)',
     async (switchSection) => {

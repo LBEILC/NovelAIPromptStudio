@@ -24,6 +24,7 @@ export function acceptanceOptions(argv = process.argv.slice(2)) {
       '设置·版式',
       '基础组件',
       '卡片缓存',
+      '外壳',
       '外壳·快捷键',
       '动效',
       '诊断',
