@@ -1,5 +1,6 @@
 import {
   Activity,
+  Fragment,
   lazy,
   Suspense,
   useEffect,
@@ -49,12 +50,21 @@ const bytes = (value: number) =>
     : value < 1048576
       ? `${(value / 1024).toFixed(1)} KB`
       : `${(value / 1048576).toFixed(1)} MB`;
-function Row({ title, help, children }: { title: string; help?: string; children: ReactNode }) {
+function Row({
+  title,
+  help,
+  children,
+}: {
+  title: string;
+  help?: string | string[];
+  children: ReactNode;
+}) {
   return (
     <div className="settings-line">
       <div>
         {title}
-        {help && <small>{help}</small>}
+        {help &&
+          (Array.isArray(help) ? help : [help]).map((line) => <small key={line}>{line}</small>)}
       </div>
       {children}
     </div>
@@ -189,7 +199,7 @@ function AI() {
           onChange={(e) => a.setSettings((s) => ({ ...s, apiKey: e.target.value }))}
         />
         <small>{a.settings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '尚未保存'}</small>
-        <small>只存在系统的安全存储里，软件不会以明文保存</small>
+        <small>加密后保存在这台电脑上，软件不保存明文</small>
       </label>
       <div className="settings-column">
         模型
@@ -232,6 +242,7 @@ function AI() {
           />
           <Button
             variant="quiet"
+            className="settings-prompt-reset"
             onClick={() =>
               a.setSettings((s) => ({
                 ...s,
@@ -467,44 +478,48 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           ],
         ],
         ['关闭当前标签', [['Mod', 'W']]],
-        [
-          '移动当前 Tag',
-          [
-            ['Alt', '←'],
-            ['Alt', '→'],
-            ['Alt', '↑'],
-            ['Alt', '↓'],
-          ],
-        ],
+        ['移动当前 Tag', [['Alt', '方向键']]],
+        ['在图片之间移动', [['方向键']]],
         ['在一摞图片里切换', [['←'], ['→']]],
-        // TODO(design): Confirm captions for existing shortcuts absent from the reference.
-        ['【文案待定：图片库与导入列表全选】', [['Mod', 'A']]],
-        ['【文案待定：图片库取消多选与关闭大图】', [['Esc']]],
         ['在工作台打开', [['Enter']]],
-        ['大图', [['Space']]],
-        ['【文案待定：图片库网格方向键选择】', [['←'], ['→'], ['↑'], ['↓']]],
+        ['看大图', [['Space']]],
+        ['全选图片', [['Mod', 'A']]],
+        ['取消选择；关闭大图', [['Esc']]],
       ].map(([title, bindings]) => (
         <Row key={title as string} title={title as string}>
           <span className="settings-shortcuts">
-            {(bindings as string[][]).map((keys) => (
-              <Shortcut key={keys.join('-')} keys={keys} />
+            {(bindings as string[][]).map((keys, index) => (
+              <Fragment key={keys.join('-')}>
+                {index > 0 && <span className="settings-shortcut-separator">/</span>}
+                <span className="settings-shortcut-binding">
+                  {keys.map((key) => (
+                    <Shortcut key={key} keys={[key]} />
+                  ))}
+                </span>
+              </Fragment>
             ))}
           </span>
         </Row>
       ))}
-      {/* TODO(design): Privacy wording omits Danbooru lookup, model discovery and connection testing. */}
       <h2>数据与隐私</h2>
+      <Row title="图片和图库数据只存在这台电脑上" help={'位置见"图片库"那一页。软件不会上传图片'}>
+        {null}
+      </Row>
       <Row
-        title="图片和图库数据只存在这台电脑上"
-        help="位置见“图片库”那一页。软件不会把图片上传到任何地方"
+        title="这些时候会联网，都不会发送图片"
+        help={[
+          '检查和下载更新：访问 GitHub。自动检查可以在上面关掉；更新说明里带图片时，会从图片所在的网站加载',
+          '翻译与分类：内置词典里没有的 Tag，会把 Tag 的名字发给 Danbooru，查它属于哪一类；配置了 AI 服务时，还没有译文的 Tag 会再发给你配置的服务',
+          '段落的"译成中文""按中文改写英文"：把这一段文字发给你配置的 AI 服务',
+          '读取模型列表、测试连接：只和你配置的 AI 服务通信，不带你的 Prompt',
+          '报告问题、提出建议：在浏览器里打开 GitHub，不自动附带任何数据',
+        ]}
       >
         {null}
       </Row>
-      <Row title="【文案待定：实际联网情况】">{null}</Row>
-      {/* TODO(design): safeStorage encrypts the key, but ciphertext lives in the local preferences file. */}
       <Row
-        title="【文案待定：API Key 的加密存储方式】"
-        help="软件不会以明文保存，诊断信息和报告问题都不会带上它"
+        title="API Key 加密后保存在这台电脑上"
+        help="用系统自带的加密能力加密，软件不保存明文；诊断信息和报告问题都不会带上它"
       >
         {null}
       </Row>

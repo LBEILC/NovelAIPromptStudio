@@ -21,8 +21,15 @@ const output = path.resolve(
 );
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nai-acceptance-'));
 let failure = false;
+let continueDictionary;
 const requests = [];
 const server = createServer((request, response) => {
+  if (request.url === '/control/dictionary-continue') {
+    continueDictionary?.();
+    continueDictionary = undefined;
+    response.end('ok');
+    return;
+  }
   if (request.url === '/control/fail') {
     failure = true;
     response.end('ok');
@@ -61,22 +68,27 @@ const server = createServer((request, response) => {
           response.end(JSON.stringify({ error: { message: 'synthetic batch failure' } }));
           return;
         }
-        response.end(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    items: tags.map(() => ({
-                      translation: '合成重译结果',
-                      category: 'Environment',
-                    })),
-                  }),
+        const complete = () =>
+          response.end(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({
+                      items: tags.map(() => ({
+                        translation: '合成重译结果',
+                        category: 'Environment',
+                      })),
+                    }),
+                  },
                 },
-              },
-            ],
-          }),
-        );
+              ],
+            }),
+          );
+        // Hold the successful second batch while the real renderer inspects
+        // the first batch's failure progress, then release through loopback.
+        if (parsed.model === 'dictionary-partial') continueDictionary = complete;
+        else complete();
       } else
         response.end(
           JSON.stringify({ model: 'acceptance-model', choices: [{ message: { content: 'OK' } }] }),

@@ -11,6 +11,7 @@ import {
   MenuItems,
   Shortcut,
   Progress,
+  useNotifications,
   useScrollArea,
   type MenuItem,
 } from '../ui';
@@ -55,21 +56,30 @@ const sourceLabel = (item: TagDictionaryEntry) =>
 
 export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void }) {
   const d = useDictionary();
+  const notify = useNotifications();
   const scroll = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
-  const failures = useRef<HTMLDetailsElement>(null);
-  useScrollArea(failures, { enabled: !!d.progress?.failed.length });
+  const failures = useRef<HTMLDivElement>(null);
+  const [showFailures, setShowFailures] = useState(false);
+  useScrollArea(failures, { enabled: showFailures && !!d.progress?.failed.length });
   useScrollArea(scroll, { topInset: '--table-head-h' });
   const [viewport, setViewport] = useState({ top: 0, height: 0, row: 36, head: 30 });
   const [editing, setEditing] = useState<string | null>(null);
   const [translation, setTranslation] = useState('');
   const [deleting, setDeleting] = useState<string[]>([]);
+  const [confirmTranslation, setConfirmTranslation] = useState(false);
   const [menu, setMenu] = useState<{
     item: TagDictionaryEntry;
     point?: { x: number; y: number };
   } | null>(null);
   const menuAnchor = useRef<HTMLElement | null>(null);
   const [message, setMessage] = useState('');
+  const retranslate = async () => {
+    setShowFailures(false);
+    const result = await d.retranslate();
+    if (result && !result.canceled && !result.failed.length)
+      notify({ text: `已翻译 ${result.translated} 条` });
+  };
   useLayoutEffect(() => {
     const node = scroll.current!;
     const measure = () => {
@@ -150,7 +160,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
     { id: 'sep', separator: true },
     {
       id: 'delete',
-      label: dictionarySource(item) === 'manual' ? '还原' : '删除，下次重新翻译',
+      label: dictionarySource(item) === 'manual' ? '还原' : '删除这一条',
       danger: true,
       onSelect: () => setDeleting([item.tag]),
     },
@@ -192,9 +202,9 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
           <Select
             label="排序"
             options={[
-              { value: 'usage', label: '用到的图片' },
+              { value: 'usage', label: '按用到的图片数' },
               { value: 'tag', label: '按 Tag' },
-              { value: 'recent', label: '最近修改' },
+              { value: 'recent', label: '按最近修改' },
             ]}
             value={d.filters.sort}
             onChange={(sort) => d.setFilters((f) => ({ ...f, sort: sort as DictionarySort }))}
@@ -388,27 +398,47 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
           {d.busy ? '正在读取…' : `${d.items.length} 条`}
         </div>
       </div>
-      {d.progress && (
+      {d.progress && (d.running || d.progress.canceled || !!d.progress.failed.length) && (
         <div className="settings-dictionary-progress" role="status">
-          {/* TODO(design): Confirm progress, cancellation and failure copy for batch AI translation. */}
-          <span>
-            【文案待定：{d.progress.canceled ? '已取消' : 'AI 翻译进度'}】{d.progress.completed} /{' '}
-            {d.progress.total} · {d.progress.failed.length} 条失败，保留原值
-          </span>
-          <Progress value={d.progress.completed} max={d.progress.total} label="AI 翻译进度" />
-          {!!d.progress.failed.length && (
-            <details ref={failures}>
-              <summary>【文案待定：查看失败条目】</summary>
+          <div className="settings-dictionary-progress-line">
+            <span>
+              {d.running
+                ? `正在用 AI 翻译 · 已完成 ${d.progress.completed} / ${d.progress.total}${d.progress.failed.length ? ` · ${d.progress.failed.length} 条没有成功` : ''}`
+                : d.progress.canceled
+                  ? `已取消。完成了 ${d.progress.translated} 条，其余没有改动`
+                  : `已翻译 ${d.progress.translated} 条，${d.progress.failed.length} 条没有成功，保持原样`}
+            </span>
+            {!d.running && !!d.progress.failed.length && (
+              <Button
+                variant="quiet"
+                aria-expanded={showFailures}
+                aria-controls="dictionary-failures"
+                onClick={() => setShowFailures((open) => !open)}
+              >
+                查看原因
+              </Button>
+            )}
+            {d.running && (
+              <Button className="settings-dictionary-cancel" variant="quiet" onClick={d.cancel}>
+                取消
+              </Button>
+            )}
+          </div>
+          {d.running && (
+            <Progress value={d.progress.completed} max={d.progress.total} label="AI 翻译进度" />
+          )}
+          {!d.running && !!d.progress.failed.length && showFailures && (
+            <div className="settings-dictionary-failures" id="dictionary-failures" ref={failures}>
               {d.progress.failed.map((item) => (
                 <p key={item.tag}>
                   {item.tag}：{item.error}
                 </p>
               ))}
-            </details>
+            </div>
           )}
         </div>
       )}
-      {!!d.selected.length && (
+      {!!d.selected.length && !d.running && (
         <div className="settings-dictionary-selection">
           <div className="nps-selection" role="group" aria-label="词典多选操作">
             <span>已选 {d.selected.length} 条</span>
@@ -425,15 +455,17 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
             <Button
               variant="quiet"
               disabled={d.busy || !d.aiReady}
-              disabledReason={!d.aiReady ? '请先在设置里配置 AI 服务' : undefined}
-              onClick={() => void d.retranslate()}
+              disabledReason={!d.aiReady ? "先在'AI 服务'里配置" : undefined}
+              onClick={() =>
+                d.selected.length > 50 ? setConfirmTranslation(true) : void retranslate()
+              }
             >
               用 AI 重新翻译
             </Button>
             <Button variant="danger" disabled={d.busy} onClick={() => setDeleting(d.selected)}>
               删除
             </Button>
-            <Button variant="quiet" onClick={() => (d.running ? d.cancel() : d.setSelected([]))}>
+            <Button variant="quiet" onClick={() => d.setSelected([])}>
               取消
             </Button>
           </div>
@@ -457,11 +489,34 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
         )}
       </Layer>
       <Dialog
+        open={confirmTranslation}
+        title={`用 AI 重新翻译 ${d.selected.length} 条？`}
+        cancelLabel="取消"
+        confirmLabel="开始翻译"
+        confirmDisabled={d.busy}
+        onCancel={() => setConfirmTranslation(false)}
+        onConfirm={() => {
+          setConfirmTranslation(false);
+          void retranslate();
+        }}
+      >
+        <p>
+          会把这些 Tag 的名字发给你配置的 AI 服务，分 {Math.ceil(d.selected.length / 50)}{' '}
+          批完成，可以随时取消。现有的译文和分类会被新的结果替换。
+        </p>
+      </Dialog>
+      <Dialog
         open={!!deleting.length}
-        title={reverting ? '还原？' : '删除？'}
+        title={
+          reverting
+            ? `还原"${deleting[0]}"？`
+            : deleting.length === 1
+              ? `删除"${deleting[0]}"？`
+              : `删除这 ${deleting.length} 条？`
+        }
         destructive
         cancelLabel="取消"
-        confirmLabel={reverting ? '还原' : `删除 ${deleting.length} 条`}
+        confirmLabel={reverting ? '还原' : '删除'}
         confirmDisabled={d.busy}
         onCancel={() => setDeleting([])}
         onConfirm={() => {
@@ -471,9 +526,12 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
             });
         }}
       >
-        {/* TODO(design): Existing deletion has no prior AI/manual history to restore. */}
-        <p>【文案待定：删除本地记录后没有译文；下次整理时重新获取，不会恢复之前的 AI 结果】</p>
-        <p>不会修改图片中已经保存的 Prompt。</p>
+        <p>
+          {reverting
+            ? '会删掉你对这个 Tag 的修改。它再次出现时，软件会重新查内置词典；内置词典里没有的，要再做一次"翻译与分类"才有译文。'
+            : '这些 Tag 再次出现时，软件会重新查内置词典；内置词典里没有的，要再做一次"翻译与分类"才有译文。'}
+        </p>
+        <p>不会改动图片里的 Prompt。</p>
       </Dialog>
     </div>
   );

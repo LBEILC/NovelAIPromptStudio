@@ -83,6 +83,12 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     '默认标签仅显示缩略图且竖图宽度符合令牌',
     `(()=>{const t=document.querySelector('.wb-tab'),i=t.querySelector('img'),s=getComputedStyle(i);return !t.querySelector('.wb-tab-name') && Math.abs(i.width-Math.max(parseFloat(s.getPropertyValue('--tab-thumb-min-w')),i.height*832/1216))<2})()`,
   );
+  await check(
+    '工作台节标题实际使用标题令牌，文档与节块间距匹配界面稿',
+    `(()=>{const doc=document.querySelector('.wb-document-scroll'),css=getComputedStyle(doc),px=name=>parseFloat(css.getPropertyValue(name)),heads=[...document.querySelectorAll('.wb-section-head')];return parseFloat(css.paddingTop)===px('--sp-1') && parseFloat(css.paddingBottom)===px('--sp-5') && heads.length>0 && heads.every(head=>{const title=getComputedStyle(head.firstElementChild),style=getComputedStyle(head);return title.fontSize===css.getPropertyValue('--fs-title').trim() && parseFloat(style.paddingTop)===px('--sp-3')+px('--sp-0') && parseFloat(style.paddingBottom)===px('--sp-0')}) && [...document.querySelectorAll('.wb-block')].every(block=>{const style=getComputedStyle(block);return parseFloat(style.paddingTop)===px('--sp-2')+px('--sp-0') && parseFloat(style.paddingBottom)===px('--sp-3')})})()`,
+    undefined,
+    'both',
+  );
   await shot('home');
   await click('其他复制方式');
   await check(

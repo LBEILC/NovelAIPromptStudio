@@ -1,3 +1,5 @@
+import { settingsCopyChecks } from './settingsCopy.js';
+
 export async function settingsLayoutChecks(h) {
   const { evaluate: e, wait, check, section } = h;
   h.category('设置·版式');
@@ -18,6 +20,22 @@ export async function settingsLayoutChecks(h) {
           await check(
             `${label}内容栏与页头水平对齐且居中`,
             `(()=>{const p=${page},copy=p.querySelector('.settings-copy'),head=p.querySelector('.settings-page-head>div'),a=copy.getBoundingClientRect(),b=head.getBoundingClientRect(),padding=parseFloat(getComputedStyle(copy).paddingLeft),max=parseFloat(getComputedStyle(copy).getPropertyValue('--page-col'));return Math.abs(a.x+padding-b.x)<2 && b.width<=max+1 && Math.abs((a.x+a.width/2)-(p.getBoundingClientRect().x+p.clientWidth/2))<2})()`,
+          );
+        }
+        if (label === '翻译词典') {
+          await check(
+            `${width} 像素时词典搜索靠左，分类和排序靠右`,
+            `(()=>{const bar=document.querySelector('.settings-table-toolbar>div'),search=bar.querySelector('.nps-input-group').getBoundingClientRect(),category=bar.querySelector('[aria-label="按 Tag 分类筛选"]').getBoundingClientRect(),sort=bar.querySelector('[aria-label="排序"]').getBoundingClientRect(),bounds=bar.getBoundingClientRect(),gap=parseFloat(getComputedStyle(bar).gap);return Math.abs(search.left-bounds.left)<1 && Math.abs(sort.right-bounds.right)<1 && category.left-search.right>gap && Math.abs(sort.left-category.right-gap)<1})()`,
+            undefined,
+            'both',
+          );
+        }
+        if (label === 'AI 服务') {
+          await check(
+            `${width} 像素时两项提示词的恢复默认按钮靠左`,
+            `(()=>{const buttons=[...document.querySelectorAll('.settings-prompt-reset')];return buttons.length===2 && buttons.every(button=>Math.abs(button.getBoundingClientRect().left-button.closest('.settings-column').getBoundingClientRect().left)<1 && button.offsetWidth<button.parentElement.clientWidth)})()`,
+            undefined,
+            'both',
           );
         }
         if (width === 1240) await h.screenshot(`settings-layout-${labels.indexOf(label)}`);
@@ -52,6 +70,8 @@ export async function settingsLayoutChecks(h) {
       `(()=>{const f=(${page}).querySelector('.settings-page-foot'),b=[...f.querySelectorAll('button')].find(b=>b.textContent==='保存');return b.getAttribute("aria-disabled")!=="true" && f.textContent.includes('有未保存的修改')})()`,
     );
     await h.input('[aria-label="模型"]', '');
+    h.window.setContentSize(1240, 760);
+    await settingsCopyChecks(h);
   } finally {
     h.window.setContentSize(...size);
   }

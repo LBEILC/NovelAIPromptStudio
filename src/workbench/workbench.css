@@ -23,11 +23,11 @@
 .wb-view-fields { display:flex; flex-direction:column; gap:var(--sp-3); }
 .wb-view-fields label { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); }
 .wb-filters { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-2) var(--sp-4); border-bottom:var(--bw) solid var(--divider); color:var(--text-2); font-size:var(--fs-small); }
-.wb-document-scroll { flex:1 1 0; min-height:0; overflow:auto; padding:var(--sp-4); }
-.wb-section-head { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-3) 0; white-space:nowrap; }
+.wb-document-scroll { flex:1 1 0; min-height:0; overflow:auto; padding:var(--sp-1) var(--sp-4) var(--sp-5); }
+.wb-section-head { display:flex; align-items:center; gap:var(--sp-2); padding:calc(var(--sp-3) + var(--sp-0)) 0 var(--sp-0); white-space:nowrap; }
 .wb-section-actions { display:flex; margin-left:auto; }
 .wb-section-actions .nps-menu-trigger > button,.wb-block header .nps-menu-trigger > button { border-color:transparent; background:transparent; color:var(--text-3); }
-.wb-block { position:relative; padding:var(--sp-3) 0; border-bottom:var(--bw) solid var(--divider); }
+.wb-block { position:relative; padding:calc(var(--sp-2) + var(--sp-0)) 0 var(--sp-3); border-bottom:var(--bw) solid var(--divider); }
 .wb-block > header { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); color:var(--text-3); font-size:var(--fs-caption); }
 .wb-tags { display:flex; flex-wrap:wrap; align-items:flex-start; gap:var(--ctl-gap); padding-top:var(--sp-2); }
 .wb-prose { font:var(--fs-prose)/var(--lh-prose) var(--font-prose); white-space:pre-wrap; }
@@ -67,7 +67,7 @@
 .wb-body > .nps-resizable { flex-shrink:0; height:100%; min-height:0; }
 .wb-body > .nps-resizable > .nps-panel-content { height:100%; overflow:hidden; }
 
-.wb-section-head > .nps-button:first-child,.wb-section-head > strong { font-size:var(--fs-title); font-weight:var(--fw-strong); padding-left:0; }
+.wb-section-head > .nps-button:first-child,.wb-section-head > strong { font-size:var(--fs-title); line-height:var(--lh-title); font-weight:var(--fw-strong); padding-left:0; }
 .wb-add-tags .wb-add-trigger.nps-button { border:var(--bw) dashed var(--border); color:var(--text-3); }
 .wb-add-tags { min-width:0; }
 .wb-add-tags:has(.nps-autocomplete) { min-width:var(--tag-input-min); }

@@ -154,6 +154,7 @@ export function useDictionary() {
       if (['untranslated', 'unsorted'].includes(filters.view))
         setHeld((current) => [...new Set([...current, ...selected])]);
       await refresh();
+      return result;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

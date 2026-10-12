@@ -125,7 +125,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       'Environment',
   );
   await h.screenshot('dictionary-inline');
-  await select('排序', '最近修改');
+  await select('排序', '按最近修改');
   await check(
     '最近修改排序将刚改分类的条目放在首位',
     `document.querySelector('tr[data-tag]').dataset.tag==='acceptance_005'`,
@@ -142,6 +142,17 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     '未配置 AI 不可重新翻译',
     `(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent==='用 AI 重新翻译');return b.disabled||b.getAttribute('aria-disabled')==='true'})()`,
   );
+  await e(
+    `[...document.querySelectorAll('.settings-dictionary-selection button')].find(b=>b.textContent==='用 AI 重新翻译').focus()`,
+  );
+  await wait('!!document.querySelector("[role=tooltip]")');
+  await check(
+    '未配置 AI 的悬停说明采用定稿',
+    `document.querySelector('[role=tooltip]').textContent==="先在'AI 服务'里配置"`,
+    undefined,
+    'once',
+  );
+  await e(`document.querySelector(${JSON.stringify(search)}).focus()`);
   await h.screenshot('dictionary-selection');
   await click('设置分类', 'document.querySelector(".settings-dictionary-selection")');
   await click('环境背景', 'document.querySelector(".nps-layer")');
@@ -161,6 +172,13 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   );
   await h.screenshot('dictionary-more');
   await click('还原', 'document.querySelector(".nps-layer")');
+  await check(
+    '还原确认逐字说明删除修改和重新获取译文',
+    `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='还原"acceptance_004"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['会删掉你对这个 Tag 的修改。它再次出现时，软件会重新查内置词典；内置词典里没有的，要再做一次"翻译与分类"才有译文。', '不会改动图片里的 Prompt。']))}})()`,
+    undefined,
+    'once',
+  );
+  await h.screenshot('dictionary-revert-confirm');
   await click('取消', 'document.querySelector("dialog")');
   await check(
     '取消还原保留数据',
@@ -244,7 +262,48 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   try {
     original();
     await configure('dictionary-success');
+    for (let i = 0; i < 5; i++) await click(`dictionary_fixture_${String(i).padStart(3, '0')}`);
     await click('用 AI 重新翻译');
+    await check(
+      '选中 50 条时直接翻译，不弹确认框',
+      '!document.querySelector("dialog[open]")',
+      undefined,
+      'once',
+    );
+    await wait('document.querySelector(".nps-toast")?.textContent==="已翻译 50 条"');
+    await check(
+      '50 条直接翻译成功，未选中的五条保持原样',
+      () =>
+        aiTags.every(
+          (tag, i) =>
+            database.lookupTagDictionary([tag]).get(tag).translation ===
+            (i < 5 ? '重译前' : '合成重译结果'),
+        ),
+      undefined,
+      'once',
+    );
+    original();
+    await configure('dictionary-success');
+    await click('用 AI 重新翻译');
+    await check(
+      '超过 50 条的确认框逐字说明数量、批次、替换与取消',
+      `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='用 AI 重新翻译 55 条？' && dialog.querySelector('.nps-dialog-body p').textContent==='会把这些 Tag 的名字发给你配置的 AI 服务，分 2 批完成，可以随时取消。现有的译文和分类会被新的结果替换。' && [...dialog.querySelectorAll('.nps-actions button')].map(b=>b.textContent).join('|')==='取消|开始翻译'})()`,
+      undefined,
+      'once',
+    );
+    await h.screenshot('dictionary-retranslate-confirm');
+    await click('取消', 'document.querySelector("dialog[open]")');
+    await check(
+      '取消重译确认不修改任何词典条目',
+      () =>
+        aiTags.every(
+          (tag) => database.lookupTagDictionary([tag]).get(tag).translation === '重译前',
+        ),
+      undefined,
+      'once',
+    );
+    await click('用 AI 重新翻译');
+    await click('开始翻译', 'document.querySelector("dialog[open]")');
     await h.until(
       () =>
         [...database.lookupTagDictionary(aiTags).values()].every(
@@ -261,8 +320,12 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       undefined,
       'once',
     );
-    await wait(
-      'document.querySelector(".settings-dictionary-progress")?.textContent.includes("55 / 55")',
+    await wait('document.querySelector(".nps-toast")?.textContent === "已翻译 55 条"');
+    await check(
+      '全部成功显示定稿通知',
+      'document.querySelector(".nps-toast").textContent === "已翻译 55 条"',
+      undefined,
+      'once',
     );
     await click('更多：dictionary_fixture_000');
     await click('复制 Tag', 'document.querySelector(".nps-layer")');
@@ -274,8 +337,15 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       'once',
     );
     await click('更多：dictionary_fixture_000');
-    await click('删除，下次重新翻译', 'document.querySelector(".nps-layer")');
-    await click('删除 1 条', 'document.querySelector("dialog")');
+    await click('删除这一条', 'document.querySelector(".nps-layer")');
+    await check(
+      '单条删除确认使用定稿标题、正文与按钮',
+      `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='删除"dictionary_fixture_000"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['这些 Tag 再次出现时，软件会重新查内置词典；内置词典里没有的，要再做一次"翻译与分类"才有译文。', '不会改动图片里的 Prompt。']))} && [...dialog.querySelectorAll('.nps-actions button')].map(b=>b.textContent).join('|')==='取消|删除'})()`,
+      undefined,
+      'once',
+    );
+    await h.screenshot('dictionary-delete-confirm');
+    await click('删除', 'document.querySelector("dialog")');
     await wait(`${count}===54`);
     await check(
       '非手动条目删除当前记录',
@@ -294,8 +364,20 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     original();
     await configure('dictionary-partial');
     await click('用 AI 重新翻译');
+    await click('开始翻译', 'document.querySelector("dialog[open]")');
     await wait(
-      'document.querySelector(".settings-dictionary-progress")?.textContent.includes("55 / 55") && document.querySelector(".settings-dictionary-progress")?.textContent.includes("50 条失败")',
+      'document.querySelector(".settings-dictionary-progress-line > span")?.textContent === "正在用 AI 翻译 · 已完成 50 / 55 · 50 条没有成功"',
+    );
+    await check(
+      '进行中的失败数量采用定稿且取消按钮靠右',
+      `(()=>{const row=document.querySelector('.settings-dictionary-progress-line'),button=row.querySelector('button');return row.firstElementChild.textContent==='正在用 AI 翻译 · 已完成 50 / 55 · 50 条没有成功' && button.textContent==='取消' && Math.abs(button.getBoundingClientRect().right-row.getBoundingClientRect().right)<1})()`,
+      undefined,
+      'both',
+    );
+    await h.screenshot('dictionary-retranslate-progress');
+    await fetch(mode.baseUrl.replace('/v1', '/control/dictionary-continue'));
+    await wait(
+      'document.querySelector(".settings-dictionary-progress-line > span")?.textContent === "已翻译 5 条，50 条没有成功，保持原样"',
     );
     await check(
       'AI 部分失败保留前 50 条并提交最后 5 条',
@@ -308,16 +390,45 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       undefined,
       'once',
     );
+    await click('查看原因', 'document.querySelector(".settings-dictionary-progress")');
+    await check(
+      '查看原因展开全部失败条目和各自原因',
+      `(()=>{const failures=[...document.querySelectorAll('.settings-dictionary-failures p')];return failures.length===50 && failures.every((row,i)=>row.textContent.includes('dictionary_fixture_'+String(i).padStart(3,'0')) && row.textContent.includes('synthetic batch failure'))})()`,
+      undefined,
+      'once',
+    );
+    await h.screenshot('dictionary-retranslate-failures');
     original();
     await configure('dictionary-cancel');
     await click('用 AI 重新翻译');
+    await click('开始翻译', 'document.querySelector("dialog[open]")');
     await wait(
       'document.querySelector(".settings-dictionary-progress")?.textContent.includes("0 / 55")',
     );
-    await click('取消', 'document.querySelector(".settings-dictionary-selection")');
+    await check(
+      '进行中无失败时不附加失败计数',
+      'document.querySelector(".settings-dictionary-progress-line > span").textContent === "正在用 AI 翻译 · 已完成 0 / 55"',
+      undefined,
+      'once',
+    );
+    await click('取消', 'document.querySelector(".settings-dictionary-progress")');
     await wait(
       'document.querySelector(".settings-dictionary-progress")?.textContent.includes("已取消")',
     );
+    await check(
+      '取消结果使用定稿并保留未完成条目',
+      'document.querySelector(".settings-dictionary-progress-line > span").textContent === "已取消。完成了 0 条，其余没有改动"',
+      undefined,
+      'once',
+    );
+    await click('删除', 'document.querySelector(".settings-dictionary-selection")');
+    await check(
+      '批量删除确认显示实际条数',
+      'document.querySelector("dialog[open] h3").textContent === "删除这 55 条？"',
+      undefined,
+      'once',
+    );
+    await click('取消', 'document.querySelector("dialog[open]")');
     await check(
       '取消 AI 请求保留未完成批次原值',
       () =>

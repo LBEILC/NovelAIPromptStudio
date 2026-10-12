@@ -230,7 +230,7 @@ export async function libraryFinishChecks({
   await wait('!!document.querySelector("dialog[open]")', '清空回收站已读完占用空间并打开确认');
   await check(
     '清空确认说明包含实际释放空间且不再有占位文字',
-    `(()=>{const text=document.querySelector('dialog[open]').textContent;return /会释放 [\\d.]+ (KB|MB)。/.test(text)&&!text.includes('文案待定')})()`,
+    `(()=>{const text=document.querySelector('dialog[open]').textContent;return /会释放 [\\d.]+ (KB|MB)。/.test(text)&&!text.includes('【')})()`,
     undefined,
     'once',
   );
