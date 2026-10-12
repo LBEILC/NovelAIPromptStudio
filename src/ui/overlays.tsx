@@ -13,7 +13,12 @@ import { flushSync } from 'react-dom';
 import { cx, focusables, placeLayer, trapTab } from './internal';
 import { useScrollArea } from './useScrollArea';
 
-const activeLayers: { node: HTMLElement; trigger: HTMLElement | null; close: () => void }[] = [];
+const activeLayers: {
+  node: HTMLElement;
+  trigger: HTMLElement | null;
+  close: () => void;
+  escapeFromAnchor: boolean;
+}[] = [];
 
 /** An inert exit can outlive its owner (for example, a menu that deletes its row). */
 function retainLayerExit(source: HTMLElement, opacity: string, transform = 'none') {
@@ -80,6 +85,7 @@ export function Layer({
   labelledBy,
   onKeyDown,
   mode = 'auto',
+  escapeFromAnchor = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -94,6 +100,7 @@ export function Layer({
   labelledBy?: string;
   onKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
   mode?: 'auto' | 'manual';
+  escapeFromAnchor?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
@@ -155,7 +162,12 @@ export function Layer({
   useEffect(() => {
     const node = ref.current;
     if (!open || !node || mode === 'manual') return;
-    const entry = { node, trigger: anchor.current, close: () => closeRef.current() };
+    const entry = {
+      node,
+      trigger: anchor.current,
+      close: () => closeRef.current(),
+      escapeFromAnchor,
+    };
     for (const layer of activeLayers) if (!layer.node.contains(entry.trigger)) layer.close();
     activeLayers.push(entry);
     const outside = (event: PointerEvent) => {
@@ -180,7 +192,11 @@ export function Layer({
     const escape = (event: KeyboardEvent) => {
       const focusedLayer = [...activeLayers]
         .reverse()
-        .find((layer) => layer.node.contains(event.target as Node));
+        .find(
+          (layer) =>
+            layer.node.contains(event.target as Node) ||
+            (layer.escapeFromAnchor && layer.trigger?.contains(event.target as Node)),
+        );
       if (event.key !== 'Escape' || (focusedLayer ?? activeLayers.at(-1)) !== entry) return;
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -196,7 +212,7 @@ export function Layer({
       document.removeEventListener('pointerdown', outside, true);
       document.removeEventListener('keydown', escape, true);
     };
-  }, [open, anchor, anchor.current, mode]);
+  }, [open, anchor, anchor.current, mode, escapeFromAnchor]);
   useLayoutEffect(() => {
     const node = ref.current;
     const rect = point

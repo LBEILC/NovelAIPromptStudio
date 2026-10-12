@@ -259,7 +259,7 @@ export async function componentChecks({ h, mode }) {
     await click('长列表验收');
     await wait('!!document.querySelector(".nps-layer[role=listbox]:popover-open")');
     await wait(
-      `[...document.querySelectorAll('.nps-layer[role=listbox]')].every(n=>n.getAnimations().every(a=>a.playState!=='running'))`,
+      `[...document.querySelectorAll('.nps-layer[role=listbox]')].every(n=>!n.hasAttribute('data-entering')&&n.getAnimations().every(a=>a.playState!=='running'))`,
     );
     await check(
       '长下拉列表不遮挡触发器',

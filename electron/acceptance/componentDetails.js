@@ -317,8 +317,10 @@ export async function componentDetails(h) {
     undefined,
     'once',
   );
+  // Focusing an offscreen control also scrolls the document, which intentionally
+  // dismisses tooltips. Finish that scroll before measuring keyboard focus.
   await e(
-    `[...document.querySelectorAll('button[data-tip]')].find(button=>button.textContent.trim()==='复制提示词').focus()`,
+    `(async()=>{const button=[...document.querySelectorAll('button[data-tip]')].find(button=>button.textContent.trim()==='复制提示词');button.scrollIntoView({block:'nearest',behavior:'instant'});await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));button.focus({preventScroll:true})})()`,
   );
   await wait(
     'document.querySelector(".nps-layer[role=tooltip]")?.textContent.includes("复制当前筛选")',

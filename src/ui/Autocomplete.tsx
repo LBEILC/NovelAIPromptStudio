@@ -17,6 +17,7 @@ export function SuggestionList({
   onActiveChange,
   id,
   directAdd,
+  emptyMessage,
 }: {
   items: Suggestion[];
   active: number;
@@ -24,9 +25,15 @@ export function SuggestionList({
   onActiveChange?: (index: number) => void;
   id: string;
   directAdd?: { label: string; onSelect: () => void };
+  emptyMessage?: string;
 }) {
   return (
     <div role="listbox" id={id} className="nps-suggestions">
+      {!items.length && !directAdd && emptyMessage && (
+        <div role="status" className="nps-menu-item nps-help">
+          {emptyMessage}
+        </div>
+      )}
       {items.map((item, index) => (
         <div
           role="option"
@@ -75,6 +82,9 @@ export function Autocomplete({
   autoFocus,
   onDismiss,
   directAdd,
+  emptyMessage,
+  selectOnTab = false,
+  onEmptyBackspace,
 }: {
   items: Suggestion[];
   value: string;
@@ -85,6 +95,9 @@ export function Autocomplete({
   autoFocus?: boolean;
   onDismiss?: () => void;
   directAdd?: { label: string; onSelect: () => void };
+  emptyMessage?: string;
+  selectOnTab?: boolean;
+  onEmptyBackspace?: () => void;
 }) {
   const anchor = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
@@ -113,7 +126,7 @@ export function Autocomplete({
         aria-label={label}
         placeholder={placeholder}
         aria-autocomplete="list"
-        aria-expanded={open && count > 0}
+        aria-expanded={open && (count > 0 || !!emptyMessage)}
         aria-controls={open ? id : undefined}
         aria-activedescendant={open && current >= 0 ? `${id}-${current}` : undefined}
         value={value}
@@ -133,10 +146,18 @@ export function Autocomplete({
             setOpen(true);
             if (count) setActive((current + (event.key === 'ArrowDown' ? 1 : -1) + count) % count);
           }
-          if (event.key === 'Enter' && open && current >= 0) {
+          if (
+            (event.key === 'Enter' || (selectOnTab && event.key === 'Tab' && !event.shiftKey)) &&
+            open &&
+            current >= 0
+          ) {
             event.preventDefault();
             if (current === items.length) add?.onSelect();
             else select(items[current]);
+          }
+          if (event.key === 'Backspace' && !value && onEmptyBackspace) {
+            event.preventDefault();
+            onEmptyBackspace();
           }
           if (event.key === 'Escape') {
             event.preventDefault();
@@ -147,10 +168,11 @@ export function Autocomplete({
         }}
       />
       <Layer
-        open={open && count > 0}
+        open={open && (count > 0 || !!emptyMessage)}
         onClose={() => setOpen(false)}
         anchor={anchor}
         className="nps-menu"
+        escapeFromAnchor
       >
         <SuggestionList
           items={items}
@@ -159,6 +181,7 @@ export function Autocomplete({
           onSelect={select}
           onActiveChange={setActive}
           directAdd={add}
+          emptyMessage={emptyMessage}
         />
       </Layer>
     </span>

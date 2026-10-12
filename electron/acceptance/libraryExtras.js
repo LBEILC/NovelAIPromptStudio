@@ -1,4 +1,5 @@
 /** Additional library behaviors run with both motion settings and both themes. */
+import { filterGalleryProjects, galleryFilterOptions } from '../../src/lib/galleryFilters.js';
 export async function extraLibraryChecks({
   h,
   database,
@@ -20,21 +21,32 @@ export async function extraLibraryChecks({
   const mod = process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true };
   await all();
   await click('筛选', scope);
-  for (const tag of ['1girl', 'not_a_real_tag_012']) {
+  const projects = database.loadLibrary('all');
+  const options = galleryFilterOptions(projects).tags;
+  const common = options.find((option) => option.value === '1girl');
+  const other = options.find(
+    (option) =>
+      option.value !== common.value &&
+      option.count < common.count &&
+      filterGalleryProjects(projects, { includeTags: [common.value, option.value] }).length > 0,
+  );
+  if (!other) throw Error('包含方式验收需要两个不同覆盖范围的真实 Tag');
+  const includeTags = [common.value, other.value];
+  for (const tag of includeTags) {
     await input('input[aria-label="包含 Tag"]', tag);
     await key('Enter');
     await settled();
   }
   await check(
     '全部都有要求同时命中全部包含 Tag',
-    '!!document.querySelector(".library-empty")',
+    `document.querySelector('.library-count')?.textContent.trim().endsWith('${filterGalleryProjects(projects, { includeTags, tagMatch: 'all' }).length} 张')===true`,
     undefined,
     'once',
   );
   await click('有任意一个');
   await check(
     '有任意一个接受任一包含 Tag',
-    'document.querySelectorAll(".library-card").length>0',
+    `document.querySelector('.library-count')?.textContent.trim().endsWith('${filterGalleryProjects(projects, { includeTags, tagMatch: 'any' }).length} 张')===true`,
     undefined,
     'once',
   );

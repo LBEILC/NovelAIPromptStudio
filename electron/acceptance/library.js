@@ -1,6 +1,7 @@
 import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryGroupingChecks } from './libraryGrouping.js';
 import { libraryViewerChecks } from './libraryViewer.js';
+import { libraryTagFilterChecks } from './libraryTagFilter.js';
 import { scrollChecks } from './scroll.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import {
@@ -78,6 +79,7 @@ export async function libraryChecks(env) {
   if (mode.category === '图片库') await libraryNamingChecks(env);
   if (!['图片库·导入', '图片库·收尾'].includes(mode.category)) await libraryGroupingChecks(env);
   if (!['图片库·导入', '图片库·收尾'].includes(mode.category)) await libraryViewerChecks(env);
+  if (!['图片库·导入', '图片库·收尾'].includes(mode.category)) await libraryTagFilterChecks(env);
   if (mode.category === '图片库·收尾') {
     await libraryFinishChecks({ h, database, refresh, click, input, selectCard, waitDetail });
     return;
@@ -408,7 +410,7 @@ export async function libraryChecks(env) {
     await checkCollectionContext(h, smart.id);
     if (!reduced) await screen('smart');
     await click('编辑规则', scope);
-    await input('input[aria-label="排除 Tag"]', '1boy');
+    await input('input[aria-label="排除 Tag"]', 'solo');
     await key('Enter');
     await click('保存规则');
     await wait('!document.querySelector(".nps-popover:popover-open")');
@@ -418,7 +420,7 @@ export async function libraryChecks(env) {
         database
           .listCollections()
           .find((c) => c.id === smart.id)
-          .filters.excludeTags.includes('1boy'),
+          .filters.excludeTags.includes('solo'),
       undefined,
       'once',
     );

@@ -9,6 +9,7 @@ import {
   Slider,
   Switch,
   Dialog,
+  Autocomplete,
 } from '../ui';
 import {
   DEFAULT_GALLERY_FILTERS,
@@ -19,6 +20,7 @@ import {
 import type { GalleryFilters } from '../shared/types';
 import type { LibraryProps } from './types';
 import { groupModelOptions } from './presentation';
+import { libraryTagSuggestions, type LibraryTagOption } from './tagSuggestions';
 
 export function FilterChips({
   filters,
@@ -99,56 +101,41 @@ function TagFilter({
 }: {
   label: string;
   values: string[];
-  options: { label: string; value: string }[];
+  options: LibraryTagOption[];
   onChange: (values: string[]) => void;
 }) {
   const [text, setText] = useState('');
   const add = (value: string) => {
-    if (value.trim() && !values.includes(value.trim())) onChange([...values, value.trim()]);
+    if (options.some((option) => option.value === value) && !values.includes(value))
+      onChange([...values, value]);
     setText('');
   };
   return (
-    <div className="library-filter-row">
+    <div className="library-filter-row library-filter-tag-row">
       <span>{label}</span>
       <div className="library-filter-tags">
         {values.map((value) => (
           <button
             key={value}
             className="library-chip"
+            aria-label={`移除${label} ${value}`}
             onClick={() => onChange(values.filter((item) => item !== value))}
           >
             {value}
             <i className="ri-close-line" />
           </button>
         ))}
-        <Input
-          aria-label={`${label} Tag`}
+        <Autocomplete
+          label={`${label} Tag`}
           placeholder="搜索 Tag 或译文"
           value={text}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              add(text);
-            }
-          }}
+          onChange={setText}
+          items={libraryTagSuggestions(options, text, values)}
+          onSelect={(item) => add(item.text)}
+          selectOnTab
+          onEmptyBackspace={() => onChange(values.slice(0, -1))}
+          emptyMessage={text.trim() ? '图片库里没有带这个 Tag 的图片' : undefined}
         />
-        {text && (
-          <div className="library-suggestions">
-            {options
-              .filter(
-                (item) =>
-                  item.label.toLowerCase().includes(text.toLowerCase()) &&
-                  !values.includes(item.value),
-              )
-              .slice(0, 8)
-              .map((item) => (
-                <button key={item.value} onClick={() => add(item.value)}>
-                  {item.label}
-                </button>
-              ))}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -171,6 +158,10 @@ export function LibraryToolbar({
   const viewAnchor = useRef<HTMLButtonElement>(null);
   const importAnchor = useRef<HTMLButtonElement>(null);
   const options = useMemo(() => galleryFilterOptions(p.filterProjects), [p.filterProjects]);
+  const tagOptions = useMemo(
+    () => galleryFilterOptions(p.filterCacheSource).tags,
+    [p.filterCacheSource],
+  );
   const filters = p.filters;
   const groupedModels = groupModelOptions(options.models);
   const rules = { ...DEFAULT_GALLERY_FILTERS, ...p.activeCollection?.filters };
@@ -330,22 +321,24 @@ export function LibraryToolbar({
           <TagFilter
             label="包含"
             values={filters.includeTags}
-            options={options.tags}
+            options={tagOptions}
             onChange={(includeTags) => p.onFiltersChange({ includeTags })}
           />
-          <OptionGroup
-            label="包含方式"
-            options={[
-              { value: 'all', label: '全部都有' },
-              { value: 'any', label: '有任意一个' },
-            ]}
-            value={filters.tagMatch}
-            onChange={(tagMatch) => p.onFiltersChange({ tagMatch: tagMatch as 'all' | 'any' })}
-          />
+          {filters.includeTags.length >= 2 && (
+            <OptionGroup
+              label="包含方式"
+              options={[
+                { value: 'all', label: '全部都有' },
+                { value: 'any', label: '有任意一个' },
+              ]}
+              value={filters.tagMatch}
+              onChange={(tagMatch) => p.onFiltersChange({ tagMatch: tagMatch as 'all' | 'any' })}
+            />
+          )}
           <TagFilter
             label="排除"
             values={filters.excludeTags}
-            options={options.tags}
+            options={tagOptions}
             onChange={(excludeTags) => p.onFiltersChange({ excludeTags })}
           />
           {(['models', 'vibes'] as const).map((key) => (
