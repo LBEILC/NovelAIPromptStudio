@@ -363,12 +363,14 @@ export function TooltipRoot() {
       if (immediate || warm) reveal();
       else timer = setTimeout(reveal, 500);
     };
-    const over = (event: PointerEvent) => show(find(event.target));
+    const over = (event: PointerEvent) => {
+      if (!pointer) show(find(event.target));
+    };
     const out = (event: PointerEvent) => {
       const next = find(event.relatedTarget);
       if (next !== target) {
         hide();
-        if (next) show(next);
+        if (next && !pointer) show(next);
       }
     };
     const down = () => {
@@ -423,10 +425,18 @@ export function TooltipRoot() {
       onClose={() => setText('')}
       role="tooltip"
       id={id}
-      className="nps-tip"
+      className={anchor.current?.dataset.tipImage ? 'nps-tip wb-tab-preview' : 'nps-tip'}
       mode="manual"
     >
-      {lastText.current}
+      {anchor.current?.dataset.tipImage ? (
+        <>
+          <img src={anchor.current.dataset.tipImage} alt="" />
+          <span>{lastText.current}</span>
+          <span className="nps-help">{anchor.current.dataset.tipDate}</span>
+        </>
+      ) : (
+        lastText.current
+      )}
     </Layer>
   );
 }

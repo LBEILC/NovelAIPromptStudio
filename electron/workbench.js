@@ -44,6 +44,8 @@ export function applyWorkbenchLibraryDetails(project, libraryProject) {
   return {
     ...applyWorkbenchStructure(project, libraryProject.prompt_structure),
     name: String(libraryProject.name || '').trim() || project.name,
+    created_at: libraryProject.created_at || project.created_at,
+    has_custom_name: libraryProject.has_custom_name,
     thumbnail_path: String(libraryProject.thumbnail_path || '').trim(),
   };
 }

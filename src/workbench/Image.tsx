@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { WorkbenchTab } from '../state/workbench';
 import type { ImageProject, Vibe } from '../shared/types';
 import { Button, Banner } from '../ui';
@@ -22,6 +22,7 @@ export function WorkbenchImage({ tab, ...p }: ImageProps) {
   const [missing, setMissing] = useState(!!tab.error);
   const [preview, setPreview] = useState(false);
   const image = tab.project;
+  useEffect(() => setMissing(!!tab.error), [image?.image_path, tab.error]);
   const metadata = image?.metadata;
   return (
     <section className="wb-stage" aria-label="当前图片">

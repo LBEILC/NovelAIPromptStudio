@@ -51,6 +51,12 @@ export interface DocumentProps {
   onTranslateTags: (entries: { scopeKey: string; tag: ImageProject['tags'][number] }[]) => void;
   onNotify: (text: string, tone?: string) => void;
   renderTag?: (entry: DocumentTag, content: ReactNode) => ReactNode;
+  renderTagList?: (
+    entries: DocumentTag[],
+    content: ReactNode[],
+    section: number,
+    block: number,
+  ) => ReactNode;
   renderParagraph?: (section: number, block: number, content: ReactNode) => ReactNode;
   renderAdd?: (section: number, block: number) => ReactNode;
   onRawEdit?: (section: number, initial?: string) => void;
@@ -472,7 +478,9 @@ export function WorkbenchDocument(p: DocumentProps) {
                 </header>
                 {block.type === 'tags' ? (
                   <div className="wb-tags">
-                    {tags.map(drawTag)}
+                    {p.renderTagList
+                      ? p.renderTagList(tags, tags.map(drawTag), si, bi)
+                      : tags.map(drawTag)}
                     {p.renderAdd?.(si, bi)}
                   </div>
                 ) : p.renderParagraph ? (
@@ -577,13 +585,22 @@ export function WorkbenchDocument(p: DocumentProps) {
                             tags.some(matches) && (
                               <div key={cat} className="wb-block">
                                 <header>{categoryLabel(cat)}</header>
-                                <div className="wb-tags">{tags.map(drawTag)}</div>
+                                <div className="wb-tags">
+                                  {p.renderTagList
+                                    ? p.renderTagList(tags, tags.map(drawTag), si, -1)
+                                    : tags.map(drawTag)}
+                                </div>
                               </div>
                             )
                           );
                         })}
                       {section.blocks.map((_, bi) => renderBlock(bi))}
-                      {!section.blocks.length && p.renderAdd?.(si, -1)}
+                      {!section.blocks.length && (
+                        <div className="wb-tags">
+                          {p.renderTagList?.([], [], si, -1)}
+                          {p.renderAdd?.(si, -1)}
+                        </div>
+                      )}
                       {!!hiddenBlocks && (
                         <p className="nps-help">
                           另外 {hiddenBlocks} 块里没有符合的内容，已经收起。

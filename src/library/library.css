@@ -150,3 +150,9 @@
 .library-rename-current { display:flex; align-items:center; gap:var(--sp-2); margin-top:var(--sp-4); }
 
 .library-pick svg { width:100%; height:100%; }
+.library-pick { z-index:2; border-color:var(--surface); background:color-mix(in srgb, var(--surface) 12%, transparent); box-shadow:0 0 var(--bw) var(--ink); }
+.library-row > .nps-menu-trigger { display:contents; }
+.library-scrub { position:absolute; bottom:var(--sp-2); left:var(--sp-2); right:var(--sp-2); display:flex; gap:var(--bw); pointer-events:none; }
+.library-scrub > span { flex:1; height:var(--progress-h); background:var(--surface); opacity:var(--dim); box-shadow:0 0 var(--bw) var(--text); }
+.library-scrub > [data-current=true] { opacity:1; }
+.library-menu-heading { padding:var(--sp-2) var(--ctl-pad-x); }

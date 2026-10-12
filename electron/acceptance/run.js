@@ -1,5 +1,6 @@
 import { workbenchChecks } from './workbench.js';
 import { libraryPolishChecks, workbenchPolishChecks } from './polish.js';
+import { libraryInteractionChecks, workbenchInteractionChecks } from './interactions.js';
 import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import { libraryChecks } from './library.js';
@@ -374,6 +375,8 @@ export async function runAcceptance(context) {
       } else if (mode.category === '外壳') await shellChecks();
       else if (mode.category === '工作台') await workbenchChecks(environment);
       else if (mode.category === '工作台·细节') await workbenchPolishChecks(environment);
+      else if (mode.category === '工作台·交互') await workbenchInteractionChecks(environment);
+      else if (mode.category === '图片库·交互') await libraryInteractionChecks(environment);
       else if (mode.category === '图片库·细节') await libraryPolishChecks(environment);
       else if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
       else if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
@@ -416,6 +419,8 @@ export async function runAcceptance(context) {
         await settingsChecks(environment, false);
         await libraryPolishChecks(environment);
         await workbenchPolishChecks(environment);
+        await libraryInteractionChecks(environment);
+        await workbenchInteractionChecks(environment);
         await uiPolishChecks(environment);
         await componentChecks(environment);
         await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());

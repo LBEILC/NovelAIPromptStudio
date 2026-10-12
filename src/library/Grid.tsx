@@ -6,6 +6,7 @@ import { adjacentRowIndex, fallbackRatio, layoutLibraryRows } from './layout';
 import { mediaUrl } from '../lib/imageStage.js';
 import type { LibraryProps } from './types';
 import { useScrollArea } from '../ui';
+import { CardMenu } from './CardMenu';
 
 export function LibraryGrid({
   p,
@@ -30,6 +31,21 @@ export function LibraryGrid({
     min: 0.5,
     max: 2.5,
   });
+  const [scrub, setScrub] = useState<{ group: string; index: number } | null>(null);
+  const wanted = useRef('');
+  const thumbnails = useRef(new Map<string, Promise<void>>());
+  const preload = (path: string) => {
+    const url = mediaUrl(path);
+    let ready = thumbnails.current.get(url);
+    if (!ready) {
+      const image = new Image();
+      image.src = url;
+      ready = image.decode();
+      thumbnails.current.set(url, ready);
+      void ready.catch(() => thumbnails.current.delete(url));
+    }
+    return ready;
+  };
   const anchor = useRef('');
   const wheel = useRef(0);
   useLayoutEffect(() => {
@@ -150,7 +166,7 @@ export function LibraryGrid({
       p.onClearSelection();
       anchor.current = group.id;
     }
-    p.onPreview(group);
+    p.onPreview(group, scrub?.group === group.id ? group.members[scrub.index] : undefined);
   };
   const updateMarquee = () => {
     const initial = drag.current;
@@ -310,37 +326,85 @@ export function LibraryGrid({
               const index = row.start + offset;
               const group = p.groups[index];
               const selected = p.selectedGroupIds.includes(group.id);
+              const shown = scrub?.group === group.id ? group.members[scrub.index] : group.cover;
               return (
-                <div
-                  role="option"
-                  aria-selected={selected || group.id === p.previewGroup?.id}
-                  aria-label={imageAccessibleName(group.cover)}
-                  tabIndex={
-                    group.id === p.previewGroup?.id || (selectedIndex < 0 && index === 0) ? 0 : -1
-                  }
-                  data-library-index={index}
-                  data-group-id={group.id}
-                  data-project-id={group.cover.id}
-                  className={`library-card ${group.id === p.previewGroup?.id ? 'current' : ''} ${selected ? 'picked' : ''}`}
-                  style={{ width, height: row.height }}
-                  key={group.id}
-                  onClick={(event) => select(index, event)}
-                  onDoubleClick={() => p.onOpenWorkbench(group.cover)}
-                >
-                  <img
-                    src={mediaUrl(group.cover.thumbnail_path || group.cover.image_path)}
-                    alt=""
-                    draggable={false}
-                  />
-                  {group.members.length > 1 && (
-                    <span className="library-stack">{group.members.length} 张</span>
-                  )}
-                  {p.selectedGroupIds.length > 0 && (
-                    <span className="library-pick">
-                      {selected && <Check size={16} strokeWidth={1.5} aria-hidden="true" />}
-                    </span>
-                  )}
-                </div>
+                <CardMenu key={group.id} p={p} group={group} image={shown} onViewer={onViewer}>
+                  <div
+                    role="option"
+                    aria-selected={selected || group.id === p.previewGroup?.id}
+                    aria-label={imageAccessibleName(group.cover)}
+                    tabIndex={
+                      group.id === p.previewGroup?.id || (selectedIndex < 0 && index === 0) ? 0 : -1
+                    }
+                    data-library-index={index}
+                    data-group-id={group.id}
+                    data-project-id={group.cover.id}
+                    className={`library-card ${group.id === p.previewGroup?.id ? 'current' : ''} ${selected ? 'picked' : ''}`}
+                    style={{ width, height: row.height }}
+                    key={group.id}
+                    onClick={(event) => select(index, event)}
+                    onDoubleClick={() => p.onOpenWorkbench(shown)}
+                    onPointerEnter={() => {
+                      if (group.members.length > 1)
+                        for (const member of group.members) {
+                          void preload(member.thumbnail_path || member.image_path).catch(() => {});
+                        }
+                    }}
+                    onPointerMove={(event) => {
+                      if (group.members.length < 2 || event.buttons) return;
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      const index = Math.max(
+                        0,
+                        Math.min(
+                          group.members.length - 1,
+                          Math.floor(
+                            ((event.clientX - rect.left) / rect.width) * group.members.length,
+                          ),
+                        ),
+                      );
+                      const member = group.members[index];
+                      wanted.current = `${group.id}:${member.id}`;
+                      void preload(member.thumbnail_path || member.image_path)
+                        .then(() => {
+                          if (wanted.current === `${group.id}:${member.id}`)
+                            setScrub({ group: group.id, index });
+                        })
+                        .catch(() => {});
+                    }}
+                    onPointerLeave={() => {
+                      wanted.current = '';
+                      setScrub(null);
+                    }}
+                  >
+                    <img
+                      src={mediaUrl(shown.thumbnail_path || shown.image_path)}
+                      data-scrub-image={shown.id}
+                      alt=""
+                      draggable={false}
+                    />
+                    {group.members.length > 1 && (
+                      <>
+                        <span className="library-stack">
+                          {scrub?.group === group.id
+                            ? `${scrub.index + 1} / 共 ${group.members.length}`
+                            : `${group.members.length} 张`}
+                        </span>
+                        {scrub?.group === group.id && (
+                          <span className="library-scrub">
+                            {group.members.map((member, i) => (
+                              <span key={member.id} data-current={i === scrub.index} />
+                            ))}
+                          </span>
+                        )}
+                      </>
+                    )}
+                    {p.selectedGroupIds.length > 0 && (
+                      <span className="library-pick" data-theme={selected ? undefined : 'light'}>
+                        {selected && <Check size={16} strokeWidth={1.5} aria-hidden="true" />}
+                      </span>
+                    )}
+                  </div>
+                </CardMenu>
               );
             })}
           </div>

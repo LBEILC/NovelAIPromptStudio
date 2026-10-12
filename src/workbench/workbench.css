@@ -48,7 +48,19 @@
 .wb-editor-actions { display:flex; justify-content:flex-end; align-items:center; gap:var(--sp-2); white-space:nowrap; }
 .wb-add-tags { display:flex; flex-direction:column; min-width:var(--tag-input-min); max-width:100%; }
 .wb-add-tags[data-drop-active=true] { outline:var(--focus-w) solid var(--focus); }
-.wb-tag-dragging .nps-tag { box-shadow:var(--shadow-pop); }
+.wb-tag-dragging { opacity:var(--dim); }
+.wb-drag-feedback { transform:scale(1.03); box-shadow:var(--shadow-pop); background:var(--surface); border-radius:var(--r-ctl); pointer-events:none; }
+[data-motion="off"] .wb-drag-feedback { transform:none; }
+.wb-tab[data-dragging="true"] { opacity:var(--dim); }
+.wb-tabs .wb-tab { transition:transform var(--dur-3) var(--ease-move), background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
+.wb-tag-target { outline:var(--focus-w) solid var(--focus); }
+.wb-sortable-tag { display:inline-flex; transition:transform var(--dur-3) var(--ease-move); }
+.wb-tag-layout { display:contents; }
+.wb-tag-layout > [data-wb-tag] { display:flex; min-width:0; max-width:100%; }
+.wb-insertion-slot { display:inline-flex; flex-shrink:0; border:var(--bw) dashed var(--focus); border-radius:var(--r-tag); background:var(--selected); }
+.wb-block:has(.wb-insertion-slot), .wb-block:has(.wb-tag-target), .wb-block:has([data-drop-active=true]) { outline:var(--bw) solid var(--focus); }
+.wb-tab-preview { display:flex; flex-direction:column; gap:var(--sp-2); max-width:var(--popover-w); }
+.wb-tab-preview img { max-width:calc(var(--thumb-row-zip) * 2); max-height:calc(var(--thumb-row-zip) * 2); object-fit:contain; align-self:center; border-radius:var(--r-thumb); }
 .wb-editor .nps-selection-slot { position:absolute; bottom:calc(var(--bar-h) + var(--sp-3)); left:var(--sp-3); right:var(--sp-3); }
 .wb-editor .nps-selection { width:100%; bottom:0; white-space:nowrap; }
 @container (max-width: 420px) {

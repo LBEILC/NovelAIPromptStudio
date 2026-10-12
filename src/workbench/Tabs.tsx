@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   DndContext,
   closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -20,6 +21,7 @@ import { hasImageName } from '../lib/imageNaming.js';
 import { mediaUrl } from '../lib/imageStage.js';
 import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
 import './workbench.css';
+import { useDragFeedback } from './DragFeedback';
 
 export interface TabsProps {
   session: WorkbenchSession;
@@ -62,14 +64,17 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
         className="wb-tab workbench-tab"
         data-workbench-tab-id={tab.id}
         data-active={tab.id === p.session.activeTabId || undefined}
+        data-dragging={sortable.isDragging || undefined}
         role="tab"
         aria-selected={tab.id === p.session.activeTabId}
         aria-label={name || '没有起名'}
-        data-tip={!name ? `没有起名 · ${image?.created_at || tab.updatedAt}` : undefined}
+        data-tip={name || '没有起名'}
+        data-tip-image={mediaUrl(image?.thumbnail_path || image?.image_path || '')}
+        data-tip-date={image?.created_at || tab.updatedAt}
         onClick={() => p.onActivateTab(tab.id)}
         style={
           {
-            transform: CSS.Transform.toString(sortable.transform),
+            transform: sortable.isDragging ? undefined : CSS.Transform.toString(sortable.transform),
             '--wb-thumb-ratio': (image?.metadata.width || 1) / (image?.metadata.height || 1),
           } as CSSProperties
         }
@@ -80,17 +85,14 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
           alt=""
           src={mediaUrl(image?.thumbnail_path || image?.image_path || '')}
         />
-        {name && (
-          <span className="wb-tab-name" data-tip-overflow={name}>
-            {name}
-          </span>
-        )}
+        {name && <span className="wb-tab-name">{name}</span>}
         {workbenchTabHasChanges(tab) && <span className="wb-dirty" aria-label="Prompt 已修改" />}
       </button>
     </ContextMenu>
   );
 }
 export function WorkbenchTabs(p: TabsProps) {
+  const drag = useDragFeedback();
   const list = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState(false);
   const sensors = useSensors(
@@ -122,9 +124,19 @@ export function WorkbenchTabs(p: TabsProps) {
       )}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={(args) =>
+          args.pointerCoordinates ? pointerWithin(args) : closestCenter(args)
+        }
+        onDragStart={(event) =>
+          drag.start(
+            event,
+            list.current?.querySelector(`[data-workbench-tab-id="${event.active.id}"]`) ?? null,
+          )
+        }
+        onDragCancel={drag.end}
         onDragEnd={({ active, over }) => {
           if (over) p.onReorderTab(String(active.id), String(over.id));
+          drag.end();
         }}
       >
         <SortableContext
@@ -137,6 +149,7 @@ export function WorkbenchTabs(p: TabsProps) {
             ))}
           </div>
         </SortableContext>
+        {drag.overlay}
       </DndContext>
       {overflow && (
         <Button

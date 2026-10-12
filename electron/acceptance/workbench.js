@@ -65,6 +65,10 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     await pointer('mouseMoved', to.x, to.y);
     await e('new Promise(resolve=>requestAnimationFrame(resolve))');
     await pointer('mouseReleased', to.x, to.y);
+    await wait('!document.querySelector(".wb-drag-feedback")');
+    await wait(
+      `(()=>{let received=false;const listener=()=>{received=true};window.addEventListener('click',listener);document.body.dispatchEvent(new MouseEvent('click',{bubbles:true}));window.removeEventListener('click',listener);return received})()`,
+    );
   };
   await click('工作台', 'document.querySelector(".studio-titlebar")');
   await check(
@@ -483,6 +487,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await key('ArrowRight', { code: 'ArrowRight' });
   await key(' ', { code: 'Space' });
   await wait(`(${session}).tabs[1].id===${JSON.stringify(order[0])}`);
+  await wait('!document.querySelector(".wb-drag-feedback")');
   await check(
     '标签键盘空格拿起、方向键移动、空格放下',
     `(${session}).tabs[1].id===${JSON.stringify(order[0])}`,
@@ -493,6 +498,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await key(' ', { code: 'Space' });
   await key('ArrowRight', { code: 'ArrowRight' });
   await key('Escape', { code: 'Escape' });
+  await wait('!document.querySelector(".wb-drag-feedback")');
   await check(
     '标签键盘 Esc 取消排序',
     `(${session}).tabs[1].id===${JSON.stringify(order[0])}`,

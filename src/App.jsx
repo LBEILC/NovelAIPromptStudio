@@ -1779,7 +1779,32 @@ export default function App() {
               }}
               onEmptyTrash={emptyTrash}
               onInstallUpdate={installDownloadedUpdate}
-              onLibraryChange={() => Promise.all([reloadLibrary('all'), reloadLibrary('trash')])}
+              onLibraryChange={async () => {
+                const [images, trash] = await Promise.all([
+                  reloadLibrary('all'),
+                  reloadLibrary('trash'),
+                ]);
+                const paths = new Map([...images, ...trash].map((image) => [image.id, image]));
+                setWorkbenchSession((session) => ({
+                  ...session,
+                  tabs: session.tabs.map((tab) => {
+                    const image = tab.source.type === 'library' && paths.get(tab.source.projectId);
+                    if (!image) return tab;
+                    const update = (project) =>
+                      project && {
+                        ...project,
+                        image_path: image.image_path,
+                        thumbnail_path: image.thumbnail_path,
+                      };
+                    return {
+                      ...tab,
+                      source: { ...tab.source, path: image.image_path },
+                      project: update(tab.project),
+                      originalProject: update(tab.originalProject),
+                    };
+                  }),
+                }));
+              }}
             />
           </div>
         </Activity>

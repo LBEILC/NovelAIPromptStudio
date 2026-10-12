@@ -20,7 +20,7 @@ function chunk(type, content) {
 }
 export async function createWorkbenchFixtures(
   directory,
-  { prefix = 'synthetic-study', seed = 42000 } = {},
+  { prefix = 'synthetic-study', seed = 42000, dark = false } = {},
 ) {
   await fs.mkdir(directory, { recursive: true });
   const files = [];
@@ -31,7 +31,10 @@ export async function createWorkbenchFixtures(
   ].entries()) {
     const file = path.join(directory, `${prefix}-s-${seed + index}.png`);
     const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#ccd5d8"/><rect x="${width * 0.15}" y="${height * 0.12}" width="${width * 0.7}" height="${height * 0.76}" fill="#f1ece2"/><circle cx="${width * 0.5}" cy="${height * 0.4}" r="${width * 0.16}" fill="#80989d"/><path d="M ${width * 0.23} ${height * 0.85} L ${width * 0.5} ${height * 0.43} L ${width * 0.77} ${height * 0.85}" fill="#ad7971"/></svg>`;
-    const png = await sharp(Buffer.from(svg)).png().toBuffer();
+    const png = await sharp(Buffer.from(svg))
+      .modulate({ brightness: dark ? 0.2 : 1 })
+      .png()
+      .toBuffer();
     const comment = {
       prompt: workbenchRaw,
       uc: workbenchNegative,

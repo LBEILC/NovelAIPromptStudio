@@ -198,6 +198,8 @@ export function Menu({
   buttonVariant = 'quiet',
   className,
   menuClassName,
+  onContextOpen,
+  heading,
 }: {
   items: MenuItem[];
   label: string;
@@ -207,6 +209,8 @@ export function Menu({
   buttonVariant?: 'default' | 'quiet';
   className?: string;
   menuClassName?: string;
+  onContextOpen?: () => void;
+  heading?: string;
 }) {
   const ref = useRef<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -221,12 +225,14 @@ export function Menu({
       onContextMenu={(event) => {
         if (!context) return;
         event.preventDefault();
+        onContextOpen?.();
         setPoint({ x: event.clientX, y: event.clientY });
         setOpen(true);
       }}
       onKeyDown={(event) => {
         if (context && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) {
           event.preventDefault();
+          onContextOpen?.();
           setPoint(undefined);
           setOpen(true);
         }
@@ -257,6 +263,7 @@ export function Menu({
         point={point}
         className={cx('nps-menu', menuClassName)}
       >
+        {heading && <div className="nps-help library-menu-heading">{heading}</div>}
         <MenuItems items={items} label={label} closeAll={close} closeLevel={close} />
       </Layer>
     </span>

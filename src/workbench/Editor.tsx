@@ -1,13 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode, type MouseEvent } from 'react';
-import {
-  DndContext,
-  PointerSensor,
-  useDraggable,
-  useDroppable,
-  useSensor,
-  useSensors,
-  pointerWithin,
-} from '@dnd-kit/core';
+import { DndContext, PointerSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
+import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   Button,
   Input,
@@ -51,6 +45,7 @@ import {
 import { deleteTags, insertTags, moveTags } from './edits';
 import { AddTags } from './AddTags';
 import { ParagraphEditor } from './Paragraph';
+import { TagDragLayout, TagInsertionSlot, useDragFeedback } from './DragFeedback';
 import type { ImageProject, TagCategory } from '../shared/types';
 
 function EditableTag({
@@ -66,21 +61,19 @@ function EditableTag({
   onClick: (event: MouseEvent<HTMLSpanElement>) => void;
   onMove: (delta: number) => void;
 }) {
-  const drag = useDraggable({ id: entry.key, disabled, data: { entry } });
-  const drop = useDroppable({
+  const drag = useSortable({
     id: entry.key,
     disabled,
-    data: { target: { section: entry.section, block: entry.block, index: entry.index } },
+    data: { entry, target: { section: entry.section, block: entry.block, index: entry.index } },
+    transition: null,
   });
   return (
     <span
-      ref={(node) => {
-        drag.setNodeRef(node);
-        drop.setNodeRef(node);
-      }}
+      ref={drag.setNodeRef}
       {...drag.listeners}
       data-marquee-key={encodeMarqueeKey(entry.key)}
-      className={drag.isDragging ? 'wb-tag-dragging' : ''}
+      className={`wb-sortable-tag ${drag.isDragging ? 'wb-tag-dragging' : drag.isOver ? 'wb-tag-target' : ''}`}
+      style={{ transform: drag.isDragging ? undefined : CSS.Transform.toString(drag.transform) }}
       onClick={onClick}
       onKeyDown={(event) => {
         if (
@@ -106,6 +99,17 @@ export interface EditorProps extends DocumentProps {
   }) => Promise<boolean>;
 }
 export function WorkbenchEditor(p: EditorProps) {
+  const dragFeedback = useDragFeedback();
+  const [dragging, setDragging] = useState<{
+    entry: DocumentTag;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    section: number;
+    block: number;
+    index?: number;
+  } | null>(null);
   const doc = useMemo(() => createPromptDocument(p.project), [p.project]);
   const entries = useMemo(() => documentTags(doc), [doc]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -239,20 +243,93 @@ export function WorkbenchEditor(p: EditorProps) {
     <div className="wb-editor" ref={root} {...marquee.handlers}>
       <DndContext
         sensors={sensors}
-        collisionDetection={pointerWithin}
+        collisionDetection={(args) =>
+          pointerWithin(args).filter((hit) => {
+            const from = args.active.data.current?.entry as DocumentTag | undefined;
+            const to = args.droppableContainers.find((container) => container.id === hit.id)?.data
+              .current?.target;
+            return (
+              from &&
+              to &&
+              doc.scopes[from.section].scope.polarity === doc.scopes[to.section].scope.polarity
+            );
+          })
+        }
+        onDragStart={(event) => {
+          const node =
+            root.current?.querySelector<HTMLElement>(
+              `[data-marquee-key="${encodeMarqueeKey(String(event.active.id))}"]`,
+            ) ?? null;
+          dragFeedback.start(event, node);
+          const rect = event.active.rect.current.initial ?? node?.getBoundingClientRect();
+          if (rect)
+            setDragging({
+              entry: event.active.data.current!.entry,
+              width: rect.width,
+              height: rect.height,
+            });
+        }}
+        onDragOver={({ over }) => {
+          if (over?.data.current?.target) setDropTarget(over.data.current.target);
+        }}
+        onDragCancel={() => {
+          dragFeedback.end();
+          setDragging(null);
+          setDropTarget(null);
+        }}
         onDragEnd={({ active, over }) =>
           guard(() => {
+            setDragging(null);
+            setDropTarget(null);
             const entry = active.data.current?.entry as DocumentTag | undefined;
             const target = over?.data.current?.target as
               | { section: number; block: number; index?: number }
               | undefined;
-            if (entry && target)
-              save(moveTags(doc, selected.includes(entry.key) ? chosen : [entry], target));
+            if (entry && target && over) {
+              const adjusted =
+                target.index != null &&
+                entry.section === target.section &&
+                entry.block === target.block &&
+                entry.index < target.index
+                  ? { ...target, index: target.index + 1 }
+                  : target;
+              const next = moveTags(doc, selected.includes(entry.key) ? chosen : [entry], adjusted);
+              const slot = root.current
+                ?.querySelector('.wb-insertion-slot')
+                ?.getBoundingClientRect();
+              dragFeedback.finish(() => save(next), slot ?? over.rect);
+            } else dragFeedback.end();
           })
         }
       >
         <WorkbenchDocument
           {...p}
+          renderTagList={(tags, content, section, block) => {
+            const cross =
+              dragging &&
+              dropTarget &&
+              dropTarget.section === section &&
+              dropTarget.block === block &&
+              (dragging.entry.section !== section || dragging.entry.block !== block);
+            const at = cross ? (dropTarget.index ?? tags.length) : -1;
+            const children = [...content];
+            if (cross)
+              children.splice(
+                at,
+                0,
+                <TagInsertionSlot
+                  key="insertion"
+                  target={dropTarget}
+                  width={dragging.width}
+                  height={dragging.height}
+                />,
+              );
+            return (
+              <SortableContext items={tags.map((tag) => tag.key)} strategy={rectSortingStrategy}>
+                <TagDragLayout dragging={!!dragging}>{children}</TagDragLayout>
+              </SortableContext>
+            );
+          }}
           scrollRef={scroll}
           selectedKeys={selected}
           onRawEdit={(section, initial) =>
@@ -554,6 +631,7 @@ export function WorkbenchEditor(p: EditorProps) {
           </SelectionBar>
           {p.children}
         </WorkbenchDocument>
+        {dragFeedback.overlay}
       </DndContext>
       <Popover label="编辑 Tag" open={!!editing} anchor={anchor} onClose={() => setEditing(null)}>
         <div className="wb-tag-editor">
