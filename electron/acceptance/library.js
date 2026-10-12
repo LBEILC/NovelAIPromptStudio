@@ -198,6 +198,58 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
+    await e('document.querySelectorAll(".library-pick")[2].click()');
+    await check(
+      '复选框追加第三张且不清空已有多选',
+      'document.querySelectorAll(".library-card.picked").length===3',
+      undefined,
+      'once',
+    );
+    await selectCard(0);
+    await check(
+      '多选时点击图片仅移除这一张',
+      'document.querySelectorAll(".library-card.picked").length===2',
+      undefined,
+      'once',
+    );
+    await e(`${grid}.click()`);
+    await check(
+      '点击网格空白处退出多选',
+      '!document.querySelector(".library-card.picked")',
+      undefined,
+      'once',
+    );
+    await e('document.querySelector(".library-pick").click()');
+    await check(
+      '无多选时复选框进入多选且有名称和勾选语义',
+      'document.querySelectorAll(".library-card.picked").length===1 && document.querySelector(".library-pick[role=checkbox][aria-checked=true]").getAttribute("aria-label").length>0',
+      undefined,
+      'once',
+    );
+    await e(
+      `(()=>{const card=document.querySelector('.library-card.picked');for(const [type,detail] of [['click',1],['click',2],['dblclick',2]])card.dispatchEvent(new MouseEvent(type,{bubbles:true,detail}))})()`,
+    );
+    await check(
+      '多选最后一张双击不会打开工作台',
+      '!!document.querySelector(".library-page") && !document.querySelector(".library-card.picked")',
+      undefined,
+      'once',
+    );
+    await e('document.querySelector(".library-pick").focus()');
+    await h.nativeKey(' ');
+    await check(
+      '空格切换复选框且不打开大图',
+      'document.querySelectorAll(".library-card.picked").length===1 && !document.querySelector(".library-viewer")',
+      undefined,
+      'once',
+    );
+    await h.nativeKey('Enter');
+    await check(
+      '回车切换复选框且不打开工作台',
+      '!document.querySelector(".library-card.picked") && !!document.querySelector(".library-page")',
+      undefined,
+      'once',
+    );
     await key('Escape', {}, grid);
     await selectCard(0);
     await selectCard(2, { shiftKey: true });

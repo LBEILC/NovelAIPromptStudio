@@ -47,6 +47,7 @@ export function LibraryGrid({
     return ready;
   };
   const anchor = useRef('');
+  const multiClick = useRef(false);
   const wheel = useRef(0);
   useLayoutEffect(() => {
     const node = scroll.current!;
@@ -159,7 +160,7 @@ export function LibraryGrid({
       p.onSelectionChange(
         p.groups.slice(Math.min(from, index), Math.max(from, index) + 1).map((g) => g.id),
       );
-    } else if (event.ctrlKey || event.metaKey) {
+    } else if (event.ctrlKey || event.metaKey || p.selectedGroupIds.length > 0) {
       p.onToggleSelect(group, event);
       anchor.current = group.id;
     } else {
@@ -210,6 +211,7 @@ export function LibraryGrid({
         updateMarquee();
       }}
       onKeyDown={(event) => {
+        if ((event.target as Element).closest('.library-pick')) return;
         if (event.ctrlKey || event.metaKey) {
           if (event.key.toLowerCase() === 'a') {
             event.preventDefault();
@@ -314,6 +316,10 @@ export function LibraryGrid({
           event.stopPropagation();
         }
       }}
+      onClick={(event) => {
+        if (!(event.target as Element).closest('.library-card, button, [data-marquee-ignore]'))
+          p.onClearSelection();
+      }}
     >
       <div className="library-rows" style={{ height: totalHeight + viewport.inset }}>
         {visible.map((row) => (
@@ -342,8 +348,15 @@ export function LibraryGrid({
                     className={`library-card ${group.id === p.previewGroup?.id ? 'current' : ''} ${selected ? 'picked' : ''}`}
                     style={{ width, height: row.height }}
                     key={group.id}
-                    onClick={(event) => select(index, event)}
-                    onDoubleClick={() => p.onOpenWorkbench(shown)}
+                    onClick={(event) => {
+                      if (event.detail <= 1) multiClick.current = p.selectedGroupIds.length > 0;
+                      if (event.detail > 1 && multiClick.current) return;
+                      select(index, event);
+                    }}
+                    onDoubleClick={() => {
+                      if (!multiClick.current && !p.selectedGroupIds.length)
+                        p.onOpenWorkbench(shown);
+                    }}
                     onPointerEnter={() => {
                       if (group.members.length > 1)
                         for (const member of group.members) {
@@ -398,11 +411,25 @@ export function LibraryGrid({
                         )}
                       </>
                     )}
-                    {p.selectedGroupIds.length > 0 && (
-                      <span className="library-pick" data-theme={selected ? undefined : 'light'}>
-                        {selected && <Check size={16} strokeWidth={1.5} aria-hidden="true" />}
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={selected}
+                      aria-label={imageAccessibleName(group.cover)}
+                      className="library-pick"
+                      data-theme={selected ? undefined : 'light'}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        anchor.current = group.id;
+                        p.onToggleSelect(group, { ...event, shiftKey: false });
+                      }}
+                      onDoubleClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => {
+                        if (event.key === ' ' || event.key === 'Enter') event.stopPropagation();
+                      }}
+                    >
+                      {selected && <Check size={16} strokeWidth={1.5} aria-hidden="true" />}
+                    </button>
                   </div>
                 </CardMenu>
               );
