@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { componentDetails } from './componentDetails.js';
+import { buttonStateChecks } from './buttonStates.js';
 
 export async function componentChecks({ h, mode }) {
   const { evaluate: e, wait, check, click, key } = h;
@@ -239,6 +240,7 @@ export async function componentChecks({ h, mode }) {
       'once',
     );
     await componentDetails(h);
+    await buttonStateChecks(h);
     await h.screenshot(`components-${theme}`);
     await h.window.loadFile(path.join(mode.root, 'showcase', 'ui-showcase.html'), {
       query: { theme: 'system', motion: 'off' },

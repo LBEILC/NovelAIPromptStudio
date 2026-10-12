@@ -214,6 +214,22 @@ function Showcase() {
           <span data-tip-overflow="Short">Short</span>
           <Menu label="验收菜单" items={menu} />
         </div>
+        <div data-button-state-probe>
+          {(['default', 'ink', 'cinnabar', 'quiet', 'danger', 'danger-outline'] as const).map(
+            (variant) => (
+              <Row key={variant}>
+                <Menu
+                  label={`状态验收 ${variant}`}
+                  buttonVariant={variant}
+                  items={[{ id: 'close', label: '关闭验收菜单' }]}
+                />
+                <Button variant={variant} disabled aria-label={`不可用验收 ${variant}`}>
+                  不可用
+                </Button>
+              </Row>
+            ),
+          )}
+        </div>
       </Section>
       <Section title="按钮">
         <Row label="默认">
@@ -498,7 +514,7 @@ function Showcase() {
           <ContextMenu items={menu} label="右键菜单">
             <Tag text="long hair" translation="长发" category="body" categoryLabel="外貌身体" />
           </ContextMenu>
-          <Button ref={anchor} onClick={() => setPopover(true)}>
+          <Button ref={anchor} onClick={() => setPopover((value) => !value)}>
             编辑一个 Tag
           </Button>
           <Popover

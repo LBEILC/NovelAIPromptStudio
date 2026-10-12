@@ -254,9 +254,11 @@ export async function componentDetails(h) {
     clickCount: 1,
   });
   await wait('!document.querySelector(".nps-layer[role=dialog]")');
-  await check(
+  await h.checkSoon(
     '编辑浮层外部点击关闭并归还焦点',
     `document.activeElement.textContent.trim()==="编辑一个 Tag" && !document.querySelector('.nps-layer.nps-popover:popover-open') && (${popoverHasMotion} || !document.querySelector('.nps-layer.nps-popover'))`,
+    undefined,
+    undefined,
     `({active:document.activeElement.outerHTML.slice(0,400),layers:[...document.querySelectorAll('.nps-layer.nps-popover')].map(node=>({html:node.outerHTML.slice(0,200),animations:node.getAnimations().length}))})`,
     'once',
   );

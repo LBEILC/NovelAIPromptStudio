@@ -293,6 +293,7 @@ export function harness(window, mode, checks) {
       type: 'keyDown',
       key,
       code: key,
+      text: key === 'Enter' ? '\r' : key === ' ' ? ' ' : undefined,
       windowsVirtualKeyCode,
       modifiers,
     });

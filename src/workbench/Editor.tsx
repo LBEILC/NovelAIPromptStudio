@@ -1,7 +1,21 @@
-import { useMemo, useRef, useState, type ReactNode, type MouseEvent } from 'react';
-import { DndContext, PointerSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
-import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import {
+  cloneElement,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+  type MouseEvent,
+} from 'react';
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  pointerWithin,
+  MeasuringStrategy,
+} from '@dnd-kit/core';
+import { SortableContext, useSortable } from '@dnd-kit/sortable';
 import {
   Button,
   Input,
@@ -45,7 +59,7 @@ import {
 import { deleteTags, insertTags, moveTags } from './edits';
 import { AddTags } from './AddTags';
 import { ParagraphEditor } from './Paragraph';
-import { TagDragLayout, TagInsertionSlot, useDragFeedback } from './DragFeedback';
+import { useTagDragLayout, TagInsertionSlot, useDragFeedback, restrictDrag } from './DragFeedback';
 import type { ImageProject, TagCategory } from '../shared/types';
 
 function EditableTag({
@@ -73,9 +87,12 @@ function EditableTag({
       {...drag.listeners}
       data-marquee-key={encodeMarqueeKey(entry.key)}
       className={`wb-sortable-tag ${drag.isDragging ? 'wb-tag-dragging' : drag.isOver ? 'wb-tag-target' : ''}`}
-      style={{ transform: drag.isDragging ? undefined : CSS.Transform.toString(drag.transform) }}
       onClick={onClick}
       onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          event.currentTarget.click();
+        }
         if (
           event.altKey &&
           ['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(event.key)
@@ -99,11 +116,13 @@ export interface EditorProps extends DocumentProps {
   }) => Promise<boolean>;
 }
 export function WorkbenchEditor(p: EditorProps) {
-  const dragFeedback = useDragFeedback();
+  const scroll = useRef<HTMLDivElement>(null);
+  const dragFeedback = useDragFeedback(scroll);
   const [dragging, setDragging] = useState<{
     entry: DocumentTag;
     width: number;
     height: number;
+    items: { key: string; width: number; height: number }[];
   } | null>(null);
   const [dropTarget, setDropTarget] = useState<{
     section: number;
@@ -129,7 +148,7 @@ export function WorkbenchEditor(p: EditorProps) {
   });
   const anchor = useRef<HTMLElement>(null);
   const root = useRef<HTMLDivElement>(null);
-  const scroll = useRef<HTMLDivElement>(null);
+  useTagDragLayout(root, !!dragging);
   const last = useRef('');
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const marquee = useMarqueeSelection({
@@ -174,8 +193,8 @@ export function WorkbenchEditor(p: EditorProps) {
         ]),
       ]);
     } else {
-      anchor.current = event.currentTarget;
-      setEditing(entry);
+      anchor.current = event.currentTarget.querySelector('.nps-tag') ?? event.currentTarget;
+      setEditing(editing?.key === entry.key ? null : entry);
       setDraft({
         tag: entry.tag.tag,
         translation: entry.tag.translation,
@@ -248,6 +267,8 @@ export function WorkbenchEditor(p: EditorProps) {
     <div className="wb-editor" ref={root} {...marquee.handlers}>
       <DndContext
         sensors={sensors}
+        modifiers={[(args) => restrictDrag(args, scroll.current)]}
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
         collisionDetection={(args) =>
           pointerWithin(args).filter((hit) => {
             const from = args.active.data.current?.entry as DocumentTag | undefined;
@@ -272,7 +293,19 @@ export function WorkbenchEditor(p: EditorProps) {
               entry: event.active.data.current!.entry,
               width: rect.width,
               height: rect.height,
+              items: (selected.includes(String(event.active.id))
+                ? chosen
+                : [event.active.data.current!.entry as DocumentTag]
+              ).map((item) => {
+                const box = root
+                  .current!.querySelector<HTMLElement>(
+                    `[data-marquee-key="${encodeMarqueeKey(item.key)}"]`,
+                  )!
+                  .getBoundingClientRect();
+                return { key: item.key, width: box.width, height: box.height };
+              }),
             });
+          setDropTarget(event.active.data.current!.target);
         }}
         onDragOver={({ over }) => {
           if (over?.data.current?.target) setDropTarget(over.data.current.target);
@@ -312,28 +345,54 @@ export function WorkbenchEditor(p: EditorProps) {
         <WorkbenchDocument
           {...p}
           renderTagList={(tags, content, section, block) => {
-            const cross =
-              dragging &&
-              dropTarget &&
-              dropTarget.section === section &&
-              dropTarget.block === block &&
-              (dragging.entry.section !== section || dragging.entry.block !== block);
-            const at = cross ? (dropTarget.index ?? tags.length) : -1;
-            const children = [...content];
-            if (cross)
+            const moving = new Set(dragging?.items.map((item) => item.key));
+            const children = content.filter((_, index) => !moving.has(tags[index].key));
+            if (dragging && dropTarget?.section === section && dropTarget.block === block) {
+              const after =
+                dragging.entry.section === section &&
+                dragging.entry.block === block &&
+                dropTarget.index != null &&
+                dragging.entry.index < dropTarget.index;
+              const at =
+                dropTarget.index == null ? tags.length : dropTarget.index + (after ? 1 : 0);
+              const insertion = tags.filter((tag) => tag.index < at && !moving.has(tag.key)).length;
               children.splice(
-                at,
+                insertion,
                 0,
-                <TagInsertionSlot
-                  key="insertion"
-                  target={dropTarget}
-                  width={dragging.width}
-                  height={dragging.height}
-                />,
+                ...dragging.items.map((item, index) => (
+                  <TagInsertionSlot
+                    key={`insertion-${item.key}`}
+                    id={`tag-insertion-${index}`}
+                    target={dropTarget}
+                    width={item.width}
+                    height={item.height}
+                  />
+                )),
               );
+            }
+            // Keep the active sensor mounted, but take its invisible source out of flow.
+            const sources = content.flatMap((child, index) => {
+              const item = dragging?.items.find((item) => item.key === tags[index].key);
+              return item
+                ? [
+                    cloneElement(child as ReactElement<{ style: React.CSSProperties }>, {
+                      style: {
+                        position: 'absolute',
+                        visibility: 'hidden',
+                        pointerEvents: 'none',
+                        width: item.width,
+                        height: item.height,
+                      },
+                    }),
+                  ]
+                : [];
+            });
             return (
-              <SortableContext items={tags.map((tag) => tag.key)} strategy={rectSortingStrategy}>
-                <TagDragLayout dragging={!!dragging}>{children}</TagDragLayout>
+              <SortableContext items={tags.map((tag) => tag.key)} strategy={() => null}>
+                <span className="wb-tag-layout">
+                  {children}
+                  {sources}
+                </span>
               </SortableContext>
             );
           }}

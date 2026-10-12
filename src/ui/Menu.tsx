@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ChevronRight, Check } from 'lucide-react';
 import { Layer } from './overlays';
-import { Button, iconProps } from './controls';
+import { Button, iconProps, type ButtonProps } from './controls';
 import { cx, composing } from './internal';
 import { Shortcut } from './ThemeProvider';
 
@@ -206,7 +206,7 @@ export function Menu({
   children?: ReactNode;
   context?: boolean;
   trigger?: ReactNode;
-  buttonVariant?: 'default' | 'quiet';
+  buttonVariant?: ButtonProps['variant'];
   className?: string;
   menuClassName?: string;
   onContextOpen?: () => void;

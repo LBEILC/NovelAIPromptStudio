@@ -9,7 +9,14 @@ export function CollectionPicker({ p, ids }: { p: LibraryProps; ids: string[] })
   const [busy, setBusy] = useState(false);
   return (
     <>
-      <Button ref={anchor} variant="quiet" size="small" onClick={() => setOpen(!open)}>
+      <Button
+        ref={anchor}
+        variant="quiet"
+        size="small"
+        aria-label="加入收藏集"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
         <i className="ri-folder-add-line" />
         加入收藏集
       </Button>

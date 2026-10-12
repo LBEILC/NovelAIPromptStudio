@@ -484,9 +484,7 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
-    await e(
-      'document.querySelector(".library-detail-picture img").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
-    );
+    await e('document.querySelector(".library-detail-picture img").click()');
     await wait('!!document.querySelector(".library-viewer .library-strip")');
     const coverMetadata = database.loadProject(cover).metadata;
     await check(

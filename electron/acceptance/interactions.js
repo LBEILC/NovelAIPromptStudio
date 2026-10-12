@@ -273,7 +273,7 @@ export async function libraryInteractionChecks(env) {
       );
       await check(
         `横向第 ${index + 1} 段显示对应缩略图且不改变详情和多选`,
-        `${stack}.querySelector('img').naturalWidth>0&&${stack}.querySelector('.library-stack').textContent==='${index + 1} / 共 3'&&${stack}.querySelectorAll('.library-scrub > span').length===3&&document.querySelector('.library-detail').dataset.detailId===${JSON.stringify(originalDetail)}&&!document.querySelector('.library-card.picked')`,
+        `${stack}.querySelector('img').naturalWidth>0&&${stack}.querySelector('.library-stack').textContent==='${index + 1} / 3'&&${stack}.querySelectorAll('.library-scrub > span').length===3&&document.querySelector('.library-detail').dataset.detailId===${JSON.stringify(originalDetail)}&&!document.querySelector('.library-card.picked')`,
         undefined,
         'once',
       );
@@ -451,7 +451,7 @@ export async function workbenchInteractionChecks(env) {
     await wait('!document.querySelector(".wb-tab-preview:popover-open")');
     await check(
       '标签页拖动有副本和原位占位且没有悬停预览',
-      `!!document.querySelector('.wb-drag-feedback img')&&parseFloat(getComputedStyle(${tab(0)}).opacity)===parseFloat(getComputedStyle(${tab(0)}).getPropertyValue('--dim'))&&!document.querySelector('.wb-tab-preview:popover-open')`,
+      `!!document.querySelector('.wb-drag-feedback img')&&getComputedStyle(${tab(0)}).visibility==='hidden'&&!document.querySelector('.wb-tab-preview:popover-open')`,
     );
     await h.screenshot('interaction-tab-drag');
     await check(
@@ -486,7 +486,7 @@ export async function workbenchInteractionChecks(env) {
     await move('mouseMoved', { x: start.x + 65, y: start.y + 20 }, true);
     await check(
       'Tag 拖动副本保留原内容与原位占位',
-      `!!document.querySelector('.wb-drag-feedback .nps-tag')&&!!document.querySelector('.wb-tag-dragging')&&parseFloat(getComputedStyle(document.querySelector('.wb-tag-dragging')).opacity)===parseFloat(getComputedStyle(document.querySelector('.wb-tag-dragging')).getPropertyValue('--dim'))`,
+      `!!document.querySelector('.wb-drag-feedback .nps-tag')&&!!document.querySelector('.wb-tag-dragging')&&getComputedStyle(document.querySelector('.wb-tag-dragging')).visibility==='hidden'`,
     );
     await h.screenshot('interaction-tag-drag');
     await h.nativeKey('Escape');
@@ -642,3 +642,5 @@ export async function workbenchInteractionChecks(env) {
     await cleanup(env, records);
   }
 }
+
+export { pointer, center, prepare, library, restoredTabs, closeAddedTabs, cleanup };

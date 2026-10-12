@@ -312,8 +312,8 @@ export async function workbenchPolishChecks(env) {
       `(()=>{const tags=[...document.querySelectorAll('.wb-tags .nps-tag')];return tags.length>0 && tags.every(t=>{const r=t.getBoundingClientRect();return [...t.querySelectorAll('.nps-tag-en,.nps-tag-zh')].every(c=>{const b=c.getBoundingClientRect();return b.top>=r.top&&b.bottom<=r.bottom+1&&b.left>=r.left&&b.right<=r.right+1})})})()`,
     );
     await check(
-      '同一行 Tag 高度一致，输入按钮和 Tag 底部对齐',
-      `(()=>{const groups=[...document.querySelectorAll('.wb-tags')];return groups.every(g=>{const tags=[...g.querySelectorAll('.nps-tag')].map(t=>t.getBoundingClientRect());return tags.every(a=>tags.filter(b=>Math.abs(a.top-b.top)<1).every(b=>Math.abs(a.height-b.height)<1)) && [...g.querySelectorAll('.wb-add-tags')].every(a=>{const r=a.getBoundingClientRect(),row=tags.filter(t=>t.top<r.bottom&&t.bottom>r.top);return !row.length||row.every(t=>Math.abs(t.bottom-r.bottom)<1)})})})()`,
+      'Tag 保持自身高度，输入按钮与所在行底部对齐',
+      `(()=>{const groups=[...document.querySelectorAll('.wb-tags')];return groups.every(g=>{const tags=[...g.querySelectorAll('.nps-tag')].map(t=>t.getBoundingClientRect());return getComputedStyle(g).alignItems==='flex-start' && [...g.querySelectorAll('.wb-add-tags')].every(a=>{const r=a.getBoundingClientRect(),row=tags.filter(t=>t.top<r.bottom&&t.bottom>r.top);return !row.length||Math.abs(Math.max(...row.map(t=>t.bottom))-r.bottom)<1})})})()`,
     );
     await e(
       `document.querySelectorAll('.wb-tags')[1].querySelector('[data-wb-tag]:last-of-type .nps-tag').click()`,

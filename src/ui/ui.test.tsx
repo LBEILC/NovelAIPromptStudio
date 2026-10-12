@@ -175,7 +175,7 @@ describe('Menu', () => {
     expect(document.activeElement).toBe(button('Open'));
   });
   it.each(['beforetoggle', 'toggle'])(
-    'reacts to native light-dismiss %s without stale focus restoration',
+    'owns outside dismissal and ignores a stale native %s after reopening',
     (eventType) => {
       render(
         <>
@@ -185,9 +185,14 @@ describe('Menu', () => {
       );
       click(button('Open'));
       const layer = query('[popover]');
-      act(() => layer.dispatchEvent(Object.assign(new Event(eventType), { newState: 'closed' })));
+      pointer(button('Next'), 'pointerdown');
       expect(host.querySelector('[role="menu"]')).toBeNull();
       expect(document.activeElement).toBe(button('Open'));
+      click(button('Open'));
+      act(() => layer.dispatchEvent(Object.assign(new Event(eventType), { newState: 'closed' })));
+      expect(host.querySelector('[role="menu"]')).not.toBeNull();
+      expect(document.activeElement).toBe(button('One'));
+      pointer(button('Next'), 'pointerdown');
       focus(button('Next'));
       act(() => layer.dispatchEvent(Object.assign(new Event('toggle'), { newState: 'closed' })));
       expect(document.activeElement).toBe(button('Next'));
@@ -209,6 +214,43 @@ describe('Menu', () => {
 });
 
 describe('Dialog and Popover', () => {
+  it('treats the trigger and nested layer as inside, while Escape closes only the top layer', () => {
+    function Fixture() {
+      const [open, setOpen] = useState(false);
+      const anchor = useRef<HTMLButtonElement>(null);
+      return (
+        <>
+          <Button ref={anchor} onClick={() => setOpen((value) => !value)}>
+            Toggle
+          </Button>
+          <Popover open={open} anchor={anchor} onClose={() => setOpen(false)} label="Parent">
+            <Select
+              label="Child"
+              value="a"
+              onChange={() => {}}
+              options={[{ value: 'a', label: 'Alpha' }]}
+            />
+          </Popover>
+          <button>Outside</button>
+        </>
+      );
+    }
+    render(<Fixture />);
+    for (let count = 1; count <= 5; count++) {
+      pointer(button('Toggle'), 'pointerdown');
+      click(button('Toggle'));
+      expect(!!host.querySelector('[role=dialog]')).toBe(count % 2 === 1);
+    }
+    click(button('Child'));
+    pointer(button('Alpha'), 'pointerdown');
+    expect(host.querySelector('[role=dialog]')).not.toBeNull();
+    key(button('Alpha'), 'Escape');
+    expect(host.querySelector('[role=listbox]')).toBeNull();
+    expect(host.querySelector('[role=dialog]')).not.toBeNull();
+    expect(document.activeElement).toBe(button('Child'));
+    pointer(button('Outside'), 'pointerdown');
+    expect(host.querySelector('[role=dialog]')).toBeNull();
+  });
   function ModalFixture({ destructive = true }: { destructive?: boolean }) {
     const [open, setOpen] = useState(false);
     return (

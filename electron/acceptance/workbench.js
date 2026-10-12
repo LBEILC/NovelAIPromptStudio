@@ -199,7 +199,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     `${raw}.includes(${JSON.stringify(workbenchRaw.split('\n\n')[1])}) && !${raw}.includes('glass window')`,
   );
   await reset();
-  await click('在这里加一块', 'document.querySelector(".wb-block")');
+  await click('加一块', 'document.querySelector(".wb-add-block-gap")');
   await check(
     '块间新增入口打开有分隔位置的原始文本编辑',
     '!!document.querySelector(".wb-raw-editor") && document.querySelector("[aria-label=原始文本]").value.includes("\\n\\n\\n\\n")',

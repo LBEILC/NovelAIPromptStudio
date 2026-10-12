@@ -21,7 +21,7 @@ import { hasImageName } from '../lib/imageNaming.js';
 import { mediaUrl } from '../lib/imageStage.js';
 import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
 import './workbench.css';
-import { useDragFeedback } from './DragFeedback';
+import { useDragFeedback, restrictDrag } from './DragFeedback';
 
 export interface TabsProps {
   session: WorkbenchSession;
@@ -74,7 +74,7 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
         onClick={() => p.onActivateTab(tab.id)}
         style={
           {
-            transform: sortable.isDragging ? undefined : CSS.Transform.toString(sortable.transform),
+            transform: sortable.isDragging ? undefined : CSS.Translate.toString(sortable.transform),
             '--wb-thumb-ratio': (image?.metadata.width || 1) / (image?.metadata.height || 1),
           } as CSSProperties
         }
@@ -92,8 +92,8 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
   );
 }
 export function WorkbenchTabs(p: TabsProps) {
-  const drag = useDragFeedback();
   const list = useRef<HTMLDivElement>(null);
+  const drag = useDragFeedback(list, true);
   const [overflow, setOverflow] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -124,6 +124,7 @@ export function WorkbenchTabs(p: TabsProps) {
       )}
       <DndContext
         sensors={sensors}
+        modifiers={[(args) => restrictDrag(args, list.current, true)]}
         collisionDetection={(args) =>
           args.pointerCoordinates ? pointerWithin(args) : closestCenter(args)
         }

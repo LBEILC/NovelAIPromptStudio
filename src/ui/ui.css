@@ -14,7 +14,6 @@
   transition: background-color var(--dur-1) var(--ease-out);
 }
 .nps-button:hover { background: var(--hover); }
-.nps-button:active:not([aria-disabled="true"]) { transform: scale(0.98); }
 .nps-button.nps-button-ink { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
 .nps-button-ink:hover { background: var(--ink-hover); border-color: var(--ink-hover); }
 .nps-button.nps-button-cinnabar { background: var(--cinnabar); border-color: var(--cinnabar); color: var(--on-cinnabar); padding: 0 var(--sp-5); }
@@ -24,7 +23,7 @@
 .nps-button.nps-button-danger { background: transparent; border-color: transparent; color: var(--danger); font-weight: var(--fw-regular); }
 .nps-button-danger:hover, .nps-button-danger-outline:hover { background: var(--danger-wash); }
 .nps-button.nps-button-danger-outline { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
-.nps-button[aria-disabled="true"]:not([aria-busy="true"]) { background: var(--hover); border-color: transparent; color: var(--text-off); }
+.nps-button:is([aria-disabled="true"],:disabled):not([aria-busy="true"]) { background: var(--hover); border-color: transparent; color: var(--text-off); }
 .nps-button.nps-small, .nps-field.nps-small { height: var(--ctl-sm); padding: 0 var(--sp-2); font-size: var(--fs-small); }
 .nps-loader { flex: 0 0 auto; width: var(--spin); height: var(--spin); border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: nps-spin var(--dur-spin) linear infinite; }
 @keyframes nps-spin { to { transform: rotate(360deg); } }
@@ -148,7 +147,17 @@
 :where(.nps-root, .nps-layer, dialog.nps-dialog) :is(button, [role="tab"], [role="option"], [role="row"], .settings-table td, .library-card, .nps-tag) {
   transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
 }
-.nps-menu-trigger > .nps-button[aria-expanded="true"] { background: var(--selected); color: var(--text); }
+/* Expanded triggers retain their own button variant. */
+.nps-button-default:is(:active,[aria-expanded="true"]) { background:var(--hover); }
+.nps-button-quiet:is(:active,[aria-expanded="true"]) { background:var(--selected); color:var(--text); }
+.nps-button.nps-button-ink:is(:hover,:active,[aria-expanded="true"]) { background:var(--ink-hover); border-color:var(--ink-hover); color:var(--on-ink); }
+.nps-button.nps-button-cinnabar:is(:hover,:active,[aria-expanded="true"]) { background:var(--cinnabar-hover); border-color:var(--cinnabar-hover); color:var(--on-cinnabar); }
+.nps-button:is(.nps-button-danger,.nps-button-danger-outline):is(:active,[aria-expanded="true"]) { background:var(--danger-wash); color:var(--danger); }
+.nps-button:is([aria-disabled="true"],:disabled):not([aria-busy="true"]):is(:hover,:active,[aria-expanded="true"]) { background:var(--hover); border-color:transparent; color:var(--text-off); }
+.nps-split-button { display:inline-flex; align-items:stretch; gap:0; }
+.nps-split-button > .nps-button:first-child { border-radius:var(--r-ctl) 0 0 var(--r-ctl); border-right:0; }
+.nps-split-button > .nps-button:last-child,.nps-split-button > .nps-menu-trigger:last-child > .nps-button { border-radius:0 var(--r-ctl) var(--r-ctl) 0; border-left:var(--bw) solid var(--border); padding:0 var(--sp-1); }
+.nps-split-button .nps-button:active { transform:none; }
 .nps-layer, dialog.nps-dialog, dialog.nps-dialog::backdrop {
   opacity: 0;
   transform: none;
@@ -160,11 +169,12 @@
   transform: none;
   transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out), display var(--dur-2) allow-discrete, overlay var(--dur-2) allow-discrete;
 }
+.nps-layer:popover-open[aria-hidden="true"] { opacity:0; transform:none; transition:opacity var(--dur-1) var(--ease-out); pointer-events:none; }
 .nps-tip { pointer-events: none; white-space: pre-line; overflow-wrap: anywhere; }
-.nps-layer:popover-open[data-entering] { opacity: 0; transform: translateY(calc(-1 * var(--sp-1))) scale(0.98); transition: none; }
-.nps-layer[data-placement="top"]:popover-open[data-entering] { transform: translateY(var(--sp-1)) scale(0.98); }
-.nps-layer[data-placement="right"]:popover-open[data-entering] { transform: translateX(calc(-1 * var(--sp-1))) scale(0.98); }
-.nps-layer[data-placement="left"]:popover-open[data-entering] { transform: translateX(var(--sp-1)) scale(0.98); }
+.nps-layer:popover-open[data-entering] { opacity: 0; transform: translateY(calc(-1 * var(--enter-shift))) scale(var(--enter-scale)); transition: none; }
+.nps-layer[data-placement="top"]:popover-open[data-entering] { transform: translateY(var(--enter-shift)) scale(var(--enter-scale)); }
+.nps-layer[data-placement="right"]:popover-open[data-entering] { transform: translateX(calc(-1 * var(--enter-shift))) scale(var(--enter-scale)); }
+.nps-layer[data-placement="left"]:popover-open[data-entering] { transform: translateX(var(--enter-shift)) scale(var(--enter-scale)); }
 .nps-layer.nps-tip:popover-open[data-entering] { transform: none; }
 @starting-style {
   dialog.nps-dialog[open] { opacity: 0; transform: scale(0.98); }

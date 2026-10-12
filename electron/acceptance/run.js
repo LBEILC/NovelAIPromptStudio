@@ -1,4 +1,5 @@
 import { workbenchChecks } from './workbench.js';
+import { interactionCorrectionChecks } from './interactionCorrections.js';
 import { libraryPolishChecks, workbenchPolishChecks } from './polish.js';
 import { libraryInteractionChecks, workbenchInteractionChecks } from './interactions.js';
 import { libraryNamingChecks } from './libraryNaming.js';
@@ -362,6 +363,7 @@ export async function runAcceptance(context) {
         await libraryChecks(environment);
         await settingsChecks(environment, false);
         await workbenchInteractionChecks(environment);
+        await interactionCorrectionChecks(environment);
         await componentChecks(environment);
       } else if (mode.category === '诊断·计时') {
         h.category('诊断·计时');
@@ -377,6 +379,7 @@ export async function runAcceptance(context) {
       else if (mode.category === '工作台') await workbenchChecks(environment);
       else if (mode.category === '工作台·细节') await workbenchPolishChecks(environment);
       else if (mode.category === '工作台·交互') await workbenchInteractionChecks(environment);
+      else if (mode.category === '交互修正') await interactionCorrectionChecks(environment);
       else if (mode.category === '图片库·交互') await libraryInteractionChecks(environment);
       else if (mode.category === '图片库·细节') await libraryPolishChecks(environment);
       else if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
@@ -422,6 +425,7 @@ export async function runAcceptance(context) {
         await workbenchPolishChecks(environment);
         await libraryInteractionChecks(environment);
         await workbenchInteractionChecks(environment);
+        await interactionCorrectionChecks(environment);
         await uiPolishChecks(environment);
         await componentChecks(environment);
         await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());

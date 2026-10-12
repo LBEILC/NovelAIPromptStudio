@@ -473,44 +473,49 @@ export function WorkbenchDocument(p: DocumentProps) {
               </div>
             );
             return (
-              <div key={bi} className="wb-block" data-wb-block={`${si}:${bi}`}>
-                <header>
-                  <span>
-                    {block.type === 'tags'
-                      ? `Tag 块${block.label ? ` · ${block.label}` : ''} · ${tags.length} 个`
-                      : `段落${block.label ? ` · ${block.label}` : ''}`}
-                  </span>
-                  <Menu
-                    label="块操作"
-                    trigger={<i className="ri-more-line" />}
-                    items={blockMenu(si, bi)}
-                  />
-                </header>
-                {block.type === 'tags' ? (
-                  <div className="wb-tags">
-                    {p.renderTagList
-                      ? p.renderTagList(tags, tags.map(drawTag), si, bi)
-                      : tags.map(drawTag)}
-                    {p.renderAdd?.(si, bi)}
-                  </div>
-                ) : p.renderParagraph ? (
-                  p.renderParagraph(si, bi, prose)
-                ) : (
-                  prose
-                )}
-                <Button
-                  className="wb-add-block"
-                  variant="quiet"
-                  size="small"
-                  onClick={() => {
-                    // TODO(design): No empty-block editor is specified; use the existing raw editor at this separator.
-                    const raw = serializePromptSection(section);
-                    const at = block.range.end;
-                    p.onRawEdit?.(si, raw.slice(0, at) + '\n\n' + raw.slice(at));
-                  }}
-                >
-                  在这里加一块
-                </Button>
+              <div key={bi} className="wb-block-group">
+                <div className="wb-block" data-wb-block={`${si}:${bi}`}>
+                  <header>
+                    <span>
+                      {block.type === 'tags'
+                        ? `Tag 块${block.label ? ` · ${block.label}` : ''} · ${tags.length} 个`
+                        : `段落${block.label ? ` · ${block.label}` : ''}`}
+                    </span>
+                    <Menu
+                      label="块操作"
+                      trigger={<i className="ri-more-line" />}
+                      items={blockMenu(si, bi)}
+                    />
+                  </header>
+                  {block.type === 'tags' ? (
+                    <div className="wb-tags">
+                      {p.renderTagList
+                        ? p.renderTagList(tags, tags.map(drawTag), si, bi)
+                        : tags.map(drawTag)}
+                      {p.renderAdd?.(si, bi)}
+                    </div>
+                  ) : p.renderParagraph ? (
+                    p.renderParagraph(si, bi, prose)
+                  ) : (
+                    prose
+                  )}
+                </div>
+                <div className="wb-add-block-gap">
+                  <Button
+                    className="wb-add-block"
+                    variant="quiet"
+                    size="small"
+                    onClick={() => {
+                      // TODO(design): No empty-block editor is specified; use the existing raw editor at this separator.
+                      const raw = serializePromptSection(section);
+                      const at = block.range.end;
+                      p.onRawEdit?.(si, raw.slice(0, at) + '\n\n' + raw.slice(at));
+                    }}
+                  >
+                    <i className="ri-add-line" />
+                    加一块
+                  </Button>
+                </div>
               </div>
             );
           };
@@ -625,27 +630,30 @@ export function WorkbenchDocument(p: DocumentProps) {
       </div>
       {p.children}
       <footer className="wb-copy-bar">
-        <Button
-          onClick={() =>
-            p.onCopyText(
-              !filtered && !p.selectedKeys?.length ? copyPromptDocument(doc) : copyContext.text,
-              copyContext.count,
-              !!p.selectedKeys?.length,
-              copyContext.ignored,
-              negativeOnly ? '负面 Tag' : '',
-              copyContext.automaticIgnored,
-            )
-          }
-        >
-          <i className="ri-file-copy-line" />
-          {copyLabel}
-        </Button>
-        <Menu
-          label="其他复制方式"
-          menuClassName="wb-copy-menu"
-          trigger={<i className="ri-arrow-down-s-line" />}
-          items={copyItems}
-        />
+        <div className="nps-split-button">
+          <Button
+            onClick={() =>
+              p.onCopyText(
+                !filtered && !p.selectedKeys?.length ? copyPromptDocument(doc) : copyContext.text,
+                copyContext.count,
+                !!p.selectedKeys?.length,
+                copyContext.ignored,
+                negativeOnly ? '负面 Tag' : '',
+                copyContext.automaticIgnored,
+              )
+            }
+          >
+            <i className="ri-file-copy-line" />
+            {copyLabel}
+          </Button>
+          <Menu
+            label="其他复制方式"
+            menuClassName="wb-copy-menu"
+            buttonVariant="default"
+            trigger={<i className="ri-arrow-down-s-line" />}
+            items={copyItems}
+          />
+        </div>
       </footer>
     </section>
   );

@@ -53,7 +53,7 @@ export function LibraryDetail({
           <img
             src={mediaUrl(detail.image_path)}
             alt={imageAccessibleName(detail)}
-            onDoubleClick={onViewer}
+            onClick={onViewer}
           />
         </div>
         {group && group.members.length > 1 && (

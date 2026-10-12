@@ -386,7 +386,7 @@ export function LibraryGrid({
                       <>
                         <span className="library-stack">
                           {scrub?.group === group.id
-                            ? `${scrub.index + 1} / 共 ${group.members.length}`
+                            ? `${scrub.index + 1} / ${group.members.length}`
                             : `${group.members.length} 张`}
                         </span>
                         {scrub?.group === group.id && (

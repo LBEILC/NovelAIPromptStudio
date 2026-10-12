@@ -140,9 +140,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
       'both',
     );
     await h.font('.library-file-start', 'IBM Plex Mono');
-    await e(
-      'document.querySelector(".library-detail-picture img").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
-    );
+    await e('document.querySelector(".library-detail-picture img").click()');
     await wait('!!document.querySelector(".library-viewer")');
     await check(
       '未起名大图顶部只有尺寸和位置，没有名称',
@@ -206,9 +204,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await input('input[aria-label="图片名称"]', '命名验收.png');
     await confirmNaming();
     await wait('document.querySelector(".library-caption b")?.textContent === "命名验收.png"');
-    await e(
-      'document.querySelector(".library-detail-picture img").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
-    );
+    await e('document.querySelector(".library-detail-picture img").click()');
     await wait('!!document.querySelector(".library-viewer")');
     await saveDefault('命名验收.png');
     await click('关闭 Esc', 'document.querySelector(".library-viewer")');

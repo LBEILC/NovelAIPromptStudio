@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { DragStartEvent } from '@dnd-kit/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useDragFeedback } from './DragFeedback';
+import { motionMilliseconds, useDragFeedback } from './DragFeedback';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 let host: HTMLDivElement;
@@ -41,6 +41,10 @@ function start(motion: string) {
   });
 }
 describe('drop commits independently of visual feedback', () => {
+  it('preserves token time when the production CSS minifier converts milliseconds to seconds', () => {
+    expect(motionMilliseconds('240ms')).toBe(240);
+    expect(motionMilliseconds(' .24s ')).toBe(240);
+  });
   it.each(['off', 'full'])(
     'commits synchronously in %s mode without an overlay animation',
     (mode) => {

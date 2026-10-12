@@ -215,6 +215,7 @@ export function LibraryToolbar({
         <Button
           ref={filterAnchor}
           aria-label="筛选"
+          aria-expanded={open === 'filter'}
           variant="quiet"
           className={count || open === 'filter' ? 'active' : ''}
           onClick={() => setOpen(open === 'filter' ? '' : 'filter')}
@@ -225,6 +226,7 @@ export function LibraryToolbar({
         </Button>
         <Button
           ref={viewAnchor}
+          aria-expanded={open === 'view'}
           variant="quiet"
           onClick={() => setOpen(open === 'view' ? '' : 'view')}
         >
@@ -232,7 +234,7 @@ export function LibraryToolbar({
           <span>视图</span>
         </Button>
         {p.view !== 'trash' && (
-          <div className="library-import-buttons">
+          <div className="library-import-buttons nps-split-button">
             <Button variant="ink" onClick={p.onImport} disabled={p.importing}>
               <i className="ri-add-line" />
               导入
@@ -241,6 +243,7 @@ export function LibraryToolbar({
               ref={importAnchor}
               variant="ink"
               aria-label="其他导入方式"
+              aria-expanded={open === 'import'}
               onClick={() => setOpen(open === 'import' ? '' : 'import')}
             >
               <i className="ri-arrow-down-s-line" />

@@ -72,6 +72,9 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
     item: TagDictionaryEntry;
     point?: { x: number; y: number };
   } | null>(null);
+  const lastMenu = useRef(menu);
+  if (menu) lastMenu.current = menu;
+  const shownMenu = menu ?? lastMenu.current;
   const menuAnchor = useRef<HTMLElement | null>(null);
   const [message, setMessage] = useState('');
   const retranslate = async () => {
@@ -363,10 +366,11 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
                     variant="quiet"
                     size="small"
                     aria-label={`更多：${item.tag}`}
+                    aria-expanded={menu?.item.tag === item.tag && !menu.point}
                     disabled={d.busy}
                     onClick={(event) => {
                       menuAnchor.current = event.currentTarget;
-                      setMenu({ item });
+                      setMenu(menu?.item.tag === item.tag && !menu.point ? null : { item });
                     }}
                   >
                     <i className="ri-more-line" />
@@ -473,15 +477,15 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
       <Layer
         open={!!menu}
         anchor={menuAnchor}
-        point={menu?.point}
+        point={shownMenu?.point}
         onClose={() => setMenu(null)}
         className="nps-menu"
         focus
       >
-        {menu && (
+        {shownMenu && (
           <MenuItems
             label="词典更多"
-            items={moreItems(menu.item)}
+            items={moreItems(shownMenu.item)}
             closeAll={() => setMenu(null)}
             closeLevel={() => setMenu(null)}
           />
