@@ -8,3 +8,24 @@ design/brand/
 design/shots/
 
 .local/fonts/
+
+# 内部文档：由私有仓库 NovelAIPromptStudio-internal 跟踪（git 目录 .internal-git/），路径不变
+.internal-git/
+.claude/
+.impeccable.md
+coordination/
+doc/specs/
+doc/roles/
+doc/archive/
+doc/research/
+doc/design.md
+doc/rebuild-plan.md
+doc/product-boundary.md
+doc/design-improvement-plan.md
+doc/lobe-visual-language.md
+doc/promo-demo-data-v090.md
+design/preview*
+design/structure.html
+design/identity/source/
+design/identity/tokens/
+design/identity/guidelines.pdf

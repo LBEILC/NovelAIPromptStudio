@@ -77,7 +77,7 @@ Windows 上执行 `npm ci` 前先确认没有本地 `npm run dev` 开发服务�
 npm run package
 ```
 
-窗口行为、快捷键、文件对话框、安全存储、安装和更新等平台相关功能，需要在相应操作系统上实际验证。无法在另一平台完成的检查按 [跨平台协作说明](../coordination/README.md)记录。
+窗口行为、快捷键、文件对话框、安全存储、安装和更新等平台相关功能，由 CI 在 Windows 和 macOS 上的自动化验收覆盖（见[自动化验收](./automated-acceptance.md)）；自动化覆盖不到的写进发布说明的已知问题。
 
 ## 3. 提交并推送版本准备
 
@@ -238,4 +238,3 @@ git push origin refs/tags/v0.3.0
 6. 下载并启动至少一个当前平台安装包。
 7. Release 正文的「下载指引」链接可正常访问；链接或正文有误时可用 `gh release edit --notes-file` 无损修正，但下次发版仍以 annotated tag 说明为准。
 8. 检查 README 的“最新版”链接能进入新 Release。
-9. 需要另一平台验证时，更新 `coordination/` 中对应记录。

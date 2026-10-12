@@ -194,7 +194,7 @@ npm run build     # 构建前端
 npm run package   # 生成当前平台安装包
 ```
 
-提交改动前，请阅读[项目文档索引](./doc/README.md)与[协作约束](./AGENTS.md)。Windows 和 macOS 是一等支持平台；涉及窗口、快捷键、文件对话框、安全存储、安装或更新的改动需要在受影响的平台验证。
+提交改动前，请阅读[项目文档索引](./doc/README.md)与[协作约束](./AGENTS.md)。Windows 和 macOS 是一等支持平台；交互行为由自动化验收在两个平台的 CI 上验证。
 
 维护者发布新版本前请阅读[发版指南](./doc/release-guide.md)。欢迎通过 [Issues](https://github.com/LBEILC/NovelAIPromptStudio/issues) 反馈问题或提出建议。
 
