@@ -137,6 +137,7 @@
 - 移除 `@lobehub/ui` 及不再使用的依赖，确认构建产物里不再有组件库运行时和语法高亮文件。
 - 归档 `doc/lobe-visual-language.md`、`doc/design-improvement-plan.md`，删除 `.agents/skills/lobe-ui-frontend/`，重写 `.impeccable.md`，更新 `doc/product-boundary.md` 和 `doc/README.md`。
 - 更新应用图标、README 截图。
+- **内部文件移出公开仓库**（用户 2026-10-12 确认，设计负责人在 013 交付后做）：在用户的 GitHub 账号下建私有仓库 `NovelAIPromptStudio-internal`，用独立的 git 目录跟踪同一个工作目录里的内部文件，路径一个都不变；公开仓库忽略并删除这些文件。进私有仓库的：`doc/specs/`（含汇报）、`doc/roles/`、`doc/design.md`、`doc/rebuild-plan.md`、`doc/archive/`、`doc/research/`、`coordination/`、界面稿 `design/preview*`、`design/identity/source/`、`.claude/`、`.impeccable.md`，以及 `AGENTS.md` 里角色和流程的部分。留在公开仓库的：产品代码、`design/tokens.css`、标志文件、README、许可证、精简后的 `AGENTS.md`（构建、测试、跨平台）。`.agents/skills/` 直接删除。不重写公开仓库的历史。之后 Codex 只写汇报不提交，汇报由设计负责人提交到私有仓库。
 - 在真实图库的副本上演练一次升级（设计负责人做，只看统计数字），两个平台的 CI 全绿，然后合并到主干、发 1.0。交互验收靠自动化，不做手动验证（用户 2026-10-11）。
 
 ## 5. 验收手段
