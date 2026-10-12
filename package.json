@@ -34,6 +34,7 @@
     "fonts:check": "node scripts/fonts.mjs --check",
     "verify:fonts:package": "node scripts/verify-font-package.mjs",
     "verify:app": "npm run build && node scripts/verify-app.mjs",
+    "verify:app:system-reduced": "npm run verify:app -- --reduced-motion --motion=system",
     "verify:packaged": "npm run fonts:check && npm run build && node scripts/verify-app.mjs --packaged"
   },
   "dependencies": {

@@ -228,6 +228,30 @@ export async function componentDetails(h) {
     undefined,
     'once',
   );
+  await e(
+    `(()=>{document.querySelector('[aria-label="右键菜单"]').focus();[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='编辑一个 Tag').click()})()`,
+  );
+  await wait('!!document.querySelector(".nps-layer[role=dialog]")');
+  await h.window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: 1,
+    y: 1,
+    button: 'left',
+    clickCount: 1,
+  });
+  await h.window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: 1,
+    y: 1,
+    button: 'left',
+    clickCount: 1,
+  });
+  await check(
+    '编辑浮层关闭归还自身触发器而非打开前的旧焦点',
+    `document.activeElement.textContent.trim()==='编辑一个 Tag' && !document.querySelector('.nps-layer[role=dialog]')`,
+    'document.activeElement.outerHTML.slice(0,400)',
+    'once',
+  );
   await click('编辑一个 Tag');
   const popoverHasMotion = await e('document.documentElement.dataset.motion === "full"');
   await h.nativeKey('Tab', 8);

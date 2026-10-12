@@ -31,6 +31,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
       '图片库·收尾',
       '图片库·滚动条',
       '设置',
+      '设置·外观',
       '设置·AI 服务',
       '设置·翻译词典',
       '设置·版式',
@@ -46,7 +47,9 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
   )
     throw Error(`Unknown acceptance category: ${category}`);
   const reducedMotion = argv.includes('--reduced-motion');
-  const suffix = `${slow > 1 ? `-slow-${slow}` : ''}${reducedMotion ? '-reduced' : ''}${category === '全部' ? '' : `-${category.replaceAll('·', '-')}`}`;
+  const motion = value('motion');
+  if (motion && !['system', 'off'].includes(motion)) throw Error('--motion must be system or off');
+  const suffix = `${slow > 1 ? `-slow-${slow}` : ''}${reducedMotion ? '-reduced' : ''}${motion ? `-${motion}` : ''}${category === '全部' ? '' : `-${category.replaceAll('·', '-')}`}`;
   const needsLibrary = [
     '减少动态效果',
     '全部',
@@ -74,6 +77,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
     needsLibrary,
     needsDictionary,
     reducedMotion,
+    motion,
     outputName: `acceptance${suffix}`,
   };
 }

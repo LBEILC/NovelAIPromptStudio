@@ -427,6 +427,10 @@ export async function workbenchInteractionChecks(env) {
       `(()=>{const p=document.querySelector('.wb-tab-preview'),probe=document.createElement('span');probe.style.background='var(--surface)';document.body.append(probe);const expected=getComputedStyle(probe).backgroundColor;probe.remove();const s=getComputedStyle(p);return s.backgroundColor===expected&&s.boxShadow!=='none'})()`,
     );
     await h.screenshot('interaction-tab-preview');
+    // Scrolling an overflowing strip can move the next tab under a stationary
+    // pointer. Leave it before scrollIntoView so the subsequent move is a real
+    // entry, not a no-op after the scroll event has dismissed the preview.
+    await move('mouseMoved', { x: 20, y: 300 });
     await move('mouseMoved', await center(h, tab(1)));
     await wait(
       `document.querySelector('.wb-tab-preview img')?.src===${tab(1)}.querySelector('img').src`,

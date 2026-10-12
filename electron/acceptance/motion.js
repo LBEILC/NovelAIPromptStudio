@@ -1,5 +1,24 @@
 export const motionDetails = `(async()=>({motion:document.documentElement.dataset.motion,appearance:await window.studio.getAppearanceSettings(),systemReduced:matchMedia('(prefers-reduced-motion: reduce)').matches,transitions:[...document.querySelectorAll('.nps-button')].map(b=>getComputedStyle(b).transitionDuration)}))()`;
 
+export async function applyMotionBaseline(h, mode) {
+  if (!mode.motion) return;
+  await h.section('外观');
+  await h.click(
+    mode.motion === 'off' ? '关闭' : '跟随系统',
+    'document.querySelector("[aria-label=动效]")',
+  );
+  await h.wait(
+    `(async()=>(await window.studio.getAppearanceSettings()).motion===${JSON.stringify(mode.motion === 'off' ? 'off' : 'reduced')})()`,
+    '指定动效基线已保存',
+  );
+  await h.check(
+    '指定动效基线已应用',
+    `document.documentElement.dataset.motion===(${mode.motion === 'off'} || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'off' : 'full')`,
+    undefined,
+    'once',
+  );
+}
+
 export async function motionChecks(h) {
   const { evaluate: e, checkSoon, wait, check, window } = h;
   const cdp = window.webContents.debugger;

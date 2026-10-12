@@ -7,6 +7,7 @@ import { clipboard, nativeImage, ipcMain } from 'electron';
 import { describeAssetDirectory } from '../libraryStorage.js';
 import { dictionaryChecks } from './dictionary.js';
 import { createTrashDraft } from './shortcuts.js';
+import { appearanceLayerChecks } from './appearanceLayers.js';
 
 export async function settingsChecks(context, restart) {
   if (context.mode.category === '设置·版式') return settingsLayoutChecks(context.h);
@@ -15,6 +16,10 @@ export async function settingsChecks(context, restart) {
   const aiInput = (index) =>
     `.settings-column input${index === 1 ? '[type=password]' : index === 2 ? '[aria-label="模型"]' : ':not([type=password]):not([aria-label])'}`;
   const savedFile = path.join(mode.root, 'settings-expected.json');
+  if (!restart) {
+    await appearanceLayerChecks(context);
+    if (mode.category === '设置·外观') return;
+  }
   if (restart) {
     const expected = JSON.parse(await fs.readFile(savedFile, 'utf8'));
     h.category('设置·重启');

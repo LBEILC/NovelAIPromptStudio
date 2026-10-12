@@ -134,8 +134,20 @@ export async function interactionCorrectionChecks(env) {
       'document.querySelector("[aria-label=动效]")',
     );
     const listbox = 'document.querySelector(".nps-menu[role=listbox]:popover-open")';
-    for (const label of ['界面字体', '等宽字体', '段落字体'])
+    const fontsBefore = env.preferences.appearanceSettings();
+    for (const [label, key] of [
+      ['界面字体', 'sansFont'],
+      ['等宽字体', 'monoFont'],
+      ['段落字体', 'proseFont'],
+    ]) {
       await toggle(h, label, `document.querySelector('[aria-label="${label}"]')`, listbox);
+      await check(
+        `${label}连续开关后偏好保持原值`,
+        () => env.preferences.appearanceSettings()[key] === fontsBefore[key],
+        () => ({ expected: fontsBefore[key], actual: env.preferences.appearanceSettings()[key] }),
+        'once',
+      );
+    }
     await h.section('翻译词典');
     await h.input('.settings-dictionary-search input', dictionaryTag);
     await wait(`!!document.querySelector('[aria-label="更多：${dictionaryTag}"]')`);

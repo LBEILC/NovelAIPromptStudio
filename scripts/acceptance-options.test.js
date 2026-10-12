@@ -27,6 +27,27 @@ it('gives a slowed complete process room while keeping a hard upper bound', () =
   expect(acceptanceOptions(['--slow=6'], {}).processTimeoutMs).toBe(1_800_000);
 });
 
+it('keeps the system-reduced full run separate from the subset and explicit-off runs', () => {
+  expect(acceptanceOptions(['--reduced-motion', '--motion=system'], {})).toMatchObject({
+    category: '全部',
+    reducedMotion: true,
+    motion: 'system',
+    needsLibrary: true,
+    needsDictionary: true,
+    outputName: 'acceptance-reduced-system',
+  });
+  expect(
+    acceptanceOptions(['--reduced-motion', '--motion=off', '--category=设置·外观'], {}),
+  ).toMatchObject({
+    category: '设置·外观',
+    motion: 'off',
+    outputName: 'acceptance-reduced-off-设置-外观',
+    needsLibrary: false,
+    needsDictionary: false,
+  });
+  expect(() => acceptanceOptions(['--motion=missing'], {})).toThrow('--motion');
+});
+
 it('selects the reduced subset fixtures and validates timing policy before launch', () => {
   expect(
     acceptanceOptions(['--category=减少动态效果', '--reduced-motion'], { CI: 'true' }),

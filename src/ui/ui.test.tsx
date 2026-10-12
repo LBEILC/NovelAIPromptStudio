@@ -910,6 +910,22 @@ describe('Panel, placement and platform', () => {
     expect(layer.style.left).toBe('0px');
     expect(layer.style.top).toBe('0px');
   });
+  it('keeps long lists on one side of their trigger and remeasures after repositioning', () => {
+    const layer = document.createElement('div');
+    vi.spyOn(layer, 'offsetWidth', 'get').mockReturnValue(200);
+    vi.spyOn(layer, 'scrollHeight', 'get').mockReturnValue(innerHeight * 2);
+    vi.spyOn(layer, 'offsetHeight', 'get').mockImplementation(() =>
+      Math.min(innerHeight, parseFloat(layer.style.maxHeight) || innerHeight),
+    );
+    for (const y of [innerHeight * 0.75, innerHeight * 0.25]) {
+      const anchor = new DOMRect(30, y, 160, 30);
+      placeLayer(layer, anchor);
+      const top = parseFloat(layer.style.top);
+      const height = parseFloat(layer.style.maxHeight);
+      expect(top >= anchor.bottom || top + height <= anchor.top).toBe(true);
+      expect(height).toBe(Math.max(anchor.top, innerHeight - anchor.bottom));
+    }
+  });
   it.each([
     ['windows', 'Ctrl K'],
     ['macos', '⌘ K'],

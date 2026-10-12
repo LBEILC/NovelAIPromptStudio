@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { cx, focusables, placeLayer, trapTab } from './internal';
 import { useScrollArea } from './useScrollArea';
 
@@ -16,6 +17,7 @@ const activeLayers: { node: HTMLElement; trigger: HTMLElement | null; close: () 
 
 /** An inert exit can outlive its owner (for example, a menu that deletes its row). */
 function retainLayerExit(source: HTMLElement, opacity: string, transform = 'none') {
+  if (document.documentElement.dataset.motion === 'off') return;
   const ghost = source.cloneNode(true) as HTMLElement;
   for (const item of [ghost, ...ghost.querySelectorAll<HTMLElement>('*')]) {
     item.removeAttribute('id');
@@ -32,9 +34,12 @@ function retainLayerExit(source: HTMLElement, opacity: string, transform = 'none
   ghost.style.transition = '';
   ghost.style.opacity = '';
   ghost.hidePopover();
-  void Promise.allSettled(
-    (ghost.getAnimations?.() ?? []).map((animation) => animation.finished),
-  ).then(() => ghost.remove());
+  const animations = ghost.getAnimations?.() ?? [];
+  if (!animations.length) ghost.remove();
+  else
+    void Promise.allSettled(animations.map((animation) => animation.finished)).then(() =>
+      ghost.remove(),
+    );
 }
 
 /** Keep native top-layer nodes mounted until their CSS exit transitions finish. */
@@ -91,6 +96,21 @@ export function Layer({
   mode?: 'auto' | 'manual';
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const wasOpen = useRef(false);
+  // Move focus out before hidePopover can restore the browser's opening-time
+  // focus, which need not be this layer's trigger. Do not steal a new target.
+  useLayoutEffect(() => {
+    if (
+      !open &&
+      wasOpen.current &&
+      focus &&
+      anchor.current?.isConnected &&
+      !anchor.current.closest('[inert]') &&
+      (document.activeElement === document.body || ref.current?.contains(document.activeElement))
+    )
+      anchor.current.focus();
+    wasOpen.current = open;
+  }, [open, focus, anchor]);
   const present = usePresence(open, ref);
   const wasPresent = useRef(present);
   useLayoutEffect(() => {
@@ -129,18 +149,8 @@ export function Layer({
     }
     snapshot.current = { trigger: anchor.current, node: node.cloneNode(true) as HTMLElement };
   });
-  const wasOpen = useRef(false);
   useLayoutEffect(() => {
     if (open && focus && ref.current) (focusables(ref.current)[0] ?? ref.current).focus();
-    else if (
-      wasOpen.current &&
-      focus &&
-      anchor.current?.isConnected &&
-      !anchor.current.closest('[inert]') &&
-      (document.activeElement === document.body || ref.current?.contains(document.activeElement))
-    )
-      anchor.current.focus();
-    wasOpen.current = open;
   }, [open, focus, anchor]);
   useEffect(() => {
     const node = ref.current;
@@ -157,16 +167,15 @@ export function Layer({
           .some((layer) => layer.node.contains(target) || layer.trigger?.contains(target))
       )
         return;
-      entry.close();
-      requestAnimationFrame(() => {
-        if (
-          focus &&
-          document.activeElement === document.body &&
-          entry.trigger?.isConnected &&
-          !entry.trigger.closest('[inert]')
-        )
-          entry.trigger.focus();
-      });
+      // A blank-area pointer default would blur the synchronously restored
+      // trigger. Real controls still receive their normal focus and click.
+      const focusTarget =
+        target instanceof Element &&
+        target.closest(
+          'button, input, select, textarea, a[href], label, [tabindex], [contenteditable="true"]',
+        );
+      if (focus && !focusTarget) event.preventDefault();
+      flushSync(() => entry.close());
     };
     const escape = (event: KeyboardEvent) => {
       const focusedLayer = [...activeLayers]

@@ -1,6 +1,7 @@
 import { EmptyMark } from '../ui';
 import { StrictMode, useRef, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { LongSelectProbe } from './LongSelectProbe';
 import { Search, X } from 'lucide-react';
 import {
   ThemeProvider,
@@ -661,7 +662,7 @@ createRoot(document.getElementById('root')!).render(
       }
     >
       <NotificationProvider>
-        <Showcase />
+        {params.get('probe') === 'long-select' ? <LongSelectProbe /> : <Showcase />}
       </NotificationProvider>
     </ThemeProvider>
   </StrictMode>,

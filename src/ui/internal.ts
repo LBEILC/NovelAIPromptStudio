@@ -46,12 +46,25 @@ export function trapTab(event: KeyboardEvent, root: HTMLElement) {
 
 /** Coordinates are measured viewport geometry, never design constants. */
 export function placeLayer(layer: HTMLElement, anchor: DOMRect, side = false) {
+  // A long dropdown must scroll on one side of its trigger. Clamping a full
+  // viewport-height list to y=0 would cover the trigger and turn its next click
+  // into an unintended option selection.
+  // Do not temporarily expand a scrolling list to measure it: Chromium would
+  // clamp scrollTop and pull the user's last visible options out of view.
+  if (side) layer.style.maxHeight = '';
   const bounds = { width: layer.offsetWidth, height: layer.offsetHeight };
+  const below = clamp(innerHeight - anchor.bottom, 0, innerHeight);
+  const above = clamp(anchor.top, 0, innerHeight);
+  const flip = !side && Math.max(layer.scrollHeight, bounds.height) > below && above > below;
+  if (!side) {
+    layer.style.maxHeight = `${flip ? above : below}px`;
+    bounds.height = layer.offsetHeight;
+  }
   let left = side ? anchor.right : anchor.left;
-  let top = side ? anchor.top : anchor.bottom;
+  let top = side ? anchor.top : flip ? anchor.top - bounds.height : anchor.bottom;
   if (left + bounds.width > innerWidth)
     left = side ? anchor.left - bounds.width : anchor.right - bounds.width;
-  if (top + bounds.height > innerHeight) top = anchor.top - bounds.height;
+  if (side && top + bounds.height > innerHeight) top = anchor.top - bounds.height;
   layer.dataset.placement = side
     ? left < anchor.left
       ? 'left'

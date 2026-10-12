@@ -7,7 +7,7 @@ export async function componentChecks({ h, mode }) {
   for (const theme of [mode.theme]) {
     h.category(`基础组件·${theme}`);
     await h.window.loadFile(path.join(mode.root, 'showcase', 'ui-showcase.html'), {
-      query: { theme: 'system' },
+      query: { theme: 'system', motion: mode.motion || 'system' },
     });
     await wait('!!document.querySelector("[data-showcase]")');
     const slider = 'input[type=range]';
@@ -251,6 +251,53 @@ export async function componentChecks({ h, mode }) {
       '[...document.querySelectorAll(".nps-loader")].length>0 && [...document.querySelectorAll(".nps-loader")].every(e=>getComputedStyle(e).animationName==="none")',
       undefined,
       'both',
+    );
+    await h.window.loadFile(path.join(mode.root, 'showcase', 'ui-showcase.html'), {
+      query: { theme: 'system', motion: mode.motion || 'system', probe: 'long-select' },
+    });
+    await wait('!!document.querySelector("[data-long-select-probe]")');
+    await click('长列表验收');
+    await wait('!!document.querySelector(".nps-layer[role=listbox]:popover-open")');
+    await wait(
+      `[...document.querySelectorAll('.nps-layer[role=listbox]')].every(n=>n.getAnimations().every(a=>a.playState!=='running'))`,
+    );
+    await check(
+      '长下拉列表不遮挡触发器',
+      `(()=>{const t=document.querySelector('[aria-label="长列表验收"]'),r=t.getBoundingClientRect(),l=document.querySelector('.nps-layer[role=listbox]').getBoundingClientRect();return t.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)) && (l.bottom<=r.top+1 || l.top>=r.bottom-1)})()`,
+      `(()=>{const t=document.querySelector('[aria-label="长列表验收"]').getBoundingClientRect();return {trigger:t.toJSON(),layer:document.querySelector('.nps-layer[role=listbox]').getBoundingClientRect().toJSON(),hit:document.elementFromPoint(t.x+t.width/2,t.y+t.height/2)?.outerHTML}})()`,
+      'both',
+    );
+    const longTrigger = await e(
+      `(()=>{const r=document.querySelector('[aria-label="长列表验收"]').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`,
+    );
+    for (const type of ['mousePressed', 'mouseReleased'])
+      await h.window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+        type,
+        ...longTrigger,
+        button: 'left',
+        clickCount: 1,
+      });
+    await check(
+      '再次点击长列表触发器只关闭而不误选条目',
+      `!document.querySelector('.nps-layer[role=listbox]') && document.querySelector('output').textContent==='0'`,
+      `document.querySelector('output').textContent`,
+      'once',
+    );
+    await click('长列表验收');
+    await key('End');
+    await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    await check(
+      '长列表滚动到末项后保持可见且不被重新定位拉回',
+      `(()=>{const n=document.querySelector('.nps-layer[role=listbox]'),r=n.getBoundingClientRect(),last=[...n.querySelectorAll('[role=option]')].at(-1).getBoundingClientRect();return last.top>=r.top && last.bottom<=r.bottom+1})()`,
+      undefined,
+      'both',
+    );
+    await key('Enter');
+    await check(
+      '限制高度的长列表仍能选择最后一项',
+      `document.querySelector('output').textContent==='99'`,
+      undefined,
+      'once',
     );
   }
 }

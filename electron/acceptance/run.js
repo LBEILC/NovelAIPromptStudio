@@ -5,7 +5,7 @@ import { libraryInteractionChecks, workbenchInteractionChecks } from './interact
 import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import { libraryChecks } from './library.js';
-import { motionChecks } from './motion.js';
+import { motionChecks, applyMotionBaseline } from './motion.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { clipboard, nativeTheme, safeStorage } from 'electron';
@@ -112,6 +112,7 @@ export async function runAcceptance(context) {
     });
     await wait('!!document.querySelector(".studio-titlebar") && !!window.studio');
     h.dualThemes(true);
+    if (mode.phase === 0) await applyMotionBaseline(h, mode);
     if (mode.reducedMotion)
       await check(
         '进程级系统减少动态效果已启用（未使用 CDP）',
@@ -313,6 +314,7 @@ export async function runAcceptance(context) {
         }
         h.dualThemes(true);
         await motionChecks(h);
+        await applyMotionBaseline(h, mode);
         await section('外观');
         window.showInactive();
         window.maximize();
