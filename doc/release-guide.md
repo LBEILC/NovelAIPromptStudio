@@ -175,7 +175,7 @@ git push origin refs/tags/v0.3.0
 1. 在 Windows 和 macOS runner 上执行 `npm ci`、`npm test`。
 2. 校验标签是否与 `package.json` 版本一致。
 3. 构建 Windows x64 安装程序。
-4. 在 macOS Intel runner 上同时构建 Intel 与 Apple Silicon 的 DMG、ZIP 和更新元数据。
+4. Intel 版和 Apple 芯片版的 macOS 包分别在对应架构的 runner 上构建（DMG、ZIP 和更新元数据），各自检查包里的原生模块并启动一次打好的应用，然后合并两份更新元数据。
 5. 汇总产物并生成 `SHA256SUMS.txt`。
 6. checkout 完整标签历史，读取 annotated tag 中的更新说明。
 7. 创建 GitHub Release 并上传产物。
