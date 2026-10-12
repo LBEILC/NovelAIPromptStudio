@@ -209,6 +209,7 @@ export function useLibraryComputation({
     galleryCollectionsWithCounts,
     editingSmartCollection,
     similarGroupingState,
+    setSimilarGroupingState,
     visibleGroups,
     galleryUpdating,
     galleryContentKey,

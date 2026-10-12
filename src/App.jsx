@@ -1002,6 +1002,7 @@ export default function App() {
     galleryCollectionsWithCounts,
     editingSmartCollection,
     similarGroupingState,
+    setSimilarGroupingState,
     visibleGroups,
     galleryUpdating,
     galleryContentKey,

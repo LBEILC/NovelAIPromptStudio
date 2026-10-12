@@ -27,7 +27,7 @@
     "start": "electron .",
     "start:demo": "electron . --profile=demo",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && node scripts/check-js-names.mjs",
     "format": "prettier --write \"{src,electron,scripts}/**/*.{js,jsx,ts,tsx,cjs,mjs}\" \"vite.config.js\"",
     "format:check": "prettier --check \"{src,electron,scripts}/**/*.{js,jsx,ts,tsx,cjs,mjs}\" \"vite.config.js\"",
     "fonts": "node scripts/fonts.mjs",
