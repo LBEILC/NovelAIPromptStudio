@@ -14,8 +14,14 @@ async function fixture(count = 0) {
   const database = await openDatabase(root);
   databases.push(database);
   const tags = Array.from({ length: count }, (_, i) => `fixture_tag_${String(i).padStart(3, '0')}`);
-  tags.forEach((tag) =>
-    database.updateTagDictionary(tag, { translation: '原译文', category: 'Body' }),
+  database.upsertTagDictionary(
+    tags.map((tag) => ({
+      tag,
+      translation: '原译文',
+      category: 'Body',
+      has_translation: true,
+      has_classification: true,
+    })),
   );
   return { database, tags };
 }
@@ -67,12 +73,12 @@ it('counts each active image once across positive, negative and character tags w
   expect(counts.get('blue hair')).toBe(1);
 });
 it('loads an entire snapshot beyond the old page size without changing paginated callers', async () => {
-  const { database } = await fixture(205);
-  expect(database.listTagDictionary({ all: true }).items).toHaveLength(205);
+  const { database } = await fixture(201);
+  expect(database.listTagDictionary({ all: true }).items).toHaveLength(201);
   expect(database.listTagDictionary({ limit: 200 }).items).toHaveLength(200);
 });
 it('keeps a failed batch unchanged and commits the successful remainder', async () => {
-  const { database, tags } = await fixture(55);
+  const { database, tags } = await fixture(51);
   let calls = 0;
   const result = await retranslateDictionary({
     tags,
@@ -81,17 +87,17 @@ it('keeps a failed batch unchanged and commits the successful remainder', async 
     fetcher: (...args) =>
       ++calls === 1 ? Promise.resolve(new Response('{}', { status: 500 })) : response(...args),
   });
-  expect(result).toMatchObject({ completed: 55, translated: 5, canceled: false });
+  expect(result).toMatchObject({ completed: 51, translated: 1, canceled: false });
   expect(result.failed).toHaveLength(50);
   expect(database.lookupTagDictionary([tags[0]]).get(tags[0]).translation).toBe('原译文');
-  expect(database.lookupTagDictionary([tags[54]]).get(tags[54])).toMatchObject({
+  expect(database.lookupTagDictionary([tags[50]]).get(tags[50])).toMatchObject({
     translation: '新译文',
     translation_source: 'ai',
     category_source: 'ai',
   });
 });
 it('cancels between batches and preserves newer manual edits during a request', async () => {
-  const { database, tags } = await fixture(55);
+  const { database, tags } = await fixture(51);
   const controller = new AbortController();
   const result = await retranslateDictionary({
     tags,
@@ -109,7 +115,7 @@ it('cancels between batches and preserves newer manual edits during a request', 
   expect(result).toMatchObject({ completed: 50, translated: 49, canceled: true });
   expect(result.failed).toHaveLength(1);
   expect(database.lookupTagDictionary([tags[0]]).get(tags[0]).translation).toBe('后来修改');
-  expect(database.lookupTagDictionary([tags[54]]).get(tags[54]).translation).toBe('原译文');
+  expect(database.lookupTagDictionary([tags[50]]).get(tags[50]).translation).toBe('原译文');
 });
 it('aborts an in-flight batch before writing any result', async () => {
   const { database, tags } = await fixture(2);

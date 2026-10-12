@@ -1,7 +1,7 @@
 import { parsePrompt } from '../../src/lib/prompt.js';
 import { createPromptStructure } from '../../src/lib/promptStructure.js';
 
-export async function libraryNamingChecks({ h, database, doubles }) {
+export async function libraryNamingChecks({ h, database, doubles, preferences }) {
   h.category('图片库·起名');
   const { evaluate: e, wait, check, click, input } = h;
   const dialog = 'document.querySelector("dialog[open]")';
@@ -16,6 +16,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     );
   };
   const fixtureIds = [];
+  const autoCheckUpdates = preferences.productivitySettings().autoCheckUpdates;
   const previousSize = h.window.getContentSize();
   h.window.setContentSize(1240, 760);
   const source = database.loadLibrary()[0];
@@ -94,6 +95,9 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     );
   };
   try {
+    // Each reload schedules an automatic update notice after six seconds. Keep
+    // that unrelated fixture notification out of the short-lived undo scenario.
+    preferences.saveProductivitySettings({ autoCheckUpdates: false });
     for (let i = 0; i < 6; i++) make(i);
     await refresh();
     await check(
@@ -329,6 +333,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await undo();
     await click('取消', bar);
   } finally {
+    preferences.saveProductivitySettings({ autoCheckUpdates });
     for (const id of fixtureIds) database.deleteProject(id);
     await h.reload();
     await click('图片库', 'document.querySelector(".studio-titlebar")');

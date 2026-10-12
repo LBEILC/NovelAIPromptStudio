@@ -64,6 +64,11 @@ export async function libraryImportExtras({ h, database, doubles, mode, files, r
     'once',
   );
   const file = batch.at(-1);
+  await fs.access(file);
+  await wait(
+    '!!document.querySelector(".library-scroll") && !document.querySelector("[data-library-updating=true]")',
+    '取消导入后的拖入目标已就绪',
+  );
   await e(
     `(()=>{const input=document.createElement('input');input.type='file';input.hidden=true;input.id='acceptance-drop-file';document.body.append(input)})()`,
   );
@@ -75,6 +80,10 @@ export async function libraryImportExtras({ h, database, doubles, mode, files, r
     selector: '#acceptance-drop-file',
   });
   await cdp.sendCommand('DOM.setFileInputFiles', { nodeId, files: [file] });
+  await wait(
+    'document.querySelector("#acceptance-drop-file")?.files?.length === 1 && !!document.querySelector(".library-scroll")',
+    '拖入文件与目标元素均已就绪',
+  );
   await e(
     `(()=>{const source=document.querySelector('#acceptance-drop-file');const data=new DataTransfer();data.items.add(source.files[0]);window.__acceptanceDrop=data;const target=document.querySelector('.library-scroll');for(const type of ['dragenter','dragover'])target.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:data,clientX:400,clientY:300}));})()`,
   );

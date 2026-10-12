@@ -671,7 +671,7 @@ it('preserves the full reader weight clamp for non-finite legacy SQLite values',
 it('shares one complete build across views and reconciles every write between batches', async () => {
   const directory = temporary();
   const api = await open(directory);
-  api.insertProjects(Array.from({ length: 80 }, (_, i) => sample(i)));
+  api.insertProjects(Array.from({ length: 51 }, (_, i) => sample(i)));
   const insertions = [];
   const prepare = DatabaseSync.prototype.prepare;
   vi.spyOn(DatabaseSync.prototype, 'prepare').mockImplementation(function (sql) {
@@ -699,7 +699,7 @@ it('shares one complete build across views and reconciles every write between ba
           api.updateProjects(['p2'], { deleted: true });
           edit(directory, (raw) => {
             raw.exec("DELETE FROM projects WHERE id = 'p1'");
-            raw.exec("UPDATE prompt_tags SET weight = 1.7 WHERE project_id = 'p79'");
+            raw.exec("UPDATE prompt_tags SET weight = 1.7 WHERE project_id = 'p50'");
           });
           api.updateTagDictionary('landscape', {
             category: 'ArtistEra',
@@ -719,7 +719,7 @@ it('shares one complete build across views and reconciles every write between ba
     api.loadLibraryCards('trash'),
   ]);
   expect(same).toEqual(cards);
-  expect(cards).toHaveLength(79);
+  expect(cards).toHaveLength(50);
   expect(trash.map((card) => card.id)).toEqual(['p2']);
   expect(cards.find((card) => card.id === 'p0').name).toBe('Changed during build');
   expect(cards.find((card) => card.id === 'p100')).toBeDefined();
@@ -729,8 +729,8 @@ it('shares one complete build across views and reconciles every write between ba
       .filter((tag) => tag.tag === 'landscape')
       .every((tag) => tag.translation === '建立期间修改'),
   ).toBe(true);
-  expect(insertions.filter((id) => id === 'p50')).toHaveLength(1);
-  expect(progress.at(-1)).toEqual({ completed: 80, total: 80 });
+  expect(insertions.filter((id) => id === 'p3')).toHaveLength(1);
+  expect(progress.at(-1)).toEqual({ completed: 51, total: 51 });
   expect(progress.every((value) => value.completed >= 0 && value.completed <= value.total)).toBe(
     true,
   );
@@ -743,7 +743,7 @@ it('shares one complete build across views and reconciles every write between ba
 it('keeps completed monotonic while deletions and imports change the build total', async () => {
   const directory = temporary();
   const api = await open(directory);
-  api.insertProjects(Array.from({ length: 80 }, (_, i) => sample(i)));
+  api.insertProjects(Array.from({ length: 51 }, (_, i) => sample(i)));
   const progress = [];
   let removed = false;
   let imported = false;
@@ -754,7 +754,7 @@ it('keeps completed monotonic while deletions and imports change the build total
       edit(directory, (raw) =>
         raw.exec('DELETE FROM projects WHERE id IN (SELECT project_id FROM library_card_cache)'),
       );
-    } else if (removed && !imported && value.total < 80) {
+    } else if (removed && !imported && value.total < 51) {
       imported = true;
       api.insertProject(sample(100));
     }
@@ -769,7 +769,7 @@ it('keeps completed monotonic while deletions and imports change the build total
 
 it('uses the resolved list as completion even when terminal progress delivery is delayed', async () => {
   const api = await open(temporary());
-  api.insertProjects(Array.from({ length: 60 }, (_, i) => sample(i)));
+  api.insertProjects(Array.from({ length: 51 }, (_, i) => sample(i)));
   const received = [];
   const delayed = [];
   let listening = true;
@@ -779,7 +779,7 @@ it('uses the resolved list as completion even when terminal progress delivery is
   });
   listening = false;
   delayed.forEach((deliver) => deliver());
-  expect(cards).toHaveLength(60);
+  expect(cards).toHaveLength(51);
   expect(delayed.length).toBeGreaterThan(0);
   expect(received.some((p) => p.completed > 0 && p.completed < p.total)).toBe(true);
   expect(received.every((p) => p.completed < p.total)).toBe(true);
@@ -799,7 +799,7 @@ it('returns complete empty and hot lists without any progress events', async () 
 it('rejects pending readers on close and resumes committed batches on reopen', async () => {
   const directory = temporary();
   let api = await open(directory);
-  api.insertProjects(Array.from({ length: 60 }, (_, i) => sample(i)));
+  api.insertProjects(Array.from({ length: 51 }, (_, i) => sample(i)));
   let interrupted = false;
   await expect(
     api.loadLibraryCards('all', ({ completed, total }) => {
@@ -815,10 +815,10 @@ it('rejects pending readers on close and resumes committed batches on reopen', a
     (raw) => raw.prepare('SELECT count(*) AS n FROM library_card_cache').get().n,
   );
   expect(saved).toBeGreaterThan(0);
-  expect(saved).toBeLessThan(60);
+  expect(saved).toBeLessThan(51);
   api = await open(directory);
   const cards = await api.loadLibraryCards();
-  expect(cards).toHaveLength(60);
+  expect(cards).toHaveLength(51);
   edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
   expect(await api.loadLibraryCards()).toEqual(cards);
 });

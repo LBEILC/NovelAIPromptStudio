@@ -302,6 +302,9 @@ export async function settingsChecks(context, restart) {
   const aiDraftMatches = `document.querySelector(${JSON.stringify(aiInput(0))})?.value === ${JSON.stringify(mode.baseUrl)} && document.querySelector('[aria-label="模型"]')?.value==='acceptance-model' && document.querySelector('input[type=password]')?.value===${JSON.stringify(encrypted ? 'acceptance-local-key' : '')} && [...document.querySelectorAll('textarea')].map(e=>e.value).join('|') === '验收翻译规则|验收分类规则'`;
   const aiDraftDetails = `(()=>{const key=document.querySelector('input[type=password]'); const areas=[...document.querySelectorAll('textarea')]; return {baseUrl:document.querySelector(${JSON.stringify(aiInput(0))})?.value, model:document.querySelector('[aria-label="模型"]')?.value, apiKey:{empty:!key?.value,length:key?.value.length ?? 0}, translationPrompt:areas[0]?.value, classificationPrompt:areas[1]?.value}})()`;
   try {
+    // Layout checks may have already loaded and retained the AI page. Start a
+    // fresh renderer after installing the gate so this is truly its first read.
+    if (slowAIRead) await h.reload();
     await section('AI 服务');
     await wait('!!document.querySelector("input[type=password]")');
     if (slowAIRead) await h.until(() => aiReads === 1, '首次设置读取已挂起');
