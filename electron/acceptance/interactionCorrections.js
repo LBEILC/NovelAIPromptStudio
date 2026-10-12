@@ -70,13 +70,23 @@ async function exitCheck(h, label, trigger, layer, close) {
   await h.wait(`!!(${layer})`);
   await settle(h);
   await h.evaluate(`(()=>{
-    const node=${layer}; window.correctionExit=null;
+    const node=${layer}; window.correctionExit=null; let closing=false;
+    const record=animated=>{
+      if(window.correctionExit)return;
+      const off=document.documentElement.dataset.motion==='off';
+      window.correctionExit={off,connected:node.isConnected,animated,duration:getComputedStyle(node).transitionDuration};
+    };
+    // Listening for the exit transition avoids sampling one frame later, which misses a 120ms fade on slow CI frames.
+    // With motion off a sub-millisecond transition may still run so that transitionend fires; it is not a fade.
+    node.addEventListener('transitionrun',event=>{
+      if(closing&&event.target===node&&event.propertyName==='opacity'&&document.documentElement.dataset.motion!=='off')record(true);
+    });
     node.addEventListener('beforetoggle',event=>{
       if(event.newState!=='closed')return;
+      closing=true;
       requestAnimationFrame(()=>{
-        const off=document.documentElement.dataset.motion==='off';
-        const animations=node.getAnimations().filter(a=>a.transitionProperty==='opacity');
-        window.correctionExit={off,connected:node.isConnected,animated:animations.some(a=>a.playState==='running'),duration:getComputedStyle(node).transitionDuration};
+        if(node.getAnimations().some(a=>a.transitionProperty==='opacity'&&a.playState==='running'))record(true);
+        requestAnimationFrame(()=>record(false));
       });
     },{once:true});
   })()`);
