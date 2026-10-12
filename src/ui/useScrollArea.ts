@@ -76,6 +76,7 @@ export function useScrollArea(
       thumb.style.height = `${metrics.size}px`;
       // Include scrollTop so the absolute thumb stays in the viewport.
       thumb.style.top = `${(overlay === node ? node.scrollTop : node.offsetTop) + metrics.offset}px`;
+      thumb.style.right = `${token('--sb-inset') - (overlay === node ? node.scrollLeft : 0)}px`;
       node.toggleAttribute('data-scrolled', node.scrollTop > 0);
     };
     const schedule = () => {

@@ -35,6 +35,7 @@ import {
 import './workbench.css';
 
 export interface DocumentProps {
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
   project: ImageProject;
   viewState: WorkbenchTab['viewState'];
   onViewStateChange: (value: WorkbenchTab['viewState']) => void;
@@ -60,7 +61,8 @@ export interface DocumentProps {
   sectionEditor?: { section: number; content: ReactNode };
 }
 export function WorkbenchDocument(p: DocumentProps) {
-  const scroll = useRef<HTMLDivElement>(null);
+  const localScroll = useRef<HTMLDivElement>(null);
+  const scroll = p.scrollRef ?? localScroll;
   useScrollArea(scroll);
   const doc = useMemo(() => createPromptDocument(p.project), [p.project]);
   const entries = useMemo(() => documentTags(doc), [doc]);

@@ -59,9 +59,13 @@ export function AddTags({
     setItems([]);
   };
   return (
-    <div className="wb-add-tags" ref={drop.setNodeRef} data-drop-active={drop.isOver || undefined}>
-      {editing ? (
-        <>
+    <>
+      <div
+        className="wb-add-tags"
+        ref={drop.setNodeRef}
+        data-drop-active={drop.isOver || undefined}
+      >
+        {editing ? (
           <Autocomplete
             autoFocus
             onDismiss={() => {
@@ -78,26 +82,28 @@ export function AddTags({
               onSelect: () => add(analysis.tags.map(formatTag).join(', ')),
             }}
           />
-          <span className="nps-help">
-            回车添加。用逗号或换行可以一次添加多个；输入中文会找对应的英文 Tag。
-          </span>
-          {value && (
-            <span className="nps-help">
-              将添加 {analysis.tags.length} 个 · {analysis.duplicateCount} 个重复
-            </span>
-          )}
-        </>
-      ) : (
-        <Button
-          className="wb-add-trigger"
-          variant="quiet"
-          size="small"
-          onClick={() => setEditing(true)}
-        >
-          <i className="ri-add-line" />
-          输入中文或英文
-        </Button>
+        ) : (
+          <Button
+            className="wb-add-trigger"
+            variant="quiet"
+            size="small"
+            onClick={() => setEditing(true)}
+          >
+            <i className="ri-add-line" />
+            输入中文或英文
+          </Button>
+        )}
+      </div>
+      {editing && (
+        <span className="nps-help wb-add-help">
+          回车添加。用逗号或换行可以一次添加多个；输入中文会找对应的英文 Tag。
+        </span>
       )}
-    </div>
+      {editing && value && (
+        <span className="nps-help wb-add-help">
+          将添加 {analysis.tags.length} 个 · {analysis.duplicateCount} 个重复
+        </span>
+      )}
+    </>
   );
 }

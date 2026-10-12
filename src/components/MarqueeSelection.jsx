@@ -19,6 +19,26 @@ function sameKeys(first, second) {
   return first.length === second.length && first.every((key, index) => key === second[index]);
 }
 
+/** Keep scrolling even when a captured pointer stops moving at the edge. */
+export function startMarqueeAutoScroll(container, getPoint) {
+  let frame = 0;
+  let previous = performance.now();
+  const tick = (now) => {
+    const point = getPoint();
+    if (!point) return;
+    const bounds = container.getBoundingClientRect();
+    const edge = Math.min(48, bounds.height / 4);
+    const speed =
+      Math.max(-1, Math.min(0, (point.y - bounds.top - edge) / edge)) +
+      Math.min(1, Math.max(0, (point.y - bounds.bottom + edge) / edge));
+    container.scrollTop += speed * Math.min(now - previous, 32) * 0.72;
+    previous = now;
+    frame = requestAnimationFrame(tick);
+  };
+  frame = requestAnimationFrame(tick);
+  return () => cancelAnimationFrame(frame);
+}
+
 function pointerOnScrollbar(container, event) {
   const bounds = container.getBoundingClientRect();
   const verticalScrollbar = container.offsetWidth - container.clientWidth;
@@ -60,6 +80,7 @@ export function useMarqueeSelection({
   const selectedKeysRef = useRef(selectedKeys);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const suppressClickRef = useRef(false);
+  const stopScroll = useRef(() => {});
 
   selectedKeysRef.current = selectedKeys;
   onSelectionChangeRef.current = onSelectionChange;
@@ -77,6 +98,7 @@ export function useMarqueeSelection({
       // Capturing on pointerdown redirects an ordinary button click to the container.
       // Wait until the gesture is unquestionably a drag.
       container.setPointerCapture?.(drag.pointerId);
+      stopScroll.current = startMarqueeAutoScroll(container, () => dragRef.current?.point);
     }
     const viewport = container.getBoundingClientRect();
     const scroll = { left: container.scrollLeft, top: container.scrollTop };
@@ -116,19 +138,29 @@ export function useMarqueeSelection({
       onSelectionChangeRef.current?.([]);
     }
     dragRef.current = null;
+    stopScroll.current();
     setRect(null);
     document.documentElement.classList.remove('is-marquee-selecting');
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    if (containerRef.current?.hasPointerCapture?.(event.pointerId)) {
+      containerRef.current.releasePointerCapture(event.pointerId);
     }
   };
 
-  useEffect(
-    () => () => {
+  const updateRef = useRef(updateSelection);
+  updateRef.current = updateSelection;
+  useEffect(() => {
+    const container = containerRef.current;
+    const scroll = () => {
+      const drag = dragRef.current;
+      if (drag?.active) updateRef.current(drag.point);
+    };
+    container?.addEventListener('scroll', scroll);
+    return () => {
+      container?.removeEventListener('scroll', scroll);
+      stopScroll.current();
       document.documentElement.classList.remove('is-marquee-selecting');
-    },
-    [],
-  );
+    };
+  }, [containerRef]);
 
   const handlers = {
     onClickCapture: (event) => {
@@ -146,6 +178,7 @@ export function useMarqueeSelection({
       const container = containerRef.current;
       if (!container || pointerOnScrollbar(container, event)) return;
       const target = event.target;
+      if (!container.contains(target)) return;
       const item = target.closest?.(itemSelector);
       if (item && !startOnItems) return;
       if (target.closest?.(INTERACTIVE_SELECTOR) && !item) return;

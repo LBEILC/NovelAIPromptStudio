@@ -1,4 +1,5 @@
 import { workbenchChecks } from './workbench.js';
+import { libraryPolishChecks, workbenchPolishChecks } from './polish.js';
 import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import { libraryChecks } from './library.js';
@@ -24,7 +25,10 @@ export async function runAcceptance(context) {
   const checks = [];
   mode.screenshots = [];
   const started = Date.now();
-  const restoreClipboard = preserveClipboard(clipboard);
+  // These focused scenarios never invoke copy/paste; leave every clipboard format untouched.
+  const restoreClipboard = ['图片库·细节', '工作台·细节'].includes(mode.category)
+    ? null
+    : preserveClipboard(clipboard);
   const previousTheme = nativeTheme.themeSource;
   const files = (await fs.readdir(path.join(mode.root, 'fixtures')))
     .filter((f) => f.endsWith('.png'))
@@ -366,6 +370,8 @@ export async function runAcceptance(context) {
         );
       } else if (mode.category === '外壳') await shellChecks();
       else if (mode.category === '工作台') await workbenchChecks(environment);
+      else if (mode.category === '工作台·细节') await workbenchPolishChecks(environment);
+      else if (mode.category === '图片库·细节') await libraryPolishChecks(environment);
       else if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
       else if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
       else if (['图片库', '图片库·导入', '图片库·收尾', '图片库·滚动条'].includes(mode.category))
@@ -405,6 +411,8 @@ export async function runAcceptance(context) {
         await libraryChecks(environment);
         await settingsChecks(environment, false);
         await componentChecks(environment);
+        await libraryPolishChecks(environment);
+        await workbenchPolishChecks(environment);
         await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());
       }
     }
@@ -426,21 +434,23 @@ export async function runAcceptance(context) {
     await h?.screenshot(`failure-${mode.phase}`).catch(() => {});
     throw error;
   } finally {
-    let restored = restoreClipboard();
-    const immediate = restored;
-    // Windows clipboard ownership may settle on the next message-loop turn.
-    // Write once; only reread, so a delayed check never overwrites another app.
-    for (let attempt = 0; !restored && attempt < 10; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, 25));
-      restored = restoreClipboard.verify();
+    if (restoreClipboard) {
+      let restored = restoreClipboard();
+      const immediate = restored;
+      // Windows clipboard ownership may settle on the next message-loop turn.
+      // Write once; only reread, so a delayed check never overwrites another app.
+      for (let attempt = 0; !restored && attempt < 10; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        restored = restoreClipboard.verify();
+      }
+      checks.push({
+        category: '隔离',
+        label: '恢复运行前剪贴板内容',
+        status: restored ? 'passed' : 'failed',
+        themeScope: 'once',
+        details: { immediate, ...restoreClipboard.details() },
+      });
     }
-    checks.push({
-      category: '隔离',
-      label: '恢复运行前剪贴板内容',
-      status: restored ? 'passed' : 'failed',
-      themeScope: 'once',
-      details: { immediate, ...restoreClipboard.details() },
-    });
     nativeTheme.themeSource = previousTheme;
     await fs.writeFile(
       path.join(mode.output, `checks-${mode.phase}.json`),

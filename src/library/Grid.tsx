@@ -1,3 +1,5 @@
+import { startMarqueeAutoScroll } from '../components/MarqueeSelection.jsx';
+import { Check } from 'lucide-react';
 import { imageAccessibleName } from '../lib/imageNaming.js';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { adjacentRowIndex, fallbackRatio, layoutLibraryRows } from './layout';
@@ -48,10 +50,13 @@ export function LibraryGrid({
     x: number;
     y: number;
     active: boolean;
+    point: { x: number; y: number };
     initial: string[];
     additive: boolean;
   } | null>(null);
   const suppress = useRef(false);
+  const stopScroll = useRef(() => {});
+  useLayoutEffect(() => () => stopScroll.current(), []);
   const [marquee, setMarquee] = useState<{
     x: number;
     y: number;
@@ -147,6 +152,36 @@ export function LibraryGrid({
     }
     p.onPreview(group);
   };
+  const updateMarquee = () => {
+    const initial = drag.current;
+    const node = scroll.current;
+    if (!initial?.active || !node) return;
+    const rect = node.getBoundingClientRect();
+    const x = Math.max(0, Math.min(node.clientWidth, initial.point.x - rect.left));
+    const y = Math.max(0, Math.min(node.clientHeight, initial.point.y - rect.top)) + node.scrollTop;
+    const box = {
+      x: Math.min(x, initial.x),
+      y: Math.min(y, initial.y),
+      width: Math.abs(x - initial.x),
+      height: Math.abs(y - initial.y),
+    };
+    setMarquee(box);
+    const hits: string[] = [];
+    for (const row of rows) {
+      if (
+        row.top + viewport.inset + row.height < box.y ||
+        row.top + viewport.inset > box.y + box.height
+      )
+        continue;
+      let left = viewport.padding;
+      row.widths.forEach((width, offset) => {
+        if (left + width >= box.x && left <= box.x + box.width)
+          hits.push(p.groups[row.start + offset].id);
+        left += width + viewport.gap;
+      });
+    }
+    p.onSelectionChange(initial.additive ? [...new Set([...initial.initial, ...hits])] : hits);
+  };
   return (
     <div
       ref={scroll}
@@ -156,6 +191,7 @@ export function LibraryGrid({
       onScroll={(event) => {
         const top = event.currentTarget.scrollTop;
         setViewport((v) => ({ ...v, top }));
+        updateMarquee();
       }}
       onKeyDown={(event) => {
         if (event.ctrlKey || event.metaKey) {
@@ -206,6 +242,7 @@ export function LibraryGrid({
           x: event.clientX - rect.left,
           y: event.clientY - rect.top + event.currentTarget.scrollTop,
           active: false,
+          point: { x: event.clientX, y: event.clientY },
           initial: p.selectedGroupIds,
           additive: event.ctrlKey || event.metaKey || event.shiftKey,
         };
@@ -218,6 +255,9 @@ export function LibraryGrid({
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top + node.scrollTop;
         if (!initial.active && Math.hypot(x - initial.x, y - initial.y) < 5) return;
+        initial.point = { x: event.clientX, y: event.clientY };
+        if (!initial.active)
+          stopScroll.current = startMarqueeAutoScroll(node, () => drag.current?.point);
         initial.active = true;
         suppress.current = true;
         try {
@@ -226,32 +266,14 @@ export function LibraryGrid({
           /* Synthetic DOM actions have no active platform pointer. */
         }
         event.preventDefault();
-        const box = {
-          x: Math.min(x, initial.x),
-          y: Math.min(y, initial.y),
-          width: Math.abs(x - initial.x),
-          height: Math.abs(y - initial.y),
-        };
-        setMarquee(box);
-        const hits: string[] = [];
-        for (const row of rows) {
-          if (
-            row.top + viewport.inset + row.height < box.y ||
-            row.top + viewport.inset > box.y + box.height
-          )
-            continue;
-          let left = viewport.padding;
-          row.widths.forEach((width, offset) => {
-            if (left + width >= box.x && left <= box.x + box.width)
-              hits.push(p.groups[row.start + offset].id);
-            left += width + viewport.gap;
-          });
-        }
-        p.onSelectionChange(initial.additive ? [...new Set([...initial.initial, ...hits])] : hits);
-        if (event.clientY > rect.bottom - viewport.gap) node.scrollTop += rowHeight / 4;
-        if (event.clientY < rect.top + viewport.gap) node.scrollTop -= rowHeight / 4;
+        updateMarquee();
       }}
       onPointerUp={(event) => {
+        if (drag.current) {
+          drag.current.point = { x: event.clientX, y: event.clientY };
+          updateMarquee();
+        }
+        stopScroll.current();
         drag.current = null;
         setMarquee(null);
         if (event.currentTarget.hasPointerCapture(event.pointerId))
@@ -261,6 +283,12 @@ export function LibraryGrid({
         }, 0);
       }}
       onPointerCancel={() => {
+        stopScroll.current();
+        drag.current = null;
+        setMarquee(null);
+      }}
+      onLostPointerCapture={() => {
+        stopScroll.current();
         drag.current = null;
         setMarquee(null);
       }}
@@ -309,7 +337,7 @@ export function LibraryGrid({
                   )}
                   {p.selectedGroupIds.length > 0 && (
                     <span className="library-pick">
-                      {selected && <i className="ri-check-line" />}
+                      {selected && <Check size={16} strokeWidth={1.5} aria-hidden="true" />}
                     </span>
                   )}
                 </div>

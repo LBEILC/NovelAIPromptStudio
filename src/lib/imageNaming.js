@@ -2,7 +2,7 @@
 export function isUnnamedImage(name) {
   const stem = String(name || '').replace(/\.(png|jpe?g|webp|gif|avif|bmp|tiff?)$/i, '');
   return (
-    /s-\d+(?: \(\d+\))?$/.test(stem) ||
+    /s-\d+(?:[_-]\d+| \(\d+\))?$/.test(stem) ||
     /^[a-f\d]{16,}$/i.test(stem) ||
     /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(stem)
   );

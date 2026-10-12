@@ -1,8 +1,8 @@
 ﻿import { hasImageName, imageAccessibleName } from '../lib/imageNaming.js';
 import { dimensions } from './presentation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Button, useScrollArea } from '../ui';
+import { Button } from '../ui';
 import { mediaUrl } from '../lib/imageStage.js';
 import type { ImageProject } from '../shared/types';
 import type { LibraryProps } from './types';
@@ -25,7 +25,29 @@ export function LibraryViewer({
   const [flip, setFlip] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLDivElement>(null);
-  useScrollArea(canvas);
+  const [size, setSize] = useState({ width: 0, height: 0, dpr: window.devicePixelRatio });
+  const [natural, setNatural] = useState({ width: 0, height: 0 });
+  const pending = useRef<{ x: number; y: number; u: number; v: number } | null>(null);
+  useLayoutEffect(() => {
+    const node = canvas.current;
+    if (!node) return;
+    const measure = () => {
+      const style = getComputedStyle(node);
+      setSize({
+        width: node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        height: node.clientHeight,
+        dpr: window.devicePixelRatio,
+      });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    window.addEventListener('resize', measure);
+    measure();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const image = p.preview;
   useEffect(() => {
@@ -37,6 +59,7 @@ export function LibraryViewer({
   }, []);
   useEffect(() => {
     setZoom(null);
+    setNatural({ width: 0, height: 0 });
     setRotation(0);
     setFlip(false);
   }, [image?.id]);
@@ -49,14 +72,63 @@ export function LibraryViewer({
     const nextGroup = p.groups.find((g) => g.members.some((member) => member.id === next.id));
     if (nextGroup) p.onPreview(nextGroup, next);
   };
-  const changeZoom = (factor: number) => {
-    const displayed = root.current?.querySelector('img');
-    const fitted =
-      displayed && image
-        ? displayed.clientWidth / (image.metadata.width || displayed.naturalWidth)
-        : 1;
-    setZoom((value) => Math.min(8, Math.max(0.05, (value ?? fitted ?? 1) * factor)));
+  const width = natural.width || image?.metadata.width || 1;
+  const height = natural.height || image?.metadata.height || 1;
+  const sideways = Math.abs(rotation % 180) === 90;
+  const rotatedWidth = sideways ? height : width;
+  const rotatedHeight = sideways ? width : height;
+  const fit = Math.min(size.width / rotatedWidth, size.height / rotatedHeight, 1 / size.dpr);
+  const scale = zoom == null ? fit : zoom / size.dpr;
+  const stageWidth = rotatedWidth * scale;
+  const stageHeight = rotatedHeight * scale;
+  const applyZoom = (value: number | null, point?: { x: number; y: number }) => {
+    if (value === zoom) return;
+    const node = canvas.current;
+    const stage = node?.querySelector('.library-viewer-image');
+    if (node && stage) {
+      const bounds = node.getBoundingClientRect();
+      const rect = stage.getBoundingClientRect();
+      const x = point?.x ?? bounds.left + node.clientWidth / 2;
+      const y = point?.y ?? bounds.top + node.clientHeight / 2;
+      pending.current = {
+        x: x - bounds.left - parseFloat(getComputedStyle(node).paddingLeft),
+        y: y - bounds.top,
+        u: (x - rect.left) / rect.width,
+        v: (y - rect.top) / rect.height,
+      };
+    }
+    setZoom(value);
   };
+  const changeZoom = (factor: number, point?: { x: number; y: number }) =>
+    applyZoom(Math.min(8, Math.max(0.05, (zoom ?? fit * size.dpr) * factor)), point);
+  const wheelZoom = useRef(changeZoom);
+  wheelZoom.current = changeZoom;
+  useEffect(() => {
+    const node = canvas.current;
+    if (!node) return;
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const units = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? node.clientHeight : 1;
+      wheelZoom.current(Math.exp(-event.deltaY * units * 0.002), {
+        x: event.clientX,
+        y: event.clientY,
+      });
+    };
+    node.addEventListener('wheel', wheel, { passive: false });
+    return () => node.removeEventListener('wheel', wheel);
+  }, []);
+  useLayoutEffect(() => {
+    const node = canvas.current;
+    if (!node) return;
+    const anchor = pending.current;
+    node.scrollLeft = anchor
+      ? Math.max(0, (size.width - stageWidth) / 2) + anchor.u * stageWidth - anchor.x
+      : (stageWidth - size.width) / 2;
+    node.scrollTop = anchor
+      ? Math.max(0, (size.height - stageHeight) / 2) + anchor.v * stageHeight - anchor.y
+      : (stageHeight - size.height) / 2;
+    pending.current = null;
+  }, [stageWidth, stageHeight, size.width, size.height]);
   if (!image) return null;
   return createPortal(
     <div
@@ -107,10 +179,6 @@ export function LibraryViewer({
       <div
         className="library-viewer-canvas"
         ref={canvas}
-        onWheel={(event) => {
-          event.preventDefault();
-          changeZoom(event.deltaY < 0 ? 1.2 : 1 / 1.2);
-        }}
         onPointerDown={(event) => {
           if (event.button !== 0) return;
           drag.current = {
@@ -127,28 +195,37 @@ export function LibraryViewer({
             event.currentTarget.scrollTop = drag.current.top - event.clientY + drag.current.y;
           }
         }}
+        onPointerCancel={() => {
+          drag.current = null;
+        }}
+        onLostPointerCapture={() => {
+          drag.current = null;
+        }}
         onPointerUp={(event) => {
           drag.current = null;
           if (event.currentTarget.hasPointerCapture(event.pointerId))
             event.currentTarget.releasePointerCapture(event.pointerId);
         }}
       >
-        <img
-          src={mediaUrl(image.image_path)}
-          alt={imageAccessibleName(image)}
-          draggable={false}
-          style={{
-            transform: `rotate(${rotation}deg) scaleX(${flip ? -1 : 1})`,
-            ...(zoom != null
-              ? {
-                  width: image.metadata.width * zoom,
-                  height: image.metadata.height * zoom,
-                  maxWidth: 'none',
-                  maxHeight: 'none',
-                }
-              : {}),
-          }}
-        />
+        <div className="library-viewer-image" style={{ width: stageWidth, height: stageHeight }}>
+          <img
+            src={mediaUrl(image.image_path)}
+            alt={imageAccessibleName(image)}
+            draggable={false}
+            onLoad={(event) =>
+              setNatural({
+                width: event.currentTarget.naturalWidth,
+                height: event.currentTarget.naturalHeight,
+              })
+            }
+            onDoubleClick={() => applyZoom(zoom == null ? 1 : null)}
+            style={{
+              width: width * scale,
+              height: height * scale,
+              transform: `translate(-50%, -50%) rotate(${rotation}deg) scaleX(${flip ? -1 : 1})`,
+            }}
+          />
+        </div>
       </div>
       <Button
         className="library-viewer-prev"
@@ -190,8 +267,8 @@ export function LibraryViewer({
           >
             <i className="ri-zoom-out-line" />
           </Button>
-          <Button variant="quiet" size="small" onClick={() => setZoom(1)}>
-            100%
+          <Button variant="quiet" size="small" aria-label="100%" onClick={() => applyZoom(1)}>
+            {zoom == null ? '适合窗口' : `${Math.round(zoom * 100)}%`}
           </Button>
           <Button variant="quiet" size="small" aria-label="放大" onClick={() => changeZoom(1.2)}>
             <i className="ri-zoom-in-line" />

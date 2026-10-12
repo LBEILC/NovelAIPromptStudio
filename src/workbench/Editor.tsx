@@ -120,10 +120,11 @@ export function WorkbenchEditor(p: EditorProps) {
   });
   const anchor = useRef<HTMLElement>(null);
   const root = useRef<HTMLDivElement>(null);
+  const scroll = useRef<HTMLDivElement>(null);
   const last = useRef('');
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const marquee = useMarqueeSelection({
-    containerRef: root,
+    containerRef: scroll,
     selectedKeys: selected,
     onSelectionChange: setSelected,
     startOnItems: false,
@@ -252,6 +253,7 @@ export function WorkbenchEditor(p: EditorProps) {
       >
         <WorkbenchDocument
           {...p}
+          scrollRef={scroll}
           selectedKeys={selected}
           onRawEdit={(section, initial) =>
             setRaw({ section, value: initial ?? serializePromptSection(doc.scopes[section]) })

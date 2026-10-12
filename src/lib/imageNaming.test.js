@@ -4,6 +4,9 @@ import { hasImageName, imageFileName, isUnnamedImage, numberedImageNames } from 
 describe('image naming', () => {
   it.each([
     'sample s-123.png',
+    'sample s-123_2.png',
+    'sample s-123-3.webp',
+    'sample s-123 (4).png',
     'sample s-9 (12).PNG',
     '0123456789abcdef',
     'ABCDEF0123456789.webp',
@@ -17,6 +20,9 @@ describe('image naming', () => {
     '123456789abcdef',
     '雪山',
     'image.png',
+    '雨后-2',
+    '雨后_2',
+    '雨后 (2)',
     's-2.txt',
     's-2 (a)',
   ])('keeps named shape %s', (name) => {

@@ -29,7 +29,10 @@
 .wb-section-actions .nps-menu-trigger > button,.wb-block header .nps-menu-trigger > button { border-color:transparent; background:transparent; color:var(--text-3); }
 .wb-block { position:relative; padding:calc(var(--sp-2) + var(--sp-0)) 0 var(--sp-3); border-bottom:var(--bw) solid var(--divider); }
 .wb-block > header { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); color:var(--text-3); font-size:var(--fs-caption); }
-.wb-tags { display:flex; flex-wrap:wrap; align-items:flex-start; gap:var(--ctl-gap); padding-top:var(--sp-2); }
+.wb-tags { display:flex; flex-wrap:wrap; align-items:stretch; gap:var(--ctl-gap); padding-top:var(--sp-2); }
+.wb-tags > [data-wb-tag], .wb-tags [data-marquee-key], .wb-tags .nps-menu-trigger { display:flex; min-width:0; max-width:100%; }
+.wb-tags .wb-add-tags { align-self:flex-end; }
+.wb-add-help { flex-basis:100%; }
 .wb-prose { font:var(--fs-prose)/var(--lh-prose) var(--font-prose); white-space:pre-wrap; }
 .wb-prose p { margin:var(--sp-2) 0; }
 .wb-translation { color:var(--text-2); font:var(--fs-small)/var(--lh-small) var(--font-ui); }

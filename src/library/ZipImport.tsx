@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, Dialog, useScrollArea } from '../ui';
 import { mediaUrl } from '../lib/imageStage.js';
@@ -246,7 +247,7 @@ export function ZipImport({
                         <span className="library-stack">已有</span>
                       ) : (
                         <span className="library-pick">
-                          {picked && <i className="ri-check-line" />}
+                          {picked && <Check size={16} strokeWidth={1.5} aria-hidden="true" />}
                         </span>
                       )}
                     </button>

@@ -108,7 +108,9 @@
 .nps-cat-clothing { color: var(--cat-clothing); } .nps-cat-action { color: var(--cat-action); }
 .nps-cat-environment { color: var(--cat-environment); } .nps-cat-composition { color: var(--cat-composition); }
 .nps-cat-style { color: var(--cat-style); } .nps-cat-unsorted { color: var(--cat-unsorted); }
-.nps-tag-text { display: flex; flex-direction: column; }
+.nps-tag-text { display: flex; flex-direction: column; min-width:0; overflow-wrap:anywhere; }
+.nps-tag { min-height:min-content; max-width:100%; flex-shrink:0; }
+.nps-tag-text > span { flex-shrink:0; }
 .nps-tag-en { font: var(--fs-small)/var(--lh-small) var(--font-mono); color: var(--text); }
 .nps-tag-zh { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-3); }
 .nps-tag-weight { font: var(--fs-caption)/var(--lh-small) var(--font-mono); color: var(--text-2); align-self: flex-start; }
