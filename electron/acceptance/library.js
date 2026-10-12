@@ -100,7 +100,11 @@ export async function libraryChecks(env) {
     prompt_structure: { ...paragraph.prompt_structure, base_prompt_raw: raw },
   });
   await refresh();
-  for (const reduced of mode.category === '图片库·导入' ? [] : [false, true]) {
+  for (const reduced of mode.category === '图片库·导入'
+    ? []
+    : mode.category === '减少动态效果'
+      ? [true]
+      : [false, true]) {
     h.category(`图片库·${reduced ? '关闭动效' : '正常动效'}`);
     await e(
       `window.studio.saveAppearanceSettings({motion:${JSON.stringify(reduced ? 'off' : 'full')}})`,
@@ -694,7 +698,7 @@ export async function libraryChecks(env) {
       input,
     });
   }
-  for (const importReduced of [false, true]) {
+  for (const importReduced of mode.category === '减少动态效果' ? [true] : [false, true]) {
     h.category(`图片库·导入与永久删除·${importReduced ? '关闭动效' : '正常动效'}`);
     await e(
       `window.studio.saveAppearanceSettings({motion:${JSON.stringify(importReduced ? 'off' : 'full')}})`,
@@ -848,6 +852,6 @@ export async function libraryChecks(env) {
     database.updateProjects(activeIds, { deleted: false });
     await refresh();
   }
-  if (mode.category !== '图片库·导入')
+  if (!['图片库·导入', '减少动态效果'].includes(mode.category))
     await libraryFinishChecks({ h, database, refresh, click, input, selectCard, waitDetail });
 }

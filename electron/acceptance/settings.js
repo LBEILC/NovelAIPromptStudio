@@ -1,4 +1,5 @@
 import { settingsLayoutChecks } from './settingsLayout.js';
+import { scrollChecks } from './scroll.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { hash } from 'node:crypto';
@@ -93,8 +94,17 @@ export async function settingsChecks(context, restart) {
     await h.screenshot(`restart-${mode.phase}`);
     return;
   }
-  if (['全部', '设置'].includes(mode.category)) await settingsLayoutChecks(h);
-  if (mode.category !== '设置·AI 服务') {
+  if (['全部', '设置', '减少动态效果'].includes(mode.category)) await settingsLayoutChecks(h);
+  if (mode.category === '减少动态效果') {
+    h.category('设置·翻译词典·关闭动效');
+    await section('翻译词典');
+    await input('[aria-label="搜索 Tag 或译文"]', 'acceptance_');
+    await wait(
+      'Number(document.querySelector(".settings-table").getAttribute("aria-rowcount"))===206',
+    );
+    await scrollChecks(h, '.settings-table-scroll');
+  }
+  if (!['设置·AI 服务', '减少动态效果'].includes(mode.category)) {
     await dictionaryChecks(context);
     if (mode.category === '设置·翻译词典') return;
     h.category('设置·图片库');
@@ -392,7 +402,7 @@ export async function settingsChecks(context, restart) {
       'once',
     );
   await h.screenshot('ai');
-  if (mode.category === '设置·AI 服务') return;
+  if (['设置·AI 服务', '减少动态效果'].includes(mode.category)) return;
   h.category('设置·关于与更新');
   await section('关于与更新');
   await wait(

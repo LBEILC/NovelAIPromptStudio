@@ -222,20 +222,14 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       const observer = new MutationObserver(sample);
       observer.observe(region, { childList: true, subtree: true, attributes: true });
       const tick = () => { if (!sample()) frame = requestAnimationFrame(tick); };
-      const timeout = setTimeout(() => finish(null), 12000);
+      const timeout = setTimeout(() => finish(null), ${Math.min(12000 * (mode.slow || 1), 60000)});
       frame = requestAnimationFrame(tick);
     });
   })()`);
   await input(search, 'acceptance_204');
   await wait(`${count}===1`);
   const shrinkElapsed = await e('window.dictionaryShrinkTiming');
-  await check(
-    '内容高度变短后细条在 100 毫秒内隐藏（页面内部计时）',
-    () => shrinkElapsed !== null && shrinkElapsed <= 100 * (mode.slow || 1),
-    undefined,
-    'once',
-  );
-  console.log(`词典细条隐藏耗时：${shrinkElapsed} ms（页面内部）`);
+  await h.timing('内容高度变短后细条隐藏（页面内部计时）', shrinkElapsed, 100);
   await check(
     '筛选缩短内容后细条隐藏且不保留虚假滚动高度',
     `(()=>{const n=document.querySelector('.settings-table-scroll');return n.querySelector('.nps-scroll-thumb').hidden && n.scrollHeight===n.clientHeight && n.scrollTop===0})()`,

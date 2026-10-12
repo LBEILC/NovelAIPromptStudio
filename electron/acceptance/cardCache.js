@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { UI_FEEDBACK_MS, waitForFeedback } from './feedback.js';
+import { UI_FEEDBACK_MS, measureFeedback } from './feedback.js';
 
 export async function cardCacheChecks({ database, h, mode = {} }) {
   h.category('卡片缓存');
@@ -55,9 +55,10 @@ export async function cardCacheChecks({ database, h, mode = {} }) {
           // A fast build may legitimately finish before the response returns.
           probe = window.studio.getUpdateStatus().then(async () => {
             state.responseMs = performance.now() - started;
-            state.responsive = clickedWhilePending && await (${waitForFeedback.toString()})(
+            state.clickedWhilePending = clickedWhilePending;
+            state.feedbackMs = await (${measureFeedback.toString()})(
               () => !!document.querySelector('.studio-settings')?.getClientRects().length,
-              ${UI_FEEDBACK_MS * (mode.slow || 1)} - state.responseMs,
+              ${Math.min(12000 * (mode.slow || 1), 60000)} - state.responseMs,
             );
           });
         }
@@ -77,10 +78,17 @@ export async function cardCacheChecks({ database, h, mode = {} }) {
     contents.send = send;
     for (const deliver of delayed) deliver();
     await h.check(
-      '建立期间发起切页与主进程请求，在反馈期限内完成',
-      'window.__cardCacheAcceptance.clicked && window.__cardCacheAcceptance.responsive',
+      '建立期间发起切页与主进程请求并完成',
+      'window.__cardCacheAcceptance.clicked && window.__cardCacheAcceptance.clickedWhilePending && window.__cardCacheAcceptance.feedbackMs !== null',
       'window.__cardCacheAcceptance',
       'once',
+    );
+    await h.timing(
+      '建立期间切页与主进程请求',
+      await h.evaluate(
+        'window.__cardCacheAcceptance.feedbackMs == null ? null : window.__cardCacheAcceptance.responseMs + window.__cardCacheAcceptance.feedbackMs',
+      ),
+      UI_FEEDBACK_MS,
     );
     await h.check(
       '并发卡片 IPC 等待同一建立过程并返回完整视图',

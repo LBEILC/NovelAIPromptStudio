@@ -61,18 +61,21 @@ it('preserves the original failure when collecting details also throws', async (
 });
 
 it('forwards deferred details from feedback checks and keeps two-argument checks compatible', async () => {
+  vi.useFakeTimers();
   const { h, checks } = setup();
-  await h.checkSoon(
+  const pending = h.checkSoon(
     'feedback',
     () => false,
     0,
     '',
     () => ({ actual: 2 }),
   );
+  await vi.advanceTimersByTimeAsync(12010);
+  await pending;
   await h.check('legacy', () => false);
   expect(checks[0].details).toEqual({ actual: 2 });
-  expect(checks[1].status).toBe('failed');
-  expect(checks[1]).not.toHaveProperty('details');
+  expect(checks.at(-1).status).toBe('failed');
+  expect(checks.at(-1)).not.toHaveProperty('details');
 });
 
 it('identifies renderer timeouts and clears their timers after successful evaluations', async () => {
@@ -111,7 +114,7 @@ it('scales feedback only in slow mode and never repeats a visual check action', 
       webContents: {
         executeJavaScript: async (code) => {
           calls.push(code);
-          return true;
+          return code.includes('performAction()') ? 850 : true;
         },
       },
     },
@@ -129,8 +132,16 @@ it('scales feedback only in slow mode and never repeats a visual check action', 
   h.dualThemes(true);
   await h.checkSoon('布局', 'true', 200, 'performAction()', undefined, 'both');
   expect(calls.filter((code) => code.includes('performAction()'))).toHaveLength(1);
-  expect(calls.find((code) => code.includes('performAction()'))).toContain(',800,');
-  expect(checks.map((check) => check.theme)).toEqual(['light', 'dark']);
+  expect(calls.find((code) => code.includes('performAction()'))).toContain(',48000,');
+  expect(checks.find((check) => check.timing).timing).toMatchObject({
+    deadlineMs: 800,
+    elapsedMs: 850,
+    exceeded: true,
+  });
+  expect(checks.filter((check) => !check.timing).map((check) => check.theme)).toEqual([
+    'light',
+    'dark',
+  ]);
   expect(theme).toBe('light');
   checks.length = 0;
   await h.check('数据', () => true, undefined, 'once');

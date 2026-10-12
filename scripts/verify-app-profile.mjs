@@ -10,6 +10,7 @@ import react from '@vitejs/plugin-react';
 import { bundledMiSans } from './font-vite.mjs';
 
 import { acceptanceOptions } from './acceptance-options.mjs';
+import { timingSummary, logTimings } from '../electron/acceptance/timing.js';
 const options = acceptanceOptions();
 const packaged = process.argv.includes('--packaged');
 const startedAt = Date.now();
@@ -155,7 +156,7 @@ try {
     });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
-  if (!packaged && ['全部', '基础组件'].includes(options.category))
+  if (!packaged && ['全部', '基础组件', '减少动态效果'].includes(options.category))
     await build({
       configFile: false,
       base: './',
@@ -249,6 +250,8 @@ try {
       break;
   }
   const checks = manifests.flatMap((item) => item.checks);
+  const timings = timingSummary(checks);
+  logTimings(timings);
   await fs.writeFile(
     path.join(output, 'manifest.json'),
     JSON.stringify(
@@ -261,6 +264,8 @@ try {
         platform: process.platform,
         durationMs: manifests.reduce((sum, item) => sum + item.durationMs, 0),
         checks,
+        timing: options.timing,
+        timings,
         wallMs: Date.now() - startedAt,
         screenshots: manifests.flatMap((item) => item.screenshots || []),
         requests,

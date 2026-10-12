@@ -8,7 +8,7 @@ it('limits CPU slowdown and rejects unknown categories before starting Electron'
 });
 
 it('prepares only the fixture types a selected category needs', () => {
-  expect(acceptanceOptions(['--category=设置·AI 服务', '--slow=4'])).toMatchObject({
+  expect(acceptanceOptions(['--category=设置·AI 服务', '--slow=4'], {})).toMatchObject({
     slow: 4,
     needsLibrary: false,
     needsDictionary: false,
@@ -22,7 +22,21 @@ it('prepares only the fixture types a selected category needs', () => {
 });
 
 it('gives a slowed complete process room while keeping a hard upper bound', () => {
-  expect(acceptanceOptions().processTimeoutMs).toBe(600_000);
-  expect(acceptanceOptions(['--slow=4']).processTimeoutMs).toBe(1_800_000);
-  expect(acceptanceOptions(['--slow=6']).processTimeoutMs).toBe(1_800_000);
+  expect(acceptanceOptions([], {}).processTimeoutMs).toBe(600_000);
+  expect(acceptanceOptions(['--slow=4'], {}).processTimeoutMs).toBe(1_800_000);
+  expect(acceptanceOptions(['--slow=6'], {}).processTimeoutMs).toBe(1_800_000);
+});
+
+it('selects the reduced subset fixtures and validates timing policy before launch', () => {
+  expect(
+    acceptanceOptions(['--category=减少动态效果', '--reduced-motion'], { CI: 'true' }),
+  ).toMatchObject({
+    timing: 'record',
+    needsLibrary: true,
+    needsDictionary: true,
+    reducedMotion: true,
+  });
+  expect(acceptanceOptions(['--timing=strict'], { CI: 'true' }).timing).toBe('strict');
+  expect(() => acceptanceOptions(['--timing=skip'], {})).toThrow('--timing');
+  expect(() => acceptanceOptions(['--slow=4'], { CI: 'true' })).toThrow('--slow');
 });

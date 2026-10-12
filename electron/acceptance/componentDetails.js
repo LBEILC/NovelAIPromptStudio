@@ -298,20 +298,11 @@ export async function componentDetails(h) {
     undefined,
     'once',
   );
-  const scrollCloseElapsed = await e(`new Promise(resolve => {
-    const start = performance.now();
-    const observer = new MutationObserver(() => {
-      if (!document.querySelector('.nps-layer[role=tooltip]')) {
-        observer.disconnect(); clearTimeout(timeout); resolve(performance.now() - start);
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    const timeout = setTimeout(() => { observer.disconnect(); resolve(2001); }, 2000);
-    window.dispatchEvent(new Event('scroll'));
-  })`);
-  await check(
+  await h.checkSoon(
     '滚动立即关闭提示',
-    () => scrollCloseElapsed <= TOOLTIP_SCROLL_CLOSE_MS,
+    '!document.querySelector(".nps-layer[role=tooltip]")',
+    TOOLTIP_SCROLL_CLOSE_MS,
+    "window.dispatchEvent(new Event('scroll'));",
     undefined,
     'once',
   );

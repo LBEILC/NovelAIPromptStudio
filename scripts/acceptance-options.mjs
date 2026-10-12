@@ -1,4 +1,6 @@
-export function acceptanceOptions(argv = process.argv.slice(2)) {
+import { timingMode } from '../electron/acceptance/timing.js';
+
+export function acceptanceOptions(argv = process.argv.slice(2), env = process.env) {
   const value = (name) =>
     argv
       .find((arg) => arg.startsWith(`--${name}=`))
@@ -7,10 +9,15 @@ export function acceptanceOptions(argv = process.argv.slice(2)) {
       .join('=');
   const slow = Number(value('slow') || 1);
   if (![1, 4, 6].includes(slow)) throw Error('--slow must be 1, 4 or 6');
+  if (timingMode(undefined, env.CI) === 'record' && slow > 1)
+    throw Error('--slow is only available outside CI');
+  const timing = timingMode(value('timing'), env.CI);
   const category = value('category') || '全部';
   if (
     ![
       '全部',
+      '减少动态效果',
+      '诊断·计时',
       '工作台',
       '图片库',
       '图片库·起名',
@@ -35,6 +42,7 @@ export function acceptanceOptions(argv = process.argv.slice(2)) {
   const reducedMotion = argv.includes('--reduced-motion');
   const suffix = `${slow > 1 ? `-slow-${slow}` : ''}${reducedMotion ? '-reduced' : ''}${category === '全部' ? '' : `-${category.replaceAll('·', '-')}`}`;
   const needsLibrary = [
+    '减少动态效果',
     '全部',
     '图片库',
     '图片库·起名',
@@ -46,8 +54,9 @@ export function acceptanceOptions(argv = process.argv.slice(2)) {
     '设置·翻译词典',
     '外壳·快捷键',
   ].includes(category);
-  const needsDictionary = ['全部', '设置', '设置·翻译词典'].includes(category);
+  const needsDictionary = ['全部', '设置', '设置·翻译词典', '减少动态效果'].includes(category);
   return {
+    timing,
     slow,
     processTimeoutMs: Math.min(600_000 * slow, 1_800_000),
     category,

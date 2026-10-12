@@ -49,6 +49,8 @@ if (process.argv.includes('--packaged')) {
     wallMs: Date.now() - started,
     durationMs: manifest.durationMs,
     checks,
+    timing: options.timing,
+    timings: manifest.timings || [],
     screenshots,
   };
   await fs.writeFile(path.join(output, 'manifest.json'), JSON.stringify(summary, null, 2));

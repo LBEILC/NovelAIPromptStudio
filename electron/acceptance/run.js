@@ -328,7 +328,22 @@ export async function runAcceptance(context) {
     };
     if (mode.category && mode.category !== '全部') {
       h.dualThemes(true);
-      if (mode.category === '外壳') await shellChecks();
+      if (mode.category === '减少动态效果') {
+        await shellChecks();
+        await libraryChecks(environment);
+        await settingsChecks(environment, false);
+        await componentChecks(environment);
+      } else if (mode.category === '诊断·计时') {
+        h.category('诊断·计时');
+        await h.checkSoon(
+          '人为延迟的反馈仍然完成',
+          'performance.now() >= window.feedbackReadyAt',
+          1,
+          'window.feedbackReadyAt = performance.now() + 50;',
+          undefined,
+          'once',
+        );
+      } else if (mode.category === '外壳') await shellChecks();
       else if (mode.category === '工作台') await workbenchChecks(environment);
       else if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
       else if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
