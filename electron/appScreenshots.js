@@ -43,6 +43,17 @@ export async function runAppScreenshots({
   preferences,
   createWindow,
 }) {
+  if (process.argv.includes('--app-screenshot-readme')) {
+    const { runReadmeScreenshots } = await import('./readmeScreenshots.js');
+    return runReadmeScreenshots({
+      app,
+      mode,
+      database,
+      assetsDirectory,
+      preferences,
+      createWindow,
+    });
+  }
   await fs.mkdir(mode.output, { recursive: true });
   for (const file of await fs.readdir(mode.output)) {
     if (file.endsWith('.png') || file === 'manifest.json')

@@ -19,7 +19,7 @@
     "icons:generate": "node scripts/generate-app-icons.mjs",
     "package": "npm run fonts:check && npm run build && electron-builder --publish never",
     "screenshots:app": "npm run build && node scripts/app-screenshots.mjs",
-    "screenshots:readme": "node scripts/render-readme-artwork.mjs",
+    "screenshots:readme": "npm run build && node scripts/readme-screenshots.mjs",
     "dev:ui": "node scripts/ui-showcase.mjs --serve",
     "screenshots:ui": "node scripts/ui-showcase.mjs",
     "audit:ui": "node scripts/audit-ui.mjs",
