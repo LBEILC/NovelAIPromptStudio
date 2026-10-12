@@ -637,7 +637,12 @@ function Showcase() {
 }
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider theme={theme} motion={params.get('motion') === 'off' ? 'off' : 'system'}>
+    <ThemeProvider
+      theme={theme}
+      motion={
+        params.get('motion') === 'off' ? 'off' : params.get('motion') === 'full' ? 'full' : 'system'
+      }
+    >
       <NotificationProvider>
         <Showcase />
       </NotificationProvider>

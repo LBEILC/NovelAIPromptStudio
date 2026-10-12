@@ -42,8 +42,9 @@ export async function uiPolishChecks({ h, mode }) {
     await key('Escape');
     await wait('!document.querySelector(".nps-layer:not(.nps-tip)")');
   };
+  // Full motion is explicit: CI runners report prefers-reduced-motion.
   await h.window.loadFile(path.join(mode.root, 'showcase', 'ui-showcase.html'), {
-    query: { theme: 'system' },
+    query: { theme: 'system', motion: 'full' },
   });
   await wait('!!document.querySelector("[data-polish-probe]")');
   await e('document.querySelector("[data-polish-probe]").scrollIntoView({block:"center"})');
