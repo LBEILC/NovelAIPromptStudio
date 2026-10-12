@@ -172,11 +172,13 @@ export function Menu({
   label,
   children,
   context = false,
+  trigger,
 }: {
   items: MenuItem[];
   label: string;
   children?: ReactNode;
   context?: boolean;
+  trigger?: ReactNode;
 }) {
   const ref = useRef<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -208,13 +210,14 @@ export function Menu({
         <Button
           ref={ref as RefObject<HTMLButtonElement | null>}
           aria-haspopup="menu"
+          aria-label={label}
           aria-expanded={open}
           onClick={() => {
             setPoint(undefined);
             setOpen(!open);
           }}
         >
-          {label}
+          {trigger ?? label}
         </Button>
       )}
       <Layer open={open} onClose={close} anchor={ref} focus point={point} className="nps-menu">

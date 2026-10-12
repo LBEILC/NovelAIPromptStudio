@@ -37,6 +37,8 @@ export interface ParseBlockOptions {
 }
 export type ParsedTag = ReturnType<typeof parsePrompt>[number];
 export interface PromptBlock {
+  userType?: boolean;
+  translation?: string;
   type: BlockType;
   range: TextRange;
   raw: string;
@@ -255,7 +257,11 @@ export function setPromptBlockType(
   index: number,
   type: BlockType,
 ): PromptSection {
-  return replaceBlockContent(section, index, section.blocks[index]?.content ?? '', type);
+  const next = replaceBlockContent(section, index, section.blocks[index]?.content ?? '', type);
+  return {
+    ...next,
+    blocks: next.blocks.map((block, i) => (i === index ? { ...block, userType: true } : block)),
+  };
 }
 
 export function editPromptParagraph(
@@ -389,10 +395,30 @@ export function createPromptDocument(
   };
   return {
     project,
-    scopes: (getPromptScopes(project) as PromptScope[]).map((scope) => ({
-      scope,
-      ...parsePromptSection(scope.raw_prompt, { overrides: overrides[scope.key] }),
-    })),
+    scopes: (getPromptScopes(project) as PromptScope[]).map((scope) => {
+      const section = parsePromptSection(scope.raw_prompt, { overrides: overrides[scope.key] });
+      const annotations = [...(structure.block_annotations?.[scope.key] || [])];
+      section.blocks = section.blocks.map((block) => {
+        let index = annotations.findIndex(
+          (entry) => entry.raw === block.raw && entry.start === block.range.start,
+        );
+        if (index < 0) index = annotations.findIndex((entry) => entry.raw === block.raw);
+        if (index < 0) return block;
+        const [entry] = annotations.splice(index, 1);
+        return {
+          ...block,
+          ...(entry.type
+            ? {
+                type: entry.type,
+                userType: true,
+                tags: entry.type === 'tags' ? parsePrompt(block.content) : [],
+              }
+            : {}),
+          translation: entry.translation,
+        };
+      });
+      return { scope, ...section };
+    }),
   };
 }
 
@@ -403,7 +429,17 @@ export function promptDocumentProject(document: PromptDocument) {
     document.project.metadata,
   );
   let tags = document.project.tags;
+  const annotations: NonNullable<PromptStructure['block_annotations']> = {};
   for (const section of document.scopes) {
+    const saved = section.blocks
+      .filter((block) => block.userType || block.translation)
+      .map((block) => ({
+        raw: block.raw,
+        start: block.range.start,
+        ...(block.userType ? { type: block.type } : {}),
+        ...(block.translation ? { translation: block.translation } : {}),
+      }));
+    if (saved.length) annotations[section.scope.key] = saved;
     const raw = serializePromptSection(section);
     const scope = section.scope;
     let nextId = 0;
@@ -429,6 +465,8 @@ export function promptDocumentProject(document: PromptDocument) {
       }
     }
   }
+  if (Object.keys(annotations).length) structure.block_annotations = annotations;
+  else delete structure.block_annotations;
   return { ...document.project, tags, prompt_structure: structure };
 }
 

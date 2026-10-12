@@ -145,6 +145,29 @@ export function normalizePromptStructure(structure, metadata = {}, idFactory = c
     base_prompt_raw: Object.prototype.hasOwnProperty.call(parsedStructure, 'base_prompt_raw')
       ? String(parsedStructure.base_prompt_raw || '')
       : String(metadataStructure.base_prompt_raw || metadata.prompt_raw || ''),
+    ...(parsedStructure.block_annotations &&
+    typeof parsedStructure.block_annotations === 'object' &&
+    !Array.isArray(parsedStructure.block_annotations)
+      ? {
+          block_annotations: Object.fromEntries(
+            Object.entries(parsedStructure.block_annotations)
+              .filter(([, value]) => Array.isArray(value))
+              .map(([key, value]) => [
+                key,
+                value
+                  .filter((entry) => entry && typeof entry.raw === 'string')
+                  .map((entry) => ({
+                    raw: entry.raw,
+                    start: Number.isFinite(entry.start) ? entry.start : 0,
+                    ...(['tags', 'paragraph'].includes(entry.type) ? { type: entry.type } : {}),
+                    ...(typeof entry.translation === 'string'
+                      ? { translation: entry.translation }
+                      : {}),
+                  })),
+              ]),
+          ),
+        }
+      : {}),
     base_undesired_raw: Object.prototype.hasOwnProperty.call(parsedStructure, 'base_undesired_raw')
       ? String(parsedStructure.base_undesired_raw || '')
       : String(metadataStructure.base_undesired_raw || metadata.negative_prompt || ''),

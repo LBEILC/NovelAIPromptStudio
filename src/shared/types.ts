@@ -70,6 +70,10 @@ export interface PromptStructureRaw {
   characters: PromptCharacterRaw[];
 }
 export interface PromptStructure extends PromptStructureRaw {
+  block_annotations?: Record<
+    string,
+    { raw: string; type?: 'tags' | 'paragraph'; translation?: string; start: number }[]
+  >;
   base_undesired_tags: Tag[];
   characters: PromptCharacter[];
 }
