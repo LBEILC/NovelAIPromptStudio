@@ -177,3 +177,67 @@ function render() {
   document.getElementById('pv-notes').innerHTML = `<h4>这一页的要点（讨论用，不是产品文案）</h4><ul>${NOTES[S.page].map((n) => `<li>${n}</li>`).join('')}</ul>`;
 }
 render();
+
+// 自绘滚动条（借鉴 ClaudeDock）：隐藏系统滚动条，每个 .scroll 配一条浮在上面的细条。
+// 滚动或指针在滚动区域里移动时出现，停下 --sb-idle 后淡出；可以拖动；避开吊顶的页头和吊底的页脚。
+(() => {
+  const layer = document.createElement('div');
+  layer.className = 'sb-layer';
+  document.body.append(layer);
+  const idle = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sb-idle')) || 900;
+  const bound = new Map();
+  const attach = (el) => {
+    const bar = document.createElement('i');
+    bar.className = 'sb';
+    bar.setAttribute('aria-hidden', 'true');
+    layer.append(bar);
+    let timer, drag;
+    const geo = () => {
+      const head = el.querySelector(':scope > .set-head');
+      const foot = el.querySelector(':scope > .set-foot');
+      head?.classList.toggle('stuck', el.scrollTop > 0);
+      const inset = 3, top = (head?.offsetHeight || 0) + inset, bottom = (foot?.offsetHeight || 0) + inset;
+      const track = el.clientHeight - top - bottom, range = el.scrollHeight - el.clientHeight;
+      const size = Math.min(track, Math.max(28, (track * el.clientHeight) / el.scrollHeight));
+      return { top, track, range, size };
+    };
+    const place = () => {
+      const { top, track, range, size } = geo();
+      bar.hidden = !el.isConnected || range <= 1 || track <= 0;
+      if (bar.hidden) return;
+      const r = el.getBoundingClientRect();
+      bar.style.height = `${size}px`;
+      bar.style.transform = `translate(${Math.round(r.right - 7)}px, ${Math.round(r.top + top + (track - size) * (el.scrollTop / range))}px)`;
+    };
+    const show = () => {
+      place();
+      bar.classList.add('show');
+      clearTimeout(timer);
+      timer = setTimeout(() => { if (!drag && !bar.matches(':hover')) bar.classList.remove('show'); }, idle());
+    };
+    el.addEventListener('scroll', show, { passive: true });
+    el.addEventListener('pointermove', show);
+    bar.addEventListener('pointerleave', show);
+    bar.addEventListener('pointerdown', (e) => {
+      const { track, range, size } = geo();
+      drag = { y: e.clientY, from: el.scrollTop, ratio: range / Math.max(1, track - size) };
+      bar.setPointerCapture(e.pointerId);
+      bar.classList.add('drag');
+      e.preventDefault();
+    });
+    bar.addEventListener('pointermove', (e) => { if (drag) el.scrollTop = drag.from + (e.clientY - drag.y) * drag.ratio; });
+    bar.addEventListener('pointerup', () => { drag = null; bar.classList.remove('drag'); show(); });
+    return { bar, place };
+  };
+  const scan = () => {
+    const found = new Set(document.querySelectorAll('#win .scroll'));
+    for (const [el, b] of bound) if (!found.has(el)) { b.bar.remove(); bound.delete(el); }
+    for (const el of found) { if (!bound.has(el)) bound.set(el, attach(el)); bound.get(el).place(); }
+  };
+  let queued = false;
+  new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; scan(); }); } })
+    .observe(document.getElementById('win'), { childList: true, subtree: true });
+  addEventListener('resize', scan);
+  addEventListener('scroll', scan, true);
+  scan();
+})();

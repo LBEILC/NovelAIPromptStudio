@@ -78,7 +78,16 @@
 .empty .fine { margin-top: var(--sp-5); font-size: var(--fs-small); color: var(--text-3); }
 
 /* ---------- 设置、素材 ---------- */
-.set { max-width: 680px; padding: 22px 36px 32px; }
+.set { box-sizing: content-box; max-width: var(--page-col); margin: 0 auto; padding: var(--sp-1) var(--page-pad-x) var(--sp-8); }
+/* 页头和页脚铺满内容区、停在顶部和底部；里面的内容对齐居中的内容栏 */
+.set-head { position: sticky; top: 0; z-index: 2; background: var(--surface); padding: var(--page-head-pad) var(--page-pad-x) var(--sp-3); box-shadow: inset 0 -1px transparent; transition: box-shadow var(--dur-2) var(--ease-out); }
+.set-head.stuck { box-shadow: inset 0 -1px var(--divider); }
+.set-head > div, .set-foot > div { max-width: var(--page-col); margin: 0 auto; }
+.set-head h1 { margin: 0; font: var(--fw-strong) var(--fs-page)/var(--lh-page) var(--font-ui); }
+.set-head p { margin: 2px 0 0; color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); }
+.set-foot { position: sticky; bottom: 0; z-index: 2; background: var(--surface); box-shadow: inset 0 1px var(--divider); padding: 0 var(--page-pad-x); }
+.set-foot > div { min-height: var(--page-foot-h); display: flex; align-items: center; gap: var(--sp-2); }
+.set-foot .foot-note { color: var(--text-3); font-size: var(--fs-small); }
 .set h2 { margin: 0 0 2px; font: var(--fw-strong) var(--fs-title)/24px var(--font-ui); }
 .set h2:not(:first-child) { margin-top: 30px; }
 .setrow { display: flex; align-items: center; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--divider); }

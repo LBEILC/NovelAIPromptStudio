@@ -121,6 +121,21 @@
   --fs-brand: 20px;           /* 关于页的产品名，行高 26px，字体 --font-prose */
   --lh-brand: 26px;
 
+  /* 设置各页（2026-10-12，借鉴 ClaudeDock） */
+  --page-col: 680px;      /* 内容栏的宽度，在内容区里水平居中；窗口变窄时两侧至少留 --page-pad-x */
+  --page-pad-x: 36px;
+  --page-head-pad: 22px;  /* 页头：上 --page-head-pad，下 --sp-3；标题 --fs-page，说明 --fs-small、--text-3。滚动时页头停在顶部，背景铺满内容区，内容对齐内容栏；内容滚到它下面之后底边出现 --divider 细线 */
+  --fs-page: 18px;        /* 页面标题，行高 26px，--fw-strong */
+  --lh-page: 26px;
+  --page-foot-h: 56px;    /* 需要"保存"的页面（AI 服务）的页脚：停在底部，背景铺满内容区，顶边 --divider 细线，内容对齐内容栏 */
+
+  /* 滚动条：不用系统滚动条，自绘一条浮在内容上面的细条（借鉴 ClaudeDock） */
+  --sb-w: 4px;            /* 平时的粗细，颜色 --border */
+  --sb-w-hover: 6px;      /* 悬停或拖动时，颜色 --text-3 */
+  --sb-inset: 3px;        /* 离滚动区域右边的距离；上下避开吊顶的页头和吊底的页脚，再各留 --sb-inset */
+  --sb-min: 28px;         /* 最短长度 */
+  --sb-idle: 900ms;       /* 停止滚动、指针离开滚动区域后多久淡出；淡入淡出 --dur-2。减少动态效果时直接出现和消失 */
+
   /* 可拖宽的面板 */
   --split-hit: 8px;       /* 分隔条可以点中的宽度；看得见的线是 --bw，悬停或拖动时变成 --rule-w 的墨色 */
   --split-step: 16px;     /* 方向键每次调整的宽度；按住 Shift 时乘以 4 */

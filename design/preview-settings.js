@@ -80,7 +80,7 @@ const SET_BODY = {
     <h2>数据与隐私</h2>
     <div class="setrow"><div>图片和图库数据只存在这台电脑上<small>位置见"图片库"那一页。软件不会把图片上传到任何地方</small></div></div>
     <div class="setrow"><div>只在这几种情况下联网<small>检查更新（可以关掉）；你配置了 AI 服务并点了翻译、分类或段落的 AI 按钮时，把这几个 Tag 或这一段文字发给你配置的服务，不发图片；点"报告问题"时在浏览器里打开 GitHub</small></div></div>
-    <div class="setrow"><div>AI 服务的密钥加密保存在本机<small>诊断信息和报告问题都不会带上它</small></div></div>
+    <div class="setrow"><div>AI 服务的 API Key 只存在系统的安全存储里<small>软件不会以明文保存，诊断信息和报告问题都不会带上它</small></div></div>
     <h2>反馈与支持</h2>
     <div class="setrow"><div>报告问题或提出建议<small>会在浏览器里打开 GitHub，不会自动附带任何数据</small></div><span class="row"><button class="btn sm">报告问题</button><button class="btn sm">提出建议</button></span></div>
     <div class="setrow"><div>诊断信息<small>只包含软件版本和操作系统，不包含图片、Prompt 和路径</small></div><button class="btn quiet sm">复制</button></div>
@@ -95,12 +95,29 @@ VIEWS.set = () => {
   const full = S.sub === 'dict';
   return `${titlebar('')}<div class="body">
     <div class="side">${items.map(([k, t, , i]) => `<div class="it ${k === S.sub ? 'on' : ''}" data-sub="${k}">${ic(i)}${t}</div>`).join('')}</div>
-    <div class="col" style="flex:1 1 0;background:var(--surface)">${full ? SET_BODY.dict() : `<div class="scroll">${SET_BODY[S.sub]()}</div>`}</div></div>`;
+    <div class="col" style="flex:1 1 0;background:var(--surface)">${full ? SET_BODY.dict() : setPage(items)}</div></div>`;
 };
+
+// 页面标题移到吊顶的页头里；AI 服务的"测试连接 / 保存"移到吊底的页脚里
+function setPage(items) {
+  const title = items.find(([k]) => k === S.sub)[1];
+  let body = SET_BODY[S.sub](), desc = '', foot = '';
+  const m = body.match(/^<div class="set">\s*<h2>([^<]+)<\/h2>(?:<div class="help">([\s\S]*?)<\/div>)?/);
+  if (m && m[1] === title) { desc = m[2] || ''; body = '<div class="set">' + body.slice(m[0].length); }
+  if (S.sub === 'ai') {
+    const f = body.match(/<div class="setfoot"><button class="btn">测试连接[\s\S]*?<\/div>/);
+    if (f) {
+      body = body.replace(f[0], '');
+      foot = `<div class="set-foot"><div><span class="foot-note">有未保存的修改</span><span class="sp"></span><button class="btn">测试连接</button><button class="btn ink">保存</button></div></div>`;
+    }
+  }
+  return `<div class="scroll"><div class="set-head"><div><h1>${title}</h1>${desc ? `<p>${desc}</p>` : ''}</div></div>${body}${foot}</div>`;
+}
 delete VIEWS.acct;
 
 Object.assign(NOTES, {
   set: ['点左边的侧栏可以切换设置的各个分页。',
+        '版式（2026-10-12，借鉴 ClaudeDock）：内容栏在右边的内容区里居中；页面标题停在顶部，滚动后才出现底线；AI 服务的"测试连接 / 保存"停在底部。滚动条是自绘的细条，滚动或指针在区域里移动时才出现，悬停变粗、可以拖动。',
         '图片库：除了存放位置，还把数据库位置、升级前的备份和回收站放在一起，"我的数据在哪、怎么备份"一页看完。',
         'AI 服务：这一块是一张表单，有明确的"保存"，因为"测试连接"要用还没保存的值。其余设置都是改了立刻生效。',
         '翻译词典：原来叫"Tag 缓存"，是按 Tag 芯片排列的；现在改成表格，一行一条，方便成批查看和修正。',
