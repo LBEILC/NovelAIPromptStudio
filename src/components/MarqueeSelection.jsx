@@ -29,7 +29,7 @@ function pointerOnScrollbar(container, event) {
   );
 }
 
-export function MarqueeSelectionOverlay({ rect, zIndex }) {
+export function MarqueeSelectionOverlay({ rect, zIndex = undefined }) {
   if (!rect || typeof document === 'undefined') return null;
   return createPortal(
     <div
@@ -52,7 +52,7 @@ export function useMarqueeSelection({
   enabled = true,
   itemSelector = '[data-marquee-key]',
   onSelectionChange,
-  selectedKeys = [],
+  selectedKeys = /** @type {string[]} */ ([]),
   startOnItems = true,
 }) {
   const [rect, setRect] = useState(null);

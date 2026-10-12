@@ -7,7 +7,7 @@ import {
 } from '../lib/promptDocument';
 import { createPromptStructure, syncProjectPromptMetadata } from '../lib/promptStructure.js';
 import { parsePrompt } from '../lib/prompt.js';
-import { documentTags, replaceSection, reparseSection } from './document';
+import { documentTags, replaceSection, reparseSection } from './model';
 
 describe('workbench block persistence', () => {
   it('preserves a chosen type and paragraph translation across normalization and JSON round trips', () => {

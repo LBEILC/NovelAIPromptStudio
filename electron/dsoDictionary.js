@@ -54,3 +54,29 @@ export function dsoDictionaryMetadata() {
 }
 
 export { DICTIONARY_PATH };
+
+export function searchDsoTags(query, limit = 30) {
+  const search = String(query || '')
+    .trim()
+    .toLowerCase()
+    .replaceAll(' ', '_');
+  if (!search) return [];
+  const data = dictionary();
+  const results = [];
+  for (const [tag, entry] of Object.entries(data.entries)) {
+    if (!tag.toLowerCase().includes(search) && !String(entry[0]).toLowerCase().includes(search))
+      continue;
+    results.push({
+      tag,
+      translation: String(entry[0] || ''),
+      category: data.categories[Number(entry[1])] || 'Unsorted',
+    });
+  }
+  return results
+    .sort(
+      (a, b) =>
+        Number(b.tag.startsWith(search)) - Number(a.tag.startsWith(search)) ||
+        a.tag.localeCompare(b.tag),
+    )
+    .slice(0, Math.min(50, Math.max(1, limit)));
+}

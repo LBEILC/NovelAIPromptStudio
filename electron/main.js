@@ -31,7 +31,7 @@ import {
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags } from './translation.js';
 import { lookupDanbooruTags } from './danbooru.js';
-import { lookupDsoTags } from './dsoDictionary.js';
+import { lookupDsoTags, searchDsoTags } from './dsoDictionary.js';
 import { annotateTags } from './tagAnnotations.js';
 import { exportEmbeddedVibeFile } from './vibes.js';
 import { applyWorkbenchLibraryDetails, readWorkbenchImage } from './workbench.js';
@@ -1174,6 +1174,27 @@ app.whenReady().then(async () => {
       return { ok: true, ...database.listTagDictionary(request) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('tag:suggest', (_event, query) => {
+    try {
+      const search = String(query || '')
+        .trim()
+        .slice(0, 240);
+      if (!search) return { ok: true, items: [] };
+      const items = new Map(
+        searchDsoTags(search).map((item) => [item.tag.toLowerCase().replaceAll(' ', '_'), item]),
+      );
+      for (const entry of database.listTagDictionary({ query: search, limit: 30 }).items) {
+        items.set(entry.tag.toLowerCase().replaceAll(' ', '_'), {
+          tag: entry.display_tag || entry.tag,
+          translation: entry.translation,
+          category: entry.category,
+        });
+      }
+      return { ok: true, items: [...items.values()].slice(0, 30) };
+    } catch (error) {
+      return { ok: false, error: error.message };
     }
   });
   ipcMain.handle('tag-cache:update', (_event, request = {}) => {

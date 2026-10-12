@@ -40,3 +40,12 @@
 .wb-copy-bar { display:flex; justify-content:flex-end; align-items:center; flex-shrink:0; gap:var(--bw); padding:var(--sp-3) var(--sp-4); min-height:var(--bar-h); border-top:var(--bw) solid var(--divider); white-space:nowrap; }
 @container (max-width: 420px) { .wb-prompt-head kbd { display:none; } }
 @container (max-width: 340px) { .wb-responsive-label { display:none; } }
+.wb-editor { position:relative; height:100%; min-height:0; }
+.wb-tag-editor { display:flex; flex-direction:column; gap:var(--sp-3); }
+.wb-tag-editor label { display:flex; flex-direction:column; gap:var(--sp-1); }
+.wb-editor-actions { display:flex; justify-content:flex-end; align-items:center; gap:var(--sp-2); white-space:nowrap; }
+.wb-add-tags { display:flex; flex-direction:column; min-width:var(--tag-input-min); max-width:100%; }
+.wb-add-tags[data-drop-active=true] { outline:var(--focus-w) solid var(--focus); }
+.wb-tag-dragging .nps-tag { box-shadow:var(--shadow-pop); }
+.wb-editor .nps-selection-slot { position:absolute; bottom:calc(var(--bar-h) + var(--sp-3)); left:var(--sp-3); right:var(--sp-3); }
+.wb-editor .nps-selection { width:100%; }

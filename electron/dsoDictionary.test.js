@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { dsoDictionaryMetadata, lookupDsoTags } from './dsoDictionary.js';
+import { dsoDictionaryMetadata, lookupDsoTags, searchDsoTags } from './dsoDictionary.js';
 
 describe('bundled DSO dictionary', () => {
+  it('finds English tags from Chinese translations without a network lookup', () => {
+    expect(searchDsoTags('蓝发').some((entry) => entry.tag === 'blue_hair')).toBe(true);
+    expect(searchDsoTags('blue hair')[0].tag).toBe('blue_hair');
+    expect(searchDsoTags('')).toEqual([]);
+    expect(searchDsoTags('hair', 4)).toHaveLength(4);
+  });
   it('looks up space and parenthesis variants without changing input order', () => {
     const found = lookupDsoTags([
       'blue hair',

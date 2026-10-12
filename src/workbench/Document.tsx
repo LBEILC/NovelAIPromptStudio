@@ -21,7 +21,7 @@ import {
   reparseSection,
   scopeLabel,
   type DocumentTag,
-} from './document';
+} from './model';
 import './workbench.css';
 
 export interface DocumentProps {

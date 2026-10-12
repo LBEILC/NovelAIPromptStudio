@@ -274,6 +274,15 @@ export function editPromptParagraph(
   return replaceBlockContent(section, index, content);
 }
 
+/** Replace only the chosen block content, retaining surrounding bytes and its chosen type. */
+export function editPromptBlockText(
+  section: PromptSection,
+  index: number,
+  content: string,
+): PromptSection {
+  return replaceBlockContent(section, index, content);
+}
+
 function decimalWeight(value: number): string {
   const text = String(value);
   if (!/[eE]/.test(text)) return text;
@@ -297,7 +306,7 @@ export function editPromptTag(
   section: PromptSection,
   blockIndex: number,
   tagIndex: number,
-  edit: { weight: number } | { delete: true },
+  edit: { weight: number } | { delete: true } | { tag: string },
 ): PromptSection {
   const block = section.blocks[blockIndex];
   if (block?.type !== 'tags') throw new TypeError('Expected a tag block');
@@ -308,6 +317,7 @@ export function editPromptTag(
   let start = range.start;
   let end = range.end;
   let replacement = '';
+  if ('tag' in edit) replacement = edit.tag;
   if ('weight' in edit) {
     if (!Number.isFinite(edit.weight)) throw new TypeError('Expected a finite weight');
     if (edit.weight === tag.weight) return section;
@@ -350,7 +360,11 @@ export function editPromptTag(
   // Deletion intentionally leaves separators and empty wrappers; the legacy parser ignores them.
   const content = block.content.slice(0, start) + replacement + block.content.slice(end);
   const expected = block.tags.flatMap((item, index) =>
-    index === tagIndex ? ('delete' in edit ? [] : [{ ...item, weight: edit.weight }]) : [item],
+    index === tagIndex
+      ? 'delete' in edit
+        ? []
+        : ['tag' in edit ? { ...item, tag: edit.tag } : { ...item, weight: edit.weight }]
+      : [item],
   );
   const actual = parsePrompt(content);
   // Malformed control tokens sometimes cannot be reweighted in the legacy grammar.
