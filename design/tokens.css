@@ -124,6 +124,8 @@
   /* 设置各页（2026-10-12，借鉴 ClaudeDock） */
   --page-col: 680px;      /* 内容栏的宽度，在内容区里水平居中；窗口变窄时两侧至少留 --page-pad-x */
   --page-pad-x: 36px;
+  --page-col-wide: 960px; /* 翻译词典的表格，同样居中 */
+  --dict-search-w: 220px;
   --page-head-pad: 22px;  /* 页头：上 --page-head-pad，下 --sp-3；标题 --fs-page，说明 --fs-small、--text-3。滚动时页头停在顶部，背景铺满内容区，内容对齐内容栏；内容滚到它下面之后底边出现 --divider 细线 */
   --fs-page: 18px;        /* 页面标题，行高 26px，--fw-strong */
   --lh-page: 26px;

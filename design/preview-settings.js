@@ -43,25 +43,53 @@ const SET_BODY = {
   </div>`,
 
   dict: () => {
+    // 默认按"用在几张图里"从多到少排：常用的 Tag 排在前面，只出现过一次的沉到后面
     const rows = [
-      ['long copper hair', '铜色长发', ['外貌身体', 'body'], '内置词典', ''],
-      ['side braid', '侧辫', ['外貌身体', 'body'], '内置词典', ''],
-      ['artist:konya_karasue', '画师', ['画师年代', 'artist-era'], '本地规则', 'row-on'],
-      ['transparent umbrella', '透明雨伞', ['服装配饰', 'clothing'], 'AI', 'row-on'],
-      ['cinematic composition', '电影感构图', ['镜头光影', 'composition'], '你改过', ''],
-      ['shu (arknights)', '', ['未分类', 'unsorted'], '还没有翻译', ''],
-      ['wet pavement', '湿漉漉的路面', ['环境背景', 'environment'], 'AI', ''],
+      ['best quality', '最佳质量', ['风格质量', 'style'], 148, '内置', ''],
+      ['looking at viewer', '看向观众', ['动作表情', 'action'], 96, '内置', ''],
+      ['long copper hair', '铜色长发', ['外貌身体', 'body'], 41, '你改过', 'row-edit'],
+      ['transparent umbrella', '透明雨伞', ['服装配饰', 'clothing'], 23, 'AI', 'row-on'],
+      ['wet pavement', '湿漉漉的路面', ['环境背景', 'environment'], 17, 'AI', 'row-on'],
+      ['cinematic composition', '电影感构图', ['镜头光影', 'composition'], 12, 'AI', 'row-hover'],
+      ['side braid', '侧辫', ['外貌身体', 'body'], 9, '内置', ''],
+      ['muted palette', '', ['未分类', 'unsorted'], 6, '', ''],
+      ['bus stop sign', '', ['未分类', 'unsorted'], 3, '', ''],
+      ['rain-streaked window', '雨痕车窗', ['环境背景', 'environment'], 1, 'AI', ''],
+      ['umbrella shadow', '伞影', ['镜头光影', 'composition'], 0, 'AI', ''],
     ];
-    return `<div style="display:flex;flex-direction:column;height:100%;min-height:0">
-    <div class="set" style="padding-bottom:10px;max-width:none"><h2>翻译词典</h2><div class="help">这里是软件记住的 Tag 译文和分类。修改只影响显示，不会改动图片里保存的 Prompt。</div></div>
-    <div class="tbl-bar"><span class="field sm grow">${ic('search-line')}<span class="ph">搜索 Tag 或译文</span></span>
-      <span class="field sm">全部分类${ic('arrow-down-s-line')}</span><span class="field sm">全部来源${ic('arrow-down-s-line')}</span><span class="muted mono">2,378 条</span></div>
-    <div class="tbl">
-      <div class="th"><span class="check"></span></div><div class="th">Tag</div><div class="th">译文</div><div class="th">分类</div><div class="th">来源</div><div class="th"></div>
-      ${rows.map(([en, zh, [cz, cc], src, cls]) => `<div class="${cls}"><span class="check ${cls ? 'on' : ''}">${cls ? ic('check-line') : ''}</span></div><div class="${cls}"><span class="en">${en}</span></div>
-        <div class="${cls}">${zh || '<span class="muted">点击填写</span>'}</div><div class="${cls}">${cat(cz, cc)}</div><div class="${cls}"><span class="src">${src}</span></div><div class="${cls}"><button class="btn quiet sm">删除</button></div>`).join('')}
-    </div>
-    <div style="padding:14px var(--sp-5);display:flex;justify-content:center"><span class="selbar"><span class="n">已选 2 条</span><button class="btn quiet sm">设置分类</button><button class="btn danger sm">删除</button><button class="btn quiet sm">取消</button></span></div>
+    const views = [['全部', '2,416', true], ['没有译文', '1,198'], ['未分类', '695'], ['AI 翻译的', '819'], ['你改过的', '41']];
+    const cell = (cls, html, extra = '') => `<div class="${cls}${extra}">${html}</div>`;
+    return `<div class="dict">
+    <div class="set-head"><div><h1>翻译词典</h1><p>软件认识的 Tag 和它们的译文、分类。工作台和图片库里显示的译文都来自这里；改了只影响显示，不会改动图片里的 Prompt。</p></div></div>
+    <div class="dict-bar"><div>
+      <span class="field sm dict-search">${ic('search-line')}<span class="ph">搜索 Tag 或译文</span><span class="kbd">Ctrl K</span></span>
+      <span class="sp"></span>
+      <span class="field sm">全部分类${ic('arrow-down-s-line')}</span>
+      <span class="field sm">按用到的图片数${ic('arrow-down-s-line')}</span>
+    </div><div class="dict-views">
+      <span class="seg">${views.map(([t, n, on]) => `<button class="${on ? 'on' : ''}">${t}<span class="dict-n">${n}</span></button>`).join('')}</span>
+    </div></div>
+    <div class="scroll"><div class="dict-tbl">
+      <div class="th"><span class="check"></span></div><div class="th">Tag</div><div class="th">译文</div><div class="th">分类</div><div class="th num">用到的图片</div><div class="th">来源</div><div class="th"></div>
+      ${rows.map(([en, zh, [cz, cc], n, src, cls]) => {
+        const on = cls === 'row-on';
+        const zhCell = cls === 'row-edit'
+          ? `<span class="field sm dict-input"><span>铜色长发</span><i class="caret"></i></span>`
+          : zh || '<span class="muted">点击填写</span>';
+        const tail = cls === 'row-hover' ? `<button class="btn quiet icon sm" aria-label="更多">${ic('more-2-fill')}</button>` : '';
+        return [
+          cell(cls, `<span class="check ${on ? 'on' : ''}">${on ? ic('check-line') : ''}</span>`),
+          cell(cls, `<span class="en">${en}</span>`),
+          cell(cls, zhCell),
+          cell(cls, `<span class="cdot" style="background:var(--cat-${cc})"></span>${cz}`, cc === 'unsorted' ? ' dim' : ''),
+          cell(cls, n ? String(n) : '<span class="muted">没用到</span>', ' num'),
+          cell(cls, src ? `<span class="src">${src}</span>` : '<span class="muted">—</span>'),
+          cell(cls, tail),
+        ].join('');
+      }).join('')}
+    </div><div class="dict-more muted">向下滚动继续显示</div></div>
+    <div class="dict-sel"><span class="selbar"><span class="n">已选 2 条</span><button class="btn quiet sm">设置分类</button><button class="btn quiet sm">用 AI 重新翻译</button><span class="sep"></span><button class="btn danger sm">删除</button><button class="btn quiet sm">取消</button></span></div>
+    <div class="dict-menu"><div class="menu"><div class="mi">在图片库里查找<span class="k">12 张</span></div><div class="mi">复制 Tag</div><hr><div class="mi danger">删除，下次重新翻译</div></div></div>
     </div>`;
   },
 
@@ -120,7 +148,7 @@ Object.assign(NOTES, {
         '版式（2026-10-12，借鉴 ClaudeDock）：内容栏在右边的内容区里居中；页面标题停在顶部，滚动后才出现底线；AI 服务的"测试连接 / 保存"停在底部。滚动条是自绘的细条，滚动或指针在区域里移动时才出现，悬停变粗、可以拖动。',
         '图片库：除了存放位置，还把数据库位置、升级前的备份和回收站放在一起，"我的数据在哪、怎么备份"一页看完。',
         'AI 服务：这一块是一张表单，有明确的"保存"，因为"测试连接"要用还没保存的值。其余设置都是改了立刻生效。',
-        '翻译词典：原来叫"Tag 缓存"，是按 Tag 芯片排列的；现在改成表格，一行一条，方便成批查看和修正。',
+        '翻译词典（2026-10-12 重做）：按"用在几张图里"排序，常用的在前；上面的分页签就是要检查的几类（没有译文、未分类、AI 翻译的、你改过的）；点译文直接在格子里改，回车保存并跳到下一行；删除收进每行的"更多"和多选操作条，不再每行一个。',
         '关于：有"非官方工具"的声明，以及字体的署名（MiSans 的授权要求在软件里注明）。',
         '1.0 不做帮助中心（2026-10-12）。原来帮助中心里真正有用的两块挪到这里：快捷键列表，以及"数据存在哪、什么时候联网"的说明。其余的引导放在用的地方：空状态、悬停提示、Tag 提示。'],
 });

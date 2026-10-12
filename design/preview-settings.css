@@ -29,3 +29,34 @@
 .about-mark { display: block; color: var(--text); }
 .about-mark svg { display: block; width: var(--about-mark); height: var(--about-mark); }
 .about-name { font: var(--fw-strong) var(--fs-brand)/var(--lh-brand) var(--font-prose); }
+
+/* 翻译词典（2026-10-12 重做）：表格比其他页宽（--page-col-wide），同样居中；页头和工具条不动，表格单独滚动 */
+.dict { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.dict .set-head > div, .dict-bar > div, .dict-tbl, .dict-more { max-width: var(--page-col-wide); margin: 0 auto; }
+.dict .set-head { position: static; }
+.dict-bar { padding: 0 var(--page-pad-x); border-bottom: var(--bw) solid var(--divider); }
+.dict-bar > div { display: flex; align-items: center; gap: var(--sp-2); }
+.dict-views { margin-top: var(--sp-2); }
+.dict-views .seg button { height: 32px; }
+.dict-n { margin-left: var(--sp-1); font: var(--fs-caption)/1 var(--font-mono); color: var(--text-3); font-weight: var(--fw-regular); }
+.dict-search { flex: 0 1 var(--dict-search-w); min-width: 140px; }
+.dict-search .kbd { margin-left: auto; }
+.dict .scroll { padding: 0 var(--page-pad-x); }
+.dict-tbl { display: grid; grid-template-columns: var(--table-check-w) minmax(180px, 1.2fr) minmax(140px, 1fr) 128px 84px 64px var(--ctl-sm); }
+.dict-tbl > div { display: flex; align-items: center; gap: var(--ctl-gap); min-height: var(--table-row-h); padding: 0 var(--sp-2); border-bottom: var(--bw) solid var(--divider); min-width: 0; }
+.dict-tbl > div:nth-child(7n + 1) { padding-left: var(--sp-1); }
+.dict-tbl > div:nth-child(7n) { padding: 0; justify-content: flex-end; }
+.dict-tbl .th { min-height: var(--table-head-h); color: var(--text-3); font-size: var(--fs-caption); background: var(--surface); position: sticky; top: 0; z-index: 1; }
+.dict-tbl .num { justify-content: flex-end; font: var(--fs-small)/1 var(--font-mono); color: var(--text-2); }
+.dict-tbl .th.num { font: var(--fs-caption)/1 var(--font-ui); color: var(--text-3); }
+.dict-tbl .en { font: var(--fs-small)/var(--lh-small) var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dict-tbl .src { color: var(--text-3); font-size: var(--fs-small); }
+.dict-tbl .dim { color: var(--text-3); }
+.dict-tbl .row-on { background: var(--selected); }
+.dict-tbl .row-hover, .dict-tbl .row-edit { background: var(--hover); }
+.dict-input { flex: 1 1 auto; height: var(--ctl-sm); border-color: var(--ink); }
+.dict-input .caret { width: 1px; height: 14px; background: var(--text); margin-left: 1px; }
+.dict-more { padding: var(--sp-4) 0 calc(var(--selbar-h) + var(--sp-8)); text-align: center; font-size: var(--fs-small); }
+.dict-sel { position: absolute; left: 0; right: 0; bottom: var(--sp-5); display: flex; justify-content: center; pointer-events: none; }
+.dict-sel .selbar { pointer-events: auto; }
+.dict-menu { position: absolute; z-index: 3; right: max(var(--page-pad-x), calc(50% - var(--page-col-wide) / 2)); top: 382px; }
