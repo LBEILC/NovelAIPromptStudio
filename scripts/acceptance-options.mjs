@@ -9,9 +9,9 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
       .join('=');
   const slow = Number(value('slow') || 1);
   if (![1, 4, 6].includes(slow)) throw Error('--slow must be 1, 4 or 6');
-  if (timingMode(undefined, env.CI) === 'record' && slow > 1)
+  if (timingMode(undefined, env.CI ?? '') === 'record' && slow > 1)
     throw Error('--slow is only available outside CI');
-  const timing = timingMode(value('timing'), env.CI);
+  const timing = timingMode(value('timing'), env.CI ?? '');
   const category = value('category') || '全部';
   if (
     ![
