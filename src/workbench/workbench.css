@@ -1,8 +1,9 @@
 .wb-tabs { display:flex; align-items:center; min-width:0; gap:var(--sp-0); -webkit-app-region:no-drag; }
-.wb-tabs-scroll { display:flex; overflow:hidden; min-width:0; gap:var(--sp-0); }
+.wb-tabs-scroll { position:relative; isolation:isolate; display:flex; overflow:hidden; min-width:0; gap:var(--sp-0); }
 .wb-tab { height:var(--ctl); display:inline-flex; align-items:center; gap:var(--sp-2); padding:0 var(--ctl-pad-x); border:0; border-radius:var(--r-ctl); background:transparent; color:var(--text-2); white-space:nowrap; }
 .wb-tab:hover { background:var(--hover); }
-.wb-tab[aria-selected=true] { background:var(--surface); color:var(--text); box-shadow:inset 0 0 0 var(--bw) var(--border); }
+.wb-tab[aria-selected=true] { color:var(--text); }
+.wb-tab-indicator { z-index:-1; background:var(--surface); box-shadow:inset 0 0 0 var(--bw) var(--border); border-radius:var(--r-ctl); }
 .nps-root .wb-tabs :focus-visible { outline-offset:calc(-1 * var(--focus-w)); }
 .wb-tab img { height:var(--tab-thumb-h); width:clamp(var(--tab-thumb-min-w),calc(var(--tab-thumb-h) * var(--wb-thumb-ratio)),var(--tab-thumb-max-w)); object-fit:cover; border-radius:var(--r-tag); }
 .wb-tab-name { max-width:var(--tab-name-max-w); overflow:hidden; text-overflow:ellipsis; }
@@ -109,3 +110,6 @@
 .wb-tab[aria-selected=true] .wb-tab-close { background:var(--surface); }
 .wb-tab:hover .wb-tab-close { background:var(--hover); }
 .wb-tab .wb-tab-close:hover { background:var(--selected); }
+
+.wb-image-transition { flex:1 1 0; min-width:0; min-height:0; display:flex; }
+.wb-prompt-transition { height:100%; min-height:0; }

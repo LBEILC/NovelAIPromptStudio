@@ -34,6 +34,7 @@ import {
   type DocumentTag,
 } from './model';
 import './workbench.css';
+import { Collapse, TransitionSurface } from '../ui/transitions';
 
 export interface DocumentProps {
   scrollRef?: React.RefObject<HTMLDivElement | null>;
@@ -405,7 +406,7 @@ export function WorkbenchDocument(p: DocumentProps) {
           </label>
         </div>
       </Popover>
-      {filtered && (
+      <Collapse open={filtered}>
         <div className="wb-filters">
           {query && (
             <Button variant="quiet" size="small" onClick={() => setQuery('')}>
@@ -435,7 +436,7 @@ export function WorkbenchDocument(p: DocumentProps) {
           </Button>
           <span className="nps-help wb-filter-note">复制时只包含筛选出的内容</span>
         </div>
-      )}
+      </Collapse>
       <div className="wb-document-scroll" ref={scroll}>
         {p.viewState.viewMode === 'category' && (
           <p className="nps-help">按分类排列时不能拖动排序</p>
@@ -573,62 +574,69 @@ export function WorkbenchDocument(p: DocumentProps) {
                   />
                 </span>
               </header>
-              {p.sectionEditor?.section === si
-                ? p.sectionEditor.content
-                : !collapsed.includes(sectionKey) && (
-                    <>
-                      {!!sectionEntries.filter((entry) => entry.automatic).length && (
-                        <div
-                          className="wb-automatic"
-                          data-tip="这些是 NovelAI 按官方预设自动加的 Tag，默认复制时不包含。"
-                        >
-                          {section.scope.automation?.sourceLabel ||
-                            `NovelAI 自动添加 · ${section.scope.automation?.tagCount}`}
-                          <Button
-                            variant="quiet"
-                            size="small"
-                            onClick={() =>
-                              setAutomatic(
-                                automatic.includes(sectionKey)
-                                  ? automatic.filter((key) => key !== sectionKey)
-                                  : [...automatic, sectionKey],
-                              )
-                            }
+              <TransitionSurface
+                kind="height"
+                change={`${collapsed.includes(sectionKey)}:${p.sectionEditor?.section === si}:${automatic.includes(sectionKey)}`}
+              >
+                {p.sectionEditor?.section === si
+                  ? p.sectionEditor.content
+                  : !collapsed.includes(sectionKey) && (
+                      <>
+                        {!!sectionEntries.filter((entry) => entry.automatic).length && (
+                          <div
+                            className="wb-automatic"
+                            data-tip="这些是 NovelAI 按官方预设自动加的 Tag，默认复制时不包含。"
                           >
-                            {automatic.includes(sectionKey) ? '隐藏' : '显示'}
-                          </Button>
-                        </div>
-                      )}
-                      {p.viewState.viewMode === 'category' &&
-                        CATEGORY_OPTIONS.map((cat) => {
-                          const tags = visibleEntries.filter((entry) => entry.tag.category === cat);
-                          return (
-                            tags.some(matches) && (
-                              <div key={cat} className="wb-block">
-                                <header>{categoryLabel(cat)}</header>
-                                <div className="wb-tags">
-                                  {p.renderTagList
-                                    ? p.renderTagList(tags, tags.map(drawTag), si, -1)
-                                    : tags.map(drawTag)}
+                            {section.scope.automation?.sourceLabel ||
+                              `NovelAI 自动添加 · ${section.scope.automation?.tagCount}`}
+                            <Button
+                              variant="quiet"
+                              size="small"
+                              onClick={() =>
+                                setAutomatic(
+                                  automatic.includes(sectionKey)
+                                    ? automatic.filter((key) => key !== sectionKey)
+                                    : [...automatic, sectionKey],
+                                )
+                              }
+                            >
+                              {automatic.includes(sectionKey) ? '隐藏' : '显示'}
+                            </Button>
+                          </div>
+                        )}
+                        {p.viewState.viewMode === 'category' &&
+                          CATEGORY_OPTIONS.map((cat) => {
+                            const tags = visibleEntries.filter(
+                              (entry) => entry.tag.category === cat,
+                            );
+                            return (
+                              tags.some(matches) && (
+                                <div key={cat} className="wb-block">
+                                  <header>{categoryLabel(cat)}</header>
+                                  <div className="wb-tags">
+                                    {p.renderTagList
+                                      ? p.renderTagList(tags, tags.map(drawTag), si, -1)
+                                      : tags.map(drawTag)}
+                                  </div>
                                 </div>
-                              </div>
-                            )
-                          );
-                        })}
-                      {section.blocks.map((_, bi) => renderBlock(bi))}
-                      {!section.blocks.length && (
-                        <div className="wb-tags">
-                          {p.renderTagList?.([], [], si, -1)}
-                          {p.renderAdd?.(si, -1)}
-                        </div>
-                      )}
-                      {!!hiddenBlocks && (
-                        <p className="nps-help">
-                          另外 {hiddenBlocks} 块里没有符合的内容，已经收起。
-                        </p>
-                      )}
-                    </>
-                  )}
+                              )
+                            );
+                          })}
+                        {section.blocks.map((_, bi) => renderBlock(bi))}
+                        {!section.blocks.length && (
+                          <div className="wb-tags">
+                            {p.renderTagList?.([], [], si, -1)}
+                            {p.renderAdd?.(si, -1)}
+                          </div>
+                        )}
+                        {!!hiddenBlocks && (
+                          <p className="nps-help">
+                            另外 {hiddenBlocks} 块里没有符合的内容，已经收起。
+                          </p>
+                        )}
+                      </>
+                    )}
+              </TransitionSurface>
             </section>
           );
         })}

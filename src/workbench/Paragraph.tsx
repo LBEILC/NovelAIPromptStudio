@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Banner, TextArea } from '../ui';
+import { TransitionSurface } from '../ui/transitions';
 import type { PromptBlock } from '../lib/promptDocument';
 
 export function ParagraphEditor({
@@ -89,93 +90,95 @@ export function ParagraphEditor({
       active = false;
     };
   }, [translateRequest]);
-  if (!editing)
-    return (
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label="编辑段落"
-        onClick={() => {
-          setEnglish(block.content);
-          setChinese(block.translation || '');
-          setEditing(true);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            setEditing(true);
-          }
-        }}
-      >
-        {children}
-      </div>
-    );
   return (
-    <div className="wb-paragraph-editor">
-      <TextArea
-        aria-label="英文段落"
-        className="wb-prose-input"
-        value={english}
-        onChange={(event) => setEnglish(event.target.value)}
-      />
-      <div className="wb-editor-actions">
-        <Button
-          variant="quiet"
-          size="small"
-          disabled={!configured || !!busy}
-          disabledReason="请先在设置里配置 AI 服务"
-          loading={busy === 'translate'}
-          onClick={() => void transform('translate')}
-        >
-          <i className="ri-arrow-down-line" />
-          译成中文
-        </Button>
-        <Button
-          variant="quiet"
-          size="small"
-          disabled={!configured || !!busy}
-          disabledReason="请先在设置里配置 AI 服务"
-          loading={busy === 'rewrite'}
-          onClick={() => void transform('rewrite')}
-        >
-          <i className="ri-arrow-up-line" />
-          按中文改写英文
-        </Button>
-        <span className="nps-help wb-editor-note">发给 NovelAI 的是上面的英文</span>
-      </div>
-      <TextArea
-        aria-label="中文段落"
-        value={chinese}
-        onChange={(event) => {
-          setChinese(event.target.value);
-          setChangedChinese(true);
-        }}
-      />
-      {error && <Banner tone="danger">{error}</Banner>}
-      <div className="wb-editor-actions">
-        {changedChinese && (
-          <span className="nps-help wb-editor-warning">中文已修改，英文还没有更新</span>
-        )}
-        <Button
-          variant="quiet"
+    <TransitionSurface kind="height" change={editing}>
+      {!editing ? (
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="编辑段落"
           onClick={() => {
-            cancel();
-            if (!busy) setEditing(false);
+            setEnglish(block.content);
+            setChinese(block.translation || '');
+            setEditing(true);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              setEditing(true);
+            }
           }}
         >
-          取消
-        </Button>
-        <Button
-          variant="ink"
-          disabled={!!busy}
-          onClick={() => {
-            onSave(english, chinese);
-            setEditing(false);
-          }}
-        >
-          完成
-        </Button>
-      </div>
-    </div>
+          {children}
+        </div>
+      ) : (
+        <div className="wb-paragraph-editor">
+          <TextArea
+            aria-label="英文段落"
+            className="wb-prose-input"
+            value={english}
+            onChange={(event) => setEnglish(event.target.value)}
+          />
+          <div className="wb-editor-actions">
+            <Button
+              variant="quiet"
+              size="small"
+              disabled={!configured || !!busy}
+              disabledReason="请先在设置里配置 AI 服务"
+              loading={busy === 'translate'}
+              onClick={() => void transform('translate')}
+            >
+              <i className="ri-arrow-down-line" />
+              译成中文
+            </Button>
+            <Button
+              variant="quiet"
+              size="small"
+              disabled={!configured || !!busy}
+              disabledReason="请先在设置里配置 AI 服务"
+              loading={busy === 'rewrite'}
+              onClick={() => void transform('rewrite')}
+            >
+              <i className="ri-arrow-up-line" />
+              按中文改写英文
+            </Button>
+            <span className="nps-help wb-editor-note">发给 NovelAI 的是上面的英文</span>
+          </div>
+          <TextArea
+            aria-label="中文段落"
+            value={chinese}
+            onChange={(event) => {
+              setChinese(event.target.value);
+              setChangedChinese(true);
+            }}
+          />
+          {error && <Banner tone="danger">{error}</Banner>}
+          <div className="wb-editor-actions">
+            {changedChinese && (
+              <span className="nps-help wb-editor-warning">中文已修改，英文还没有更新</span>
+            )}
+            <Button
+              variant="quiet"
+              onClick={() => {
+                cancel();
+                if (!busy) setEditing(false);
+              }}
+            >
+              取消
+            </Button>
+            <Button
+              variant="ink"
+              disabled={!!busy}
+              onClick={() => {
+                onSave(english, chinese);
+                setEditing(false);
+              }}
+            >
+              完成
+            </Button>
+          </div>
+        </div>
+      )}
+    </TransitionSurface>
   );
 }

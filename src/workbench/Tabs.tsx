@@ -1,4 +1,4 @@
-import { DecodedImage } from '../ui/transitions';
+import { DecodedImage, useMovingIndicator } from '../ui/transitions';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   DndContext,
@@ -139,6 +139,8 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
 export function WorkbenchTabs(p: TabsProps) {
   const list = useRef<HTMLDivElement>(null);
   const bar = useRef<HTMLDivElement>(null);
+  const indicator = useRef<HTMLSpanElement>(null);
+  useMovingIndicator(list, indicator, '.wb-tab[aria-selected=true]', p.session);
   const drag = useDragFeedback(list, true);
   const [overflow, setOverflow] = useState(false);
   const sensors = useSensors(
@@ -217,6 +219,11 @@ export function WorkbenchTabs(p: TabsProps) {
           strategy={horizontalListSortingStrategy}
         >
           <div className="wb-tabs-scroll" role="tablist" aria-label="图片标签页" ref={list}>
+            <span
+              ref={indicator}
+              className="nps-moving-indicator wb-tab-indicator"
+              aria-hidden="true"
+            />
             {p.session.tabs.map((tab) => (
               <Tab key={tab.id} tab={tab} p={p} />
             ))}

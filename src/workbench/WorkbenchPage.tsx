@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Banner, Button, EmptyMark, EmptyState, ResizablePanel } from '../ui';
 import { WorkbenchEditor, type EditorProps } from './Editor';
 import { WorkbenchImage } from './Image';
@@ -7,6 +7,7 @@ import type { ImageProject, Vibe } from '../shared/types';
 import { activeWorkbenchTab } from '../lib/workbenchSession.js';
 import { WORKBENCH_SOURCE_PANEL_WIDTH_KEY } from '../lib/panelLayout.js';
 import './workbench.css';
+import { TransitionSurface } from '../ui/transitions';
 
 export interface WorkbenchPageProps
   extends Pick<
@@ -34,6 +35,23 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
     () => Number(localStorage.getItem(WORKBENCH_SOURCE_PANEL_WIDTH_KEY)) || defaultWidth,
   );
   const tab = activeWorkbenchTab(p.session);
+  const previous = useRef(p.session.activeTabId);
+  const oldIndex = p.session.tabs.findIndex((item) => item.id === previous.current);
+  const index = p.session.tabs.findIndex((item) => item.id === tab?.id);
+  const direction = Math.sign(index - oldIndex);
+  const scrollPositions = useRef(new Map<string, number>());
+  const prompt = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    previous.current = tab?.id || '';
+    const node = prompt.current?.querySelector<HTMLElement>('.wb-document-scroll');
+    if (!node || !tab) return;
+    node.scrollTop = scrollPositions.current.get(tab.id) || 0;
+    const remember = () => scrollPositions.current.set(tab.id, node.scrollTop);
+    node.addEventListener('scroll', remember);
+    return () => {
+      node.removeEventListener('scroll', remember);
+    };
+  }, [tab?.id]);
   if (!tab)
     return (
       <main className="workbench-page wb-empty">
@@ -61,16 +79,18 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
     >
       {p.error && <Banner tone="danger">{p.error}</Banner>}
       <div className="wb-body">
-        <WorkbenchImage
-          key={tab.id}
-          tab={tab}
-          onCopyImage={p.onCopyImage}
-          onDownloadImage={p.onDownloadImage}
-          onReset={p.onReset}
-          onSaveLibrary={p.onSaveLibrary}
-          onReveal={p.onReveal}
-          onRevealVibe={p.onRevealVibe}
-        />
+        <TransitionSurface change={tab.id} direction={direction} className="wb-image-transition">
+          <WorkbenchImage
+            key={tab.id}
+            tab={tab}
+            onCopyImage={p.onCopyImage}
+            onDownloadImage={p.onDownloadImage}
+            onReset={p.onReset}
+            onSaveLibrary={p.onSaveLibrary}
+            onReveal={p.onReveal}
+            onRevealVibe={p.onRevealVibe}
+          />
+        </TransitionSurface>
         <ResizablePanel
           width={width}
           defaultWidth={defaultWidth}
@@ -83,15 +103,17 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
             localStorage.setItem(WORKBENCH_SOURCE_PANEL_WIDTH_KEY, String(value));
           }}
         >
-          {tab.project && (
-            <WorkbenchEditor
-              key={tab.id}
-              {...p}
-              project={tab.project}
-              viewState={tab.viewState}
-              onViewStateChange={(state) => p.onUpdateViewState(tab.id, state)}
-            />
-          )}
+          <TransitionSurface change={tab.id} className="wb-prompt-transition" nodeRef={prompt}>
+            {tab.project && (
+              <WorkbenchEditor
+                key={tab.id}
+                {...p}
+                project={tab.project}
+                viewState={tab.viewState}
+                onViewStateChange={(state) => p.onUpdateViewState(tab.id, state)}
+              />
+            )}
+          </TransitionSurface>
         </ResizablePanel>
       </div>
     </main>
