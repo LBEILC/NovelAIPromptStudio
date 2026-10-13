@@ -17,10 +17,7 @@ const editor = 'document.querySelector(".nps-popover:popover-open .wb-tag-editor
 const scroll = 'document.querySelector(".wb-document-scroll")';
 
 async function notificationClearance(h, label, selector) {
-  await h.wait(
-    `document.querySelector('.nps-notifications').getAnimations().every(a=>a.playState!=='running')`,
-    '通知位置稳定',
-  );
+  await settleLayout(h, `.nps-notifications, ${selector}`);
   await h.check(
     `${label}通知位于操作条上方且每个按钮中心可点击`,
     `(()=>{

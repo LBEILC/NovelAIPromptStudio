@@ -1,3 +1,4 @@
+import { TransitionSurface, useMovingIndicator } from './transitions';
 import {
   useId,
   useLayoutEffect,
@@ -336,31 +337,7 @@ export function OptionGroup({
 }) {
   const group = useRef<HTMLDivElement>(null);
   const thumb = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    const node = group.current;
-    const slider = thumb.current;
-    if (!node || !slider) return;
-    let disposed = false;
-    const measure = () => {
-      if (disposed) return;
-      const selected = node.querySelector<HTMLElement>('[aria-checked="true"]');
-      slider.hidden = !selected;
-      if (!selected) return;
-      slider.style.width = selected.offsetWidth + 'px';
-      slider.style.transform = 'translateX(' + selected.offsetLeft + 'px)';
-    };
-    const resize = new ResizeObserver(measure);
-    resize.observe(node);
-    node.querySelectorAll('button').forEach((item) => resize.observe(item));
-    document.fonts?.addEventListener('loadingdone', measure);
-    void document.fonts?.ready.then(measure);
-    measure();
-    return () => {
-      disposed = true;
-      resize.disconnect();
-      document.fonts?.removeEventListener('loadingdone', measure);
-    };
-  }, [value, options]);
+  useMovingIndicator(group, thumb, '[aria-checked=true]', value);
   const enabled = options.filter((option) => !disabled && !option.disabled);
   return (
     <div
@@ -427,6 +404,9 @@ export function Tabs({
   label: string;
 }) {
   const id = useId();
+  const list = useRef<HTMLDivElement>(null);
+  const marker = useRef<HTMLSpanElement>(null);
+  useMovingIndicator(list, marker, '[aria-selected=true]', value);
   const enabled = items.filter((item) => !item.disabled);
   return (
     <div className="nps-tabs">
@@ -434,6 +414,7 @@ export function Tabs({
         role="tablist"
         aria-label={label}
         className="nps-tablist"
+        ref={list}
         onKeyDown={(event) => {
           if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || !enabled.length)
             return;
@@ -452,6 +433,7 @@ export function Tabs({
             [index]?.focus();
         }}
       >
+        <span ref={marker} className="nps-moving-indicator nps-tab-indicator" aria-hidden="true" />
         {items.map((item, index) => (
           <button
             key={item.value}
@@ -468,18 +450,20 @@ export function Tabs({
           </button>
         ))}
       </div>
-      {items.map((item, index) => (
-        <div
-          key={item.value}
-          role="tabpanel"
-          id={`${id}-panel-${index}`}
-          aria-labelledby={`${id}-tab-${index}`}
-          tabIndex={0}
-          hidden={item.value !== value}
-        >
-          {item.content}
-        </div>
-      ))}
+      <TransitionSurface change={value}>
+        {items.map((item, index) => (
+          <div
+            key={item.value}
+            role="tabpanel"
+            id={`${id}-panel-${index}`}
+            aria-labelledby={`${id}-tab-${index}`}
+            tabIndex={0}
+            hidden={item.value !== value}
+          >
+            {item.content}
+          </div>
+        ))}
+      </TransitionSurface>
     </div>
   );
 }

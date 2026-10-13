@@ -475,6 +475,11 @@ export async function settingsChecks(context, restart) {
     'once',
   );
   await click('查看声明');
+  await e(`(() => {
+    const names = ['MiSans VF 4.003','Newsreader','IBM Plex Mono','Remix Icon'];
+    for (const summary of document.querySelectorAll('dialog details summary'))
+      if (names.includes(summary.textContent)) summary.click();
+  })()`);
   await h.checkSoon(
     '声明包含三种字体和 Remix Icon 完整许可',
     '["MiSans VF 4.003","Newsreader","IBM Plex Mono","Remix Icon"].every(name=>[...document.querySelectorAll("dialog details")].some(d=>d.querySelector("summary").textContent===name && d.querySelector("pre").textContent.length>500))',

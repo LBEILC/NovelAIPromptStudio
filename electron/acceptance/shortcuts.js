@@ -51,7 +51,7 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
   await shortcut('v');
   await wait('document.querySelectorAll(".workbench-tab").length===3');
   await check(
-    'Mod+V 从真实剪贴板打开工作台图片',
+    'Mod+V 从剪贴板替身打开工作台图片',
     'document.querySelectorAll(".workbench-tab").length===3',
     undefined,
     'once',
@@ -91,7 +91,7 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
   await shortcut('v');
   await h.until(() => database.loadLibrary('all').length === before + 2, '图库快捷键导入剪贴板');
   await check(
-    '图库 Mod+V 导入真实剪贴板图片',
+    '图库 Mod+V 导入剪贴板替身图片',
     () => database.loadLibrary('all').length === before + 2,
     undefined,
     'once',

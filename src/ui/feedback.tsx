@@ -11,6 +11,7 @@ import { Plus } from 'lucide-react';
 import 'remixicon/fonts/remixicon.css';
 import { Button, iconProps } from './controls';
 import { cx, clamp } from './internal';
+import { Presence, TransitionSurface } from './transitions';
 import emptySymbol from '../../design/identity/logo/symbol-empty.svg?raw';
 
 export function EmptyMark() {
@@ -82,7 +83,8 @@ export function Notification({ notice, onDismiss }: { notice: Notice; onDismiss:
     };
   }, [hover, focused, notice.id, notice.duration]);
   return (
-    <div
+    <TransitionSurface
+      change={notice.id}
       className="nps-toast"
       onPointerEnter={() => setHover(true)}
       onPointerLeave={() => setHover(false)}
@@ -92,7 +94,7 @@ export function Notification({ notice, onDismiss }: { notice: Notice; onDismiss:
       }}
     >
       <NotificationContent notice={notice} onAction={onDismiss} />
-    </div>
+    </TransitionSurface>
   );
 }
 export function NotificationProvider({ children }: { children: ReactNode }) {
@@ -126,10 +128,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         }
         if (!bar.checkVisibility()) continue;
         const rect = bar.getBoundingClientRect();
-        bottom = Math.max(bottom, innerHeight - rect.top + gap);
+        let top = rect.top;
+        // Reserve the final layout position, not a transient entry translation.
+        for (let surface: HTMLElement | null = bar; surface; surface = surface.parentElement)
+          if (surface.dataset.transitionKind === 'presence')
+            top -= new DOMMatrix(getComputedStyle(surface).transform).m42;
+        bottom = Math.max(bottom, innerHeight - top + gap);
       }
-      const value = `${bottom}px`;
-      if (node.style.bottom !== value) node.style.bottom = value;
+      const offset = bottom - parseFloat(style.getPropertyValue('--sp-6'));
+      const value = `translate(-50%, ${-offset}px)`;
+      if (node.style.transform !== value) node.style.transform = value;
     };
     const resize = new ResizeObserver(update);
     const mutations = new MutationObserver(update);
@@ -173,18 +181,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         aria-live="polite"
         aria-atomic="true"
       >
-        {current && (
-          <Notification
-            notice={current}
-            onDismiss={() =>
-              setNotices((state) =>
-                state.current?.id === current.id
-                  ? { current: state.pending, pending: null }
-                  : state,
-              )
-            }
-          />
-        )}
+        <Presence show={!!current} className="nps-notification-presence">
+          {current && (
+            <Notification
+              notice={current}
+              onDismiss={() =>
+                setNotices((state) =>
+                  state.current?.id === current.id
+                    ? { current: state.pending, pending: null }
+                    : state,
+                )
+              }
+            />
+          )}
+        </Presence>
       </div>
     </NoticeContext.Provider>
   );
@@ -317,10 +327,18 @@ export function SelectionBar({
 }) {
   return (
     <div className="nps-selection-slot">
-      <div className="nps-selection" role="group" aria-label={label} hidden={!visible}>
+      <TransitionSurface
+        change={visible}
+        kind="presence"
+        enter={visible}
+        className="nps-selection"
+        role="group"
+        aria-label={label}
+        hidden={!visible}
+      >
         <span>{label}</span>
         {children}
-      </div>
+      </TransitionSurface>
     </div>
   );
 }

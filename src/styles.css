@@ -19,7 +19,8 @@ button, select, input[type="range"] { cursor: default; }
 .file-drop-target i { font-size: var(--icon); }
 .file-drop-target strong { font-size: var(--fs-title); font-weight: var(--fw-strong); }
 .file-drop-target span { color: var(--text-3); font-size: var(--fs-small); }
-.import-status, .import-result { position: fixed; z-index: 80; bottom: var(--sp-5); left: var(--sp-5); display: flex; align-items: center; gap: var(--sp-2); max-width: calc(100vw - var(--sp-5) * 2); padding: var(--sp-3) var(--sp-4); color: var(--text); background: var(--surface); border-radius: var(--r-panel); box-shadow: var(--shadow-pop); }
+.import-transition { position:fixed; z-index:80; bottom:var(--sp-5); left:var(--sp-5); }
+.import-status, .import-result { display: flex; align-items: center; gap: var(--sp-2); max-width: calc(100vw - var(--sp-5) * 2); padding: var(--sp-3) var(--sp-4); color: var(--text); background: var(--surface); border-radius: var(--r-panel); box-shadow: var(--shadow-pop); }
 .import-status > div { flex: 1; min-width: 0; display: grid; }
 .import-status strong, .import-status span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .import-status span, .import-result { color: var(--text-3); font-size: var(--fs-small); }

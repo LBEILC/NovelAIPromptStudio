@@ -27,7 +27,7 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react';
-import { TransitionSurface } from './ui/transitions';
+import { Collapse, Presence, TransitionSurface } from './ui/transitions';
 import LibraryPage from './library/LibraryPage';
 import { useLibraryCacheProgress } from './state/libraryCacheProgress';
 import SettingsPage from './settings/SettingsPage';
@@ -285,32 +285,36 @@ function ImportExperience({ dragState, progress, result, target, onCancel, onDis
           </div>
         </div>
       )}
-      {importing && (
-        <div className="import-status">
-          <div>
-            <strong>{progress.phase === 'preparing' ? '正在检查文件' : '正在导入图片'}</strong>
-            <span>
-              {progress.current || '准备中'} · {percent}%
-            </span>
+      <Collapse open={importing} className="import-transition">
+        {importing && (
+          <div className="import-status">
+            <div>
+              <strong>{progress.phase === 'preparing' ? '正在检查文件' : '正在导入图片'}</strong>
+              <span>
+                {progress.current || '准备中'} · {percent}%
+              </span>
+            </div>
+            <Progress value={percent} label="导入进度" />
+            <Button onClick={onCancel} size="small">
+              取消
+            </Button>
           </div>
-          <Progress value={percent} label="导入进度" />
-          <Button onClick={onCancel} size="small">
-            取消
-          </Button>
-        </div>
-      )}
-      {result && (
-        <div className="import-result">
-          <i className={result.errors?.length ? 'ri-alert-line' : 'ri-check-line'} />
-          <span>
-            已导入 {result.imported?.length || 0} 张 · 跳过重复 {result.duplicates?.length || 0} 张
-            {result.errors?.length ? ` · 没能导入 ${result.errors.length} 张` : ''}
-          </span>
-          <Button onClick={onDismiss} size="small" variant="quiet">
-            关闭
-          </Button>
-        </div>
-      )}
+        )}
+      </Collapse>
+      <Presence show={!!result} className="import-transition">
+        {result && (
+          <div className="import-result">
+            <i className={result.errors?.length ? 'ri-alert-line' : 'ri-check-line'} />
+            <span>
+              已导入 {result.imported?.length || 0} 张 · 跳过重复 {result.duplicates?.length || 0}{' '}
+              张{result.errors?.length ? ` · 没能导入 ${result.errors.length} 张` : ''}
+            </span>
+            <Button onClick={onDismiss} size="small" variant="quiet">
+              关闭
+            </Button>
+          </div>
+        )}
+      </Presence>
     </>
   );
 }
