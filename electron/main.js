@@ -83,7 +83,12 @@ app.setName('NovelAI Prompt Studio');
 const acceptanceMode = configureAcceptanceMode(app);
 const acceptanceCardCache = createAcceptanceCardCache(acceptanceMode);
 installAcceptanceLatency(acceptanceMode, ipcMain);
-const acceptanceDoubles = installAcceptanceDoubles(acceptanceMode, { dialog, shell });
+const acceptanceDoubles = installAcceptanceDoubles(acceptanceMode, {
+  dialog,
+  shell,
+  clipboard,
+  nativeImage,
+});
 const screenshotMode = configureScreenshotMode(app);
 const databaseProbeOutput = process.argv
   .find((argument) => argument.startsWith('--database-probe-output='))
@@ -441,6 +446,9 @@ app.whenReady().then(async () => {
     if (!filePath) return new Response('Missing media path', { status: 400 });
     return net.fetch(pathToFileURL(filePath).toString());
   });
+
+  ipcMain.handle('clipboard:read-text', () => clipboard.readText());
+  ipcMain.handle('clipboard:write-text', (_event, text) => clipboard.writeText(String(text)));
 
   ipcMain.handle('library:load', async (_event, request = {}) => {
     await contentBackfill;

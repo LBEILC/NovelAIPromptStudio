@@ -1,3 +1,4 @@
+import { writeClipboardText } from '../lib/clipboard';
 import {
   Activity,
   Fragment,
@@ -385,9 +386,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
     void window.studio?.openReleasePage(url).catch((e: Error) => setMessage(e.message));
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(
-        feedbackDiagnostics(state?.currentVersion, state?.platform),
-      );
+      await writeClipboardText(feedbackDiagnostics(state?.currentVersion, state?.platform));
       setMessage('已复制诊断信息');
     } catch {
       setMessage('没能复制诊断信息');

@@ -1,3 +1,4 @@
+import { writeClipboardText } from '../lib/clipboard';
 import { SurfaceButton } from '../ui';
 import { dimensions, generationParameters, modelDisplayName } from './presentation';
 import { useRef, useState } from 'react';
@@ -176,7 +177,7 @@ export function LibraryDetail({
         <LibraryPrompt project={detail} />
       </div>
       <div className="library-detail-bar">
-        <Button onClick={() => navigator.clipboard.writeText(libraryPositivePrompt(detail))}>
+        <Button onClick={() => writeClipboardText(libraryPositivePrompt(detail))}>
           <i className="ri-file-copy-line" />
           复制提示词
         </Button>

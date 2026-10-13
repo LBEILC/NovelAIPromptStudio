@@ -142,3 +142,48 @@ it.each([false, true])(
     }
   },
 );
+
+it('isolates text, images and file formats without calling the operating system', () => {
+  const names = [
+    'readText',
+    'writeText',
+    'readImage',
+    'writeImage',
+    'readBuffer',
+    'writeBuffer',
+    'read',
+    'availableFormats',
+    'clear',
+    'write',
+  ];
+  const original = Object.fromEntries(
+    names.map((name) => [
+      name,
+      vi.fn(() => {
+        throw Error('native clipboard touched');
+      }),
+    ]),
+  );
+  const clipboard = { ...original };
+  const empty = { isEmpty: () => true };
+  const doubles = installAcceptanceDoubles(
+    {},
+    { dialog: {}, shell: {}, clipboard, nativeImage: { createEmpty: () => empty } },
+  );
+  clipboard.writeText('fixture');
+  expect(clipboard.readText()).toBe('fixture');
+  const image = { isEmpty: () => false };
+  clipboard.writeImage(image);
+  expect(clipboard.readText()).toBe('');
+  expect(clipboard.readImage()).toBe(image);
+  const bytes = Buffer.from('file:///fixture.png');
+  clipboard.writeBuffer('text/uri-list', bytes);
+  bytes.fill(0);
+  expect(clipboard.read('text/uri-list')).toBe('file:///fixture.png');
+  expect(clipboard.availableFormats()).toEqual(['text/uri-list']);
+  clipboard.clear();
+  expect(clipboard.readImage()).toBe(empty);
+  expect(Object.values(original).every((fn) => fn.mock.calls.length === 0)).toBe(true);
+  doubles.restore();
+  expect(clipboard.readText).toBe(original.readText);
+});

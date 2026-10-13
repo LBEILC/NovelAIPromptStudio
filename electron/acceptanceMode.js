@@ -59,7 +59,7 @@ export function configureAcceptanceMode(app, argv = process.argv) {
   return { ...config, root };
 }
 
-export function installAcceptanceDoubles(mode, { dialog, shell }) {
+export function installAcceptanceDoubles(mode, { dialog, shell, clipboard, nativeImage }) {
   if (!mode) return null;
   const calls = [];
   const selections = [];
@@ -94,7 +94,70 @@ export function installAcceptanceDoubles(mode, { dialog, shell }) {
       return key === 'showItemInFolder' ? undefined : Promise.resolve('');
     });
   }
+  const realClipboard = clipboard
+    ? Object.fromEntries(
+        Object.keys(clipboard)
+          .filter((key) => typeof clipboard[key] === 'function')
+          .map((key) => [key, clipboard[key].bind(clipboard)]),
+      )
+    : null;
+  if (clipboard) {
+    let data = {};
+    let buffers = new Map();
+    const clear = () => {
+      data = {};
+      buffers = new Map();
+    };
+    const methods = {
+      clear,
+      availableFormats: () => [
+        ...Object.keys(data)
+          .map(
+            (key) =>
+              ({ text: 'text/plain', html: 'text/html', rtf: 'text/rtf', image: 'image/png' })[key],
+          )
+          .filter(Boolean),
+        ...buffers.keys(),
+      ],
+      write: (value) => {
+        clear();
+        data = { ...value };
+      },
+      readText: () => data.text || '',
+      readHTML: () => data.html || '',
+      readRTF: () => data.rtf || '',
+      readBookmark: () => ({ title: data.bookmark || '', url: data.bookmark ? data.text : '' }),
+      readImage: () => data.image || nativeImage.createEmpty(),
+      readBuffer: (format) => Buffer.from(buffers.get(format) || []),
+      read: (format) => buffers.get(format)?.toString('utf8') || '',
+      writeBuffer: (format, value) => {
+        clear();
+        buffers.set(format, Buffer.from(value));
+      },
+    };
+    for (const [suffix, field] of [
+      ['Text', 'text'],
+      ['HTML', 'html'],
+      ['RTF', 'rtf'],
+      ['Image', 'image'],
+    ])
+      methods['write' + suffix] = (value) => {
+        clear();
+        data[field] = value;
+      };
+    // Replace every native entry point: new APIs must be explicitly modelled.
+    for (const key of Object.keys(realClipboard))
+      replace(
+        clipboard,
+        key,
+        methods[key] ||
+          (() => {
+            throw Error(`Unsupported acceptance clipboard API: ${key}`);
+          }),
+      );
+  }
   return {
+    realClipboard,
     calls,
     selections,
     saves,

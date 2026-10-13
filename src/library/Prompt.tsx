@@ -1,3 +1,4 @@
+import { writeClipboardText } from '../lib/clipboard';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, Tag, type TagCategory as UICategory } from '../ui';
 import { createPromptDocument, type PromptBlock } from '../lib/promptDocument';
@@ -159,7 +160,7 @@ export function LibraryPrompt({ project }: { project: ImageRecord }) {
                 aria-label={`复制${title}`}
                 onClick={(event) => {
                   event.preventDefault();
-                  void navigator.clipboard.writeText(scope.raw_prompt);
+                  void writeClipboardText(scope.raw_prompt);
                 }}
               >
                 <i className="ri-file-copy-line" />

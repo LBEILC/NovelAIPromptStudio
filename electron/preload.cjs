@@ -14,6 +14,8 @@ function invoke(channel, ...args) {
 contextBridge.exposeInMainWorld(
   'studio',
   /** @satisfies {import('../src/shared/ipc').StudioApi} */ ({
+    readClipboardText: () => invoke('clipboard:read-text'),
+    writeClipboardText: (text) => invoke('clipboard:write-text', text),
     onNavigate: (callback) => {
       /** @param {Electron.IpcRendererEvent} _event @param {string} destination */
       const listener = (_event, destination) => callback(destination);

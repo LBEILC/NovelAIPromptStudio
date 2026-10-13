@@ -143,6 +143,8 @@ export type DroppedFiles = Iterable<File> | ArrayLike<File> | null;
 // Each signature corresponds to one property in electron/preload.cjs.
 // Event unsubscriptions return ipcRenderer in the preload implementation.
 export interface StudioApi {
+  readClipboardText(): Promise<string>;
+  writeClipboardText(text: string): Promise<void>;
   loadLibrary(view?: 'all' | 'favorites' | 'trash'): Promise<ImageRecord[]>;
   loadLibraryCards(view?: 'all' | 'favorites' | 'trash'): Promise<LibraryCard[]>;
   onLibraryCardCacheProgress(callback: (progress: LibraryCardCacheProgress) => void): void;

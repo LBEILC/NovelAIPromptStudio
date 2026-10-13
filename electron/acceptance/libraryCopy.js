@@ -44,9 +44,6 @@ export async function libraryCopyChecks(env) {
     .loadLibrary('all')
     .filter((p) => files.some((file) => path.basename(file, '.png') === p.name));
   let copied = 0;
-  await e(
-    `(()=>{const write=navigator.clipboard.writeText.bind(navigator.clipboard);window.__libraryCopy='';navigator.clipboard.writeText=async text=>{window.__libraryCopy=text;return write(text)}})()`,
-  );
   for (const record of originals) {
     await input('.gallery-search input', record.name);
     await wait(
@@ -58,13 +55,13 @@ export async function libraryCopyChecks(env) {
     await click('复制提示词', 'document.querySelector(".library-detail-bar")');
     await h.until(
       async () =>
-        (await e('window.__libraryCopy')) === formatPositivePromptForCopy(record) &&
+        clipboard.readText() === formatPositivePromptForCopy(record) &&
         clipboard.readText().replaceAll('\r\n', '\n') ===
           formatPositivePromptForCopy(record).replaceAll('\r\n', '\n'),
       '复制完整正面提示词',
     );
-    const libraryText = await e('window.__libraryCopy');
-    await e('window.__libraryCopy=null');
+    const libraryText = clipboard.readText();
+    clipboard.clear();
     await click('在工作台打开', 'document.querySelector(".library-detail-bar")');
     await wait(
       'document.querySelector(".studio-titlebar [aria-current=page]")?.textContent.trim()==="工作台"',
@@ -93,10 +90,7 @@ export async function libraryCopyChecks(env) {
     await e(
       `[...document.querySelectorAll('[role=menuitem]')].find(item=>item.textContent.startsWith('复制全部提示词')).click()`,
     );
-    await h.until(
-      async () => (await e('window.__libraryCopy')) === libraryText,
-      '工作台实际复制结果逐字一致',
-    );
+    await h.until(async () => clipboard.readText() === libraryText, '工作台实际复制结果逐字一致');
     await click('图片库', 'document.querySelector(".studio-titlebar")');
     await waitDetail();
     const negative = getPromptScopes(record).filter(
@@ -106,7 +100,7 @@ export async function libraryCopyChecks(env) {
       await e(`document.querySelectorAll('.library-doc details .nps-button')[${index}].click()`);
       await h.until(
         async () =>
-          (await e('window.__libraryCopy')) === negative[index].raw_prompt &&
+          clipboard.readText() === negative[index].raw_prompt &&
           clipboard.readText().replaceAll('\r\n', '\n') ===
             negative[index].raw_prompt.replaceAll('\r\n', '\n'),
         '复制原始负面提示词',

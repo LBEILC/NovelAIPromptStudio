@@ -1,3 +1,4 @@
+import { writeClipboardText } from '../lib/clipboard';
 import { SurfaceButton } from '../ui';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -153,12 +154,10 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
       id: 'copy',
       label: '复制 Tag',
       onSelect: () => {
-        void navigator.clipboard
-          .writeText((item.display_tag || item.tag).replaceAll('_', ' '))
-          .then(
-            () => setMessage('已复制 Tag'),
-            (error) => setMessage(String(error)),
-          );
+        void writeClipboardText((item.display_tag || item.tag).replaceAll('_', ' ')).then(
+          () => setMessage('已复制 Tag'),
+          (error) => setMessage(String(error)),
+        );
       },
     },
     { id: 'sep', separator: true },

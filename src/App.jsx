@@ -1,3 +1,4 @@
+import { writeClipboardText, readClipboardText } from './lib/clipboard';
 import { numberedImageNames } from './lib/imageNaming.js';
 import { deletionDetail } from './library/presentation';
 import { useLibraryComputation } from './state/libraryComputation';
@@ -234,7 +235,7 @@ async function runTextEditAction(selection, action) {
     editable.setSelectionRange(start, end);
   if (start != null && end != null && typeof editable.setRangeText === 'function') {
     if (action === 'copy' || action === 'cut') {
-      await navigator.clipboard.writeText(String(editable.value || '').slice(start, end));
+      await writeClipboardText(String(editable.value || '').slice(start, end));
       if (action === 'cut') {
         editable.setRangeText('', start, end, 'end');
         dispatchInput(editable, 'deleteByCut');
@@ -242,7 +243,7 @@ async function runTextEditAction(selection, action) {
       return;
     }
     if (action === 'paste') {
-      const text = await navigator.clipboard.readText();
+      const text = await readClipboardText();
       editable.setRangeText(text, start, end, 'end');
       dispatchInput(editable, 'insertFromPaste', text);
       return;
@@ -1599,7 +1600,7 @@ export default function App() {
                 automaticIgnored = 0,
               ) => {
                 if (!text) return;
-                await navigator.clipboard.writeText(text);
+                await writeClipboardText(text);
                 const ignoredLabels = [
                   ignored ? `${ignored} 个负面 Tag` : '',
                   automaticIgnored ? `${automaticIgnored} 个 NovelAI 自动 Tag` : '',

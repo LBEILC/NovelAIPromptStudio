@@ -1,3 +1,4 @@
+import { writeClipboardText } from '../lib/clipboard';
 import { useState, type ReactNode } from 'react';
 import { ContextMenu, Dialog, Input, type MenuItem } from '../ui';
 import { LibraryRename } from './Rename';
@@ -58,8 +59,7 @@ export function CardMenu({
                   label: '复制提示词',
                   onSelect: () => {
                     void window.studio?.loadLibraryDetail(image.id).then((detail) => {
-                      if (detail)
-                        return navigator.clipboard.writeText(libraryPositivePrompt(detail));
+                      if (detail) return writeClipboardText(libraryPositivePrompt(detail));
                     });
                   },
                 },

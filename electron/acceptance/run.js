@@ -11,7 +11,7 @@ import { libraryChecks } from './library.js';
 import { motionChecks, applyMotionBaseline } from './motion.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { clipboard, nativeTheme, safeStorage } from 'electron';
+import { nativeTheme, safeStorage } from 'electron';
 import { pathToFileURL } from 'node:url';
 import { importLibraryFiles } from '../importer.js';
 import { harness } from './harness.js';
@@ -31,30 +31,6 @@ export async function runAcceptance(context) {
   const checks = [];
   mode.screenshots = [];
   const started = Date.now();
-  // These focused scenarios never invoke copy/paste; leave every clipboard format untouched.
-  const clipboardFree =
-    mode.packaged ||
-    [
-      '客户端边界',
-      '悬停态覆盖',
-      '客户端控件',
-      '图片库·细节',
-      '工作台·细节',
-      '基础组件·细节',
-      '基础组件',
-      '图片库·起名',
-      '图片库·收尾',
-      '图片库·滚动条',
-      '工作台·交互',
-      '交互修正',
-      '设置·外观',
-      '设置·AI 服务',
-      '设置·版式',
-      '外壳',
-      '动效',
-      '卡片缓存',
-    ].includes(mode.category);
-  const restoreClipboard = clipboardFree ? null : preserveClipboard(clipboard);
   const previousTheme = nativeTheme.themeSource;
   const files = (await fs.readdir(path.join(mode.root, 'fixtures')))
     .filter((f) => f.endsWith('.png'))
@@ -213,6 +189,31 @@ export async function runAcceptance(context) {
         );
         database.updateProjectName(cacheProbe.id, cacheProbe.name);
         await cardCacheChecks({ database, h, mode, cardCacheControl: context.cardCacheControl });
+      }
+    }
+    if (mode.packaged) {
+      const real = context.doubles.realClipboard;
+      let restore;
+      try {
+        restore = preserveClipboard(real);
+      } catch (error) {
+        h.uncovered('真实剪贴板读写', String(error));
+      }
+      if (restore) {
+        try {
+          real.writeText('acceptance clipboard probe');
+          await h.until(() => real.readText() === 'acceptance clipboard probe', '真实剪贴板读写');
+          await check(
+            '真实剪贴板文本读写',
+            () => real.readText() === 'acceptance clipboard probe',
+            undefined,
+            'once',
+          );
+        } finally {
+          restore();
+          await h.until(() => restore.verify(), '恢复真实剪贴板');
+          await check('恢复真实剪贴板', () => restore.verify(), undefined, 'once');
+        }
       }
     }
     if (mode.packaged) {
@@ -480,23 +481,6 @@ export async function runAcceptance(context) {
     await h?.screenshot(`failure-${mode.phase}`).catch(() => {});
     throw error;
   } finally {
-    if (restoreClipboard) {
-      let restored = restoreClipboard();
-      const immediate = restored;
-      // Windows clipboard ownership may settle on the next message-loop turn.
-      // Write once; only reread, so a delayed check never overwrites another app.
-      for (let attempt = 0; !restored && attempt < 10; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 25));
-        restored = restoreClipboard.verify();
-      }
-      checks.push({
-        category: '隔离',
-        label: '恢复运行前剪贴板内容',
-        status: restored ? 'passed' : 'failed',
-        themeScope: 'once',
-        details: { immediate, ...restoreClipboard.details() },
-      });
-    }
     nativeTheme.themeSource = previousTheme;
     await fs.writeFile(
       path.join(mode.output, `checks-${mode.phase}.json`),
