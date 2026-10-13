@@ -255,7 +255,7 @@ export async function libraryInteractionChecks(env) {
       undefined,
       'once',
     );
-    await library(h, 'interaction-fixture-light', '提示词完全相同');
+    await library(h, 'interaction-fixture-light', '完全相同');
     await wait('document.querySelectorAll(".library-card").length===1');
     const stack = 'document.querySelector(".library-card")';
     await e(`${stack}.click()`);
@@ -423,15 +423,15 @@ export async function workbenchInteractionChecks(env) {
     await wait('document.querySelector(".wb-tab-preview:popover-open img")?.naturalWidth>0');
     await check(
       '标签页预览包含缩略图、未命名提示和导入时间',
-      `(()=>{const p=document.querySelector('.wb-tab-preview:popover-open'),t=${tab(0)},i=p?.querySelector('img');return !!i&&i.src===t.querySelector('img').src&&p.textContent.includes('没有起名')&&p.textContent.includes(${JSON.stringify(records[0].created_at)})&&i.naturalWidth>0})()`,
+      `(()=>{const p=document.querySelector('.wb-tab-preview:popover-open'),t=${tab(0)},i=p?.querySelector('img');return !!i&&i.src===t.querySelector('img').src&&p.textContent.includes('没有起名')&&/导入$/.test(p.querySelector('.nps-help').textContent)&&!p.querySelector('.nps-help').textContent.includes('T')&&i.naturalWidth>0})()`,
     );
     await check(
       '预览图片最长边受限且保留原比例',
       `(()=>{const i=document.querySelector('.wb-tab-preview img'),r=i.getBoundingClientRect();return Math.max(r.width,r.height)<=240&&Math.abs(r.width/r.height-i.naturalWidth/i.naturalHeight)<0.01})()`,
     );
     await check(
-      '标签页预览使用浮层纸色与阴影而非普通文字提示底色',
-      `(()=>{const p=document.querySelector('.wb-tab-preview'),probe=document.createElement('span');probe.style.background='var(--surface)';document.body.append(probe);const expected=getComputedStyle(probe).backgroundColor;probe.remove();const s=getComputedStyle(p);return s.backgroundColor===expected&&s.boxShadow!=='none'})()`,
+      '标签页预览与悬停提示共用主题底色及阴影',
+      `(()=>{const p=document.querySelector('.wb-tab-preview'),probe=document.createElement('span');probe.style.background='var(--tip-bg)';document.body.append(probe);const expected=getComputedStyle(probe).backgroundColor;probe.remove();const s=getComputedStyle(p);return s.backgroundColor===expected&&s.boxShadow!=='none'})()`,
     );
     await h.screenshot('interaction-tab-preview');
     // Scrolling an overflowing strip can move the next tab under a stationary

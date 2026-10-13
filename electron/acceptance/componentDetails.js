@@ -60,7 +60,7 @@ export async function componentDetails(h) {
   await key('ArrowRight');
   await h.checkSoon(
     '选项组方向键选中相邻项且只有一个 Tab 停靠点',
-    '[...document.querySelectorAll("[role=radio]")].filter(e=>e.tabIndex===0).length===1 && document.activeElement.textContent.trim()==="译文" && document.activeElement.getAttribute("aria-checked")==="true"',
+    '[...document.querySelectorAll("[aria-label=默认显示] [role=radio]")].filter(e=>e.tabIndex===0).length===1 && document.activeElement.textContent.trim()==="译文" && document.activeElement.getAttribute("aria-checked")==="true"',
     undefined,
     undefined,
     undefined,

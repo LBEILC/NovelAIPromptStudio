@@ -1,8 +1,12 @@
 ﻿/* States shared by client surfaces; all paint comes from the design tokens. */
+a[href] { color: inherit; }
+a[href]:not([aria-disabled="true"]):hover { background: var(--hover); }
+a[href]:not([aria-disabled="true"]):active { background: var(--selected); }
+a[href][aria-disabled="true"] { color: var(--text-off); cursor: default; }
 :where(.nps-root, .nps-layer, .nps-dialog) button { cursor: default; }
 :where(.nps-root, .nps-layer, .nps-dialog) :is(button, [role="button"], [role="tab"], summary):focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
-:where(.nps-root, .nps-layer, .nps-dialog) :is(.nps-surface-row, .nps-surface-chip, .nps-surface-tab, .wb-tab, summary, .nps-option, .nps-tablist button):not(:disabled,[aria-disabled="true"]):hover { background: var(--hover); color: var(--text); }
-:where(.nps-root, .nps-layer, .nps-dialog) :is(.nps-surface-row, .nps-surface-chip, .nps-surface-tab, .wb-tab, summary, .nps-option, .nps-tablist button, .nps-menu-item):not(:disabled,[aria-disabled="true"]):active { background: var(--selected); color: var(--text); }
+:where(.nps-root, .nps-layer, .nps-dialog) :is(.nps-surface-row, .nps-surface-chip, .nps-surface-tab, .wb-tab, summary, .nps-tablist button):not(:disabled,[aria-disabled="true"]):hover { background: var(--hover); color: var(--text); }
+:where(.nps-root, .nps-layer, .nps-dialog) :is(.nps-surface-row, .nps-surface-chip, .nps-surface-tab, .wb-tab, summary, .nps-tablist button, .nps-menu-item):not(:disabled,[aria-disabled="true"]):active { background: var(--selected); color: var(--text); }
 .nps-root .settings-sidebar button[aria-current="page"]:hover { background: var(--hover); }
 .nps-root .settings-sidebar button[aria-current="page"]:active { background: var(--selected); box-shadow: inset 0 0 0 var(--bw) var(--text-3); }
 .nps-root .library-side-item.on:hover { background: var(--hover); }
@@ -41,6 +45,7 @@
 .nps-root :is(.library-detail-picture,.wb-canvas) img[role="button"] { cursor: zoom-in; }
 .nps-root .library-pick { opacity: 0; }
 .nps-root .library-card:is(:hover,:focus-within,.picked) .library-pick { opacity: 1; }
+.nps-root .library-page:has(.library-selection-bar) .library-pick { opacity: 1; }
 .nps-root .library-pick:hover { border-color: var(--text); box-shadow: 0 0 0 var(--bw) var(--border); }
 .nps-root .library-pick:active { border-color: var(--text); box-shadow: 0 0 0 var(--bw) var(--text-3); }
 
@@ -77,3 +82,8 @@
 :where(.nps-root,.library-viewer) :is(.library-card,.wb-tab,[aria-label="编辑段落"],img[role="button"])[aria-disabled="true"]:is(:hover,:active) { background: transparent; box-shadow: none; }
 
 .library-strip .nps-surface-image:focus-visible { outline-offset: calc(-1 * var(--focus-w)); }
+
+/* Segments retain one thumb; hover and press affect only the option label/surface. */
+.nps-options .nps-option:not(:disabled):hover { color:var(--text); box-shadow:inset 0 0 0 var(--bw) var(--border); }
+.nps-options .nps-option:not(:disabled):active { background:var(--selected); }
+.nps-options .nps-option:focus-visible { outline-offset:calc(-1 * var(--focus-w)); }

@@ -1,3 +1,4 @@
+import { formatImportDate } from '../lib/displayDate';
 import {
   useEffect,
   useLayoutEffect,
@@ -562,7 +563,7 @@ export function TooltipRoot() {
         <>
           <img src={anchor.current.dataset.tipImage} alt="" />
           <span>{lastText.current}</span>
-          <span className="nps-help">{anchor.current.dataset.tipDate}</span>
+          <span className="nps-help">{formatImportDate(anchor.current.dataset.tipDate)}</span>
         </>
       ) : (
         lastText.current

@@ -1435,7 +1435,7 @@ app.whenReady().then(async () => {
         phase: 'available',
         hasUpdate: true,
         latestVersion: '99.0.0',
-        notes: '# 验收发布说明\n\n本地替身。',
+        notes: '# 验收发布说明\n\n本地替身。[验收链接](https://example.com/acceptance)',
         releaseUrl: 'https://github.com/LBEILC/NovelAIPromptStudio/releases/tag/v99.0.0',
       });
       return { ok: true, ...updateState };

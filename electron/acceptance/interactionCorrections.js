@@ -330,7 +330,7 @@ export async function interactionCorrectionChecks(env) {
     const menu = 'document.querySelector(".nps-menu:popover-open")';
     await toggle(h, '显示', wb('显示'), pop('显示方式'));
     await press(h, wb('显示'));
-    for (const label of ['语言', '排列', '只看', '分类'])
+    for (const label of ['分类'])
       await toggle(
         h,
         `显示·${label}`,

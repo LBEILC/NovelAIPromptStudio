@@ -162,7 +162,9 @@ try {
   const baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
   if (
     !packaged &&
-    ['全部', '悬停态覆盖', '基础组件', '基础组件·细节', '减少动态效果'].includes(options.category)
+    ['全部', '悬停态覆盖', '客户端控件', '基础组件', '基础组件·细节', '减少动态效果'].includes(
+      options.category,
+    )
   )
     await build({
       configFile: false,

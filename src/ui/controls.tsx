@@ -1,5 +1,6 @@
 import {
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   useEffect,
@@ -323,18 +324,51 @@ export function OptionGroup({
   value,
   onChange,
   label,
+  size = 'default',
+  disabled = false,
 }: {
   options: Option[];
   value: string;
   onChange: (value: string) => void;
   label: string;
+  size?: 'default' | 'small';
+  disabled?: boolean;
 }) {
-  const enabled = options.filter((option) => !option.disabled);
+  const group = useRef<HTMLDivElement>(null);
+  const thumb = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const node = group.current;
+    const slider = thumb.current;
+    if (!node || !slider) return;
+    let disposed = false;
+    const measure = () => {
+      if (disposed) return;
+      const selected = node.querySelector<HTMLElement>('[aria-checked="true"]');
+      slider.hidden = !selected;
+      if (!selected) return;
+      slider.style.width = selected.offsetWidth + 'px';
+      slider.style.transform = 'translateX(' + selected.offsetLeft + 'px)';
+    };
+    const resize = new ResizeObserver(measure);
+    resize.observe(node);
+    node.querySelectorAll('button').forEach((item) => resize.observe(item));
+    document.fonts?.addEventListener('loadingdone', measure);
+    void document.fonts?.ready.then(measure);
+    measure();
+    return () => {
+      disposed = true;
+      resize.disconnect();
+      document.fonts?.removeEventListener('loadingdone', measure);
+    };
+  }, [value, options]);
+  const enabled = options.filter((option) => !disabled && !option.disabled);
   return (
     <div
       role="radiogroup"
       aria-label={label}
-      className="nps-options"
+      ref={group}
+      aria-disabled={disabled || undefined}
+      className={cx('nps-options', size === 'small' && 'nps-options-small')}
       onKeyDown={(event) => {
         if (
           !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key) ||
@@ -358,13 +392,14 @@ export function OptionGroup({
           [index]?.focus();
       }}
     >
+      <span ref={thumb} className="nps-option-thumb" aria-hidden="true" />
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
           role="radio"
           aria-checked={option.value === value}
-          disabled={option.disabled}
+          disabled={disabled || option.disabled}
           className="nps-option"
           tabIndex={
             option.value === value ||

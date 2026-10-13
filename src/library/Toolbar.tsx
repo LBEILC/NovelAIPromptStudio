@@ -482,9 +482,9 @@ export function LibraryToolbar({
               onChange={(promptScope) => p.onGroupingChange({ promptScope })}
               options={[
                 { value: 'separate', label: '不合并' },
-                { value: 'full', label: '提示词完全相同' },
-                { value: 'base', label: '基础提示词相同' },
-                { value: 'similar', label: '提示词相似' },
+                { value: 'full', label: '完全相同' },
+                { value: 'base', label: '基础相同' },
+                { value: 'similar', label: '相似' },
               ]}
             />
           </div>

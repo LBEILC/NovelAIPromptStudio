@@ -18,6 +18,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
       '全部',
       '客户端边界',
       '悬停态覆盖',
+      '客户端控件',
       '减少动态效果',
       '诊断·计时',
       '工作台',
@@ -54,6 +55,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
   const suffix = `${slow > 1 ? `-slow-${slow}` : ''}${reducedMotion ? '-reduced' : ''}${motion ? `-${motion}` : ''}${category === '全部' ? '' : `-${category.replaceAll('·', '-')}`}`;
   const needsLibrary = [
     '悬停态覆盖',
+    '客户端控件',
     '减少动态效果',
     '全部',
     '图片库',
@@ -71,9 +73,14 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
     '设置·翻译词典',
     '外壳·快捷键',
   ].includes(category);
-  const needsDictionary = ['全部', '悬停态覆盖', '设置', '设置·翻译词典', '减少动态效果'].includes(
-    category,
-  );
+  const needsDictionary = [
+    '全部',
+    '悬停态覆盖',
+    '客户端控件',
+    '设置',
+    '设置·翻译词典',
+    '减少动态效果',
+  ].includes(category);
   return {
     timing,
     slow,

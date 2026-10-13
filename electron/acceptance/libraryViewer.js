@@ -35,10 +35,7 @@ export async function libraryViewerChecks({ h, database }) {
     await h.input('input[aria-label="搜索图片库"]', 'viewer-fixture');
     await h.click('视图');
     await h.select('图片排序', '最近导入的在前');
-    await h.click(
-      '提示词完全相同',
-      'document.querySelector("[role=radiogroup][aria-label=合并方式]")',
-    );
+    await h.click('完全相同', 'document.querySelector("[role=radiogroup][aria-label=合并方式]")');
     await h.key('Escape');
     await h.wait(
       '!document.querySelector("[data-library-updating=true]") && document.querySelectorAll(".library-card").length===3',

@@ -448,8 +448,12 @@ export default function App() {
   const cacheProgress = useLibraryCacheProgress(libraryLoading);
   const reduceMotion = useStudioReducedMotion(appearance.motion);
 
-  const showToast = useCallback((message, _tone, source = 'user') => {
-    notificationTarget.current.notify({ text: message, source });
+  const showToast = useCallback((message, tone = 'success', source = 'user') => {
+    notificationTarget.current.notify({
+      text: message,
+      tone: tone === 'warning' ? 'info' : tone,
+      source,
+    });
   }, []);
 
   const requestConfirmation = useCallback(
@@ -846,6 +850,7 @@ export default function App() {
       if (result?.summary)
         showToast(
           `已导入 ${result.summary.imported} 张 · 跳过重复 ${result.summary.duplicates} 张 · 没能导入 ${result.summary.failed} 张`,
+          result.summary.failed > 0 && result.summary.imported === 0 ? 'error' : 'success',
         );
       await reloadLibrary('all');
       if (result?.imported?.length) setPreviewProjectId(result.imported.at(-1).id);
@@ -1200,6 +1205,7 @@ export default function App() {
     }
     await reloadAfterGalleryAction();
     notify({
+      tone: 'success',
       text: ids.length === 1 ? '已移入回收站' : `已把 ${ids.length} 张图片移入回收站`,
       action: { label: '撤销', onClick: () => restoreProjects(result.results?.success || ids) },
     });
@@ -1287,6 +1293,7 @@ export default function App() {
     }
     await reloadLibrary(galleryView);
     notify({
+      tone: 'success',
       text: '已给 ' + ids.length + ' 张图片起名',
       action: {
         label: '撤销',
@@ -1625,7 +1632,7 @@ export default function App() {
                   activeTab.project.prompt_structure.block_annotations,
                 );
                 if (!result.ok) {
-                  showToast(result.error);
+                  showToast(result.error, 'error');
                   return;
                 }
                 setWorkbenchSession((current) =>

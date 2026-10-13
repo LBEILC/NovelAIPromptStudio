@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Plus } from 'lucide-react';
+import 'remixicon/fonts/remixicon.css';
 import { Button, iconProps } from './controls';
 import { cx, clamp } from './internal';
 import emptySymbol from '../../design/identity/logo/symbol-empty.svg?raw';
@@ -25,6 +26,7 @@ export function EmptyMark() {
 export interface Notice {
   id: number;
   text: string;
+  tone?: 'success' | 'error' | 'info';
   action?: { label: string; onClick: () => void };
   duration?: number;
   source?: 'user' | 'background';
@@ -39,17 +41,24 @@ export function NotificationContent({
 }) {
   return (
     <>
+      {notice.tone === 'success' && (
+        <i className="ri-check-line nps-notice-success" aria-hidden="true" />
+      )}
+      {notice.tone === 'error' && (
+        <i className="ri-error-warning-line nps-notice-error" aria-hidden="true" />
+      )}
       {notice.text}
       {notice.action && (
-        <button
-          type="button"
+        <Button
+          variant="quiet"
+          size="small"
           onClick={() => {
             notice.action?.onClick();
             onAction?.();
           }}
         >
           {notice.action.label}
-        </button>
+        </Button>
       )}
     </>
   );

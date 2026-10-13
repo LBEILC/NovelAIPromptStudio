@@ -166,7 +166,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   );
   await click('显示');
   await shot('view');
-  await h.select('只看', '负面提示词');
+  await h.select('只看', '负面');
   await key('Escape');
   await click('复制负面提示词 · 2');
   await checkCopy(

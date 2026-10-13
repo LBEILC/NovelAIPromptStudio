@@ -349,7 +349,7 @@ export async function libraryChecks(env) {
     await click('筛选', scope);
     for (const index of [0, 1]) {
       await e(
-        `document.querySelectorAll('.library-filter-options')[${index}].querySelector('input').click()`,
+        `document.querySelectorAll('.library-filter-options')[${index}].querySelector('[role=checkbox]').click()`,
       );
       await closePopover();
       await wait(
@@ -522,7 +522,7 @@ export async function libraryChecks(env) {
     // Changing collection may unmount the original picker; Escape is safe in either case.
     await key('Escape');
     await all();
-    await setGrouping('提示词完全相同');
+    await setGrouping('完全相同');
     await e(
       `(()=>{const c=[...document.querySelectorAll('.library-card')].find(c=>c.querySelector('.library-stack'));c.focus();c.click()})()`,
     );

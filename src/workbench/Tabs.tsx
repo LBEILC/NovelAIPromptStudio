@@ -121,6 +121,7 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
         <Button
           variant="quiet"
           size="small"
+          className="wb-tab-close"
           aria-label={`关闭 ${name || '标签'}`}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {

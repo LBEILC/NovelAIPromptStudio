@@ -27,14 +27,14 @@ export async function libraryGroupingChecks({ h, database }) {
     await h.input('input[aria-label="搜索图片库"]', 'similarity-fixture');
     await h.click('视图');
     const options = 'document.querySelector("[role=radiogroup][aria-label=合并方式]")';
-    await h.click('提示词完全相同', options);
+    await h.click('完全相同', options);
     await h.wait(
       '!document.querySelector("[data-library-updating=true]") && document.querySelectorAll(".library-card").length===2',
     );
     await h.evaluate(
       `window.__groupingErrors=[];window.__groupingEmpty=false;window.__groupingErrorListener=e=>window.__groupingErrors.push(e.message);window.addEventListener('error',window.__groupingErrorListener);window.__groupingObserver=new MutationObserver(()=>{if(!document.querySelector('.library-card'))window.__groupingEmpty=true});window.__groupingObserver.observe(document.querySelector('[data-library-grid]'),{childList:true,subtree:true})`,
     );
-    await h.click('提示词相似', options);
+    await h.click('相似', options);
     await h.wait('!!document.querySelector("input[aria-label=相似度]")');
     await h.key('Home', {}, 'document.querySelector("input[aria-label=相似度]")');
     await h.wait(
@@ -42,7 +42,7 @@ export async function libraryGroupingChecks({ h, database }) {
     );
     await h.check(
       '相似分组选中、说明和滑块显示，低阈值合并两张',
-      `document.querySelector('[role=radio][aria-checked=true]')?.textContent.includes('提示词相似') && !!document.querySelector('input[aria-label=相似度]') && document.querySelector('.library-help')?.textContent.includes('足够接近') && document.querySelectorAll('.library-card').length===1`,
+      `document.querySelector('[role=radio][aria-checked=true]')?.textContent.includes('相似') && !!document.querySelector('input[aria-label=相似度]') && document.querySelector('.library-help')?.textContent.includes('足够接近') && document.querySelectorAll('.library-card').length===1`,
       undefined,
       'once',
     );
@@ -56,13 +56,13 @@ export async function libraryGroupingChecks({ h, database }) {
       undefined,
       'once',
     );
-    await h.click('提示词完全相同', options);
+    await h.click('完全相同', options);
     await h.wait(
       '!document.querySelector("input[aria-label=相似度]") && !document.querySelector("[data-library-updating=true]")',
     );
     await h.check(
       '切回完全相同恢复精确分组',
-      `document.querySelector('[role=radio][aria-checked=true]')?.textContent.includes('提示词完全相同') && document.querySelectorAll('.library-card').length===2`,
+      `document.querySelector('[role=radio][aria-checked=true]')?.textContent.includes('完全相同') && document.querySelectorAll('.library-card').length===2`,
       undefined,
       'once',
     );

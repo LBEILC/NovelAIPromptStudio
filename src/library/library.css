@@ -128,7 +128,7 @@
 @container (max-width:420px) { .library-tools > .nps-button > .nps-button-label > span:not(.library-condition-count) { display:none; } }
 .library-tags-more-measure { position:absolute; top:0; max-height:0; overflow:hidden; visibility:hidden; pointer-events:none; }
 .nps-popover:has(.library-filter-panel) { width:var(--popover-w-wide); }
-.library-filter-panel .nps-options { flex-wrap:wrap; }
+.library-filter-panel .nps-options { flex-wrap:nowrap; }
 .library-filter-panel .nps-option { white-space:nowrap; }
 .library-view-vibe { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); }
 .library-row-end { margin-left:auto; }

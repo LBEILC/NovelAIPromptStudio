@@ -295,6 +295,20 @@ function Showcase() {
         </Row>
         <Row label="选项">
           <OptionGroup label="默认显示" options={options} value={display} onChange={setDisplay} />
+          <OptionGroup
+            label="小号分段"
+            size="small"
+            options={options.map((o, i) => ({ ...o, disabled: i === 1 }))}
+            value={display}
+            onChange={setDisplay}
+          />
+          <OptionGroup
+            label="不可用分段"
+            disabled
+            options={options}
+            value={display}
+            onChange={setDisplay}
+          />
         </Row>
         <Row label="页签">
           <Tabs
@@ -446,11 +460,23 @@ function Showcase() {
       <Section title="通知、提示与多选操作条">
         <Row>
           <span className="nps-toast">
-            <NotificationContent notice={{ text: '已复制 52 个 Tag' }} />
+            <NotificationContent notice={{ tone: 'error', text: '没能完成操作' }} />
+          </span>
+          <span className="nps-toast">
+            <NotificationContent notice={{ text: '没有更多内容' }} />
+          </span>
+        </Row>
+        <Row>
+          <span className="nps-toast">
+            <NotificationContent notice={{ tone: 'success', text: '已复制 52 个 Tag' }} />
           </span>
           <span className="nps-toast">
             <NotificationContent
-              notice={{ text: '已移入回收站', action: { label: '撤销', onClick: () => {} } }}
+              notice={{
+                tone: 'success',
+                text: '已移入回收站',
+                action: { label: '撤销', onClick: () => {} },
+              }}
             />
           </span>
         </Row>
@@ -534,11 +560,17 @@ function Showcase() {
             onConfirm={() => setDialog(false)}
           />
           <Tooltip text="复制当前筛选后可见的正面提示词">
-            <Button onClick={() => notify({ text: '已复制 52 个 Tag' })}>复制提示词</Button>
+            <Button onClick={() => notify({ tone: 'success', text: '已复制 52 个 Tag' })}>
+              复制提示词
+            </Button>
           </Tooltip>
           <Button
             onClick={() =>
-              notify({ text: '已移入回收站', action: { label: '撤销', onClick: () => {} } })
+              notify({
+                tone: 'success',
+                text: '已移入回收站',
+                action: { label: '撤销', onClick: () => {} },
+              })
             }
           >
             删除

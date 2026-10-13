@@ -62,7 +62,10 @@ export async function hoverAudit(h, mode, name) {
         '!document.querySelector(".nps-tip:popover-open")',
         '悬停提示关闭后审计稳定节点',
       );
-      await h.wait('!document.querySelector(".nps-layer[aria-hidden=true]")', '关闭浮层退出后扫描');
+      await h.wait(
+        '[...document.querySelectorAll(".nps-layer[aria-hidden=true]")].every(n=>!n.checkVisibility({checkVisibilityCSS:true}))',
+        '关闭浮层退出后扫描',
+      );
       await h.evaluate(
         `(()=>{document.querySelectorAll('[data-hover-audit]').forEach(n=>n.removeAttribute('data-hover-audit'));let i=0;for(const n of document.querySelectorAll('button,a[href],input,textarea,select,summary,[tabindex],[role="button"],[role="tab"],[role="option"],[role="radio"],[role="checkbox"],[role="switch"],[role="menuitem"],[role="slider"],[role="spinbutton"]'))n.dataset.hoverAudit=String(++i);for(const n of document.querySelectorAll('.library-count,.library-fan img,.library-block-label,.wb-block header > span:first-child,.settings-page-head h1,.nps-tag:not([data-interactive])')){if(n.closest('.nps-menu-trigger'))continue;n.dataset.hoverAudit=String(++i);n.dataset.hoverStatic='true'}window.__hoverAuditNext=i;})()`,
       );
@@ -163,6 +166,24 @@ export async function hoverAudit(h, mode, name) {
           failures.push({ ...item, error: 'DOM 节点丢失' });
           continue;
         }
+        // Real pointer hover also hovers the ancestor that reveals an overlay control.
+        const revealId = await h.evaluate(`(()=>{
+          const n=document.querySelector('[data-hover-audit="${item.id}"]');
+          const host=n.matches('.library-pick')?n.closest('.library-card'):n.closest('.wb-add-block-gap');
+          if(!host)return null;
+          if(!host.dataset.hoverAudit)host.dataset.hoverAudit=String(++window.__hoverAuditNext);
+          return host.dataset.hoverAudit;
+        })()`);
+        const reveal = revealId
+          ? (
+              await send('DOM.querySelector', {
+                nodeId: root.nodeId,
+                selector: '[data-hover-audit="' + revealId + '"]',
+              })
+            ).nodeId
+          : null;
+        if (reveal)
+          await send('CSS.forcePseudoState', { nodeId: reveal, forcedPseudoClasses: ['hover'] });
         const extraId = await h.evaluate(`(()=>{
   const n=document.querySelector('[data-hover-audit="${item.id}"]');
   const e=n?.matches('input:not([type="range"])')?n.closest('.nps-field'):n?.matches('.nps-menu-trigger')?n.querySelector('.library-card,button,[role="tab"]'):null;
@@ -249,6 +270,7 @@ export async function hoverAudit(h, mode, name) {
             );
           }
         }
+        if (reveal) await send('CSS.forcePseudoState', { nodeId: reveal, forcedPseudoClasses: [] });
         inventory.push(result);
       }
       await fs.writeFile(

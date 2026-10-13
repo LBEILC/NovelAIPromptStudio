@@ -306,10 +306,20 @@ export function harness(window, mode, checks) {
     });
   };
   const select = async (label, text) => {
+    const group =
+      'document.querySelector(' +
+      JSON.stringify('[role="radiogroup"][aria-label="' + label + '"]') +
+      ')';
+    if (await evaluate('!!' + group)) {
+      await click(text, group);
+      return;
+    }
     await click(label);
-    await wait('!!document.querySelector(".nps-layer [role=option]")');
+    await wait(
+      '!!document.querySelector(".nps-layer:popover-open:not([aria-hidden=true]) [role=option]")',
+    );
     await evaluate(
-      `(() => {const e=[...document.querySelectorAll('.nps-layer [role=option]')].find(e=>e.textContent.trim()===${JSON.stringify(text)}); if(!e)throw Error('缺少选项');e.click()})()`,
+      `(() => {const e=[...document.querySelectorAll('.nps-layer:popover-open:not([aria-hidden=true]) [role=option]')].find(e=>e.textContent.trim()===${JSON.stringify(text)}); if(!e)throw Error('缺少选项');e.click()})()`,
     );
   };
   const section = async (name) => {

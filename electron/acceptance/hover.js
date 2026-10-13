@@ -70,6 +70,17 @@ export async function hoverChecks(context) {
       await audit('词典编辑');
       await h.nativeKey('Escape');
     }
+    if (section === '关于与更新') {
+      await h.click('检查更新');
+      await h.click('更新说明');
+      await h.wait('!!document.querySelector("dialog[open] a[href]")');
+      await audit('更新说明与外链');
+      await h.click('关闭', 'document.querySelector("dialog[open]")');
+      await h.click('查看声明');
+      await h.wait('!!document.querySelector("dialog[open] summary")');
+      await audit('第三方声明');
+      await h.click('关闭', 'document.querySelector("dialog[open]")');
+    }
   }
   const original = h.window.webContents.getURL();
   await h.window.loadFile(path.join(mode.root, 'showcase', 'ui-showcase.html'), {

@@ -9,7 +9,7 @@
 .wb-current { width:var(--mark); height:var(--mark); background:var(--cinnabar); flex-shrink:0; }
 .wb-dirty { width:var(--cat-dot); height:var(--cat-dot); background:var(--text-3); border-radius:50%; }
 .wb-stage { flex:1 1 0; min-width:0; min-height:0; display:flex; flex-direction:column; background:var(--bg); }
-.wb-canvas { flex:1 1 0; min-height:0; display:flex; align-items:center; justify-content:center; padding:var(--sp-5) var(--sp-6) var(--sp-2); overflow:hidden; }
+.wb-canvas { flex:1 1 0; min-height:0; display:flex; align-items:center; justify-content:center; padding:var(--sp-5) var(--sp-6) calc(var(--sp-8) + var(--sp-2)); overflow:hidden; }
 .wb-canvas img { min-width:0; min-height:0; max-width:100%; max-height:100%; object-fit:contain; border-radius:var(--r-ctl); box-shadow:var(--shadow-print); }
 .wb-caption { display:flex; flex-direction:column; gap:var(--sp-0); padding:var(--ctl-pad-x) var(--sp-6) var(--ctl-gap); }
 .wb-caption strong { font-weight:var(--fw-strong); }
@@ -63,7 +63,7 @@
 .wb-insertion-slot { display:inline-flex; flex-shrink:0; border:var(--bw) dashed var(--focus); border-radius:var(--r-tag); background:var(--selected); }
 .wb-block:has(.wb-insertion-slot), .wb-block:has(.wb-tag-target), .wb-block:has([data-drop-active=true]) { outline:var(--bw) solid var(--focus); }
 .wb-tab-preview { display:flex; flex-direction:column; gap:var(--sp-2); max-width:var(--popover-w); }
-.nps-tip.wb-tab-preview { padding:var(--sp-3); border-radius:var(--r-panel); background:var(--surface); color:var(--text); box-shadow:var(--shadow-pop); }
+.nps-tip.wb-tab-preview { padding:var(--sp-3); border-radius:var(--r-panel); box-shadow:var(--shadow-pop); }
 .wb-tab-preview img { max-width:calc(var(--thumb-row-zip) * 2); max-height:calc(var(--thumb-row-zip) * 2); object-fit:contain; align-self:center; border-radius:var(--r-thumb); }
 .wb-editor .nps-selection-slot { position:absolute; bottom:calc(var(--bar-h) + var(--sp-3)); left:var(--sp-3); right:var(--sp-3); }
 .wb-editor .nps-selection { width:100%; bottom:0; white-space:nowrap; }
@@ -101,3 +101,11 @@
 .wb-filter-note { flex-basis:100%; }
 
 .wb-section-head > .nps-button:first-child { color:var(--text); }
+
+/* Close controls overlay the same fixed tab allocation in every state. */
+.wb-tab { position:relative; padding-right:calc(var(--ctl-sm) + var(--ctl-pad-x)); }
+.wb-tab .wb-tab-close { position:absolute; right:var(--sp-0); visibility:hidden; background:var(--bg); }
+.wb-tab:is([aria-selected=true],:hover,:focus-within) .wb-tab-close { visibility:visible; }
+.wb-tab[aria-selected=true] .wb-tab-close { background:var(--surface); }
+.wb-tab:hover .wb-tab-close { background:var(--hover); }
+.wb-tab .wb-tab-close:hover { background:var(--selected); }

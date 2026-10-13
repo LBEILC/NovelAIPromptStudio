@@ -5,6 +5,7 @@ import {
   Menu,
   Popover,
   Select,
+  OptionGroup,
   Tag,
   Shortcut,
   useScrollArea,
@@ -351,7 +352,8 @@ export function WorkbenchDocument(p: DocumentProps) {
         <div className="wb-view-fields">
           <label>
             语言
-            <Select
+            <OptionGroup
+              size="small"
               label="语言"
               value={p.viewState.language}
               onChange={(language) => p.onViewStateChange({ ...p.viewState, language })}
@@ -364,7 +366,8 @@ export function WorkbenchDocument(p: DocumentProps) {
           </label>
           <label>
             排列
-            <Select
+            <OptionGroup
+              size="small"
               label="排列"
               value={p.viewState.viewMode}
               onChange={(viewMode) => p.onViewStateChange({ ...p.viewState, viewMode })}
@@ -376,14 +379,15 @@ export function WorkbenchDocument(p: DocumentProps) {
           </label>
           <label>
             只看
-            <Select
+            <OptionGroup
+              size="small"
               label="只看"
               value={polarity}
               onChange={setPolarity}
               options={[
                 { value: 'all', label: '全部' },
                 { value: 'prompt', label: '正面' },
-                { value: 'undesired', label: '负面提示词' },
+                { value: 'undesired', label: '负面' },
               ]}
             />
           </label>

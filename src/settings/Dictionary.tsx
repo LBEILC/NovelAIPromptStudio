@@ -82,7 +82,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
     setShowFailures(false);
     const result = await d.retranslate();
     if (result && !result.canceled && !result.failed.length)
-      notify({ text: `已翻译 ${result.translated} 条` });
+      notify({ tone: 'success', text: `已翻译 ${result.translated} 条` });
   };
   useLayoutEffect(() => {
     const node = scroll.current!;

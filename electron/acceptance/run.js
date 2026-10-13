@@ -1,3 +1,4 @@
+import { clientControlChecks } from './clientControls.js';
 import { hoverChecks } from './hover.js';
 import { clientChecks } from './client.js';
 import { workbenchChecks } from './workbench.js';
@@ -31,11 +32,29 @@ export async function runAcceptance(context) {
   mode.screenshots = [];
   const started = Date.now();
   // These focused scenarios never invoke copy/paste; leave every clipboard format untouched.
-  const restoreClipboard = ['图片库·细节', '工作台·细节', '基础组件·细节', '基础组件'].includes(
-    mode.category,
-  )
-    ? null
-    : preserveClipboard(clipboard);
+  const clipboardFree =
+    mode.packaged ||
+    [
+      '客户端边界',
+      '悬停态覆盖',
+      '客户端控件',
+      '图片库·细节',
+      '工作台·细节',
+      '基础组件·细节',
+      '基础组件',
+      '图片库·起名',
+      '图片库·收尾',
+      '图片库·滚动条',
+      '工作台·交互',
+      '交互修正',
+      '设置·外观',
+      '设置·AI 服务',
+      '设置·版式',
+      '外壳',
+      '动效',
+      '卡片缓存',
+    ].includes(mode.category);
+  const restoreClipboard = clipboardFree ? null : preserveClipboard(clipboard);
   const previousTheme = nativeTheme.themeSource;
   const files = (await fs.readdir(path.join(mode.root, 'fixtures')))
     .filter((f) => f.endsWith('.png'))
@@ -364,6 +383,7 @@ export async function runAcceptance(context) {
     } else if (mode.category && mode.category !== '全部') {
       h.dualThemes(true);
       if (mode.category === '减少动态效果') {
+        await clientControlChecks(environment);
         await shellChecks();
         await libraryChecks(environment);
         await settingsChecks(environment, false);
@@ -382,6 +402,7 @@ export async function runAcceptance(context) {
         );
       } else if (mode.category === '客户端边界') await clientChecks(environment);
       else if (mode.category === '悬停态覆盖') await hoverChecks(environment);
+      else if (mode.category === '客户端控件') await clientControlChecks(environment);
       else if (mode.category === '外壳') await shellChecks();
       else if (mode.category === '工作台') await workbenchChecks(environment);
       else if (mode.category === '工作台·细节') await workbenchPolishChecks(environment);
@@ -423,6 +444,7 @@ export async function runAcceptance(context) {
     } else {
       await clientChecks(environment);
       await hoverChecks(environment);
+      await clientControlChecks(environment);
       await shellChecks();
       if (!mode.packaged) {
         await workbenchChecks(environment);
