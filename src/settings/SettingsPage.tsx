@@ -11,6 +11,7 @@ import {
 } from 'react';
 import {
   Button,
+  Progress,
   Input,
   TextArea,
   Select,
@@ -313,7 +314,11 @@ function Storage({
       {s.busy && (
         <div className="settings-column">
           正在移动到新位置
-          <progress max={s.progress?.total || 1} value={s.progress?.completed || 0} />
+          <Progress
+            max={s.progress?.total || 1}
+            value={s.progress?.completed || 0}
+            label="迁移进度"
+          />
           <small>
             {s.progress
               ? `已复制 ${s.progress.completed} / ${s.progress.total} 个文件 · 可以继续使用，移动完成前不要关闭软件`
@@ -449,7 +454,8 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       </Row>
       {state?.phase === 'downloading' && (
         <div className="settings-column">
-          正在下载更新 · {Math.round(state.progress)}%<progress max={100} value={state.progress} />
+          正在下载更新 · {Math.round(state.progress)}%
+          <Progress max={100} value={state.progress} label="下载更新进度" />
           <small>
             {bytes(state.transferred || 0)} / {bytes(state.total || 0)}
           </small>
@@ -572,7 +578,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       >
         {dialog === 'notes' ? (
           <Suspense fallback={null}>
-            <ReleaseNotes onOpenLink={open}>{state?.notes || ''}</ReleaseNotes>
+            <ReleaseNotes>{state?.notes || ''}</ReleaseNotes>
           </Suspense>
         ) : (
           <>
@@ -590,7 +596,10 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
               ['DanbooruSearchOnline', dictionaryLicense],
             ].map(([name, license]) => (
               <details key={name}>
-                <summary>{name}</summary>
+                <summary>
+                  <i className="ri-arrow-right-s-line disclosure-icon" aria-hidden="true" />
+                  {name}
+                </summary>
                 <pre className="settings-license">{license}</pre>
               </details>
             ))}
@@ -601,12 +610,16 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
   );
 }
 export default function SettingsPage(props: {
+  menuDestination?: { section: string } | null;
   onFindTag?: (tag: string) => void;
   onInstallUpdate: () => Promise<unknown>;
   onLibraryChange: () => Promise<unknown>;
   onEmptyTrash: () => Promise<unknown>;
 }) {
   const sidebar = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (props.menuDestination) setSection(props.menuDestination.section);
+  }, [props.menuDestination]);
   useScrollArea(sidebar);
   const [section, setSection] = useState(
     (window as Window & { studioScreenshot?: { section?: string } }).studioScreenshot?.section ||

@@ -1,3 +1,9 @@
+import {
+  guardClientWindow,
+  themeBackground,
+  clientMenu,
+  openExternalLink,
+} from './clientWindow.js';
 import { hasImageName, imageFileName } from '../src/lib/imageNaming.js';
 import { normalizePromptStructure } from '../src/lib/promptStructure.js';
 import crypto from 'node:crypto';
@@ -158,7 +164,7 @@ function sendPreparedImportUpdate(sender, update) {
 
 const titleBarSyncs = new WeakMap();
 async function syncTitleBarOverlay(window) {
-  if (process.platform !== 'win32' || window.isDestroyed()) return;
+  if (window.isDestroyed()) return;
   const mode = preferences.appearanceSettings().themeMode;
   const theme = mode === 'auto' ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light') : mode;
   const request = Symbol();
@@ -170,7 +176,7 @@ async function syncTitleBarOverlay(window) {
       probe.dataset.theme = ${JSON.stringify(theme)};
       document.documentElement.append(probe);
       const style = getComputedStyle(probe);
-      const value = { color: style.getPropertyValue('--pane').trim(), symbolColor: style.getPropertyValue('--text').trim(), height: parseInt(style.getPropertyValue('--titlebar-h'), 10) };
+      const value = { background: style.getPropertyValue('--bg').trim(), color: style.getPropertyValue('--pane').trim(), symbolColor: style.getPropertyValue('--text').trim(), height: parseInt(style.getPropertyValue('--titlebar-h'), 10) };
       probe.remove();
       return value;
     })()`);
@@ -180,8 +186,13 @@ async function syncTitleBarOverlay(window) {
       overlay.color &&
       overlay.symbolColor &&
       overlay.height > 0
-    )
-      window.setTitleBarOverlay(overlay);
+    ) {
+      window.setBackgroundColor(overlay.background);
+      if (process.platform === 'win32') {
+        const { background, ...titlebar } = overlay;
+        window.setTitleBarOverlay(titlebar);
+      }
+    }
   } catch (error) {
     if (!window.isDestroyed()) console.error('Unable to synchronize title bar:', error);
   }
@@ -205,7 +216,15 @@ function createWindow(captureState = null) {
     ...(process.platform === 'win32' ? { titleBarOverlay: true } : {}),
     autoHideMenuBar: process.platform === 'win32',
     icon: appIconPath,
-    backgroundColor: '#10151b',
+    backgroundColor: themeBackground(
+      path.join(import.meta.dirname, '..'),
+      preferences.appearanceSettings().themeMode === 'auto'
+        ? nativeTheme.shouldUseDarkColors
+          ? 'dark'
+          : 'light'
+        : preferences.appearanceSettings().themeMode,
+    ),
+    show: false,
     ...(acceptanceMode ? { show: false } : {}),
     ...(captureState ? { show: false, useContentSize: true, enableLargerThanScreen: true } : {}),
     webPreferences: {
@@ -213,6 +232,8 @@ function createWindow(captureState = null) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      spellcheck: false,
+      devTools: !app.isPackaged,
       ...(acceptanceMode ? { backgroundThrottling: false, offscreen: true } : {}),
       ...(captureState
         ? {
@@ -222,6 +243,11 @@ function createWindow(captureState = null) {
           }
         : {}),
     },
+  });
+  guardClientWindow(window, { packaged: app.isPackaged, shell });
+  window.once('ready-to-show', async () => {
+    await syncTitleBarOverlay(window);
+    if (!acceptanceMode && !captureState && !window.isDestroyed()) window.show();
   });
   window.webContents.on('did-finish-load', () => void syncTitleBarOverlay(window));
   const developmentUrl =
@@ -351,7 +377,26 @@ app.whenReady().then(async () => {
     }
     return;
   }
-  if (process.platform === 'win32') Menu.setApplicationMenu(null);
+  if (process.platform === 'darwin')
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate(
+        clientMenu({
+          app,
+          development: !app.isPackaged,
+          navigate: (destination) =>
+            BrowserWindow.getFocusedWindow()?.webContents.send('app:navigate', destination),
+          feedback: (label, title) =>
+            openExternalLink(
+              shell,
+              'https://github.com/LBEILC/NovelAIPromptStudio/issues/new?labels=' +
+                label +
+                '&title=' +
+                encodeURIComponent(title),
+            ),
+        }),
+      ),
+    );
+  else Menu.setApplicationMenu(null);
   if (process.platform === 'darwin' && app.dock) app.dock.setIcon(appIconPath);
   const dataDirectory = path.join(app.getPath('userData'), 'data');
   const defaultAssetsDirectory = path.join(app.getPath('userData'), 'assets');

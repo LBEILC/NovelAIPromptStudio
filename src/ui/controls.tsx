@@ -96,6 +96,10 @@ export function Input({
       >
         {prefix}
         <input
+          autoCapitalize="off"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           {...props}
           aria-invalid={!!error || undefined}
           aria-describedby={
@@ -141,7 +145,15 @@ export function TextArea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
   useScrollArea(ref, { overlayRef: overlay });
   return (
     <span className="nps-textarea-wrap" ref={overlay}>
-      <textarea {...props} ref={ref} className={cx('nps-textarea', className)} />
+      <textarea
+        autoCapitalize="off"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        {...props}
+        ref={ref}
+        className={cx('nps-textarea', className)}
+      />
     </span>
   );
 }

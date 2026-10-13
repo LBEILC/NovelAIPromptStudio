@@ -151,6 +151,7 @@ export function LibraryPrompt({ project }: { project: ImageRecord }) {
         return negative ? (
           <details key={scope.key}>
             <summary className="library-section-title">
+              <i className="ri-arrow-right-s-line disclosure-icon" aria-hidden="true" />
               {title}
               <Button
                 size="small"

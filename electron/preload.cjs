@@ -14,6 +14,12 @@ function invoke(channel, ...args) {
 contextBridge.exposeInMainWorld(
   'studio',
   /** @satisfies {import('../src/shared/ipc').StudioApi} */ ({
+    onNavigate: (callback) => {
+      /** @param {Electron.IpcRendererEvent} _event @param {string} destination */
+      const listener = (_event, destination) => callback(destination);
+      ipcRenderer.on('app:navigate', listener);
+      return () => ipcRenderer.removeListener('app:navigate', listener);
+    },
     loadLibrary: (view = 'all') => invoke('library:load', { view }),
     loadLibraryCards: (view = 'all') => invoke('library:cards', { view }),
     onLibraryCardCacheProgress: (callback) => {

@@ -16,6 +16,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
   if (
     ![
       '全部',
+      '客户端边界',
       '减少动态效果',
       '诊断·计时',
       '工作台',

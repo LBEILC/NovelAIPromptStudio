@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import { installClientDefaults } from './lib/clientDefaults';
 import { AppearanceProvider } from './state/appearance';
 import { NotificationProvider } from './ui';
 import './fonts.css';
@@ -18,6 +19,7 @@ document.documentElement.dataset.platform = navigator.platform.startsWith('Win')
   : navigator.platform.startsWith('Mac')
     ? 'macos'
     : 'other';
+installClientDefaults();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppearanceProvider>

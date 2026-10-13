@@ -66,7 +66,7 @@
 .library-strip img { display:block; width:var(--strip-w); height:var(--strip-h); object-fit:cover; border-radius:var(--r-thumb); }
 .library-strip .is-current { outline:var(--thumb-ring) solid var(--cinnabar); outline-offset:var(--bw); }
 .library-strip .is-cover::after { content:''; position:absolute; left:0; right:0; bottom:calc(-1 * var(--sp-1)); height:var(--rule-w); background:var(--text-3); }
-.library-doc { padding:var(--sp-4); user-select:text; }
+.library-doc { padding:var(--sp-4); }
 .library-section-title { display:flex; align-items:center; gap:var(--sp-2); font-weight:var(--fw-strong); margin:var(--sp-3) 0; }
 .library-section-title small { font-weight:var(--fw-regular); color:var(--text-3); font-size:var(--fs-small); }
 .library-section-title .nps-button { margin-left:auto; }

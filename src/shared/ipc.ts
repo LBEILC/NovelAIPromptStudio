@@ -258,6 +258,7 @@ export interface StudioApi {
   downloadUpdate(): Promise<Result>;
   installUpdate(): Promise<Result>;
   openReleasePage(url?: string): Promise<{ ok: true }>;
+  onNavigate(callback: (destination: string) => void): () => void;
   onUpdateState(callback: (state: UpdateState) => void): void;
   offUpdateState(): Electron.IpcRenderer;
   listSystemFonts(): Promise<

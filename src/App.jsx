@@ -32,7 +32,7 @@ import { useLibraryCacheProgress } from './state/libraryCacheProgress';
 import SettingsPage from './settings/SettingsPage';
 import { Titlebar } from './shell/Titlebar';
 import { useAppearance } from './state/appearance';
-import { Dialog, Button, Layer, MenuItems, useNotifications } from './ui';
+import { Dialog, Button, Progress, Layer, MenuItems, useNotifications } from './ui';
 import WorkbenchPage from './workbench/WorkbenchPage';
 import { WorkbenchTabs } from './workbench/Tabs';
 import { useWorkbenchState } from './state/workbench';
@@ -336,7 +336,7 @@ function ImportExperience({ dragState, progress, result, target, onCancel, onDis
               {progress.current || '准备中'} · {percent}%
             </span>
           </div>
-          <progress max="100" value={percent} />
+          <Progress value={percent} label="导入进度" />
           <Button onClick={onCancel} size="small">
             取消
           </Button>
@@ -366,6 +366,15 @@ function formatBytes(bytes) {
 
 export default function App() {
   const { appearance } = useAppearance();
+  const [menuDestination, setMenuDestination] = useState(null);
+  useEffect(
+    () =>
+      studio.onNavigate?.((destination) => {
+        setMenuDestination({ section: destination === 'about' ? 'updates' : 'appearance' });
+        setPage('settings');
+      }),
+    [],
+  );
   const [page, setPage] = useState(window.studioScreenshot?.page || 'workbench');
   const notify = useNotifications();
   const notificationTarget = useRef({ page, notify });
@@ -1767,6 +1776,7 @@ export default function App() {
         <Activity mode={page === 'settings' ? 'visible' : 'hidden'}>
           <div className="app-page-surface">
             <SettingsPage
+              menuDestination={menuDestination}
               onFindTag={(tag) => {
                 selectGalleryCollection('');
                 setGalleryFilters({ ...DEFAULT_GALLERY_FILTERS, query: tag });
