@@ -1,4 +1,5 @@
 import { TOOLTIP_SCROLL_CLOSE_MS } from './feedback.js';
+import { settleLayout } from './layout.js';
 // Supplementary checks converted from the archived 004/004a verification lists.
 export async function componentDetails(h) {
   const { evaluate: e, wait, check, key, click, input } = h;
@@ -339,6 +340,7 @@ export async function componentDetails(h) {
     undefined,
     'once',
   );
+  await settleLayout(h, '.nps-demo-selection');
   const before = await e(
     'document.querySelector(".nps-demo-selection").getBoundingClientRect().height',
   );

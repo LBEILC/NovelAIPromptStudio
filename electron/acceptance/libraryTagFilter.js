@@ -1,5 +1,6 @@
 import { parsePrompt } from '../../src/lib/prompt.js';
 import { createPromptStructure } from '../../src/lib/promptStructure.js';
+import { settleLayout } from './layout.js';
 
 export async function libraryTagFilterChecks({ h, database }) {
   h.category('图片库·Tag 候选');
@@ -32,6 +33,16 @@ export async function libraryTagFilterChecks({ h, database }) {
     await h.reload();
     await h.click('图片库', 'document.querySelector(".studio-titlebar")');
     await h.click('全部图片', 'document.querySelector(".library-page")');
+    await h.evaluate(`(()=>{
+      window.filterEntrySample=null;
+      const observer=new MutationObserver(()=>{
+        const panel=document.querySelector('.nps-popover:popover-open'),row=[...document.querySelectorAll('.library-filter-row')].find(n=>n.firstElementChild.textContent==='模型');
+        if(!panel||!row)return;
+        window.filterEntrySample={entering:panel.hasAttribute('data-entering'),animations:panel.getAnimations({subtree:true}).length,top:row.getBoundingClientRect().top};
+        observer.disconnect();
+      });
+      observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['data-entering']});
+    })()`);
     await h.click('筛选');
     await h.check(
       '未选两个包含 Tag 时隐藏包含方式',
@@ -39,11 +50,12 @@ export async function libraryTagFilterChecks({ h, database }) {
       undefined,
       'once',
     );
-    await h.evaluate(
-      `Promise.all(document.querySelector('.nps-popover:popover-open').getAnimations({subtree:true}).map(animation=>animation.finished.catch(()=>{})))`,
-    );
+    await settleLayout(h, '.nps-popover:popover-open');
     const modelTop = await h.evaluate(
       `([...document.querySelectorAll('.library-filter-row')].find(row=>row.firstElementChild.textContent==='模型')).getBoundingClientRect().top`,
+    );
+    console.log(
+      `筛选进场证据：${JSON.stringify(await h.evaluate('window.filterEntrySample'))}；稳定基准：${modelTop}`,
     );
     await h.input(input, 'z');
     await h.wait('document.querySelectorAll(".nps-suggestions [role=option]").length>=4');

@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { importLibraryFiles } from '../importer.js';
 import { parsePrompt } from '../../src/lib/prompt.js';
+import { settleLayout } from './layout.js';
 
 const viewer = 'document.querySelector(".library-viewer")';
 const canvas = 'document.querySelector(".library-viewer-canvas")';
@@ -134,6 +135,7 @@ export async function libraryPolishChecks(env) {
         }
       }
     }
+    await settleLayout(h, '.library-viewer');
     await e(
       `(()=>{const n=${canvas};n.scrollLeft=(n.scrollWidth-n.clientWidth)/2;n.scrollTop=(n.scrollHeight-n.clientHeight)/2;const c=n.getBoundingClientRect(),i=n.querySelector('img').getBoundingClientRect();window.polishAnchor={x:c.left+c.width*.57,y:c.top+c.height*.42};window.polishBefore={u:(polishAnchor.x-i.left)/i.width,v:(polishAnchor.y-i.top)/i.height};n.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:polishAnchor.x,clientY:polishAnchor.y,deltaY:-70}))})()`,
     );

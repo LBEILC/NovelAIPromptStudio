@@ -3,6 +3,7 @@ import path from 'node:path';
 import { clipboard, nativeImage } from 'electron';
 import { createWorkbenchFixtures, workbenchRaw, workbenchNegative } from './workbenchFixtures.js';
 import { tabOutlineChecks } from './tabOutline.js';
+import { settleElements } from './layout.js';
 
 export async function workbenchChecks({ h, mode, doubles, database, preferences }) {
   const { evaluate: e, wait, click, input, check, key } = h;
@@ -53,10 +54,13 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
       clickCount: 1,
     });
   const drag = async (source, target) => {
-    const center = async (selector) =>
-      e(
+    const center = async (selector) => {
+      await e(`(${selector}).scrollIntoView({block:'nearest',inline:'nearest'})`);
+      await settleElements(h, `[${selector}]`);
+      return e(
         `(()=>{const n=${selector};n.scrollIntoView({block:'nearest',inline:'nearest'});const r=(n.matches('.wb-tab')?n.querySelector('img'):n).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`,
       );
+    };
     const from = await center(source);
     await pointer('mouseMoved', from.x, from.y);
     await pointer('mousePressed', from.x, from.y);

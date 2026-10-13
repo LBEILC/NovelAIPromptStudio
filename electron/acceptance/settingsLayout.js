@@ -1,4 +1,5 @@
 import { settingsCopyChecks } from './settingsCopy.js';
+import { settleLayout } from './layout.js';
 
 export async function settingsLayoutChecks(h) {
   const { evaluate: e, wait, check, section } = h;
@@ -51,6 +52,7 @@ export async function settingsLayoutChecks(h) {
       '页头在顶部没有底线',
       `getComputedStyle(${head}).boxShadow.includes('rgba(0, 0, 0, 0)')`,
     );
+    await settleLayout(h, '.settings-page-head, .settings-page-foot');
     const before = await e(
       `({head:${head}.getBoundingClientRect().top,foot:${footer}.getBoundingClientRect().top})`,
     );

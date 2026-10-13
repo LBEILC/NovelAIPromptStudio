@@ -7,6 +7,7 @@ import {
   closeAddedTabs,
   cleanup,
 } from './interactions.js';
+import { settleLayout } from './layout.js';
 
 const frame = 'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))';
 const active = '.nps-layer:popover-open:not([aria-hidden="true"]):not(.nps-tip)';
@@ -34,10 +35,7 @@ async function notificationClearance(h, label, selector) {
 }
 
 async function settle(h) {
-  await h.wait(
-    `[...document.querySelectorAll('${active}')].every(n=>{n.getBoundingClientRect();return !n.hasAttribute('data-entering')&&n.getAnimations({subtree:true}).every(a=>!a.pending&&a.playState!=='running')})`,
-    '浮层到达可检查的稳定状态',
-  );
+  await settleLayout(h, active);
 }
 
 async function press(h, expression) {
@@ -403,6 +401,7 @@ export async function interactionCorrectionChecks(env) {
     await h.input('[aria-label="译文"]', '合成验收译文');
     await click('完成', editor);
     await e(`${scroll}.scrollTop=0;${frame}`);
+    await settleLayout(h, '.wb-document-scroll');
     await e(
       `window.correctionSizes=Object.fromEntries(${tags}.map(n=>{const r=n.getBoundingClientRect();return [n.querySelector('.nps-tag-en').textContent,{width:r.width,height:r.height}]}))`,
     );
@@ -473,7 +472,7 @@ export async function interactionCorrectionChecks(env) {
       true,
     );
     await wait('!!document.querySelectorAll(".wb-tags")[1].querySelector(".wb-insertion-slot")');
-    await e(`Promise.allSettled(${tags}.flatMap(n=>n.getAnimations()).map(a=>a.finished))`);
+    await settleLayout(h, '.wb-document-scroll [data-wb-tag]');
     await h.screenshot('correction-tag-cross-block');
     await e(
       `window.correctionPreview=${tags}.filter(n=>getComputedStyle(n).visibility!=='hidden').map(n=>{const r=n.getBoundingClientRect(),b=${scroll}.getBoundingClientRect();return {text:n.querySelector('.nps-tag-en').textContent,x:r.left-b.left,y:r.top-b.top+${scroll}.scrollTop}})`,

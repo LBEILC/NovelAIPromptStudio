@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import { clipboard } from 'electron';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { importLibraryFiles } from '../importer.js';
+import { settleElements, settleLayout } from './layout.js';
 
 const frame = 'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))';
 const menu = 'document.querySelector(".nps-menu:popover-open [role=menu]")';
@@ -33,11 +34,16 @@ function pointer(h) {
   };
 }
 async function center(h, selector, block = 'nearest', thumbnail = true) {
+  await h.evaluate(
+    `(${selector}).scrollIntoView({block:${JSON.stringify(block)},inline:'nearest'})`,
+  );
+  await settleElements(h, `[${selector}]`);
   return h.evaluate(
     `(async()=>{const n=${selector};n.scrollIntoView({block:${JSON.stringify(block)},inline:'nearest'});await ${frame};const target=${thumbnail}&&n.matches('.wb-tab')?n.querySelector('img')||n:n;const r=target.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`,
   );
 }
 async function context(h, selector) {
+  await settleElements(h, `[${selector}]`);
   await h.evaluate(
     `(()=>{const n=${selector},r=n.getBoundingClientRect();n.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:r.left+r.width/2,clientY:r.top+r.height/2}))})()`,
   );
@@ -260,6 +266,7 @@ export async function libraryInteractionChecks(env) {
     const originalDetail = await e('document.querySelector(".library-detail").dataset.detailId');
     const cover = await e(`${stack}.querySelector('img').getAttribute('src')`);
     const move = pointer(h);
+    await settleLayout(h, '.library-card');
     const bounds = await e(
       `(()=>{const r=${stack}.getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height}})()`,
     );

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { componentDetails } from './componentDetails.js';
 import { buttonStateChecks } from './buttonStates.js';
+import { settleLayout } from './layout.js';
 
 export async function componentChecks({ h, mode }) {
   const { evaluate: e, wait, check, click, key } = h;
@@ -35,6 +36,7 @@ export async function componentChecks({ h, mode }) {
         `document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center',behavior:'instant'})`,
       );
       await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+      await settleLayout(h, selector);
       const rect = await e(
         `(() => {const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})()`,
       );
