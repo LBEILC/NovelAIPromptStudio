@@ -1,3 +1,4 @@
+import { DecodedImage } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { hasImageName, imageAccessibleName } from '../lib/imageNaming.js';
 import { dimensions } from './presentation';
@@ -232,7 +233,7 @@ export function LibraryViewer({
         }}
       >
         <div className="library-viewer-image" style={{ width: stageWidth, height: stageHeight }}>
-          <img
+          <DecodedImage
             src={mediaUrl(image.image_path)}
             alt={imageAccessibleName(image)}
             draggable={false}
@@ -282,7 +283,7 @@ export function LibraryViewer({
                 aria-label={imageAccessibleName(member)}
                 onClick={() => show(group, member)}
               >
-                <img src={mediaUrl(member.thumbnail_path)} alt="" />
+                <DecodedImage src={mediaUrl(member.thumbnail_path)} alt="" />
               </SurfaceButton>
             ))}
           </div>

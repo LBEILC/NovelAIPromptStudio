@@ -27,7 +27,7 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react';
-import { motion, useAnimationControls } from 'motion/react';
+import { TransitionSurface } from './ui/transitions';
 import LibraryPage from './library/LibraryPage';
 import { useLibraryCacheProgress } from './state/libraryCacheProgress';
 import SettingsPage from './settings/SettingsPage';
@@ -90,13 +90,7 @@ import {
   writeActiveGalleryCollection,
 } from './lib/galleryCollections.js';
 import { writeGalleryGrouping } from './lib/galleryGrouping.js';
-import {
-  MOTION_BLUR_MEDIUM_PX,
-  MOTION_DISTANCE_BASE_PX,
-  MOTION_DURATION_FAST_SECONDS,
-  MOTION_EASE_SMOOTH_OUT,
-  useStudioReducedMotion,
-} from './lib/motion.js';
+import { useStudioReducedMotion } from './lib/motion.js';
 import {
   moveOverviewTags,
   overviewMoveContext,
@@ -262,44 +256,6 @@ async function runTextEditAction(selection, action) {
     'select-all': 'selectAll',
   }[action];
   if (command) document.execCommand(command);
-}
-
-function PageSurface({ active, motionMode, children }) {
-  const controls = useAnimationControls();
-  const reduceMotion = useStudioReducedMotion(motionMode);
-
-  useLayoutEffect(() => {
-    if (!active) return undefined;
-    if (reduceMotion) {
-      controls.set({ filter: 'blur(0px)', opacity: 1, y: 0 });
-      return undefined;
-    }
-    controls.set({
-      filter: `blur(${MOTION_BLUR_MEDIUM_PX}px)`,
-      opacity: 0.72,
-      y: MOTION_DISTANCE_BASE_PX,
-    });
-    controls.start({
-      filter: 'blur(0px)',
-      opacity: 1,
-      transition: { duration: MOTION_DURATION_FAST_SECONDS, ease: MOTION_EASE_SMOOTH_OUT },
-      y: 0,
-    });
-    return () => {
-      controls.stop();
-      controls.set({
-        filter: `blur(${MOTION_BLUR_MEDIUM_PX}px)`,
-        opacity: 0,
-        y: MOTION_DISTANCE_BASE_PX,
-      });
-    };
-  }, [active, controls, reduceMotion]);
-
-  return (
-    <motion.div animate={controls} className="app-page-surface" initial={false}>
-      {children}
-    </motion.div>
-  );
 }
 
 function ImportExperience({ dragState, progress, result, target, onCancel, onDismiss }) {
@@ -1570,9 +1526,9 @@ export default function App() {
           />
         )}
       </Titlebar>
-      <div className="app-content">
+      <TransitionSurface className="app-content" change={page}>
         <Activity mode={page === 'workbench' ? 'visible' : 'hidden'}>
-          <PageSurface active={page === 'workbench'} motionMode={appearance.motion}>
+          <div className="app-page-surface">
             <WorkbenchPage
               error={workbenchError}
               focusScopeKey={workbenchFocus.scopeKey}
@@ -1678,10 +1634,10 @@ export default function App() {
               }
               session={workbenchSession}
             />
-          </PageSurface>
+          </div>
         </Activity>
         <Activity mode={page === 'gallery' ? 'visible' : 'hidden'}>
-          <PageSurface active={page === 'gallery'} motionMode={appearance.motion}>
+          <div className="app-page-surface">
             <LibraryPage
               cacheProgress={cacheProgress}
               allCount={projectsByView.all.length}
@@ -1779,7 +1735,7 @@ export default function App() {
               updating={galleryUpdating}
               view={galleryView}
             />
-          </PageSurface>
+          </div>
         </Activity>
         <Activity mode={page === 'settings' ? 'visible' : 'hidden'}>
           <div className="app-page-surface">
@@ -1821,7 +1777,7 @@ export default function App() {
             />
           </div>
         </Activity>
-      </div>
+      </TransitionSurface>
       {page !== 'gallery' && (
         <ImportExperience
           dragState={dragState}

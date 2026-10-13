@@ -1,3 +1,4 @@
+import { TransitionSurface } from '../ui/transitions';
 import { writeClipboardText } from '../lib/clipboard';
 import {
   Activity,
@@ -639,7 +640,7 @@ export default function SettingsPage(props: {
           </Button>
         ))}
       </nav>
-      <section className="settings-body">
+      <TransitionSurface className="settings-body" change={section}>
         <Activity mode={section === 'appearance' ? 'visible' : 'hidden'}>
           <Appearance />
         </Activity>
@@ -655,7 +656,7 @@ export default function SettingsPage(props: {
         <Activity mode={section === 'updates' ? 'visible' : 'hidden'}>
           <About {...props} />
         </Activity>
-      </section>
+      </TransitionSurface>
     </main>
   );
 }

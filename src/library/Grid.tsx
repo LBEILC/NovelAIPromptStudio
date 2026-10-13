@@ -1,3 +1,4 @@
+import { DecodedImage } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { startMarqueeAutoScroll } from '../components/MarqueeSelection.jsx';
 import { Check } from 'lucide-react';
@@ -390,7 +391,7 @@ export function LibraryGrid({
                       setScrub(null);
                     }}
                   >
-                    <img
+                    <DecodedImage
                       src={mediaUrl(shown.thumbnail_path || shown.image_path)}
                       data-scrub-image={shown.id}
                       alt=""

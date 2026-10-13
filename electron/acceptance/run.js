@@ -1,3 +1,4 @@
+import { transitionChecks } from './transitions.js';
 import { clientControlChecks } from './clientControls.js';
 import { hoverChecks } from './hover.js';
 import { clientChecks } from './client.js';
@@ -383,7 +384,10 @@ export async function runAcceptance(context) {
       await h.screenshot('packaged-fonts');
     } else if (mode.category && mode.category !== '全部') {
       h.dualThemes(true);
-      if (mode.category === '减少动态效果') {
+      if (mode.category === '过渡动效') {
+        await transitionChecks(environment);
+      } else if (mode.category === '减少动态效果') {
+        await transitionChecks(environment);
         await clientControlChecks(environment);
         await shellChecks();
         await libraryChecks(environment);
@@ -443,6 +447,7 @@ export async function runAcceptance(context) {
       );
       await settingsChecks(environment, true);
     } else {
+      await transitionChecks(environment);
       await clientChecks(environment);
       await hoverChecks(environment);
       await clientControlChecks(environment);

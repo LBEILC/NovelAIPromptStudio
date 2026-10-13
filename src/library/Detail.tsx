@@ -1,3 +1,4 @@
+import { DecodedImage } from '../ui/transitions';
 import { writeClipboardText } from '../lib/clipboard';
 import { SurfaceButton } from '../ui';
 import { dimensions, generationParameters, modelDisplayName } from './presentation';
@@ -32,7 +33,7 @@ export function LibraryDetail({
               .filter((group) => p.selectedGroupIds.includes(group.id))
               .slice(0, 3)
               .map((group) => (
-                <img key={group.id} src={mediaUrl(group.cover.thumbnail_path)} alt="" />
+                <DecodedImage key={group.id} src={mediaUrl(group.cover.thumbnail_path)} alt="" />
               ))}
           </div>
           <b>
@@ -52,7 +53,7 @@ export function LibraryDetail({
     <aside className="library-detail" data-detail-id={detail.id} aria-busy={pending}>
       <div className="library-detail-scroll" ref={scroll}>
         <div className="library-detail-picture">
-          <img
+          <DecodedImage
             src={mediaUrl(detail.image_path)}
             alt={imageAccessibleName(detail)}
             role="button"
@@ -76,7 +77,7 @@ export function LibraryDetail({
                 aria-label={imageAccessibleName(member)}
                 onClick={() => p.onPreview(group, member)}
               >
-                <img src={mediaUrl(member.thumbnail_path)} alt="" />
+                <DecodedImage src={mediaUrl(member.thumbnail_path)} alt="" />
               </SurfaceButton>
             ))}
             <span className="library-help library-mono">

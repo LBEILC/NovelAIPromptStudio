@@ -44,6 +44,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
       '外壳',
       '外壳·快捷键',
       '动效',
+      '过渡动效',
       '诊断',
       '诊断·渲染器',
     ].includes(category)
@@ -58,6 +59,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
     '客户端控件',
     '减少动态效果',
     '全部',
+    '过渡动效',
     '图片库',
     '图片库·细节',
     '工作台·细节',

@@ -1,0 +1,10 @@
+.nps-transition-height { min-height:0; overflow:hidden; }
+.nps-transition-height:empty { height:0; padding:0; margin:0; border:0; }
+.nps-decoded-image { opacity:0; background:var(--bg); transition:opacity var(--dur-2) var(--ease-out); }
+.nps-decoded-image[data-image-ready] { opacity:1; }
+.nps-decoded-image[data-image-immediate] { transition:none; }
+.nps-moving-indicator { position:absolute; left:0; top:0; transform-origin:0 0; pointer-events:none; }
+[data-motion="off"] .nps-decoded-image { transition:none; }
+@media (prefers-reduced-motion:reduce) {
+  html:not([data-motion="full"]) .nps-decoded-image { transition:none; }
+}

@@ -1,3 +1,4 @@
+import { DecodedImage } from '../ui/transitions';
 import { useEffect, useState } from 'react';
 import type { WorkbenchTab } from '../state/workbench';
 import type { ImageProject, Vibe } from '../shared/types';
@@ -33,7 +34,7 @@ export function WorkbenchImage({ tab, ...p }: ImageProps) {
       )}
       <div className="wb-canvas">
         {image && !missing ? (
-          <img
+          <DecodedImage
             alt="当前图片"
             role="button"
             tabIndex={0}

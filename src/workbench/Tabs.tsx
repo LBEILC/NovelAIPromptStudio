@@ -1,3 +1,4 @@
+import { DecodedImage } from '../ui/transitions';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   DndContext,
@@ -111,7 +112,7 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
         }
       >
         {tab.id === p.session.activeTabId && <span className="wb-current" />}
-        <img
+        <DecodedImage
           draggable={false}
           alt=""
           src={mediaUrl(image?.thumbnail_path || image?.image_path || '')}

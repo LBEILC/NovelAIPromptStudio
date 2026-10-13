@@ -1,3 +1,4 @@
+import { DecodedImage } from './transitions';
 import { formatImportDate } from '../lib/displayDate';
 import {
   useEffect,
@@ -561,7 +562,7 @@ export function TooltipRoot() {
     >
       {anchor.current?.dataset.tipImage ? (
         <>
-          <img src={anchor.current.dataset.tipImage} alt="" />
+          <DecodedImage src={anchor.current.dataset.tipImage} alt="" />
           <span>{lastText.current}</span>
           <span className="nps-help">{formatImportDate(anchor.current.dataset.tipDate)}</span>
         </>

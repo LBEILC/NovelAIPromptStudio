@@ -2,9 +2,16 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { harness } from './harness.js';
 
-export async function runLibraryBenchmark({ mode, preferences, createWindow }) {
+export async function runLibraryBenchmark({ mode, preferences, createWindow, database }) {
   const count = mode.count || 5000;
-  preferences.saveAppearanceSettings({ themeMode: 'light', motion: 'off' });
+  preferences.saveAppearanceSettings({ themeMode: 'light', motion: 'full' });
+  const collectionId = 'benchmark-transition';
+  const collectionCards = (await database.loadLibraryCards()).slice(0, count / 2);
+  database.createCollection({ id: collectionId, name: '切换基准', kind: 'manual' });
+  database.updateCollectionProjects(
+    collectionId,
+    collectionCards.map((card) => card.id),
+  );
   mode.screenshots = [];
   const checks = [];
   const window = createWindow();
@@ -93,6 +100,24 @@ export async function runLibraryBenchmark({ mode, preferences, createWindow }) {
     await h.evaluate(
       'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))',
     );
+    const collectionSwitchSamplesMs = [];
+    for (const [name, expected] of [
+      ['切换基准', count / 2],
+      ['全部图片', count],
+    ]) {
+      const start = performance.now();
+      await h.click(name, 'document.querySelector(".library-side")');
+      await h.wait(
+        `!document.querySelector('[data-library-updating=true]') && document.querySelector('.library-count')?.textContent.includes('${expected} 组')`,
+      );
+      collectionSwitchSamplesMs.push(performance.now() - start);
+      await h.check(
+        '切换收藏集后窗口化行数仍有界',
+        'document.querySelectorAll(".library-card").length < 100',
+        undefined,
+        'once',
+      );
+    }
     const details = await h.evaluate(`(async()=>{
       const times=[];
       const cards=[...document.querySelectorAll('.library-card')].slice(-5);
@@ -116,6 +141,7 @@ export async function runLibraryBenchmark({ mode, preferences, createWindow }) {
           viewport: '1240x760',
           coldOpenMs,
           warmOpenMs,
+          collectionSwitchSamplesMs,
           scroll,
           detailSamplesMs: details,
           detailMaxMs: Math.max(...details),
