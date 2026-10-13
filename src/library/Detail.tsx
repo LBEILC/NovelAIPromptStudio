@@ -1,3 +1,4 @@
+import { SurfaceButton } from '../ui';
 import { dimensions, generationParameters, modelDisplayName } from './presentation';
 import { useRef, useState } from 'react';
 import { Button, useScrollArea } from '../ui';
@@ -53,20 +54,29 @@ export function LibraryDetail({
           <img
             src={mediaUrl(detail.image_path)}
             alt={imageAccessibleName(detail)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onViewer();
+              }
+            }}
             onClick={onViewer}
           />
         </div>
         {group && group.members.length > 1 && (
           <div className="library-strip">
             {group.members.map((member) => (
-              <button
+              <SurfaceButton
+                kind="image"
                 key={member.id}
                 className={`${member.id === detail.id ? 'is-current' : ''} ${member.id === group.cover.id ? 'is-cover' : ''}`}
                 aria-label={imageAccessibleName(member)}
                 onClick={() => p.onPreview(group, member)}
               >
                 <img src={mediaUrl(member.thumbnail_path)} alt="" />
-              </button>
+              </SurfaceButton>
             ))}
             <span className="library-help library-mono">
               {group.members.findIndex((member) => member.id === detail.id) + 1} /{' '}

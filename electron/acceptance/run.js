@@ -1,3 +1,4 @@
+import { hoverChecks } from './hover.js';
 import { clientChecks } from './client.js';
 import { workbenchChecks } from './workbench.js';
 import { interactionCorrectionChecks } from './interactionCorrections.js';
@@ -380,6 +381,7 @@ export async function runAcceptance(context) {
           'once',
         );
       } else if (mode.category === '客户端边界') await clientChecks(environment);
+      else if (mode.category === '悬停态覆盖') await hoverChecks(environment);
       else if (mode.category === '外壳') await shellChecks();
       else if (mode.category === '工作台') await workbenchChecks(environment);
       else if (mode.category === '工作台·细节') await workbenchPolishChecks(environment);
@@ -420,6 +422,7 @@ export async function runAcceptance(context) {
       await settingsChecks(environment, true);
     } else {
       await clientChecks(environment);
+      await hoverChecks(environment);
       await shellChecks();
       if (!mode.packaged) {
         await workbenchChecks(environment);

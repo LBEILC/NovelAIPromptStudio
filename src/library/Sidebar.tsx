@@ -1,3 +1,4 @@
+import { SurfaceButton } from '../ui';
 import { useRef, useState } from 'react';
 import { Button, Dialog, Input, ContextMenu, useScrollArea } from '../ui';
 import type { Collection } from '../shared/types';
@@ -10,14 +11,15 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
   const [name, setName] = useState('');
   return (
     <aside className="library-side" aria-label="图片库导航" ref={scroll}>
-      <button
+      <SurfaceButton
+        kind="row"
         aria-label="全部图片"
         className={`library-side-item ${p.view === 'all' && !p.activeCollection ? 'on' : ''}`}
         onClick={() => p.onCollectionSelect('')}
       >
         <i className="ri-image-2-line" />
         全部图片<span>{p.allCount ?? p.filterCacheSource.length}</span>
-      </button>
+      </SurfaceButton>
       <div className="library-side-label">
         收藏集
         <Button
@@ -60,7 +62,8 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
                   },
                 ]}
               >
-                <button
+                <SurfaceButton
+                  kind="row"
                   aria-label={collection.name}
                   data-collection-id={collection.id}
                   className={`library-side-item ${p.activeCollection?.id === collection.id || p.editingSmartCollection?.id === collection.id ? 'on' : ''}`}
@@ -69,19 +72,20 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
                   <i className={kind === 'manual' ? 'ri-folder-line' : 'ri-folder-settings-line'} />
                   {collection.name}
                   <span>{collection.image_count ?? 0}</span>
-                </button>
+                </SurfaceButton>
               </ContextMenu>
             ))}
         </div>
       ))}
-      <button
+      <SurfaceButton
+        kind="row"
         aria-label="回收站"
         className={`library-side-item library-trash ${p.view === 'trash' ? 'on' : ''}`}
         onClick={() => p.onViewChange('trash')}
       >
         <i className="ri-delete-bin-line" />
         回收站<span>{p.trashCount ?? 0}</span>
-      </button>
+      </SurfaceButton>
       <Dialog
         open={!!naming}
         title={naming === 'new' ? '新建收藏集' : '重命名'}

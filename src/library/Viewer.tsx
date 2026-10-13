@@ -1,4 +1,5 @@
-﻿import { hasImageName, imageAccessibleName } from '../lib/imageNaming.js';
+import { SurfaceButton } from '../ui';
+import { hasImageName, imageAccessibleName } from '../lib/imageNaming.js';
 import { dimensions } from './presentation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -274,14 +275,15 @@ export function LibraryViewer({
         {group && group.members.length > 1 && (
           <div className="library-strip">
             {group.members.map((member) => (
-              <button
+              <SurfaceButton
+                kind="image"
                 key={member.id}
                 className={member.id === image.id ? 'is-current' : ''}
                 aria-label={imageAccessibleName(member)}
                 onClick={() => show(group, member)}
               >
                 <img src={mediaUrl(member.thumbnail_path)} alt="" />
-              </button>
+              </SurfaceButton>
             ))}
           </div>
         )}

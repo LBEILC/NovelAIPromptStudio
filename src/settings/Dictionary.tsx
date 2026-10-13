@@ -1,3 +1,4 @@
+import { SurfaceButton } from '../ui';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Button,
@@ -214,7 +215,8 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
         </div>
         <div className="settings-dictionary-views" role="tablist" aria-label="词典分页签">
           {views.map(([view, label]) => (
-            <button
+            <SurfaceButton
+              kind="tab"
               key={view}
               type="button"
               role="tab"
@@ -226,7 +228,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
             >
               {label}
               <span>{d.counts[view].toLocaleString()}</span>
-            </button>
+            </SurfaceButton>
           ))}
         </div>
       </div>

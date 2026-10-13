@@ -980,3 +980,12 @@ describe('Panel, placement and platform', () => {
     expect(change).toHaveBeenCalledWith(true);
   });
 });
+
+it('exposes partial checkbox selection and selects the remaining items', () => {
+  const changed = vi.fn();
+  render(<Checkbox label="Partial" checked={false} mixed onChange={changed} />);
+  const checkbox = query<HTMLButtonElement>('[role="checkbox"]');
+  expect(checkbox.getAttribute('aria-checked')).toBe('mixed');
+  click(checkbox);
+  expect(changed).toHaveBeenCalledWith(true);
+});

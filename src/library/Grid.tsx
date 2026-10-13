@@ -1,3 +1,4 @@
+import { SurfaceButton } from '../ui';
 import { startMarqueeAutoScroll } from '../components/MarqueeSelection.jsx';
 import { Check } from 'lucide-react';
 import { imageAccessibleName } from '../lib/imageNaming.js';
@@ -411,7 +412,8 @@ export function LibraryGrid({
                         )}
                       </>
                     )}
-                    <button
+                    <SurfaceButton
+                      kind="check"
                       type="button"
                       role="checkbox"
                       aria-checked={selected}
@@ -429,7 +431,7 @@ export function LibraryGrid({
                       }}
                     >
                       {selected && <Check size={16} strokeWidth={1.5} aria-hidden="true" />}
-                    </button>
+                    </SurfaceButton>
                   </div>
                 </CardMenu>
               );

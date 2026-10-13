@@ -62,11 +62,13 @@ export async function buttonStateChecks(h) {
       const bg =
         state === 'disabled'
           ? 'var(--hover)'
-          : state === 'hover'
-            ? hover
-            : state === 'focus-visible'
-              ? normal
-              : pressed;
+          : state === 'active' && variant === 'default'
+            ? 'var(--selected)'
+            : state === 'hover'
+              ? hover
+              : state === 'focus-visible'
+                ? normal
+                : pressed;
       const fg =
         state === 'disabled'
           ? 'var(--text-off)'

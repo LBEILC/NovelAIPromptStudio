@@ -248,8 +248,10 @@ export function Tag({
   state = 'default',
   onClick,
   className,
+  interactive = !!onClick,
 }: {
   text: string;
+  interactive?: boolean;
   translation?: string;
   category?: TagCategory;
   categoryLabel: string;
@@ -267,12 +269,13 @@ export function Tag({
   onClick?: () => void;
   className?: string;
 }) {
+  const Element = interactive ? 'button' : 'span';
   return (
-    <button
-      type="button"
+    <Element
+      data-interactive={interactive || undefined}
       className={cx('nps-tag', `nps-tag-${state}`, className)}
       aria-label={[text, translation, weight, categoryLabel].filter(Boolean).join(', ')}
-      aria-pressed={state === 'selected'}
+      aria-pressed={interactive ? state === 'selected' : undefined}
       onClick={onClick}
     >
       {state === 'add' ? (
@@ -291,7 +294,7 @@ export function Tag({
         )}
       </span>
       {weight && <span className="nps-tag-weight">{weight}</span>}
-    </button>
+    </Element>
   );
 }
 export function SelectionBar({

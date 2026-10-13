@@ -64,6 +64,27 @@ export function Button({
   );
 }
 
+// Unwrapped surfaces keep their layout while sharing desktop interaction states.
+export function SurfaceButton({
+  kind = 'row',
+  className,
+  disabledReason,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  kind?: 'row' | 'image' | 'chip' | 'tab' | 'check';
+  disabledReason?: string;
+  'data-tip'?: string;
+}) {
+  return (
+    <button
+      {...props}
+      type={props.type ?? 'button'}
+      className={cx('nps-surface-button', `nps-surface-${kind}`, className)}
+      data-tip={props.disabled ? disabledReason : props['data-tip']}
+    />
+  );
+}
+
 export type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'prefix'> & {
   size?: 'default' | 'small';
   prefix?: ReactNode;
@@ -434,6 +455,7 @@ export function Toggle({
   label,
   disabled,
   kind = 'switch',
+  mixed = false,
   className,
 }: {
   checked: boolean;
@@ -441,20 +463,22 @@ export function Toggle({
   label: string;
   disabled?: boolean;
   kind?: 'switch' | 'checkbox';
+  mixed?: boolean;
   className?: string;
 }) {
   return (
     <button
       type="button"
       role={kind}
-      aria-checked={checked}
+      aria-checked={mixed ? 'mixed' : checked}
       aria-label={label}
       data-tip={label}
       disabled={disabled}
       className={cx(`nps-${kind}`, className)}
       onClick={() => onChange(!checked)}
     >
-      {kind === 'checkbox' && checked && <Check {...iconProps} />}
+      {kind === 'checkbox' &&
+        (mixed ? <Minus {...iconProps} /> : checked && <Check {...iconProps} />)}
     </button>
   );
 }

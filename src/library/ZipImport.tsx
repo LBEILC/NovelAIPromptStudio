@@ -1,3 +1,4 @@
+import { SurfaceButton } from '../ui';
 import { Check } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, Dialog, useScrollArea } from '../ui';
@@ -226,7 +227,8 @@ export function ZipImport({
                   const entry = entries[row.start + offset];
                   const picked = active.includes(entry.id);
                   return (
-                    <button
+                    <SurfaceButton
+                      kind="image"
                       className={`library-card ${picked ? 'picked' : ''} ${entry.duplicate || entry.previewError ? 'dim' : ''}`}
                       key={entry.id}
                       data-entry-id={entry.id}
@@ -250,7 +252,7 @@ export function ZipImport({
                           {picked && <Check size={16} strokeWidth={1.5} aria-hidden="true" />}
                         </span>
                       )}
-                    </button>
+                    </SurfaceButton>
                   );
                 })}
               </div>

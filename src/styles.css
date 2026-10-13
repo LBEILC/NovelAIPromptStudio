@@ -9,7 +9,7 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 body { background: var(--surface); color: var(--text); font: var(--fs-body)/var(--lh-body) var(--font-ui); }
 button, input, select, textarea { font: inherit; }
 button { color: inherit; border: 0; }
-button, select, input[type="range"] { cursor: pointer; }
+button, select, input[type="range"] { cursor: default; }
 .app-content { min-width: 0; min-height: 0; overflow: hidden; }
 .app-page-surface { width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
 .app-page-surface > main { width: 100%; height: 100%; }

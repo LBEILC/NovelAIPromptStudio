@@ -13,15 +13,15 @@
   background: var(--surface); color: var(--text); font-weight: var(--fw-strong); white-space: nowrap;
   transition: background-color var(--dur-1) var(--ease-out);
 }
-.nps-button:hover { background: var(--hover); }
+.nps-button:not([aria-disabled="true"],:disabled):hover { background: var(--hover); }
 .nps-button.nps-button-ink { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
-.nps-button-ink:hover { background: var(--ink-hover); border-color: var(--ink-hover); }
+.nps-button-ink:not([aria-disabled="true"],:disabled):hover { background: var(--ink-hover); border-color: var(--ink-hover); }
 .nps-button.nps-button-cinnabar { background: var(--cinnabar); border-color: var(--cinnabar); color: var(--on-cinnabar); padding: 0 var(--sp-5); }
-.nps-button-cinnabar:hover { background: var(--cinnabar-hover); border-color: var(--cinnabar-hover); }
+.nps-button-cinnabar:not([aria-disabled="true"],:disabled):hover { background: var(--cinnabar-hover); border-color: var(--cinnabar-hover); }
 .nps-button.nps-button-quiet { background: transparent; border-color: transparent; color: var(--text-2); font-weight: var(--fw-regular); }
-.nps-button-quiet:hover { background: var(--hover); color: var(--text); }
+.nps-button-quiet:not([aria-disabled="true"],:disabled):hover { background: var(--hover); color: var(--text); }
 .nps-button.nps-button-danger { background: transparent; border-color: transparent; color: var(--danger); font-weight: var(--fw-regular); }
-.nps-button-danger:hover, .nps-button-danger-outline:hover { background: var(--danger-wash); }
+.nps-button-danger:not([aria-disabled="true"],:disabled):hover, .nps-button-danger-outline:not([aria-disabled="true"],:disabled):hover { background: var(--danger-wash); }
 .nps-button.nps-button-danger-outline { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
 .nps-button:is([aria-disabled="true"],:disabled):not([aria-busy="true"]) { background: var(--hover); border-color: transparent; color: var(--text-off); }
 .nps-button.nps-small, .nps-field.nps-small { height: var(--ctl-sm); padding: 0 var(--sp-2); font-size: var(--fs-small); }
@@ -118,7 +118,7 @@
 .nps-tag-en { font: var(--fs-small)/var(--lh-small) var(--font-mono); color: var(--text); }
 .nps-tag-zh { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-3); }
 .nps-tag-weight { font: var(--fs-caption)/var(--lh-small) var(--font-mono); color: var(--text-2); align-self: flex-start; }
-.nps-tag:hover { background: var(--hover); }
+.nps-tag[data-interactive]:hover { background: var(--hover); }
 .nps-tag-selected { border-color: var(--text); background: var(--selected); }
 .nps-tag-translating .nps-tag-zh { color: var(--text-off); }
 .nps-tag-syntax { border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); }
@@ -154,11 +154,11 @@
 }
 /* Expanded triggers retain their own button variant. */
 /* The pressed look is for popup triggers; disclosure toggles (collapse/expand) opt out. */
-.nps-button-default:is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--hover); }
-.nps-button-quiet:is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--selected); color:var(--text); }
-.nps-button.nps-button-ink:is(:hover,:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--ink-hover); border-color:var(--ink-hover); color:var(--on-ink); }
-.nps-button.nps-button-cinnabar:is(:hover,:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--cinnabar-hover); border-color:var(--cinnabar-hover); color:var(--on-cinnabar); }
-.nps-button:is(.nps-button-danger,.nps-button-danger-outline):is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--danger-wash); color:var(--danger); }
+.nps-button-default:not([aria-disabled="true"],:disabled):is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--hover); }
+.nps-button-quiet:not([aria-disabled="true"],:disabled):is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--selected); color:var(--text); }
+.nps-button.nps-button-ink:not([aria-disabled="true"],:disabled):is(:hover,:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--ink-hover); border-color:var(--ink-hover); color:var(--on-ink); }
+.nps-button.nps-button-cinnabar:not([aria-disabled="true"],:disabled):is(:hover,:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--cinnabar-hover); border-color:var(--cinnabar-hover); color:var(--on-cinnabar); }
+.nps-button:not([aria-disabled="true"],:disabled):is(.nps-button-danger,.nps-button-danger-outline):is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--danger-wash); color:var(--danger); }
 .nps-button:is([aria-disabled="true"],:disabled):not([aria-busy="true"]):is(:hover,:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--hover); border-color:transparent; color:var(--text-off); }
 .nps-split-button { display:inline-flex; align-items:stretch; gap:0; }
 .nps-split-button > .nps-button:first-child { border-radius:var(--r-ctl) 0 0 var(--r-ctl); border-right:0; }

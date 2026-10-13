@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import '../../design/tokens.css';
 import './ui.css';
+import './interaction.css';
 import { TooltipRoot } from './overlays';
 
 export type Platform = 'windows' | 'macos' | 'linux';

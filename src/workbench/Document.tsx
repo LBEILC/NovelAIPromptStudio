@@ -282,6 +282,7 @@ export function WorkbenchDocument(p: DocumentProps) {
           : '';
     const content = (
       <Tag
+        interactive={!!p.renderTag}
         text={language === 'translated' && tag.translation ? tag.translation : tag.tag}
         translation={syntax || (language === 'bilingual' ? tag.translation : '')}
         category={categoryColors[tag.category]}

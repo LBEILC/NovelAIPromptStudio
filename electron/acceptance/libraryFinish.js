@@ -111,7 +111,7 @@ export async function libraryFinishChecks({
   await click('编辑规则', scope);
   await check(
     '旧规则只选同名组一部分时保留半选状态',
-    `(()=>{const label=[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5');return !!label?.querySelector('input').indeterminate})()`,
+    `(()=>{const label=[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5');return label?.querySelector('[role=checkbox]').getAttribute('aria-checked')==='mixed'})()`,
     undefined,
     'once',
   );
@@ -157,7 +157,7 @@ export async function libraryFinishChecks({
     'both',
   );
   await e(
-    "[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5').querySelector('input').click()",
+    "[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5').querySelector('[role=checkbox]').click()",
   );
   await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
   await key('Escape');
@@ -188,11 +188,14 @@ export async function libraryFinishChecks({
   );
   await click('全部图片', scope);
   await click('筛选', scope);
-  const modelInput = `[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5')?.querySelector('input')`;
-  await wait(`!!(${modelInput}) && !(${modelInput}).checked`, '全部图片的模型筛选已重置');
+  const modelInput = `[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5')?.querySelector('[role=checkbox]')`;
+  await wait(
+    `!!(${modelInput}) && (${modelInput}).getAttribute('aria-checked')==='false'`,
+    '全部图片的模型筛选已重置',
+  );
   await h.checkSoon(
     '点击合并模型复选项后全部别名选中',
-    `(${modelInput}).checked && !(${modelInput}).indeterminate`,
+    `(${modelInput}).getAttribute('aria-checked')==='true'`,
     undefined,
     `(${modelInput}).click()`,
     undefined,
@@ -200,7 +203,7 @@ export async function libraryFinishChecks({
   );
   await h.checkSoon(
     '再次取消合并模型复选项取消全部别名',
-    `(()=>{const label=[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5');const input=label.querySelector('input');return !input.checked&&!input.indeterminate})()`,
+    `(()=>{const label=[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5');const input=label.querySelector('[role=checkbox]');return input.getAttribute('aria-checked')==='false'})()`,
     undefined,
     `(${modelInput}).click()`,
     undefined,

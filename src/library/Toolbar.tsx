@@ -1,3 +1,4 @@
+import { SurfaceButton } from '../ui';
 import { useMemo, useRef, useState } from 'react';
 import {
   Shortcut,
@@ -8,6 +9,7 @@ import {
   Select,
   Slider,
   Switch,
+  Checkbox,
   Dialog,
   Autocomplete,
 } from '../ui';
@@ -74,7 +76,8 @@ export function FilterChips({
   return (
     <div className="library-chips">
       {chips.map((chip) => (
-        <button
+        <SurfaceButton
+          kind="chip"
           className="library-chip"
           key={chip.id}
           data-tip={chip.title}
@@ -84,7 +87,7 @@ export function FilterChips({
           {chip.label}
           <b>{chip.value}</b>
           <i className="ri-close-line" />
-        </button>
+        </SurfaceButton>
       ))}
       <Button variant="quiet" size="small" onClick={() => onChange(DEFAULT_GALLERY_FILTERS)}>
         清除
@@ -115,7 +118,8 @@ function TagFilter({
       <span>{label}</span>
       <div className="library-filter-tags">
         {values.map((value) => (
-          <button
+          <SurfaceButton
+            kind="chip"
             key={value}
             className="library-chip"
             aria-label={`移除${label} ${value}`}
@@ -123,7 +127,7 @@ function TagFilter({
           >
             {value}
             <i className="ri-close-line" />
-          </button>
+          </SurfaceButton>
         ))}
         <Autocomplete
           label={`${label} Tag`}
@@ -362,18 +366,16 @@ export function LibraryToolbar({
                         : undefined
                     }
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
+                      label={option.label}
                       checked={option.values.every((value) => filters[key].includes(value))}
-                      ref={(node) => {
-                        if (node)
-                          node.indeterminate =
-                            option.values.some((value) => filters[key].includes(value)) &&
-                            !option.values.every((value) => filters[key].includes(value));
-                      }}
-                      onChange={(event) =>
+                      mixed={
+                        option.values.some((value) => filters[key].includes(value)) &&
+                        !option.values.every((value) => filters[key].includes(value))
+                      }
+                      onChange={(checked) =>
                         p.onFiltersChange({
-                          [key]: event.target.checked
+                          [key]: checked
                             ? [...new Set([...filters[key], ...option.values])]
                             : filters[key].filter((v) => !option.values.includes(v)),
                         })
