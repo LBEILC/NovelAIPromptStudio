@@ -166,9 +166,16 @@ it('isolates text, images and file formats without calling the operating system'
   );
   const clipboard = { ...original };
   const empty = { isEmpty: () => true };
+  const decoded = { isEmpty: () => false };
+  const createFromBuffer = vi.fn(() => decoded);
   const doubles = installAcceptanceDoubles(
     {},
-    { dialog: {}, shell: {}, clipboard, nativeImage: { createEmpty: () => empty } },
+    {
+      dialog: {},
+      shell: {},
+      clipboard,
+      nativeImage: { createEmpty: () => empty, createFromBuffer },
+    },
   );
   clipboard.writeText('fixture');
   expect(clipboard.readText()).toBe('fixture');
@@ -181,6 +188,11 @@ it('isolates text, images and file formats without calling the operating system'
   bytes.fill(0);
   expect(clipboard.read('text/uri-list')).toBe('file:///fixture.png');
   expect(clipboard.availableFormats()).toEqual(['text/uri-list']);
+  expect(clipboard.readImage()).toBe(empty);
+  clipboard.writeBuffer('PNG', Buffer.from('encoded fixture'));
+  expect(clipboard.readImage()).toBe(decoded);
+  expect(createFromBuffer).toHaveBeenCalledWith(Buffer.from('encoded fixture'));
+  expect(clipboard.readBuffer('PNG').toString()).toBe('encoded fixture');
   clipboard.clear();
   expect(clipboard.readImage()).toBe(empty);
   expect(Object.values(original).every((fn) => fn.mock.calls.length === 0)).toBe(true);

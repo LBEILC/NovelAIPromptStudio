@@ -127,7 +127,13 @@ export function installAcceptanceDoubles(mode, { dialog, shell, clipboard, nativ
       readHTML: () => data.html || '',
       readRTF: () => data.rtf || '',
       readBookmark: () => ({ title: data.bookmark || '', url: data.bookmark ? data.text : '' }),
-      readImage: () => data.image || nativeImage.createEmpty(),
+      readImage: () => {
+        if (data.image) return data.image;
+        for (const [format, bytes] of buffers)
+          if (/^(PNG|JFIF|WebP|(?:image\/|public\.)(png|jpeg|webp))$/i.test(format))
+            return nativeImage.createFromBuffer(bytes);
+        return nativeImage.createEmpty();
+      },
       readBuffer: (format) => Buffer.from(buffers.get(format) || []),
       read: (format) => buffers.get(format)?.toString('utf8') || '',
       writeBuffer: (format, value) => {
