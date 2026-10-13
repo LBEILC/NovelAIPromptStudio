@@ -160,6 +160,9 @@ export async function interactionCorrectionChecks(env) {
     releaseUpdate = resolve;
   });
   env.doubles.beforeUpdateCheck = () => updateReady;
+  // The update notice only appears with auto-check on; earlier settings scenarios may leave it off.
+  const originalAutoCheck = env.preferences.productivitySettings().autoCheckUpdates;
+  env.preferences.saveProductivitySettings({ autoCheckUpdates: true });
   await h.reload();
   const previousTabs = await restoredTabs(h);
   try {
@@ -552,6 +555,7 @@ export async function interactionCorrectionChecks(env) {
   } finally {
     releaseUpdate();
     delete env.doubles.beforeUpdateCheck;
+    env.preferences.saveProductivitySettings({ autoCheckUpdates: originalAutoCheck });
     await h.nativeKey('Escape');
     await move('mouseReleased', { x: 20, y: 300 });
     await h.window.webContents.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');
