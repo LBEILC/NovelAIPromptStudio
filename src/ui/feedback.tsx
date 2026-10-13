@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Plus } from 'lucide-react';
 import { Button, iconProps } from './controls';
 import { cx, clamp } from './internal';
@@ -85,6 +93,51 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }>({ current: null, pending: null });
   const next = useRef(0);
   const layer = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const node = layer.current;
+    if (!node) return;
+    const selector =
+      '.library-dock > *, .settings-dictionary-selection .nps-selection, .import-status, .import-result';
+    const observed = new Set<Element>();
+    const update = () => {
+      const bars = [...document.querySelectorAll<HTMLElement>(selector)];
+      for (const bar of observed) {
+        if (!bars.includes(bar as HTMLElement)) {
+          resize.unobserve(bar);
+          observed.delete(bar);
+        }
+      }
+      const style = getComputedStyle(node);
+      let bottom = parseFloat(style.getPropertyValue('--sp-6'));
+      const gap = parseFloat(style.getPropertyValue('--sp-2'));
+      for (const bar of bars) {
+        if (!observed.has(bar)) {
+          resize.observe(bar);
+          observed.add(bar);
+        }
+        if (!bar.checkVisibility()) continue;
+        const rect = bar.getBoundingClientRect();
+        bottom = Math.max(bottom, innerHeight - rect.top + gap);
+      }
+      const value = `${bottom}px`;
+      if (node.style.bottom !== value) node.style.bottom = value;
+    };
+    const resize = new ResizeObserver(update);
+    const mutations = new MutationObserver(update);
+    mutations.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['class', 'style', 'hidden'],
+    });
+    window.addEventListener('resize', update);
+    update();
+    return () => {
+      resize.disconnect();
+      mutations.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
   useEffect(() => {
     if (current) layer.current?.showPopover();
     else layer.current?.hidePopover();

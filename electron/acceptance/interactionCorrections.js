@@ -15,6 +15,24 @@ const tags = '[...document.querySelectorAll(".wb-document-scroll [data-wb-tag]")
 const editor = 'document.querySelector(".nps-popover:popover-open .wb-tag-editor")';
 const scroll = 'document.querySelector(".wb-document-scroll")';
 
+async function notificationClearance(h, label, selector) {
+  await h.wait(
+    `document.querySelector('.nps-notifications').getAnimations().every(a=>a.playState!=='running')`,
+    '通知位置稳定',
+  );
+  await h.check(
+    `${label}通知位于操作条上方且每个按钮中心可点击`,
+    `(()=>{
+    const bar=document.querySelector(${JSON.stringify(selector)}),toast=document.querySelector('.nps-toast');
+    const a=bar.getBoundingClientRect(),b=toast.getBoundingClientRect(),gap=parseFloat(getComputedStyle(toast).getPropertyValue('--sp-2'));
+    return Math.abs(a.top-b.bottom-gap)<1 && [...bar.querySelectorAll('button')].every(button=>{const r=button.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('button')===button});
+  })()`,
+    undefined,
+    'both',
+  );
+  await h.screenshot(`notification-clearance-${label}`);
+}
+
 async function settle(h) {
   await h.wait(
     `[...document.querySelectorAll('${active}')].every(n=>n.getAnimations({subtree:true}).every(a=>a.playState!=='running'))`,
@@ -135,6 +153,11 @@ export async function interactionCorrectionChecks(env) {
   ]);
   const originalMotion = env.preferences.appearanceSettings().motion;
   const move = pointer(h);
+  let releaseUpdate;
+  const updateReady = new Promise((resolve) => {
+    releaseUpdate = resolve;
+  });
+  env.doubles.beforeUpdateCheck = () => updateReady;
   await h.reload();
   const previousTabs = await restoredTabs(h);
   try {
@@ -176,6 +199,15 @@ export async function interactionCorrectionChecks(env) {
       dictionaryMenu,
     );
     await click(dictionaryTag, 'document.querySelector(".settings-table")');
+    releaseUpdate();
+    await wait(
+      'document.querySelector(".nps-toast")?.textContent.includes("发现新版本")',
+      '批量操作期间显示后台通知',
+    );
+    await e(
+      `document.querySelector('.nps-toast').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
+    );
+    await notificationClearance(h, '词典', '.settings-dictionary-selection .nps-selection');
     await toggle(
       h,
       '词典批量设置分类',
@@ -183,7 +215,24 @@ export async function interactionCorrectionChecks(env) {
       dictionaryMenu,
     );
     await click(dictionaryTag, 'document.querySelector(".settings-table")');
+    await h.reload();
     await library(h, 'correction-fixture');
+    await e(
+      `document.querySelector('.library-card').dispatchEvent(new MouseEvent('click',{bubbles:true,${process.platform === 'darwin' ? 'metaKey' : 'ctrlKey'}:true}))`,
+    );
+    await wait('!!document.querySelector(".library-selection-bar")');
+    await wait(
+      'document.querySelector(".nps-toast")?.textContent.includes("发现新版本")',
+      '图片库批量操作期间显示后台通知',
+    );
+    await e(
+      `document.querySelector('.nps-toast').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
+    );
+    await notificationClearance(h, '图片库', '.library-selection-bar');
+    await h.nativeKey('Escape');
+    await e(
+      `document.querySelector('.nps-toast').dispatchEvent(new PointerEvent('pointerout',{bubbles:true,relatedTarget:document.body}))`,
+    );
     const byLabel = (label) =>
       `[...document.querySelectorAll('.library-page button')].find(n=>n.getAttribute('aria-label')===${JSON.stringify(label)}||n.textContent.trim()===${JSON.stringify(label)})`;
     const pop = (label) =>
@@ -498,6 +547,8 @@ export async function interactionCorrectionChecks(env) {
     await h.nativeKey('Escape');
     await move('mouseReleased', upper);
   } finally {
+    releaseUpdate();
+    delete env.doubles.beforeUpdateCheck;
     await h.nativeKey('Escape');
     await move('mouseReleased', { x: 20, y: 300 });
     await h.window.webContents.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');

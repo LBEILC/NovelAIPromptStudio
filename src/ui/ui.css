@@ -91,6 +91,11 @@
 .nps-notifications { position: fixed; inset: auto; bottom: var(--sp-6); left: 50%; transform: translateX(-50%); padding: 0; border: 0; margin: 0; background: transparent; overflow: visible; }
 .nps-toast { height: var(--toast-h); padding: 0 var(--sp-4); display: inline-flex; align-items: center; gap: var(--sp-3); border-radius: var(--r-ctl); background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-pop); }
 .nps-toast:has(button) { padding-right: var(--sp-2); }
+.nps-notifications { transition: bottom var(--dur-3) var(--ease-move); }
+[data-motion="off"] .nps-notifications { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion="full"]) .nps-notifications { transition: none; }
+}
 .nps-toast button { height: var(--sp-6); padding: 0 var(--sp-2); border: 0; border-radius: var(--r-tag); background: transparent; color: inherit; text-decoration: underline; }
 .nps-tip { padding: var(--sp-1) var(--sp-2); border-radius: var(--r-tag); background: var(--ink); color: var(--on-ink); font-size: var(--fs-caption); line-height: var(--lh-caption); }
 .nps-banner { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); font-size: var(--fs-small); line-height: var(--lh-small); }
