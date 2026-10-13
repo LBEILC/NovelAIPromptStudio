@@ -1,3 +1,4 @@
+import { Collapse, Presence, TransitionSurface } from '../ui/transitions';
 import { LibraryRename } from './Rename';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, EmptyState, EmptyMark, Progress, ResizablePanel } from '../ui';
@@ -94,105 +95,114 @@ export default function LibraryPage(
             }}
           />
         )}
-        {p.cacheProgress ? (
-          <div className="library-cache">
-            <b>
-              正在整理图片库 {p.cacheProgress.completed.toLocaleString()} /{' '}
-              {p.cacheProgress.total.toLocaleString()}
-            </b>
-            <Progress
-              label="正在整理图片库"
-              value={p.cacheProgress.completed}
-              max={p.cacheProgress.total}
-            />
-            <span className="library-help">只在升级后第一次打开时需要</span>
-          </div>
-        ) : empty ? (
-          <div className="library-empty">
-            <EmptyState
-              graphic={noImages ? <EmptyMark /> : null}
-              title={noImages ? '图片库里还没有图片' : '没有符合条件的图片'}
-              description={
-                noImages
-                  ? '把图片或 NovelAI 导出的 ZIP 拖到这里。软件会复制一份保存，并读出每张图的提示词和参数。'
-                  : `图片库里有 ${p.allCount ?? p.filterCacheSource.length} 张图片，但没有一张同时满足现在的搜索和筛选。`
-              }
-              actions={
-                noImages ? (
-                  <>
-                    <Button variant="ink" onClick={p.onImport}>
-                      导入图片
-                    </Button>
-                    <Button onClick={p.onImportClipboard}>从剪贴板导入</Button>
-                  </>
-                ) : (
-                  <Button onClick={() => p.onFiltersChange(DEFAULT_GALLERY_FILTERS)}>
-                    清除搜索和筛选
-                  </Button>
-                )
-              }
-              fine={noImages ? '导入不会修改或移动你原来的文件。' : undefined}
-            />
-          </div>
-        ) : (
-          <LibraryGrid
-            p={p}
-            rowHeight={rowHeight}
-            onRowHeight={(height) => {
-              setRowHeight(height);
-              persist(GALLERY_CARD_SIZE_KEY, height * fallbackRatio);
-            }}
-            onViewer={() => setViewer(true)}
-          />
-        )}
+        <div className="library-results">
+          <Collapse open={!!p.cacheProgress} className="library-cache-transition">
+            {p.cacheProgress && (
+              <div className="library-cache">
+                <b>
+                  正在整理图片库 {p.cacheProgress.completed.toLocaleString()} /{' '}
+                  {p.cacheProgress.total.toLocaleString()}
+                </b>
+                <Progress
+                  label="正在整理图片库"
+                  value={p.cacheProgress.completed}
+                  max={p.cacheProgress.total}
+                />
+                <span className="library-help">只在升级后第一次打开时需要</span>
+              </div>
+            )}
+          </Collapse>
+          <TransitionSurface
+            className="library-result-content"
+            change={p.contentKey}
+            hidden={!!p.cacheProgress}
+          >
+            {empty ? (
+              <div className="library-empty">
+                <EmptyState
+                  graphic={noImages ? <EmptyMark /> : null}
+                  title={noImages ? '图片库里还没有图片' : '没有符合条件的图片'}
+                  description={
+                    noImages
+                      ? '把图片或 NovelAI 导出的 ZIP 拖到这里。软件会复制一份保存，并读出每张图的提示词和参数。'
+                      : `图片库里有 ${p.allCount ?? p.filterCacheSource.length} 张图片，但没有一张同时满足现在的搜索和筛选。`
+                  }
+                  actions={
+                    noImages ? (
+                      <>
+                        <Button variant="ink" onClick={p.onImport}>
+                          导入图片
+                        </Button>
+                        <Button onClick={p.onImportClipboard}>从剪贴板导入</Button>
+                      </>
+                    ) : (
+                      <Button onClick={() => p.onFiltersChange(DEFAULT_GALLERY_FILTERS)}>
+                        清除搜索和筛选
+                      </Button>
+                    )
+                  }
+                  fine={noImages ? '导入不会修改或移动你原来的文件。' : undefined}
+                />
+              </div>
+            ) : (
+              <LibraryGrid
+                p={p}
+                rowHeight={rowHeight}
+                onRowHeight={(height) => {
+                  setRowHeight(height);
+                  persist(GALLERY_CARD_SIZE_KEY, height * fallbackRatio);
+                }}
+                onViewer={() => setViewer(true)}
+              />
+            )}
+          </TransitionSurface>
+        </div>
         {error && <div role="alert">{error}</div>}
-        {ids.length > 0 && (
-          <div className="library-dock">
-            <div className="library-selection-bar" aria-label="多选操作条">
-              <span>
-                已选 {p.selectedGroupIds.length} 组 · {ids.length} 张
-              </span>
-              {p.view === 'trash' ? (
-                <>
-                  <Button variant="quiet" size="small" onClick={() => p.onRestore(ids)}>
-                    <i className="ri-arrow-go-back-line" />
-                    恢复
+        <Presence show={ids.length > 0} className="library-dock">
+          <div className="library-selection-bar" aria-label="多选操作条">
+            <span>
+              已选 {p.selectedGroupIds.length} 组 · {ids.length} 张
+            </span>
+            {p.view === 'trash' ? (
+              <>
+                <Button variant="quiet" size="small" onClick={() => p.onRestore(ids)}>
+                  <i className="ri-arrow-go-back-line" />
+                  恢复
+                </Button>
+                <Button variant="danger" size="small" onClick={() => p.onPermanentDelete(ids)}>
+                  永久删除
+                </Button>
+              </>
+            ) : (
+              <>
+                <CollectionPicker p={p} ids={ids} />
+                <Button size="small" variant="quiet" onClick={() => setRenaming(true)}>
+                  <i className="ri-edit-line" />
+                  起名
+                </Button>
+                {p.activeCollection?.kind === 'manual' && (
+                  <Button
+                    size="small"
+                    variant="quiet"
+                    onClick={() =>
+                      p.onCollectionProjectsChange(p.activeCollection!.id, ids, 'remove')
+                    }
+                  >
+                    移出这个收藏集
                   </Button>
-                  <Button variant="danger" size="small" onClick={() => p.onPermanentDelete(ids)}>
-                    永久删除
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <CollectionPicker p={p} ids={ids} />
-                  <Button size="small" variant="quiet" onClick={() => setRenaming(true)}>
-                    <i className="ri-edit-line" />
-                    起名
-                  </Button>
-                  {p.activeCollection?.kind === 'manual' && (
-                    <Button
-                      size="small"
-                      variant="quiet"
-                      onClick={() =>
-                        p.onCollectionProjectsChange(p.activeCollection!.id, ids, 'remove')
-                      }
-                    >
-                      移出这个收藏集
-                    </Button>
-                  )}
-                  <Button size="small" variant="danger" onClick={() => p.onTrash(ids)}>
-                    移入回收站
-                  </Button>
-                </>
-              )}
-              <Button size="small" variant="quiet" onClick={p.onClearSelection}>
-                取消
-              </Button>
-            </div>
+                )}
+                <Button size="small" variant="danger" onClick={() => p.onTrash(ids)}>
+                  移入回收站
+                </Button>
+              </>
+            )}
+            <Button size="small" variant="quiet" onClick={p.onClearSelection}>
+              取消
+            </Button>
           </div>
-        )}
-        {busyImport && p.importProgress && (
-          <div className="library-dock">
+        </Presence>
+        <Collapse open={!!busyImport && !!p.importProgress} className="library-dock">
+          {p.importProgress && (
             <div className="library-job">
               <div className="library-job-top">
                 <b>
@@ -212,8 +222,8 @@ export default function LibraryPage(
                 张图片库里已经有的图片
               </span>
             </div>
-          </div>
-        )}
+          )}
+        </Collapse>
         {p.dragState?.active && (
           <div className="library-drop">
             {p.dragState.valid ? '松开后导入图片库' : '只能导入 PNG、JPG、WEBP 图片和 ZIP'}

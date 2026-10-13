@@ -1,4 +1,5 @@
 import { SurfaceButton } from '../ui';
+import { useMovingIndicator } from '../ui/transitions';
 import { useRef, useState } from 'react';
 import { Button, Dialog, Input, ContextMenu, useScrollArea } from '../ui';
 import type { Collection } from '../shared/types';
@@ -6,6 +7,13 @@ import type { LibraryProps } from './types';
 
 export function LibrarySidebar({ p }: { p: LibraryProps }) {
   const scroll = useRef<HTMLElement>(null);
+  const marker = useRef<HTMLSpanElement>(null);
+  useMovingIndicator(
+    scroll,
+    marker,
+    '.library-side-item.on',
+    `${p.view}:${p.activeCollection?.id}`,
+  );
   useScrollArea(scroll);
   const [naming, setNaming] = useState<Collection | 'new' | null>(null);
   const [name, setName] = useState('');
@@ -86,6 +94,11 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
         <i className="ri-delete-bin-line" />
         回收站<span>{p.trashCount ?? 0}</span>
       </SurfaceButton>
+      <span
+        ref={marker}
+        className="nps-moving-indicator library-nav-indicator"
+        aria-hidden="true"
+      />
       <Dialog
         open={!!naming}
         title={naming === 'new' ? '新建收藏集' : '重命名'}

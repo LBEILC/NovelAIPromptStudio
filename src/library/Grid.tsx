@@ -1,4 +1,4 @@
-import { DecodedImage } from '../ui/transitions';
+import { DecodedImage, Presence, useNewItemEntrance } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { startMarqueeAutoScroll } from '../components/MarqueeSelection.jsx';
 import { Check } from 'lucide-react';
@@ -34,6 +34,9 @@ export function LibraryGrid({
     max: 2.5,
   });
   const [scrub, setScrub] = useState<{ group: string; index: number } | null>(null);
+  const [hovered, setHovered] = useState('');
+  const groupIds = useMemo(() => p.groups.map((group) => group.id), [p.groups]);
+  useNewItemEntrance(scroll, groupIds, p.contentKey, !p.updating);
   const wanted = useRef('');
   const thumbnails = useRef(new Map<string, Promise<void>>());
   const preload = (path: string) => {
@@ -141,6 +144,7 @@ export function LibraryGrid({
   }, [rows, selectedIndex]);
   useLayoutEffect(() => {
     if (scroll.current) scroll.current.scrollTop = 0;
+    setViewport((v) => (v.top === 0 ? v : { ...v, top: 0 }));
   }, [p.contentKey]);
   const visible = rows.filter(
     (row) =>
@@ -346,6 +350,7 @@ export function LibraryGrid({
                     }
                     data-library-index={index}
                     data-group-id={group.id}
+                    data-enter-id={group.id}
                     data-project-id={group.cover.id}
                     className={`library-card ${group.id === p.previewGroup?.id ? 'current' : ''} ${selected ? 'picked' : ''}`}
                     style={{ width, height: row.height }}
@@ -360,6 +365,7 @@ export function LibraryGrid({
                         p.onOpenWorkbench(shown);
                     }}
                     onPointerEnter={() => {
+                      setHovered(group.id);
                       if (group.members.length > 1)
                         for (const member of group.members) {
                           void preload(member.thumbnail_path || member.image_path).catch(() => {});
@@ -387,11 +393,13 @@ export function LibraryGrid({
                         .catch(() => {});
                     }}
                     onPointerLeave={() => {
+                      setHovered('');
                       wanted.current = '';
                       setScrub(null);
                     }}
                   >
                     <DecodedImage
+                      immediate={hovered === group.id || scrub?.group === group.id}
                       src={mediaUrl(shown.thumbnail_path || shown.image_path)}
                       data-scrub-image={shown.id}
                       alt=""
@@ -399,18 +407,28 @@ export function LibraryGrid({
                     />
                     {group.members.length > 1 && (
                       <>
-                        <span className="library-stack">
+                        <span
+                          className="library-stack nps-fade-state"
+                          data-visible={hovered === group.id || undefined}
+                        >
                           {scrub?.group === group.id
                             ? `${scrub.index + 1} / ${group.members.length}`
-                            : `${group.members.length} 张`}
+                            : `1 / ${group.members.length}`}
                         </span>
-                        {scrub?.group === group.id && (
+                        <Presence
+                          show={hovered === group.id}
+                          className="library-scrub-presence"
+                          shift={false}
+                        >
                           <span className="library-scrub">
                             {group.members.map((member, i) => (
-                              <span key={member.id} data-current={i === scrub.index} />
+                              <span
+                                key={member.id}
+                                data-current={i === (scrub?.group === group.id ? scrub.index : 0)}
+                              />
                             ))}
                           </span>
-                        )}
+                        </Presence>
                       </>
                     )}
                     <SurfaceButton

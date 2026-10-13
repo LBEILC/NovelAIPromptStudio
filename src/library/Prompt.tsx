@@ -1,4 +1,5 @@
 import { writeClipboardText } from '../lib/clipboard';
+import { Disclosure, TransitionSurface } from '../ui/transitions';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, Tag, type TagCategory as UICategory } from '../ui';
 import { createPromptDocument, type PromptBlock } from '../lib/promptDocument';
@@ -96,14 +97,14 @@ function TagBlock({ block, annotations }: { block: PromptBlock; annotations: Pro
       >
         还有 {tags.length} 个
       </Button>
-      <div className="library-tags">
+      <TransitionSurface className="library-tags" kind="height" change={expanded}>
         {expanded ? tags : tags.slice(0, limit)}
         {!expanded && limit < tags.length && (
           <Button variant="quiet" size="small" onClick={() => setExpanded(true)}>
             还有 {tags.length - limit} 个
           </Button>
         )}
-      </div>
+      </TransitionSurface>
     </div>
   );
 }
@@ -150,24 +151,29 @@ export function LibraryPrompt({ project }: { project: ImageRecord }) {
           </div>
         ));
         return negative ? (
-          <details key={scope.key}>
-            <summary className="library-section-title">
-              <i className="ri-arrow-right-s-line disclosure-icon" aria-hidden="true" />
-              {title}
-              <Button
-                size="small"
-                variant="quiet"
-                aria-label={`复制${title}`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  void writeClipboardText(scope.raw_prompt);
-                }}
-              >
-                <i className="ri-file-copy-line" />
-              </Button>
-            </summary>
+          <Disclosure
+            key={scope.key}
+            summaryClassName="library-section-title"
+            summary={
+              <>
+                <i className="ri-arrow-right-s-line disclosure-icon" aria-hidden="true" />
+                {title}
+                <Button
+                  size="small"
+                  variant="quiet"
+                  aria-label={`复制${title}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void writeClipboardText(scope.raw_prompt);
+                  }}
+                >
+                  <i className="ri-file-copy-line" />
+                </Button>
+              </>
+            }
+          >
             {content}
-          </details>
+          </Disclosure>
         ) : (
           <section key={scope.key}>
             <div className="library-section-title">

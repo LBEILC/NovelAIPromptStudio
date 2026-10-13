@@ -1,3 +1,4 @@
+import { Collapse } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -72,27 +73,29 @@ export function FilterChips({
           : GALLERY_DATE_PRESETS.find((item) => item.value === filters.datePreset)?.label || '',
       clear: () => onChange({ datePreset: 'all', dateFrom: '', dateTo: '' }),
     });
-  if (!chips.length && !filters.query) return null;
+
   return (
-    <div className="library-chips">
-      {chips.map((chip) => (
-        <SurfaceButton
-          kind="chip"
-          className="library-chip"
-          key={chip.id}
-          data-tip={chip.title}
-          onClick={chip.clear}
-          aria-label={`移除${chip.label} ${chip.value}`}
-        >
-          {chip.label}
-          <b>{chip.value}</b>
-          <i className="ri-close-line" />
-        </SurfaceButton>
-      ))}
-      <Button variant="quiet" size="small" onClick={() => onChange(DEFAULT_GALLERY_FILTERS)}>
-        清除
-      </Button>
-    </div>
+    <Collapse open={!!chips.length || !!filters.query} className="library-filter-collapse">
+      <div className="library-chips">
+        {chips.map((chip) => (
+          <SurfaceButton
+            kind="chip"
+            className="library-chip"
+            key={chip.id}
+            data-tip={chip.title}
+            onClick={chip.clear}
+            aria-label={`移除${chip.label} ${chip.value}`}
+          >
+            {chip.label}
+            <b>{chip.value}</b>
+            <i className="ri-close-line" />
+          </SurfaceButton>
+        ))}
+        <Button variant="quiet" size="small" onClick={() => onChange(DEFAULT_GALLERY_FILTERS)}>
+          清除
+        </Button>
+      </div>
+    </Collapse>
   );
 }
 

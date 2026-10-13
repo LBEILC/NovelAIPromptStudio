@@ -1,4 +1,5 @@
 import { writeClipboardText } from '../lib/clipboard';
+import { useMovingIndicator } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -61,6 +62,9 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
   const notify = useNotifications();
   const scroll = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
+  const viewList = useRef<HTMLDivElement>(null);
+  const viewMarker = useRef<HTMLSpanElement>(null);
+  useMovingIndicator(viewList, viewMarker, '[aria-selected=true]', d.filters.view);
   const failures = useRef<HTMLDivElement>(null);
   const [showFailures, setShowFailures] = useState(false);
   useScrollArea(failures, { enabled: showFailures && !!d.progress?.failed.length });
@@ -212,7 +216,12 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
             onChange={(sort) => d.setFilters((f) => ({ ...f, sort: sort as DictionarySort }))}
           />
         </div>
-        <div className="settings-dictionary-views" role="tablist" aria-label="词典分页签">
+        <div
+          className="settings-dictionary-views"
+          role="tablist"
+          aria-label="词典分页签"
+          ref={viewList}
+        >
           {views.map(([view, label]) => (
             <SurfaceButton
               kind="tab"
@@ -229,6 +238,11 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
               <span>{d.counts[view].toLocaleString()}</span>
             </SurfaceButton>
           ))}
+          <span
+            ref={viewMarker}
+            className="nps-moving-indicator settings-view-indicator"
+            aria-hidden="true"
+          />
         </div>
       </div>
       {(d.error || message) && <p role={d.error ? 'alert' : 'status'}>{d.error || message}</p>}

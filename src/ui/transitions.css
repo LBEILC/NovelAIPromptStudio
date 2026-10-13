@@ -4,6 +4,9 @@
 .nps-decoded-image[data-image-ready] { opacity:1; }
 .nps-decoded-image[data-image-immediate] { transition:none; }
 .nps-moving-indicator { position:absolute; left:0; top:0; transform-origin:0 0; pointer-events:none; }
+.nps-fade-state { opacity:0; transition:opacity var(--dur-1) var(--ease-out); }
+.nps-fade-state[data-visible] { opacity:1; transition-duration:var(--dur-2); }
+.nps-disclosure::details-content { content-visibility:visible; }
 [data-motion="off"] .nps-decoded-image { transition:none; }
 @media (prefers-reduced-motion:reduce) {
   html:not([data-motion="full"]) .nps-decoded-image { transition:none; }

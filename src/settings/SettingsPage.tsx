@@ -1,4 +1,4 @@
-import { TransitionSurface } from '../ui/transitions';
+import { Disclosure, TransitionSurface, useMovingIndicator } from '../ui/transitions';
 import { writeClipboardText } from '../lib/clipboard';
 import {
   Activity,
@@ -595,13 +595,17 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
               ['Remix Icon', remixLicense],
               ['DanbooruSearchOnline', dictionaryLicense],
             ].map(([name, license]) => (
-              <details key={name}>
-                <summary>
-                  <i className="ri-arrow-right-s-line disclosure-icon" aria-hidden="true" />
-                  {name}
-                </summary>
+              <Disclosure
+                key={name}
+                summary={
+                  <>
+                    <i className="ri-arrow-right-s-line disclosure-icon" aria-hidden="true" />
+                    {name}
+                  </>
+                }
+              >
                 <pre className="settings-license">{license}</pre>
-              </details>
+              </Disclosure>
             ))}
           </>
         )}
@@ -625,6 +629,8 @@ export default function SettingsPage(props: {
     (window as Window & { studioScreenshot?: { section?: string } }).studioScreenshot?.section ||
       'appearance',
   );
+  const marker = useRef<HTMLSpanElement>(null);
+  useMovingIndicator(sidebar, marker, '[aria-current=page]', section);
   return (
     <main className="studio-settings">
       <nav className="settings-sidebar" aria-label="设置分类" ref={sidebar}>
@@ -639,6 +645,11 @@ export default function SettingsPage(props: {
             {label}
           </Button>
         ))}
+        <span
+          ref={marker}
+          className="nps-moving-indicator settings-nav-indicator"
+          aria-hidden="true"
+        />
       </nav>
       <TransitionSurface className="settings-body" change={section}>
         <Activity mode={section === 'appearance' ? 'visible' : 'hidden'}>

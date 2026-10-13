@@ -1,4 +1,4 @@
-import { DecodedImage } from '../ui/transitions';
+import { DecodedImage, TransitionSurface } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { hasImageName, imageAccessibleName } from '../lib/imageNaming.js';
 import { dimensions } from './presentation';
@@ -30,12 +30,14 @@ export function LibraryViewer({
     p.groups.map((group) => ({ ...group, members: [...group.members] })),
   );
   const [image, setImage] = useState(p.preview);
+  const [direction, setDirection] = useState(0);
   const group = groups.find((item) => item.members.some((member) => member.id === image?.id));
   const sequence = groups.flatMap((item) =>
     item.members.map((member) => ({ group: item, member })),
   );
   const position = sequence.findIndex((item) => item.member.id === image?.id);
   const show = (nextGroup: LibraryGroup, next: LibraryGroup['cover']) => {
+    setDirection(Math.sign(sequence.findIndex((item) => item.member.id === next.id) - position));
     setImage(next);
     p.onPreview(nextGroup, next);
   };
@@ -147,13 +149,18 @@ export function LibraryViewer({
   }, [stageWidth, stageHeight, size.width, size.height]);
   if (!image) return null;
   return createPortal(
-    <div
+    <TransitionSurface
       className="library-viewer"
+      kind="presence"
+      change="viewer"
+      enter
+      shift={false}
+      duration="move"
       role="dialog"
       aria-modal="true"
       aria-label="大图"
       data-viewer-project-id={image.id}
-      ref={root}
+      nodeRef={root}
       tabIndex={-1}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
@@ -232,7 +239,14 @@ export function LibraryViewer({
             event.currentTarget.releasePointerCapture(event.pointerId);
         }}
       >
-        <div className="library-viewer-image" style={{ width: stageWidth, height: stageHeight }}>
+        <TransitionSurface
+          className="library-viewer-image"
+          change={image.id}
+          direction={direction}
+          enter
+          scale
+          style={{ width: stageWidth, height: stageHeight }}
+        >
           <DecodedImage
             src={mediaUrl(image.image_path)}
             alt={imageAccessibleName(image)}
@@ -250,7 +264,7 @@ export function LibraryViewer({
               transform: `translate(-50%, -50%) rotate(${rotation}deg) scaleX(${flip ? -1 : 1})`,
             }}
           />
-        </div>
+        </TransitionSurface>
       </div>
       <Button
         className="library-viewer-prev"
@@ -364,7 +378,7 @@ export function LibraryViewer({
           )}
         </div>
       </div>
-    </div>,
+    </TransitionSurface>,
     document.body,
   );
 }

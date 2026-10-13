@@ -112,6 +112,7 @@ function snapshot(source: HTMLElement) {
   if (!rect.width || !rect.height || !source.checkVisibility()) return null;
   const host = document.createElement('div');
   host.className = 'nps-transition-snapshot';
+  host.dataset.transitionSource = source.className;
   host.setAttribute('aria-hidden', 'true');
   host.inert = true;
   host.popover = 'manual';
@@ -178,6 +179,8 @@ type SurfaceProps = HTMLAttributes<HTMLDivElement> & {
   direction?: number;
   enter?: boolean;
   scale?: boolean;
+  shift?: boolean;
+  duration?: 'enter' | 'move';
   nodeRef?: RefObject<HTMLDivElement | null>;
 };
 type Snapshot = { old: ReturnType<typeof snapshot>; height: number; opacity: string } | null;
@@ -228,7 +231,8 @@ export class TransitionSurface extends Component<SurfaceProps> {
     const node = this.node.current;
     if (!node) return;
     const t = tokens(node);
-    const { kind = 'content', direction = 0, scale } = this.props;
+    const { kind = 'content', direction = 0, shift = true, duration, scale } = this.props;
+    const scaleIn = scale && !before;
     const height = node.getBoundingClientRect().height;
     const old = before?.old;
     if (old) {
@@ -248,15 +252,16 @@ export class TransitionSurface extends Component<SurfaceProps> {
         () => old.host.remove(),
       );
     }
+    if (kind === 'presence' && this.props.change === false) return;
     const frames: Keyframe[] =
       kind === 'height'
         ? [
-            { height: `${before?.height || 0}px`, opacity: before?.height ? 1 : 0 },
+            { height: `${before?.height || 0}px`, opacity: before?.opacity || 0 },
             { height: `${height}px`, opacity: 1 },
           ]
         : [{ opacity: before?.opacity || 0 }, { opacity: 1 }];
-    if (kind !== 'height' && (direction || kind === 'presence' || scale)) {
-      frames[0].transform = scale
+    if (kind !== 'height' && (direction || (kind === 'presence' && shift) || scaleIn)) {
+      frames[0].transform = scaleIn
         ? `scale(${t.scale})`
         : direction
           ? `translateX(${Math.sign(direction) * t.shift * 2}px)`
@@ -266,7 +271,7 @@ export class TransitionSurface extends Component<SurfaceProps> {
     this.stop = animate(
       node,
       frames,
-      kind === 'height' || scale ? t.move : t.enter,
+      kind === 'height' || scaleIn || duration === 'move' ? t.move : t.enter,
       kind === 'height' ? t.easeMove : t.out,
     );
   }
@@ -278,6 +283,8 @@ export class TransitionSurface extends Component<SurfaceProps> {
       direction,
       enter,
       scale,
+      shift,
+      duration,
       nodeRef,
       children,
       className = '',
@@ -311,6 +318,34 @@ export function Collapse({
   );
 }
 
+/** Keep native disclosure semantics, with a shared height surface for its contents. */
+export function Disclosure({
+  summary,
+  summaryClassName,
+  children,
+}: {
+  summary: ReactNode;
+  summaryClassName?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details className="nps-disclosure" open={open}>
+      <summary
+        className={summaryClassName}
+        onClick={(event) => {
+          if (event.defaultPrevented) return;
+          event.preventDefault();
+          setOpen(!open);
+        }}
+      >
+        {summary}
+      </summary>
+      <Collapse open={open}>{children}</Collapse>
+    </details>
+  );
+}
+
 export function Presence({
   show,
   children,
@@ -320,6 +355,40 @@ export function Presence({
     <TransitionSurface {...props} change={show} kind="presence" enter={show}>
       {show ? children : null}
     </TransitionSurface>
+  );
+}
+
+/** Animate only newly inserted visible items; scrolling/recycling is not insertion. */
+export function useNewItemEntrance(
+  root: RefObject<HTMLElement | null>,
+  ids: string[],
+  revision: string,
+  ready = true,
+) {
+  const previous = useRef<{ ids: Set<string>; revision: string } | null>(null);
+  const active = useRef(new Set<() => void>());
+  useLayoutEffect(() => {
+    if (!ready) return;
+    const before = previous.current;
+    if (before?.revision === revision && root.current && motionEnabled()) {
+      for (const item of root.current.querySelectorAll<HTMLElement>('[data-enter-id]')) {
+        if (before.ids.has(item.dataset.enterId!)) continue;
+        const t = tokens(item);
+        let cancel = () => {};
+        cancel = animate(item, [{ opacity: 0 }, { opacity: 1 }], t.enter, t.out, () =>
+          active.current.delete(cancel),
+        );
+        active.current.add(cancel);
+      }
+    }
+    previous.current = { ids: new Set(ids), revision };
+  }, [root, ids, revision, ready]);
+  useLayoutEffect(
+    () => () => {
+      for (const cancel of active.current) cancel();
+      active.current.clear();
+    },
+    [],
   );
 }
 
@@ -336,6 +405,8 @@ function DecodedImageSource({ src = '', className = '', immediate = false, ...pr
     const node = ref.current;
     if (!node || !src) return;
     let current = true;
+    // Establish the transparent first frame even when decode resolves immediately.
+    void getComputedStyle(node).opacity;
     void node.decode().then(
       () => {
         if (!current) return;
@@ -369,6 +440,7 @@ export function useMovingIndicator(
 ) {
   const placed = useRef(false);
   const cancel = useRef(() => {});
+  const geometry = useRef('');
   useLayoutEffect(() => {
     const root = container.current;
     const marker = indicator.current;
@@ -383,13 +455,21 @@ export function useMovingIndicator(
       const before = marker.getBoundingClientRect();
       const outer = root.getBoundingClientRect();
       const next = target.getBoundingClientRect();
+      // Popovers may still be scaling in. Store layout pixels, not scaled screen pixels.
+      const scaleX = outer.width / root.offsetWidth || 1;
+      const scaleY = outer.height / root.offsetHeight || 1;
+      const width = next.width / scaleX;
+      const height = next.height / scaleY;
+      const x = (next.left - outer.left) / scaleX + root.scrollLeft - root.clientLeft;
+      const y = (next.top - outer.top) / scaleY + root.scrollTop - root.clientTop;
+      const key = [x, y, width, height].map((value) => Math.round(value * 100) / 100).join(':');
+      if (placed.current && geometry.current === key) return;
+      geometry.current = key;
       cancel.current();
       marker.hidden = false;
-      const x = next.left - outer.left + root.scrollLeft - root.clientLeft;
-      const y = next.top - outer.top + root.scrollTop - root.clientTop;
       Object.assign(marker.style, {
-        width: `${next.width}px`,
-        height: `${next.height}px`,
+        width: `${width}px`,
+        height: `${height}px`,
         transform: `translate(${x}px, ${y}px)`,
       });
       if (placed.current && moving && next.width && next.height) {
@@ -398,7 +478,7 @@ export function useMovingIndicator(
           marker,
           [
             {
-              transform: `translate(${x + before.left - next.left}px, ${y + before.top - next.top}px) scale(${before.width / next.width}, ${before.height / next.height})`,
+              transform: `translate(${x + (before.left - next.left) / scaleX}px, ${y + (before.top - next.top) / scaleY}px) scale(${before.width / next.width}, ${before.height / next.height})`,
             },
             { transform: `translate(${x}px, ${y}px)` },
           ],

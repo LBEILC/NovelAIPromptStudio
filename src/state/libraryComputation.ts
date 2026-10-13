@@ -190,7 +190,11 @@ export function useLibraryComputation({
     libraryLoading ||
     deferredGalleryComputation !== galleryComputation ||
     (deferredGalleryComputation.grouping.promptScope === 'similar' && similarGroupingState.loading);
-  const galleryContentKey = `${deferredGalleryComputation.view}:${deferredGalleryComputation.activeCollection?.id || 'all'}:${deferredGalleryComputation.grouping.promptScope}:${deferredGalleryComputation.grouping.mergeVibes ? 1 : 0}:${deferredGalleryComputation.grouping.similarityThreshold}:${deferredGalleryComputation.sort}:${JSON.stringify(deferredGalleryComputation.filters)}:${similarGroupingState.requestId}:${visibleGroups.length}:${visibleGroups[0]?.id || ''}:${visibleGroups.at(-1)?.id || ''}`;
+  const resultKey = `${deferredGalleryComputation.view}:${deferredGalleryComputation.activeCollection?.id || 'all'}:${deferredGalleryComputation.grouping.promptScope}:${deferredGalleryComputation.grouping.mergeVibes ? 1 : 0}:${deferredGalleryComputation.grouping.similarityThreshold}:${deferredGalleryComputation.sort}:${JSON.stringify(deferredGalleryComputation.filters)}`;
+  // Publish the swap identity with completed results. Imports/deletes retain it,
+  // so neither the whole grid nor its scroll position restarts for a few rows.
+  const [galleryContentKey, setContentKey] = useState(resultKey);
+  if (!galleryUpdating && galleryContentKey !== resultKey) setContentKey(resultKey);
   const previewGroup =
     visibleGroups.find((group) => group.id === previewGroupId) ||
     visibleGroups.find((group) =>

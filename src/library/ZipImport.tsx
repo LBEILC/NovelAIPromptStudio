@@ -1,3 +1,4 @@
+import { DecodedImage } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { Check } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -240,7 +241,7 @@ export function ZipImport({
                         if (entry.previewPath) setPreview(entry);
                       }}
                     >
-                      <img
+                      <DecodedImage
                         src={entry.previewPath ? mediaUrl(entry.previewPath) : undefined}
                         alt={entry.previewPath ? '' : entry.fileName}
                         draggable={false}
@@ -269,7 +270,7 @@ export function ZipImport({
         onCancel={() => setPreview(null)}
         onConfirm={() => setPreview(null)}
       >
-        <img
+        <DecodedImage
           className="library-zip-preview"
           src={preview ? mediaUrl(preview.previewPath) : undefined}
           alt={preview?.fileName}

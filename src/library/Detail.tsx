@@ -1,4 +1,4 @@
-import { DecodedImage } from '../ui/transitions';
+import { DecodedImage, TransitionSurface } from '../ui/transitions';
 import { writeClipboardText } from '../lib/clipboard';
 import { SurfaceButton } from '../ui';
 import { dimensions, generationParameters, modelDisplayName } from './presentation';
@@ -52,7 +52,7 @@ export function LibraryDetail({
   return (
     <aside className="library-detail" data-detail-id={detail.id} aria-busy={pending}>
       <div className="library-detail-scroll" ref={scroll}>
-        <div className="library-detail-picture">
+        <TransitionSurface className="library-detail-picture" change={detail.id}>
           <DecodedImage
             src={mediaUrl(detail.image_path)}
             alt={imageAccessibleName(detail)}
@@ -66,7 +66,7 @@ export function LibraryDetail({
             }}
             onClick={onViewer}
           />
-        </div>
+        </TransitionSurface>
         {group && group.members.length > 1 && (
           <div className="library-strip">
             {group.members.map((member) => (
