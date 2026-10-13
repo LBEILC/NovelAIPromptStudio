@@ -235,9 +235,13 @@ export async function transitionChecks({ h, mode, doubles }) {
             'once',
           );
           await finish(h);
+          // The snapshot is removed after the finished animation settles, which can be a frame later.
+          const settled =
+            'getComputedStyle(document.querySelector(".app-content")).opacity==="1" && !document.querySelector(".nps-transition-snapshot")';
+          await wait(settled, `${destination} 过渡收尾`);
           await check(
             `${dark} / ${choice}：${destination}最终完全显示且旧画面已释放`,
-            'getComputedStyle(document.querySelector(".app-content")).opacity==="1" && !document.querySelector(".nps-transition-snapshot")',
+            settled,
             undefined,
             'once',
           );

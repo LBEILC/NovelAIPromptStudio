@@ -623,12 +623,10 @@ export async function workbenchInteractionChecks(env) {
         `(()=>{const t=${tab(i)}.querySelector('img'),image=document.querySelector('.wb-canvas img');return t.complete&&t.naturalWidth>0&&image?.complete&&image.naturalWidth>0})()`,
       );
       const updated = env.database.loadProject(record.id);
-      await check(
-        '迁移后已打开标签页的缩略图和原图加载新路径',
-        `(()=>{const t=${tab(i)}.querySelector('img'),i=document.querySelector('.wb-canvas img');return decodeURIComponent(t.src).includes(${JSON.stringify(path.basename(updated.thumbnail_path))})&&decodeURIComponent(i.src).includes('interaction-moved-assets')&&t.naturalWidth>0&&i.naturalWidth>0})()`,
-        undefined,
-        'once',
-      );
+      // The tab switch cross-fades: wait for the new image itself, not just any decoded canvas image.
+      const moved = `(()=>{const t=${tab(i)}.querySelector('img'),i=document.querySelector('.wb-canvas img');return decodeURIComponent(t.src).includes(${JSON.stringify(path.basename(updated.thumbnail_path))})&&decodeURIComponent(i.src).includes('interaction-moved-assets')&&t.naturalWidth>0&&i.naturalWidth>0})()`;
+      await wait(moved, '迁移后的标签页图片换成新路径');
+      await check('迁移后已打开标签页的缩略图和原图加载新路径', moved, undefined, 'once');
     }
     await e(`${tab(1)}.click()`);
     await check(
