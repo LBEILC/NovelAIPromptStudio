@@ -1,4 +1,5 @@
 import { transitionChecks } from './transitions.js';
+import { detailLayoutChecks } from './detailLayout.js';
 import { clientControlChecks } from './clientControls.js';
 import { hoverChecks } from './hover.js';
 import { clientChecks } from './client.js';
@@ -395,6 +396,7 @@ export async function runAcceptance(context) {
         await motionOffChecks(environment);
         await workbenchInteractionChecks(environment);
         await interactionCorrectionChecks(environment);
+        await detailLayoutChecks(environment);
         await componentChecks(environment);
       } else if (mode.category === '诊断·计时') {
         h.category('诊断·计时');
@@ -414,6 +416,7 @@ export async function runAcceptance(context) {
       else if (mode.category === '工作台·细节') await workbenchPolishChecks(environment);
       else if (mode.category === '工作台·交互') await workbenchInteractionChecks(environment);
       else if (mode.category === '交互修正') await interactionCorrectionChecks(environment);
+      else if (mode.category === '详情布局') await detailLayoutChecks(environment);
       else if (mode.category === '图片库·交互') await libraryInteractionChecks(environment);
       else if (mode.category === '图片库·细节') await libraryPolishChecks(environment);
       else if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
@@ -473,6 +476,7 @@ export async function runAcceptance(context) {
           () => libraryInteractionChecks(environment),
           () => workbenchInteractionChecks(environment),
           () => interactionCorrectionChecks(environment),
+          () => detailLayoutChecks(environment),
           () => uiPolishChecks(environment),
           () => componentChecks(environment),
         ],

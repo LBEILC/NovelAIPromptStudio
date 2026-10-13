@@ -86,7 +86,7 @@ function EditableTag({
       ref={drag.setNodeRef}
       {...drag.listeners}
       data-marquee-key={encodeMarqueeKey(entry.key)}
-      className={`wb-sortable-tag ${drag.isDragging ? 'wb-tag-dragging' : drag.isOver ? 'wb-tag-target' : ''}`}
+      className={`wb-sortable-tag ${drag.isDragging ? 'wb-tag-dragging' : ''}`}
       onClick={onClick}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -415,6 +415,7 @@ export function WorkbenchEditor(p: EditorProps) {
                   content: (
                     <div className="wb-raw-editor">
                       <TextArea
+                        autoSize
                         aria-label="原始文本"
                         value={raw.value}
                         onChange={(event) => setRaw({ ...raw, value: event.target.value })}

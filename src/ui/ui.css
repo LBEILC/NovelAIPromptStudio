@@ -181,7 +181,7 @@
   transform: none;
   transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out), display var(--dur-2) allow-discrete, overlay var(--dur-2) allow-discrete;
 }
-.nps-layer:popover-open[aria-hidden="true"] { opacity:0; transform:none; transition:opacity var(--dur-1) var(--ease-out); pointer-events:none; }
+.nps-layer:popover-open[aria-hidden="true"] { transition-duration:var(--dur-1); pointer-events:none; }
 .nps-tip { pointer-events: none; white-space: pre-line; overflow-wrap: anywhere; }
 .nps-layer:popover-open[data-entering] { opacity: 0; transform: translateY(calc(-1 * var(--enter-shift))) scale(var(--enter-scale)); transition: none; }
 .nps-layer[data-placement="top"]:popover-open[data-entering] { transform: translateY(var(--enter-shift)) scale(var(--enter-scale)); }

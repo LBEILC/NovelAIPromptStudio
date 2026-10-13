@@ -119,19 +119,6 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
         />
         {name && <span className="wb-tab-name">{name}</span>}
         {workbenchTabHasChanges(tab) && <span className="wb-dirty" aria-label="提示词已修改" />}
-        <Button
-          variant="quiet"
-          size="small"
-          className="wb-tab-close"
-          aria-label={`关闭 ${name || '标签'}`}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            void p.onCloseTab(tab.id);
-          }}
-        >
-          <i className="ri-close-line" />
-        </Button>
       </div>
     </ContextMenu>
   );

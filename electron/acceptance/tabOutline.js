@@ -16,11 +16,4 @@ export async function tabOutlineChecks(h) {
     'both',
   );
   await h.screenshot('workbench-tab-outline');
-  await h.evaluate(`${tab}.querySelector('button').focus({preventScroll:true})`);
-  await h.check(
-    '标签内关闭按钮的键盘焦点框也画在盒内',
-    `(()=>{const node=document.activeElement,style=getComputedStyle(node);return !!node.closest('.wb-tab') && node.matches(':focus-visible') && parseFloat(style.outlineOffset)+parseFloat(style.outlineWidth)<=0})()`,
-    undefined,
-    'both',
-  );
 }

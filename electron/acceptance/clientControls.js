@@ -114,13 +114,13 @@ export async function clientControlChecks({ h, mode, doubles }) {
     document.activeElement?.blur();
     window.dispatchEvent(new Event('blur'));
   });
-  await check('标签关闭：当前项常显，非当前项隐藏且保留稳定宽度', () => {
+  await check('标签页无关闭按钮且不为它留位', () => {
     const tabs = [...document.querySelectorAll('.wb-tab')];
     window.__closeWidths = tabs.map((n) => n.getBoundingClientRect().width);
     return tabs.every(
       (n) =>
-        getComputedStyle(n.querySelector('.wb-tab-close')).visibility ===
-        (n.getAttribute('aria-selected') === 'true' ? 'visible' : 'hidden'),
+        !n.querySelector('button') &&
+        getComputedStyle(n).paddingLeft === getComputedStyle(n).paddingRight,
     );
   });
   const cdp = h.window.webContents.debugger;
@@ -135,15 +135,14 @@ export async function clientControlChecks({ h, mode, doubles }) {
     const tabs = [...document.querySelectorAll('.wb-tab')];
     return (
       tabs.every((n, i) => n.getBoundingClientRect().width === window.__closeWidths[i]) &&
-      getComputedStyle(document.querySelector('.wb-tab[aria-selected=false] .wb-tab-close'))
-        .visibility === 'visible'
+      !document.querySelector('.wb-tab-close')
     );
   };
   await cdp.sendCommand('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['hover'] });
-  await check('非当前标签悬停出现关闭按钮，标签宽度不变', closeVisible);
+  await check('非当前标签悬停无关闭按钮，标签宽度不变', closeVisible);
   await cdp.sendCommand('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] });
   await e(() => document.querySelector('.wb-tab[aria-selected=false]').focus());
-  await check('键盘聚焦非当前标签显示关闭按钮，宽度不变', closeVisible);
+  await check('键盘聚焦非当前标签无关闭按钮，宽度不变', closeVisible);
   await h.wait('!!document.querySelector(".wb-tab-preview:popover-open")');
   await check('标签预览时间为日期或今天时分，没有原始时间戳', () =>
     /^(?:今天 \d{2}:\d{2}|\d{4}-\d{2}-\d{2}) 导入$/.test(

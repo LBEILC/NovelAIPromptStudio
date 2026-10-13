@@ -97,7 +97,11 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   doubles.selections.push({ canceled: false, filePaths: [files[0]] });
   await click('打开图片', 'document.querySelector(".studio-titlebar")');
   await wait('document.querySelectorAll(".wb-block").length===4');
-  await click('关闭 标签', 'document.querySelector(".wb-tab")');
+  await h.evaluate(() =>
+    document
+      .querySelector('.wb-tab')
+      .dispatchEvent(new MouseEvent('auxclick', { bubbles: true, button: 1 })),
+  );
   await wait('document.querySelectorAll(".wb-tab").length===0');
   await check(
     '标签页直接关闭入口沿用关闭命令',

@@ -1,3 +1,5 @@
+import { focusRingChecks } from './focusRings.js';
+
 export async function workbenchTransitions(h, enabled, theme, { capture, finish, sequence }) {
   const { evaluate: e, check, click, wait } = h;
   const label = (text) => `${theme} / ${enabled}：${text}`;
@@ -59,6 +61,7 @@ export async function workbenchTransitions(h, enabled, theme, { capture, finish,
     'once',
   );
   await finish(h);
+  await focusRingChecks(h, '段落编辑与展开的节');
   await click('取消', 'document.querySelector(".wb-paragraph-editor")');
   await wait('!document.querySelector(".nps-transition-snapshot")');
   await wait('!document.querySelector(".nps-toast")');

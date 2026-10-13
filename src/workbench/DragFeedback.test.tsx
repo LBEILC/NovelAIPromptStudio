@@ -41,6 +41,19 @@ function start(motion: string) {
   });
 }
 describe('drop commits independently of visual feedback', () => {
+  it('keeps the rendered thumbnail, name and dirty mark in an inert drag copy', () => {
+    host.innerHTML =
+      '<span id="fixture-tab" data-workbench-tab-id="fixture" aria-selected="true"><img class="nps-decoded-image" src="fixture.png" data-image-ready="true"><span class="wb-tab-name">Synthetic name</span><span class="wb-dirty" aria-label="modified"></span></span>';
+    start('full');
+    const html = feedback.overlay.props.children.props.dangerouslySetInnerHTML.__html;
+    const copy = document.createElement('div');
+    copy.innerHTML = html;
+    expect(copy.querySelector('img')?.dataset.imageReady).toBe('true');
+    expect(copy.querySelector('img')?.dataset.imageImmediate).toBe('true');
+    expect(copy.querySelector('.wb-tab-name')?.textContent).toBe('Synthetic name');
+    expect(copy.querySelector('.wb-dirty')).not.toBeNull();
+    expect(copy.querySelector('[id],[data-workbench-tab-id],[aria-selected]')).toBeNull();
+  });
   it('preserves token time when the production CSS minifier converts milliseconds to seconds', () => {
     expect(motionMilliseconds('240ms')).toBe(240);
     expect(motionMilliseconds(' .24s ')).toBe(240);

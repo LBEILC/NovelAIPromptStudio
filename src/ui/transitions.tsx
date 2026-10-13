@@ -268,11 +268,13 @@ export class TransitionSurface extends Component<SurfaceProps> {
           : `translateY(${t.shift * 2}px)`;
       frames[1].transform = 'none';
     }
+    if (kind === 'height') node.setAttribute('data-height-animating', '');
     this.stop = animate(
       node,
       frames,
       kind === 'height' || scaleIn || duration === 'move' ? t.move : t.enter,
       kind === 'height' ? t.easeMove : t.out,
+      () => node.removeAttribute('data-height-animating'),
     );
   }
 

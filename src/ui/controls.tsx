@@ -162,10 +162,39 @@ export interface Option {
   prefix?: ReactNode;
   disabled?: boolean;
 }
-export function TextArea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function TextArea({
+  className,
+  autoSize = false,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { autoSize?: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const overlay = useRef<HTMLSpanElement>(null);
   useScrollArea(ref, { overlayRef: overlay });
+  useLayoutEffect(() => {
+    const node = ref.current;
+    const viewport = node?.closest<HTMLElement>('.wb-document-scroll');
+    if (!autoSize || !node || !viewport) return;
+    // TODO(design): No maximum is specified; cap at the available prompt viewport, preserving the existing minimum.
+    const size = () => {
+      const section = node.closest<HTMLElement>('.wb-section')!;
+      const style = getComputedStyle(node);
+      const overhead = section.getBoundingClientRect().height - node.getBoundingClientRect().height;
+      const viewportStyle = getComputedStyle(viewport);
+      node.style.maxHeight = `${Math.max(parseFloat(style.minHeight), viewport.clientHeight - parseFloat(viewportStyle.paddingTop) - parseFloat(viewportStyle.paddingBottom) - overhead)}px`;
+      node.style.height = 'auto';
+      node.style.height = `${node.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth)}px`;
+    };
+    const observer = new ResizeObserver(size);
+    observer.observe(viewport);
+    size();
+    return () => observer.disconnect();
+  }, [autoSize, props.value]);
+  useLayoutEffect(() => {
+    if (autoSize && ref.current) {
+      ref.current.setSelectionRange(0, 0);
+      ref.current.scrollTop = 0;
+    }
+  }, [autoSize]);
   return (
     <span className="nps-textarea-wrap" ref={overlay}>
       <textarea

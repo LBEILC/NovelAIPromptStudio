@@ -88,7 +88,12 @@ export function useTagDragLayout(root: RefObject<HTMLElement | null>, dragging: 
     let frame = 0;
     const guard = () => {
       const overlap = () => {
-        const rects = nodes.map((node) => node.getBoundingClientRect());
+        const rects = [
+          ...nodes.map((node) => (node.querySelector('.nps-tag') ?? node).getBoundingClientRect()),
+          ...[...(root.current?.querySelectorAll('.wb-insertion-slot') ?? [])].map((node) =>
+            node.getBoundingClientRect(),
+          ),
+        ];
         return rects.some((a, i) =>
           rects
             .slice(i + 1)
@@ -170,11 +175,15 @@ export function useDragFeedback(container?: RefObject<HTMLElement | null>, horiz
       for (const name of item.getAttributeNames())
         if (
           name === 'id' ||
-          name.startsWith('data-') ||
+          (name.startsWith('data-') && !name.startsWith('data-image-')) ||
           name.startsWith('aria-') ||
           name === 'tabindex'
         )
           item.removeAttribute(name);
+    }
+    for (const image of clone.querySelectorAll('.nps-decoded-image')) {
+      image.setAttribute('data-image-ready', 'true');
+      image.setAttribute('data-image-immediate', 'true');
     }
     clone.style.transform = '';
     const rect = event.active.rect.current.initial ?? node.getBoundingClientRect();

@@ -308,7 +308,9 @@ export async function transitionChecks({ h, mode, doubles }) {
           'once',
         );
         await finish(h);
-        await e('document.querySelector(".wb-tab[aria-selected=true] .wb-tab-close").click()');
+        await e(
+          `document.querySelector('.wb-tab[aria-selected=true]').dispatchEvent(new MouseEvent('auxclick',{bubbles:true,button:1}))`,
+        );
         await capture(h, '.wb-canvas img,.wb-tab img', async () => {
           doubles.selections.push({ canceled: false, filePaths: [images[0]] });
           await click('打开图片', 'document.querySelector(".studio-titlebar")');
@@ -321,7 +323,9 @@ export async function transitionChecks({ h, mode, doubles }) {
           'once',
         );
         await finish(h);
-        await e('document.querySelector(".wb-tab[aria-selected=true] .wb-tab-close").click()');
+        await e(
+          `document.querySelector('.wb-tab[aria-selected=true]').dispatchEvent(new MouseEvent('auxclick',{bubbles:true,button:1}))`,
+        );
       }
     }
     await h.section('外观');
@@ -355,7 +359,9 @@ export async function transitionChecks({ h, mode, doubles }) {
     );
     await click('工作台', 'document.querySelector(".studio-titlebar")');
     while (await e('!!document.querySelector(".wb-tab")'))
-      await e('document.querySelector(".wb-tab-close").click()');
+      await e(
+        `document.querySelector('.wb-tab').dispatchEvent(new MouseEvent('auxclick',{bubbles:true,button:1}))`,
+      );
     await h.section('外观');
     await click(
       saved.motion === 'off' ? '关闭' : saved.motion === 'reduced' ? '跟随系统' : '完整',

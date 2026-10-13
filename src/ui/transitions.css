@@ -1,4 +1,6 @@
-.nps-transition-height { min-height:0; overflow:hidden; }
+.nps-transition-height { min-height:0; overflow:visible; padding-inline:calc(var(--focus-w) + var(--focus-offset)); margin-inline:calc(-1 * (var(--focus-w) + var(--focus-offset))); }
+.nps-transition-height[data-height-animating] { overflow:hidden; }
+.nps-transition-height :where(button,input,textarea,select,summary,[tabindex]) { scroll-margin:calc(var(--focus-w) + var(--focus-offset)); }
 .nps-transition-height:empty { height:0; padding:0; margin:0; border:0; }
 .nps-decoded-image { opacity:0; background:var(--bg); transition:opacity var(--dur-2) var(--ease-out); }
 .nps-decoded-image[data-image-ready] { opacity:1; }

@@ -8,6 +8,7 @@ import {
   cleanup,
 } from './interactions.js';
 import { settleLayout } from './layout.js';
+import { focusRingChecks } from './focusRings.js';
 
 const frame = 'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))';
 const active = '.nps-layer:popover-open:not([aria-hidden="true"]):not(.nps-tip)';
@@ -261,6 +262,13 @@ export async function interactionCorrectionChecks(env) {
       ['点击外面', () => press(h, 'document.querySelector(".library-search input")')],
     ])
       await exitCheck(h, label, trigger, pop('视图'), close);
+    for (const label of ['筛选', '视图']) {
+      await exitCheck(h, `${label}关闭同时重算结果`, byLabel(label), pop(label), async () => {
+        await h.input('[aria-label="搜索图片库"]', 'correction-fixture-');
+        await h.nativeKey('Escape');
+      });
+      await h.input('[aria-label="搜索图片库"]', 'correction-fixture');
+    }
     await press(h, byLabel('筛选'));
     await exitCheck(
       h,
@@ -390,6 +398,25 @@ export async function interactionCorrectionChecks(env) {
     await h.nativeKey('Escape');
     await click('更多', 'document.querySelector(".wb-section")');
     await click('编辑原始文本', menu);
+    await focusRingChecks(h, '原始文本编辑');
+    await e(`document.querySelector('[aria-label="原始文本"]').focus({preventScroll:true})`);
+    await check(
+      '原始文本打开并聚焦后仍从完整第一行开始',
+      `(()=>{const n=document.querySelector('[aria-label="原始文本"]');return n.scrollTop===0&&n.selectionStart===0&&parseFloat(getComputedStyle(n).paddingTop)>=0})()`,
+    );
+    await h.screenshot('024-raw-focused');
+    await h.input('[aria-label="原始文本"]', 'synthetic_short');
+    await e(
+      `window.rawShortHeight=document.querySelector('[aria-label="原始文本"]').getBoundingClientRect().height`,
+    );
+    await h.input(
+      '[aria-label="原始文本"]',
+      Array.from({ length: 200 }, (_, i) => `synthetic_growth_${i}`).join(', '),
+    );
+    await check(
+      '原始文本随内容增高，到视口上限后才内部滚动',
+      `(()=>{const n=document.querySelector('[aria-label="原始文本"]'),s=getComputedStyle(n),r=n.getBoundingClientRect();return r.height>window.rawShortHeight&&r.height<=parseFloat(s.maxHeight)+1&&n.scrollHeight>n.clientHeight})()`,
+    );
     const raw =
       'tiny, synthetic_long_tag_alpha, medium_tag, synthetic_long_tag_beta, short, another_synthetic_tag, x, wide_synthetic_tag_gamma, last_tag\n\nsecond_block, another_long_synthetic_tag, final_marker';
     await h.input('[aria-label="原始文本"]', raw);
@@ -418,18 +445,30 @@ export async function interactionCorrectionChecks(env) {
     await e(`window.correctionFrames=[];window.correctionSample=true;window.correctionFrameId=0;
       const correctionSampleFrame=()=>{if(!window.correctionSample)return;window.correctionFrameId=requestAnimationFrame(()=>{setTimeout(()=>{
         if(!window.correctionSample)return;
-        const nodes=${tags}.filter(n=>getComputedStyle(n).visibility!=='hidden'),rects=nodes.map(n=>n.getBoundingClientRect());
+        const nodes=${tags}.filter(n=>getComputedStyle(n).visibility!=='hidden'),rects=nodes.map(n=>n.querySelector('.nps-tag').getBoundingClientRect());
         const dimensions=nodes.every((n,i)=>{const old=window.correctionSizes[n.querySelector('.nps-tag-en').textContent],r=rects[i];return old&&Math.abs(r.width-old.width)<1&&Math.abs(r.height-old.height)<1});
         const separate=rects.every((a,i)=>rects.slice(i+1).every(b=>a.right<=b.left+0.5||a.left>=b.right-0.5||a.bottom<=b.top+0.5||a.top>=b.bottom-0.5));
         const animations=nodes.flatMap(n=>n.getAnimations());
-        window.correctionFrames.push({dimensions,separate,animated:animations.some(a=>a.playState==='running'),translation:animations.every(a=>a.effect.getKeyframes().every(k=>!k.transform||k.transform==='none'||k.transform.startsWith('translate(')))});
+        const noOutline=[...document.querySelectorAll('.wb-sortable-tag,.wb-block,.wb-add-tags')].every(n=>getComputedStyle(n).outlineStyle==='none'||parseFloat(getComputedStyle(n).outlineWidth)===0);
+        const slots=[...document.querySelectorAll('.wb-insertion-slot')],slotSeparate=slots.every(n=>{const b=n.getBoundingClientRect();return rects.every(a=>a.right<=b.left+.5||a.left>=b.right-.5||a.bottom<=b.top+.5||a.top>=b.bottom-.5)});
+        window.correctionFrames.push({dimensions,separate,noOutline,slotSeparate,slots:slots.length,animated:animations.some(a=>a.playState==='running'),translation:animations.every(a=>a.effect.getKeyframes().every(k=>!k.transform||k.transform==='none'||k.transform.startsWith('translate(')))});
         correctionSampleFrame();
       },0)})};correctionSampleFrame();`);
     for (const [label, target, screenshot] of [
       [
-        '同块',
+        'Tag 正中间',
         'document.querySelectorAll(".wb-tags")[0].querySelectorAll(".nps-tag")[1]',
         'same-block',
+      ],
+      [
+        '两个 Tag 的缝',
+        'document.querySelectorAll(".wb-tags")[0].querySelectorAll(".nps-tag")[2]',
+        'gap',
+      ],
+      [
+        '一行末尾',
+        'document.querySelectorAll(".wb-tags")[0].querySelectorAll(".nps-tag")[3]',
+        'row-end',
       ],
       [
         '跨行',
@@ -443,6 +482,14 @@ export async function interactionCorrectionChecks(env) {
       ],
     ]) {
       const point = await center(h, target);
+      if (screenshot === 'gap' || screenshot === 'row-end') {
+        Object.assign(
+          point,
+          await e(
+            `(()=>{const nodes=[...document.querySelectorAll('.wb-tags')[0].querySelectorAll('.nps-tag')].filter(n=>getComputedStyle(n).visibility!=='hidden'),rects=nodes.map(n=>n.getBoundingClientRect());const a=rects[0],b=rects.find(r=>r.left>a.right&&Math.abs(r.top-a.top)<1);const last=rects.filter(r=>Math.abs(r.top-a.top)<1).at(-1);return ${screenshot === 'gap' ? '{x:(a.right+b.left)/2,y:a.top+a.height/2}' : '{x:last.right+2,y:last.top+last.height/2}'};})()`,
+          ),
+        );
+      }
       await move('mouseMoved', point, true);
       for (let sample = 0; sample < 3; sample++) {
         await e(frame);
@@ -456,7 +503,7 @@ export async function interactionCorrectionChecks(env) {
     await e('window.correctionSample=false;cancelAnimationFrame(window.correctionFrameId)');
     await check(
       '逐帧拖动采样保持自身尺寸与不相交，完整动效确实只用位移',
-      `window.correctionFrames.length>3&&window.correctionFrames.every(f=>f.dimensions&&f.separate&&f.translation)&&(document.documentElement.dataset.motion==='off'?!window.correctionFrames.some(f=>f.animated):window.correctionFrames.some(f=>f.animated))`,
+      `window.correctionFrames.length>3&&window.correctionFrames.every(f=>f.dimensions&&f.separate&&f.translation&&f.noOutline&&f.slotSeparate&&f.slots===1)&&(document.documentElement.dataset.motion==='off'?!window.correctionFrames.some(f=>f.animated):window.correctionFrames.some(f=>f.animated))`,
       'window.correctionFrames',
       'once',
     );
@@ -507,6 +554,10 @@ export async function interactionCorrectionChecks(env) {
     );
     const tab = 'document.querySelector(".wb-tabs-scroll .wb-tab")';
     const origin = await startDrag(tab);
+    await check(
+      '标签拖动副本保留图片、名称与修改标记，图片直接显示',
+      `(()=>{const source=${tab},copy=document.querySelector('.wb-drag-feedback');const image=copy.querySelector('img');return image?.complete&&image.naturalWidth>0&&getComputedStyle(image).opacity==='1'&&getComputedStyle(image).transitionDuration==='0s'&&copy.textContent===source.textContent&&!!copy.querySelector('.wb-dirty')===!!source.querySelector('.wb-dirty')})()`,
+    );
     for (const point of [
       { x: 0, y: 500 },
       { x: 1230, y: 500 },

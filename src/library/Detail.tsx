@@ -55,6 +55,12 @@ export function LibraryDetail({
         <TransitionSurface className="library-detail-picture" change={detail.id}>
           <DecodedImage
             src={mediaUrl(detail.image_path)}
+            width={detail.metadata.width || undefined}
+            height={detail.metadata.height || undefined}
+            style={{
+              aspectRatio: `${detail.metadata.width || 1} / ${detail.metadata.height || 1}`,
+              height: 'auto',
+            }}
             alt={imageAccessibleName(detail)}
             role="button"
             tabIndex={0}
