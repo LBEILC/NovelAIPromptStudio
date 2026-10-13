@@ -35,7 +35,7 @@ async function notificationClearance(h, label, selector) {
 
 async function settle(h) {
   await h.wait(
-    `[...document.querySelectorAll('${active}')].every(n=>n.getAnimations({subtree:true}).every(a=>a.playState!=='running'))`,
+    `[...document.querySelectorAll('${active}')].every(n=>{n.getBoundingClientRect();return !n.hasAttribute('data-entering')&&n.getAnimations({subtree:true}).every(a=>!a.pending&&a.playState!=='running')})`,
     '浮层到达可检查的稳定状态',
   );
 }
@@ -88,34 +88,38 @@ async function exitCheck(h, label, trigger, layer, close) {
   await h.wait(`!!(${layer})`);
   await settle(h);
   await h.evaluate(`(()=>{
-    const node=${layer}; window.correctionExit=null; let closing=false;
-    const record=animated=>{
-      if(window.correctionExit)return;
-      const off=document.documentElement.dataset.motion==='off';
-      window.correctionExit={off,connected:node.isConnected,animated,duration:getComputedStyle(node).transitionDuration};
-    };
-    // Listening for the exit transition avoids sampling one frame later, which misses a 120ms fade on slow CI frames.
-    // With motion off a sub-millisecond transition may still run so that transitionend fires; it is not a fade.
+    const node=window.correctionExitNode=${layer};
+    const result=window.correctionExit={off:document.documentElement.dataset.motion==='off',connected:false,animated:false,closed:false,duration:'',events:[]};
+    // Observe opacity runs independently of beforetoggle and later frame timing.
+    // Entry runs end at 1; only a meaningful transition ending at 0 is a fade out.
     node.addEventListener('transitionrun',event=>{
-      if(closing&&event.target===node&&event.propertyName==='opacity'&&document.documentElement.dataset.motion!=='off')record(true);
+      if(event.target!==node||event.propertyName!=='opacity')return;
+      for(const animation of node.getAnimations()){
+        if(animation.transitionProperty!=='opacity')continue;
+        const frames=animation.effect.getKeyframes(),end=Number(frames.at(-1)?.opacity),duration=Number(animation.effect.getComputedTiming().duration);
+        result.events.push({type:'transitionrun',end,duration,closed:result.closed});
+        if(end===0&&duration>=1){result.animated=true;result.connected=node.isConnected;}
+      }
     });
     node.addEventListener('beforetoggle',event=>{
       if(event.newState!=='closed')return;
-      closing=true;
-      requestAnimationFrame(()=>{
-        if(node.getAnimations().some(a=>a.transitionProperty==='opacity'&&a.playState==='running'))record(true);
-        requestAnimationFrame(()=>record(false));
-      });
-    },{once:true});
+      result.closed=true;
+      result.duration=getComputedStyle(node).transitionDuration;
+      result.events.push({type:'beforetoggle'});
+    });
   })()`);
   await close();
-  await h.wait('window.correctionExit!==null', `${label} 已观察到关闭`);
+  await h.wait(`window.correctionExit.closed && !(${layer})`, `${label} 已观察到关闭`);
+  // Presence keeps the node in the DOM until its transitions finish. Waiting for
+  // their completion also lets all transitionrun records arrive before asserting.
+  await h.wait('!window.correctionExitNode.isConnected', `${label} 退出过渡完成`);
   await h.check(
     `${label}：完整动效保留淡出，关闭动效直接退出`,
     `(()=>{const r=window.correctionExit,t=getComputedStyle(document.documentElement).getPropertyValue('--dur-1').trim(),ms=parseFloat(t)*(t.endsWith('ms')?1:1000);return r.off?!r.animated:r.connected&&r.animated&&r.duration.split(',').some(s=>Math.abs(parseFloat(s)*1000-ms)<1)})()`,
     'window.correctionExit',
     'once',
   );
+  console.log(`淡出证据 ${label}：${JSON.stringify(await h.evaluate('window.correctionExit'))}`);
   await h.wait(`!(${layer})`);
 }
 
