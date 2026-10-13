@@ -768,8 +768,10 @@ it('keeps completed monotonic while deletions and imports change the build total
 }, 30_000);
 
 it('uses the resolved list as completion even when terminal progress delivery is delayed', async () => {
-  const api = await open(temporary());
-  api.insertProjects(Array.from({ length: 51 }, (_, i) => sample(i)));
+  // Three one-row batches preserve intermediate and delayed terminal delivery
+  // without generating dozens of unrelated cards or relying on machine speed.
+  const api = await open(temporary(), { cardBuildSchedule: { rowsPerBatch: 1 } });
+  api.insertProjects(Array.from({ length: 3 }, (_, i) => sample(i)));
   const received = [];
   const delayed = [];
   let listening = true;
@@ -779,11 +781,11 @@ it('uses the resolved list as completion even when terminal progress delivery is
   });
   listening = false;
   delayed.forEach((deliver) => deliver());
-  expect(cards).toHaveLength(51);
+  expect(cards).toHaveLength(3);
   expect(delayed.length).toBeGreaterThan(0);
   expect(received.some((p) => p.completed > 0 && p.completed < p.total)).toBe(true);
   expect(received.every((p) => p.completed < p.total)).toBe(true);
-});
+}, 30_000);
 
 it('returns complete empty and hot lists without any progress events', async () => {
   const api = await open(temporary());

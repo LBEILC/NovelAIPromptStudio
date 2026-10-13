@@ -18,7 +18,7 @@ function chunk(type, content = Buffer.alloc(0)) {
   return Buffer.concat([length, typeBuffer, content, Buffer.alloc(4)]);
 }
 
-function workbenchPng(filePath) {
+function workbenchPng(filePath, { minimal = false } = {}) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(832, 0);
   ihdr.writeUInt32BE(1216, 4);
@@ -26,10 +26,12 @@ function workbenchPng(filePath) {
     prompt: '1girl, silver hair',
     uc: 'lowres',
     model: 'nai-diffusion-4-5-full',
-    reference_image_multiple: ['a'.repeat(1000)],
-    reference_strength_multiple: [0.45],
-    qualityToggle: true,
-    ucPreset: 0,
+    ...(!minimal && {
+      reference_image_multiple: ['a'.repeat(1000)],
+      reference_strength_multiple: [0.45],
+      qualityToggle: true,
+      ucPreset: 0,
+    }),
   });
   fs.writeFileSync(
     filePath,
@@ -55,7 +57,9 @@ describe('workbench image reader', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-workbench-'));
     temporaryDirectories.push(directory);
     const filePath = path.join(directory, 'synthetic.png');
-    workbenchPng(filePath);
+    // This case only needs source text and annotations; Vibe and automatic-tag
+    // metadata are covered by the image-reader case below.
+    workbenchPng(filePath, { minimal: true });
     const project = await readWorkbenchImage(filePath);
     const structure = {
       ...project.prompt_structure,
@@ -66,9 +70,12 @@ describe('workbench image reader', () => {
       },
     };
     const database = await openDatabase(directory);
-    database.insertProject({ ...project, content_hash: 'synthetic-memory' });
-    database.rememberWorkbenchStructure(filePath, structure, project.id);
-    database.close();
+    try {
+      database.insertProject({ ...project, content_hash: 'synthetic-memory' });
+      database.rememberWorkbenchStructure(filePath, structure, project.id);
+    } finally {
+      database.close();
+    }
     const reopened = await openDatabase(directory);
     try {
       const read = applyWorkbenchStructure(
@@ -86,7 +93,7 @@ describe('workbench image reader', () => {
     } finally {
       reopened.close();
     }
-  });
+  }, 30_000);
   it('uses the library title and thumbnail for library-backed workbench tabs', () => {
     expect(
       applyWorkbenchLibraryDetails(
