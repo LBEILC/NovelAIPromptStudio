@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { clipboard, nativeImage } from 'electron';
 import { createWorkbenchFixtures, workbenchRaw, workbenchNegative } from './workbenchFixtures.js';
+import { tabOutlineChecks } from './tabOutline.js';
 
 export async function workbenchChecks({ h, mode, doubles, database, preferences }) {
   const { evaluate: e, wait, click, input, check, key } = h;
@@ -130,6 +131,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     'both',
   );
   await shot('home');
+  await tabOutlineChecks(h);
   await click('其他复制方式');
   await check(
     '工作台复制菜单可交互且提供正面、排除和逐节复制',
