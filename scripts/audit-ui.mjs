@@ -14,9 +14,15 @@ async function files(directory) {
   ).flat();
 }
 const violations = [];
+// The frozen snapshot of outgoing content has to override every copied rule, whatever its
+// specificity. That is the one sanctioned use of !important; everything else stays forbidden.
+const importantAllowed = new Set([path.join('src', 'ui', 'transitions.tsx')]);
 for (const file of await files('src')) {
   const source = await readFile(file, 'utf8');
-  if (/from\s*['"](?:@lobehub\/ui|antd)|!important/.test(source))
+  if (
+    /from\s*['"](?:@lobehub\/ui|antd)/.test(source) ||
+    (/!important/.test(source) && !importantAllowed.has(file))
+  )
     violations.push(`${file}: prohibited import or important`);
   if (file.endsWith('.css')) {
     const css = source.replace(/\/\*[\s\S]*?\*\//g, '');
