@@ -473,6 +473,9 @@ export function useMovingIndicator(
       const before = marker.getBoundingClientRect();
       const outer = root.getBoundingClientRect();
       const next = target.getBoundingClientRect();
+      // A closed native popover has no layout yet. Its toggle event below
+      // measures again after showPopover(), before accepting a placement.
+      if (!next.width || !next.height || !root.offsetWidth || !root.offsetHeight) return;
       // Popovers may still be scaling in. Store layout pixels, not scaled screen pixels.
       const scaleX = outer.width / root.offsetWidth || 1;
       const scaleY = outer.height / root.offsetHeight || 1;
@@ -510,7 +513,15 @@ export function useMovingIndicator(
     const resize = new ResizeObserver(() => update());
     resize.observe(root);
     for (const child of root.children) if (child !== marker) resize.observe(child);
-    return () => resize.disconnect();
+    const popovers: HTMLElement[] = [];
+    for (let parent = root.parentElement; parent; parent = parent.parentElement)
+      if (parent.hasAttribute('popover')) popovers.push(parent);
+    const shown = () => update();
+    for (const popover of popovers) popover.addEventListener('toggle', shown);
+    return () => {
+      resize.disconnect();
+      for (const popover of popovers) popover.removeEventListener('toggle', shown);
+    };
   }, [container, indicator, selector, change]);
   useLayoutEffect(() => () => cancel.current(), []);
 }
