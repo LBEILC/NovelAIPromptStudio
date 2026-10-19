@@ -50,6 +50,7 @@
   --bar-h: 52px;        /* 工作台底部的操作栏 */
   --versions-w: 212px;  /* 工作台左侧的版本栏 */
   --prompt-w: 520px;    /* 工作台右侧的 Prompt 栏，可拖宽 */
+  --prompt-min-w: 440px; /* Prompt 栏最窄：底栏收起"Seed"字样和尺寸图标后放得下，顶部搜索框还留 96 的输入区 */
   --side-w: 196px;      /* 图片库、素材、设置的侧栏 */
   --detail-w: 340px;    /* 图片库的详情栏，可拖宽 */
   --logo: 22px;          /* 标题栏里的标志。一律用 design/identity/logo/ 的路径，不用字体去拼 */
@@ -197,6 +198,7 @@
   --surface: #ffffff;     /* 内容面：Prompt 栏、详情栏、对话框、浮层 */
   --hover: #f0f0ed;       /* 悬停 */
   --selected: #e9e8e4;    /* 选中的列表项、当前页签 */
+  --select-bg: rgba(28, 28, 28, 0.18); /* 选中文字的底色：墨色 18%，不和权重高亮的三种浅底混 */
   --border: #e2e1dc;      /* 控件和面板的边 */
   --divider: #ecebe7;     /* 内容之间的分隔线 */
 
@@ -278,6 +280,7 @@
   --surface: #1d1c1a;
   --hover: #262523;
   --selected: #302e2b;
+  --select-bg: rgba(241, 239, 234, 0.18);
   --border: #33312e;
   --divider: #262523;
 
