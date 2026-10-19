@@ -517,10 +517,16 @@ export function useMovingIndicator(
     for (let parent = root.parentElement; parent; parent = parent.parentElement)
       if (parent.hasAttribute('popover')) popovers.push(parent);
     const shown = () => update();
-    for (const popover of popovers) popover.addEventListener('toggle', shown);
+    for (const popover of popovers) {
+      popover.addEventListener('toggle', shown);
+      popover.addEventListener('nps-layer-positioned', shown);
+    }
     return () => {
       resize.disconnect();
-      for (const popover of popovers) popover.removeEventListener('toggle', shown);
+      for (const popover of popovers) {
+        popover.removeEventListener('toggle', shown);
+        popover.removeEventListener('nps-layer-positioned', shown);
+      }
     };
   }, [container, indicator, selector, change]);
   useLayoutEffect(() => () => cancel.current(), []);

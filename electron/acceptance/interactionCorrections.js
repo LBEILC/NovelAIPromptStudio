@@ -533,9 +533,11 @@ export async function interactionCorrectionChecks(env) {
     await move('mouseMoved', landing, true);
     await move('mouseReleased', landing);
     await wait('!document.querySelector(".wb-drag-feedback")');
+    await settleLayout(h, '.wb-document-scroll [data-wb-tag]');
     await check(
       '放下后的真实排版与拖动预览一致',
       `window.correctionPreview.every(old=>{const n=${tags}.find(n=>n.querySelector('.nps-tag-en').textContent===old.text),r=n.getBoundingClientRect(),b=${scroll}.getBoundingClientRect();return Math.abs(r.left-b.left-old.x)<1&&Math.abs(r.top-b.top+${scroll}.scrollTop-old.y)<1})`,
+      `window.correctionPreview.map(old=>{const n=${tags}.find(n=>n.querySelector('.nps-tag-en').textContent===old.text),r=n?.getBoundingClientRect(),b=${scroll}.getBoundingClientRect();return {before:old,after:r&&{x:r.left-b.left,y:r.top-b.top+${scroll}.scrollTop}}})`,
     );
     const gap = 'document.querySelector(".wb-add-block-gap")';
     await move('mouseMoved', await center(h, tag));

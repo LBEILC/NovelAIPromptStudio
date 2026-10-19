@@ -237,6 +237,9 @@ export function Layer({
         ? new DOMRect(currentPoint.x, currentPoint.y, 0, 0)
         : anchor.current?.getBoundingClientRect();
       if (rect) placeLayer(node, rect, side);
+      // Native toggle is queued asynchronously; descendants need their first
+      // visible geometry before this layout effect and the first paint finish.
+      node.dispatchEvent(new Event('nps-layer-positioned'));
     };
     position();
     if (entering) node.getBoundingClientRect();
