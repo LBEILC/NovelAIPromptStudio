@@ -19,6 +19,8 @@ import { importLibraryFiles } from '../importer.js';
 import { extraLibraryChecks } from './libraryExtras.js';
 import { libraryImportExtras } from './libraryImportExtras.js';
 import { motionDetails } from './motion.js';
+import { capture, finish } from './transitions.js';
+import { focusRingChecks } from './focusRings.js';
 const require = createRequire(import.meta.url);
 
 export async function libraryChecks(env) {
@@ -392,8 +394,18 @@ export async function libraryChecks(env) {
     if (!reduced) await screen('filter');
     await click('存为智能收藏集');
     await input('input[aria-label="智能收藏集名称"]', `012智能${reduced}`);
-    await click('存为智能收藏集', dialog);
-    await wait(`!!document.querySelector('.library-side [aria-label="012智能${reduced}"]')`);
+    await capture(h, '.library-collection-collapse,.library-side .nps-menu-trigger', async () => {
+      await click('存为智能收藏集', dialog);
+      await wait(`!!document.querySelector('.library-side [aria-label="012智能${reduced}"]')`);
+    });
+    await check(
+      '智能收藏集规则栏按高度展开；关闭动效直接到位',
+      `(()=>{const off=document.documentElement.dataset.motion==='off'||document.documentElement.dataset.motion!=='full'&&matchMedia('(prefers-reduced-motion: reduce)').matches;return off?window.transitionSamples.length===0:window.transitionSamples.some(a=>a.effect.target.matches('.library-collection-collapse')&&a.effect.getKeyframes().some(f=>'height'in f))})()`,
+      undefined,
+      'once',
+    );
+    await finish(h);
+    await focusRingChecks(h, '智能收藏集规则栏');
     const smart = database.listCollections().find((c) => c.name === `012智能${reduced}`);
     await check(
       '将当前条件存为智能收藏集',
@@ -426,8 +438,17 @@ export async function libraryChecks(env) {
     );
     await click('重命名', 'document.querySelector(".library-collection-row")');
     await input('input[aria-label="收藏集名称"]', `012改名${reduced}`);
-    await click('重命名', dialog);
-    await wait(`!!document.querySelector('.library-side [aria-label="012改名${reduced}"]')`);
+    await capture(h, '.library-collection-title,.nps-transition-snapshot', async () => {
+      await click('重命名', dialog);
+      await wait(`!!document.querySelector('.library-side [aria-label="012改名${reduced}"]')`);
+    });
+    await check(
+      '收藏集改名原位替换内容；关闭动效直接到位',
+      `(()=>{const off=document.documentElement.dataset.motion==='off'||document.documentElement.dataset.motion!=='full'&&matchMedia('(prefers-reduced-motion: reduce)').matches;return off?window.transitionSamples.length===0:window.transitionSamples.some(a=>a.effect.target.matches('.library-collection-title')&&a.effect.getKeyframes().every(f=>'opacity'in f&&!('transform'in f)))})()`,
+      undefined,
+      'once',
+    );
+    await finish(h);
     await check(
       '智能收藏集重命名持久化',
       () => database.listCollections().some((c) => c.name === `012改名${reduced}`),

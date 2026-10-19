@@ -24,6 +24,8 @@ export function LibraryDetail({
   const [renaming, setRenaming] = useState(false);
   const scroll = useRef<HTMLDivElement>(null);
   useScrollArea(scroll, { enabled: !!detail && !p.selectedGroupIds.length });
+  // TODO(design): Confirm whether switching between the multi-selection summary
+  // and single-image details should fade the whole panel; detail text currently switches directly.
   if (p.selectedGroupIds.length)
     return (
       <aside className="library-detail">

@@ -1,5 +1,10 @@
 import { writeClipboardText } from '../lib/clipboard';
-import { useMovingIndicator } from '../ui/transitions';
+import {
+  Collapse,
+  TransitionSurface,
+  useMovingIndicator,
+  useNavigationSelection,
+} from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -64,7 +69,10 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
   const root = useRef<HTMLDivElement>(null);
   const viewList = useRef<HTMLDivElement>(null);
   const viewMarker = useRef<HTMLSpanElement>(null);
-  useMovingIndicator(viewList, viewMarker, '[aria-selected=true]', d.filters.view);
+  const [selectedView, selectView] = useNavigationSelection(d.filters.view, (view) =>
+    d.setFilters((f) => ({ ...f, view })),
+  );
+  useMovingIndicator(viewList, viewMarker, '[aria-selected=true]', selectedView);
   const failures = useRef<HTMLDivElement>(null);
   const [showFailures, setShowFailures] = useState(false);
   useScrollArea(failures, { enabled: showFailures && !!d.progress?.failed.length });
@@ -228,10 +236,10 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
               key={view}
               type="button"
               role="tab"
-              aria-selected={d.filters.view === view}
+              aria-selected={selectedView === view}
               onClick={() => {
                 setEditing(null);
-                d.setFilters((f) => ({ ...f, view }));
+                selectView(view);
               }}
             >
               {label}
@@ -246,9 +254,10 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
         </div>
       </div>
       {(d.error || message) && <p role={d.error ? 'alert' : 'status'}>{d.error || message}</p>}
-      <div
+      <TransitionSurface
         className="settings-table-scroll settings-scroll"
-        ref={scroll}
+        change={d.filters}
+        nodeRef={scroll}
         onScroll={(event) => {
           const top = event.currentTarget.scrollTop;
           setViewport((v) => ({ ...v, top }));
@@ -318,30 +327,32 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
                   </span>
                 </td>
                 <td>
-                  {editing === item.tag ? (
-                    <Input
-                      size="small"
-                      aria-label="译文"
-                      autoFocus
-                      value={translation}
-                      onChange={(event) => setTranslation(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.nativeEvent.isComposing) return;
-                        if (event.key === 'Escape') {
-                          event.preventDefault();
-                          setEditing(null);
-                        }
-                        if (event.key === 'Enter' || (event.key === 'Tab' && !event.shiftKey)) {
-                          event.preventDefault();
-                          void saveTranslation(item, event.key === 'Enter' ? 'next' : 'category');
-                        }
-                      }}
-                    />
-                  ) : (
-                    <Button variant="quiet" disabled={d.busy} onClick={() => beginEdit(item)}>
-                      {item.translation || '点击填写'}
-                    </Button>
-                  )}
+                  <TransitionSurface change={editing === item.tag ? 'edit' : item.translation}>
+                    {editing === item.tag ? (
+                      <Input
+                        size="small"
+                        aria-label="译文"
+                        autoFocus
+                        value={translation}
+                        onChange={(event) => setTranslation(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.nativeEvent.isComposing) return;
+                          if (event.key === 'Escape') {
+                            event.preventDefault();
+                            setEditing(null);
+                          }
+                          if (event.key === 'Enter' || (event.key === 'Tab' && !event.shiftKey)) {
+                            event.preventDefault();
+                            void saveTranslation(item, event.key === 'Enter' ? 'next' : 'category');
+                          }
+                        }}
+                      />
+                    ) : (
+                      <Button variant="quiet" disabled={d.busy} onClick={() => beginEdit(item)}>
+                        {item.translation || '点击填写'}
+                      </Button>
+                    )}
+                  </TransitionSurface>
                 </td>
                 <td>
                   <Menu
@@ -415,9 +426,15 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
         <div className="settings-dictionary-count">
           {d.busy ? '正在读取…' : `${d.items.length} 条`}
         </div>
-      </div>
+      </TransitionSurface>
       {d.progress && (d.running || d.progress.canceled || !!d.progress.failed.length) && (
-        <div className="settings-dictionary-progress" role="status">
+        <TransitionSurface
+          kind="presence"
+          enter
+          change={true}
+          className="settings-dictionary-progress"
+          role="status"
+        >
           <div className="settings-dictionary-progress-line">
             <span>
               {d.running
@@ -446,7 +463,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
           {d.running && (
             <Progress value={d.progress.completed} max={d.progress.total} label="AI 翻译进度" />
           )}
-          {!d.running && !!d.progress.failed.length && showFailures && (
+          <Collapse open={!d.running && !!d.progress.failed.length && showFailures}>
             <div className="settings-dictionary-failures" id="dictionary-failures" ref={failures}>
               {d.progress.failed.map((item) => (
                 <p key={item.tag}>
@@ -454,11 +471,16 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
                 </p>
               ))}
             </div>
-          )}
-        </div>
+          </Collapse>
+        </TransitionSurface>
       )}
       {!!d.selected.length && !d.running && (
-        <div className="settings-dictionary-selection">
+        <TransitionSurface
+          kind="presence"
+          enter
+          change={true}
+          className="settings-dictionary-selection"
+        >
           <div className="nps-selection" role="group" aria-label="词典多选操作">
             <span>已选 {d.selected.length} 条</span>
             <Menu
@@ -488,7 +510,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
               取消
             </Button>
           </div>
-        </div>
+        </TransitionSurface>
       )}
       <Layer
         open={!!menu}

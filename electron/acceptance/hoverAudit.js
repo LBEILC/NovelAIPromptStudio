@@ -1,5 +1,6 @@
 ﻿import fs from 'node:fs/promises';
 import path from 'node:path';
+import { observeStatePaint, persistStateAudit } from './stateAudit.js';
 
 // Focus containers and delegated gesture surfaces are not activatable controls.
 // Keep these explicit and in the inventory, rather than silently ignoring listeners.
@@ -56,6 +57,7 @@ export async function hoverAudit(h, mode, name) {
     async () => {
       failures = [];
       const theme = mode.themeDriver.get();
+      await h.evaluate('window.statePaintPrevious=new Map();window.statePaintRecords=[]');
       await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
       await h.evaluate('document.activeElement?.blur(); window.dispatchEvent(new Event("blur"))');
       await h.wait(
@@ -131,10 +133,11 @@ export async function hoverAudit(h, mode, name) {
           disabledProbe: state === 'disabled' && !item.disabled,
         };
       };
-      const read = (id) =>
+      const read = (id, state = 'baseline') =>
         h.evaluate(`(()=>{
       const n=document.querySelector('[data-hover-audit="${id}"]');if(!n)return null;
       const host=n.matches('input:not([type="range"])')?n.closest('.nps-field')||n:n;
+      (${observeStatePaint.toString()})(host,${JSON.stringify(id)},${JSON.stringify(state)});
       const nodes=[host,...host.querySelectorAll('*')];
       for(const x of nodes)for(const a of x.getAnimations())if(a.effect?.getTiming().iterations!==Infinity)a.finish();
       const paint=s=>({backgroundColor:s.backgroundColor,color:s.color,boxShadow:s.boxShadow,opacity:s.opacity,
@@ -210,8 +213,8 @@ export async function hoverAudit(h, mode, name) {
           for (const x of n.children || []) gather(x);
         };
         if (item.kind === 'slider') for (const shadow of node.shadowRoots || []) gather(shadow);
-        const snapshot = async () => {
-          const normal = await read(item.id);
+        const snapshot = async (state = 'baseline') => {
+          const normal = await read(item.id, state);
           const shadow = [];
           for (const nodeId of shadowIds) {
             const result = await send('CSS.getComputedStyleForNode', { nodeId });
@@ -231,12 +234,15 @@ export async function hoverAudit(h, mode, name) {
           ? ['hover', 'active']
           : ['hover', 'active', 'focus-visible']) {
           await pseudo([state]);
-          const painted = await snapshot();
+          const painted = await snapshot(state);
           const changed = painted !== baseline;
+          const movingCurrent = await h.evaluate(
+            `(()=>{const n=document.querySelector('[data-hover-audit="${item.id}"]'),s='.library-side-item.on,.settings-sidebar button[aria-current="page"],.settings-dictionary-views button[aria-selected="true"],.nps-option[aria-checked="true"],.nps-tablist button[aria-selected="true"],.wb-tab[aria-selected="true"]';return n.matches(s)||!!n.querySelector(s)})()`,
+          );
           const feedback =
             state === 'focus-visible'
               ? JSON.parse(painted)[0]?.some((s) => s.outline !== null)
-              : changed;
+              : movingCurrent || changed;
           result.states[state] = feedback;
           if (!item.disabled) await capture(item, state);
           if (item.disabled || item.static ? changed : !feedback)
@@ -251,6 +257,7 @@ export async function hoverAudit(h, mode, name) {
             });
         }
         await pseudo([]);
+        await snapshot('leave');
         if (
           !item.disabled &&
           !item.static &&
@@ -281,6 +288,7 @@ export async function hoverAudit(h, mode, name) {
         path.join(mode.output, 'hover-state-images.json'),
         JSON.stringify(Object.values(examples), null, 2),
       );
+      await persistStateAudit(h, mode, name, theme);
       return failures.length === 0;
     },
     () => failures,

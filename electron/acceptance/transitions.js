@@ -1,24 +1,39 @@
 import path from 'node:path';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { workbenchTransitions } from './workbenchTransitions.js';
+import { motionCompletion } from './motionCompletion.js';
+import { beginStateOperation, endStateOperation, persistOperations } from './stateAudit.js';
 const frame = 'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))';
 
 // Pause real browser animations, without replacing business state or IPC.
-async function capture(h, selector, action) {
+export async function capture(h, selector, action) {
+  await h.evaluate(`(${beginStateOperation.toString()})(${JSON.stringify(selector)})`);
   await h.evaluate(`(() => {
     window.transitionSamples = [];
+    window.stateOperationEffects = [];
     window.transitionAnimate = Element.prototype.animate;
+    const existingEffects = new Set(document.getAnimations());
     window.transitionListener = event => {
+      for (const animation of event.target.getAnimations()) if (!window.stateOperationEffects.includes(animation)) window.stateOperationEffects.push(animation);
       if (!event.target.matches(${JSON.stringify(selector)})) return;
       for (const animation of event.target.getAnimations()) {
-        if (!(animation instanceof CSSTransition) || window.transitionSamples.includes(animation)) continue;
+        if (!(animation instanceof CSSTransition) || existingEffects.has(animation) || window.transitionSamples.includes(animation)) continue;
         animation.pause();
         window.transitionSamples.push(animation);
       }
     };
     document.addEventListener('transitionrun', window.transitionListener, true);
+    // Flush and sample CSS effects each frame too: transitionrun can be delivered
+    // after the rAF callback in Chromium, including when the element is an image.
+    window.transitionPoll = () => {
+      for (const node of document.querySelectorAll(${JSON.stringify(selector)}))
+        window.transitionListener({target:node});
+      window.transitionPollFrame=requestAnimationFrame(window.transitionPoll);
+    };
+    window.transitionPoll();
     Element.prototype.animate = function(...args) {
       const animation = window.transitionAnimate.apply(this, args);
+      window.stateOperationEffects.push(animation);
       if (this.matches(${JSON.stringify(selector)})) {
         animation.pause();
         window.transitionSamples.push(animation);
@@ -30,6 +45,7 @@ async function capture(h, selector, action) {
     await action();
     await h.evaluate(frame);
   } finally {
+    await h.evaluate('cancelAnimationFrame(window.transitionPollFrame)');
     await h.evaluate('void (Element.prototype.animate = window.transitionAnimate)');
     await h.evaluate(
       "document.removeEventListener('transitionrun', window.transitionListener, true)",
@@ -37,11 +53,12 @@ async function capture(h, selector, action) {
   }
 }
 
-async function finish(h) {
+export async function finish(h) {
   await h.evaluate(
     'window.transitionSamples.forEach(animation => { if (animation.playState !== "idle") animation.finish(); })',
   );
   await h.evaluate(frame);
+  await h.evaluate(`(${endStateOperation.toString()})()`);
 }
 
 async function sequence(h, name) {
@@ -269,19 +286,77 @@ export async function transitionChecks({ h, mode, doubles }) {
         );
         await finish(h);
         await h.section('翻译词典');
-        await capture(h, '.settings-view-indicator', () =>
-          e('document.querySelectorAll(".settings-dictionary-views button")[1].click()'),
+        await wait(
+          `document.querySelector('.settings-dictionary-views')?.checkVisibility({checkVisibilityCSS:true})`,
         );
+        await capture(h, '.settings-view-indicator,.settings-table-scroll', async () => {
+          await e('document.querySelectorAll(".settings-dictionary-views button")[1].click()');
+          await wait(
+            `document.querySelectorAll('.settings-dictionary-views button')[1].getAttribute('aria-selected')==='true'`,
+          );
+          await e(frame);
+        });
         await check(
           `${dark} / ${choice}：词典分页签标记只移动，筛选立即生效`,
           `document.querySelectorAll('.settings-dictionary-views button')[1].getAttribute('aria-selected')==='true' && ${enabled ? "window.transitionSamples.some(a=>a.effect.getKeyframes().every(f=>'transform' in f && !('opacity' in f)))" : 'window.transitionSamples.length===0'}`,
           undefined,
           'once',
         );
+        await check(
+          `${dark} / ${choice}：词典筛选表格原地换内容`,
+          enabled
+            ? "window.transitionSamples.some(a=>a.effect.target.matches('.settings-table-scroll')&&a.effect.getKeyframes().every(f=>'opacity'in f&&!('transform'in f)))"
+            : 'window.transitionSamples.length===0',
+          undefined,
+          'once',
+        );
         await finish(h);
         await e('document.querySelectorAll(".settings-dictionary-views button")[0].click()');
+        await wait('!!document.querySelector(".settings-table tbody tr[data-tag] .nps-checkbox")');
+        await capture(h, '.settings-dictionary-selection,.nps-transition-snapshot', () =>
+          e('document.querySelector(".settings-table tbody tr[data-tag] .nps-checkbox").click()'),
+        );
+        await check(
+          `${dark} / ${choice}：词典多选条从下方淡入`,
+          enabled
+            ? "window.transitionSamples.some(a=>a.effect.target.matches('.settings-dictionary-selection')&&a.effect.getKeyframes().some(f=>'opacity'in f))"
+            : 'window.transitionSamples.length===0',
+          undefined,
+          'once',
+        );
+        await finish(h);
+        await capture(h, '.nps-transition-snapshot', () =>
+          click('取消', 'document.querySelector(".settings-dictionary-selection")'),
+        );
+        await check(
+          `${dark} / ${choice}：词典取消选择立即生效并淡出`,
+          `!document.querySelector('.settings-dictionary-selection') && ${enabled ? "window.transitionSamples.some(a=>a.effect.getKeyframes().every(f=>'opacity'in f))" : 'window.transitionSamples.length===0'}`,
+          undefined,
+          'once',
+        );
+        await finish(h);
+        await capture(h, '.settings-table td .nps-transition-content', () =>
+          e(
+            'document.querySelector(".settings-table tbody tr[data-tag] td:nth-child(3) button").click()',
+          ),
+        );
+        await check(
+          `${dark} / ${choice}：词典译文与输入框原地换内容`,
+          enabled
+            ? "window.transitionSamples.some(a=>a.effect.getKeyframes().every(f=>'opacity'in f&&!('transform'in f)))"
+            : 'window.transitionSamples.length===0',
+          undefined,
+          'once',
+        );
+        await finish(h);
+        await h.key(
+          'Escape',
+          {},
+          'document.querySelector(".settings-table input[aria-label=译文]")',
+        );
         await libraryTransitions({ h }, enabled, dark);
         await workbenchTransitions(h, enabled, dark, { capture, finish, sequence });
+        await motionCompletion({ h, mode }, enabled, dark, { capture, finish, sequence });
         const images = await createWorkbenchFixtures(
           path.join(mode.root, `decode-${dark}-${enabled}`),
           {
@@ -354,14 +429,18 @@ export async function transitionChecks({ h, mode, doubles }) {
       'once',
     );
   } finally {
+    await persistOperations(h, mode);
     await e(
       'if(window.transitionAnimate) Element.prototype.animate=window.transitionAnimate; window.transitionSamples?.forEach(a=>{if(a.playState!=="idle") a.finish()})',
     );
     await click('工作台', 'document.querySelector(".studio-titlebar")');
-    while (await e('!!document.querySelector(".wb-tab")'))
+    while (await e('!!document.querySelector(".wb-tab")')) {
       await e(
         `document.querySelector('.wb-tab').dispatchEvent(new MouseEvent('auxclick',{bubbles:true,button:1}))`,
       );
+      if (await e('!!document.querySelector("dialog[open]")'))
+        await click('丢弃并关闭', 'document.querySelector("dialog[open]")');
+    }
     await h.section('外观');
     await click(
       saved.motion === 'off' ? '关闭' : saved.motion === 'reduced' ? '跟随系统' : '完整',

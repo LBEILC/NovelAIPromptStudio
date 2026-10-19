@@ -1,4 +1,4 @@
-import { TransitionSurface, useMovingIndicator } from './transitions';
+import { TransitionSurface, useMovingIndicator, useNavigationSelection } from './transitions';
 import {
   useId,
   useLayoutEffect,
@@ -366,11 +366,13 @@ export function OptionGroup({
 }) {
   const group = useRef<HTMLDivElement>(null);
   const thumb = useRef<HTMLSpanElement>(null);
-  useMovingIndicator(group, thumb, '[aria-checked=true]', value);
+  const [selected, select] = useNavigationSelection(value, onChange);
+  useMovingIndicator(group, thumb, '[aria-checked=true]', selected);
   const enabled = options.filter((option) => !disabled && !option.disabled);
   return (
     <div
       role="radiogroup"
+      data-navigation-pending={value !== selected || undefined}
       aria-label={label}
       ref={group}
       aria-disabled={disabled || undefined}
@@ -382,7 +384,7 @@ export function OptionGroup({
         )
           return;
         event.preventDefault();
-        const current = enabled.findIndex((option) => option.value === value);
+        const current = enabled.findIndex((option) => option.value === selected);
         const index =
           event.key === 'Home'
             ? 0
@@ -392,7 +394,7 @@ export function OptionGroup({
                   (['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 1) +
                   enabled.length) %
                 enabled.length;
-        onChange(enabled[index].value);
+        select(enabled[index].value);
         event.currentTarget
           .querySelectorAll<HTMLElement>('[role="radio"]:not(:disabled)')
           [index]?.focus();
@@ -404,16 +406,16 @@ export function OptionGroup({
           key={option.value}
           type="button"
           role="radio"
-          aria-checked={option.value === value}
+          aria-checked={option.value === selected}
           disabled={disabled || option.disabled}
           className="nps-option"
           tabIndex={
-            option.value === value ||
-            (!enabled.some((item) => item.value === value) && option === enabled[0])
+            option.value === selected ||
+            (!enabled.some((item) => item.value === selected) && option === enabled[0])
               ? 0
               : -1
           }
-          onClick={() => onChange(option.value)}
+          onClick={() => select(option.value)}
         >
           {option.label}
         </button>
@@ -435,7 +437,8 @@ export function Tabs({
   const id = useId();
   const list = useRef<HTMLDivElement>(null);
   const marker = useRef<HTMLSpanElement>(null);
-  useMovingIndicator(list, marker, '[aria-selected=true]', value);
+  const [selected, select] = useNavigationSelection(value, onChange);
+  useMovingIndicator(list, marker, '[aria-selected=true]', selected);
   const enabled = items.filter((item) => !item.disabled);
   return (
     <div className="nps-tabs">
@@ -448,7 +451,7 @@ export function Tabs({
           if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || !enabled.length)
             return;
           event.preventDefault();
-          const current = enabled.findIndex((item) => item.value === value);
+          const current = enabled.findIndex((item) => item.value === selected);
           const index =
             event.key === 'Home'
               ? 0
@@ -456,7 +459,7 @@ export function Tabs({
                 ? enabled.length - 1
                 : (current + (event.key === 'ArrowLeft' ? -1 : 1) + enabled.length) %
                   enabled.length;
-          onChange(enabled[index].value);
+          select(enabled[index].value);
           event.currentTarget
             .querySelectorAll<HTMLElement>('[role="tab"]:not(:disabled)')
             [index]?.focus();
@@ -470,10 +473,10 @@ export function Tabs({
             role="tab"
             id={`${id}-tab-${index}`}
             aria-controls={`${id}-panel-${index}`}
-            aria-selected={item.value === value}
-            tabIndex={item.value === value ? 0 : -1}
+            aria-selected={item.value === selected}
+            tabIndex={item.value === selected ? 0 : -1}
             disabled={item.disabled}
-            onClick={() => onChange(item.value)}
+            onClick={() => select(item.value)}
           >
             {item.label}
           </button>

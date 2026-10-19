@@ -1,4 +1,9 @@
-import { Disclosure, TransitionSurface, useMovingIndicator } from '../ui/transitions';
+import {
+  Disclosure,
+  TransitionSurface,
+  useMovingIndicator,
+  useNavigationSelection,
+} from '../ui/transitions';
 import { writeClipboardText } from '../lib/clipboard';
 import {
   Activity,
@@ -630,28 +635,11 @@ export default function SettingsPage(props: {
       'appearance',
   );
   const marker = useRef<HTMLSpanElement>(null);
-  useMovingIndicator(sidebar, marker, '[aria-current=page]', section);
-  return (
-    <main className="studio-settings">
-      <nav className="settings-sidebar" aria-label="设置分类" ref={sidebar}>
-        {sections.map(([key, label, icon]) => (
-          <Button
-            key={key}
-            variant="quiet"
-            aria-current={key === section ? 'page' : undefined}
-            onClick={() => setSection(key)}
-          >
-            <i className={`ri-${icon}`} aria-hidden="true" />
-            {label}
-          </Button>
-        ))}
-        <span
-          ref={marker}
-          className="nps-moving-indicator settings-nav-indicator"
-          aria-hidden="true"
-        />
-      </nav>
-      <TransitionSurface className="settings-body" change={section}>
+  const [selected, select] = useNavigationSelection(section, setSection);
+  useMovingIndicator(sidebar, marker, '[aria-current=page]', selected);
+  const content = useMemo(
+    () => (
+      <TransitionSurface className="settings-body" change={section} data-settings-section={section}>
         <Activity mode={section === 'appearance' ? 'visible' : 'hidden'}>
           <Appearance />
         </Activity>
@@ -668,6 +656,31 @@ export default function SettingsPage(props: {
           <About {...props} />
         </Activity>
       </TransitionSurface>
+    ),
+    [section, props],
+  );
+  return (
+    <main className="studio-settings">
+      <nav className="settings-sidebar" aria-label="设置分类" ref={sidebar}>
+        {sections.map(([key, label, icon]) => (
+          <Button
+            key={key}
+            variant="quiet"
+            aria-current={key === selected ? 'page' : undefined}
+            data-settings-target={key}
+            onClick={() => select(key)}
+          >
+            <i className={`ri-${icon}`} aria-hidden="true" />
+            {label}
+          </Button>
+        ))}
+        <span
+          ref={marker}
+          className="nps-moving-indicator settings-nav-indicator"
+          aria-hidden="true"
+        />
+      </nav>
+      {content}
     </main>
   );
 }

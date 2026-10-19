@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom';
 import {
   Component,
   createRef,
@@ -16,6 +17,19 @@ export function motionEnabled() {
   return (
     mode !== 'off' && (mode === 'full' || !matchMedia('(prefers-reduced-motion: reduce)').matches)
   );
+}
+
+/** Start the compositor-driven marker before publishing the content update.
+ * Business commands stay in this event so later input cannot be overwritten.
+ */
+export function useNavigationSelection<T>(value: T, onChange: (next: T) => void) {
+  const [selected, setSelected] = useState(value);
+  useLayoutEffect(() => setSelected(value), [value]);
+  const select = (next: T) => {
+    flushSync(() => setSelected(next));
+    onChange(next);
+  };
+  return [selected, select] as const;
 }
 
 function tokens(node: Element) {
@@ -77,6 +91,8 @@ function animate(
   void animation.finished.then(cancel, cancel);
   return cancel;
 }
+
+export { animate as animateElement, tokens as motionTokens };
 
 let snapshotSheet: CSSStyleSheet | undefined;
 let sheetSignature = '';

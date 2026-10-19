@@ -1,4 +1,4 @@
-import { DecodedImage, useMovingIndicator } from '../ui/transitions';
+import { DecodedImage, useMovingIndicator, useNavigationSelection } from '../ui/transitions';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   DndContext,
@@ -127,7 +127,13 @@ export function WorkbenchTabs(p: TabsProps) {
   const list = useRef<HTMLDivElement>(null);
   const bar = useRef<HTMLDivElement>(null);
   const indicator = useRef<HTMLSpanElement>(null);
-  useMovingIndicator(list, indicator, '.wb-tab[aria-selected=true]', p.session);
+  const [selected, select] = useNavigationSelection(p.session.activeTabId, p.onActivateTab);
+  const visualProps = {
+    ...p,
+    session: { ...p.session, activeTabId: selected },
+    onActivateTab: select,
+  };
+  useMovingIndicator(list, indicator, '.wb-tab[aria-selected=true]', selected);
   const drag = useDragFeedback(list, true);
   const [overflow, setOverflow] = useState(false);
   const sensors = useSensors(
@@ -171,7 +177,7 @@ export function WorkbenchTabs(p: TabsProps) {
       .querySelector('[aria-selected=true]')
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     return () => observer.disconnect();
-  }, [p.session]);
+  }, [p.session, selected]);
   return (
     <div className="wb-tabs" ref={bar}>
       {overflow && (
@@ -212,7 +218,7 @@ export function WorkbenchTabs(p: TabsProps) {
               aria-hidden="true"
             />
             {p.session.tabs.map((tab) => (
-              <Tab key={tab.id} tab={tab} p={p} />
+              <Tab key={tab.id} tab={tab} p={visualProps} />
             ))}
           </div>
         </SortableContext>

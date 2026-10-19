@@ -265,56 +265,58 @@ export function LibraryToolbar({
           )}
         </div>
       )}
-      {p.activeCollection && (
-        <div className="library-chips library-collection-row">
-          {p.activeCollection.kind === 'smart' ? (
-            ruleParts.length ? (
-              <>
-                <span className="library-help">规则</span>
-                {ruleParts.map((part, index) => (
-                  <span className="library-chip" key={index}>
-                    {part}
-                  </span>
-                ))}
-              </>
+      <Collapse open={!!p.activeCollection} className="library-collection-collapse">
+        {p.activeCollection && (
+          <div className="library-chips library-collection-row">
+            {p.activeCollection.kind === 'smart' ? (
+              ruleParts.length ? (
+                <>
+                  <span className="library-help">规则</span>
+                  {ruleParts.map((part, index) => (
+                    <span className="library-chip" key={index}>
+                      {part}
+                    </span>
+                  ))}
+                </>
+              ) : (
+                <span className="library-help">没有规则，包含全部图片</span>
+              )
             ) : (
-              <span className="library-help">没有规则，包含全部图片</span>
-            )
-          ) : (
-            <span className="library-help">手动整理，从详情栏或多选条加入图片</span>
-          )}
-          <span className="library-row-end" />
-          {p.activeCollection.kind === 'smart' && (
+              <span className="library-help">手动整理，从详情栏或多选条加入图片</span>
+            )}
+            <span className="library-row-end" />
+            {p.activeCollection.kind === 'smart' && (
+              <Button
+                size="small"
+                variant="quiet"
+                onClick={() => {
+                  p.onCollectionRulesEdit(p.activeCollection!);
+                  setOpen('filter');
+                }}
+              >
+                编辑规则
+              </Button>
+            )}
             <Button
               size="small"
               variant="quiet"
               onClick={() => {
-                p.onCollectionRulesEdit(p.activeCollection!);
-                setOpen('filter');
+                setName(p.activeCollection!.name);
+                setRenaming(true);
               }}
             >
-              编辑规则
+              重命名
             </Button>
-          )}
-          <Button
-            size="small"
-            variant="quiet"
-            onClick={() => {
-              setName(p.activeCollection!.name);
-              setRenaming(true);
-            }}
-          >
-            重命名
-          </Button>
-          <Button
-            size="small"
-            variant="danger"
-            onClick={() => p.onCollectionDelete(p.activeCollection!)}
-          >
-            删除收藏集
-          </Button>
-        </div>
-      )}
+            <Button
+              size="small"
+              variant="danger"
+              onClick={() => p.onCollectionDelete(p.activeCollection!)}
+            >
+              删除收藏集
+            </Button>
+          </div>
+        )}
+      </Collapse>
       <Popover
         open={open === 'filter' || !!p.editingSmartCollection}
         anchor={filterAnchor}

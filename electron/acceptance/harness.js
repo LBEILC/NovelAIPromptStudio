@@ -343,6 +343,7 @@ export function harness(window, mode, checks) {
       ')';
     if (await evaluate('!!' + group)) {
       await click(text, group);
+      await wait(`${group}?.dataset.navigationPending!=='true'`, `${label} 的选择已提交`);
       return;
     }
     await click(label);
@@ -358,7 +359,7 @@ export function harness(window, mode, checks) {
     await wait('!!document.querySelector(".settings-sidebar")');
     await click(name, 'document.querySelector(".settings-sidebar")');
     await wait(
-      `!![...document.querySelectorAll('.settings-sidebar [aria-current=page]')].find(e=>e.textContent.trim()===${JSON.stringify(name)})`,
+      `(()=>{const selected=[...document.querySelectorAll('.settings-sidebar [aria-current=page]')].find(e=>e.textContent.trim()===${JSON.stringify(name)});return !!selected&&document.querySelector('.settings-body')?.dataset.settingsSection===selected.dataset.settingsTarget})()`,
     );
   };
   const capture = async (name) => {

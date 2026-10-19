@@ -4,7 +4,7 @@
 .library-side { position:relative; isolation:isolate; flex:0 0 var(--side-w); width:var(--side-w); display:flex; flex-direction:column; padding:var(--sp-3) var(--sp-2); gap:var(--bw); background:var(--pane); border-right:var(--bw) solid var(--border); overflow:auto; }
 .library-side-item { display:flex; align-items:center; gap:var(--ctl-gap); width:100%; min-height:var(--ctl); padding:0 var(--sp-2); border:0; border-radius:var(--r-ctl); background:transparent; color:var(--text-2); text-align:left; }
 .library-side-item:hover { background:var(--hover); }
-.library-side-item.on { color:var(--text); font-weight:var(--fw-strong); }
+.library-side-item.on { color:var(--text); }
 .library-side-item span { margin-left:auto; color:var(--text-3); font:var(--fs-caption)/1 var(--font-mono); }
 .library-side-item i { color:var(--text-3); }
 .library-side-label { display:flex; align-items:center; justify-content:space-between; padding:var(--sp-4) var(--sp-2) var(--sp-1); color:var(--text-3); font-size:var(--fs-caption); }

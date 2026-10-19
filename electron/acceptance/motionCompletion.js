@@ -1,0 +1,225 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { focusRingChecks } from './focusRings.js';
+
+export async function motionCompletion({ h, mode }, enabled, theme, { capture, finish, sequence }) {
+  const { evaluate: e, check, click, wait } = h;
+  const label = (text) => `${theme} / ${enabled}：${text}`;
+  const cssTransition = (selector, property) =>
+    `(()=>{const n=document.querySelector(${JSON.stringify(selector)});if(!n)return false;const s=getComputedStyle(n);const declared=s.transitionProperty.split(',').some(p=>p.trim()==='all'||p.trim().startsWith(${JSON.stringify(property)}));const moving=s.transitionDuration.split(',').some(d=>parseFloat(d)>0.001);return ${enabled}?declared&&moving:!moving})()`;
+  const settle = () =>
+    e(
+      `new Promise(resolve=>requestAnimationFrame(()=>{for(const a of document.getAnimations())if(a.effect?.getTiming().iterations!==Infinity)a.finish();requestAnimationFrame(resolve)}))`,
+    );
+  await click('图片库', 'document.querySelector(".studio-titlebar")');
+  await click('全部图片', 'document.querySelector(".library-side")');
+  await wait('!document.querySelector("[data-library-updating=true]")');
+  await settle();
+  // Unpaused rAF/Long Tasks trace. These are real frames, independent of the screenshot sampler.
+  const trace = await e(`(async()=>{
+    const marker=document.querySelector('.library-nav-indicator'),rows=[],longTasks=[];
+    const observer=new PerformanceObserver(list=>longTasks.push(...list.getEntries().map(n=>({start:n.startTime,duration:n.duration}))));
+    observer.observe({type:'longtask',buffered:false});
+    const start=performance.now();document.querySelector('.library-side [data-collection-id="acceptance"]').click();
+    await Promise.resolve();
+    const first=marker.getAnimations().map(a=>({state:a.playState,frames:a.effect.getKeyframes()}));
+    for(let i=0;i<30;i++){
+      await new Promise(requestAnimationFrame);
+      const a=marker.getAnimations()[0],r=marker.getBoundingClientRect();
+      rows.push({time:performance.now()-start,y:r.y,progress:a?.effect.getComputedTiming().progress??1,content:!!document.querySelector('.library-collection-row')});
+      if(i>2&&!a)break;
+    }
+    observer.disconnect();return {first,rows,longTasks};
+  })()`);
+  await fs.writeFile(
+    path.join(mode.output, `024-navigation-trace-${theme}-${enabled}.json`),
+    JSON.stringify(trace, null, 2),
+  );
+  await wait('!!document.querySelector(".library-collection-row")');
+  await check(
+    label('导航选中收藏集且内容更新'),
+    'document.querySelector(".library-side-item.on")?.dataset.collectionId === "acceptance"',
+    undefined,
+    'once',
+  );
+  await check(
+    label('当前导航不加粗，悬停底色由唯一标记承担'),
+    `(()=>{const n=document.querySelector('.library-side-item.on'),s=getComputedStyle(n);return s.fontWeight===getComputedStyle(document.querySelector('.library-side-item')).fontWeight&&s.backgroundColor==='rgba(0, 0, 0, 0)'})()`,
+    undefined,
+    'once',
+  );
+  await click('全部图片', 'document.querySelector(".library-side")');
+  await settle();
+  await capture(
+    h,
+    '.library-nav-indicator,.library-collection-collapse,.nps-transition-snapshot',
+    async () => {
+      await click('验收收藏集', 'document.querySelector(".library-side")');
+      await wait('!!document.querySelector(".library-collection-row")');
+    },
+  );
+  await check(
+    label('收藏集规则行展开后控件存在'),
+    '!!document.querySelector(".library-collection-row")',
+    undefined,
+    'once',
+  );
+  if (enabled) await sequence(h, `024-sidebar-rules-${theme}`);
+  await finish(h);
+  await focusRingChecks(h, '收藏集规则栏');
+  await capture(h, '.library-collection-collapse,.nps-transition-snapshot', async () => {
+    await click('全部图片', 'document.querySelector(".library-side")');
+    await wait('!document.querySelector(".library-collection-row")');
+  });
+  await check(
+    label('规则栏退出移除控件'),
+    '!document.querySelector(".library-collection-row")',
+    undefined,
+    'once',
+  );
+  await finish(h);
+  await settle();
+  await h.nativeKey('Tab');
+  await e('document.activeElement?.blur()');
+  await settle();
+  await capture(h, '.nps-field', () =>
+    e('document.querySelector("[aria-label=搜索图片库]").focus()'),
+  );
+  await check(
+    label('搜索焦点框进入有颜色或粗细过渡'),
+    cssTransition('[aria-label=搜索图片库]', 'outline-'),
+    undefined,
+    'once',
+  );
+  if (enabled) await sequence(h, `024-focus-${theme}`);
+  await finish(h);
+  await capture(h, '.nps-field', () => e('document.activeElement.blur()'));
+  await check(
+    label('搜索焦点框离开同样淡出'),
+    cssTransition('[aria-label=搜索图片库]', 'outline-'),
+    undefined,
+    'once',
+  );
+  await finish(h);
+  await wait('document.querySelectorAll(".library-card").length>1');
+  await wait('!document.querySelector("[data-library-updating=true]")');
+  await settle();
+  await capture(h, '.library-card img,.library-pick', () =>
+    e('document.querySelector(".library-card:not(.current)").click()'),
+  );
+  await check(
+    label('当前卡片边框颜色或粗细过渡'),
+    cssTransition('.library-card img', 'outline-'),
+    `({samples:window.transitionSamples.map(a=>({target:a.effect.target.className,state:a.playState,property:a.transitionProperty})),cards:[...document.querySelectorAll('.library-card img')].slice(0,3).map(n=>({class:n.parentElement.className,outline:getComputedStyle(n).outline,transition:getComputedStyle(n).transition}))})`,
+    'once',
+  );
+  await finish(h);
+  await capture(h, '.library-card img,.library-pick', () =>
+    e('document.querySelectorAll(".library-card")[1].querySelector("[role=checkbox]").click()'),
+  );
+  await check(
+    label('多选卡片边框和复选框淡入'),
+    cssTransition('.library-card img', 'outline-') +
+      ' && ' +
+      cssTransition('.library-pick', 'opacity'),
+    `({samples:window.transitionSamples.map(a=>({target:a.effect.target.className,state:a.playState,property:a.transitionProperty})),cards:[...document.querySelectorAll('.library-card img')].slice(0,3).map(n=>({class:n.parentElement.className,outline:getComputedStyle(n).outline,transition:getComputedStyle(n).transition}))})`,
+    'once',
+  );
+  await finish(h);
+  await click('取消', 'document.querySelector(".library-selection-bar")');
+  await click('新建收藏集', 'document.querySelector(".library-side")');
+  const name = `motion-fixture-${theme}-${enabled}`;
+  await h.input('dialog[open] [aria-label=收藏集名称]', name);
+  await capture(h, '.library-side .nps-menu-trigger,[data-list-exit]', async () => {
+    await click('新建', 'document.querySelector("dialog[open]")');
+    await wait(`!!document.querySelector('.library-side [aria-label="${name}"]')`);
+  });
+  await check(
+    label('新建收藏集存在于列表'),
+    `!!document.querySelector('.library-side [aria-label="${name}"]')`,
+    undefined,
+    'once',
+  );
+  await finish(h);
+  await click(name, 'document.querySelector(".library-side")');
+  await wait('!!document.querySelector(".library-collection-row")');
+  await click('删除收藏集', 'document.querySelector(".library-collection-row")');
+  await capture(h, '[data-list-exit],.library-side .nps-menu-trigger', async () => {
+    await click('删除收藏集', 'document.querySelector("dialog[open]")');
+    await wait(`!document.querySelector('.library-side [aria-label="${name}"]')`);
+  });
+  await check(
+    label('收藏集删除立即生效，淡出的副本不可操作'),
+    `[...document.querySelectorAll('[data-list-exit]')].every(n=>n.inert&&!n.querySelector('[data-collection-id],[data-wb-tag]'))`,
+    undefined,
+    'once',
+  );
+  await finish(h);
+  await settle();
+  await click('工作台', 'document.querySelector(".studio-titlebar")');
+  if (await e('!!document.querySelector(".wb-dirty-line")')) {
+    await click('还原成原图的提示词');
+    await click('恢复', 'document.querySelector("dialog[open]")');
+    await wait('!document.querySelector(".wb-dirty-line")');
+  }
+  await settle();
+  await e('document.querySelector(".wb-add-trigger").click()');
+  const text = `motion_insert_${theme}_${enabled}`;
+  await h.input('[aria-label="输入中文或英文"]', text);
+  await capture(h, '[data-wb-tag],[data-list-exit],.wb-dirty-collapse', () =>
+    h.key('Enter', {}, 'document.querySelector("[aria-label=输入中文或英文]")'),
+  );
+  await check(
+    label('首次修改提示行展开，关闭动效直接到位'),
+    `!!document.querySelector('.wb-dirty-line')`,
+    undefined,
+    'once',
+  );
+  await check(
+    label('新增 Tag 淡入且实际内容立即存在'),
+    `[...document.querySelectorAll('[data-wb-tag]')].some(n=>n.textContent.includes(${JSON.stringify(text)}))`,
+    undefined,
+    'once',
+  );
+  await finish(h);
+  await h.key('Escape');
+  await e(
+    `([...document.querySelectorAll('[data-wb-tag]')].find(n=>n.textContent.includes(${JSON.stringify(text)}))).querySelector(".wb-sortable-tag").click()`,
+  );
+  await wait('!!document.querySelector(".wb-tag-editor")');
+  // Escape also collapses the add-tag helper. Measure deletion only after that
+  // independent height transition has settled.
+  await settle();
+  await capture(h, '[data-list-exit],[data-wb-tag],.wb-dirty-collapse', () =>
+    click('删除', 'document.querySelector(".wb-tag-editor")'),
+  );
+  await check(
+    label('删除 Tag 先淡出，退出副本不带业务标识'),
+    `[...document.querySelectorAll('[data-list-exit]')].every(n=>n.inert&&!n.querySelector('[data-collection-id],[data-wb-tag]'))`,
+    undefined,
+    'once',
+  );
+  if (enabled) await sequence(h, `024-tag-exit-${theme}`);
+  await finish(h);
+  await settle();
+  await check(
+    label('删除结束清除副本且没有残留动画'),
+    "!document.querySelector('[data-list-exit]')",
+    undefined,
+    'once',
+  );
+  // Adding and deleting a tag may normalize its raw separators. Reset through
+  // the user command rather than assuming the serialized prompt is identical.
+  await click('还原成原图的提示词');
+  await capture(h, '.wb-dirty-collapse,.nps-transition-snapshot', async () => {
+    await click('恢复', 'document.querySelector("dialog[open]")');
+    await wait('!document.querySelector(".wb-dirty-line")');
+  });
+  await check(
+    label('还原原图提示词后提示行收起且按钮立即移除'),
+    `!document.querySelector('.wb-dirty-line')`,
+    undefined,
+    'once',
+  );
+  await finish(h);
+}

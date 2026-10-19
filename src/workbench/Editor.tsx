@@ -61,6 +61,7 @@ import { AddTags } from './AddTags';
 import { ParagraphEditor } from './Paragraph';
 import { useTagDragLayout, TagInsertionSlot, useDragFeedback, restrictDrag } from './DragFeedback';
 import type { ImageProject, TagCategory } from '../shared/types';
+import { AnimatedItems } from '../ui/AnimatedItems';
 
 function EditableTag({
   entry,
@@ -389,10 +390,16 @@ export function WorkbenchEditor(p: EditorProps) {
             });
             return (
               <SortableContext items={tags.map((tag) => tag.key)} strategy={() => null}>
-                <span className="wb-tag-layout">
+                <AnimatedItems
+                  as="span"
+                  className="wb-tag-layout"
+                  attribute="data-wb-tag"
+                  ids={tags.map((tag) => tag.key)}
+                  disabled={!!dragging}
+                >
                   {children}
                   {sources}
-                </span>
+                </AnimatedItems>
               </SortableContext>
             );
           }}

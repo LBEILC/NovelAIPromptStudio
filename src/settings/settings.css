@@ -2,7 +2,7 @@
 .settings-sidebar { position:relative; isolation:isolate; width: var(--side-w); flex: 0 0 var(--side-w); padding: var(--sp-3) var(--sp-2); background: var(--pane); border-right: var(--bw) solid var(--border); display: flex; flex-direction: column; gap: var(--bw); overflow: auto; }
 .settings-sidebar .nps-button { justify-content: flex-start; }
 .settings-sidebar .nps-button-label { display: flex; align-items: center; gap: var(--sp-2); }
-.settings-sidebar button[aria-current="page"] { color: var(--text); font-weight: var(--fw-strong); }
+.settings-sidebar button[aria-current="page"] { color: var(--text); }
 .settings-sidebar i { font-size: var(--icon); color: var(--text-3); }
 .settings-body { flex: 1; min-width: 0; overflow: hidden; }
 .settings-page { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -40,7 +40,7 @@
 .settings-dictionary-search input { text-overflow: ellipsis; }
 .settings-dictionary-views { position:relative; isolation:isolate; margin-top: var(--sp-2); }
 .settings-dictionary-views button { height: var(--sp-8); display: inline-flex; gap: var(--sp-1); align-items: center; border: 0; background: transparent; color: var(--text-3); white-space: nowrap; padding: 0 var(--sp-2); border-radius: var(--r-ctl) var(--r-ctl) 0 0; }
-.settings-dictionary-views button[aria-selected="true"] { color: var(--text); font-weight: var(--fw-strong); }
+.settings-dictionary-views button[aria-selected="true"] { color: var(--text); }
 .settings-dictionary-views button span { color: var(--text-3); font: var(--fs-caption)/1 var(--font-mono); }
 .settings-table-scroll { overflow: auto; flex: 1; min-height: 0; padding: 0 var(--page-pad-x); }
 .settings-table { width: 100%; border-collapse: collapse; display: grid; grid-template-columns: var(--table-check-w) minmax(0, 1.2fr) minmax(0, 1fr) 128px 84px 64px var(--ctl-sm); }

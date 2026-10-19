@@ -1,4 +1,4 @@
-import { DecodedImage } from '../ui/transitions';
+import { Collapse, DecodedImage } from '../ui/transitions';
 import { useEffect, useState } from 'react';
 import type { WorkbenchTab } from '../state/workbench';
 import type { ImageProject, Vibe } from '../shared/types';
@@ -74,14 +74,17 @@ export function WorkbenchImage({ tab, ...p }: ImageProps) {
                 .filter(Boolean)
                 .join(' · ')}
             </span>
-            {tab.originalProject && workbenchTabHasChanges(tab) && (
+            <Collapse
+              open={!!tab.originalProject && workbenchTabHasChanges(tab)}
+              className="wb-dirty-collapse"
+            >
               <span className="wb-dirty-line">
                 提示词已经和原图不一样
                 <Button variant="quiet" size="small" onClick={p.onReset}>
                   还原成原图的提示词
                 </Button>
               </span>
-            )}
+            </Collapse>
           </div>
           <div className="wb-image-actions">
             {tab.source.type === 'library' ? (

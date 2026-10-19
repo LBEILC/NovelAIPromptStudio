@@ -9,6 +9,7 @@
 .nps-fade-state { opacity:0; transition:opacity var(--dur-1) var(--ease-out); }
 .nps-fade-state[data-visible] { opacity:1; transition-duration:var(--dur-2); }
 .nps-disclosure::details-content { content-visibility:visible; }
+.nps-animated-items { display:contents; }
 [data-motion="off"] .nps-decoded-image { transition:none; }
 @media (prefers-reduced-motion:reduce) {
   html:not([data-motion="full"]) .nps-decoded-image { transition:none; }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { Autocomplete, Button, type Suggestion } from '../ui';
+import { Collapse, TransitionSurface } from '../ui/transitions';
 import { analyzePromptBatch, formatTag } from '../lib/prompt.js';
 import type { Tag } from '../shared/types';
 
@@ -65,45 +66,47 @@ export function AddTags({
         ref={drop.setNodeRef}
         data-drop-active={drop.isOver || undefined}
       >
-        {editing ? (
-          <Autocomplete
-            autoFocus
-            onDismiss={() => {
-              if (!value.trim()) setEditing(false);
-            }}
-            label="输入中文或英文"
-            placeholder="输入中文或英文"
-            value={value}
-            onChange={setValue}
-            items={items}
-            onSelect={(item) => add(item.text)}
-            directAdd={{
-              label: `会添加 ${analysis.tags.length} 个 · ${analysis.duplicateCount} 个重复`,
-              onSelect: () => add(analysis.tags.map(formatTag).join(', ')),
-            }}
-          />
-        ) : (
-          <Button
-            className="wb-add-trigger"
-            variant="quiet"
-            size="small"
-            onClick={() => setEditing(true)}
-          >
-            <i className="ri-add-line" />
-            输入中文或英文
-          </Button>
-        )}
+        <TransitionSurface change={editing}>
+          {editing ? (
+            <Autocomplete
+              autoFocus
+              onDismiss={() => {
+                if (!value.trim()) setEditing(false);
+              }}
+              label="输入中文或英文"
+              placeholder="输入中文或英文"
+              value={value}
+              onChange={setValue}
+              items={items}
+              onSelect={(item) => add(item.text)}
+              directAdd={{
+                label: `会添加 ${analysis.tags.length} 个 · ${analysis.duplicateCount} 个重复`,
+                onSelect: () => add(analysis.tags.map(formatTag).join(', ')),
+              }}
+            />
+          ) : (
+            <Button
+              className="wb-add-trigger"
+              variant="quiet"
+              size="small"
+              onClick={() => setEditing(true)}
+            >
+              <i className="ri-add-line" />
+              输入中文或英文
+            </Button>
+          )}
+        </TransitionSurface>
       </div>
-      {editing && (
+      <Collapse open={editing} className="wb-add-help">
         <span className="nps-help wb-add-help">
           回车添加。用逗号或换行可以一次添加多个；输入中文会找对应的英文 Tag。
         </span>
-      )}
-      {editing && value && (
+      </Collapse>
+      <Collapse open={editing && !!value} className="wb-add-help">
         <span className="nps-help wb-add-help">
           会添加 {analysis.tags.length} 个 · {analysis.duplicateCount} 个重复
         </span>
-      )}
+      </Collapse>
     </>
   );
 }

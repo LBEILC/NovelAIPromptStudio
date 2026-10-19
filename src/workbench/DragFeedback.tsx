@@ -38,7 +38,13 @@ export function TagInsertionSlot({
 /** Translate real flex positions; never borrow the size of another item. */
 export function useTagDragLayout(root: RefObject<HTMLElement | null>, dragging: boolean) {
   const previous = useRef(new Map<string, DOMRect>());
+  const wasDragging = useRef(false);
   useLayoutEffect(() => {
+    if (!dragging && !wasDragging.current) {
+      previous.current.clear();
+      return;
+    }
+    wasDragging.current = dragging;
     const next = new Map<string, DOMRect>();
     const style = getComputedStyle(document.documentElement);
     const nodes = [...(root.current?.querySelectorAll<HTMLElement>('[data-wb-tag]') ?? [])].filter(

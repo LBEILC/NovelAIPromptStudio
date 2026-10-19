@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { DecodedImage, TransitionSurface } from './transitions';
+import { DecodedImage, TransitionSurface, useNavigationSelection } from './transitions';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 let root: Root;
@@ -67,4 +67,37 @@ it('publishes new content and commands immediately with motion off', () => {
   act(() => host.querySelector('button')!.click());
   expect(command).toHaveBeenCalledOnce();
   expect(document.querySelector('.nps-transition-snapshot')).toBeNull();
+});
+
+it('starts navigation before its command and never overwrites subsequent input', () => {
+  document.documentElement.dataset.motion = 'full';
+  const command = vi.fn((next: string) => {
+    expect(host.firstElementChild?.getAttribute('data-selected')).toBe(next);
+  });
+  function Navigation() {
+    const [selected, select] = useNavigationSelection<string>('first', command);
+    return (
+      <div data-selected={selected}>
+        <button onClick={() => select('second')}>second</button>
+        <button onClick={() => select('last')}>last</button>
+        <input aria-label="search" />
+      </div>
+    );
+  }
+  vi.useFakeTimers();
+  try {
+    act(() => root.render(<Navigation />));
+    act(() => host.querySelectorAll('button')[0].click());
+    expect(command).toHaveBeenLastCalledWith('second');
+    act(() => host.querySelectorAll('button')[1].click());
+    expect(command).toHaveBeenLastCalledWith('last');
+    host.querySelector('input')!.value = 'subsequent search';
+    act(() => vi.runAllTimers());
+    expect(command).toHaveBeenCalledTimes(2);
+    expect(host.querySelector('input')!.value).toBe('subsequent search');
+    act(() => root.render(null));
+    expect(command).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
 });
