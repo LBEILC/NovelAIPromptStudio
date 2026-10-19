@@ -199,7 +199,9 @@ try {
   if (packaged) await verifyNativePackage(executable);
   const manifests = [];
   const restarts =
-    !packaged && options.category === '全部' && (!options.shard || options.shard.restarts);
+    !packaged &&
+    (options.category === '全部' || options.restart) &&
+    (!options.shard || options.shard.restarts);
   for (const phase of restarts ? [0, 1, 2] : [0]) {
     await fs.writeFile(
       path.join(root, 'run.json'),

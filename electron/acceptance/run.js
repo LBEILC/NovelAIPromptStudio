@@ -384,7 +384,7 @@ export async function runAcceptance(context) {
       await section('关于与更新');
       await fontChecks();
       await h.screenshot('packaged-fonts');
-    } else if (mode.category && mode.category !== '全部') {
+    } else if (mode.category && mode.category !== '全部' && mode.phase === 0) {
       h.dualThemes(true);
       if (mode.category === '过渡动效') {
         await transitionChecks(environment);
@@ -423,8 +423,10 @@ export async function runAcceptance(context) {
       else if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
       else if (['图片库', '图片库·导入', '图片库·收尾', '图片库·滚动条'].includes(mode.category))
         await libraryChecks(environment);
-      else if (mode.category.startsWith('设置')) await settingsChecks(environment, false);
-      else if (mode.category === '基础组件') await componentChecks(environment);
+      else if (mode.category.startsWith('设置')) {
+        await settingsChecks(environment, false);
+        if (mode.restart) await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());
+      } else if (mode.category === '基础组件') await componentChecks(environment);
       else if (mode.category === '基础组件·细节') await uiPolishChecks(environment);
       else if (mode.category === '卡片缓存') await cardCacheChecks(environment);
       else if (mode.category === '外壳·快捷键') await shortcutChecks(environment);

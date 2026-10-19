@@ -62,6 +62,8 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
     ? { index: Number(shardMatch[1]), total: 3, restarts: shardMatch[1] === '2' }
     : null;
   const reducedMotion = argv.includes('--reduced-motion');
+  const restart = argv.includes('--restart');
+  if (restart && category !== '设置') throw Error('--restart requires --category=设置');
   const motion = value('motion');
   if (motion && !['system', 'off'].includes(motion)) throw Error('--motion must be system or off');
   const suffix = `${slow > 1 ? `-slow-${slow}` : ''}${reducedMotion ? '-reduced' : ''}${motion ? `-${motion}` : ''}${category === '全部' ? '' : `-${category.replaceAll('·', '-')}`}${shard ? `-shard-${shard.index}` : ''}`;
@@ -105,6 +107,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
     needsDictionary,
     reducedMotion,
     motion,
-    outputName: `acceptance${suffix}`,
+    restart,
+    outputName: `acceptance${suffix}${restart ? '-restart' : ''}`,
   };
 }

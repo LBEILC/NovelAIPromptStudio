@@ -1,6 +1,18 @@
 import { expect, it } from 'vitest';
 import { acceptanceOptions } from './acceptance-options.mjs';
 
+it('isolates targeted settings restarts and rejects categories without restart fixtures', () => {
+  expect(
+    acceptanceOptions(['--category=设置', '--restart', '--reduced-motion', '--motion=system'], {}),
+  ).toMatchObject({
+    restart: true,
+    needsLibrary: true,
+    needsDictionary: true,
+    outputName: 'acceptance-reduced-system-设置-restart',
+  });
+  expect(() => acceptanceOptions(['--category=工作台', '--restart'], {})).toThrow('--restart');
+});
+
 it('limits CPU slowdown and rejects unknown categories before starting Electron', () => {
   for (const value of ['0', '2', '-4', 'NaN', '60'])
     expect(() => acceptanceOptions([`--slow=${value}`])).toThrow('--slow');

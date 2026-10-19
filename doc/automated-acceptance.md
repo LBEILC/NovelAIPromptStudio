@@ -17,6 +17,7 @@ npm run verify:app -- --category="图片库" --slow=6
 npm run verify:app -- --category="图片库·复制" --slow=6
 npm run verify:app -- --category="设置·AI 服务" --slow=4
 npm run verify:app -- --category="设置" --timing=record
+npm run verify:app -- --category="设置" --restart --reduced-motion --motion=system
 npm run verify:app -- --category="基础组件" --timing=strict
 npm run verify:app -- --reduced-motion --category="减少动态效果"
 npm run verify:app -- --reduced-motion --motion=system --category="设置·外观"
@@ -24,6 +25,8 @@ npm run verify:app -- --reduced-motion --motion=off --category="基础组件"
 ```
 
 `npm run verify:app:system-reduced` 执行完整验收和两次进程重启，使用进程级系统减少动态效果，并通过真实设置界面选择“跟随系统”。结果单独保存在 `.codex-runs/acceptance-reduced-system/`。它保留原有明确检查完整／关闭动效的组合场景，组合结束后在外壳、设置场景恢复指定基线；不会把全套缩减为“减少动态效果”分类。它很慢，只在排查减少动态效果下的问题时手动运行；常规交付和 CI 用下面的“减少动态效果”分类。
+
+全套中断后需要定向复测持久化时，可在 `--category="设置"` 后加 `--restart`：先执行设置分类并保存真实数据快照，再关闭进程、重启两次，执行与全套相同的持久化断言。结果目录另加 `-restart`，不覆盖原分类证据；该选项仅接受设置分类。
 
 `--motion=system|off` 可指定应用动效基线，独立于 `--reduced-motion` 的系统偏好模拟；组件展示页也使用同一基线。`设置·外观` 是字体下拉框的最小回归分类，验证连续选择的持久化、指针与 Enter／空格反复开关不意外改值，结束后从界面恢复原字体。它不准备图库或词典，也不执行重启；跨进程持久化仍由全套验证。排查无动效问题时，将 `设置·外观` 和 `基础组件` 分别在上述两种应用基线下运行。
 
