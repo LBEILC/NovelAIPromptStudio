@@ -3,7 +3,17 @@ name: CI
 on:
   push:
     branches: [main, 'rebuild/**']
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+      - 'LICENSE'
+      - 'LICENSES/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+      - 'LICENSE'
+      - 'LICENSES/**'
   workflow_dispatch:
 
 permissions:
@@ -48,7 +58,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
-        node: [22, 24]
+        # The app runs on Electron's own Node; scripts and tests target 24.
+        node: [24]
     steps:
       - name: Check out source
         uses: actions/checkout@v6
@@ -91,6 +102,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
+        # The full suite in three groups side by side (electron/acceptance/run.js).
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v7
@@ -110,14 +123,14 @@ jobs:
         run: node -e "console.error('MiSans font cache was not prepared; check the prepare-fonts job. Matrix jobs never download fonts.'); process.exit(1)"
       - run: npm run fonts:check
       - run: npm run build
-      - run: npm run verify:app
+      - run: npm run verify:app -- --shard=${{ matrix.shard }}/3
       - name: Upload acceptance-checks
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: acceptance-checks-${{ matrix.os }}-node24
+          name: acceptance-checks-${{ matrix.os }}-shard${{ matrix.shard }}
           path: |
-            .codex-runs/acceptance/
+            .codex-runs/acceptance-shard-${{ matrix.shard }}/
           if-no-files-found: ignore
 
   reduced-motion:
@@ -218,6 +231,8 @@ jobs:
           if-no-files-found: ignore
 
   screenshots:
+    # Only for visual review on request: Actions → CI → Run workflow.
+    if: github.event_name == 'workflow_dispatch'
     needs: prepare-fonts
     runs-on: ${{ matrix.os }}
     strategy:

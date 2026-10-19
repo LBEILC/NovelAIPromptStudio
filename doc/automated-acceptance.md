@@ -1,6 +1,6 @@
 # 自动化验收
 
-`npm run verify:app` 构建正式页面，在新的临时数据目录中启动真实 Electron，操作界面、断言结果并截图。数据、复制、键盘等行为只执行一次；外观断言在相同业务状态下通过 `nativeTheme` 切换实际系统主题，检查浅色和深色，不改 DOM 主题属性或 React 状态。之后关闭整个进程，用同一目录重启两次，验证偏好、数据及恢复默认提示词的持久化。`npm run verify:packaged` 构建未签名目录包并实际启动包内可执行文件，检查数据库、演示图片、页面和随包字体。`npm run screenshots:app` 保留原来的固定场景截图用途。
+`npm run verify:app` 构建正式页面，在新的临时数据目录中启动真实 Electron，操作界面、断言结果并截图。每条断言默认只在一套主题下执行一次；只有显式标为 `'both'` 的断言（颜色、令牌、对比度）会在相同业务状态下通过 `nativeTheme` 切换实际系统主题，再检查另一套，不改 DOM 主题属性或 React 状态。截图仍拍深浅两张，供目视检查。之后关闭整个进程，用同一目录重启两次，验证偏好、数据及恢复默认提示词的持久化。`npm run verify:packaged` 构建未签名目录包并实际启动包内可执行文件，检查数据库、演示图片、页面和随包字体。`npm run screenshots:app` 保留原来的固定场景截图用途。
 
 普通结果位于 `.codex-runs/acceptance/`，减少动态效果、慢速 4 倍、慢速 6 倍分别使用 `acceptance-reduced/`、`acceptance-slow-4/`、`acceptance-slow-6/`，目录包使用 `acceptance-packaged/`。`manifest.json` 汇总每条中文标签、分类、主题范围 `themeScope`、实际主题、结果和耗时；`light/` 是主运行目录，其中同时保存深浅截图及 `checks-0.json`、`checks-1.json`、`checks-2.json`。断言失败或操作超时使命令失败。等待超时会立即保存 `timeout-阶段-序号.png` 和同名 JSON（分类、上一条通过的断言、当前操作、控制元素角色/名称/可见性/禁用状态），不采集输入值或完整页面正文。渲染器不可响应时会记录诊断采集失败原因。产物由 Windows/macOS CI 上传，不提交进 Git；尚未执行的截图或打包步骤没有产物时，上传步骤跳过。
 
@@ -8,6 +8,7 @@
 
 ```sh
 npm run verify:app
+npm run verify:app -- --shard=2/3
 npm run verify:app:system-reduced
 npm run verify:app -- --slow=4
 npm run verify:app -- --category="图片库·起名" --slow=6
@@ -22,7 +23,7 @@ npm run verify:app -- --reduced-motion --motion=system --category="设置·外�
 npm run verify:app -- --reduced-motion --motion=off --category="基础组件"
 ```
 
-`npm run verify:app:system-reduced` 执行完整验收和两次进程重启，使用进程级系统减少动态效果，并通过真实设置界面选择“跟随系统”。结果单独保存在 `.codex-runs/acceptance-reduced-system/`。它保留原有明确检查完整／关闭动效的组合场景，组合结束后在外壳、设置场景恢复指定基线；不会把全套缩减为“减少动态效果”分类。修改共用组件时，本机交付前必须补跑这条命令。CI 不增加作业，仍由已有普通全套与减少动态效果分类覆盖。
+`npm run verify:app:system-reduced` 执行完整验收和两次进程重启，使用进程级系统减少动态效果，并通过真实设置界面选择“跟随系统”。结果单独保存在 `.codex-runs/acceptance-reduced-system/`。它保留原有明确检查完整／关闭动效的组合场景，组合结束后在外壳、设置场景恢复指定基线；不会把全套缩减为“减少动态效果”分类。它很慢，只在排查减少动态效果下的问题时手动运行；常规交付和 CI 用下面的“减少动态效果”分类。
 
 `--motion=system|off` 可指定应用动效基线，独立于 `--reduced-motion` 的系统偏好模拟；组件展示页也使用同一基线。`设置·外观` 是字体下拉框的最小回归分类，验证连续选择的持久化、指针与 Enter／空格反复开关不意外改值，结束后从界面恢复原字体。它不准备图库或词典，也不执行重启；跨进程持久化仍由全套验证。排查无动效问题时，将 `设置·外观` 和 `基础组件` 分别在上述两种应用基线下运行。
 
@@ -38,19 +39,19 @@ npm run verify:app -- --reduced-motion --motion=off --category="基础组件"
 
 ## 交付前验证频率
 
-改动界面或验收脚本的任务，本机全套普通模式一次、慢机器模式一次（默认 4 倍）、减少动态效果一次。修偶发失败的任务，额外把对应的最小分类在 6 倍慢模式下运行 10 次。每次使用新的临时 Profile，并保留各次清单与耗时。不要要求全套连续多次；碰到与当前任务无关的失败记入汇报，不为它重跑全套。
+改动过程中只跑相关分类。改动界面或验收脚本的任务，推送前本机跑一遍普通全套（可以按 `--shard=1/3` 到 `3/3` 分三次跑）；减少动态效果只跑相关分类，全套交给 CI。慢机器模式只在本机复现时序问题时用。不要要求全套连续多次；碰到与当前任务无关的失败记入汇报，不为它重跑全套。
 
 任务说明指定了分类或次数时，以任务说明为准，不额外运行全套，也不为无关失败重跑。慢机器模式只在本机复现时序问题，CI 拒绝 `--slow=4/6`。
 
-CI 先执行 `prepare-fonts`，恢复或下载并校验固定 SHA-256 的 MiSans 缓存，再并行执行下面的作业。各作业只依赖字体准备，彼此不依赖，各自安装依赖和构建，不传递构建产物。
+只改 Markdown、`doc/`、许可证的推送不触发 CI。CI 先执行 `prepare-fonts`，恢复或下载并校验固定 SHA-256 的 MiSans 缓存，再并行执行下面的作业。各作业只依赖字体准备，彼此不依赖，各自安装依赖和构建，不传递构建产物。
 
 | 作业 | 平台与 Node | 内容与证据 |
 | --- | --- | --- |
-| `check` | Windows、macOS × Node 22、24 | `npm ci`、格式、类型、单元测试、生产构建；Node 24 加 `audit:ui`，上传 `check-ui-audit-*` |
-| `acceptance` | Windows、macOS，Node 24 | `verify:app` 普通全套，上传 `acceptance-checks-*` |
+| `check` | Windows、macOS，Node 24 | `npm ci`、格式、类型、单元测试、生产构建、`audit:ui`，上传 `check-ui-audit-*`。软件运行时用 Electron 自带的 Node，所以不再测 Node 22 |
+| `acceptance` | Windows、macOS × 三块，Node 24 | `verify:app --shard=k/3`：普通全套按 `electron/acceptance/run.js` 里的三组并排运行，只有第 2 块（以设置收尾）执行两次重启；上传 `acceptance-checks-<平台>-shard<k>` |
 | `reduced-motion` | Windows、macOS，Node 24 | 减少动态效果分类与延迟 AI 设置读取，上传 `reduced-motion-checks-*` |
 | `packaged` | Windows、macOS，Node 24 | `verify:packaged`、`verify:fonts:package`、SQLite 主进程探针，上传 `packaged-acceptance-*`、`packaged-fonts-*`、`packaged-sqlite-probe-*` |
-| `screenshots` | Windows，Node 24 | `screenshots:app`、`screenshots:ui`，上传 `screenshots-app-*`、`screenshots-ui-*` |
+| `screenshots` | Windows，Node 24 | 只在手动运行工作流（Actions → CI → Run workflow）时执行：`screenshots:app`、`screenshots:ui`，上传 `screenshots-app-*`、`screenshots-ui-*` |
 
 产物名还包含平台和 Node 版本；断言失败时仍上传已有证据。原先随组件截图上传的 `production-files.json` 改由产生它的 `check` 作业上传。实际字体绘制、基础组件键盘和对话框断言、打包字体仍由两个平台覆盖。组件截图脚本中的 Chromium 原生语义探针只在 Windows 执行。
 
@@ -67,13 +68,15 @@ gh run rerun <id> --failed
 
 GitHub 页面也可选择 “Re-run failed jobs”。已经成功的作业无需重跑；若代码需要修复，推送修复后创建新运行，旧运行重跑仍使用原提交。没有加入失败自动重试。目标为整轮 6 分钟以内、单作业重跑 4 分钟以内；实际远端耗时需在推送后检查，不能用本地耗时代替。
 
-减少动态效果使用 `--reduced-motion --category="减少动态效果"`，单进程运行外壳（含动效组合）、基础组件、设置版式、词典滚动条及 AI 服务（保留 `NPS_ACCEPTANCE_SLOW_AI_READ=1` 的延迟读取验证），以及图库的“关闭动效”和“导入与永久删除·关闭动效”场景。图库正常动效那一轮、起名、复制、收尾、工作台、快捷键、词典数据操作、存储管理、关于与更新及持久化重启不在此子集中重复；普通全套中的这些检查保持。设置外观中的动效选择由外壳的动效场景覆盖。
+减少动态效果使用 `--reduced-motion --category="减少动态效果"`（2026-10-19 精简）：过渡检查只跑“关闭”那一轮；然后在设置里把动效改成“跟随系统”，确认它随系统关闭，再执行一条全局检查（`motionOff.js`）：工作台、图片库与详情栏、视图浮层和设置五个分页里，没有任何元素（含 `::before`、`::after`）声明超过 1 毫秒的过渡或动画，也没有正在运行的有限动画；最后在动效关闭的状态下跑工作台交互、交互修正和基础组件这几组依赖过渡事件来关闭、归还焦点的流程。其余行为与是否有动效无关，由普通全套覆盖。
 
 ## 计时策略
 
 `checkSoon` 将行为和计时分别记录：行为必须在普通等待上限内完成（通常 12 秒，慢模式折算且最多 60 秒），缺失行为、求值错误和操作超时始终失败。计时仍从原来的操作起点测量，保留 100/200 ms 等期限，慢模式按倍数折算。词典细条的页面内部计时及卡片缓存响应也使用相同策略。
 
-本机默认严格，计时超限会失败；`CI` 环境变量为真时默认只记录（空值、`0`、`false` 视为假），计时超限标记“计时：超过期限”，不算失败。`--timing=record` 或 `--timing=strict` 可显式覆盖默认策略，不会放宽行为等待上限。
+本机和 CI 默认都只记录（2026-10-19 起）：计时超限标记“计时：超过期限”，不算失败。需要按期限判定时显式加 `--timing=strict`，它不会放宽行为等待上限。
+
+**动效取样只记录**（2026-10-19 起）：动效完整开启时，检查取样到的动画（表达式里用到 `transitionSamples`、`getAnimations()`、`getKeyframes()` 等）的断言失败只记为 `recorded`，日志以 `RECORD` 开头，不让命令失败；动效的手感由设计负责人看截图判断。动效关闭或减少动态效果时，同样的断言照常判定，因为“什么都不动”是行为，不是手感。
 
 每条计时写入检查记录的 `timing` 字段；总清单另含 `timings` 表，列出期限 `deadlineMs`、实测 `elapsedMs`、是否超限 `exceeded`、是否超过两倍 `overDouble` 和策略。日志也输出相同汇总，超过期限两倍的项目排在最前。没有完成的测量以 `null` 保留并判失败，不伪造耗时。
 
@@ -85,7 +88,7 @@ GitHub 页面也可选择 “Re-run failed jobs”。已经成功的作业无需
 
 在 `electron/acceptance/` 对应场景模块增加操作与检查，从 `run.js` 接入新场景即可。使用 `h.category('中文分类')`、`h.click()`、`h.input()`、`h.key()`、`h.select()` 操作实际页面；异步变化先 `await h.wait('布尔表达式', '中文等待标签')`，再 `await h.check('中文验收标签', '布尔表达式')`。主进程状态可用 `h.check('标签', () => 布尔值)` 检查，严格要求结果为 `true`。完成关键状态后调用 `h.screenshot('文件名')`。
 
-每条 `h.check` 第四个参数、`h.checkSoon` 第六个参数必须标出主题范围：`'once'` 表示数据、键盘、复制内容等行为；`'both'` 表示颜色、布局、字体或无法确定与主题无关的断言，省略时保守地按 `both`。外观检查读取同一个状态在另一主题的表现，不重复触发写入、复制、删除等动作；反馈期限只测交互本身。`h.font` 在两主题下分别通过 CDP 读取实际字体，`h.screenshot` 同状态拍两张。检查固定主题按钮和原生标题栏令牌的外壳场景显式各跑一遍，其余场景使用产品已有的“跟随系统”。
+`h.check` 第四个参数、`h.checkSoon` 第六个参数是主题范围，省略时为 `'once'`。只有颜色、令牌、对比度这类确实随主题变化的断言才写 `'both'`，它会读取同一个状态在另一主题的表现，不重复触发写入、复制、删除等动作；反馈期限只测交互本身。`h.font` 只查一次（字体与主题无关），`h.screenshot` 同状态拍两张。新写的动效断言只检查最终状态和“声明了过渡”（读计算后的样式），不写逐帧取样和计时。检查固定主题按钮和原生标题栏令牌的外壳场景显式各跑一遍，其余场景使用产品已有的“跟随系统”。
 
 ```js
 await h.section('翻译词典');

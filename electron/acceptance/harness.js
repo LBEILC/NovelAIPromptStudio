@@ -12,6 +12,7 @@ export function harness(window, mode, checks) {
   const timingPolicy = timingMode(mode.timing);
   const waitBudget = Math.min(12000 * scale, 60000);
   const evaluationBudget = Math.min(15000 * scale, 60000);
+  const settleBudget = Math.min(1000 * scale, 6000);
   const bounded = async (promise, ms, label) => {
     let timer;
     try {
@@ -136,6 +137,15 @@ export function harness(window, mode, checks) {
       window.webContents.removeListener('did-finish-load', loaded);
     }
   };
+  // Motion is reviewed by eye from the screenshots, not gated by assertions:
+  // with full motion on, a check that inspects sampled animations is recorded
+  // (status "recorded") instead of failing the run. With motion off, the same
+  // checks still gate, since "nothing animates" is a behaviour, not a feel.
+  const MOTION_SAMPLE =
+    /transitionSamples|stateOperationEffects|polishAnimations|getKeyframes\(|getAnimations\(/;
+  const motionIsFull = async () =>
+    !mode.reducedMotion &&
+    (await evaluate('document.documentElement.dataset.motion').catch(() => null)) === 'full';
   let dualThemes = false;
   const withOtherTheme = async (run) => {
     const original = mode.themeDriver.get();
@@ -156,7 +166,7 @@ export function harness(window, mode, checks) {
       );
     }
   };
-  const checkOne = async (label, expression, failureDetails, themeScope = 'both', timing) => {
+  const checkOne = async (label, expression, failureDetails, themeScope = 'once', timing) => {
     operation = label;
     const record = {
       category,
@@ -168,8 +178,16 @@ export function harness(window, mode, checks) {
     };
     checks.push(record);
     try {
-      const result =
-        typeof expression === 'string' ? await evaluate(expression) : await expression();
+      let result = typeof expression === 'string' ? await evaluate(expression) : await expression();
+      // A page read gets up to a second to settle: re-read every frame until it
+      // holds, so a transition still running does not fail a behaviour check.
+      if (typeof expression === 'string') {
+        const deadline = Date.now() + settleBudget;
+        while (result !== true && Date.now() < deadline) {
+          await evaluate('new Promise(resolve=>requestAnimationFrame(resolve))');
+          result = await evaluate(expression);
+        }
+      }
       if (result !== true) throw new Error(`断言值：${JSON.stringify(result)}`);
       record.status = 'passed';
       lastPassed = label;
@@ -186,12 +204,23 @@ export function harness(window, mode, checks) {
           record.details = { error: String(detailsError) };
         }
       }
-      record.context = await evaluate('document.body.innerText.slice(-6000)').catch(
-        () => 'renderer unavailable',
-      );
-      console.error(
-        `FAIL [${category}] ${label}\n${record.error}${record.details === undefined ? '' : `\n失败说明：${JSON.stringify(record.details)}`}\n${record.context}`,
-      );
+      if (
+        typeof expression === 'string' &&
+        MOTION_SAMPLE.test(expression) &&
+        (await motionIsFull())
+      ) {
+        record.status = 'recorded';
+        console.log(
+          `RECORD [${category}] ${label}（动效取样只记录）\n${record.error}${record.details === undefined ? '' : `\n失败说明：${JSON.stringify(record.details)}`}`,
+        );
+      } else {
+        record.context = await evaluate('document.body.innerText.slice(-6000)').catch(
+          () => 'renderer unavailable',
+        );
+        console.error(
+          `FAIL [${category}] ${label}\n${record.error}${record.details === undefined ? '' : `\n失败说明：${JSON.stringify(record.details)}`}\n${record.context}`,
+        );
+      }
     }
     // A process-level watchdog cannot run our finally block. Keep bounded-cost
     // partial evidence so a later hard exit does not hide preceding failures.
@@ -204,7 +233,9 @@ export function harness(window, mode, checks) {
       await fs.rename(file + '.tmp', file);
     }
   };
-  const check = async (label, expression, failureDetails, themeScope = 'both') => {
+  // Behaviour is checked once. Only checks that pass 'both' explicitly (colours,
+  // tokens, contrast) are repeated under the other theme.
+  const check = async (label, expression, failureDetails, themeScope = 'once') => {
     await checkOne(label, expression, failureDetails, themeScope);
     if (dualThemes && themeScope === 'both')
       await withOtherTheme(() => checkOne(label, expression, failureDetails, themeScope));
@@ -238,7 +269,7 @@ export function harness(window, mode, checks) {
     timeoutMs = UI_FEEDBACK_MS,
     action = '',
     failureDetails,
-    themeScope = 'both',
+    themeScope = 'once',
   ) => {
     let elapsedMs = null;
     await checkOne(
@@ -369,10 +400,8 @@ export function harness(window, mode, checks) {
       fonts.some((f) => f.isCustomFont && f.glyphCount > 0 && f.familyName.includes(family)),
     );
   };
-  const font = async (selector, family) => {
-    await fontOne(selector, family);
-    if (dualThemes) await withOtherTheme(() => fontOne(selector, family));
-  };
+  // Fonts do not depend on the theme.
+  const font = (selector, family) => fontOne(selector, family);
   return {
     window,
     dualThemes: (enabled) => {

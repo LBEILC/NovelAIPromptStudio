@@ -140,9 +140,14 @@ export async function libraryInteractionChecks(env) {
         `${card(record.id)}.dispatchEvent(new MouseEvent('click',{bubbles:true,...${JSON.stringify(mod)}}))`,
       );
     await wait('document.querySelectorAll(".library-card.picked").length===2');
+    // Read the colours once the pick transition has settled.
+    const checkboxes = `(()=>{const cards=[...document.querySelectorAll('.library-card')];return cards.length===6&&cards.every(c=>{const p=c.querySelector('.library-pick'),s=getComputedStyle(p),picked=c.classList.contains('picked');return +s.zIndex>0&&s.opacity==='1'&&(picked?s.backgroundColor===getComputedStyle(c).getPropertyValue('--ink').trim().replace('#1c1c1c','rgb(28, 28, 28)').replace('#f1efea','rgb(241, 239, 234)'):p.dataset.theme==='light'&&s.backgroundColor.includes('0.12'))})})()`;
+    await wait(checkboxes, '复选框过渡结束');
     await check(
       '浅深图片上的复选框选中实心、未选中半透明且处于选框之上',
-      `(()=>{const cards=[...document.querySelectorAll('.library-card')];return cards.length===6&&cards.every(c=>{const p=c.querySelector('.library-pick'),s=getComputedStyle(p),picked=c.classList.contains('picked');return +s.zIndex>0&&s.opacity==='1'&&(picked?s.backgroundColor===getComputedStyle(c).getPropertyValue('--ink').trim().replace('#1c1c1c','rgb(28, 28, 28)').replace('#f1efea','rgb(241, 239, 234)'):p.dataset.theme==='light'&&s.backgroundColor.includes('0.12'))})})()`,
+      checkboxes,
+      undefined,
+      'both',
     );
     await h.screenshot('interaction-checkboxes');
     await context(h, card(records[0].id));

@@ -61,3 +61,14 @@ it('selects the reduced subset fixtures and validates timing policy before launc
   expect(() => acceptanceOptions(['--timing=skip'], {})).toThrow('--timing');
   expect(() => acceptanceOptions(['--slow=4'], { CI: 'true' })).toThrow('--slow');
 });
+
+it('splits only the full suite into three shards', () => {
+  expect(acceptanceOptions(['--shard=2/3'], {})).toMatchObject({
+    shard: { index: 2, total: 3, restarts: true },
+    outputName: 'acceptance-shard-2',
+  });
+  expect(acceptanceOptions([], {}).shard).toBeNull();
+  expect(() => acceptanceOptions(['--shard=4/3'], {})).toThrow('--shard');
+  expect(() => acceptanceOptions(['--shard=1/2'], {})).toThrow('--shard');
+  expect(() => acceptanceOptions(['--shard=1/3', '--category=工作台'], {})).toThrow('--shard');
+});

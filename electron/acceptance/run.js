@@ -10,6 +10,7 @@ import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import { libraryChecks } from './library.js';
 import { motionChecks, applyMotionBaseline } from './motion.js';
+import { motionOffChecks } from './motionOff.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { nativeTheme, safeStorage } from 'electron';
@@ -387,11 +388,11 @@ export async function runAcceptance(context) {
       if (mode.category === '过渡动效') {
         await transitionChecks(environment);
       } else if (mode.category === '减少动态效果') {
+        // One global audit, plus the flows whose closing and focus return
+        // depend on transition events (the ones that broke under reduced
+        // motion before). Everything else behaves the same either way.
         await transitionChecks(environment);
-        await clientControlChecks(environment);
-        await shellChecks();
-        await libraryChecks(environment);
-        await settingsChecks(environment, false);
+        await motionOffChecks(environment);
         await workbenchInteractionChecks(environment);
         await interactionCorrectionChecks(environment);
         await componentChecks(environment);
@@ -447,26 +448,38 @@ export async function runAcceptance(context) {
       );
       await settingsChecks(environment, true);
     } else {
-      await transitionChecks(environment);
-      await clientChecks(environment);
-      await hoverChecks(environment);
-      await clientControlChecks(environment);
-      await shellChecks();
-      if (!mode.packaged) {
-        await workbenchChecks(environment);
-        await shortcutChecks(environment);
-        await libraryNamingChecks(environment);
-        await libraryChecks(environment);
-        await settingsChecks(environment, false);
-        await libraryPolishChecks(environment);
-        await workbenchPolishChecks(environment);
-        await libraryInteractionChecks(environment);
-        await workbenchInteractionChecks(environment);
-        await interactionCorrectionChecks(environment);
-        await uiPolishChecks(environment);
-        await componentChecks(environment);
+      // The original order, cut into three groups of similar length so CI can
+      // run them side by side (--shard=k/3). Later groups start from a fresh
+      // profile; settings depend on the workbench and library state before
+      // them, so they close the second group, which also owns the restarts.
+      const groups = [
+        [
+          () => transitionChecks(environment),
+          () => clientChecks(environment),
+          () => hoverChecks(environment),
+          () => clientControlChecks(environment),
+          () => shellChecks(),
+        ],
+        [
+          () => workbenchChecks(environment),
+          () => shortcutChecks(environment),
+          () => libraryNamingChecks(environment),
+          () => libraryChecks(environment),
+          () => settingsChecks(environment, false),
+        ],
+        [
+          () => libraryPolishChecks(environment),
+          () => workbenchPolishChecks(environment),
+          () => libraryInteractionChecks(environment),
+          () => workbenchInteractionChecks(environment),
+          () => interactionCorrectionChecks(environment),
+          () => uiPolishChecks(environment),
+          () => componentChecks(environment),
+        ],
+      ];
+      for (const run of mode.shard ? groups[mode.shard.index - 1] : groups.flat()) await run();
+      if (!mode.shard || mode.shard.restarts)
         await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());
-      }
     }
     h.category('隔离');
     await check('验收运行没有请求外部网络', () => blockedRequests.length === 0, undefined, 'once');

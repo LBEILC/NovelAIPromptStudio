@@ -8,10 +8,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('uses CI recording by default and permits explicit strict overrides', () => {
-  expect(timingMode(undefined, 'true')).toBe('record');
-  expect(timingMode('strict', 'true')).toBe('strict');
-  for (const ci of ['', 'false', '0']) expect(timingMode(undefined, ci)).toBe('strict');
+it('records by default everywhere and permits explicit strict overrides', () => {
+  expect(timingMode(undefined)).toBe('record');
+  expect(timingMode('strict')).toBe('strict');
   expect(() => timingMode('skip')).toThrow('--timing');
 });
 

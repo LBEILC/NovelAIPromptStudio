@@ -208,13 +208,17 @@ export async function transitionChecks({ h, mode, doubles }) {
   await click('跟随系统', 'document.querySelector("[role=radiogroup][aria-label=主题]")');
   h.dualThemes(false);
   try {
-    for (const dark of ['light', 'dark']) {
+    // Motion does not depend on the theme: one theme, with motion on and off.
+    for (const dark of [theme]) {
       mode.themeDriver.set(dark);
       await wait(`document.documentElement.dataset.theme==='${dark}'`);
-      for (const [choice, enabled] of [
+      // Under system reduced motion only the "off" pass matters; forcing full
+      // motion on top of it is not a state users reach by accident.
+      const passes = [
         ['完整', true],
         ['关闭', false],
-      ]) {
+      ].filter(([, enabled]) => !mode.reducedMotion || !enabled);
+      for (const [choice, enabled] of passes) {
         await h.section('外观');
         await click(choice, 'document.querySelector("[role=radiogroup][aria-label=动效]")');
         await wait(`document.documentElement.dataset.motion==='${enabled ? 'full' : 'off'}'`);

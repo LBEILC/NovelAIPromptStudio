@@ -198,7 +198,9 @@ try {
   }
   if (packaged) await verifyNativePackage(executable);
   const manifests = [];
-  for (const phase of packaged || options.category !== '全部' ? [0] : [0, 1, 2]) {
+  const restarts =
+    !packaged && options.category === '全部' && (!options.shard || options.shard.restarts);
+  for (const phase of restarts ? [0, 1, 2] : [0]) {
     await fs.writeFile(
       path.join(root, 'run.json'),
       JSON.stringify({

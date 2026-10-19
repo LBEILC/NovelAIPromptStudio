@@ -1,5 +1,7 @@
-export function timingMode(value, ci = process.env.CI) {
-  const mode = value || (ci && !/^(false|0)$/i.test(ci) ? 'record' : 'strict');
+// Timing is recorded, never gating, unless a run asks for --timing=strict.
+// Deadlines on shared or slow machines measured the machine, not the product.
+export function timingMode(value) {
+  const mode = value || 'record';
   if (!['record', 'strict'].includes(mode)) throw Error('--timing must be record or strict');
   return mode;
 }

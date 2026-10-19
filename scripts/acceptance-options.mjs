@@ -9,9 +9,9 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
       .join('=');
   const slow = Number(value('slow') || 1);
   if (![1, 4, 6].includes(slow)) throw Error('--slow must be 1, 4 or 6');
-  if (timingMode(undefined, env.CI ?? '') === 'record' && slow > 1)
-    throw Error('--slow is only available outside CI');
-  const timing = timingMode(value('timing'), env.CI ?? '');
+  const ci = !!env.CI && !/^(false|0)$/i.test(env.CI);
+  if (ci && slow > 1) throw Error('--slow is only available outside CI');
+  const timing = timingMode(value('timing'));
   const category = value('category') || '全部';
   if (
     ![
@@ -50,10 +50,20 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
     ].includes(category)
   )
     throw Error(`Unknown acceptance category: ${category}`);
+  // CI splits the full suite into parallel jobs; each shard runs its share of
+  // phase 0, and only shard 2 (which owns settings) runs the restarts.
+  // The groups themselves live in electron/acceptance/run.js.
+  const shardValue = value('shard');
+  const shardMatch = shardValue?.match(/^([1-3])\/3$/);
+  if (shardValue && !shardMatch) throw Error('--shard must be 1/3, 2/3 or 3/3');
+  if (shardValue && category !== '全部') throw Error('--shard requires the full suite');
+  const shard = shardMatch
+    ? { index: Number(shardMatch[1]), total: 3, restarts: shardMatch[1] === '2' }
+    : null;
   const reducedMotion = argv.includes('--reduced-motion');
   const motion = value('motion');
   if (motion && !['system', 'off'].includes(motion)) throw Error('--motion must be system or off');
-  const suffix = `${slow > 1 ? `-slow-${slow}` : ''}${reducedMotion ? '-reduced' : ''}${motion ? `-${motion}` : ''}${category === '全部' ? '' : `-${category.replaceAll('·', '-')}`}`;
+  const suffix = `${slow > 1 ? `-slow-${slow}` : ''}${reducedMotion ? '-reduced' : ''}${motion ? `-${motion}` : ''}${category === '全部' ? '' : `-${category.replaceAll('·', '-')}`}${shard ? `-shard-${shard.index}` : ''}`;
   const needsLibrary = [
     '悬停态覆盖',
     '客户端控件',
@@ -88,6 +98,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
     slow,
     processTimeoutMs: Math.min(600_000 * slow, 1_800_000),
     category,
+    shard,
     needsLibrary,
     needsDictionary,
     reducedMotion,
