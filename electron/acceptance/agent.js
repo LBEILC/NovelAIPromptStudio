@@ -103,8 +103,13 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'agent', 'SKILL.md'),
     'utf8',
   );
-  const copied = await h.evaluate('window.studio.readClipboardText()');
-  await h.check('技能全文与分发文件逐字一致', () => copied === skill, undefined, 'once');
+  await h.wait(`(async()=>await window.studio.readClipboardText()===${JSON.stringify(skill)})()`);
+  await h.check(
+    '技能全文与分发文件逐字一致',
+    `(async()=>await window.studio.readClipboardText()===${JSON.stringify(skill)})()`,
+    undefined,
+    'once',
+  );
   await h.click('打开所在文件夹');
   await h.check(
     '打开技能目录使用系统文件管理器入口',
