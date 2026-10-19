@@ -1,6 +1,6 @@
 ﻿import fs from 'node:fs/promises';
-import { harness } from './acceptance/harness.js';
-import { workbenchRaw } from './acceptance/workbenchFixtures.js';
+import { harness } from '../acceptance/harness.js';
+import { workbenchRaw } from '../acceptance/workbenchFixtures.js';
 
 export async function prepareWorkbenchScreenshot({ window, scene, mode, filePaths }) {
   if (!scene.workbenchState) return async () => {};

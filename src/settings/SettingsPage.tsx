@@ -44,7 +44,7 @@ import remixLicense from '../../LICENSES/RemixIcon/LICENSE?raw';
 import dictionaryLicense from '../../third_party/DanbooruSearchOnline/LICENSE?raw';
 import type { AppearanceSettings } from '../shared/types';
 import './settings.css';
-const ReleaseNotes = lazy(() => import('../components/ReleaseNotes.jsx'));
+const ReleaseNotes = lazy(() => import('./ReleaseNotes.jsx'));
 const sections = [
   ['appearance', '外观', 'contrast-2-line'],
   ['storage', '图片库', 'hard-drive-2-line'],

@@ -4,8 +4,8 @@ import { createRequire } from 'node:module';
 import sharp from 'sharp';
 import { dialog, shell } from 'electron';
 import { installAcceptanceDoubles } from './acceptanceMode.js';
-import { harness } from './acceptance/harness.js';
-import { importLibraryFiles } from './importer.js';
+import { harness } from '../acceptance/harness.js';
+import { importLibraryFiles } from '../importer.js';
 const require = createRequire(import.meta.url);
 
 /** Drive real library states after ordinary screenshot startup has settled. */

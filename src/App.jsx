@@ -171,7 +171,7 @@ const studio = window.studio || {
     primaryColor: 'blue',
     sansFont: DEFAULT_SANS_FONT,
     monoFont: DEFAULT_MONO_FONT,
-    motion: 'full',
+    motion: 'reduced',
   }),
   saveAppearanceSettings: async (settings) => settings,
   getProductivitySettings: async () => ({ recentImageDirectory: '', autoCheckUpdates: true }),

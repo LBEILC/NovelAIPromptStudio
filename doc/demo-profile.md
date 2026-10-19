@@ -53,7 +53,7 @@ NovelAI Prompt Studio-demo/
 
 1. 关闭默认环境，运行 `npm run start:demo`。
 2. 确认图片库为空，设置页没有已保存的 API Key 或私人服务地址。
-3. 从 `demo/promo-v090/final/` 一次导入 14 张正式图片。
+3. 从 `demo/images/final/` 一次导入 14 张正式图片。
 4. 创建“本周精选”和“构图研究”收藏集，补充演示用 Tag 译名与分类，并打开三个工作台标签。
 5. 退出后再次运行 `npm run start:demo`，确认演示状态恢复。
 6. 需要回到日常图库时，退出应用并运行 `npm start`。

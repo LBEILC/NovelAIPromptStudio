@@ -15,13 +15,6 @@ export function quoteFontFamily(family) {
   return GENERIC_FONTS.has(value.toLocaleLowerCase('en-US')) ? value : `"${value}"`;
 }
 
-export function fontStack(family, role = 'sans') {
-  const selected = quoteFontFamily(
-    family || (role === 'mono' ? DEFAULT_MONO_FONT : DEFAULT_SANS_FONT),
-  );
-  return `${selected}, var(--font-${role === 'mono' ? 'mono' : 'ui'})`;
-}
-
 export function isMonospaceFont(font, measureText) {
   const family = String(font?.family || '').trim();
   if (!family) return false;

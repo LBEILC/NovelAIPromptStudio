@@ -17,6 +17,22 @@ afterEach(() => {
 });
 
 describe('AI preferences', () => {
+  it.each([undefined, 'full', 'reduced', 'off'])(
+    'preserves stored motion %s across unrelated appearance saves',
+    (motion) => {
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
+      temporaryDirectories.push(directory);
+      const file = path.join(directory, 'preferences.json');
+      fs.writeFileSync(file, JSON.stringify({ appearance: { motion } }));
+      const preferences = openPreferences(directory, safeStorage);
+      expect(preferences.appearanceSettings().motion).toBe(motion ?? 'reduced');
+      preferences.saveAppearanceSettings({ themeMode: 'dark' });
+      expect(JSON.parse(fs.readFileSync(file, 'utf8')).appearance.motion).toBe(motion ?? 'reduced');
+      expect(openPreferences(directory, safeStorage).appearanceSettings().motion).toBe(
+        motion ?? 'reduced',
+      );
+    },
+  );
   it('keeps legacy appearance choices and raw primary color while adding the prose font', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
     temporaryDirectories.push(directory);
@@ -113,7 +129,7 @@ describe('AI preferences', () => {
       sansFont: 'MiSans',
       monoFont: 'IBM Plex Mono',
       proseFont: 'Newsreader',
-      motion: 'full',
+      motion: 'reduced',
     });
     expect(
       preferences.saveAppearanceSettings({

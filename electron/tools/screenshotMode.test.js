@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import { configureScreenshotMode } from './screenshotMode.js';
 
-const preload = fs.readFileSync(new URL('./preload.cjs', import.meta.url), 'utf8');
+const preload = fs.readFileSync(new URL('../preload.cjs', import.meta.url), 'utf8');
 function runPreload(argv) {
   const exposed = {};
   const listeners = {};

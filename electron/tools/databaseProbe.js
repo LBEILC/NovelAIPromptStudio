@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync, backup } from 'node:sqlite';
-import { openDatabase } from './database.js';
+import { openDatabase } from '../database.js';
 
 // Explicit command-line check only; the main process selects a temporary profile
 // before reaching this module and never opens the user's data or a BrowserWindow.

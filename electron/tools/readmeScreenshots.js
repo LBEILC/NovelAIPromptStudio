@@ -1,9 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { net, session } from 'electron';
-import { importLibraryFiles } from './importer.js';
-import { harness } from './acceptance/harness.js';
-import { WORKBENCH_SOURCE_PANEL_WIDTH_KEY } from '../src/lib/panelLayout.js';
+import { importLibraryFiles } from '../importer.js';
+import { harness } from '../acceptance/harness.js';
+import { WORKBENCH_SOURCE_PANEL_WIDTH_KEY } from '../../src/lib/panelLayout.js';
 
 const paragraph =
   'A vertical full illustration of a girl waiting at a bus shelter just after the rain. She stands slightly right of centre, the transparent umbrella tilted toward the viewer, while the wet pavement mirrors the pale sky.';
@@ -248,7 +248,7 @@ export async function runReadmeScreenshots({
     screenshots.push(name);
   };
   try {
-    const source = path.resolve('demo/promo-v090/final');
+    const source = path.resolve('demo/images/final');
     const files = (await fs.readdir(source))
       .filter((f) => f.endsWith('.png'))
       .sort()

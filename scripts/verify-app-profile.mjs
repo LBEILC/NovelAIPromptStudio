@@ -146,7 +146,7 @@ try {
   await fs.writeFile(path.join(root, 'owner'), 'verify:app');
   await fs.mkdir(path.join(root, 'fixtures'));
   if (options.category === '图片库·复制') {
-    const source = path.resolve('demo/promo-v090/final');
+    const source = path.resolve('demo/images/final');
     // Full-suite library order starts with the last imported fixture. Keep that
     // same image (also present in the recorded CI-timeout screenshot) here.
     const file = (await fs.readdir(source))
@@ -155,7 +155,7 @@ try {
       .at(-1);
     await fs.copyFile(path.join(source, file), path.join(root, 'fixtures', file));
   } else if (options.needsLibrary)
-    await fs.cp(path.resolve('demo/promo-v090/final'), path.join(root, 'fixtures'), {
+    await fs.cp(path.resolve('demo/images/final'), path.join(root, 'fixtures'), {
       recursive: true,
     });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));

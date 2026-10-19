@@ -9,7 +9,7 @@ vi.mock('electron', () => ({
   nativeImage: { createFromBuffer: vi.fn() },
   screen: { getDisplayMatching: () => ({ size: { width: 1024, height: 768 } }) },
 }));
-vi.mock('./importer.js', () => ({
+vi.mock('../importer.js', () => ({
   importLibraryFiles: vi.fn(async () => ({ imported: Array(14).fill({}), errors: [] })),
 }));
 const { runAppScreenshots } = await import('./appScreenshots.js');

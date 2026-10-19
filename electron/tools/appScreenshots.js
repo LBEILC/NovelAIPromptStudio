@@ -1,15 +1,15 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ipcMain, nativeImage, screen } from 'electron';
-import { importLibraryFiles } from './importer.js';
-import { screenshotScenes } from '../scripts/app-screenshot-scenes.mjs';
-import { createWorkbenchFixtures, workbenchRaw } from './acceptance/workbenchFixtures.js';
-import { readWorkbenchImage } from './workbench.js';
+import { importLibraryFiles } from '../importer.js';
+import { screenshotScenes } from '../../scripts/app-screenshot-scenes.mjs';
+import { createWorkbenchFixtures, workbenchRaw } from '../acceptance/workbenchFixtures.js';
+import { readWorkbenchImage } from '../workbench.js';
 import { prepareWorkbenchScreenshot } from './workbenchScreenshots.js';
 import { prepareSettingsScreenshot } from './settingsScreenshots.js';
 import { workbenchReferenceRenderer } from './workbenchReference.js';
 import { prepareLibraryScreenshot } from './libraryScreenshots.js';
-import referenceSupport from '../scripts/reference-availability.cjs';
+import referenceSupport from '../../scripts/reference-availability.cjs';
 
 async function renderedFonts(webContents, selectors) {
   const cdp = webContents.debugger;
@@ -59,7 +59,7 @@ export async function runAppScreenshots({
     if (file.endsWith('.png') || file === 'manifest.json')
       await fs.unlink(path.join(mode.output, file));
   }
-  const source = path.resolve('demo/promo-v090/final');
+  const source = path.resolve('demo/images/final');
   const filePaths = (await fs.readdir(source))
     .filter((name) => name.endsWith('.png'))
     .sort()

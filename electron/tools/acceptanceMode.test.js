@@ -85,7 +85,11 @@ it('slows each real temporary-profile file operation without delaying other path
 });
 
 it('normal startup changes no paths and installs no doubles', () => {
-  const app = { setPath: vi.fn(), disableHardwareAcceleration: vi.fn() };
+  const app = {
+    setPath: vi.fn(),
+    disableHardwareAcceleration: vi.fn(),
+    commandLine: { appendSwitch: vi.fn() },
+  };
   const dialog = { showOpenDialog: vi.fn() };
   const shell = { openExternal: vi.fn() };
   const original = dialog.showOpenDialog;
@@ -95,6 +99,7 @@ it('normal startup changes no paths and installs no doubles', () => {
   expect(dialog.showOpenDialog).toBe(original);
   expect(app.setPath).not.toHaveBeenCalled();
   expect(app.disableHardwareAcceleration).not.toHaveBeenCalled();
+  expect(app.commandLine.appendSwitch).not.toHaveBeenCalled();
 });
 
 it('rejects ordinary profiles before accessing their contents', () => {
@@ -116,6 +121,7 @@ it.each([false, true])(
         commandLine: { appendSwitch: vi.fn() },
       };
       const mode = configureAcceptanceMode(app, ['--verify-app=' + root]);
+      expect(app.commandLine.appendSwitch).toHaveBeenCalledWith('no-sandbox');
       expect(
         app.commandLine.appendSwitch.mock.calls.some(
           ([name]) => name === 'force-prefers-reduced-motion',

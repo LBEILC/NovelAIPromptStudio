@@ -85,6 +85,8 @@
       "src/lib/**/*",
       "!electron/**/*.test.js",
       "!electron/fixtures/**/*",
+      "!electron/tools/*Screenshots.js",
+      "!electron/tools/workbenchReference.js",
       "!src/lib/**/*.test.js",
       "!src/lib/**/*.test.ts",
       "build/**/*",

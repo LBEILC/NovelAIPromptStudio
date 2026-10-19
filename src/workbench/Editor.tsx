@@ -46,7 +46,7 @@ import {
 } from '../lib/promptStructure.js';
 import { CATEGORY_OPTIONS, formatTag } from '../lib/prompt.js';
 import { encodeMarqueeKey } from '../lib/marqueeSelection.js';
-import { useMarqueeSelection, MarqueeSelectionOverlay } from '../components/MarqueeSelection.jsx';
+import { useMarqueeSelection, MarqueeSelectionOverlay } from '../ui/MarqueeSelection.jsx';
 import { WorkbenchDocument, type DocumentProps } from './Document';
 import {
   documentTags,

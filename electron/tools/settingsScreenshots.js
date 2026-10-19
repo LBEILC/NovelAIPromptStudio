@@ -1,4 +1,4 @@
-import { harness } from './acceptance/harness.js';
+import { harness } from '../acceptance/harness.js';
 
 export async function prepareSettingsScreenshot({ window, scene, mode }) {
   if (!scene.settingsState) return;

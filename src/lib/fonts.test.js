@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { fontStack, isMonospaceFont, partitionFontFamilies, quoteFontFamily } from './fonts.js';
+import { isMonospaceFont, partitionFontFamilies, quoteFontFamily } from './fonts.js';
 
 describe('font preferences', () => {
   it('quotes concrete font families but preserves CSS generic families', () => {
     expect(quoteFontFamily('Cascadia Mono')).toBe('"Cascadia Mono"');
     expect(quoteFontFamily('system-ui')).toBe('system-ui');
-    expect(fontStack('Cascadia Mono', 'mono')).toContain('"Cascadia Mono"');
   });
 
   it('uses metadata, names, and measured glyph widths to identify monospace fonts', () => {

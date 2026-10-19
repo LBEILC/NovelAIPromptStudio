@@ -14,7 +14,7 @@ export const defaultAppearance: AppearanceSettings = {
   sansFont: 'MiSans',
   monoFont: 'IBM Plex Mono',
   proseFont: defaultProseFont,
-  motion: 'full',
+  motion: 'reduced',
 };
 const AppearanceContext = createContext<{
   appearance: AppearanceSettings;

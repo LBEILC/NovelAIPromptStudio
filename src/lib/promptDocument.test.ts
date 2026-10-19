@@ -613,7 +613,7 @@ describe('lossless block document', () => {
 
   it('checks every repository demo image scope against the legacy parser', async () => {
     // src/lib -> root is two levels; metadata reads only the explicitly approved demo folder.
-    const root = new URL('../../demo/promo-v090/final/', import.meta.url);
+    const root = new URL('../../demo/images/final/', import.meta.url);
     const files = (await readdir(root)).filter((name) => name.endsWith('.png'));
     expect(files).toHaveLength(14);
     let checked = 0;

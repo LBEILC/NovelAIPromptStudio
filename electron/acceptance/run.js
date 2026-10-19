@@ -10,7 +10,7 @@ import { libraryInteractionChecks, workbenchInteractionChecks } from './interact
 import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import { libraryChecks } from './library.js';
-import { motionChecks, applyMotionBaseline } from './motion.js';
+import { motionChecks, applyMotionBaseline, defaultMotionChecks } from './motion.js';
 import { motionOffChecks } from './motionOff.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -112,7 +112,10 @@ export async function runAcceptance(context) {
     });
     await wait('!!document.querySelector(".studio-titlebar") && !!window.studio');
     h.dualThemes(true);
-    if (mode.phase === 0) await applyMotionBaseline(h, mode);
+    if (mode.phase === 0) {
+      await defaultMotionChecks(h);
+      await applyMotionBaseline(h, mode);
+    }
     if (mode.reducedMotion)
       await check(
         '进程级系统减少动态效果已启用（未使用 CDP）',

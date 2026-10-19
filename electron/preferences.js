@@ -13,7 +13,7 @@ const APPEARANCE_DEFAULTS = Object.freeze({
   sansFont: 'MiSans',
   monoFont: 'IBM Plex Mono',
   proseFont: 'Newsreader',
-  motion: 'full',
+  motion: 'reduced',
 });
 const APPEARANCE_VALUES = {
   themeMode: new Set(['auto', 'dark', 'light']),

@@ -60,13 +60,13 @@ import {
   installUpdateAfterClosingDatabase,
 } from './updates.js';
 import { configureAppProfile } from './appProfile.js';
-import { configureScreenshotMode } from './screenshotMode.js';
+import { configureScreenshotMode } from './tools/screenshotMode.js';
 import {
   configureAcceptanceMode,
   createAcceptanceCardCache,
   installAcceptanceDoubles,
   installAcceptanceLatency,
-} from './acceptanceMode.js';
+} from './tools/acceptanceMode.js';
 import {
   copyImageToClipboard,
   copyManagedImageToClipboard,
@@ -371,7 +371,7 @@ function batchSummary(results = {}) {
 app.whenReady().then(async () => {
   if (databaseProbeDirectory) {
     try {
-      const { runDatabaseProbe } = await import('./databaseProbe.js');
+      const { runDatabaseProbe } = await import('./tools/databaseProbe.js');
       await runDatabaseProbe(databaseProbeDirectory, databaseProbeOutput, app.isPackaged);
       app.quit();
     } catch (error) {
@@ -1671,7 +1671,7 @@ app.whenReady().then(async () => {
   }
   if (screenshotMode) {
     try {
-      const { runAppScreenshots } = await import('./appScreenshots.js');
+      const { runAppScreenshots } = await import('./tools/appScreenshots.js');
       await runAppScreenshots({
         app,
         mode: screenshotMode,

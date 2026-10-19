@@ -1,6 +1,6 @@
 import { DecodedImage, Presence, useNewItemEntrance } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
-import { startMarqueeAutoScroll } from '../components/MarqueeSelection.jsx';
+import { startMarqueeAutoScroll } from '../ui/MarqueeSelection.jsx';
 import { Check } from 'lucide-react';
 import { imageAccessibleName } from '../lib/imageNaming.js';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
