@@ -83,7 +83,11 @@
       "dist/**/*",
       "electron/**/*",
       "src/lib/**/*",
+      "src/workbench/edits.ts",
+      "src/workbench/model.ts",
+      "agent/**/*",
       "!electron/**/*.test.js",
+      "!electron/**/*.test.ts",
       "!electron/fixtures/**/*",
       "!electron/tools/*Screenshots.js",
       "!electron/tools/workbenchReference.js",
@@ -93,6 +97,7 @@
       "package.json"
     ],
     "extraResources": [
+      { "from": "agent", "to": "agent" },
       {
         "from": "LICENSE",
         "to": "LICENSE"

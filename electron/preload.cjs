@@ -14,6 +14,28 @@ function invoke(channel, ...args) {
 contextBridge.exposeInMainWorld(
   'studio',
   /** @satisfies {import('../src/shared/ipc').StudioApi} */ ({
+    invoke: (name, input) => invoke('studio:command', name, input),
+    onCommandEvent: (callback) => {
+      /** @param {Electron.IpcRendererEvent} _event @param {import('../src/shared/commands').CommandEvent} message */
+      const listener = (_event, message) => callback(message);
+      ipcRenderer.on('studio:command-event', listener);
+      return () => ipcRenderer.removeListener('studio:command-event', listener);
+    },
+    onCommandPrepare: (callback) => {
+      /** @param {Electron.IpcRendererEvent} _event @param {string} id */
+      const listener = (_event, id) => {
+        void callback().then(
+          () => ipcRenderer.send('studio:command-prepared', id, ''),
+          (error) => ipcRenderer.send('studio:command-prepared', id, String(error)),
+        );
+      };
+      ipcRenderer.on('studio:command-prepare', listener);
+      return () => ipcRenderer.removeListener('studio:command-prepare', listener);
+    },
+    getAgentSetup: () => invoke('agent:setup'),
+    installAgentCLI: () => invoke('agent:install'),
+    readAgentSkill: () => invoke('agent:skill'),
+    revealAgentSkill: () => invoke('agent:reveal'),
     readClipboardText: () => invoke('clipboard:read-text'),
     writeClipboardText: (text) => invoke('clipboard:write-text', text),
     onNavigate: (callback) => {

@@ -369,6 +369,7 @@ export default function App() {
   const {
     workbenchSession,
     setWorkbenchSession,
+    workbenchConnection,
     workbenchSessionReady,
     setWorkbenchSessionReady,
     workbenchLoading,
@@ -501,6 +502,42 @@ export default function App() {
   }, [reloadCollections]);
 
   useEffect(() => {
+    if (!workbenchConnection) return;
+    const prepare = studio.onCommandPrepare(() => workbenchConnection.prepare());
+    const events = studio.onCommandEvent((event) => {
+      const wasCurrent = event.tabId === workbenchConnection.current.activeTabId;
+      workbenchConnection.receive(event);
+      if (event.libraryChanged) {
+        void reloadLibrary('all', 'background');
+        void reloadLibrary('trash', 'background');
+        void reloadCollections('background');
+      }
+      if (event.source === 'agent' && event.undoId && wasCurrent) {
+        notificationTarget.current.notify({
+          text: 'Agent 修改了提示词',
+          tone: 'info',
+          action: {
+            label: '撤销',
+            onClick: () => {
+              void workbenchConnection
+                .flush()
+                .then(async () => {
+                  const result = await studio.invoke('workbench.undo', { undoId: event.undoId });
+                  if (!result.ok) showToast(result.error.message, 'error');
+                })
+                .catch((error) => showToast(error.message, 'error'));
+            },
+          },
+        });
+      }
+    });
+    return () => {
+      prepare();
+      events();
+    };
+  }, [workbenchConnection, reloadLibrary, reloadCollections, showToast]);
+
+  useEffect(() => {
     let active = true;
     const restore = async () => {
       if (window.studioScreenshot) {
@@ -512,65 +549,27 @@ export default function App() {
           }),
         );
         if (!active) return;
+        if (workbenchConnection) {
+          const initial = await studio.invoke('workbench.session', {});
+          if (!initial.ok) throw new Error(initial.error.message);
+          workbenchConnection.hydrate(initial.data);
+        }
         setWorkbenchSession({ version: 2, tabs, activeTabId: tabs[0]?.id || '' });
+        await workbenchConnection?.flush();
         setWorkbenchSessionReady(true);
         return;
       }
-      const saved = parseWorkbenchSession(
-        window.localStorage.getItem(WORKBENCH_SESSION_KEY) ||
-          window.localStorage.getItem(LEGACY_WORKBENCH_SESSION_KEY),
-      );
-      if (!saved?.tabs?.length) {
+      if (!workbenchConnection) {
         setWorkbenchSessionReady(true);
         return;
       }
-      setWorkbenchLoading(true);
-      const tabs = await Promise.all(
-        saved.tabs.map(async (stored) => {
-          const result = await studio.openWorkbenchImage(stored.source.path, stored.source);
-          if (!result?.ok || !result.project) {
-            return {
-              id: stored.id,
-              identity: `${stored.source.type}:${stored.source.projectId || stored.source.path || stored.source.temporaryId}`,
-              displayName: stored.displayName || '不可用图片',
-              source: stored.source,
-              originalProject: null,
-              project: syncProjectPromptMetadata({
-                id: stored.id,
-                name: stored.displayName || '',
-                image_path: stored.source.path || '',
-                thumbnail_path: '',
-                created_at: stored.updatedAt,
-                updated_at: stored.updatedAt,
-                metadata: {},
-                tags: stored.draft.tags || [],
-                prompt_structure: stored.draft.prompt_structure,
-              }),
-              savedDraft: stored.draft,
-              viewState: normalizeWorkbenchViewState(stored.viewState),
-              updatedAt: stored.updatedAt,
-              error: result?.error || '图片源已不可用',
-            };
-          }
-          const restoredSource = result.source || stored.source;
-          return createWorkbenchTab(hydrateProject(result.project), {
-            ...stored,
-            displayName:
-              restoredSource.type === 'library' ? result.project.name : stored.displayName,
-            draft: stored.draft,
-            source: restoredSource,
-          });
-        }),
-      );
-      if (!active) return;
-      setWorkbenchSession({
-        version: 2,
-        tabs,
-        activeTabId: tabs.some((tab) => tab.id === saved.activeTabId)
-          ? saved.activeTabId
-          : tabs[0]?.id || '',
+      const result = await studio.invoke('workbench.session', {
+        legacyV2: window.localStorage.getItem(WORKBENCH_SESSION_KEY) || '',
+        legacyV1: window.localStorage.getItem(LEGACY_WORKBENCH_SESSION_KEY) || '',
       });
-      window.localStorage.removeItem(LEGACY_WORKBENCH_SESSION_KEY);
+      if (!result.ok) throw new Error(result.error.message);
+      if (!active) return;
+      workbenchConnection.hydrate(result.data);
       setWorkbenchLoading(false);
       setWorkbenchSessionReady(true);
     };
@@ -588,12 +587,6 @@ export default function App() {
 
   useEffect(() => {
     if (!workbenchSessionReady) return;
-    if (workbenchSession.tabs.length)
-      window.localStorage.setItem(
-        WORKBENCH_SESSION_KEY,
-        serializeWorkbenchSession(workbenchSession),
-      );
-    else window.localStorage.removeItem(WORKBENCH_SESSION_KEY);
     const temporaryPaths = workbenchSession.tabs
       .filter((tab) => tab.source?.type === 'clipboard' && tab.source.path)
       .map((tab) => tab.source.path);
@@ -1490,14 +1483,7 @@ export default function App() {
 
   const installDownloadedUpdate = async () => {
     try {
-      const serialized = serializeWorkbenchSession(workbenchSession);
-      if (serialized) {
-        window.localStorage.setItem(WORKBENCH_SESSION_KEY, serialized);
-        if (window.localStorage.getItem(WORKBENCH_SESSION_KEY) !== serialized)
-          throw new Error('没能保存当前打开的标签页，更新安装已暂停');
-      } else {
-        window.localStorage.removeItem(WORKBENCH_SESSION_KEY);
-      }
+      await workbenchConnection?.flush();
       const result = await studio.installUpdate();
       if (!result?.ok) throw new Error(result?.error || '没能开始安装更新');
       return true;
@@ -1588,10 +1574,11 @@ export default function App() {
               onSaveLibrary={async () => {
                 if (!activeTab?.project) return;
                 const tabId = activeTab.id;
-                const result = await studio.saveWorkbenchToLibrary(
-                  activeTab.project.image_path,
-                  activeTab.project.prompt_structure.block_annotations,
-                );
+                await workbenchConnection?.flush();
+                const commandResult = await studio.invoke('workbench.save-to-library', { tabId });
+                const result = commandResult.ok
+                  ? { ok: true, project: commandResult.data.project }
+                  : { ok: false, error: commandResult.error.message };
                 if (!result.ok) {
                   showToast(result.error, 'error');
                   return;

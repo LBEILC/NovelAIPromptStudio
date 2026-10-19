@@ -8,6 +8,7 @@
     "types": ["node", "vite/client"],
     "strict": true,
     "allowJs": true,
+    "allowImportingTsExtensions": true,
     "checkJs": false,
     "noEmit": true,
     "isolatedModules": true,

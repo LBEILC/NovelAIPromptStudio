@@ -116,7 +116,7 @@ export async function createTrashDraft({ h, database }) {
   // Read the application's own persisted session to identify the opened library
   // project; setup moves only this disposable fixture into the recycle bin.
   const session = await e(
-    `Object.values(localStorage).map(value=>{try{return JSON.parse(value)}catch{return null}}).find(value=>value?.version===2 && value?.tabs?.some(tab=>tab.source?.type==='library'))`,
+    `(async()=>{const ready=await window.studio.invoke('workbench.list',{});if(!ready.ok)throw Error(ready.error.message);const result=await window.studio.invoke('workbench.session',{});if(!result.ok)throw Error(result.error.message);return result.data})()`,
   );
   const projectId = session.tabs.find((tab) => tab.id === session.activeTabId)?.source?.projectId;
   await check(

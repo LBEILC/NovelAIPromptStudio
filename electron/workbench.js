@@ -47,6 +47,14 @@ export function applyWorkbenchLibraryDetails(project, libraryProject) {
     created_at: libraryProject.created_at || project.created_at,
     has_custom_name: libraryProject.has_custom_name,
     thumbnail_path: String(libraryProject.thumbnail_path || '').trim(),
+    tags: libraryProject.tags ?? project.tags,
+    prompt_structure: libraryProject.prompt_structure ?? project.prompt_structure,
+    metadata: {
+      ...project.metadata,
+      prompt_raw: libraryProject.metadata?.prompt_raw ?? project.metadata?.prompt_raw,
+      negative_prompt:
+        libraryProject.metadata?.negative_prompt ?? project.metadata?.negative_prompt,
+    },
   };
 }
 

@@ -5,12 +5,13 @@ import { clipboard } from 'electron';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { importLibraryFiles } from '../importer.js';
 import { settleElements, settleLayout } from './layout.js';
+import { withWorkbenchState, sessionExpression, draftExpression } from './workbenchState.js';
 
 const frame = 'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))';
 const menu = 'document.querySelector(".nps-menu:popover-open [role=menu]")';
 const tabs = 'document.querySelectorAll(".wb-tabs-scroll .wb-tab")';
-const session = `JSON.parse(localStorage.getItem('novelai-prompt-studio.workbench-session.v2'))`;
-const draft = `(()=>{const s=${session};return s?.tabs.find(t=>t.id===s.activeTabId)?.draft})()`;
+const session = sessionExpression;
+const draft = draftExpression;
 const mod = process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true };
 
 function pointer(h) {
@@ -96,6 +97,7 @@ async function closeAddedTabs(h, previous) {
   }
 }
 async function restoredTabs(h) {
+  h = withWorkbenchState(h);
   const previous = await h.evaluate(`${session}?.tabs?.map(t=>t.id) ?? []`);
   await h.click('工作台', 'document.querySelector(".studio-titlebar")');
   // The full suite leaves tabs open. Reload finishes before their async file
@@ -121,6 +123,7 @@ async function cleanup(env, records) {
 }
 
 export async function libraryInteractionChecks(env) {
+  env = { ...env, h: withWorkbenchState(env.h) };
   const { h } = env;
   const { evaluate: e, wait, check, click, key } = h;
   h.category('图片库·交互');
@@ -393,6 +396,7 @@ export async function libraryInteractionChecks(env) {
 }
 
 export async function workbenchInteractionChecks(env) {
+  env = { ...env, h: withWorkbenchState(env.h) };
   const { h, doubles } = env;
   const { evaluate: e, wait, check, click, key } = h;
   h.category('工作台·交互');

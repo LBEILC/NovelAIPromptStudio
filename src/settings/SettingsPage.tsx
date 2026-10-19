@@ -50,6 +50,7 @@ const sections = [
   ['storage', '图片库', 'hard-drive-2-line'],
   ['ai', 'AI 服务', 'translate-2'],
   ['tags', '翻译词典', 'book-2-line'],
+  ['agent', 'Agent', 'terminal-box-line'],
   ['updates', '关于与更新', 'information-line'],
 ];
 const bytes = (value: number) =>
@@ -76,6 +77,110 @@ function Row({
       </div>
       {children}
     </div>
+  );
+}
+function Agent() {
+  const [setup, setSetup] = useState<{
+    installed: boolean;
+    path: string;
+    onPath: boolean;
+    skillPath: string;
+  } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  useEffect(() => {
+    let active = true;
+    void window.studio
+      ?.getAgentSetup()
+      .then((result) => {
+        if (!active) return;
+        if (result.ok) setSetup(result);
+        else setMessage(result.error);
+      })
+      .catch((error) => {
+        if (active) setMessage(error.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const install = async () => {
+    setBusy(true);
+    try {
+      const result = await window.studio!.installAgentCLI();
+      if (!result.ok) throw Error(result.error);
+      setSetup(result);
+      setMessage('');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const copy = async () => {
+    try {
+      const result = await window.studio!.readAgentSkill();
+      if (!result.ok) throw Error(result.error);
+      await writeClipboardText(result.text);
+      setMessage('已复制技能内容');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  };
+  return (
+    <SettingsFrame
+      title="Agent"
+      description="让你自己的 Agent（比如 Claude Code、Codex）通过命令行使用这个软件：读提示词、改工作台、搜图片库。"
+    >
+      <Row
+        title="命令行工具"
+        help={
+          setup?.installed
+            ? [
+                setup.path,
+                // TODO(design): Confirm terminal PATH guidance for platforms without automatic PATH updates.
+                ...(!setup.onPath
+                  ? [
+                      '【文案待定：在终端配置中加入 export PATH="$HOME/.local/bin:$PATH"，然后重新打开终端。】',
+                    ]
+                  : []),
+              ]
+            : undefined
+        }
+      >
+        <div className="settings-actions">
+          <span>{setup?.installed ? '已安装' : '未安装'}</span>
+          <Button loading={busy} onClick={() => void install()}>
+            {setup?.installed ? '重新安装' : '安装'}
+          </Button>
+        </div>
+      </Row>
+      <Row title="Agent 技能" help="一份教 Agent 怎么用这些命令的说明，放进你的 Agent 的技能目录。">
+        <div className="settings-actions">
+          <Button
+            variant="quiet"
+            onClick={() => {
+              void window.studio!.revealAgentSkill().then((result) => {
+                if (!result.ok) setMessage(result.error);
+              });
+            }}
+          >
+            打开所在文件夹
+          </Button>
+          <Button onClick={() => void copy()}>复制内容</Button>
+        </div>
+      </Row>
+      <Row
+        title="Agent 能做什么"
+        help={[
+          '读提示词和参数，改工作台，搜索和整理图片库，修改翻译词典。',
+          '不能永久删除图片，不能改设置，读不到任何密钥。',
+        ]}
+      >
+        {null}
+      </Row>
+      <p role="status">{message}</p>
+    </SettingsFrame>
   );
 }
 function Appearance() {
@@ -654,6 +759,9 @@ export default function SettingsPage(props: {
         </Activity>
         <Activity mode={section === 'updates' ? 'visible' : 'hidden'}>
           <About {...props} />
+        </Activity>
+        <Activity mode={section === 'agent' ? 'visible' : 'hidden'}>
+          <Agent />
         </Activity>
       </TransitionSurface>
     ),

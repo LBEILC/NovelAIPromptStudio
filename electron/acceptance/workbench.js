@@ -4,16 +4,18 @@ import { clipboard, nativeImage } from 'electron';
 import { createWorkbenchFixtures, workbenchRaw, workbenchNegative } from './workbenchFixtures.js';
 import { tabOutlineChecks } from './tabOutline.js';
 import { settleElements } from './layout.js';
+import { withWorkbenchState, sessionExpression, draftExpression } from './workbenchState.js';
 
 export async function workbenchChecks({ h, mode, doubles, database, preferences }) {
+  h = withWorkbenchState(h);
   const { evaluate: e, wait, click, input, check, key } = h;
   h.category('工作台');
   const files = await createWorkbenchFixtures(path.join(mode.root, 'workbench-fixtures'));
   const previousSize = h.window.getContentSize();
   h.window.setContentSize(1240, 760);
   const modifier = process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true };
-  const session = `JSON.parse(localStorage.getItem('novelai-prompt-studio.workbench-session.v2'))`;
-  const draft = `(()=>{const s=${session};return s?.tabs.find(t=>t.id===s.activeTabId)?.draft})()`;
+  const session = sessionExpression;
+  const draft = draftExpression;
   const raw = `(${draft})?.prompt_structure.base_prompt_raw`;
   const base = 'document.querySelector(".wb-section[data-wb-scope=\"base:prompt\"]")';
   // All actions go through DOM or Electron/CDP. The persisted session is observed, never set.

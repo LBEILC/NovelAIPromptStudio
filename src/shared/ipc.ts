@@ -25,6 +25,7 @@ import type {
   WorkbenchImage,
   WorkbenchSource,
 } from './types';
+import type { InvokeCommand, CommandEvent } from './commands';
 
 export interface Failure {
   ok: false;
@@ -143,6 +144,17 @@ export type DroppedFiles = Iterable<File> | ArrayLike<File> | null;
 // Each signature corresponds to one property in electron/preload.cjs.
 // Event unsubscriptions return ipcRenderer in the preload implementation.
 export interface StudioApi {
+  invoke: InvokeCommand;
+  onCommandEvent(callback: (event: CommandEvent) => void): () => void;
+  onCommandPrepare(callback: () => Promise<void>): () => void;
+  getAgentSetup(): Promise<
+    Result<{ installed: boolean; path: string; onPath: boolean; skillPath: string }>
+  >;
+  installAgentCLI(): Promise<
+    Result<{ installed: boolean; path: string; onPath: boolean; skillPath: string }>
+  >;
+  readAgentSkill(): Promise<Result<{ text: string }>>;
+  revealAgentSkill(): Promise<Result>;
   readClipboardText(): Promise<string>;
   writeClipboardText(text: string): Promise<void>;
   loadLibrary(view?: 'all' | 'favorites' | 'trash'): Promise<ImageRecord[]>;

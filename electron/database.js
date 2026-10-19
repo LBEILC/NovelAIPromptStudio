@@ -1622,6 +1622,74 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       'SELECT id, name, image_path, thumbnail_path, deleted_at FROM projects WHERE content_hash = $content_hash LIMIT 1',
       { $content_hash: String(contentHash || '') },
     )[0] || null;
+
+  // An explicit workbench save changes the library's prompt record, never the
+  // original image bytes. Keep collection membership and the asset identity.
+  const saveProjectPrompt = (id, draft) => {
+    const existing = loadProject(id);
+    if (!existing) throw new Error('图片不存在');
+    const next = {
+      ...existing,
+      tags: draft.tags,
+      prompt_structure: draft.prompt_structure,
+      metadata: {
+        ...existing.metadata,
+        prompt_raw: draft.metadata.prompt_raw,
+        negative_prompt: draft.metadata.negative_prompt,
+      },
+    };
+    const fingerprints = galleryProjectGroupingFingerprints(next);
+    database.run('BEGIN');
+    try {
+      database.run('DELETE FROM prompt_tags WHERE project_id = $id', { $id: id });
+      for (const [position, tag] of next.tags.entries())
+        database.run(
+          `INSERT INTO prompt_tags (id, project_id, tag, translation, category, weight, position, note, raw_segment, syntax_issue, brace_depth, brace_group, brace_trailing_comma)
+         VALUES ($tag_id, $id, $tag, $translation, $category, $weight, $position, $note, $raw_segment, $syntax_issue, $brace_depth, $brace_group, $brace_trailing_comma)`,
+          {
+            $tag_id: `${id}:saved:${position}`,
+            $id: id,
+            $tag: tag.tag,
+            $translation: tag.translation || '',
+            $category: normalizeCategory(tag.category, tag.tag),
+            $weight: tag.weight ?? 1,
+            $position: position,
+            $note: tag.note || '',
+            $raw_segment: tag.raw_segment || '',
+            $syntax_issue: tag.syntax_issue || '',
+            $brace_depth: tag.brace_depth || 0,
+            $brace_group: tag.brace_group || '',
+            $brace_trailing_comma: tag.brace_trailing_comma ? 1 : 0,
+          },
+        );
+      database.run(
+        'UPDATE generation_metadata SET prompt_raw=$prompt, negative_prompt=$negative, prompt_structure_json=$structure WHERE project_id=$id',
+        {
+          $id: id,
+          $prompt: next.metadata.prompt_raw,
+          $negative: next.metadata.negative_prompt,
+          $structure: JSON.stringify(next.prompt_structure),
+        },
+      );
+      database.run(
+        'UPDATE projects SET prompt_fingerprint=$prompt, base_prompt_fingerprint=$base, exact_group_fingerprint=$exact, updated_at=$time WHERE id=$id',
+        {
+          $id: id,
+          $prompt: fingerprints.promptFingerprint,
+          $base: fingerprints.basePromptFingerprint,
+          $exact: fingerprints.exactGroupFingerprint,
+          $time: new Date().toISOString(),
+        },
+      );
+      clearInvalidGroupCovers();
+      database.run('COMMIT');
+      persist();
+      return loadProject(id);
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+  };
   const projectHashCandidates = () =>
     query("SELECT id, image_path FROM projects WHERE content_hash = '' AND deleted_at = ''");
   const projectDimensionCandidates = () =>
@@ -1962,6 +2030,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     deleteTagDictionaries: atomic(deleteTagDictionaries),
     enrichProjectTags,
     insertProject: atomic(insertProject),
+    saveProjectPrompt: atomic(saveProjectPrompt),
     deleteProject: atomic(deleteProject),
     updateProjectName: atomic(updateProjectName),
     loadWorkbenchStructure: (filePath) => {

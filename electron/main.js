@@ -42,11 +42,7 @@ import { lookupDanbooruTags } from './danbooru.js';
 import { lookupDsoTags, searchDsoTags } from './dsoDictionary.js';
 import { annotateTags } from './tagAnnotations.js';
 import { exportEmbeddedVibeFile } from './vibes.js';
-import {
-  applyWorkbenchLibraryDetails,
-  readWorkbenchImage,
-  applyWorkbenchStructure,
-} from './workbench.js';
+import { applyWorkbenchLibraryDetails, applyWorkbenchStructure } from './workbench.js';
 import { listSystemFonts } from './fonts.js';
 import {
   createDatabaseStorage,
@@ -60,6 +56,7 @@ import {
   installUpdateAfterClosingDatabase,
 } from './updates.js';
 import { configureAppProfile } from './appProfile.js';
+import { installCommandRuntime } from './commands/runtime.js';
 import { configureScreenshotMode } from './tools/screenshotMode.js';
 import {
   configureAcceptanceMode,
@@ -100,6 +97,17 @@ if (databaseProbeDirectory) {
   app.setPath('userData', databaseProbeDirectory);
   app.setPath('sessionData', databaseProbeDirectory);
 } else if (!screenshotMode && !acceptanceMode) configureAppProfile(app);
+if (!databaseProbeDirectory && !screenshotMode && !acceptanceMode) {
+  if (!app.requestSingleInstanceLock()) app.exit(0);
+  app.on('second-instance', () => {
+    const window = BrowserWindow.getAllWindows()[0];
+    if (window) {
+      if (window.isMinimized()) window.restore();
+      window.show();
+      window.focus();
+    }
+  });
+}
 if (process.platform === 'win32') app.setAppUserModelId('studio.novelai.prompt');
 protocol.registerSchemesAsPrivileged([
   {
@@ -116,6 +124,8 @@ let contentBackfill = Promise.resolve();
 let storageMigrationActive = false;
 let permanentDeletionActive = false;
 let workbenchTemporaryDirectory;
+let commandRuntime;
+let quitPrepared = false;
 let updateState = {
   phase: 'idle',
   progress: 0,
@@ -250,6 +260,18 @@ function createWindow(captureState = null) {
     },
   });
   guardClientWindow(window, { packaged: app.isPackaged, shell });
+  let closePrepared = false;
+  window.on('close', (event) => {
+    if (acceptanceMode || captureState || quitPrepared || closePrepared || !commandRuntime) return;
+    event.preventDefault();
+    void commandRuntime
+      .prepareWindow(window)
+      .then(() => {
+        closePrepared = true;
+        window.close();
+      })
+      .catch((error) => console.error('Unable to save workbench before closing:', error));
+  });
   window.once('ready-to-show', async () => {
     await syncTitleBarOverlay(window);
     if (!acceptanceMode && !captureState && !window.isDestroyed()) window.show();
@@ -353,6 +375,12 @@ function configureAutoUpdater() {
 function imageDialogDefaultPath() {
   const recent = preferences.productivitySettings().recentImageDirectory;
   return recent || undefined;
+}
+
+async function readCommandImage(filePath) {
+  const result = await commandRuntime.dispatch('image.read', { path: filePath }, 'ui');
+  if (!result.ok) throw new Error(result.error.message);
+  return result.data.project;
 }
 
 function rememberImageDirectory(filePaths = []) {
@@ -631,9 +659,7 @@ app.whenReady().then(async () => {
       rememberImageDirectory(result.filePaths);
     }
     try {
-      const project = await readWorkbenchImage(filePath, {
-        enrichProjectTags: database.enrichProjectTags,
-      });
+      const project = await readCommandImage(filePath);
       return {
         ok: true,
         project: applyWorkbenchLibraryDetails(
@@ -663,9 +689,7 @@ app.whenReady().then(async () => {
         items.push({
           ok: true,
           project: applyWorkbenchStructure(
-            await readWorkbenchImage(filePath, {
-              enrichProjectTags: database.enrichProjectTags,
-            }),
+            await readCommandImage(filePath),
             database.loadWorkbenchStructure(filePath),
           ),
           source: { type: 'file', path: filePath },
@@ -687,9 +711,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('workbench:image:clipboard', async () => {
     try {
       const source = readClipboardImageSource(workbenchTemporaryDirectory);
-      const project = await readWorkbenchImage(source.filePath, {
-        enrichProjectTags: database.enrichProjectTags,
-      });
+      const project = await readCommandImage(source.filePath);
       return {
         ok: true,
         project,
@@ -1648,6 +1670,28 @@ app.whenReady().then(async () => {
     }
   });
 
+  try {
+    commandRuntime = await installCommandRuntime({
+      database,
+      assetsDirectory: () => assetsDirectory,
+      busy: () => storageMigrationActive || permanentDeletionActive,
+      createWindow,
+      testRoot: acceptanceMode ? path.join(acceptanceMode.root, 'agent-install') : undefined,
+    });
+  } catch (error) {
+    console.error('Unable to initialize workbench commands:', error);
+    if (!acceptanceMode && !screenshotMode) {
+      // TODO(design): Confirm startup failure copy for unreadable sessions or unavailable local IPC.
+      dialog.showErrorBox(
+        '【文案待定：工作台启动失败】',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+    database.close();
+    app.exit(1);
+    return;
+  }
+
   if (acceptanceMode) {
     try {
       const { runAcceptance } = await import('./acceptance/run.js');
@@ -1697,8 +1741,20 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   if (!screenshotMode && !acceptanceMode && process.platform !== 'darwin') app.quit();
 });
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (!quitPrepared && commandRuntime && !acceptanceMode && !screenshotMode) {
+    event.preventDefault();
+    void commandRuntime
+      .flush()
+      .then(() => {
+        quitPrepared = true;
+        app.quit();
+      })
+      .catch((error) => console.error('Unable to save workbench before quitting:', error));
+    return;
+  }
   quitting = true;
+  void commandRuntime?.close();
   database?.close();
   for (const sessionId of preparedImports.keys()) releasePreparedImport(sessionId).catch(() => {});
 });

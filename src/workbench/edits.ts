@@ -5,9 +5,9 @@ import {
   createPromptDocument,
   promptDocumentProject,
   type PromptDocument,
-} from '../lib/promptDocument';
+} from '../lib/promptDocument.ts';
 import { formatTag, promptTagRanges } from '../lib/prompt.js';
-import { replaceSection, reparseSection, type DocumentTag } from './model';
+import { replaceSection, reparseSection, type DocumentTag } from './model.ts';
 
 export function insertTags(
   document: PromptDocument,

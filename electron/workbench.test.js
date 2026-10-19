@@ -102,6 +102,17 @@ describe('workbench image reader', () => {
       ),
     ).toMatchObject({ name: '图库标题', thumbnail_path: 'thumbnail.webp' });
   });
+  it('reopens the saved library draft while retaining image generation details', () => {
+    const image = { metadata: { prompt_raw: 'original', negative_prompt: '', seed: 42 }, tags: [] };
+    const saved = {
+      metadata: { prompt_raw: 'edited', negative_prompt: 'blur' },
+      tags: [{ tag: 'edited' }],
+    };
+    const reopened = applyWorkbenchLibraryDetails(image, saved);
+    expect(reopened.metadata).toEqual({ prompt_raw: 'edited', negative_prompt: 'blur', seed: 42 });
+    expect(reopened.tags).toEqual(saved.tags);
+    expect(image.metadata.prompt_raw).toBe('original');
+  });
 
   it('parses a source image without copying it into the library', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-workbench-'));

@@ -24,8 +24,13 @@ import { uiPolishChecks } from './uiPolish.js';
 import { shortcutChecks } from './shortcuts.js';
 import { preserveClipboard } from './clipboard.js';
 import { cardCacheChecks } from './cardCache.js';
+import { agentChecks } from './agent.js';
 
 export async function runAcceptance(context) {
+  if (context.mode.commandBenchmark) {
+    const { runCommandBenchmark } = await import('./commandBenchmark.js');
+    return runCommandBenchmark(context);
+  }
   if (context.mode.libraryBenchmark) {
     const { runLibraryBenchmark } = await import('./libraryBenchmark.js');
     return runLibraryBenchmark(context);
@@ -370,6 +375,7 @@ export async function runAcceptance(context) {
     };
     if (mode.packaged) {
       await clientChecks(environment);
+      await agentChecks(environment);
       h.category('安装包');
       const { default: sharp } = await import('sharp');
       await check(
@@ -400,6 +406,7 @@ export async function runAcceptance(context) {
         await workbenchInteractionChecks(environment);
         await interactionCorrectionChecks(environment);
         await detailLayoutChecks(environment);
+        await agentChecks(environment);
         await componentChecks(environment);
       } else if (mode.category === '诊断·计时') {
         h.category('诊断·计时');
@@ -415,6 +422,7 @@ export async function runAcceptance(context) {
       else if (mode.category === '悬停态覆盖') await hoverChecks(environment);
       else if (mode.category === '客户端控件') await clientControlChecks(environment);
       else if (mode.category === '外壳') await shellChecks();
+      else if (mode.category === 'Agent') await agentChecks(environment);
       else if (mode.category === '工作台') await workbenchChecks(environment);
       else if (mode.category === '工作台·细节') await workbenchPolishChecks(environment);
       else if (mode.category === '工作台·交互') await workbenchInteractionChecks(environment);
@@ -483,6 +491,7 @@ export async function runAcceptance(context) {
           () => interactionCorrectionChecks(environment),
           () => detailLayoutChecks(environment),
           () => uiPolishChecks(environment),
+          () => agentChecks(environment),
           () => componentChecks(environment),
         ],
       ];

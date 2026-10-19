@@ -1,25 +1,12 @@
-import { useState } from 'react';
-import type { ImageProject, WorkbenchSource } from '../shared/types';
-import { normalizeWorkbenchViewState } from '../lib/workbenchSession.js';
-
-export interface WorkbenchTab {
-  id: string;
-  identity: string;
-  displayName: string;
-  source: WorkbenchSource;
-  project: ImageProject | null;
-  originalProject: ImageProject | null;
-  viewState: ReturnType<typeof normalizeWorkbenchViewState>;
-  updatedAt: string;
-  error: string;
-}
-export interface WorkbenchSession {
-  version: number;
-  tabs: WorkbenchTab[];
-  activeTabId: string;
-}
+import { useState, useRef, useEffect } from 'react';
+import { WorkbenchConnection } from '../lib/workbenchConnection';
+import type { CommandSession } from '../shared/commands';
+export type {
+  CommandTab as WorkbenchTab,
+  CommandSession as WorkbenchSession,
+} from '../shared/commands';
 export function useWorkbenchState() {
-  const [workbenchSession, setWorkbenchSession] = useState<WorkbenchSession>({
+  const [workbenchSession, publishSession] = useState<CommandSession>({
     version: 2,
     tabs: [],
     activeTabId: '',
@@ -27,6 +14,20 @@ export function useWorkbenchState() {
   const [workbenchSessionReady, setWorkbenchSessionReady] = useState(false);
   const [workbenchLoading, setWorkbenchLoading] = useState(false);
   const [workbenchError, setWorkbenchError] = useState('');
+  const connection = useRef<WorkbenchConnection | null>(null);
+  if (!connection.current && window.studio?.invoke)
+    connection.current = new WorkbenchConnection(
+      window.studio.invoke,
+      publishSession,
+      setWorkbenchError,
+    );
+  const setWorkbenchSession = (
+    next: CommandSession | ((previous: CommandSession) => CommandSession),
+  ) => {
+    if (connection.current) connection.current.update(next);
+    else publishSession(next);
+  };
+  useEffect(() => () => connection.current?.dispose(), []);
   const [workbenchFocus, setWorkbenchFocus] = useState<{ scopeKey: string; tagId: string | null }>({
     scopeKey: 'base:prompt',
     tagId: null,
@@ -34,6 +35,7 @@ export function useWorkbenchState() {
   return {
     workbenchSession,
     setWorkbenchSession,
+    workbenchConnection: connection.current,
     workbenchSessionReady,
     setWorkbenchSessionReady,
     workbenchLoading,

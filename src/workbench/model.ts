@@ -6,7 +6,7 @@ import {
   type PromptDocument,
   type PromptDocumentScope,
   type PromptSection,
-} from '../lib/promptDocument';
+} from '../lib/promptDocument.ts';
 import type { Tag } from '../shared/types';
 import type { TagCategory } from '../ui';
 

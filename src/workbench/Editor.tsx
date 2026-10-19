@@ -420,7 +420,10 @@ export function WorkbenchEditor(p: EditorProps) {
               ? {
                   section: raw.section,
                   content: (
-                    <div className="wb-raw-editor">
+                    <div
+                      className="wb-raw-editor"
+                      data-command-scope={doc.scopes[raw.section].scope.key}
+                    >
                       <TextArea
                         autoSize
                         aria-label="原始文本"
@@ -719,7 +722,11 @@ export function WorkbenchEditor(p: EditorProps) {
         {dragFeedback.overlay}
       </DndContext>
       <Popover label="编辑 Tag" open={!!editing} anchor={anchor} onClose={() => setEditing(null)}>
-        <div className="wb-tag-editor">
+        <div
+          className="wb-tag-editor"
+          data-command-scope={editing ? doc.scopes[editing.section].scope.key : undefined}
+          data-command-block={editing?.block}
+        >
           <label>
             Tag
             <Input
