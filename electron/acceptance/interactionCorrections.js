@@ -322,6 +322,10 @@ export async function interactionCorrectionChecks(env) {
       pop('加入收藏集'),
     );
     for (const record of records.slice(0, 2)) {
+      await wait(
+        `!!document.querySelector('[data-project-id="${record.id}"]')`,
+        '换页后目标图片已渲染',
+      );
       await e(
         `document.querySelector('[data-project-id="${record.id}"]').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
       );
@@ -400,9 +404,10 @@ export async function interactionCorrectionChecks(env) {
     await click('编辑原始文本', menu);
     await focusRingChecks(h, '原始文本编辑');
     await e(`document.querySelector('[aria-label="原始文本"]').focus({preventScroll:true})`);
+    await settleLayout(h, '[aria-label="原始文本"]');
     await check(
       '原始文本打开并聚焦后仍从完整第一行开始',
-      `(()=>{const n=document.querySelector('[aria-label="原始文本"]');return n.scrollTop===0&&n.selectionStart===0&&parseFloat(getComputedStyle(n).paddingTop)>=0})()`,
+      `(()=>{const n=document.querySelector('[aria-label="原始文本"]'),s=getComputedStyle(n);return document.activeElement===n&&parseFloat(s.outlineWidth)>0&&s.outlineStyle!=='none'&&n.scrollTop===0&&n.selectionStart===0&&parseFloat(s.paddingTop)>=0})()`,
     );
     await h.screenshot('024-raw-focused');
     await h.input('[aria-label="原始文本"]', 'synthetic_short');

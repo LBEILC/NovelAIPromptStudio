@@ -97,10 +97,8 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   doubles.selections.push({ canceled: false, filePaths: [files[0]] });
   await click('打开图片', 'document.querySelector(".studio-titlebar")');
   await wait('document.querySelectorAll(".wb-block").length===4');
-  await h.evaluate(() =>
-    document
-      .querySelector('.wb-tab')
-      .dispatchEvent(new MouseEvent('auxclick', { bubbles: true, button: 1 })),
+  await e(
+    `document.querySelector('.wb-tab').dispatchEvent(new MouseEvent('auxclick', { bubbles: true, button: 1 }))`,
   );
   await wait('document.querySelectorAll(".wb-tab").length===0');
   await check(
@@ -205,6 +203,10 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   }
   await h.select('排列', '按分类');
   await key('Escape');
+  await wait(
+    'document.body.innerText.includes("按分类排列时不能拖动排序")',
+    '选择排列后立即关闭浮层仍提交选择',
+  );
   await check(
     '按分类排列保留段落并提示不可拖动排序',
     '!!document.querySelector(".wb-prose") && document.body.innerText.includes("按分类排列时不能拖动排序")',
@@ -633,6 +635,10 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     'once',
   );
   await e('document.querySelectorAll(".wb-tab")[1].click()');
+  await wait(
+    `(${session}).activeTabId===document.querySelectorAll('.wb-tab')[1].dataset.workbenchTabId`,
+    '标签页内容与持久化选择已切换',
+  );
   await fs.rename(files[1], files[1] + '.moved');
   await h.reload();
   await wait('document.body.innerText.includes("这张图片已被移动或删除")');

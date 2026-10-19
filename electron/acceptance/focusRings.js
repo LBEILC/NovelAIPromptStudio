@@ -16,8 +16,10 @@ export async function focusRingChecks(h, label) {
         node.scrollIntoView({block:'nearest',inline:'nearest'});
         node.focus({preventScroll:true});
         const owner=node.closest('.nps-field')||node;
+        getComputedStyle(owner).outlineWidth;
         for(const a of owner.getAnimations())a.finish();
         const style=getComputedStyle(owner),r=owner.getBoundingClientRect(),out=Math.max(0,parseFloat(style.outlineWidth)+parseFloat(style.outlineOffset));
+        if(document.activeElement!==node||style.outlineStyle==='none'||parseFloat(style.outlineWidth)===0){failures.push({control:node.getAttribute('aria-label')||node.textContent.slice(0,50),reason:'missing focus paint'});continue;}
         if(style.outlineStyle==='none'||!out)continue;
         for(let parent=owner.parentElement;parent;parent=parent.parentElement){
           const s=getComputedStyle(parent),b=parent.getBoundingClientRect();
