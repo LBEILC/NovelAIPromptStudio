@@ -301,6 +301,9 @@ export function WorkbenchEditor(p: EditorProps) {
 
   // ---------- Tag 的编辑浮层 ----------
   const [editing, setEditing] = useState<DocumentTag | null>(null);
+  // 关上浮层的淡出期间还要知道是哪个 Tag 打开的（定位和还焦点）
+  const lastEditKey = useRef('');
+  if (editing) lastEditKey.current = editing.key;
   const [draft, setDraft] = useState({ tag: '', translation: '', category: 'Unsorted', weight: 1 });
   const [catMenu, setCatMenu] = useState(false);
   const openEditor = (e: DocumentTag) => {
@@ -1908,8 +1911,8 @@ export function WorkbenchEditor(p: EditorProps) {
       <Pop
         open={!!editing}
         onClose={commitEditor}
-        anchor={editing ? tagRef(editing.key) : undefined}
-        trigger={editing ? tagRef(editing.key) : undefined}
+        anchor={lastEditKey.current ? tagRef(lastEditKey.current) : undefined}
+        trigger={lastEditKey.current ? tagRef(lastEditKey.current) : undefined}
         className="popover tag-pop"
         restoreFocus
         label="编辑 Tag"

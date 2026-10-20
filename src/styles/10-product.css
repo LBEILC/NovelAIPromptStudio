@@ -140,3 +140,14 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 /* 图片库：悬停细线那条规则（.lgrid .card img）在后面，会把当前卡片的朱砂框和多选的墨色框盖掉 */
 .lgrid .card.on img { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
 .lgrid .card.picked img { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ZIP 导入：预览还没读出来的小图是浅灰底加一道慢慢扫过的微光，读出来以后淡入；选中的框画在外层 */
+.ztile .zthumb { position: relative; display: block; width: 100%; height: 100%; overflow: hidden; border-radius: var(--r-thumb); background: var(--hover); }
+.ztile .zthumb img { opacity: 0; transition: opacity var(--dur-2) var(--ease-out); }
+.ztile .zthumb.ready img { opacity: 1; }
+.ztile.dup .zthumb.ready img { opacity: var(--dim); }
+.ztile .zthumb.wait::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--surface) 70%, transparent) 50%, transparent 70%); transform: translateX(-100%); animation: zshine calc(var(--dur-spin) * 2) var(--ease-move) infinite; }
+@keyframes zshine { to { transform: translateX(100%); } }
+.ztile.on .zthumb { outline: 2px solid var(--ink); outline-offset: 2px; }
+.ztile.on .zthumb img { outline: none; }
+.zload { color: var(--text-3); }

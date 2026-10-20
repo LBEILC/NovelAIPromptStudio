@@ -19,6 +19,7 @@ interface Session {
   archives: { id: string; name: string; count: number }[];
   directImageCount?: number;
   previewComplete?: boolean;
+  previewCompleted?: number;
   previewError?: string;
 }
 export function ZipImport({
@@ -139,6 +140,12 @@ export function ZipImport({
           <span className="mono selectable">{s?.archives.map((a) => a.name).join('、')}</span> ·{' '}
           {entries.length} 张图片
           {dup ? `，其中 ${dup} 张已在图片库里` : ''}
+          {s && !s.previewComplete && (
+            <span className="zload">
+              {' '}
+              · 正在读取预览 {s.previewCompleted || 0} / {entries.length}
+            </span>
+          )}
         </p>
         {s?.previewError && (
           <p className="help err" role="alert">
@@ -196,7 +203,7 @@ export function ZipImport({
                       e.duplicate ? '内容相同的图片已经在图片库里，导入时跳过' : e.previewError
                     }
                   >
-                    {src && <img src={src} alt="" draggable={false} />}
+                    <Thumb src={src} />
                     <span className="zdup">{e.duplicate ? '已在图片库' : '无法读取'}</span>
                   </span>
                 );
@@ -213,7 +220,7 @@ export function ZipImport({
                   onClick={(ev) => toggle(e, ev.shiftKey)}
                   onDoubleClick={() => src && setViewer(viewable.indexOf(e))}
                 >
-                  {src && <img src={src} alt="" draggable={false} />}
+                  <Thumb src={src} />
                   <CheckMark state={on ? 'on' : ''} />
                 </button>
               );
@@ -238,5 +245,23 @@ export function ZipImport({
         onClose={() => setViewer(null)}
       />
     </>
+  );
+}
+
+/** 一张小图：预览还没读出来时是浅灰底加一道扫过的微光，读出来以后淡入 */
+function Thumb({ src }: { src?: string }) {
+  const [ready, setReady] = useState(false);
+  return (
+    <span className={`zthumb ${ready ? 'ready' : 'wait'}`}>
+      {src && (
+        <img
+          src={src}
+          alt=""
+          draggable={false}
+          onLoad={() => setReady(true)}
+          onError={() => setReady(true)}
+        />
+      )}
+    </span>
   );
 }

@@ -224,10 +224,19 @@ function PopBody(p: PopProps & { leaving: boolean; nodeRef: RefObject<HTMLElemen
     if (a && a !== document.body && !ref.current?.contains(a)) return;
     const resolve = (r: PopProps['trigger']) =>
       typeof r === 'string' ? (win.current || document).querySelector(r) : r?.current || null;
-    const target = [resolve(p.trigger), anchorEl(), back.current].find(
-      (el): el is HTMLElement =>
-        el instanceof HTMLElement && el.isConnected && el !== document.body,
-    );
+    // 锚点本身不能聚焦（例如包着按钮的 span）时，用它里面的第一个按钮
+    const focusable = (el: Element | null) =>
+      !el
+        ? null
+        : el.matches('button, a[href], input, textarea, select, [tabindex]')
+          ? el
+          : el.querySelector('button, a[href], [tabindex]');
+    const target = [resolve(p.trigger), anchorEl(), back.current]
+      .map(focusable)
+      .find(
+        (el): el is HTMLElement =>
+          el instanceof HTMLElement && el.isConnected && el !== document.body,
+      );
     target?.focus({ preventScroll: true });
   };
   const restoreRef = useRef(restore);
