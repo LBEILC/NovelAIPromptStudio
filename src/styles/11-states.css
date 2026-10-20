@@ -2,9 +2,9 @@
 
 [hidden] { display: none !important; }
 
-/* 动效关闭：全部直接到位 */
+/* 动效关闭：全部直接到位。用 0 秒：1 毫秒的话，窗口在后台时过渡和动画不推进，样式会停在半路 */
 html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after {
-  transition-duration: 1ms !important; animation-duration: 1ms !important; animation-delay: 0s !important; }
+  transition-duration: 0s !important; transition-delay: 0s !important; animation-duration: 0s !important; animation-delay: 0s !important; }
 
 /* 退出（2.17）：被拿掉的东西加 .leaving，从现在的样子淡出 --dur-1，不位移；同时取代它的进入动画，不能再点 */
 .leaving { pointer-events: none !important; animation: pf-out var(--dur-1) var(--ease-out) forwards !important; }

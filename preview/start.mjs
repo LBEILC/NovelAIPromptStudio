@@ -62,12 +62,14 @@ function validatePaths(value, key = '') {
   else if (value && typeof value === 'object')
     for (const [k, v] of Object.entries(value)) validatePaths(v, k);
 }
-// 外框上的"导入 · 压缩包"：临时打一个不压缩的 ZIP。6 张演示图末尾多几个字节（算新图），3 张原样（图片库里已有）
+// 外框上的"导入 · 压缩包"：临时打一个不压缩的 ZIP
 function previewZip() {
-  const entries = images.slice(0, 9).map((file, i) => {
+  // 60 张：前 3 张原样（图片库里已有），其余末尾多几个字节（算新图）
+  const entries = Array.from({ length: 60 }, (_, i) => {
+    const file = images[i % images.length];
     let data = fs.readFileSync(file);
-    if (i < 6) data = Buffer.concat([data, Buffer.from(`preview-${Date.now()}-${i}`)]);
-    return { name: `雨天合集/${path.basename(file)}`, data };
+    if (i >= 3) data = Buffer.concat([data, Buffer.from(`preview-${Date.now()}-${i}`)]);
+    return { name: `雨天合集/${String(i + 1).padStart(2, '0')}-${path.basename(file)}`, data };
   });
   const local = [],
     central = [];

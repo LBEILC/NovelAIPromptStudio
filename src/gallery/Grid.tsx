@@ -496,8 +496,8 @@ function Cards({
                 tabIndex={-1}
                 data-tip={picked ? '取消选择' : '选择'}
                 onKeyDown={(e) => {
-                  // 复选框获得焦点时：空格切换选择
-                  if (e.key !== ' ') return;
+                  // 复选框获得焦点时：空格或回车切换选择（不打开大图或工作台）
+                  if (e.key !== ' ' && e.key !== 'Enter') return;
                   e.preventDefault();
                   e.stopPropagation();
                   anchor.current = g.id;
