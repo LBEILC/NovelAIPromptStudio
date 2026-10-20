@@ -27,6 +27,9 @@ export async function startFakeNovelAI() {
     balance: 10000,
     tier: 3,
     usage: 12,
+    images: [],
+    holdAt: 0,
+    resume: null,
   };
   const png = await sharp({ create: { width: 64, height: 64, channels: 4, background: '#8899aa' } })
     .png()
@@ -67,7 +70,9 @@ export async function startFakeNovelAI() {
       return;
     }
     // Different seeds yield distinct bytes, preserving importer duplicate behavior.
-    const pixels = await sharp(png)
+    const pixels = await sharp(
+      state.images[(state.requests.length - 1) % state.images.length] || png,
+    )
       .resize(body.parameters.width, body.parameters.height)
       .png()
       .toBuffer();
@@ -85,6 +90,12 @@ export async function startFakeNovelAI() {
     if (req.url.endsWith('-stream')) {
       res.setHeader('Content-Type', 'text/event-stream');
       res.write(`event: intermediate\ndata: ${JSON.stringify({ step_ix: 14, samp_ix: 0 })}\n\n`);
+      if (state.requests.length === state.holdAt) {
+        await new Promise((resolve) => {
+          state.resume = resolve;
+        });
+        state.resume = null;
+      }
       res.end(
         `event: final\ndata: ${JSON.stringify({ image: image.toString('base64'), samp_ix: 0 })}\n\n`,
       );

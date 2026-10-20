@@ -36,22 +36,29 @@ try {
   }
   const evidence = path.resolve('.codex-runs/readme');
   const manifest = JSON.parse(await fs.readFile(path.join(evidence, 'manifest.json'), 'utf8'));
-  if (manifest.screenshots.length !== 4 || manifest.checks.some((c) => c.status !== 'passed'))
+  if (manifest.screenshots.length !== 7 || manifest.checks.some((c) => c.status !== 'passed'))
     throw Error('Incomplete README screenshots');
-  await fs.mkdir('doc/screenshots', { recursive: true });
-  for (const name of ['hero', 'workbench', 'library', 'dictionary']) {
+  for (const name of [
+    'generate',
+    'versions',
+    'agent',
+    'text',
+    'library',
+    'account',
+    'dictionary',
+  ]) {
     const source = path.join(evidence, `${name}.png`);
     const metadata = await sharp(source).metadata();
-    if (metadata.width !== 1920 || metadata.height !== 1080) throw Error('Invalid screenshot size');
-    const output = path.join('doc/screenshots', `readme-${name}-v100.webp`);
+    if (metadata.width !== 2480 || metadata.height !== 1520) throw Error('Invalid screenshot size');
+    const output = path.join(evidence, `readme-${name}-v120.webp`);
     let buffer;
-    for (const quality of [90, 85, 80, 75]) {
+    for (const quality of [90, 85, 80, 75, 70, 65, 60, 55, 50]) {
       buffer = await sharp(source).webp({ quality, effort: 6 }).toBuffer();
-      if (buffer.length < 200000) break;
+      if (buffer.length < 300000) break;
     }
-    if (buffer.length >= 200000) throw Error(`Screenshot exceeds 200 KB: ${name}`);
+    if (buffer.length >= 300000) throw Error(`Screenshot exceeds 300 KB: ${name}`);
     await fs.writeFile(output, buffer);
-    console.log(`${output}: ${buffer.length} bytes, 1920×1080`);
+    console.log(`${output}: ${buffer.length} bytes, 2480×1520`);
   }
 } finally {
   if (
