@@ -9,10 +9,12 @@ export function NameAI({
   groups,
   p,
   compact = false,
+  openRequest = 0,
 }: {
   groups: LibraryGroup[];
   p: LibraryProps;
   compact?: boolean;
+  openRequest?: number;
 }) {
   const [target, setTarget] = useState('');
   const [phase, setPhase] = useState('');
@@ -22,6 +24,14 @@ export function NameAI({
   >([]);
   const request = useRef('');
   const notify = useNotifications();
+  const handled = useRef(0);
+  useEffect(() => {
+    if (openRequest && openRequest !== handled.current && target) {
+      handled.current = openRequest;
+      if (localStorage.getItem(`nps.name-consent:${target}`)) void start();
+      else setPhase('confirm');
+    }
+  }, [openRequest, target]);
   useEffect(() => {
     let active = true;
     void invokeUI('settings.ai.get', {}).then((s) => {

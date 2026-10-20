@@ -575,19 +575,12 @@ export async function libraryChecks(env) {
     await key(' ', {}, grid);
     await wait('!!document.querySelector(".library-viewer")');
     const viewer = 'document.querySelector(".library-viewer")';
-    await key('Escape', {}, viewer);
-    await e(
-      'document.querySelector(".library-card.current").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,clientX:300,clientY:180}))',
-    );
-    await click('复制图片', 'document.querySelector("[role=menu]")');
+    await click('复制图片', viewer);
     await h.until(() => !clipboard.readImage().isEmpty(), '复制大图');
     await check('复制图片得到像素', () => !clipboard.readImage().isEmpty(), undefined, 'once');
     const saved = path.join(mode.root, `saved-${reduced}.png`);
     doubles.saves.push({ canceled: false, filePath: saved });
-    await e(
-      'document.querySelector(".library-card.current").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,clientX:300,clientY:180}))',
-    );
-    await click('另存为…', 'document.querySelector("[role=menu]")');
+    await click('另存为', viewer);
     await h.until(async () => !!(await fs.stat(saved).catch(() => null)), '另存为完成');
     await check(
       '另存为通过文件选择替身保存副本',
@@ -595,8 +588,6 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
-    await key(' ', {}, grid);
-    await wait('!!document.querySelector(".library-viewer")');
     const beforeName = await e('document.querySelector(".library-viewer").dataset.viewerProjectId');
     await key('ArrowRight', {}, viewer);
     await check(

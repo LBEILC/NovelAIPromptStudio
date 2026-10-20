@@ -98,6 +98,7 @@ export function ParagraphEditor({
     <TransitionSurface kind="height" change={editing}>
       {!editing ? (
         <div
+          className="wb-paragraph-view"
           role="button"
           tabIndex={0}
           aria-label="编辑段落"
@@ -124,6 +125,8 @@ export function ParagraphEditor({
           }}
         >
           <TextArea
+            autoSize="content"
+            rows={1}
             autoFocus={autoEdit}
             aria-label="英文段落"
             className="wb-prose-input"
@@ -156,6 +159,8 @@ export function ParagraphEditor({
             <span className="nps-help wb-editor-note">发给 NovelAI 的是上面的英文</span>
           </div>
           <TextArea
+            autoSize="content"
+            rows={1}
             aria-label="中文段落"
             value={chinese}
             onChange={(event) => {

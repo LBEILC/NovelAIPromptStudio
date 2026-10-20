@@ -148,8 +148,10 @@ export async function libraryInteractionChecks(env) {
     await expectMenu(h, '多选右键仅提供全部选中图片的操作', [
       '在工作台打开 2 张',
       '起名',
+      '根据提示词起名',
       '加入收藏集',
       '移入回收站',
+      '取消选择',
     ]);
     await check(
       '多选菜单显示图片张数且保留选择',
@@ -172,11 +174,8 @@ export async function libraryInteractionChecks(env) {
       '在工作台打开',
       '看大图',
       '复制提示词',
-      '复制图片',
-      '另存为…',
       '起名',
       '加入收藏集',
-      '在文件夹中显示',
       '移入回收站',
     ]);
     await check(
@@ -184,10 +183,6 @@ export async function libraryInteractionChecks(env) {
       `document.querySelectorAll('.library-card.picked').length===0&&document.querySelector('.library-detail')?.dataset.detailId===${JSON.stringify(records[1].id)}`,
       undefined,
       'once',
-    );
-    await check(
-      '单图菜单显示快捷键、三个分隔线和危险操作颜色',
-      `${menu}.querySelectorAll('.nps-menu-separator').length===3&&${menu}.querySelectorAll('.nps-kbd').length===2&&${menu}.querySelector('[aria-label="移入回收站"]').classList.contains('nps-error')`,
     );
     await h.screenshot('interaction-menu-single');
     await click('复制提示词', menu);

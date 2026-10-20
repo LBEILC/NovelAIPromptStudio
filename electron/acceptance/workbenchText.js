@@ -58,6 +58,9 @@ export async function textEditingChecks({ h, raw, draft, reset, modifier }) {
     code: 'Backspace',
     windowsVirtualKeyCode: 8,
   });
+  await h.wait(
+    '!!document.querySelector(".tx-hl .bad")&&document.querySelector(".tx-err")?.textContent.includes("第 1 行：{ 没有配对")',
+  );
   await check(
     '不配对括号显示波浪线和行号',
     '!!document.querySelector(".tx-hl .bad")&&document.querySelector(".tx-err").textContent.includes("第 1 行：{ 没有配对")',

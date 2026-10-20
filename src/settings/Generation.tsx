@@ -113,7 +113,7 @@ export function GenerationPreferences({ agent = false }: { agent?: boolean }) {
     </>
   );
 }
-export function NovelAIAccount() {
+export function NovelAIAccount({ onSaved }: { onSaved?: () => void }) {
   const state = useGeneration(),
     [editing, setEditing] = useState(false),
     [token, setToken] = useState(''),
@@ -126,6 +126,7 @@ export function NovelAIAccount() {
       await invokeUI('account.save', { token });
       setToken('');
       setEditing(false);
+      onSaved?.();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -153,15 +154,17 @@ export function NovelAIAccount() {
               <Button variant="ink" loading={busy} onClick={() => void save()}>
                 保存
               </Button>
-              <Button
-                variant="quiet"
-                onClick={() => {
-                  setEditing(false);
-                  setToken('');
-                }}
-              >
-                取消
-              </Button>
+              {state.settings.hasToken && (
+                <Button
+                  variant="quiet"
+                  onClick={() => {
+                    setEditing(false);
+                    setToken('');
+                  }}
+                >
+                  取消
+                </Button>
+              )}
             </>
           ) : (
             <>
@@ -202,7 +205,7 @@ export function NovelAIAccount() {
           </div>
         </div>
       )}
-      {!!state.subscription?.active && (
+      {state.settings.hasToken && !!state.subscription?.active && (
         <div className="settings-column">
           <label>V5 免费用量</label>
           <Progress label="V5 免费用量" value={state.subscription.usage?.percent || 0} />
@@ -213,7 +216,7 @@ export function NovelAIAccount() {
         </div>
       )}
       {(error || state.accountError) && <p role="status">{error || state.accountError}</p>}
-      <GenerationPreferences />
+      {state.settings.hasToken && <GenerationPreferences />}
     </SettingsFrame>
   );
 }

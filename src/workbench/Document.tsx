@@ -886,35 +886,7 @@ export function WorkbenchDocument(p: DocumentProps) {
         </AnimatedItems>
       </div>
       {p.children}
-      {p.generationFooter || (
-        <footer className="wb-copy-bar">
-          <div className="nps-split-button">
-            <Button
-              onClick={() =>
-                p.onCopyText(
-                  !filtered && !p.selectedKeys?.length ? copyPromptDocument(doc) : copyContext.text,
-                  copyContext.count,
-                  !!p.selectedKeys?.length,
-                  copyContext.ignored,
-                  negativeOnly ? '负面 Tag' : '',
-                  copyContext.automaticIgnored,
-                )
-              }
-            >
-              <i className="ri-file-copy-line" />
-              {copyLabel}
-            </Button>
-            <Menu
-              label="其他复制方式"
-              menuClassName="wb-copy-menu"
-              buttonVariant="default"
-              trigger={<i className="ri-arrow-down-s-line" />}
-              items={copyItems}
-            />
-          </div>
-          {p.generationSetup}
-        </footer>
-      )}
+      {p.generationFooter || <footer className="wb-copy-bar">{p.generationSetup}</footer>}
     </section>
   );
 }

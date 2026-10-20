@@ -949,6 +949,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
   );
 }
 export default function SettingsPage(props: {
+  onAccountSaved?: () => void;
   menuDestination?: { section: string } | null;
   onFindTag?: (tag: string) => void;
   onInstallUpdate: () => Promise<unknown>;
@@ -977,7 +978,7 @@ export default function SettingsPage(props: {
           <Storage {...props} />
         </Activity>
         <Activity mode={section === 'novelai' ? 'visible' : 'hidden'}>
-          <NovelAIAccount />
+          <NovelAIAccount onSaved={props.onAccountSaved} />
         </Activity>
         <Activity mode={section === 'ai' ? 'visible' : 'hidden'}>
           <AI />

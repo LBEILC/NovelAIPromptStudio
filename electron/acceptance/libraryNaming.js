@@ -96,11 +96,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
   const saveDefault = async (expected) => {
     doubles.saves.push({ canceled: true });
     const count = doubles.calls.length;
-    await h.key('Escape', {}, 'document.querySelector(".library-viewer")');
-    await e(
-      'document.querySelector(".library-card.current").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,clientX:300,clientY:180}))',
-    );
-    await click('另存为…', 'document.querySelector("[role=menu]")');
+    await click('另存为', 'document.querySelector(".library-viewer")');
     await h.until(() => doubles.calls.length > count, '另存为默认名称已传给原生对话框');
     await check(
       '另存为默认名称：' + expected,
@@ -111,8 +107,6 @@ export async function libraryNamingChecks({ h, database, doubles }) {
       undefined,
       'once',
     );
-    await h.key(' ', {}, 'document.querySelector("[data-library-grid]")');
-    await wait('!!document.querySelector(".library-viewer")');
   };
   try {
     for (let i = 0; i < 6; i++) make(i);

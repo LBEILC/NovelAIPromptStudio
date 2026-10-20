@@ -213,6 +213,15 @@ export function LibraryViewer({
           <i className="ri-arrow-right-s-line" />
         </Button>
         <span className="library-help">滚轮缩放 · 拖动平移 · 双击适应窗口</span>
+        {/* TODO(design): Reuse the workbench image actions until the large-image toolbar is specified. */}
+        <Button variant="quiet" size="small" onClick={() => p.onCopyImage(image)}>
+          <i className="ri-file-copy-line" />
+          复制图片
+        </Button>
+        <Button variant="quiet" size="small" onClick={() => p.onDownloadImage(image)}>
+          <i className="ri-download-2-line" />
+          另存为
+        </Button>
         <span className="library-viewer-percent library-mono">{percent}%</span>
         <Button variant="quiet" size="small" onClick={onClose}>
           <i className="ri-close-line" />

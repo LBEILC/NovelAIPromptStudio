@@ -1,5 +1,5 @@
 import { useEffect, useState, type RefObject } from 'react';
-import { Button, Checkbox, Dialog, Input, Popover } from '../ui';
+import { Button, Dialog, Input, Popover } from '../ui';
 import { numberedImageNames } from '../lib/imageNaming.js';
 import type { LibraryProps } from './types';
 
@@ -21,16 +21,14 @@ export function LibraryRename({
   onClose: () => void;
 }) {
   const [name, setName] = useState(initialName);
-  const [onlyCurrent, setOnlyCurrent] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (open) {
       setName(initialName);
-      setOnlyCurrent(false);
       setBusy(false);
     }
   }, [open, initialName]);
-  const targets = onlyCurrent && currentId ? [currentId] : ids;
+  const targets = ids;
   const names = numberedImageNames(name, targets.length);
   const hintNames = numberedImageNames(name.trim() || '名称', targets.length);
   const save = async () => {
@@ -121,18 +119,6 @@ export function LibraryRename({
           {name.trim() ? (targets.length === 1 ? names[0] : `${names[0]} … ${names.at(-1)}`) : ''}
         </span>
       </div>
-      {/* TODO(design): 界面稿未展示整摞的单张选项，暂放在结果下方并复用既有 Checkbox。 */}
-      {currentId && ids.length > 1 && (
-        <label className="library-rename-current">
-          <Checkbox
-            label="只改这一张"
-            checked={onlyCurrent}
-            disabled={busy}
-            onChange={setOnlyCurrent}
-          />
-          <span>只改这一张</span>
-        </label>
-      )}
     </Dialog>
   );
 }

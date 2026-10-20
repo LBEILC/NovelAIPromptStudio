@@ -1,4 +1,5 @@
 import { NameAI } from './NameAI';
+import { invokeUI } from '../lib/commands';
 import { Collapse, Presence, TransitionSurface } from '../ui/transitions';
 import { LibraryRename } from './Rename';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -54,10 +55,23 @@ export default function LibraryPage(
     () => stored(GALLERY_PREVIEW_PANEL_WIDTH_KEY) || token('--detail-w'),
   );
   const [renaming, setRenaming] = useState(false);
+  const [nameAIRequest, setNameAIRequest] = useState(0);
+  const [aiConfigured, setAIConfigured] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void invokeUI('settings.ai.get', {}).then((s) => {
+      if (active) setAIConfigured(!!s.model);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
   const renameAnchor = useRef<HTMLButtonElement>(null);
   const [renameRequest, setRenameRequest] = useState<{ id: string; sequence: number }>();
   p = {
     ...p,
+    aiConfigured,
+    onRequestNameAI: () => setNameAIRequest((n) => n + 1),
     renameRequest,
     onRequestRename: (id) => setRenameRequest({ id, sequence: Date.now() }),
   };
@@ -212,7 +226,11 @@ export default function LibraryPage(
                   <i className="ri-edit-line" />
                   起名
                 </Button>
-                <NameAI p={p} groups={p.groups.filter((g) => p.selectedGroupIds.includes(g.id))} />
+                <NameAI
+                  p={p}
+                  openRequest={nameAIRequest}
+                  groups={p.groups.filter((g) => p.selectedGroupIds.includes(g.id))}
+                />
                 {p.activeCollection?.kind === 'manual' && (
                   <Button
                     size="small"

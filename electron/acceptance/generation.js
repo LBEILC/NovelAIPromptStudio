@@ -91,7 +91,12 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   );
   await input('[aria-label="持久令牌"]', 'acceptance-token');
   await click('保存', 'document.querySelector("[data-settings-section=novelai]")');
-  await wait('document.body.innerText.includes("已保存 ••••••••")');
+  await wait('!!document.querySelector(".wb-generation-bar")');
+  await check(
+    '保存令牌后返回工作台并可生成',
+    'document.querySelector(".studio-titlebar [aria-current=page]")?.textContent.trim()==="工作台"&&!!document.querySelector(".wb-generation-bar")',
+  );
+  await h.section('NovelAI 账号');
   await check(
     '正确令牌显示余额与用量',
     `document.body.innerText.includes('10,000 Anlas')&&!!document.querySelector('[aria-label="V5 免费用量"]')`,
@@ -244,6 +249,7 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   );
   await click('确定');
   await wait('document.body.innerText.includes("改成 832×1216")');
+  await h.screenshot('033-fix-paid-banner');
   await click('改成 832×1216');
   await wait('!document.body.innerText.includes("改成 832×1216")');
   generationService.state.balance = 0;

@@ -1,4 +1,10 @@
-import type { Collection, GalleryFilters, ImageRecord, LibraryCard } from '../shared/types';
+import type {
+  Collection,
+  GalleryFilters,
+  ImageRecord,
+  ImageProject,
+  LibraryCard,
+} from '../shared/types';
 import type { MouseEvent } from 'react';
 
 export interface Grouping {
@@ -16,6 +22,8 @@ export interface LibraryGroup {
 }
 export type CountedCollection = Collection & { image_count: number | null };
 export interface LibraryProps {
+  onRequestNameAI?: () => void;
+  aiConfigured?: boolean;
   groups: LibraryGroup[];
   collections: CountedCollection[];
   activeCollection: Collection | null;
@@ -58,8 +66,8 @@ export interface LibraryProps {
   onViewChange: (view: string) => void;
   onPreview: (group: LibraryGroup, project?: LibraryCard) => void;
   onOpenWorkbench: (project: LibraryCard | ImageRecord) => void;
-  onCopyImage: (project: LibraryCard | ImageRecord) => Promise<unknown>;
-  onDownloadImage: (project: LibraryCard | ImageRecord) => Promise<unknown>;
+  onCopyImage: (project: LibraryCard | ImageRecord | ImageProject) => Promise<unknown>;
+  onDownloadImage: (project: LibraryCard | ImageRecord | ImageProject) => Promise<unknown>;
   onReveal: (project: LibraryCard | ImageRecord) => void;
   renameRequest?: { id: string; sequence: number };
   onRequestRename?: (id: string) => void;

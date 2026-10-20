@@ -1771,6 +1771,7 @@ export default function App() {
         <Activity mode={page === 'settings' ? 'visible' : 'hidden'}>
           <div className="app-page-surface">
             <SettingsPage
+              onAccountSaved={() => setPage('workbench')}
               menuDestination={menuDestination}
               onFindTag={(tag) => {
                 selectGalleryCollection('');

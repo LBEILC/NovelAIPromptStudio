@@ -167,7 +167,7 @@ export function TextArea({
   className,
   autoSize = false,
   ...props
-}: TextareaHTMLAttributes<HTMLTextAreaElement> & { autoSize?: boolean }) {
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { autoSize?: boolean | 'content' }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const overlay = useRef<HTMLSpanElement>(null);
   useScrollArea(ref, { overlayRef: overlay });
@@ -181,7 +181,10 @@ export function TextArea({
       const style = getComputedStyle(node);
       const overhead = section.getBoundingClientRect().height - node.getBoundingClientRect().height;
       const viewportStyle = getComputedStyle(viewport);
-      node.style.maxHeight = `${Math.max(parseFloat(style.minHeight), viewport.clientHeight - parseFloat(viewportStyle.paddingTop) - parseFloat(viewportStyle.paddingBottom) - overhead)}px`;
+      node.style.maxHeight =
+        autoSize === 'content'
+          ? 'none'
+          : `${Math.max(parseFloat(style.minHeight), viewport.clientHeight - parseFloat(viewportStyle.paddingTop) - parseFloat(viewportStyle.paddingBottom) - overhead)}px`;
       node.style.height = 'auto';
       node.style.height = `${node.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth)}px`;
     };

@@ -123,8 +123,8 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await shot('copy-header');
   await click('块操作', 'document.querySelector(".wb-block")');
   await check(
-    'Tag 块菜单使用定稿动作、三个分隔线且没有未实现项目',
-    `(()=>{const m=document.querySelector('.nps-layer [role=menu]');return [...m.querySelectorAll('[role=menuitem]')].map(n=>n.getAttribute('aria-label')).join('|')==='转为段落|翻译并分类|复制|上移|下移|删除' && m.querySelectorAll('.nps-menu-separator').length===3})()`,
+    'Tag 块菜单包含常用块保存与原有编辑动作',
+    `(()=>{const m=document.querySelector('.nps-layer [role=menu]');return ['转为段落','翻译并分类','复制','存为常用块…','上移','下移','删除'].every(label=>[...m.querySelectorAll('[role=menuitem]')].some(n=>n.getAttribute('aria-label')===label))})()`,
   );
   await shot('copy-tag-menu');
   await key('Escape');

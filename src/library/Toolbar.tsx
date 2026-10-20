@@ -357,7 +357,10 @@ export function LibraryToolbar({
             onChange={(excludeTags) => p.onFiltersChange({ excludeTags })}
           />
           {(['models', 'vibes'] as const).map((key) => (
-            <div className="library-filter-row" key={key}>
+            <div
+              className={`library-filter-row ${key === 'vibes' ? 'library-filter-row-top' : ''}`}
+              key={key}
+            >
               <span>{key === 'models' ? '模型' : 'Vibe'}</span>
               <div className={`library-filter-options ${key === 'vibes' ? 'two' : ''}`}>
                 {(key === 'models'

@@ -187,6 +187,58 @@ export async function materialsChecks({ h, mode, database, preferences }) {
       () =>
         JSON.stringify(database.loadLibrary().map((p) => [p.id, p.name])) === JSON.stringify(names),
     );
+    await click('筛选');
+    await h.screenshot('033-fix-filter-sidebar');
+    await key('Escape');
+    await e(
+      'document.querySelector(".library-card").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,clientX:300,clientY:200}))',
+    );
+    await h.screenshot('033-fix-card-menu');
+    await key('Escape');
+    await e('document.querySelector(".library-card").click()');
+    await e(
+      `document.querySelectorAll(".library-card")[1].dispatchEvent(new MouseEvent("click",{bubbles:true,${process.platform === 'darwin' ? 'metaKey' : 'ctrlKey'}:true}))`,
+    );
+    await wait('document.querySelectorAll(".library-card.picked").length===2');
+    await e(
+      'document.querySelector(".library-card").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,clientX:300,clientY:200}))',
+    );
+    await h.screenshot('033-fix-multiple-menu');
+    await e(
+      'document.querySelector("[role=menu] [aria-label=起名], [role=menu] [aria-label=重命名]").click()',
+    );
+    await wait('!!document.querySelector("dialog[open]")');
+    await check(
+      '一组起名不提供仅当前图片选项',
+      '!document.querySelector("dialog[open]").textContent.includes("仅当前图片")',
+    );
+    await h.screenshot('033-fix-group-name');
+    await click('取消', dialog);
+    await click('工作台', 'document.querySelector(".studio-titlebar")');
+    await h.screenshot('033-fix-no-token');
+    await check(
+      '没有令牌时底栏只保留生成入口',
+      '!document.querySelector(".wb-copy-bar [aria-label=复制]")&&!!document.querySelector(".wb-prompt-head [aria-label=复制]")',
+    );
+    await command('prompt.set', {
+      tabId: opened.tab.id,
+      scope: 'base:prompt',
+      text: 'A quiet garden stretches behind the small house. Soft morning light falls across the stone path and the wooden door.',
+    });
+    await wait('!!document.querySelector("[aria-label=编辑段落]")');
+    await h.screenshot('033-fix-paragraph-view');
+    await e('document.querySelector("[aria-label=编辑段落]").click()');
+    await input(
+      '[aria-label="中文段落"]',
+      '房屋后方是一座安静的花园。柔和的晨光照在石径与木门上。',
+    );
+    await h.screenshot('033-fix-paragraph-edit');
+    await h.section('NovelAI 账号');
+    await h.screenshot('033-fix-no-token-settings');
+    await check(
+      '没有令牌时账号页隐藏余额与用量',
+      '(()=>{const text=document.querySelector("[data-settings-section=novelai]").innerText;return !text.includes("余额")&&!text.includes("用量")})()',
+    );
   } finally {
     await release();
     preferences.saveAISettings(previous);

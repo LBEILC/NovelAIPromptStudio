@@ -31,8 +31,6 @@ export function CardMenu({
     ? p.groups.filter((g) => p.selectedGroupIds.includes(g.id)).flatMap((g) => g.members)
     : group.members;
   const ids = images.map((item) => item.id);
-  // TODO(design): The reference omits copy/save/reveal and multi-selection menu states.
-  // Keep those existing actions until their placement is defined.
   const items: MenuItem[] =
     p.view === 'trash'
       ? [
@@ -68,8 +66,6 @@ export function CardMenu({
                       });
                   },
                 },
-                { id: 'copy', label: '复制图片', onSelect: () => void p.onCopyImage(image) },
-                { id: 'save', label: '另存为…', onSelect: () => void p.onDownloadImage(image) },
                 { id: 'edit-separator', separator: true as const },
               ]
             : []),
@@ -78,6 +74,16 @@ export function CardMenu({
             label: hasImageName(image) ? '重命名' : '起名',
             onSelect: () => (multiple ? setRename(true) : p.onRequestRename?.(image.id)),
           },
+          ...(multiple
+            ? [
+                {
+                  id: 'name-ai',
+                  label: '根据提示词起名',
+                  disabled: !p.aiConfigured,
+                  onSelect: () => p.onRequestNameAI?.(),
+                },
+              ]
+            : []),
           {
             id: 'collection',
             label: '加入收藏集',
@@ -99,9 +105,6 @@ export function CardMenu({
               },
             ],
           },
-          ...(!multiple
-            ? [{ id: 'reveal', label: '在文件夹中显示', onSelect: () => p.onReveal(image) }]
-            : []),
           ...(p.activeCollection?.kind === 'manual'
             ? [
                 {
@@ -114,6 +117,9 @@ export function CardMenu({
             : []),
           { id: 'trash-separator', separator: true },
           { id: 'trash', label: '移入回收站', danger: true, onSelect: () => void p.onTrash(ids) },
+          ...(multiple
+            ? [{ id: 'clear', label: '取消选择', onSelect: () => p.onClearSelection() }]
+            : []),
         ];
   return (
     <>
