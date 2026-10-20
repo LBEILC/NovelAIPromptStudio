@@ -460,7 +460,23 @@ export default function GalleryPage(
         items={viewer?.items || []}
         index={viewer?.index || 0}
         onIndex={(index) => setViewer((v) => (v ? { ...v, index } : v))}
-        onClose={() => setViewer(null)}
+        onClose={() => {
+          // 关上大图：刚才看的那一张成为当前，焦点回到它的卡片
+          const it = viewer && viewer.items[viewer.index];
+          const g = it && p.groups.find((x) => x.id === it.group);
+          setViewer(null);
+          if (!g) return;
+          if (!p.selectedGroupIds.length)
+            p.onPreview(
+              g,
+              g.members.find((m) => m.id === it.id),
+            );
+          requestAnimationFrame(() =>
+            [...document.querySelectorAll<HTMLElement>('.lgrid .card')]
+              .find((c) => c.dataset.groupId === g.id)
+              ?.focus({ preventScroll: true }),
+          );
+        }}
         onCopy={(it) => {
           const m = memberOf(it.id);
           if (m) void p.onCopyImage(m);

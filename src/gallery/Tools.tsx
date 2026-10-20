@@ -148,9 +148,11 @@ export function Tools({
   // 条件行：平时可以逐条去掉；看智能收藏集时是它的规则，只读，最后是"编辑规则"
   const chips = chipList(filters, p.onFiltersChange);
   const chipKey = smart ? smart.id : p.editingSmartCollection ? 'edit' : 'user';
+  // 智能收藏集即使没有条件也显示这一行（可以"编辑规则"）；收起时淡出的是收起前的那一行
+  const showChips = chips.length > 0 || !!smart;
   const lastChips = useRef({ list: chips, ro: !!smart, key: chipKey });
-  if (chips.length) lastChips.current = { list: chips, ro: !!smart, key: chipKey };
-  const C = chips.length ? { list: chips, ro: !!smart, key: chipKey } : lastChips.current;
+  if (showChips) lastChips.current = { list: chips, ro: !!smart, key: chipKey };
+  const C = showChips ? { list: chips, ro: !!smart, key: chipKey } : lastChips.current;
   const swaps = useSwap(C, (c) => c.key);
   return (
     <>
@@ -246,7 +248,7 @@ export function Tools({
           </button>
         </div>
       )}
-      <div className={`expand lchips ${chips.length ? 'open' : ''}`}>
+      <div className={`expand lchips ${showChips ? 'open' : ''}`}>
         <div>
           <div className="swap">
             {swaps.map(({ key, value, leaving }) => (
@@ -569,7 +571,13 @@ function FilterPop({
                 key={m.label}
                 className="lcheck"
                 role="checkbox"
-                aria-checked={state('models', m.values) === 'on'}
+                aria-checked={
+                  state('models', m.values) === 'on'
+                    ? true
+                    : state('models', m.values) === 'some'
+                      ? 'mixed'
+                      : false
+                }
                 data-tip={
                   m.values.length > 1
                     ? m.values

@@ -290,6 +290,34 @@ export function WorkbenchTabs(p: TabsProps) {
         onKeyDown={(e) => {
           const i = p.session.tabs.findIndex((t) => t.id === p.session.activeTabId),
             n = p.session.tabs.length;
+          // 键盘换位置：空格拿起有焦点的标签页，← → 移动，空格或 Enter 放下，Esc 也是放下
+          if (e.key === ' ' && !lifted) {
+            e.preventDefault();
+            const id = (e.target as Element).closest<HTMLElement>('[data-tab]')?.dataset.tab;
+            if (id) {
+              setLifted(id);
+              setPeek('');
+            }
+            return;
+          }
+          if (lifted) {
+            if ([' ', 'Enter', 'Escape', 'Tab'].includes(e.key)) {
+              if (e.key !== 'Tab') e.preventDefault();
+              setLifted('');
+              return;
+            }
+            const j = p.session.tabs.findIndex((t) => t.id === lifted);
+            const to = e.key === 'ArrowRight' ? j + 1 : e.key === 'ArrowLeft' ? j - 1 : -1;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') e.preventDefault();
+            if (j >= 0 && to >= 0 && to < n) {
+              p.onReorderTab(lifted, p.session.tabs[to].id);
+              const id = lifted;
+              requestAnimationFrame(() =>
+                list.current?.querySelector<HTMLElement>(`[data-tab="${id}"]`)?.focus(),
+              );
+            }
+            return;
+          }
           const next =
             e.key === 'ArrowRight'
               ? (i + 1) % n

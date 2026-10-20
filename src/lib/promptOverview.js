@@ -14,7 +14,7 @@ export const DEFAULT_OVERVIEW_FILTERS = {
 };
 
 export function overviewTagKey(scopeKey, tagId) {
-  return `${scopeKey}\u0000${tagId}`;
+  return `${scopeKey}|${tagId}`;
 }
 
 export function isOverviewTagVisible(entries = [], scopeKey, tagId) {

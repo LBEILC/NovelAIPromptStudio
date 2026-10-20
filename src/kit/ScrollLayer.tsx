@@ -63,6 +63,8 @@ export function ScrollLayer() {
         return false;
       }
       const r = el.getBoundingClientRect();
+      // 平时在内容之上、浮层之下；滚的是对话框或浮层里面的内容时，放到它们上面
+      sb.parentElement?.classList.toggle('over', !!el.closest('.backdrop, .float'));
       sb.style.height = `${g.size}px`;
       sb.style.transform = `translate(${r.left + el.clientWidth - ms('--sb-inset') - ms('--sb-w')}px, ${r.top + g.offset}px)`;
       return g;

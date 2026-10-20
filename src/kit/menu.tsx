@@ -49,10 +49,13 @@ export function MenuItems({
   items,
   onClose,
   autoFocus = true,
+  onBack,
 }: {
   items: MenuEntry[];
   onClose: () => void;
   autoFocus?: boolean;
+  /** 子菜单：← 或 Esc 回到上一层 */
+  onBack?: () => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(-1);
@@ -63,8 +66,11 @@ export function MenuItems({
     up: 0,
   });
   useEffect(() => {
-    if (autoFocus) focusQuietly(box.current);
-  }, []);
+    if (!autoFocus) return;
+    focusQuietly(box.current);
+    // 用键盘进入子菜单时，高亮第一项
+    if (onBack) setActive(items.findIndex(usable));
+  }, [autoFocus]);
   useEffect(() => {
     const el = subOpen >= 0 && box.current?.children[subOpen];
     if (el instanceof HTMLElement) setFit({ i: subOpen, ...fitSub(el) });
@@ -111,6 +117,11 @@ export function MenuItems({
           e.preventDefault();
           e.stopPropagation();
           setSubOpen(active);
+        } else if (onBack && (e.key === 'ArrowLeft' || e.key === 'Escape')) {
+          e.preventDefault();
+          e.stopPropagation();
+          setActive(-1);
+          onBack();
         } else if (e.key === 'Tab') {
           e.preventDefault();
           onClose();
@@ -165,6 +176,11 @@ export function MenuItems({
                 <MenuItems
                   items={e.sub}
                   autoFocus={subOpen === i}
+                  onBack={() => {
+                    setSubOpen(-1);
+                    setActive(i);
+                    focusQuietly(box.current);
+                  }}
                   onClose={() => {
                     setSubOpen(-1);
                     onClose();
@@ -240,5 +256,51 @@ export function ContextMenu({
     >
       <MenuItems items={items} onClose={onClose} />
     </Pop>
+  );
+}
+
+/** "更多"这类按钮：点一下打开菜单，再点一下（或 Enter、空格）关上；关上后焦点回到按钮。 */
+export function MenuButton({
+  label,
+  items,
+  icon = 'more-line',
+  place = 'below-right',
+  className = 'btn quiet sm icon',
+  menuKey,
+}: {
+  label: string;
+  /** 验收用的钩子（data-menu-key） */
+  menuKey?: string;
+  /** 打开时才算菜单项 */
+  items: () => MenuEntry[];
+  icon?: string;
+  place?: Place;
+  className?: string;
+}) {
+  const btn = useRef<HTMLButtonElement>(null);
+  const [shown, setShown] = useState<MenuEntry[] | null>(null);
+  const last = useRef<MenuEntry[]>([]);
+  if (shown) last.current = shown;
+  return (
+    <>
+      <button
+        ref={btn}
+        className={`${className} ${shown ? 'is-hover' : ''}`}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={!!shown}
+        data-menu-key={menuKey}
+        onClick={() => setShown(shown ? null : items())}
+      >
+        <Icon name={icon} />
+      </button>
+      <MenuPop
+        open={!!shown}
+        onClose={() => setShown(null)}
+        anchor={btn}
+        place={place}
+        items={shown || last.current}
+      />
+    </>
   );
 }

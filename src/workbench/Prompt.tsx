@@ -41,7 +41,7 @@ import { InsertPop, CharacterPick } from './Insert';
 import { useTidy } from './Tidy';
 import { Icon, Kbd, Seg, isMod } from '../kit/controls';
 import { Pop } from '../kit/layer';
-import { ContextMenu, MenuPop, type MenuEntry } from '../kit/menu';
+import { ContextMenu, MenuButton, MenuPop, type MenuEntry } from '../kit/menu';
 import { useNotifications } from '../kit/toast';
 import { FlipScope, dur, useExitList, useSwap } from '../kit/motion';
 import { blockTips } from '../kit/tip';
@@ -634,7 +634,7 @@ export function WorkbenchEditor(p: EditorProps) {
           const before = projectRef.current;
           if (update(removePromptCharacter(p.project, c.id)))
             notify({
-              text: `已删除${c.label}`,
+              text: `已删除“${c.label}”`,
               action: { label: '撤销', onClick: () => p.onUpdateProject(before) },
             });
         },
@@ -650,6 +650,9 @@ export function WorkbenchEditor(p: EditorProps) {
     from: string;
     to: string;
     index: number;
+    /** 原来的位置；拖出提示词栏时回到这里，松手就是取消 */
+    home: number;
+    out?: boolean;
     w: number;
     h: number;
     inner: string;
@@ -702,6 +705,19 @@ export function WorkbenchEditor(p: EditorProps) {
         fl = float.current;
       if (!d || !sc || !fl || !pressRef.current) return;
       const cr = sc.getBoundingClientRect();
+      const margin = 24,
+        p0 = posRef.current;
+      if (
+        p0.x < cr.left - margin ||
+        p0.x > cr.right + margin ||
+        p0.y < cr.top - margin ||
+        p0.y > cr.bottom + margin
+      ) {
+        if (!d.out) setDrag({ ...d, to: d.from, index: d.home, out: true });
+        fl.style.left = `${p0.x - pressRef.current.offX}px`;
+        fl.style.top = `${p0.y - pressRef.current.offY}px`;
+        return;
+      }
       const x = Math.max(
           cr.left,
           Math.min(cr.right - d.w, posRef.current.x - pressRef.current.offX),
@@ -738,7 +754,7 @@ export function WorkbenchEditor(p: EditorProps) {
             break;
           }
         }
-        if (to !== d.to || index !== d.index) setDrag({ ...d, to, index });
+        if (to !== d.to || index !== d.index || d.out) setDrag({ ...d, to, index, out: false });
       }
       const edge = 32;
       if (posRef.current.y < cr.top + edge) sc.scrollTop -= 8;
@@ -772,6 +788,7 @@ export function WorkbenchEditor(p: EditorProps) {
           from,
           to: from,
           index: idx < 0 ? list.length : idx,
+          home: idx < 0 ? list.length : idx,
           w: r.width,
           h: r.height,
           inner: pressRef.current.el.innerHTML,
@@ -792,7 +809,7 @@ export function WorkbenchEditor(p: EditorProps) {
       setTimeout(() => (swallowRef.current = false), 0);
       const commit = () => {
         setDrag(null);
-        if (cancel) return;
+        if (cancel || d.out) return;
         const [si, bi] = d.to.split(':').map(Number);
         const moving = entries.filter((x) => d.keys.includes(x.key));
         const remaining = entries.filter(
@@ -822,7 +839,7 @@ export function WorkbenchEditor(p: EditorProps) {
     const key = (ev: KeyboardEvent) => {
       if (ev.key === 'Escape' && dragRef.current) {
         ev.stopPropagation();
-        setDrag((d) => (d ? { ...d, to: d.from, index: 0 } : d));
+        setDrag((d) => (d ? { ...d, to: d.from, index: d.home } : d));
         finish(true);
       }
     };
@@ -1013,7 +1030,27 @@ export function WorkbenchEditor(p: EditorProps) {
           if (ev.key === 'Enter' || ev.key === ' ') {
             ev.preventDefault();
             openEditor(e);
+            return;
           }
+          // Alt + 方向键：在这一块里往前（← ↑）或往后（→ ↓）挪一个位置，焦点跟着它
+          const d = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[ev.key];
+          if (!ev.altKey || !d || e.automatic) return;
+          ev.preventDefault();
+          const row = entries.filter(
+            (x) => x.section === e.section && x.block === e.block && !x.automatic,
+          );
+          const i = row.findIndex((x) => x.key === e.key);
+          if (i < 0 || i + d < 0 || i + d >= row.length) return;
+          guard(() => {
+            save(
+              moveTags(doc, [e], {
+                section: e.section,
+                block: e.block,
+                index: d > 0 ? i + 2 : i - 1,
+              }),
+            );
+            requestAnimationFrame(() => findTag(scroll.current, e.key)?.focus());
+          });
         }}
         onContextMenu={(ev) => {
           ev.preventDefault();
@@ -1070,24 +1107,9 @@ export function WorkbenchEditor(p: EditorProps) {
   };
   const acts = (items: () => MenuEntry[], label: string, k: string) => (
     <span className="acts">
-      <button
-        className={`btn quiet sm icon ${menu?.items && openMenuKey === k ? 'is-hover' : ''}`}
-        aria-label={label}
-        data-menu-key={k}
-        onClick={(ev) => {
-          const r = (ev.currentTarget as HTMLElement).getBoundingClientRect();
-          setOpenMenuKey(k);
-          setMenu({ at: [r.right - 208, r.bottom + 6], items: items() });
-        }}
-      >
-        <Icon name="more-line" />
-      </button>
+      <MenuButton label={label} items={items} menuKey={k} />
     </span>
   );
-  const [openMenuKey, setOpenMenuKey] = useState('');
-  useEffect(() => {
-    if (!menu) setOpenMenuKey('');
-  }, [menu]);
 
   /** 角色的标题行：名字（点击重命名）、块数、复制和更多（按块、按文本两种方式共用） */
   const charTitle = (c: (typeof chars)[number], si: number) => (
@@ -1403,6 +1425,16 @@ export function WorkbenchEditor(p: EditorProps) {
   }));
   const countTags = (si: number) => entries.filter((e) => e.section === si && !e.automatic).length;
   const charRows = useExitList(charScopes, (x) => x.c.id);
+  // 删掉的角色淡出时显示它删除前最后的样子：节编号已经变了，不能再用新的提示词重画
+  const charEls = useRef(new Map<string, HTMLElement>());
+  const charHtml = useRef(new Map<string, string>());
+  useLayoutEffect(() => {
+    for (const [id, el] of charEls.current) {
+      if (el.isConnected && !el.classList.contains('leaving'))
+        charHtml.current.set(id, el.innerHTML);
+      else if (!el.isConnected) charEls.current.delete(id);
+    }
+  });
   const addCharacter = () => {
     if (full) return;
     if (update(addPromptCharacter(p.project)))
@@ -1476,8 +1508,21 @@ export function WorkbenchEditor(p: EditorProps) {
       )}
       {polarity !== 'undesired' && charHead}
       {charRows.map(({ item: { c, si, ni }, leaving }) =>
-        polarity === 'undesired' && ni < 0 ? null : (
+        polarity === 'undesired' && ni < 0 ? null : leaving ? (
           <div
+            className="char-sec leaving"
+            key={`ch-${c.id}`}
+            data-key={`ch-${c.id}`}
+            data-flip=""
+            data-exit="lift"
+            aria-hidden="true"
+            dangerouslySetInnerHTML={{ __html: charHtml.current.get(c.id) || '' }}
+          />
+        ) : (
+          <div
+            ref={(el) => {
+              if (el) charEls.current.set(c.id, el);
+            }}
             className={`char-sec ${leaving ? 'leaving' : ''}`}
             key={`ch-${c.id}`}
             data-key={`ch-${c.id}`}
@@ -1647,17 +1692,29 @@ export function WorkbenchEditor(p: EditorProps) {
     return doc.scopes.flatMap((section, si) =>
       section.scope.polarity !== pol
         ? []
-        : section.blocks
-            .map((b, bi) => ({ b, bi }))
-            .filter(({ b }) => b.type === 'tags')
-            .map(({ b, bi }) => ({
-              label: `${scopeLabel(section)}${section.blocks.length > 1 ? ` · TAG 块${b.displayLabel || b.label ? ` · ${b.displayLabel || b.label}` : ` ${bi + 1}`}` : ''}`,
-              onSelect: () =>
-                guard(() => {
-                  save(moveTags(doc, chosen, { section: si, block: bi }));
-                  setSelected([]);
-                }),
-            })),
+        : !section.blocks.some((b) => b.type === 'tags')
+          ? // 还没有 Tag 块的节（例如空角色）：移过去成为它的第一块
+            [
+              {
+                label: `${scopeLabel(section)} · 新的一块`,
+                onSelect: () =>
+                  guard(() => {
+                    save(moveTags(doc, chosen, { section: si, block: -1 }));
+                    setSelected([]);
+                  }),
+              },
+            ]
+          : section.blocks
+              .map((b, bi) => ({ b, bi }))
+              .filter(({ b }) => b.type === 'tags')
+              .map(({ b, bi }) => ({
+                label: `${scopeLabel(section)}${section.blocks.length > 1 ? ` · TAG 块${b.displayLabel || b.label ? ` · ${b.displayLabel || b.label}` : ` ${bi + 1}`}` : ''}`,
+                onSelect: () =>
+                  guard(() => {
+                    save(moveTags(doc, chosen, { section: si, block: bi }));
+                    setSelected([]);
+                  }),
+              })),
     );
   })();
   const [moveMenu, setMoveMenu] = useState(false);
@@ -1854,6 +1911,7 @@ export function WorkbenchEditor(p: EditorProps) {
         anchor={editing ? tagRef(editing.key) : undefined}
         trigger={editing ? tagRef(editing.key) : undefined}
         className="popover tag-pop"
+        restoreFocus
         label="编辑 Tag"
         deps={[editing?.key]}
       >

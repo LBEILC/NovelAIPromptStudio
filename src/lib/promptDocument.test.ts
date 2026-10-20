@@ -690,7 +690,7 @@ describe('block document structure and legacy copy policy', () => {
     expect(copyVisiblePromptDocument(document).text).toBe('1.5::sky ::, 1girl, silver hair');
     expect(
       copyVisiblePromptDocument(document, {
-        selectedKeys: ['base:prompt\u0000' + project.tags[0].id],
+        selectedKeys: ['base:prompt|' + project.tags[0].id],
       }).text,
     ).toBe('1.5::sky ::');
     expect(promptDocumentProject(document)).toEqual(promptDocumentProject(document));

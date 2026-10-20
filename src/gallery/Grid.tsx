@@ -260,7 +260,8 @@ function Cards({
     const cx = (x: number) => Math.max(0, Math.min(r.width, x - r.left)),
       cy = (y: number) => Math.max(0, Math.min(r.height, y - r.top));
     const x0 = cx(d.sx),
-      y0 = cy(d.sy + (scroll.current!.scrollTop - (d as unknown as { st: number }).st)),
+      // 起点固定在内容上：网格跟着滚动往上走了多少，起点在屏幕上就往上挪多少
+      y0 = cy(d.sy - (scroll.current!.scrollTop - (d as unknown as { st: number }).st)),
       x1 = cx(d.px),
       y1 = cy(d.py);
     const box = {
@@ -308,11 +309,16 @@ function Cards({
       }
       setMarq(null);
     };
+    // 框选时滚动（滚轮或贴边自动滚）：指针没动也要重算框住的范围
+    const onScroll = () => drag.current?.on && updateMarq();
+    const sc = scroll.current;
     addEventListener('pointermove', move);
     addEventListener('pointerup', up);
+    sc?.addEventListener('scroll', onScroll);
     return () => {
       removeEventListener('pointermove', move);
       removeEventListener('pointerup', up);
+      sc?.removeEventListener('scroll', onScroll);
     };
   });
   // 画出看得见的几行（上下各多画一行）
@@ -347,6 +353,10 @@ function Cards({
           e.preventDefault();
           e.stopPropagation();
         }
+      }}
+      onClick={(e) => {
+        // 点网格的空白处：退出多选
+        if (e.target === e.currentTarget && picking) p.onClearSelection();
       }}
       onKeyDown={(e) => {
         if ((e.target as Element).closest('.lpick')) return;
@@ -483,7 +493,16 @@ function Cards({
                 role="checkbox"
                 aria-checked={picked}
                 aria-label="选择"
+                tabIndex={-1}
                 data-tip={picked ? '取消选择' : '选择'}
+                onKeyDown={(e) => {
+                  // 复选框获得焦点时：空格切换选择
+                  if (e.key !== ' ') return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  anchor.current = g.id;
+                  p.onToggleSelect(g, e);
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (e.shiftKey) select(i, e);

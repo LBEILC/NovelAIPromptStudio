@@ -135,3 +135,4 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 .popover.seed-pop { width: calc(var(--popover-w) * 0.75); gap: var(--sp-2); }
 .popover.seed-pop .frow { display: grid; grid-template-columns: 44px 1fr; align-items: center; }
 .popover.seed-pop .field { width: 100%; }
+.sb-layer.over { z-index: 45; }

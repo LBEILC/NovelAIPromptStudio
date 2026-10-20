@@ -220,7 +220,20 @@ export function ParagraphEditor({
       <div className="row para-foot">
         <span className="help">{zhDirty ? '中文已修改，英文未同步' : ''}</span>
         <span className="sp" />
-        <button className="btn quiet sm" onClick={cancel}>
+        <button
+          className="btn quiet sm"
+          data-tip={busy ? '停止这次 AI 请求，已经输入的文字保留' : undefined}
+          onClick={() => {
+            // AI 正在处理：只停止这次请求，编辑框和已经输入的文字都留着
+            if (busy && job.current) {
+              void invokeUI('paragraph.cancel', { id: job.current });
+              job.current = '';
+              setBusy('');
+              return;
+            }
+            cancel();
+          }}
+        >
           取消
         </button>
         <button

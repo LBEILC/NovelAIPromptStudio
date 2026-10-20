@@ -59,8 +59,6 @@ it('menu arrows skip disabled entries and separators; Enter executes and closes'
   expect(query('[aria-disabled=true]').dataset.tip).toBe('Unavailable reason');
 });
 
-// TODO(design): these independent expected failures track missing submenu behavior.
-// Keep them explicit until the UI owner implements the required navigation.
 function submenuFixture() {
   const close = vi.fn();
   render(
@@ -76,18 +74,18 @@ function submenuFixture() {
   key(menu, 'ArrowRight');
   return { close, menu, child: query('.submenu [role=menu]') };
 }
-it.fails('ArrowRight transfers focus into the submenu', () => {
+it('ArrowRight transfers focus into the submenu', () => {
   const { child } = submenuFixture();
   expect(document.activeElement).toBe(child);
 });
-it.fails('ArrowLeft closes the submenu and returns focus to its parent', () => {
+it('ArrowLeft closes the submenu and returns focus to its parent', () => {
   const { child, menu } = submenuFixture();
   act(() => child.focus());
   key(child, 'ArrowLeft');
   expect(query('.mi.open')).toBeNull();
   expect(document.activeElement).toBe(menu);
 });
-it.fails('Escape closes only the submenu and preserves its parent', () => {
+it('Escape closes only the submenu and preserves its parent', () => {
   const { child, close } = submenuFixture();
   act(() => child.focus());
   key(child, 'Escape');

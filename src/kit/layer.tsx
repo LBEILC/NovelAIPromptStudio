@@ -88,6 +88,8 @@ function onPointerDown(e: PointerEvent) {
 }
 function onKey(e: KeyboardEvent) {
   if (e.key !== 'Escape' || !stack.length) return;
+  // 焦点在子菜单里：Esc 只关子菜单，交给菜单自己处理
+  if ((document.activeElement as Element | null)?.closest?.('.submenu')) return;
   e.preventDefault();
   e.stopPropagation();
   stack[stack.length - 1].close();
@@ -166,7 +168,7 @@ export interface PopProps {
   children: ReactNode;
   /** 内容变了以后重新定位 */
   deps?: unknown[];
-  /** 关闭时把焦点还给锚点 */
+  /** 关闭时把焦点还给触发它的按钮；有 trigger 时默认是 */
   restoreFocus?: boolean;
   /** 不登记点外面关闭（例如悬停弹出的预览） */
   passive?: boolean;
@@ -209,17 +211,37 @@ function PopBody(p: PopProps & { leaving: boolean; nodeRef: RefObject<HTMLElemen
     return () => ro.disconnect();
   }, [p.leaving]);
   useDismiss(p.open && !p.leaving && !p.passive, p.onClose, [ref], { trigger: p.trigger });
+  // 关上时焦点回到打开它的地方：优先是触发它的按钮（锚点），其次是打开前有焦点的元素。
+  // 只在焦点还在浮层里、或者已经丢到 body 上时才还，用户自己点到别处的不动
+  // 有触发按钮的浮层默认还焦点
+  const wantFocus = p.restoreFocus ?? !!p.trigger;
+  const back = useRef<HTMLElement | null>(null);
+  const restored = useRef(false);
+  const restore = () => {
+    if (!wantFocus || restored.current) return;
+    restored.current = true;
+    const a = document.activeElement;
+    if (a && a !== document.body && !ref.current?.contains(a)) return;
+    const resolve = (r: PopProps['trigger']) =>
+      typeof r === 'string' ? (win.current || document).querySelector(r) : r?.current || null;
+    const target = [resolve(p.trigger), anchorEl(), back.current].find(
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement && el.isConnected && el !== document.body,
+    );
+    target?.focus({ preventScroll: true });
+  };
+  const restoreRef = useRef(restore);
+  restoreRef.current = restore;
   useEffect(() => {
-    if (!p.restoreFocus) return;
-    const back = document.activeElement as HTMLElement | null;
-    return () => {
-      if (
-        back?.isConnected &&
-        (!document.activeElement || ref.current?.contains(document.activeElement))
-      )
-        back.focus({ preventScroll: true });
-    };
+    // 开发模式的严格模式会先卸载再挂载一次：重新挂载时重置
+    restored.current = false;
+    if (wantFocus && !back.current) back.current = document.activeElement as HTMLElement | null;
+    // 关闭动效时浮层直接卸载，不经过 leaving
+    return () => restoreRef.current();
   }, []);
+  useEffect(() => {
+    if (p.leaving) restore();
+  }, [p.leaving]);
   return (
     <div
       ref={ref}

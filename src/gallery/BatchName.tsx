@@ -2,6 +2,7 @@
 // 只有一张时写"只有一张，不加编号"。回车确定、Esc 取消；完成后通知带"撤销"（撤销由调用方给）。
 import { useEffect, useState } from 'react';
 import { Pop } from '../kit/layer';
+import { numberedImageNames } from '../lib/imageNaming.js';
 
 export function BatchNamePop({
   open,
@@ -67,7 +68,9 @@ export function BatchNamePop({
         </button>
       </span>
       <span className="help">
-        {count > 1 ? `按当前顺序编号：${nm}-01、${nm}-02……` : '只有一张，不加编号'}
+        {count > 1
+          ? `按当前顺序编号：${numberedImageNames(nm, count).slice(0, 2).join('、')}……`
+          : '只有一张，不加编号'}
       </span>
     </Pop>
   );
