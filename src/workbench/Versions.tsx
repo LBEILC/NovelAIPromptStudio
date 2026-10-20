@@ -12,7 +12,8 @@ import {
 import { useGeneration } from '../state/generation';
 import { invokeUI } from '../lib/commands';
 import { mediaUrl } from '../lib/imageStage.js';
-import { versionDiff, diffSummary, oneLine, changeText } from '../lib/versionDiff';
+import { versionDiff } from '../lib/versionDiff';
+import { VersionDifference, VersionSummary } from './VersionDifference';
 import { AnimatedItems } from '../ui/AnimatedItems';
 import type { CommandTab } from '../shared/commands';
 import type { WorkVersion, WorkOrigin } from '../shared/generation';
@@ -93,6 +94,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
   }, [current, tab.id, tab.versionImageId]);
   if (!current) return null;
   const kids = (id: string) => versions.filter((v) => v.parentId === id);
+  const subtree = (v: WorkVersion): WorkVersion[] => [v, ...kids(v.id).flatMap(subtree)];
   const line: WorkVersion[] = [];
   let end = current;
   while (kids(end.id).length) end = kids(end.id)[0];
@@ -309,6 +311,9 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                 .sort((a, b) => Number(b.branchId === left) - Number(a.branchId === left));
               return (
                 <div key={v.id} data-version-id={v.id}>
+                  {v.parentId && v.branchId === v.id && (
+                    <div className="wb-version-branch">{v.branchName}</div>
+                  )}
                   <ContextMenu
                     label="版本操作"
                     items={[{ id: 'rename', label: '重命名分支…', onSelect: () => rename(v) }]}
@@ -326,12 +331,11 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                       onBlur={hidePeek}
                       onMouseLeave={hidePeek}
                     >
-                      {v.parentId && v.branchId === v.id && <small>{v.branchName}</small>}
                       <span className="wb-version-number">
                         {v.parentId ? `第 ${v.number} 版` : '原图'}
-                        {v.source === 'agent' ? ' · Agent' : ''}
+                        {v.source === 'agent' && <span className="wb-version-source">Agent</span>}
                       </span>
-                      <span className="wb-version-summary">{diffSummary(delta(v))}</span>
+                      {v.parentId && <VersionSummary diff={delta(v)} />}
                       {!v.parentId && origin && (
                         <Button
                           variant="quiet"
@@ -461,9 +465,25 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                         {kids(v.id).length
                           ? ` · 分支 ${Math.max(...versions.map((v) => v.branchNumber)) + 1}`
                           : ''}
-                        <small>{diffSummary(changed)}</small>
+                        <VersionSummary diff={changed} />
                       </div>
                     )}
+                  {pending
+                    .filter((j) => j.parentId === v.id)
+                    .map((j) => (
+                      <div className="wb-version-draft" key={j.id}>
+                        <span className="wb-version-number">
+                          待确认<span className="wb-version-source">Agent</span>
+                        </span>
+                        <VersionSummary diff={versionDiff(v.project, j.project)} />
+                        <div className="wb-generation-slots">
+                          {Array.from({ length: Math.min(6, j.count) }, (_, i) => (
+                            <span key={i} />
+                          ))}
+                          {j.count > 6 && <span>+{j.count - 6}</span>}
+                        </div>
+                      </div>
+                    ))}
                   {(expanded.includes(`fork:${v.id}`)
                     ? forks
                     : forks.length > 3
@@ -486,15 +506,20 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                         onBlur={hidePeek}
                         onMouseLeave={hidePeek}
                       >
-                        <span>
-                          {f.branchName}
-                          {f.branchId === left
-                            ? ' · 刚才所在'
-                            : f.source === 'agent'
-                              ? ' · Agent'
-                              : ''}
+                        <i className="ri-git-branch-line" />
+                        <span className="wb-fork-content">
+                          <span className="wb-fork-name">
+                            {f.branchName}
+                            {f.branchId === left ? (
+                              ' · 刚才所在'
+                            ) : f.source === 'agent' ? (
+                              <span className="wb-version-source">Agent</span>
+                            ) : (
+                              ''
+                            )}
+                          </span>
+                          <VersionSummary compact diff={delta(f)} />
                         </span>
-                        <small>{oneLine(delta(f))}</small>
                       </button>
                     </ContextMenu>
                   ))}
@@ -516,11 +541,6 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
               );
             })}
           </AnimatedItems>
-          {pending.map((j) => (
-            <div className="wb-version-draft" key={j.id}>
-              待确认 · Agent<small>{j.count} 张</small>
-            </div>
-          ))}
           {job && !job.versionId && !appending && (
             <div
               className={job.state === 'failed' ? 'wb-version-draft' : 'wb-version-row'}
@@ -583,33 +603,28 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
       </Popover>
       <Layer
         side
-        className="nps-popover"
+        className="nps-popover wb-version-peek"
         open={!!peek && !!peek.parentId}
         anchor={peekAnchor}
         role="tooltip"
         onClose={hidePeek}
       >
         {peek && (
-          <>
-            <strong>第 {peek.number} 版</strong>
-            {delta(peek).size && <p>{oneLine({ ...delta(peek), items: [], paras: [] })}</p>}
-            {delta(peek).items.map((item, i) => (
-              <span className={`wb-diff-${item.kind}`} key={i}>
-                {changeText(item)}{' '}
-              </span>
-            ))}
-            {delta(peek).paras.map((p, i) => (
-              <div key={i}>
-                <strong>{p.label}</strong>
-                <p>
-                  <del>{p.old}</del>
-                </p>
-                <p>
-                  <ins>{p.now}</ins>
-                </p>
-              </div>
-            ))}
-          </>
+          <VersionDifference
+            diff={delta(peek)}
+            title={
+              peek.id === 'draft'
+                ? '未生成'
+                : !line.some((v) => v.id === peek.id)
+                  ? `${peek.branchName} · ${subtree(peek).length} 版 · ${subtree(peek).reduce((n, v) => n + v.images.filter((image) => !image.deleted).length, 0)} 张`
+                  : `第 ${peek.number} 版`
+            }
+            against={
+              versions.find((v) => v.id === peek.parentId)?.parentId
+                ? `第 ${versions.find((v) => v.id === peek.parentId)!.number} 版`
+                : '原图'
+            }
+          />
         )}
       </Layer>
     </ResizablePanel>

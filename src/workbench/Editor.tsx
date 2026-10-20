@@ -531,11 +531,13 @@ export function WorkbenchEditor(p: EditorProps) {
                   : '暂无角色 · 添加后可为每个角色单独编写提示词'}
               </span>
               <Button
+                className="wb-add-character"
                 variant="quiet"
                 size="small"
                 disabled={p.project.prompt_structure.characters.length >= MAX_PROMPT_CHARACTERS}
                 onClick={() => p.onUpdateProject(addPromptCharacter(p.project))}
               >
+                <i className="ri-add-line" />
                 添加角色
               </Button>
             </div>

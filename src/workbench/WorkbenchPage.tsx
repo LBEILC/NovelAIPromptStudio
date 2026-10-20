@@ -8,7 +8,7 @@ import { activeWorkbenchTab } from '../lib/workbenchSession.js';
 import { WORKBENCH_SOURCE_PANEL_WIDTH_KEY } from '../lib/panelLayout.js';
 import './workbench.css';
 import { TransitionSurface } from '../ui/transitions';
-import { GenerationBar } from './GenerationBar';
+import { GenerationBar, GenerationSetup } from './GenerationBar';
 import { useGeneration } from '../state/generation';
 import { Versions } from './Versions';
 
@@ -19,6 +19,7 @@ export interface WorkbenchPageProps
   > {
   session: WorkbenchSession;
   beforeGeneration?: () => Promise<void>;
+  onConfigureGeneration: () => void;
   error: string;
   loading: boolean;
   onChooseImage: () => void;
@@ -128,6 +129,11 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
                 key={tab.id}
                 {...p}
                 project={tab.project}
+                generationSetup={
+                  !generation.settings.hasToken ? (
+                    <GenerationSetup onConfigure={p.onConfigureGeneration} />
+                  ) : undefined
+                }
                 generationFooter={
                   generation.settings.hasToken ? (
                     <GenerationBar tab={tab} before={p.beforeGeneration} />

@@ -388,6 +388,22 @@ export async function runReadmeScreenshots({
     await finished(branch.id);
     await invoke('version.open', { tabId, versionId: mainTip.id });
     tree = await invoke('version.list', { tabId });
+    if (process.argv.includes('--compare-prototype')) {
+      const { comparePrototype } = await import('./comparePrototype.js');
+      return await comparePrototype({
+        app,
+        window,
+        h,
+        invoke,
+        cli,
+        tabId,
+        tree,
+        raw,
+        generationService,
+        database,
+        preferences,
+      });
+    }
     await h.check(
       '演示作品由假服务生成至少五版并有分叉',
       () => tree.versions.length >= 5 && new Set(tree.versions.map((v) => v.branchId)).size >= 2,

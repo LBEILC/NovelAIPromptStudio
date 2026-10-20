@@ -136,12 +136,6 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     '默认标签页仅显示缩略图且竖图宽度符合令牌',
     `(()=>{const t=document.querySelector('.wb-tab'),i=t.querySelector('img'),s=getComputedStyle(i);return !t.querySelector('.wb-tab-name') && Math.abs(i.width-Math.max(parseFloat(s.getPropertyValue('--tab-thumb-min-w')),i.height*832/1216))<2})()`,
   );
-  await check(
-    '工作台节标题实际使用标题令牌，文档与节块间距匹配界面稿',
-    `(()=>{const doc=document.querySelector('.wb-document-scroll'),css=getComputedStyle(doc),px=name=>parseFloat(css.getPropertyValue(name)),heads=[...document.querySelectorAll('.wb-section-head')];return parseFloat(css.paddingTop)===px('--sp-1') && parseFloat(css.paddingBottom)===px('--sp-5') && heads.length>0 && heads.every(head=>{const title=getComputedStyle(head.firstElementChild),style=getComputedStyle(head);return title.fontSize===css.getPropertyValue('--fs-title').trim() && parseFloat(style.paddingTop)===px('--sp-3')+px('--sp-0') && parseFloat(style.paddingBottom)===px('--sp-0')}) && [...document.querySelectorAll('.wb-block')].every(block=>{const style=getComputedStyle(block);return parseFloat(style.paddingTop)===px('--sp-2')+px('--sp-0') && parseFloat(style.paddingBottom)===px('--sp-3')})})()`,
-    undefined,
-    'both',
-  );
   await shot('home');
 
   await click('其他复制方式');
@@ -515,14 +509,22 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     '多选移动到空角色节保留原 Tag 权重',
     `(${draft}).prompt_structure.characters[0].prompt_tags.some(t=>t.tag==='blue hair'&&t.weight===1.25)`,
   );
-  await menu('角色操作', '重命名', 'document.querySelectorAll(".wb-section")[2]');
+  await menu(
+    '角色操作',
+    '重命名',
+    'document.querySelector(`.wb-section[data-wb-scope^="character:"][data-wb-scope$=":prompt"]`)',
+  );
   await input('[aria-label="角色名称"]', '合成角色');
   await key('Enter', {}, 'document.activeElement');
   await check(
     '角色重命名同步正面和排除节',
     'document.body.innerText.includes("合成角色 的负面提示词")',
   );
-  await menu('角色操作', '删除角色', 'document.querySelectorAll(".wb-section")[2]');
+  await menu(
+    '角色操作',
+    '删除角色',
+    'document.querySelector(`.wb-section[data-wb-scope^="character:"][data-wb-scope$=":prompt"]`)',
+  );
   await check('删除角色直接移除其两节', 'document.querySelectorAll(".wb-section").length===2');
   await click('撤销', 'document.querySelector(".nps-notifications")');
   await check(

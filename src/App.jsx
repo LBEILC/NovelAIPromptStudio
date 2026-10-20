@@ -1545,6 +1545,10 @@ export default function App() {
         <Activity mode={page === 'workbench' ? 'visible' : 'hidden'}>
           <div className="app-page-surface">
             <WorkbenchPage
+              onConfigureGeneration={() => {
+                setMenuDestination({ section: 'novelai' });
+                setPage('settings');
+              }}
               beforeGeneration={() => workbenchConnection?.flush() || Promise.resolve()}
               error={workbenchError}
               focusScopeKey={workbenchFocus.scopeKey}

@@ -3,6 +3,7 @@ import { Button, Popover, Progress, useNotifications } from '../ui';
 import { useGeneration } from '../state/generation';
 import { invokeUI } from '../lib/commands';
 import './generation.css';
+import { mediaUrl } from '../lib/imageStage.js';
 export function GenerationTitle({ onOpen }: { onOpen: (tabId: string) => void }) {
   const state = useGeneration(),
     [open, setOpen] = useState(false),
@@ -57,74 +58,107 @@ export function GenerationTitle({ onOpen }: { onOpen: (tabId: string) => void })
   const pending = state.jobs.filter((j) => j.state === 'pending'),
     running = state.jobs.find((j) => j.state === 'generating');
   if (!state.settings.hasToken) return null;
+  const total = pending.reduce((n, job) => n + job.count, 0);
+  const cost = pending.reduce((n, job) => n + (job.estimate || 0), 0);
   return (
     <div className="wb-generation-title">
       {!!pending.length && (
-        <Button variant="quiet" ref={anchor} onClick={() => setOpen(!open)}>
+        <Button
+          size="small"
+          ref={anchor}
+          className="wb-agent-pill"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          <span className="wb-agent-dot" />
           Agent 待确认 · {pending.length}
         </Button>
       )}
-      <Button
-        variant="quiet"
+      <button
+        className="nps-field nps-small wb-balance-chip"
         onClick={() => {
           if (running) onOpen(running.tabId);
         }}
+        data-tip="Anlas 余额与 V5 免费用量"
       >
         {running
           ? running.continuous
             ? `生成中 · 第 ${running.index} 张`
             : `生成中 · ${running.index} / ${running.count}`
           : `${state.balance.toLocaleString('en-US')} Anlas${state.subscription?.active ? ` · 用量 ${state.subscription.usage?.percent || 0}%` : ''}`}
-      </Button>
-      {running &&
-        (running.progress == null ? (
-          <span className="wb-title-progress" aria-label="生成中">
-            <i />
-          </span>
-        ) : (
-          <Progress label="生成进度" value={running.progress * 100} />
-        ))}
+        {running &&
+          (running.progress == null ? (
+            <span className="wb-title-progress" aria-label="生成中">
+              <i />
+            </span>
+          ) : (
+            <Progress label="生成进度" value={running.progress * 100} />
+          ))}
+      </button>
       <Popover
         open={open && !!pending.length}
         anchor={anchor}
         label="Agent 待确认"
+        className="wb-agent-queue"
+        align="end"
         onClose={() => setOpen(false)}
       >
+        <header className="wb-queue-head">
+          Agent 添加了 {pending.length} 个生成任务，待确认
+          <small>确认后逐张发送。未确认的任务不会发送，也不消耗 Anlas。</small>
+        </header>
         {pending.map((job) => (
           <div className="wb-pending-item" key={job.id}>
-            <strong>
-              {job.name} · 基于第 {job.parentNumber} 版
-            </strong>
-            <small>{job.summary || '没有改动'}</small>
-            <small>
-              {job.count} 张 · {job.project.metadata.width}×{job.project.metadata.height} · Seed{' '}
-              {job.fixedSeed ? '固定' : '随机'}
-            </small>
+            <img src={mediaUrl(job.project.thumbnail_path || job.project.image_path)} alt="" />
+            <div>
+              <b>
+                {job.name} · {job.parentNumber === 1 ? '原图' : `基于第 ${job.parentNumber} 版`}
+              </b>
+              {job.summary && <small>{job.summary}</small>}
+              <small>
+                {job.count} 张 · {job.project.metadata.width} × {job.project.metadata.height} · Seed{' '}
+                {job.fixedSeed ? '固定' : '随机'}
+              </small>
+            </div>
             <Button
               variant="quiet"
+              size="small"
+              aria-label="移除"
               onClick={() => void invokeUI('generate.cancel', { ids: [job.id] })}
             >
-              移除
+              <i className="ri-close-line" />
             </Button>
           </div>
         ))}
-        <p>合计 {pending.reduce((n, j) => n + (j.estimate || 0), 0)} Anlas</p>
-        <div className="settings-actions">
+        <footer className="wb-queue-foot">
+          <span className="wb-generation-cost">
+            <strong>
+              共 {total} 张 · {cost} Anlas
+            </strong>
+            <small>
+              {cost
+                ? `余额 ${state.balance.toLocaleString('en-US')}`
+                : `用量 ${state.subscription?.usage?.percent || 0}%`}
+            </small>
+          </span>
           <Button
-            onClick={() => void invokeUI('generate.cancel', { ids: pending.map((j) => j.id) })}
+            variant="quiet"
+            size="small"
+            onClick={() => void invokeUI('generate.cancel', { ids: pending.map((job) => job.id) })}
           >
             全部取消
           </Button>
           <Button
             variant="cinnabar"
+            size="small"
             onClick={() => {
-              void invokeUI('generate.confirm', { ids: pending.map((j) => j.id) });
+              void invokeUI('generate.confirm', { ids: pending.map((job) => job.id) });
               setOpen(false);
             }}
           >
-            生成 {pending.reduce((n, j) => n + j.count, 0)} 张
+            生成 {total} 张
           </Button>
-        </div>
+        </footer>
       </Popover>
     </div>
   );

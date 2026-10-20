@@ -166,6 +166,7 @@ export function WorkbenchImage({ tab, ...p }: ImageProps) {
                 data-tip={`恢复成${version?.parentId ? `第 ${version.number} 版` : '原图'}的提示词`}
                 onClick={p.onReset}
               >
+                <i className="ri-arrow-go-back-line" />
                 恢复
               </Button>
             </div>
@@ -205,7 +206,10 @@ export function WorkbenchImage({ tab, ...p }: ImageProps) {
           </div>
           <div className="wb-image-actions">
             {tab.source.type === 'library' ? (
-              <span>已存入图片库</span>
+              <span className="wb-saved">
+                <i className="ri-check-line" />
+                已存入图片库
+              </span>
             ) : (
               <Button size="small" onClick={p.onSaveLibrary}>
                 存入图片库

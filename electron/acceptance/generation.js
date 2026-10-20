@@ -64,7 +64,24 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
     '没有令牌时版本栏和生成底栏均不显示',
     '!document.querySelector(".wb-versions")&&!document.querySelector(".wb-generation-bar")',
   );
-  await h.section('NovelAI 账号');
+  await click('生成');
+  await wait(
+    'document.querySelector(".nps-popover:popover-open")?.textContent.includes("配置 NovelAI 账号")',
+  );
+  await check(
+    '无令牌生成显示配置引导',
+    'document.body.innerText.includes("持久令牌后，就可以在这里生成新的一版")',
+  );
+  await h.screenshot('generation-no-token-guide');
+  await h.key('Escape');
+  await check('Esc 关闭令牌引导', '!document.querySelector(".nps-popover:popover-open")');
+  await click('生成');
+  await click('去设置');
+  await wait('!!document.querySelector("[data-settings-section=novelai]")');
+  await check(
+    '生成引导打开 NovelAI 账号页',
+    '!!document.querySelector("[data-settings-section=novelai] [aria-label=持久令牌]")',
+  );
   await input('[aria-label="持久令牌"]', 'wrong-token');
   await click('保存', 'document.querySelector("[data-settings-section=novelai]")');
   await wait('document.body.innerText.includes("保存失败：持久令牌无效")');
@@ -211,11 +228,11 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   await click('832×1216', 'document.querySelector(".wb-generation-bar")');
   await click('横图 1216×832');
   await wait(
-    'document.querySelector(".wb-size-button")?.textContent.includes("1216×832")&&document.querySelector(".wb-version-draft small")?.textContent.startsWith("尺寸")',
+    'document.querySelector(".wb-size-button")?.textContent.includes("1216×832")&&document.querySelector(".wb-version-draft .wb-version-summary")?.textContent.startsWith("尺寸")',
   );
   await check(
     '横图免费且尺寸变化位于摘要第一行',
-    'document.querySelector(".wb-version-draft small")?.textContent.startsWith("尺寸 832×1216→1216×832")',
+    'document.querySelector(".wb-version-draft .wb-version-summary")?.textContent.startsWith("尺寸 832×1216→1216×832")',
   );
   await click('1216×832', 'document.querySelector(".wb-generation-bar")');
   await click('自定义…');

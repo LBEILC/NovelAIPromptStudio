@@ -41,6 +41,7 @@ import { Collapse, TransitionSurface } from '../ui/transitions';
 
 export interface DocumentProps {
   generationFooter?: ReactNode;
+  generationSetup?: ReactNode;
   scrollRef?: React.RefObject<HTMLDivElement | null>;
   project: ImageProject;
   viewState: WorkbenchTab['viewState'];
@@ -84,6 +85,13 @@ export function WorkbenchDocument(p: DocumentProps) {
   useScrollArea(scroll);
   const doc = useMemo(() => createPromptDocument(p.project), [p.project]);
   const entries = useMemo(() => documentTags(doc), [doc]);
+  const displaySections = doc.scopes
+    .map((section, index) => ({ section, index }))
+    .sort((a, b) => {
+      const rank = (s: typeof a.section) =>
+        s.scope.kind === 'character' ? 1 : s.scope.polarity === 'prompt' ? 0 : 2;
+      return rank(a.section) - rank(b.section);
+    });
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState(() => localStorage.getItem('nps.prompt-edit-mode') || 'blocks');
   const textMode = mode === 'text';
@@ -400,19 +408,38 @@ export function WorkbenchDocument(p: DocumentProps) {
           <i className="ri-translate-2" />
           <span className="wb-responsive-label">翻译</span>
         </Button>
-        <Button
-          className="wb-head-copy"
-          size="small"
-          variant="quiet"
-          aria-label="复制"
-          data-tip-when-icon=""
-          onClick={() => copy(copyPromptDocument(doc), '全部提示词')}
-        >
-          <i className="ri-file-copy-line" />
-          <span className="wb-copy-label">复制</span>
-        </Button>
+        <div className="nps-split-button wb-head-copy-group">
+          <Button
+            className="wb-head-copy"
+            size="small"
+            aria-label="复制"
+            data-tip-when-icon=""
+            onClick={() =>
+              p.onCopyText(
+                !filtered && !p.selectedKeys?.length ? copyPromptDocument(doc) : copyContext.text,
+                copyContext.count,
+                !!p.selectedKeys?.length,
+                copyContext.ignored,
+                negativeOnly ? '负面 Tag' : '',
+                copyContext.automaticIgnored,
+              )
+            }
+          >
+            <i className="ri-file-copy-line" />
+            <span className="wb-copy-label">{copyLabel}</span>
+          </Button>
+          <Menu
+            label="其他复制方式"
+            menuClassName="wb-copy-menu"
+            buttonVariant="default"
+            trigger={<i className="ri-arrow-down-s-line" />}
+            items={copyItems}
+          />
+        </div>
       </div>
       <Popover
+        className="wb-view-popover"
+        align="end"
         label="显示方式"
         open={viewOpen}
         anchor={viewAnchor}
@@ -511,10 +538,10 @@ export function WorkbenchDocument(p: DocumentProps) {
         )}
         <AnimatedItems
           className="wb-sections"
-          ids={doc.scopes.map((s) => s.scope.key)}
+          ids={displaySections.map(({ section }) => section.scope.key)}
           attribute="data-wb-scope"
         >
-          {doc.scopes.map((section, si) => {
+          {displaySections.map(({ section, index: si }) => {
             if (!textMode && polarity !== 'all' && section.scope.polarity !== polarity) return null;
             const sectionEntries = entries.filter((entry) => entry.section === si);
             const sectionKey = section.scope.key;
@@ -534,6 +561,7 @@ export function WorkbenchDocument(p: DocumentProps) {
               automation && ['confirmed', 'inferred'].includes(automation.status) ? (
                 <div className="wb-auto-group">
                   <div className="wb-automatic">
+                    <i className="ri-sparkling-line" />
                     <span>
                       NovelAI 自动添加 · {automation.kind === 'quality' ? '质量 Tag' : '负面预设'} ·{' '}
                       {automation.label}
@@ -608,18 +636,20 @@ export function WorkbenchDocument(p: DocumentProps) {
               return (
                 <div key={bi} className="wb-block-group">
                   <div className="wb-block" data-wb-block={`${si}:${bi}`}>
-                    <header>
-                      <span>
-                        {block.type === 'tags'
-                          ? `Tag 块${block.displayLabel || block.label ? ` · ${block.displayLabel || block.label}` : ''} · ${tags.length} 个`
-                          : `段落${block.label ? ` · ${block.label}` : ''}`}
-                      </span>
-                      <Menu
-                        label="块操作"
-                        trigger={<i className="ri-more-line" />}
-                        items={blockMenu(si, bi)}
-                      />
-                    </header>
+                    {(section.scope.polarity === 'prompt' || block.type === 'paragraph') && (
+                      <header>
+                        <span>
+                          {block.type === 'tags'
+                            ? `Tag 块${block.displayLabel || block.label ? ` · ${block.displayLabel || block.label}` : ''} · ${tags.length} 个`
+                            : `段落${block.label ? ` · ${block.label}` : ''}`}
+                        </span>
+                        <Menu
+                          label="块操作"
+                          trigger={<i className="ri-more-line" />}
+                          items={blockMenu(si, bi)}
+                        />
+                      </header>
+                    )}
                     {block.type === 'tags' ? (
                       <div className="wb-tags">
                         {p.renderTagList
@@ -644,7 +674,6 @@ export function WorkbenchDocument(p: DocumentProps) {
                         <i className="ri-add-line" />
                         Tag 块
                       </Button>
-                      <span>|</span>
                       <Button
                         variant="quiet"
                         size="small"
@@ -658,7 +687,15 @@ export function WorkbenchDocument(p: DocumentProps) {
               );
             };
             return (
-              <section key={sectionKey} className="wb-section" data-wb-scope={sectionKey}>
+              <section
+                key={sectionKey}
+                className={`wb-section${section.scope.kind === 'character' ? ` wb-character-${section.scope.polarity}` : ''}`}
+                data-wb-scope={sectionKey}
+              >
+                {section.scope.kind === 'base' &&
+                  section.scope.polarity === 'undesired' &&
+                  !doc.scopes.some((s) => s.scope.kind === 'character') &&
+                  p.characterActions}
                 {section.scope.kind === 'character' &&
                   !doc.scopes.slice(0, si).some((s) => s.scope.kind === 'character') &&
                   p.characterActions}
@@ -682,45 +719,51 @@ export function WorkbenchDocument(p: DocumentProps) {
                       {scopeLabel(section)}
                     </Button>
                   )}
-                  <span className="nps-help">
-                    {textMode && si === 0
-                      ? '空一行是新的一块'
-                      : filtered
-                        ? `${visibleEntries.filter(matches).length} 个符合，共 ${visibleEntries.length} 个`
-                        : `${section.blocks.length} 块`}
-                  </span>
-                  <span className="wb-section-actions">
-                    <Button
-                      variant="quiet"
-                      size="small"
-                      aria-label="复制这一节"
-                      onClick={() =>
-                        copy(copyPromptDocumentScope(doc, sectionKey), scopeLabel(section))
-                      }
-                    >
-                      <i className="ri-file-copy-line" />
-                    </Button>
-                    {p.sectionActions?.(si)}
-                    {section.scope.kind !== 'character' && (
-                      <Menu
-                        label="更多"
-                        trigger={<i className="ri-more-line" />}
-                        items={[
-                          {
-                            id: 'raw',
-                            label: '切换为文本编辑',
-                            shortcut: ['Mod', 'E'],
-                            onSelect: () => switchMode('text'),
-                          },
-                          {
-                            id: 'translate',
-                            label: '翻译并分类',
-                            onSelect: () => translate(sectionEntries),
-                          },
-                        ]}
-                      />
-                    )}
-                  </span>
+                  {(!textMode || si === 0) && (
+                    <span className="nps-help">
+                      {textMode && si === 0
+                        ? '空一行是新的一块'
+                        : filtered
+                          ? `${visibleEntries.filter(matches).length} 个符合，共 ${visibleEntries.length} 个`
+                          : section.scope.polarity === 'undesired'
+                            ? `${visibleEntries.length} 个 Tag`
+                            : `${section.blocks.length} 块`}
+                    </span>
+                  )}
+                  {(!textMode || si === 0) && (
+                    <span className="wb-section-actions">
+                      <Button
+                        variant="quiet"
+                        size="small"
+                        aria-label="复制这一节"
+                        onClick={() =>
+                          copy(copyPromptDocumentScope(doc, sectionKey), scopeLabel(section))
+                        }
+                      >
+                        <i className="ri-file-copy-line" />
+                      </Button>
+                      {!textMode && p.sectionActions?.(si)}
+                      {!textMode && section.scope.kind !== 'character' && (
+                        <Menu
+                          label="更多"
+                          trigger={<i className="ri-more-line" />}
+                          items={[
+                            {
+                              id: 'raw',
+                              label: '切换为文本编辑',
+                              shortcut: ['Mod', 'E'],
+                              onSelect: () => switchMode('text'),
+                            },
+                            {
+                              id: 'translate',
+                              label: '翻译并分类',
+                              onSelect: () => translate(sectionEntries),
+                            },
+                          ]}
+                        />
+                      )}
+                    </span>
+                  )}
                 </header>
                 <TransitionSurface
                   kind="height"
@@ -820,7 +863,6 @@ export function WorkbenchDocument(p: DocumentProps) {
             );
           })}
         </AnimatedItems>
-        {!doc.scopes.some((s) => s.scope.kind === 'character') && p.characterActions}
       </div>
       {p.children}
       {p.generationFooter || (
@@ -849,6 +891,7 @@ export function WorkbenchDocument(p: DocumentProps) {
               items={copyItems}
             />
           </div>
+          {p.generationSetup}
         </footer>
       )}
     </section>

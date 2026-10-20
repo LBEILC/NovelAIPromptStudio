@@ -12,6 +12,33 @@ const presets = [
   ['横图', 1216, 832],
   ['方图', 1024, 1024],
 ] as const;
+export function GenerationSetup({ onConfigure }: { onConfigure: () => void }) {
+  const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <Button ref={anchor} variant="cinnabar" onClick={() => setOpen(!open)}>
+        生成
+      </Button>
+      <Popover open={open} anchor={anchor} label="配置 NovelAI 账号" onClose={() => setOpen(false)}>
+        <p className="nps-help">
+          在“设置 → NovelAI 账号”里填入持久令牌后，就可以在这里生成新的一版。
+        </p>
+        <div className="nps-actions">
+          <Button
+            variant="ink"
+            onClick={() => {
+              setOpen(false);
+              onConfigure();
+            }}
+          >
+            去设置
+          </Button>
+        </div>
+      </Popover>
+    </>
+  );
+}
 export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () => Promise<void> }) {
   const state = useGeneration(),
     notify = useNotifications();
@@ -91,6 +118,18 @@ export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () =>
     setInput(null);
   };
   const freeSize = presets.find(([, pw, ph]) => Math.sign(pw - ph) === Math.sign(w - h))!;
+  const paidReasons = [
+    w * h > 1048576 ? '尺寸超出免费范围' : '',
+    Number(metadata?.steps) > 28 ? '步数超过 28 步' : '',
+    /(?:^|[^.\d])5(?:[^.\d]|$)/.test(String(metadata?.model)) &&
+    state.subscription?.usage?.isNegative
+      ? 'V5 免费用量已用尽'
+      : '',
+    ((tab.project as (NonNullable<typeof tab.project> & { vibes?: unknown[] }) | null)?.vibes
+      ?.length || 0) > 4
+      ? 'Vibe 参考数量超出免费范围'
+      : '',
+  ].filter(Boolean);
   return (
     <>
       {!!estimate &&
@@ -98,21 +137,16 @@ export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () =>
         !estimate.unavailable &&
         state.subscription?.active &&
         state.subscription.tier >= 3 && (
-          <Banner tone="warn">
-            {w * h > 1048576
-              ? '尺寸超出免费范围'
-              : Number(metadata?.steps) > 28
-                ? '步数超过 28 步'
-                : state.subscription?.usage?.isNegative
-                  ? 'V5 免费用量已用尽'
-                  : 'Vibe 参考数量超出免费范围'}
-            ，每张 {estimate.perImage} Anlas
-            {w * h > 1048576 && (
-              <Button size="small" onClick={() => void choose(freeSize[1], freeSize[2])}>
-                改成 {freeSize[1]}×{freeSize[2]}
-              </Button>
-            )}
-          </Banner>
+          <div className="wb-generation-banner">
+            <Banner tone="warn">
+              本次生成不在免费范围内：{paidReasons.join('；')}，将消耗 {estimate.anlas} Anlas。
+              {w * h > 1048576 && (
+                <Button size="small" onClick={() => void choose(freeSize[1], freeSize[2])}>
+                  改成 {freeSize[1]}×{freeSize[2]}
+                </Button>
+              )}
+            </Banner>
+          </div>
         )}
       <div className="wb-generation-bar">
         {job ? (
@@ -124,15 +158,17 @@ export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () =>
                   ? `生成中 第 ${job.index} 张 · 持续生成`
                   : `生成中 ${job.index} / ${job.count} · ${job.spentKnown ? `已消耗 ${job.spent} Anlas` : '消耗未知'}`}
             </span>
-            <Button disabled>
-              <i className="ri-loader-4-line nps-spinner" />
-              生成中
-            </Button>
             <Button
+              variant="quiet"
+              size="small"
               disabled={job.stop}
               onClick={() => void invokeUI('generate.stop', { id: job.id })}
             >
+              <i className="ri-stop-line" />
               {job.stop ? '正在停止' : '停止'}
+            </Button>
+            <Button variant="cinnabar" disabled loading>
+              生成中
             </Button>
           </>
         ) : (
@@ -143,7 +179,8 @@ export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () =>
               onClick={() => setFixed(!fixed)}
             >
               <span className="wb-seed-label">Seed</span>
-              {fixed ? '固定' : '随机'}
+              <span className="nps-mono">{fixed ? metadata?.seed : '随机'}</span>
+              <i className={fixed ? 'ri-lock-line' : 'ri-shuffle-line'} />
             </Button>
             <Button
               size="small"
@@ -173,7 +210,7 @@ export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () =>
               </Button>
               {input === null ? (
                 <Button size="small" aria-label="张数" onClick={() => setInput(String(count))}>
-                  {continuous ? '持续' : count}
+                  {continuous ? '持续' : `${count} 张`}
                 </Button>
               ) : (
                 <Input
