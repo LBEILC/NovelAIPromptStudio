@@ -29,7 +29,8 @@ export function GenerationTitle({ onOpen }: { onOpen: (tabId: string) => void })
         });
       if (job.state === 'failed')
         notify({
-          text: `生成失败：${job.error} · ${job.spentKnown ? (job.spent ? `本次已消耗 ${job.spent} Anlas` : '本次未消耗 Anlas') : '【文案待定：无法查询实际消耗】'}`,
+          // TODO(design): balance lookup can fail after the request; spending is unknown.
+          text: `生成失败：${job.error} · ${job.spentKnown ? (job.spent ? `本次已消耗 ${job.spent} Anlas` : '本次未消耗 Anlas') : '【文案待定：实际消耗查询失败】'}`,
           tone: 'error',
           action: { label: '重试', onClick: () => void invokeUI('generate.retry', { id: job.id }) },
         });

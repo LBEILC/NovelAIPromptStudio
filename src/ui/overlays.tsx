@@ -474,6 +474,13 @@ export function TooltipRoot() {
         measured.scrollHeight <= measured.clientHeight
       )
         return;
+      if (
+        node.hasAttribute('data-tip-when-icon') &&
+        [...node.querySelectorAll<HTMLElement>('.wb-responsive-label,.wb-copy-label')].some(
+          (label) => getComputedStyle(label).display !== 'none',
+        )
+      )
+        return;
       const value = node.dataset.tip ?? node.dataset.tipOverflow ?? '';
       if (!value) return;
       target = node;
@@ -566,8 +573,21 @@ export function TooltipRoot() {
       {anchor.current?.dataset.tipImage ? (
         <>
           <DecodedImage src={anchor.current.dataset.tipImage} alt="" />
-          <span>{lastText.current}</span>
-          <span className="nps-help">{formatImportDate(anchor.current.dataset.tipDate)}</span>
+          <span className="wb-tab-preview-name" data-file={anchor.current.dataset.tipFile}>
+            {anchor.current.dataset.tipFile ? (
+              <>
+                <span>{lastText.current.slice(0, Math.ceil(lastText.current.length / 2))}</span>
+                <span>{lastText.current.slice(Math.ceil(lastText.current.length / 2))}</span>
+              </>
+            ) : (
+              lastText.current
+            )}
+          </span>
+          <span className="nps-help">{anchor.current.dataset.tipDetails}</span>
+          <span className="nps-help">
+            {formatImportDate(anchor.current.dataset.tipDate)}
+            {anchor.current.dataset.tipStatus ? ` · ${anchor.current.dataset.tipStatus}` : ''}
+          </span>
         </>
       ) : (
         lastText.current

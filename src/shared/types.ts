@@ -72,7 +72,14 @@ export interface PromptStructureRaw {
 export interface PromptStructure extends PromptStructureRaw {
   block_annotations?: Record<
     string,
-    { raw: string; type?: 'tags' | 'paragraph'; translation?: string; start: number }[]
+    {
+      raw: string;
+      textLayout?: boolean;
+      type?: 'tags' | 'paragraph';
+      translation?: string;
+      displayLabel?: string;
+      start: number;
+    }[]
   >;
   base_undesired_tags: Tag[];
   characters: PromptCharacter[];
@@ -85,6 +92,8 @@ export type StoredPromptStructure = Partial<
   characters: PromptCharacter[];
 };
 export interface PromptAutomation {
+  template?: string;
+  virtual?: boolean;
   cleanedRaw: string;
   kind: 'quality' | 'undesired';
   label: string;

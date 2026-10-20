@@ -17,6 +17,7 @@ const passive = {
   '[role="tabpanel"]': '键盘可到达的内容区域',
   '[role="dialog"],dialog': '对话框焦点范围',
   '.wb-document-scroll': '提示词框选与空白区取消选择',
+  '.nps-resizer': '028 分隔线视觉反馈由设计审阅；边界和恢复由工作台行为验收覆盖',
 };
 const kindExpression = `(n)=>{
   if(n.matches('.nps-tag,.wb-sortable-tag'))return 'tag';

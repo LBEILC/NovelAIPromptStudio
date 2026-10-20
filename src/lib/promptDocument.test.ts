@@ -719,7 +719,11 @@ describe('block document structure and legacy copy policy', () => {
         );
       }
       for (const scope of getPromptScopes(project))
-        expect(copyPromptDocumentScope(document, scope.key)).toBe(scope.raw_prompt);
+        expect(copyPromptDocumentScope(document, scope.key)).toBe(
+          ['confirmed', 'inferred'].includes(scope.automation?.status || '')
+            ? scope.automation!.cleanedRaw
+            : scope.raw_prompt,
+        );
       const filters = [
         DEFAULT_OVERVIEW_FILTERS,
         { ...DEFAULT_OVERVIEW_FILTERS, category: 'Environment' },

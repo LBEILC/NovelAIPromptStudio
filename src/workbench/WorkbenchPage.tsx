@@ -100,8 +100,21 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
         <ResizablePanel
           width={width}
           defaultWidth={defaultWidth}
-          min={280}
-          max={Math.max(defaultWidth, window.innerWidth - 280)}
+          min={parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue('--prompt-min-w'),
+          )}
+          max={Math.max(
+            defaultWidth,
+            window.innerWidth -
+              parseFloat(
+                getComputedStyle(document.documentElement).getPropertyValue('--popover-w'),
+              ) -
+              (generation.settings.hasToken
+                ? parseFloat(
+                    getComputedStyle(document.documentElement).getPropertyValue('--versions-w'),
+                  )
+                : 0),
+          )}
           edge="left"
           label="提示词栏宽度"
           onWidthChange={(value) => {

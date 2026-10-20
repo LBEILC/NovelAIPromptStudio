@@ -161,21 +161,20 @@ export async function motionCompletion({ h, mode }, enabled, theme, { capture, f
   await finish(h);
   await settle();
   await click('工作台', 'document.querySelector(".studio-titlebar")');
-  if (await e('!!document.querySelector(".wb-dirty-line")')) {
-    await click('还原成原图的提示词');
-    await click('恢复', 'document.querySelector("dialog[open]")');
-    await wait('!document.querySelector(".wb-dirty-line")');
+  if (await e('!!document.querySelector(".wb-stage-dirty[data-visible]")')) {
+    await click('恢复', 'document.querySelector(".wb-stage-title")');
+    await wait('!document.querySelector(".wb-stage-dirty[data-visible]")');
   }
   await settle();
   await e('document.querySelector(".wb-add-trigger").click()');
   const text = `motion_insert_${theme}_${enabled}`;
   await h.input('[aria-label="输入中文或英文"]', text);
-  await capture(h, '[data-wb-tag],[data-list-exit],.wb-dirty-collapse', () =>
+  await capture(h, '[data-wb-tag],[data-list-exit],.wb-stage-dirty', () =>
     h.key('Enter', {}, 'document.querySelector("[aria-label=输入中文或英文]")'),
   );
   await check(
-    label('首次修改提示行展开，关闭动效直接到位'),
-    `!!document.querySelector('.wb-dirty-line')`,
+    label('首次修改标记草稿'),
+    `!!document.querySelector('.wb-stage-dirty[data-visible]')`,
     undefined,
     'once',
   );
@@ -194,7 +193,7 @@ export async function motionCompletion({ h, mode }, enabled, theme, { capture, f
   // Escape also collapses the add-tag helper. Measure deletion only after that
   // independent height transition has settled.
   await settle();
-  await capture(h, '[data-list-exit],[data-wb-tag],.wb-dirty-collapse', () =>
+  await capture(h, '[data-list-exit],[data-wb-tag],.wb-stage-dirty', () =>
     click('删除', 'document.querySelector(".wb-tag-editor")'),
   );
   await check(
@@ -214,14 +213,13 @@ export async function motionCompletion({ h, mode }, enabled, theme, { capture, f
   );
   // Adding and deleting a tag may normalize its raw separators. Reset through
   // the user command rather than assuming the serialized prompt is identical.
-  await click('还原成原图的提示词');
-  await capture(h, '.wb-dirty-collapse,.nps-transition-snapshot', async () => {
-    await click('恢复', 'document.querySelector("dialog[open]")');
-    await wait('!document.querySelector(".wb-dirty-line")');
+  await capture(h, '.wb-stage-dirty,.nps-transition-snapshot', async () => {
+    await click('恢复', 'document.querySelector(".wb-stage-title")');
+    await wait('!document.querySelector(".wb-stage-dirty[data-visible]")');
   });
   await check(
-    label('还原原图提示词后提示行收起且按钮立即移除'),
-    `!document.querySelector('.wb-dirty-line')`,
+    label('恢复原图提示词后清除草稿标记'),
+    `!document.querySelector('.wb-stage-dirty[data-visible]')`,
     undefined,
     'once',
   );

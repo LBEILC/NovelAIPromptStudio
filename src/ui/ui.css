@@ -149,8 +149,8 @@
 .nps-resizable { position: relative; max-width: 100%; }
 .nps-panel-content { overflow: auto; }
 .nps-resizer { position: absolute; top: 0; bottom: 0; width: var(--split-hit); background: transparent; cursor: col-resize; touch-action: none; }
-.nps-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: var(--bw); background: var(--border); }
-.nps-resizer:hover::after, .nps-resizer:focus-visible::after, .nps-resizer[data-dragging="true"]::after { width: var(--rule-w); background: var(--text); }
+.nps-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: var(--rule-w); background: var(--text); opacity:0; transition:opacity var(--dur-1) var(--ease-out); }
+.nps-resizer:hover::after, .nps-resizer:focus-visible::after, .nps-resizer[data-dragging="true"]::after { opacity:1; }
 .nps-resizer-right { right: 0; } .nps-resizer-left { left: 0; }
 .nps-sr { position: absolute; width: 0; height: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
@@ -160,7 +160,7 @@
 }
 /* Expanded triggers retain their own button variant. */
 /* The pressed look is for popup triggers; disclosure toggles (collapse/expand) opt out. */
-.nps-button-default:not([aria-disabled="true"],:disabled):is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--hover); }
+.nps-button-default:not([aria-disabled="true"],:disabled):is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--selected); }
 .nps-button-quiet:not([aria-disabled="true"],:disabled):is(:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--selected); color:var(--text); }
 .nps-button.nps-button-ink:not([aria-disabled="true"],:disabled):is(:hover,:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--ink-hover); border-color:var(--ink-hover); color:var(--on-ink); }
 .nps-button.nps-button-cinnabar:not([aria-disabled="true"],:disabled):is(:hover,:active,[aria-expanded="true"]:not([data-disclosure])) { background:var(--cinnabar-hover); border-color:var(--cinnabar-hover); color:var(--on-cinnabar); }

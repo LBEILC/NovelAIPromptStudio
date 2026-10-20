@@ -5,7 +5,7 @@ export async function buttonStateChecks(h) {
   await cdp.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
   const { root } = await cdp.sendCommand('DOM.getDocument');
   const variants = {
-    default: ['var(--surface)', 'var(--hover)', 'var(--hover)', 'var(--text)', 'var(--border)'],
+    default: ['var(--surface)', 'var(--hover)', 'var(--selected)', 'var(--text)', 'var(--border)'],
     ink: ['var(--ink)', 'var(--ink-hover)', 'var(--ink-hover)', 'var(--on-ink)', 'var(--ink)'],
     cinnabar: [
       'var(--cinnabar)',

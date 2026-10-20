@@ -458,8 +458,8 @@ export async function workbenchInteractionChecks(env) {
     await wait('!!document.querySelector(".wb-tab-preview:popover-open img")');
     await wait('document.querySelector(".wb-tab-preview:popover-open img")?.naturalWidth>0');
     await check(
-      '标签页预览包含缩略图、未命名提示和导入时间',
-      `(()=>{const p=document.querySelector('.wb-tab-preview:popover-open'),t=${tab(0)},i=p?.querySelector('img');return !!i&&i.src===t.querySelector('img').src&&p.textContent.includes('没有起名')&&/导入$/.test(p.querySelector('.nps-help').textContent)&&!p.querySelector('.nps-help').textContent.includes('T')&&i.naturalWidth>0})()`,
+      '标签页预览包含缩略图、文件名、尺寸和导入时间',
+      `(()=>{const p=document.querySelector('.wb-tab-preview:popover-open'),t=${tab(0)},i=p?.querySelector('img');return !!i&&i.src===t.querySelector('img').src&&p.querySelector('[data-file]')?.textContent===t.dataset.tip&&p.textContent.includes('×')&&/导入/.test(p.textContent)&&i.naturalWidth>0})()`,
     );
     await check(
       '预览图片最长边受限且保留原比例',
@@ -581,7 +581,8 @@ export async function workbenchInteractionChecks(env) {
     );
     await click('添加角色');
     await wait(`${draft}.prompt_structure.characters.length===1`);
-    const characterAdd = `document.querySelectorAll('.wb-section')[2].querySelector('.wb-add-trigger')`;
+    await click('＋ Tag 块', 'document.querySelector(".wb-character-empty")');
+    const characterAdd = `document.querySelectorAll('.wb-section')[2].querySelector('.wb-add-trigger,.wb-character-empty')`;
     await e(`${characterAdd}.scrollIntoView({block:'center'});${frame}`);
     start = await dragStart(source);
     const character = await center(h, characterAdd, 'center');
@@ -614,15 +615,14 @@ export async function workbenchInteractionChecks(env) {
       await click('工作台', 'document.querySelector(".studio-titlebar")');
       await wait('document.documentElement.dataset.motion==="off"');
       await click('角色操作', 'document.querySelectorAll(".wb-section")[2]');
-      await click('移除角色', menu);
-      await wait('!!document.querySelector("dialog[open]")');
-      await click('移除角色', 'document.querySelector("dialog[open]")');
+      await click('删除角色', menu);
       await wait(`${draft}.prompt_structure.characters.length===0`);
       await click('添加角色');
       await wait(`${draft}.prompt_structure.characters.length===1`);
+      await click('＋ Tag 块', 'document.querySelector(".wb-character-empty")');
       const index = 0;
       const section = 2 + index * 2;
-      const add = `document.querySelectorAll('.wb-section')[${section}].querySelector('.wb-add-trigger')`;
+      const add = `document.querySelectorAll('.wb-section')[${section}].querySelector('.wb-add-trigger,.wb-character-empty')`;
       await e(`${add}.scrollIntoView({block:'center'});${frame}`);
       const tag = mode === '跟随系统' ? 'standing' : 'glass window';
       start = await dragStart(source);

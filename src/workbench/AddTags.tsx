@@ -1,5 +1,5 @@
 import { invokeResult } from '../lib/commands';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { Autocomplete, Button, type Suggestion } from '../ui';
 import { Collapse, TransitionSurface } from '../ui/transitions';
@@ -11,13 +11,17 @@ export function AddTags({
   block,
   tags,
   onAdd,
+  autoEdit = false,
+  onDismiss,
 }: {
   section: number;
   block: number;
   tags: Tag[];
   onAdd: (text: string) => void;
+  autoEdit?: boolean;
+  onDismiss?: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(autoEdit);
   const [value, setValue] = useState('');
   const [items, setItems] = useState<Suggestion[]>([]);
   const analysis = useMemo(() => analyzePromptBatch(value, tags), [value, tags]);
@@ -71,7 +75,10 @@ export function AddTags({
             <Autocomplete
               autoFocus
               onDismiss={() => {
-                if (!value.trim()) setEditing(false);
+                if (!value.trim()) {
+                  setEditing(false);
+                  onDismiss?.();
+                }
               }}
               label="输入中文或英文"
               placeholder="输入中文或英文"
@@ -108,5 +115,14 @@ export function AddTags({
         </span>
       </Collapse>
     </>
+  );
+}
+
+export function EmptyRole({ section, children }: { section: number; children: ReactNode }) {
+  const drop = useDroppable({ id: `empty:${section}`, data: { target: { section, block: -1 } } });
+  return (
+    <div className="wb-character-empty" ref={drop.setNodeRef}>
+      {children}
+    </div>
   );
 }

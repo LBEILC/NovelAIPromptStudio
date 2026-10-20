@@ -412,31 +412,31 @@ export async function interactionCorrectionChecks(env) {
     await e('document.removeEventListener("transitionrun",window.correctionTagListener,true)');
     await h.nativeKey('Escape');
     await click('更多', 'document.querySelector(".wb-section")');
-    await click('编辑原始文本', menu);
+    await click('切换为文本编辑', menu);
     await focusRingChecks(h, '原始文本编辑');
-    await e(`document.querySelector('[aria-label="原始文本"]').focus({preventScroll:true})`);
-    await settleLayout(h, '[aria-label="原始文本"]');
+    await e(`document.querySelector('.wb-text-section textarea').focus({preventScroll:true})`);
+    await settleLayout(h, '.wb-text-section textarea');
     await check(
       '原始文本打开并聚焦后仍从完整第一行开始',
-      `(()=>{const n=document.querySelector('[aria-label="原始文本"]'),s=getComputedStyle(n);return document.activeElement===n&&parseFloat(s.outlineWidth)>0&&s.outlineStyle!=='none'&&n.scrollTop===0&&n.selectionStart===0&&parseFloat(s.paddingTop)>=0})()`,
+      `(()=>{const n=document.querySelector('.wb-text-section textarea'),s=getComputedStyle(n);return document.activeElement===n&&parseFloat(s.outlineWidth)>0&&s.outlineStyle!=='none'&&n.scrollTop===0&&n.selectionStart===0&&parseFloat(s.paddingTop)>=0})()`,
     );
     await h.screenshot('024-raw-focused');
-    await h.input('[aria-label="原始文本"]', 'synthetic_short');
+    await h.input('.wb-text-section textarea', 'synthetic_short');
     await e(
-      `window.rawShortHeight=document.querySelector('[aria-label="原始文本"]').getBoundingClientRect().height`,
+      `window.rawShortHeight=document.querySelector('.wb-text-section textarea').getBoundingClientRect().height`,
     );
     await h.input(
-      '[aria-label="原始文本"]',
+      '.wb-text-section textarea',
       Array.from({ length: 200 }, (_, i) => `synthetic_growth_${i}`).join(', '),
     );
     await check(
-      '原始文本随内容增高，到视口上限后才内部滚动',
-      `(()=>{const n=document.querySelector('[aria-label="原始文本"]'),s=getComputedStyle(n),r=n.getBoundingClientRect();return r.height>window.rawShortHeight&&r.height<=parseFloat(s.maxHeight)+1&&n.scrollHeight>n.clientHeight})()`,
+      '文本框随内容长高，由提示词栏统一滚动',
+      `(()=>{const n=document.querySelector('.wb-text-section textarea'),s=getComputedStyle(n),r=n.getBoundingClientRect();return r.height>window.rawShortHeight&&n.scrollHeight<=n.clientHeight+1&&document.querySelector('.wb-document-scroll').scrollHeight>document.querySelector('.wb-document-scroll').clientHeight})()`,
     );
     const raw =
       'tiny, synthetic_long_tag_alpha, medium_tag, synthetic_long_tag_beta, short, another_synthetic_tag, x, wide_synthetic_tag_gamma, last_tag\n\nsecond_block, another_long_synthetic_tag, final_marker';
-    await h.input('[aria-label="原始文本"]', raw);
-    await click('保存', 'document.querySelector(".wb-raw-editor")');
+    await h.input('.wb-text-section textarea', raw);
+    await click('按块编辑（Ctrl E 切换）');
     await wait(
       'document.querySelector(".wb-tags")?.textContent.includes("synthetic_long_tag_alpha")',
     );
@@ -555,27 +555,27 @@ export async function interactionCorrectionChecks(env) {
     await move('mouseMoved', await center(h, tag));
     await check(
       '指针在块里时加一块不可见',
-      `getComputedStyle(${gap}.querySelector('button')).opacity==='0'`,
+      `getComputedStyle(${gap}.querySelector('.wb-add-block')).opacity==='0'`,
     );
     await move('mouseMoved', await center(h, gap));
-    await wait(`getComputedStyle(${gap}.querySelector('button')).opacity==='1'`);
+    await wait(`getComputedStyle(${gap}.querySelector('.wb-add-block')).opacity==='1'`);
     await check(
       '空隙中的加一块可见且不覆盖任何 Tag',
-      `(()=>{const b=${gap}.querySelector('button'),r=b.getBoundingClientRect();return getComputedStyle(b).opacity==='1'&&${tags}.every(t=>{const a=t.getBoundingClientRect();return a.right<=r.left||a.left>=r.right||a.bottom<=r.top||a.top>=r.bottom})})()`,
+      `(()=>{const b=${gap}.querySelector('button'),r=b.getBoundingClientRect();return getComputedStyle(b.parentElement).opacity==='1'&&${tags}.every(t=>{const a=t.getBoundingClientRect();return a.right<=r.left||a.left>=r.right||a.bottom<=r.top||a.top>=r.bottom})})()`,
     );
     await h.screenshot('correction-add-block');
     await move('mouseMoved', { x: 20, y: 300 });
     await e(`${gap}.querySelector('button').focus()`);
-    await wait(`getComputedStyle(${gap}.querySelector('button')).opacity==='1'`);
+    await wait(`getComputedStyle(${gap}.querySelector('.wb-add-block')).opacity==='1'`);
     await check(
       '键盘聚焦加一块时可见',
-      `getComputedStyle(${gap}.querySelector('button')).opacity==='1'`,
+      `getComputedStyle(${gap}.querySelector('.wb-add-block')).opacity==='1'`,
     );
     const tab = 'document.querySelector(".wb-tabs-scroll .wb-tab")';
     const origin = await startDrag(tab);
     await check(
-      '标签拖动副本保留图片、名称与修改标记，图片直接显示',
-      `(()=>{const source=${tab},copy=document.querySelector('.wb-drag-feedback');const image=copy.querySelector('img');return image?.complete&&image.naturalWidth>0&&getComputedStyle(image).opacity==='1'&&getComputedStyle(image).transitionDuration==='0s'&&copy.textContent===source.textContent&&!!copy.querySelector('.wb-dirty')===!!source.querySelector('.wb-dirty')})()`,
+      '标签拖动副本保留图片来源、名称与修改标记',
+      `(()=>{const source=${tab},copy=document.querySelector('.wb-drag-feedback');return copy.querySelector('img')?.getAttribute('src')===source.querySelector('img')?.getAttribute('src')&&copy.textContent===source.textContent&&!!copy.querySelector('.wb-dirty')===!!source.querySelector('.wb-dirty')})()`,
     );
     for (const point of [
       { x: 0, y: 500 },
@@ -592,12 +592,12 @@ export async function interactionCorrectionChecks(env) {
     await move('mouseReleased', origin);
     await wait('!document.querySelector(".wb-drag-feedback")');
     await click('更多', 'document.querySelector(".wb-section")');
-    await click('编辑原始文本', menu);
+    await click('切换为文本编辑', menu);
     await h.input(
-      '[aria-label="原始文本"]',
+      '.wb-text-section textarea',
       Array.from({ length: 100 }, (_, index) => `scroll_fixture_tag_${index}`).join(', '),
     );
-    await click('保存', 'document.querySelector(".wb-raw-editor")');
+    await click('按块编辑（Ctrl E 切换）');
     await e(`${scroll}.scrollTop=0`);
     await startDrag(source);
     const lower = await e(

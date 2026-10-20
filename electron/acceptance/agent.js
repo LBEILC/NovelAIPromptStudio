@@ -86,8 +86,8 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   }
   await h.section('Agent');
   await h.check(
-    'Agent 位于词典与关于之间，页面只有三行',
-    `(()=>{const pages=[...document.querySelectorAll('.settings-sidebar button')].map(n=>n.textContent.trim()),at=pages.indexOf('Agent');return pages[at-1]==='翻译词典'&&pages[at+1]==='关于与更新'&&[...document.querySelectorAll('[data-settings-section=agent] .settings-line')].filter(n=>n.checkVisibility()).length===3})()`,
+    'Agent 位于词典与关于之间，包含工具、能力和生成设置',
+    `(()=>{const pages=[...document.querySelectorAll('.settings-sidebar button')].map(n=>n.textContent.trim()),at=pages.indexOf('Agent'),page=document.querySelector('[data-settings-section=agent]');return pages[at-1]==='翻译词典'&&pages[at+1]==='关于与更新'&&['命令行工具','Agent 技能','Agent 能做什么','生成方式','花费上限'].every(label=>page.textContent.includes(label))})()`,
     undefined,
     'once',
   );

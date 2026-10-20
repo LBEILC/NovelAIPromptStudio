@@ -255,3 +255,23 @@ GitHub 页面上的 “Re-run failed jobs” 等价。一个平台打包失败�
 6. 下载并启动至少一个当前平台安装包。
 7. Release 正文的「下载指引」链接可正常访问；链接或正文有误时可用 `gh release edit --notes-file` 无损修正，但下次发版仍以 annotated tag 说明为准。
 8. 检查 README 的“最新版”链接能进入新 Release。
+
+
+## 结构化更新说明
+
+发版前可添加 `release-notes/<版本号>.json`（例如 `release-notes/1.2.0.json`）。发布流程校验后将它作为 `release-notes.json` 附件上传；没有此文件时继续发布，应用退回显示 Release 的 Markdown 说明。
+
+```json
+{
+  "schema": "nps-release-notes/1",
+  "version": "1.2.0",
+  "date": "2026-10-20",
+  "items": [
+    { "kind": "new", "area": "gen", "title": "生成图片", "detail": "可以在工作台生成图片。", "highlight": true, "icon": "image" }
+  ]
+}
+```
+
+`version` 必须与发布版本一致，格式为三段数字；`date` 是有效的 YYYY-MM-DD 日期。`items` 每项必填 `kind`（new / improved / fixed）、`area`（wb / lib / gen / agent / set / app）、`title` 和 `detail`。标题不超过 16 个字符；标题和说明均不能为空，不含换行或 HTML 尖括号。可选 `highlight` 为布尔值，最多两项为 true；可选 `icon` 为 restart / image / folder / calendar / translate / speed / shield / sparkle / palette / terminal。
+
+本机校验：`node scripts/prepare-release-notes.mjs 1.2.0`。校验失败会退出并报告字段；未找到文件时明确提示使用 Markdown。

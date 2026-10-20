@@ -1,6 +1,6 @@
 import { it, expect } from 'vitest';
 import { versionDiff, diffSummary, oneLine } from './versionDiff';
-import { createPromptStructure } from './promptStructure.js';
+import { createPromptStructure, addPromptCharacter } from './promptStructure.js';
 import { parsePrompt } from './prompt.js';
 import type { ImageProject } from '../shared/types';
 const project = (prompt: string, negative = 'lowres') => {
@@ -48,4 +48,12 @@ it('summarizes a paragraph in one sentence and keeps its full comparison', () =>
   expect(oneLine(d)).toBe('改写了“Scene”段落');
   expect(d.paras[0].old).toContain('stands');
   expect(d.paras[0].now).toContain('sits');
+});
+
+it('uses character and negative prefixes from the approved summary rules', () => {
+  const a = addPromptCharacter(project('rain')) as ImageProject;
+  const b = structuredClone(a);
+  b.prompt_structure.characters[0].undesired_raw = 'blurry';
+  b.prompt_structure.characters[0].undesired_tags = parsePrompt('blurry');
+  expect(oneLine(versionDiff(a, b))).toBe('角色 1 负面 +blurry');
 });

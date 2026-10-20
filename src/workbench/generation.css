@@ -50,3 +50,11 @@
 .wb-generation-title .nps-progress, .wb-title-progress { width:var(--ctl); }
 .wb-title-progress { height:var(--rule-w); background:var(--selected); overflow:hidden; }
 .wb-title-progress > i { display:block; width:33%; height:100%; background:var(--text); animation:wb-generation-sweep calc(var(--dur-3) * 4) linear infinite alternate; }
+
+.wb-version-original { padding:0; border:0; border-radius:var(--r-thumb); background:transparent; height:calc(var(--ctl) + var(--sp-2)); cursor:pointer; }
+.wb-version-original img { height:100%; max-width:calc((var(--ctl) + var(--sp-2))*var(--thumb-ratio-max)); object-fit:cover; border-radius:inherit; }
+.wb-version-original[aria-current=true] { outline:var(--bw) solid var(--cinnabar-text); outline-offset:var(--bw); }
+
+.wb-version-images > .wb-generation-slots { display:contents; }
+.wb-generation-slots { flex-wrap:wrap; }
+.wb-generation-slots[data-generation-state=failed] { color:var(--danger); }

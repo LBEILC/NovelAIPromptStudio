@@ -15,6 +15,8 @@ export async function settingsCopyChecks(h) {
       ],
     ],
     ['关闭当前标签页', [[modifier, 'W']]],
+    ['切换按块 / 按文本编辑', [[modifier, 'E']]],
+    ['在这一版的图之间切换', [['←', '→']]],
     ['移动当前 Tag 或块', [[process.platform === 'darwin' ? '⌥' : 'Alt', '方向键']]],
     ['取消选择', [['Esc']]],
     ['在图片之间移动', [['方向键']]],
@@ -46,6 +48,8 @@ export async function settingsCopyChecks(h) {
     [
       '这些时候会联网，都不会发送你的图片',
       [
+        '生成图片：用你的持久令牌把提示词和参数发给 NovelAI；带 Vibe 的图会带上图里的 Vibe 编码',
+        '查询余额：打开软件、每次生成结束和点“刷新”时，向 NovelAI 查询 Anlas 余额和用量',
         '检查和下载更新：访问 GitHub。自动检查可以在上面关掉；更新说明里带图片时，会从图片所在的网站加载',
         '翻译与分类：内置词典里没有的 Tag，会把 Tag 的名字发给 Danbooru，查它属于哪一类；配置了 AI 服务时，还没有译文的 Tag 会再发给你配置的服务',
         '段落的"译成中文""按中文改写英文"：把这一段文字发给你配置的 AI 服务',
@@ -55,12 +59,12 @@ export async function settingsCopyChecks(h) {
     ],
     ['命令行工具只在这台电脑上和软件通信', ['不开网络端口；Agent 能做什么见"Agent"那一页']],
     [
-      'API Key 加密后保存在这台电脑上',
+      'API Key 和 NovelAI 持久令牌加密后保存在这台电脑上',
       ['用系统自带的加密能力加密，软件不保存明文；诊断信息和报告问题都不会带上它们'],
     ],
   ];
   await check(
-    '数据与隐私四行和五项联网说明逐字匹配定稿',
+    '数据与隐私四行和七项联网说明逐字匹配定稿',
     `(()=>{let row=[...document.querySelectorAll('.settings-copy h2')].find(n=>n.textContent==='数据与隐私').nextElementSibling;const actual=[];while(row?.classList.contains('settings-line')){actual.push([row.firstElementChild.firstChild.textContent,[...row.querySelectorAll('small')].map(n=>n.textContent)]);row=row.nextElementSibling;}return JSON.stringify(actual)===${JSON.stringify(JSON.stringify(privacy))}})()`,
     undefined,
     'once',
@@ -70,10 +74,12 @@ export async function settingsCopyChecks(h) {
   );
   await h.screenshot('settings-about-privacy');
   await section('AI 服务');
-  await wait('!!document.querySelector("input[type=password],.settings-saved-key")');
+  await wait(
+    '!!document.querySelector(".settings-column input[type=password],.settings-saved-key")',
+  );
   await check(
     'AI Key 说明与关于页采用一致的加密存储文案',
-    `document.querySelector('input[type=password],.settings-saved-key').closest('.settings-column').lastElementChild.textContent==='加密后保存在这台电脑上，软件不保存明文'`,
+    `document.querySelector('.settings-column input[type=password],.settings-saved-key').closest('.settings-column').lastElementChild.textContent==='加密后保存在这台电脑上，软件不保存明文'`,
     undefined,
     'once',
   );

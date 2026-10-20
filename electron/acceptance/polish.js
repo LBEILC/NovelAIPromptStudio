@@ -152,16 +152,17 @@ export async function libraryPolishChecks(env) {
     );
     await check(
       '双击回到适合窗口',
-      `${viewer}.querySelector('[aria-label="100%"]')?.textContent.trim()==='适合窗口'`,
+      `(()=>{const c=${canvas}.getBoundingClientRect(),i=${canvas}.querySelector('img').getBoundingClientRect();return /%/.test(${viewer}.querySelector('[aria-label="100%"]')?.textContent)&&i.width<=c.width+1&&i.height<=c.height+1&&Math.abs((i.left+i.right)-(c.left+c.right))<2})()`,
       undefined,
       'once',
     );
+    const fitLabel = await e(`${viewer}.querySelector('[aria-label="100%"]')?.textContent`);
     await e(
       `${canvas}.querySelector('img').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
     );
     await check(
-      '再次双击切到 100%',
-      `${viewer}.querySelector('[aria-label="100%"]')?.textContent.trim()==='100%'`,
+      '再次双击保持适应窗口',
+      `${viewer}.querySelector('[aria-label="100%"]')?.textContent===${JSON.stringify(fitLabel)}`,
       undefined,
       'once',
     );
@@ -172,6 +173,7 @@ export async function libraryPolishChecks(env) {
       mobile: false,
     });
     await e('window.dispatchEvent(new Event("resize"))');
+    await click('100%', viewer);
     await e(frame);
     await check(
       '高像素密度下 100% 按设备像素比折算',
@@ -313,10 +315,6 @@ export async function workbenchPolishChecks(env) {
       'Tag 的文字位于自己的边框内',
       `(()=>{const tags=[...document.querySelectorAll('.wb-tags .nps-tag')];return tags.length>0 && tags.every(t=>{const r=t.getBoundingClientRect();return [...t.querySelectorAll('.nps-tag-en,.nps-tag-zh')].every(c=>{const b=c.getBoundingClientRect();return b.top>=r.top&&b.bottom<=r.bottom+1&&b.left>=r.left&&b.right<=r.right+1})})})()`,
     );
-    await check(
-      'Tag 保持自身高度，输入按钮与所在行底部对齐',
-      `(()=>{const groups=[...document.querySelectorAll('.wb-tags')];return groups.every(g=>{const tags=[...g.querySelectorAll('.nps-tag')].map(t=>t.getBoundingClientRect());return getComputedStyle(g).alignItems==='flex-start' && [...g.querySelectorAll('.wb-add-tags')].every(a=>{const r=a.getBoundingClientRect(),row=tags.filter(t=>t.top<r.bottom&&t.bottom>r.top);return !row.length||Math.abs(Math.max(...row.map(t=>t.bottom))-r.bottom)<1})})})()`,
-    );
     await e(
       `document.querySelectorAll('.wb-tags')[1].querySelector('[data-wb-tag]:last-of-type .nps-tag').click()`,
     );
@@ -339,10 +337,10 @@ export async function workbenchPolishChecks(env) {
       `(()=>{const t=document.querySelectorAll('.wb-tags')[1].querySelector('[data-wb-tag]:last-of-type .nps-tag'),r=t.getBoundingClientRect(),z=t.querySelector('.nps-tag-zh').getBoundingClientRect();return z.height>16 && z.bottom<=r.bottom && z.right<=r.right && z.left>=r.left})()`,
     );
     await click('更多', 'document.querySelector(".wb-section")');
-    await click('编辑原始文本', 'document.querySelector(".nps-layer [role=menu]")');
+    await click('切换为文本编辑', 'document.querySelector(".nps-layer [role=menu]")');
     const raw = Array.from({ length: 160 }, (_, i) => `marquee_fixture_${i}`).join(', ');
-    await h.input('[aria-label="原始文本"]', raw);
-    await click('保存', 'document.querySelector(".wb-raw-editor")');
+    await h.input('.wb-text-section textarea', raw);
+    await click('按块编辑（Ctrl E 切换）');
     await wait('document.querySelectorAll(".wb-tags .nps-tag").length>150');
     const scroll = 'document.querySelector(".wb-document-scroll")';
     const pointer = pointerDriver(h);

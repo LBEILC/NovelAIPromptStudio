@@ -25,7 +25,7 @@ export function versionDiff(before: ImageProject, after: ImageProject): VersionD
       id: section.scope.key,
       pre:
         section.scope.kind === 'character'
-          ? `${section.scope.label} `
+          ? `${section.scope.character.label}${section.scope.polarity === 'undesired' ? ' 负面' : ''} `
           : section.scope.polarity === 'undesired'
             ? '负面 '
             : '',

@@ -1,3 +1,4 @@
+import { promptForTransmission } from '../../src/lib/promptStructure.js';
 import fs from 'node:fs/promises';
 import syncFs from 'node:fs';
 import path from 'node:path';
@@ -108,9 +109,13 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       edits.seed = seed;
     }
     if (draft.metadata.prompt_raw !== original.metadata.prompt_raw)
-      edits.prompt = draft.metadata.prompt_raw;
+      edits.prompt = promptForTransmission(draft.metadata.prompt_raw, draft, 'base:prompt');
     if (draft.metadata.negative_prompt !== original.metadata.negative_prompt)
-      edits.negative = draft.metadata.negative_prompt;
+      edits.negative = promptForTransmission(
+        draft.metadata.negative_prompt,
+        draft,
+        'base:undesired',
+      );
     const chars = (p) =>
       (p.prompt_structure?.characters || []).map((c) => [c.prompt_raw, c.undesired_raw, c.center]);
     if (JSON.stringify(chars(draft)) !== JSON.stringify(chars(original))) {
@@ -121,9 +126,17 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         edits[key] = {
           ...(raw[key] || {}),
           caption: {
-            base_caption: base,
+            base_caption: promptForTransmission(
+              base,
+              draft,
+              key === 'v4_prompt' ? 'base:prompt' : 'base:undesired',
+            ),
             char_captions: draft.prompt_structure.characters.map((c) => ({
-              char_caption: c[field],
+              char_caption: promptForTransmission(
+                c[field],
+                draft,
+                `character:${c.id}:${field === 'prompt_raw' ? 'prompt' : 'undesired'}`,
+              ),
               centers: [c.center],
             })),
           },
@@ -237,8 +250,10 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     if (!version || version.workId !== parent.workId)
       throw new CommandError('not_found', '版本不存在');
     const image =
-      version.images.find((i) => i.projectId === input.imageId && !i.deleted) ||
-      version.images.find((i) => !i.deleted);
+      !version.parentId && input.imageId === version.project.id
+        ? null
+        : version.images.find((i) => i.projectId === input.imageId && !i.deleted) ||
+          version.images.find((i) => !i.deleted);
     const p = image ? services.database.loadProject(image.projectId) : version.project;
     const snapshot = {
       ...version.project,
@@ -254,13 +269,13 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     const session = store.get(),
       next = session.tabs.find((t) => t.id === current.id);
     Object.assign(next, {
-      ...(image
-        ? { source: { type: 'library', projectId: image.projectId, path: p.image_path } }
-        : {}),
+      source: services.database.loadProject(p.id)
+        ? { type: 'library', projectId: p.id, path: p.image_path }
+        : { type: 'file', path: p.image_path },
       project: snapshot,
       originalProject: structuredClone(snapshot),
       versionId: version.id,
-      versionImageId: image?.projectId || '',
+      versionImageId: image?.projectId || (!version.parentId ? version.project.id : ''),
       revision: (current.revision || 0) + 1,
     });
     await store.save(session);
@@ -436,9 +451,14 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     'work.open-from-image': async (input) => {
       const current = tab(input.tabId),
         version = versions.get(input.versionId);
-      if (!version || !version.images.some((i) => i.projectId === input.imageId))
+      if (
+        !version ||
+        (!version.images.some((i) => i.projectId === input.imageId) &&
+          (version.parentId || version.project.id !== input.imageId))
+      )
         throw new CommandError('not_found', '图片不存在');
-      const image = services.database.loadProject(input.imageId);
+      const storedImage = services.database.loadProject(input.imageId);
+      const image = storedImage || version.project;
       const snapshot = {
         ...version.project,
         id: image.id,
@@ -451,7 +471,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         },
       };
       const next = createWorkbenchTab(snapshot, {
-        source: { type: 'library', projectId: image.id, path: image.image_path },
+        source: storedImage
+          ? { type: 'library', projectId: image.id, path: image.image_path }
+          : { type: 'file', path: image.image_path },
       });
       next.identity = `work:${next.id}`;
       next.workId = next.id;

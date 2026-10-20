@@ -145,8 +145,8 @@ export async function clientControlChecks({ h, mode, doubles }) {
   await check('键盘聚焦非当前标签无关闭按钮，宽度不变', closeVisible);
   await h.wait('!!document.querySelector(".wb-tab-preview:popover-open")');
   await check('标签预览时间为日期或今天时分，没有原始时间戳', () =>
-    /^(?:今天 \d{2}:\d{2}|\d{4}-\d{2}-\d{2}) 导入$/.test(
-      document.querySelector('.wb-tab-preview .nps-help').textContent,
+    [...document.querySelectorAll('.wb-tab-preview .nps-help')].some((n) =>
+      /^(?:今天 \d{2}:\d{2}|\d{4}-\d{2}-\d{2}) 导入$/.test(n.textContent),
     ),
   );
   await h.screenshot('022-tab-preview');

@@ -27,6 +27,7 @@ import {
   SelectionBar,
   TextArea,
   type MenuItem,
+  useNotifications,
 } from '../ui';
 import {
   createPromptDocument,
@@ -34,6 +35,9 @@ import {
   editPromptTag,
   editPromptParagraph,
   serializePromptSection,
+  parsePromptSection,
+  copyPromptDocumentScope,
+  type PromptBlock,
   copyVisiblePromptDocument,
   type PromptDocument,
 } from '../lib/promptDocument';
@@ -138,7 +142,14 @@ export function WorkbenchEditor(p: EditorProps) {
     block: -1,
     request: 0,
   });
-  const [raw, setRaw] = useState<{ section: number; value: string } | null>(null);
+  const [newBlock, setNewBlock] = useState<{
+    section: number;
+    after: number;
+    type: 'tags' | 'paragraph';
+  } | null>(null);
+  const notify = useNotifications(),
+    projectRef = useRef(p.project);
+  projectRef.current = p.project;
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [editing, setEditing] = useState<DocumentTag | null>(null);
   const [draft, setDraft] = useState({
@@ -157,6 +168,7 @@ export function WorkbenchEditor(p: EditorProps) {
     selectedKeys: selected,
     onSelectionChange: setSelected,
     startOnItems: false,
+    additiveModifiers: true,
   });
   const guard = (operation: () => void) => {
     try {
@@ -412,59 +424,111 @@ export function WorkbenchEditor(p: EditorProps) {
               request: previous.request + 1,
             }))
           }
-          onRawEdit={(section, initial) =>
-            setRaw({ section, value: initial ?? serializePromptSection(doc.scopes[section]) })
-          }
-          sectionEditor={
-            raw
-              ? {
-                  section: raw.section,
-                  content: (
-                    <div
-                      className="wb-raw-editor"
-                      data-command-scope={doc.scopes[raw.section].scope.key}
-                    >
-                      <TextArea
-                        autoSize
-                        aria-label="原始文本"
-                        value={raw.value}
-                        onChange={(event) => setRaw({ ...raw, value: event.target.value })}
-                      />
-                      <p className="nps-help">
-                        空一行就是新的一块。保存后重新分块，译文和分类会保留。
-                      </p>
-                      <div className="wb-editor-actions">
-                        <Button variant="quiet" onClick={() => setRaw(null)}>
-                          取消
-                        </Button>
-                        <Button
-                          variant="ink"
-                          onClick={() =>
-                            guard(() => {
-                              save(
-                                replaceSection(
-                                  doc,
-                                  raw.section,
-                                  reparseSection(doc.scopes[raw.section], raw.value),
-                                ),
-                              );
-                              setRaw(null);
-                            })
-                          }
-                        >
-                          保存
-                        </Button>
-                      </div>
-                    </div>
-                  ),
+          onEditModeChange={() => setSelected([])}
+          onInsertBlock={(section, after, type) => setNewBlock({ section, after, type })}
+          renderNewBlock={(section, after) => {
+            if (!newBlock || newBlock.section !== section || newBlock.after !== after) return null;
+            const commit = (text: string, translation = '') => {
+              if (text.trim()) {
+                const previous = doc.scopes[section],
+                  raw = serializePromptSection(previous),
+                  at = after < 0 ? 0 : previous.blocks[after].range.end;
+                const inserted = (at ? '\n\n' : '') + text;
+                const next = reparseSection(previous, raw.slice(0, at) + inserted + raw.slice(at));
+                const target = next.blocks.find((b) => b.range.start >= at);
+                if (target) {
+                  target.type = newBlock.type;
+                  target.userType = true;
+                  target.translation = translation;
+                  if (newBlock.type === 'tags') target.displayLabel = '新的块';
                 }
-              : undefined
-          }
+                save(replaceSection(doc, section, next));
+              }
+              setNewBlock(null);
+            };
+            const empty = {
+              type: 'paragraph',
+              raw: '',
+              content: '',
+              label: '',
+              prefix: '',
+              suffix: '',
+              labelSpacing: '',
+              range: { start: 0, end: 0 },
+              contentRange: { start: 0, end: 0 },
+              tags: [],
+            } as PromptBlock;
+            return (
+              <div className="wb-new-block" data-command-scope={doc.scopes[section].scope.key}>
+                {newBlock.type === 'tags' ? (
+                  <>
+                    <header>新的块</header>
+                    <AddTags
+                      autoEdit
+                      section={section}
+                      block={-1}
+                      tags={doc.scopes[section].scope.tags}
+                      onAdd={(text) => commit(text)}
+                      onDismiss={() => setNewBlock(null)}
+                    />
+                  </>
+                ) : (
+                  <ParagraphEditor
+                    autoEdit
+                    block={empty}
+                    onSave={commit}
+                    onDismiss={() => setNewBlock(null)}
+                  >
+                    {null}
+                  </ParagraphEditor>
+                )}
+              </div>
+            );
+          }}
+          onRenameCharacter={(si) => {
+            const scope = doc.scopes[si].scope;
+            if (scope.kind !== 'character') return;
+            const c = scope.character;
+            setRenaming({ id: c.id, name: c.label });
+          }}
+          sectionTitle={(si) => {
+            const scope = doc.scopes[si].scope;
+            if (
+              scope.kind !== 'character' ||
+              !renaming ||
+              renaming.id !== scope.character.id ||
+              scope.polarity !== 'prompt'
+            )
+              return null;
+            const c = scope.character;
+            const finish = () => {
+              if (renaming.name.trim())
+                p.onUpdateProject(
+                  updatePromptCharacter(p.project, c.id, { label: renaming.name.trim() }),
+                );
+              setRenaming(null);
+            };
+            return (
+              <Input
+                className="wb-character-name"
+                autoFocus
+                aria-label="角色名称"
+                value={renaming.name}
+                onChange={(e) => setRenaming({ ...renaming, name: e.target.value })}
+                onBlur={finish}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === 'Escape') finish();
+                }}
+              />
+            );
+          }}
           characterActions={
             <div className="wb-section-head">
               <strong>角色</strong>
               <span className="nps-help">
-                {p.project.prompt_structure.characters.length || '暂无'}
+                {p.project.prompt_structure.characters.length
+                  ? `${p.project.prompt_structure.characters.length} 个`
+                  : '暂无角色 · 添加后可为每个角色单独编写提示词'}
               </span>
               <Button
                 variant="quiet"
@@ -480,29 +544,10 @@ export function WorkbenchEditor(p: EditorProps) {
             const scope = doc.scopes[si].scope;
             if (scope.kind !== 'character' || scope.polarity !== 'prompt') return null;
             const character = scope.character;
-            if (renaming?.id === character.id)
-              return (
-                <Input
-                  aria-label="角色名称"
-                  value={renaming.name}
-                  onChange={(event) => setRenaming({ ...renaming, name: event.target.value })}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') setRenaming(null);
-                    if (event.key === 'Enter' && renaming.name.trim()) {
-                      p.onUpdateProject(
-                        updatePromptCharacter(p.project, character.id, {
-                          label: renaming.name.trim(),
-                        }),
-                      );
-                      setRenaming(null);
-                    }
-                  }}
-                />
-              );
             return (
               <Menu
                 label="角色操作"
-                trigger={<i className="ri-edit-line" />}
+                trigger={<i className="ri-more-line" />}
                 items={[
                   {
                     id: 'rename',
@@ -510,22 +555,46 @@ export function WorkbenchEditor(p: EditorProps) {
                     onSelect: () => setRenaming({ id: character.id, name: character.label }),
                   },
                   {
-                    id: 'remove',
-                    label: '移除角色',
-                    danger: true,
+                    id: 'copy',
+                    label: '复制这个角色',
                     onSelect: () =>
-                      void (async () => {
-                        if (
-                          await p.onConfirm({
-                            title: `移除“${character.label}”？`,
-                            message: '这个角色的提示词、负面提示词和整理过的 Tag 会一起移除。',
-                            detail: `共包含 ${character.prompt_tags.length + character.undesired_tags.length} 个 Tag。`,
-                            okText: '移除角色',
-                            danger: true,
-                          })
-                        )
-                          p.onUpdateProject(removePromptCharacter(p.project, character.id));
-                      })(),
+                      p.onCopyText(
+                        copyPromptDocumentScope(doc, scope.key),
+                        0,
+                        false,
+                        0,
+                        character.label,
+                      ),
+                  },
+                  { id: 'separator', separator: true },
+                  {
+                    id: 'remove',
+                    label: '删除角色',
+                    danger: true,
+                    onSelect: () => {
+                      const index = p.project.prompt_structure.characters.findIndex(
+                          (c) => c.id === character.id,
+                        ),
+                        saved = structuredClone(character);
+                      p.onUpdateProject(removePromptCharacter(p.project, character.id));
+                      notify({
+                        text: `已删除${character.label}`,
+                        action: {
+                          label: '撤销',
+                          onClick: () => {
+                            const current = projectRef.current,
+                              characters = [...current.prompt_structure.characters];
+                            if (!characters.some((c) => c.id === saved.id)) {
+                              characters.splice(index, 0, saved);
+                              p.onUpdateProject({
+                                ...current,
+                                prompt_structure: { ...current.prompt_structure, characters },
+                              });
+                            }
+                          },
+                        },
+                      });
+                    },
                   },
                 ]}
               />

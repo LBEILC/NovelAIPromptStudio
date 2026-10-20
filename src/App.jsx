@@ -1485,17 +1485,6 @@ export default function App() {
 
   const resetWorkbench = async () => {
     if (!activeTab?.project) return;
-    if (
-      workbenchTabHasChanges(activeTab) &&
-      !(await requestConfirmation({
-        title: '恢复图片里原来的提示词？',
-        message: '这个标签页里的修改会被清除。',
-        detail: '图片文件本身不会被修改，其他标签页不受影响。',
-        okText: '恢复',
-        danger: true,
-      }))
-    )
-      return;
     setWorkbenchSession((current) =>
       updateWorkbenchTab(current, activeTab.id, (tab) => ({
         ...tab,

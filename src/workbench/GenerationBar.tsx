@@ -93,14 +93,27 @@ export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () =>
   const freeSize = presets.find(([, pw, ph]) => Math.sign(pw - ph) === Math.sign(w - h))!;
   return (
     <>
-      {!!estimate && !estimate.free && !estimate.unavailable && w * h > 1048576 && (
-        <Banner tone="warn">
-          超出免费范围，每张 {estimate.perImage} Anlas
-          <Button size="small" onClick={() => void choose(freeSize[1], freeSize[2])}>
-            改成 {freeSize[1]}×{freeSize[2]}
-          </Button>
-        </Banner>
-      )}
+      {!!estimate &&
+        !estimate.free &&
+        !estimate.unavailable &&
+        state.subscription?.active &&
+        state.subscription.tier >= 3 && (
+          <Banner tone="warn">
+            {w * h > 1048576
+              ? '尺寸超出免费范围'
+              : Number(metadata?.steps) > 28
+                ? '步数超过 28 步'
+                : state.subscription?.usage?.isNegative
+                  ? 'V5 免费用量已用尽'
+                  : 'Vibe 参考数量超出免费范围'}
+            ，每张 {estimate.perImage} Anlas
+            {w * h > 1048576 && (
+              <Button size="small" onClick={() => void choose(freeSize[1], freeSize[2])}>
+                改成 {freeSize[1]}×{freeSize[2]}
+              </Button>
+            )}
+          </Banner>
+        )}
       <div className="wb-generation-bar">
         {job ? (
           <>
@@ -109,7 +122,7 @@ export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () =>
                 ? '完成当前这张后停止'
                 : job.continuous
                   ? `生成中 第 ${job.index} 张 · 持续生成`
-                  : `生成中 ${job.index} / ${job.count} · 已消耗 ${job.spent} Anlas`}
+                  : `生成中 ${job.index} / ${job.count} · ${job.spentKnown ? `已消耗 ${job.spent} Anlas` : '【文案待定：实际消耗查询失败】'}`}
             </span>
             <Button disabled>
               <i className="ri-loader-4-line nps-spinner" />
@@ -252,14 +265,22 @@ export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () =>
             <div
               className="wb-custom-size"
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && Number(size.width) > 0 && Number(size.height) > 0)
+                if (
+                  e.key === 'Enter' &&
+                  /^\d+$/.test(size.width) &&
+                  /^\d+$/.test(size.height) &&
+                  Number(size.width) > 0 &&
+                  Number(size.height) > 0
+                )
                   void choose(norm(size.width), norm(size.height));
               }}
             >
               <Input
                 aria-label="宽"
                 value={size.width}
-                onChange={(e) => setSize({ ...size, width: e.target.value })}
+                onChange={(e) => {
+                  if (/^\d*$/.test(e.target.value)) setSize({ ...size, width: e.target.value });
+                }}
               />
               <Button
                 aria-label="交换宽高"
@@ -271,7 +292,9 @@ export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () =>
               <Input
                 aria-label="高"
                 value={size.height}
-                onChange={(e) => setSize({ ...size, height: e.target.value })}
+                onChange={(e) => {
+                  if (/^\d*$/.test(e.target.value)) setSize({ ...size, height: e.target.value });
+                }}
               />
             </div>
             <p className="nps-help">

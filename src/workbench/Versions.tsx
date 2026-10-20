@@ -72,7 +72,10 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         )
       )
         return;
-      const images = current.images.filter((i) => !i.deleted);
+      const images = [
+        ...(!current.parentId ? [{ projectId: current.project.id }] : []),
+        ...current.images.filter((i) => !i.deleted),
+      ];
       if (images.length < 2) return;
       const index = images.findIndex((i) => i.projectId === tab.versionImageId),
         next =
@@ -116,9 +119,44 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     timer.current = setTimeout(() => setPeek(v), 400);
   };
   const pending = state.jobs.filter((j) => j.tabId === tab.id && j.state === 'pending');
-  const job = state.jobs.find(
-    (j) => j.tabId === tab.id && ['queued', 'generating', 'failed'].includes(j.state),
-  );
+  const tabJobs = state.jobs.filter((j) => j.tabId === tab.id);
+  const job =
+    tabJobs.find((j) => ['queued', 'generating'].includes(j.state)) ||
+    (tabJobs.at(-1)?.state === 'failed' ? tabJobs.at(-1) : undefined);
+  const appending =
+    job &&
+    versionDiff(versions.find((v) => v.id === job.parentId)?.project || job.project, job.project)
+      .empty;
+  const renderSlots = (limit: number) =>
+    job ? (
+      <div className="wb-generation-slots" data-generation-state={job.state}>
+        {Array.from(
+          { length: Math.min(limit, job.continuous ? 1 : Math.max(1, job.count - job.completed)) },
+          (_, i) => (
+            <span
+              key={i}
+              style={{
+                width: `${(token('--ctl') + token('--sp-2')) * Math.max(token('--thumb-ratio-min'), Math.min(token('--thumb-ratio-max'), job.project.metadata.width / job.project.metadata.height))}px`,
+              }}
+              className={i === 0 && job.state === 'generating' ? 'is-generating' : ''}
+              data-indeterminate={job.progress == null ? 'true' : undefined}
+            >
+              {i === 0 &&
+                (job.state === 'failed' ? (
+                  '×'
+                ) : job.state === 'generating' ? (
+                  <i
+                    style={job.progress != null ? { width: `${job.progress * 100}%` } : undefined}
+                  />
+                ) : null)}
+            </span>
+          ),
+        )}
+        {!job.continuous && job.count - job.completed > limit && (
+          <span>+{job.count - job.completed - limit}</span>
+        )}
+      </div>
+    ) : null;
   const changed = tab.project && versionDiff(current.project, tab.project);
   const thumbnail = (v: WorkVersion, image: WorkVersion['images'][number]) => (
     <ContextMenu
@@ -230,29 +268,6 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             setPeek(null);
           }}
         >
-          {origin && (
-            <Button
-              variant="quiet"
-              onClick={() =>
-                void invokeUI('work.open', {
-                  workId: origin.workId,
-                  versionId: origin.versionId,
-                  imageId: origin.projectId,
-                })
-              }
-            >
-              来自 {origin.name || '原作品'} · 第 {origin.number} 版 ↗
-            </Button>
-          )}
-          {derived.map((d) => (
-            <Button
-              variant="quiet"
-              key={d.workId}
-              onClick={() => void invokeUI('work.open', { workId: d.workId })}
-            >
-              已作为新作品打开 · 第 {d.source.number} 版 ↗
-            </Button>
-          ))}
           <AnimatedItems ids={line.map((v) => v.id)} attribute="data-version-id">
             {line.map((v) => {
               const images = v.images.filter((i) => !i.deleted),
@@ -273,7 +288,11 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                     2 -
                     1,
                 );
-              let visible = expanded.includes(v.id) ? images : images.slice(0, limit);
+              const activeJob =
+                job?.versionId === v.id || (!job?.versionId && appending && job?.parentId === v.id);
+              const imageLimit =
+                activeJob && !expanded.includes(v.id) ? Math.max(1, limit - 1) : limit;
+              let visible = expanded.includes(v.id) ? images : images.slice(0, imageLimit);
               const selected = images.find((i) => i.projectId === tab.versionImageId);
               if (selected && !visible.includes(selected))
                 visible = [...visible.slice(0, -1), selected];
@@ -307,16 +326,78 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                         {v.source === 'agent' ? ' · Agent' : ''}
                       </span>
                       <span className="wb-version-summary">{diffSummary(delta(v))}</span>
+                      {!v.parentId && origin && (
+                        <Button
+                          variant="quiet"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void invokeUI('work.open', {
+                              workId: origin.workId,
+                              versionId: origin.versionId,
+                              imageId: origin.projectId,
+                            });
+                          }}
+                        >
+                          来自 {origin.name || '原作品'} · 第 {origin.number} 版 ↗
+                        </Button>
+                      )}
+                      {derived
+                        .filter((d) => d.source.versionId === v.id)
+                        .map((d) => (
+                          <Button
+                            variant="quiet"
+                            key={d.workId}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void invokeUI('work.open', { workId: d.workId });
+                            }}
+                          >
+                            新作品 ↗
+                          </Button>
+                        ))}
+
                       <div className="wb-version-images">
-                        {visible.map((i) => thumbnail(v, i))}
-                        {!v.parentId && !images.length && (
-                          <img
-                            src={mediaUrl(v.project.thumbnail_path || v.project.image_path)}
-                            alt="原图"
-                          />
+                        {!v.parentId && (
+                          <ContextMenu
+                            label="原图操作"
+                            items={[
+                              {
+                                id: 'new-work',
+                                label: '作为新作品打开',
+                                onSelect: () =>
+                                  void invokeUI('work.open-from-image', {
+                                    tabId: tab.id,
+                                    versionId: v.id,
+                                    imageId: v.project.id,
+                                  }).then(() => notify({ text: '已作为新作品打开' })),
+                              },
+                            ]}
+                          >
+                            <button
+                              className="wb-version-original"
+                              aria-label="查看原图"
+                              aria-current={
+                                v.id === current.id &&
+                                (!tab.versionImageId || tab.versionImageId === v.project.id)
+                                  ? 'true'
+                                  : undefined
+                              }
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void open(v, v.project.id);
+                              }}
+                            >
+                              <img
+                                src={mediaUrl(v.project.thumbnail_path || v.project.image_path)}
+                                alt="原图"
+                              />
+                            </button>
+                          </ContextMenu>
                         )}
+                        {visible.map((i) => thumbnail(v, i))}
                         {v.parentId && !images.length && <span>图片都在回收站</span>}
-                        {images.length > limit && (
+                        {activeJob && renderSlots(Math.max(1, limit - visible.length))}
+                        {images.length > imageLimit && (
                           <Button
                             size="small"
                             onClick={(e) => {
@@ -336,46 +417,49 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                       </div>
                     </div>
                   </ContextMenu>
-                  {v.id === current.id && changed && !changed.empty && (
-                    <div
-                      className="wb-version-draft"
-                      tabIndex={0}
-                      onMouseEnter={(e) =>
-                        hover(
-                          {
-                            ...current,
-                            id: 'draft',
-                            parentId: current.id,
-                            project: tab.project!,
-                            number: versions.length + 1,
-                          },
-                          e.currentTarget,
-                        )
-                      }
-                      onFocus={(e) =>
-                        hover(
-                          {
-                            ...current,
-                            id: 'draft',
-                            parentId: current.id,
-                            project: tab.project!,
-                            number: versions.length + 1,
-                          },
-                          e.currentTarget,
-                        )
-                      }
-                      onMouseLeave={() => {
-                        clearTimeout(timer.current);
-                        setPeek(null);
-                      }}
-                    >
-                      未生成
-                      {kids(v.id).length
-                        ? ` · 分支 ${Math.max(...versions.map((v) => v.branchNumber)) + 1}`
-                        : ''}
-                      <small>{diffSummary(changed)}</small>
-                    </div>
-                  )}
+                  {v.id === current.id &&
+                    changed &&
+                    !changed.empty &&
+                    (!job || job.state === 'failed') && (
+                      <div
+                        className="wb-version-draft"
+                        tabIndex={0}
+                        onMouseEnter={(e) =>
+                          hover(
+                            {
+                              ...current,
+                              id: 'draft',
+                              parentId: current.id,
+                              project: tab.project!,
+                              number: versions.length + 1,
+                            },
+                            e.currentTarget,
+                          )
+                        }
+                        onFocus={(e) =>
+                          hover(
+                            {
+                              ...current,
+                              id: 'draft',
+                              parentId: current.id,
+                              project: tab.project!,
+                              number: versions.length + 1,
+                            },
+                            e.currentTarget,
+                          )
+                        }
+                        onMouseLeave={() => {
+                          clearTimeout(timer.current);
+                          setPeek(null);
+                        }}
+                      >
+                        未生成
+                        {kids(v.id).length
+                          ? ` · 分支 ${Math.max(...versions.map((v) => v.branchNumber)) + 1}`
+                          : ''}
+                        <small>{diffSummary(changed)}</small>
+                      </div>
+                    )}
                   {(expanded.includes(`fork:${v.id}`)
                     ? forks
                     : forks.length > 3
@@ -394,6 +478,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                         className="wb-version-fork"
                         onClick={() => void open(f)}
                         onMouseEnter={(e) => hover(f, e.currentTarget)}
+                        onFocus={(e) => hover(f, e.currentTarget)}
                         onMouseLeave={() => {
                           clearTimeout(timer.current);
                           setPeek(null);
@@ -434,27 +519,15 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
               待确认 · Agent<small>{j.count} 张</small>
             </div>
           ))}
-          {job && (
-            <div className="wb-version-draft" data-generation-state={job.state}>
-              {job.state === 'failed' ? '×' : `生成中 ${job.index} / ${job.count}`}
-              <div className="wb-generation-slots">
-                <span
-                  className={job.state === 'generating' ? 'is-generating' : ''}
-                  data-indeterminate={job.progress == null ? 'true' : undefined}
-                >
-                  {job.state === 'generating' && (
-                    <i
-                      style={job.progress != null ? { width: `${job.progress * 100}%` } : undefined}
-                    />
-                  )}
-                </span>
-                {!job.continuous &&
-                  Array.from(
-                    { length: Math.min(5, Math.max(0, job.count - job.completed - 1)) },
-                    (_, i) => <span key={i} />,
-                  )}
-                {job.count - job.completed > 6 && `+${job.count - job.completed - 6}`}
-              </div>
+          {job && !job.versionId && !appending && (
+            <div
+              className={job.state === 'failed' ? 'wb-version-draft' : 'wb-version-row'}
+              data-generation-state={job.state}
+            >
+              {job.state === 'failed' ? '×' : `第 ${versions.length + 1} 版`}
+              {job.source === 'agent' ? ' · Agent' : ''}
+              <small>{job.summary}</small>
+              {renderSlots(6)}
             </div>
           )}
         </div>

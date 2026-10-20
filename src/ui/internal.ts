@@ -52,9 +52,10 @@ export function placeLayer(layer: HTMLElement, anchor: DOMRect, side = false) {
   // Do not temporarily expand a scrolling list to measure it: Chromium would
   // clamp scrollTop and pull the user's last visible options out of view.
   if (side) layer.style.maxHeight = '';
+  const margin = parseFloat(getComputedStyle(layer).getPropertyValue('--sp-2')) || 0;
   const bounds = { width: layer.offsetWidth, height: layer.offsetHeight };
-  const below = clamp(innerHeight - anchor.bottom, 0, innerHeight);
-  const above = clamp(anchor.top, 0, innerHeight);
+  const below = clamp(innerHeight - margin - anchor.bottom, 0, innerHeight);
+  const above = clamp(anchor.top - margin, 0, innerHeight);
   const flip = !side && Math.max(layer.scrollHeight, bounds.height) > below && above > below;
   if (!side) {
     layer.style.maxHeight = `${flip ? above : below}px`;
@@ -62,9 +63,9 @@ export function placeLayer(layer: HTMLElement, anchor: DOMRect, side = false) {
   }
   let left = side ? anchor.right : anchor.left;
   let top = side ? anchor.top : flip ? anchor.top - bounds.height : anchor.bottom;
-  if (left + bounds.width > innerWidth)
+  if (left + bounds.width > innerWidth - margin)
     left = side ? anchor.left - bounds.width : anchor.right - bounds.width;
-  if (side && top + bounds.height > innerHeight) top = anchor.top - bounds.height;
+  if (side && top + bounds.height > innerHeight - margin) top = anchor.top - bounds.height;
   layer.dataset.placement = side
     ? left < anchor.left
       ? 'left'
@@ -72,11 +73,11 @@ export function placeLayer(layer: HTMLElement, anchor: DOMRect, side = false) {
     : top < anchor.top
       ? 'top'
       : 'bottom';
-  const finalLeft = clamp(left, 0, Math.max(0, innerWidth - bounds.width));
-  const finalTop = clamp(top, 0, Math.max(0, innerHeight - bounds.height));
+  const finalLeft = clamp(left, margin, Math.max(margin, innerWidth - margin - bounds.width));
+  const finalTop = clamp(top, margin, Math.max(margin, innerHeight - margin - bounds.height));
   layer.style.transformOrigin = side
     ? `${left < anchor.left ? bounds.width : 0}px ${clamp(anchor.top + anchor.height / 2 - finalTop, 0, bounds.height)}px`
     : `${clamp(anchor.left + anchor.width / 2 - finalLeft, 0, bounds.width)}px ${top < anchor.top ? bounds.height : 0}px`;
-  layer.style.left = `${clamp(left, 0, Math.max(0, innerWidth - bounds.width))}px`;
-  layer.style.top = `${clamp(top, 0, Math.max(0, innerHeight - bounds.height))}px`;
+  layer.style.left = `${clamp(left, margin, Math.max(margin, innerWidth - margin - bounds.width))}px`;
+  layer.style.top = `${clamp(top, margin, Math.max(margin, innerHeight - margin - bounds.height))}px`;
 }

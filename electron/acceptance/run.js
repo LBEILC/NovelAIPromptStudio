@@ -497,8 +497,8 @@ export async function runAcceptance(context) {
           () => detailLayoutChecks(environment),
           () => uiPolishChecks(environment),
           () => agentChecks(environment),
-          () => componentChecks(environment),
           () => generationChecks(environment),
+          () => componentChecks(environment),
         ],
       ];
       for (const run of mode.shard ? groups[mode.shard.index - 1] : groups.flat()) await run();

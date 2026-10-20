@@ -1,6 +1,7 @@
 import { parsePrompt, parsePromptPreservingEdits, promptTagRanges, formatTag } from './prompt.js';
 import {
   getPromptScopes,
+  promptForTransmission,
   normalizePromptStructure,
   formatPositivePromptForCopy,
   positivePromptCopyOptions,
@@ -37,6 +38,8 @@ export interface ParseBlockOptions {
 }
 export type ParsedTag = ReturnType<typeof parsePrompt>[number];
 export interface PromptBlock {
+  textLayout?: boolean;
+  displayLabel?: string;
   userType?: boolean;
   translation?: string;
   type: BlockType;
@@ -429,6 +432,8 @@ export function createPromptDocument(
               }
             : {}),
           translation: entry.translation,
+          displayLabel: entry.displayLabel,
+          textLayout: entry.textLayout,
         };
       });
       return { scope, ...section };
@@ -446,9 +451,13 @@ export function promptDocumentProject(document: PromptDocument) {
   const annotations: NonNullable<PromptStructure['block_annotations']> = {};
   for (const section of document.scopes) {
     const saved = section.blocks
-      .filter((block) => block.userType || block.translation)
+      .filter(
+        (block) => block.userType || block.translation || block.displayLabel || block.textLayout,
+      )
       .map((block) => ({
         raw: block.raw,
+        ...(block.textLayout ? { textLayout: true } : {}),
+        ...(block.displayLabel ? { displayLabel: block.displayLabel } : {}),
         start: block.range.start,
         ...(block.userType ? { type: block.type } : {}),
         ...(block.translation ? { translation: block.translation } : {}),
@@ -498,7 +507,15 @@ export function promptDocumentCopyOptions(
 }
 export function copyPromptDocumentScope(document: PromptDocument, key: string) {
   const section = document.scopes.find((section) => section.scope.key === key);
-  return section ? serializePromptSection(section) : '';
+  return section
+    ? promptForTransmission(
+        ['confirmed', 'inferred'].includes(section.scope.automation?.status || '')
+          ? section.scope.automation!.cleanedRaw
+          : serializePromptSection(section),
+        promptDocumentProject(document),
+        key,
+      )
+    : '';
 }
 /** Visible/selected entries retain the established category ordering and automatic/negative exclusions. */
 export function copyVisiblePromptDocument(

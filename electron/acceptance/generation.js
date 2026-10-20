@@ -56,7 +56,10 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   await click('工作台', 'document.querySelector(".studio-titlebar")');
   doubles.selections.push({ canceled: false, filePaths: [files[0]] });
   await click('打开图片', 'document.querySelector(".studio-titlebar")');
-  await wait('!!document.querySelector(".wb-section")');
+  await wait(
+    `(async()=>{const list=(await window.studio.invoke('workbench.list',{})).data;if(!list.activeTabId)return false;const current=(await window.studio.invoke('workbench.get',{tabId:list.activeTabId})).data;return current.tab.source.path===${JSON.stringify(files[0])}&&!!document.querySelector('.wb-section')})()`,
+    '新生成夹具打开完成后再进入设置',
+  );
   await check(
     '没有令牌时版本栏和生成底栏均不显示',
     '!document.querySelector(".wb-versions")&&!document.querySelector(".wb-generation-bar")',
@@ -162,11 +165,12 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   await e(
     `document.querySelector('.wb-version-thumb').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:200}))`,
   );
+  const beforeNewWork = await invoke('workbench.list');
   await click('作为新作品打开');
   await wait('document.body.innerText.includes("来自")');
   await check('从图片打开新作品记录来源', async () => {
     const tabs = await invoke('workbench.list');
-    return tabs.tabs.length === 2 && tabs.activeTabId !== tabId;
+    return tabs.tabs.length === beforeNewWork.tabs.length + 1 && tabs.activeTabId !== tabId;
   });
   await e(
     `[...document.querySelectorAll('.wb-versions button')].find(b=>b.textContent.includes('来自')).click()`,
@@ -230,6 +234,14 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
       versions.versions.at(-1).source === 'agent'
     );
   });
+  await click('图片库', 'document.querySelector(".studio-titlebar")');
+  await input('[aria-label="搜索图片库"]', '');
+  await click('生成记录');
+  await wait('!!document.querySelector(".library-version-badge")');
+  await check(
+    '生成记录逐张列出且最新卡片标注版本和Agent',
+    `(()=>{const cards=[...document.querySelectorAll('.library-card')];return cards.length>0&&!document.querySelector('.library-stack')&&/第 [0-9]+ 版/.test(cards[0].querySelector('.library-version-badge')?.textContent)&&cards[0].textContent.includes('Agent')})()`,
+  );
   await h.section('Agent');
   await click('直接生成');
   await check(

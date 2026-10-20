@@ -124,3 +124,35 @@ describe('version persistence', () => {
       expect(store.work('new-work').source.versionId).toBe(next.id);
     }));
 });
+
+it('matches branch numbering for the approved 21-version prototype tree', () =>
+  fixture((db, file) => {
+    migrateGenerationVersions(db, file);
+    db.exec(
+      "CREATE TABLE projects(id TEXT PRIMARY KEY, deleted_at TEXT); INSERT INTO projects VALUES ('synthetic-image','')",
+    );
+    const store = createVersionStore(db),
+      versions = [];
+    const parents = [null, 1, 2, 3, 2, 5, 6, 4, 8, 1, 10, 9, 12, 11, 13, 8, 8, 17, 8, 8, 20];
+    const expected = [0, 0, 0, 0, 1, 1, 1, 0, 0, 2, 2, 0, 0, 2, 0, 3, 4, 4, 5, 6, 6];
+    for (let i = 0; i < parents.length; i++) {
+      const project = {
+        metadata: { prompt_raw: `synthetic_${i}`, negative_prompt: '', width: 832, height: 1216 },
+        prompt_structure: { characters: [] },
+      };
+      const v =
+        i === 0
+          ? store.ensure('prototype-tree', project)
+          : store.append({
+              workId: 'prototype-tree',
+              parentId: versions[parents[i] - 1].id,
+              project,
+              source: 'user',
+              image: { id: 'synthetic-image' },
+              seed: i,
+            });
+      versions.push(v);
+      expect(v.number).toBe(i + 1);
+      expect(v.branchName).toBe(expected[i] ? `分支 ${expected[i]}` : '主线');
+    }
+  }));
