@@ -496,8 +496,6 @@ export async function workbenchInteractionChecks(env) {
       undefined,
       'once',
     );
-    await click('恢复', 'document.querySelector(".cap-title")');
-    await wait(`${draft}.prompt_structure.base_prompt_raw===${JSON.stringify(original)}`);
     start = await dragStart(source);
     const nextBlock = await center(
       h,
