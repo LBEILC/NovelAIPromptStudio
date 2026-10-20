@@ -137,6 +137,16 @@ export interface CommandDefinitions {
     input: { id: string; name: string };
     output: { item: import('./materials').Material };
   };
+  /**
+   * 改一块素材的内容（素材是模板：只影响以后插入的地方）。常用块不写 block；角色写 block（第几块），负面提示词写 negative: true。
+   * text 是这一块的文字（Tag 块按逗号分开、可以带 1.2::tag:: 权重；段落是原文），块的类型不变，段落改了以后译文清空。
+   * 负面提示词的 text 是全部负面 Tag（按逗号分开），保存后负面提示词变成这一个 Tag 块。
+   * asNew 为 true 时原来那份不动，另存一份新的（名称加"副本"，用过次数从 0 开始，示例图片沿用），返回新的那一份。
+   */
+  'material.update': {
+    input: { id: string; block?: number; negative?: boolean; text: string; asNew?: boolean };
+    output: { item: import('./materials').Material };
+  };
   'material.delete': { input: { id: string }; output: Record<string, never> };
 
   'generate.estimate': {

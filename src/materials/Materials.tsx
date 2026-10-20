@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { writeClipboardText } from '../lib/clipboard';
 import { mediaUrl } from '../lib/imageStage.js';
-import { Icon, isMod } from '../kit/controls';
+import { Icon, Kbd, isMod } from '../kit/controls';
 import { Pop } from '../kit/layer';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
 import { FlipScope, dur, useIndicator } from '../kit/motion';
@@ -31,6 +31,7 @@ const NOUN: Record<Kind, string> = { block: '常用块', character: '角色', vi
 // 名词前后接中文时，英文名词两边留空格（"搜索 Vibe 的名称"）
 const sp = (n: string) => (/^[A-Za-z]/.test(n) ? ` ${n} ` : n);
 const ROW = 3;
+type Part = 'self' | 'negative' | number;
 const UNDO_MS = 5000;
 
 // ---------- 示例图片：按图片 id 读缩略图和名称，读过的记下来 ----------
@@ -242,6 +243,38 @@ export function MaterialsPage({
       () => notify({ text: `已复制“${m.name}”`, tone: 'success' }),
       (e) => notify({ text: `复制失败：${(e as Error).message}`, tone: 'error' }),
     );
+  // 编辑内容：保存是原地改（用过次数不变）；另存为新的放在原来那份下面并展开
+  const saveEdit = async (m: Material, part: Part, text: string, asNew: boolean) => {
+    try {
+      const { item } = await invokeUI('material.update', {
+        id: m.id,
+        text,
+        ...(part === 'negative'
+          ? { negative: true }
+          : typeof part === 'number'
+            ? { block: part }
+            : {}),
+        ...(asNew ? { asNew: true } : {}),
+      });
+      if (asNew) {
+        setItems((all) => {
+          const next = [...all];
+          next.splice(next.findIndex((x) => x.id === m.id) + 1, 0, item);
+          return next;
+        });
+        setOpen(item.id);
+        scrollTo.current = item.id;
+        notify({ text: `已另存为“${item.name}”`, tone: 'success' });
+      } else {
+        setItems((all) => all.map((x) => (x.id === m.id ? item : x)));
+        notify({ text: '已保存', tone: 'success' });
+      }
+      return true;
+    } catch (e) {
+      notify({ text: `保存失败：${(e as Error).message}`, tone: 'error' });
+      return false;
+    }
+  };
   // 删除：先淡出，再从列表里拿掉（其他行补位）；通知里可以撤销，几秒后才真的删
   const remove = (m: Material) => {
     if (open === m.id) setOpen('');
@@ -462,6 +495,7 @@ export function MaterialsPage({
                             onRenameDone={(save) => void commitRename(save)}
                             onMenu={(at) => setMenu(menu?.id === m.id ? null : { at, id: m.id })}
                             onCopy={() => copy(m)}
+                            onSave={(part, text, asNew) => saveEdit(m, part, text, asNew)}
                             onShowImage={onShowImage}
                             onPeekMove={peekMove}
                             onPeekLeave={peekLeave}
@@ -542,6 +576,7 @@ function Row({
   onRenameDone,
   onMenu,
   onCopy,
+  onSave,
   onShowImage,
   onPeekMove,
   onPeekLeave,
@@ -557,12 +592,45 @@ function Row({
   onRenameDone: (save: boolean) => void;
   onMenu: (at: [number, number]) => void;
   onCopy: () => void;
+  /** 保存编辑：part 是 'self'（常用块本身）、角色的第几块或 'negative'；成功时返回 true */
+  onSave: (part: Part, text: string, asNew: boolean) => Promise<boolean>;
   onShowImage?: (id: string) => void;
   onPeekMove: (id: string, n: number) => (e: React.PointerEvent<HTMLElement>) => void;
   onPeekLeave: () => void;
 }) {
   const ex = useExamples(m.examples);
   const renaming = rename !== null;
+  const [edit, setEdit] = useState<{ part: Part; text: string } | null>(null);
+  useEffect(() => {
+    if (!open) setEdit(null);
+  }, [open]);
+  const startEdit = (part: Part) =>
+    setEdit({
+      part,
+      text:
+        part === 'negative'
+          ? (m.negativeBlocks || []).map((b) => b.content).join(', ')
+          : (part === 'self' ? m.blocks[0] : m.blocks[part])?.content || '',
+    });
+  const editBox = (part: Part, tags: boolean) =>
+    edit?.part === part ? (
+      <EditBox
+        text={edit.text}
+        tags={tags}
+        noun={NOUN[m.kind]}
+        onChange={(text) => setEdit({ part, text })}
+        onCancel={() => setEdit(null)}
+        onSave={async (asNew) => {
+          if (await onSave(part, edit.text.trim(), asNew)) setEdit(null);
+        }}
+      />
+    ) : null;
+  const editButton = (part: Part) =>
+    edit ? null : (
+      <button className="btn quiet sm icon" aria-label="编辑" onClick={() => startEdit(part)}>
+        <Icon name="edit-line" />
+      </button>
+    );
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (renaming) {
@@ -680,53 +748,70 @@ function Row({
                       <div className="mat-sub" key={i}>
                         <div className="mat-sub-h">
                           <span className="label">{b.type === 'tags' ? 'Tag 块' : '段落'}</span>
+                          {edit?.part !== i && editButton(i)}
                         </div>
-                        <MaterialContent m={{ ...m, blocks: [b] }} max={Infinity} />
+                        {editBox(i, b.type === 'tags') || (
+                          <MaterialContent m={{ ...m, blocks: [b] }} max={Infinity} />
+                        )}
                       </div>
                     ))}
                     <div className="mat-sub">
                       <div className="mat-sub-h">
                         <span className="label">负面提示词</span>
+                        {edit?.part !== 'negative' && editButton('negative')}
                       </div>
-                      {m.negativeBlocks?.some((b) => b.type !== 'tags' || b.tags.length) ? (
-                        <MaterialContent m={{ ...m, blocks: m.negativeBlocks }} max={Infinity} />
-                      ) : (
-                        <p className="help">没有 Tag</p>
-                      )}
+                      {editBox('negative', true) ||
+                        (m.negativeBlocks?.some((b) => b.type !== 'tags' || b.tags.length) ? (
+                          <MaterialContent m={{ ...m, blocks: m.negativeBlocks }} max={Infinity} />
+                        ) : (
+                          <p className="help">没有 Tag</p>
+                        ))}
                     </div>
                   </>
+                ) : edit?.part === 'self' ? (
+                  editBox('self', m.blocks[0]?.type === 'tags')
                 ) : (
                   <MaterialContent m={m} max={Infinity} />
                 )}
-                <div className="mat-sub mat-ex">
-                  <div className="mat-ex-h">
-                    <span className="label">示例图片</span>
-                  </div>
-                  {ex.length ? (
-                    <div className="mat-ex-list">
-                      {ex.map((e) => (
-                        <span className="mat-ex-it" key={e.id}>
-                          <img
-                            src={e.thumb}
-                            alt=""
-                            draggable={false}
-                            data-tip="在图片库中查看"
-                            onClick={() => onShowImage?.(e.id)}
-                          />
-                        </span>
-                      ))}
+                {edit?.part === 'self' ? null : (
+                  <>
+                    <div className="mat-sub mat-ex">
+                      <div className="mat-ex-h">
+                        <span className="label">示例图片</span>
+                      </div>
+                      {ex.length ? (
+                        <div className="mat-ex-list">
+                          {ex.map((e) => (
+                            <span className="mat-ex-it" key={e.id}>
+                              <img
+                                src={e.thumb}
+                                alt=""
+                                draggable={false}
+                                data-tip="在图片库中查看"
+                                onClick={() => onShowImage?.(e.id)}
+                              />
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="help">暂无示例图片。</span>
+                      )}
                     </div>
-                  ) : (
-                    <span className="help">暂无示例图片。</span>
-                  )}
-                </div>
-                <div className="mat-acts">
-                  <span className="sp" />
-                  <button className="btn quiet sm" onClick={onCopy}>
-                    <Icon name="file-copy-line" />
-                    复制
-                  </button>
-                </div>
+                    <div className="mat-acts">
+                      <span className="sp" />
+                      <button className="btn quiet sm" onClick={onCopy}>
+                        <Icon name="file-copy-line" />
+                        复制
+                      </button>
+                      {m.kind === 'block' && (
+                        <button className="btn sm" onClick={() => startEdit('self')}>
+                          <Icon name="edit-line" />
+                          编辑
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -804,5 +889,89 @@ function VibeRow({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * 编辑一块素材（原型 matEditBox）：素材是模板，插进提示词时复制一份，所以改这里只影响以后插入的地方；
+ * 想保留原来的可以"另存为新的"。Ctrl Enter 保存，Esc 取消；Tag 写成 1.2::tag:: 带权重。
+ */
+function EditBox({
+  text,
+  tags,
+  noun,
+  onChange,
+  onCancel,
+  onSave,
+}: {
+  text: string;
+  tags: boolean;
+  noun: string;
+  onChange: (text: string) => void;
+  onCancel: () => void;
+  onSave: (asNew: boolean) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const ok = !!text.trim();
+  const save = async (asNew: boolean) => {
+    if (!ok || busy) return;
+    setBusy(true);
+    try {
+      await onSave(asNew);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <label className={`field mat-edit ${tags ? 'mono' : ''}`}>
+        <textarea
+          autoFocus
+          rows={tags ? 3 : 4}
+          spellCheck={false}
+          aria-label="素材内容"
+          value={text}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              onCancel();
+            } else if (e.key === 'Enter' && isMod(e)) {
+              e.preventDefault();
+              void save(false);
+            }
+          }}
+        />
+      </label>
+      <span className="help">
+        修改只影响以后插入的地方，已经用过的提示词和图片不变。
+        {tags ? '' : '保存后译文需要重新生成。'}
+      </span>
+      <div className="mat-acts">
+        <span className="help key-hint">
+          <Kbd keys="Mod Enter" />
+          <span>保存</span>
+          <Kbd keys="Esc" />
+          <span>取消</span>
+        </span>
+        <span className="sp" />
+        <button className="btn quiet sm" onClick={onCancel}>
+          取消
+        </button>
+        <button className="btn sm" disabled={!ok || busy} onClick={() => void save(true)}>
+          另存为新的{noun}
+        </button>
+        <button
+          className={`btn ink sm ${busy ? 'loading' : ''}`}
+          disabled={!ok || busy}
+          data-tip={ok ? undefined : '内容不能为空'}
+          onClick={() => void save(false)}
+        >
+          保存
+        </button>
+      </div>
+    </>
   );
 }

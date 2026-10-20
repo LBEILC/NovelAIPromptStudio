@@ -45,6 +45,18 @@ export const commandRegistry = {
     mutation: true,
     uiOnly: true,
   },
+  'material.update': {
+    fields: {
+      id: 'string',
+      block: 'integer',
+      negative: 'boolean',
+      text: 'string',
+      asNew: 'boolean',
+    },
+    required: ['id', 'text'],
+    mutation: true,
+    uiOnly: true,
+  },
   'material.delete': { fields: { id: 'string' }, required: ['id'], mutation: true, uiOnly: true },
 
   'generate.estimate': {
