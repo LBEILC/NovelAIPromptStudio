@@ -185,3 +185,4 @@
 .library-summary { flex:1; min-height:0; overflow:auto; }
 .library-strip { padding-bottom:var(--sp-1); }
 .library-strip-rest { padding-top:var(--ctl-gap); }
+.library-version-badge { position:absolute; top:var(--sp-2); left:var(--sp-2); padding:var(--sp-0) var(--sp-1); background:var(--bg); color:var(--text-2); border-radius:var(--r-tag); font-size:var(--fs-caption); }

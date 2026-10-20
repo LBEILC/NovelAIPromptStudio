@@ -6,6 +6,7 @@ import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { RETIRED_TABLES } from './versions.js';
 import { openDatabase } from './database.js';
 
 const fixture = new URL('./fixtures/pre-native.sqlite', import.meta.url);
@@ -82,7 +83,7 @@ describe('native engine upgrade', () => {
   // The fixed legacy bytes, two real backups and reopen are the assertion:
   // do not replace them with a smaller/new database (shared Windows CI: 6.2s).
   it(
-    'opens the fixed old file without changing tables, rows or library payloads',
+    'opens the fixed old file retiring only specified tables and preserving active rows and library payloads',
     { timeout: 20000 },
     async () => {
       const directory = temporary(true);
@@ -104,12 +105,24 @@ describe('native engine upgrade', () => {
             .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
             .all()
             .map((r) => r.name),
-        ).toEqual(Object.keys(expected.tables));
+        ).toEqual(
+          [
+            ...Object.keys(expected.tables).filter((name) => !RETIRED_TABLES.includes(name)),
+            'version_images',
+            'work_branch_names',
+            'work_versions',
+            'works',
+          ].sort(),
+        );
         for (const [name, rows] of Object.entries(expected.tables)) {
+          if (RETIRED_TABLES.includes(name)) continue;
           const actual = raw.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all();
           expect(
             name === 'app_meta'
-              ? actual.filter((row) => row.key !== 'prompt_fingerprints_version')
+              ? actual.filter(
+                  (row) =>
+                    !['prompt_fingerprints_version', 'generation_versions_v1'].includes(row.key),
+                )
               : actual,
             name,
           ).toEqual(rows);
@@ -128,6 +141,7 @@ describe('native engine upgrade', () => {
       expect(fs.readFileSync(reopened.backupPath)).toEqual(before);
       reopened.close();
       expect(fs.readdirSync(directory).sort()).toEqual([
+        'studio.pre-generation-versions.sqlite',
         'studio.pre-node-sqlite.sqlite',
         'studio.pre-phase2.sqlite',
         'studio.sqlite',
@@ -191,7 +205,7 @@ describe('native engine upgrade', () => {
     expect(typeof database.loadProject('image-0').metadata.steps).toBe('number');
   });
 
-  it('preserves legacy rows and metadata even when a referenced project is permanently deleted', async () => {
+  it('preserves metadata orphans after retirement even when a referenced project is permanently deleted', async () => {
     const directory = temporary(true);
     const database = await open(directory);
     database.deleteProject('image-0');
@@ -209,6 +223,12 @@ describe('native engine upgrade', () => {
     ]);
     inspect(directory, (raw) => {
       for (const [table, rows] of Object.entries(expected.tables)) {
+        if (RETIRED_TABLES.includes(table)) {
+          expect(
+            raw.prepare('SELECT name FROM sqlite_master WHERE name=?').get(table),
+          ).toBeUndefined();
+          continue;
+        }
         if (!activeTables.has(table) || ['generation_metadata', 'prompt_tags'].includes(table))
           expect(raw.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all(), table).toEqual(rows);
       }

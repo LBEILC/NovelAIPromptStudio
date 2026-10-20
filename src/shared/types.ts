@@ -135,6 +135,9 @@ export interface StoredGenerationParameters extends GenerationParameters {
   extra_json: string;
 }
 export interface ImageProject {
+  generated_work_id?: string;
+  version_number?: number;
+  generation_source?: 'user' | 'agent';
   original_filename?: string;
   has_custom_name?: boolean;
   id: string;
@@ -183,6 +186,9 @@ export interface LibraryCard
     | 'vibe_fingerprint'
     | 'group_cover_id'
   > {
+  generated_work_id?: string;
+  version_number?: number;
+  generation_source?: 'user' | 'agent';
   // null reuses JSON.stringify(JSON.parse(prompt_fingerprint).base).
   // The main process only emits it when that equals the stored base fingerprint.
   base_prompt_fingerprint: string | null;

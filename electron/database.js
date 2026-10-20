@@ -12,6 +12,7 @@ import { extractV4PromptData, normalizePromptStructure } from '../src/lib/prompt
 import { danbooruLookupName } from './danbooru.js';
 import { extractEmbeddedVibes, fingerprintVibes } from './vibes.js';
 import { imageFileName } from '../src/lib/imageNaming.js';
+import { migrateGenerationVersions, createVersionStore } from './versions.js';
 
 const TAG_CATEGORIES = new Set(CATEGORY_OPTIONS);
 export const DEFAULT_GALLERY_COLLECTION_ID = 'default-gallery-collection';
@@ -243,6 +244,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   connection.exec(
     'PRAGMA journal_mode=DELETE; PRAGMA synchronous=EXTRA; PRAGMA fullfsync=ON; PRAGMA foreign_keys=OFF',
   );
+  migrateGenerationVersions(connection, filePath);
   begin();
   database.run(CORE_SCHEMA);
 
@@ -769,6 +771,19 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     };
   };
 
+  const generatedFields = (id) => {
+    const row = query(
+      'SELECT v.work_id, v.number, v.source FROM version_images vi JOIN work_versions v ON v.id=vi.version_id WHERE vi.project_id=$id ORDER BY vi.rowid DESC LIMIT 1',
+      { $id: id },
+    )[0];
+    return row
+      ? {
+          generated_work_id: row.work_id,
+          version_number: row.number,
+          generation_source: row.source,
+        }
+      : {};
+  };
   const hydrateProject = (project) => {
     if (!project) return null;
     const metadata =
@@ -790,6 +805,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       : null;
     return {
       ...hydrated,
+      ...generatedFields(project.id),
       ...namingFields(project, metadata),
       group_cover_id: cover?.project_id || '',
     };
@@ -1361,9 +1377,25 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
         cover.project_id,
       ]),
     );
+    const generated = new Map(
+      query(
+        'SELECT vi.project_id,v.work_id,v.number,v.source FROM version_images vi JOIN work_versions v ON v.id=vi.version_id ORDER BY vi.rowid',
+      ).map((row) => [
+        row.project_id,
+        {
+          generated_work_id: row.work_id,
+          version_number: row.number,
+          generation_source: row.source,
+        },
+      ]),
+    );
     return rows.map((row) => {
       const entry = cardMemory.get(row.project_id);
-      return { ...entry.card, group_cover_id: covers.get(entry.coverKey) || '' };
+      return {
+        ...entry.card,
+        ...generated.get(row.project_id),
+        group_cover_id: covers.get(entry.coverKey) || '',
+      };
     });
   };
 
@@ -2009,6 +2041,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   backfillPromptFingerprints(false);
   commit();
   return {
+    versions: createVersionStore(connection),
     loadLibrary,
     loadLibraryCards,
     listImportDates: (view = 'all') =>
@@ -2115,5 +2148,6 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     filePath,
     backupPath,
     engineBackupPath,
+    refreshGeneratedCards: () => invalidateCards(true),
   };
 }

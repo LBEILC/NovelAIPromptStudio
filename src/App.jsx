@@ -36,6 +36,7 @@ import { Titlebar } from './shell/Titlebar';
 import { useAppearance } from './state/appearance';
 import { Dialog, Button, Progress, Layer, MenuItems, useNotifications } from './ui';
 import WorkbenchPage from './workbench/WorkbenchPage';
+import { GenerationTitle } from './workbench/GenerationTitle';
 import { WorkbenchTabs } from './workbench/Tabs';
 import { useWorkbenchState } from './state/workbench';
 import { ZipImport } from './library/ZipImport';
@@ -1519,7 +1520,18 @@ export default function App() {
 
   return (
     <div className="app-shell" ref={appShellRef}>
-      <Titlebar onNavigate={setPage} page={page}>
+      <Titlebar
+        onNavigate={setPage}
+        page={page}
+        status={
+          <GenerationTitle
+            onOpen={(id) => {
+              setWorkbenchSession((current) => ({ ...current, activeTabId: id }));
+              setPage('workbench');
+            }}
+          />
+        }
+      >
         {page === 'workbench' && (
           <WorkbenchTabs
             session={workbenchSession}
@@ -1544,6 +1556,7 @@ export default function App() {
         <Activity mode={page === 'workbench' ? 'visible' : 'hidden'}>
           <div className="app-page-surface">
             <WorkbenchPage
+              beforeGeneration={() => workbenchConnection?.flush() || Promise.resolve()}
               error={workbenchError}
               focusScopeKey={workbenchFocus.scopeKey}
               focusTagId={workbenchFocus.tagId}

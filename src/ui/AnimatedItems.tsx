@@ -3,7 +3,7 @@ import { animateElement, motionEnabled, motionTokens } from './transitions';
 
 type Props = {
   ids: string[];
-  attribute: 'data-wb-tag' | 'data-collection-id';
+  attribute: 'data-wb-tag' | 'data-collection-id' | 'data-version-id';
   children: ReactNode;
   className?: string;
   disabled?: boolean;

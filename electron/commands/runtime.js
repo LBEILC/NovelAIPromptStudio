@@ -13,7 +13,7 @@ import {
 } from '../workbench.js';
 import { importLibraryFiles } from '../importer.js';
 /** @typedef {import('../../src/shared/types').ImageProject} Project */
-/** @param {{database:Awaited<ReturnType<import('../database.js').openDatabase>>,assetsDirectory:()=>string,busy:()=>boolean,createWindow:()=>Electron.BrowserWindow,testRoot?:string,handlers?:import('./index.js').Services['handlers'],selectSource?:import('./index.js').Services['selectSource'],readyLibrary?:()=>Promise<void>,beforeCommand?:import('./index.js').Services['beforeCommand']}} options */
+/** @param {{preferences?:ReturnType<import('../preferences.js').openPreferences>, generationBaseUrl?:string, database:Awaited<ReturnType<import('../database.js').openDatabase>>,assetsDirectory:()=>string,busy:()=>boolean,createWindow:()=>Electron.BrowserWindow,testRoot?:string,handlers?:import('./index.js').Services['handlers'],selectSource?:import('./index.js').Services['selectSource'],readyLibrary?:()=>Promise<void>,beforeCommand?:import('./index.js').Services['beforeCommand']}} options */
 export async function installCommandRuntime(options) {
   const handlers = options.handlers || {};
   const { database } = options;
@@ -52,6 +52,8 @@ export async function installCommandRuntime(options) {
     });
   }
   const commands = await createCommands({
+    preferences: options.preferences,
+    generationBaseUrl: options.generationBaseUrl,
     directory,
     version: app.getVersion(),
     database,
@@ -157,12 +159,16 @@ export async function installCommandRuntime(options) {
   return {
     ...commands,
     async flush() {
+      await commands.close();
       for (const window of BrowserWindow.getAllWindows())
         if (ready.has(window.webContents.id)) await prepareWindow(window);
       await commands.store.exclusive(async () => {});
     },
     prepareWindow,
-    close: server.close,
+    close: async () => {
+      await commands.close();
+      await server.close();
+    },
     endpoint: server.endpoint,
   };
 }

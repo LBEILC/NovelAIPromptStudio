@@ -29,6 +29,7 @@ import { filterGalleryProjects } from '../../src/lib/galleryFilters.js';
 import { galleryCollectionScope } from '../../src/lib/galleryCollections.js';
 import { insertTags } from '../../src/workbench/edits.ts';
 import { searchDsoTags } from '../dsoDictionary.js';
+import { generationCommands } from './generation.js';
 
 /** @typedef {import('../../src/shared/commands').CommandName} Name */
 /** @typedef {import('../../src/shared/commands').CommandTab} Tab */
@@ -50,6 +51,7 @@ import { searchDsoTags } from '../dsoDictionary.js';
  * handlers?:Partial<Handlers>
  * selectSource?:(caller:Caller)=>Promise<Source|null>, readyLibrary?:()=>Promise<void>
  * beforeCommand?:(name:Name)=>Promise<void>
+ * preferences?:ReturnType<import('../preferences.js').openPreferences>, generationBaseUrl?:string
  * }} Services */
 
 /** @param {Services} services */
@@ -477,6 +479,8 @@ export async function createCommands(services) {
       return store.get();
     },
   };
+  const generation = generationCommands({ services, store, tab, revision, unlocked, emit });
+  Object.assign(handlers, generation.handlers);
   /** @param {import('../../src/shared/commands').CommandInput<'collection.add'>} input @param {'add'|'remove'} action */
   async function members(input, action) {
     revision(input.expectedRevision, store.revision());
@@ -538,6 +542,7 @@ export async function createCommands(services) {
   }
   return {
     dispatch,
+    close: generation.close,
     store,
     clearEditing: () => {
       editing = [];

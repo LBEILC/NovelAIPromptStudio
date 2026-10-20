@@ -49,10 +49,12 @@ import remixLicense from '../../LICENSES/RemixIcon/LICENSE?raw';
 import dictionaryLicense from '../../third_party/DanbooruSearchOnline/LICENSE?raw';
 import type { AppearanceSettings } from '../shared/types';
 import './settings.css';
+import { NovelAIAccount, GenerationPreferences } from './Generation';
 const ReleaseNotes = lazy(() => import('./ReleaseNotes.jsx'));
 const sections = [
   ['appearance', '外观', 'contrast-2-line'],
   ['storage', '图片库', 'hard-drive-2-line'],
+  ['novelai', 'NovelAI 账号', 'key-2-line'],
   ['ai', 'AI 服务', 'translate-2'],
   ['tags', '翻译词典', 'book-2-line'],
   ['agent', 'Agent', 'terminal-box-line'],
@@ -194,13 +196,14 @@ function Agent() {
       <Row
         title="Agent 能做什么"
         help={[
-          '读提示词和参数，改工作台，搜索和整理图片库，修改翻译词典。',
+          '读提示词和参数，改工作台，搜索和整理图片库，修改翻译词典，排队生成。',
           '不能永久删除图片，不能改设置，读不到任何密钥。',
         ]}
       >
         {null}
       </Row>
       <p role="status">{message}</p>
+      <GenerationPreferences agent />
     </SettingsFrame>
   );
 }
@@ -933,6 +936,9 @@ export default function SettingsPage(props: {
         </Activity>
         <Activity mode={section === 'storage' ? 'visible' : 'hidden'}>
           <Storage {...props} />
+        </Activity>
+        <Activity mode={section === 'novelai' ? 'visible' : 'hidden'}>
+          <NovelAIAccount />
         </Activity>
         <Activity mode={section === 'ai' ? 'visible' : 'hidden'}>
           <AI />

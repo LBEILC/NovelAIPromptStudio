@@ -78,7 +78,6 @@ export async function readWorkbenchImage(
   }
   const embeddedVibes = metadata.embedded_vibes || [];
   delete metadata.embedded_vibes;
-  delete metadata.extra_json;
   const now = new Date().toISOString();
   const project = {
     id: `workbench-${crypto.randomUUID()}`,

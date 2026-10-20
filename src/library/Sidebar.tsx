@@ -101,6 +101,18 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
         全部图片<span>{p.allCount ?? p.filterCacheSource.length}</span>
       </SurfaceButton>
       <div className="library-side-label">
+        <SurfaceButton
+          kind="row"
+          aria-label="生成记录"
+          className={`library-side-item ${selected === 'collection:__generated__' ? 'on' : ''}`}
+          onClick={() => select('collection:__generated__')}
+        >
+          <i className="ri-history-line" />
+          生成记录
+          <span>{p.filterCacheSource.filter((image) => image.generated_work_id).length}</span>
+        </SurfaceButton>
+      </div>
+      <div className="library-side-label">
         收藏集
         <Button
           variant="quiet"

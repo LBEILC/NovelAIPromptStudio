@@ -38,15 +38,32 @@ export function useLibraryComputation({
 }: Options) {
   const groupingWorkerRef = useRef<Worker | null>(null);
   const groupingRequestRef = useRef(0);
+  const generatedCollection = useMemo(
+    () => ({
+      id: '__generated__',
+      name: '生成记录',
+      kind: 'manual' as const,
+      member_ids: projects.filter((p) => p.generated_work_id).map((p) => p.id),
+      filters: galleryFilters,
+      created_at: '',
+      updated_at: '',
+    }),
+    [projects, galleryFilters],
+  );
   const activeCollection =
     galleryView === 'all'
-      ? galleryCollections.find((collection) => collection.id === activeCollectionId) || null
+      ? activeCollectionId === '__generated__'
+        ? generatedCollection
+        : galleryCollections.find((collection) => collection.id === activeCollectionId) || null
       : null;
   const galleryComputation = useMemo(
     () => ({
       activeCollection: editingSmartCollectionId ? null : activeCollection,
       filters: galleryFilters,
-      grouping: galleryGrouping,
+      grouping:
+        activeCollection?.id === '__generated__'
+          ? { ...galleryGrouping, promptScope: 'separate', history: true }
+          : galleryGrouping,
       projects,
       sort,
       view: galleryView,

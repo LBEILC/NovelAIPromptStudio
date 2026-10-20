@@ -22,6 +22,7 @@ import { hasImageName } from '../lib/imageNaming.js';
 import { mediaUrl } from '../lib/imageStage.js';
 import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
 import './workbench.css';
+import { useGeneration } from '../state/generation';
 import { useDragFeedback, restrictDrag } from './DragFeedback';
 
 export interface TabsProps {
@@ -34,6 +35,8 @@ export interface TabsProps {
 }
 function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
   const sortable = useSortable({ id: tab.id });
+  const generation = useGeneration();
+  const running = generation.jobs.some((j) => j.tabId === tab.id && j.state === 'generating');
   const image = tab.project;
   const name = image && hasImageName(image) ? image.name : '';
   const index = p.session.tabs.findIndex((item) => item.id === tab.id);
@@ -118,6 +121,11 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
           src={mediaUrl(image?.thumbnail_path || image?.image_path || '')}
         />
         {name && <span className="wb-tab-name">{name}</span>}
+        {running && (
+          <span className="wb-tab-generating" data-tip="生成中">
+            ●
+          </span>
+        )}
         {workbenchTabHasChanges(tab) && <span className="wb-dirty" aria-label="提示词已修改" />}
       </div>
     </ContextMenu>

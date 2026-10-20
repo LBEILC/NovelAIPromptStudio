@@ -8,6 +8,9 @@ import { activeWorkbenchTab } from '../lib/workbenchSession.js';
 import { WORKBENCH_SOURCE_PANEL_WIDTH_KEY } from '../lib/panelLayout.js';
 import './workbench.css';
 import { TransitionSurface } from '../ui/transitions';
+import { GenerationBar } from './GenerationBar';
+import { useGeneration } from '../state/generation';
+import { Versions } from './Versions';
 
 export interface WorkbenchPageProps
   extends Pick<
@@ -15,6 +18,7 @@ export interface WorkbenchPageProps
     'onCopyText' | 'onConfirm' | 'onNotify' | 'onTranslateTags' | 'onUpdateProject'
   > {
   session: WorkbenchSession;
+  beforeGeneration?: () => Promise<void>;
   error: string;
   loading: boolean;
   onChooseImage: () => void;
@@ -28,6 +32,7 @@ export interface WorkbenchPageProps
   onUpdateViewState: (tabId: string, state: EditorProps['viewState']) => void;
 }
 export default function WorkbenchPage(p: WorkbenchPageProps) {
+  const generation = useGeneration();
   const defaultWidth = parseFloat(
     getComputedStyle(document.documentElement).getPropertyValue('--prompt-w'),
   );
@@ -79,6 +84,7 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
     >
       {p.error && <Banner tone="danger">{p.error}</Banner>}
       <div className="wb-body">
+        {generation.settings.hasToken && <Versions tab={tab} before={p.beforeGeneration} />}
         <TransitionSurface change={tab.id} direction={direction} className="wb-image-transition">
           <WorkbenchImage
             key={tab.id}
@@ -109,6 +115,11 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
                 key={tab.id}
                 {...p}
                 project={tab.project}
+                generationFooter={
+                  generation.settings.hasToken ? (
+                    <GenerationBar tab={tab} before={p.beforeGeneration} />
+                  ) : undefined
+                }
                 viewState={tab.viewState}
                 onViewStateChange={(state) => p.onUpdateViewState(tab.id, state)}
               />

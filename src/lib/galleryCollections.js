@@ -50,7 +50,9 @@ export function galleryCollectionImageCount(projects = [], collection, nowValue 
 export function readActiveGalleryCollection(storage, collections = []) {
   try {
     const id = String(storage?.getItem(GALLERY_COLLECTION_ACTIVE_KEY) || '');
-    return collections.some((collection) => collection.id === id) ? id : '';
+    return id === '__generated__' || collections.some((collection) => collection.id === id)
+      ? id
+      : '';
   } catch {
     return '';
   }
