@@ -174,8 +174,9 @@ git push origin main refs/tags/v0.3.0
 
 1. 三个 `package` 作业直接并行启动，分别构建 Windows x64、macOS Intel、macOS Apple Silicon。各自安装依赖、校验标签与版本一致，恢复字体缓存；未命中时下载并校验，再构建打包。
 2. 每个打包作业保留原生模块检查、启动真实打包程序的轻量验收、包内字体检查和更新元数据检查，不重复执行类型和单元测试。
-3. `release` 只等待三个打包作业成功，合并两个 macOS 架构的更新元数据，校验产物，加入可用的 `release-notes.json` 并生成 `SHA256SUMS.txt`。
-4. checkout 完整标签历史，读取 annotated tag 中的更新说明；只有标签推送事件才创建 GitHub Release 并上传全部附件，不再额外上传一份合并产物到 Actions。
+3. `release` 只等待 Windows x64 和 macOS Apple Silicon 两个打包作业成功，校验这两个平台的产物和更新元数据，加入可用的 `release-notes.json` 并生成 `SHA256SUMS.txt`。
+4. checkout 完整标签历史，读取 annotated tag 中的更新说明；只有标签推送事件才创建 GitHub Release，先上传 Windows 和 Apple 芯片的附件，不再额外上传一份合并产物到 Actions。
+5. macOS Intel 作业独立完成打包和检查，等待同一 Release 存在且主发布附件就绪后，追加 DMG、ZIP 和 blockmap，合并 x64 更新条目到 `latest-mac.yml` 并更新完整的 `SHA256SUMS.txt`。通常比主发布晚几分钟，最多轮询约 20 分钟。Intel 失败会在作业日志中明确提示，不影响已经发布的 Release，可重跑 Intel 作业补齐附件。未签名 macOS 当前未启用自动更新，允许其元数据稍后补齐。
 
 当前发布产物包括：
 
@@ -185,7 +186,7 @@ git push origin main refs/tags/v0.3.0
 - 所有上传文件的 SHA-256 校验清单。
 - GitHub 根据发布标签自动提供的完整源码 ZIP 与 TAR.GZ；它们必须和安装包指向同一标签。
 
-`workflow_dispatch` 可手动验证云端打包，但因为它不是标签事件，不会创建 GitHub Release。
+`workflow_dispatch` 可手动验证云端打包，但因为它不是标签事件，不会创建 GitHub Release；Intel 只打包、检查并保存 Actions 产物，不等待或上传到 Release。
 
 ```sh
 gh workflow run release.yml --ref <待验证分支>
@@ -224,7 +225,7 @@ gh run view <id> --log-failed
 gh run rerun <id> --failed
 ```
 
-GitHub 页面上的 “Re-run failed jobs” 等价。一个平台打包失败不必重跑另两个已成功的平台；下游发布只等待三个打包作业成功。日常 CI 保留 Windows/macOS 的格式、类型、单测和构建检查，以及 Windows 三分片界面验收；截图仅手动触发。日常 CI 失败需修复，但不作为发版门槛。没有加入失败自动重试。
+GitHub 页面上的 “Re-run failed jobs” 等价。一个平台打包失败不必重跑另两个已成功的平台；下游发布只等待 Windows 和 Apple Silicon 成功，Intel 失败不阻止发布。Intel 使用 `continue-on-error`，整轮状态可能仍然成功，需检查其日志和实际附件；可用 `gh run rerun <id> --job <Intel作业ID>` 单独重跑。日常 CI 保留 Windows/macOS 的格式、类型、单测和构建检查，以及 Windows 三分片界面验收；截图仅手动触发。日常 CI 失败需修复，但不作为发版门槛。没有加入失败自动重试。
 
 在 `main` 修复问题、重新验证并递增 patch 版本，然后创建新标签。正式标签一旦推送，应保留历史，不要 force-push。
 
@@ -246,9 +247,9 @@ GitHub 页面上的 “Re-run failed jobs” 等价。一个平台打包失败�
 
 ## 发版完成后的核对
 
-1. GitHub Actions 所有 job 成功。
+1. GitHub Actions 主打包和发布 job 成功。
 2. Release 标题、正文和版本号正确。
-3. Windows、macOS Intel、macOS Apple Silicon 产物均存在。
+3. Windows 和 macOS Apple Silicon 产物存在；稍后确认 Intel 的 DMG、ZIP、blockmap 已补齐，`latest-mac.yml` 同时含 x64 与 arm64 条目，`SHA256SUMS.txt` 已覆盖补传附件。
 4. `SHA256SUMS.txt` 存在，且与下载的当前平台安装包实测校验一致。
 5. Release 自动生成的 `Source code (zip)` 与 `Source code (tar.gz)` 可以下载，并对应本次发布标签。
 6. 下载并启动至少一个当前平台安装包。

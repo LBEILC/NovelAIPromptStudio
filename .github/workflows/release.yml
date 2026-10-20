@@ -25,16 +25,6 @@ jobs:
               release/*.exe
               release/*.exe.blockmap
               release/latest.yml
-          - name: macOS Intel
-            os: macos-15-intel
-            package_args: --mac --x64
-            artifact: macos-x64
-            artifact_glob: |
-              release/*.dmg
-              release/*.dmg.blockmap
-              release/*.zip
-              release/*.zip.blockmap
-              release/latest-mac.yml
           - name: macOS Apple Silicon
             os: macos-15
             package_args: --mac --arm64
@@ -117,6 +107,94 @@ jobs:
           path: ${{ matrix.artifact_glob }}
           if-no-files-found: error
 
+  package-intel:
+    name: Package macOS Intel and append release assets
+    runs-on: macos-15-intel
+    # Intel is supplemental and never gates the primary release.
+    continue-on-error: true
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify release tag
+        if: github.ref_type == 'tag'
+        run: node scripts/verify-release-tag.mjs "${{ github.ref_name }}"
+
+      - name: Restore pinned MiSans VF
+        id: misans-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .local/fonts/MiSansVF.ttf
+          enableCrossOsArchive: true
+          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
+      - name: Download MiSans on cache miss
+        if: steps.misans-cache.outputs.cache-hit != 'true'
+        run: npm run fonts
+      - run: npm run fonts:check
+      - name: Save verified MiSans on cache miss
+        if: steps.misans-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .local/fonts/MiSansVF.ttf
+          enableCrossOsArchive: true
+          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
+      - name: Package, sign, and notarize macOS application
+        run: |
+          # Unset signing/notarization secrets when unconfigured: electron-builder
+          # treats a defined-but-empty CSC_LINK as a relative file path and fails.
+          if [ -z "$CSC_LINK" ]; then
+            unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          fi
+          npm run package -- --mac --x64
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Launch the exact packaged application and verify native modules
+        run: node scripts/verify-app.mjs --packaged --existing-package
+
+      - run: npm run verify:fonts:package
+
+      - name: Verify updater metadata matches packaged artifacts
+        run: npm run verify:update-artifacts
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-x64
+          path: |
+            release/*.dmg
+            release/*.dmg.blockmap
+            release/*.zip
+            release/*.zip.blockmap
+            release/latest-mac.yml
+          if-no-files-found: error
+
+      - name: Append Intel assets to the published release
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/append-intel-release.mjs "$RELEASE_TAG" release
+
+      - name: Report Intel failure without blocking the release
+        if: failure()
+        run: echo "::warning::Intel packaging or upload failed. The Windows and Apple Silicon release is not blocked or removed; inspect this job and rerun it to complete Intel assets."
+
   release:
     name: Verify combined artifacts and publish tagged releases
     needs: package
@@ -128,14 +206,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download installers
+      - name: Download Windows installer
         uses: actions/download-artifact@v8
         with:
-          path: release-artifacts
-          merge-multiple: false
+          name: windows-x64
+          path: release-artifacts/windows-x64
+
+      - name: Download Apple Silicon installers
+        uses: actions/download-artifact@v8
+        with:
+          name: macos-arm64
+          path: release-artifacts/macos-arm64
 
       - name: Merge updater metadata across architectures
-        run: node scripts/merge-release-artifacts.mjs release-artifacts release-combined
+        run: node scripts/merge-release-artifacts.mjs release-artifacts release-combined arm64
 
       - name: Verify combined update metadata
         run: node scripts/verify-update-artifacts.mjs release-combined
