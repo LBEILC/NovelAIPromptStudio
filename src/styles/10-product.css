@@ -1,0 +1,45 @@
+/* 产品里补的规则：原型用内联样式或原型外框实现、产品要用类名写的地方。只用 tokens.css 的令牌。 */
+
+/* 对话框里的引文（原型是内联样式） */
+.dialog .dlg-quote { margin: var(--sp-3) 0; padding-left: var(--sp-3); border-left: var(--rule-w) solid var(--border); }
+
+/* 菜单的内容：键盘焦点在这一层上，不画焦点框（当前项用 .on 的底色表示） */
+.menu-items { display: flex; flex-direction: column; outline: none; }
+.submenu > .menu-items { min-width: inherit; }
+/* 键盘进入子菜单（→）时和悬停一样展开 */
+.menu .mi.sub.open > .submenu { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity var(--dur-2) var(--ease-out), visibility 0s; }
+.menu .mi.sub.open { background: var(--hover); }
+
+/* 拖栏宽的键盘分隔条：看不见、不接鼠标（鼠标由 useResizable 按 --split-hit 判断）；键盘焦点在上面时显示那条线 */
+.rz-key { position: absolute; top: 0; bottom: 0; width: var(--split-hit); z-index: 6; pointer-events: none; outline: none; }
+.rz-key.rz-left { left: calc(var(--split-hit) / -2); }
+.rz-key.rz-right { right: calc(var(--split-hit) / -2); }
+
+/* 图片库的详情栏：原型里写在内联样式上的几处间距 */
+.detail .caption.dcap { padding: var(--ctl-pad-x) var(--sp-4) 0; }
+.detail .stage-acts.dacts { padding: var(--sp-1) var(--sp-2) 0; }
+.detail .doc.ddoc { padding-top: 0; }
+.detail .doc.ddoc .sec-h:first-child { padding-top: var(--sp-2); }
+button.tag.ghost { font: inherit; font-size: var(--fs-small); }
+
+/* 退出（2.17）：被拿掉的东西加 .leaving，从现在的样子淡出 --dur-1，不位移；同时取代它的进入动画 */
+@keyframes pf-out { to { opacity: 0; } }
+.leaving { animation: pf-out var(--dur-1) var(--ease-out) forwards !important; }
+.row.lc-new { flex-wrap: nowrap; }
+.lib-grid-col { flex: 1 1 0; }
+
+/* 页面：四页都留在页面里（切回来时状态还在），切换时旧的淡出、新的淡入（.pages 是 .swap） */
+.pages > .app-page-surface { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.pages > .app-page-surface > .body { flex: 1 1 auto; }
+/* 标题栏可以拖动窗口；按钮、标签页不能 */
+.tb { -webkit-app-region: drag; }
+.tb button, .tb .tab, .tb .tabs, .tb input, .tb .field, .tb [role="button"] { -webkit-app-region: no-drag; }
+/* Windows：系统的窗口按钮画在标题栏最右边，这里留出它们的宽度 */
+html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px))); }
+.tb .wc { align-self: stretch; }
+.tb-set.on { background: var(--selected); color: var(--text); }
+
+/* 自绘滚动条：带 data-scroll 的区域也不显示系统滚动条（.scroll 已经在 01-base.css 里藏了） */
+[data-scroll] { scrollbar-width: none; }
+[data-scroll]::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.sb { will-change: transform; }

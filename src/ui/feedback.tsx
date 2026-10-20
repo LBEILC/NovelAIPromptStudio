@@ -1,3 +1,4 @@
+import { useNotifications as useKitNotifications } from '../kit/toast';
 import {
   createContext,
   useContext,
@@ -199,10 +200,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     </NoticeContext.Provider>
   );
 }
+// 035：旧组件的通知交给新的通知（src/kit/toast.tsx），全软件只有一种样子
 export function useNotifications() {
-  const notify = useContext(NoticeContext);
-  if (!notify) throw new Error('NotificationProvider is required');
-  return notify;
+  return useKitNotifications();
 }
 export function Banner({
   tone = 'info',

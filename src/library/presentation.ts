@@ -6,7 +6,18 @@ export function libraryCountText(groups: number, images: number, total?: number)
   );
 }
 
+// 接口用的模型标识（生成的图片里记的是它）→ 界面上的名字（doc/design.md 2.8）
+const MODEL_IDS: Record<string, string> = {
+  'nai-diffusion-5-full': 'V5 Full',
+  'nai-diffusion-5-full-medium': 'V5 Full Medium',
+  'nai-diffusion-5-curated': 'V5 Curated',
+  'nai-diffusion-4-5-full': 'V4.5 Full',
+  'nai-diffusion-4-5-curated': 'V4.5 Curated',
+  'nai-diffusion-4-full': 'V4 Full',
+  'nai-diffusion-4-curated-preview': 'V4 Curated Preview',
+};
 export function modelDisplayName(raw = '') {
+  if (MODEL_IDS[raw.trim()]) return MODEL_IDS[raw.trim()];
   const name = raw.replace(/\s+[\da-f]{8}$/i, '');
   const known = name.match(/^(?:NovelAI Diffusion )?(V(?:3|4(?:\.5)?|5))(?: (Full|Curated))?$/i);
   return known

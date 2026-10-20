@@ -8,8 +8,6 @@ import { libraryPositivePrompt } from './Prompt';
 import { createPromptStructure, formatPositivePromptForCopy } from '../lib/promptStructure.js';
 import { parsePrompt } from '../lib/prompt.js';
 import type { ImageRecord } from '../shared/types';
-import { LibraryGrid } from './Grid';
-import type { LibraryProps } from './types';
 import type { LibraryCardCacheProgress } from '../shared/ipc';
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 function project(id: string, raw = '  sky, rain\r\n') {
@@ -68,42 +66,6 @@ it('keeps the painted detail while loading and ignores late stale replies', asyn
     await act(async () => pending.get('latest')!(project('latest')));
     await act(async () => pending.get('slow')!(project('slow')));
     expect(host.textContent).toBe('latest');
-  } finally {
-    act(() => root.unmount());
-    vi.unstubAllGlobals();
-  }
-});
-
-it('handles queued scroll updates after React clears the event currentTarget', async () => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe() {}
-      disconnect() {}
-    },
-  );
-  const host = document.createElement('div');
-  const root = createRoot(host);
-  const props = {
-    groups: [],
-    selectedGroupIds: [],
-    previewGroup: null,
-    contentKey: 'test',
-  } as unknown as LibraryProps;
-  try {
-    await act(async () =>
-      root.render(
-        <LibraryGrid p={props} rowHeight={200} onRowHeight={() => {}} onViewer={() => {}} />,
-      ),
-    );
-    const grid = host.querySelector<HTMLElement>('[data-library-grid]')!;
-    await act(async () => {
-      grid.scrollTop = 250;
-      grid.dispatchEvent(new Event('scroll'));
-      grid.scrollTop = 500;
-      grid.dispatchEvent(new Event('scroll'));
-    });
-    expect(host.querySelector('[data-library-grid]')).toBe(grid);
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

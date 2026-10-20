@@ -30,17 +30,21 @@ import {
   Undo2,
 } from 'lucide-react';
 import { Collapse, Presence, TransitionSurface } from './ui/transitions';
-import LibraryPage from './library/LibraryPage';
+import GalleryPage from './gallery/GalleryPage';
 import { useLibraryCacheProgress } from './state/libraryCacheProgress';
 import SettingsPage from './settings/SettingsPage';
 import { Titlebar } from './shell/Titlebar';
 import { useAppearance } from './state/appearance';
-import { Dialog, Button, Progress, Layer, MenuItems, useNotifications } from './ui';
+import { Button, Progress, useNotifications } from './ui';
 import WorkbenchPage from './workbench/WorkbenchPage';
-import { GenerationTitle } from './workbench/GenerationTitle';
+import { GenerationStatus } from './shell/GenerationStatus';
+import { Confirm } from './kit/dialog';
+import { ContextMenu } from './kit/menu';
+import { useWin } from './kit/layer';
+import { useSwap } from './kit/motion';
 import { WorkbenchTabs } from './workbench/Tabs';
 import { useWorkbenchState } from './state/workbench';
-import { ZipImport } from './library/ZipImport';
+import { ZipImport } from './gallery/ZipImport';
 import {
   allPromptTags,
   getPromptScope,
@@ -313,15 +317,19 @@ export default function App() {
     event.preventDefault();
     event.stopPropagation();
     setContextMenu({
-      point: { x: event.clientX, y: event.clientY },
+      at: [event.clientX, event.clientY],
       items: items.map((item) =>
         item.type === 'divider'
-          ? { id: item.key, separator: true }
-          : { id: item.key, label: item.label, disabled: item.disabled, onSelect: item.onClick },
+          ? 'sep'
+          : { label: item.label, disabled: item.disabled, onSelect: item.onClick },
       ),
     });
   };
-  const appShellRef = useRef(null);
+  const appShellRef = useWin();
+  const pageSwap = useSwap(page, (value) => value);
+  const pageShown = (key) => (pageSwap.some((item) => item.key === key) ? 'visible' : 'hidden');
+  const pageClass = (key) =>
+    `app-page-surface ${pageSwap.some((item) => item.key === key && item.leaving) ? 'leaving' : ''}`;
   const dropHandlerRef = useRef(null);
   const annotationTimer = useRef(null);
   const confirmationResolverRef = useRef(null);
@@ -1509,12 +1517,12 @@ export default function App() {
   };
 
   return (
-    <div className="app-shell" ref={appShellRef}>
+    <>
       <Titlebar
         onNavigate={setPage}
         page={page}
         status={
-          <GenerationTitle
+          <GenerationStatus
             onOpen={(id) => {
               setWorkbenchSession((current) => ({ ...current, activeTabId: id }));
               setPage('workbench');
@@ -1544,9 +1552,9 @@ export default function App() {
           />
         )}
       </Titlebar>
-      <TransitionSurface className="app-content" change={page}>
-        <Activity mode={page === 'workbench' ? 'visible' : 'hidden'}>
-          <div className="app-page-surface">
+      <div className="swap pages">
+        <Activity mode={pageShown('workbench')}>
+          <div className={pageClass('workbench')} data-enter="fade">
             <WorkbenchPage
               onShowMaterials={(kind = 'block') => {
                 setMaterialKind(kind);
@@ -1667,9 +1675,9 @@ export default function App() {
             />
           </div>
         </Activity>
-        <Activity mode={page === 'gallery' ? 'visible' : 'hidden'}>
-          <div className="app-page-surface">
-            <LibraryPage
+        <Activity mode={pageShown('gallery')}>
+          <div className={pageClass('gallery')} data-enter="fade">
+            <GalleryPage
               cacheProgress={cacheProgress}
               allCount={projectsByView.all.length}
               trashCount={projectsByView.trash.length}
@@ -1767,11 +1775,13 @@ export default function App() {
             />
           </div>
         </Activity>
-        <Activity mode={page === 'materials' ? 'visible' : 'hidden'}>
-          <MaterialsPage initialKind={materialKind} />
+        <Activity mode={pageShown('materials')}>
+          <div className={pageClass('materials')} data-enter="fade">
+            <MaterialsPage initialKind={materialKind} />
+          </div>
         </Activity>
-        <Activity mode={page === 'settings' ? 'visible' : 'hidden'}>
-          <div className="app-page-surface">
+        <Activity mode={pageShown('settings')}>
+          <div className={pageClass('settings')} data-enter="fade">
             <SettingsPage
               onAccountSaved={() => setPage('workbench')}
               menuDestination={menuDestination}
@@ -1811,7 +1821,7 @@ export default function App() {
             />
           </div>
         </Activity>
-      </TransitionSurface>
+      </div>
       {page !== 'gallery' && (
         <ImportExperience
           dragState={dragState}
@@ -1831,33 +1841,25 @@ export default function App() {
         onImport={commitArchiveImport}
       />
 
-      <Dialog
-        open={Boolean(confirmation)}
-        title={confirmation?.title || ''}
-        cancelLabel="取消"
-        confirmLabel={confirmation?.okText || '确定'}
-        destructive={Boolean(confirmation?.danger)}
-        onCancel={() => resolveConfirmation(false)}
-        onConfirm={() => resolveConfirmation(true)}
-      >
-        <p>{confirmation?.message}</p>
-        {confirmation?.detail && <p>{confirmation.detail}</p>}
-      </Dialog>
-      <Layer
-        open={!!contextMenu}
+      <Confirm
+        options={
+          confirmation
+            ? {
+                title: confirmation.title || '',
+                body: confirmation.message,
+                tail: confirmation.detail,
+                ok: confirmation.okText || '确定',
+                danger: Boolean(confirmation.danger),
+              }
+            : null
+        }
+        onAnswer={resolveConfirmation}
+      />
+      <ContextMenu
+        at={contextMenu?.at || null}
+        items={contextMenu?.items || []}
         onClose={() => setContextMenu(null)}
-        anchor={appShellRef}
-        point={contextMenu?.point}
-        focus
-        className="nps-menu"
-      >
-        <MenuItems
-          items={contextMenu?.items || []}
-          label="文本操作"
-          closeAll={() => setContextMenu(null)}
-          closeLevel={() => setContextMenu(null)}
-        />
-      </Layer>
-    </div>
+      />
+    </>
   );
 }

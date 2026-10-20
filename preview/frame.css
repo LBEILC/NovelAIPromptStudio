@@ -1,0 +1,17 @@
+/* 预览的外框（不属于产品）：上面一排模拟按钮，下面一个 1240×760 的窗口，和原来的交互原型一样 */
+html.pv, html.pv body { height: auto; min-height: 100%; overflow: auto; }
+html.pv body { background: var(--pane); }
+.pv-bar { position: sticky; top: 0; z-index: 9; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 10px 20px; background: var(--pane); border-bottom: 1px solid var(--border); font: var(--fs-small)/var(--lh-small) var(--font-ui); color: var(--text-2); }
+.pv-bar b { font-weight: var(--fw-strong); color: var(--text); font-size: var(--fs-body); }
+.pv-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pv-group > span { color: var(--text-3); margin-right: 2px; }
+.pv-group button { height: 26px; padding: 0 8px; border: var(--bw) solid var(--border); border-radius: var(--r-ctl); background: var(--surface); color: var(--text-2); font: inherit; cursor: pointer; }
+.pv-group button:hover { color: var(--text); }
+.pv-group button.on { color: var(--text); font-weight: var(--fw-strong); border-color: var(--text-3); }
+.pv-group button:disabled { opacity: 0.5; }
+.pv-out { flex-basis: 100%; color: var(--danger); }
+.pv-out:empty { display: none; }
+.pv-stage { padding: 24px 20px 48px; overflow-x: auto; }
+html.pv #root { width: var(--win-w); height: var(--win-h); margin: 0 auto; border: 1px solid var(--border); border-radius: var(--r-panel); overflow: hidden; box-shadow: var(--shadow-print); position: relative; }
+/* 窗口按钮：产品里是系统画的，这里只是示意 */
+html.pv .tb .wc { width: auto; display: flex; align-self: stretch; }

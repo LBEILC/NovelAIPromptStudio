@@ -156,58 +156,171 @@ stream.onmessage = (event) => {
   }
   for (const callback of events) callback(message);
 };
+// 预览的外框：上面一排模拟按钮，下面一个 1240×760 的窗口（和原来的交互原型一样）；平台可以切 Windows / macOS
+const PLATFORM_KEY = 'nps-preview-platform';
+const platform = (() => {
+  try {
+    return localStorage.getItem(PLATFORM_KEY) || 'windows';
+  } catch {
+    return 'windows';
+  }
+})();
 await import('/src/main.tsx');
-const host = document.createElement('div');
-host.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:2147483647';
-document.body.append(host);
-const shadow = host.attachShadow({ mode: 'open' });
-shadow.innerHTML = `<style>:host{font:13px system-ui;color:#222}button,select{font:inherit;padding:5px;margin:3px;border:1px solid #bbb;border-radius:4px;background:#fff;color:#222;cursor:pointer}section{width:290px;max-height:65vh;overflow:auto;padding:10px;background:#f3f3f3;border:1px solid #aaa;box-shadow:0 2px 14px #0003}section[hidden]{display:none}h4{margin:8px 3px}p{margin:4px;line-height:1.5}output{display:block;color:#a22}</style><section hidden><h4>预览场景</h4><div id="actions"></div><output></output></section><button id="toggle">预览场景</button>`;
-const panel = shadow.querySelector('section');
-shadow.querySelector('#toggle').onclick = () => (panel.hidden = !panel.hidden);
-const actions = shadow.querySelector('#actions');
-function add(label, action, value) {
-  const b = document.createElement('button');
-  b.textContent = label;
-  b.onclick = async () => {
-    b.disabled = true;
-    try {
-      shadow.querySelector('output').textContent = '';
-      if (action.startsWith('agent-')) await prepareUI();
-      const r = await request('scenario', { action, value });
-      if (r.reload) {
-        for (const key of Object.keys(localStorage))
-          if (key.includes('workbench')) localStorage.removeItem(key);
-        location.reload();
+await import('/preview/frame.css');
+const html = document.documentElement;
+html.classList.add('pv');
+html.dataset.platform = platform;
+const bar = document.createElement('header');
+bar.className = 'pv-bar';
+const stage = document.createElement('main');
+stage.className = 'pv-stage';
+const rootEl = document.getElementById('root');
+document.body.prepend(bar);
+rootEl.replaceWith(stage);
+stage.append(rootEl);
+// 平台的外壳：Windows 右边是窗口按钮，macOS 左边是红绿灯（产品里都是系统画的，这里只是示意）
+const dressShell = () => {
+  const tb = rootEl.querySelector('.tb');
+  if (!tb) return;
+  const wc = tb.querySelector('.wc');
+  if (wc && !wc.childElementCount && platform === 'windows')
+    wc.innerHTML = '<span>—</span><span>☐</span><span>✕</span>';
+  if (platform === 'macos' && !tb.querySelector('.lights'))
+    tb.insertAdjacentHTML('afterbegin', '<span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>');
+};
+new MutationObserver(dressShell).observe(rootEl, { childList: true, subtree: true });
+const out = document.createElement('span');
+out.className = 'pv-out';
+const group = (title, items) => {
+  const g = document.createElement('div');
+  g.className = 'pv-group';
+  const head = document.createElement('span');
+  head.textContent = title;
+  g.append(head);
+  for (const [label, run, on] of items) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (on?.()) b.classList.add('on');
+    b.onclick = async () => {
+      b.disabled = true;
+      out.textContent = '';
+      try {
+        await run();
+      } catch (error) {
+        out.textContent = error.message;
+      } finally {
+        b.disabled = false;
       }
-    } catch (error) {
-      shadow.querySelector('output').textContent = error.message;
-    } finally {
-      b.disabled = false;
-    }
-  };
-  actions.append(b);
-}
-add('重置数据', 'reset');
-add('空图片库', 'empty');
-add('没有令牌', 'token', false);
-add('已填令牌', 'token', true);
-add('没有 AI', 'ai', false);
-add('已配置 AI', 'ai', true);
-for (const code of [401, 402, 422, 429, 500, 'offline'])
-  add(code === 'offline' ? '生成连不上' : `生成失败 ${code}`, 'generation-error', code);
-add('生成变慢', 'slow-generation', true);
-add('恢复生成速度', 'slow-generation', false);
-add('未订阅', 'account', 'unsubscribed');
-add('V5 用量用完', 'account', 'usage');
-add('余额不足', 'account', 'balance');
-add('恢复账号', 'account', 'normal');
-add('下次 AI 失败', 'ai-error');
-add('Agent 改 Tag', 'agent-edit');
-add('Agent 排两次生成', 'agent-generate');
-add('导入变慢', 'slow-import', true);
-add('恢复导入速度', 'slow-import', false);
-add('2000 张图片', 'many');
-add('浅色', 'appearance', { themeMode: 'light' });
-add('深色', 'appearance', { themeMode: 'dark' });
-add('完整动效', 'appearance', { motion: 'full' });
-add('关闭动效', 'appearance', { motion: 'off' });
+    };
+    g.append(b);
+  }
+  bar.append(g);
+};
+const act = (action, value) => async () => {
+  if (action.startsWith('agent-')) await prepareUI();
+  const r = await request('scenario', { action, value });
+  if (r.reload) {
+    for (const key of Object.keys(localStorage)) if (key.includes('workbench')) localStorage.removeItem(key);
+    location.reload();
+  }
+};
+bar.innerHTML = '<b>界面整体预览</b>';
+group('主题', [
+  ['浅色', act('appearance', { themeMode: 'light' }), () => html.dataset.theme === 'light'],
+  ['深色', act('appearance', { themeMode: 'dark' }), () => html.dataset.theme === 'dark'],
+]);
+group('动效', [
+  ['完整', act('appearance', { motion: 'full' }), () => html.dataset.motion !== 'off'],
+  ['关闭', act('appearance', { motion: 'off' }), () => html.dataset.motion === 'off'],
+]);
+const setPlatform = (p) => async () => {
+  localStorage.setItem(PLATFORM_KEY, p);
+  location.reload();
+};
+group('平台', [
+  ['Windows', setPlatform('windows'), () => platform === 'windows'],
+  ['macOS', setPlatform('macos'), () => platform === 'macos'],
+]);
+// 窗口的常用尺寸：最小 960×600（软件允许的最小窗口）、默认 1240×760，以及几种常见的屏幕
+const SIZE_KEY = 'nps-preview-size';
+const SIZES = [
+  ['960×600', '最小'],
+  ['1240×760', '默认'],
+  ['1366×768', ''],
+  ['1440×900', ''],
+  ['1920×1080', ''],
+];
+let size = (() => {
+  try {
+    return localStorage.getItem(SIZE_KEY) || '1240×760';
+  } catch {
+    return '1240×760';
+  }
+})();
+const applySize = () => {
+  const [w, h] = size.split('×');
+  rootEl.style.width = w + 'px';
+  rootEl.style.height = h + 'px';
+  for (const b of bar.querySelectorAll('[data-size]')) b.classList.toggle('on', b.dataset.size === size);
+  // 产品里窗口大小变了会触发 resize；这里改的是外框，补发一次
+  dispatchEvent(new Event('resize'));
+};
+group(
+  '尺寸',
+  SIZES.map(([s, note]) => [
+    note ? s + ' ' + note : s,
+    async () => {
+      size = s;
+      try {
+        localStorage.setItem(SIZE_KEY, s);
+      } catch {
+        /* 记不住也照常能用 */
+      }
+      applySize();
+    },
+    () => size === s,
+  ]),
+);
+bar.lastElementChild.querySelectorAll('button').forEach((b, i) => (b.dataset.size = SIZES[i][0]));
+applySize();
+group('数据', [
+  ['重来', act('reset')],
+  ['空图片库', act('empty')],
+  ['2000 张图片', act('many')],
+]);
+group('账号', [
+  ['没有令牌', act('token', false)],
+  ['已填令牌', act('token', true)],
+  ['未订阅', act('account', 'unsubscribed')],
+  ['V5 用量用尽', act('account', 'usage')],
+  ['余额不足', act('account', 'balance')],
+  ['恢复账号', act('account', 'normal')],
+]);
+group('生成', [
+  ...[401, 402, 422, 429, 500].map((code) => ['下次失败 ' + code, act('generation-error', code)]),
+  ['下次连不上', act('generation-error', 'offline')],
+  ['变慢', act('slow-generation', true)],
+  ['恢复速度', act('slow-generation', false)],
+]);
+group('AI 服务', [
+  ['未配置', act('ai', false)],
+  ['已配置', act('ai', true)],
+  ['下次 AI 失败', act('ai-error')],
+]);
+group('Agent', [
+  ['改提示词', act('agent-edit')],
+  ['排两次生成', act('agent-generate')],
+]);
+group('导入', [
+  ['变慢', act('slow-import', true)],
+  ['恢复速度', act('slow-import', false)],
+]);
+bar.append(out);
+// 主题、动效的按钮跟着当前的样子
+new MutationObserver(() => {
+  for (const b of bar.querySelectorAll('.pv-group button')) {
+    const t = b.textContent, g = b.parentElement.firstChild.textContent;
+    if (g === '主题') b.classList.toggle('on', html.dataset.theme === (t === '深色' ? 'dark' : 'light'));
+    if (g === '动效') b.classList.toggle('on', (html.dataset.motion === 'off') === (t === '关闭'));
+  }
+}).observe(html, { attributes: true, attributeFilter: ['data-theme', 'data-motion'] });
