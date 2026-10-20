@@ -7,8 +7,8 @@ import {
   type ReleaseNotes,
 } from '../lib/releaseNotes.js';
 export function StructuredReleaseNotes({ notes }: { notes: ReleaseNotes }) {
-  const highlights = notes.items.filter((item) => item.highlight);
-  const rest = notes.items.filter((item) => !item.highlight);
+  const highlights = notes.items.filter((item) => item.highlight).slice(0, 2);
+  const rest = notes.items.filter((item) => !highlights.includes(item));
   const title = (item: ReleaseItem) => (
     <>
       <b>{item.title}</b>
@@ -16,7 +16,7 @@ export function StructuredReleaseNotes({ notes }: { notes: ReleaseNotes }) {
     </>
   );
   return (
-    <div className="rn">
+    <div className="rn selectable">
       <div className="rn-head">
         <b>{notes.version} 更新说明</b>
         <span>

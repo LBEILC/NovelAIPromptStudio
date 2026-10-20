@@ -29,6 +29,7 @@ export function useDictionary() {
   const [selected, setSelected] = useState<string[]>([]);
   const [held, setHeld] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [running, setRunning] = useState(false);
   const [aiReady, setAiReady] = useState(false);
   const [serviceUrl, setServiceUrl] = useState('');
@@ -51,7 +52,10 @@ export function useDictionary() {
         if (active) setError(e.message);
       })
       .finally(() => {
-        if (active) setPending(false);
+        if (active) {
+          setPending(false);
+          setLoaded(true);
+        }
       });
     void invokeUI('settings.ai.get', {})
       .then((settings) => {
@@ -186,6 +190,7 @@ export function useDictionary() {
     selected,
     setSelected,
     busy: pending || running,
+    loading: !loaded,
     running,
     aiReady,
     serviceUrl,

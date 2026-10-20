@@ -186,7 +186,10 @@ const dressShell = () => {
   if (wc && !wc.childElementCount && platform === 'windows')
     wc.innerHTML = '<span>—</span><span>☐</span><span>✕</span>';
   if (platform === 'macos' && !tb.querySelector('.lights'))
-    tb.insertAdjacentHTML('afterbegin', '<span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>');
+    tb.insertAdjacentHTML(
+      'afterbegin',
+      '<span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>',
+    );
 };
 new MutationObserver(dressShell).observe(rootEl, { childList: true, subtree: true });
 const out = document.createElement('span');
@@ -220,7 +223,8 @@ const act = (action, value) => async () => {
   if (action.startsWith('agent-')) await prepareUI();
   const r = await request('scenario', { action, value });
   if (r.reload) {
-    for (const key of Object.keys(localStorage)) if (key.includes('workbench')) localStorage.removeItem(key);
+    for (const key of Object.keys(localStorage))
+      if (key.includes('workbench')) localStorage.removeItem(key);
     location.reload();
   }
 };
@@ -261,7 +265,8 @@ const applySize = () => {
   const [w, h] = size.split('×');
   rootEl.style.width = w + 'px';
   rootEl.style.height = h + 'px';
-  for (const b of bar.querySelectorAll('[data-size]')) b.classList.toggle('on', b.dataset.size === size);
+  for (const b of bar.querySelectorAll('[data-size]'))
+    b.classList.toggle('on', b.dataset.size === size);
   // 产品里窗口大小变了会触发 resize；这里改的是外框，补发一次
   dispatchEvent(new Event('resize'));
 };
@@ -311,6 +316,10 @@ group('Agent', [
   ['改提示词', act('agent-edit')],
   ['排两次生成', act('agent-generate')],
 ]);
+group('更新', [
+  ['有新版本', act('update', true)],
+  ['已是最新', act('update', false)],
+]);
 group('导入', [
   ['变慢', act('slow-import', true)],
   ['恢复速度', act('slow-import', false)],
@@ -319,8 +328,10 @@ bar.append(out);
 // 主题、动效的按钮跟着当前的样子
 new MutationObserver(() => {
   for (const b of bar.querySelectorAll('.pv-group button')) {
-    const t = b.textContent, g = b.parentElement.firstChild.textContent;
-    if (g === '主题') b.classList.toggle('on', html.dataset.theme === (t === '深色' ? 'dark' : 'light'));
+    const t = b.textContent,
+      g = b.parentElement.firstChild.textContent;
+    if (g === '主题')
+      b.classList.toggle('on', html.dataset.theme === (t === '深色' ? 'dark' : 'light'));
     if (g === '动效') b.classList.toggle('on', (html.dataset.motion === 'off') === (t === '关闭'));
   }
 }).observe(html, { attributes: true, attributeFilter: ['data-theme', 'data-motion'] });

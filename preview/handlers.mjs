@@ -33,6 +33,71 @@ import {
   resolveImageFile,
 } from '../electron/assetFiles.js';
 
+// 外框上的"更新"一组改这里
+export const previewUpdate = {
+  available: false,
+  checked: false,
+  checkedAt: '',
+  progress: null,
+  downloaded: false,
+};
+export function resetPreviewUpdate(available) {
+  Object.assign(previewUpdate, {
+    available,
+    checked: false,
+    checkedAt: '',
+    progress: null,
+    downloaded: false,
+  });
+}
+// 预览用的更新说明（演示内容，不是真的版本）
+const PREVIEW_NOTES = {
+  schema: 'nps-release-notes/1',
+  version: '1.9.0',
+  date: '2026-10-26',
+  items: [
+    {
+      kind: 'new',
+      area: 'lib',
+      highlight: true,
+      icon: 'folder',
+      title: '智能收藏集可以编辑规则',
+      detail: '右键智能收藏集选择“编辑规则…”，在筛选浮层里修改条件，网格会实时显示符合的图片。',
+    },
+    {
+      kind: 'new',
+      area: 'lib',
+      highlight: true,
+      icon: 'calendar',
+      title: '按日期范围筛选图片',
+      detail: '筛选里的时间改为日期范围：可以用快捷选项，也可以在月历上选开始和结束日期。',
+    },
+    {
+      kind: 'improved',
+      area: 'lib',
+      title: '视图选项排列更整齐',
+      detail: '切换合并方式时，视图浮层的大小保持不变。',
+    },
+    {
+      kind: 'improved',
+      area: 'wb',
+      title: 'Tag 拖动更顺手',
+      detail: '落点按被拖的那一个 Tag 的位置判断。',
+    },
+    {
+      kind: 'fixed',
+      area: 'set',
+      title: 'AI 服务的测试结果及时清除',
+      detail: '修改服务地址、API Key 或模型后，上一次的测试结果会被清除。',
+    },
+    {
+      kind: 'fixed',
+      area: 'app',
+      title: '图标按钮按下时不再偏移',
+      detail: '只有图标的按钮按下时，图标不再向右移动。',
+    },
+  ],
+};
 export function createPreviewHandlers({
   database,
   preferences,
@@ -977,21 +1042,54 @@ export function createPreviewHandlers({
     const settings = input.settings;
     return preferences.saveProductivitySettings(settings);
   });
-  for (const name of [
-    'updates.status',
-    'updates.check',
-    'updates.download',
-    'updates.install',
-    'updates.open-release',
-  ])
-    registerCommand(name, () => ({
+  // 更新：默认是最新版本；外框上"有新版本"之后，检查更新会发现 1.9.0，下载有进度，完成后可以"重启并安装"
+  const update = () => {
+    const u = previewUpdate;
+    const found = u.available && u.checked;
+    return {
       ok: true,
-      phase: 'current',
+      phase: !found
+        ? 'current'
+        : u.downloaded
+          ? 'downloaded'
+          : u.progress != null
+            ? 'downloading'
+            : 'available',
+      hasUpdate: found,
       currentVersion: 'preview',
-      packaged: false,
-      canDownloadUpdate: false,
-      canInstallUpdate: false,
-    }));
+      latestVersion: found ? '1.9.0' : undefined,
+      checkedAt: u.checkedAt,
+      progress: u.progress || 0,
+      packaged: u.available,
+      platform: process.platform,
+      updateMode: 'auto',
+      canDownloadUpdate: found,
+      canInstallUpdate: !!u.downloaded,
+      structuredNotes: found ? PREVIEW_NOTES : undefined,
+    };
+  };
+  registerCommand('updates.status', update);
+  registerCommand('updates.check', async () => {
+    await new Promise((r) => setTimeout(r, 900));
+    previewUpdate.checked = true;
+    previewUpdate.checkedAt = new Date().toISOString();
+    return update();
+  });
+  registerCommand('updates.download', () => {
+    if (!previewUpdate.checked || previewUpdate.progress != null) return { ok: true };
+    previewUpdate.progress = 0;
+    const tick = () => {
+      if (previewUpdate.progress == null) return;
+      previewUpdate.progress = Math.min(100, previewUpdate.progress + 4);
+      if (previewUpdate.progress >= 100) previewUpdate.downloaded = true;
+      emit({ type: 'updates', data: update() });
+      if (!previewUpdate.downloaded) setTimeout(tick, 80);
+    };
+    setTimeout(tick, 80);
+    return { ok: true };
+  });
+  registerCommand('updates.install', () => ({ ok: true }));
+  registerCommand('updates.open-release', () => ({ ok: true }));
   registerCommand('fonts.list', async (input, _caller) => {
     try {
       return { ok: true, fonts: await listSystemFonts() };

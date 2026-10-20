@@ -3,16 +3,6 @@
 import type { ReactNode } from 'react';
 import { Icon, Logo } from '../kit/controls';
 import 'remixicon/fonts/remixicon.css';
-import './shell.css';
-
-/** 旧设置页的关于页还在用；设置页重写后删掉 */
-export function BrandMark() {
-  return (
-    <span className="studio-brand-mark" aria-hidden="true">
-      <Logo />
-    </span>
-  );
-}
 
 export type Page = 'workbench' | 'gallery' | 'materials' | 'settings';
 const NAV: [Page, string][] = [

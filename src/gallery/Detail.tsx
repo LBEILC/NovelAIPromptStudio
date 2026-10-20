@@ -9,25 +9,13 @@ import { writeClipboardText } from '../lib/clipboard';
 import { mediaUrl } from '../lib/imageStage.js';
 import { hasImageName, imageFileName, imageAccessibleName } from '../lib/imageNaming.js';
 import { createPromptDocument, type PromptBlock } from '../lib/promptDocument';
-import { CATEGORY_LABELS } from '../lib/prompt.js';
 import { dimensions, libraryCountText, modelDisplayName } from '../library/presentation';
 import { libraryPositivePrompt } from '../library/Prompt';
 import type { ImageRecord, Tag, TagCategory } from '../shared/types';
 import type { LibraryGroup, LibraryProps } from '../library/types';
 
-export const CAT_VAR: Record<TagCategory, string> = {
-  ArtistEra: 'artist-era',
-  Subject: 'subject',
-  Identity: 'identity',
-  Body: 'body',
-  Clothing: 'clothing',
-  Action: 'action',
-  Environment: 'environment',
-  Composition: 'composition',
-  StyleQuality: 'style',
-  Unsorted: 'unsorted',
-};
-export const CAT_NAME = CATEGORY_LABELS as Record<TagCategory, string>;
+export { CAT_VAR, CAT_NAME } from '../kit/categories';
+import { CAT_VAR, CAT_NAME } from '../kit/categories';
 const thumb = (c: { thumbnail_path?: string; image_path: string }) =>
   mediaUrl(c.thumbnail_path || c.image_path);
 const STRIP_ROW = 6;

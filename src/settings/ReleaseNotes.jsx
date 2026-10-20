@@ -14,7 +14,7 @@ const releaseNotesSchema = {
 
 export default function ReleaseNotes({ children }) {
   return (
-    <article className="settings-release-notes-content">
+    <article className="rn rn-md selectable">
       <ReactMarkdown
         rehypePlugins={[rehypeRaw, [rehypeSanitize, releaseNotesSchema]]}
         remarkPlugins={[remarkGfm]}

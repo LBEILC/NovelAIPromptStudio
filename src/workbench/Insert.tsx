@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { mediaUrl } from '../lib/imageStage.js';
-import { CAT_VAR } from '../gallery/Detail';
+import { CAT_VAR } from '../kit/categories';
 import { Icon, Kbd } from '../kit/controls';
 import { Pop } from '../kit/layer';
 import { MenuPop } from '../kit/menu';

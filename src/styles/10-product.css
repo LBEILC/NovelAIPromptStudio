@@ -66,3 +66,44 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 .col.prompt > .prompt-in { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 /* 张数："3 张"排在一行（.stepper b 是 grid，数字和"张"会被排成上下两格） */
 .count-step .count-n { display: flex; align-items: center; justify-content: center; padding: 0 var(--sp-1); white-space: nowrap; }
+
+/* 设置：主题外层撑满窗口；侧栏的分类是按钮；每一页叠在同一个格子里，页本身是一列 */
+#root > .nps-root { height: 100%; }
+.set-side button.it { width: 100%; border: 0; background: transparent; text-align: left; }
+.setp .set-col { flex: 1 1 0; background: var(--surface); }
+.set-pane { display: flex; flex-direction: column; min-height: 0; }
+.set-pane > .dict { flex: 1 1 auto; height: auto; }
+.sdd .sdd-v { display: inline-flex; align-items: center; gap: var(--ctl-gap); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sdd.set-dd { min-width: 180px; }
+.sdd.set-dd-model, .field.set-model { min-width: 240px; }
+.field.set-key { min-width: 260px; }
+.menu.font-menu { max-height: min(360px, 60vh); }
+.set-banner { margin: var(--sp-3) 0 0; }
+.set .row.set-nowrap { flex-wrap: nowrap; }
+.set-limit { border-bottom: var(--bw) solid var(--divider); }
+.set-limit-row { padding: 0 0 13px; }
+.field.set-limit-in { width: 90px; }
+.set-foot .foot-ok { padding: var(--sp-1) var(--ctl-pad-x); }
+.setrow small .path { display: block; }
+/* 翻译词典：勾选框是按钮；分类小圆点；出错时的横幅 */
+.dx-check { display: inline-flex; padding: 0; border: 0; background: transparent; }
+.dx-check:disabled { opacity: var(--dim); }
+.sdd .cdot, .dcell .cdot { width: 6px; height: 6px; }
+.dict-err { max-width: var(--page-col-wide); margin: 0 auto var(--sp-4); }
+/* 更新说明没有结构化内容时，按 Markdown 显示 */
+.rn-md { display: block; overflow-wrap: anywhere; }
+.rn-md img { max-width: 100%; }
+.rn-md pre { white-space: pre-wrap; }
+.rn-md table { display: block; overflow: auto; }
+.rn-md :is(h1, h2, h3, h4, h5, h6) { margin: var(--sp-2) 0 var(--sp-1); font: var(--fw-strong) var(--fs-body)/var(--lh-body) var(--font-ui); }
+.rn-md :is(ul, ol) { margin: 0; padding-left: var(--sp-5); }
+.rn-md p { margin: 0 0 var(--sp-1); }
+/* 字体与开源组件：每一份许可可以展开 */
+.dialog.lic-dlg { width: calc(var(--dialog-w) + var(--popover-w) * 0.6); display: flex; flex-direction: column; max-height: calc(100% - var(--sp-8) * 2); }
+.backdrop:has(.lic-dlg) { grid-template-rows: minmax(0, 1fr); }
+.lic-dlg .lic-list { flex: 1 1 auto; min-height: 0; margin-top: var(--sp-3); border-top: var(--bw) solid var(--divider); }
+.lic summary { display: flex; align-items: center; gap: var(--ctl-gap); height: var(--table-row-h); border-bottom: var(--bw) solid var(--divider); list-style: none; color: var(--text); }
+.lic summary::-webkit-details-marker { display: none; }
+.lic summary [class^="ri-"] { color: var(--text-3); transition: transform var(--dur-1) var(--ease-out); }
+.lic[open] summary [class^="ri-"] { transform: rotate(90deg); }
+.lic pre { margin: 0; padding: var(--sp-2) 0 var(--sp-3); white-space: pre-wrap; font: var(--fs-caption)/var(--lh-caption) var(--font-mono); color: var(--text-2); border-bottom: var(--bw) solid var(--divider); }

@@ -7,6 +7,7 @@ import react from '@vitejs/plugin-react';
 import { bundledMiSans } from '../scripts/font-vite.mjs';
 import { startServices } from './services.mjs';
 import { createSession } from './session.mjs';
+import { resetPreviewUpdate } from './handlers.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const imageDir = path.join(root, 'demo/images/final');
@@ -75,6 +76,7 @@ async function scenario({ action, value }) {
         delay: 1500,
       });
       Object.assign(services.state, { aiFail: false, disconnect: false, slowImport: false });
+      resetPreviewUpdate(false);
       session = await createSession(services, images, emit, action === 'empty');
     } finally {
       resetting = false;
@@ -97,7 +99,10 @@ async function scenario({ action, value }) {
     await session.call('account.refresh');
   } else if (action === 'ai-error') services.state.aiFail = true;
   else if (action === 'slow-import') services.state.slowImport = Boolean(value);
-  else if (action === 'appearance')
+  else if (action === 'update') {
+    resetPreviewUpdate(Boolean(value));
+    emit({ type: 'updates', data: await session.call('updates.status') });
+  } else if (action === 'appearance')
     await session.call('settings.appearance.save', { settings: value });
   else if (action === 'many') {
     const cards = await session.database.loadLibraryCards();

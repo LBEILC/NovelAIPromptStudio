@@ -10,7 +10,7 @@ import {
   promptDocumentProject,
   setPromptBlockType,
 } from '../lib/promptDocument';
-import { CAT_VAR } from '../gallery/Detail';
+import { CAT_VAR } from '../kit/categories';
 import { Icon } from '../kit/controls';
 import { Confirm } from '../kit/dialog';
 import { useNotifications } from '../kit/toast';

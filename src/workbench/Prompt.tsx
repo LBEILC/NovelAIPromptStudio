@@ -33,7 +33,7 @@ import {
   type DocumentTag,
 } from './model';
 import { deleteTags, insertTags, moveTags } from './edits';
-import { CAT_VAR } from '../gallery/Detail';
+import { CAT_VAR } from '../kit/categories';
 import { AddTags } from './AddTags';
 import { ParagraphEditor } from './Paragraph';
 import { TextSection } from './TextSection';
