@@ -56,8 +56,11 @@ export async function extraLibraryChecks({
   await click('新建收藏集', side);
   await input('input[aria-label="收藏集名称"]', `012多选${reduced}`);
   await key('Enter', {}, 'document.activeElement');
-  await wait('!document.querySelector("dialog[open]")');
+  await wait('!document.querySelector("input[aria-label=收藏集名称]")');
   const collection = database.listCollections().find((c) => c.name === `012多选${reduced}`);
+  await wait(
+    `document.querySelector('.library-side-item.on[data-collection-id="${collection?.id}"]') && document.querySelector('.library-empty h3')?.textContent === '收藏集为空'`,
+  );
   await check(
     '侧栏新建普通收藏集并进入空集合',
     () => !!collection && collection.member_ids.length === 0,
@@ -65,6 +68,12 @@ export async function extraLibraryChecks({
     'once',
   );
   await all();
+  await check(
+    '新建确认后的失焦不会重复创建收藏集',
+    () => database.listCollections().filter((c) => c.name === `012多选${reduced}`).length === 1,
+    undefined,
+    'once',
+  );
   await selectCard(0);
   await selectCard(1, mod);
   const selected = await e(

@@ -39,7 +39,7 @@ async function settle(h) {
 async function press(h, expression) {
   const point = await center(h, expression);
   const cdp = h.window.webContents.debugger;
-  for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased'])
+  for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
     await cdp.sendCommand('Input.dispatchMouseEvent', {
       type,
       ...point,
@@ -47,6 +47,9 @@ async function press(h, expression) {
       buttons: type === 'mousePressed' ? 1 : 0,
       clickCount: type === 'mouseMoved' ? 0 : 1,
     });
+    // CDP acknowledgement can precede renderer event handling on CI.
+    await h.evaluate(frame);
+  }
 }
 
 async function toggle(h, label, trigger, layer) {

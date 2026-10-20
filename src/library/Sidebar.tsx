@@ -51,7 +51,11 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
         naming === 'new'
           ? await p.onCollectionCreate('manual', name.trim())
           : await p.onCollectionRename(naming, name.trim());
-      if (result !== false) setNaming(null);
+      if (result !== false) {
+        // Blur can arrive before React removes the committed input.
+        canceled.current = true;
+        setNaming(null);
+      }
     } finally {
       saving.current = false;
     }
