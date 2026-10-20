@@ -77,7 +77,6 @@ export function ParagraphEditor({
     if (!translateRequest || handledTranslation.current === translateRequest) return;
     handledTranslation.current = translateRequest;
     const text = editing ? english : block.content;
-    // TODO(design): 无 AI 配置时块菜单是否直接禁用待定；当前打开编辑器并沿用已有禁用提示。
     if (!editing) {
       setEnglish(block.content);
       setChinese(block.translation || '');

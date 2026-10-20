@@ -91,7 +91,7 @@
 .nps-dialog-body { color: var(--text-2); }
 .nps-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); }
 .nps-quote { margin: var(--sp-3) 0; padding: var(--sp-0) 0 var(--sp-0) var(--sp-3); border-left: var(--rule-w) solid var(--border); color: var(--text-2); font: var(--fs-body)/var(--lh-body) var(--font-prose); }
-.nps-notifications { position: fixed; inset: auto; bottom: var(--sp-6); left: 50%; transform: translateX(-50%); padding: 0; border: 0; margin: 0; background: transparent; overflow: visible; }
+.nps-notifications { position: fixed; inset: auto; bottom: calc(var(--bar-h) + var(--sp-3)); left: 50%; transform: translateX(-50%); padding: 0; border: 0; margin: 0; background: transparent; overflow: visible; }
 .nps-toast { height: var(--toast-h); padding: 0 var(--sp-4); display: inline-flex; align-items: center; gap: var(--sp-3); border-radius: var(--r-ctl); background: var(--tip-bg); color: var(--tip-text); border:var(--bw) solid var(--tip-border); box-shadow: var(--shadow-pop); }
 .nps-toast:has(button) { padding-right: var(--sp-2); }
 .nps-notifications { transition: transform var(--dur-3) var(--ease-move); }

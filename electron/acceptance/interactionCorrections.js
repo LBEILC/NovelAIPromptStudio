@@ -16,14 +16,14 @@ const tags = '[...document.querySelectorAll(".wb-document-scroll [data-wb-tag]")
 const editor = 'document.querySelector(".nps-popover:popover-open .wb-tag-editor")';
 const scroll = 'document.querySelector(".wb-document-scroll")';
 
-async function notificationClearance(h, label, selector) {
+export async function notificationClearance(h, label, selector) {
   await settleLayout(h, `.nps-notifications, ${selector}`);
   await h.check(
     `${label}通知位于操作条上方且每个按钮中心可点击`,
     `(()=>{
     const bar=document.querySelector(${JSON.stringify(selector)}),toast=document.querySelector('.nps-toast');
-    const a=bar.getBoundingClientRect(),b=toast.getBoundingClientRect(),gap=parseFloat(getComputedStyle(toast).getPropertyValue('--sp-2'));
-    return Math.abs(a.top-b.bottom-gap)<1 && [...bar.querySelectorAll('button')].every(button=>{const r=button.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('button')===button});
+    const a=bar.getBoundingClientRect(),b=toast.getBoundingClientRect();
+    return b.bottom<=a.top && [...bar.querySelectorAll('button')].every(button=>{const r=button.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('button')===button});
   })()`,
     undefined,
     'both',

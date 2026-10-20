@@ -137,7 +137,9 @@
 .tx-err { display: flex; align-items: center; gap: var(--sp-1); margin: calc(var(--sp-2) * -1) 0 var(--sp-3); font-size: var(--fs-caption); color: var(--warn); }
 
 .nps-option-icon { width:var(--ctl-sm); padding:0; }
-.wb-text-suggestions { min-width:var(--popover-w); }
+.wb-text-suggestions { width:var(--popover-w); max-width:calc(100vw - var(--sp-4)); }
+.wb-text-suggestions .nps-menu-item > span:not(.nps-menu-trailing) { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wb-text-suggestions .nps-menu-trailing { flex-shrink:0; }
 
 .wb-add-block { display:inline-flex; align-items:center; border:var(--bw) solid var(--border); border-radius:var(--r-ctl); }
 .wb-character-empty { border:var(--bw) dashed var(--border); border-radius:var(--r-ctl); padding:var(--sp-3); display:flex; flex-direction:column; gap:var(--sp-2); color:var(--text-3); font-size:var(--fs-small); }

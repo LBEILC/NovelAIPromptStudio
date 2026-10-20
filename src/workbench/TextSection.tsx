@@ -102,7 +102,7 @@ export function TextSection({
       void invokeUI('dictionary.suggest', { query: search }).then((r) => {
         if (alive) {
           setItems(
-            r.items.map((item) => ({
+            r.items.slice(0, 6).map((item) => ({
               id: item.tag,
               text: item.tag,
               translation: item.translation,

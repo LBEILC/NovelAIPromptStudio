@@ -1,3 +1,4 @@
+import { notificationClearance } from './interactionCorrections.js';
 import { scrollChecks } from './scroll.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -412,6 +413,7 @@ export async function settingsChecks(context, restart) {
   await input('textarea', '验收翻译规则（已保存）');
   await click('保存');
   await wait('document.body.innerText.includes("已保存")');
+  await notificationClearance(h, 'AI服务页脚', '.settings-page-foot');
   if (encrypted)
     await check(
       '空 Key 再保存保留加密 Key',

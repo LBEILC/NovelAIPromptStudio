@@ -122,7 +122,7 @@ export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () =>
                 ? '完成当前这张后停止'
                 : job.continuous
                   ? `生成中 第 ${job.index} 张 · 持续生成`
-                  : `生成中 ${job.index} / ${job.count} · ${job.spentKnown ? `已消耗 ${job.spent} Anlas` : '【文案待定：实际消耗查询失败】'}`}
+                  : `生成中 ${job.index} / ${job.count} · ${job.spentKnown ? `已消耗 ${job.spent} Anlas` : '消耗未知'}`}
             </span>
             <Button disabled>
               <i className="ri-loader-4-line nps-spinner" />

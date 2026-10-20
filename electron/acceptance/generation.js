@@ -112,6 +112,17 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
     );
   });
   await check('生成请求保持全软件串行', () => generationService.state.maxActive === 1);
+  await wait('!!document.querySelector(".wb-canvas img")?.naturalWidth');
+  await check(
+    '生成后舞台图片在版本栏中唯一标为当前',
+    `(async()=>{
+    const t=(await window.studio.invoke('workbench.get',{tabId:${JSON.stringify(tabId)}})).data.tab;
+    const images=[...document.querySelectorAll('.wb-version-thumb[aria-current="true"]')];
+    const stage=document.querySelector('.wb-canvas img');
+    const image=(await window.studio.invoke('library.get',{id:t.versionImageId})).data.project;
+    return images.length===1 && images[0].querySelector('img')?.getAttribute('src')==='novelai-media://file?path='+encodeURIComponent(image.thumbnail_path||image.image_path) && stage?.getAttribute('src')==='novelai-media://file?path='+encodeURIComponent(image.image_path);
+  })()`,
+  );
   await h.screenshot('generation-three-images');
   generationService.state.delay = 500;
   await click('生成', 'document.querySelector(".wb-generation-bar")');

@@ -23,7 +23,7 @@
 .wb-version-images { display:flex; flex-wrap:wrap; gap:var(--sp-1); padding:var(--sp-1) 0; }
 .wb-version-thumb, .wb-version-images > img { height:calc(var(--ctl) + var(--sp-2)); border-radius:var(--r-thumb); }
 .wb-version-thumb { padding:0; border:0; background:none; cursor:pointer; outline:var(--thumb-ring) solid transparent; outline-offset:var(--sp-0); transition:outline-color var(--dur-1) var(--ease-out); }
-.wb-version-thumb[aria-current=true] { outline-color:var(--cinnabar-text); }
+.wb-version-thumb[aria-current=true] { outline:var(--thumb-ring) solid var(--cinnabar); outline-offset:var(--sp-0); }
 .wb-version-thumb img { height:100%; width:100%; object-fit:cover; border-radius:inherit; }
 .wb-version-fork { display:flex; flex-direction:column; width:100%; text-align:left; padding:var(--sp-2); color:var(--text-3); border:0; background:none; cursor:pointer; }
 .wb-version-fork small { color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
@@ -41,7 +41,6 @@
 .wb-versions .nps-animated-items { display:block; }
 
 .wb-generation-slots > .is-generating > i { position:absolute; height:var(--rule-w); background:var(--text); bottom:0; left:0; }
-/* TODO(design): confirm the indeterminate sweep period; the prototype only shows step progress. */
 .wb-generation-slots > [data-indeterminate=true] > i { width:33%; animation:wb-generation-sweep calc(var(--dur-3) * 4) linear infinite alternate; }
 @keyframes wb-generation-sweep { to { transform:translateX(200%); } }
 

@@ -108,6 +108,11 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   await h.click('重新安装');
   await h.wait('!document.querySelector("[data-settings-section=agent] [aria-busy=true]")');
   await h.click('复制内容');
+  await h.wait('document.querySelector(".nps-toast")?.textContent.includes("已复制技能内容")');
+  await h.check(
+    '复制技能用通知反馈，页面不插入状态文字',
+    'document.querySelector(".nps-toast")?.textContent.includes("已复制技能内容")&&!document.querySelector("[data-settings-section=agent]").textContent.includes("已复制技能内容")',
+  );
   const skill = await fs.readFile(
     path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'agent', 'SKILL.md'),
     'utf8',

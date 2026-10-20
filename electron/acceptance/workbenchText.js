@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { settleLayout } from './layout.js';
 import { clipboard } from 'electron';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 export async function textEditingChecks({ h, raw, draft, reset, modifier }) {
@@ -29,6 +30,10 @@ export async function textEditingChecks({ h, raw, draft, reset, modifier }) {
   await check(
     '逗号后输入wa出现补全',
     'document.querySelectorAll(".wb-text-suggestions [role=option]").length>0',
+  );
+  await check(
+    '输入 wa 后补全项不超过六个',
+    'document.querySelectorAll(".wb-text-suggestions [role=option]").length<=6',
   );
   await h.screenshot('workbench-text-autocomplete');
   await key('Enter', {}, 'document.querySelector(".wb-text-section textarea")');
@@ -175,6 +180,11 @@ export async function automaticAndVibeChecks({ h, mode, doubles }) {
       await check(
         '自动内容展开后显示只读Tag',
         '!!document.querySelector(".wb-auto-tags")&&document.querySelector(".wb-auto-tags").textContent.includes("masterpiece")&&!document.querySelector(".wb-auto-tags [data-interactive]")',
+      );
+      await settleLayout(h, '.wb-auto-group');
+      await check(
+        '自动内容展开完成后不裁切',
+        `(()=>{const n=document.querySelector('.wb-auto-group').closest('.nps-transition-height');return !!n&&n.scrollHeight<=n.clientHeight+1})()`,
       );
       await h.screenshot('workbench-automatic-expanded');
       await click('复制提示词');

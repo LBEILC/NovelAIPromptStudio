@@ -1,3 +1,4 @@
+import { notificationClearance } from './interactionCorrections.js';
 import { textEditingChecks, automaticAndVibeChecks } from './workbenchText.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -555,6 +556,9 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     undefined,
     'once',
   );
+  await click('复制图片', 'document.querySelector(".wb-image-actions")');
+  await wait('document.querySelector(".nps-toast")?.textContent.includes("已复制图片")');
+  await notificationClearance(h, '工作台', '.wb-image-actions');
   doubles.selections.push({ canceled: false, filePaths: [files[1]] });
   await click('打开图片', 'document.querySelector(".studio-titlebar")');
   await wait('document.querySelectorAll(".wb-tab").length===2');

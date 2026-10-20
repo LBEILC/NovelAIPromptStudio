@@ -136,7 +136,7 @@
 .nps-popover:has(.library-filter-panel) { width:var(--popover-w-wide); }
 .library-filter-panel .nps-options { flex-wrap:nowrap; }
 .library-filter-panel .nps-option { white-space:nowrap; }
-.library-view-vibe { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); }
+.library-view-vibe { display:flex; align-items:center; gap:var(--sp-2); color:var(--text-2); font-size:var(--fs-small); }
 .library-row-end { margin-left:auto; }
 .library-side .nps-menu-trigger { display:flex; width:100%; }
 
@@ -186,3 +186,6 @@
 .library-strip { padding-bottom:var(--sp-1); }
 .library-strip-rest { padding-top:var(--ctl-gap); }
 .library-version-badge { position:absolute; top:var(--sp-2); left:var(--sp-2); padding:var(--sp-0) var(--sp-1); background:var(--bg); color:var(--text-2); border-radius:var(--r-tag); font-size:var(--fs-caption); }
+
+.library-filter-row.library-filter-row-top { align-items:start; }
+.library-filter-row > .library-view-vibe { color:var(--text-2); font-size:var(--fs-small); }

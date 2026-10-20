@@ -89,6 +89,7 @@ function Row({
   );
 }
 function Agent() {
+  const notify = useNotifications();
   const [setup, setSetup] = useState<{
     installed: boolean;
     path: string;
@@ -135,7 +136,7 @@ function Agent() {
       const result = await invokeUI('agent.skill', {});
       if (!result.ok) throw Error(result.error);
       await writeClipboardText(result.text);
-      setMessage('已复制技能内容');
+      notify({ text: '已复制技能内容', tone: 'success' });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     }
