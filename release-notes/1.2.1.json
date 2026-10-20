@@ -1,0 +1,59 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "1.2.1",
+  "date": "2026-10-20",
+  "items": [
+    {
+      "kind": "improved",
+      "area": "app",
+      "title": "界面按新设计重做",
+      "detail": "图片库、大图、设置各页、工作台和标签页按 1.2 的新设计重做：侧栏、详情栏、筛选和视图浮层、选中框、大图的工具条和浏览方式都换成了新的样子。",
+      "highlight": true,
+      "icon": "palette"
+    },
+    {
+      "kind": "improved",
+      "area": "gen",
+      "title": "生成入口一直可见",
+      "detail": "没填 NovelAI 持久令牌时，底栏也有“生成”，点了说明去哪里填，“去设置”直接打开 NovelAI 账号页。",
+      "highlight": true,
+      "icon": "image"
+    },
+    {
+      "kind": "fixed",
+      "area": "gen",
+      "title": "V5 生成补上自动内容",
+      "detail": "1.2.0 生成 V5 图时没有把质量 Tag 和负面预设写进提示词，结果和 NovelAI 网页不一致；现在和官方客户端一样写进去。复制提示词时仍默认不含这些自动添加的内容。"
+    },
+    {
+      "kind": "improved",
+      "area": "lib",
+      "title": "ZIP 导入前挑选",
+      "detail": "小图按各自的比例排列，已在图片库里的不能选；可以拖动框选、Shift 连选、全选或全不选。图片多时只有小图区域滚动。"
+    },
+    {
+      "kind": "new",
+      "area": "lib",
+      "title": "多选后批量起名",
+      "detail": "图片库多选后，操作条上点“起名”，输入一个名称，按当前顺序编号，可以撤销。"
+    },
+    {
+      "kind": "improved",
+      "area": "lib",
+      "title": "详情栏更简洁",
+      "detail": "详情栏只显示尺寸、模型、Vibe、日期和提示词，完整参数在工作台里看；一组的封面自动选定。"
+    },
+    {
+      "kind": "improved",
+      "area": "set",
+      "title": "设置的提示更清楚",
+      "detail": "系统加密不可用、读不出模型列表、测试连接失败、命令行不在 PATH 里、检查更新失败时，都会说明原因和能做什么。"
+    },
+    {
+      "kind": "improved",
+      "area": "set",
+      "title": "AI 服务改为内置提示词",
+      "detail": "翻译和分类统一使用内置的提示词，不再提供自定义。"
+    }
+  ]
+}
