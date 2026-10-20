@@ -68,6 +68,9 @@ export async function textEditingChecks({ h, raw, draft, reset, modifier }) {
     code: 'KeyZ',
     windowsVirtualKeyCode: 90,
     modifiers: process.platform === 'darwin' ? 4 : 2,
+    // CDP key events bypass Cocoa's key-binding translation on macOS.
+    // Supply the native edit command that Command-Z normally carries.
+    ...(process.platform === 'darwin' ? { commands: ['undo'] } : {}),
   });
   await cdp.sendCommand('Input.dispatchKeyEvent', {
     type: 'keyUp',
