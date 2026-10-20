@@ -19,11 +19,14 @@ function fixture(run) {
 describe('version migration', () => {
   it('backs up all retired rows, removes only named tables, and runs once', () =>
     fixture((db, file) => {
+      // Commit the synthetic legacy fixture before testing the on-disk backup.
+      db.exec('BEGIN');
       for (const table of RETIRED_TABLES)
         db.exec(`CREATE TABLE ${table}(value TEXT); INSERT INTO ${table} VALUES ('synthetic')`);
       db.exec(
         "CREATE TABLE unrelated (id INTEGER, value TEXT); INSERT INTO unrelated VALUES (1,'keep'),(2,'unchanged')",
       );
+      db.exec('COMMIT');
       const before = db.prepare('SELECT * FROM unrelated').all();
       expect(migrateGenerationVersions(db, file)).toBe(true);
       const names = db
@@ -128,6 +131,9 @@ describe('version persistence', () => {
 it('matches branch numbering for the approved 21-version prototype tree', () =>
   fixture((db, file) => {
     migrateGenerationVersions(db, file);
+    // This case checks tree numbering, not per-version disk durability.
+    // Batch writes while retaining the store's nested savepoints and every assertion.
+    db.exec('BEGIN');
     db.exec(
       "CREATE TABLE projects(id TEXT PRIMARY KEY, deleted_at TEXT); INSERT INTO projects VALUES ('synthetic-image','')",
     );
@@ -155,4 +161,5 @@ it('matches branch numbering for the approved 21-version prototype tree', () =>
       expect(v.number).toBe(i + 1);
       expect(v.branchName).toBe(expected[i] ? `分支 ${expected[i]}` : '主线');
     }
+    db.exec('COMMIT');
   }));

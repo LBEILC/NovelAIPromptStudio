@@ -216,7 +216,7 @@ describe('command contract', () => {
       if (definition.required?.length) expect(() => validateCommand(name, {}, 'ui')).toThrow();
       if (definition.uiOnly) expect(() => validateCommand(name, {}, 'agent')).toThrow(/只供/);
     });
-  it('executes every public command through the same dispatcher', async () => {
+  it('executes workbench and prompt commands through the dispatcher and saves to the library', async () => {
     const app = await setup();
     expect((await app.call('app.status')).libraryCount).toBe(1);
     expect(
@@ -264,6 +264,11 @@ describe('command contract', () => {
     expect((await app.call('library.get', { id: 'synthetic-image' })).project.tags[0].weight).toBe(
       1.25,
     );
+    await app.call('workbench.close', { tabId, expectedRevision: saved.revision });
+    expect((await app.call('workbench.list')).tabs).toHaveLength(1);
+  });
+  it('executes library, collection and dictionary commands through the dispatcher', async () => {
+    const app = await setup();
     await app.call('library.import', { path: '/synthetic.png' });
     await app.call('library.rename', { id: 'synthetic-image', name: 'Renamed' });
     expect((await app.call('collection.list')).items.some((c: any) => c.id === 'collection')).toBe(
@@ -284,8 +289,6 @@ describe('command contract', () => {
     await app.call('library.trash', { ids: ['synthetic-image'] });
     expect((await app.call('library.search', { view: 'trash' })).total).toBe(1);
     expect((await app.call('library.search', {})).total).toBe(0);
-    await app.call('workbench.close', { tabId, expectedRevision: saved.revision });
-    expect((await app.call('workbench.list')).tabs).toHaveLength(1);
   });
   it('rejects stale revisions, invalid targets and forbidden capabilities without mutation', async () => {
     const app = await setup();
