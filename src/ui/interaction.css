@@ -1,122 +1,36 @@
-﻿/* States shared by client surfaces; all paint comes from the design tokens. */
-a[href] { color: inherit; }
-a[href]:not([aria-disabled="true"]):hover { background: var(--hover); }
-a[href]:not([aria-disabled="true"]):active { background: var(--selected); }
-a[href][aria-disabled="true"] { color: var(--text-off); cursor: default; }
-:where(.nps-root, .nps-layer, .nps-dialog) button { cursor: default; }
-:where(.nps-root, .nps-layer, .nps-dialog,.library-viewer) :is(button,a[href], [role="button"], [role="tab"], summary):focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
-:where(.nps-root, .nps-layer, .nps-dialog) :is(.nps-surface-row, .nps-surface-chip, .nps-surface-tab, .wb-tab, summary, .nps-tablist button):not(:disabled,[aria-disabled="true"]):hover { background: var(--hover); color: var(--text); }
-:where(.nps-root, .nps-layer, .nps-dialog) :is(.nps-surface-row, .nps-surface-chip, .nps-surface-tab, .wb-tab, summary, .nps-tablist button, .nps-menu-item):not(:disabled,[aria-disabled="true"]):active { background: var(--selected); color: var(--text); }
-.nps-root .settings-sidebar button[aria-current="page"]:hover { background: var(--hover); }
-.nps-root .settings-sidebar button[aria-current="page"]:active { background: var(--selected); box-shadow: inset 0 0 0 var(--bw) var(--text-3); }
-.nps-root .library-side-item.on:hover { background: var(--hover); }
-.nps-root .library-side-item.on:active { background: var(--selected); box-shadow: inset 0 0 0 var(--bw) var(--text-3); }
-.nps-root .wb-tab[aria-selected="true"]:hover { background: var(--hover); }
-.nps-root .wb-tab[aria-selected="true"]:active { background: var(--selected); }
-.nps-root .settings-dictionary-views button[aria-selected="true"]:hover { background: var(--hover); }
-.nps-root .settings-dictionary-views button[aria-selected="true"]:active { box-shadow: inset 0 0 0 var(--bw) var(--text-3); }
-.nps-menu-item.nps-current:hover { background: var(--selected); }
-.nps-root .nps-button-default:active:not([aria-disabled="true"]) { background: var(--selected); }
-
-.nps-field:not(.nps-off):hover, .nps-textarea:not(:disabled):hover { border-color: var(--text-3); }
-.nps-field:not(.nps-off):active, .nps-textarea:not(:disabled):active { border-color: var(--text); }
-.nps-field:has(input:focus-visible) { outline: var(--focus-w) solid var(--focus); }
-.nps-field:focus-within:not(:has(:focus-visible)) { outline: none; }
-.nps-root .nps-select:not(:disabled,[aria-disabled="true"]):hover { border-color: var(--text-3); }
-.nps-root .nps-select:not(:disabled,[aria-disabled="true"]):active { border-color: var(--text); }
-.nps-stepper > button:not(:disabled):hover { background: var(--hover); }
-.nps-stepper > button:not(:disabled):active { background: var(--selected); }
-.nps-stepper :focus-visible, .nps-stepper .nps-field:has(input:focus-visible) { outline-offset: calc(-1 * var(--focus-w)); }
-.nps-switch:not(:disabled):hover { box-shadow: inset 0 0 0 var(--bw) var(--text-3); }
-.nps-switch:not(:disabled):active { box-shadow: inset 0 0 0 var(--rule-w) var(--text); }
-.nps-checkbox:not(:disabled):hover { border-color: var(--text); box-shadow: 0 0 0 var(--bw) var(--border); }
-.nps-checkbox:not(:disabled):active { border-color: var(--text); box-shadow: 0 0 0 var(--bw) var(--text-3); }
-.nps-slider input:not(:disabled):hover::-webkit-slider-thumb { background: var(--hover); }
-.nps-slider input:not(:disabled):active::-webkit-slider-thumb { background: var(--selected); }
-.nps-slider input:not(:disabled):hover::-moz-range-thumb { background: var(--hover); }
-.nps-slider input:not(:disabled):active::-moz-range-thumb { background: var(--selected); }
-.nps-slider input:disabled { opacity: var(--dim); }
-.nps-resizer:active::after { width: var(--rule-w); background: var(--text); }
-.nps-scroll-thumb:active { background: var(--text); width: var(--sb-w-hover); }
-
-.nps-root .library-card:hover, .nps-root .nps-surface-image:hover, .nps-root :is(.library-detail-picture,.wb-canvas) img[role="button"]:hover { box-shadow: 0 0 0 var(--bw) var(--border), var(--shadow-print); }
-.nps-root .library-card:active, .nps-root .nps-surface-image:active, .nps-root :is(.library-detail-picture,.wb-canvas) img[role="button"]:active { box-shadow: 0 0 0 var(--bw) var(--text-3), var(--shadow-print); }
-.nps-root .nps-surface-image { cursor: default; }
-.nps-root :is(.library-detail-picture,.wb-canvas) img[role="button"] { cursor: zoom-in; }
-.nps-root .library-pick { opacity: 0; }
-.nps-root .library-card:is(:hover,:focus-within,.picked) .library-pick { opacity: 1; }
-.nps-root .library-page:has(.library-selection-bar) .library-pick { opacity: 1; }
-.nps-root .library-pick:hover { border-color: var(--text); box-shadow: 0 0 0 var(--bw) var(--border); }
-.nps-root .library-pick:active { border-color: var(--text); box-shadow: 0 0 0 var(--bw) var(--text-3); }
-
-.nps-root [aria-label="编辑段落"]:hover { background: var(--hover); }
-.nps-root [aria-label="编辑段落"]:active { background: var(--selected); }
-.nps-root .wb-sortable-tag:hover .nps-tag { background: var(--hover); }
-.nps-root .wb-sortable-tag:active .nps-tag, .nps-tag[data-interactive]:active { background: var(--selected); }
-.nps-tag[data-interactive].nps-tag-selected:active { border-color: var(--text-3); }
-.nps-root .nps-toast button:hover { background: var(--hover); color: var(--text); }
-.nps-root .nps-toast button:active { background: var(--selected); color: var(--text); }
-.nps-toast button:hover { background: var(--hover); color: var(--text); }
-.nps-toast button:active { background: var(--selected); color: var(--text); }
-
-.nps-root .nps-surface-button:disabled, .nps-root .nps-option:disabled { color: var(--text-off); background: transparent; box-shadow: none; }
-.nps-root .nps-surface-image:disabled { opacity: var(--dim); }
-.nps-root .nps-stepper > button:disabled { color: var(--text-off); background: transparent; }
-.nps-root .nps-field.nps-off { border-color: var(--border); color: var(--text-off); }
-
-
-.nps-button:not([aria-disabled="true"],:disabled):active { background: var(--selected); }
-.nps-root .nps-button-quiet:is(.active,[aria-expanded="true"]):not([aria-disabled="true"]):hover { background: var(--hover); color: var(--text); }
-.nps-root .nps-button-quiet:is(.active,[aria-expanded="true"]):not([aria-disabled="true"]):active { background: var(--selected); box-shadow: inset 0 0 0 var(--bw) var(--text-3); }
-.nps-option[aria-checked="true"]:not(:disabled):active { box-shadow: inset 0 0 0 var(--bw) var(--text-3); }
-.library-viewer .nps-surface-image:hover { box-shadow: 0 0 0 var(--bw) var(--border), var(--shadow-print); }
-.library-viewer .nps-surface-image:active { box-shadow: 0 0 0 var(--bw) var(--text-3), var(--shadow-print); }
-.nps-toast button:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
-
-.nps-menu-trigger[tabindex]:hover .nps-tag { background: var(--hover); }
-.nps-menu-trigger[tabindex]:active .nps-tag { background: var(--selected); }
-.nps-checkbox[aria-checked="mixed"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
-
-/* Non-button surfaces share the semantic disabled appearance. */
-:where(.nps-root,.library-viewer) :is(.library-card,.wb-tab,[aria-label="编辑段落"],img[role="button"])[aria-disabled="true"] { color: var(--text-off); opacity: var(--dim); cursor: default; }
-:where(.nps-root,.library-viewer) :is(.library-card,.wb-tab,[aria-label="编辑段落"],img[role="button"])[aria-disabled="true"]:is(:hover,:active) { background: transparent; box-shadow: none; }
-
-.library-strip .nps-surface-image:focus-visible { outline-offset: calc(-1 * var(--focus-w)); }
-
-/* Segments retain one thumb; hover and press affect only the option label/surface. */
-.nps-options .nps-option:not(:disabled):hover { color:var(--text); box-shadow:inset 0 0 0 var(--bw) var(--border); }
-.nps-options .nps-option:not(:disabled):active { background:var(--selected); }
-.nps-options .nps-option:focus-visible { outline-offset:calc(-1 * var(--focus-w)); }
-
-/* Focus paint has a transparent resting state so both arrival and departure interpolate. */
-:where(.nps-root,.nps-layer,.nps-dialog,.library-viewer) :is(button,a[href],input,textarea,select,summary,[tabindex],[role="button"],[role="option"],[role="menuitem"],.wb-sortable-tag,.nps-field):where(:not(.nps-layer,.nps-dialog)) {
-  outline:0 solid transparent;
-  outline-offset:var(--focus-offset);
-}
-:is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) :is(button,a[href],input,textarea,select,summary,[tabindex],[role="button"],[role="option"],[role="menuitem"],.wb-sortable-tag,.nps-field):where(:not(.nps-layer,.nps-dialog)) {
-  transition:opacity var(--dur-2) var(--ease-out),background-color var(--dur-1) var(--ease-out),color var(--dur-1) var(--ease-out),border-color var(--dur-1) var(--ease-out),outline-color var(--dur-1) var(--ease-out),outline-width var(--dur-1) var(--ease-out),outline-offset var(--dur-1) var(--ease-out),box-shadow var(--dur-1) var(--ease-out);
-}
-:where(.nps-root,.nps-layer,.nps-dialog,.library-viewer) .nps-field input { outline:none; }
-.nps-root .wb-tabs :is(button,[tabindex]),.nps-root .nps-options .nps-option,.nps-stepper :is(button,.nps-field),.library-strip .nps-surface-image { outline-offset:calc(-1 * var(--focus-w)); }
-
-/* A single moving surface owns the current background; labels share its duration. */
-:is(.nps-root,.nps-layer) :is(.library-side-item,.settings-sidebar > button,.settings-dictionary-views > button,.nps-option,.nps-tablist > button,.wb-tab) {
-  font-weight:var(--fw-regular);
-  transition:opacity var(--dur-1) var(--ease-out),transform var(--dur-3) var(--ease-move),background-color var(--dur-1) var(--ease-out),color var(--dur-3) var(--ease-move),border-color var(--dur-1) var(--ease-out),outline-color var(--dur-1) var(--ease-out),outline-width var(--dur-1) var(--ease-out),outline-offset var(--dur-1) var(--ease-out),box-shadow var(--dur-1) var(--ease-out);
-}
-:is(.nps-root,.nps-layer) :is(.library-side-item.on,.settings-sidebar > button[aria-current="page"],.settings-dictionary-views > button[aria-selected="true"],.nps-option[aria-checked="true"],.nps-tablist > button[aria-selected="true"],.wb-tab[aria-selected="true"]):not(:disabled,[aria-disabled="true"]) {
-  background:transparent;
-  box-shadow:none;
-  transition:opacity var(--dur-1) var(--ease-out),transform var(--dur-3) var(--ease-move),color var(--dur-3) var(--ease-move),border-color var(--dur-1) var(--ease-out),outline-color var(--dur-1) var(--ease-out),outline-width var(--dur-1) var(--ease-out);
-}
-
-.nps-root .library-pick { transition:box-shadow var(--dur-1) var(--ease-out),opacity var(--dur-1) var(--ease-out),background-color var(--dur-1) var(--ease-out),border-color var(--dur-1) var(--ease-out),outline-color var(--dur-1) var(--ease-out),outline-width var(--dur-1) var(--ease-out); }
-.nps-root .library-card:is(:hover,:focus-within,.picked) .library-pick,.nps-root .library-page:has(.library-selection-bar) .library-pick { transition-duration:var(--dur-1),var(--dur-2),var(--dur-1),var(--dur-1),var(--dur-1),var(--dur-1); }
-.nps-root .library-card img { outline:0 solid transparent; outline-offset:var(--thumb-ring); transition:opacity var(--dur-2) var(--ease-out),outline-color var(--dur-1) var(--ease-out),outline-width var(--dur-1) var(--ease-out),outline-offset var(--dur-1) var(--ease-out); }
-.nps-root .library-card.current img { outline-width:var(--thumb-ring); outline-color:var(--cinnabar); }
-.nps-root .library-card.picked img { outline-width:var(--thumb-ring); outline-color:var(--text); outline-offset:var(--sp-0); }
-
-html:root[data-motion="off"] :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) :is(button,a[href],input,textarea,select,summary,[tabindex],[role="button"],[role="option"],[role="menuitem"],.wb-sortable-tag,.nps-field,img) { transition:none; }
-@media (prefers-reduced-motion:reduce) {
-  html:root:not([data-motion="full"]) :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) :is(button,a[href],input,textarea,select,summary,[tabindex],[role="button"],[role="option"],[role="menuitem"],.wb-sortable-tag,.nps-field,img) { transition:none; }
-}
+﻿/* Component states transcribed from the interactive reference. */
+a[href] { color:inherit; }
+:where(.nps-root,.nps-layer,.nps-dialog,.library-viewer) :is(button,summary) { cursor:default; }
+:where(.nps-root,.nps-layer,.nps-dialog,.library-viewer) :is(button,a[href],[role="button"],[role="tab"],summary):focus-visible { outline:var(--focus-w) solid var(--focus); outline-offset:var(--focus-offset); }
+:where(.nps-root,.nps-layer,.nps-dialog) :is(.nps-surface-row,.nps-surface-chip,.nps-surface-tab,summary):not(:disabled,[aria-disabled="true"]):hover { background:var(--hover); color:var(--text); }
+.nps-menu-item:not([aria-disabled="true"]):active { background:var(--selected); }
+.nps-menu-item[aria-disabled="true"]:is(:hover,:active) { background:transparent; }
+.nps-field:not(.nps-off):hover, .nps-textarea:not(:disabled):hover { border-color:var(--text-off); }
+.nps-field:focus-within, .nps-textarea:focus { border-color:var(--text-2); }
+.nps-root .nps-select:not(:disabled):hover { border-color:var(--text-3); }
+.nps-root .nps-select[aria-expanded="true"] { border-color:var(--text-2); }
+.nps-stepper > button:not(:disabled):hover { background:var(--hover); }
+.nps-stepper > button:not(:disabled):active { background:var(--selected); }
+.nps-stepper :focus-visible { outline-offset:calc(-1 * var(--focus-w)); }
+.nps-checkbox:not(:disabled):hover { border-color:var(--text-2); }
+.nps-checkbox[aria-checked="mixed"] { background:var(--ink); border-color:var(--ink); color:var(--on-ink); }
+.nps-slider input:not(:disabled):hover::-webkit-slider-thumb, .nps-slider input:not(:disabled):active::-webkit-slider-thumb { background:var(--selected); }
+.nps-slider input:not(:disabled):hover::-moz-range-thumb { background:var(--selected); }
+.nps-slider input:disabled { opacity:var(--dim); }
+.nps-root :is(.library-detail-picture,.wb-canvas) img[role="button"] { cursor:zoom-in; }
+.nps-root [aria-label="编辑段落"]:hover { background:var(--hover); }
+.nps-root .wb-sortable-tag:hover .nps-tag { background:var(--hover); }
+.nps-tag[data-interactive]:active { background:var(--selected); }
+.nps-toast button { margin-left:var(--sp-1); font-weight:var(--fw-strong); }
+.nps-toast button:hover { background:var(--hover); color:var(--tip-text); }
+.nps-toast button:active { background:var(--selected); color:var(--tip-text); }
+.nps-surface-button:disabled, .nps-option:disabled { color:var(--text-off); background:transparent; }
+.nps-surface-image:disabled { opacity:var(--dim); }
+.nps-field.nps-off { border-color:var(--border); color:var(--text-off); }
+:is(.nps-root,.nps-layer) :is(.library-side-item,.settings-sidebar > button,.nps-option,.nps-tablist > button,.wb-tab) { font-weight:var(--fw-regular); }
+:is(.nps-root,.nps-layer) :is(.library-side-item.on,.settings-sidebar > button[aria-current="page"],.nps-option[aria-checked="true"],.nps-tablist > button[aria-selected="true"]):not(:disabled,[aria-disabled="true"]) { background:transparent; box-shadow:none; }
+:is(.nps-root,.nps-layer) :is(.library-side-item,.settings-sidebar > button,.nps-option,.nps-tablist > button) { transition:background-color var(--dur-1) var(--ease-out),color var(--dur-3) var(--ease-out); }
+html.is-dragging, html.is-dragging * { user-select:none !important; cursor:grabbing !important; }
+:is(.nps-root,.nps-layer,.nps-dialog) :is(.nps-button,.nps-tag,.nps-field,.nps-checkbox,.nps-menu-item) { transition:background-color var(--dur-1) var(--ease-out),color var(--dur-1) var(--ease-out),border-color var(--dur-1) var(--ease-out),box-shadow var(--dur-1) var(--ease-out),outline-color var(--dur-1) var(--ease-out),opacity var(--dur-1) var(--ease-out); }
+html:root[data-motion="off"] :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *,html:root[data-motion="off"] :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *::before,html:root[data-motion="off"] :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *::after { transition:none; animation:none; }
+@media (prefers-reduced-motion:reduce) { html:root:not([data-motion="full"]) :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *,html:root:not([data-motion="full"]) :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *::before,html:root:not([data-motion="full"]) :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *::after { transition:none; animation:none; } }

@@ -83,6 +83,7 @@ export function Layer({
   className,
   focus = false,
   side = false,
+  align = 'start',
   point,
   labelledBy,
   onKeyDown,
@@ -98,6 +99,7 @@ export function Layer({
   className?: string;
   focus?: boolean;
   side?: boolean;
+  align?: 'start' | 'end';
   point?: { x: number; y: number };
   labelledBy?: string;
   onKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
@@ -220,7 +222,7 @@ export function Layer({
     const rect = point
       ? new DOMRect(point.x, point.y, 0, 0)
       : anchor.current?.getBoundingClientRect();
-    if (open && node && rect) placeLayer(node, rect, side);
+    if (open && node && rect) placeLayer(node, rect, side, align);
   });
   useLayoutEffect(() => {
     const node = ref.current;
@@ -236,7 +238,7 @@ export function Layer({
       const rect = currentPoint
         ? new DOMRect(currentPoint.x, currentPoint.y, 0, 0)
         : anchor.current?.getBoundingClientRect();
-      if (rect) placeLayer(node, rect, side);
+      if (rect) placeLayer(node, rect, side, align);
       // Native toggle is queued asynchronously; descendants need their first
       // visible geometry before this layout effect and the first paint finish.
       node.dispatchEvent(new Event('nps-layer-positioned'));
@@ -263,7 +265,7 @@ export function Layer({
       window.removeEventListener('scroll', position, true);
       node.hidePopover();
     };
-  }, [present, anchor, side, mode]);
+  }, [present, anchor, side, align, mode]);
   return present ? (
     <div
       ref={ref}
@@ -288,12 +290,16 @@ export function Popover({
   anchor,
   children,
   label,
+  className,
+  align,
 }: {
   open: boolean;
   onClose: () => void;
   anchor: RefObject<HTMLElement | null>;
   children: ReactNode;
   label: string;
+  className?: string;
+  align?: 'start' | 'end';
 }) {
   const id = useId();
   return (
@@ -301,10 +307,11 @@ export function Popover({
       open={open}
       onClose={onClose}
       anchor={anchor}
+      align={align}
       focus
       role="dialog"
       labelledBy={id}
-      className="nps-popover"
+      className={cx('nps-popover', className)}
       onKeyDown={(event) => {
         trapTab(event, event.currentTarget);
         if (event.key === 'Escape') {

@@ -10,7 +10,6 @@ import {
   type InputHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
-import { Check, Minus, Plus, ChevronDown } from 'lucide-react';
 import { cx, composing, quantize } from './internal';
 import { Layer } from './overlays';
 import { useScrollArea } from './useScrollArea';
@@ -61,7 +60,7 @@ export function Button({
       }}
     >
       {loading && <span aria-hidden="true" className="nps-loader" />}
-      <span className="nps-button-label">{children}</span>
+      {children}
     </button>
   );
 }
@@ -271,7 +270,7 @@ export function Select({
       >
         {options.find((option) => option.value === value)?.prefix}
         {options.find((option) => option.value === value)?.label}
-        <ChevronDown {...iconProps} />
+        <i className="ri-arrow-down-s-line" aria-hidden="true" />
       </button>
       <Layer
         open={open}
@@ -345,7 +344,7 @@ export function Select({
           >
             {option.prefix}
             {option.label}
-            {option.value === value && <Check {...iconProps} />}
+            {option.value === value && <i className="ri-check-line" aria-hidden="true" />}
           </button>
         ))}
       </Layer>
@@ -536,7 +535,11 @@ export function Toggle({
       onClick={() => onChange(!checked)}
     >
       {kind === 'checkbox' &&
-        (mixed ? <Minus {...iconProps} /> : checked && <Check {...iconProps} />)}
+        (mixed ? (
+          <i className="ri-subtract-line" aria-hidden="true" />
+        ) : (
+          checked && <i className="ri-check-line" aria-hidden="true" />
+        ))}
     </button>
   );
 }
@@ -649,7 +652,7 @@ export function Stepper({
         disabled={disabled || (min !== undefined && value <= min)}
         onClick={() => change(value - step)}
       >
-        <Minus {...iconProps} />
+        <i className="ri-subtract-line" aria-hidden="true" />
       </button>
       <Input
         type="text"
@@ -681,7 +684,7 @@ export function Stepper({
         disabled={disabled || (max !== undefined && value >= max)}
         onClick={() => change(value + step)}
       >
-        <Plus {...iconProps} />
+        <i className="ri-add-line" aria-hidden="true" />
       </button>
     </span>
   );

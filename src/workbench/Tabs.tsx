@@ -1,15 +1,23 @@
 import { invokeUI } from '../lib/commands';
 import { AnimatedItems } from '../ui/AnimatedItems';
-import { DecodedImage, useMovingIndicator, useNavigationSelection } from '../ui/transitions';
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
+  DecodedImage,
+  useMovingIndicator,
+  useNavigationSelection,
+  animateElement,
+  motionTokens,
+} from '../ui/transitions';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { Button, ContextMenu, type MenuItem } from '../ui';
+import type { WorkbenchSession, WorkbenchTab } from '../state/workbench';
+import { hasImageName, imageFileName } from '../lib/imageNaming.js';
+import { mediaUrl } from '../lib/imageStage.js';
+import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
+import './tabs.css';
+import { useGeneration } from '../state/generation';
+import { nearestTabSlot } from '../lib/tabSlots.js';
+import { flushSync } from 'react-dom';
+import { DndContext, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import {
   SortableContext,
   horizontalListSortingStrategy,
@@ -17,15 +25,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Button, ContextMenu, type MenuItem } from '../ui';
-import type { WorkbenchSession, WorkbenchTab } from '../state/workbench';
-import { hasImageName, imageFileName } from '../lib/imageNaming.js';
-import { mediaUrl } from '../lib/imageStage.js';
-import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
-import './workbench.css';
-import { useGeneration } from '../state/generation';
-import { nearestTabSlot } from '../lib/tabSlots.js';
-import { useDragFeedback, restrictDrag } from './DragFeedback';
+import { useDragFeedback } from './DragFeedback';
 
 export interface TabsProps {
   session: WorkbenchSession;
@@ -79,10 +79,9 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
         ref={sortable.setNodeRef}
         {...sortable.attributes}
         {...sortable.listeners}
-        className="wb-tab workbench-tab"
+        className={`wb-tab workbench-tab ${name ? '' : 'bare'}`}
         data-workbench-tab-id={tab.id}
         data-active={tab.id === p.session.activeTabId || undefined}
-        data-dragging={sortable.isDragging || undefined}
         role="tab"
         aria-selected={tab.id === p.session.activeTabId}
         aria-label={name || '没有起名'}
@@ -134,18 +133,22 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
         }}
         style={
           {
-            transform: sortable.isDragging ? undefined : CSS.Translate.toString(sortable.transform),
+            transform: sortable.isSorting ? CSS.Translate.toString(sortable.transform) : undefined,
             '--wb-thumb-ratio': (image?.metadata.width || 1) / (image?.metadata.height || 1),
           } as CSSProperties
         }
       >
-        {tab.id === p.session.activeTabId && <span className="wb-current" />}
         <DecodedImage
           draggable={false}
           alt=""
           src={mediaUrl(image?.thumbnail_path || image?.image_path || '')}
         />
-        {name && <span className="wb-tab-name">{name}</span>}
+        {name && (
+          <>
+            <span className="wb-tab-name">{name}</span>
+            <span className="wb-tab-count">{versionCount} 版</span>
+          </>
+        )}
         {running && (
           <span className="wb-tab-generating" data-tip="生成中">
             ●
@@ -167,12 +170,122 @@ export function WorkbenchTabs(p: TabsProps) {
     onActivateTab: select,
   };
   useMovingIndicator(list, indicator, '.wb-tab[aria-selected=true]', selected);
+  // TODO(design): The reference has no keyboard sorting; retain the existing keyboard behavior and feedback.
   const drag = useDragFeedback(list, true);
-  const [overflow, setOverflow] = useState(false);
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+  const [overflow, setOverflow] = useState(false);
+  const latest = useRef(p);
+  latest.current = p;
+  useEffect(() => {
+    const node = list.current;
+    if (!node) return;
+    let press: { id: string; x: number; y: number; grab: number; active: boolean } | null = null;
+    let suppressClick = false;
+    const moves = new Map<string, () => void>();
+    const down = (event: PointerEvent) => {
+      const el = (event.target as HTMLElement).closest<HTMLElement>('[data-workbench-tab-id]');
+      if (event.button !== 0 || !el || el.dataset.workbenchTabId === 'new-tab') return;
+      press = {
+        id: el.dataset.workbenchTabId!,
+        x: event.clientX,
+        y: event.clientY,
+        grab: event.clientX - el.getBoundingClientRect().left,
+        active: false,
+      };
+      event.preventDefault();
+    };
+    const move = (event: PointerEvent) => {
+      if (!press) return;
+      if (!press.active && Math.hypot(event.clientX - press.x, event.clientY - press.y) < 4) return;
+      press.active = true;
+      document.documentElement.classList.add('is-dragging');
+      getSelection()?.removeAllRanges();
+      const ids = latest.current.session.tabs.map((t) => t.id);
+      const element = (id: string) =>
+        node.querySelector<HTMLElement>(`[data-workbench-tab-id="${id}"]`)!;
+      const el = element(press.id),
+        bounds = node.getBoundingClientRect();
+      const base = element(ids[0]).offsetLeft;
+      const gap = parseFloat(getComputedStyle(node).columnGap) || 0;
+      const want = Math.max(
+        base,
+        Math.min(node.clientWidth - el.offsetWidth, event.clientX - bounds.left - press.grab),
+      );
+      const slot = nearestTabSlot(
+        base,
+        ids.filter((id) => id !== press!.id).map((id) => element(id).offsetWidth),
+        gap,
+        want,
+      );
+      if (ids[slot] !== press.id) {
+        const before = new Map(ids.map((id) => [id, element(id).getBoundingClientRect().left]));
+        flushSync(() => latest.current.onReorderTab(press!.id, ids[slot]));
+        for (const id of ids) {
+          if (id === press.id) continue;
+          const item = element(id);
+          moves.get(id)?.();
+          const dx = before.get(id)! - item.getBoundingClientRect().left;
+          const timing = motionTokens(item);
+          moves.set(
+            id,
+            animateElement(
+              item,
+              [{ transform: `translateX(${dx}px)` }, { transform: 'none' }],
+              timing.move,
+              timing.easeMove,
+            ),
+          );
+        }
+      }
+      el.dataset.dragging = 'true';
+      el.style.transition = 'box-shadow var(--dur-1) var(--ease-out)';
+      el.style.transform = `translateX(${want - el.offsetLeft}px) scale(var(--drag-scale))`;
+      if (press.id === latest.current.session.activeTabId && indicator.current) {
+        indicator.current.style.transition = 'none';
+        indicator.current.style.transform = `translate(${want}px, ${el.offsetTop}px) scale(var(--drag-scale))`;
+      }
+    };
+    const up = () => {
+      if (press?.active) {
+        suppressClick = true;
+        const el = node.querySelector<HTMLElement>(`[data-workbench-tab-id="${press.id}"]`);
+        if (el) {
+          delete el.dataset.dragging;
+          el.style.transition = '';
+          el.style.transform = '';
+        }
+        if (indicator.current) {
+          indicator.current.style.transition = '';
+          indicator.current.style.transform = `translate(${node.querySelector<HTMLElement>('[aria-selected=true]')?.offsetLeft || 0}px, 0px)`;
+        }
+      }
+      press = null;
+      document.documentElement.classList.remove('is-dragging');
+    };
+    const click = (event: MouseEvent) => {
+      if (suppressClick) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressClick = false;
+      }
+    };
+    node.addEventListener('pointerdown', down);
+    node.addEventListener('click', click, true);
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', up);
+    return () => {
+      node.removeEventListener('pointerdown', down);
+      node.removeEventListener('click', click, true);
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', up);
+      for (const stop of moves.values()) stop();
+      document.documentElement.classList.remove('is-dragging');
+    };
+  }, []);
   useLayoutEffect(() => {
     const node = bar.current;
     if (!node) return;
@@ -224,22 +337,6 @@ export function WorkbenchTabs(p: TabsProps) {
       )}
       <DndContext
         sensors={sensors}
-        modifiers={[(args) => restrictDrag(args, list.current, true)]}
-        collisionDetection={(args) => {
-          if (!args.pointerCoordinates) return closestCenter(args);
-          const ids = p.session.tabs.map((t) => t.id),
-            active = String(args.active.id);
-          const rects = ids.map((id) => args.droppableRects.get(id));
-          if (rects.some((r) => !r)) return closestCenter(args);
-          const gap = parseFloat(getComputedStyle(list.current!).columnGap) || 0;
-          const slot = nearestTabSlot(
-            rects[0]!.left,
-            rects.filter((_, i) => ids[i] !== active).map((r) => r!.width),
-            gap,
-            args.collisionRect.left,
-          );
-          return [{ id: ids[slot] }];
-        }}
         onDragStart={(event) =>
           drag.start(
             event,

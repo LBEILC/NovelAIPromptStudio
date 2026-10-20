@@ -45,26 +45,37 @@ export function trapTab(event: KeyboardEvent, root: HTMLElement) {
 }
 
 /** Coordinates are measured viewport geometry, never design constants. */
-export function placeLayer(layer: HTMLElement, anchor: DOMRect, side = false) {
+export function placeLayer(
+  layer: HTMLElement,
+  anchor: DOMRect,
+  side = false,
+  align: 'start' | 'end' = 'start',
+) {
   // A long dropdown must scroll on one side of its trigger. Clamping a full
   // viewport-height list to y=0 would cover the trigger and turn its next click
   // into an unintended option selection.
   // Do not temporarily expand a scrolling list to measure it: Chromium would
   // clamp scrollTop and pull the user's last visible options out of view.
   if (side) layer.style.maxHeight = '';
-  const margin = parseFloat(getComputedStyle(layer).getPropertyValue('--sp-2')) || 0;
+  const style = getComputedStyle(layer);
+  const margin = parseFloat(style.getPropertyValue('--sp-2')) || 0;
+  const gap = parseFloat(style.getPropertyValue('--ctl-gap')) || 0;
   const bounds = { width: layer.offsetWidth, height: layer.offsetHeight };
-  const below = clamp(innerHeight - margin - anchor.bottom, 0, innerHeight);
-  const above = clamp(anchor.top - margin, 0, innerHeight);
+  const below = clamp(innerHeight - margin - gap - anchor.bottom, 0, innerHeight);
+  const above = clamp(anchor.top - margin - gap, 0, innerHeight);
   const flip = !side && Math.max(layer.scrollHeight, bounds.height) > below && above > below;
   if (!side) {
     layer.style.maxHeight = `${flip ? above : below}px`;
     bounds.height = layer.offsetHeight;
   }
-  let left = side ? anchor.right : anchor.left;
-  let top = side ? anchor.top : flip ? anchor.top - bounds.height : anchor.bottom;
+  let left = side
+    ? anchor.right + gap
+    : align === 'end'
+      ? anchor.right - bounds.width
+      : anchor.left;
+  let top = side ? anchor.top : flip ? anchor.top - bounds.height - gap : anchor.bottom + gap;
   if (left + bounds.width > innerWidth - margin)
-    left = side ? anchor.left - bounds.width : anchor.right - bounds.width;
+    left = side ? anchor.left - bounds.width - gap : anchor.right - bounds.width;
   if (side && top + bounds.height > innerHeight - margin) top = anchor.top - bounds.height;
   layer.dataset.placement = side
     ? left < anchor.left

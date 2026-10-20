@@ -1,16 +1,22 @@
 #root > .nps-root { height: 100%; }
-.app-shell { width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
-.app-content { flex: 1; }
-.studio-titlebar { display: flex; align-items: center; gap: var(--sp-0); height: var(--titlebar-h); flex: 0 0 var(--titlebar-h); padding-left: var(--sp-3); background: var(--pane); color: var(--text); border-bottom: var(--bw) solid var(--border); -webkit-app-region: drag; font: var(--fs-body)/var(--lh-body) var(--font-ui); }
-.studio-titlebar nav { display: flex; gap: var(--sp-0); }
-.studio-titlebar button { -webkit-app-region: no-drag; color: var(--text-2); }
-.studio-titlebar button[aria-current="page"] { color: var(--text); font-weight: var(--fw-strong); }
-.studio-brand-mark { display: inline-flex; align-items: center; }
-.studio-brand-mark svg { display: block; width: var(--logo); height: var(--logo); }
-.studio-brand-mark [data-color="text"] { fill: var(--text); }
-.studio-brand-mark [data-color="primary"] { fill: var(--cinnabar-seal); }
-.studio-titlebar i { font-size: var(--icon); }
-.studio-titlebar-space { flex: 1; align-self: stretch; }
-.studio-window-controls { align-self: stretch; }
-html[data-platform="macos"] .studio-titlebar { padding-left: 80px; }
-html[data-platform="windows"] .studio-window-controls { width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px))); }
+.app-shell { width:100%; height:100%; min-height:0; display:flex; flex-direction:column; overflow:hidden; background:var(--bg); }
+.app-content { flex:1; }
+.studio-titlebar { height:var(--titlebar-h); flex:0 0 auto; display:flex; align-items:center; gap:var(--sp-0); padding-left:calc(var(--sp-3) + var(--sp-0)); background:var(--pane); border-bottom:var(--bw) solid var(--border); -webkit-app-region:drag; }
+.studio-titlebar button { -webkit-app-region:no-drag; }
+.studio-logo { display:inline-flex; padding:0; background:transparent; margin-right:var(--ctl-pad-x); color:var(--text); }
+.studio-brand-mark, .studio-brand-mark svg { display:block; width:var(--logo); height:var(--logo); }
+.studio-brand-mark [data-color="text"] { fill:var(--text); }
+.studio-brand-mark [data-color="primary"] { fill:var(--cinnabar-seal); }
+.studio-titlebar nav { display:flex; gap:var(--sp-0); flex:0 0 auto; }
+.studio-titlebar nav button { height:var(--tab-h); padding:0 var(--ctl-pad-x); border:0; border-radius:var(--r-ctl); background:transparent; color:var(--text-2); white-space:nowrap; transition:color var(--dur-3) var(--ease-out),background-color var(--dur-1) var(--ease-out); }
+.studio-titlebar nav button:hover { background:var(--hover); color:var(--text); }
+.studio-titlebar nav button[aria-current="page"] { color:var(--text); font-weight:var(--fw-regular); }
+.studio-titlebar-separator { width:var(--bw); height:var(--switch-h); background:var(--border); margin:0 var(--ctl-pad-x); flex:none; }
+.studio-titlebar-space { flex:1 1 0; align-self:stretch; }
+.studio-titlebar-end { display:flex; align-items:center; gap:var(--ctl-gap); padding-right:var(--ctl-gap); }
+.studio-titlebar .studio-settings-button { width:var(--ctl-sm); padding:0; }
+.studio-titlebar .studio-settings-button[aria-current="page"] { background:var(--selected); color:var(--text); }
+.studio-titlebar i { font-size:var(--icon-sm); }
+.studio-window-controls { align-self:stretch; }
+html[data-platform="macos"] .studio-titlebar { padding-left:80px; }
+html[data-platform="windows"] .studio-window-controls { width:calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px))); }

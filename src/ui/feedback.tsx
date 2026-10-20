@@ -7,9 +7,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Plus } from 'lucide-react';
 import 'remixicon/fonts/remixicon.css';
-import { Button, iconProps } from './controls';
+import { Button } from './controls';
 import { cx, clamp } from './internal';
 import { Presence, TransitionSurface } from './transitions';
 import emptySymbol from '../../design/identity/logo/symbol-empty.svg?raw';
@@ -299,7 +298,7 @@ export function Tag({
       onClick={onClick}
     >
       {state === 'add' ? (
-        <Plus {...iconProps} />
+        <i className="ri-add-line" aria-hidden="true" />
       ) : (
         <span className={cx('nps-dot', `nps-cat-${category}`)} />
       )}

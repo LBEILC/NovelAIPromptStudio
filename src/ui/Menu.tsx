@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { ChevronRight, Check } from 'lucide-react';
 import { Layer } from './overlays';
-import { Button, iconProps, type ButtonProps } from './controls';
+import { Button, type ButtonProps } from './controls';
 import { cx, composing } from './internal';
 import { Shortcut } from './ThemeProvider';
 
@@ -154,13 +153,13 @@ export function MenuItems({
                 }
               }}
             >
-              {item.current && <Check {...iconProps} />}
+              {item.current && <i className="ri-check-line" aria-hidden="true" />}
               {item.prefix}
               {item.label}
               <span className="nps-menu-trailing">
                 {item.trailing}
                 {item.shortcut && <Shortcut keys={item.shortcut} />}
-                {item.children && <ChevronRight {...iconProps} />}
+                {item.children && <i className="ri-arrow-right-s-line" aria-hidden="true" />}
               </span>
             </button>
             {item.children && (

@@ -30,7 +30,7 @@
 .nps-input-group { display: inline-flex; flex-direction: column; min-width: 0; }
 .nps-field { padding: 0 var(--ctl-pad-x); gap: var(--ctl-gap); height: var(--ctl); display: inline-flex; align-items: center; min-width: 0; border: var(--bw) solid var(--border); border-radius: var(--r-ctl); background: var(--surface); color: var(--text); }
 .nps-field input { width: 100%; min-width: 0; height: 100%; border: 0; padding: 0; background: transparent; outline: none; }
-.nps-field:focus-within { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
+.nps-field:focus-within { border-color: var(--text-2); }
 .nps-field input:focus-visible { outline: none; }
 .nps-field input::placeholder { color: var(--text-3); }
 .nps-field-error { border-color: var(--danger); }
@@ -92,7 +92,7 @@
 .nps-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); }
 .nps-quote { margin: var(--sp-3) 0; padding: var(--sp-0) 0 var(--sp-0) var(--sp-3); border-left: var(--rule-w) solid var(--border); color: var(--text-2); font: var(--fs-body)/var(--lh-body) var(--font-prose); }
 .nps-notifications { position: fixed; inset: auto; bottom: calc(var(--bar-h) + var(--sp-3)); left: 50%; transform: translateX(-50%); padding: 0; border: 0; margin: 0; background: transparent; overflow: visible; }
-.nps-toast { height: var(--toast-h); padding: 0 var(--sp-4); display: inline-flex; align-items: center; gap: var(--sp-3); border-radius: var(--r-ctl); background: var(--tip-bg); color: var(--tip-text); border:var(--bw) solid var(--tip-border); box-shadow: var(--shadow-pop); }
+.nps-toast { height: var(--toast-h); padding: 0 var(--sp-4) 0 var(--sp-3); display: inline-flex; align-items: center; gap: var(--sp-2); border-radius: var(--r-ctl); background: var(--tip-bg); color: var(--tip-text); border:var(--bw) solid var(--tip-border); box-shadow: var(--shadow-pop); }
 .nps-toast:has(button) { padding-right: var(--sp-2); }
 .nps-notifications { transition: transform var(--dur-3) var(--ease-move); }
 [data-motion="off"] .nps-notifications { transition: none; }
@@ -109,7 +109,7 @@
 .nps-banner-danger { background: var(--danger-wash); color: var(--danger); }
 .nps-banner-ok { background: var(--ok-wash); color: var(--ok); }
 .nps-progress { height: var(--progress-h); border-radius: 0; background: var(--border); overflow: hidden; }
-.nps-progress > span { display: block; height: 100%; background: var(--cinnabar); }
+.nps-progress > span { display: block; height: 100%; background: var(--ink); }
 .nps-tag { gap: var(--ctl-gap); display: inline-flex; align-items: center; border: var(--bw) solid var(--border); border-radius: var(--r-tag); background: var(--surface); text-align: left; padding: var(--tag-pad-y) var(--tag-pad-x) calc(var(--tag-pad-y) + var(--bw)); }
 .nps-dot { flex: 0 0 auto; align-self: flex-start; margin-top: calc((var(--lh-small) - var(--cat-dot)) / 2); width: var(--cat-dot); height: var(--cat-dot); border-radius: 50%; background: currentColor; }
 .nps-cat-artist-era { color: var(--cat-artist-era); } .nps-cat-subject { color: var(--cat-subject); }
@@ -189,7 +189,7 @@
 .nps-layer[data-placement="left"]:popover-open[data-entering] { transform: translateX(var(--enter-shift)) scale(var(--enter-scale)); }
 .nps-layer.nps-tip:popover-open[data-entering] { transform: none; }
 @starting-style {
-  dialog.nps-dialog[open] { opacity: 0; transform: scale(0.98); }
+  dialog.nps-dialog[open] { opacity: 0; transform: scale(var(--enter-scale)); }
   dialog.nps-dialog[open]::backdrop { opacity: 0; }
 }
 
@@ -202,6 +202,10 @@
 .nps-empty-mark [data-color="text"] { fill:currentColor; }
 .nps-empty-mark [data-color="empty"] { stroke:currentColor; }
 
-.nps-button-label { display:inline-flex; align-items:center; justify-content:center; gap:var(--ctl-gap); }
-
 .nps-tab-indicator { border-bottom:var(--rule-w) solid var(--text); }
+
+.nps-button > i, .nps-field > i { font-size:var(--icon); line-height:1; flex:none; }
+.nps-small > i, .nps-menu-item i, .nps-stepper i { font-size:var(--icon-sm); }
+.nps-checkbox i { font-size:var(--fs-small); line-height:1; }
+.nps-field > i { color:var(--text-3); }
+.nps-dialog-body > p { margin:0; }

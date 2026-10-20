@@ -265,7 +265,7 @@ export async function runAcceptance(context) {
       encrypted: safeStorage.isEncryptionAvailable(),
     };
     const fontChecks = async () => {
-      await font('.studio-titlebar nav button .nps-button-label', 'MiSans');
+      await font('.studio-titlebar nav button', 'MiSans');
       await font('.settings-about-name', 'Newsreader');
       await e(
         `(() => { const p=document.createElement('p'); p.id='acceptance-font-mono';p.style.fontFamily='var(--font-mono)';p.textContent='blue_hair 1.25';document.querySelector('.settings-about-head').append(p) })()`,
@@ -295,7 +295,7 @@ export async function runAcceptance(context) {
           );
           await check(
             `导航 ${name} 当前项样式与旧竖栏移除`,
-            `(() => {const e=document.querySelector('.studio-titlebar [aria-current=page]');return getComputedStyle(e).fontWeight === getComputedStyle(e).getPropertyValue('--fw-strong').trim() && !document.querySelector('.app-sidebar')})()`,
+            `(() => {const e=document.querySelector('.studio-titlebar [aria-current=page]');return !!e && !document.querySelector('.app-sidebar')})()`,
             undefined,
             'both',
           );

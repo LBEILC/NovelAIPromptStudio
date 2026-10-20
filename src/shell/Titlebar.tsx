@@ -25,39 +25,47 @@ export function Titlebar({
 }) {
   return (
     <header className="studio-titlebar">
-      <Button
-        variant="quiet"
+      <button
+        className="studio-logo"
         aria-label="NovelAI Prompt Studio · 返回工作台"
         onClick={() => onNavigate('workbench')}
       >
         <BrandMark />
-      </Button>
+      </button>
       <nav aria-label="主导航">
         {[
           ['workbench', '工作台'],
           ['gallery', '图片库'],
         ].map(([key, label]) => (
-          <Button
-            variant="quiet"
+          <button
             key={key}
             aria-current={page === key ? 'page' : undefined}
             onClick={() => onNavigate(key)}
           >
             {label}
-          </Button>
+          </button>
         ))}
       </nav>
-      {children}
-      <div className="studio-titlebar-space" />
-      {status}
-      <Button
-        variant="quiet"
-        aria-label="设置"
-        aria-current={page === 'settings' ? 'page' : undefined}
-        onClick={() => onNavigate('settings')}
-      >
-        <i className="ri-settings-3-line" aria-hidden="true" />
-      </Button>
+      {children && (
+        <>
+          <span className="studio-titlebar-separator" />
+          {children}
+        </>
+      )}
+      <span className="studio-titlebar-space" />
+      <div className="studio-titlebar-end">
+        {status}
+        <Button
+          variant="quiet"
+          size="small"
+          className="studio-settings-button"
+          aria-label="设置"
+          aria-current={page === 'settings' ? 'page' : undefined}
+          onClick={() => onNavigate('settings')}
+        >
+          <i className="ri-settings-3-line" aria-hidden="true" />
+        </Button>
+      </div>
       <div className="studio-window-controls" />
     </header>
   );
