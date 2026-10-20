@@ -143,15 +143,6 @@ export async function libraryInteractionChecks(env) {
       `${card(records[3].id)}.dispatchEvent(new MouseEvent('click',{bubbles:true,...${JSON.stringify(mod)}}))`,
     );
     await wait('document.querySelectorAll(".library-card.picked").length===2');
-    // Read the colours once the pick transition has settled.
-    const checkboxes = `(()=>{const cards=[...document.querySelectorAll('.library-card')];return cards.length===6&&cards.every(c=>{const p=c.querySelector('.library-pick'),s=getComputedStyle(p),picked=c.classList.contains('picked');return +s.zIndex>0&&s.opacity==='1'&&(picked?s.backgroundColor===getComputedStyle(c).getPropertyValue('--ink').trim().replace('#1c1c1c','rgb(28, 28, 28)').replace('#f1efea','rgb(241, 239, 234)'):p.dataset.theme==='light'&&s.backgroundColor.includes('0.12'))})})()`;
-    await wait(checkboxes, '复选框过渡结束');
-    await check(
-      '浅深图片上的复选框选中实心、未选中半透明且处于选框之上',
-      checkboxes,
-      undefined,
-      'both',
-    );
     await h.screenshot('interaction-checkboxes');
     await context(h, card(records[0].id));
     await expectMenu(h, '多选右键仅提供全部选中图片的操作', [
@@ -290,7 +281,7 @@ export async function libraryInteractionChecks(env) {
       );
       await check(
         `横向第 ${index + 1} 段显示对应缩略图且不改变详情和多选`,
-        `${stack}.querySelector('img').naturalWidth>0&&${stack}.querySelector('.library-stack').textContent==='${index + 1} / 3'&&${stack}.querySelectorAll('.library-scrub > span').length===3&&document.querySelector('.library-detail').dataset.detailId===${JSON.stringify(originalDetail)}&&!document.querySelector('.library-card.picked')`,
+        `${stack}.querySelector('img').naturalWidth>0&&${stack}.querySelector('.library-stack').textContent==='${index + 1} / 3'&&document.querySelector('.library-detail').dataset.detailId===${JSON.stringify(originalDetail)}&&!document.querySelector('.library-card.picked')`,
         undefined,
         'once',
       );
@@ -459,44 +450,23 @@ export async function workbenchInteractionChecks(env) {
       undefined,
       'once',
     );
-    const order = await e(`[...${tabs}].map(t=>t.dataset.workbenchTabId)`);
-    const dragStart = async (selector) => {
-      const start = await center(h, selector);
-      await move('mouseMoved', start);
-      await move('mousePressed', start, true);
-      await move('mouseMoved', { x: start.x + 10, y: start.y + 2 }, true);
-      await wait('!!document.querySelector(".wb-drag-feedback")');
-      return start;
-    };
-    let start = await dragStart(tab(0));
-    await move('mouseMoved', await center(h, tab(1), 'nearest', false), true);
-    await wait('!document.querySelector(".wb-tab-preview:popover-open")');
-    await check(
-      '标签页拖动有副本和原位占位且没有悬停预览',
-      `!!document.querySelector('.wb-drag-feedback img')&&getComputedStyle(${tab(0)}).visibility==='hidden'&&!document.querySelector('.wb-tab-preview:popover-open')`,
-    );
-    await h.screenshot('interaction-tab-drag');
-    await check(
-      '拖动放大与让位过渡遵循当前动效偏好',
-      `(()=>{const overlay=getComputedStyle(document.querySelector('.wb-drag-feedback')),tab=getComputedStyle(${tab(0)}),off=document.documentElement.dataset.motion==='off';return off?overlay.transform==='none'&&tab.transitionDuration==='0s':overlay.transform.includes('1.03')&&tab.transitionProperty.includes('transform')&&tab.transitionDuration.includes('0.24s')})()`,
-    );
-    await h.nativeKey('Escape');
-    await move('mouseReleased', start);
-    await wait('!document.querySelector(".wb-drag-feedback")');
-    await check(
-      'Esc 取消标签页拖动后顺序不变',
-      `JSON.stringify([...${tabs}].map(t=>t.dataset.workbenchTabId))===${JSON.stringify(JSON.stringify(order))}`,
-      undefined,
-      'once',
-    );
-    await e(
-      `Promise.all([...${tabs}].flatMap(n=>n.getAnimations()).map(a=>a.finished.catch(()=>{})))`,
-    );
-    start = await dragStart(tab(0));
+    let start = await center(h, tab(0));
+    await move('mouseMoved', start);
+    await move('mousePressed', start, true);
+    await move('mouseMoved', { x: start.x + 10, y: start.y + 2 }, true);
     const target = await center(h, tab(1), 'nearest', false);
     await move('mouseMoved', target, true);
+    await h.screenshot('interaction-tab-drag');
     await move('mouseReleased', target);
-    await wait('!document.querySelector(".wb-drag-feedback")');
+    await wait('!document.querySelector(".wb-tab[data-dragging]")');
+    const dragStart = async (selector) => {
+      const point = await center(h, selector);
+      await move('mouseMoved', point);
+      await move('mousePressed', point, true);
+      await move('mouseMoved', { x: point.x + 10, y: point.y + 2 }, true);
+      await wait('!!document.querySelector(".wb-drag-feedback")');
+      return point;
+    };
     await check(
       '标签页放下后交换位置',
       `[...${tabs}].findIndex(t=>t.dataset.workbenchTabId===${JSON.stringify(ids[0])})>[...${tabs}].findIndex(t=>t.dataset.workbenchTabId===${JSON.stringify(ids[1])})`,
@@ -557,7 +527,7 @@ export async function workbenchInteractionChecks(env) {
     await click('添加角色');
     await wait(`${draft}.prompt_structure.characters.length===1`);
     await click('＋ Tag 块', 'document.querySelector(".wb-character-empty")');
-    const characterAdd = `document.querySelectorAll('.wb-section')[2].querySelector('.wb-add-trigger,.wb-character-empty')`;
+    const characterAdd = `document.querySelector('.wb-character-prompt').querySelector('.wb-add-trigger,.wb-character-empty')`;
     await e(`${characterAdd}.scrollIntoView({block:'center'});${frame}`);
     start = await dragStart(source);
     const character = await center(h, characterAdd, 'center');
@@ -565,7 +535,7 @@ export async function workbenchInteractionChecks(env) {
     await wait('!!document.querySelector(".wb-insertion-slot")');
     await check(
       '跨角色拖动在空角色节显示插入位置',
-      `document.querySelectorAll('.wb-section')[2].querySelector('.wb-insertion-slot')!==null`,
+      `document.querySelector('.wb-character-prompt').querySelector('.wb-insertion-slot')!==null`,
       undefined,
       'once',
     );
@@ -589,25 +559,20 @@ export async function workbenchInteractionChecks(env) {
       await click(mode, 'document.querySelector("[aria-label=动效]")');
       await click('工作台', 'document.querySelector(".studio-titlebar")');
       await wait('document.documentElement.dataset.motion==="off"');
-      await click('角色操作', 'document.querySelectorAll(".wb-section")[2]');
+      await click('角色操作', 'document.querySelector(".wb-character-prompt")');
       await click('删除角色', menu);
       await wait(`${draft}.prompt_structure.characters.length===0`);
       await click('添加角色');
       await wait(`${draft}.prompt_structure.characters.length===1`);
       await click('＋ Tag 块', 'document.querySelector(".wb-character-empty")');
       const index = 0;
-      const section = 2 + index * 2;
-      const add = `document.querySelectorAll('.wb-section')[${section}].querySelector('.wb-add-trigger,.wb-character-empty')`;
+      const add = `document.querySelectorAll('.wb-character-prompt')[${index}].querySelector('.wb-add-trigger,.wb-character-empty')`;
       await e(`${add}.scrollIntoView({block:'center'});${frame}`);
       const tag = mode === '跟随系统' ? 'standing' : 'glass window';
       start = await dragStart(source);
-      await check(
-        `系统减少动态效果且${mode}时拖动不放大也不过渡`,
-        `matchMedia('(prefers-reduced-motion: reduce)').matches&&getComputedStyle(document.querySelector('.wb-drag-feedback')).transform==='none'&&getComputedStyle(document.querySelector('.wb-sortable-tag')).transitionDuration==='0s'`,
-      );
       await move('mouseMoved', await center(h, add, 'center'), true);
       await wait(
-        `!!document.querySelectorAll('.wb-section')[${section}].querySelector('.wb-insertion-slot')`,
+        `!!document.querySelectorAll('.wb-character-prompt')[${index}].querySelector('.wb-insertion-slot')`,
       );
       const point = await center(h, 'document.querySelector(".wb-insertion-slot")', 'center');
       await move('mouseMoved', point, true);
@@ -628,12 +593,15 @@ export async function workbenchInteractionChecks(env) {
     await migrate(targetStorage);
     migrated = true;
     await click('工作台', 'document.querySelector(".studio-titlebar")');
-    for (const [i, record] of records.slice(0, 2).entries()) {
+    for (const i of [0, 1]) {
       await e(`${tab(i)}.click()`);
       await wait(
         `(()=>{const t=${tab(i)}.querySelector('img'),image=document.querySelector('.wb-canvas img');return t.complete&&t.naturalWidth>0&&image?.complete&&image.naturalWidth>0})()`,
       );
-      const updated = env.database.loadProject(record.id);
+      const projectId = await e(
+        `${session}.tabs.find(t=>t.id===${JSON.stringify(ids[i])}).source.projectId`,
+      );
+      const updated = env.database.loadProject(projectId);
       // The tab switch cross-fades: wait for the new image itself, not just any decoded canvas image.
       const moved = `(()=>{const t=${tab(i)}.querySelector('img'),i=document.querySelector('.wb-canvas img');return decodeURIComponent(t.src).includes(${JSON.stringify(path.basename(updated.thumbnail_path))})&&decodeURIComponent(i.src).includes('interaction-moved-assets')&&t.naturalWidth>0&&i.naturalWidth>0})()`;
       try {

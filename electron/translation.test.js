@@ -98,8 +98,8 @@ describe('OpenAI-compatible AI translation', () => {
       categories: ['Body', 'Composition'],
     });
     const systemPrompt = JSON.parse(fetcher.mock.calls[0][1].body).messages[0].content;
-    expect(systemPrompt).toContain('Use the studio translation glossary.');
-    expect(systemPrompt).toContain('Use the studio classification rules.');
+    expect(systemPrompt).not.toContain('Use the studio translation glossary.');
+    expect(systemPrompt).not.toContain('Use the studio classification rules.');
     expect(systemPrompt).toContain('Return only valid JSON');
   });
 

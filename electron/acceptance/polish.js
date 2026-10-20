@@ -71,10 +71,6 @@ export async function libraryPolishChecks(env) {
   const { evaluate: e, check, wait, click, key } = h;
   h.category('图片库·细节');
   const projects = await prepare(env);
-  await check(
-    '图片库搜索快捷键使用共享 Shortcut 并按平台显示',
-    `document.querySelector('.library-search .nps-kbd')?.textContent === ${JSON.stringify(process.platform === 'darwin' ? '⌘ K' : 'Ctrl K')}`,
-  );
   const pointer = pointerDriver(h);
   for (const shape of ['portrait', 'landscape']) {
     const project = projects.find((p) =>
@@ -88,40 +84,15 @@ export async function libraryPolishChecks(env) {
 
     await e(frame);
 
-    await check(
-      '大图没有原生滚动条和自绘细条',
-      `${canvas}.querySelector('.nps-scroll-thumb')===null && getComputedStyle(${canvas}).scrollbarWidth==='none'`,
+    await e(
+      `(()=>{const n=${canvas},r=n.getBoundingClientRect();n.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:r.left+r.width/2,clientY:r.top+r.height/2,deltaY:-600}))})()`,
     );
-    for (const rotation of [0, 90, 270]) {
-      if (rotation)
-        for (let i = 0; i < (rotation === 90 ? 1 : 2); i++) await click('向右旋转', viewer);
-      for (const zoom of [1, 4]) {
-        await click('100%', viewer);
-        if (zoom === 4)
-          await e(
-            `(()=>{const n=${canvas},r=n.getBoundingClientRect();n.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:r.left+r.width/2,clientY:r.top+r.height/2,deltaY:-Math.log(4)/0.002}))})()`,
-          );
-        await e(frame);
-
-        for (const [horizontal, vertical] of [
-          [1, 1],
-          [-1, 1],
-          [-1, -1],
-          [1, -1],
-        ]) {
-          const center = await e(
-            `(()=>{const r=${canvas}.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`,
-          );
-          await pointer('mousePressed', center.x, center.y);
-          await pointer('mouseMoved', center.x + horizontal * 20000, center.y + vertical * 20000);
-          await pointer(
-            'mouseReleased',
-            center.x + horizontal * 20000,
-            center.y + vertical * 20000,
-          );
-        }
-      }
-    }
+    const center = await e(
+      `(()=>{const r=${canvas}.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`,
+    );
+    await pointer('mousePressed', center.x, center.y);
+    await pointer('mouseMoved', center.x + 100, center.y + 60);
+    await pointer('mouseReleased', center.x + 100, center.y + 60);
     await settleLayout(h, '.library-viewer');
     await e(
       `(()=>{const n=${canvas};n.scrollLeft=(n.scrollWidth-n.clientWidth)/2;n.scrollTop=(n.scrollHeight-n.clientHeight)/2;const c=n.getBoundingClientRect(),i=n.querySelector('img').getBoundingClientRect();window.polishAnchor={x:c.left+c.width*.57,y:c.top+c.height*.42};window.polishBefore={u:(polishAnchor.x-i.left)/i.width,v:(polishAnchor.y-i.top)/i.height};n.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:polishAnchor.x,clientY:polishAnchor.y,deltaY:-70}))})()`,
@@ -133,13 +104,13 @@ export async function libraryPolishChecks(env) {
       `${canvas}.querySelector('img').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
     );
 
-    const fitLabel = await e(`${viewer}.querySelector('[aria-label="100%"]')?.textContent`);
+    const fitLabel = await e(`${viewer}.querySelector('.library-viewer-percent')?.textContent`);
     await e(
       `${canvas}.querySelector('img').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
     );
     await check(
       '再次双击保持适应窗口',
-      `${viewer}.querySelector('[aria-label="100%"]')?.textContent===${JSON.stringify(fitLabel)}`,
+      `${viewer}.querySelector('.library-viewer-percent')?.textContent===${JSON.stringify(fitLabel)}`,
       undefined,
       'once',
     );

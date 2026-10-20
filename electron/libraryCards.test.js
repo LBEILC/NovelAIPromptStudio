@@ -117,7 +117,6 @@ it('preserves every grouping, score, filter, collection, view and detail with co
   api.backfillPromptFingerprints();
   api.updateProjects(['p2'], { isFavorite: true });
   api.updateProjects(['p3'], { deleted: true });
-  api.setGroupCover(api.loadProject('p0').exact_group_fingerprint, 'p0');
   const projectIds = (items) => items.map((p) => p.id);
   const groupShape = (groups) =>
     groups.map((g) => ({ ...g, members: projectIds(g.members), cover: g.cover.id }));
@@ -523,13 +522,12 @@ it('recomputes only dirty derivations and keeps live fields and covers current',
   reads.length = 0;
   api.updateProjectName('p0', 'Current name');
   api.updateProjects(['p1'], { deleted: true });
-  api.setGroupCover(api.loadProject('p0').exact_group_fingerprint, 'p0');
   reads.length = 0;
   const cards = await api.loadLibraryCards();
   expect([...new Set(reads)].sort()).toEqual(['p0', 'p1']);
   expect(cards.find((p) => p.id === 'p0')).toMatchObject({
     name: 'Current name',
-    group_cover_id: 'p0',
+    group_cover_id: '',
   });
   expect(cards.some((p) => p.id === 'p1')).toBe(false);
   reads.length = 0;
@@ -551,8 +549,9 @@ it('recomputes only dirty derivations and keeps live fields and covers current',
   await expectLiveCardSemantics(api);
 }, 30_000);
 
-it('reads and sets existing exact-group covers while the derived cards stay cached', async () => {
-  const api = await open(temporary());
+it('ignores legacy cover overrides without migrating or losing images', async () => {
+  const directory = temporary();
+  const api = await open(directory);
   const first = sample(0);
   api.insertProject(first);
   api.insertProject({
@@ -561,16 +560,14 @@ it('reads and sets existing exact-group covers while the derived cards stay cach
     tags: first.tags.map((tag) => ({ ...tag, id: `mirror-${tag.id}` })),
   });
   api.backfillPromptFingerprints();
-  const before = await api.loadLibraryCards();
-  expect(before.every((card) => card.group_cover_id === '')).toBe(true);
-  const fingerprint = api.loadProject('p0').exact_group_fingerprint;
-  api.setGroupCover(fingerprint, 'mirror');
-  expect((await api.loadLibraryCards()).every((card) => card.group_cover_id === 'mirror')).toBe(
-    true,
+  edit(directory, (raw) =>
+    raw
+      .prepare('INSERT INTO prompt_group_covers VALUES (?,?)')
+      .run(api.loadProject('p0').exact_group_fingerprint, 'mirror'),
   );
-  await expectLiveCardSemantics(api);
-  api.setGroupCover(fingerprint, 'p0');
-  expect((await api.loadLibraryCards()).every((card) => card.group_cover_id === 'p0')).toBe(true);
+  const cards = await api.loadLibraryCards();
+  expect(cards).toHaveLength(2);
+  expect(cards.every((card) => card.group_cover_id === '')).toBe(true);
   await expectLiveCardSemantics(api);
 });
 
@@ -892,3 +889,33 @@ it.each([1, 25])(
     expect(performance.now).toBe(clock);
   },
 );
+it('uses the original work image for its cover without changing generated image identities', async () => {
+  const directory = temporary();
+  const api = await open(directory);
+  api.insertProject(sample(0));
+  const original = {
+    image_path: '/synthetic/original.png',
+    thumbnail_path: '/synthetic/thumb.png',
+    metadata: { width: 1216, height: 832 },
+    prompt_raw: 'not included in cards',
+  };
+  edit(directory, (raw) => {
+    raw
+      .prepare('INSERT INTO works VALUES (?,?,?,?)')
+      .run('work', JSON.stringify(original), 'null', '2026-01-01');
+    raw
+      .prepare('INSERT INTO work_versions VALUES (?,?,?,?,?,?,?,?,?)')
+      .run('version', 'work', null, 1, 'version', 0, '{}', 'user', '2026-01-01');
+    raw
+      .prepare('INSERT INTO version_images VALUES (?,?,?,?,?)')
+      .run('image', 'version', 'p0', '1', '2026-01-02');
+  });
+  const cards = await api.loadLibraryCards();
+  expect(cards[0].work_cover).toEqual({
+    image_path: original.image_path,
+    thumbnail_path: original.thumbnail_path,
+    metadata: original.metadata,
+  });
+  expect(cards[0].id).toBe('p0');
+  expect(api.loadProject('p0').work_cover).toEqual(cards[0].work_cover);
+});

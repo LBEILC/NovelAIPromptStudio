@@ -1,4 +1,4 @@
-import { Button, Input, Select, OptionGroup } from './Controls';
+﻿import { Button, Input, Select, OptionGroup } from './Controls';
 import { invokeUI } from '../lib/commands';
 import {
   Collapse,
@@ -20,8 +20,8 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  Banner,
   Progress,
-  TextArea,
   Switch,
   Dialog,
   Shortcut,
@@ -150,13 +150,27 @@ function Agent() {
       title="Agent"
       description="让你的 Agent（如 Claude Code、Codex）通过命令行使用本软件：读取提示词、修改工作台、搜索图片库、添加生成任务。"
     >
+      {message && (
+        <Banner tone="danger">
+          <i className="ri-error-warning-line" aria-hidden />
+          <span>安装失败：{message}</span>
+        </Banner>
+      )}
       <Row
         title="命令行工具"
         help={
           setup?.installed
             ? [
                 `已安装 · nai-studio${version ? ` ${version}` : ''}`,
-                <code>{setup.path}</code>,
+                ...(!setup.onPath
+                  ? [
+                      <span className="settings-warning">
+                        命令所在的文件夹不在 PATH 里，终端里找不到 nai-studio。把下面的文件夹加进
+                        PATH，再重新打开终端。
+                      </span>,
+                    ]
+                  : []),
+                <code>{setup.path.replace(/[\\/][^\\/]*$/, '')}</code>,
                 ...(setup.platform === 'win32'
                   ? setup.pathFailed
                     ? [
@@ -178,6 +192,18 @@ function Agent() {
         }
       >
         <div className="settings-actions">
+          {setup?.installed && !setup.onPath && (
+            <Button
+              variant="quiet"
+              onClick={() =>
+                void writeClipboardText(setup.path.replace(/[\\/][^\\/]*$/, '')).then(() =>
+                  notify({ text: '已复制命令所在的文件夹', tone: 'success' }),
+                )
+              }
+            >
+              复制位置
+            </Button>
+          )}
           <Button loading={busy} onClick={() => void install()}>
             {setup?.installed ? '重新安装' : '安装'}
           </Button>
@@ -207,7 +233,6 @@ function Agent() {
       >
         {null}
       </Row>
-      {message && <p role="status">{message}</p>}
       <GenerationPreferences agent />
     </SettingsFrame>
   );
@@ -352,6 +377,15 @@ function AI() {
         </>
       }
     >
+      {!a.settings.encryptionAvailable && (
+        <Banner tone="warn">
+          <i className="ri-alert-line" aria-hidden />
+          <span>
+            这台电脑的系统加密不可用，无法保存 API
+            Key。软件不会以明文保存密钥；系统加密恢复后再填写。
+          </span>
+        </Banner>
+      )}
       <label className="settings-column">
         服务地址
         <Input
@@ -365,7 +399,7 @@ function AI() {
       <div className="settings-column">
         API Key
         <div className="settings-actions settings-credential">
-          {a.settings.hasApiKey && !replacing ? (
+          {a.settings.encryptionAvailable && a.settings.hasApiKey && !replacing ? (
             <>
               <span className="nps-field nps-small settings-saved-key settings-ai-key">
                 已保存 ••••••••
@@ -379,12 +413,16 @@ function AI() {
                 aria-label="API Key"
                 type="password"
                 value={a.settings.apiKey}
-                placeholder={a.settings.hasApiKey ? '粘贴新的 API Key' : '粘贴 API Key'}
+                placeholder={
+                  a.settings.encryptionAvailable && a.settings.hasApiKey
+                    ? '粘贴新的 API Key'
+                    : '粘贴 API Key'
+                }
                 onChange={(event) =>
                   a.setSettings((current) => ({ ...current, apiKey: event.target.value }))
                 }
               />
-              {a.settings.hasApiKey && (
+              {a.settings.encryptionAvailable && a.settings.hasApiKey && (
                 <Button
                   variant="quiet"
                   onClick={() => {
@@ -398,12 +436,16 @@ function AI() {
             </>
           )}
         </div>
-        <small>加密后保存在这台电脑上，软件不保存明文</small>
+        <small>
+          {a.settings.encryptionAvailable
+            ? '加密后保存在这台电脑上，软件不保存明文'
+            : '系统加密不可用，填写后只在这次使用中有效，关闭软件后需要重新填写'}
+        </small>
       </div>
       <div className="settings-column">
         模型
         <div className="settings-actions settings-model">
-          {a.models.length || (a.settings.model && !manualModel) ? (
+          {!a.modelsError && (a.models.length || (a.settings.model && !manualModel)) ? (
             <Select
               label="模型列表"
               value={a.settings.model}
@@ -419,8 +461,9 @@ function AI() {
           ) : (
             <Input
               aria-label="模型"
+              className="settings-mono"
               value={a.settings.model}
-              placeholder="输入或读取模型 ID"
+              placeholder="输入模型 ID"
               onChange={(event) => {
                 setManualModel(true);
                 a.setSettings((current) => ({ ...current, model: event.target.value }));
@@ -436,41 +479,8 @@ function AI() {
             {a.operation === 'models' ? '读取中' : '重新读取模型列表'}
           </Button>
         </div>
+        {a.modelsError && <small>读取模型列表失败：{a.modelsError}，可以直接输入模型 ID</small>}
       </div>
-      {!a.settings.encryptionAvailable && (
-        <p role="alert">当前系统安全存储不可用，应用不会以明文保存 API Key。</p>
-      )}
-      <h2>提示词</h2>
-      <p>软件会在后面固定附加输出格式、数量和顺序的要求，这里只写翻译和分类的规则。</p>
-      {(
-        [
-          ['translationPrompt', '翻译规则'],
-          ['classificationPrompt', '分类规则'],
-        ] as const
-      ).map(([key, label]) => (
-        <label className="settings-column" key={key}>
-          {label}
-          <TextArea
-            value={a.settings[key]}
-            onChange={(e) => a.setSettings((s) => ({ ...s, [key]: e.target.value }))}
-          />
-          <Button
-            variant="quiet"
-            className="settings-prompt-reset"
-            onClick={() =>
-              a.setSettings((s) => ({
-                ...s,
-                [key]:
-                  key === 'translationPrompt'
-                    ? s.defaultPrompts.translation
-                    : s.defaultPrompts.classification,
-              }))
-            }
-          >
-            恢复默认
-          </Button>
-        </label>
-      ))}
     </SettingsFrame>
   );
 }
@@ -551,22 +561,23 @@ function Storage({
         </TransitionSurface>
       </Collapse>
       {s.error && <p role="alert">{s.error}</p>}
-      <h2>数据与备份</h2>
-      <Row
-        title="数据库"
-        help={
-          s.database
+      <div className="settings-column">
+        <div>数据库</div>
+        <code>
+          {s.database
             ? `${s.database.directory}${s.database.directory.includes('\\') ? '\\' : '/'}${s.database.fileName}`
-            : '正在读取…'
-        }
-      >
-        <Button
-          disabled={!s.database}
-          onClick={() => s.database && void s.revealDatabase(s.database.fileName)}
-        >
-          打开文件夹
-        </Button>
-      </Row>
+            : '正在读取…'}
+        </code>
+        <small>收藏集、名称、版本记录、翻译词典和设置都在这里</small>
+        <div className="settings-actions">
+          <Button
+            disabled={!s.database}
+            onClick={() => s.database && void s.revealDatabase(s.database.fileName)}
+          >
+            打开文件夹
+          </Button>
+        </div>
+      </div>
       {s.backups?.map((backup) => (
         <Row
           key={backup.fileName}
@@ -645,7 +656,9 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
             ? '正在检查更新…'
             : hasUpdate
               ? `发现新版本 ${state.latestVersion}`
-              : '已是最新版本'
+              : u.error || state?.error
+                ? '检查更新失败'
+                : '已是最新版本'
         }
         help={[
           `当前版本 ${state?.currentVersion || '—'} · 上次检查：${lastUpdateCheckLabel(state?.checkedAt)}`,
@@ -658,7 +671,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           loading={state?.phase === 'checking'}
           onClick={() => void u.check()}
         >
-          {state?.phase === 'checking' ? '检查中' : '检查更新'}
+          {state?.phase === 'checking' ? '检查中' : u.error || state?.error ? '重试' : '检查更新'}
         </Button>
       </Row>
       <Collapse open={hasUpdate}>
@@ -678,9 +691,11 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
                     ? '重启后安装，工作台中的标签页和草稿会保留'
                     : state.phase === 'downloading'
                       ? `正在下载 · ${Math.round(state.progress)}%`
-                      : state.structuredNotes
-                        ? releaseCounts(state.structuredNotes)
-                        : ''}
+                      : state.platform === 'darwin'
+                        ? 'macOS 上需要到下载页手动安装（安装包没有签名）'
+                        : state.structuredNotes
+                          ? releaseCounts(state.structuredNotes)
+                          : ''}
                 </small>
                 <Progress
                   max={100}
@@ -728,7 +743,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
                     {state.phase === 'downloading'
                       ? '下载中'
                       : state.platform === 'darwin' && state.updateMode === 'manual'
-                        ? '下载 macOS 安装包'
+                        ? '前往下载页'
                         : '下载'}
                   </Button>
                 )}

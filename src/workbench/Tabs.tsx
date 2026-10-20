@@ -138,6 +138,7 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
           } as CSSProperties
         }
       >
+        {tab.id === p.session.activeTabId && <span className="wb-tab-current" aria-hidden />}
         <DecodedImage
           draggable={false}
           alt=""
@@ -170,7 +171,7 @@ export function WorkbenchTabs(p: TabsProps) {
     onActivateTab: select,
   };
   useMovingIndicator(list, indicator, '.wb-tab[aria-selected=true]', selected);
-  // TODO(design): The reference has no keyboard sorting; retain the existing keyboard behavior and feedback.
+
   const drag = useDragFeedback(list, true);
   const sensors = useSensors(
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),

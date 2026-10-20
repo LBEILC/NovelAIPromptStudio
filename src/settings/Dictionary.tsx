@@ -1,11 +1,6 @@
 import { Button, Input, Select } from './Controls';
 import { writeClipboardText } from '../lib/clipboard';
-import {
-  Collapse,
-  TransitionSurface,
-  useMovingIndicator,
-  useNavigationSelection,
-} from '../ui/transitions';
+import { TransitionSurface, useMovingIndicator, useNavigationSelection } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -16,7 +11,6 @@ import {
   Layer,
   MenuItems,
   Shortcut,
-  Progress,
   useNotifications,
   useScrollArea,
   type MenuItem,
@@ -71,9 +65,6 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
     d.setFilters((f) => ({ ...f, view })),
   );
   useMovingIndicator(viewList, viewMarker, '[aria-selected=true]', selectedView);
-  const failures = useRef<HTMLDivElement>(null);
-  const [showFailures, setShowFailures] = useState(false);
-  useScrollArea(failures, { enabled: showFailures && !!d.progress?.failed.length });
   useScrollArea(scroll, { topInset: '--table-head-h' });
   const [viewport, setViewport] = useState({ top: 0, height: 0, row: 36, head: 30 });
   const [editing, setEditing] = useState<string | null>(null);
@@ -102,11 +93,21 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
     document.addEventListener('pointerdown', commitOutside, true);
     return () => document.removeEventListener('pointerdown', commitOutside, true);
   }, [d.save]);
-  const retranslate = async () => {
-    setShowFailures(false);
-    const result = await d.retranslate();
+  const retranslate = async (tags?: string[]) => {
+    const result = await d.retranslate(tags);
     if (result && !result.canceled && !result.failed.length)
       notify({ tone: 'success', text: `已重新翻译 ${result.translated} 项` });
+    else if (result?.failed.length)
+      notify({
+        tone: 'error',
+        text: `翻译失败：${result.failed[0].error}。已翻译 ${result.translated} 项，其余没有改动`,
+        action: {
+          label: '重试',
+          onClick: () => void retranslate(result.failed.map((item) => item.tag)),
+        },
+      });
+    else if (result?.canceled)
+      notify({ tone: 'success', text: `已停止：翻译了 ${result.translated} 项，其余没有改动` });
   };
   useLayoutEffect(() => {
     const node = scroll.current!;
@@ -311,6 +312,10 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
                   checked={
                     !!d.items.length && d.items.every((item) => d.selected.includes(item.tag))
                   }
+                  mixed={
+                    d.items.some((item) => d.selected.includes(item.tag)) &&
+                    !d.items.every((item) => d.selected.includes(item.tag))
+                  }
                   onChange={(checked) =>
                     d.setSelected(checked ? d.items.map((item) => item.tag) : [])
                   }
@@ -494,53 +499,6 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
           {d.busy ? '正在读取…' : `共 ${d.items.length} 项`}
         </div>
       </TransitionSurface>
-      {d.progress && (d.running || d.progress.canceled || !!d.progress.failed.length) && (
-        <TransitionSurface
-          kind="presence"
-          enter
-          change={true}
-          className="settings-dictionary-progress"
-          role="status"
-        >
-          <div className="settings-dictionary-progress-line">
-            <span>
-              {d.running
-                ? `正在用 AI 翻译 · 已完成 ${d.progress.completed} / ${d.progress.total}${d.progress.failed.length ? ` · 没能翻译 ${d.progress.failed.length} 条` : ''}`
-                : d.progress.canceled
-                  ? `已取消。完成了 ${d.progress.translated} 条，其余没有改动`
-                  : `已翻译 ${d.progress.translated} 条，没能翻译 ${d.progress.failed.length} 条，保持原样`}
-            </span>
-            {!d.running && !!d.progress.failed.length && (
-              <Button
-                variant="quiet"
-                aria-expanded={showFailures}
-                data-disclosure=""
-                aria-controls="dictionary-failures"
-                onClick={() => setShowFailures((open) => !open)}
-              >
-                查看原因
-              </Button>
-            )}
-            {d.running && (
-              <Button className="settings-dictionary-cancel" variant="quiet" onClick={d.cancel}>
-                取消
-              </Button>
-            )}
-          </div>
-          {d.running && (
-            <Progress value={d.progress.completed} max={d.progress.total} label="AI 翻译进度" />
-          )}
-          <Collapse open={!d.running && !!d.progress.failed.length && showFailures}>
-            <div className="settings-dictionary-failures" id="dictionary-failures" ref={failures}>
-              {d.progress.failed.map((item) => (
-                <p key={item.tag}>
-                  {item.tag}：{item.error}
-                </p>
-              ))}
-            </div>
-          </Collapse>
-        </TransitionSurface>
-      )}
       {!!d.selected.length && (
         <TransitionSurface
           kind="presence"
@@ -550,39 +508,53 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
         >
           <div className="nps-selection" role="group" aria-label="词典多选操作">
             <span>已选 {d.selected.length} 项</span>
-            <Menu
-              label="设置分类"
-              buttonVariant="quiet"
-              items={categories.map((category) => ({
-                id: category.value,
-                label: category.label,
-                prefix: category.prefix,
-                disabled: d.busy,
-                onSelect: async () => {
-                  const count = d.selected.length;
-                  if (await d.categorize(category.value as TagCategory))
-                    notify({ tone: 'success', text: `已将 ${count} 项设为"${category.label}"` });
-                },
-              }))}
-            />
-            <Button
-              variant="quiet"
-              disabled={d.busy || !d.aiReady}
-              loading={d.running}
-              disabledReason={!d.aiReady ? "先在'AI 服务'里配置" : undefined}
-              onClick={() =>
-                d.selected.length > 50 ? setConfirmTranslation(true) : void retranslate()
-              }
-            >
-              {d.running ? '翻译中' : '用 AI 重新翻译'}
-            </Button>
-            <span className="settings-selection-divider" aria-hidden />
-            <Button variant="danger" disabled={d.busy} onClick={() => setDeleting(d.selected)}>
-              删除
-            </Button>
-            <Button variant="quiet" onClick={() => d.setSelected([])}>
-              取消
-            </Button>
+            {d.running ? (
+              <>
+                <span>
+                  · 正在翻译 {d.progress?.completed || 0} / {d.progress?.total || 0}
+                </span>
+                <Button variant="quiet" onClick={d.cancel}>
+                  停止
+                </Button>
+              </>
+            ) : (
+              <>
+                <Menu
+                  label="设置分类"
+                  buttonVariant="quiet"
+                  items={categories.map((category) => ({
+                    id: category.value,
+                    label: category.label,
+                    prefix: category.prefix,
+                    disabled: d.busy,
+                    onSelect: async () => {
+                      const count = d.selected.length;
+                      if (await d.categorize(category.value as TagCategory))
+                        notify({
+                          tone: 'success',
+                          text: `已将 ${count} 项设为"${category.label}"`,
+                        });
+                    },
+                  }))}
+                />
+                <Button
+                  variant="quiet"
+                  disabled={d.busy || !d.aiReady}
+                  loading={d.running}
+                  disabledReason={!d.aiReady ? "先在'AI 服务'里配置" : undefined}
+                  onClick={() => setConfirmTranslation(true)}
+                >
+                  {d.running ? '翻译中' : '用 AI 重新翻译'}
+                </Button>
+                <span className="settings-selection-divider" aria-hidden />
+                <Button variant="danger" disabled={d.busy} onClick={() => setDeleting(d.selected)}>
+                  删除
+                </Button>
+                <Button variant="quiet" onClick={() => d.setSelected([])}>
+                  取消
+                </Button>
+              </>
+            )}
           </div>
         </TransitionSurface>
       )}
@@ -605,9 +577,9 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
       </Layer>
       <Dialog
         open={confirmTranslation}
-        title={`用 AI 重新翻译 ${d.selected.length} 条？`}
+        title={`用 AI 重新翻译 ${d.selected.length} 项？`}
         cancelLabel="取消"
-        confirmLabel="开始翻译"
+        confirmLabel="重新翻译"
         confirmDisabled={d.busy}
         onCancel={() => setConfirmTranslation(false)}
         onConfirm={() => {
@@ -616,8 +588,8 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
         }}
       >
         <p>
-          会把这些 Tag 的名字发给你配置的 AI 服务，分 {Math.ceil(d.selected.length / 50)}{' '}
-          批完成，可以随时取消。现有的译文和分类会被新的结果替换。
+          会把这 {d.selected.length} 个 Tag 发给你配置的 AI 服务（{d.serviceUrl}
+          ）。返回的译文会替换现在的译文，改过的也会被替换。
         </p>
       </Dialog>
       <Dialog

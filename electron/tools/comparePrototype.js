@@ -150,6 +150,7 @@ export async function comparePrototype({ app, window, h, invoke, cli }) {
       'design/prototype.js',
       'design/prototype-lib.js',
       'design/prototype-set.js',
+      'design/prototype-fill.js',
     ];
     const sources = await Promise.all(
       scripts.map((file) => fs.readFile(path.join(root, file), 'utf8')),
@@ -176,6 +177,13 @@ export async function comparePrototype({ app, window, h, invoke, cli }) {
         await reference.webContents.executeJavaScript(
           `${state};S.lang="en";root.dataset.theme=${JSON.stringify(theme)};paint();`,
         );
+        const caption = await h.evaluate(
+          'document.querySelector(".wb-caption .wb-meta")?.textContent || document.querySelector(".wb-caption .meta")?.textContent || ""',
+        );
+        if (caption)
+          await reference.webContents.executeJavaScript(
+            `document.querySelector('.caption .meta').textContent=${JSON.stringify(caption)}`,
+          );
         reference.showInactive();
         const ready = `(async()=>{await document.fonts.ready;await Promise.all([...document.images].filter(i=>i.getClientRects().length).map(i=>i.decode().catch(()=>{})));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return true})()`;
         await Promise.all([h.evaluate(ready), reference.webContents.executeJavaScript(ready)]);

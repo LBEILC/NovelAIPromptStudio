@@ -82,7 +82,7 @@ export function LibraryPrompt({ project }: { project: ImageRecord }) {
           scope.kind === 'base'
             ? negative
               ? '负面提示词'
-              : scope.label
+              : '基础提示词'
             : `${/^Character \d+$/i.test(scope.character.label) || !scope.character.label ? `角色 ${scope.characterIndex + 1}` : scope.character.label}${negative ? ' · 负面提示词' : ''}`;
         const content = section.blocks.map((block, index) => (
           <div className="library-block" key={index}>
@@ -137,13 +137,12 @@ export function LibraryPrompt({ project }: { project: ImageRecord }) {
           </Disclosure>
         ) : (
           <section key={scope.key}>
-            {/* TODO(design): Character, negative and multiple-block layouts are not specified by the reference. */}
-            {scope.kind !== 'base' && (
+            {
               <div className="library-section-title">
                 {title}
                 <small>{section.blocks.length} 块</small>
               </div>
-            )}
+            }
             {content}
           </section>
         );

@@ -23,3 +23,5 @@
 .wb-tab-preview-name[data-file] { display:flex; font-family:var(--font-mono); font-size:var(--fs-small); }
 .wb-tab-preview-name[data-file] > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wb-tab-preview-name[data-file] > span:last-child { flex-shrink:0; max-width:60%; overflow:hidden; white-space:nowrap; }
+
+.wb-tab-current { width:var(--mark); height:var(--mark); background:var(--cinnabar); flex:0 0 auto; }

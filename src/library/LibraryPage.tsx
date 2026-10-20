@@ -1,6 +1,6 @@
 import { Collapse, Presence, TransitionSurface } from '../ui/transitions';
 import { LibraryRename } from './Rename';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, EmptyState, EmptyMark, Progress, ResizablePanel } from '../ui';
 import { useLibraryDetail } from '../state/libraryDetail';
 import { GALLERY_CARD_SIZE_KEY } from '../lib/galleryLayout.js';
@@ -53,6 +53,7 @@ export default function LibraryPage(
     () => stored(GALLERY_PREVIEW_PANEL_WIDTH_KEY) || token('--detail-w'),
   );
   const [renaming, setRenaming] = useState(false);
+  const renameAnchor = useRef<HTMLButtonElement>(null);
   const [renameRequest, setRenameRequest] = useState<{ id: string; sequence: number }>();
   p = {
     ...p,
@@ -100,7 +101,7 @@ export default function LibraryPage(
           : '在详情栏或卡片的右键菜单中选择"加入收藏集"即可添加图片。';
   const clearLabel =
     searching && filtering ? '清除搜索和筛选' : searching ? '清除搜索' : '清除筛选';
-  // TODO(design): Upgrade-cache progress and bulk naming are not covered by the reference.
+
   const busyImport =
     p.importProgress && ['preparing', 'importing'].includes(p.importProgress.phase);
   return (
@@ -131,27 +132,7 @@ export default function LibraryPage(
           />
         )}
         <div className="library-results">
-          <Collapse open={!!p.cacheProgress} className="library-cache-transition">
-            {p.cacheProgress && (
-              <div className="library-cache">
-                <b>
-                  正在整理图片库 {p.cacheProgress.completed.toLocaleString()} /{' '}
-                  {p.cacheProgress.total.toLocaleString()}
-                </b>
-                <Progress
-                  label="正在整理图片库"
-                  value={p.cacheProgress.completed}
-                  max={p.cacheProgress.total}
-                />
-                <span className="library-help">只在升级后第一次打开时需要</span>
-              </div>
-            )}
-          </Collapse>
-          <TransitionSurface
-            className="library-result-content"
-            change={p.contentKey}
-            hidden={!!p.cacheProgress}
-          >
+          <TransitionSurface className="library-result-content" change={p.contentKey}>
             {empty ? (
               <div className="library-empty">
                 <EmptyState
@@ -221,8 +202,12 @@ export default function LibraryPage(
                   在工作台打开
                 </Button>
                 <CollectionPicker p={p} ids={ids} />
-                {/* TODO(design): The reference has no bulk rename or collection-removal entry. */}
-                <Button size="small" variant="quiet" onClick={() => setRenaming(true)}>
+                <Button
+                  ref={renameAnchor}
+                  size="small"
+                  variant="quiet"
+                  onClick={() => setRenaming(true)}
+                >
                   <i className="ri-edit-line" />
                   起名
                 </Button>
@@ -275,6 +260,27 @@ export default function LibraryPage(
             </div>
           )}
         </Collapse>
+        <Collapse open={!!p.cacheProgress} className="library-dock library-cache-transition">
+          {p.cacheProgress && (
+            <div className="library-job">
+              <div className="library-job-top">
+                <span className="nps-loader" aria-hidden />
+                <b>
+                  正在整理图片库 {p.cacheProgress.completed.toLocaleString('en-US')} /{' '}
+                  {p.cacheProgress.total.toLocaleString('en-US')}
+                </b>
+              </div>
+              <Progress
+                label="正在整理图片库"
+                value={p.cacheProgress.completed}
+                max={p.cacheProgress.total}
+              />
+              <span className="library-help">
+                第一次打开新版本时整理一次。整理完之前，搜索和筛选的结果可能不全，可以照常使用
+              </span>
+            </div>
+          )}
+        </Collapse>
         {p.dragState?.active && (
           <div className="library-drop">
             {p.dragState.valid ? '松开后导入图片库' : '只能导入 PNG、JPG、WEBP 图片和 ZIP'}
@@ -297,7 +303,13 @@ export default function LibraryPage(
           <LibraryDetail p={p} detail={detail} onViewer={() => setViewer(true)} />
         </ResizablePanel>
       )}
-      <LibraryRename open={renaming} p={p} ids={ids} onClose={() => setRenaming(false)} />
+      <LibraryRename
+        anchor={renameAnchor}
+        open={renaming}
+        p={p}
+        ids={ids}
+        onClose={() => setRenaming(false)}
+      />
       {viewer && (
         <LibraryViewer
           p={p}

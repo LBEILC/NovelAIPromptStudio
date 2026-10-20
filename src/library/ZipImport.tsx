@@ -1,13 +1,11 @@
 import { DecodedImage } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
-import { Check } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Dialog, useScrollArea } from '../ui';
 import { mediaUrl } from '../lib/imageStage.js';
-import { layoutLibraryRows, fallbackRatio } from './layout';
+import { fallbackRatio } from './layout';
 import type { PreparedImportEntry } from '../shared/types';
 
-// TODO(design): This workflow has no matching state in the reference; retain its existing presentation.
 interface Entry extends PreparedImportEntry {
   previewError?: string;
   duplicate?: boolean;
@@ -33,8 +31,6 @@ export function ZipImport({
     () => importSession?.entries.map((entry) => entry.id) || [],
   );
   const [preview, setPreview] = useState<Entry | null>(null);
-  const [width, setWidth] = useState(0);
-  const [tokens, setTokens] = useState({ height: 120, gap: 8, min: 0.5, max: 2.5 });
   const grid = useRef<HTMLDivElement>(null);
   useScrollArea(grid, { enabled: !!importSession });
   const anchor = useRef('');
@@ -50,43 +46,19 @@ export function ZipImport({
   const selectable = entries.filter((entry) => !entry.previewError && !entry.duplicate);
   const active = selection.filter((id) => selectable.some((entry) => entry.id === id));
   useEffect(() => {
+    if (!importSession || preview) return;
+    const enter = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (active.length || importSession.directImageCount) onImport(active);
+    };
+    document.addEventListener('keydown', enter, true);
+    return () => document.removeEventListener('keydown', enter, true);
+  }, [importSession, preview, active, onImport]);
+  useEffect(() => {
     setSelection(importSession?.entries.map((entry) => entry.id) || []);
   }, [importSession?.sessionId]);
-  useLayoutEffect(() => {
-    const node = grid.current;
-    if (!node) return;
-    const measure = () => {
-      const style = getComputedStyle(node);
-      const value = (key: string) => parseFloat(style.getPropertyValue(key));
-      setWidth(node.clientWidth);
-      setTokens({
-        height: value('--thumb-row-zip'),
-        gap: value('--sp-2'),
-        min: value('--thumb-ratio-min'),
-        max: value('--thumb-ratio-max'),
-      });
-    };
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    measure();
-    return () => observer.disconnect();
-  }, [importSession?.sessionId]);
-  const rows = useMemo(
-    () =>
-      layoutLibraryRows(
-        entries.map((entry) =>
-          entry.previewWidth && entry.previewHeight
-            ? entry.previewWidth / entry.previewHeight
-            : fallbackRatio,
-        ),
-        width,
-        tokens.height,
-        tokens.gap,
-        tokens.min,
-        tokens.max,
-      ),
-    [entries, width, tokens],
-  );
   const toggle = (entry: Entry, shift: boolean) => {
     if (entry.previewError || entry.duplicate) return;
     const from = selectable.findIndex((item) => item.id === anchor.current);
@@ -108,7 +80,8 @@ export function ZipImport({
     <>
       <Dialog
         open={!!importSession}
-        title="选择要导入的图片"
+        title="从 ZIP 导入"
+        confirmDisabled={!active.length && !importSession?.directImageCount}
         cancelLabel="取消"
         confirmLabel={`导入 ${active.length + (importSession?.directImageCount || 0)} 张`}
         onCancel={onCancel}
@@ -127,22 +100,29 @@ export function ZipImport({
           }}
         >
           <p>
-            {importSession?.archives.map((archive) => archive.name).join('、')} 里有{' '}
-            {entries.length} 张图片，其中 {entries.filter((entry) => entry.duplicate).length}{' '}
-            张已经在图片库里。
+            <span className="library-mono">
+              {importSession?.archives.map((archive) => archive.name).join('、')}
+            </span>{' '}
+            · {entries.length} 张图片
+            {entries.some((entry) => entry.duplicate) &&
+              `，其中 ${entries.filter((entry) => entry.duplicate).length} 张已在图片库里`}
           </p>
           <div className="library-zip-actions">
-            <span>
-              已选 {active.length} / {selectable.length} 张
-            </span>
+            <span>已选 {active.length} 张 · 拖动可以框选，Shift 连选</span>
             <Button
               size="small"
               variant="quiet"
+              disabled={active.length === selectable.length}
               onClick={() => setSelection(selectable.map((entry) => entry.id))}
             >
               全选
             </Button>
-            <Button size="small" variant="quiet" onClick={() => setSelection([])}>
+            <Button
+              size="small"
+              variant="quiet"
+              disabled={!active.length}
+              onClick={() => setSelection([])}
+            >
               全不选
             </Button>
           </div>
@@ -157,7 +137,7 @@ export function ZipImport({
               drag.current = {
                 x: event.clientX - rect.left,
                 y: event.clientY - rect.top + node.scrollTop,
-                initial: event.ctrlKey || event.metaKey ? active : [],
+                initial: event.ctrlKey || event.metaKey || event.shiftKey ? active : [],
                 active: false,
               };
             }}
@@ -168,7 +148,7 @@ export function ZipImport({
                 rect = node.getBoundingClientRect();
               const x = event.clientX - rect.left,
                 y = event.clientY - rect.top + node.scrollTop;
-              if (!from.active && Math.hypot(x - from.x, y - from.y) < 5) return;
+              if (!from.active && Math.hypot(x - from.x, y - from.y) < 4) return;
               from.active = true;
               suppressClick.current = true;
               event.preventDefault();
@@ -219,46 +199,41 @@ export function ZipImport({
               }
             }}
           >
-            {rows.map((row) => (
-              <div
-                className="library-zip-row"
-                key={row.start}
-                style={{ height: row.height, gap: tokens.gap }}
-              >
-                {row.widths.map((itemWidth, offset) => {
-                  const entry = entries[row.start + offset];
-                  const picked = active.includes(entry.id);
-                  return (
-                    <SurfaceButton
-                      kind="image"
-                      className={`library-card ${picked ? 'picked' : ''} ${entry.duplicate || entry.previewError ? 'dim' : ''}`}
-                      key={entry.id}
-                      data-entry-id={entry.id}
-                      style={{ width: itemWidth, height: row.height }}
-                      aria-label={entry.fileName}
-                      aria-pressed={picked}
-                      onClick={(event) => toggle(entry, event.shiftKey)}
-                      onDoubleClick={() => {
-                        if (entry.previewPath) setPreview(entry);
-                      }}
-                    >
-                      <DecodedImage
-                        src={entry.previewPath ? mediaUrl(entry.previewPath) : undefined}
-                        alt={entry.previewPath ? '' : entry.fileName}
-                        draggable={false}
-                      />
-                      {entry.duplicate ? (
-                        <span className="library-stack">已有</span>
-                      ) : (
-                        <span className="library-pick">
-                          {picked && <Check size={16} strokeWidth={1.5} aria-hidden="true" />}
-                        </span>
-                      )}
-                    </SurfaceButton>
-                  );
-                })}
-              </div>
-            ))}
+            {entries.map((entry) => {
+              const picked = active.includes(entry.id);
+              const ratio =
+                entry.previewWidth && entry.previewHeight
+                  ? entry.previewWidth / entry.previewHeight
+                  : fallbackRatio;
+              return (
+                <SurfaceButton
+                  kind="image"
+                  className={`library-card ${picked ? 'picked' : ''} ${entry.duplicate || entry.previewError ? 'dim' : ''}`}
+                  key={entry.id}
+                  data-entry-id={entry.id}
+                  style={{ flex: `${ratio} 1 calc(var(--thumb-row) * 2 / 3 * ${ratio})` }}
+                  aria-label={entry.fileName}
+                  aria-pressed={picked}
+                  onClick={(event) => toggle(entry, event.shiftKey)}
+                  onDoubleClick={() => {
+                    if (entry.previewPath) setPreview(entry);
+                  }}
+                >
+                  <DecodedImage
+                    src={entry.previewPath ? mediaUrl(entry.previewPath) : undefined}
+                    alt={entry.previewPath ? '' : entry.fileName}
+                    draggable={false}
+                  />
+                  {entry.duplicate ? (
+                    <span className="library-stack">已在图片库</span>
+                  ) : (
+                    <span className="library-pick">
+                      <i className="ri-check-line" aria-hidden="true" />
+                    </span>
+                  )}
+                </SurfaceButton>
+              );
+            })}
             {marquee && <div className="library-marquee" style={marquee} />}
           </div>
         </div>

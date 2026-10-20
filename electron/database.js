@@ -771,9 +771,18 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     };
   };
 
+  const originalCover = (json) => {
+    const original = safeJson(json);
+    if (!original?.image_path) return undefined;
+    return {
+      image_path: original.image_path,
+      thumbnail_path: original.thumbnail_path || original.image_path,
+      metadata: { width: original.metadata?.width, height: original.metadata?.height },
+    };
+  };
   const generatedFields = (id) => {
     const row = query(
-      'SELECT v.work_id, v.number, v.source FROM version_images vi JOIN work_versions v ON v.id=vi.version_id WHERE vi.project_id=$id ORDER BY vi.rowid DESC LIMIT 1',
+      'SELECT v.work_id, v.number, v.source, w.origin_json FROM version_images vi JOIN work_versions v ON v.id=vi.version_id JOIN works w ON w.id=v.work_id WHERE vi.project_id=$id ORDER BY vi.rowid DESC LIMIT 1',
       { $id: id },
     )[0];
     return row
@@ -781,6 +790,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
           generated_work_id: row.work_id,
           version_number: row.number,
           generation_source: row.source,
+          work_cover: originalCover(row.origin_json),
         }
       : {};
   };
@@ -797,17 +807,11 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       metadata,
       prompt_structure: safeJson(metadata.prompt_structure_json),
     });
-    const cover = project.exact_group_fingerprint
-      ? query(
-          'SELECT project_id FROM prompt_group_covers WHERE prompt_fingerprint = $fingerprint',
-          { $fingerprint: project.exact_group_fingerprint },
-        )[0]
-      : null;
     return {
       ...hydrated,
       ...generatedFields(project.id),
       ...namingFields(project, metadata),
-      group_cover_id: cover?.project_id || '',
+      group_cover_id: '',
     };
   };
 
@@ -857,14 +861,6 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       if (!tagsByProject.has(tag.project_id)) tagsByProject.set(tag.project_id, []);
       tagsByProject.get(tag.project_id).push(tag);
     }
-    const covers = new Map(
-      query(
-        `SELECT prompt_group_covers.prompt_fingerprint, prompt_group_covers.project_id
-       FROM prompt_group_covers
-       JOIN projects ON projects.exact_group_fingerprint = prompt_group_covers.prompt_fingerprint
-       WHERE ${where}`,
-      ).map((cover) => [cover.prompt_fingerprint, cover.project_id]),
-    );
     const hydrated = projects.map((project) => {
       const metadata = metadataByProject.get(project.id) || {};
       return {
@@ -873,7 +869,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
         metadata,
         prompt_structure: safeJson(metadata.prompt_structure_json),
         ...namingFields(project, metadata),
-        group_cover_id: covers.get(project.exact_group_fingerprint) || '',
+        group_cover_id: '',
       };
     });
     const cached = lookupTagDictionary(
@@ -1371,21 +1367,16 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     // Original ORDER BY created_at ties followed the projects table's row order.
     const rows = query(`SELECT project_id FROM library_card_cache WHERE ${where}
       ORDER BY created_at DESC, project_order`);
-    const covers = new Map(
-      query('SELECT prompt_fingerprint, project_id FROM prompt_group_covers').map((cover) => [
-        coverKey(cover.prompt_fingerprint),
-        cover.project_id,
-      ]),
-    );
     const generated = new Map(
       query(
-        'SELECT vi.project_id,v.work_id,v.number,v.source FROM version_images vi JOIN work_versions v ON v.id=vi.version_id ORDER BY vi.rowid',
+        'SELECT vi.project_id,v.work_id,v.number,v.source,w.origin_json FROM version_images vi JOIN work_versions v ON v.id=vi.version_id JOIN works w ON w.id=v.work_id ORDER BY vi.rowid',
       ).map((row) => [
         row.project_id,
         {
           generated_work_id: row.work_id,
           version_number: row.number,
           generation_source: row.source,
+          work_cover: originalCover(row.origin_json),
         },
       ]),
     );
@@ -1394,7 +1385,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       return {
         ...entry.card,
         ...generated.get(row.project_id),
-        group_cover_id: covers.get(entry.coverKey) || '',
+        group_cover_id: '',
       };
     });
   };
@@ -1882,23 +1873,6 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     }
   };
 
-  const setGroupCover = (fingerprint, projectId) => {
-    const normalizedFingerprint = String(fingerprint || '');
-    const id = String(projectId || '');
-    const project = query(
-      'SELECT id FROM projects WHERE id = $id AND exact_group_fingerprint = $fingerprint',
-      { $id: id, $fingerprint: normalizedFingerprint },
-    )[0];
-    if (!normalizedFingerprint || !project) throw new Error('图片不属于当前图片组');
-    database.run(
-      `INSERT INTO prompt_group_covers (prompt_fingerprint, project_id) VALUES ($fingerprint, $project_id)
-       ON CONFLICT(prompt_fingerprint) DO UPDATE SET project_id = excluded.project_id`,
-      { $fingerprint: normalizedFingerprint, $project_id: id },
-    );
-    persist();
-    return { promptFingerprint: normalizedFingerprint, projectId: id };
-  };
-
   const clearInvalidGroupCovers = () => {
     database.run(
       `DELETE FROM prompt_group_covers
@@ -2130,7 +2104,6 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       return previous;
     }),
     updateProjects: atomic(updateProjects),
-    setGroupCover: atomic(setGroupCover),
     loadTrashSummary,
     backfillPromptFingerprints: atomic(backfillPromptFingerprints),
     // One synchronous chunk, with an independent savepoint for each image.

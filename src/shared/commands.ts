@@ -210,10 +210,6 @@ export interface CommandDefinitions {
     output: IPC.Result<{ deleted: boolean }>;
   };
   'library.restore': { input: { ids: string[] }; output: IPC.BatchResult };
-  'library.set-cover': {
-    input: { fingerprint: string; projectId: string };
-    output: IPC.Result<{ promptFingerprint: string; projectId: string }>;
-  };
   'trash.delete-permanently': {
     input: { ids?: string[] };
     output: IPC.BatchResult;

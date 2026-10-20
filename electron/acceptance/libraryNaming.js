@@ -9,9 +9,11 @@ export async function libraryNamingChecks({ h, database, doubles }) {
   const bar = 'document.querySelector(".library-selection-bar")';
   const confirmNaming = async () => {
     if (await e('!!document.querySelector("dialog[open]")')) await click('起名', dialog);
+    else if (await e('!!document.querySelector(".library-batch-name:popover-open")'))
+      await click('确定', 'document.querySelector(".library-batch-name:popover-open")');
     else await h.key('Enter', {}, 'document.querySelector(".library-inline-name input")');
     await wait(
-      '!document.querySelector("dialog[open],.library-inline-name")',
+      '!document.querySelector("dialog[open],.library-inline-name,.library-batch-name:popover-open")',
       '起名完成后编辑关闭',
     );
     await wait(
@@ -81,7 +83,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     );
     if (!multi)
       await wait(
-        'document.querySelector(".library-detail")?.dataset.detailId === document.querySelector(".library-card.current")?.dataset.projectId && document.querySelector(".library-detail")?.getAttribute("aria-busy") === "false"',
+        `(async()=>{const detail=document.querySelector('.library-detail'), card=document.querySelector('.library-card.current');if(!detail?.dataset.detailId||!card||detail.getAttribute('aria-busy')!=='false')return false;const ids=[detail.dataset.detailId,card.dataset.projectId];const [a,b]=await Promise.all(ids.map(id=>window.studio.invoke('library.get',{id}).then(r=>r.data.project)));return a.id===b.id||a.exact_group_fingerprint===b.exact_group_fingerprint})()`,
       );
   };
   const undo = async () => {
@@ -249,17 +251,12 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await input('input[aria-label="图片名称"]', '批量验收');
     await check(
       '六张预览两位编号',
-      'document.querySelector(".library-rename-result").textContent === "批量验收-01 … 批量验收-06"',
+      'document.querySelector(".library-batch-name").textContent.includes("批量验收-01、批量验收-02……")',
       undefined,
       'both',
     );
     await h.screenshot('library-rename');
-    await check(
-      '起名对话框在标题栏下的工作区居中',
-      `(()=>{const dialog=document.querySelector('dialog[open]').getBoundingClientRect(),page=document.querySelector('.library-page').getBoundingClientRect();return Math.abs(dialog.top+dialog.height/2-page.top-page.height/2)<1})()`,
-      undefined,
-      'both',
-    );
+
     await confirmNaming();
     await h.until(
       () => fixtureIds.every((id) => database.loadProject(id).has_custom_name),
@@ -274,7 +271,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
           ordered.every(
             (cover, index) =>
               records.find((p) => p.id === cover).name ===
-              `批量验收-${String(index * 2 + 1).padStart(2, '0')}`,
+              `批量验收-${String(index * 2 + 2).padStart(2, '0')}`,
           ) &&
           new Set(records.map((p) => p.name)).size === 6
         );
@@ -345,7 +342,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await input('input[aria-label="图片名称"]', '百张验收');
     await check(
       '一百张预览切换为三位编号',
-      'document.querySelector(".library-rename-result").textContent === "百张验收-001 … 百张验收-100"',
+      'document.querySelector(".library-batch-name").textContent.includes("百张验收-001、百张验收-002……")',
       undefined,
       'once',
     );

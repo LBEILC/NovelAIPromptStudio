@@ -330,6 +330,18 @@ export default function App() {
   const projects = projectsByView[galleryView] || [];
   const libraryLoading = Boolean(libraryLoadingByView[galleryView]);
   const cacheProgress = useLibraryCacheProgress(libraryLoading);
+  const cacheWasVisible = useRef(false);
+  useEffect(() => {
+    if (cacheProgress) cacheWasVisible.current = true;
+    else if (!libraryLoading && cacheWasVisible.current) {
+      cacheWasVisible.current = false;
+      notificationTarget.current.notify({
+        text: '图片库已整理好',
+        tone: 'success',
+        source: 'background',
+      });
+    }
+  }, [cacheProgress, libraryLoading]);
   const reduceMotion = useStudioReducedMotion(appearance.motion);
 
   const showToast = useCallback((message, tone = 'success', source = 'user') => {
@@ -1279,19 +1291,6 @@ export default function App() {
     return true;
   };
 
-  const setGroupCover = async (group, project) => {
-    const result = await invokeUI('library.set-cover', {
-      fingerprint: group.fingerprint,
-      projectId: project.id,
-    });
-    if (!result?.ok) {
-      showToast(result?.error || '没能设为封面', 'error');
-      return;
-    }
-    showToast('已设为封面');
-    await reloadLibrary(galleryView);
-  };
-
   const toggleGroupSelection = (group, event) => {
     const index = visibleGroups.findIndex((item) => item.id === group.id);
     setSelectedGroupIds((current) => {
@@ -1736,7 +1735,6 @@ export default function App() {
                 setSelectedGroupIds(groupIds);
                 lastSelectedGroupRef.current = groupIds.at(-1) || '';
               }}
-              onSetCover={setGroupCover}
               onSelectAll={() => setSelectedGroupIds(visibleGroups.map((group) => group.id))}
               onSortChange={setSort}
               onToggleSelect={toggleGroupSelection}

@@ -36,8 +36,8 @@ export function useUpdates() {
       if (!result.ok) throw new Error(result.error);
       setState(result);
     } catch (e) {
-      setError(String(e));
-      setState((current) => current && { ...current, phase: 'error' });
+      setError(e instanceof Error ? e.message : String(e));
+      setState((current) => current && { ...current, phase: 'error', hasUpdate: false });
     }
   };
   const changeAutoCheck = async (checked: boolean) => {
@@ -47,7 +47,7 @@ export function useUpdates() {
       });
       if (saved) setAutoCheck(saved.autoCheckUpdates);
     } catch (e) {
-      setError(String(e));
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
   const download = async () => {
@@ -55,7 +55,7 @@ export function useUpdates() {
       const result = await invokeUI('updates.download', {});
       if (result && !result.ok) throw new Error(result.error);
     } catch (e) {
-      setError(String(e));
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
   return { state, autoCheck, changeAutoCheck, check, download, error };

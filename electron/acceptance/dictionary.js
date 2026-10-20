@@ -319,11 +319,10 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     for (let i = 0; i < 5; i++) await click(`dictionary_fixture_${String(i).padStart(3, '0')}`);
     await click('用 AI 重新翻译');
     await check(
-      '选中 50 条时直接翻译，不弹确认框',
-      '!document.querySelector("dialog[open]")',
-      undefined,
-      'once',
+      '重译前确认实际选择数量',
+      `document.querySelector('dialog[open] h3')?.textContent==='用 AI 重新翻译 50 项？'`,
     );
+    await click('重新翻译', 'document.querySelector("dialog[open]")');
     await wait('document.querySelector(".nps-toast")?.textContent==="已重新翻译 50 项"');
     await check(
       '50 条直接翻译成功，未选中的五条保持原样',
@@ -340,10 +339,8 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     await configure('dictionary-success');
     await click('用 AI 重新翻译');
     await check(
-      '超过 50 条的确认框逐字说明数量、批次、替换与取消',
-      `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='用 AI 重新翻译 55 条？' && dialog.querySelector('.nps-dialog-body p').textContent==='会把这些 Tag 的名字发给你配置的 AI 服务，分 2 批完成，可以随时取消。现有的译文和分类会被新的结果替换。' && [...dialog.querySelectorAll('.nps-actions button')].map(b=>b.textContent).join('|')==='取消|开始翻译'})()`,
-      undefined,
-      'once',
+      '重译前确认包含服务地址和覆盖说明',
+      `document.querySelector('dialog[open] h3')?.textContent==='用 AI 重新翻译 55 项？' && document.querySelector('dialog[open]').textContent.includes('改过的也会被替换')`,
     );
     await h.screenshot('dictionary-retranslate-confirm');
     await click('取消', 'document.querySelector("dialog[open]")');
@@ -357,7 +354,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       'once',
     );
     await click('用 AI 重新翻译');
-    await click('开始翻译', 'document.querySelector("dialog[open]")');
+    await click('重新翻译', 'document.querySelector("dialog[open]")');
     await h.until(
       () =>
         [...database.lookupTagDictionary(aiTags).values()].every(
@@ -418,20 +415,15 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     original();
     await configure('dictionary-partial');
     await click('用 AI 重新翻译');
-    await click('开始翻译', 'document.querySelector("dialog[open]")');
+    await click('重新翻译', 'document.querySelector("dialog[open]")');
     await wait(
-      'document.querySelector(".settings-dictionary-progress-line > span")?.textContent === "正在用 AI 翻译 · 已完成 50 / 55 · 没能翻译 50 条"',
+      'document.querySelector(".settings-dictionary-selection")?.textContent.includes("正在翻译 50 / 55")',
     );
-    await check(
-      '进行中的失败数量采用定稿且取消按钮靠右',
-      `(()=>{const row=document.querySelector('.settings-dictionary-progress-line'),button=row.querySelector('button');return row.firstElementChild.textContent==='正在用 AI 翻译 · 已完成 50 / 55 · 没能翻译 50 条' && button.textContent==='取消' && Math.abs(button.getBoundingClientRect().right-row.getBoundingClientRect().right)<1})()`,
-      undefined,
-      'both',
-    );
+
     await h.screenshot('dictionary-retranslate-progress');
     await fetch(mode.baseUrl.replace('/v1', '/control/dictionary-continue'));
     await wait(
-      'document.querySelector(".settings-dictionary-progress-line > span")?.textContent === "已翻译 5 条，没能翻译 50 条，保持原样"',
+      'document.querySelector(".nps-toast")?.textContent.includes("已翻译 5 项，其余没有改动")',
     );
     await check(
       'AI 部分失败保留前 50 条并提交最后 5 条',
@@ -444,34 +436,41 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       undefined,
       'once',
     );
-    await click('查看原因', 'document.querySelector(".settings-dictionary-progress")');
     await check(
-      '查看原因展开全部失败条目和各自原因',
-      `(()=>{const failures=[...document.querySelectorAll('.settings-dictionary-failures p')];return failures.length===50 && failures.every((row,i)=>row.textContent.includes('dictionary_fixture_'+String(i).padStart(3,'0')) && row.textContent.includes('synthetic batch failure'))})()`,
+      '失败通知提供重试',
+      `document.querySelector('.nps-toast')?.textContent.includes('重试')`,
+    );
+    await h.screenshot('dictionary-retranslate-failures');
+    preferences.saveAISettings({ baseUrl: mode.baseUrl, model: 'dictionary-success' });
+    for (const tag of aiTags.slice(50))
+      database.updateTagDictionary(tag, { translation: '已完成后保留的修订', category: 'Body' });
+    await click('重试', 'document.querySelector(".nps-toast")');
+    await wait('document.querySelector(".nps-toast")?.textContent.includes("已重新翻译 50 项")');
+    await check(
+      '重试只发送失败条目，保留已成功条目的后续修订',
+      () => {
+        const items = database.lookupTagDictionary(aiTags);
+        return aiTags.every(
+          (tag, i) =>
+            items.get(tag).translation === (i < 50 ? '合成重译结果' : '已完成后保留的修订'),
+        );
+      },
       undefined,
       'once',
     );
-    await h.screenshot('dictionary-retranslate-failures');
     original();
     await configure('dictionary-cancel');
     await click('用 AI 重新翻译');
-    await click('开始翻译', 'document.querySelector("dialog[open]")');
+    await click('重新翻译', 'document.querySelector("dialog[open]")');
     await wait(
-      'document.querySelector(".settings-dictionary-progress")?.textContent.includes("0 / 55")',
+      'document.querySelector(".settings-dictionary-selection")?.textContent.includes("0 / 55")',
     );
-    await check(
-      '进行中无失败时不附加失败计数',
-      'document.querySelector(".settings-dictionary-progress-line > span").textContent === "正在用 AI 翻译 · 已完成 0 / 55"',
-      undefined,
-      'once',
-    );
-    await click('取消', 'document.querySelector(".settings-dictionary-progress")');
-    await wait(
-      'document.querySelector(".settings-dictionary-progress")?.textContent.includes("已取消")',
-    );
+
+    await click('停止', 'document.querySelector(".settings-dictionary-selection")');
+    await wait('document.querySelector(".nps-toast")?.textContent.includes("已停止")');
     await check(
       '取消结果使用定稿并保留未完成条目',
-      'document.querySelector(".settings-dictionary-progress-line > span").textContent === "已取消。完成了 0 条，其余没有改动"',
+      'document.querySelector(".nps-toast").textContent.includes("已停止：翻译了 0 项，其余没有改动")',
       undefined,
       'once',
     );

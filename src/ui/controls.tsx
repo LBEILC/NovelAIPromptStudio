@@ -175,7 +175,7 @@ export function TextArea({
     const node = ref.current;
     const viewport = node?.closest<HTMLElement>('.wb-document-scroll');
     if (!autoSize || !node || !viewport) return;
-    // TODO(design): No maximum is specified; cap at the available prompt viewport, preserving the existing minimum.
+
     const size = () => {
       const section = node.closest<HTMLElement>('.wb-section')!;
       const style = getComputedStyle(node);

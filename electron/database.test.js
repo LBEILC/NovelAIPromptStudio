@@ -627,7 +627,7 @@ describe('phase 2 core database', () => {
     ]);
   }, 30_000);
 
-  it('groups seed variants with a stable Prompt fingerprint and persists a valid cover', async () => {
+  it('groups seed variants with a stable Prompt fingerprint', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
     temporaryDirectories.push(directory);
     const database = await openDatabase(directory);
@@ -641,10 +641,6 @@ describe('phase 2 core database', () => {
     expect(loaded[0].prompt_fingerprint).toBe(loaded[1].prompt_fingerprint);
     expect(loaded[0].base_prompt_fingerprint).toBeTruthy();
     expect(loaded[0].exact_group_fingerprint).toBe(loaded[1].exact_group_fingerprint);
-    database.setGroupCover(loaded[0].exact_group_fingerprint, 'project-1');
-    expect(database.loadLibrary().every((entry) => entry.group_cover_id === 'project-1')).toBe(
-      true,
-    );
     database.deleteProject('project-1');
     expect(database.loadLibrary()[0].group_cover_id).toBe('');
   });
@@ -677,8 +673,5 @@ describe('phase 2 core database', () => {
     expect(first.prompt_fingerprint).toBe(differentVibe.prompt_fingerprint);
     expect(first.exact_group_fingerprint).not.toBe(differentVibe.exact_group_fingerprint);
     expect(first.exact_group_fingerprint).not.toBe(differentModel.exact_group_fingerprint);
-    expect(() => database.setGroupCover(first.exact_group_fingerprint, differentVibe.id)).toThrow(
-      '图片不属于当前图片组',
-    );
   });
 });

@@ -1,12 +1,7 @@
 import { Collapse, DecodedImage, TransitionSurface } from '../ui/transitions';
 import { writeClipboardText } from '../lib/clipboard';
 import { Shortcut, SurfaceButton } from '../ui';
-import {
-  dimensions,
-  generationParameters,
-  libraryCountText,
-  modelDisplayName,
-} from './presentation';
+import { dimensions, libraryCountText, modelDisplayName } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import { Button, useScrollArea } from '../ui';
 import { hasImageName, imageFileName, imageAccessibleName } from '../lib/imageNaming.js';
@@ -81,7 +76,11 @@ export function LibraryDetail({
               .filter((group) => p.selectedGroupIds.includes(group.id))
               .slice(0, 5)
               .map((group) => (
-                <DecodedImage key={group.id} src={mediaUrl(group.cover.thumbnail_path)} alt="" />
+                <DecodedImage
+                  key={group.id}
+                  src={mediaUrl(group.coverImage?.thumbnail_path || group.cover.thumbnail_path)}
+                  alt=""
+                />
               ))}
           </div>
           <span className="library-help">
@@ -112,8 +111,6 @@ export function LibraryDetail({
   const filename = imageFileName(detail);
   const filenameCharacters = Array.from(filename);
   const pending = p.preview?.id !== detail.id;
-  // TODO(design): The prototype does not specify generation parameters or the set-cover action.
-  const parameters = generationParameters(detail.metadata);
   return (
     <aside className="library-detail" data-detail-id={detail.id} aria-busy={pending}>
       <div className="library-detail-scroll" ref={scroll}>
@@ -238,12 +235,8 @@ export function LibraryDetail({
                 </span>
               </>
             )}
+            {detail.vibe_fingerprint && <> · Vibe {detail.vibe_fingerprint.slice(0, 8)}</>}
           </span>
-          {parameters && (
-            <span className="library-mono" data-generation-parameters>
-              {parameters}
-            </span>
-          )}
           <span>
             {(p.view === 'trash' ? detail.deleted_at : detail.created_at).slice(0, 10)}{' '}
             {p.view === 'trash' ? '移入回收站' : '导入'}
@@ -287,11 +280,7 @@ export function LibraryDetail({
                 <i className="ri-edit-line" />
                 {hasImageName(detail) ? '重命名' : '起名'}
               </Button>
-              {group && group.members.length > 1 && group.canSetCover && (
-                <Button variant="quiet" size="small" onClick={() => p.onSetCover(group, detail)}>
-                  设为封面
-                </Button>
-              )}
+
               <Button
                 variant="quiet"
                 size="small"

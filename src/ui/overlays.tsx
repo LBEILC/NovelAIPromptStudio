@@ -358,7 +358,12 @@ export function DialogContent({
       <div className="nps-dialog-body">{children}</div>
       {quote && <blockquote className="nps-quote">{quote}</blockquote>}
       <div className="nps-actions">
-        <button ref={cancelRef} type="button" className="nps-button" onClick={onCancel}>
+        <button
+          ref={cancelRef}
+          type="button"
+          className="nps-button nps-button-quiet"
+          onClick={onCancel}
+        >
           {cancelLabel}
         </button>
         <button

@@ -3,13 +3,7 @@ import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'r
 import type { AISettings } from '../shared/types';
 
 type SettingsDraft = AISettings & { apiKey: string };
-const editableFields = [
-  'baseUrl',
-  'apiKey',
-  'model',
-  'translationPrompt',
-  'classificationPrompt',
-] as const;
+const editableFields = ['baseUrl', 'apiKey', 'model'] as const;
 type EditableField = (typeof editableFields)[number];
 
 export function useAISettings(notify?: (text: string) => void) {
@@ -22,9 +16,6 @@ export function useAISettings(notify?: (text: string) => void) {
       baseUrl: 'https://api.openai.com/v1',
       model: '',
       apiKey: '',
-      translationPrompt: '',
-      classificationPrompt: '',
-      defaultPrompts: { translation: '', classification: '' },
       hasApiKey: false,
       encryptionAvailable: true,
     },
@@ -52,6 +43,7 @@ export function useAISettings(notify?: (text: string) => void) {
     });
   }, []);
   const [models, setModels] = useState<string[]>([]);
+  const [modelsError, setModelsError] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const loaded = useRef(false);
@@ -104,6 +96,7 @@ export function useAISettings(notify?: (text: string) => void) {
         };
       });
       if (action === 'models') {
+        setModelsError('');
         const result = await invokeUI('ai.models', {});
         if (!result.ok) throw new Error(result.error);
         setModels(result.models);
@@ -121,6 +114,7 @@ export function useAISettings(notify?: (text: string) => void) {
     } catch (error) {
       if (action === 'models') setModels([]);
       const text = error instanceof Error ? error.message : String(error);
+      if (action === 'models') setModelsError(text);
       if (action === 'test' && revision.current === requestRevision)
         setTestResult({ ok: false, text: `连接失败：${text}` });
       else setMessage(text);
@@ -129,5 +123,16 @@ export function useAISettings(notify?: (text: string) => void) {
       setOperation('');
     }
   };
-  return { settings, setSettings, models, busy, message, run, dirty, testResult, operation };
+  return {
+    settings,
+    setSettings,
+    models,
+    modelsError,
+    busy,
+    message,
+    run,
+    dirty,
+    testResult,
+    operation,
+  };
 }

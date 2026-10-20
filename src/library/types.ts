@@ -11,7 +11,7 @@ export interface LibraryGroup {
   fingerprint: string;
   cover: LibraryCard;
   members: LibraryCard[];
-  canSetCover: boolean;
+  coverImage?: LibraryCard['work_cover'];
   grouping: Grouping;
 }
 export type CountedCollection = Collection & { image_count: number | null };
@@ -61,7 +61,6 @@ export interface LibraryProps {
   onCopyImage: (project: LibraryCard | ImageRecord) => Promise<unknown>;
   onDownloadImage: (project: LibraryCard | ImageRecord) => Promise<unknown>;
   onReveal: (project: LibraryCard | ImageRecord) => void;
-  onSetCover: (group: LibraryGroup, project: LibraryCard | ImageRecord) => Promise<unknown>;
   renameRequest?: { id: string; sequence: number };
   onRequestRename?: (id: string) => void;
   onRename: (project: LibraryCard | ImageRecord, name: string) => Promise<boolean>;

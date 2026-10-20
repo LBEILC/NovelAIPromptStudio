@@ -89,33 +89,29 @@ describe('AI preferences', () => {
     expect(fs.readFileSync(preferences.filePath, 'utf8')).not.toContain('top-secret');
   });
 
-  it('persists editable translation and classification prompts', () => {
+  it('ignores legacy custom AI rules and keeps session credentials off disk', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
     temporaryDirectories.push(directory);
-    const preferences = openPreferences(directory, safeStorage);
-
-    const defaults = preferences.publicSettings().defaultPrompts;
-    expect(defaults.translation).toBeTruthy();
-    expect(defaults.classification).toBeTruthy();
-    expect(
-      preferences.saveAISettings({
-        baseUrl: 'https://api.example.com/v1',
-        model: 'qwen-plus',
-        translationPrompt: 'Translate with my glossary.',
-        classificationPrompt: 'Classify using my taxonomy.',
-      }),
-    ).toEqual(
-      expect.objectContaining({
-        translationPrompt: 'Translate with my glossary.',
-        classificationPrompt: 'Classify using my taxonomy.',
+    fs.writeFileSync(
+      path.join(directory, 'preferences.json'),
+      JSON.stringify({
+        aiTranslationPrompt: 'legacy rule',
+        aiClassificationPrompt: 'legacy category',
       }),
     );
-
-    const stored = JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'));
-    expect(stored).toMatchObject({
-      aiTranslationPrompt: 'Translate with my glossary.',
-      aiClassificationPrompt: 'Classify using my taxonomy.',
+    const unavailable = { ...safeStorage, isEncryptionAvailable: () => false };
+    const preferences = openPreferences(directory, unavailable);
+    expect(preferences.publicSettings()).not.toHaveProperty('translationPrompt');
+    preferences.saveAISettings({
+      baseUrl: 'https://api.example.com/v1',
+      model: 'test',
+      apiKey: 'session-only-secret',
     });
+    expect(preferences.credentials().apiKey).toBe('session-only-secret');
+    const stored = fs.readFileSync(preferences.filePath, 'utf8');
+    expect(stored).not.toContain('session-only-secret');
+    expect(stored).not.toContain('legacy rule');
+    expect(openPreferences(directory, unavailable).credentials().apiKey).toBe('');
   });
 
   it('persists validated cross-platform appearance preferences', () => {

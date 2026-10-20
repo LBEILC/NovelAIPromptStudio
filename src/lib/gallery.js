@@ -72,14 +72,13 @@ function finalizeGalleryGroup(group, grouping, exact = false) {
   const members = [...group.members].sort(
     (left, right) => galleryProjectDate(right) - galleryProjectDate(left),
   );
-  const requestedCover = exact
-    ? members.find((project) => members.some((member) => member.group_cover_id === project.id))
-    : null;
-  const cover = requestedCover || members[0];
+  const cover = group.key.startsWith('work:')
+    ? members.find((member) => member.version_number === 1) || members.at(-1)
+    : members.at(-1);
   return {
     ...group,
     cover,
-    canSetCover: exact && Boolean(group.fingerprint),
+    ...(group.key.startsWith('work:') && cover.work_cover ? { coverImage: cover.work_cover } : {}),
     grouping,
     members,
     id: group.key,
@@ -209,7 +208,7 @@ export function reconcileGallerySelection(groups = [], selectedGroupIds = []) {
 export function galleryGroupMenuLabels(group) {
   const grouped = Number(group?.count || group?.members?.length || 0) > 1;
   return {
-    rename: grouped ? (group?.canSetCover ? '重命名封面' : '重命名当前图片') : '重命名',
+    rename: grouped ? '重命名当前图片' : '重命名',
   };
 }
 

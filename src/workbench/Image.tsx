@@ -67,7 +67,6 @@ export function WorkbenchImage({ tab, ...p }: ImageProps) {
           fingerprint: version.id,
           cover: members[0],
           members,
-          canSetCover: false,
           grouping: { promptScope: 'separate', mergeVibes: false, similarityThreshold: 85 },
         } as unknown as LibraryGroup)
       : null;

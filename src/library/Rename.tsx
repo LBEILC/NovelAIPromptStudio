@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react';
-import { Checkbox, Dialog, Input } from '../ui';
+import { useEffect, useState, type RefObject } from 'react';
+import { Button, Checkbox, Dialog, Input, Popover } from '../ui';
 import { numberedImageNames } from '../lib/imageNaming.js';
 import type { LibraryProps } from './types';
 
-// TODO(design): This workflow has no matching state in the reference; retain its existing presentation.
 export function LibraryRename({
   open,
   p,
   ids,
   currentId,
   initialName = '',
+  anchor,
   onClose,
 }: {
   open: boolean;
@@ -17,6 +17,7 @@ export function LibraryRename({
   ids: string[];
   currentId?: string;
   initialName?: string;
+  anchor?: RefObject<HTMLElement | null>;
   onClose: () => void;
 }) {
   const [name, setName] = useState(initialName);
@@ -31,6 +32,57 @@ export function LibraryRename({
   }, [open, initialName]);
   const targets = onlyCurrent && currentId ? [currentId] : ids;
   const names = numberedImageNames(name, targets.length);
+  const hintNames = numberedImageNames(name.trim() || '名称', targets.length);
+  const save = async () => {
+    if (busy || !name.trim()) return;
+    setBusy(true);
+    try {
+      if (await p.onRenameMany(targets, name.trim())) onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (anchor)
+    return (
+      <Popover
+        open={open}
+        anchor={anchor}
+        onClose={onClose}
+        label={`给 ${targets.length} 张图片起名`}
+        className="library-batch-name"
+      >
+        <h6>给 {targets.length} 张图片起名</h6>
+        <div className="library-batch-name-row">
+          <Input
+            size="small"
+            aria-label="图片名称"
+            placeholder="名称"
+            value={name}
+            disabled={busy}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void save();
+              }
+            }}
+          />
+          <Button
+            size="small"
+            variant="ink"
+            disabled={!name.trim() || busy}
+            onClick={() => void save()}
+          >
+            确定
+          </Button>
+        </div>
+        <span className="library-help">
+          {targets.length > 1
+            ? `按当前顺序编号：${hintNames[0]}、${hintNames[1]}……`
+            : '只有一张，不加编号'}
+        </span>
+      </Popover>
+    );
   return (
     <Dialog
       open={open}

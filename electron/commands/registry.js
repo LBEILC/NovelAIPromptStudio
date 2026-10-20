@@ -108,11 +108,6 @@ export const commandRegistry = {
   },
   'collection.delete': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
   'library.restore': { fields: { ids: 'strings' }, required: ['ids'], uiOnly: true },
-  'library.set-cover': {
-    fields: { fingerprint: 'string', projectId: 'string' },
-    required: ['fingerprint', 'projectId'],
-    uiOnly: true,
-  },
   'trash.delete-permanently': { fields: { ids: 'stringList' }, required: [], uiOnly: true },
   'trash.summary': { fields: {}, required: [], uiOnly: true },
   'workbench.temp-sync': { fields: { paths: 'stringList' }, required: ['paths'], uiOnly: true },
@@ -431,12 +426,9 @@ function valid(value, type) {
         baseUrl: 'text',
         model: 'text',
         apiKey: 'text',
-        translationPrompt: 'text',
-        classificationPrompt: 'text',
         clearApiKey: 'boolean',
         hasApiKey: 'boolean',
         encryptionAvailable: 'boolean',
-        defaultPrompts: 'defaultPrompts',
       },
       appearanceSettings: {
         themeMode: 'auto|dark|light',
@@ -455,12 +447,6 @@ function valid(value, type) {
       )
     );
   }
-  if (type === 'defaultPrompts')
-    return (
-      record(value) &&
-      Object.keys(value).every((key) => ['translation', 'classification'].includes(key)) &&
-      Object.values(value).every((entry) => valid(entry, 'text'))
-    );
   if (type === 'renames' || type === 'dictionaryEntries') {
     /** @type {Record<string,string>} */
     const fields =

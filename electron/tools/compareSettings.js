@@ -5,7 +5,15 @@ import { BrowserWindow, net } from 'electron';
 import sharp from 'sharp';
 
 // Reuses the screenshot harness's disposable profile and offline service doubles.
-export async function compareSettings({ app, window, h, invoke, generationService }) {
+export async function compareSettings({
+  app,
+  window,
+  h,
+  invoke,
+  generationService,
+  mode,
+  commandHandlers,
+}) {
   const source = path.resolve(process.env.NPS_COMPARE_SETTINGS_DIR);
   const root = app.getAppPath();
   const output = path.join(root, '.codex-runs', 'compare-settings');
@@ -79,11 +87,16 @@ export async function compareSettings({ app, window, h, invoke, generationServic
         'design/prototype.js',
         'design/prototype-lib.js',
         'design/prototype-set.js',
+        'design/prototype-fill.js',
       ].map((name) => fs.readFile(path.join(source, name), 'utf8')),
     );
     await reference.webContents.executeJavaScript(
       sources.join('\n') + '\nroot.dataset.motion="off";S.page="set";S.set.motion="off";paint();',
     );
+    const setup = await invoke('agent.setup');
+    if (!path.resolve(setup.path).startsWith(path.resolve(mode.root) + path.sep))
+      throw Error('Screenshot installation must stay inside the disposable profile');
+    await invoke('agent.install');
     const ai = await invoke('settings.ai.get');
     await invoke('settings.ai.save', {
       settings: {
@@ -121,6 +134,12 @@ export async function compareSettings({ app, window, h, invoke, generationServic
       ts: i,
     }));
     const storage = await invoke('storage.get');
+    const databaseLocation = await invoke('storage.database');
+    const backupFile = path.join(databaseLocation.directory, 'studio.pre-comparison.sqlite');
+    if (!path.resolve(backupFile).startsWith(path.resolve(mode.root) + path.sep))
+      throw Error('Screenshot backup must stay inside the disposable profile');
+    await fs.writeFile(backupFile, 'Synthetic screenshot backup metadata');
+    await fs.truncate(backupFile, 38 * 1024 * 1024);
     await reference.webContents.executeJavaScript(
       `S.set.dx.rows=${JSON.stringify(rows)};S.set.libPath=${JSON.stringify(storage.assetsDirectory)};paint();`,
     );
@@ -143,28 +162,30 @@ export async function compareSettings({ app, window, h, invoke, generationServic
       }
       await h.section(section);
       await reference.webContents.executeJavaScript(
-        `S.set.sec=${JSON.stringify(sec)};S.pop=null;S.dialog=null;root.dataset.theme=${JSON.stringify(dark ? 'dark' : 'light')};paint();`,
+        `S.set.sec=${JSON.stringify(sec)};S.set.alt=${JSON.stringify(sec === 'storage')};S.pop=null;S.dialog=null;root.dataset.theme=${JSON.stringify(dark ? 'dark' : 'light')};paint();`,
       );
       await h.wait(
         `document.documentElement.dataset.theme===${JSON.stringify(dark ? 'dark' : 'light')}`,
       );
       if (prepare) await prepare();
       await h.wait('!document.querySelector(".nps-toast")');
-      let installedAgent;
-      if (id === 'agent') {
-        const folder = path.join(root, '.codex-runs', 'acceptance-设置', 'light');
-        const setup = await fs
-          .readFile(path.join(folder, '032-agent-fixture.json'), 'utf8')
-          .then(JSON.parse)
-          .catch(() => null);
-        if (setup?.installed) {
-          installedAgent = await fs.readFile(
-            path.join(folder, '032-settings-agent-installed-light.png'),
-          );
-          await reference.webContents.executeJavaScript(
-            `document.querySelector('.set .setrow .path').textContent=${JSON.stringify(setup.path)}`,
-          );
-        }
+      if (sec === 'storage') {
+        const content = await h.evaluate(`({
+          columns:[...document.querySelectorAll('[data-settings-section=storage] .settings-column')].map(n=>({path:n.querySelector('code')?.textContent,help:n.querySelector('small')?.textContent})),
+          backup:[...document.querySelectorAll('[data-settings-section=storage] .settings-line')].find(n=>n.textContent.includes('升级前的备份'))?.querySelector('small')?.textContent
+        })`);
+        await reference.webContents.executeJavaScript(`(()=>{
+          const data=${JSON.stringify(content)},cols=[...document.querySelectorAll('.setcol')];
+          cols[0].querySelector('.path').textContent=data.columns[0].path;
+          cols[0].querySelector('small').textContent=data.columns[0].help;
+          cols[1].querySelector('.path').textContent=data.columns[1].path;
+          [...document.querySelectorAll('.setrow')].find(n=>n.textContent.includes('升级前的备份')).querySelector('small').textContent=data.backup;
+        })()`);
+      }
+      if (sec === 'agent') {
+        await reference.webContents.executeJavaScript(
+          `S.set.alt=${JSON.stringify(!setup.onPath)};paint();document.querySelector('.set .setrow .path').textContent=${JSON.stringify(path.dirname(setup.path))}`,
+        );
       }
       await Promise.all([h.evaluate(ready), reference.webContents.executeJavaScript(ready)]);
       // Force a fresh frame in the hidden reference window after theme/overlay changes.
@@ -178,10 +199,7 @@ export async function compareSettings({ app, window, h, invoke, generationServic
         window.webContents.capturePage(),
       ]);
       const left = await sharp(a.toPNG()).resize(1240, 760).png().toBuffer();
-      const right = await sharp(installedAgent || b.toPNG())
-        .resize(1240, 760)
-        .png()
-        .toBuffer();
+      const right = await sharp(b.toPNG()).resize(1240, 760).png().toBuffer();
       await fs.writeFile(path.join(output, `${id}-reference.png`), left);
       await fs.writeFile(path.join(output, `${id}-app.png`), right);
       await sharp({ create: { width: 2480, height: 760, channels: 4, background: '#fff' } })
@@ -217,7 +235,14 @@ export async function compareSettings({ app, window, h, invoke, generationServic
     await capture('account-exhausted', 'NovelAI 账号', 'acct');
     generationService.state.tier = 0;
     await invoke('account.refresh');
-    await capture('account-unsubscribed', 'NovelAI 账号', 'acct');
+    await capture('account-unsubscribed', 'NovelAI 账号', 'acct', false, async () => {
+      // The prototype has no tier fixture; substitute only the approved account content.
+      await reference.webContents.executeJavaScript(`(()=>{
+        const row=[...document.querySelectorAll('.setrow')].find(n=>n.firstElementChild?.firstChild?.textContent==='余额');
+        row.querySelector('small').textContent='未订阅 · 每次生成都要花 Anlas';
+        [...document.querySelectorAll('.setcol')].find(n=>n.firstElementChild?.textContent==='V5 免费用量')?.remove();
+      })()`);
+    });
     generationService.state.tier = 3;
     generationService.state.usage = 12;
     await invoke('account.refresh');
@@ -295,6 +320,89 @@ export async function compareSettings({ app, window, h, invoke, generationServic
         'S.set.dx.edit=null;S.set.dx.picked=dxRows().slice(0,2).map(r=>r.id);paint();',
       );
     });
+    await capture('dictionary-confirm', '翻译词典', 'dict', false, async () => {
+      await h.click('用 AI 重新翻译');
+      await reference.webContents.executeJavaScript('ACT.dxRetrans();paint();');
+    });
+    await h.click('取消', 'document.querySelector("dialog[open]")');
+    const replaced = new Map();
+    const replace = (name, handler) => {
+      if (!replaced.has(name)) replaced.set(name, commandHandlers[name]);
+      commandHandlers[name] = handler;
+    };
+    try {
+      replace('settings.ai.get', () => ({
+        ...ai,
+        baseUrl: 'https://api.example.com/v1',
+        model: 'claude-haiku-5-5',
+        encryptionAvailable: false,
+      }));
+      const saveAI = commandHandlers['settings.ai.save'];
+      replace('settings.ai.save', async (input, context) => ({
+        ...(await saveAI(input, context)),
+        encryptionAvailable: false,
+      }));
+      replace('ai.models', () => ({ ok: false, error: '这个服务不提供模型列表' }));
+      replace('ai.test', () => ({ ok: false, error: '401 · API Key 无效' }));
+      await h.reload();
+      await capture('ai-exceptions', 'AI 服务', 'ai', false, async () => {
+        await h.click('重新读取模型列表');
+        await h.wait('!!document.querySelector(\'input[aria-label="模型"]\')');
+        await h.click('测试连接');
+        await h.wait('document.querySelector(".settings-page-foot")?.textContent.includes("失败")');
+        await reference.webContents.executeJavaScript(
+          'S.set.alt=true;S.set.tested=false;S.set.aiFailed=true;paint();',
+        );
+      });
+      replace('agent.setup', () => ({ ...setup, installed: true, onPath: false }));
+      replace('agent.install', () => ({
+        ok: false,
+        error:
+          '没有权限写入命令所在的文件夹。可以用有权限的账号重试，或把 nai-studio 放进 PATH 里的任意文件夹。',
+      }));
+      await h.reload();
+      await capture('agent-exceptions', 'Agent', 'agent', false, async () => {
+        await h.click('重新安装');
+        await h.wait('document.body.innerText.includes("安装失败")');
+        await reference.webContents.executeJavaScript(
+          'S.set.alt=true;S.set.agentFail=true;paint();',
+        );
+      });
+      const status = await invoke('updates.status');
+      replace('updates.status', () => ({
+        ...status,
+        phase: 'current',
+        hasUpdate: false,
+        error: '',
+      }));
+      replace('updates.check', () => ({ ok: false, error: '无法连接到 GitHub' }));
+      await h.reload();
+      await capture('about-failed', '关于与更新', 'about', false, async () => {
+        await h.click('检查更新');
+        await h.wait('document.body.innerText.includes("检查更新失败")');
+        await reference.webContents.executeJavaScript('S.set.alt=true;S.set.upd="";paint();');
+      });
+      const release = await reference.webContents.executeJavaScript('RELEASE_NOTES');
+      replace('updates.status', () => ({
+        ...status,
+        platform: 'darwin',
+        packaged: true,
+        phase: 'available',
+        hasUpdate: true,
+        latestVersion: release.version,
+        structuredNotes: release,
+        canDownloadUpdate: false,
+        updateMode: 'manual',
+        error: '',
+      }));
+      await h.reload();
+      await capture('about-macos', '关于与更新', 'about', false, async () => {
+        await h.wait('document.body.innerText.includes("前往下载页")');
+        await reference.webContents.executeJavaScript('S.set.alt=true;S.set.upd="found";paint();');
+      });
+    } finally {
+      for (const [name, handler] of replaced) commandHandlers[name] = handler;
+    }
     await fs.writeFile(
       path.join(output, 'index.html'),
       `<!doctype html><meta charset="utf-8"><title>032 C 设置对照</title><style>body{margin:24px;background:#eee;font-family:system-ui}img{width:100%}h2{font-size:18px}</style><p>左：原型；右：软件。全部数据来自临时截图环境。</p>${shots.map((id) => `<h2>${id}</h2><a href="${id}.png"><img src="${id}.png"></a>`).join('')}`,

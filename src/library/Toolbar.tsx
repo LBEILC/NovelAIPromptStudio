@@ -1,4 +1,4 @@
-import { LibraryLayer, LibraryPopover } from './Popover';
+import { Layer as LibraryLayer, Popover as LibraryPopover } from '../ui';
 import { Collapse } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -314,6 +314,7 @@ export function LibraryToolbar({
         </div>
       )}
       <LibraryPopover
+        align="end"
         open={open === 'filter' || !!p.editingSmartCollection}
         anchor={filterAnchor}
         label="筛选"
@@ -480,6 +481,7 @@ export function LibraryToolbar({
         </div>
       </LibraryPopover>
       <LibraryPopover
+        align="end"
         open={open === 'view'}
         anchor={viewAnchor}
         label="视图"
@@ -566,6 +568,7 @@ export function LibraryToolbar({
         </div>
       </LibraryPopover>
       <LibraryLayer
+        align="end"
         open={open === 'import'}
         anchor={importAnchor}
         className="nps-menu"

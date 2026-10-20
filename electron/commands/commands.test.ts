@@ -126,9 +126,6 @@ describe('command contract', () => {
           return {
             baseUrl: '',
             model: '',
-            translationPrompt: '',
-            classificationPrompt: '',
-            defaultPrompts: { translation: '', classification: '' },
             hasApiKey: false,
             encryptionAvailable: true,
           };

@@ -113,7 +113,7 @@ export function LibraryGrid({
     () =>
       layoutLibraryRows(
         p.groups.map((group) => {
-          const { width, height } = group.cover.metadata;
+          const { width, height } = (group.coverImage || group.cover).metadata;
           return width && height ? width / height : fallbackRatio;
         }),
         viewport.width,
@@ -185,7 +185,14 @@ export function LibraryGrid({
       anchor.current = group.id;
     }
     if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !p.selectedGroupIds.length)
-      p.onPreview(group, p.previewGroup?.id === group.id ? p.preview || undefined : undefined);
+      p.onPreview(
+        group,
+        scrub?.group === group.id
+          ? group.members[scrub.index]
+          : p.previewGroup?.id === group.id
+            ? p.preview || undefined
+            : undefined,
+      );
   };
   const updateMarquee = () => {
     const initial = drag.current;
@@ -242,7 +249,7 @@ export function LibraryGrid({
           p.onClearSelection();
           return;
         }
-        // TODO(design): The reference has no library Enter/Space/grid-arrow handlers; retain existing shortcuts.
+
         if (event.key === 'Enter' && p.preview) {
           event.preventDefault();
           p.onOpenWorkbench(p.preview);
@@ -374,8 +381,7 @@ export function LibraryGrid({
                     }}
                     onDoubleClick={() => {
                       if (!multiClick.current && !p.selectedGroupIds.length) {
-                        if (p.previewGroup?.id !== group.id) p.onPreview(group);
-                        onViewer();
+                        if (p.view !== 'trash') p.onOpenWorkbench(shown);
                       }
                     }}
                     onPointerEnter={() => {
@@ -414,7 +420,10 @@ export function LibraryGrid({
                   >
                     <DecodedImage
                       immediate={hovered === group.id || scrub?.group === group.id}
-                      src={mediaUrl(shown.thumbnail_path || shown.image_path)}
+                      src={mediaUrl(
+                        (scrub?.group === group.id ? shown : group.coverImage || shown)
+                          .thumbnail_path || shown.image_path,
+                      )}
                       data-scrub-image={shown.id}
                       alt=""
                       draggable={false}

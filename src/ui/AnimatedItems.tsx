@@ -102,8 +102,6 @@ export class AnimatedItems extends Component<Props> {
   }
 
   private move(before: Map<string, DOMRect>) {
-    // TODO(design): Movement outside this list (later section/group headings) needs
-    // a choice between container height and individual translation; keep its existing layout.
     if (!this.alive || this.props.disabled || !motionEnabled()) return;
     for (const [id, node] of this.items()) {
       const old = before.get(id);

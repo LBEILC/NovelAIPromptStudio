@@ -1,4 +1,4 @@
-import { LibraryPopover } from './Popover';
+import { Popover as LibraryPopover } from '../ui';
 import { useRef, useState } from 'react';
 import { Button, Checkbox, Input } from '../ui';
 import { AnimatedItems } from '../ui/AnimatedItems';

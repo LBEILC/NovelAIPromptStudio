@@ -31,6 +31,7 @@ export function useDictionary() {
   const [pending, setPending] = useState(false);
   const [running, setRunning] = useState(false);
   const [aiReady, setAiReady] = useState(false);
+  const [serviceUrl, setServiceUrl] = useState('');
   const [progress, setProgress] = useState<DictionaryTranslationProgress | null>(null);
   const requestId = useRef('');
   const revision = useRef(0);
@@ -54,7 +55,10 @@ export function useDictionary() {
       });
     void invokeUI('settings.ai.get', {})
       .then((settings) => {
-        if (active) setAiReady(!!settings.model.trim());
+        if (active) {
+          setAiReady(!!settings.model.trim());
+          setServiceUrl(settings.baseUrl);
+        }
       })
       .catch((e: Error) => {
         if (active) setError(e.message);
@@ -140,25 +144,25 @@ export function useDictionary() {
     );
   const remove = (tags: string[]) =>
     mutate(tags, () => invokeUI('dictionary.remove', { tags: tags }));
-  const retranslate = async () => {
-    if (running || !selected.length || !aiReady) return;
+  const retranslate = async (tags = selected) => {
+    if (running || !tags.length || !aiReady) return;
     const id = crypto.randomUUID();
     requestId.current = id;
     setRunning(true);
     setError('');
     setProgress({
       id,
-      total: selected.length,
+      total: tags.length,
       completed: 0,
       translated: 0,
       failed: [],
       canceled: false,
     });
     try {
-      const result = await invokeUI('dictionary.retranslate', { id: id, tags: selected });
+      const result = await invokeUI('dictionary.retranslate', { id: id, tags });
       if (!result.ok) throw Error(result.error);
       setProgress(result);
-      setHeld((current) => [...new Set([...current, ...selected])]);
+      setHeld((current) => [...new Set([...current, ...tags])]);
       await refresh();
       return result;
     } catch (e) {
@@ -184,6 +188,7 @@ export function useDictionary() {
     busy: pending || running,
     running,
     aiReady,
+    serviceUrl,
     progress,
     error,
     save,

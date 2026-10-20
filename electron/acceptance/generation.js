@@ -287,10 +287,10 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   await click('图片库', 'document.querySelector(".studio-titlebar")');
   await input('[aria-label="搜索图片库"]', '');
   await click('生成记录');
-  await wait('!!document.querySelector(".library-version-badge")');
+  await wait('!!document.querySelector(".library-card .library-stack")');
   await check(
     '生成记录逐张列出且最新卡片标注版本和Agent',
-    `(()=>{const cards=[...document.querySelectorAll('.library-card')];return cards.length>0&&!document.querySelector('.library-stack')&&/第 [0-9]+ 版/.test(cards[0].querySelector('.library-version-badge')?.textContent)&&cards[0].textContent.includes('Agent')})()`,
+    `(()=>{const cards=[...document.querySelectorAll('.library-card')];return cards.length>0&&!document.querySelector('.library-stack .ri-stack-line')&&/第 [0-9]+ 版/.test(cards[0].querySelector('.library-stack')?.textContent)&&cards[0].textContent.includes('Agent')})()`,
   );
   await h.section('Agent');
   await click('直接生成');

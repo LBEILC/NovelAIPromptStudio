@@ -145,6 +145,11 @@ export interface StoredGenerationParameters extends GenerationParameters {
 }
 export interface ImageProject {
   generated_work_id?: string;
+  work_cover?: {
+    image_path: string;
+    thumbnail_path: string;
+    metadata: { width?: number; height?: number };
+  };
   version_number?: number;
   generation_source?: 'user' | 'agent';
   original_filename?: string;
@@ -196,6 +201,11 @@ export interface LibraryCard
     | 'group_cover_id'
   > {
   generated_work_id?: string;
+  work_cover?: {
+    image_path: string;
+    thumbnail_path: string;
+    metadata: { width?: number; height?: number };
+  };
   version_number?: number;
   generation_source?: 'user' | 'agent';
   // null reuses JSON.stringify(JSON.parse(prompt_fingerprint).base).
@@ -257,9 +267,6 @@ export interface TagDictionaryEntry extends TagAnnotation {
 export interface AISettings {
   baseUrl: string;
   model: string;
-  translationPrompt: string;
-  classificationPrompt: string;
-  defaultPrompts: { translation: string; classification: string };
   hasApiKey: boolean;
   encryptionAvailable: boolean;
 }
@@ -267,8 +274,6 @@ export interface AISettingsInput {
   baseUrl?: string;
   model?: string;
   apiKey?: string;
-  translationPrompt?: string;
-  classificationPrompt?: string;
   clearApiKey?: boolean;
 }
 export interface AppearanceSettings {

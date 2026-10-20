@@ -27,9 +27,6 @@ afterEach(() => {
 const ai = {
   baseUrl: 'https://example.test/v1',
   model: 'saved',
-  translationPrompt: 'translate',
-  classificationPrompt: 'classify',
-  defaultPrompts: { translation: 'translate', classification: 'classify' },
   hasApiKey: true,
   encryptionAvailable: true,
 };
@@ -120,8 +117,6 @@ describe('settings domain state', () => {
         baseUrl: 'https://draft.test/v1',
         model: 'draft',
         apiKey: 'secret',
-        translationPrompt: 'draft translation',
-        classificationPrompt: 'draft classification',
       };
       act(() => state.setSettings((s) => ({ ...s, ...draft })));
       if (switchSection) {

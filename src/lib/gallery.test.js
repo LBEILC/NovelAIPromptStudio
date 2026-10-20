@@ -42,7 +42,7 @@ const similarItem = (id, tags, { model = 'nai-v4.5', vibe = 'vibe-a', undesired 
 });
 
 describe('gallery grouping and selection', () => {
-  it('groups only non-empty matching fingerprints and honors a valid persisted cover', () => {
+  it('groups matching fingerprints using the earliest import as cover', () => {
     const groups = groupGalleryProjects([
       item('older', 'same', '2026-01-01', 'older'),
       item('newer', 'same', '2026-02-01', 'older'),
@@ -51,17 +51,16 @@ describe('gallery grouping and selection', () => {
     ]);
     expect(groups).toHaveLength(3);
     expect(groups.find((group) => group.count === 2)).toMatchObject({
-      canSetCover: true,
       cover: { id: 'older' },
     });
   });
 
-  it('falls back to the newest remaining member when a persisted cover is invalid', () => {
+  it('ignores persisted covers and selects the earliest remaining import', () => {
     const [group] = groupGalleryProjects([
       item('older', 'same', '2026-01-01', 'deleted-cover'),
       item('newer', 'same', '2026-02-01', 'deleted-cover'),
     ]);
-    expect(group.cover.id).toBe('newer');
+    expect(group.cover.id).toBe('older');
   });
 
   it('expands selected groups to current-view project ids and drops hidden selection', () => {
@@ -94,8 +93,8 @@ describe('gallery grouping and selection', () => {
 
   it('uses single-image wording unless the card represents a real group', () => {
     expect(galleryGroupMenuLabels({ count: 1 })).toEqual({ rename: '重命名' });
-    expect(galleryGroupMenuLabels({ canSetCover: true, count: 2 })).toEqual({
-      rename: '重命名封面',
+    expect(galleryGroupMenuLabels({ count: 2 })).toEqual({
+      rename: '重命名当前图片',
     });
   });
 
@@ -134,7 +133,7 @@ describe('gallery grouping and selection', () => {
       { promptScope: 'full', mergeVibes: true },
     );
     expect(groups).toHaveLength(1);
-    expect(groups[0]).toMatchObject({ canSetCover: false, count: 1, cover: { id: 'older match' } });
+    expect(groups[0]).toMatchObject({ count: 1, cover: { id: 'older match' } });
     expect(groups[0].members.map((project) => project.id)).toEqual(['older match']);
   });
 
@@ -173,7 +172,6 @@ describe('gallery grouping and selection', () => {
       ['a', 'bb'],
       ['ccc'],
     ]);
-    expect(groups.every((group) => !group.canSetCover)).toBe(true);
   });
 
   it('keeps Vibe and model as independent hard boundaries in similar mode', () => {

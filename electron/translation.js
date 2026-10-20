@@ -194,12 +194,8 @@ function parseTranslationJson(content, expectedLength) {
 }
 
 async function translateTagBatch(cleaned, baseUrl, model, settings, fetcher, signal) {
-  const translationPrompt =
-    String(settings.translationPrompt || DEFAULT_TRANSLATION_PROMPT).trim() ||
-    DEFAULT_TRANSLATION_PROMPT;
-  const classificationPrompt =
-    String(settings.classificationPrompt || DEFAULT_CLASSIFICATION_PROMPT).trim() ||
-    DEFAULT_CLASSIFICATION_PROMPT;
+  const translationPrompt = DEFAULT_TRANSLATION_PROMPT;
+  const classificationPrompt = DEFAULT_CLASSIFICATION_PROMPT;
   const body = await requestJson(
     `${baseUrl}/chat/completions`,
     {

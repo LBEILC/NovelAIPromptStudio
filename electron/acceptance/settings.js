@@ -9,6 +9,7 @@ import { dictionaryChecks } from './dictionary.js';
 import { createTrashDraft } from './shortcuts.js';
 import { appearanceLayerChecks } from './appearanceLayers.js';
 import { settingsGenerationChecks } from './settingsGeneration.js';
+import { settingsExceptionChecks } from './settingsExceptions.js';
 
 export async function settingsChecks(context, restart) {
   const { h, mode, app, database, preferences, doubles, files, encrypted } = context;
@@ -43,15 +44,13 @@ export async function settingsChecks(context, restart) {
       '!!document.querySelector(".settings-column input[type=password],.settings-ai-key")',
     );
     await wait(
-      `(()=>{const fields=[...document.querySelectorAll('textarea')];return document.querySelector('${aiInput(0)}')?.value===${JSON.stringify(expected.ai.baseUrl)} && fields[0]?.value===${JSON.stringify(expected.ai.translationPrompt)} && fields[1]?.value===${JSON.stringify(expected.ai.classificationPrompt)}})()`,
+      `document.querySelector('${aiInput(0)}')?.value===${JSON.stringify(expected.ai.baseUrl)}`,
       '重启后的 AI 设置完成异步加载',
     );
     await check(
-      '重启保留地址、模型和两种提示词',
+      '重启保留地址与模型',
       () =>
-        ['baseUrl', 'model', 'translationPrompt', 'classificationPrompt'].every(
-          (key) => preferences.publicSettings()[key] === expected.ai[key],
-        ),
+        ['baseUrl', 'model'].every((key) => preferences.publicSettings()[key] === expected.ai[key]),
       undefined,
       'once',
     );
@@ -63,42 +62,6 @@ export async function settingsChecks(context, restart) {
         'once',
       );
     else h.uncovered('重启验证安全存储', '本平台 safeStorage 不可用');
-    if (mode.phase === 1) {
-      await click('恢复默认', 'document', 0);
-      await h.checkSoon(
-        '仅恢复翻译规则，分类草稿保持',
-        `(()=>{const areas=[...document.querySelectorAll('textarea')];return areas[0].value===${JSON.stringify(preferences.publicSettings().defaultPrompts.translation)} && areas[1].value==='验收分类规则'})()`,
-        undefined,
-        undefined,
-        undefined,
-        'once',
-      );
-      await click('恢复默认', 'document', 1);
-      await h.checkSoon(
-        '分类规则恢复到默认内容',
-        `[...document.querySelectorAll('textarea')][1].value===${JSON.stringify(preferences.publicSettings().defaultPrompts.classification)}`,
-        undefined,
-        undefined,
-        undefined,
-        'once',
-      );
-      await click('保存');
-      await wait('document.body.innerText.includes("已保存")');
-      await check(
-        '两种提示词分别恢复默认',
-        () => {
-          const s = preferences.publicSettings();
-          return (
-            s.translationPrompt === s.defaultPrompts.translation &&
-            s.classificationPrompt === s.defaultPrompts.classification
-          );
-        },
-        undefined,
-        'once',
-      );
-      expected.ai = preferences.publicSettings();
-      await fs.writeFile(savedFile, JSON.stringify(expected));
-    }
     await h.screenshot(`restart-${mode.phase}`);
     return;
   }
@@ -319,8 +282,8 @@ export async function settingsChecks(context, restart) {
       return saved;
     };
   }
-  const aiDraftMatches = `document.querySelector(${JSON.stringify(aiInput(0))})?.value === ${JSON.stringify(mode.baseUrl)} && (document.querySelector('input[aria-label="模型"]')?.value==='acceptance-model' || document.querySelector('[aria-label="模型列表"]')?.textContent.includes('acceptance-model')) && document.querySelector('.settings-column input[type=password]')?.value===${JSON.stringify(encrypted ? 'acceptance-local-key' : '')} && [...document.querySelectorAll('textarea')].map(e=>e.value).join('|') === '验收翻译规则|验收分类规则'`;
-  const aiDraftDetails = `(()=>{const key=document.querySelector('.settings-column input[type=password]'); const areas=[...document.querySelectorAll('textarea')]; return {baseUrl:document.querySelector(${JSON.stringify(aiInput(0))})?.value, model:document.querySelector('[aria-label="模型"]')?.value, apiKey:{empty:!key?.value,length:key?.value.length ?? 0}, translationPrompt:areas[0]?.value, classificationPrompt:areas[1]?.value}})()`;
+  const aiDraftMatches = `document.querySelector(${JSON.stringify(aiInput(0))})?.value === ${JSON.stringify(mode.baseUrl)} && (document.querySelector('input[aria-label="模型"]')?.value==='acceptance-model' || document.querySelector('[aria-label="模型列表"]')?.textContent.includes('acceptance-model')) && document.querySelector('.settings-column input[type=password]')?.value===${JSON.stringify(encrypted ? 'acceptance-local-key' : '')}`;
+  const aiDraftDetails = `(()=>{const key=document.querySelector('.settings-column input[type=password]'); return {baseUrl:document.querySelector(${JSON.stringify(aiInput(0))})?.value, model:document.querySelector('[aria-label="模型"]')?.value, apiKey:{empty:!key?.value,length:key?.value.length ?? 0}}})()`;
   try {
     // Layout checks may have already loaded and retained the AI page. Start a
     // fresh renderer after installing the gate so this is truly its first read.
@@ -342,10 +305,7 @@ export async function settingsChecks(context, restart) {
     if (await e('!!document.querySelector(\'input[aria-label="模型"]\')'))
       await input(aiInput(2), 'acceptance-model');
     else await select('模型列表', 'acceptance-model');
-    await input('textarea', '验收翻译规则');
-    await e(
-      `(() => {const e=[...document.querySelectorAll('textarea')][1]; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'验收分类规则');e.dispatchEvent(new Event('input',{bubbles:true}))})()`,
-    );
+
     await section('外观');
     await section('AI 服务');
     await check('分页切换保留 AI 草稿', aiDraftMatches, aiDraftDetails, 'once');
@@ -356,7 +316,7 @@ export async function settingsChecks(context, restart) {
       await e(
         "(async()=>{await window.studio.invoke('settings.ai.get',{}); await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})()",
       );
-      await check('晚到的已保存 AI 设置不覆盖五个草稿字段', aiDraftMatches, aiDraftDetails, 'once');
+      await check('晚到的已保存 AI 设置不覆盖草稿字段', aiDraftMatches, aiDraftDetails, 'once');
       if (!(await e(aiDraftMatches)))
         throw new Error('AI 草稿已丢失，停止后续连接测试，避免访问被覆盖后的服务地址');
     }
@@ -414,7 +374,7 @@ export async function settingsChecks(context, restart) {
       'once',
     );
   }
-  await input('textarea', '验收翻译规则（已保存）');
+  await input(aiInput(0), mode.baseUrl + '/');
   await click('保存');
   await wait('document.body.innerText.includes("已保存")');
   await notificationClearance(h, 'AI服务页脚', '.settings-page-foot');
@@ -613,6 +573,7 @@ export async function settingsChecks(context, restart) {
     undefined,
     'once',
   );
+  await settingsExceptionChecks(context);
   database.updateProjects([database.loadLibrary('all').at(-1).id], { deleted: true });
   await fs.writeFile(
     savedFile,

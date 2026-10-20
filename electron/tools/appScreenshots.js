@@ -36,6 +36,7 @@ async function renderedFonts(webContents, selectors) {
 }
 
 export async function runAppScreenshots({
+  commandHandlers,
   generationService,
   app,
   mode,
@@ -47,6 +48,7 @@ export async function runAppScreenshots({
   if (process.argv.includes('--app-screenshot-readme')) {
     const { runReadmeScreenshots } = await import('./readmeScreenshots.js');
     return runReadmeScreenshots({
+      commandHandlers,
       generationService,
       app,
       mode,

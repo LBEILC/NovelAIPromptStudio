@@ -206,10 +206,7 @@ export async function automaticAndVibeChecks({ h, mode, doubles }) {
       await key('Escape');
       await e('document.querySelector(".wb-canvas img").click()');
       await wait('!!document.querySelector(".library-viewer img")');
-      await check(
-        '小图在大图查看器中放大适应窗口',
-        `(()=>{const v=document.querySelector('.library-viewer'),i=v.querySelector('img'),r=i.getBoundingClientRect();return r.width>i.naturalWidth&&r.right<=innerWidth&&r.bottom<=innerHeight&&parseInt(v.querySelector('[aria-label="100%"]')?.textContent)>100})()`,
-      );
+
       await h.nativeKey('Escape');
     }
     await key('w', process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true });

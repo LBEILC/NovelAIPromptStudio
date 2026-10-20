@@ -53,8 +53,6 @@ const handlers = {
   'collection.update': (input) => unavailable('请在桌面应用中修改收藏集')(input.id, input.patch),
   'collection.delete': (input) => unavailable('请在桌面应用中删除收藏集')(input.id),
   'library.restore': (input) => unavailable('请在桌面应用中管理回收站')(input.ids),
-  'library.set-cover': (input) =>
-    unavailable('请在桌面应用中设置封面')(input.fingerprint, input.projectId),
   'trash.delete-permanently': (input) => unavailable('请在桌面应用中管理回收站')(input.ids),
   'trash.summary': (input) => (async () => ({ ok: true, projects: [], count: 0, totalBytes: 0 }))(),
   'workbench.temp-sync': (input) => (async () => ({ ok: true }))(input.paths),

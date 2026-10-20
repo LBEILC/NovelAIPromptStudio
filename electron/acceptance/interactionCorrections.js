@@ -367,7 +367,7 @@ export async function interactionCorrectionChecks(env) {
       await move('mouseMoved', start);
       await move('mousePressed', start, true);
       await move('mouseMoved', { x: start.x + 10, y: start.y + 2 }, true);
-      await wait('!!document.querySelector(".wb-drag-feedback")');
+      await wait('!!document.querySelector(".wb-drag-feedback,.wb-tab[data-dragging]")');
       return start;
     };
     const source = 'document.querySelector(".wb-tags [data-marquee-key]")';

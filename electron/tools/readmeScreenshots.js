@@ -136,6 +136,7 @@ year2025|2025 年|ArtistEra
   });
 
 export async function runReadmeScreenshots({
+  commandHandlers,
   app,
   mode,
   database,
@@ -335,12 +336,22 @@ export async function runReadmeScreenshots({
     await h.evaluate('document.fonts.ready.then(()=>true)');
     if (process.argv.includes('--compare-library')) {
       const { compareLibrary } = await import('./compareLibrary.js');
-      return await compareLibrary({ app, window, h, invoke, database });
+      return await compareLibrary({ app, window, h, invoke, database, mode, commandHandlers });
     }
 
     if (process.env.NPS_COMPARE_SETTINGS_DIR) {
       const { compareSettings } = await import('./compareSettings.js');
-      await compareSettings({ app, window, h, invoke, preferences, database, generationService });
+      await compareSettings({
+        app,
+        window,
+        h,
+        invoke,
+        preferences,
+        database,
+        generationService,
+        mode,
+        commandHandlers,
+      });
       return;
     }
     const tags = [

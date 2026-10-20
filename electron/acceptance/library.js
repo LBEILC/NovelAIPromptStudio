@@ -553,16 +553,6 @@ export async function libraryChecks(env) {
       'document.querySelector(".library-detail .library-strip button.is-current")?.getAttribute("aria-label")===document.querySelector(".library-caption .library-name")?.textContent',
     );
     const cover = await e('document.querySelector(".library-detail").dataset.detailId');
-    await click('设为封面', 'document.querySelector(".library-detail-actions")');
-    await wait(
-      '!!document.querySelector(".library-detail .library-strip button.is-cover.is-current")',
-    );
-    await check(
-      '一摞图片逐张切换并设为封面',
-      () => database.loadProject(cover).group_cover_id === cover,
-      undefined,
-      'once',
-    );
     await e('document.querySelector(".library-detail-picture img").click()');
     await wait('!!document.querySelector(".library-viewer")');
     await check(
@@ -574,12 +564,7 @@ export async function libraryChecks(env) {
     await key('Escape', {}, 'document.querySelector(".library-viewer")');
     if (!reduced) await screen('group');
     await refresh();
-    await check(
-      '重新加载后封面仍在',
-      () => database.loadProject(cover).group_cover_id === cover,
-      undefined,
-      'once',
-    );
+
     await setGrouping('不合并');
     if (!reduced) await libraryCopyChecks(env);
     h.category(`图片库·${reduced ? '关闭动效' : '正常动效'}`);
@@ -653,14 +638,16 @@ export async function libraryChecks(env) {
     await e(
       'document.querySelector(".library-card").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
     );
-    await wait('!!document.querySelector(".library-viewer")');
+    await wait(
+      'document.querySelector(".studio-titlebar [aria-current=page]")?.textContent.trim()==="工作台"',
+    );
     await check(
-      '双击卡片打开大图并保留图片库',
-      '!!document.querySelector(".library-viewer") && !!document.querySelector(".library-page")',
+      '双击卡片在工作台打开',
+      'document.querySelectorAll(".workbench-tab").length>0 && !document.querySelector(".library-viewer")',
       undefined,
       'once',
     );
-    await key('Escape', {}, 'document.querySelector(".library-viewer")');
+    await click('图片库', 'document.querySelector(".studio-titlebar")');
     await selectCard(0);
     await waitDetail();
     const trashId = await e('document.querySelector(".library-detail").dataset.detailId');
@@ -806,6 +793,11 @@ export async function libraryChecks(env) {
     await click('导入', scope);
     await wait('document.querySelectorAll(".library-zip .library-card").length===4');
     await wait('document.querySelector(".library-zip")?.textContent.includes("其中 1 张")');
+    await check(
+      'ZIP 默认选中全部可导入图片',
+      'document.querySelectorAll(".library-zip .library-card.picked").length===3',
+    );
+    await click('全不选', dialog);
     await click('全选', dialog);
     await check(
       'ZIP 全选只选择可导入图片',
@@ -826,6 +818,25 @@ export async function libraryChecks(env) {
     );
     await click('关闭', '[...document.querySelectorAll("dialog[open]")].at(-1)');
     await click('全不选', dialog);
+    await e(
+      `(()=>{const cards=document.querySelectorAll('.library-zip .library-card');cards[1].click();cards[3].dispatchEvent(new MouseEvent('click',{bubbles:true,shiftKey:true}))})()`,
+    );
+    await check(
+      'ZIP Shift 连选跳过重复项',
+      'document.querySelectorAll(".library-zip .library-card.picked").length===3 && !document.querySelector(".library-zip .library-card.dim.picked")',
+    );
+    for (const modifier of ['ctrlKey', 'shiftKey']) {
+      await click('全不选', dialog);
+      await e(`document.querySelectorAll('.library-zip .library-card')[3].click()`);
+      await e(
+        `(()=>{const grid=document.querySelector('.library-zip-grid'),r=grid.querySelectorAll('.library-card')[1].getBoundingClientRect();for(const [type,x,y] of [['pointerdown',r.left+2,r.top+2],['pointermove',r.right-2,r.bottom-2],['pointerup',r.right-2,r.bottom-2]])grid.dispatchEvent(new PointerEvent(type,{bubbles:true,pointerId:1,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:x,clientY:y,${modifier}:true}))})()`,
+      );
+      await check(
+        `ZIP ${modifier} 框选保留已有选择`,
+        'document.querySelectorAll(".library-zip .library-card.picked").length===2 && !document.querySelector(".library-zip .library-card.dim.picked")',
+      );
+    }
+    await click('全不选', dialog);
     await e('document.querySelectorAll(".library-zip .library-card")[1].click()');
     await check(
       'ZIP 标记已有图片并支持挑选',
@@ -834,7 +845,7 @@ export async function libraryChecks(env) {
       'once',
     );
     await screen('zip');
-    await click('导入 1 张', dialog);
+    await key('Enter', {}, 'document.querySelector(".library-zip")');
     await h.until(() => database.loadLibrary('all').length === before + 3, 'ZIP 只导入所选');
     await check(
       'ZIP 只导入选中的图片',
@@ -842,6 +853,78 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
+    const commandNames = ['import.prepare', 'import.previews', 'import.cancel'];
+    const originalHandlers = commandNames.map((name) => env.commandHandlers[name]);
+    try {
+      const sample = database.loadProject(database.loadLibrary('all')[0].id);
+      env.commandHandlers['import.prepare'] = () => ({
+        ok: true,
+        sessionId: 'large-zip-acceptance',
+        requiresSelection: true,
+        archives: [{ id: 'large', name: 'synthetic-large.zip', count: 60 }],
+        entries: Array.from({ length: 60 }, (_, i) => ({
+          id: `large-${i}`,
+          archiveId: 'large',
+          fileName: `synthetic-${i}.png`,
+          previewPath: sample.image_path,
+          previewWidth: sample.metadata.width,
+          previewHeight: sample.metadata.height,
+        })),
+      });
+      env.commandHandlers['import.previews'] = () => ({ ok: true });
+      env.commandHandlers['import.cancel'] = () => ({ ok: true });
+      await click('导入', scope);
+      await wait('document.querySelectorAll(".library-zip [data-entry-id]").length===60');
+      await wait('document.querySelector(".library-zip-grid .nps-scroll-thumb")?.hidden===false');
+      await e(
+        `document.querySelector('.library-zip-grid').dispatchEvent(new PointerEvent('pointermove',{bubbles:true}))`,
+      );
+      await wait(
+        `(()=>{const t=document.querySelector('.library-zip-grid .nps-scroll-thumb'),r=t.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===t})()`,
+      );
+      const point = await e(
+        `(()=>{const n=document.querySelector('.library-zip-grid'),t=n.querySelector('.nps-scroll-thumb'),r=t.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,end:n.getBoundingClientRect().bottom-1}})()`,
+      );
+      for (const [type, y] of [
+        ['mousePressed', point.y],
+        ['mouseMoved', point.end],
+        ['mouseReleased', point.end],
+      ]) {
+        await h.window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+          type,
+          x: point.x,
+          y,
+          button: type === 'mouseMoved' ? 'none' : 'left',
+          buttons: type === 'mouseReleased' ? 0 : 1,
+          clickCount: type === 'mouseMoved' ? 0 : 1,
+        });
+        if (type === 'mousePressed')
+          await wait(
+            'document.querySelector(".library-zip-grid .nps-scroll-thumb")?.dataset.dragging==="true"',
+          );
+      }
+      await wait(
+        `(()=>{const n=document.querySelector('.library-zip-grid');return n.scrollTop>=n.scrollHeight-n.clientHeight-1})()`,
+      );
+      await e(`document.querySelector('[data-entry-id="large-59"]').click()`);
+      await check(
+        '大 ZIP 可拖动滚动条到底并修改最后一张的选择',
+        `document.querySelector('[data-entry-id="large-59"]').getAttribute('aria-pressed')==='false'&&document.querySelectorAll('.library-zip .picked').length===59`,
+        undefined,
+        'once',
+      );
+      await click('取消', dialog);
+      await check(
+        '取消大 ZIP 挑选不写入图库',
+        () => database.loadLibrary('all').length === before + 3,
+        undefined,
+        'once',
+      );
+    } finally {
+      commandNames.forEach((name, i) => {
+        env.commandHandlers[name] = originalHandlers[i];
+      });
+    }
     await libraryImportExtras({ h, database, doubles, mode, files, reduced: importReduced, click });
     await all();
     await input('.gallery-search input', uniqueName);

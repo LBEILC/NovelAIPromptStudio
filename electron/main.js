@@ -1075,15 +1075,6 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  registerCommand('library.set-cover', (input, _event) => {
-    const fingerprint = input.fingerprint;
-    const projectId = input.projectId;
-    try {
-      return { ok: true, ...database.setGroupCover(fingerprint, projectId) };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
   registerCommand('trash.delete-permanently', async (input, _event) => {
     const ids = input.ids || [];
     if (storageMigrationActive) return { ok: false, error: '资源库正在迁移，请稍候' };
@@ -1600,7 +1591,10 @@ app.whenReady().then(async () => {
       assetsDirectory: () => assetsDirectory,
       busy: () => storageMigrationActive || permanentDeletionActive,
       createWindow,
-      testRoot: acceptanceMode ? path.join(acceptanceMode.root, 'agent-install') : undefined,
+      testRoot:
+        acceptanceMode || screenshotMode
+          ? path.join((acceptanceMode || screenshotMode).root, 'agent-install')
+          : undefined,
     });
   } catch (error) {
     console.error('Unable to initialize workbench commands:', error);
@@ -1643,6 +1637,7 @@ app.whenReady().then(async () => {
     try {
       const { runAppScreenshots } = await import('./tools/appScreenshots.js');
       await runAppScreenshots({
+        commandHandlers,
         generationService: acceptanceGeneration,
         app,
         mode: screenshotMode,
