@@ -37,24 +37,84 @@ export function migrateMaterials(connection, filePath, { copy = fs.copyFileSync 
   }
 }
 export function createMaterialStore(connection) {
+  // Ordering lives in the existing JSON payload so older databases need no migration.
+  const rows = () =>
+    connection
+      .prepare(
+        "SELECT * FROM materials ORDER BY COALESCE(json_extract(payload,'$._order'),0),created_at DESC,id",
+      )
+      .all();
   const decode = (row) =>
     row && {
-      ...JSON.parse(row.payload),
+      ...publicPayload(row.payload),
       id: row.id,
       kind: row.kind,
       name: row.name,
       uses: row.uses,
     };
+  const publicPayload = (payload) => {
+    const { _order, ...value } = JSON.parse(payload);
+    return value;
+  };
   return {
-    list: () =>
-      connection.prepare('SELECT * FROM materials ORDER BY created_at DESC,id').all().map(decode),
+    list: () => rows().map(decode),
     get: (id) => decode(connection.prepare('SELECT * FROM materials WHERE id=?').get(id)),
     save(value) {
       const id = crypto.randomUUID();
       connection
         .prepare('INSERT INTO materials(id,kind,name,payload,created_at) VALUES (?,?,?,?,?)')
-        .run(id, value.kind, value.name, JSON.stringify(value), new Date().toISOString());
+        .run(
+          id,
+          value.kind,
+          value.name,
+          JSON.stringify({
+            ...value,
+            _order: (JSON.parse(rows()[0]?.payload || '{}')._order || 0) - 1,
+          }),
+          new Date().toISOString(),
+        );
       return this.get(id);
+    },
+    update(id, value, asNew = false) {
+      const existing = rows();
+      const index = existing.findIndex((row) => row.id === id);
+      if (index < 0) throw new Error('素材不存在');
+      const payload = JSON.parse(existing[index].payload);
+      if (!asNew) {
+        connection
+          .prepare('UPDATE materials SET payload=? WHERE id=?')
+          .run(JSON.stringify({ ...value, _order: payload._order }), id);
+        return this.get(id);
+      }
+      const names = new Set(existing.map((row) => row.name));
+      const base = `${existing[index].name} 副本`;
+      let name = base,
+        number = 2;
+      while (names.has(name)) name = `${base} ${number++}`;
+      connection.exec('SAVEPOINT material_copy');
+      try {
+        const copy = this.save({ ...value, name });
+        existing.splice(
+          index + 1,
+          0,
+          connection.prepare('SELECT * FROM materials WHERE id=?').get(copy.id),
+        );
+        const write = connection.prepare('UPDATE materials SET payload=? WHERE id=?');
+        existing.forEach((row, order) =>
+          write.run(
+            JSON.stringify({
+              ...JSON.parse(row.payload),
+              _order: order,
+            }),
+            row.id,
+          ),
+        );
+        connection.exec('RELEASE material_copy');
+        return this.get(copy.id);
+      } catch (error) {
+        connection.exec('ROLLBACK TO material_copy; RELEASE material_copy');
+        throw error;
+      }
     },
     rename(id, name) {
       connection.prepare('UPDATE materials SET name=? WHERE id=?').run(name, id);

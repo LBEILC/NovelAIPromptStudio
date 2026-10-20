@@ -131,9 +131,9 @@ export async function materialsChecks({ h, mode, database, preferences }) {
     );
     await click('存为角色…');
     await click('从素材添加角色');
-    await wait('!!document.querySelector(".menu:not(.leaving)")');
+    await wait('!!document.querySelector(".ins-pop:not(.leaving) [role=option]")');
     await h.screenshot('033-character-insert');
-    await e('document.querySelector(".menu:not(.leaving) [role=menuitem]").click()');
+    await e('document.querySelector(".ins-pop:not(.leaving) [role=option]").click()');
     await wait(`(${draftExpression}).prompt_structure.characters.length===2`);
     await check(
       '角色从素材加回且保留负面提示词',
@@ -144,6 +144,46 @@ export async function materialsChecks({ h, mode, database, preferences }) {
     await h.screenshot('033-materials-blocks');
     await e('document.querySelector(".mrow-h").click()');
     await h.screenshot('033-materials-expanded');
+    const savedBlock = (await command('material.list', {})).items.find(
+      (m) => m.name === '合成常用块',
+    );
+    const materialRow = (id) => `document.querySelector('[data-mat="${id}"]').parentElement`;
+    await click('编辑', materialRow(savedBlock.id));
+    await input('[aria-label="素材内容"]', '1.2::red hair::, standing');
+    await click('保存', materialRow(savedBlock.id));
+    await wait('!document.querySelector("[aria-label=素材内容]")');
+    const editedBlock = (await command('material.list', {})).items.find(
+      (m) => m.id === savedBlock.id,
+    );
+    await check(
+      '编辑常用块保存内容且用过次数不变',
+      () =>
+        editedBlock.blocks[0].content === '1.2::red hair::, standing' &&
+        editedBlock.uses === savedBlock.uses,
+    );
+    await h.screenshot('040-material-edited');
+    await click('编辑', materialRow(savedBlock.id));
+    await input('[aria-label="素材内容"]', 'smile, outdoors');
+    await click('另存为新的常用块', materialRow(savedBlock.id));
+    await wait('!document.querySelector("[aria-label=素材内容]")');
+    const copiedList = (await command('material.list', {})).items;
+    const copy = copiedList.find((m) => m.name === '合成常用块 副本');
+    await check(
+      '另存常用块新增副本且原内容不变',
+      () =>
+        !!copy &&
+        copy.blocks[0].content === 'smile, outdoors' &&
+        copy.uses === 0 &&
+        JSON.stringify(copiedList.find((m) => m.id === savedBlock.id)) ===
+          JSON.stringify(editedBlock) &&
+        copiedList.findIndex((m) => m.id === copy.id) ===
+          copiedList.findIndex((m) => m.id === savedBlock.id) + 1,
+    );
+    await h.screenshot('040-material-copied');
+    await click('更多', materialRow(copy.id));
+    await click('删除');
+    await wait(`!document.querySelector('[data-mat="${copy.id}"]')`);
+    await h.until(() => !database.materials.get(copy.id), '测试副本删除落库');
     await click('更多', 'document.querySelector(".mrow")');
     await click('重命名');
     await input('[aria-label="名称"]', '合成改名');

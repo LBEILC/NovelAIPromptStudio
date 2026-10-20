@@ -7,6 +7,7 @@ import {
   parsePromptSection,
   serializePromptSection,
   promptDocumentProject,
+  editPromptBlockText,
 } from '../../src/lib/promptDocument.ts';
 import { reparseSection } from '../../src/workbench/model.ts';
 import { addPromptCharacter, updatePromptCharacter } from '../../src/lib/promptStructure.js';
@@ -234,6 +235,36 @@ export function materialCommands({ services, tab, full, edit, locate, revision }
       };
     },
     'material.rename': ({ id, name }) => ({ item: db.rename(read(id).id, name.trim()) }),
+    'material.update': ({ id, block, negative, text, asNew }) => {
+      const material = read(id);
+      if (typeof text !== 'string' || !text.trim())
+        throw new CommandError('invalid_input', '素材内容不能为空');
+      if (material.kind === 'block' && negative !== undefined)
+        throw new CommandError('invalid_input', '常用块没有负面提示词');
+      if (negative && block !== undefined)
+        throw new CommandError('invalid_input', '负面提示词和块位置不能同时指定');
+      const next = structuredClone(material);
+      if (negative) {
+        const base = parsePromptSection('placeholder').blocks[0];
+        next.negativeBlocks = editPromptBlockText(
+          { blocks: [base], separators: ['', ''] },
+          0,
+          text,
+        ).blocks;
+      } else {
+        const index = material.kind === 'block' && block === undefined ? 0 : block;
+        if (!Number.isInteger(index) || index < 0 || index >= material.blocks.length)
+          throw new CommandError('invalid_input', '素材块位置不存在');
+        const section = editPromptBlockText(
+          { blocks: [material.blocks[index]], separators: ['', ''] },
+          0,
+          text,
+        );
+        next.blocks[index] = section.blocks[0];
+        if (next.blocks[index].type === 'paragraph') delete next.blocks[index].translation;
+      }
+      return { item: db.update(id, next, asNew) };
+    },
     'material.delete': ({ id }) => {
       db.remove(read(id).id);
       return {};
