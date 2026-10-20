@@ -5,6 +5,7 @@ import {
   generationModel,
   generationUnavailable,
   createNovelAIClient,
+  generationError,
 } from './generation.js';
 import { createGenerationQueue } from './generationQueue.js';
 import { readdir } from 'node:fs/promises';
@@ -67,7 +68,11 @@ describe('generation request contract', () => {
         'reference_strength_multiple',
         'reference_information_extracted_multiple',
       ])
-        if (raw[key] !== undefined) expect(request.parameters[key]).toEqual(raw[key]);
+        if (raw[key] !== undefined) {
+          if (typeof raw[key] === 'object' && !Array.isArray(raw[key]))
+            expect(request.parameters[key]).toMatchObject(raw[key]);
+          else expect(request.parameters[key]).toEqual(raw[key]);
+        }
       expect(request.parameters.negative_prompt).toBe(
         raw.uc ?? raw.negative_prompt ?? raw.v4_negative_prompt?.caption?.base_caption ?? '',
       );
@@ -160,7 +165,7 @@ describe('generation request contract', () => {
       'reference_information_extracted_multiple',
     ])
       expect(r.parameters[k]).toEqual(vibe[k]);
-    expect(r.parameters).not.toHaveProperty('tag_hint_qt');
+    expect(r.parameters.tag_hint_qt).toBe(vibe.tag_hint_qt);
     expect(
       generationUnavailable({ ...vibe, reference_image_multiple: [] }, 'nai-diffusion-4-5-full'),
     ).toContain('编码没有');
@@ -348,5 +353,93 @@ describe('application-wide generation worker', () => {
     await until(() => r.status(b.id).state === 'completed');
     expect(n).toBe(2);
     expect(r.status(b.id).images).toEqual(['result']);
+  });
+});
+
+describe('model request compatibility and HTTP failures', () => {
+  it.each([
+    'nai-diffusion-4-5-full',
+    'nai-diffusion-4-5-curated',
+    'nai-diffusion-4-full',
+    'nai-diffusion-4-curated-preview',
+  ])('normalizes PNG-only options for %s without changing captions', async (model) => {
+    const { startFakeNovelAI } = await import('./fixtures/novelAIService.js');
+    const server = await startFakeNovelAI();
+    try {
+      const request = buildGenerationRequest(
+        {
+          ...raw,
+          sm: true,
+          sm_dyn: true,
+          dynamic_thresholding: true,
+          deliberate_euler_ancestral_bug: true,
+          prefer_brownian: false,
+          noise_schedule: 'karras',
+        },
+        model,
+        { seed: 42 },
+      );
+      expect(request.parameters).not.toHaveProperty('sm');
+      expect(request.parameters).not.toHaveProperty('sm_dyn');
+      expect(request.parameters).toMatchObject({
+        dynamic_thresholding: false,
+        deliberate_euler_ancestral_bug: false,
+        prefer_brownian: true,
+        seed: 42,
+      });
+      expect(request.input).toBe(raw.prompt);
+      expect(request.parameters.v4_prompt).toEqual(raw.v4_prompt);
+      const client = createNovelAIClient({ token: () => 'acceptance-token', baseUrl: server.url });
+      const image = await client.generate(request);
+      expect(image.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+      expect(server.state.requests).toHaveLength(1);
+      expect(server.state.requests[0].model).toBe(model);
+    } finally {
+      await server.close();
+    }
+  });
+  it.each([
+    [401, '持久令牌无效，请在设置里更换'],
+    [402, 'Anlas 不足'],
+    [400, 'NovelAI 拒绝了这次请求：Invalid sampler'],
+    [422, 'NovelAI 拒绝了这次请求：Invalid sampler'],
+    [429, '请求太频繁，请稍后再试'],
+    [503, 'NovelAI 服务繁忙'],
+  ])('reports status %s without retrying', async (status, message) => {
+    let calls = 0;
+    const client = createNovelAIClient({
+      token: () => 'private-token',
+      fetchImpl: async () => {
+        calls++;
+        return new Response(JSON.stringify({ message: 'Invalid sampler' }), { status });
+      },
+    });
+    await expect(client.generate(buildGenerationRequest(raw, model))).rejects.toThrow(message);
+    expect(calls).toBe(1);
+  });
+  it('redacts the token from structured HTTP and SSE reasons', async () => {
+    for (const stream of [false, true]) {
+      const body = {
+        status: 422,
+        message: 'Invalid private-token Bearer abc https://example.invalid/secret',
+      };
+      const client = createNovelAIClient({
+        token: () => 'private-token',
+        fetchImpl: async () =>
+          new Response(
+            stream ? `event: error\ndata: ${JSON.stringify(body)}\n\n` : JSON.stringify(body),
+            {
+              status: stream ? 200 : 422,
+              headers: { 'Content-Type': stream ? 'text/event-stream' : 'application/json' },
+            },
+          ),
+      });
+      const error = await client.generate(buildGenerationRequest(raw, model)).catch((e) => e);
+      expect(error.message).toContain('NovelAI 拒绝了这次请求');
+      for (const value of ['private-token', 'Bearer abc', 'https://'])
+        expect(error.message).not.toContain(value);
+    }
+    expect(generationError(0)).toBe('无法连接到 NovelAI');
+    expect(generationError(403)).toBe('NovelAI 拒绝了这次请求');
   });
 });

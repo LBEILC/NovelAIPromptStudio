@@ -103,6 +103,7 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   );
   await click('工作台', 'document.querySelector(".studio-titlebar")');
   await wait('!!document.querySelector(".wb-generation-bar")');
+  await h.screenshot('034-08-versions-original');
   const tabId = await e('window.studio.invoke("workbench.list",{}).then(r=>r.data.activeTabId)');
   await e(
     `window.studio.invoke('prompt.set',{tabId:${JSON.stringify(tabId)},scope:'base:prompt',text:'rain, cloud'})`,
@@ -146,6 +147,7 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   })()`,
   );
   await h.screenshot('generation-three-images');
+  await h.screenshot('034-08-versions-multiple');
   generationService.state.delay = 500;
   await click('生成', 'document.querySelector(".wb-generation-bar")');
   await wait('document.body.innerText.includes("停止")');
@@ -201,6 +203,7 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   await e(
     `document.querySelector('.wb-versions header span').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:80,clientY:120}))`,
   );
+  await h.screenshot('034-08-versions-branch');
   await click('重命名分支…');
   await input('[aria-label="分支名称"]', '雪景');
   await click('确定');
@@ -252,6 +255,112 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   await h.screenshot('033-fix-paid-banner');
   await click('改成 832×1216');
   await wait('!document.body.innerText.includes("改成 832×1216")');
+  // 034: exercise final user-visible state through the actual controls.
+  await click('张数');
+  await input('[aria-label="输入张数"]', '1');
+  await h.key('Enter');
+  await click('编辑 Seed');
+  await input('[aria-label="输入 Seed"]', '1234567890');
+  await h.screenshot('034-04-seed-edit');
+  await h.key('Enter');
+  const sent = generationService.state.requests.length;
+  await click('生成', 'document.querySelector(".wb-generation-bar")');
+  await wait(
+    `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.filter(j=>j.tabId===${JSON.stringify(tabId)}).every(j=>!['queued','generating'].includes(j.state)))`,
+  );
+  await check(
+    '手输 Seed 用于下一次生成',
+    () =>
+      generationService.state.requests.length === sent + 1 &&
+      generationService.state.requests.at(-1).parameters.seed === 1234567890,
+  );
+  await click('编辑 Seed');
+  await input('[aria-label="输入 Seed"]', '4294967296');
+  await h.key('Enter');
+  await check(
+    '超范围 Seed 提示并恢复原值',
+    'document.body.innerText.includes("Seed 只能是 0 到 4294967295 的整数")&&document.querySelector(".wb-seed-value").textContent==="1234567890"',
+  );
+  await click('编辑 Seed');
+  await input('[aria-label="输入 Seed"]', '0');
+  await h.key('Escape');
+  await check(
+    'Esc 取消 Seed 编辑',
+    'document.querySelector("button.wb-seed-value")?.textContent==="1234567890"',
+  );
+  await click('编辑 Seed');
+  await input('[aria-label="输入 Seed"]', '');
+  await h.key('Enter');
+  await click('生成', 'document.querySelector(".wb-generation-bar")');
+  await wait(
+    `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.filter(j=>j.tabId===${JSON.stringify(tabId)}).every(j=>!['queued','generating'].includes(j.state)))`,
+  );
+  await check('Seed 清空后恢复随机生成', async () => {
+    const jobs = (await invoke('generate.status')).jobs;
+    return (
+      !jobs.at(-1).fixedSeed &&
+      generationService.state.requests.length === sent + 2 &&
+      (await e('document.querySelector(".wb-seed-value")?.textContent==="随机"'))
+    );
+  });
+  generationService.state.tier = 1;
+  await invoke('account.refresh');
+  await invoke('settings.generation.save', { continuous: true });
+  await click('编辑 Seed');
+  await input('[aria-label="输入 Seed"]', '1234567890');
+  await h.key('Enter');
+  const resizer = `document.querySelector('[aria-label="提示词栏宽度"]')`;
+  for (const width of [600, 520, 480, 440]) {
+    const box = await e(
+      `(()=>{const r=${resizer}.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,width:Number(${resizer}.getAttribute('aria-valuenow'))}})()`,
+    );
+    const cdp = h.window.webContents.debugger;
+    await cdp.sendCommand('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: box.x,
+      y: box.y,
+      button: 'left',
+      clickCount: 1,
+    });
+    await cdp.sendCommand('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: box.x + box.width - width,
+      y: box.y,
+      buttons: 1,
+    });
+    await cdp.sendCommand('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: box.x + box.width - width,
+      y: box.y,
+      button: 'left',
+      clickCount: 1,
+    });
+    await wait(
+      `Math.abs(document.querySelector('.wb-prompt').getBoundingClientRect().width-${width})<=1`,
+    );
+    await check(
+      `底栏 ${width}px 保留生成按钮且不溢出`,
+      `(()=>{const bar=document.querySelector('.wb-generation-bar'), button=bar.querySelector('.nps-button-cinnabar');return bar.scrollWidth<=bar.clientWidth&&button.getBoundingClientRect().right<=bar.getBoundingClientRect().right})()`,
+    );
+    await h.screenshot(`034-03-bar-${width}`);
+  }
+  await e(`${resizer}.dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`);
+  await invoke('settings.generation.save', { continuous: false });
+  for (const outside of ['.wb-canvas', '.wb-versions', '.studio-titlebar']) {
+    await e(
+      `document.querySelector('.wb-version-row').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:200}))`,
+    );
+    await wait('!!document.querySelector(".nps-menu:popover-open")');
+    await h.screenshot('034-05-menu');
+    await e(
+      `document.querySelector(${JSON.stringify(outside)}).dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))`,
+    );
+    await wait('!document.querySelector(".nps-menu:popover-open")');
+    await check(
+      `右键菜单在 ${outside} 按下后关闭`,
+      '!document.querySelector(".nps-menu:popover-open")',
+    );
+  }
   generationService.state.balance = 0;
   generationService.state.tier = 0;
   await invoke('account.refresh');

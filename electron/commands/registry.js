@@ -53,7 +53,13 @@ export const commandRegistry = {
     example: { tabId: 'tab-id', count: 1 },
   },
   'generate.start': {
-    fields: { ...tab, count: 'integer', continuous: 'boolean', fixedSeed: 'boolean' },
+    fields: {
+      ...tab,
+      count: 'integer',
+      continuous: 'boolean',
+      fixedSeed: 'boolean',
+      seed: 'integer',
+    },
     required: ['tabId', 'count'],
     mutation: true,
     example: { tabId: 'tab-id', count: 1 },

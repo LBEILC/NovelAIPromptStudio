@@ -20,6 +20,8 @@ const COMMON = [
   'sm_dyn',
   'v4_prompt',
   'v4_negative_prompt',
+  'tag_hint_qt',
+  'tag_hint_uc_preset',
 ];
 const V5 = [
   'straight_alpha',
@@ -125,6 +127,23 @@ export function buildGenerationRequest(raw, model, edits = {}) {
     )
       parameters[key].caption.base_caption = value;
   }
+  // Match the official client's model capabilities, rather than forwarding PNG-only options.
+  delete parameters.sm;
+  delete parameters.sm_dyn;
+  parameters.dynamic_thresholding = false;
+  if (parameters.sampler === 'ddim') parameters.sampler = 'k_euler_ancestral';
+  if (model.startsWith('nai-diffusion-5-')) {
+    parameters.noise_schedule = 'karras';
+    delete parameters.skip_cfg_above_sigma;
+  }
+  if (parameters.sampler === 'k_euler_ancestral' && parameters.noise_schedule !== 'native') {
+    parameters.deliberate_euler_ancestral_bug = false;
+    parameters.prefer_brownian = true;
+  }
+  parameters.v4_prompt.use_coords ??= false;
+  parameters.v4_prompt.use_order ??= true;
+  parameters.v4_negative_prompt.legacy_uc ??=
+    model.startsWith('nai-diffusion-4-') && !model.startsWith('nai-diffusion-4-5-');
   for (const key of ['width', 'height']) if (edits[key] !== undefined) parameters[key] = edits[key];
   return { action: 'generate', input: prompt, model, parameters };
 }
@@ -151,16 +170,23 @@ export function estimateGeneration(request, subscription, count = 1) {
   return { anlas: perImage * count, perImage, free: perImage === 0, count };
 }
 
-export function generationError(status) {
-  return status === 401
-    ? '持久令牌无效，请在设置里更换'
-    : status === 402
-      ? 'Anlas 不足'
-      : status === 429
-        ? '请求太频繁，请稍后再试'
-        : status >= 500
-          ? 'NovelAI 服务繁忙'
-          : '无法连接到 NovelAI';
+export function generationError(status, reason = '') {
+  if (status === 401) return '持久令牌无效，请在设置里更换';
+  if (status === 402) return 'Anlas 不足';
+  if (status === 429) return '请求太频繁，请稍后再试';
+  if (status >= 500) return 'NovelAI 服务繁忙';
+  if (status >= 400) return `NovelAI 拒绝了这次请求${reason ? `：${reason}` : ''}`;
+  return '无法连接到 NovelAI';
+}
+
+function serverReason(body, secret = '') {
+  const value = body?.message ?? body?.error?.message ?? body?.error ?? body?.detail;
+  if (typeof value !== 'string') return '';
+  return (secret ? value.split(secret).join('[redacted]') : value)
+    .replace(/Bearer\s+\S+/gi, '[redacted]')
+    .replace(/https?:\/\/\S+/gi, '[redacted]')
+    .replace(/[\x00-\x1f\x7f]/g, ' ')
+    .slice(0, 500);
 }
 
 export function extractGeneratedPng(buffer) {
@@ -210,24 +236,33 @@ export function createNovelAIClient({
   )
     throw new Error('不支持的生成服务地址');
   async function send(endpoint, body) {
+    let secret;
     try {
+      secret = await token();
       const response = await fetchImpl(new URL(endpoint, url), {
         method: body ? 'POST' : 'GET',
         redirect: 'error',
         headers: {
-          Authorization: `Bearer ${await token()}`,
+          Authorization: `Bearer ${secret}`,
           ...(body ? { 'Content-Type': 'application/json' } : {}),
         },
         ...(body ? { body: JSON.stringify(body) } : {}),
         signal: AbortSignal.timeout(180000),
       });
-      if (!response.ok)
-        throw Object.assign(new Error(generationError(response.status)), {
-          status: response.status,
-        });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw Object.assign(
+          new Error(generationError(response.status, serverReason(body, secret))),
+          {
+            status: response.status,
+            safe: true,
+          },
+        );
+      }
       return response;
     } catch (error) {
-      // Never propagate HTTP bodies, URLs, headers or tokens into diagnostics.
+      // Only the bounded, redacted server reason may reach the UI.
+      if (error.safe) throw error;
       throw Object.assign(new Error(generationError(error.status)), { status: error.status || 0 });
     }
   }
@@ -240,6 +275,7 @@ export function createNovelAIClient({
       });
       if (!response.headers.get('content-type')?.includes('text/event-stream'))
         return extractGeneratedPng(Buffer.from(await response.arrayBuffer()));
+      const secret = await token();
       let pending = '',
         final;
       const decoder = new TextDecoder();
@@ -263,7 +299,16 @@ export function createNovelAIClient({
             .find((line) => line.startsWith('event:'))
             ?.slice(6)
             .trim();
-        if (type === 'error') throw new Error(generationError(Number(value.status) || 500));
+        if (type === 'error')
+          throw Object.assign(
+            new Error(
+              generationError(
+                Number(value.status || value.status_code) || 500,
+                serverReason(value, secret),
+              ),
+            ),
+            { safe: true },
+          );
         if (type === 'intermediate' && Number.isFinite(value.step_ix))
           onProgress(Math.max(0, Math.min(1, value.step_ix / request.parameters.steps)));
         if (type === 'final' && value.image) final = Buffer.from(value.image, 'base64');
@@ -279,7 +324,8 @@ export function createNovelAIClient({
         }
         if (pending.trim()) consume(pending);
       } catch (error) {
-        throw new Error(error.message === 'NovelAI 服务繁忙' ? error.message : '无法读取生成结果');
+        if (error.safe) throw error;
+        throw new Error('无法读取生成结果');
       }
       if (!final) throw new Error('生成结果没有 PNG');
       if (final.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a')

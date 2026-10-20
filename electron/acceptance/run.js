@@ -24,6 +24,7 @@ import { preserveClipboard } from './clipboard.js';
 import { cardCacheChecks } from './cardCache.js';
 import { agentChecks } from './agent.js';
 import { generationChecks } from './generation.js';
+import { referenceEvidence } from './referenceEvidence.js';
 
 export async function runAcceptance(context) {
   if (context.mode.commandBenchmark) {
@@ -91,6 +92,7 @@ export async function runAcceptance(context) {
     };
     nativeTheme.themeSource = 'light';
     h = harness(window, mode, checks);
+    referenceEvidence(h, database);
     const { evaluate: e, wait, check, click, section, font } = h;
     const blockedRequests = [];
     window.webContents.session.webRequest.onBeforeRequest(

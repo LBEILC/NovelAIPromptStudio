@@ -74,7 +74,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     }
     return versions.get(current.versionId) || root;
   }
-  async function requestFor(current, fixedSeed = false) {
+  async function requestFor(current, fixedSeed = false, explicitSeed) {
     const original = current.originalProject || current.project;
     let metadata = original.metadata;
     if (!metadata.extra_json && original.image_path)
@@ -103,7 +103,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     const draft = current.project,
       edits = { width: draft.metadata.width, height: draft.metadata.height };
     if (fixedSeed) {
-      const seed = Number(draft.metadata.seed);
+      const seed = explicitSeed ?? Number(draft.metadata.seed);
       if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff)
         throw new Error('Seed 无效');
       edits.seed = seed;
@@ -347,7 +347,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       if (!settings().hasToken) throw new Error('没有持久令牌');
       if (input.continuous && (caller.source === 'agent' || !settings().continuous))
         throw new CommandError('forbidden', '持续生成未开启');
-      const request = await requestFor(current, input.fixedSeed),
+      const request = await requestFor(current, input.fixedSeed, input.seed),
         price = estimateGeneration(request, subscription, input.count),
         s = settings();
       if (balance() < (input.continuous ? price.perImage : price.anlas))

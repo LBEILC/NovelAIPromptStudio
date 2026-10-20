@@ -144,7 +144,7 @@ export interface CommandDefinitions {
     output: GenerationEstimate;
   };
   'generate.start': {
-    input: TabInput & { count: number; continuous?: boolean; fixedSeed?: boolean };
+    input: TabInput & { count: number; continuous?: boolean; fixedSeed?: boolean; seed?: number };
     output: GenerationJob;
   };
   'generate.status': { input: { id?: string }; output: GenerationStatus };

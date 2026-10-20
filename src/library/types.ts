@@ -65,7 +65,7 @@ export interface LibraryProps {
   onQueryChange: (query: string) => void;
   onViewChange: (view: string) => void;
   onPreview: (group: LibraryGroup, project?: LibraryCard) => void;
-  onOpenWorkbench: (project: LibraryCard | ImageRecord) => void;
+  onOpenWorkbench: (project: Pick<ImageRecord, 'id'>) => void;
   onCopyImage: (project: LibraryCard | ImageRecord | ImageProject) => Promise<unknown>;
   onDownloadImage: (project: LibraryCard | ImageRecord | ImageProject) => Promise<unknown>;
   onReveal: (project: LibraryCard | ImageRecord) => void;

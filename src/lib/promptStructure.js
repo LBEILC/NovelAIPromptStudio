@@ -219,7 +219,7 @@ export function getPromptScopes(project) {
       key: 'base:prompt',
       kind: 'base',
       polarity: 'prompt',
-      label: structure.characters.length ? '基础提示词' : '提示词',
+      label: '基础提示词',
       raw_prompt: structure.base_prompt_raw ?? project.metadata?.prompt_raw ?? '',
       tags: project.tags || [],
     },
