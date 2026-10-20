@@ -247,15 +247,19 @@ export async function libraryRefinementChecks({ h, database }) {
     );
     await click('筛选');
     await input('[aria-label="包含 Tag"]', 'round shape');
+    await wait(
+      'document.querySelector("[aria-label=\\"包含 Tag\\"]")?.getAttribute("aria-expanded")==="true" && [...document.querySelectorAll("[role=option]")].some(n=>n.textContent.includes("round shape"))',
+    );
     await key('Enter', {}, 'document.activeElement');
+    await wait('document.querySelector(".library-chips")?.textContent.includes("round shape")');
     await close();
-    await settle();
+    await h.until(async () => (await count()) === 4, '027 普通包含条件已更新网格');
     const ordinaryCount = await count();
     await e(`document.querySelector('[data-collection-id="${collections.at(-1)}"]').click()`);
-    await settle();
+    await h.until(async () => (await count()) === 5, '027 智能收藏集规则已更新网格');
     await check('027 智能收藏集不叠加普通筛选', async () => (await count()) === 5);
     await click('全部图片', 'document.querySelector(".library-side")');
-    await settle();
+    await h.until(async () => (await count()) === ordinaryCount, '027 全部图片的普通筛选已恢复');
     await check(
       '027 回到全部图片恢复普通筛选',
       async () => (await count()) === ordinaryCount && ordinaryCount === 4,

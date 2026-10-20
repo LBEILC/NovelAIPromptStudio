@@ -80,7 +80,7 @@ export async function libraryChecks(env) {
   };
   const waitDetail = async () =>
     wait(
-      'document.querySelector(".library-card.current")?.dataset.projectId === document.querySelector(".library-detail")?.dataset.detailId',
+      'document.querySelector(".library-detail")?.getAttribute("aria-busy")==="false" && document.querySelector(".library-card.current")?.dataset.projectId === document.querySelector(".library-detail")?.dataset.detailId',
     );
   if (mode.category === '图片库') await libraryNamingChecks(env);
   if (!['图片库·导入', '图片库·收尾'].includes(mode.category)) await libraryGroupingChecks(env);

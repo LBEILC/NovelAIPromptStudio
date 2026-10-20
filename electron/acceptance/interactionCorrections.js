@@ -337,7 +337,10 @@ export async function interactionCorrectionChecks(env) {
       await e(
         `document.querySelector('[data-project-id="${record.id}"]').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
       );
-      await wait('!!document.querySelector(".wb-document-scroll")');
+      await wait(
+        `document.querySelector('.wb-page[data-project-id="${record.id}"]')?.checkVisibility() && document.querySelector('.studio-titlebar [aria-current=page]')?.textContent.trim()==='工作台'`,
+        '双击的图片已完成加载并成为当前工作台页面',
+      );
       if (record === records[0])
         await click('图片库', 'document.querySelector(".studio-titlebar")');
     }
