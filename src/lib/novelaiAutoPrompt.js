@@ -257,7 +257,7 @@ function stripSuffixTemplate(rawPrompt, template) {
 
 function stripPrefixTemplate(rawPrompt, template) {
   const raw = String(rawPrompt || '');
-  const expression = new RegExp(`^\\s*${templatePattern(template)}(?:\\s*[,，]\\s*)?`, 'i');
+  const expression = new RegExp(`^\\s*${templatePattern(template)}(?:\\s*[,，]\\s*|\\s*$)`, 'i');
   const match = expression.exec(raw);
   if (!match) return null;
   return { cleanedRaw: raw.slice(match[0].length), matchIndex: match.index };
@@ -328,15 +328,56 @@ function emptyAnalysis(kind, status = 'unknown') {
 }
 
 function hintedAnalysis(kind, scope, profile, label, template) {
+  const definition = { template, position: kind === 'quality' ? 'suffix' : 'prefix' };
+  if (
+    kind === 'undesired' &&
+    template &&
+    stripPrefixTemplate(scope.raw_prompt, `nsfw, ${template}`)
+  )
+    definition.template = `nsfw, ${template}`;
+  const match = template ? stripTemplate(scope.raw_prompt, definition) : null;
   return {
     ...emptyAnalysis(kind, 'confirmed'),
-    cleanedRaw: scope.raw_prompt,
+    cleanedRaw: match?.cleanedRaw ?? scope.raw_prompt,
     label,
     modelLabel: profile?.label || '',
-    template,
-    virtual: true,
-    tagCount: template ? parsePrompt(template, () => '').length : 0,
+    template: definition.template,
+    virtual: !match,
+    tagIds: match ? templateTagIds(scope.tags, definition) : [],
+    tagCount: template ? parsePrompt(definition.template, () => '').length : 0,
   };
+}
+
+// The V5 server does not expand hints: same-seed verification on 2026-10-20.
+// Keep this at the request boundary so stored drafts and ordinary copies stay unchanged.
+export function expandV5AutomaticPrompt(prompt, negative, model, hints) {
+  if (!model.startsWith('nai-diffusion-5-')) return { prompt, negative };
+  const quality = {
+    1: MODEL_PROFILES.v5.quality.template,
+    3: 'very aesthetic, amazing quality, no text',
+  }[Number(hints.tag_hint_qt)];
+  if (quality && !stripSuffixTemplate(prompt, quality)) {
+    const textStart = findPromptTextBlockStart(prompt);
+    const boundary = textStart >= 0 ? textStart : prompt.length;
+    const prefix = prompt
+      .slice(0, boundary)
+      .trim()
+      .replace(/[,，]\s*$/, '');
+    const text = prompt.slice(boundary);
+    prompt = [prefix, quality, text].filter(Boolean).join(', ');
+  }
+  const label = { 2: 'Heavy', 3: 'Light', 4: 'Human Focus', 5: 'Furry Focus' }[
+    Number(hints.tag_hint_uc_preset)
+  ];
+  const template = MODEL_PROFILES.v5.undesired.find((preset) => preset.label === label)?.template;
+  if (template) {
+    const withNsfw = !!stripPrefixTemplate(negative, `nsfw, ${template}`);
+    if (!withNsfw && !stripPrefixTemplate(negative, template))
+      negative = [template, negative].filter(Boolean).join(', ');
+    if (model.endsWith('-full') && !prompt.toLowerCase().includes('nsfw') && !withNsfw)
+      negative = `nsfw, ${negative}`;
+  }
+  return { prompt, negative };
 }
 function analyzeQuality(settings, scope, profiles) {
   if (

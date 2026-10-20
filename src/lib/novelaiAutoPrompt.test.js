@@ -66,9 +66,9 @@ describe('NovelAI automatic prompt recognition', () => {
       status: 'confirmed',
       modelLabel: 'V5',
       tagCount: 3,
-      cleanedRaw: project.prompt_structure.base_prompt_raw,
-      virtual: true,
-      tagIds: [],
+      cleanedRaw: 'A sign beside the girl, teXt: Hello, world!\n\n第二行',
+      virtual: false,
+      tagIds: ['tag-1', 'tag-2', 'tag-3'],
     });
   });
 
@@ -134,7 +134,7 @@ describe('NovelAI automatic prompt recognition', () => {
     expect(undesired.tagIds).toHaveLength(17);
   });
 
-  it('recognizes V5 preset integers without removing similarly named user tags', () => {
+  it('recognizes expanded V5 presets and keeps user exclusions outside the automatic block', () => {
     const heavy =
       'lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page';
     const light =
@@ -154,10 +154,11 @@ describe('NovelAI automatic prompt recognition', () => {
       expect(automation).toMatchObject({
         status: 'confirmed',
         label,
-        cleanedRaw: `${template}, custom exclusion`,
+        cleanedRaw: 'custom exclusion',
         template,
+        virtual: false,
       });
-      expect(automation.tagIds).toEqual([]);
+      expect(automation.tagIds.length).toBeGreaterThan(0);
     }
   });
 
@@ -199,5 +200,16 @@ describe('NovelAI automatic prompt recognition', () => {
       [5, 'Furry Focus'],
     ])
       expect(getPromptScopes(projectFixture({ ucPreset: preset }))[1].automation.label).toBe(label);
+  });
+  it('copies an expanded V5 image without automatic tags and includes them exactly once on request', () => {
+    const project = projectFixture({
+      prompt: 'synthetic subject, very aesthetic, masterpiece, no text',
+      qualityToggle: true,
+    });
+    expect(formatPositivePromptForCopy(project)).toBe('synthetic subject');
+    expect(formatPositivePromptForCopy(project, { includeAutomatic: true })).toBe(
+      'synthetic subject, very aesthetic, masterpiece, no text',
+    );
+    expect(getPromptScopes(project)[0].automation).toMatchObject({ virtual: false });
   });
 });

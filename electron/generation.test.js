@@ -74,28 +74,77 @@ describe('generation request contract', () => {
     }
     expect(count).toBeGreaterThan(0);
   });
-  it('preserves original captions, coordinates and allowed parameters without adding presets', () => {
+  it('expands V5 presets in both captions and request text while retaining coordinates and hints', () => {
     const r = buildGenerationRequest(raw, model);
     for (const k of [
-      'prompt',
       'width',
       'height',
       'steps',
       'scale',
       'sampler',
       'cfg_rescale',
-      'v4_prompt',
-      'v4_negative_prompt',
       'tag_hint_qt',
       'tag_hint_uc_preset',
     ])
       expect(r.parameters[k]).toEqual(raw[k]);
-    expect(r.input).toBe(raw.prompt);
-    expect(r.parameters.negative_prompt).toBe(raw.uc);
+    expect(r.input).toBe(`${raw.prompt}, very aesthetic, masterpiece, no text`);
+    expect(r.parameters.prompt).toBe(r.input);
+    expect(r.parameters.negative_prompt).toBe(
+      'nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, lowres',
+    );
+    expect(r.parameters.v4_prompt).toEqual({
+      ...raw.v4_prompt,
+      caption: { ...raw.v4_prompt.caption, base_caption: r.input },
+    });
+    expect(r.parameters.v4_negative_prompt).toEqual({
+      ...raw.v4_negative_prompt,
+      caption: { ...raw.v4_negative_prompt.caption, base_caption: r.parameters.negative_prompt },
+    });
     expect(r.parameters).not.toHaveProperty('model_hash');
     expect(r.parameters).not.toHaveProperty('internal_unknown');
     expect(r.parameters.n_samples).toBe(1);
     expect(raw.v4_prompt.caption.base_caption).toBe(raw.prompt);
+  });
+  it('does not duplicate already expanded V5 presets on successive generations', () => {
+    const first = buildGenerationRequest(raw, model, { seed: 123 });
+    const again = buildGenerationRequest(
+      { ...first.parameters, uc: first.parameters.negative_prompt },
+      model,
+      { seed: 123 },
+    );
+    expect(again).toEqual(first);
+  });
+  it('keeps None, Curated and explicit nsfw conditioning distinct', () => {
+    const none = buildGenerationRequest({ ...raw, tag_hint_qt: 0, tag_hint_uc_preset: 0 }, model);
+    expect(none.input).toBe(raw.prompt);
+    expect(none.parameters.negative_prompt).toBe(raw.uc);
+    for (const [variant, prompt] of [
+      ['nai-diffusion-5-curated', 'synthetic landscape'],
+      [model, 'nsfw, synthetic subject'],
+    ]) {
+      const result = buildGenerationRequest({ ...raw, prompt, tag_hint_qt: 3 }, variant);
+      expect(result.input).toBe(`${prompt}, very aesthetic, amazing quality, no text`);
+      expect(result.parameters.negative_prompt.startsWith('nsfw, ')).toBe(false);
+    }
+  });
+  it('inserts quality before V5 Text content and leaves edited character captions intact', () => {
+    const edited = {
+      caption: {
+        base_caption: 'stale base',
+        char_captions: [{ char_caption: 'synthetic character', centers: [{ x: 0.6, y: 0.2 }] }],
+      },
+      use_coords: true,
+    };
+    const result = buildGenerationRequest(raw, model, {
+      prompt: 'synthetic sign, Text: line one\n\nline two',
+      v4_prompt: edited,
+    });
+    expect(result.input).toBe(
+      'synthetic sign, very aesthetic, masterpiece, no text, Text: line one\n\nline two',
+    );
+    expect(result.parameters.v4_prompt.caption.char_captions).toEqual(edited.caption.char_captions);
+    expect(result.parameters.v4_prompt.caption.base_caption).toBe(result.input);
+    expect(edited.caption.base_caption).toBe('stale base');
   });
   it('preserves V4.5 Vibe encodings and their settings byte for byte', () => {
     const vibe = {

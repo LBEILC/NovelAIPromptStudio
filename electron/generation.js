@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import yauzl from 'yauzl';
+import { expandV5AutomaticPrompt } from '../src/lib/novelaiAutoPrompt.js';
 
 // Explicit allowlists: image metadata also contains internal, non-request fields.
 const COMMON = [
@@ -96,13 +97,14 @@ export function buildGenerationRequest(raw, model, edits = {}) {
       .filter((key) => raw[key] !== undefined)
       .map((key) => [key, structuredClone(raw[key])]),
   );
-  const prompt = edits.prompt ?? raw.prompt ?? raw.v4_prompt?.caption?.base_caption ?? '';
-  const negative =
+  let prompt = edits.prompt ?? raw.prompt ?? raw.v4_prompt?.caption?.base_caption ?? '';
+  let negative =
     edits.negative ??
     raw.uc ??
     raw.negative_prompt ??
     raw.v4_negative_prompt?.caption?.base_caption ??
     '';
+  ({ prompt, negative } = expandV5AutomaticPrompt(prompt, negative, model, raw));
   Object.assign(parameters, {
     params_version: 4,
     prompt,
@@ -117,7 +119,10 @@ export function buildGenerationRequest(raw, model, edits = {}) {
     parameters[key] ??= { caption: { base_caption: value, char_captions: [] } };
     // Keep unmodified captions and coordinate flags exactly as stored in the PNG.
     if (edits[key] !== undefined) parameters[key] = structuredClone(edits[key]);
-    if (edits[key === 'v4_prompt' ? 'prompt' : 'negative'] !== undefined)
+    if (
+      model.startsWith('nai-diffusion-5-') ||
+      edits[key === 'v4_prompt' ? 'prompt' : 'negative'] !== undefined
+    )
       parameters[key].caption.base_caption = value;
   }
   for (const key of ['width', 'height']) if (edits[key] !== undefined) parameters[key] = edits[key];
