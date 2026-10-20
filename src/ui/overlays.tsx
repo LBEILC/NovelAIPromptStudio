@@ -89,6 +89,7 @@ export function Layer({
   onKeyDown,
   mode = 'auto',
   escapeFromAnchor = false,
+  dismissOnAnchor = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -105,6 +106,7 @@ export function Layer({
   onKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
   mode?: 'auto' | 'manual';
   escapeFromAnchor?: boolean;
+  dismissOnAnchor?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
@@ -180,7 +182,10 @@ export function Layer({
       if (
         activeLayers
           .slice(index)
-          .some((layer) => layer.node.contains(target) || layer.trigger?.contains(target))
+          .some(
+            (layer) =>
+              layer.node.contains(target) || (!dismissOnAnchor && layer.trigger?.contains(target)),
+          )
       )
         return;
       // A blank-area pointer default would blur the synchronously restored
@@ -216,7 +221,7 @@ export function Layer({
       document.removeEventListener('pointerdown', outside, true);
       document.removeEventListener('keydown', escape, true);
     };
-  }, [open, anchor, anchor.current, mode, escapeFromAnchor]);
+  }, [open, anchor, anchor.current, mode, escapeFromAnchor, dismissOnAnchor]);
   useLayoutEffect(() => {
     const node = ref.current;
     const rect = point
@@ -340,6 +345,7 @@ export function DialogContent({
   destructive = false,
   confirmDisabled = false,
   cancelRef,
+  footerLeading,
 }: {
   title: string;
   children: ReactNode;
@@ -351,6 +357,7 @@ export function DialogContent({
   destructive?: boolean;
   confirmDisabled?: boolean;
   cancelRef?: RefObject<HTMLButtonElement | null>;
+  footerLeading?: ReactNode;
 }) {
   return (
     <>
@@ -358,6 +365,9 @@ export function DialogContent({
       <div className="nps-dialog-body">{children}</div>
       {quote && <blockquote className="nps-quote">{quote}</blockquote>}
       <div className="nps-actions">
+        {footerLeading && (
+          <span className="nps-dialog-footer-leading nps-help">{footerLeading}</span>
+        )}
         <button
           ref={cancelRef}
           type="button"

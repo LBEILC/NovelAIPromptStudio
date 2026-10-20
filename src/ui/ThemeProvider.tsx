@@ -27,6 +27,22 @@ export function ThemeProvider({
 }) {
   useEffect(() => {
     const html = document.documentElement;
+    html.dataset.inputMode = 'pointer';
+    const pointer = () => {
+      html.dataset.inputMode = 'pointer';
+    };
+    const key = (event: KeyboardEvent) => {
+      if (!event.metaKey && !event.ctrlKey && !event.altKey) html.dataset.inputMode = 'keyboard';
+    };
+    document.addEventListener('pointerdown', pointer, true);
+    document.addEventListener('keydown', key, true);
+    return () => {
+      document.removeEventListener('pointerdown', pointer, true);
+      document.removeEventListener('keydown', key, true);
+    };
+  }, []);
+  useEffect(() => {
+    const html = document.documentElement;
     const previous = { theme: html.dataset.theme, motion: html.dataset.motion };
     const dark = matchMedia('(prefers-color-scheme: dark)');
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');

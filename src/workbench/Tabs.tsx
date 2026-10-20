@@ -33,6 +33,8 @@ export interface TabsProps {
   onCloseTab: (id: string) => Promise<void> | void;
   onReorderTab: (id: string, target: string) => void;
   onChooseImage: () => void;
+  onOpenClipboard: () => void;
+  onBrowseLibrary: () => void;
   onShowLibrary: (tab: WorkbenchTab) => void;
 }
 function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
@@ -368,7 +370,31 @@ export function WorkbenchTabs(p: TabsProps) {
               {p.session.tabs.map((tab) => (
                 <Tab key={tab.id} tab={tab} p={visualProps} />
               ))}
-              <span>
+              <ContextMenu
+                label="打开方式"
+                items={[
+                  {
+                    id: 'file',
+                    label: '打开图片…',
+                    shortcut: ['Mod', 'I'],
+                    prefix: <i className="ri-folder-open-line" />,
+                    onSelect: p.onChooseImage,
+                  },
+                  {
+                    id: 'clipboard',
+                    label: '从剪贴板打开',
+                    shortcut: ['Mod', 'V'],
+                    prefix: <i className="ri-clipboard-line" />,
+                    onSelect: p.onOpenClipboard,
+                  },
+                  {
+                    id: 'library',
+                    label: '从图片库打开',
+                    prefix: <i className="ri-gallery-line" />,
+                    onSelect: p.onBrowseLibrary,
+                  },
+                ]}
+              >
                 <Button
                   data-workbench-tab-id="new-tab"
                   variant="quiet"
@@ -377,7 +403,7 @@ export function WorkbenchTabs(p: TabsProps) {
                 >
                   <i className="ri-add-line" />
                 </Button>
-              </span>
+              </ContextMenu>
             </AnimatedItems>
           </div>
         </SortableContext>

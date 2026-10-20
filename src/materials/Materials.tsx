@@ -106,6 +106,7 @@ export function MaterialPicker({
   flush?: () => Promise<void>;
   onManage?: () => void;
 }) {
+  const pickerAnchor = useRef<HTMLElement>(null);
   const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false),
     [query, setQuery] = useState(''),
@@ -141,6 +142,9 @@ export function MaterialPicker({
         aria-label={character ? '从素材添加角色' : '常用块'}
         onClick={async () => {
           try {
+            pickerAnchor.current = character
+              ? anchor.current
+              : anchor.current?.closest<HTMLElement>('.wb-add-block') || anchor.current;
             setItems((await invokeUI('material.list', {})).items);
             setQuery('');
             setSelected(-1);
@@ -150,7 +154,7 @@ export function MaterialPicker({
           }
         }}
       >
-        <i className={character ? 'ri-arrow-down-s-line' : 'ri-bookmark-line'} />
+        {character && <i className="ri-arrow-down-s-line" />}
         {!character && '常用块'}
       </Button>
       <Popover
@@ -160,7 +164,7 @@ export function MaterialPicker({
           setPeek(null);
           setImage('');
         }}
-        anchor={anchor}
+        anchor={pickerAnchor}
         label={character ? '从素材添加角色' : '插入常用块'}
         className={character ? 'nps-menu' : 'material-picker'}
       >
@@ -262,7 +266,19 @@ export function MaterialPicker({
                     : '暂无常用块。在块的菜单里选“存为常用块”即可添加。'}
               </p>
             )}
-            <span className="nps-help">↑ ↓ 选择　Enter 插入</span>
+            <div className="material-picker-footer">
+              <span className="nps-help">↑↓ 选择 · Enter 插入</span>
+              <Button
+                variant="quiet"
+                size="small"
+                onClick={() => {
+                  setOpen(false);
+                  onManage?.();
+                }}
+              >
+                管理常用块
+              </Button>
+            </div>
           </div>
         )}
         {(peek || image) && (
@@ -372,7 +388,6 @@ export function MaterialsPage({ initialKind = 'block' }: { initialKind?: string 
                     </button>
                     <Collapse open={expanded === v.id}>
                       <div className="material-body">
-                        {/* TODO(design): Imported metadata contains encoded Vibe data, not the original reference image. */}
                         <p className="nps-help">
                           【文案待定：图片中只有 Vibe 编码，无法还原参考图】
                         </p>
@@ -484,6 +499,10 @@ export function MaterialsPage({ initialKind = 'block' }: { initialKind?: string 
             </div>
           )}
         </TransitionSurface>
+        <footer className="material-count">
+          {kind === 'vibe' ? vibes.length : shown.length} 个
+          {kind === 'block' ? '常用块' : kind === 'character' ? '角色' : 'Vibe'}
+        </footer>
       </section>
       <Dialog
         open={!!deleting}

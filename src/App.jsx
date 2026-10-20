@@ -1533,6 +1533,8 @@ export default function App() {
               setWorkbenchSession((current) => reorderWorkbenchTabs(current, id, target))
             }
             onChooseImage={() => openWorkbenchPath()}
+            onOpenClipboard={() => openClipboardWorkbenchImage()}
+            onBrowseLibrary={() => setPage('gallery')}
             onShowLibrary={(tab) => {
               setGalleryView('all');
               setGalleryFilters({ ...DEFAULT_GALLERY_FILTERS, query: tab.project?.name || '' });

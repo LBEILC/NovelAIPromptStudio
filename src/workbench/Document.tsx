@@ -685,12 +685,12 @@ export function WorkbenchDocument(p: DocumentProps) {
                   {p.renderNewBlock?.(si, bi)}
                   <div className="wb-add-block-gap">
                     <span className="wb-add-block">
+                      <i className="ri-add-line" />
                       <Button
                         variant="quiet"
                         size="small"
                         onClick={() => p.onInsertBlock?.(si, bi, 'tags')}
                       >
-                        <i className="ri-add-line" />
                         Tag 块
                       </Button>
                       <Button

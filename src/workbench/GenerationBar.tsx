@@ -53,7 +53,9 @@ export function GenerationBar({
   const [count, setCount] = useState(1),
     [input, setInput] = useState<string | null>(null),
     [continuous, setContinuous] = useState(false),
-    [fixed, setFixed] = useState(false);
+    [seed, setSeed] = useState<number | null>(null),
+    [seedInput, setSeedInput] = useState<string | null>(null);
+  const seedEditing = useRef(false);
   const [estimate, setEstimate] = useState<GenerationEstimate | null>(null),
     [menu, setMenu] = useState(false),
     [custom, setCustom] = useState(false),
@@ -125,6 +127,17 @@ export function GenerationBar({
       setCount(Number(input));
     setInput(null);
   };
+  const commitSeed = (save: boolean) => {
+    if (!seedEditing.current) return;
+    seedEditing.current = false;
+    const value = (seedInput || '').trim();
+    if (save) {
+      if (!value) setSeed(null);
+      else if (/^\d+$/.test(value) && Number(value) <= 4294967295) setSeed(Number(value));
+      else notify({ text: 'Seed 只能是 0 到 4294967295 的整数', tone: 'error' });
+    }
+    setSeedInput(null);
+  };
   const freeSize = presets.find(([, pw, ph]) => Math.sign(pw - ph) === Math.sign(w - h))!;
   const paidReasons = [
     w * h > 1048576 ? '尺寸超出免费范围' : '',
@@ -181,15 +194,50 @@ export function GenerationBar({
           </>
         ) : (
           <>
-            <Button
-              size="small"
-              data-tip={fixed ? `固定 Seed ${metadata?.seed}` : '随机 Seed'}
-              onClick={() => setFixed(!fixed)}
+            <div
+              className="nps-field nps-small wb-seed"
+              data-tip={seed === null ? '随机 Seed' : `固定 Seed ${seed}`}
             >
               <span className="wb-seed-label">Seed</span>
-              <span className="nps-mono">{fixed ? metadata?.seed : '随机'}</span>
-              <i className={fixed ? 'ri-lock-line' : 'ri-shuffle-line'} />
-            </Button>
+              {seedInput === null ? (
+                <button
+                  className="wb-seed-value"
+                  aria-label="编辑 Seed"
+                  onClick={() => {
+                    seedEditing.current = true;
+                    setSeedInput(seed === null ? '' : String(seed));
+                  }}
+                >
+                  {seed ?? '随机'}
+                </button>
+              ) : (
+                <input
+                  className="wb-seed-value"
+                  aria-label="输入 Seed"
+                  autoFocus
+                  value={seedInput}
+                  onChange={(e) => setSeedInput(e.target.value)}
+                  onBlur={() => commitSeed(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === 'Escape') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      commitSeed(e.key === 'Enter');
+                    }
+                  }}
+                />
+              )}
+              <button
+                className="wb-seed-toggle"
+                aria-label="切换随机或固定 Seed"
+                onClick={() => {
+                  commitSeed(false);
+                  setSeed(seed === null ? Number(metadata?.seed || 0) : null);
+                }}
+              >
+                <i className={seed === null ? 'ri-shuffle-line' : 'ri-lock-line'} />
+              </button>
+            </div>
             <Button
               size="small"
               ref={anchor}
@@ -218,7 +266,14 @@ export function GenerationBar({
               </Button>
               {input === null ? (
                 <Button size="small" aria-label="张数" onClick={() => setInput(String(count))}>
-                  {continuous ? '持续' : `${count} 张`}
+                  {continuous ? (
+                    '持续'
+                  ) : (
+                    <>
+                      {count}
+                      <span className="wb-count-unit"> 张</span>
+                    </>
+                  )}
                 </Button>
               ) : (
                 <Input
@@ -255,6 +310,11 @@ export function GenerationBar({
               )}
             </div>
             <span
+              data-tip={
+                estimate?.free
+                  ? `用量 ${state.subscription?.usage?.percent || 0}%`
+                  : `余额 ${state.balance.toLocaleString('en-US')}`
+              }
               className={`wb-generation-cost ${(estimate?.anlas || 0) > state.balance ? 'is-insufficient' : ''}`}
             >
               <strong>
@@ -293,7 +353,8 @@ export function GenerationBar({
                       tabId: tab.id,
                       count,
                       continuous,
-                      fixedSeed: fixed,
+                      fixedSeed: seed !== null,
+                      ...(seed !== null ? { seed } : {}),
                     });
                   } catch (e) {
                     notify({ text: (e as Error).message, tone: 'error' });

@@ -213,16 +213,38 @@ export function LibraryViewer({
           <i className="ri-arrow-right-s-line" />
         </Button>
         <span className="library-help">滚轮缩放 · 拖动平移 · 双击适应窗口</span>
-        {/* TODO(design): Reuse the workbench image actions until the large-image toolbar is specified. */}
-        <Button variant="quiet" size="small" onClick={() => p.onCopyImage(image)}>
-          <i className="ri-file-copy-line" />
-          复制图片
-        </Button>
-        <Button variant="quiet" size="small" onClick={() => p.onDownloadImage(image)}>
-          <i className="ri-download-2-line" />
-          另存为
-        </Button>
         <span className="library-viewer-percent library-mono">{percent}%</span>
+        <span className="library-viewer-separator" />
+        <Button
+          variant="quiet"
+          size="small"
+          aria-label="复制图片"
+          data-tip="复制图片"
+          onClick={() => p.onCopyImage(image)}
+        >
+          <i className="ri-file-copy-line" />
+        </Button>
+        <Button
+          variant="quiet"
+          size="small"
+          aria-label="另存为"
+          data-tip="另存为"
+          onClick={() => p.onDownloadImage(image)}
+        >
+          <i className="ri-download-2-line" />
+        </Button>
+        <Button
+          variant="quiet"
+          size="small"
+          aria-label="在工作台打开"
+          data-tip="在工作台打开"
+          onClick={() => {
+            p.onOpenWorkbench?.(image);
+            onClose();
+          }}
+        >
+          <i className="ri-external-link-line" />
+        </Button>
         <Button variant="quiet" size="small" onClick={onClose}>
           <i className="ri-close-line" />
           关闭

@@ -34,3 +34,7 @@ html:root.is-dragging, html:root.is-dragging body * { user-select:none; cursor:g
 :is(.nps-root,.nps-layer,.nps-dialog) :is(.nps-button,.nps-tag,.nps-field,.nps-checkbox,.nps-menu-item) { transition:background-color var(--dur-1) var(--ease-out),color var(--dur-1) var(--ease-out),border-color var(--dur-1) var(--ease-out),box-shadow var(--dur-1) var(--ease-out),outline-color var(--dur-1) var(--ease-out),opacity var(--dur-1) var(--ease-out); }
 html:root[data-motion="off"] :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *,html:root[data-motion="off"] :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *::before,html:root[data-motion="off"] :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *::after { transition:none; animation:none; }
 @media (prefers-reduced-motion:reduce) { html:root:not([data-motion="full"]) :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *,html:root:not([data-motion="full"]) :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *::before,html:root:not([data-motion="full"]) :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) *::after { transition:none; animation:none; } }
+
+html[data-input-mode="pointer"] :is(.nps-root,.nps-layer,.nps-dialog,.library-viewer) :focus-visible { outline:none; }
+:is(.nps-root,.nps-layer,.nps-dialog) .nps-field input:focus-visible,
+:is(.nps-root,.nps-layer,.nps-dialog) .nps-textarea:focus-visible { outline:none; }

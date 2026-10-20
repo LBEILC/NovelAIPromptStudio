@@ -4,7 +4,6 @@
 .tidy-row .nps-help { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .tidy-space { flex:1; }
 .tidy-progress { height:var(--progress-h); background:var(--border); overflow:hidden; }
-/* TODO(design): The prototype's 1.2s indeterminate timing needs a design token. */
 .tidy-progress i { display:block; height:100%; width:32%; background:var(--ink); animation:tidy-indeterminate var(--dur-spin) var(--ease-move) infinite alternate; }
 @keyframes tidy-indeterminate { from { transform:translateX(0); } to { transform:translateX(212%); } }
 [data-motion="off"] .tidy-progress i { animation:none; width:100%; opacity:var(--dim); }
@@ -18,3 +17,14 @@
 .ai-name-row { display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-2) 0; border-top:var(--bw) solid var(--divider); }
 .ai-name-row img { width:calc(var(--ctl) + var(--sp-4)); height:calc(var(--ctl) + var(--sp-4)); object-fit:cover; border-radius:var(--r-thumb); }
 .ai-name-content { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--sp-1); }
+
+.tidy-why > .tidy-decision { margin-left:auto; display:flex; align-items:center; white-space:nowrap; gap:var(--sp-2); }
+
+.ai-name-row { display:grid; grid-template-columns:auto minmax(0,1.4fr) minmax(0,1fr) auto; }
+.ai-name-row:first-child { border-top:0; }
+.ai-name-pic { display:flex; width:calc(var(--strip-w) * 2); }
+.ai-name-row img { width:var(--strip-w); height:var(--strip-h); }
+.ai-name-original { display:flex; flex-direction:column; gap:var(--sp-0); min-width:0; font-size:var(--fs-small); color:var(--text-2); }
+.ai-name-original > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ai-name-actions { display:flex; gap:var(--sp-0); min-width:calc(var(--ctl-sm) * 2 + var(--sp-0)); justify-content:flex-end; }
+.nps-dialog-footer-leading { margin-right:auto; }

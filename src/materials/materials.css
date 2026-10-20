@@ -25,3 +25,8 @@
 .material-title { display:flex; align-items:baseline; gap:var(--sp-2); min-width:0; }
 .material-title b { font-weight:var(--fw-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .material-type { flex:0 0 auto; color:var(--text-3); font-size:var(--fs-caption); }
+
+.material-picker-footer { display:flex; align-items:center; justify-content:space-between; border-top:var(--bw) solid var(--divider); padding-top:var(--sp-2); }
+.material-head > span:last-child { opacity:0; }
+.material-head:hover > span:last-child,.material-head:focus-within > span:last-child { opacity:1; }
+.material-count { padding:var(--sp-2) var(--sp-5); border-top:var(--bw) solid var(--divider); color:var(--text-3); font-size:var(--fs-small); }

@@ -264,6 +264,7 @@ export function Menu({
         anchor={ref}
         focus
         point={point}
+        dismissOnAnchor={context}
         className={cx('nps-menu', menuClassName)}
       >
         {heading && <div className="nps-help library-menu-heading">{heading}</div>}

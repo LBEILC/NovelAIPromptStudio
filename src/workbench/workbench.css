@@ -135,3 +135,6 @@
 .tx-hl .num.neg { color: var(--remove); }
 .tx-hl .bad { text-decoration: underline wavy var(--warn); text-decoration-thickness: var(--bw); text-underline-offset: calc(var(--sp-1) - var(--bw)); }
 .tx-err { display: flex; align-items: center; gap: var(--sp-1); margin: calc(var(--sp-2) * -1) 0 var(--sp-3); font-size: var(--fs-caption); color: var(--warn); }
+
+.wb-add-block > i { font-size:var(--icon-sm); }
+.wb-add-block .nps-button { font-weight:var(--fw-regular); }

@@ -281,8 +281,8 @@ export function useTidy(p: {
             <span>{x.reason}</span>
           </span>
           {x.decision !== undefined ? (
-            <>
-              <span>{x.decision ? '已接受' : '已放弃'}</span>
+            <span className="tidy-decision">
+              <span>{x.decision ? '✓ 已接受' : '已放弃'}</span>
               <Button
                 size="small"
                 variant="quiet"
@@ -292,7 +292,7 @@ export function useTidy(p: {
               >
                 撤回
               </Button>
-            </>
+            </span>
           ) : (
             <>
               <Button

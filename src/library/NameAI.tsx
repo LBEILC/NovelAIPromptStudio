@@ -121,6 +121,9 @@ export function NameAI({
       <Dialog
         open={!!phase && phase !== 'confirm'}
         title="根据提示词起名"
+        footerLeading={
+          phase === 'results' ? `还有 ${rows.filter((r) => !r.done).length} 项未处理` : undefined
+        }
         cancelLabel={phase === 'running' ? '取消' : '放弃'}
         confirmLabel={phase === 'failed' ? '重试' : '全部接受'}
         confirmDisabled={
@@ -149,7 +152,9 @@ export function NameAI({
             <div className="ai-name-list">
               {rows.map((row, i) => (
                 <div className="ai-name-row" key={row.ids.join(',')}>
-                  <img src={mediaUrl(row.thumbnail)} alt="" />
+                  <span className="ai-name-pic">
+                    <img src={mediaUrl(row.thumbnail)} alt="" />
+                  </span>
                   <div className="ai-name-content">
                     {row.done ? (
                       <strong>✓ {row.name}</strong>
@@ -169,30 +174,35 @@ export function NameAI({
                         ? `${row.ids.length} 张 · 将命名为 ${row.name}-01 至 -${String(row.ids.length).padStart(2, '0')}`
                         : '1 张'}
                     </span>
-                    <span className="nps-help">原来　{row.original || '未起名'}</span>
                   </div>
-                  {row.done ? (
-                    <span>已起名</span>
-                  ) : (
-                    <>
-                      <Button
-                        size="small"
-                        aria-label="接受名称"
-                        disabled={!row.name.trim()}
-                        onClick={() => void accept([i])}
-                      >
-                        ✓
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="quiet"
-                        aria-label="去掉"
-                        onClick={() => setRows(rows.filter((_, j) => j !== i))}
-                      >
-                        ✕
-                      </Button>
-                    </>
-                  )}
+                  <div className="ai-name-original">
+                    <span>原来</span>
+                    <span>{row.original || '未起名'}</span>
+                  </div>
+                  <div className="ai-name-actions">
+                    {row.done ? (
+                      <span>已起名</span>
+                    ) : (
+                      <>
+                        <Button
+                          size="small"
+                          aria-label="接受名称"
+                          disabled={!row.name.trim()}
+                          onClick={() => void accept([i])}
+                        >
+                          ✓
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="quiet"
+                          aria-label="去掉"
+                          onClick={() => setRows(rows.filter((_, j) => j !== i))}
+                        >
+                          ✕
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
