@@ -670,7 +670,10 @@ export function WorkbenchEditor(p: EditorProps) {
                         });
                         notify({
                           text: '已存为角色',
-                          action: { label: '查看', onClick: () => p.onShowMaterials?.() },
+                          action: {
+                            label: '查看',
+                            onClick: () => p.onShowMaterials?.('character'),
+                          },
                         });
                       } catch (e) {
                         p.onNotify((e as Error).message, 'error');

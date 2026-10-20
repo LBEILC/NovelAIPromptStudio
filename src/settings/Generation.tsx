@@ -120,13 +120,14 @@ export function NovelAIAccount({ onSaved }: { onSaved?: () => void }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   async function save() {
+    const firstToken = !state.settings.hasToken;
     setBusy(true);
     setError('');
     try {
       await invokeUI('account.save', { token });
       setToken('');
       setEditing(false);
-      onSaved?.();
+      if (firstToken) onSaved?.();
     } catch (e) {
       setError((e as Error).message);
     } finally {

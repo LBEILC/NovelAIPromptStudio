@@ -50,9 +50,11 @@ export function MaterialContent({
 export function MaterialExamples({
   ids,
   onPreview,
+  expanded = false,
 }: {
   ids: string[];
   onPreview?: (path: string) => void;
+  expanded?: boolean;
 }) {
   const [images, setImages] = useState<{ id: string; thumbnail: string; image: string }[]>([]);
   useEffect(() => {
@@ -76,7 +78,7 @@ export function MaterialExamples({
     };
   }, [ids.join(',')]);
   return (
-    <span className="material-examples">
+    <span className={`material-examples${expanded ? ' material-examples-expanded' : ''}`}>
       {images.map((x) => (
         <img
           key={x.id}
@@ -323,9 +325,9 @@ export function MaterialsPage({ initialKind = 'block' }: { initialKind?: string 
     <main className="library-page materials-page">
       <aside className="library-side">
         {[
-          ['block', '常用块', 'ri-bookmark-line'],
-          ['character', '角色', 'ri-user-line'],
-          ['vibe', 'Vibe', 'ri-image-line'],
+          ['block', '常用块', 'ri-stack-line'],
+          ['character', '角色', 'ri-user-3-line'],
+          ['vibe', 'Vibe', 'ri-palette-line'],
         ].map(([key, label, icon]) => (
           <button
             className={`library-side-item ${key === kind ? 'on' : ''}`}
@@ -349,6 +351,7 @@ export function MaterialsPage({ initialKind = 'block' }: { initialKind?: string 
         <div className="library-tools">
           <Input
             aria-label="搜索素材"
+            prefix={<i className="ri-search-line" />}
             placeholder={`搜索${kind === 'block' ? '常用块' : kind === 'character' ? '角色' : 'Vibe'}的名称或内容`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -399,35 +402,37 @@ export function MaterialsPage({ initialKind = 'block' }: { initialKind?: string 
                     }}
                   >
                     <div className="material-main">
-                      {rename === x.id ? (
-                        <Input
-                          autoFocus
-                          aria-label="素材名称"
-                          value={name}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => setName(e.target.value)}
-                          onKeyDown={(e) => {
-                            e.stopPropagation();
-                            if (e.key === 'Enter') void saveName();
-                            if (e.key === 'Escape') setRename('');
-                          }}
-                          onBlur={() => void saveName()}
-                        />
-                      ) : (
-                        <b>{x.name}</b>
-                      )}
+                      <div className="material-title">
+                        {rename === x.id ? (
+                          <Input
+                            autoFocus
+                            aria-label="素材名称"
+                            value={name}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setName(e.target.value)}
+                            onKeyDown={(e) => {
+                              e.stopPropagation();
+                              if (e.key === 'Enter') void saveName();
+                              if (e.key === 'Escape') setRename('');
+                            }}
+                            onBlur={() => void saveName()}
+                          />
+                        ) : (
+                          <b>{x.name}</b>
+                        )}
+                        <span className="material-type">
+                          {x.kind === 'character'
+                            ? `${x.blocks.length} 块${x.negativeBlocks?.length ? ` · 负面 ${x.negativeBlocks.reduce((n, b) => n + b.tags.length, 0)} 个 Tag` : ''}`
+                            : x.blocks[0]?.type === 'tags'
+                              ? `Tag 块 · ${x.blocks[0].tags.length} 个`
+                              : '段落'}
+                        </span>
+                      </div>
                       <span className="material-preview">
                         {x.blocks.map((b) => b.content).join('\n')}
                       </span>
                     </div>
-                    <span className="nps-help">
-                      {x.kind === 'character'
-                        ? `${x.blocks.length} 块`
-                        : x.blocks[0]?.type === 'tags'
-                          ? `Tag 块 · ${x.blocks[0].tags.length} 个`
-                          : '段落'}
-                    </span>
-                    <MaterialExamples ids={x.examples} />
+                    <MaterialExamples ids={x.examples.slice(0, 3)} />
                     <span className="nps-help">用过 {x.uses} 次</span>
                     <span onClick={(e) => e.stopPropagation()}>
                       <Menu
@@ -462,7 +467,7 @@ export function MaterialsPage({ initialKind = 'block' }: { initialKind?: string 
                         </>
                       )}
                       <span className="nps-help">示例图片</span>
-                      <MaterialExamples ids={x.examples} />
+                      <MaterialExamples ids={x.examples} expanded />
                     </div>
                   </Collapse>
                 </div>

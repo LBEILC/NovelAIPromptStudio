@@ -19,9 +19,15 @@ export async function settingsGenerationChecks({
     );
   h.category('设置·NovelAI 账号');
   await section('NovelAI 账号');
+  const firstToken = !preferences.novelAIToken();
   if (await evaluate('!document.querySelector(\'[aria-label="持久令牌"]\')')) await click('更换');
   await input('[aria-label="持久令牌"]', 'acceptance-token');
   await click('保存', 'document.querySelector("[data-settings-section=novelai]")');
+  if (firstToken)
+    await wait(
+      'document.querySelector(".studio-titlebar [aria-current=page]")?.textContent.trim()==="工作台"',
+    );
+  await section('NovelAI 账号');
   await wait('document.body.innerText.includes("10,000 Anlas")');
   await check(
     '保存令牌后输入框清空并退出编辑',
