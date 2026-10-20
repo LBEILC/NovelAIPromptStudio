@@ -1,6 +1,11 @@
-﻿import type { ReactNode } from 'react';
+﻿// 版本差异（doc/design.md 2.23）：版本栏里每一版写相对上一版改了什么（最多两行）；
+// 停在一版上 400ms 弹出完整对比：参数、按块分组的 Tag、段落的新旧原文（删掉的字加删除线、加上的加下划线）。
+import type { ReactNode } from 'react';
 import { changeText, diffSummary, oneLine, type VersionDiff } from '../lib/versionDiff';
 
+const KIND = { add: 'plus', rem: 'minus', w: 'wchg' } as const;
+
+/** 摘要：Tag 的增减和权重用颜色区分（新增绿、去掉红、权重正文色）。 */
 export function VersionSummary({
   diff,
   compact = false,
@@ -14,7 +19,7 @@ export function VersionSummary({
   while (cursor < text.length) {
     const next = diff.items
       .map((item) => ({ item, at: text.indexOf(changeText(item), cursor) }))
-      .filter((item) => item.at >= 0)
+      .filter((x) => x.at >= 0)
       .sort((a, b) => a.at - b.at)[0];
     if (!next) {
       pieces.push(text.slice(cursor));
@@ -23,24 +28,23 @@ export function VersionSummary({
     pieces.push(text.slice(cursor, next.at));
     const value = changeText(next.item);
     pieces.push(
-      <span key={cursor} className={`wb-change-${next.item.kind}`}>
+      <span key={cursor} className={KIND[next.item.kind]}>
         {value}
       </span>,
     );
     cursor = next.at + value.length;
   }
-  return <span className="wb-version-summary">{pieces}</span>;
+  return <span className="what">{pieces}</span>;
 }
 
-// Preserve the reference's word-level additions and deletions in paragraph comparisons.
+// 段落按词对比：旧文里删掉的词加删除线，新文里加上的词加下划线
 function words(before: string, after: string) {
   const a = before.split(/(\s+)/),
     b = after.split(/(\s+)/);
-  const matrix = Array.from({ length: a.length + 1 }, () => new Uint32Array(b.length + 1));
+  const m = Array.from({ length: a.length + 1 }, () => new Uint32Array(b.length + 1));
   for (let i = a.length - 1; i >= 0; i--)
     for (let j = b.length - 1; j >= 0; j--)
-      matrix[i][j] =
-        a[i] === b[j] ? matrix[i + 1][j + 1] + 1 : Math.max(matrix[i + 1][j], matrix[i][j + 1]);
+      m[i][j] = a[i] === b[j] ? m[i + 1][j + 1] + 1 : Math.max(m[i + 1][j], m[i][j + 1]);
   const old: ReactNode[] = [],
     now: ReactNode[] = [];
   let i = 0,
@@ -49,7 +53,7 @@ function words(before: string, after: string) {
     if (i < a.length && j < b.length && a[i] === b[j]) {
       old.push(a[i++]);
       now.push(b[j++]);
-    } else if (j < b.length && (i >= a.length || matrix[i][j + 1] >= matrix[i + 1][j])) {
+    } else if (j < b.length && (i >= a.length || m[i][j + 1] >= m[i + 1][j])) {
       now.push(/^\s+$/.test(b[j]) ? b[j] : <ins key={j}>{b[j]}</ins>);
       j++;
     } else {
@@ -59,6 +63,8 @@ function words(before: string, after: string) {
   }
   return { old, now };
 }
+
+/** 完整对比（放在 .ver-peek 浮层里）。 */
 export function VersionDifference({
   diff,
   title,
@@ -68,53 +74,51 @@ export function VersionDifference({
   title: string;
   against: string;
 }) {
-  const groups = [...new Set(diff.items.map((item) => item.label))];
+  const groups = [...new Set(diff.items.map((x) => x.label))];
   const count = diff.items.length + diff.paras.length + (diff.size ? 1 : 0);
   return (
     <>
-      <header className="wb-diff-head">
+      <div className="vp-h">
         <b>{title}</b>
-        <span className="nps-help">
+        <span className="help">
           与{against}相比{count ? ` · ${count} 处改动` : ''}
         </span>
-      </header>
+      </div>
       {diff.size && (
-        <section className="wb-diff-group">
-          <span className="wb-diff-label">参数</span>
-          <div className="wb-diff-tags">
-            尺寸 {diff.size.from.join('×')} → {diff.size.to.join('×')}
+        <div className="vp-g">
+          <span className="label">参数</span>
+          <div className="vp-tags mono">
+            <span className="wchg">
+              尺寸 {diff.size.from.join('×')}→{diff.size.to.join('×')}
+            </span>
           </div>
-        </section>
+        </div>
       )}
       {groups.map((label) => (
-        <section className="wb-diff-group" key={label}>
-          <span className="wb-diff-label">{label}</span>
-          <div className="wb-diff-tags">
+        <div className="vp-g" key={label}>
+          <span className="label">{label}</span>
+          <div className="vp-tags mono">
             {diff.items
-              .filter((item) => item.label === label)
-              .map((item, index) => (
-                <span key={index} className={`wb-change-${item.kind}`}>
-                  {changeText({ ...item, pre: '' })}
+              .filter((x) => x.label === label)
+              .map((x, i) => (
+                <span key={i} className={KIND[x.kind]}>
+                  {changeText({ ...x, pre: '' })}
                 </span>
               ))}
           </div>
-        </section>
+        </div>
       ))}
-      {diff.paras.map((p, index) => {
-        const changes = words(p.old, p.now);
+      {diff.paras.map((p, i) => {
+        const w = words(p.old, p.now);
         return (
-          <section className="wb-diff-group" key={index}>
-            <span className="wb-diff-label">{p.label ? `段落 · ${p.label}` : '段落'}</span>
-            {p.old && <p className="wb-diff-paragraph old">{changes.old}</p>}
-            {p.now ? (
-              <p className="wb-diff-paragraph">{changes.now}</p>
-            ) : (
-              <p className="nps-help">删除了这一段</p>
-            )}
-          </section>
+          <div className="vp-g" key={i}>
+            <span className="label">{p.label ? `段落 · ${p.label}` : '段落'}</span>
+            {p.old && <p className="vp-p old">{w.old}</p>}
+            {p.now ? <p className="vp-p">{w.now}</p> : <p className="vp-p help">删除了这一段</p>}
+          </div>
         );
       })}
-      {!count && <p className="nps-help">{diff.order ? '只调整了顺序' : '没有改动'}</p>}
+      {!count && <p className="help">{diff.order ? '只调整了顺序' : '没有改动'}</p>}
     </>
   );
 }

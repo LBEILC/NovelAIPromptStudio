@@ -1,21 +1,28 @@
-import { DecodedImage } from '../ui/transitions';
-import { useEffect, useState, useRef } from 'react';
+// 工作台的舞台（doc/design.md 2.14、2.23）：中间是这一版的图，像放在纸上的照片；点了打开大图。
+// 标题行：起了名的写"名称 · 第 3 版"，没起名的只写"第 3 版"（原图写"原图"）；提示词改过以后淡入"已修改"和"恢复"，
+// 标题行固定高度，出现消失都不挤动图片。下面一行是尺寸、模型和参数；没起名时再一行"文件"。V4.5 的图另有一行 Vibe。
+// 右键图片：作为新作品打开、移入回收站。焦点不在输入框时 ← → 在这一版的图之间切换，到头停住。
+import { useEffect, useMemo, useState } from 'react';
 import type { WorkbenchTab } from '../state/workbench';
 import type { ImageProject, ImageRecord, Vibe } from '../shared/types';
-import { Button, Banner, ContextMenu, Popover, useNotifications } from '../ui';
+import type { WorkVersion } from '../shared/generation';
 import { hasImageName, imageFileName } from '../lib/imageNaming.js';
 import { mediaUrl } from '../lib/imageStage.js';
 import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
-import { generationParameters, modelDisplayName } from '../library/presentation';
-import './workbench.css';
 import { invokeUI } from '../lib/commands';
+import { generationParameters, modelDisplayName } from '../library/presentation';
 import { useGeneration } from '../state/generation';
-import type { WorkVersion } from '../shared/generation';
-import type { LibraryGroup } from '../library/types';
-import { LibraryViewer } from '../library/Viewer';
+import { Icon } from '../kit/controls';
+import { ContextMenu, type MenuEntry } from '../kit/menu';
+import { Pop } from '../kit/layer';
+import { useNotifications } from '../kit/toast';
+import { useSwap } from '../kit/motion';
+import { Viewer } from '../kit/Viewer';
 
 export interface ImageProps {
   tab: WorkbenchTab;
+  /** 切换标签页时图片朝新标签页的方向换内容：-1 往左、1 往右 */
+  dir?: number;
   onSaveLibrary: () => void;
   onReveal: () => void;
   onCopyImage: (project: ImageProject) => void;
@@ -23,273 +30,349 @@ export interface ImageProps {
   onReset: () => void;
   onRevealVibe: (vibe: Vibe) => void;
 }
-export function WorkbenchImage({ tab, ...p }: ImageProps) {
-  const [missing, setMissing] = useState(!!tab.error);
-  const [preview, setPreview] = useState(false);
+const midEll = (s: string, max: number) =>
+  s.length <= max
+    ? s
+    : `${s.slice(0, Math.ceil((max - 1) * 0.6))}…${s.slice(-Math.floor((max - 1) * 0.4))}`;
+
+export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
+  const notify = useNotifications();
+  const generation = useGeneration();
   const image = tab.project as (ImageProject & { vibes?: Vibe[] }) | null;
-  const generation = useGeneration(),
-    notify = useNotifications();
-  const [version, setVersion] = useState<WorkVersion | null>(null),
-    [members, setMembers] = useState<ImageRecord[]>([]),
-    [refresh, setRefresh] = useState(0);
+  const [missing, setMissing] = useState(!!tab.error);
+  const [version, setVersion] = useState<WorkVersion | null>(null);
+  const [members, setMembers] = useState<ImageRecord[]>([]);
+  const [refresh, setRefresh] = useState(0);
+  const [viewer, setViewer] = useState<number | null>(null);
+  const [menu, setMenu] = useState<[number, number] | null>(null);
+  const [vibe, setVibe] = useState<number | null>(null);
+  useEffect(() => setMissing(!!tab.error), [image?.image_path, tab.error]);
   useEffect(() => {
-    if (!generation.settings.hasToken) return;
-    let active = true;
+    if (!generation.settings.hasToken) {
+      setVersion(null);
+      setMembers([]);
+      return;
+    }
+    let live = true;
     void invokeUI('version.list', { tabId: tab.id }).then(async (r) => {
-      const v = r.versions.find((v) => v.id === tab.versionId) || r.versions[0];
+      const v = r.versions.find((x) => x.id === tab.versionId) || r.versions[0];
+      if (!v) return;
       const list = await Promise.all(
         v.images
           .filter((i) => !i.deleted)
-          .map((i) => invokeUI('library.get', { id: i.projectId }).then((r) => r.project)),
+          .map((i) => invokeUI('library.get', { id: i.projectId }).then((x) => x.project)),
       );
-      if (active) {
-        setVersion(v);
-        setMembers(v.parentId ? list : [v.project as unknown as ImageRecord, ...list]);
-      }
+      if (!live) return;
+      setVersion(v);
+      setMembers(
+        (v.parentId ? list : [v.project as unknown as ImageRecord, ...list]).filter(Boolean),
+      );
     });
     return () => {
-      active = false;
+      live = false;
     };
-  }, [tab.id, tab.versionId, tab.revision, generation.jobs, refresh]);
+  }, [
+    tab.id,
+    tab.versionId,
+    tab.versionImageId,
+    tab.revision,
+    generation.jobs,
+    refresh,
+    generation.settings.hasToken,
+  ]);
   useEffect(
     () =>
-      window.studio?.onCommandEvent((event) => {
-        if (event.type === 'workbench' && event.libraryChanged) setRefresh((n) => n + 1);
+      window.studio?.onCommandEvent((e) => {
+        if (e.type === 'workbench' && e.libraryChanged) setRefresh((n) => n + 1);
       }),
     [],
   );
   const allTrashed =
     !!version?.parentId && version.images.length > 0 && !version.images.some((i) => !i.deleted);
-  const group =
-    version && members.length
-      ? ({
-          id: version.id,
-          fingerprint: version.id,
-          cover: members[0],
-          members,
-          grouping: { promptScope: 'separate', mergeVibes: false, similarityThreshold: 85 },
-        } as unknown as LibraryGroup)
-      : null;
-  const stageImageId = tab.versionImageId || (!version?.parentId ? version?.project.id : '');
-  const imageMenu =
-    version && stageImageId
+  const stageId = tab.versionImageId || (!version?.parentId ? version?.project.id : '') || '';
+  const index = Math.max(
+    0,
+    members.findIndex((m) => m.id === stageId),
+  );
+  const show = (i: number) => {
+    const m = members[i];
+    if (version && m)
+      void invokeUI('version.open', { tabId: tab.id, versionId: version.id, imageId: m.id });
+  };
+  // ← → 在这一版的图之间走（焦点在输入框、菜单、对话框里时不算）
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const t = e.target as HTMLElement;
+      if (
+        t.closest?.(
+          'input, textarea, [contenteditable="true"], [role="menu"], [role="dialog"], [role="tablist"], .segc, [role="slider"]',
+        )
+      )
+        return;
+      if (!members.length || viewer != null) return;
+      if (!document.querySelector('.wb-body:not(.leaving)')?.checkVisibility?.()) return;
+      const next = Math.max(
+        0,
+        Math.min(members.length - 1, index + (e.key === 'ArrowLeft' ? -1 : 1)),
+      );
+      if (next === index) return;
+      e.preventDefault();
+      show(next);
+    };
+    addEventListener('keydown', key);
+    return () => removeEventListener('keydown', key);
+  });
+  const dirty = workbenchTabHasChanges(tab);
+  const vlabel = version?.parentId ? `第 ${version.number} 版` : '原图';
+  const title = image && hasImageName(image) ? `${image.name} · ${vlabel}` : vlabel;
+  const m = image?.metadata;
+  const pics = useSwap(
+    {
+      src: image && !missing ? mediaUrl(image.image_path) : '',
+      key: `${tab.id}:${image?.image_path}:${allTrashed}`,
+    },
+    (v) => v.key,
+  );
+  const enter = dir < 0 ? 'left' : dir > 0 ? 'right' : 'fade';
+  const menuItems: MenuEntry[] =
+    version && stageId
       ? [
           {
-            id: 'new-work',
             label: '作为新作品打开',
-            onSelect: () => {
+            onSelect: () =>
               void invokeUI('work.open-from-image', {
                 tabId: tab.id,
                 versionId: version.id,
-                imageId: stageImageId!,
-              }).then(() => notify({ text: '已作为新作品打开' }));
-            },
+                imageId: stageId,
+              }).then(() => notify({ text: '已作为新作品打开' })),
           },
           {
-            id: 'trash',
             label: '移入回收站',
-            disabled: tab.source.type !== 'library',
-            disabledReason: tab.source.type !== 'library' ? '请先存入图片库' : undefined,
-            onSelect: () => {
-              const id = stageImageId!;
-              void invokeUI('library.trash', { ids: [id] }).then(() => {
+            danger: true,
+            disabled: tab.source.type !== 'library' ? '请先存入图片库' : false,
+            onSelect: () =>
+              void invokeUI('library.trash', { ids: [stageId] }).then(() => {
                 setRefresh((n) => n + 1);
                 notify({
                   text: '已移入回收站',
                   action: {
                     label: '撤销',
-                    onClick: () => {
-                      void invokeUI('library.restore', { ids: [id] }).then(() =>
+                    onClick: () =>
+                      void invokeUI('library.restore', { ids: [stageId] }).then(() =>
                         setRefresh((n) => n + 1),
-                      );
-                    },
+                      ),
                   },
                 });
-              });
-            },
+              }),
           },
         ]
       : [];
-
-  useEffect(() => setMissing(!!tab.error), [image?.image_path, tab.error]);
-  const metadata = image?.metadata;
+  const vibes = image?.vibes || [];
+  const viewerItems = useMemo(
+    () =>
+      (members.length ? members : image ? [image as unknown as ImageRecord] : []).map((x) => ({
+        id: x.id,
+        src: mediaUrl(x.image_path),
+      })),
+    [members, image?.image_path],
+  );
   return (
-    <section className="wb-stage" aria-label="当前图片">
+    <div className="col stage">
       {(missing || !image) && (
-        <Banner tone="warn">
-          这张图片已被移动或删除。提示词还在，可以继续编辑和复制；关闭这个标签页不影响其他标签页。
-        </Banner>
+        <div className="stage-banner">
+          <div className="banner warn">
+            <Icon name="alert-line" />
+            <span>
+              这张图片已被移动或删除。提示词还在，可以继续编辑和复制；关闭这个标签页不影响其他标签页。
+            </span>
+          </div>
+        </div>
       )}
-      <ContextMenu className="wb-canvas-menu" label="图片操作" items={imageMenu}>
-        <div className="wb-canvas">
-          {image && !missing && !allTrashed ? (
-            <DecodedImage
+      <div className="canvas swap">
+        {pics.map(({ key, value, leaving }) =>
+          allTrashed && !leaving ? (
+            <div key={key} className="canvas-empty" data-enter="fade">
+              <Icon name="delete-bin-line" />
+              这一版的图片都在回收站
+            </div>
+          ) : value.src ? (
+            <img
+              key={key}
+              className={leaving ? 'leaving' : ''}
+              data-enter={enter}
+              data-stage=""
+              src={value.src}
               alt="当前图片"
+              draggable={false}
               role="button"
-              tabIndex={0}
-              onClick={() => setPreview(true)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') setPreview(true);
-              }}
-              src={mediaUrl(image.image_path)}
+              tabIndex={leaving ? -1 : 0}
               onError={() => setMissing(true)}
+              onClick={() => setViewer(index)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setViewer(index);
+              }}
+              onContextMenu={(e) => {
+                if (!menuItems.length) return;
+                e.preventDefault();
+                setMenu([e.clientX, e.clientY]);
+              }}
             />
           ) : (
-            <p>{allTrashed ? '这一版的图片都在回收站' : '无法显示图片'}</p>
-          )}
-        </div>
-      </ContextMenu>
+            <div key={key} className="canvas-empty" data-enter="fade">
+              <Icon name="image-line" />
+              无法显示图片
+            </div>
+          ),
+        )}
+      </div>
       {image && (
         <>
-          <div className="wb-caption">
-            <div className="wb-stage-title">
-              <strong
-                data-tip={`${hasImageName(image) ? image.name + ' · ' : ''}${version?.parentId ? `第 ${version.number} 版` : '原图'}`}
-                data-tip-overflow=""
-              >
-                {hasImageName(image) ? image.name + ' · ' : ''}
-                {version?.parentId ? `第 ${version.number} 版` : '原图'}
-              </strong>
-              <span
-                className="wb-stage-dirty"
-                data-visible={workbenchTabHasChanges(tab) || undefined}
-              >
-                已修改
-              </span>
-              <Button
-                className="wb-stage-reset"
-                data-visible={workbenchTabHasChanges(tab) || undefined}
-                tabIndex={workbenchTabHasChanges(tab) ? 0 : -1}
-                variant="quiet"
-                size="small"
-                data-tip={`恢复成${version?.parentId ? `第 ${version.number} 版` : '原图'}的提示词`}
-                onClick={p.onReset}
-              >
-                <i className="ri-arrow-go-back-line" />
-                恢复
-              </Button>
+          <div className="caption">
+            <div className="cap-title">
+              <b data-tip-overflow={title}>{title}</b>
+              {dirty && (
+                <span className="dirty-tag" data-enter="fade">
+                  已修改
+                </span>
+              )}
+              <span className="sp" />
+              {dirty && (
+                <button
+                  className="btn quiet sm"
+                  data-enter="fade"
+                  data-tip={`恢复成${vlabel}的提示词`}
+                  onClick={p.onReset}
+                >
+                  <Icon name="arrow-go-back-line" />
+                  恢复
+                </button>
+              )}
             </div>
-            <span className="wb-meta">
+            <span className="meta mono selectable">
               {[
-                metadata?.width && metadata?.height ? `${metadata.width} × ${metadata.height}` : '',
-                modelDisplayName(metadata?.model),
-                generationParameters(metadata || {}),
+                m?.width && m?.height ? `${m.width} × ${m.height}` : '',
+                modelDisplayName(m?.model),
+                generationParameters(m || {}),
               ]
                 .filter(Boolean)
                 .join(' · ')}
             </span>
             {!hasImageName(image) && (
-              <span className="wb-file" data-tip={imageFileName(image)}>
-                文件{' '}
-                <span>
-                  {imageFileName(image).slice(0, Math.ceil(imageFileName(image).length / 2))}
-                </span>
-                <span>
-                  {imageFileName(image).slice(Math.ceil(imageFileName(image).length / 2))}
-                </span>
+              <span className="meta file" data-tip={imageFileName(image)}>
+                文件 <span className="mono selectable">{midEll(imageFileName(image), 56)}</span>
               </span>
             )}
-            {!!image.vibes?.length && (
-              <div className="wb-vibes">
-                <span>Vibe</span>
-                {image.vibes.map((vibe, index) => (
-                  <VibeChip
-                    key={vibe.id || index}
-                    vibe={vibe}
-                    index={index}
-                    onReveal={() => p.onRevealVibe(vibe)}
-                  />
+            {vibes.length > 0 && (
+              <div className="vibes">
+                <span className="muted">Vibe</span>
+                {vibes.map((v, i) => (
+                  <button
+                    key={v.id || i}
+                    className={`vibe-chip ${vibe === i ? 'on' : ''}`}
+                    data-trigger={`vibe-${i}`}
+                    data-tip={`Vibe ${i + 1} · 参考强度 ${Number(v.strength).toFixed(2)} · 信息提取 ${v.information_extracted == null ? '未知' : Number(v.information_extracted).toFixed(2)}`}
+                    onClick={() => setVibe(vibe === i ? null : i)}
+                  >
+                    <span className="vph">
+                      <Icon name="image-line" />
+                    </span>
+                    <span className="mono">{Number(v.strength).toFixed(2)}</span>
+                  </button>
                 ))}
               </div>
             )}
           </div>
-          <div className="wb-image-actions">
+          <div className="stage-acts">
             {tab.source.type === 'library' ? (
-              <span className="wb-saved">
-                <i className="ri-check-line" />
+              <span className="saved">
+                <Icon name="check-line" />
                 已存入图片库
               </span>
             ) : (
-              <Button size="small" onClick={p.onSaveLibrary}>
+              <button className="btn sm" onClick={p.onSaveLibrary}>
                 存入图片库
-              </Button>
+              </button>
             )}
-            <Button variant="quiet" size="small" onClick={p.onReveal}>
-              <i className="ri-folder-open-line" />
+            <button className="btn quiet sm" onClick={p.onReveal}>
+              <Icon name="folder-open-line" />
               在文件夹中显示
-            </Button>
-            <Button variant="quiet" size="small" onClick={() => p.onCopyImage(image)}>
-              <i className="ri-file-copy-line" />
+            </button>
+            <button className="btn quiet sm" onClick={() => p.onCopyImage(image)}>
+              <Icon name="file-copy-line" />
               复制图片
-            </Button>
-            <Button variant="quiet" size="small" onClick={() => p.onDownloadImage(image)}>
-              <i className="ri-download-2-line" />
+            </button>
+            <button className="btn quiet sm" onClick={() => p.onDownloadImage(image)}>
+              <Icon name="download-2-line" />
               另存为
-            </Button>
+            </button>
           </div>
         </>
       )}
-      {preview && image && (
-        <LibraryViewer
-          onClose={() => setPreview(false)}
-          p={{
-            preview: image,
-            previewGroup: group,
-            groups: group ? [group] : [],
-            onPreview: (_group, next) => {
-              if (version && next)
-                void invokeUI('version.open', {
-                  tabId: tab.id,
-                  versionId: version.id,
-                  imageId: next.id,
-                });
-            },
-            onCopyImage: async () => p.onCopyImage(image),
-            onDownloadImage: async () => p.onDownloadImage(image),
-          }}
-        />
-      )}
-    </section>
-  );
-}
-
-function VibeChip({ vibe, index, onReveal }: { vibe: Vibe; index: number; onReveal: () => void }) {
-  const anchor = useRef<HTMLButtonElement>(null),
-    [open, setOpen] = useState(false);
-  const information =
-    vibe.information_extracted == null ? '未知' : Number(vibe.information_extracted).toFixed(2);
-  return (
-    <>
-      <Button
-        ref={anchor}
-        size="small"
-        variant="quiet"
-        data-tip={`Vibe ${index + 1} · 参考强度 ${Number(vibe.strength).toFixed(2)} · 信息提取 ${information}`}
-        onClick={() => setOpen(true)}
+      <ContextMenu at={menu} onClose={() => setMenu(null)} items={menuItems} />
+      <Pop
+        open={vibe != null && !!vibes[vibe]}
+        onClose={() => setVibe(null)}
+        anchor={`[data-trigger="vibe-${vibe}"]`}
+        trigger={`[data-trigger="vibe-${vibe}"]`}
+        place="above-left"
+        enter="pop-up"
+        className="popover vibe-pop"
+        label="Vibe"
       >
-        <i className="ri-image-line" />
-        {Number(vibe.strength).toFixed(2)}
-      </Button>
-      <Popover
-        open={open}
-        anchor={anchor}
-        onClose={() => setOpen(false)}
-        label={`Vibe ${index + 1}`}
-      >
-        <div className="wb-vibe-detail">
-          <i className="ri-image-line" />
-          <strong>Vibe {index + 1}</strong>
-          <span>参考强度 {Number(vibe.strength).toFixed(2)}</span>
-          <span>
-            信息提取 {information}
-            {information === '未知' ? ' · 原图里没有记录' : ''}
-          </span>
-          <span>编码文件 {vibe.name}</span>
-          <Button size="small" onClick={onReveal}>
-            在文件夹中显示
-          </Button>
-        </div>
-      </Popover>
-    </>
+        {vibe != null && vibes[vibe] && (
+          <>
+            <div className="vp-h">
+              <b>Vibe {vibe + 1}</b>
+            </div>
+            <div className="vibe-img">
+              <span className="help">原图里只有编码，没有参考图</span>
+            </div>
+            <div className="frow">
+              <span className="label">参考强度</span>
+              <span className="mono">{Number(vibes[vibe].strength).toFixed(2)}</span>
+            </div>
+            <div className="frow">
+              <span className="label">信息提取</span>
+              <span>
+                {vibes[vibe].information_extracted == null ? (
+                  <>
+                    未知<span className="help"> · 原图里没有记录</span>
+                  </>
+                ) : (
+                  <span className="mono">
+                    {Number(vibes[vibe].information_extracted).toFixed(2)}
+                  </span>
+                )}
+              </span>
+            </div>
+            <div className="frow">
+              <span className="label">编码</span>
+              <span className="mono path" data-tip={vibes[vibe].name}>
+                {vibes[vibe].name}
+              </span>
+            </div>
+            <div className="row vp-acts">
+              <button className="btn quiet sm" onClick={() => p.onRevealVibe(vibes[vibe])}>
+                <Icon name="folder-open-line" />
+                在文件夹中显示
+              </button>
+            </div>
+          </>
+        )}
+      </Pop>
+      <Viewer
+        open={viewer != null}
+        items={viewerItems}
+        index={viewer ?? 0}
+        onIndex={(i) => {
+          setViewer(i);
+          show(i);
+        }}
+        onClose={() => setViewer(null)}
+        onCopy={() => image && p.onCopyImage(image)}
+        onSaveAs={() => image && p.onDownloadImage(image)}
+      />
+    </div>
   );
 }

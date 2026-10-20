@@ -256,7 +256,7 @@ html.is-dragging, html.is-dragging * { user-select: none !important; -webkit-use
 @container (max-width: 480px) { .gen-bar .seedf .seed-t { display: none; } .gen-bar .seedf { padding-right: 8px; } .gen-bar .count-step .btn { width: calc(var(--ctl-sm) * 0.8); } }
 @container (max-width: 460px) { .gen-bar .row { gap: var(--sp-1); } .gen-bar .seedf .seed-val { display: none; } .gen-bar .seedf .seed-t { display: inline-grid; } .gen-bar .seedf { padding: 0 var(--sp-0); } }
 /* 提示词栏顶部窄时，复制按钮只留图标 */
-.col.prompt > .col-h { container-type: inline-size; }
+.col.prompt .col-h { container-type: inline-size; }
 @container (max-width: 460px) { [data-act="copy"] .lbl { display: none; } [data-act="copy"] { width: var(--ctl-sm); padding: 0; } }
 
 /* ---------- 悬停提示：和产品的 .nps-tip 一样，跟着主题走；淡入 --dur-2，淡出 --dur-1，不位移 ---------- */
@@ -318,13 +318,13 @@ html.rz-dragging, html.rz-dragging * { user-select: none !important; }
 .win, .tip-pop { --select-bg: color-mix(in srgb, var(--ink) 18%, transparent); }
 .win ::selection { background: var(--select-bg); color: inherit; }
 /* ---------- 编辑方式：块 | 文本（2.24）---------- */
-.col.prompt > .col-h .mode-sw { flex: 0 0 auto; }
-.col.prompt > .col-h .mode-sw > span { padding: 0 var(--sp-2); }
-.col.prompt > .col-h .mode-sw [class^="ri-"] { font-size: var(--icon-sm); }
+.col.prompt .col-h .mode-sw { flex: 0 0 auto; }
+.col.prompt .col-h .mode-sw > span { padding: 0 var(--sp-2); }
+.col.prompt .col-h .mode-sw [class^="ri-"] { font-size: var(--icon-sm); }
 /* 顶部放不下时按 2.11 的顺序收：先藏搜索框里的快捷键提示，再把"显示""翻译"收成图标 */
-@container (max-width: 540px) { .col.prompt > .col-h .field.grow .kbd { display: none; } }
+@container (max-width: 540px) { .col.prompt .col-h .field.grow .kbd { display: none; } }
 /* 字收起来以后和只有图标的按钮一样是方的（--ctl-sm），不留原来的左右留白 */
-@container (max-width: 476px) { .col.prompt > .col-h .btn.quiet .lbl { display: none; } .col.prompt > .col-h .btn.quiet:has(> .lbl) { width: var(--ctl-sm); padding: 0; } }
+@container (max-width: 476px) { .col.prompt .col-h .btn.quiet .lbl { display: none; } .col.prompt .col-h .btn.quiet:has(> .lbl) { width: var(--ctl-sm); padding: 0; } }
 .text-doc .sec-h .muted { font-size: var(--fs-caption); }
 .tx-wrap { position: relative; margin: var(--sp-1) 0 var(--sp-3); }
 .tx-wrap .tx, .tx-wrap .tx-hl { box-sizing: border-box; width: 100%; min-height: var(--area-min-h); margin: 0; padding: var(--sp-2) var(--ctl-pad-x); border: var(--bw) solid var(--border); border-radius: var(--r-ctl);

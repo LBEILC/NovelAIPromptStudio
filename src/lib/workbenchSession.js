@@ -22,7 +22,7 @@ export const DEFAULT_WORKBENCH_VIEW_STATE = Object.freeze({
     domain: 'all',
     query: '',
   }),
-  language: 'original',
+  language: 'bilingual',
   viewMode: 'structure',
 });
 

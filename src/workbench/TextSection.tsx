@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { Layer } from '../ui';
-import { SuggestionList, type Suggestion } from '../ui/Autocomplete';
+import { Pop } from '../kit/layer';
+import { Icon } from '../kit/controls';
+
+type Suggestion = { id: string; text: string; translation?: string; count?: string };
 import { invokeUI } from '../lib/commands';
 import { textErrors, textMarks } from '../lib/promptText.js';
 import { categoryLabel } from './model';
@@ -191,7 +193,7 @@ export function TextSection({
   };
   const position = caret.current?.getBoundingClientRect();
   return (
-    <div className="wb-text-section">
+    <>
       <div className="tx-wrap">
         <div className="tx-hl" ref={mirror} aria-hidden="true">
           {parts}
@@ -199,7 +201,7 @@ export function TextSection({
         </div>
         <textarea
           ref={area}
-          className="tx nps-textarea"
+          className="area tx"
           aria-label={label}
           value={value}
           spellCheck={false}
@@ -258,26 +260,35 @@ export function TextSection({
         />
       </div>
       {!!errors.length && (
-        <p className="tx-err" role="status">
+        <div className="tx-err" role="status" data-enter="fade">
+          <Icon name="alert-line" />
           {errors[0].msg}
           {errors.length > 1 ? `，另外还有 ${errors.length - 1} 处` : ''}
-        </p>
+        </div>
       )}
-      <Layer
+      <Pop
         open={suggest && !!items.length}
-        anchor={area}
-        point={position ? { x: position.left, y: position.bottom } : undefined}
-        className="nps-popover wb-text-suggestions"
         onClose={() => setSuggest(false)}
+        point={position ? [position.left, position.bottom + 4] : undefined}
+        anchor={area}
+        className="menu complete"
+        style={{ minWidth: 'var(--complete-min-w)' }}
+        passive
+        deps={[items.length, position?.left, position?.bottom]}
       >
-        <SuggestionList
-          id={`text-suggestions-${label}`}
-          items={items}
-          active={active}
-          onActiveChange={setActive}
-          onSelect={choose}
-        />
-      </Layer>
-    </div>
+        {items.map((item, i) => (
+          <div
+            key={item.id}
+            className={`mi ${i === active ? 'on' : ''}`}
+            onPointerDown={(e) => e.preventDefault()}
+            onPointerEnter={() => setActive(i)}
+            onClick={() => choose(item)}
+          >
+            <span className="en">{item.text}</span>
+            <span className="zh">{item.translation}</span>
+          </div>
+        ))}
+      </Pop>
+    </>
   );
 }

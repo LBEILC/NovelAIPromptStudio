@@ -1,31 +1,20 @@
+// 工作台的标签页（doc/design.md 2.14、2.17）：一个标签页是一个作品。没起名的只显示缩略图（按比例），起过名的后面写名称和版数。
+// 当前标签页的底和外框是一块会滑的标记；有改动的带小圆点，生成中的带墨色小圆点。悬停 400ms 弹出预览卡片。
+// 拖动换位置（只能横着拖）：按被拖的标签页自己的位置判断，过了到相邻空位的一半就换；其他的让位。中键关闭。
+// 右键：关闭、关闭其他标签页、关闭右侧标签页、在图片库中显示。最右边的"+"点击打开图片，右键是打开方式的菜单。
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
-import { AnimatedItems } from '../ui/AnimatedItems';
-import {
-  DecodedImage,
-  useMovingIndicator,
-  useNavigationSelection,
-  animateElement,
-  motionTokens,
-} from '../ui/transitions';
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { Button, ContextMenu, type MenuItem } from '../ui';
-import type { WorkbenchSession, WorkbenchTab } from '../state/workbench';
 import { hasImageName, imageFileName } from '../lib/imageNaming.js';
 import { mediaUrl } from '../lib/imageStage.js';
 import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
-import './tabs.css';
-import { useGeneration } from '../state/generation';
 import { nearestTabSlot } from '../lib/tabSlots.js';
-import { flushSync } from 'react-dom';
-import { DndContext, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
-import {
-  SortableContext,
-  horizontalListSortingStrategy,
-  sortableKeyboardCoordinates,
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { useDragFeedback } from './DragFeedback';
+import { useGeneration } from '../state/generation';
+import { Icon } from '../kit/controls';
+import { ContextMenu, type MenuEntry } from '../kit/menu';
+import { Pop } from '../kit/layer';
+import { dur, easeMove, useExitList, useIndicator } from '../kit/motion';
+import { blockTips } from '../kit/tip';
+import type { WorkbenchSession, WorkbenchTab } from '../state/workbench';
 
 export interface TabsProps {
   session: WorkbenchSession;
@@ -37,387 +26,413 @@ export interface TabsProps {
   onBrowseLibrary: () => void;
   onShowLibrary: (tab: WorkbenchTab) => void;
 }
-function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
-  const sortable = useSortable({ id: tab.id });
-  const generation = useGeneration();
-  const job = generation.jobs.find((j) => j.tabId === tab.id && j.state === 'generating');
-  const running = !!job;
-  const [versionCount, setVersionCount] = useState(1);
-  useEffect(() => {
-    let active = true;
-    if (generation.settings.hasToken)
-      void invokeUI('version.list', { tabId: tab.id }).then((r) => {
-        if (active) setVersionCount(r.versions.length);
-      });
-    return () => {
-      active = false;
-    };
-  }, [tab.id, tab.revision, generation.jobs]);
-  const image = tab.project;
-  const name = image && hasImageName(image) ? image.name : '';
-  const index = p.session.tabs.findIndex((item) => item.id === tab.id);
-  const closeMany = async (tabs: WorkbenchTab[]) => {
-    for (const item of tabs) await p.onCloseTab(item.id);
-  };
-  const items: MenuItem[] = [
-    { id: 'close', label: '关闭', onSelect: () => void p.onCloseTab(tab.id) },
-    {
-      id: 'others',
-      label: '关闭其他标签页',
-      onSelect: () => void closeMany(p.session.tabs.filter((item) => item.id !== tab.id)),
-    },
-    {
-      id: 'right',
-      label: '关闭右侧标签页',
-      disabled: index === p.session.tabs.length - 1,
-      onSelect: () => void closeMany(p.session.tabs.slice(index + 1)),
-    },
-  ];
-  if (tab.source.type === 'library')
-    items.push({ id: 'library', label: '在图片库里显示', onSelect: () => p.onShowLibrary(tab) });
-  return (
-    <ContextMenu label={name || '没有起名'} items={items}>
-      <div
-        ref={sortable.setNodeRef}
-        {...sortable.attributes}
-        {...sortable.listeners}
-        className={`wb-tab workbench-tab ${name ? '' : 'bare'}`}
-        data-workbench-tab-id={tab.id}
-        data-active={tab.id === p.session.activeTabId || undefined}
-        role="tab"
-        aria-selected={tab.id === p.session.activeTabId}
-        aria-label={name || '没有起名'}
-        data-tip={name || (image ? imageFileName(image) : '')}
-        data-tip-file={!name || undefined}
-        data-tip-details={
-          image ? `${image.metadata.width} × ${image.metadata.height} · ${versionCount} 版` : ''
-        }
-        data-tip-status={
-          running
-            ? `生成中 ${job!.completed + 1} / ${job!.count}`
-            : workbenchTabHasChanges(tab)
-              ? '有未生成的改动'
-              : ''
-        }
-        data-tip-image={mediaUrl(image?.thumbnail_path || image?.image_path || '')}
-        data-tip-date={image?.created_at || tab.updatedAt}
-        onClick={() => p.onActivateTab(tab.id)}
-        onMouseDown={(event) => {
-          if (event.button === 1) event.preventDefault();
-        }}
-        onAuxClick={(event) => {
-          if (event.button !== 1) return;
-          event.preventDefault();
-          event.stopPropagation();
-          void p.onCloseTab(tab.id);
-        }}
-        onKeyDown={(event) => {
-          if (event.target !== event.currentTarget) return;
-          sortable.listeners?.onKeyDown?.(event);
-          if (event.defaultPrevented || sortable.isSorting) return;
-          const next =
-            event.key === 'ArrowRight'
-              ? (index + 1) % p.session.tabs.length
-              : event.key === 'ArrowLeft'
-                ? (index - 1 + p.session.tabs.length) % p.session.tabs.length
-                : event.key === 'Home'
-                  ? 0
-                  : event.key === 'End'
-                    ? p.session.tabs.length - 1
-                    : -1;
-          if (next < 0) return;
-          event.preventDefault();
-          p.onActivateTab(p.session.tabs[next].id);
-          event.currentTarget
-            .closest('[role=tablist]')
-            ?.querySelectorAll<HTMLElement>('[role=tab]')
-            [next]?.focus();
-        }}
-        style={
-          {
-            transform: sortable.isSorting ? CSS.Translate.toString(sortable.transform) : undefined,
-            '--wb-thumb-ratio': (image?.metadata.width || 1) / (image?.metadata.height || 1),
-          } as CSSProperties
-        }
-      >
-        {tab.id === p.session.activeTabId && <span className="wb-tab-current" aria-hidden />}
-        <DecodedImage
-          draggable={false}
-          alt=""
-          src={mediaUrl(image?.thumbnail_path || image?.image_path || '')}
-        />
-        {name && (
-          <>
-            <span className="wb-tab-name">{name}</span>
-            <span className="wb-tab-count">{versionCount} 版</span>
-          </>
-        )}
-        {running && (
-          <span className="wb-tab-generating" data-tip="生成中">
-            ●
-          </span>
-        )}
-        {workbenchTabHasChanges(tab) && <span className="wb-dirty" aria-label="提示词已修改" />}
-      </div>
-    </ContextMenu>
-  );
-}
-export function WorkbenchTabs(p: TabsProps) {
-  const list = useRef<HTMLDivElement>(null);
-  const bar = useRef<HTMLDivElement>(null);
-  const indicator = useRef<HTMLSpanElement>(null);
-  const [selected, select] = useNavigationSelection(p.session.activeTabId, p.onActivateTab);
-  const visualProps = {
-    ...p,
-    session: { ...p.session, activeTabId: selected },
-    onActivateTab: select,
-  };
-  useMovingIndicator(list, indicator, '.wb-tab[aria-selected=true]', selected);
+let dragging = false;
+blockTips(() => dragging);
+const shapeOf = (w = 1, h = 1) => (w > h ? 'wide' : w === h ? 'square' : '');
+const when = (iso = '') => {
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return '';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(t.getMonth() + 1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;
+};
+const midEll = (s: string, max: number) =>
+  s.length <= max
+    ? s
+    : `${s.slice(0, Math.ceil((max - 1) * 0.6))}…${s.slice(-Math.floor((max - 1) * 0.4))}`;
 
-  const drag = useDragFeedback(list, true);
-  const sensors = useSensors(
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+export function WorkbenchTabs(p: TabsProps) {
+  const generation = useGeneration();
+  const list = useRef<HTMLDivElement>(null);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [menu, setMenu] = useState<{ at: [number, number]; tab: WorkbenchTab | null } | null>(null);
+  const [peek, setPeek] = useState('');
+  const [lifted, setLifted] = useState('');
   const [overflow, setOverflow] = useState(false);
+  const peekTimer = useRef(0);
+  const tabs = useExitList(p.session.tabs, (t) => t.id);
+  useIndicator(list, [p.session.activeTabId, p.session.tabs.length, counts]);
+  // 版数（有账号时才有版本）
+  const revisions = p.session.tabs.map((t) => `${t.id}:${t.revision}`).join('|');
+  useEffect(() => {
+    if (!generation.settings.hasToken) return;
+    let live = true;
+    for (const t of p.session.tabs)
+      void invokeUI('version.list', { tabId: t.id })
+        .then(
+          (r) =>
+            live &&
+            setCounts((c) =>
+              c[t.id] === r.versions.length ? c : { ...c, [t.id]: r.versions.length },
+            ),
+        )
+        .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [revisions, generation.jobs.length, generation.settings.hasToken]);
+  // 放不下时两头出现翻页按钮
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const update = () => setOverflow(el.scrollWidth > el.clientWidth + 1);
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    update();
+    el.querySelector('.tab.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    return () => ro.disconnect();
+  }, [p.session.tabs.length, p.session.activeTabId]);
+  useEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth || e.ctrlKey || e.metaKey) return;
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (!d) return;
+      e.preventDefault();
+      el.scrollLeft += d;
+    };
+    el.addEventListener('wheel', wheel, { passive: false });
+    return () => el.removeEventListener('wheel', wheel);
+  }, []);
+  // 拖动换位置：被拖的那一个跟着指针（只横着走），放大到 --drag-scale；其他的排到放下之后会在的位置
   const latest = useRef(p);
   latest.current = p;
   useEffect(() => {
-    const node = list.current;
-    if (!node) return;
-    let press: { id: string; x: number; y: number; grab: number; active: boolean } | null = null;
-    let suppressClick = false;
-    const moves = new Map<string, () => void>();
-    const down = (event: PointerEvent) => {
-      const el = (event.target as HTMLElement).closest<HTMLElement>('[data-workbench-tab-id]');
-      if (event.button !== 0 || !el || el.dataset.workbenchTabId === 'new-tab') return;
+    const box = list.current!;
+    let press: { id: string; x: number; y: number; grab: number; on: boolean } | null = null,
+      swallow = false;
+    const el = (id: string) => box.querySelector<HTMLElement>(`[data-tab="${id}"]`);
+    const down = (e: PointerEvent) => {
+      const t = (e.target as Element).closest<HTMLElement>('[data-tab]');
+      if (e.button !== 0 || !t) return;
       press = {
-        id: el.dataset.workbenchTabId!,
-        x: event.clientX,
-        y: event.clientY,
-        grab: event.clientX - el.getBoundingClientRect().left,
-        active: false,
+        id: t.dataset.tab!,
+        x: e.clientX,
+        y: e.clientY,
+        grab: e.clientX - t.getBoundingClientRect().left,
+        on: false,
       };
-      event.preventDefault();
     };
-    const move = (event: PointerEvent) => {
+    const move = (e: PointerEvent) => {
       if (!press) return;
-      if (!press.active && Math.hypot(event.clientX - press.x, event.clientY - press.y) < 4) return;
-      press.active = true;
-      document.documentElement.classList.add('is-dragging');
-      getSelection()?.removeAllRanges();
+      if (!press.on && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 4) return;
+      if (!press.on) {
+        press.on = true;
+        dragging = true;
+        setLifted(press.id);
+        setPeek('');
+        document.documentElement.classList.add('is-dragging');
+        getSelection()?.removeAllRanges();
+      }
       const ids = latest.current.session.tabs.map((t) => t.id);
-      const element = (id: string) =>
-        node.querySelector<HTMLElement>(`[data-workbench-tab-id="${id}"]`)!;
-      const el = element(press.id),
-        bounds = node.getBoundingClientRect();
-      const base = element(ids[0]).offsetLeft;
-      const gap = parseFloat(getComputedStyle(node).columnGap) || 0;
+      const me = el(press.id);
+      if (!me) return;
+      const r = box.getBoundingClientRect(),
+        first = el(ids[0])!,
+        base = first.offsetLeft,
+        gap = parseFloat(getComputedStyle(box).columnGap) || 2;
       const want = Math.max(
         base,
-        Math.min(node.clientWidth - el.offsetWidth, event.clientX - bounds.left - press.grab),
+        Math.min(
+          box.scrollWidth - me.offsetWidth,
+          e.clientX - r.left + box.scrollLeft - press.grab,
+        ),
       );
       const slot = nearestTabSlot(
         base,
-        ids.filter((id) => id !== press!.id).map((id) => element(id).offsetWidth),
+        ids.filter((id) => id !== press!.id).map((id) => el(id)!.offsetWidth),
         gap,
         want,
       );
       if (ids[slot] !== press.id) {
-        const before = new Map(ids.map((id) => [id, element(id).getBoundingClientRect().left]));
-        flushSync(() => latest.current.onReorderTab(press!.id, ids[slot]));
-        for (const id of ids) {
-          if (id === press.id) continue;
-          const item = element(id);
-          moves.get(id)?.();
-          const dx = before.get(id)! - item.getBoundingClientRect().left;
-          const timing = motionTokens(item);
-          moves.set(
-            id,
-            animateElement(
-              item,
-              [{ transform: `translateX(${dx}px)` }, { transform: 'none' }],
-              timing.move,
-              timing.easeMove,
-            ),
-          );
-        }
+        const before = new Map(ids.map((id) => [id, el(id)!.getBoundingClientRect().left]));
+        latest.current.onReorderTab(press.id, ids[slot]);
+        requestAnimationFrame(() => {
+          for (const id of ids) {
+            if (id === press?.id) continue;
+            const n = el(id);
+            if (!n) continue;
+            const dx = before.get(id)! - n.getBoundingClientRect().left;
+            if (Math.abs(dx) > 0.5 && dur(3))
+              n.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], {
+                duration: dur(3),
+                easing: easeMove(),
+              });
+          }
+        });
       }
-      el.dataset.dragging = 'true';
-      el.style.transition = 'box-shadow var(--dur-1) var(--ease-out)';
-      el.style.transform = `translateX(${want - el.offsetLeft}px) scale(var(--drag-scale))`;
-      if (press.id === latest.current.session.activeTabId && indicator.current) {
-        indicator.current.style.transition = 'none';
-        indicator.current.style.transform = `translate(${want}px, ${el.offsetTop}px) scale(var(--drag-scale))`;
+      me.style.transition = 'box-shadow var(--dur-1) var(--ease-out)';
+      me.style.transform = `translateX(${want - me.offsetLeft}px) scale(var(--drag-scale))`;
+      const ind = box.querySelector<HTMLElement>(':scope > .ind');
+      if (ind && press.id === latest.current.session.activeTabId) {
+        ind.classList.add('jump');
+        ind.style.transform = `translate(${want}px, ${me.offsetTop}px)`;
       }
     };
     const up = () => {
-      if (press?.active) {
-        suppressClick = true;
-        const el = node.querySelector<HTMLElement>(`[data-workbench-tab-id="${press.id}"]`);
-        if (el) {
-          delete el.dataset.dragging;
-          el.style.transition = '';
-          el.style.transform = '';
+      if (press?.on) {
+        swallow = true;
+        const me = el(press.id);
+        if (me) {
+          me.style.transition =
+            'transform var(--dur-3) var(--ease-move), box-shadow var(--dur-1) var(--ease-out)';
+          me.style.transform = '';
+          setTimeout(
+            () => {
+              me.style.transition = '';
+            },
+            dur(3) + 30,
+          );
         }
-        if (indicator.current) {
-          indicator.current.style.transition = '';
-          indicator.current.style.transform = `translate(${node.querySelector<HTMLElement>('[aria-selected=true]')?.offsetLeft || 0}px, 0px)`;
+        const ind = box.querySelector<HTMLElement>(':scope > .ind'),
+          on = box.querySelector<HTMLElement>(':scope > .on');
+        if (ind && on) {
+          ind.classList.remove('jump');
+          ind.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
         }
+        setTimeout(() => setLifted(''), dur(3));
       }
       press = null;
+      dragging = false;
       document.documentElement.classList.remove('is-dragging');
     };
-    const click = (event: MouseEvent) => {
-      if (suppressClick) {
-        event.preventDefault();
-        event.stopPropagation();
-        suppressClick = false;
-      }
+    const click = (e: MouseEvent) => {
+      if (!swallow) return;
+      swallow = false;
+      e.preventDefault();
+      e.stopPropagation();
     };
-    node.addEventListener('pointerdown', down);
-    node.addEventListener('click', click, true);
-    document.addEventListener('pointermove', move);
-    document.addEventListener('pointerup', up);
-    document.addEventListener('pointercancel', up);
+    box.addEventListener('pointerdown', down);
+    box.addEventListener('click', click, true);
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+    addEventListener('pointercancel', up);
     return () => {
-      node.removeEventListener('pointerdown', down);
-      node.removeEventListener('click', click, true);
-      document.removeEventListener('pointermove', move);
-      document.removeEventListener('pointerup', up);
-      document.removeEventListener('pointercancel', up);
-      for (const stop of moves.values()) stop();
-      document.documentElement.classList.remove('is-dragging');
+      box.removeEventListener('pointerdown', down);
+      box.removeEventListener('click', click, true);
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      removeEventListener('pointercancel', up);
     };
   }, []);
-  useLayoutEffect(() => {
-    const node = bar.current;
-    if (!node) return;
-    const wheel = (event: WheelEvent) => {
-      const viewport = list.current;
-      if (
-        !viewport ||
-        viewport.scrollWidth <= viewport.clientWidth ||
-        event.ctrlKey ||
-        event.metaKey
-      )
-        return;
-      const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
-      if (!delta) return;
-      event.preventDefault();
-      const unit =
-        event.deltaMode === 2
-          ? viewport.clientWidth
-          : event.deltaMode === 1
-            ? parseFloat(getComputedStyle(viewport).lineHeight) || 1
-            : 1;
-      viewport.scrollLeft += delta * unit;
-    };
-    node.addEventListener('wheel', wheel, { passive: false });
-    return () => node.removeEventListener('wheel', wheel);
-  }, []);
-  useLayoutEffect(() => {
-    const node = list.current;
-    if (!node) return;
-    const update = () => setOverflow(node.scrollWidth > node.clientWidth);
-    const observer = new ResizeObserver(update);
-    observer.observe(node);
-    update();
-    node
-      .querySelector('[aria-selected=true]')
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    return () => observer.disconnect();
-  }, [p.session, selected]);
+  const closeMany = async (ts: WorkbenchTab[]) => {
+    for (const t of ts) await p.onCloseTab(t.id);
+  };
+  const menuItems: MenuEntry[] = !menu
+    ? []
+    : menu.tab
+      ? (() => {
+          const t = menu.tab,
+            i = p.session.tabs.findIndex((x) => x.id === t.id);
+          return [
+            { label: '关闭', hint: 'Ctrl W', onSelect: () => void p.onCloseTab(t.id) },
+            {
+              label: '关闭其他标签页',
+              disabled: p.session.tabs.length < 2,
+              onSelect: () => void closeMany(p.session.tabs.filter((x) => x.id !== t.id)),
+            },
+            {
+              label: '关闭右侧标签页',
+              disabled: i === p.session.tabs.length - 1,
+              onSelect: () => void closeMany(p.session.tabs.slice(i + 1)),
+            },
+            ...(t.source.type === 'library'
+              ? ['sep' as const, { label: '在图片库中显示', onSelect: () => p.onShowLibrary(t) }]
+              : []),
+          ];
+        })()
+      : [
+          {
+            label: '打开图片…',
+            icon: 'folder-open-line',
+            hint: 'Ctrl I',
+            onSelect: p.onChooseImage,
+          },
+          {
+            label: '从剪贴板打开',
+            icon: 'clipboard-line',
+            hint: 'Ctrl V',
+            onSelect: p.onOpenClipboard,
+          },
+          { label: '从图片库打开', icon: 'gallery-line', onSelect: p.onBrowseLibrary },
+        ];
+  const peekTab = p.session.tabs.find((t) => t.id === peek);
+  const peekState = (t: WorkbenchTab) => {
+    const job = generation.jobs.find((j) => j.tabId === t.id && j.state === 'generating');
+    return job
+      ? `生成中 · ${job.continuous ? `第 ${job.index} 张` : `${job.index} / ${job.count}`}`
+      : workbenchTabHasChanges(t)
+        ? '有未生成的改动'
+        : '';
+  };
+  const scrollBy = (d: number) =>
+    list.current?.scrollBy({
+      left: d * (list.current.clientWidth * 0.8),
+      behavior: dur(3) ? 'smooth' : 'auto',
+    });
   return (
-    <div className="wb-tabs" ref={bar}>
+    <>
       {overflow && (
-        <Button
-          variant="quiet"
-          aria-label="向前浏览"
-          onClick={() => list.current?.scrollBy({ left: -list.current.clientWidth })}
+        <button
+          className="btn quiet sm icon tabs-page"
+          aria-label="向前翻"
+          onClick={() => scrollBy(-1)}
         >
-          ‹
-        </Button>
+          <Icon name="arrow-left-s-line" />
+        </button>
       )}
-      <DndContext
-        sensors={sensors}
-        onDragStart={(event) =>
-          drag.start(
-            event,
-            list.current?.querySelector(`[data-workbench-tab-id="${event.active.id}"]`) ?? null,
-          )
-        }
-        onDragCancel={drag.end}
-        onDragEnd={({ active, over }) => {
-          if (over) p.onReorderTab(String(active.id), String(over.id));
-          drag.end();
+      <div
+        className={`tabs has-ind ${overflow ? 'clip' : ''}`}
+        ref={list}
+        role="tablist"
+        aria-label="作品"
+        onKeyDown={(e) => {
+          const i = p.session.tabs.findIndex((t) => t.id === p.session.activeTabId),
+            n = p.session.tabs.length;
+          const next =
+            e.key === 'ArrowRight'
+              ? (i + 1) % n
+              : e.key === 'ArrowLeft'
+                ? (i - 1 + n) % n
+                : e.key === 'Home'
+                  ? 0
+                  : e.key === 'End'
+                    ? n - 1
+                    : -1;
+          if (next < 0 || !n) return;
+          e.preventDefault();
+          p.onActivateTab(p.session.tabs[next].id);
+          requestAnimationFrame(() =>
+            list.current?.querySelectorAll<HTMLElement>('[data-tab]')[next]?.focus(),
+          );
         }}
       >
-        <SortableContext
-          items={p.session.tabs.map((tab) => tab.id)}
-          strategy={horizontalListSortingStrategy}
-        >
-          <div className="wb-tabs-scroll" role="tablist" aria-label="图片标签页" ref={list}>
-            <span
-              ref={indicator}
-              className="nps-moving-indicator wb-tab-indicator"
-              aria-hidden="true"
-            />
-            <AnimatedItems
-              ids={[...p.session.tabs.map((t) => t.id), 'new-tab']}
-              attribute="data-workbench-tab-id"
-              parentItem
+        <i className="ind" />
+        {tabs.map(({ item: t, leaving }) => {
+          const img = t.project;
+          const name = img && hasImageName(img) ? img.name : '';
+          const on = t.id === p.session.activeTabId;
+          const busy = generation.jobs.some((j) => j.tabId === t.id && j.state === 'generating');
+          const dirty = workbenchTabHasChanges(t);
+          return (
+            <button
+              key={t.id}
+              data-tab={t.id}
+              className={`tab ${name ? '' : 'bare'} ${on ? 'on' : ''} ${lifted === t.id ? 'lifted' : ''} ${leaving ? 'leaving' : ''}`}
+              role="tab"
+              aria-selected={on}
+              aria-label={name || (img ? imageFileName(img) : '没有起名')}
+              tabIndex={on ? 0 : -1}
+              data-enter="fade"
+              data-no-tip=""
+              onClick={() => p.onActivateTab(t.id)}
+              onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+              onAuxClick={(e) => {
+                if (e.button !== 1) return;
+                e.preventDefault();
+                void p.onCloseTab(t.id);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setPeek('');
+                setMenu({ at: [e.clientX, e.clientY], tab: t });
+              }}
+              onPointerEnter={() => {
+                clearTimeout(peekTimer.current);
+                if (dragging) return;
+                if (peek) setPeek(t.id);
+                else peekTimer.current = window.setTimeout(() => setPeek(t.id), 400);
+              }}
+              onPointerLeave={() => {
+                clearTimeout(peekTimer.current);
+                peekTimer.current = window.setTimeout(() => setPeek(''), 80);
+              }}
+              onPointerDown={() => {
+                clearTimeout(peekTimer.current);
+                setPeek('');
+              }}
             >
-              {p.session.tabs.map((tab) => (
-                <Tab key={tab.id} tab={tab} p={visualProps} />
-              ))}
-              <ContextMenu
-                label="打开方式"
-                items={[
-                  {
-                    id: 'file',
-                    label: '打开图片…',
-                    shortcut: ['Mod', 'I'],
-                    prefix: <i className="ri-folder-open-line" />,
-                    onSelect: p.onChooseImage,
-                  },
-                  {
-                    id: 'clipboard',
-                    label: '从剪贴板打开',
-                    shortcut: ['Mod', 'V'],
-                    prefix: <i className="ri-clipboard-line" />,
-                    onSelect: p.onOpenClipboard,
-                  },
-                  {
-                    id: 'library',
-                    label: '从图片库打开',
-                    prefix: <i className="ri-gallery-line" />,
-                    onSelect: p.onBrowseLibrary,
-                  },
-                ]}
-              >
-                <Button
-                  data-workbench-tab-id="new-tab"
-                  variant="quiet"
-                  aria-label="打开图片"
-                  onClick={p.onChooseImage}
-                >
-                  <i className="ri-add-line" />
-                </Button>
-              </ContextMenu>
-            </AnimatedItems>
-          </div>
-        </SortableContext>
-        {drag.overlay}
-      </DndContext>
+              {on && <span className="cur" />}
+              <img
+                className={shapeOf(img?.metadata.width, img?.metadata.height)}
+                src={mediaUrl(img?.thumbnail_path || img?.image_path || '')}
+                alt=""
+                draggable={false}
+              />
+              {name && (
+                <>
+                  <span className="nm">{name}</span>
+                  {counts[t.id] != null && <span className="n mono">{counts[t.id]} 版</span>}
+                </>
+              )}
+              {busy ? (
+                <span className="dirty busy" aria-label="生成中" />
+              ) : dirty ? (
+                <span className="dirty" aria-label="有未生成的改动" />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
       {overflow && (
-        <Button
-          variant="quiet"
-          aria-label="向后浏览"
-          onClick={() => list.current?.scrollBy({ left: list.current.clientWidth })}
+        <button
+          className="btn quiet sm icon tabs-page"
+          aria-label="向后翻"
+          onClick={() => scrollBy(1)}
         >
-          ›
-        </Button>
+          <Icon name="arrow-right-s-line" />
+        </button>
       )}
-    </div>
+      <button
+        className="tab add"
+        aria-label="打开图片"
+        data-tip="打开图片 · 右键选择打开方式"
+        onClick={p.onChooseImage}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenu({ at: [e.clientX, e.clientY], tab: null });
+        }}
+      >
+        <Icon name="add-line" />
+      </button>
+      <ContextMenu at={menu?.at || null} onClose={() => setMenu(null)} items={menuItems} />
+      <Pop
+        open={!!peekTab && !lifted && !menu}
+        onClose={() => setPeek('')}
+        anchor={`[data-tab="${peek}"]`}
+        className="popover tab-peek"
+        passive
+        deps={[peek]}
+      >
+        {peekTab?.project && (
+          <>
+            <div className="tp-img">
+              <img
+                src={mediaUrl(peekTab.project.thumbnail_path || peekTab.project.image_path)}
+                alt=""
+              />
+            </div>
+            {hasImageName(peekTab.project) ? (
+              <b className="tp-name">{peekTab.project.name}</b>
+            ) : (
+              <span className="tp-file mono">{midEll(imageFileName(peekTab.project), 44)}</span>
+            )}
+            <span className="help mono">
+              {peekTab.project.metadata.width} × {peekTab.project.metadata.height}
+              {counts[peekTab.id] != null ? ` · ${counts[peekTab.id]} 版` : ''}
+            </span>
+            <span className="help">
+              {when(peekTab.project.created_at || peekTab.updatedAt)} 导入
+              {peekState(peekTab) && (
+                <>
+                  {' · '}
+                  <span className="tp-state">{peekState(peekTab)}</span>
+                </>
+              )}
+            </span>
+          </>
+        )}
+      </Pop>
+    </>
   );
 }

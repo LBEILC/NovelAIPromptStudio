@@ -1,128 +1,138 @@
+// 添加 Tag（doc/design.md 2.14）：块末尾的虚线框，点了变成输入框；中文会找对应的英文 Tag，逗号或换行一次加多个，回车添加。
+// 虚线框和输入框跟 Tag 一样高。什么都没输就离开，输入框收回去（新建的空块这时会被拿掉）。
+import { useEffect, useRef, useState } from 'react';
 import { invokeResult } from '../lib/commands';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useDroppable } from '@dnd-kit/core';
-import { Autocomplete, Button, type Suggestion } from '../ui';
-import { Collapse, TransitionSurface } from '../ui/transitions';
-import { analyzePromptBatch, formatTag } from '../lib/prompt.js';
-import type { Tag } from '../shared/types';
+import { Icon } from '../kit/controls';
+import { Pop } from '../kit/layer';
 
+type Hit = { tag: string; translation?: string };
 export function AddTags({
-  section,
-  block,
-  tags,
   onAdd,
   autoEdit = false,
   onDismiss,
+  id,
 }: {
-  section: number;
-  block: number;
-  tags: Tag[];
   onAdd: (text: string) => void;
   autoEdit?: boolean;
   onDismiss?: () => void;
+  /** 这一块的标识，补全浮层贴着它 */
+  id: string;
 }) {
   const [editing, setEditing] = useState(autoEdit);
-  const [value, setValue] = useState('');
-  const [items, setItems] = useState<Suggestion[]>([]);
-  const analysis = useMemo(() => analyzePromptBatch(value, tags), [value, tags]);
-  const drop = useDroppable({
-    id: `end:${section}:${block}`,
-    data: { target: { section, block } },
-  });
+  const [text, setText] = useState('');
+  const [hits, setHits] = useState<Hit[]>([]);
+  const [pick, setPick] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    let active = true;
-    if (!value.trim() || /[,，\n]/.test(value)) {
-      setItems([]);
+    const q = text.trim();
+    if (!q || /[,，\n]/.test(q)) {
+      setHits([]);
       return;
     }
-    const timer = setTimeout(() => {
-      invokeResult('dictionary.suggest', { query: value })
-        .then((result) => {
-          if (active && result.ok)
-            setItems(
-              result.items.map((item) => ({
-                id: item.tag,
-                text: item.tag,
-                translation: item.translation,
-                count: item.count ? String(item.count) : '',
-              })),
-            );
+    let live = true;
+    const t = setTimeout(() => {
+      void invokeResult('dictionary.suggest', { query: q })
+        .then((r) => {
+          if (live && r.ok) {
+            setHits(r.items.slice(0, 6));
+            setPick(0);
+          }
         })
-        .catch(() => {
-          if (active) setItems([]);
-        });
+        .catch(() => live && setHits([]));
     }, 120);
     return () => {
-      active = false;
-      clearTimeout(timer);
+      live = false;
+      clearTimeout(t);
     };
-  }, [value]);
-  const add = (text: string) => {
-    if (!text.trim()) return;
-    onAdd(text);
-    setValue('');
-    setItems([]);
+  }, [text]);
+  const add = (value: string) => {
+    if (!value.trim()) return;
+    onAdd(value.trim());
+    setText('');
+    setHits([]);
+    requestAnimationFrame(() => input.current?.focus());
   };
+  const close = () => {
+    setEditing(false);
+    setText('');
+    setHits([]);
+    onDismiss?.();
+  };
+  if (!editing)
+    return (
+      <span
+        className="tag ghost"
+        role="button"
+        tabIndex={0}
+        data-add={id}
+        onClick={() => setEditing(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setEditing(true);
+          }
+        }}
+      >
+        <Icon name="add-line" />
+        输入中文或英文
+      </span>
+    );
   return (
     <>
-      <div
-        className="wb-add-tags"
-        ref={drop.setNodeRef}
-        data-drop-active={drop.isOver || undefined}
+      <span className="tag input" data-add={id}>
+        <input
+          ref={input}
+          autoFocus
+          value={text}
+          placeholder="输入中文或英文"
+          aria-label="添加 Tag"
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={(e) => {
+            if (e.relatedTarget instanceof Element && e.relatedTarget.closest('.complete')) return;
+            if (!text.trim()) close();
+          }}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              if (!hits.length) return;
+              e.preventDefault();
+              setPick((pick + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % hits.length);
+            } else if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
+              e.preventDefault();
+              add(hits.length && text.trim() && !/[,，\n]/.test(text) ? hits[pick].tag : text);
+            } else if (e.key === 'Escape') {
+              e.stopPropagation();
+              if (text) setText('');
+              else close();
+            }
+          }}
+        />
+      </span>
+      <Pop
+        open={hits.length > 0 && !!text.trim()}
+        onClose={() => setHits([])}
+        anchor={`[data-add="${id}"]`}
+        trigger={`[data-add="${id}"]`}
+        className="menu complete"
+        style={{ minWidth: 'var(--complete-min-w)' }}
+        passive
+        deps={[hits.length]}
       >
-        <TransitionSurface change={editing}>
-          {editing ? (
-            <Autocomplete
-              autoFocus
-              onDismiss={() => {
-                if (!value.trim()) {
-                  setEditing(false);
-                  onDismiss?.();
-                }
-              }}
-              label="输入中文或英文"
-              placeholder="输入中文或英文"
-              value={value}
-              onChange={setValue}
-              items={items}
-              onSelect={(item) => add(item.text)}
-              directAdd={{
-                label: `会添加 ${analysis.tags.length} 个 · ${analysis.duplicateCount} 个重复`,
-                onSelect: () => add(analysis.tags.map(formatTag).join(', ')),
-              }}
-            />
-          ) : (
-            <Button
-              className="wb-add-trigger"
-              variant="quiet"
-              size="small"
-              onClick={() => setEditing(true)}
-            >
-              <i className="ri-add-line" />
-              输入中文或英文
-            </Button>
-          )}
-        </TransitionSurface>
-      </div>
-      <Collapse open={editing} className="wb-add-help">
-        <span className="nps-help wb-add-help">
-          回车添加。用逗号或换行可以一次添加多个；输入中文会找对应的英文 Tag。
-        </span>
-      </Collapse>
-      <Collapse open={editing && !!value} className="wb-add-help">
-        <span className="nps-help wb-add-help">
-          会添加 {analysis.tags.length} 个 · {analysis.duplicateCount} 个重复
-        </span>
-      </Collapse>
+        {hits.map((h, i) => (
+          <div
+            key={h.tag}
+            className={`mi ${i === pick ? 'on' : ''}`}
+            onPointerDown={(e) => e.preventDefault()}
+            onPointerEnter={() => setPick(i)}
+            onClick={() => add(h.tag)}
+          >
+            <span className="en">{h.tag}</span>
+            <span className="zh">{h.translation}</span>
+          </div>
+        ))}
+      </Pop>
     </>
-  );
-}
-
-export function EmptyRole({ section, children }: { section: number; children: ReactNode }) {
-  const drop = useDroppable({ id: `empty:${section}`, data: { target: { section, block: -1 } } });
-  return (
-    <div className="wb-character-empty" ref={drop.setNodeRef}>
-      {children}
-    </div>
   );
 }

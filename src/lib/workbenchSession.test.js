@@ -145,7 +145,7 @@ describe('workbench session v2', () => {
     const restored = parseWorkbenchSession(JSON.stringify(serialized));
     expect(restored.tabs[0].viewState).toEqual({
       filters: { category: 'All', polarity: 'all', domain: 'all', query: '' },
-      language: 'original',
+      language: 'bilingual',
       viewMode: 'structure',
     });
   });

@@ -1556,6 +1556,7 @@ export default function App() {
         <Activity mode={pageShown('workbench')}>
           <div className={pageClass('workbench')} data-enter="fade">
             <WorkbenchPage
+              onBrowseLibrary={() => setPage('gallery')}
               onShowMaterials={(kind = 'block') => {
                 setMaterialKind(kind);
                 setPage('materials');

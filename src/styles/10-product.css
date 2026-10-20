@@ -43,3 +43,26 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 [data-scroll] { scrollbar-width: none; }
 [data-scroll]::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .sb { will-change: transform; }
+
+/* 标签页：生成中的小圆点是墨色；放不下时横着滚（不显示滚动条），两头是翻页按钮 */
+.tab .dirty.busy { background: var(--ink); }
+.tabs { overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tb .tabs-page { flex: 0 0 auto; }
+
+/* 工作台：拖起来的 Tag 跟着指针（按窗口坐标放）；编辑浮层；角色改名的输入框 */
+.tag.drag-float { position: fixed; }
+.popover.tag-pop .frow { grid-template-columns: 44px 1fr; }
+.popover.tag-pop .field { width: 100%; }
+.popover.tag-pop .ldd { justify-content: flex-start; gap: var(--ctl-gap); }
+.popover.tag-pop .ldd > [class*="ri-arrow-down-s"] { margin-left: auto; }
+.popover.tag-pop .cdot, .ldd .cdot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; }
+.sec-h .char-name { width: var(--char-name-w); }
+.tags.prop-new { border-radius: var(--r-ctl); }
+.stage-banner { padding: var(--sp-3) var(--sp-5) 0; }
+.vibe-pop .vp-acts { justify-content: flex-end; }
+
+/* 提示词栏：每个标签页一层（切换时只淡入），里面照常是 列头 / 提案条 / 内容 / 底栏 */
+.col.prompt > .prompt-in { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+/* 张数："3 张"排在一行（.stepper b 是 grid，数字和"张"会被排成上下两格） */
+.count-step .count-n { display: flex; align-items: center; justify-content: center; padding: 0 var(--sp-1); white-space: nowrap; }

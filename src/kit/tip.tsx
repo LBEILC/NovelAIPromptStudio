@@ -5,10 +5,11 @@
 // data-tip-overflow="全文" 只在文字被省略时提示；放不下时字被收起来的按钮（.lbl 被藏起）也用 aria-label。
 import { useEffect, useRef } from 'react';
 
-let blocked = () => false;
-/** 拖动这类时候不出提示。 */
+const blockers: (() => boolean)[] = [];
+const blocked = () => blockers.some((fn) => fn());
+/** 拖动这类时候不出提示（可以登记多个条件）。 */
 export function blockTips(fn: () => boolean) {
-  blocked = fn;
+  blockers.push(fn);
 }
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
