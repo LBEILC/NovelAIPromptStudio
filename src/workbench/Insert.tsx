@@ -1,4 +1,4 @@
-// 插入常用块（doc/design.md 2.25）：在两块之间、或空角色里点"常用块"，浮层里可以搜索，↑ ↓ 选、回车插入。
+// 插入常用块，和"添加角色"旁边的箭头（doc/design.md 2.25）：在两块之间、或空角色里点"常用块"，浮层里可以搜索，↑ ↓ 选、回车插入。
 // 每行第一行是名称、类型和"用过 N 次"，第二行是内容的前两行、右边几张示例小图；刚打开时不高亮，指针或方向键所在的那一行用悬停的底色。
 // 停在名称或内容上弹出完整内容，停在小图上弹出示例图片的预览，两个不同时出现，都贴在浮层左边。
 import { useEffect, useRef, useState } from 'react';
@@ -6,8 +6,7 @@ import { invokeUI } from '../lib/commands';
 import { mediaUrl } from '../lib/imageStage.js';
 import { CAT_VAR } from '../kit/categories';
 import { Icon, Kbd } from '../kit/controls';
-import { Pop } from '../kit/layer';
-import { MenuPop } from '../kit/menu';
+import { Pop, type Place } from '../kit/layer';
 import { useNotifications } from '../kit/toast';
 import type { Material } from '../shared/materials';
 import type { TagCategory } from '../shared/types';
@@ -54,6 +53,12 @@ function Example({
     />
   ) : null;
 }
+const typeOf = (m: Material) =>
+  m.kind === 'character'
+    ? `${m.blocks.length} 块`
+    : m.blocks[0]?.type === 'tags'
+      ? `Tag 块 · ${m.blocks[0].tags.length} 个`
+      : '段落';
 const matText = (m: Material) =>
   m.blocks.map((b) => (b.type === 'tags' ? b.content : b.content)).join('\n\n');
 
@@ -103,17 +108,23 @@ export function InsertPop({
   before,
   flush,
   onManage,
+  kind = 'block',
+  place,
 }: {
   open: boolean;
   onClose: () => void;
   anchor: string;
   tabId: string;
-  scope: string;
-  before: number;
+  scope?: string;
+  before?: number;
   flush?: () => Promise<void>;
   onManage?: () => void;
+  /** 常用块，或者"添加角色"旁边的箭头：从素材里选一个角色 */
+  kind?: 'block' | 'character';
+  place?: Place;
 }) {
   const notify = useNotifications();
+  const noun = kind === 'character' ? '角色' : '常用块';
   const [items, setItems] = useState<Material[]>([]);
   const [q, setQ] = useState('');
   const [pick, setPick] = useState(-1);
@@ -125,7 +136,7 @@ export function InsertPop({
     setPick(-1);
     setPeek(null);
     void invokeUI('material.list', {})
-      .then((r) => setItems(r.items.filter((x) => x.kind === 'block')))
+      .then((r) => setItems(r.items.filter((x) => x.kind === kind)))
       .catch((e) => notify({ text: (e as Error).message, tone: 'error' }));
   }, [open]);
   const list = items.filter(
@@ -134,7 +145,10 @@ export function InsertPop({
   const insert = async (m: Material) => {
     try {
       await flush?.();
-      await invokeUI('material.insert', { tabId, id: m.id, scope, before });
+      await invokeUI(
+        'material.insert',
+        kind === 'character' ? { tabId, id: m.id } : { tabId, id: m.id, scope, before },
+      );
       onClose();
     } catch (e) {
       notify({ text: (e as Error).message, tone: 'error' });
@@ -158,7 +172,8 @@ export function InsertPop({
         anchor={anchor}
         trigger={anchor}
         className="popover ins-pop"
-        label="插入常用块"
+        place={place}
+        label={kind === 'character' ? '从素材添加角色' : '插入常用块'}
         deps={[list.length]}
       >
         <label className="field sm">
@@ -166,8 +181,8 @@ export function InsertPop({
           <input
             autoFocus
             value={q}
-            placeholder="搜索常用块"
-            aria-label="搜索常用块"
+            placeholder={`搜索${noun}`}
+            aria-label={`搜索${noun}`}
             autoComplete="off"
             spellCheck={false}
             onChange={(e) => {
@@ -193,13 +208,15 @@ export function InsertPop({
             }}
           />
         </label>
-        <div className="ins-list" data-scroll="">
+        <div className="ins-list" data-scroll="" role="listbox" aria-label={noun}>
           {list.length ? (
             list.map((m, i) => (
               <div
                 key={m.id}
                 className={`ins-row ${i === pick ? 'on' : ''}`}
                 data-insrow={m.id}
+                role="option"
+                aria-selected={i === pick}
                 onPointerEnter={() => setPick(i)}
                 onClick={() => void insert(m)}
               >
@@ -210,11 +227,7 @@ export function InsertPop({
                     onPointerLeave={unpeek}
                   >
                     <b>{m.name}</b>
-                    <span className="muted">
-                      {m.blocks[0]?.type === 'tags'
-                        ? `Tag 块 · ${m.blocks[0].tags.length} 个`
-                        : '段落'}
-                    </span>
+                    <span className="muted">{typeOf(m)}</span>
                   </span>
                   <span className="sp" />
                   <span className="muted mono">用过 {m.uses} 次</span>
@@ -251,8 +264,10 @@ export function InsertPop({
           ) : (
             <p className="help ins-empty">
               {q.trim()
-                ? '没有找到匹配的常用块'
-                : '暂无常用块。在块的菜单里选"存为常用块"即可添加。'}
+                ? `没有找到匹配的${noun}`
+                : kind === 'character'
+                  ? '暂无保存的角色。在角色的“更多”菜单里选“存为角色”即可添加。'
+                  : '暂无常用块。在块的菜单里选"存为常用块"即可添加。'}
             </p>
           )}
         </div>
@@ -272,7 +287,7 @@ export function InsertPop({
               onManage?.();
             }}
           >
-            管理常用块
+            管理{noun}
           </button>
         </div>
       </Pop>
@@ -295,10 +310,7 @@ export function InsertPop({
               <div className="vp-h">
                 <b>{peeked.name}</b>
                 <span className="help">
-                  {peeked.blocks[0]?.type === 'tags'
-                    ? `Tag 块 · ${peeked.blocks[0].tags.length} 个`
-                    : '段落'}{' '}
-                  · 用过 {peeked.uses} 次
+                  {typeOf(peeked)} · 用过 {peeked.uses} 次
                 </span>
               </div>
               <div className="ins-peek-b">
@@ -311,15 +323,8 @@ export function InsertPop({
   );
 }
 
-/** "添加角色"旁边的箭头：从素材里选一个角色，连同它的块和负面一起加进来 */
-export function CharacterPick({
-  open,
-  onClose,
-  anchor,
-  tabId,
-  flush,
-  onManage,
-}: {
+/** "添加角色"旁边的箭头：从素材里选一个角色，连同它的块和负面一起加进来。和常用块用同一个浮层（带示例小图） */
+export function CharacterPick(p: {
   open: boolean;
   onClose: () => void;
   anchor: string;
@@ -327,41 +332,5 @@ export function CharacterPick({
   flush?: () => Promise<void>;
   onManage?: () => void;
 }) {
-  const notify = useNotifications();
-  const [items, setItems] = useState<Material[]>([]);
-  useEffect(() => {
-    if (open)
-      void invokeUI('material.list', {}).then((r) =>
-        setItems(r.items.filter((x) => x.kind === 'character')),
-      );
-  }, [open]);
-  return (
-    <MenuPop
-      open={open}
-      onClose={onClose}
-      anchor={anchor}
-      place="below-right"
-      wide
-      items={[
-        { header: '从素材添加' },
-        ...(items.length
-          ? items.map((m) => ({
-              label: m.name,
-              icon: 'user-3-line',
-              hint: `${m.blocks.length} 块`,
-              onSelect: async () => {
-                try {
-                  await flush?.();
-                  await invokeUI('material.insert', { tabId, id: m.id });
-                } catch (e) {
-                  notify({ text: (e as Error).message, tone: 'error' });
-                }
-              },
-            }))
-          : [{ label: '暂无保存的角色', disabled: true }]),
-        'sep',
-        { label: '管理角色…', onSelect: () => onManage?.() },
-      ]}
-    />
-  );
+  return <InsertPop {...p} kind="character" place="below-right" />;
 }
