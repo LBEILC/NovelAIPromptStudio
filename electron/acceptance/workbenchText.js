@@ -42,8 +42,12 @@ export async function textEditingChecks({ h, raw, draft, reset, modifier }) {
     `(()=>{const n=document.querySelector('.wb-text-section textarea');return n.value.endsWith(', ')&&!n.value.endsWith(', wa')})()`,
   );
   await input('.wb-text-section textarea', '1.3::rain::, {clouds}, -1.5::wind::');
+  await wait(
+    'document.querySelector(".tx-hl").textContent.trimEnd()==="1.3::rain::, {clouds}, -1.5::wind::"',
+    '新的文本已完成渲染后再选择待删除的括号',
+  );
   await e(
-    `(()=>{const n=document.querySelector('.wb-text-section textarea'),at=n.value.indexOf('}');n.focus();n.setSelectionRange(at,at+1)})()`,
+    `(async()=>{await new Promise(resolve=>requestAnimationFrame(resolve));const n=document.querySelector('.wb-text-section textarea'),at=n.value.indexOf('}');n.focus();n.setSelectionRange(at,at+1)})()`,
   );
   const cdp = h.window.webContents.debugger;
   await cdp.sendCommand('Input.dispatchKeyEvent', {
@@ -87,6 +91,10 @@ export async function textEditingChecks({ h, raw, draft, reset, modifier }) {
     windowsVirtualKeyCode: 90,
     modifiers: process.platform === 'darwin' ? 4 : 2,
   });
+  await wait(
+    'document.querySelector(".wb-text-section textarea").value==="1.3::rain::, {clouds}, -1.5::wind::"&&!document.querySelector(".tx-err")',
+    '原生撤销恢复文本与错误提示的最终状态',
+  );
   await check(
     '文字框原生撤销恢复匹配括号后波浪线消失',
     '!document.querySelector(".tx-err")&&!document.querySelector(".tx-hl .bad")',

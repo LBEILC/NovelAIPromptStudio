@@ -63,8 +63,17 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   await h.check(
     'help 列出全部公开命令和输入格式',
     () =>
-      help.commands.length === 39 &&
-      help.commands.every((c) => c.input && !c.name.startsWith('workbench.commit')),
+      help.commands.length === 42 &&
+      ['material.list', 'material.save', 'material.insert'].every((name) =>
+        help.commands.some((c) => c.name === name && c.example),
+      ) &&
+      help.commands.every(
+        (c) =>
+          c.input &&
+          !['workbench.commit', 'material.delete', 'prompt.tidy', 'library.suggest-names'].includes(
+            c.name,
+          ),
+      ),
     undefined,
     'once',
   );

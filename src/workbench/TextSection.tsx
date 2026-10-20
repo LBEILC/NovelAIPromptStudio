@@ -126,6 +126,7 @@ export function TextSection({
     setSuggest(false);
     setItems([]);
     requestAnimationFrame(() => {
+      if (area.current?.value !== next) return;
       area.current?.focus();
       area.current?.setSelectionRange(position, position);
     });
