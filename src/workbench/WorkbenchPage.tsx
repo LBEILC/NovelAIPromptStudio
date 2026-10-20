@@ -20,7 +20,7 @@ export interface WorkbenchPageProps
     'onCopyText' | 'onConfirm' | 'onNotify' | 'onTranslateTags' | 'onUpdateProject'
   > {
   session: WorkbenchSession;
-  onShowMaterials?: (kind?: string) => void;
+  onShowMaterials?: (kind?: string, id?: string) => void;
   beforeGeneration?: () => Promise<void>;
   onConfigureGeneration: () => void;
   error: string;

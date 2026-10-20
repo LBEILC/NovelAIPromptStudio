@@ -66,7 +66,7 @@ export interface EditorProps {
     entries: { scopeKey: string; tag: ImageProject['tags'][number] }[],
   ) => void | Promise<unknown>;
   onNotify: (text: string, tone?: string) => void;
-  onShowMaterials?: (kind?: string) => void;
+  onShowMaterials?: (kind?: string, id?: string) => void;
   before?: () => Promise<void>;
   onProposalChange?: (value: boolean) => void;
   onConfirm: (options: {
@@ -566,7 +566,7 @@ export function WorkbenchEditor(p: EditorProps) {
     if (!saveBlock?.name.trim() || !p.tabId) return;
     try {
       await p.before?.();
-      await invokeUI('material.save', {
+      const { item } = await invokeUI('material.save', {
         tabId: p.tabId,
         scope: doc.scopes[saveBlock.si].scope.key,
         block: saveBlock.bi,
@@ -575,7 +575,7 @@ export function WorkbenchEditor(p: EditorProps) {
       setSaveBlock(null);
       notify({
         text: '已存为常用块',
-        action: { label: '查看', onClick: () => p.onShowMaterials?.() },
+        action: { label: '查看', onClick: () => p.onShowMaterials?.('block', item.id) },
       });
     } catch (e) {
       notify({ text: (e as Error).message, tone: 'error' });
@@ -602,10 +602,14 @@ export function WorkbenchEditor(p: EditorProps) {
         onSelect: async () => {
           try {
             await p.before?.();
-            await invokeUI('material.save', { tabId: p.tabId!, scope: scope.key, name: c.label });
+            const { item } = await invokeUI('material.save', {
+              tabId: p.tabId!,
+              scope: scope.key,
+              name: c.label,
+            });
             notify({
               text: '已存为角色',
-              action: { label: '查看', onClick: () => p.onShowMaterials?.('character') },
+              action: { label: '查看', onClick: () => p.onShowMaterials?.('character', item.id) },
             });
           } catch (e) {
             notify({ text: (e as Error).message, tone: 'error' });

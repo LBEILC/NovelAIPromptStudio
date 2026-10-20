@@ -247,7 +247,7 @@ export default function App() {
     [],
   );
   const [page, setPage] = useState(window.studioScreenshot?.page || 'workbench');
-  const [materialKind, setMaterialKind] = useState('block');
+  const [materialTarget, setMaterialTarget] = useState({ kind: 'block', n: 0 });
   const notify = useNotifications();
   const notificationTarget = useRef({ page, notify });
   notificationTarget.current = { page, notify };
@@ -1557,8 +1557,8 @@ export default function App() {
           <div className={pageClass('workbench')} data-enter="fade">
             <WorkbenchPage
               onBrowseLibrary={() => setPage('gallery')}
-              onShowMaterials={(kind = 'block') => {
-                setMaterialKind(kind);
+              onShowMaterials={(kind = 'block', id) => {
+                setMaterialTarget((t) => ({ kind, id, n: t.n + 1 }));
                 setPage('materials');
               }}
               onConfigureGeneration={() => {
@@ -1778,7 +1778,16 @@ export default function App() {
         </Activity>
         <Activity mode={pageShown('materials')}>
           <div className={pageClass('materials')} data-enter="fade">
-            <MaterialsPage initialKind={materialKind} />
+            <MaterialsPage
+              target={materialTarget}
+              onShowImage={(id) => {
+                selectGalleryCollection('');
+                setGalleryView('all');
+                setGalleryFilters(DEFAULT_GALLERY_FILTERS);
+                setPreviewProjectId(id);
+                setPage('gallery');
+              }}
+            />
           </div>
         </Activity>
         <Activity mode={pageShown('settings')}>

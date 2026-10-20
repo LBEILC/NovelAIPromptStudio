@@ -107,3 +107,8 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 .lic summary [class^="ri-"] { color: var(--text-3); transition: transform var(--dur-1) var(--ease-out); }
 .lic[open] summary [class^="ri-"] { transform: rotate(90deg); }
 .lic pre { margin: 0; padding: var(--sp-2) 0 var(--sp-3); white-space: pre-wrap; font: var(--fs-caption)/var(--lh-caption) var(--font-mono); color: var(--text-2); border-bottom: var(--bw) solid var(--divider); }
+
+/* 素材：右边一列撑满；段落的预览保留换行 */
+.matp .mat-col { flex: 1 1 0; }
+.mrow-pre .prose-pre { white-space: pre-line; }
+.mat-ex-it img[data-tip] { cursor: pointer; }

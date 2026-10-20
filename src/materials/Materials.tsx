@@ -1,528 +1,808 @@
-import { useEffect, useRef, useState } from 'react';
-import { Button, Dialog, Input, Menu, MenuItems, Popover, Tag, useNotifications } from '../ui';
-import { Collapse, TransitionSurface } from '../ui/transitions';
+// 素材（doc/design.md 2.9、2.25）：左边三类（常用块、角色、Vibe），右边一行一项、细线分隔，不做卡片。
+// 点一行在原位展开看完整内容，再点收起。行末三张示例小图（多的写"+N"），停在上面弹出大图预览，左右划过去换图。
+// 右键或行末"更多"：重命名（就地改）、复制、删除。删除直接删：那一行淡出，通知里可以撤销（几秒后才真的删）。
+// 从工作台"存为常用块""存为角色"的通知点"查看"跳过来时，刚存的那一项展开并滚到它。
+// Vibe 在 1.3 只列出从图片里读到过的 Vibe（2.25）。
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
+import { writeClipboardText } from '../lib/clipboard';
 import { mediaUrl } from '../lib/imageStage.js';
-import { categoryColors } from '../workbench/model';
+import { Icon, isMod } from '../kit/controls';
+import { Pop } from '../kit/layer';
+import { ContextMenu, type MenuEntry } from '../kit/menu';
+import { FlipScope, dur, useIndicator } from '../kit/motion';
+import { useNotifications } from '../kit/toast';
+import { MaterialContent } from '../workbench/Insert';
+import { Swap } from '../settings/parts';
 import type { Material } from '../shared/materials';
-import type { PromptBlock } from '../lib/promptDocument';
-import './materials.css';
 
-export function MaterialContent({
-  blocks,
-  limit = false,
-}: {
-  blocks: PromptBlock[];
-  limit?: boolean;
-}) {
-  return (
-    <>
-      {blocks.map((b, i) => (
-        <div key={i}>
-          {b.type === 'tags' ? (
-            <div className="wb-tags">
-              {b.tags.slice(0, limit ? 24 : undefined).map((t, j) => (
-                <Tag
-                  key={j}
-                  text={t.tag}
-                  translation={t.translation}
-                  weight={t.weight === 1 ? undefined : String(t.weight)}
-                  category={categoryColors[t.category]}
-                  categoryLabel={t.category}
-                  interactive={false}
-                />
-              ))}
-              {limit && b.tags.length > 24 && (
-                <span className="nps-help">还有 {b.tags.length - 24} 个</span>
-              )}
-            </div>
-          ) : (
-            <div className="wb-prose">
-              <p>{b.content}</p>
-              {b.translation && <p className="wb-translation">{b.translation}</p>}
-            </div>
-          )}
-        </div>
-      ))}
-    </>
-  );
+type Kind = 'block' | 'character' | 'vibe';
+type Vibe = {
+  id: string;
+  name: string;
+  sources: { id: string; name: string; thumbnail: string }[];
+};
+const TABS: [Kind, string, string][] = [
+  ['block', '常用块', 'stack-line'],
+  ['character', '角色', 'user-3-line'],
+  ['vibe', 'Vibe', 'palette-line'],
+];
+const NOUN: Record<Kind, string> = { block: '常用块', character: '角色', vibe: 'Vibe' };
+// 名词前后接中文时，英文名词两边留空格（"搜索 Vibe 的名称"）
+const sp = (n: string) => (/^[A-Za-z]/.test(n) ? ` ${n} ` : n);
+const ROW = 3;
+const UNDO_MS = 5000;
+
+// ---------- 示例图片：按图片 id 读缩略图和名称，读过的记下来 ----------
+type Example = { id: string; thumb: string; image: string; name: string; file: string };
+const exampleCache = new Map<string, Promise<Example | null>>();
+function loadExample(id: string) {
+  let p = exampleCache.get(id);
+  if (!p) {
+    p = invokeUI('library.get', { id })
+      .then(({ project }) =>
+        project.deleted_at
+          ? null
+          : {
+              id,
+              thumb: mediaUrl(project.thumbnail_path || project.image_path),
+              image: mediaUrl(project.image_path),
+              name: project.name || '',
+              file: project.image_path.split(/[\\/]/).pop() || '',
+            },
+      )
+      .catch(() => null);
+    exampleCache.set(id, p);
+  }
+  return p;
 }
-export function MaterialExamples({
-  ids,
-  onPreview,
-  expanded = false,
-}: {
-  ids: string[];
-  onPreview?: (path: string) => void;
-  expanded?: boolean;
-}) {
-  const [images, setImages] = useState<{ id: string; thumbnail: string; image: string }[]>([]);
+function useExamples(ids: string[]) {
+  const [list, setList] = useState<Example[]>([]);
+  const key = ids.join(',');
   useEffect(() => {
-    let active = true;
-    void Promise.all(
-      ids.slice(0, 6).map(async (id) => {
-        try {
-          const { project } = await invokeUI('library.get', { id });
-          return project.deleted_at
-            ? null
-            : { id, thumbnail: project.thumbnail_path, image: project.image_path };
-        } catch {
-          return null;
-        }
-      }),
-    ).then((rows) => {
-      if (active) setImages(rows.filter((x): x is NonNullable<typeof x> => !!x));
-    });
+    let live = true;
+    void Promise.all(ids.map(loadExample)).then(
+      (rows) => live && setList(rows.filter((x): x is Example => !!x)),
+    );
     return () => {
-      active = false;
+      live = false;
     };
-  }, [ids.join(',')]);
-  return (
-    <span className={`material-examples${expanded ? ' material-examples-expanded' : ''}`}>
-      {images.map((x) => (
-        <img
-          key={x.id}
-          src={mediaUrl(x.thumbnail)}
-          alt="示例图片"
-          onMouseEnter={() => onPreview?.(x.image)}
-          onMouseLeave={() => onPreview?.('')}
-        />
-      ))}
-    </span>
-  );
+  }, [key]);
+  return list;
 }
-export function MaterialPicker({
-  tabId,
-  scope,
-  before,
-  character = false,
-  flush,
-  onManage,
-}: {
-  tabId: string;
-  scope?: string;
-  before?: number;
-  character?: boolean;
-  flush?: () => Promise<void>;
-  onManage?: () => void;
-}) {
-  const pickerAnchor = useRef<HTMLElement>(null);
-  const anchor = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState(false),
-    [query, setQuery] = useState(''),
-    [selected, setSelected] = useState(-1);
-  const [items, setItems] = useState<Material[]>([]);
-  const [peek, setPeek] = useState<Material | null>(null),
-    [image, setImage] = useState('');
-  const notify = useNotifications();
-  const visible = items.filter(
-    (x) =>
-      x.kind === (character ? 'character' : 'block') &&
-      `${x.name} ${x.blocks.map((b) => b.content).join(' ')}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
+
+const contentText = (m: Material) =>
+  [...m.blocks, ...(m.negativeBlocks || [])].map((b) => b.content).join('\n\n');
+const preview = (m: Material) => {
+  const b = m.blocks[0];
+  if (!b) return <span className="muted">没有块</span>;
+  return b.type === 'tags' ? (
+    <span className="mono">{b.content}</span>
+  ) : (
+    <span className="prose-pre">{b.content}</span>
   );
-  const insert = async (item: Material) => {
+};
+const typeText = (m: Material) => {
+  if (m.kind === 'character') {
+    const neg = (m.negativeBlocks || []).reduce(
+      (n, b) => n + (b.type === 'tags' ? b.tags.length : 0),
+      0,
+    );
+    return `${m.blocks.length} 块${neg ? ` · 负面 ${neg} 个 Tag` : ''}`;
+  }
+  const b = m.blocks[0];
+  return b?.type === 'tags' ? `Tag 块 · ${b.tags.length} 个` : '段落';
+};
+
+export function MaterialsPage({
+  target,
+  onShowImage,
+}: {
+  /** 要看的那一类，以及要展开的那一项（从工作台跳过来时） */
+  target?: { kind: string; id?: string; n: number };
+  onShowImage?: (id: string) => void;
+}) {
+  const notify = useNotifications();
+  const [items, setItems] = useState<Material[]>([]);
+  const [vibes, setVibes] = useState<Vibe[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [kind, setKind] = useState<Kind>('block');
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState('');
+  const [rename, setRename] = useState<{ id: string; text: string } | null>(null);
+  const [fading, setFading] = useState<string[]>([]);
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [menu, setMenu] = useState<{ at: [number, number]; id: string } | null>(null);
+  const [peek, setPeek] = useState<{ id: string; i: number } | null>(null);
+  const side = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const search = useRef<HTMLInputElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const deletes = useRef(new Map<string, number>());
+  const scrollTo = useRef('');
+  useIndicator(side, [kind]);
+
+  const reload = async () => {
+    const [m, v] = await Promise.all([
+      invokeUI('material.list', {}),
+      invokeUI('material.vibes', {}),
+    ]);
+    setItems(m.items);
+    setVibes(v.items);
+    setLoaded(true);
+  };
+  useEffect(() => {
+    void reload().catch((e) => notify({ text: (e as Error).message, tone: 'error' }));
+  }, []);
+  // 每次回到这一页都重新读一遍（工作台里可能刚存了新的）
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const io = new IntersectionObserver((es) => {
+      if (es.some((e) => e.isIntersecting)) void reload().catch(() => {});
+      else {
+        setPeek(null);
+        setMenu(null);
+      }
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!target) return;
+    const k = (['block', 'character', 'vibe'] as Kind[]).includes(target.kind as Kind)
+      ? (target.kind as Kind)
+      : 'block';
+    setKind(k);
+    setQ('');
+    setRename(null);
+    if (target.id) {
+      setOpen(target.id);
+      scrollTo.current = target.id;
+    }
+  }, [target?.n]);
+  useLayoutEffect(() => {
+    const id = scrollTo.current;
+    if (!id) return;
+    const row = list.current?.querySelector(`[data-mat="${CSS.escape(id)}"]`);
+    if (!row) return;
+    scrollTo.current = '';
+    row.scrollIntoView({ block: 'nearest', behavior: dur(1) ? 'smooth' : 'auto' });
+  });
+
+  const query = q.trim().toLowerCase();
+  const shown = useMemo(
+    () =>
+      kind === 'vibe'
+        ? vibes.filter(
+            (v) =>
+              !query ||
+              `${v.name} ${v.sources.map((s) => s.name).join(' ')}`.toLowerCase().includes(query),
+          )
+        : items.filter(
+            (m) =>
+              m.kind === kind &&
+              !hidden.includes(m.id) &&
+              (!query || `${m.name}\n${contentText(m)}`.toLowerCase().includes(query)),
+          ),
+    [items, vibes, kind, query, hidden],
+  );
+  // 换一批（切换分类、搜索）：结果真的变了才整块换内容
+  const gen = useRef({ n: 0, key: '', sig: '' });
+  const sig = shown.map((x) => x.id).join(',');
+  const batch = `${kind}|${query}`;
+  if (gen.current.key !== batch) {
+    if (gen.current.sig !== `${kind}:${sig}`) gen.current.n++;
+    gen.current.key = batch;
+  }
+  gen.current.sig = `${kind}:${sig}`;
+
+  const count = (k: Kind) =>
+    k === 'vibe'
+      ? vibes.length
+      : items.filter((m) => m.kind === k && !hidden.includes(m.id)).length;
+  const switchTo = (k: Kind) => {
+    if (k === kind) return;
+    setKind(k);
+    setOpen('');
+    setRename(null);
+  };
+
+  // Ctrl K 聚焦搜索
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!root.current?.getClientRects().length) return;
+      if (isMod(e) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        search.current?.focus();
+        search.current?.select();
+      }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, []);
+
+  const commitRename = async (save: boolean) => {
+    const r = rename;
+    setRename(null);
+    if (!r || !save) return;
+    const name = r.text.trim();
+    const m = items.find((x) => x.id === r.id);
+    if (!m || !name || name === m.name) return;
+    setItems((all) => all.map((x) => (x.id === r.id ? { ...x, name } : x)));
     try {
-      await flush?.();
-      await invokeUI('material.insert', { tabId, id: item.id, scope, before });
-      setOpen(false);
-      setPeek(null);
-      setImage('');
+      await invokeUI('material.rename', { id: r.id, name });
     } catch (e) {
-      notify({ text: (e as Error).message, tone: 'error' });
+      notify({ text: `重命名失败：${(e as Error).message}`, tone: 'error' });
+      void reload();
     }
   };
-  return (
-    <>
-      <Button
-        size="small"
-        variant="quiet"
-        ref={anchor}
-        aria-label={character ? '从素材添加角色' : '常用块'}
-        onClick={async () => {
-          try {
-            pickerAnchor.current = character
-              ? anchor.current
-              : anchor.current?.closest<HTMLElement>('.wb-add-block') || anchor.current;
-            setItems((await invokeUI('material.list', {})).items);
-            setQuery('');
-            setSelected(-1);
-            setOpen(!open);
-          } catch (e) {
-            notify({ text: (e as Error).message, tone: 'error' });
+  const copy = (m: Material) =>
+    void writeClipboardText(contentText(m)).then(
+      () => notify({ text: `已复制“${m.name}”`, tone: 'success' }),
+      (e) => notify({ text: `复制失败：${(e as Error).message}`, tone: 'error' }),
+    );
+  // 删除：先淡出，再从列表里拿掉（其他行补位）；通知里可以撤销，几秒后才真的删
+  const remove = (m: Material) => {
+    if (open === m.id) setOpen('');
+    setFading((f) => [...f, m.id]);
+    window.setTimeout(() => {
+      setFading((f) => f.filter((x) => x !== m.id));
+      setHidden((h) => [...h, m.id]);
+      const timer = window.setTimeout(() => {
+        deletes.current.delete(m.id);
+        void invokeUI('material.delete', { id: m.id })
+          .then(() => {
+            setItems((all) => all.filter((x) => x.id !== m.id));
+            setHidden((h) => h.filter((x) => x !== m.id));
+          })
+          .catch((e) => {
+            setHidden((h) => h.filter((x) => x !== m.id));
+            notify({ text: `删除失败：${(e as Error).message}`, tone: 'error' });
+          });
+      }, UNDO_MS);
+      deletes.current.set(m.id, timer);
+      notify({
+        text: `已删除${sp(NOUN[m.kind]).trimEnd()}“${m.name}”`,
+        tone: 'success',
+        duration: UNDO_MS,
+        action: {
+          label: '撤销',
+          onClick: () => {
+            clearTimeout(deletes.current.get(m.id));
+            deletes.current.delete(m.id);
+            setHidden((h) => h.filter((x) => x !== m.id));
+          },
+        },
+      });
+    }, dur(1));
+  };
+  // 离开软件前把还在等撤销的删掉
+  useEffect(() => {
+    const flush = () => {
+      for (const [id, t] of deletes.current) {
+        clearTimeout(t);
+        void invokeUI('material.delete', { id });
+      }
+      deletes.current.clear();
+    };
+    window.addEventListener('beforeunload', flush);
+    return () => window.removeEventListener('beforeunload', flush);
+  }, []);
+
+  const menuItem = menu && items.find((m) => m.id === menu.id);
+  const lastMenu = useRef<Material | null>(null);
+  if (menuItem) lastMenu.current = menuItem;
+  const menuItems = (m: Material | null): MenuEntry[] =>
+    m
+      ? [
+          { label: '重命名', onSelect: () => setRename({ id: m.id, text: m.name }) },
+          { label: '复制', onSelect: () => copy(m) },
+          'sep',
+          { label: '删除', danger: true, onSelect: () => remove(m) },
+        ]
+      : [];
+
+  // 示例图片的悬停预览：停 400ms 出现，在小图条上左右划动换图（已经出现时立即换），移开 80ms 后收起
+  const peekTimer = useRef(0);
+  const peekAt = (el: HTMLElement, x: number, n: number) => {
+    const r = el.getBoundingClientRect();
+    return Math.max(0, Math.min(n - 1, Math.floor(((x - r.left) / r.width) * n)));
+  };
+  const peekMove = (id: string, n: number) => (e: React.PointerEvent<HTMLElement>) => {
+    const next = { id, i: peekAt(e.currentTarget, e.clientX, n) };
+    clearTimeout(peekTimer.current);
+    if (peek) {
+      if (peek.id !== next.id || peek.i !== next.i) setPeek(next);
+    } else peekTimer.current = window.setTimeout(() => setPeek(next), 400);
+  };
+  const peekLeave = () => {
+    clearTimeout(peekTimer.current);
+    peekTimer.current = window.setTimeout(() => setPeek(null), 80);
+  };
+  useEffect(() => {
+    if (!peek) return;
+    const hide = () => {
+      clearTimeout(peekTimer.current);
+      setPeek(null);
+    };
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && hide();
+    window.addEventListener('pointerdown', hide, true);
+    window.addEventListener('scroll', hide, true);
+    window.addEventListener('keydown', esc, true);
+    return () => {
+      window.removeEventListener('pointerdown', hide, true);
+      window.removeEventListener('scroll', hide, true);
+      window.removeEventListener('keydown', esc, true);
+    };
+  }, [!!peek]);
+  const lastPeek = useRef(peek);
+  if (peek) lastPeek.current = peek;
+  const peekItem = lastPeek.current && items.find((m) => m.id === lastPeek.current!.id);
+
+  const empty = () => {
+    const noun = sp(NOUN[kind]).trimEnd();
+    if (query)
+      return (
+        <div className="empty">
+          <h3>没有找到匹配的{noun}</h3>
+          <p>名称和内容中都不包含“{q.trim()}”。</p>
+          <div className="acts">
+            <button
+              className="btn"
+              onClick={() => {
+                setQ('');
+                search.current?.focus();
+              }}
+            >
+              清除搜索
+            </button>
+          </div>
+        </div>
+      );
+    return (
+      <div className="empty">
+        <h3>暂无{noun}</h3>
+        <p>
+          {
+            {
+              block: '在工作台中打开块的菜单，选择“存为常用块”，就可以在这里反复使用。',
+              character: '在工作台中打开角色的“更多”菜单，选择“存为角色”，就可以在这里反复使用。',
+              vibe: '导入带 Vibe 的图片后，用到的 Vibe 会列在这里。',
+            }[kind]
           }
-        }}
-      >
-        {character && <i className="ri-arrow-down-s-line" />}
-        {!character && '常用块'}
-      </Button>
-      <Popover
-        open={open}
-        onClose={() => {
-          setOpen(false);
-          setPeek(null);
-          setImage('');
-        }}
-        anchor={pickerAnchor}
-        label={character ? '从素材添加角色' : '插入常用块'}
-        className={character ? 'nps-menu' : 'material-picker'}
-      >
-        {character ? (
-          <>
-            <div className="nps-help library-menu-heading">从素材添加</div>
-            <MenuItems
-              label="从素材添加角色"
-              closeAll={() => setOpen(false)}
-              closeLevel={() => setOpen(false)}
-              items={[
-                ...(visible.length
-                  ? visible.map((x) => ({
-                      id: x.id,
-                      label: x.name,
-                      prefix: <i className="ri-user-3-line" />,
-                      trailing: `${x.blocks.length} 块`,
-                      onSelect: () => void insert(x),
-                    }))
-                  : [{ id: 'empty', label: '暂无保存的角色', disabled: true }]),
-                { id: 'separator', separator: true },
-                { id: 'manage', label: '管理角色…', onSelect: onManage },
-              ]}
-            />
-          </>
-        ) : (
+        </p>
+      </div>
+    );
+  };
+
+  return (
+    <div className="body matp" ref={root}>
+      <div className="side has-ind" ref={side} aria-label="素材分类">
+        <i className="ind" />
+        {TABS.map(([k, name, icon]) => (
           <div
-            onKeyDown={(e) => {
-              if (['ArrowDown', 'ArrowUp'].includes(e.key)) {
-                e.preventDefault();
-                setSelected(
-                  (v) => (v + (e.key === 'ArrowDown' ? 1 : -1) + visible.length) % visible.length,
-                );
-              }
-              if (e.key === 'Enter' && visible[selected]) {
-                e.preventDefault();
-                void insert(visible[selected]);
-              }
-            }}
+            key={k}
+            className={`it ${kind === k ? 'on' : ''}`}
+            role="button"
+            tabIndex={0}
+            aria-current={kind === k ? 'true' : undefined}
+            onClick={() => switchTo(k)}
+            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && switchTo(k)}
           >
-            <Input
-              autoFocus
-              aria-label={character ? '搜索角色' : '搜索常用块'}
-              placeholder={character ? '搜索角色' : '搜索常用块'}
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setSelected(-1);
+            <Icon name={icon} />
+            <span className="nm">{name}</span>
+            <span className="n">{loaded ? count(k) : ''}</span>
+          </div>
+        ))}
+      </div>
+      <div className="col mat-col">
+        <div className="col-h mtools">
+          <label className="field grow">
+            <Icon name="search-line" />
+            <input
+              ref={search}
+              placeholder={`搜索${sp(NOUN[kind])}的名称${kind === 'vibe' ? '' : '或内容'}`}
+              aria-label="搜索素材"
+              autoComplete="off"
+              spellCheck={false}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && q) {
+                  e.stopPropagation();
+                  setQ('');
+                }
               }}
             />
-            <div className="material-insert-list">
-              {visible.map((x, i) => (
-                <div
-                  className={`material-insert-row ${selected === i ? 'on' : ''}`}
-                  key={x.id}
-                  role="button"
-                  tabIndex={0}
-                  onMouseEnter={() => setSelected(i)}
-                  onClick={() => void insert(x)}
-                >
-                  <div
-                    onMouseEnter={() => {
-                      setPeek(x);
-                      setImage('');
-                    }}
-                    onMouseLeave={() => setPeek(null)}
-                  >
-                    <b>{x.name}</b>{' '}
-                    <span className="nps-help">
-                      {character
-                        ? `${x.blocks.length} 块`
-                        : x.blocks[0]?.type === 'tags'
-                          ? 'Tag 块'
-                          : '段落'}{' '}
-                      · 用过 {x.uses} 次
-                    </span>
-                    <div className="material-insert-bottom">
-                      <p className="material-preview">
-                        {x.blocks.map((b) => b.content).join('\n')}
-                      </p>
-                      <MaterialExamples
-                        ids={x.examples.slice(0, 3)}
-                        onPreview={(path) => {
-                          setPeek(null);
-                          setImage(path);
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {!visible.length && (
-              <p className="nps-help">
-                {character
-                  ? '暂无保存的角色'
-                  : query
-                    ? '没有找到匹配的常用块'
-                    : '暂无常用块。在块的菜单里选“存为常用块”即可添加。'}
-              </p>
-            )}
-            <div className="material-picker-footer">
-              <span className="nps-help">↑↓ 选择 · Enter 插入</span>
-              <Button
-                variant="quiet"
-                size="small"
+            {q && (
+              <button
+                className="btn quiet sm icon lq-x"
+                aria-label="清除搜索"
                 onClick={() => {
-                  setOpen(false);
-                  onManage?.();
+                  setQ('');
+                  search.current?.focus();
                 }}
               >
-                管理常用块
-              </Button>
-            </div>
-          </div>
-        )}
-        {(peek || image) && (
-          <div className="material-peek">
-            {image ? (
-              <img src={mediaUrl(image)} alt="示例图片预览" />
-            ) : (
-              peek && (
-                <>
-                  <b>{peek.name}</b>
-                  <MaterialContent blocks={peek.blocks} limit />
-                </>
-              )
+                <Icon name="close-line" />
+              </button>
             )}
-          </div>
-        )}
-      </Popover>
+          </label>
+        </div>
+        <div className="scroll" ref={list}>
+          <Swap k={String(gen.current.n)}>
+            {!loaded ? null : shown.length ? (
+              <>
+                <FlipScope root={list}>
+                  <div className="mlist">
+                    {kind === 'vibe'
+                      ? (shown as Vibe[]).map((v) => (
+                          <VibeRow
+                            key={v.id}
+                            v={v}
+                            open={open === v.id}
+                            onToggle={() => setOpen(open === v.id ? '' : v.id)}
+                            onShowImage={onShowImage}
+                          />
+                        ))
+                      : (shown as Material[]).map((m) => (
+                          <Row
+                            key={m.id}
+                            m={m}
+                            open={open === m.id}
+                            fading={fading.includes(m.id)}
+                            menuOpen={menu?.id === m.id}
+                            rename={rename?.id === m.id ? rename.text : null}
+                            peekIndex={peek?.id === m.id ? peek.i : -1}
+                            onToggle={() => {
+                              if (rename?.id === m.id) return;
+                              setOpen(open === m.id ? '' : m.id);
+                            }}
+                            onRename={(text) => setRename({ id: m.id, text })}
+                            onRenameDone={(save) => void commitRename(save)}
+                            onMenu={(at) => setMenu(menu?.id === m.id ? null : { at, id: m.id })}
+                            onCopy={() => copy(m)}
+                            onShowImage={onShowImage}
+                            onPeekMove={peekMove}
+                            onPeekLeave={peekLeave}
+                          />
+                        ))}
+                  </div>
+                </FlipScope>
+                <div className="label lcount">
+                  {shown.length} 个{sp(NOUN[kind]).trimEnd()}
+                </div>
+              </>
+            ) : (
+              empty()
+            )}
+          </Swap>
+        </div>
+      </div>
+      <ContextMenu
+        at={menuItem ? menu!.at : null}
+        onClose={() => setMenu(null)}
+        className="lsp"
+        items={menuItems(lastMenu.current)}
+      />
+      <Pop
+        open={!!peek && !!peekItem}
+        onClose={() => setPeek(null)}
+        anchor={lastPeek.current ? `[data-mexrow="${CSS.escape(lastPeek.current.id)}"]` : undefined}
+        place="below-right"
+        className="popover tab-peek mex-peek"
+        passive
+        deps={[lastPeek.current?.id]}
+      >
+        {peekItem && <PeekCard ids={peekItem.examples} i={lastPeek.current!.i} />}
+      </Pop>
+    </div>
+  );
+}
+
+function PeekCard({ ids, i }: { ids: string[]; i: number }) {
+  const ex = useExamples(ids);
+  if (!ex.length) return null;
+  const k = Math.min(i, ex.length - 1);
+  const e = ex[k];
+  return (
+    <>
+      <Swap k={e.id} className="tp-img">
+        <img src={e.image} alt="" />
+      </Swap>
+      {e.name ? (
+        <b className="tp-name">{e.name}</b>
+      ) : (
+        <span className="tp-file mono">{e.file}</span>
+      )}
+      <div className="mex-peek-f">
+        <span className="mex-peek-strip">
+          {ex.map((y, n) => (
+            <img key={y.id} className={n === k ? 'cur' : ''} src={y.thumb} alt="" />
+          ))}
+        </span>
+        <span className="sp" />
+        <span className="tp-state mono">
+          {k + 1} / {ex.length}
+        </span>
+      </div>
     </>
   );
 }
 
-export function MaterialsPage({ initialKind = 'block' }: { initialKind?: string }) {
-  const [items, setItems] = useState<Material[]>([]);
-  const [vibes, setVibes] = useState<
-    { id: string; name: string; sources: { id: string; name: string; thumbnail: string }[] }[]
-  >([]);
-  const [kind, setKind] = useState('block'),
-    [query, setQuery] = useState(''),
-    [expanded, setExpanded] = useState('');
-  useEffect(() => setKind(initialKind), [initialKind]);
-  const [rename, setRename] = useState(''),
-    [name, setName] = useState(''),
-    [deleting, setDeleting] = useState<Material | null>(null);
-  const notify = useNotifications();
-  const reload = async () => {
-    setItems((await invokeUI('material.list', {})).items);
-    setVibes((await invokeUI('material.vibes', {})).items);
-  };
+function Row({
+  m,
+  open,
+  fading,
+  menuOpen,
+  rename,
+  peekIndex,
+  onToggle,
+  onRename,
+  onRenameDone,
+  onMenu,
+  onCopy,
+  onShowImage,
+  onPeekMove,
+  onPeekLeave,
+}: {
+  m: Material;
+  open: boolean;
+  fading: boolean;
+  menuOpen: boolean;
+  rename: string | null;
+  peekIndex: number;
+  onToggle: () => void;
+  onRename: (text: string) => void;
+  onRenameDone: (save: boolean) => void;
+  onMenu: (at: [number, number]) => void;
+  onCopy: () => void;
+  onShowImage?: (id: string) => void;
+  onPeekMove: (id: string, n: number) => (e: React.PointerEvent<HTMLElement>) => void;
+  onPeekLeave: () => void;
+}) {
+  const ex = useExamples(m.examples);
+  const renaming = rename !== null;
+  const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    void reload().catch((e) => notify({ text: e.message, tone: 'error' }));
-  }, []);
-  const saveName = async () => {
-    if (!name.trim()) return;
-    try {
-      await invokeUI('material.rename', { id: rename, name });
-      setRename('');
-      await reload();
-    } catch (e) {
-      notify({ text: (e as Error).message, tone: 'error' });
+    if (renaming) {
+      input.current?.focus();
+      input.current?.select();
     }
-  };
-  const shown = items.filter(
-    (x) =>
-      x.kind === kind &&
-      `${x.name} ${x.blocks.map((b) => b.content).join(' ')}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-  );
+  }, [renaming]);
+  // 点到改名框以外：保存
+  useEffect(() => {
+    if (!renaming) return;
+    const down = (e: PointerEvent) => {
+      if (!(e.target instanceof Element) || !e.target.closest('.mrow-rename')) onRenameDone(true);
+    };
+    document.addEventListener('pointerdown', down, true);
+    return () => document.removeEventListener('pointerdown', down, true);
+  }, [renaming, onRenameDone]);
   return (
-    <main className="library-page materials-page">
-      <aside className="library-side">
-        {[
-          ['block', '常用块', 'ri-stack-line'],
-          ['character', '角色', 'ri-user-3-line'],
-          ['vibe', 'Vibe', 'ri-palette-line'],
-        ].map(([key, label, icon]) => (
-          <button
-            className={`library-side-item ${key === kind ? 'on' : ''}`}
-            aria-label={label}
-            key={key}
-            onClick={() => {
-              setKind(key);
-              setQuery('');
-              setExpanded('');
-            }}
-          >
-            <i className={icon} />
-            <span>{label}</span>
-            <span className="library-side-count">
-              {key === 'vibe' ? vibes.length : items.filter((x) => x.kind === key).length}
-            </span>
-          </button>
-        ))}
-      </aside>
-      <section className="library-middle">
-        <div className="library-tools">
-          <Input
-            aria-label="搜索素材"
-            prefix={<i className="ri-search-line" />}
-            placeholder={`搜索${kind === 'block' ? '常用块' : kind === 'character' ? '角色' : 'Vibe'}的名称或内容`}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+    <div
+      className={`mrow ${open ? 'open' : ''} ${fading ? 'fading' : ''}`}
+      data-key={`mr-${m.id}`}
+      data-flip=""
+      data-enter="fade"
+    >
+      <div
+        className="mrow-h"
+        data-mat={m.id}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        onContextMenu={(e) => {
+          if ((e.target as Element).closest('input')) return;
+          e.preventDefault();
+          onMenu([e.clientX, e.clientY]);
+        }}
+      >
+        <div className="mrow-main">
+          <div className="mrow-t">
+            {renaming ? (
+              <label className="field sm mrow-rename" onClick={(e) => e.stopPropagation()}>
+                <input
+                  ref={input}
+                  aria-label="名称"
+                  placeholder="名称"
+                  value={rename}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(e) => onRename(e.target.value)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.nativeEvent.isComposing) return;
+                    if (e.key === 'Enter') onRenameDone(true);
+                    if (e.key === 'Escape') onRenameDone(false);
+                  }}
+                />
+              </label>
+            ) : (
+              <b className="mrow-name">{m.name}</b>
+            )}
+            <span className="mtype">{typeText(m)}</span>
+          </div>
+          <div className="mrow-pre">{preview(m)}</div>
         </div>
-        <TransitionSurface change={kind} className="materials-scroll">
-          {kind === 'vibe'
-            ? vibes
-                .filter((v) => v.name.toLowerCase().includes(query.toLowerCase()))
-                .map((v) => (
-                  <div className="material-row" key={v.id}>
-                    <button
-                      className="material-head"
-                      onClick={() => setExpanded(expanded === v.id ? '' : v.id)}
-                    >
-                      <b>{v.name}</b>
-                      <span className="nps-help">出自 {v.sources.length} 张图片</span>
-                    </button>
-                    <Collapse open={expanded === v.id}>
-                      <div className="material-body">
-                        <p className="nps-help">
-                          【文案待定：图片中只有 Vibe 编码，无法还原参考图】
-                        </p>
-                        {v.sources.map((s) => (
-                          <div className="material-source" key={s.id}>
-                            <img src={mediaUrl(s.thumbnail)} alt="来源图片" />
-                            <span>{s.name}</span>
-                          </div>
-                        ))}
+        {ex.length > 0 && (
+          <span
+            className={`mex-row ${peekIndex >= 0 ? 'peeking' : ''}`}
+            data-mexrow={m.id}
+            onPointerMove={onPeekMove(m.id, ex.length)}
+            onPointerLeave={onPeekLeave}
+          >
+            {ex.slice(0, ROW).map((e, i) => (
+              <img
+                key={e.id}
+                className={i === peekIndex ? 'cur' : ''}
+                src={e.thumb}
+                alt=""
+                draggable={false}
+              />
+            ))}
+            {ex.length > ROW && (
+              <span className={`mex-more mono ${peekIndex >= ROW ? 'cur' : ''}`}>
+                +{ex.length - ROW}
+              </span>
+            )}
+          </span>
+        )}
+        <span className="mrow-n">用过 {m.uses} 次</span>
+        <button
+          className={`btn quiet sm icon mmore ${menuOpen ? 'is-hover' : ''}`}
+          aria-label="更多"
+          aria-haspopup="menu"
+          onClick={(e) => {
+            e.stopPropagation();
+            const r = e.currentTarget.getBoundingClientRect();
+            onMenu([r.right, r.bottom + 4]);
+          }}
+        >
+          <Icon name="more-2-line" />
+        </button>
+      </div>
+      <div className={`expand ${open ? 'open' : ''}`}>
+        <div>
+          <div className="mrow-body">
+            {open && (
+              <>
+                {m.kind === 'character' ? (
+                  <>
+                    {m.blocks.map((b, i) => (
+                      <div className="mat-sub" key={i}>
+                        <div className="mat-sub-h">
+                          <span className="label">{b.type === 'tags' ? 'Tag 块' : '段落'}</span>
+                        </div>
+                        <MaterialContent m={{ ...m, blocks: [b] }} max={Infinity} />
                       </div>
-                    </Collapse>
-                  </div>
-                ))
-            : shown.map((x) => (
-                <div className="material-row" key={x.id} data-material-id={x.id}>
-                  <div
-                    className={`material-head ${expanded === x.id ? 'open' : ''}`}
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={expanded === x.id}
-                    onClick={() => setExpanded(expanded === x.id ? '' : x.id)}
-                    onKeyDown={(e) => {
-                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
-                        e.preventDefault();
-                        setExpanded(expanded === x.id ? '' : x.id);
-                      }
-                    }}
-                  >
-                    <div className="material-main">
-                      <div className="material-title">
-                        {rename === x.id ? (
-                          <Input
-                            autoFocus
-                            aria-label="素材名称"
-                            value={name}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setName(e.target.value)}
-                            onKeyDown={(e) => {
-                              e.stopPropagation();
-                              if (e.key === 'Enter') void saveName();
-                              if (e.key === 'Escape') setRename('');
-                            }}
-                            onBlur={() => void saveName()}
-                          />
-                        ) : (
-                          <b>{x.name}</b>
-                        )}
-                        <span className="material-type">
-                          {x.kind === 'character'
-                            ? `${x.blocks.length} 块${x.negativeBlocks?.length ? ` · 负面 ${x.negativeBlocks.reduce((n, b) => n + b.tags.length, 0)} 个 Tag` : ''}`
-                            : x.blocks[0]?.type === 'tags'
-                              ? `Tag 块 · ${x.blocks[0].tags.length} 个`
-                              : '段落'}
-                        </span>
+                    ))}
+                    <div className="mat-sub">
+                      <div className="mat-sub-h">
+                        <span className="label">负面提示词</span>
                       </div>
-                      <span className="material-preview">
-                        {x.blocks.map((b) => b.content).join('\n')}
-                      </span>
-                    </div>
-                    <MaterialExamples ids={x.examples.slice(0, 3)} />
-                    <span className="nps-help">用过 {x.uses} 次</span>
-                    <span onClick={(e) => e.stopPropagation()}>
-                      <Menu
-                        label="素材操作"
-                        trigger={<i className="ri-more-2-line" />}
-                        items={[
-                          {
-                            id: 'rename',
-                            label: '改名',
-                            onSelect: () => {
-                              setRename(x.id);
-                              setName(x.name);
-                            },
-                          },
-                          {
-                            id: 'delete',
-                            label: '删除',
-                            danger: true,
-                            onSelect: () => setDeleting(x),
-                          },
-                        ]}
-                      />
-                    </span>
-                  </div>
-                  <Collapse open={expanded === x.id}>
-                    <div className="material-body">
-                      <MaterialContent blocks={x.blocks} />
-                      {!!x.negativeBlocks?.length && (
-                        <>
-                          <b>负面提示词</b>
-                          <MaterialContent blocks={x.negativeBlocks} />
-                        </>
+                      {m.negativeBlocks?.some((b) => b.type !== 'tags' || b.tags.length) ? (
+                        <MaterialContent m={{ ...m, blocks: m.negativeBlocks }} max={Infinity} />
+                      ) : (
+                        <p className="help">没有 Tag</p>
                       )}
-                      <span className="nps-help">示例图片</span>
-                      <MaterialExamples ids={x.examples} expanded />
                     </div>
-                  </Collapse>
+                  </>
+                ) : (
+                  <MaterialContent m={m} max={Infinity} />
+                )}
+                <div className="mat-sub mat-ex">
+                  <div className="mat-ex-h">
+                    <span className="label">示例图片</span>
+                  </div>
+                  {ex.length ? (
+                    <div className="mat-ex-list">
+                      {ex.map((e) => (
+                        <span className="mat-ex-it" key={e.id}>
+                          <img
+                            src={e.thumb}
+                            alt=""
+                            draggable={false}
+                            data-tip="在图片库中查看"
+                            onClick={() => onShowImage?.(e.id)}
+                          />
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="help">暂无示例图片。</span>
+                  )}
                 </div>
-              ))}
-          {!(kind === 'vibe' ? vibes.length : shown.length) && (
-            <div className="material-body">
-              <h3>暂无{kind === 'block' ? '常用块' : kind === 'character' ? '角色' : 'Vibe'}</h3>
-              {kind !== 'vibe' && (
-                <p className="nps-help">
-                  在工作台中打开{kind === 'block' ? '块' : '角色'}的“更多”菜单，选择“存为
-                  {kind === 'block' ? '常用块' : '角色'}”，就可以在这里反复使用。
-                </p>
-              )}
-            </div>
-          )}
-        </TransitionSurface>
-        <footer className="material-count">
-          {kind === 'vibe' ? vibes.length : shown.length} 个
-          {kind === 'block' ? '常用块' : kind === 'character' ? '角色' : 'Vibe'}
-        </footer>
-      </section>
-      <Dialog
-        open={!!deleting}
-        title={`删除“${deleting?.name || ''}”？`}
-        cancelLabel="取消"
-        confirmLabel="删除"
-        destructive
-        onCancel={() => setDeleting(null)}
-        onConfirm={async () => {
-          try {
-            await invokeUI('material.delete', { id: deleting!.id });
-            setDeleting(null);
-            await reload();
-          } catch (e) {
-            notify({ text: (e as Error).message, tone: 'error' });
+                <div className="mat-acts">
+                  <span className="sp" />
+                  <button className="btn quiet sm" onClick={onCopy}>
+                    <Icon name="file-copy-line" />
+                    复制
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VibeRow({
+  v,
+  open,
+  onToggle,
+  onShowImage,
+}: {
+  v: Vibe;
+  open: boolean;
+  onToggle: () => void;
+  onShowImage?: (id: string) => void;
+}) {
+  const first = v.sources[0];
+  return (
+    <div className={`mrow ${open ? 'open' : ''}`} data-key={`mr-${v.id}`} data-flip="">
+      <div
+        className="mrow-h"
+        data-mat={v.id}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            onToggle();
           }
         }}
       >
-        <p>已经用过的提示词和图片不变。</p>
-      </Dialog>
-    </main>
+        {first && (
+          <span className="mrow-pic">
+            <img src={mediaUrl(first.thumbnail)} alt="" draggable={false} />
+          </span>
+        )}
+        <div className="mrow-main">
+          <div className="mrow-t">
+            <b className="mrow-name">{v.name}</b>
+            <span className="mtype">出自 {v.sources.length} 张图片</span>
+          </div>
+          <div className="mrow-pre">{v.sources.map((s) => s.name).join('、')}</div>
+        </div>
+      </div>
+      <div className={`expand ${open ? 'open' : ''}`}>
+        <div>
+          <div className="mrow-body">
+            {open && (
+              <>
+                <span className="help">
+                  图片里只保存了 Vibe 的编码，没有参考图本身。下面是用过它的图片。
+                </span>
+                <div className="mat-ex-list">
+                  {v.sources.map((s) => (
+                    <span className="mat-ex-it" key={s.id}>
+                      <img
+                        src={mediaUrl(s.thumbnail)}
+                        alt=""
+                        draggable={false}
+                        data-tip={`${s.name || '图片'} · 在图片库中查看`}
+                        onClick={() => onShowImage?.(s.id)}
+                      />
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
