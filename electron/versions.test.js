@@ -1,3 +1,4 @@
+import './fixtures/databaseTestBudget.js';
 import { describe, it, expect } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';

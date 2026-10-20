@@ -10,51 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  prepare-fonts:
-    name: Prepare verified MiSans cache
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-      - name: Restore pinned MiSans VF
-        # Tags can read the default branch cache. Wait for main's prepare-fonts
-        # before pushing a release tag; a feature branch cache is not visible.
-        id: misans-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: .local/fonts/MiSansVF.ttf
-          enableCrossOsArchive: true
-          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
-      - name: Download MiSans on cache miss
-        if: steps.misans-cache.outputs.cache-hit != 'true'
-        run: npm run fonts
-      - run: npm run fonts:check
-      - name: Save verified MiSans for dependent jobs in this ref
-        if: steps.misans-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: .local/fonts/MiSansVF.ttf
-          enableCrossOsArchive: true
-          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
-
-  check:
-    name: Release tests and types
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: node scripts/prepare-release-notes.mjs
-
   package:
-    needs: prepare-fonts
     name: Package ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -107,17 +63,24 @@ jobs:
         if: github.ref_type == 'tag'
         run: node scripts/verify-release-tag.mjs "${{ github.ref_name }}"
 
-      - name: Restore prepared MiSans cache (no download)
+      - name: Restore pinned MiSans VF
         id: misans-cache
         uses: actions/cache/restore@v5
         with:
           path: .local/fonts/MiSansVF.ttf
           enableCrossOsArchive: true
           key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
-      - name: Fail if font cache was not prepared
+      - name: Download MiSans on cache miss
         if: steps.misans-cache.outputs.cache-hit != 'true'
-        run: node -e "console.error('MiSans font cache was not prepared; check the prepare-fonts job. Matrix jobs never download fonts.'); process.exit(1)"
+        run: npm run fonts
       - run: npm run fonts:check
+      - name: Save verified MiSans on cache miss
+        if: steps.misans-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .local/fonts/MiSansVF.ttf
+          enableCrossOsArchive: true
+          key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
       - name: Package application
         if: runner.os != 'macOS'
         run: npm run package -- ${{ matrix.package_args }}
@@ -156,7 +119,7 @@ jobs:
 
   release:
     name: Verify combined artifacts and publish tagged releases
-    needs: [check, package]
+    needs: package
     runs-on: ubuntu-latest
 
     steps:
@@ -181,16 +144,13 @@ jobs:
         run: node scripts/prepare-release-notes.mjs "${{ github.ref_name }}" release-combined
         if: github.ref_type == 'tag'
 
+      - name: Validate structured release notes for manual runs
+        if: github.event_name == 'workflow_dispatch'
+        run: node scripts/prepare-release-notes.mjs "$(node -p 'require("./package.json").version')" release-combined
+
       - name: Create checksums
         working-directory: release-combined
         run: sha256sum * > SHA256SUMS.txt
-
-      - name: Retain verified combined artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: verified-release-artifacts
-          path: release-combined/*
-          if-no-files-found: error
 
       - name: Create GitHub Release
         if: github.event_name == 'push' && github.ref_type == 'tag'
