@@ -1,0 +1,19 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "1.2.0",
+  "date": "2026-10-20",
+  "items": [
+    { "kind": "new", "area": "gen", "title": "在软件里生成图片", "detail": "在“设置 → NovelAI 账号”里填入持久令牌后，改完提示词直接生成新的一版。生成前一直显示这次要花多少，请求一张接一张地发，生成的图自动存进图片库。", "highlight": true, "icon": "image" },
+    { "kind": "new", "area": "agent", "title": "Agent 与命令行", "detail": "提供命令行工具 nai-studio 和 Agent 技能，Claude Code、Codex 这类 Agent 可以读写提示词、整理图片库、排队生成。Agent 排的生成要你在标题栏确认后才发出。在“设置 → Agent”里安装。", "highlight": true, "icon": "terminal" },
+    { "kind": "new", "area": "gen", "title": "版本与分支", "detail": "每次生成自动记成一版；回到旧版本接着改会分出新分支。版本栏只显示你正在走的这条线，停在一版上可以看和上一版的完整对比。" },
+    { "kind": "new", "area": "gen", "title": "作为新作品打开", "detail": "改得够多时，从一张图另起一个作品，新旧两边可以互相跳。" },
+    { "kind": "new", "area": "wb", "title": "文本方式", "detail": "像 NovelAI 网页一样直接改整段文字，带补全、悬停译文、语法检查和按权重铺底色。按 Ctrl E 在按块和按文本之间切换。" },
+    { "kind": "new", "area": "lib", "title": "生成记录", "detail": "图片库侧栏列出软件生成的全部图片，最新的在前，每张写着是第几版。" },
+    { "kind": "improved", "area": "lib", "title": "按日期范围筛选", "detail": "导入时间改用月历选范围，也有今天、最近 7 天等快捷选项；有图片的日子带一个小点。" },
+    { "kind": "improved", "area": "lib", "title": "收藏集就地编辑", "detail": "收藏集就地新建和改名；智能收藏集可以编辑规则，网格实时预览。" },
+    { "kind": "improved", "area": "wb", "title": "角色和加一块", "detail": "新角色是空的，由你选加 Tag 块还是段落；指针移到两块之间可以加一块。" },
+    { "kind": "improved", "area": "set", "title": "翻译词典", "detail": "按分页签检查暂无译文、未分类、AI 翻译和改过的条目，在任意分页签里都能直接改。" },
+    { "kind": "improved", "area": "set", "title": "关于与更新", "detail": "直接显示分组的更新说明；快捷键按通用、工作台、图片库分组。" },
+    { "kind": "improved", "area": "app", "title": "清理旧数据表", "detail": "第一次打开 1.2 时先备份数据库，再删掉 1.0 之前留下、早已不用的旧数据表。图片、收藏集和译文都保留。", "icon": "shield" }
+  ]
+}
