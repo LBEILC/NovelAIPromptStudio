@@ -57,3 +57,15 @@ it('uses character and negative prefixes from the approved summary rules', () =>
   b.prompt_structure.characters[0].undesired_tags = parsePrompt('blurry');
   expect(oneLine(versionDiff(a, b))).toBe('角色 1 负面 +blurry');
 });
+it('pairs a repeated tag by occurrence instead of merging it by name', () => {
+  const same = '0.8::artist:kushima yu::, rain, 1.1::artist:kushima yu::';
+  expect(versionDiff(project(same), project(same)).empty).toBe(true);
+  expect(
+    diffSummary(
+      versionDiff(
+        project(same),
+        project('0.8::artist:kushima yu::, rain, 1.3::artist:kushima yu::'),
+      ),
+    ),
+  ).toBe('artist:kushima yu 1.1→1.3');
+});

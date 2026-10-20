@@ -12,7 +12,7 @@ import { useGeneration } from '../state/generation';
 import { Icon } from '../kit/controls';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
 import { Pop } from '../kit/layer';
-import { dur, easeMove, useExitList, useIndicator } from '../kit/motion';
+import { FlipScope, dur, useExitList, useIndicator } from '../kit/motion';
 import { blockTips } from '../kit/tip';
 import type { WorkbenchSession, WorkbenchTab } from '../state/workbench';
 
@@ -50,7 +50,21 @@ export function WorkbenchTabs(p: TabsProps) {
   const [overflow, setOverflow] = useState(false);
   const peekTimer = useRef(0);
   const tabs = useExitList(p.session.tabs, (t) => t.id);
-  useIndicator(list, [p.session.activeTabId, p.session.tabs.length, counts]);
+  // 关掉的那一个淡出、真正拿掉以后其他的补位，当前标记跟着重新对位
+  useIndicator(list, [
+    p.session.activeTabId,
+    tabs.map((t) => t.key).join('|'),
+    p.session.tabs.map((t) => t.id).join('|'),
+    counts,
+  ]);
+  // 拖动中：被拖的那一个停在指针的位置（换位以后它在 DOM 里的位置变了，要按新的位置重算）
+  const drag = useRef<{ id: string; want: number } | null>(null);
+  useLayoutEffect(() => {
+    const d = drag.current,
+      me = d && list.current?.querySelector<HTMLElement>(`[data-tab="${d.id}"]`);
+    if (d && me)
+      me.style.transform = `translateX(${d.want - me.offsetLeft}px) scale(var(--drag-scale))`;
+  });
   // 版数（有账号时才有版本）
   const revisions = p.session.tabs.map((t) => `${t.id}:${t.revision}`).join('|');
   useEffect(() => {
@@ -144,23 +158,9 @@ export function WorkbenchTabs(p: TabsProps) {
         gap,
         want,
       );
-      if (ids[slot] !== press.id) {
-        const before = new Map(ids.map((id) => [id, el(id)!.getBoundingClientRect().left]));
-        latest.current.onReorderTab(press.id, ids[slot]);
-        requestAnimationFrame(() => {
-          for (const id of ids) {
-            if (id === press?.id) continue;
-            const n = el(id);
-            if (!n) continue;
-            const dx = before.get(id)! - n.getBoundingClientRect().left;
-            if (Math.abs(dx) > 0.5 && dur(3))
-              n.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], {
-                duration: dur(3),
-                easing: easeMove(),
-              });
-          }
-        });
-      }
+      drag.current = { id: press.id, want };
+      // 换位：其他标签页由 FlipScope 让位（被拖的那一个不参与）
+      if (ids[slot] !== press.id) latest.current.onReorderTab(press.id, ids[slot]);
       me.style.transition = 'box-shadow var(--dur-1) var(--ease-out)';
       me.style.transform = `translateX(${want - me.offsetLeft}px) scale(var(--drag-scale))`;
       const ind = box.querySelector<HTMLElement>(':scope > .ind');
@@ -170,6 +170,7 @@ export function WorkbenchTabs(p: TabsProps) {
       }
     };
     const up = () => {
+      drag.current = null;
       if (press?.on) {
         swallow = true;
         const me = el(press.id);
@@ -308,71 +309,75 @@ export function WorkbenchTabs(p: TabsProps) {
         }}
       >
         <i className="ind" />
-        {tabs.map(({ item: t, leaving }) => {
-          const img = t.project;
-          const name = img && hasImageName(img) ? img.name : '';
-          const on = t.id === p.session.activeTabId;
-          const busy = generation.jobs.some((j) => j.tabId === t.id && j.state === 'generating');
-          const dirty = workbenchTabHasChanges(t);
-          return (
-            <button
-              key={t.id}
-              data-tab={t.id}
-              className={`tab ${name ? '' : 'bare'} ${on ? 'on' : ''} ${lifted === t.id ? 'lifted' : ''} ${leaving ? 'leaving' : ''}`}
-              role="tab"
-              aria-selected={on}
-              aria-label={name || (img ? imageFileName(img) : '没有起名')}
-              tabIndex={on ? 0 : -1}
-              data-enter="fade"
-              data-no-tip=""
-              onClick={() => p.onActivateTab(t.id)}
-              onMouseDown={(e) => e.button === 1 && e.preventDefault()}
-              onAuxClick={(e) => {
-                if (e.button !== 1) return;
-                e.preventDefault();
-                void p.onCloseTab(t.id);
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setPeek('');
-                setMenu({ at: [e.clientX, e.clientY], tab: t });
-              }}
-              onPointerEnter={() => {
-                clearTimeout(peekTimer.current);
-                if (dragging) return;
-                if (peek) setPeek(t.id);
-                else peekTimer.current = window.setTimeout(() => setPeek(t.id), 400);
-              }}
-              onPointerLeave={() => {
-                clearTimeout(peekTimer.current);
-                peekTimer.current = window.setTimeout(() => setPeek(''), 80);
-              }}
-              onPointerDown={() => {
-                clearTimeout(peekTimer.current);
-                setPeek('');
-              }}
-            >
-              {on && <span className="cur" />}
-              <img
-                className={shapeOf(img?.metadata.width, img?.metadata.height)}
-                src={mediaUrl(img?.thumbnail_path || img?.image_path || '')}
-                alt=""
-                draggable={false}
-              />
-              {name && (
-                <>
-                  <span className="nm">{name}</span>
-                  {counts[t.id] != null && <span className="n mono">{counts[t.id]} 版</span>}
-                </>
-              )}
-              {busy ? (
-                <span className="dirty busy" aria-label="生成中" />
-              ) : dirty ? (
-                <span className="dirty" aria-label="有未生成的改动" />
-              ) : null}
-            </button>
-          );
-        })}
+        <FlipScope root={list}>
+          {tabs.map(({ item: t, leaving }) => {
+            const img = t.project;
+            const name = img && hasImageName(img) ? img.name : '';
+            const on = t.id === p.session.activeTabId;
+            const busy = generation.jobs.some((j) => j.tabId === t.id && j.state === 'generating');
+            const dirty = workbenchTabHasChanges(t);
+            return (
+              <button
+                key={t.id}
+                data-tab={t.id}
+                data-key={`tab-${t.id}`}
+                data-flip={lifted === t.id ? undefined : ''}
+                className={`tab ${name ? '' : 'bare'} ${on ? 'on' : ''} ${lifted === t.id ? 'lifted' : ''} ${leaving ? 'leaving' : ''}`}
+                role="tab"
+                aria-selected={on}
+                aria-label={name || (img ? imageFileName(img) : '没有起名')}
+                tabIndex={on ? 0 : -1}
+                data-enter="fade"
+                data-no-tip=""
+                onClick={() => p.onActivateTab(t.id)}
+                onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+                onAuxClick={(e) => {
+                  if (e.button !== 1) return;
+                  e.preventDefault();
+                  void p.onCloseTab(t.id);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setPeek('');
+                  setMenu({ at: [e.clientX, e.clientY], tab: t });
+                }}
+                onPointerEnter={() => {
+                  clearTimeout(peekTimer.current);
+                  if (dragging) return;
+                  if (peek) setPeek(t.id);
+                  else peekTimer.current = window.setTimeout(() => setPeek(t.id), 400);
+                }}
+                onPointerLeave={() => {
+                  clearTimeout(peekTimer.current);
+                  peekTimer.current = window.setTimeout(() => setPeek(''), 80);
+                }}
+                onPointerDown={() => {
+                  clearTimeout(peekTimer.current);
+                  setPeek('');
+                }}
+              >
+                {on && <span className="cur" />}
+                <img
+                  className={shapeOf(img?.metadata.width, img?.metadata.height)}
+                  src={mediaUrl(img?.thumbnail_path || img?.image_path || '')}
+                  alt=""
+                  draggable={false}
+                />
+                {name && (
+                  <>
+                    <span className="nm">{name}</span>
+                    {counts[t.id] != null && <span className="n mono">{counts[t.id]} 版</span>}
+                  </>
+                )}
+                {busy ? (
+                  <span className="dirty busy" aria-label="生成中" />
+                ) : dirty ? (
+                  <span className="dirty" aria-label="有未生成的改动" />
+                ) : null}
+              </button>
+            );
+          })}
+        </FlipScope>
       </div>
       {overflow && (
         <button

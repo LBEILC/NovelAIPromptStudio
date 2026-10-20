@@ -97,7 +97,7 @@ button { font: inherit; color: inherit; cursor: default; }
 .scroll { flex: 1 1 auto; min-height: 0; overflow: auto; scrollbar-width: none; }
 .scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
 /* 自绘滚动条：浮在内容上面，平时看不见，滚动或指针进入滚动区域时出现 */
-.sb-layer { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
+.sb-layer { position: fixed; inset: 0; pointer-events: none; z-index: 15; }
 .sb { position: absolute; top: 0; left: 0; width: var(--sb-w); border-radius: 999px; background: var(--border); opacity: 0; pointer-events: auto; transition: opacity var(--dur-2) var(--ease-out), width var(--dur-1), margin var(--dur-1), background-color var(--dur-1); }
 .sb.show { opacity: 1; }
 .sb:hover, .sb.drag { width: var(--sb-w-hover); margin-left: calc(var(--sb-w) - var(--sb-w-hover)); background: var(--text-3); opacity: 1; }

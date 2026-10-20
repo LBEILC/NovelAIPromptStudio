@@ -27,6 +27,23 @@ export type MenuEntry =
 const isItem = (e: MenuEntry): e is Exclude<MenuEntry, 'sep' | { header: ReactNode }> =>
   e !== 'sep' && !('header' in e);
 const usable = (e: MenuEntry) => isItem(e) && !e.disabled;
+/** 子菜单放进窗口里：右边放不下就翻到左边，下面放不下就往上挪 */
+function fitSub(item: HTMLElement) {
+  const sub = item.querySelector<HTMLElement>(':scope > .submenu');
+  const win = item.closest('.win') || document.documentElement;
+  if (!sub) return { left: false, up: 0 };
+  const wr = win.getBoundingClientRect(),
+    r = item.getBoundingClientRect(),
+    edge = 8,
+    gap = 4;
+  const left =
+    r.right + gap + sub.offsetWidth + edge > wr.right &&
+    r.left - gap - sub.offsetWidth - edge >= wr.left;
+  // 子菜单默认和这一项的顶边对齐（往上 --sp-1）；下面放不下就往上挪
+  const top = r.top - gap;
+  const over = top + sub.offsetHeight + edge - wr.bottom;
+  return { left, up: over > 0 ? Math.min(over, top - wr.top - edge) : 0 };
+}
 
 export function MenuItems({
   items,
@@ -40,9 +57,18 @@ export function MenuItems({
   const box = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(-1);
   const [subOpen, setSubOpen] = useState(-1);
+  const [fit, setFit] = useState<{ i: number; left: boolean; up: number }>({
+    i: -1,
+    left: false,
+    up: 0,
+  });
   useEffect(() => {
     if (autoFocus) focusQuietly(box.current);
   }, []);
+  useEffect(() => {
+    const el = subOpen >= 0 && box.current?.children[subOpen];
+    if (el instanceof HTMLElement) setFit({ i: subOpen, ...fitSub(el) });
+  }, [subOpen]);
   const move = (d: number) => {
     let i = active;
     for (let n = 0; n < items.length; n++) {
@@ -102,13 +128,14 @@ export function MenuItems({
         return (
           <div
             key={i}
-            className={`mi ${e.danger ? 'danger' : ''} ${e.disabled ? 'off' : ''} ${i === active ? 'on' : ''} ${e.sub ? 'sub' : ''} ${subOpen === i ? 'open' : ''} ${e.className || ''}`}
+            className={`mi ${e.danger ? 'danger' : ''} ${e.disabled ? 'off' : ''} ${i === active ? 'on' : ''} ${e.sub ? 'sub' : ''} ${subOpen === i ? 'open' : ''} ${fit.i === i && fit.left ? 'left' : ''} ${e.className || ''}`}
             role="menuitem"
             aria-disabled={e.disabled ? true : undefined}
             data-tip={typeof e.disabled === 'string' ? e.disabled : undefined}
-            onPointerEnter={() => {
+            onPointerEnter={(ev) => {
               setActive(usable(e) ? i : -1);
               setSubOpen(-1);
+              if (e.sub) setFit({ i, ...fitSub(ev.currentTarget) });
             }}
             onPointerLeave={() => setActive(-1)}
             onClick={(ev) => {
@@ -131,7 +158,10 @@ export function MenuItems({
               </span>
             )}
             {e.sub && (
-              <div className="menu submenu">
+              <div
+                className="menu submenu"
+                style={fit.i === i && fit.up ? { marginTop: -fit.up } : undefined}
+              >
                 <MenuItems
                   items={e.sub}
                   autoFocus={subOpen === i}

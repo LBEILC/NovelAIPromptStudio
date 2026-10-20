@@ -75,7 +75,13 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     storage: 'nps.versions-width',
     label: '版本栏宽度',
   });
-  const [versions, setVersions] = useState<WorkVersion[]>([]);
+  const [loaded, setLoaded] = useState<{ tab: string; versions: WorkVersion[] }>({
+    tab: '',
+    versions: [],
+  });
+  // 切标签页时还没读到新的之前，先照旧显示，但不拿上一个标签页的版本算"未生成"
+  const versions = loaded.versions;
+  const stale = loaded.tab !== tab.id;
   const [origin, setOrigin] = useState<WorkOrigin | null>(null);
   const [derived, setDerived] = useState<{ workId: string; source: WorkOrigin }[]>([]);
   const [open, setOpen] = useState<string[]>([]);
@@ -105,7 +111,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
       .then(() => invokeUI('version.list', { tabId: tab.id }))
       .then((r) => {
         if (!live) return;
-        setVersions(r.versions);
+        setLoaded({ tab: tab.id, versions: r.versions });
         setOrigin(r.origin);
         setDerived(r.derived);
       })
@@ -201,7 +207,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
   const appending =
     job && versionDiff(byId(job.parentId)?.project || job.project, job.project).empty;
   const pending = jobs.filter((j) => j.state === 'pending');
-  const draft = current && tab.project ? versionDiff(current.project, tab.project) : null;
+  const draft = !stale && current && tab.project ? versionDiff(current.project, tab.project) : null;
   const rowW = (rz.width || ms('--versions-w')) - 32;
   const ratio = (v: WorkVersion) =>
     Math.max(

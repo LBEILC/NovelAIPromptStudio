@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import zlib from 'node:zlib';
 import { createServer } from 'vite';
 import react from '@vitejs/plugin-react';
 import { bundledMiSans } from '../scripts/font-vite.mjs';
@@ -61,7 +62,58 @@ function validatePaths(value, key = '') {
   else if (value && typeof value === 'object')
     for (const [k, v] of Object.entries(value)) validatePaths(v, k);
 }
+// 外框上的"导入 · 压缩包"：临时打一个不压缩的 ZIP。6 张演示图末尾多几个字节（算新图），3 张原样（图片库里已有）
+function previewZip() {
+  const entries = images.slice(0, 9).map((file, i) => {
+    let data = fs.readFileSync(file);
+    if (i < 6) data = Buffer.concat([data, Buffer.from(`preview-${Date.now()}-${i}`)]);
+    return { name: `雨天合集/${path.basename(file)}`, data };
+  });
+  const local = [],
+    central = [];
+  let offset = 0;
+  for (const { name, data } of entries) {
+    const nameBuf = Buffer.from(name, 'utf8'),
+      crc = zlib.crc32(data);
+    const head = Buffer.alloc(30);
+    head.writeUInt32LE(0x04034b50, 0);
+    head.writeUInt16LE(20, 4);
+    head.writeUInt16LE(0x0800, 6);
+    head.writeUInt32LE(crc, 14);
+    head.writeUInt32LE(data.length, 18);
+    head.writeUInt32LE(data.length, 22);
+    head.writeUInt16LE(nameBuf.length, 26);
+    local.push(head, nameBuf, data);
+    const dir = Buffer.alloc(46);
+    dir.writeUInt32LE(0x02014b50, 0);
+    dir.writeUInt16LE(20, 4);
+    dir.writeUInt16LE(20, 6);
+    dir.writeUInt16LE(0x0800, 8);
+    dir.writeUInt32LE(crc, 16);
+    dir.writeUInt32LE(data.length, 20);
+    dir.writeUInt32LE(data.length, 24);
+    dir.writeUInt16LE(nameBuf.length, 28);
+    dir.writeUInt32LE(offset, 42);
+    central.push(dir, nameBuf);
+    offset += 30 + nameBuf.length + data.length;
+  }
+  const dirSize = central.reduce((n, b) => n + b.length, 0);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(dirSize, 12);
+  end.writeUInt32LE(offset, 16);
+  const out = path.join(session.directory, `雨天合集-${Date.now()}.zip`);
+  fs.writeFileSync(out, Buffer.concat([...local, ...central, end]));
+  return out;
+}
 async function scenario({ action, value }) {
+  if (action === 'zip') {
+    const file = previewZip();
+    session.allowedPath(file);
+    return { path: file };
+  }
   if (action === 'reset' || action === 'empty') {
     emit({ type: 'preview-reset-start' });
     resetting = true;

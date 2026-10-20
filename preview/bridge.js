@@ -34,6 +34,8 @@ async function request(endpoint, data) {
   if (!res.ok) throw Error(result.error);
   return result;
 }
+// 外框上的"导入 · 压缩包"：下一次打开文件时直接用后台打好的 ZIP，不弹选择框
+let nextPick = null;
 function chooseFiles(multiple) {
   return new Promise((resolve) => {
     const input = document.createElement('input');
@@ -93,6 +95,11 @@ window.studio = {
         !input.fromClipboard) ||
       (name === 'workbench.open' && !input.path && !input.source && !input.libraryId)
     ) {
+      if (nextPick && name !== 'workbench.open') {
+        input = { ...input, paths: nextPick };
+        nextPick = null;
+        return request('invoke', { name, input: await resolveUploads(input) });
+      }
       const selected = await chooseFiles(name !== 'workbench.open');
       if (!selected.length)
         return {
@@ -320,7 +327,21 @@ group('更新', [
   ['有新版本', act('update', true)],
   ['已是最新', act('update', false)],
 ]);
+const importZip = async () => {
+  const r = await request('scenario', { action: 'zip' });
+  nextPick = [r.path];
+  [...document.querySelectorAll('.tb .nav button')]
+    .find((b) => b.textContent === '图片库')
+    ?.click();
+  await new Promise((done) => setTimeout(done, 400));
+  const button = [...document.querySelectorAll('.libp .btn.ink')].find(
+    (b) => b.textContent.trim() === '导入',
+  );
+  if (!button) throw Error('先关掉浮层和对话框');
+  button.click();
+};
 group('导入', [
+  ['压缩包', importZip],
   ['变慢', act('slow-import', true)],
   ['恢复速度', act('slow-import', false)],
 ]);

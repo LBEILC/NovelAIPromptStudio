@@ -126,3 +126,12 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 .matp .mat-col { flex: 1 1 0; }
 .mrow-pre .prose-pre { white-space: pre-line; }
 .mat-ex-it img[data-tip] { cursor: pointer; }
+
+/* "加一块"：按钮条比间隙高，没出现时不接指针，免得挡住上下的 Tag */
+.blk-gap .add-blks { pointer-events: none; }
+.blk-gap:hover .add-blks, .blk-gap .add-blks:focus-within, .blk-gap:has(.is-hover) .add-blks { pointer-events: auto; }
+
+/* Seed 的小浮层（底栏最窄时）：上面随机 / 固定，下面数值 */
+.popover.seed-pop { width: calc(var(--popover-w) * 0.75); gap: var(--sp-2); }
+.popover.seed-pop .frow { display: grid; grid-template-columns: 44px 1fr; align-items: center; }
+.popover.seed-pop .field { width: 100%; }

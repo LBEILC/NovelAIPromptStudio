@@ -1,10 +1,10 @@
 // 提示词栏底部的底栏（doc/design.md 2.23）：Seed、尺寸、张数、费用、"生成"。放不下时按顺序收起（src/styles/07-core.css 的 @container），
 // "生成"永远完整。生成中左边换成"生成中 2 / 3 · 已消耗 N Anlas"，"生成"换成不可点的"生成中"，旁边"停止"。
 // 不在免费范围时上面一条横幅说清原因和要花多少，右边一键改回免费尺寸。没有配置账号时只有"生成"，点了引导去设置。
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGeneration } from '../state/generation';
 import { invokeUI } from '../lib/commands';
-import { Icon, Kbd } from '../kit/controls';
+import { Icon, Kbd, Seg } from '../kit/controls';
 import { Pop } from '../kit/layer';
 import { MenuPop } from '../kit/menu';
 import { useNotifications } from '../kit/toast';
@@ -77,6 +77,10 @@ export function GenerationBar({
   const [continuous, setContinuous] = useState(false);
   const [seed, setSeed] = useState<number | null>(null);
   const [seedText, setSeedText] = useState<string | null>(null);
+  // 底栏最窄时 Seed 只剩一个图标：点开一个小浮层，在里面切随机 / 固定、输入数值
+  const [seedPop, setSeedPop] = useState(false);
+  const [seedDraft, setSeedDraft] = useState('');
+  const seedBtn = useRef<HTMLButtonElement>(null);
   const [estimate, setEstimate] = useState<GenerationEstimate | null>(null);
   const [sizeMenu, setSizeMenu] = useState(false);
   const [custom, setCustom] = useState<{ w: string; h: string } | null>(null);
@@ -151,6 +155,15 @@ export function GenerationBar({
       else notify({ text: 'Seed 只能是 0 到 4294967295 的整数', tone: 'error' });
     }
     setSeedText(null);
+  };
+  const saveSeedDraft = () => {
+    const v = seedDraft.trim();
+    if (!v) setSeed(null);
+    else if (/^\d+$/.test(v) && Number(v) <= 4294967295) setSeed(Number(v));
+    else {
+      notify({ text: 'Seed 只能是 0 到 4294967295 的整数', tone: 'error' });
+      setSeedDraft(seed === null ? '' : String(seed));
+    }
   };
   const go = async () => {
     if (proposal) {
@@ -296,14 +309,35 @@ export function GenerationBar({
                     </button>
                   )}
                   <button
-                    className="seed-t"
+                    ref={seedBtn}
+                    className={`seed-t ${seedPop ? 'is-hover' : ''}`}
                     aria-label={seed === null ? '固定 Seed' : '改为随机'}
                     data-tip={
-                      seed === null
-                        ? 'Seed 随机 · 点击固定为上一张图的 Seed'
-                        : `Seed ${seed} · 点击改为随机`
+                      seedPop
+                        ? undefined
+                        : seed === null
+                          ? 'Seed 随机 · 点击固定为上一张图的 Seed'
+                          : `Seed ${seed} · 点击改为随机`
                     }
-                    onClick={() => {
+                    onPointerEnter={(e) => {
+                      // 数值收起来了的时候，点它是打开浮层
+                      const val = e.currentTarget.parentElement?.querySelector('.seed-val');
+                      if (seedPop) return;
+                      e.currentTarget.dataset.tip =
+                        val && getComputedStyle(val).display === 'none'
+                          ? `Seed ${seed ?? '随机'} · 点击修改`
+                          : seed === null
+                            ? 'Seed 随机 · 点击固定为上一张图的 Seed'
+                            : `Seed ${seed} · 点击改为随机`;
+                    }}
+                    onClick={(e) => {
+                      // 数值收起来了（最窄的时候）：打开浮层，不直接切换
+                      const val = e.currentTarget.parentElement?.querySelector('.seed-val');
+                      if (val && getComputedStyle(val).display === 'none') {
+                        setSeedDraft(seed === null ? '' : String(seed));
+                        setSeedPop(!seedPop);
+                        return;
+                      }
                       setSeedText(null);
                       setSeed(seed === null ? Number(m?.seed || 0) : null);
                     }}
@@ -311,6 +345,61 @@ export function GenerationBar({
                     <Icon name={seed === null ? 'shuffle-line' : 'lock-line'} />
                   </button>
                 </span>
+                <Pop
+                  open={seedPop}
+                  onClose={() => {
+                    saveSeedDraft();
+                    setSeedPop(false);
+                  }}
+                  anchor={seedBtn}
+                  trigger={seedBtn}
+                  place="above-left"
+                  enter="pop-up"
+                  className="popover seed-pop"
+                  label="Seed"
+                  restoreFocus
+                >
+                  <div className="frow">
+                    <span className="label">Seed</span>
+                    <Seg
+                      label="Seed"
+                      items={[
+                        ['rand', '随机'],
+                        ['fixed', '固定'],
+                      ]}
+                      value={seed === null ? 'rand' : 'fixed'}
+                      onChange={(k) => {
+                        const next = k === 'rand' ? null : Number(m?.seed || 0);
+                        setSeed(next);
+                        setSeedDraft(next === null ? '' : String(next));
+                      }}
+                    />
+                  </div>
+                  <label className="field sm mono">
+                    <input
+                      autoFocus
+                      inputMode="numeric"
+                      value={seedDraft}
+                      placeholder="随机"
+                      aria-label="Seed 数值"
+                      autoComplete="off"
+                      spellCheck={false}
+                      onChange={(e) => setSeedDraft(e.target.value)}
+                      onBlur={saveSeedDraft}
+                      onKeyDown={(e) => {
+                        if (e.nativeEvent.isComposing) return;
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          saveSeedDraft();
+                          setSeedPop(false);
+                        }
+                      }}
+                    />
+                  </label>
+                  <span className="help">
+                    固定时用这里的数值，清空就是随机。只收 0 到 4294967295 的整数。
+                  </span>
+                </Pop>
                 <button
                   className="field sm size-btn"
                   data-trigger="size"

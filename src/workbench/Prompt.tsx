@@ -94,6 +94,16 @@ const syntaxNote = (t: DocumentTag['tag']) =>
       ? '多余的 :: 结束符；前面没有强调时相当于权重 1'
       : '';
 const blockKey = (si: number, bi: number) => `${si}:${bi}`;
+// Tag 的标识里有空字符，CSS.escape 会把它换掉，不能拼进选择器；按属性值逐个比对
+const findTag = (root: ParentNode | null | undefined, key: string) =>
+  [...(root?.querySelectorAll<HTMLElement>('[data-tag-key]') || [])].find(
+    (el) => el.dataset.tagKey === key,
+  ) || null;
+const tagRef = (key: string) => ({
+  get current() {
+    return findTag(document.querySelector('.col.prompt'), key);
+  },
+});
 
 export function WorkbenchEditor(p: EditorProps) {
   const notify = useNotifications();
@@ -840,9 +850,7 @@ export function WorkbenchEditor(p: EditorProps) {
     if (!drag || !float.current) return;
     const el = float.current;
     if (!el.style.left) {
-      const src = scroll.current?.querySelector<HTMLElement>(
-        `[data-tag-key="${CSS.escape(drag.keys[0])}"]`,
-      );
+      const src = findTag(scroll.current, drag.keys[0]);
       const r = src?.getBoundingClientRect();
       if (r) {
         el.style.left = `${r.left}px`;
@@ -1081,6 +1089,59 @@ export function WorkbenchEditor(p: EditorProps) {
     if (!menu) setOpenMenuKey('');
   }, [menu]);
 
+  /** 角色的标题行：名字（点击重命名）、块数、复制和更多（按块、按文本两种方式共用） */
+  const charTitle = (c: (typeof chars)[number], si: number) => (
+    <div className="sec-h char-h">
+      {renaming?.id === c.id ? (
+        <>
+          <label className="field sm is-focus char-name">
+            <input
+              autoFocus
+              value={renaming.name}
+              aria-label="角色名称"
+              onChange={(e) => setRenaming({ ...renaming, name: e.target.value })}
+              onBlur={() => {
+                if (renaming.name.trim() && renaming.name.trim() !== c.label)
+                  update(
+                    updatePromptCharacter(p.project, c.id, {
+                      label: renaming.name.trim(),
+                    }),
+                  );
+                setRenaming(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return;
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                if (e.key === 'Escape') {
+                  e.stopPropagation();
+                  setRenaming(null);
+                }
+              }}
+            />
+          </label>
+          <span className="help key-hint">
+            <Kbd keys="Enter" />
+            <span>保存</span>
+          </span>
+        </>
+      ) : (
+        <>
+          <span
+            role="button"
+            data-tip="点击重命名"
+            onClick={() => setRenaming({ id: c.id, name: c.label })}
+          >
+            {c.label}
+          </span>
+          <span className="muted">{doc.scopes[si].blocks.length} 块</span>
+        </>
+      )}
+      <span className="acts" style={{ marginLeft: 'auto' }}>
+        {secCopy(si, c.label)}
+        {acts(() => charMenu(si), '这个角色的操作', `char-${c.id}`)}
+      </span>
+    </div>
+  );
   // ---------- 一块 ----------
   const blockEl = (si: number, bi: number, b: PromptBlock, negative: boolean) => {
     const key = blockKey(si, bi);
@@ -1427,56 +1488,7 @@ export function WorkbenchEditor(p: EditorProps) {
           >
             {polarity !== 'undesired' && si >= 0 && (
               <>
-                <div className="sec-h char-h">
-                  {renaming?.id === c.id ? (
-                    <>
-                      <label className="field sm is-focus char-name">
-                        <input
-                          autoFocus
-                          value={renaming.name}
-                          aria-label="角色名称"
-                          onChange={(e) => setRenaming({ ...renaming, name: e.target.value })}
-                          onBlur={() => {
-                            if (renaming.name.trim() && renaming.name.trim() !== c.label)
-                              update(
-                                updatePromptCharacter(p.project, c.id, {
-                                  label: renaming.name.trim(),
-                                }),
-                              );
-                            setRenaming(null);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.nativeEvent.isComposing) return;
-                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                            if (e.key === 'Escape') {
-                              e.stopPropagation();
-                              setRenaming(null);
-                            }
-                          }}
-                        />
-                      </label>
-                      <span className="help key-hint">
-                        <Kbd keys="Enter" />
-                        <span>保存</span>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span
-                        role="button"
-                        data-tip="点击重命名"
-                        onClick={() => setRenaming({ id: c.id, name: c.label })}
-                      >
-                        {c.label}
-                      </span>
-                      <span className="muted">{doc.scopes[si].blocks.length} 块</span>
-                    </>
-                  )}
-                  <span className="acts" style={{ marginLeft: 'auto' }}>
-                    {secCopy(si, c.label)}
-                    {acts(() => charMenu(si), '这个角色的操作', `char-${c.id}`)}
-                  </span>
-                </div>
+                {charTitle(c, si)}
                 {doc.scopes[si].blocks.length ? (
                   blocksOf(si)
                 ) : (
@@ -1607,7 +1619,7 @@ export function WorkbenchEditor(p: EditorProps) {
       </div>
       {charScopes.map(({ c, si, ni }) => (
         <div className="char-sec" key={`tch-${c.id}`}>
-          <div className="sec-h char-h">{c.label}</div>
+          {si >= 0 ? charTitle(c, si) : <div className="sec-h char-h">{c.label}</div>}
           {si >= 0 && textBox(si, c.label)}
           {ni >= 0 && (
             <>
@@ -1839,8 +1851,8 @@ export function WorkbenchEditor(p: EditorProps) {
       <Pop
         open={!!editing}
         onClose={commitEditor}
-        anchor={editing ? `[data-tag-key="${CSS.escape(editing.key)}"]` : undefined}
-        trigger={editing ? `[data-tag-key="${CSS.escape(editing.key)}"]` : undefined}
+        anchor={editing ? tagRef(editing.key) : undefined}
+        trigger={editing ? tagRef(editing.key) : undefined}
         className="popover tag-pop"
         label="编辑 Tag"
         deps={[editing?.key]}

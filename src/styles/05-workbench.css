@@ -19,7 +19,6 @@
 .tag.input .caret { width: var(--bw); height: var(--lh-small); background: var(--text); margin-left: var(--sp-0); }
 .tags + .help { margin-top: var(--sp-2); }
 .tag.sel .w, .tag.sel .en { color: var(--text); }
-.tag.editing { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
 
 /* NovelAI 自动添加的内容：一行说明，默认收起 */
 .auto { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0 0; padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3); border: var(--bw) dashed var(--border); border-radius: var(--r-ctl); color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small); }

@@ -242,16 +242,31 @@ export function useIndicator(box: RefObject<HTMLElement | null>, deps: unknown[]
       }
     };
     place();
+  }, deps);
+  // 大小变了（窗口、字体）时直接到位，不滑。只建一次：新建的监听会马上回调一次，会打断刚开始的滑动
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    let size = '';
     const ro = new ResizeObserver(() => {
+      const next = `${el.offsetWidth}x${el.offsetHeight}`;
+      if (next === size) return;
+      const first = !size;
+      size = next;
+      if (first) return;
       const ind = el.querySelector<HTMLElement>(':scope > .ind');
-      ind?.classList.add('jump');
-      place();
-      ind?.getBoundingClientRect();
-      ind?.classList.remove('jump');
+      const on = el.querySelector<HTMLElement>(':scope > .on, :scope > [aria-current="page"]');
+      if (!ind || !on) return;
+      ind.classList.add('jump');
+      ind.style.width = `${on.offsetWidth}px`;
+      ind.style.height = `${on.offsetHeight}px`;
+      ind.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
+      ind.getBoundingClientRect();
+      ind.classList.remove('jump');
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, deps);
+  }, []);
 }
 
 /** 换内容（2.17）：key 变了时旧的淡出、新的淡入。返回当前和正在离开的两份。 */

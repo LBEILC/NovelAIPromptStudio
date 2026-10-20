@@ -60,7 +60,8 @@ export function TextSection({
     setValue(text);
   }, [text]);
   useEffect(() => {
-    const flush = () => flushSync(() => commitRef.current());
+    // 只有真的有没存的文字时才同步提交（多数时候没有，免得在 React 的生命周期里调 flushSync）
+    const flush = () => pending.current !== null && flushSync(() => commitRef.current());
     window.addEventListener('nps:flush-text', flush);
     return () => {
       window.removeEventListener('nps:flush-text', flush);
