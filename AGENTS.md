@@ -30,6 +30,8 @@ NovelAI Prompt Studio is a cross-platform desktop application. Windows and macOS
 
 Interactive behavior is verified by automated acceptance scripts, not by manual checklists. See `doc/automated-acceptance.md`.
 
+For the separate browser UI preview with temporary demo data and local fake services, see `doc/ui-preview.md`.
+
 - The acceptance harness launches the real application (built, not the dev server) in an isolated temporary profile with demo data, drives it from Electron's main process, and asserts the result of every step: DOM-level actions through `webContents.executeJavaScript`, Electron APIs for windows, menus and native theme, and the Chrome DevTools Protocol for emulation and font checks.
 - Every check has a readable label and a single boolean assertion; a failed check fails the command. Checks cover user-visible flows (final state only), data safety (delete, recycle bin, backup, migration), command and Agent permission boundaries, and that the packaged app starts. Visual details — hover and pressed states, focus rings, transitions and animation timing, pixel layout — are not asserted: the interactive prototype is the reference, and they are reviewed against it from the screenshots taken in each run.
 - During a change, run only the affected categories locally; the full suite runs in CI on push.
