@@ -396,9 +396,11 @@ export async function workbenchInteractionChecks(env) {
     await library(h, 'workbench-interaction-fixture');
     for (const [index, record] of records.slice(0, 2).entries()) {
       await wait(`!!document.querySelector('[data-project-id="${record.id}"]')`);
-      await e(
-        `document.querySelector('[data-project-id="${record.id}"]').click();document.querySelector('[data-library-grid]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`,
+      await e(`document.querySelector('[data-project-id="${record.id}"]').click()`);
+      await wait(
+        `document.querySelector('.library-detail')?.dataset.detailId===${JSON.stringify(record.id)}`,
       );
+      await key('Enter', {}, 'document.querySelector("[data-library-grid]")');
       await wait(`${tabs}.length===${previousTabs.length + index + 1}`);
       if (index === 0) await click('图片库', 'document.querySelector(".studio-titlebar")');
     }

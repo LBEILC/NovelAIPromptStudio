@@ -49,7 +49,7 @@
 .settings-table-toolbar > div { display: flex; align-items: center; gap: var(--sp-2); }
 .settings-table-toolbar > div > .nps-input-group { flex: 0 1 var(--dict-search-w); min-width: var(--area-prose-min-h); margin-right: auto; }
 .settings-dictionary-search input { text-overflow: ellipsis; }
-.settings-dictionary-views { position:relative; isolation:isolate; margin-top: var(--sp-2); gap: var(--tab-gap) !important; }
+.settings-table-toolbar > .settings-dictionary-views { position:relative; isolation:isolate; margin-top: var(--sp-2); gap: var(--tab-gap); }
 .settings-dictionary-views button { height: calc(var(--tab-h) + var(--sp-1)); display: inline-flex; gap: var(--sp-1); align-items: center; border: 0; background: transparent; color: var(--text-3); white-space: nowrap; padding: 0; border-radius: 0; }
 .settings-dictionary-views button[aria-selected="true"] { color: var(--text); }
 .settings-dictionary-views button span { color: var(--text-3); font: var(--fs-caption)/1 var(--font-mono); }

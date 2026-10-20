@@ -159,7 +159,7 @@
 .library-card:hover .library-pick, .library-rows.picking .library-pick, .library-pick:focus-visible { opacity:1; }
 .library-pick:hover { border-color:var(--text); }
 .library-row > .nps-menu-trigger { display:contents; }
-.library-scrub { position:absolute; bottom:var(--ctl-gap); left:var(--ctl-gap); right:var(--ctl-gap); height:var(--thumb-ring); border-radius:var(--bw); background:rgba(255,255,255,0.5); pointer-events:none; }
+.library-scrub { position:absolute; bottom:var(--ctl-gap); left:var(--ctl-gap); right:var(--ctl-gap); height:var(--thumb-ring); border-radius:var(--bw); background:var(--thumb-scrub-track); pointer-events:none; }
 .library-scrub > i { position:absolute; top:0; bottom:0; background:var(--ink); border-radius:var(--bw); }
 .library-menu-heading { padding:var(--sp-2) var(--ctl-pad-x); }
 
