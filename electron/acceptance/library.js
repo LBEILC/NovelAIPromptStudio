@@ -492,6 +492,7 @@ export async function libraryChecks(env) {
     const target = await e('document.querySelector(".col.detail").dataset.detailId');
     await click('加入收藏集', 'document.querySelector(".detail .dacts")');
     const manual = database.listCollections().find((c) => c.kind === 'manual');
+    const collectionRow = `[...document.querySelectorAll('.lcollect:not(.leaving) [role=checkbox]')].find(n=>n.querySelector('.nm')?.textContent===${JSON.stringify(manual.name)})`;
     await click(manual.name, 'document.querySelector(".popover:not(.leaving)")');
     await h.until(
       () =>
@@ -501,6 +502,9 @@ export async function libraryChecks(env) {
           .member_ids.includes(target),
       '加入收藏集',
     );
+    // The database write finishes before React receives the updated collection.
+    // Wait for the checked state before invoking the inverse operation.
+    await wait(`${collectionRow}?.getAttribute('aria-checked')==='true'`, '收藏集勾选已呈现在界面');
     await check(
       '详情浮层勾选加入收藏集',
       () =>
