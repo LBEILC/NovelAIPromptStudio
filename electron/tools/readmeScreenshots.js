@@ -333,6 +333,11 @@ export async function runReadmeScreenshots({
     h = harness(window, { ...mode, output, screenshots: [], phase: 'readme' }, checks);
     await h.wait(`document.documentElement.dataset.screenshotReady==='workbench'`);
     await h.evaluate('document.fonts.ready.then(()=>true)');
+    if (process.argv.includes('--compare-library')) {
+      const { compareLibrary } = await import('./compareLibrary.js');
+      return await compareLibrary({ app, window, h, invoke, database });
+    }
+
     const tags = [
       ...new Set(
         projects

@@ -1,5 +1,6 @@
+import { LibraryPopover } from './Popover';
 import { useRef, useState } from 'react';
-import { Button, Checkbox, Input, Popover } from '../ui';
+import { Button, Checkbox, Input } from '../ui';
 import { AnimatedItems } from '../ui/AnimatedItems';
 import type { LibraryProps } from './types';
 
@@ -44,8 +45,14 @@ export function CollectionPicker({ p, ids }: { p: LibraryProps; ids: string[] })
         <i className="ri-folder-add-line" />
         加入收藏集
       </Button>
-      <Popover open={open} onClose={() => setOpen(false)} anchor={anchor} label="加入收藏集">
-        <div className="library-filter-panel">
+      <LibraryPopover
+        align="start"
+        open={open}
+        onClose={() => setOpen(false)}
+        anchor={anchor}
+        label="加入收藏集"
+      >
+        <div className="library-collect-panel">
           <b>{ids.length > 1 ? `把 ${ids.length} 张加入收藏集` : '加入收藏集'}</b>
           <AnimatedItems
             ids={manual.map((collection) => collection.id)}
@@ -98,7 +105,7 @@ export function CollectionPicker({ p, ids }: { p: LibraryProps; ids: string[] })
             一张图片可以加入多个收藏集。智能收藏集按规则自动收录，无法手动加入。
           </span>
         </div>
-      </Popover>
+      </LibraryPopover>
     </>
   );
 }

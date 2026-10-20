@@ -61,12 +61,16 @@ it('keeps the opening group and member order when library props change', async (
     );
     await key('ArrowRight');
     expect(current()).toBe('stack-b');
-    await key('ArrowDown');
+    await key('ArrowRight');
+    expect(current()).toBe('stack-c');
+    await key('ArrowRight');
     expect(current()).toBe('last');
-    await key('ArrowUp');
-    expect(current()).toBe('stack-b');
-    await key('ArrowUp');
-    expect(current()).toBe('first');
+    await key('ArrowRight');
+    expect(current()).toBe('last');
+    await key('ArrowLeft');
+    await key('ArrowLeft');
+    await key('ArrowLeft');
+    await key('ArrowLeft');
     await key('ArrowLeft');
     expect(current()).toBe('first');
   } finally {

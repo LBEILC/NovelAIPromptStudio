@@ -7,6 +7,7 @@ import { mediaUrl } from '../lib/imageStage.js';
 import { layoutLibraryRows, fallbackRatio } from './layout';
 import type { PreparedImportEntry } from '../shared/types';
 
+// TODO(design): This workflow has no matching state in the reference; retain its existing presentation.
 interface Entry extends PreparedImportEntry {
   previewError?: string;
   duplicate?: boolean;

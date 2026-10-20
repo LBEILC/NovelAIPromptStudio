@@ -1,6 +1,6 @@
 import { writeClipboardText } from '../lib/clipboard';
 import { Disclosure, TransitionSurface } from '../ui/transitions';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button, Tag, type TagCategory as UICategory } from '../ui';
 import { createPromptDocument, type PromptBlock } from '../lib/promptDocument';
 import { formatPositivePromptForCopy } from '../lib/promptStructure.js';
@@ -42,32 +42,6 @@ export function libraryPositivePrompt(project: ImageRecord) {
 
 function TagBlock({ block, annotations }: { block: PromptBlock; annotations: PromptTag[] }) {
   const [expanded, setExpanded] = useState(false);
-  const [limit, setLimit] = useState(Infinity);
-  const measurement = useRef<HTMLDivElement>(null);
-  const moreMeasurement = useRef<HTMLButtonElement>(null);
-  useLayoutEffect(() => {
-    const node = measurement.current!;
-    const measure = () => {
-      const tops = [...node.children].map((child) => (child as HTMLElement).offsetTop);
-      const second = tops.find((top) => top > (tops[0] ?? 0));
-      const third = second == null ? -1 : tops.findIndex((top) => top > second);
-      let visible = third;
-      if (visible > 0) {
-        const gap = parseFloat(getComputedStyle(node).columnGap) || 0;
-        const moreWidth = moreMeasurement.current?.getBoundingClientRect().width || 0;
-        while (visible > 0 && tops[visible - 1] === second) {
-          const last = node.children[visible - 1] as HTMLElement;
-          if (last.offsetLeft + last.offsetWidth + gap + moreWidth <= node.clientWidth) break;
-          visible--;
-        }
-      }
-      setLimit(third < 0 ? Infinity : Math.max(1, visible));
-    };
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    measure();
-    return () => observer.disconnect();
-  }, [block]);
   const tags = block.tags.map((tag, index) => {
     const annotation = annotations.find((candidate) => candidate.tag === tag.tag);
     const category = annotation?.category || 'Unsorted';
@@ -76,32 +50,19 @@ function TagBlock({ block, annotations }: { block: PromptBlock; annotations: Pro
         key={index}
         text={tag.tag}
         translation={annotation?.translation}
-        weight={String(tag.weight)}
         category={categories[category]}
         categoryLabel={labels[category]}
+        onClick={() => void writeClipboardText(tag.tag)}
       />
     );
   });
   return (
     <div className="library-tags-container">
-      <div className="library-tags library-tags-measure" ref={measurement} aria-hidden="true">
-        {tags}
-      </div>
-      <Button
-        ref={moreMeasurement}
-        className="library-tags-more-measure"
-        aria-hidden="true"
-        tabIndex={-1}
-        variant="quiet"
-        size="small"
-      >
-        还有 {tags.length} 个
-      </Button>
       <TransitionSurface className="library-tags" kind="height" change={expanded}>
-        {expanded ? tags : tags.slice(0, limit)}
-        {!expanded && limit < tags.length && (
+        {expanded ? tags : tags.slice(0, 8)}
+        {!expanded && 8 < tags.length && (
           <Button variant="quiet" size="small" onClick={() => setExpanded(true)}>
-            还有 {tags.length - limit} 个
+            还有 {tags.length - 8} 个
           </Button>
         )}
       </TransitionSurface>
@@ -176,10 +137,13 @@ export function LibraryPrompt({ project }: { project: ImageRecord }) {
           </Disclosure>
         ) : (
           <section key={scope.key}>
-            <div className="library-section-title">
-              {title}
-              <small>{section.blocks.length} 块</small>
-            </div>
+            {/* TODO(design): Character, negative and multiple-block layouts are not specified by the reference. */}
+            {scope.kind !== 'base' && (
+              <div className="library-section-title">
+                {title}
+                <small>{section.blocks.length} 块</small>
+              </div>
+            )}
             {content}
           </section>
         );

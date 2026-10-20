@@ -43,41 +43,34 @@ export async function libraryViewerChecks({ h, database }) {
     await h.evaluate('document.querySelector(".library-card").click()');
     await h.key(' ', {}, 'document.querySelector("[data-library-grid]")');
     await h.wait(at(ids[0]));
+    await h.evaluate(
+      'document.querySelector(".library-viewer-canvas").dispatchEvent(new WheelEvent("wheel",{bubbles:true,cancelable:true,deltaY:-300,clientX:400,clientY:300}))',
+    );
     await h.check(
-      '大图第一张禁用上一张并说明已到头',
-      'document.querySelector(".library-viewer-prev").getAttribute("aria-disabled")==="true" && document.querySelector(".library-viewer-prev").dataset.tip==="已经是第一张"',
+      '滚轮放大当前图片',
+      'Number(document.querySelector(".library-viewer-canvas img").style.transform.match(/scale\\(([^)]+)\\)/)[1])>1',
       undefined,
       'once',
     );
+    await h.evaluate(
+      'document.querySelector(".library-viewer-canvas img").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
+    );
+    await h.check(
+      '双击恢复适应窗口且清除平移',
+      'document.querySelector(".library-viewer-canvas img").style.transform==="translate(0px, 0px) scale(1)"',
+      undefined,
+      'once',
+    );
+    await move('ArrowLeft', 0, '第一张继续向左不循环');
     for (let i = 1; i < 5; i++) await move('ArrowRight', i, `右键按完整顺序到第 ${i + 1} 张`);
     await move('ArrowRight', 4, '最后一张继续向右不循环');
-    await h.check(
-      '末尾禁用下一张并说明已到头',
-      'document.querySelector(".library-viewer-next").getAttribute("aria-disabled")==="true" && document.querySelector(".library-viewer-next").dataset.tip==="已经是最后一张"',
-      undefined,
-      'once',
-    );
     await move('ArrowLeft', 3, '向左进入一摞落在最后一张');
-    await h.check(
-      '大图显示当前摞内序号和三个成员缩略图',
-      'document.querySelector(".library-viewer-top").textContent.includes("3 / 3") && document.querySelectorAll(".library-viewer .library-strip button").length===3',
-      undefined,
-      'both',
-    );
-    await move('ArrowDown', 4, '向下跳到下一组封面');
-    await move('ArrowUp', 1, '向上跳到上一组封面');
-    await move('ArrowUp', 0, '一摞内向上跳到前一单张');
-    await move('ArrowLeft', 0, '第一张继续向左不循环');
-    await h.click('下一张', viewer);
-    await h.wait(at(ids[1]));
-    await h.evaluate(
-      'document.querySelectorAll(".library-viewer .library-strip button")[1].click()',
-    );
-    await h.wait(at(ids[2]));
-    await h.check('底部缩略图直接选择当前摞的成员', at(ids[2]), undefined, 'once');
     await h.click('上一张', viewer);
-    await h.wait(at(ids[1]));
-    await h.check('两侧按钮使用同一完整顺序', at(ids[1]), undefined, 'once');
+    await h.wait(at(ids[2]));
+    await h.check('底部上一张使用同一完整顺序', at(ids[2]), undefined, 'once');
+    await h.click('下一张', viewer);
+    await h.wait(at(ids[3]));
+    await h.check('底部下一张使用同一完整顺序', at(ids[3]), undefined, 'once');
     await h.key('Escape', {}, viewer);
   } finally {
     for (const id of ids) database.deleteProject(id);

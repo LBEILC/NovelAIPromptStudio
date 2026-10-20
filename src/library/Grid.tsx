@@ -1,7 +1,6 @@
 import { DecodedImage, Presence, useNewItemEntrance } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { startMarqueeAutoScroll } from '../ui/MarqueeSelection.jsx';
-import { Check } from 'lucide-react';
 import { imageAccessibleName } from '../lib/imageNaming.js';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { adjacentRowIndex, fallbackRatio, layoutLibraryRows } from './layout';
@@ -165,17 +164,28 @@ export function LibraryGrid({
         0,
         p.groups.findIndex((g) => g.id === (anchor.current || p.previewGroup?.id)),
       );
-      p.onSelectionChange(
-        p.groups.slice(Math.min(from, index), Math.max(from, index) + 1).map((g) => g.id),
-      );
+      p.onSelectionChange([
+        ...new Set([
+          ...p.selectedGroupIds,
+          ...p.groups.slice(Math.min(from, index), Math.max(from, index) + 1).map((g) => g.id),
+        ]),
+      ]);
     } else if (event.ctrlKey || event.metaKey || p.selectedGroupIds.length > 0) {
-      p.onToggleSelect(group, event);
+      if (
+        !p.selectedGroupIds.length &&
+        (event.ctrlKey || event.metaKey) &&
+        p.previewGroup &&
+        p.previewGroup.id !== group.id
+      )
+        p.onSelectionChange([p.previewGroup.id, group.id]);
+      else p.onToggleSelect(group, event);
       anchor.current = group.id;
     } else {
       p.onClearSelection();
       anchor.current = group.id;
     }
-    p.onPreview(group, scrub?.group === group.id ? group.members[scrub.index] : undefined);
+    if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !p.selectedGroupIds.length)
+      p.onPreview(group, p.previewGroup?.id === group.id ? p.preview || undefined : undefined);
   };
   const updateMarquee = () => {
     const initial = drag.current;
@@ -232,12 +242,13 @@ export function LibraryGrid({
           p.onClearSelection();
           return;
         }
+        // TODO(design): The reference has no library Enter/Space/grid-arrow handlers; retain existing shortcuts.
         if (event.key === 'Enter' && p.preview) {
           event.preventDefault();
           p.onOpenWorkbench(p.preview);
           return;
         }
-        if (event.key === ' ' && p.preview) {
+        if (event.key === ' ' && p.preview && !p.selectedGroupIds.length) {
           event.preventDefault();
           onViewer();
           return;
@@ -329,13 +340,12 @@ export function LibraryGrid({
           p.onClearSelection();
       }}
     >
-      <div className="library-rows" style={{ height: totalHeight + viewport.inset }}>
+      <div
+        className={`library-rows ${p.selectedGroupIds.length ? 'picking' : ''}`}
+        style={{ height: totalHeight + viewport.inset }}
+      >
         {visible.map((row) => (
-          <div
-            className="library-row"
-            key={row.start}
-            style={{ top: row.top + viewport.inset, height: row.height }}
-          >
+          <div className="library-row" key={row.start} style={{ top: row.top, height: row.height }}>
             {row.widths.map((width, offset) => {
               const index = row.start + offset;
               const group = p.groups[index];
@@ -354,7 +364,7 @@ export function LibraryGrid({
                     data-group-id={group.id}
                     data-enter-id={group.id}
                     data-project-id={group.cover.id}
-                    className={`library-card ${group.id === p.previewGroup?.id ? 'current' : ''} ${selected ? 'picked' : ''}`}
+                    className={`library-card ${group.id === p.previewGroup?.id && !p.selectedGroupIds.length ? 'current' : ''} ${selected ? 'picked' : ''}`}
                     style={{ width, height: row.height }}
                     key={group.id}
                     onClick={(event) => {
@@ -363,8 +373,10 @@ export function LibraryGrid({
                       select(index, event);
                     }}
                     onDoubleClick={() => {
-                      if (!multiClick.current && !p.selectedGroupIds.length)
-                        p.onOpenWorkbench(shown);
+                      if (!multiClick.current && !p.selectedGroupIds.length) {
+                        if (p.previewGroup?.id !== group.id) p.onPreview(group);
+                        onViewer();
+                      }
                     }}
                     onPointerEnter={() => {
                       setHovered(group.id);
@@ -407,8 +419,8 @@ export function LibraryGrid({
                       alt=""
                       draggable={false}
                     />
-                    {!!shown.version_number && (
-                      <span className="library-version-badge">
+                    {p.activeCollection?.id === '__generated__' && !!shown.version_number && (
+                      <span className="library-stack">
                         第 {shown.version_number} 版
                         {shown.generation_source === 'agent' ? ' · Agent' : ''}
                       </span>
@@ -430,12 +442,12 @@ export function LibraryGrid({
                           shift={false}
                         >
                           <span className="library-scrub">
-                            {group.members.map((member, i) => (
-                              <span
-                                key={member.id}
-                                data-current={i === (scrub?.group === group.id ? scrub.index : 0)}
-                              />
-                            ))}
+                            <i
+                              style={{
+                                left: `${((scrub?.group === group.id ? scrub.index : 0) / group.members.length) * 100}%`,
+                                width: `${100 / group.members.length}%`,
+                              }}
+                            />
                           </span>
                         </Presence>
                       </>
@@ -447,18 +459,20 @@ export function LibraryGrid({
                       aria-checked={selected}
                       aria-label={imageAccessibleName(group.cover)}
                       className="library-pick"
-                      data-theme={selected ? undefined : 'light'}
                       onClick={(event) => {
                         event.stopPropagation();
-                        anchor.current = group.id;
-                        p.onToggleSelect(group, { ...event, shiftKey: false });
+                        if (event.shiftKey) select(index, event);
+                        else {
+                          anchor.current = group.id;
+                          p.onToggleSelect(group, event);
+                        }
                       }}
                       onDoubleClick={(event) => event.stopPropagation()}
                       onKeyDown={(event) => {
                         if (event.key === ' ' || event.key === 'Enter') event.stopPropagation();
                       }}
                     >
-                      {selected && <Check size={16} strokeWidth={1.5} aria-hidden="true" />}
+                      <i className="ri-check-line" aria-hidden="true" />
                     </SurfaceButton>
                   </div>
                 </CardMenu>

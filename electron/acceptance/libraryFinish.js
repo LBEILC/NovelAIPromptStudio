@@ -84,7 +84,7 @@ export async function libraryFinishChecks({
   await click('编辑规则', scope);
   await check(
     '旧规则只选同名组一部分时保留半选状态',
-    `(()=>{const label=[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5');return label?.querySelector('[role=checkbox]').getAttribute('aria-checked')==='mixed'})()`,
+    `(()=>{const label=[...document.querySelectorAll('.library-filter-check')].find(n=>n.textContent.trim()==='V5');return label?.getAttribute('aria-checked')==='mixed'})()`,
     undefined,
     'once',
   );
@@ -120,17 +120,17 @@ export async function libraryFinishChecks({
   await key('Escape');
   await click('筛选', scope);
   await e(
-    `[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
+    `[...document.querySelectorAll('.library-filter-check')].find(n=>n.textContent.trim()==='V5').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
   );
   await wait('!!document.querySelector("[role=tooltip]:popover-open")');
   await check(
     '同短名模型合为一个复选项且保留全部原名提示',
-    `(()=>{const labels=[...document.querySelectorAll('.library-filter-options label')].filter(n=>n.textContent.trim()==='V5');return labels.length===1&&!labels[0].hasAttribute('title')&&${JSON.stringify(models)}.every(v=>document.querySelector('[role=tooltip]:popover-open')?.textContent.includes(v))})()`,
+    `(()=>{const labels=[...document.querySelectorAll('.library-filter-check')].filter(n=>n.textContent.trim()==='V5');return labels.length===1&&!labels[0].hasAttribute('title')&&${JSON.stringify(models)}.every(v=>document.querySelector('[role=tooltip]:popover-open')?.textContent.includes(v))})()`,
     undefined,
     'both',
   );
   await e(
-    "[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5').querySelector('[role=checkbox]').click()",
+    "[...document.querySelectorAll('.library-filter-check')].find(n=>n.textContent.trim()==='V5').click()",
   );
   await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
   await key('Escape');
@@ -161,7 +161,7 @@ export async function libraryFinishChecks({
   );
   await click('全部图片', scope);
   await click('筛选', scope);
-  const modelInput = `[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5')?.querySelector('[role=checkbox]')`;
+  const modelInput = `[...document.querySelectorAll('.library-filter-check')].find(n=>n.textContent.trim()==='V5')`;
   await wait(
     `!!(${modelInput}) && (${modelInput}).getAttribute('aria-checked')==='false'`,
     '全部图片的模型筛选已重置',
@@ -176,7 +176,7 @@ export async function libraryFinishChecks({
   );
   await h.checkSoon(
     '再次取消合并模型复选项取消全部别名',
-    `(()=>{const label=[...document.querySelectorAll('.library-filter-options label')].find(n=>n.textContent.trim()==='V5');const input=label.querySelector('[role=checkbox]');return input.getAttribute('aria-checked')==='false'})()`,
+    `(()=>{const label=[...document.querySelectorAll('.library-filter-check')].find(n=>n.textContent.trim()==='V5');const input=label;return input.getAttribute('aria-checked')==='false'})()`,
     undefined,
     `(${modelInput}).click()`,
     undefined,

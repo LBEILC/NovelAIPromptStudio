@@ -146,7 +146,7 @@ export async function libraryChecks(env) {
       expectedTrash = database.loadLibrary('trash').length;
     await check(
       '侧栏全部图片与回收站数量来自真实数据库',
-      `Number(document.querySelector('.library-side [aria-label="全部图片"] span').textContent)===${expectedAll} && Number(document.querySelector('.library-side [aria-label="回收站"] span').textContent)===${expectedTrash}`,
+      `Number(document.querySelector('.library-side [aria-label="全部图片"] .library-side-count').textContent)===${expectedAll} && Number(document.querySelector('.library-side [aria-label="回收站"] .library-side-count').textContent)===${expectedTrash}`,
       undefined,
       'once',
     );
@@ -564,13 +564,12 @@ export async function libraryChecks(env) {
       'once',
     );
     await e('document.querySelector(".library-detail-picture img").click()');
-    await wait('!!document.querySelector(".library-viewer .library-strip")');
-    const coverMetadata = database.loadProject(cover).metadata;
+    await wait('!!document.querySelector(".library-viewer")');
     await check(
-      '一摞大图顶部显示实际尺寸及当前序号',
-      `(()=>{const buttons=[...document.querySelectorAll('.library-viewer .library-strip button')];const index=buttons.findIndex(b=>b.classList.contains('is-current'));return buttons.length>1&&index>=0&&document.querySelector('.library-viewer-top .library-mono').textContent.trim()===${JSON.stringify(`${coverMetadata.width} × ${coverMetadata.height}`)}+' · '+(index+1)+' / '+buttons.length})()`,
+      '详情图片打开当前成员的大图',
+      `document.querySelector('.library-viewer').dataset.viewerProjectId===${JSON.stringify(cover)}`,
       undefined,
-      'both',
+      'once',
     );
     await key('Escape', {}, 'document.querySelector(".library-viewer")');
     if (!reduced) await screen('group');
@@ -591,42 +590,19 @@ export async function libraryChecks(env) {
     await key(' ', {}, grid);
     await wait('!!document.querySelector(".library-viewer")');
     const viewer = 'document.querySelector(".library-viewer")';
-    await click('放大', viewer);
-    await check(
-      '大图放大有实际尺寸',
-      'document.querySelector(".library-viewer-canvas img").style.width!==""',
-      undefined,
-      'both',
+    await key('Escape', {}, viewer);
+    await e(
+      'document.querySelector(".library-card.current").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,clientX:300,clientY:180}))',
     );
-    await click('缩小', viewer);
-    await click('100%', viewer);
-    await check(
-      '100% 使用图片原始宽度',
-      'document.querySelector(".library-viewer-canvas img").clientWidth===document.querySelector(".library-viewer-canvas img").naturalWidth',
-      undefined,
-      'both',
-    );
-    await click('向左旋转', viewer);
-    await check(
-      '向左旋转',
-      'document.querySelector(".library-viewer-canvas img").style.transform.includes("-90deg")',
-      undefined,
-      'both',
-    );
-    await click('向右旋转', viewer);
-    await click('左右翻转', viewer);
-    await check(
-      '向右旋转和左右翻转',
-      'document.querySelector(".library-viewer-canvas img").style.transform.includes("0deg")&&document.querySelector(".library-viewer-canvas img").style.transform.includes("scaleX(-1)")',
-      undefined,
-      'both',
-    );
-    await click('复制图片', viewer);
+    await click('复制图片', 'document.querySelector("[role=menu]")');
     await h.until(() => !clipboard.readImage().isEmpty(), '复制大图');
     await check('复制图片得到像素', () => !clipboard.readImage().isEmpty(), undefined, 'once');
     const saved = path.join(mode.root, `saved-${reduced}.png`);
     doubles.saves.push({ canceled: false, filePath: saved });
-    await click('另存为', viewer);
+    await e(
+      'document.querySelector(".library-card.current").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,clientX:300,clientY:180}))',
+    );
+    await click('另存为…', 'document.querySelector("[role=menu]")');
     await h.until(async () => !!(await fs.stat(saved).catch(() => null)), '另存为完成');
     await check(
       '另存为通过文件选择替身保存副本',
@@ -634,28 +610,26 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
-    const beforeName = await e('document.querySelector(".library-viewer-top b").textContent');
+    await key(' ', {}, grid);
+    await wait('!!document.querySelector(".library-viewer")');
+    const beforeName = await e('document.querySelector(".library-viewer").dataset.viewerProjectId');
     await key('ArrowRight', {}, viewer);
     await check(
       '大图右键切换',
-      'document.querySelector(".library-viewer-top b").textContent!==' + JSON.stringify(beforeName),
+      'document.querySelector(".library-viewer").dataset.viewerProjectId!==' +
+        JSON.stringify(beforeName),
       undefined,
       'once',
     );
     await key('ArrowLeft', {}, viewer);
     await check(
       '大图左键切回',
-      'document.querySelector(".library-viewer-top b").textContent===' + JSON.stringify(beforeName),
+      'document.querySelector(".library-viewer").dataset.viewerProjectId===' +
+        JSON.stringify(beforeName),
       undefined,
       'once',
     );
 
-    await check(
-      '大图摞内位置与小图条一致',
-      "(()=>{const strip=document.querySelector('.library-viewer .library-strip');return !strip || document.querySelector('.library-viewer-top .library-mono').textContent.trim().endsWith(' · '+([...strip.children].findIndex(b=>b.classList.contains('is-current'))+1)+' / '+strip.children.length)})()",
-      undefined,
-      'both',
-    );
     if (!reduced) await screen('viewer');
     await key('Escape', {}, viewer);
     await wait('!document.querySelector(".library-viewer")');
@@ -679,16 +653,14 @@ export async function libraryChecks(env) {
     await e(
       'document.querySelector(".library-card").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
     );
-    await wait(
-      'document.querySelector(".studio-titlebar [aria-current=page]")?.textContent.trim()==="工作台"',
-    );
+    await wait('!!document.querySelector(".library-viewer")');
     await check(
-      '双击在工作台打开',
-      'document.querySelectorAll(".workbench-tab").length>0',
+      '双击卡片打开大图并保留图片库',
+      '!!document.querySelector(".library-viewer") && !!document.querySelector(".library-page")',
       undefined,
       'once',
     );
-    await click('图片库', 'document.querySelector(".studio-titlebar")');
+    await key('Escape', {}, 'document.querySelector(".library-viewer")');
     await selectCard(0);
     await waitDetail();
     const trashId = await e('document.querySelector(".library-detail").dataset.detailId');
