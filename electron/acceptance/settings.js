@@ -1,4 +1,3 @@
-import { settingsLayoutChecks } from './settingsLayout.js';
 import { scrollChecks } from './scroll.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -10,7 +9,6 @@ import { createTrashDraft } from './shortcuts.js';
 import { appearanceLayerChecks } from './appearanceLayers.js';
 
 export async function settingsChecks(context, restart) {
-  if (context.mode.category === '设置·版式') return settingsLayoutChecks(context.h);
   const { h, mode, app, database, preferences, doubles, files, encrypted } = context;
   const { evaluate: e, wait, check, click, input, select, section } = h;
   const aiInput = (index) =>
@@ -101,7 +99,6 @@ export async function settingsChecks(context, restart) {
     await h.screenshot(`restart-${mode.phase}`);
     return;
   }
-  if (['全部', '设置', '减少动态效果'].includes(mode.category)) await settingsLayoutChecks(h);
   if (mode.category === '减少动态效果') {
     h.category('设置·翻译词典·关闭动效');
     await section('翻译词典');

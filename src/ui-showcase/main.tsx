@@ -192,46 +192,6 @@ function Showcase() {
   const notify = useNotifications();
   return (
     <main className="nps-demo-sheet" data-showcase="004">
-      <Section title="提示与浮层验收">
-        <div data-polish-probe>
-          <Button tip="验收提示一" aria-label="验收控件一">
-            <Search {...iconProps} />
-          </Button>
-          <Button tip="验收提示二" aria-label="验收控件二">
-            <X {...iconProps} />
-          </Button>
-          <span
-            data-tip-overflow="Synthetic overflowing name"
-            style={{
-              display: 'inline-block',
-              width: 60,
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            Synthetic overflowing name
-          </span>
-          <span data-tip-overflow="Short">Short</span>
-          <Menu label="验收菜单" items={menu} />
-        </div>
-        <div data-button-state-probe>
-          {(['default', 'ink', 'cinnabar', 'quiet', 'danger', 'danger-outline'] as const).map(
-            (variant) => (
-              <Row key={variant}>
-                <Menu
-                  label={`状态验收 ${variant}`}
-                  buttonVariant={variant}
-                  items={[{ id: 'close', label: '关闭验收菜单' }]}
-                />
-                <Button variant={variant} disabled aria-label={`不可用验收 ${variant}`}>
-                  不可用
-                </Button>
-              </Row>
-            ),
-          )}
-        </div>
-      </Section>
       <Section title="按钮">
         <Row label="默认">
           <Button>复制提示词</Button>

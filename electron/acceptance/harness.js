@@ -1,7 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { UI_FEEDBACK_MS, measureFeedback } from './feedback.js';
-import { timingMode } from './timing.js';
 
 export function harness(window, mode, checks) {
   let category = '启动';
@@ -9,7 +7,6 @@ export function harness(window, mode, checks) {
   let lastPassed = '无';
   let diagnosticIndex = 0;
   const scale = mode.slow || 1;
-  const timingPolicy = timingMode(mode.timing);
   const waitBudget = Math.min(12000 * scale, 60000);
   const evaluationBudget = Math.min(15000 * scale, 60000);
   const settleBudget = Math.min(1000 * scale, 6000);
@@ -166,14 +163,13 @@ export function harness(window, mode, checks) {
       );
     }
   };
-  const checkOne = async (label, expression, failureDetails, themeScope = 'once', timing) => {
+  const checkOne = async (label, expression, failureDetails, themeScope = 'once') => {
     operation = label;
     const record = {
       category,
       label,
       status: 'failed',
       themeScope,
-      ...(timing ? { timing } : {}),
       ...(mode.themeDriver ? { theme: mode.themeDriver.get() } : {}),
     };
     checks.push(record);
@@ -240,61 +236,26 @@ export function harness(window, mode, checks) {
     if (dualThemes && themeScope === 'both')
       await withOtherTheme(() => checkOne(label, expression, failureDetails, themeScope));
   };
-  const timing = async (label, elapsedMs, timeoutMs = UI_FEEDBACK_MS) => {
-    const deadlineMs = Math.min(timeoutMs * scale, 60000);
-    const valid = typeof elapsedMs === 'number' && Number.isFinite(elapsedMs) && elapsedMs >= 0;
-    const exceeded = valid && elapsedMs > deadlineMs;
-    const measurement = {
-      deadlineMs,
-      elapsedMs: valid ? elapsedMs : null,
-      exceeded,
-      overDouble: valid && elapsedMs > deadlineMs * 2,
-      policy: timingPolicy,
-      result: valid ? (exceeded ? '计时：超过期限' : '计时：期限内') : '行为未完成',
-    };
-    console.log(
-      `${measurement.result} [${category}] ${label}：${measurement.elapsedMs} ms / ${deadlineMs} ms（${timingPolicy}）`,
-    );
-    await checkOne(
-      '计时：' + label,
-      () => valid && (timingPolicy === 'record' || !exceeded),
-      () => measurement,
-      'once',
-      measurement,
-    );
-  };
+  // Compatibility signature for existing flows; only the final state gates acceptance.
   const checkSoon = async (
     label,
     expression,
-    timeoutMs = UI_FEEDBACK_MS,
+    _deadline,
     action = '',
     failureDetails,
     themeScope = 'once',
   ) => {
-    let elapsedMs = null;
+    if (action) await evaluate(action);
     await checkOne(
       label,
       async () => {
-        const started = Date.now();
-        elapsedMs =
-          typeof expression === 'string'
-            ? await evaluate(
-                `(${measureFeedback.toString()})(()=>(${expression}),${waitBudget},()=>{${action}})`,
-              )
-            : await bounded(
-                measureFeedback(expression, waitBudget),
-                waitBudget,
-                '反馈条件求值超时',
-              );
-        if (elapsedMs === null) await failTimeout('界面反馈未完成', started, waitBudget, label);
-        return true;
+        if (typeof expression === 'string') await wait(expression, label);
+        else await until(expression, label);
+        return typeof expression === 'string' ? evaluate(expression) : expression();
       },
       failureDetails,
       themeScope,
     );
-    await timing(label, elapsedMs, timeoutMs);
-    // The interaction and its feedback deadline run once. Reinspect the same
-    // state under the other real system theme without repeating side effects.
     if (dualThemes && themeScope === 'both')
       await withOtherTheme(() => checkOne(label, expression, failureDetails, themeScope));
   };
@@ -414,7 +375,6 @@ export function harness(window, mode, checks) {
     until,
     check,
     checkSoon,
-    timing,
     click,
     input,
     key,

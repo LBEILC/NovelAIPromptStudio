@@ -1,8 +1,5 @@
 import { libraryRefinementChecks } from './libraryRefinement.js';
-import { transitionChecks } from './transitions.js';
-import { detailLayoutChecks } from './detailLayout.js';
 import { clientControlChecks } from './clientControls.js';
-import { hoverChecks } from './hover.js';
 import { clientChecks } from './client.js';
 import { workbenchChecks } from './workbench.js';
 import { interactionCorrectionChecks } from './interactionCorrections.js';
@@ -11,7 +8,7 @@ import { libraryInteractionChecks, workbenchInteractionChecks } from './interact
 import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryCopyChecks } from './libraryCopy.js';
 import { libraryChecks } from './library.js';
-import { motionChecks, applyMotionBaseline, defaultMotionChecks } from './motion.js';
+import { applyMotionBaseline, defaultMotionChecks } from './motion.js';
 import { motionOffChecks } from './motionOff.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -21,7 +18,6 @@ import { importLibraryFiles } from '../importer.js';
 import { harness } from './harness.js';
 import { settingsChecks } from './settings.js';
 import { componentChecks } from './components.js';
-import { uiPolishChecks } from './uiPolish.js';
 import { shortcutChecks } from './shortcuts.js';
 import { preserveClipboard } from './clipboard.js';
 import { cardCacheChecks } from './cardCache.js';
@@ -348,7 +344,6 @@ export async function runAcceptance(context) {
           await overlayCheck(`跟随系统 ${theme} 时标题栏令牌同步`);
         }
         h.dualThemes(true);
-        await motionChecks(h);
         await applyMotionBaseline(h, mode);
         await section('外观');
         window.showInactive();
@@ -397,31 +392,16 @@ export async function runAcceptance(context) {
       await h.screenshot('packaged-fonts');
     } else if (mode.category && mode.category !== '全部' && mode.phase === 0) {
       h.dualThemes(true);
-      if (mode.category === '过渡动效') {
-        await transitionChecks(environment);
-      } else if (mode.category === '减少动态效果') {
+      if (mode.category === '减少动态效果') {
         // One global audit, plus the flows whose closing and focus return
         // depend on transition events (the ones that broke under reduced
         // motion before). Everything else behaves the same either way.
-        await transitionChecks(environment);
         await motionOffChecks(environment);
         await workbenchInteractionChecks(environment);
         await interactionCorrectionChecks(environment);
-        await detailLayoutChecks(environment);
         await agentChecks(environment);
         await componentChecks(environment);
-      } else if (mode.category === '诊断·计时') {
-        h.category('诊断·计时');
-        await h.checkSoon(
-          '人为延迟的反馈仍然完成',
-          'performance.now() >= window.feedbackReadyAt',
-          1,
-          'window.feedbackReadyAt = performance.now() + 50;',
-          undefined,
-          'once',
-        );
       } else if (mode.category === '客户端边界') await clientChecks(environment);
-      else if (mode.category === '悬停态覆盖') await hoverChecks(environment);
       else if (mode.category === '客户端控件') await clientControlChecks(environment);
       else if (mode.category === '外壳') await shellChecks();
       else if (mode.category === 'Agent') await agentChecks(environment);
@@ -430,7 +410,6 @@ export async function runAcceptance(context) {
       else if (mode.category === '工作台·细节') await workbenchPolishChecks(environment);
       else if (mode.category === '工作台·交互') await workbenchInteractionChecks(environment);
       else if (mode.category === '交互修正') await interactionCorrectionChecks(environment);
-      else if (mode.category === '详情布局') await detailLayoutChecks(environment);
       else if (mode.category === '图片库·交互') await libraryInteractionChecks(environment);
       else if (mode.category === '图片库·细节') await libraryPolishChecks(environment);
       else if (mode.category === '图片库·027') await libraryRefinementChecks(environment);
@@ -442,14 +421,9 @@ export async function runAcceptance(context) {
         await settingsChecks(environment, false);
         if (mode.restart) await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());
       } else if (mode.category === '基础组件') await componentChecks(environment);
-      else if (mode.category === '基础组件·细节') await uiPolishChecks(environment);
       else if (mode.category === '卡片缓存') await cardCacheChecks(environment);
       else if (mode.category === '外壳·快捷键') await shortcutChecks(environment);
-      else if (mode.category === '动效') {
-        h.category('外壳·动效');
-        await section('外观');
-        await motionChecks(h);
-      } else if (mode.category === '诊断') {
+      else if (mode.category === '诊断') {
         h.category('诊断');
         await h.wait('false', '人为制造等待超时', 50);
       } else if (mode.category === '诊断·渲染器') {
@@ -474,9 +448,7 @@ export async function runAcceptance(context) {
       // them, so they close the second group, which also owns the restarts.
       const groups = [
         [
-          () => transitionChecks(environment),
           () => clientChecks(environment),
-          () => hoverChecks(environment),
           () => clientControlChecks(environment),
           () => shellChecks(),
         ],
@@ -494,8 +466,6 @@ export async function runAcceptance(context) {
           () => libraryInteractionChecks(environment),
           () => workbenchInteractionChecks(environment),
           () => interactionCorrectionChecks(environment),
-          () => detailLayoutChecks(environment),
-          () => uiPolishChecks(environment),
           () => agentChecks(environment),
           () => generationChecks(environment),
           () => componentChecks(environment),

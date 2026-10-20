@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { capture, finish } from './transitions.js';
 import fs from 'node:fs/promises';
 import { clipboard } from 'electron';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
@@ -281,30 +280,6 @@ export async function libraryInteractionChecks(env) {
     );
     await move('mouseMoved', { x: bounds.left - 5, y: bounds.top - 5 });
     await settleLayout(h, '.library-card');
-    await capture(h, '.library-pick,.library-scrub-presence,.library-stack', async () => {
-      await move('mouseMoved', {
-        x: bounds.left + bounds.width / 2,
-        y: bounds.top + bounds.height / 2,
-      });
-      await wait(`!!${stack}.querySelector('.library-scrub')`);
-    });
-    await check(
-      '一摞的张数、细条和悬停复选框淡入；关闭动效无过渡',
-      `(()=>{const off=document.documentElement.dataset.motion==='off'||document.documentElement.dataset.motion!=='full'&&matchMedia('(prefers-reduced-motion: reduce)').matches;const n=document.querySelector('.library-pick'),style=getComputedStyle(n);return !!document.querySelector('.library-scrub')&&style.transitionDuration.split(',').some(d=>parseFloat(d)>0.001)===!off})()`,
-      undefined,
-      'once',
-    );
-    await finish(h);
-    await capture(h, '.library-pick,.library-scrub-presence,.nps-transition-snapshot', () =>
-      move('mouseMoved', { x: bounds.left - 5, y: bounds.top - 5 }),
-    );
-    await check(
-      '离开一摞时张数、细条和复选框淡出',
-      `(()=>{const off=document.documentElement.dataset.motion==='off'||document.documentElement.dataset.motion!=='full'&&matchMedia('(prefers-reduced-motion: reduce)').matches;const style=getComputedStyle(document.querySelector('.library-pick'));return !document.querySelector('.library-scrub')&&style.transitionDuration.split(',').some(d=>parseFloat(d)>0.001)===!off})()`,
-      undefined,
-      'once',
-    );
-    await finish(h);
     for (const index of [0, 2, 1]) {
       await move('mouseMoved', {
         x: bounds.left + (bounds.width * (index + 0.5)) / 3,

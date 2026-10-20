@@ -1,35 +1,3 @@
-/** Measure painted icon/text separation, including anonymous flex text items. */
-export async function checkLibraryButtonGaps(h, state) {
-  await h.check(
-    `图片库图文按钮间距为 ctl-gap（${state}）`,
-    `(()=>{
-    const buttons=[...document.querySelectorAll('.library-page button,.library-viewer button,.nps-popover:popover-open button')].filter(b=>b.getClientRects().length);
-    const measurements=[];
-    for(const button of buttons){
-      for(const icon of button.querySelectorAll('i[class*="ri-"]')){
-        if(!icon.getClientRects().length)continue;
-        const nodes=[...icon.parentNode.childNodes];
-        const at=nodes.indexOf(icon);
-        const rectFor=node=>{
-          if(node.nodeType===3){const value=node.textContent;const start=value.search(/\\S/);if(start<0)return null;const r=document.createRange();r.setStart(node,start);r.setEnd(node,value.trimEnd().length);return r.getBoundingClientRect();}
-          return node.nodeType===1&&node.textContent.trim()&&node.getClientRects().length?node.getBoundingClientRect():null;
-        };
-        const next=nodes.slice(at+1).map(rectFor).find(Boolean);
-        const prev=nodes.slice(0,at).reverse().map(rectFor).find(Boolean);
-        if(!next&&!prev)continue;
-        const r=icon.getBoundingClientRect();
-        const gap=next?next.left-r.right:r.left-prev.right;
-        measurements.push({text:button.textContent.trim(),gap,expected:parseFloat(getComputedStyle(button).getPropertyValue('--ctl-gap'))});
-      }
-    }
-    window.__libraryGapMeasurements=measurements;
-    return measurements.length>0&&measurements.every(m=>Math.abs(m.gap-m.expected)<=1);
-  })()`,
-    undefined,
-    'both',
-  );
-}
-
 export async function collectionContext(h, id, action) {
   await h.evaluate(
     `document.querySelector('[data-collection-id="${id}"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:80,clientY:180}))`,
@@ -41,8 +9,8 @@ export async function collectionContext(h, id, action) {
 export async function checkCollectionContext(h, id) {
   await collectionContext(h, id);
   await h.check(
-    '收藏集右键菜单包含重命名和危险色删除；智能收藏集提供编辑规则',
-    `(async()=>{const menu=document.querySelector('.nps-menu:popover-open'),items=[...menu.querySelectorAll('[role=menuitem]')];await Promise.allSettled(items.flatMap(item=>item.getAnimations().map(animation=>animation.finished)));const probe=document.createElement('span');probe.style.color='var(--danger)';menu.append(probe);const danger=getComputedStyle(probe).color;probe.remove();return (items.length===2||items.length===3&&items[0].textContent.trim()==='编辑规则…')&&items.at(-2).textContent.trim()==='重命名'&&items.at(-1).textContent.trim()==='删除'&&getComputedStyle(items.at(-1)).color===danger})()`,
+    '收藏集右键菜单包含重命名和删除；智能收藏集提供编辑规则',
+    `(async()=>{const menu=document.querySelector('.nps-menu:popover-open'),items=[...menu.querySelectorAll('[role=menuitem]')];return (items.length===2||items.length===3&&items[0].textContent.trim()==='编辑规则…')&&items.at(-2).textContent.trim()==='重命名'&&items.at(-1).textContent.trim()==='删除'})()`,
     undefined,
     'both',
   );

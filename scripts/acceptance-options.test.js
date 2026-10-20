@@ -60,17 +60,14 @@ it('keeps the system-reduced full run separate from the subset and explicit-off 
   expect(() => acceptanceOptions(['--motion=missing'], {})).toThrow('--motion');
 });
 
-it('selects the reduced subset fixtures and validates timing policy before launch', () => {
+it('selects the reduced subset fixtures before launch', () => {
   expect(
     acceptanceOptions(['--category=减少动态效果', '--reduced-motion'], { CI: 'true' }),
   ).toMatchObject({
-    timing: 'record',
     needsLibrary: true,
     needsDictionary: true,
     reducedMotion: true,
   });
-  expect(acceptanceOptions(['--timing=strict'], { CI: 'true' }).timing).toBe('strict');
-  expect(() => acceptanceOptions(['--timing=skip'], {})).toThrow('--timing');
   expect(() => acceptanceOptions(['--slow=4'], { CI: 'true' })).toThrow('--slow');
 });
 

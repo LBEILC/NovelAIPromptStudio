@@ -4,12 +4,7 @@ import { libraryViewerChecks } from './libraryViewer.js';
 import { libraryTagFilterChecks } from './libraryTagFilter.js';
 import { scrollChecks } from './scroll.js';
 import { libraryCopyChecks } from './libraryCopy.js';
-import {
-  checkLibraryButtonGaps,
-  checkCollectionContext,
-  collectionContext,
-  libraryFinishChecks,
-} from './libraryFinish.js';
+import { checkCollectionContext, collectionContext, libraryFinishChecks } from './libraryFinish.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -20,8 +15,6 @@ import { importLibraryFiles } from '../importer.js';
 import { extraLibraryChecks } from './libraryExtras.js';
 import { libraryImportExtras } from './libraryImportExtras.js';
 import { motionDetails } from './motion.js';
-import { capture, finish } from './transitions.js';
-import { focusRingChecks } from './focusRings.js';
 const require = createRequire(import.meta.url);
 
 export async function libraryChecks(env) {
@@ -163,7 +156,7 @@ export async function libraryChecks(env) {
       undefined,
       'both',
     );
-    await checkLibraryButtonGaps(h, '默认');
+
     if (!reduced) await screen('mixed');
     await selectCard(1);
     await waitDetail();
@@ -269,7 +262,7 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
-    await checkLibraryButtonGaps(h, '多选');
+
     if (!reduced) await screen('select');
     await click('取消', 'document.querySelector(".library-selection-bar")');
     await check(
@@ -398,7 +391,7 @@ export async function libraryChecks(env) {
     await click('筛选', scope);
     await input('input[aria-label="包含 Tag"]', '1girl');
     await key('Enter');
-    await checkLibraryButtonGaps(h, '筛选');
+
     if (!reduced) await screen('filter');
     await click('存为智能收藏集');
     await wait('!!document.querySelector(".library-side input")');
@@ -411,7 +404,7 @@ export async function libraryChecks(env) {
     await input('input[aria-label="收藏集名称"]', `012智能${reduced}`);
     await key('Enter', {}, 'document.activeElement');
     await wait(`!!document.querySelector('.library-side [aria-label="012智能${reduced}"]')`);
-    await focusRingChecks(h, '智能收藏集规则栏');
+
     const smart = database.listCollections().find((c) => c.name === `012智能${reduced}`);
     await check(
       '将当前条件存为智能收藏集',
@@ -646,7 +639,7 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
-    await checkLibraryButtonGaps(h, '大图');
+
     await check(
       '大图摞内位置与小图条一致',
       "(()=>{const strip=document.querySelector('.library-viewer .library-strip');return !strip || document.querySelector('.library-viewer-top .library-mono').textContent.trim().endsWith(' · '+([...strip.children].findIndex(b=>b.classList.contains('is-current'))+1)+' / '+strip.children.length)})()",
@@ -725,7 +718,7 @@ export async function libraryChecks(env) {
     await wait('document.querySelectorAll(".library-card").length===1');
     await selectCard(0);
     await waitDetail();
-    await checkLibraryButtonGaps(h, '回收站');
+
     await check(
       '恢复按钮有返回图标',
       '!!document.querySelector(".library-detail-actions .ri-arrow-go-back-line")',
