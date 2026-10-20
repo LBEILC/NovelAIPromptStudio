@@ -2,9 +2,9 @@
 
 本文说明 NovelAI Prompt Studio 当前的正式发版流程。仓库通过 [GitHub Actions](../.github/workflows/release.yml) 在 Windows 和 macOS runner 上构建安装包，并在版本标签推送后创建 GitHub Release。
 
-## 一句话流程
+## 发布流程
 
-先把准备发布的代码提交到 `main`，更新 `package.json` 与 `package-lock.json` 中的版本号，完成测试和构建，再创建一个包含完整更新说明的 annotated tag 并推送。推送 `v*` 标签后，GitHub Actions 会自动打包和发布。
+先把准备发布的代码提交到 `main`，更新 `package.json` 与 `package-lock.json` 中的版本号，完成本机测试和构建，再创建包含完整更新说明的 annotated tag。版本号提交和标签一起推送：`git push origin main refs/tags/vX.Y.Z`。发版不等 CI；日常 CI 是推送后的检查，不阻止发版。标签触发的工作流直接打包和发布。
 
 ## 发版前检查
 
@@ -80,17 +80,16 @@ npm run package
 
 窗口行为、快捷键、文件对话框、安全存储、安装和更新等平台相关功能，由 CI 在 Windows 和 macOS 上的自动化验收覆盖（见[自动化验收](./automated-acceptance.md)）；自动化覆盖不到的写进发布说明的已知问题。
 
-## 3. 提交并推送版本准备
+## 3. 提交版本准备
 
 只暂存本次发版所需文件，避免把无关的本地改动一起提交：
 
 ```bash
 git add package.json package-lock.json
-git commit -m "chore: prepare v0.3.0 release"
-git push origin main
+git commit -m "[工程] 准备 v0.3.0 发版" -- package.json package-lock.json
 ```
 
-如果发版本身修改了工作流、文档或打包配置，也应明确加入同一个提交或单独提交后先推送 `main`。
+如果发版本身修改了工作流、文档或打包配置，也应明确加入同一个提交或单独提交，最后与标签一起推送 `main`。不要等待 main 的 CI 或字体缓存预热。
 
 ## 4. 编写 Release 更新说明
 
@@ -146,7 +145,7 @@ git push origin main
 ```bash
 git tag -a v0.3.0 --cleanup=verbatim -F release-notes-v0.3.0.md
 git show v0.3.0 --no-patch
-git push origin refs/tags/v0.3.0
+git push origin main refs/tags/v0.3.0
 ```
 
 `--cleanup=verbatim` 会保留 Markdown 中以 `#` 开头的标题；省略它时，Git 可能把标题当作注释清掉。确认标签创建成功后删除临时说明文件，不要误提交到仓库。
@@ -162,7 +161,7 @@ git tag -a v0.3.0 \
   -m "## 体验与修复" \
   -m "- 修复某项问题。"
 git show v0.3.0 --no-patch
-git push origin refs/tags/v0.3.0
+git push origin main refs/tags/v0.3.0
 ```
 
 以上续行符是 POSIX shell 示例；PowerShell 可将命令写成一行，或使用反引号续行。更推荐方式 A，避免不同 shell 的转义差异。
@@ -173,11 +172,11 @@ git push origin refs/tags/v0.3.0
 
 推送 `v*` 标签后，[`Package and release`](../.github/workflows/release.yml) 会：
 
-1. `check` 在 Windows + Node 22 单独执行 `npm ci`、类型检查和单元测试，与 `prepare-fonts` 及后续打包并行。
-2. `prepare-fonts` 恢复或下载并校验固定版本的 MiSans；三个 `package` 作业只依赖它，各自安装依赖、校验标签与版本一致、恢复并校验字体、构建打包。
-3. `package` 分别构建 Windows x64、macOS Intel、macOS Apple Silicon。每个作业保留原生模块检查、启动真实打包程序的轻量验收、包内字体检查和更新元数据检查，不重复执行类型和单元测试。
-4. `release` 同时等待 `check` 和三个 `package` 全部成功，合并两个 macOS 架构的更新元数据，校验产物并生成 `SHA256SUMS.txt`。
-5. checkout 完整标签历史，读取 annotated tag 中的更新说明；只有标签推送事件才创建 GitHub Release 并上传产物。
+1. 三个 `package` 作业直接并行启动，分别构建 Windows x64、macOS Intel、macOS Apple Silicon。各自安装依赖、校验标签与版本一致，恢复字体缓存；未命中时下载并校验，再构建打包。
+2. 每个打包作业保留原生模块检查、启动真实打包程序的轻量验收、包内字体检查和更新元数据检查，不重复执行类型和单元测试。
+3. `release` 只等待 Windows x64 和 macOS Apple Silicon 两个打包作业成功，校验这两个平台的产物和更新元数据，加入可用的 `release-notes.json` 并生成 `SHA256SUMS.txt`。
+4. checkout 完整标签历史，读取 annotated tag 中的更新说明；只有标签推送事件才创建 GitHub Release，先上传 Windows 和 Apple 芯片的附件，不再额外上传一份合并产物到 Actions。
+5. macOS Intel 作业独立完成打包和检查，等待同一 Release 存在且主发布附件就绪后，追加 DMG、ZIP 和 blockmap，合并 x64 更新条目到 `latest-mac.yml` 并更新完整的 `SHA256SUMS.txt`。通常比主发布晚几分钟，最多轮询约 20 分钟。Intel 失败会在作业日志中明确提示，不影响已经发布的 Release，可重跑 Intel 作业补齐附件。未签名 macOS 当前未启用自动更新，允许其元数据稍后补齐。
 
 当前发布产物包括：
 
@@ -187,7 +186,7 @@ git push origin refs/tags/v0.3.0
 - 所有上传文件的 SHA-256 校验清单。
 - GitHub 根据发布标签自动提供的完整源码 ZIP 与 TAR.GZ；它们必须和安装包指向同一标签。
 
-`workflow_dispatch` 可手动验证云端打包，但因为它不是标签事件，不会创建 GitHub Release。
+`workflow_dispatch` 可手动验证云端打包，但因为它不是标签事件，不会创建 GitHub Release；Intel 只打包、检查并保存 Actions 产物，不等待或上传到 Release。
 
 ```sh
 gh workflow run release.yml --ref <待验证分支>
@@ -197,7 +196,7 @@ gh workflow run release.yml --ref <待验证分支>
 
 CI 和发版使用完全相同的缓存键（版本与 SHA-256）、`.local/fonts/MiSansVF.ttf` 路径以及 `enableCrossOsArchive: true`。根据 [GitHub 缓存作用域规则](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching)，标签运行可以回退读取默认分支 `main` 的缓存，不能读取其他功能分支或其他标签的缓存；相同键还必须匹配缓存版本（路径和压缩方式）。
 
-发布前先等待 `main` 上 CI 的 `prepare-fonts` 成功，再推送标签。只有功能分支已绿、或同时推送 main 和标签，都不能保证标签启动时 main 缓存已保存。1.0 发版的字体恢复发生于 2026-10-12 07:36:58 UTC，main 的匹配缓存到 07:37:09 UTC 才保存，所以两边同时未命中；后续标签可复用已保存的 main 缓存。缓存被淘汰或版本变化时，先在 main 运行 CI 预热；若仍未命中，`prepare-fonts` 保留从官方来源下载并校验的回退，打包矩阵不各自下载。
+缓存只用于加速，不是发布前提。CI 的每个作业和发版的每个打包作业都会独立恢复缓存，未命中就运行 `npm run fonts` 从官方来源下载，随后运行 `npm run fonts:check` 并保存已校验的缓存。可以同时推送 main 和标签，无需等待 main 的 CI 或预热字体缓存。
 
 ## macOS 签名与公证
 
@@ -226,7 +225,7 @@ gh run view <id> --log-failed
 gh run rerun <id> --failed
 ```
 
-GitHub 页面上的 “Re-run failed jobs” 等价。一个平台打包失败不必重跑另两个已成功的平台；`check` 失败不必重跑已成功的打包。下游发布仍须等所有依赖成功。日常 CI 也已拆成检查、界面验收、减少动态效果、安装包和截图作业，详见[自动化验收](./automated-acceptance.md)。没有加入失败自动重试。
+GitHub 页面上的 “Re-run failed jobs” 等价。一个平台打包失败不必重跑另两个已成功的平台；下游发布只等待 Windows 和 Apple Silicon 成功，Intel 失败不阻止发布。Intel 使用 `continue-on-error`，整轮状态可能仍然成功，需检查其日志和实际附件；可用 `gh run rerun <id> --job <Intel作业ID>` 单独重跑。日常 CI 保留 Windows/macOS 的格式、类型、单测和构建检查，以及 Windows 三分片界面验收；截图仅手动触发。日常 CI 失败需修复，但不作为发版门槛。没有加入失败自动重试。
 
 在 `main` 修复问题、重新验证并递增 patch 版本，然后创建新标签。正式标签一旦推送，应保留历史，不要 force-push。
 
@@ -248,9 +247,9 @@ GitHub 页面上的 “Re-run failed jobs” 等价。一个平台打包失败�
 
 ## 发版完成后的核对
 
-1. GitHub Actions 所有 job 成功。
+1. GitHub Actions 主打包和发布 job 成功。
 2. Release 标题、正文和版本号正确。
-3. Windows、macOS Intel、macOS Apple Silicon 产物均存在。
+3. Windows 和 macOS Apple Silicon 产物存在；稍后确认 Intel 的 DMG、ZIP、blockmap 已补齐，`latest-mac.yml` 同时含 x64 与 arm64 条目，`SHA256SUMS.txt` 已覆盖补传附件。
 4. `SHA256SUMS.txt` 存在，且与下载的当前平台安装包实测校验一致。
 5. Release 自动生成的 `Source code (zip)` 与 `Source code (tar.gz)` 可以下载，并对应本次发布标签。
 6. 下载并启动至少一个当前平台安装包。
