@@ -42,7 +42,7 @@ async function press(h, expression) {
   }
 }
 
-async function toggle(h, label, trigger, layer) {
+async function toggle(h, label, trigger, layer, focusTarget = trigger) {
   for (let count = 1; count <= 5; count++) {
     await press(h, trigger);
 
@@ -57,9 +57,10 @@ async function toggle(h, label, trigger, layer) {
   }
   await h.nativeKey('Escape');
   await h.wait(`!(${layer})`);
+  await h.wait(`document.activeElement===${focusTarget}`, `${label}关闭后恢复焦点`);
   await h.check(
-    `${label}：Esc 返回触发器`,
-    `document.activeElement===${trigger}`,
+    `${label}：Esc 恢复焦点`,
+    `document.activeElement===${focusTarget}`,
     undefined,
     'once',
   );
@@ -275,7 +276,13 @@ export async function interactionCorrectionChecks(env) {
     await h.nativeKey('Escape');
     await toggle(h, '节菜单', wb('更多'), menu);
     await toggle(h, '块菜单', wb('这一块的操作'), menu);
-    await toggle(h, '复制拆分箭头', wb('其他复制方式'), menu);
+    await toggle(
+      h,
+      '复制拆分箭头',
+      wb('其他复制方式'),
+      menu,
+      'document.querySelector(\'[data-trigger="copy"] button\')',
+    );
     await click('添加角色');
     await toggle(h, '角色操作', wb('这个角色的操作'), menu);
     await e(
