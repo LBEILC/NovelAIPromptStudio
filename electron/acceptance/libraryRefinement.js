@@ -18,7 +18,7 @@ export async function libraryRefinementChecks({ h, database }) {
   const settle = () => wait('!document.querySelector("[data-library-updating=true]")');
   const count = () =>
     e(
-      'Number(document.querySelector(".library-count").textContent.match(/(?:·\\s*)?(\\d+) 张/)[1])',
+      'Number(document.querySelector(".library-count")?.textContent.match(/(?:·\\s*)?(\\d+) 张/)?.[1])',
     );
   const close = () => key('Escape', {}, 'document.activeElement');
   const screenshot = async (name) => {
@@ -206,6 +206,10 @@ export async function libraryRefinementChecks({ h, database }) {
           .find((collection) => collection.id === smart.id)
           .filters.excludeTags.includes('round shape'),
       '027 规则保存',
+    );
+    await wait(
+      '[...document.querySelectorAll(".library-chips button")].some(n=>n.textContent.trim()==="编辑规则") && !document.querySelector(".nps-popover:popover-open .library-filter-panel")',
+      '027 规则保存完成并回到只读状态',
     );
     await check(
       '027 保存规则更新只读条件行',
