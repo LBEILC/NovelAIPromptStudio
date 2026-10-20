@@ -1,3 +1,4 @@
+import { invokeUI, onProgress } from '../lib/commands';
 import { useEffect, useState } from 'react';
 import type { StorageDetails, DatabaseStorageLocation, DatabaseBackup } from '../shared/ipc';
 import type { LibraryStorageProgress } from '../shared/types';
@@ -13,7 +14,7 @@ export function useStorage(onLibraryChange: () => Promise<unknown>) {
     const studio = window.studio;
     if (!studio) return;
     let active = true;
-    void Promise.all([studio.getDatabaseStorage(), studio.listDatabaseBackups()])
+    void Promise.all([invokeUI('storage.database', {}), invokeUI('storage.backups', {})])
       .then(([location, listing]) => {
         if (!active) return;
         if (location.ok) setDatabase(location);
@@ -24,20 +25,19 @@ export function useStorage(onLibraryChange: () => Promise<unknown>) {
       .catch((e: Error) => {
         if (active) setDatabaseError(e.message);
       });
-    studio
-      .getLibraryStorage()
+    invokeUI('storage.get', {})
       .then((result) => {
         if (!active) return;
         if (result.ok) setDetails(result);
         else setError(result.error);
       })
       .catch((e: Error) => setError(e.message));
-    studio.onLibraryStorageProgress((next) => {
+    const unsubscribe = onProgress('library:storage-progress', (next) => {
       if (active) setProgress(next);
     });
     return () => {
       active = false;
-      studio.offLibraryStorageProgress();
+      unsubscribe();
     };
   }, []);
   const change = async () => {
@@ -46,7 +46,7 @@ export function useStorage(onLibraryChange: () => Promise<unknown>) {
     setProgress(null);
     setError('');
     try {
-      const result = await window.studio.changeLibraryStorage();
+      const result = await invokeUI('storage.change', {});
       if (!result.ok) throw new Error(result.error);
       if ('canceled' in result) return;
       setDetails(result);
@@ -60,7 +60,7 @@ export function useStorage(onLibraryChange: () => Promise<unknown>) {
   };
   const reveal = async () => {
     try {
-      const result = await window.studio?.revealLibraryStorage();
+      const result = await invokeUI('storage.reveal', {});
       if (result && !result.ok) throw new Error(result.error);
     } catch (e) {
       setError(String(e));
@@ -69,7 +69,7 @@ export function useStorage(onLibraryChange: () => Promise<unknown>) {
   const revealDatabase = async (fileName: string) => {
     setDatabaseError('');
     try {
-      const result = await window.studio?.revealDatabaseFile(fileName);
+      const result = await invokeUI('storage.reveal-backup', { fileName: fileName });
       if (result && !result.ok) throw new Error(result.error);
     } catch (e) {
       setDatabaseError(e instanceof Error ? e.message : String(e));

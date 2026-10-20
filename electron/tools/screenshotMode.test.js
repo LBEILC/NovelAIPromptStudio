@@ -9,7 +9,12 @@ const preload = fs.readFileSync(new URL('../preload.cjs', import.meta.url), 'utf
 function runPreload(argv) {
   const exposed = {};
   const listeners = {};
-  const ipcRenderer = { invoke: vi.fn(async () => []), send: vi.fn() };
+  const ipcRenderer = {
+    invoke: vi.fn(async () => []),
+    send: vi.fn(),
+    on: vi.fn(),
+    removeListener: vi.fn(),
+  };
   vm.runInNewContext(preload, {
     require: () => ({
       contextBridge: {
@@ -30,17 +35,43 @@ function runPreload(argv) {
 }
 
 describe('screenshot isolation', () => {
+  it('delivers each command event unchanged and unsubscribes only its own listener', () => {
+    const { exposed, ipcRenderer } = runPreload(['electron', '.']);
+    const callback = vi.fn();
+    const unsubscribe = exposed.studio.onCommandEvent(callback);
+    const [channel, listener] = ipcRenderer.on.mock.calls[0];
+    expect(channel).toBe('studio:command-event');
+    for (const event of [
+      { type: 'workbench', session: { version: 2, tabs: [], activeTabId: '' }, source: 'agent' },
+      { type: 'progress', topic: 'library:cards-progress', data: { completed: 1, total: 2 } },
+      { type: 'updates', data: { phase: 'current' } },
+      { type: 'navigate', destination: 'settings' },
+    ]) {
+      listener({}, event);
+      expect(callback).toHaveBeenLastCalledWith(event);
+    }
+    unsubscribe();
+    expect(ipcRenderer.removeListener).toHaveBeenCalledWith(channel, listener);
+  });
   it('normal preload exposes only the product API, with no screenshot listeners', async () => {
     const { exposed, listeners, ipcRenderer } = runPreload(['electron', '.']);
     expect(Object.keys(exposed)).toEqual(['studio']);
     expect(listeners).toEqual({});
-    await exposed.studio.loadLibrary();
-    expect(ipcRenderer.invoke).toHaveBeenCalledWith('library:load', { view: 'all' });
+    expect(Object.keys(exposed.studio).sort()).toEqual([
+      'invoke',
+      'onCommandEvent',
+      'onCommandPrepare',
+      'pathsForFiles',
+    ]);
+    await exposed.studio.invoke('library.cards', { view: 'all' });
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('studio:command', 'library.cards', {
+      view: 'all',
+    });
   });
   it('screenshot preload exposes explicit state, pending IPC and error reporting', async () => {
     const { exposed, ipcRenderer } = runPreload(['--app-screenshot-state={"page":"gallery"}']);
     expect(exposed.studioScreenshot.page).toBe('gallery');
-    const loading = exposed.studio.loadLibrary();
+    const loading = exposed.studio.invoke('library.cards', {});
     expect(exposed.studioScreenshot.pending()).toBe(1);
     await loading;
     expect(exposed.studioScreenshot.pending()).toBe(0);

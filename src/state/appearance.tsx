@@ -1,3 +1,4 @@
+import { invokeUI } from '../lib/commands';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppearanceSettings } from '../shared/types';
 import { ThemeProvider } from '../ui';
@@ -41,8 +42,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     const request = revision.current;
-    window.studio
-      ?.getAppearanceSettings()
+    invokeUI('settings.appearance.get', {})
       .then((saved) => {
         if (active && request === revision.current)
           setAppearance({ ...defaultAppearance, ...saved, primaryColor: 'blue' });
@@ -70,7 +70,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   }, [appearance, resolvedTheme]);
   const changeAppearance = async (patch: Partial<AppearanceSettings>) => {
     const request = ++revision.current;
-    const saved = await window.studio?.saveAppearanceSettings(patch);
+    const saved = await invokeUI('settings.appearance.save', { settings: patch });
     // A reply contains the whole snapshot at that save, not the latest choice.
     if (request === revision.current)
       setAppearance((current) => ({ ...current, ...(saved ?? patch), primaryColor: 'blue' }));

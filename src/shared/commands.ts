@@ -1,3 +1,5 @@
+import type * as Types from './types';
+import type * as IPC from './ipc';
 import type {
   ImageProject,
   WorkbenchSource,
@@ -62,7 +64,8 @@ export interface EditingTarget {
   scope?: string;
   block?: number;
 }
-export interface CommandEvent {
+export interface WorkbenchCommandEvent {
+  type: 'workbench';
   session: CommandSession;
   source: 'ui' | 'agent';
   tabId?: string;
@@ -70,7 +73,214 @@ export interface CommandEvent {
   libraryChanged?: boolean;
   dictionaryChanged?: boolean;
 }
+export interface ProgressTopics {
+  'library:cards-progress': IPC.LibraryCardCacheProgress;
+  'library:storage-progress': Types.LibraryStorageProgress;
+  'library:import-progress': Types.ImportProgress;
+  'library:import-preview': Types.PreparedImportPreview;
+  'tag-cache:retranslate:progress': IPC.DictionaryTranslationProgress;
+}
+export type ProgressCommandEvent = {
+  [K in keyof ProgressTopics]: { type: 'progress'; topic: K; data: ProgressTopics[K] };
+}[keyof ProgressTopics];
+export type CommandEvent =
+  | WorkbenchCommandEvent
+  | ProgressCommandEvent
+  | { type: 'updates'; data: Types.UpdateState }
+  | { type: 'navigate'; destination: string };
 export interface CommandDefinitions {
+  'agent.setup': {
+    input: Record<string, never>;
+    output: IPC.Result<{
+      installed: boolean;
+      path: string;
+      onPath: boolean;
+      skillPath: string;
+      platform: string;
+    }>;
+  };
+  'agent.install': {
+    input: Record<string, never>;
+    output: IPC.Result<{
+      installed: boolean;
+      path: string;
+      onPath: boolean;
+      skillPath: string;
+      platform: string;
+      pathFailed?: boolean;
+    }>;
+  };
+  'agent.skill': { input: Record<string, never>; output: IPC.Result<{ text: string }> };
+  'agent.reveal': { input: Record<string, never>; output: IPC.Result };
+  'image.copy': { input: { id?: string; path?: string }; output: IPC.Result };
+  'image.save-as': {
+    input: { id?: string; path?: string; name?: string };
+    output: IPC.DownloadResult;
+  };
+  'file.reveal': {
+    input: {
+      path?: string;
+      vibe?: Pick<Types.Vibe, 'encoding'> & Partial<Omit<Types.Vibe, 'encoding'>>;
+    };
+    output: IPC.Result<{ filePath: string }>;
+  };
+  'workbench.open-many': {
+    input: { paths: string[] };
+    output: { ok: boolean; items: IPC.DroppedWorkbenchItem[]; error?: string };
+  };
+  'import.prepare': { input: { paths?: string[] }; output: IPC.PreparedImportResult };
+  'import.files': {
+    input: { paths?: string[]; fromClipboard?: boolean };
+    output: IPC.ImportResult;
+  };
+  'import.cancel': { input: { id: string }; output: { ok: boolean } };
+  'library.cards': {
+    input: { view?: 'all' | 'favorites' | 'trash' };
+    output: Types.LibraryCard[];
+  };
+  'collection.create': {
+    input: { collection: IPC.CollectionInput };
+    output: IPC.Result<{ collection: Types.Collection | null }>;
+  };
+  'collection.update': {
+    input: { id: string; patch: IPC.CollectionPatch };
+    output: IPC.Result<{ collection: Types.Collection | null }>;
+  };
+  'collection.delete': {
+    input: { id: string };
+    output: IPC.Result<{ deleted: boolean }>;
+  };
+  'library.restore': { input: { ids: string[] }; output: IPC.BatchResult };
+  'library.set-cover': {
+    input: { fingerprint: string; projectId: string };
+    output: IPC.Result<{ promptFingerprint: string; projectId: string }>;
+  };
+  'trash.delete-permanently': {
+    input: { ids?: string[] };
+    output: IPC.BatchResult;
+  };
+  'trash.summary': {
+    input: Record<string, never>;
+    output: IPC.Result<{
+      projects: Pick<
+        Types.ImageRecord,
+        'id' | 'name' | 'image_path' | 'thumbnail_path' | 'is_favorite' | 'deleted_at'
+      >[];
+      count: number;
+      totalBytes: number | null;
+    }>;
+  };
+  'workbench.temp-sync': {
+    input: { paths: string[] };
+    output: IPC.Result<{ removed: string[] }>;
+  };
+  'workbench.save-structure': {
+    input: { filePath: string; structure: import('./types').PromptStructure; projectId?: string };
+    output: IPC.Result;
+  };
+  'workbench.open-clipboard': {
+    input: Record<string, never>;
+    output: Exclude<IPC.WorkbenchResult, { canceled: true }>;
+  };
+  'dictionary.retranslate': {
+    input: { id: string; tags: string[] };
+    output: IPC.Result<IPC.DictionaryTranslationProgress>;
+  };
+  'dictionary.retranslate-cancel': { input: { id: string }; output: IPC.Result };
+  'dictionary.translate': {
+    input: { tags: string[] };
+    output: IPC.Result<IPC.TranslationResult>;
+  };
+  'dictionary.remove': {
+    input: { tags: string[] };
+    output: IPC.Result<{ deleted: number }>;
+  };
+  'paragraph.transform': {
+    input: {
+      request: {
+        id: string;
+        text: string;
+        direction: 'translate' | 'rewrite';
+      };
+    };
+    output: IPC.Result<{ text: string }>;
+  };
+  'paragraph.cancel': { input: { id: string }; output: IPC.Result };
+  'import.previews': { input: { sessionId: string }; output: IPC.Result };
+  'import.commit': {
+    input: { sessionId: string; entryIds: string[] };
+    output: IPC.ImportResult;
+  };
+
+  'clipboard.read-text': { input: Record<string, never>; output: string };
+  'clipboard.write-text': { input: { text: string }; output: void };
+  'settings.ai.get': { input: Record<string, never>; output: Types.AISettings };
+  'settings.ai.save': {
+    input: { settings: Types.AISettingsInput };
+    output: Types.AISettings;
+  };
+  'settings.appearance.get': {
+    input: Record<string, never>;
+    output: Types.AppearanceSettings;
+  };
+  'settings.appearance.save': {
+    input: { settings: Partial<Types.AppearanceSettings> };
+    output: Types.AppearanceSettings;
+  };
+  'settings.productivity.get': {
+    input: Record<string, never>;
+    output: Types.ProductivitySettings;
+  };
+  'settings.productivity.save': {
+    input: { settings: Partial<Types.ProductivitySettings> };
+    output: Types.ProductivitySettings;
+  };
+  'updates.status': {
+    input: Record<string, never>;
+    output: { ok: true } & Types.UpdateState;
+  };
+  'updates.check': {
+    input: Record<string, never>;
+    output:
+      | ({ ok: true } & Types.UpdateState)
+      | (IPC.Failure & Types.UpdateCapabilities & { currentVersion: string });
+  };
+  'updates.download': { input: Record<string, never>; output: IPC.Result };
+  'updates.install': { input: Record<string, never>; output: IPC.Result };
+  'updates.open-release': { input: { url?: string }; output: { ok: true } };
+  'fonts.list': {
+    input: Record<string, never>;
+    output:
+      | { ok: true; fonts: { family: string; monospace: boolean }[] }
+      | (IPC.Failure & { fonts: [] });
+  };
+  'ai.models': {
+    input: Record<string, never>;
+    output: IPC.Result<{ models: string[] }>;
+  };
+  'ai.test': {
+    input: Record<string, never>;
+    output: IPC.Result<{ model: string; latencyMs: number; response: string }>;
+  };
+  'storage.get': {
+    input: Record<string, never>;
+    output: IPC.Result<IPC.StorageDetails>;
+  };
+  'storage.database': {
+    input: Record<string, never>;
+    output: IPC.Result<IPC.DatabaseStorageLocation>;
+  };
+  'storage.backups': {
+    input: Record<string, never>;
+    output: IPC.Result<{ backups: IPC.DatabaseBackup[] }>;
+  };
+  'storage.reveal-backup': { input: { fileName: string }; output: IPC.Result };
+  'storage.change': {
+    input: Record<string, never>;
+    output: IPC.StorageChangeResult;
+  };
+  'storage.reveal': { input: Record<string, never>; output: IPC.Result };
+
   'app.status': {
     input: Record<string, never>;
     output: { version: string; libraryCount: number; workbenchTabs: number; revision: number };
@@ -93,8 +303,8 @@ export interface CommandDefinitions {
     };
   };
   'workbench.open': {
-    input: Revision & { path?: string; libraryId?: string };
-    output: TabDocument;
+    input: Revision & { path?: string; libraryId?: string; source?: WorkbenchSource };
+    output: TabDocument | { canceled: true };
   };
   'workbench.get': { input: { tabId: string }; output: TabDocument };
   'workbench.close': { input: TabInput; output: { closed: string } };
@@ -125,7 +335,10 @@ export interface CommandDefinitions {
     };
     output: { items: LibraryCard[]; total: number; revision: number };
   };
-  'library.get': { input: { id: string }; output: { project: ImageProject; revision: number } };
+  'library.get': {
+    input: { id: string };
+    output: { project: Types.ImageRecord; revision: number };
+  };
   'library.import': {
     input: Revision & { path: string };
     output: { project: ImageProject; revision: number };
@@ -136,7 +349,38 @@ export interface CommandDefinitions {
   };
   'library.trash': {
     input: Revision & { ids: string[] };
-    output: { ids: string[]; revision: number };
+    output: {
+      ids: string[];
+      revision: number;
+      results: Types.BatchResults;
+      summary: Types.BatchSummary;
+    };
+  };
+  'library.rename-many': {
+    input: Revision & { changes: { id: string; name: string; has_custom_name?: boolean }[] };
+    output: {
+      previous: { id: string; name: string; has_custom_name: boolean }[];
+      revision: number;
+    };
+  };
+  'dictionary.list': {
+    input: {
+      query?: string;
+      category?: TagCategory;
+      source?: string;
+      limit?: number;
+      offset?: number;
+      all?: boolean;
+    };
+    output: { items: TagDictionaryEntry[]; total: number; limit: number; offset: number };
+  };
+  'dictionary.suggest': {
+    input: { query: string };
+    output: { items: { tag: string; translation: string; category: string; count: number }[] };
+  };
+  'dictionary.set-many': {
+    input: Revision & { entries: { tag: string; translation?: string; category?: TagCategory }[] };
+    output: { items: TagDictionaryEntry[]; revision: number };
   };
   'collection.list': {
     input: Record<string, never>;
@@ -144,11 +388,11 @@ export interface CommandDefinitions {
   };
   'collection.add': {
     input: Revision & { collectionId: string; ids: string[] };
-    output: { revision: number };
+    output: { revision: number; results: Types.BatchResults; summary: Types.BatchSummary };
   };
   'collection.remove': {
     input: Revision & { collectionId: string; ids: string[] };
-    output: { revision: number };
+    output: { revision: number; results: Types.BatchResults; summary: Types.BatchSummary };
   };
   'dictionary.lookup': {
     input: { tags: string[] };

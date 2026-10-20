@@ -1,3 +1,4 @@
+import { invokeUI } from '../lib/commands';
 import { useEffect, useState } from 'react';
 import type { ImageRecord } from '../shared/types';
 
@@ -9,8 +10,8 @@ export function useLibraryDetail(id: string, revision: unknown) {
     if (!id) return;
     let active = true;
     setError('');
-    window.studio
-      ?.loadLibraryDetail(id)
+    invokeUI('library.get', { id: id })
+      .then((result) => result.project)
       .then((record) => {
         if (active) setDetail(record);
       })

@@ -46,8 +46,11 @@ it('keeps the painted detail while loading and ignores late stale replies', asyn
   Object.defineProperty(window, 'studio', {
     configurable: true,
     value: {
-      loadLibraryDetail: (id: string) =>
-        new Promise<ImageRecord>((resolve) => pending.set(id, resolve)),
+      invoke: (_name: string, { id }: { id: string }) =>
+        new Promise<ImageRecord>((resolve) => pending.set(id, resolve)).then((project) => ({
+          ok: true,
+          data: { project, revision: 0 },
+        })),
     },
   });
   const host = document.createElement('div');
@@ -112,10 +115,11 @@ it('delays cache progress and hides it on list completion without a terminal eve
   let progress: (value: LibraryCardCacheProgress) => void = () => {};
   const unsubscribe = vi.fn();
   vi.stubGlobal('studio', {
-    onLibraryCardCacheProgress: (callback: typeof progress) => {
-      progress = callback;
+    onCommandEvent: (callback: (event: import('../shared/commands').CommandEvent) => void) => {
+      progress = (value) =>
+        callback({ type: 'progress', topic: 'library:cards-progress', data: value });
+      return unsubscribe;
     },
-    offLibraryCardCacheProgress: unsubscribe,
   });
   const host = document.createElement('div');
   const root = createRoot(host);

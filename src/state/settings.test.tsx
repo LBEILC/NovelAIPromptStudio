@@ -33,6 +33,15 @@ const ai = {
   hasApiKey: true,
   encryptionAvailable: true,
 };
+function mockStudio(handlers: Record<string, (input: any) => unknown>): StudioApi {
+  return {
+    invoke: async (name: string, input: unknown) => ({
+      ok: true,
+      data: await handlers[name]?.(input),
+    }),
+    onCommandEvent: () => () => {},
+  } as unknown as StudioApi;
+}
 describe('settings domain state', () => {
   it('ignores stale appearance saves and the initial read after a newer choice', async () => {
     vi.stubGlobal('matchMedia', () => ({
@@ -43,16 +52,18 @@ describe('settings domain state', () => {
     type Settings = typeof defaultAppearance;
     let load!: (settings: Settings) => void;
     const saves: ((settings: Settings) => void)[] = [];
-    window.studio = {
-      getAppearanceSettings: () =>
-        new Promise<Settings>((resolve) => {
-          load = resolve;
-        }),
-      saveAppearanceSettings: () =>
-        new Promise<Settings>((resolve) => {
-          saves.push(resolve);
-        }),
-    } as unknown as StudioApi;
+    window.studio = mockStudio({
+      'settings.appearance.get': (input: any) =>
+        (() =>
+          new Promise<Settings>((resolve) => {
+            load = resolve;
+          }))(),
+      'settings.appearance.save': (input: any) =>
+        (() =>
+          new Promise<Settings>((resolve) => {
+            saves.push(resolve);
+          }))(),
+    });
     let state!: ReturnType<typeof useAppearance>;
     function Harness() {
       state = useAppearance();
@@ -86,9 +97,10 @@ describe('settings domain state', () => {
     'preserves drafts when the initial AI read arrives late (switch=%s)',
     async (switchSection) => {
       const pending: ((value: typeof ai) => void)[] = [];
-      window.studio = {
-        getAISettings: () => new Promise((resolve) => pending.push(resolve)),
-      } as unknown as StudioApi;
+      window.studio = mockStudio({
+        'settings.ai.get': (input: any) =>
+          (() => new Promise((resolve) => pending.push(resolve)))(),
+      });
       let state!: ReturnType<typeof useAISettings>;
       function Harness() {
         state = useAISettings();
@@ -123,8 +135,11 @@ describe('settings domain state', () => {
   );
   it('retains AI drafts across hidden settings sections and clears the key only after saving', async () => {
     const getAISettings = vi.fn(async () => ai);
-    const saveAISettings = vi.fn(async () => ({ ...ai, model: 'draft' }));
-    window.studio = { getAISettings, saveAISettings } as unknown as StudioApi;
+    const saveAISettings = vi.fn(async (_settings: unknown) => ({ ...ai, model: 'draft' }));
+    window.studio = mockStudio({
+      'settings.ai.get': (input: any) => getAISettings(),
+      'settings.ai.save': (input: any) => saveAISettings(input.settings),
+    });
     let state!: ReturnType<typeof useAISettings>;
     function Harness() {
       state = useAISettings();
@@ -164,13 +179,14 @@ describe('settings domain state', () => {
     'keeps cleared fields and newer saves ahead of an initial read (save=%s)',
     async (saveFirst) => {
       let resolveRead!: (value: typeof ai) => void;
-      window.studio = {
-        getAISettings: () =>
-          new Promise((resolve) => {
-            resolveRead = resolve;
-          }),
-        saveAISettings: async () => ({ ...ai, model: '' }),
-      } as unknown as StudioApi;
+      window.studio = mockStudio({
+        'settings.ai.get': (input: any) =>
+          (() =>
+            new Promise((resolve) => {
+              resolveRead = resolve;
+            }))(),
+        'settings.ai.save': (input: any) => (async () => ({ ...ai, model: '' }))(),
+      });
       let state!: ReturnType<typeof useAISettings>;
       function Harness() {
         state = useAISettings();
@@ -186,13 +202,14 @@ describe('settings domain state', () => {
   );
   it('does not test a model after failed secure credential saving', async () => {
     const testAIModel = vi.fn();
-    window.studio = {
-      getAISettings: async () => ai,
-      saveAISettings: async () => {
-        throw new Error('安全存储不可用');
-      },
-      testAIModel,
-    } as unknown as StudioApi;
+    window.studio = mockStudio({
+      'settings.ai.get': (input: any) => (async () => ai)(),
+      'settings.ai.save': (input: any) =>
+        (async () => {
+          throw new Error('安全存储不可用');
+        })(),
+      'ai.test': (input: any) => testAIModel(),
+    });
     let state!: ReturnType<typeof useAISettings>;
     function Harness() {
       state = useAISettings();
@@ -216,7 +233,7 @@ describe('settings domain state', () => {
           }),
       )
       .mockResolvedValue({ ok: true, items: [], total: 2, limit: 200, offset: 0 });
-    window.studio = { listTagCache } as unknown as StudioApi;
+    window.studio = mockStudio({ 'dictionary.list': (input: any) => listTagCache(input) });
     let state!: ReturnType<typeof useDictionary>;
     function Harness() {
       state = useDictionary();
@@ -257,10 +274,12 @@ describe('settings domain state', () => {
       }
       return media.get(query);
     });
-    window.studio = {
-      getAppearanceSettings: async () => ({ ...defaultAppearance, primaryColor: 'purple' }),
-      saveAppearanceSettings: async (patch: object) => ({ ...defaultAppearance, ...patch }),
-    } as unknown as StudioApi;
+    window.studio = mockStudio({
+      'settings.appearance.get': (input: any) =>
+        (async () => ({ ...defaultAppearance, primaryColor: 'purple' }))(),
+      'settings.appearance.save': (input: any) =>
+        (async (patch: object) => ({ ...defaultAppearance, ...patch }))(input.settings),
+    });
     let state!: ReturnType<typeof useAppearance>;
     function Harness() {
       state = useAppearance();

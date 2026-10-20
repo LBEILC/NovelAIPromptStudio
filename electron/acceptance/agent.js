@@ -63,7 +63,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   await h.check(
     'help 列出全部公开命令和输入格式',
     () =>
-      help.commands.length === 26 &&
+      help.commands.length === 30 &&
       help.commands.every((c) => c.input && !c.name.startsWith('workbench.commit')),
     undefined,
     'once',
@@ -75,6 +75,15 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     undefined,
     'once',
   );
+  for (const name of ['settings.ai.get', 'trash.delete-permanently']) {
+    const result = await cli(name);
+    await h.check(
+      `CLI 拒绝 ${name}`,
+      () => result.code === 1 && result.result.error.code === 'forbidden',
+      undefined,
+      'once',
+    );
+  }
   await h.section('Agent');
   await h.check(
     'Agent 位于词典与关于之间，页面只有三行',
@@ -103,10 +112,12 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'agent', 'SKILL.md'),
     'utf8',
   );
-  await h.wait(`(async()=>await window.studio.readClipboardText()===${JSON.stringify(skill)})()`);
+  await h.wait(
+    `(async()=>await window.studio.invoke('clipboard.read-text',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})===${JSON.stringify(skill)})()`,
+  );
   await h.check(
     '技能全文与分发文件逐字一致',
-    `(async()=>await window.studio.readClipboardText()===${JSON.stringify(skill)})()`,
+    `(async()=>await window.studio.invoke('clipboard.read-text',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})===${JSON.stringify(skill)})()`,
     undefined,
     'once',
   );
@@ -163,6 +174,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     undefined,
     'once',
   );
+  await settleLayout(h, '.wb-document-scroll');
   await h.screenshot('agent-edit');
   const stale = await cli('tag.set', {
     tabId,
@@ -273,7 +285,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   await call('workbench.close', { tabId });
   await call('workbench.close', { tabId: second.tab.id });
   const reopened = await h.evaluate(
-    `window.studio.openWorkbenchImage('', {type:'library',projectId:${JSON.stringify(saved.project.id)}})`,
+    `window.studio.invoke('workbench.open',{source:{type:'library',projectId:${JSON.stringify(saved.project.id)}}}).then(result=>{if(!result.ok)throw Error(result.error.message);return {ok:true,project:result.data.tab.project,source:result.data.tab.source}})`,
   );
   await h.check(
     '界面从图库重新打开时读取已保存草稿',
@@ -281,6 +293,26 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     undefined,
     'once',
   );
+  const imported = await call('library.import', { path: files[1] });
+  await call('library.rename-many', {
+    changes: [
+      { id: saved.project.id, name: '命令批量起名 1' },
+      { id: imported.project.id, name: '命令批量起名 2' },
+    ],
+    expectedRevision: imported.revision,
+  });
+  await h.click('图片库', 'document.querySelector(".studio-titlebar")');
+  await h.input('[aria-label="搜索图片库"]', '命令批量起名');
+  await h.wait(
+    '!!document.querySelector(\'.library-card[aria-label="命令批量起名 1"]\') && !!document.querySelector(\'.library-card[aria-label="命令批量起名 2"]\')',
+  );
+  await h.check(
+    '批量起名后图片库卡片显示两个新名称',
+    '!!document.querySelector(\'.library-card[aria-label="命令批量起名 1"]\') && !!document.querySelector(\'.library-card[aria-label="命令批量起名 2"]\')',
+    undefined,
+    'once',
+  );
+  database.deleteProject(imported.project.id);
   // Only the synthetic record created by this check is removed from the isolated database.
   database.deleteProject(saved.project.id);
 }

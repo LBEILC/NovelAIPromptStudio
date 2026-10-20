@@ -1,3 +1,4 @@
+import { onProgress } from '../lib/commands';
 import { useEffect, useRef, useState } from 'react';
 import type { LibraryCardCacheProgress } from '../shared/ipc';
 
@@ -7,11 +8,11 @@ export function useLibraryCacheProgress(loading: boolean) {
   const active = useRef(loading);
   active.current = loading;
   useEffect(() => {
-    window.studio?.onLibraryCardCacheProgress((value) => {
+    const unsubscribe = onProgress('library:cards-progress', (value) => {
       if (active.current) setProgress(value);
     });
     return () => {
-      window.studio?.offLibraryCardCacheProgress();
+      unsubscribe();
     };
   }, []);
   useEffect(() => {

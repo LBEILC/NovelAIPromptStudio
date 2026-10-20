@@ -3,7 +3,7 @@ import { scrollChecks } from './scroll.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { hash } from 'node:crypto';
-import { clipboard, nativeImage, ipcMain } from 'electron';
+import { clipboard, nativeImage } from 'electron';
 import { describeAssetDirectory } from '../libraryStorage.js';
 import { dictionaryChecks } from './dictionary.js';
 import { createTrashDraft } from './shortcuts.js';
@@ -222,9 +222,13 @@ export async function settingsChecks(context, restart) {
     const progress = [];
     const send = h.window.webContents.send.bind(h.window.webContents);
     h.window.webContents.send = (channel, ...args) => {
-      if (channel === 'library:storage-progress')
+      if (
+        channel === 'studio:command-event' &&
+        args[0]?.type === 'progress' &&
+        args[0]?.topic === 'library:storage-progress'
+      )
         progress.push({
-          ...args[0],
+          ...args[0].data,
           oldPresent: database
             .loadLibrary('all')
             .every((project) => requireExists(project.image_path)),
@@ -306,13 +310,12 @@ export async function settingsChecks(context, restart) {
     const gate = new Promise((resolve) => {
       releaseAIRead = resolve;
     });
-    ipcMain.removeHandler('ai:settings:get');
-    ipcMain.handle('ai:settings:get', async () => {
+    context.commandHandlers['settings.ai.get'] = async () => {
       const saved = preferences.publicSettings();
       aiReads++;
       await gate;
       return saved;
-    });
+    };
   }
   const aiDraftMatches = `document.querySelector(${JSON.stringify(aiInput(0))})?.value === ${JSON.stringify(mode.baseUrl)} && document.querySelector('[aria-label="模型"]')?.value==='acceptance-model' && document.querySelector('input[type=password]')?.value===${JSON.stringify(encrypted ? 'acceptance-local-key' : '')} && [...document.querySelectorAll('textarea')].map(e=>e.value).join('|') === '验收翻译规则|验收分类规则'`;
   const aiDraftDetails = `(()=>{const key=document.querySelector('input[type=password]'); const areas=[...document.querySelectorAll('textarea')]; return {baseUrl:document.querySelector(${JSON.stringify(aiInput(0))})?.value, model:document.querySelector('[aria-label="模型"]')?.value, apiKey:{empty:!key?.value,length:key?.value.length ?? 0}, translationPrompt:areas[0]?.value, classificationPrompt:areas[1]?.value}})()`;
@@ -343,7 +346,7 @@ export async function settingsChecks(context, restart) {
       releaseAIRead();
       // A subsequent IPC round trip and React paint drain the released replies.
       await e(
-        '(async()=>{await window.studio.getAISettings(); await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})()',
+        "(async()=>{await window.studio.invoke('settings.ai.get',{}); await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})()",
       );
       await check('晚到的已保存 AI 设置不覆盖五个草稿字段', aiDraftMatches, aiDraftDetails, 'once');
       if (!(await e(aiDraftMatches)))
@@ -352,8 +355,7 @@ export async function settingsChecks(context, restart) {
   } finally {
     if (slowAIRead) {
       releaseAIRead();
-      ipcMain.removeHandler('ai:settings:get');
-      ipcMain.handle('ai:settings:get', () => preferences.publicSettings());
+      context.commandHandlers['settings.ai.get'] = () => preferences.publicSettings();
     }
   }
   await click('重新读取模型列表');

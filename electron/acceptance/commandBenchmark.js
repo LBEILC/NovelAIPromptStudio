@@ -21,7 +21,9 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
     );
     if (at % 1000 === 0) console.log(`性能夹具 ${at}/5000`);
   }
+  const firstCardsStart = performance.now();
   const cards = await database.loadLibraryCards();
+  const firstCardsMs = performance.now() - firstCardsStart;
   database.createCollection({ id: 'benchmark-half', name: '基准筛选', kind: 'manual' });
   database.updateCollectionProjects(
     'benchmark-half',
@@ -33,7 +35,15 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
   const loaded = new Promise((resolve) => window.webContents.once('did-finish-load', resolve));
   const h = harness(window, mode, checks);
   const e = h.evaluate;
-  const samples = { input: [], drag: [], tabs: [], filter: [] };
+  const samples = {
+    input: [],
+    drag: [],
+    tabs: [],
+    filter: [],
+    firstCards: [firstCardsMs],
+    import100: [],
+    dictionary: [],
+  };
   try {
     window.webContents.debugger.attach('1.3');
     await window.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', {
@@ -96,6 +106,33 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
     await h.wait('!document.querySelector("[data-library-updating=true]")');
     samples.filter = await e(
       `(async()=>{const times=[];for(let i=0;i<12;i++){const half=i%2===0,n=document.querySelector(half?'.library-side [data-collection-id="benchmark-half"]':'.library-side [aria-label="全部图片"]'),start=performance.now();n.click();do{await new Promise(resolve=>requestAnimationFrame(resolve));if(performance.now()-start>10000)throw Error('Filter timeout')}while(document.querySelector('[data-library-updating=true]')||!document.querySelector('.library-count').textContent.includes((half?'2500':'5000')+' 组'));await new Promise(resolve=>requestAnimationFrame(resolve));times.push(performance.now()-start);}return times.slice(2)})()`,
+    );
+    const importStart = performance.now();
+    for (let at = 0; at < 100; at += 25) {
+      const inserted = database.insertProjects(
+        Array.from({ length: 25 }, (_, i) => ({
+          ...project(5000 + at + i),
+          image_path: files[i % 3],
+          thumbnail_path: files[i % 3],
+        })),
+      );
+      if (inserted.some((item) => item.error)) throw Error('Benchmark import failed');
+    }
+    samples.import100.push(performance.now() - importStart);
+    const existing = database.listTagDictionary({ all: true }).items;
+    database.deleteTagDictionaries(existing.map((item) => item.tag));
+    database.upsertTagDictionary(
+      Array.from({ length: 2000 }, (_, i) => ({
+        tag: `benchmark_dictionary_${i}`,
+        translation: `基准词条 ${i}`,
+        category: 'Unsorted',
+        translation_source: 'manual',
+        category_source: 'manual',
+      })),
+    );
+    await h.click('设置', 'document.querySelector(".studio-titlebar")');
+    samples.dictionary = await e(
+      `(async()=>{const start=performance.now();[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='翻译词典').click();do{await new Promise(resolve=>requestAnimationFrame(resolve));if(performance.now()-start>10000)throw Error('Dictionary timeout')}while(!document.querySelector('.settings-dictionary-count')?.textContent.includes('2000'));return [performance.now()-start]})()`,
     );
     const metrics = Object.fromEntries(
       Object.entries(samples).map(([key, values]) => [key, median(values)]),

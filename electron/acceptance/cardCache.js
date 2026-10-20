@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { BrowserWindow } from 'electron';
 import { UI_FEEDBACK_MS, measureFeedback } from './feedback.js';
 
 export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl }) {
@@ -7,6 +8,13 @@ export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl
   const timing = process.env.NPS_ACCEPTANCE_CARD_TIMING || 'fast';
   if (!cardCacheControl) throw Error('Card cache checks require guarded acceptance mode');
   const raw = new DatabaseSync(database.filePath);
+  const unrelated = new BrowserWindow({ show: false });
+  let unrelatedProgress = 0;
+  const originalSend = unrelated.webContents.send.bind(unrelated.webContents);
+  unrelated.webContents.send = (channel, event, ...args) => {
+    if (channel === 'studio:command-event' && event?.type === 'progress') unrelatedProgress++;
+    return originalSend(channel, event, ...args);
+  };
   try {
     await h.click('工作台', 'document.querySelector(".studio-titlebar")');
     await database.loadLibraryCards();
@@ -32,7 +40,9 @@ export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl
     await h.evaluate(`(async () => {
       const state = window.__cardCacheAcceptance = { progress: [], pending: true, clicked: false, responsive: false };
       let probe;
-      window.studio.onLibraryCardCacheProgress(value => {
+      window.__cardCacheUnsubscribe = window.studio.onCommandEvent(event => {
+        if(event.type !== 'progress' || event.topic !== 'library:cards-progress') return;
+        const value = event.data;
         state.progress.push(value);
         if (!state.clicked && value.completed < value.total) {
           const started = performance.now();
@@ -41,7 +51,7 @@ export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl
           state.clicked = true;
           // Probe the main event loop without deliberately delayed disk I/O.
           // A fast build may legitimately finish before the response returns.
-          probe = window.studio.getUpdateStatus().then(async () => {
+          probe = window.studio.invoke('updates.status',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data}).then(async () => {
             state.responseMs = performance.now() - started;
             state.clickedWhilePending = clickedWhilePending;
             state.feedbackMs = await (${measureFeedback.toString()})(
@@ -53,16 +63,17 @@ export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl
       });
       try {
         const [first, second, trash] = await Promise.all([
-          window.studio.loadLibraryCards(), window.studio.loadLibraryCards(), window.studio.loadLibraryCards('trash'),
+          window.studio.invoke('library.cards',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data}), window.studio.invoke('library.cards',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data}), window.studio.invoke('library.cards',{view:'trash'}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data}),
         ]);
         state.pending = false;
         if (probe) await probe;
         state.same = JSON.stringify(first) === JSON.stringify(second);
         state.counts = { active: first.length, trash: trash.length };
         state.complete = first.length === ${counts.active} && trash.length === ${counts.trash};
-      } finally { window.studio.offLibraryCardCacheProgress(); }
+      } finally { window.__cardCacheUnsubscribe(); }
     })()`);
     const delayedCount = cardCacheControl.flush();
+    await h.check('进度只发送给请求卡片的窗口', () => unrelatedProgress === 0, undefined, 'once');
     await h.check(
       '建立期间发起切页与主进程请求并完成',
       'window.__cardCacheAcceptance.clicked && window.__cardCacheAcceptance.clickedWhilePending && window.__cardCacheAcceptance.feedbackMs !== null',
@@ -116,8 +127,11 @@ export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl
     await h.screenshot('card-cache-settings-responsive');
     await h.evaluate('delete window.__cardCacheAcceptance');
   } finally {
+    unrelated.destroy();
     cardCacheControl.reset();
-    await h.evaluate('window.studio.offLibraryCardCacheProgress()').catch(() => {});
+    await h
+      .evaluate('window.__cardCacheUnsubscribe?.(); delete window.__cardCacheUnsubscribe')
+      .catch(() => {});
     for (const id of ids) database.deleteProject(id);
     raw.exec('BEGIN');
     for (const id of ids) {

@@ -1,3 +1,4 @@
+import { invokeUI } from '../lib/commands';
 import { writeClipboardText } from '../lib/clipboard';
 import { useState, type ReactNode } from 'react';
 import { ContextMenu, Dialog, Input, type MenuItem } from '../ui';
@@ -58,9 +59,11 @@ export function CardMenu({
                   id: 'prompt',
                   label: '复制提示词',
                   onSelect: () => {
-                    void window.studio?.loadLibraryDetail(image.id).then((detail) => {
-                      if (detail) return writeClipboardText(libraryPositivePrompt(detail));
-                    });
+                    void invokeUI('library.get', { id: image.id })
+                      .then((result) => result.project)
+                      .then((detail) => {
+                        if (detail) return writeClipboardText(libraryPositivePrompt(detail));
+                      });
                   },
                 },
                 { id: 'copy', label: '复制图片', onSelect: () => void p.onCopyImage(image) },

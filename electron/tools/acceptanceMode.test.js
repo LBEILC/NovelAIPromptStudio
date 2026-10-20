@@ -36,24 +36,17 @@ it('keeps card scheduling out of normal and packaged launches and releases termi
 it('delays real disk-backed handlers only inside slow acceptance and preserves results', async () => {
   vi.useFakeTimers();
   try {
-    const handlers = new Map();
-    const ipc = { handle: (channel, callback) => handlers.set(channel, callback) };
-    const original = ipc.handle;
-    installAcceptanceLatency(null, ipc);
-    expect(ipc.handle).toBe(original);
-    installAcceptanceLatency({ slow: 4 }, ipc);
     const read = vi.fn(() => ({ actual: 42 }));
-    ipc.handle('workbench:image:open', read);
-    const pending = handlers.get('workbench:image:open')('event', 'file');
+    expect(installAcceptanceLatency(null)).toBeUndefined();
+    const beforeCommand = installAcceptanceLatency({ slow: 4 });
+    const pending = beforeCommand('workbench.open').then(() => read('event', 'file'));
     await vi.advanceTimersByTimeAsync(159);
     expect(read).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(await pending).toEqual({ actual: 42 });
     expect(read).toHaveBeenCalledWith('event', 'file');
-    ipc.handle('updates:status', read);
-    await handlers.get('updates:status')();
-    ipc.handle('library:import-cancel', read);
-    await handlers.get('library:import-cancel')();
+    await beforeCommand('updates.status');
+    await beforeCommand('import.cancel');
     expect(vi.getTimerCount()).toBe(0);
   } finally {
     vi.useRealTimers();
@@ -71,7 +64,7 @@ it('slows each real temporary-profile file operation without delaying other path
     );
     const read = methods.readFile;
     const profile = path.resolve(os.tmpdir(), 'nai-acceptance-unit');
-    installAcceptanceLatency({ slow: 6, root: profile }, { handle: vi.fn() }, methods);
+    installAcceptanceLatency({ slow: 6, root: profile }, methods);
     const pending = methods.readFile(path.join(profile, 'image.png'));
     await vi.advanceTimersByTimeAsync(49);
     expect(read).not.toHaveBeenCalled();

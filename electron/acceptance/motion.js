@@ -1,4 +1,4 @@
-export const motionDetails = `(async()=>({motion:document.documentElement.dataset.motion,appearance:await window.studio.getAppearanceSettings(),systemReduced:matchMedia('(prefers-reduced-motion: reduce)').matches,transitions:[...document.querySelectorAll('.nps-button')].map(b=>getComputedStyle(b).transitionDuration)}))()`;
+export const motionDetails = `(async()=>({motion:document.documentElement.dataset.motion,appearance:await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data}),systemReduced:matchMedia('(prefers-reduced-motion: reduce)').matches,transitions:[...document.querySelectorAll('.nps-button')].map(b=>getComputedStyle(b).transitionDuration)}))()`;
 
 export async function defaultMotionChecks(h) {
   const { check, wait, window } = h;
@@ -6,7 +6,7 @@ export async function defaultMotionChecks(h) {
   await wait("!!document.querySelector('[aria-label=动效] button[aria-checked=true]')");
   await check(
     '新临时目录的动效默认显示跟随系统',
-    `(async()=> (await window.studio.getAppearanceSettings()).motion === 'reduced' && document.querySelector('[aria-label=动效] button[aria-checked=true]').textContent.trim() === '跟随系统')()`,
+    `(async()=> (await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})).motion === 'reduced' && document.querySelector('[aria-label=动效] button[aria-checked=true]').textContent.trim() === '跟随系统')()`,
     undefined,
     'once',
   );
@@ -34,7 +34,7 @@ export async function applyMotionBaseline(h, mode) {
     'document.querySelector("[aria-label=动效]")',
   );
   await h.wait(
-    `(async()=>(await window.studio.getAppearanceSettings()).motion===${JSON.stringify(mode.motion === 'off' ? 'off' : 'reduced')})()`,
+    `(async()=>(await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})).motion===${JSON.stringify(mode.motion === 'off' ? 'off' : 'reduced')})()`,
     '指定动效基线已保存',
   );
   await h.check(
@@ -72,7 +72,7 @@ export async function motionChecks(h) {
           'both',
         );
         // Persistence is real disk I/O, not part of the visual feedback budget.
-        const saved = `(async()=>(await window.studio.getAppearanceSettings()).motion===${JSON.stringify(motion)})()`;
+        const saved = `(async()=>(await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})).motion===${JSON.stringify(motion)})()`;
         await wait(saved, '动效偏好保存完成：' + motion);
         await check(
           `系统减少动态效果=${reduced}，${label}的偏好已保存`,
@@ -87,7 +87,7 @@ export async function motionChecks(h) {
         await h.reload();
         await wait('!!document.querySelector(".studio-titlebar")');
         await wait(
-          `(async()=>(await window.studio.getAppearanceSettings()).motion==='full')()`,
+          `(async()=>(await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})).motion==='full')()`,
           '刷新后读取已保存的完整动效偏好',
         );
         await checkSoon(

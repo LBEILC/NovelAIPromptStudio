@@ -284,7 +284,7 @@ export async function runAppScreenshots({
             for (const mode of [theme === 'light' ? 'dark' : 'light', theme]) {
               const before = overlayUpdates.length;
               await window.webContents.executeJavaScript(
-                `window.studio.saveAppearanceSettings({ themeMode: ${JSON.stringify(mode)} })`,
+                `window.studio.invoke('settings.appearance.save',{settings:{ themeMode: ${JSON.stringify(mode)} }}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})`,
               );
               const deadline = Date.now() + 3000;
               while (overlayUpdates.length === before) {

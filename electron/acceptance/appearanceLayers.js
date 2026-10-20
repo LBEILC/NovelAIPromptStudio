@@ -19,7 +19,7 @@ export async function appearanceLayerChecks({ h, preferences, mode }) {
     await h.until(() => preferences.appearanceSettings()[key] === family, `${label}保存选中值`);
     await check(
       `${label}选中后已保存且列表关闭`,
-      `(async()=>(await window.studio.getAppearanceSettings())[${JSON.stringify(key)}]===${JSON.stringify(family)} && !document.querySelector('.nps-layer[role=listbox]:popover-open'))()`,
+      `(async()=>(await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data}))[${JSON.stringify(key)}]===${JSON.stringify(family)} && !document.querySelector('.nps-layer[role=listbox]:popover-open'))()`,
       undefined,
       'once',
     );

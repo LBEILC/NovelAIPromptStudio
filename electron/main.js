@@ -39,7 +39,7 @@ import {
 import { openPreferences } from './preferences.js';
 import { listModels, testModel, translateTags, transformParagraph } from './translation.js';
 import { lookupDanbooruTags } from './danbooru.js';
-import { lookupDsoTags, searchDsoTags } from './dsoDictionary.js';
+import { lookupDsoTags } from './dsoDictionary.js';
 import { annotateTags } from './tagAnnotations.js';
 import { exportEmbeddedVibeFile } from './vibes.js';
 import { applyWorkbenchLibraryDetails, applyWorkbenchStructure } from './workbench.js';
@@ -79,7 +79,6 @@ const { autoUpdater } = electronUpdater;
 app.setName('NovelAI Prompt Studio');
 const acceptanceMode = configureAcceptanceMode(app);
 const acceptanceCardCache = createAcceptanceCardCache(acceptanceMode);
-installAcceptanceLatency(acceptanceMode, ipcMain);
 const acceptanceDoubles = installAcceptanceDoubles(acceptanceMode, {
   dialog,
   shell,
@@ -174,7 +173,12 @@ async function releasePreparedImport(sessionId) {
 }
 
 function sendPreparedImportUpdate(sender, update) {
-  if (!sender.isDestroyed()) sender.send('library:import-preview', update);
+  if (!sender.isDestroyed())
+    sender.send('studio:command-event', {
+      type: 'progress',
+      topic: 'library:import-preview',
+      data: update,
+    });
 }
 
 const titleBarSyncs = new WeakMap();
@@ -293,7 +297,8 @@ function notifyUpdateState(patch = {}) {
     ...getUpdateCapabilities(process.platform, app.isPackaged),
   };
   for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) window.webContents.send('updates:state', updateState);
+    if (!window.isDestroyed())
+      window.webContents.send('studio:command-event', { type: 'updates', data: updateState });
   }
 }
 
@@ -417,7 +422,10 @@ app.whenReady().then(async () => {
           app,
           development: !app.isPackaged,
           navigate: (destination) =>
-            BrowserWindow.getFocusedWindow()?.webContents.send('app:navigate', destination),
+            BrowserWindow.getFocusedWindow()?.webContents.send('studio:command-event', {
+              type: 'navigate',
+              destination: destination,
+            }),
           feedback: (label, title) =>
             openExternalLink(
               shell,
@@ -475,43 +483,51 @@ app.whenReady().then(async () => {
     return net.fetch(pathToFileURL(filePath).toString());
   });
 
-  ipcMain.handle('clipboard:read-text', () => clipboard.readText());
-  ipcMain.handle('clipboard:write-text', (_event, text) => clipboard.writeText(String(text)));
+  const commandHandlers = {};
+  const registerCommand = (name, handler) => {
+    commandHandlers[name] = handler;
+  };
+  registerCommand('clipboard.read-text', (input, _caller) => {
+    return clipboard.readText();
+  });
+  registerCommand('clipboard.write-text', (input, _event) => {
+    const text = input.text;
+    return clipboard.writeText(String(text));
+  });
 
-  ipcMain.handle('library:load', async (_event, request = {}) => {
+  const cardProgressRequests = new Map();
+  registerCommand('library.cards', async (input, event) => {
+    const request = input;
     await contentBackfill;
-    return database.loadLibrary(request.view);
-  });
-  const sendCardCacheProgress = (progress) => {
-    for (const window of BrowserWindow.getAllWindows())
-      if (!window.webContents.isDestroyed())
-        window.webContents.send('library:cards-progress', progress);
-  };
-  const reportCardCacheProgress = (progress) => {
-    if (acceptanceCardCache) acceptanceCardCache.report(progress, sendCardCacheProgress);
-    else sendCardCacheProgress(progress);
-  };
-  ipcMain.handle('library:cards', async (_event, request = {}) => {
-    await contentBackfill;
-    return database.loadLibraryCards(request.view, reportCardCacheProgress);
-  });
-  ipcMain.handle('library:detail', async (_event, id) => {
-    await contentBackfill;
-    return database.loadProject(id);
-  });
-  ipcMain.handle('library:collections:list', async () => {
-    try {
-      await contentBackfill;
-      return { ok: true, collections: database.listCollections() };
-    } catch (error) {
-      return {
-        ok: false,
-        collections: [],
-        error: error instanceof Error ? error.message : String(error),
+    let subscription = cardProgressRequests.get(event.sender.id);
+    if (!subscription) {
+      const send = (progress) => {
+        if (!event.sender.isDestroyed())
+          event.sender.send('studio:command-event', {
+            type: 'progress',
+            topic: 'library:cards-progress',
+            data: progress,
+          });
       };
+      subscription = {
+        count: 0,
+        report: (progress) => {
+          if (acceptanceCardCache) acceptanceCardCache.report(progress, send);
+          else send(progress);
+        },
+      };
+      cardProgressRequests.set(event.sender.id, subscription);
+    }
+    subscription.count++;
+    try {
+      return await database.loadLibraryCards(request.view, subscription.report);
+    } finally {
+      if (--subscription.count === 0) cardProgressRequests.delete(event.sender.id);
     }
   });
-  ipcMain.handle('library:collections:create', (_event, request = {}) => {
+
+  registerCommand('collection.create', (input, _event) => {
+    const request = input.collection;
     try {
       return {
         ok: true,
@@ -521,42 +537,36 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('library:collections:update', (_event, request = {}) => {
+  registerCommand('collection.update', (input, _event) => {
+    const request = input;
     try {
       return { ok: true, collection: database.updateCollection(request.id, request.patch) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('library:collections:delete', (_event, id) => {
+  registerCommand('collection.delete', (input, _event) => {
+    const id = input.id;
     try {
       return { ok: true, deleted: database.deleteCollection(id) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('library:collections:projects', (_event, request = {}) => {
-    try {
-      const results = database.updateCollectionProjects(
-        request.id,
-        request.projectIds,
-        request.action,
-      );
-      return { ok: true, results, summary: batchSummary(results) };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
+
   const databaseStorage = createDatabaseStorage(dataDirectory);
-  ipcMain.handle('database:storage:get', () => ({ ok: true, ...databaseStorage.location() }));
-  ipcMain.handle('database:backups:list', async () => {
+  registerCommand('storage.database', (input, _caller) => {
+    return { ok: true, ...databaseStorage.location() };
+  });
+  registerCommand('storage.backups', async (input, _caller) => {
     try {
       return { ok: true, ...(await databaseStorage.listBackups()) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('database:storage:reveal', async (_event, fileName) => {
+  registerCommand('storage.reveal-backup', async (input, _event) => {
+    const fileName = input.fileName;
     try {
       await databaseStorage.reveal(fileName, (file) => shell.showItemInFolder(file));
       return { ok: true };
@@ -564,7 +574,7 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('library:storage:get', async () => {
+  registerCommand('storage.get', async (input, _caller) => {
     try {
       const details = await describeAssetDirectory(assetsDirectory);
       return { ok: true, ...details, ...preferences.librarySettings() };
@@ -572,7 +582,7 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('library:storage:reveal', async () => {
+  registerCommand('storage.reveal', async (input, _caller) => {
     try {
       fs.mkdirSync(assetsDirectory, { recursive: true });
       const error = await shell.openPath(assetsDirectory);
@@ -581,7 +591,7 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('library:storage:change', async (event) => {
+  registerCommand('storage.change', async (input, event) => {
     if (storageMigrationActive) return { ok: false, error: '资源库正在迁移，请稍候' };
     if (activeImports.size) return { ok: false, error: '请等待当前图片导入完成后再更改资源库位置' };
     const owner = BrowserWindow.fromWebContents(event.sender);
@@ -618,7 +628,12 @@ app.whenReady().then(async () => {
         sourceDirectory: previousDirectory,
         targetDirectory,
         onProgress: (progress) => {
-          if (!event.sender.isDestroyed()) event.sender.send('library:storage-progress', progress);
+          if (!event.sender.isDestroyed())
+            event.sender.send('studio:command-event', {
+              type: 'progress',
+              topic: 'library:storage-progress',
+              data: progress,
+            });
         },
         commit: async ({ sourceDirectory, targetDirectory: nextDirectory }) => {
           database.relocateAssetPaths(sourceDirectory, nextDirectory);
@@ -638,47 +653,9 @@ app.whenReady().then(async () => {
       storageMigrationActive = false;
     }
   });
-  ipcMain.handle('workbench:image:open', async (_event, request = {}) => {
-    let filePath = String(request.filePath || '');
-    const libraryProject =
-      request.source?.type === 'library' && request.source.projectId
-        ? database.loadProject(request.source.projectId)
-        : null;
-    if (libraryProject?.image_path) filePath = libraryProject.image_path;
-    if (request.fromDrop && !filePath)
-      return { ok: false, project: null, error: '无法读取拖入文件的本地路径' };
-    if (!filePath) {
-      const result = await dialog.showOpenDialog({
-        title: '在工作台中打开 NovelAI 图片',
-        defaultPath: imageDialogDefaultPath(),
-        properties: ['openFile'],
-        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
-      });
-      if (result.canceled) return { ok: true, canceled: true, project: null };
-      [filePath] = result.filePaths;
-      rememberImageDirectory(result.filePaths);
-    }
-    try {
-      const project = await readCommandImage(filePath);
-      return {
-        ok: true,
-        project: applyWorkbenchLibraryDetails(
-          applyWorkbenchStructure(project, database.loadWorkbenchStructure(filePath)),
-          libraryProject,
-        ),
-        source: request.source
-          ? { ...request.source, path: filePath }
-          : { type: 'file', path: filePath },
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        project: null,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  });
-  ipcMain.handle('workbench:images:open-dropped', async (_event, request = {}) => {
+
+  registerCommand('workbench.open-many', async (input, event) => {
+    const request = { filePaths: input.paths };
     const filePaths = Array.isArray(request.filePaths)
       ? request.filePaths.map(String).filter(Boolean)
       : [];
@@ -708,7 +685,7 @@ app.whenReady().then(async () => {
       error: items.every((item) => !item.ok) ? items[0]?.error : '',
     };
   });
-  ipcMain.handle('workbench:image:clipboard', async () => {
+  registerCommand('workbench.open-clipboard', async (input, _caller) => {
     try {
       const source = readClipboardImageSource(workbenchTemporaryDirectory);
       const project = await readCommandImage(source.filePath);
@@ -732,7 +709,8 @@ app.whenReady().then(async () => {
       };
     }
   });
-  ipcMain.handle('workbench:temp:sync', (_event, referencedPaths = []) => {
+  registerCommand('workbench.temp-sync', (input, _event) => {
+    const referencedPaths = input.paths;
     try {
       return {
         ok: true,
@@ -742,12 +720,13 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('library:import-prepare', async (_event, request = {}) => {
+  registerCommand('import.prepare', async (input, event) => {
+    const request = { filePaths: input.paths || [] };
     if (storageMigrationActive) return { ok: false, error: '资源库正在迁移，请稍候' };
     await contentBackfill;
     let filePaths = Array.isArray(request.filePaths) ? request.filePaths : [];
     if (!filePaths.length) {
-      const result = await dialog.showOpenDialog({
+      const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
         title: '导入 NovelAI 图片或 ZIP',
         defaultPath: imageDialogDefaultPath(),
         properties: ['openFile', 'multiSelections'],
@@ -834,7 +813,8 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('library:import-previews:start', (event, sessionId) => {
+  registerCommand('import.previews', (input, event) => {
+    const sessionId = input.sessionId;
     const session = preparedImports.get(String(sessionId || ''));
     if (!session) return { ok: false, error: '导入预览已过期，请重新选择压缩包' };
     if (session.previewPromise) return { ok: true };
@@ -887,10 +867,9 @@ app.whenReady().then(async () => {
     })();
     return { ok: true };
   });
-  ipcMain.handle('library:import-prepared:cancel', async (_event, sessionId) => ({
-    ok: Boolean(await releasePreparedImport(sessionId)),
-  }));
-  ipcMain.handle('library:import-prepared:commit', async (event, request = {}) => {
+
+  registerCommand('import.commit', async (input, event) => {
+    const request = input;
     if (storageMigrationActive) {
       await releasePreparedImport(request.sessionId).catch(() => {});
       return {
@@ -916,7 +895,11 @@ app.whenReady().then(async () => {
     activeImports.set(batchId, controller);
     const notify = (progress) => {
       if (!event.sender.isDestroyed())
-        event.sender.send('library:import-progress', { batchId, ...progress });
+        event.sender.send('studio:command-event', {
+          type: 'progress',
+          topic: 'library:import-progress',
+          data: { batchId, ...progress },
+        });
     };
     notify({ phase: 'preparing', processed: 0, total: 0, current: '准备所选图片' });
     try {
@@ -974,7 +957,8 @@ app.whenReady().then(async () => {
       activeImports.delete(batchId);
     }
   });
-  ipcMain.handle('library:import-images', async (event, request = {}) => {
+  registerCommand('import.files', async (input, event) => {
+    const request = { filePaths: input.paths || [], fromClipboard: input.fromClipboard };
     if (storageMigrationActive)
       return {
         ok: false,
@@ -1003,7 +987,7 @@ app.whenReady().then(async () => {
       }
     }
     if (!filePaths.length) {
-      const result = await dialog.showOpenDialog({
+      const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
         title: '导入 NovelAI 图片或 ZIP',
         defaultPath: imageDialogDefaultPath(),
         properties: ['openFile', 'multiSelections'],
@@ -1030,7 +1014,11 @@ app.whenReady().then(async () => {
     activeImports.set(batchId, controller);
     const notify = (progress) => {
       if (!event.sender.isDestroyed())
-        event.sender.send('library:import-progress', { batchId, ...progress });
+        event.sender.send('studio:command-event', {
+          type: 'progress',
+          topic: 'library:import-progress',
+          data: { batchId, ...progress },
+        });
     };
     try {
       const imported = await importLibraryFiles({
@@ -1075,35 +1063,9 @@ app.whenReady().then(async () => {
       activeImports.delete(batchId);
     }
   });
-  ipcMain.handle('library:import-cancel', (_event, batchId) => {
-    const controller = activeImports.get(String(batchId || ''));
-    if (!controller) return { ok: false };
-    controller.abort();
-    return { ok: true };
-  });
-  ipcMain.handle('project:update-names', (_event, changes) => {
-    try {
-      return { ok: true, previous: database.updateProjectNames(changes) };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-  ipcMain.handle('project:update-name', (_event, id, name) => {
-    try {
-      return { ok: true, project: database.updateProjectName(id, name) };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-  ipcMain.handle('project:move-to-trash', (_event, ids) => {
-    try {
-      const results = database.updateProjects(ids, { deleted: true });
-      return { ok: true, results, summary: batchSummary(results) };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-  ipcMain.handle('project:restore', (_event, ids) => {
+
+  registerCommand('library.restore', (input, _event) => {
+    const ids = input.ids;
     try {
       const results = database.updateProjects(ids, { deleted: false });
       return { ok: true, results, summary: batchSummary(results) };
@@ -1111,14 +1073,17 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('project:group-cover:set', (_event, fingerprint, projectId) => {
+  registerCommand('library.set-cover', (input, _event) => {
+    const fingerprint = input.fingerprint;
+    const projectId = input.projectId;
     try {
       return { ok: true, ...database.setGroupCover(fingerprint, projectId) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('project:permanent-delete', async (_event, ids = []) => {
+  registerCommand('trash.delete-permanently', async (input, _event) => {
+    const ids = input.ids || [];
     if (storageMigrationActive) return { ok: false, error: '资源库正在迁移，请稍候' };
     if (activeImports.size) return { ok: false, error: '请等待当前图片导入完成后再永久删除' };
     if (permanentDeletionActive) return { ok: false, error: '永久删除正在进行，请稍候' };
@@ -1160,7 +1125,7 @@ app.whenReady().then(async () => {
       permanentDeletionActive = false;
     }
   });
-  ipcMain.handle('project:trash-summary', () => {
+  registerCommand('trash.summary', (input, _caller) => {
     try {
       const projects = database.loadTrashSummary();
       let totalBytes = 0;
@@ -1184,7 +1149,7 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('image:copy', (_event, projectId) => {
+  const copyLibraryImage = (_event, projectId) => {
     try {
       const project = database.loadProject(projectId);
       if (!project) throw new Error('图片不存在');
@@ -1193,8 +1158,8 @@ app.whenReady().then(async () => {
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
-  });
-  ipcMain.handle('image:download', async (event, projectId) => {
+  };
+  const saveLibraryImage = async (event, projectId) => {
     try {
       const project = database.loadProject(projectId);
       if (!project) throw new Error('图片不存在');
@@ -1218,16 +1183,16 @@ app.whenReady().then(async () => {
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
-  });
-  ipcMain.handle('workbench:image:copy-current', (_event, filePath) => {
+  };
+  const copyWorkbenchImage = (_event, filePath) => {
     try {
       copyImageToClipboard(filePath, { nativeImage, clipboard });
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
-  });
-  ipcMain.handle('workbench:image:download-current', async (event, request = {}) => {
+  };
+  const saveWorkbenchImage = async (event, request = {}) => {
     try {
       const sourcePath = resolveImageFile(request.filePath);
       const extension = path.extname(sourcePath).toLowerCase() || '.png';
@@ -1247,25 +1212,11 @@ app.whenReady().then(async () => {
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
-  });
-  ipcMain.handle('tag:annotations:save', (_event, entries = []) => {
-    try {
-      for (const entry of entries || []) {
-        const patch = {};
-        if (entry?.translation_source === 'manual')
-          patch.translation = String(entry.translation || '');
-        if (entry?.category_source === 'manual')
-          patch.category = String(entry.category || 'Unsorted');
-        if (Object.keys(patch).length)
-          database.updateTagDictionary(String(entry?.tag || ''), patch);
-      }
-      return { ok: true };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
+  };
+
   const dictionaryTranslations = new Map();
-  ipcMain.handle('tag-cache:retranslate', async (event, request = {}) => {
+  registerCommand('dictionary.retranslate', async (input, event) => {
+    const request = input;
     const id = String(request.id || '');
     const key = `${event.sender.id}:${id}`;
     const controller = new AbortController();
@@ -1282,7 +1233,11 @@ app.whenReady().then(async () => {
         signal: controller.signal,
         progress: (progress) => {
           if (!event.sender.isDestroyed())
-            event.sender.send('tag-cache:retranslate:progress', { id, ...progress });
+            event.sender.send('studio:command-event', {
+              type: 'progress',
+              topic: 'tag-cache:retranslate:progress',
+              data: { id, ...progress },
+            });
         },
       });
       return { ok: true, id, ...result };
@@ -1293,58 +1248,14 @@ app.whenReady().then(async () => {
       event.sender.removeListener('destroyed', cancel);
     }
   });
-  ipcMain.handle('tag-cache:retranslate:cancel', (event, id) => {
+  registerCommand('dictionary.retranslate-cancel', (input, event) => {
+    const id = input.id;
     dictionaryTranslations.get(`${event.sender.id}:${String(id)}`)?.abort();
     return { ok: true };
   });
-  ipcMain.handle('tag-cache:list', async (_event, request = {}) => {
-    try {
-      const result = database.listTagDictionary(request);
-      if (request.all) {
-        const counts = await database.tagImageCounts();
-        result.items = result.items.map((item) => ({
-          ...item,
-          image_count: counts.get(item.tag.toLowerCase().replaceAll('_', ' ')) || 0,
-        }));
-      }
-      return { ok: true, ...result };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-  ipcMain.handle('tag:suggest', async (_event, query) => {
-    try {
-      const search = String(query || '')
-        .trim()
-        .slice(0, 240);
-      if (!search) return { ok: true, items: [] };
-      const items = new Map(
-        searchDsoTags(search).map((item) => [item.tag.toLowerCase().replaceAll(' ', '_'), item]),
-      );
-      for (const entry of database.listTagDictionary({ query: search, limit: 30 }).items) {
-        items.set(entry.tag.toLowerCase().replaceAll(' ', '_'), {
-          tag: entry.display_tag || entry.tag,
-          translation: entry.translation,
-          category: entry.category,
-        });
-      }
-      const counts = await database.tagImageCounts();
-      return {
-        ok: true,
-        items: [...items.values()]
-          .reverse()
-          .slice(0, 30)
-          .map((item) => ({
-            ...item,
-            tag: item.tag.replaceAll('_', ' '),
-            count: counts.get(item.tag.toLowerCase().replaceAll('_', ' ')) || 0,
-          })),
-      };
-    } catch (error) {
-      return { ok: false, error: error.message };
-    }
-  });
-  ipcMain.handle('workbench:structure:save', (_event, request) => {
+
+  registerCommand('workbench.save-structure', (input, _event) => {
+    const request = input;
     try {
       database.rememberWorkbenchStructure(request.filePath, request.structure, request.projectId);
       return { ok: true };
@@ -1352,81 +1263,16 @@ app.whenReady().then(async () => {
       return { ok: false, error: error.message };
     }
   });
-  ipcMain.handle('workbench:save-library', async (_event, request = {}) => {
-    try {
-      if (storageMigrationActive) throw new Error('资源库正在迁移，请稍候');
-      await contentBackfill;
-      const result = await importLibraryFiles({
-        filePaths: [String(request.filePath)],
-        assetsDirectory,
-        database,
-        prepareProject: async (project) =>
-          database.enrichProjectTags({
-            ...project,
-            prompt_structure: normalizePromptStructure(
-              { ...project.prompt_structure, block_annotations: request.annotations },
-              project.metadata,
-            ),
-          }),
-      });
-      const id = result.imported[0]?.id || result.duplicates[0]?.projectId;
-      if (!id) throw new Error(result.errors[0]?.error || '图片没有存入图片库');
-      const saved = database.loadProject(id);
-      database.rememberWorkbenchStructure(
-        saved.image_path,
-        { ...saved.prompt_structure, block_annotations: request.annotations },
-        id,
-      );
-      return { ok: true, project: database.loadProject(id) };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-  ipcMain.handle('tag-cache:update', (_event, request = {}) => {
-    try {
-      const tag = String(request.tag || '').trim();
-      if (!tag) throw new Error('Tag 不能为空');
-      if (!database.lookupTagDictionary([tag]).size) throw new Error('Tag 缓存不存在或已被删除');
-      const patch = request.patch || {};
-      return {
-        ok: true,
-        item: database.updateTagDictionary(tag, {
-          translation: patch.translation,
-          category: patch.category,
-        }),
-      };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-  ipcMain.handle('tag-cache:update-many', (_event, request = {}) => {
-    try {
-      return {
-        ok: true,
-        items: database.updateTagDictionaryCategory(
-          request.tags || [],
-          String(request.category || ''),
-        ),
-      };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-  ipcMain.handle('tag-cache:delete', (_event, tag) => {
-    try {
-      return { ok: true, deleted: database.deleteTagDictionary(tag) };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-  ipcMain.handle('tag-cache:delete-many', (_event, tags = []) => {
+
+  registerCommand('dictionary.remove', (input, _event) => {
+    const tags = input.tags;
     try {
       return { ok: true, deleted: database.deleteTagDictionaries(tags) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('vibe:embedded:reveal', (_event, vibe = {}) => {
+  const revealVibe = (_event, vibe = {}) => {
     try {
       const filePath = exportEmbeddedVibeFile(vibe, assetsDirectory);
       shell.showItemInFolder(filePath);
@@ -1434,12 +1280,20 @@ app.whenReady().then(async () => {
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
+  };
+
+  registerCommand('settings.ai.get', (input, _caller) => {
+    return preferences.publicSettings();
   });
-  ipcMain.handle('file:reveal', (_event, filePath) => shell.showItemInFolder(filePath));
-  ipcMain.handle('ai:settings:get', () => preferences.publicSettings());
-  ipcMain.handle('ai:settings:save', (_event, settings) => preferences.saveAISettings(settings));
-  ipcMain.handle('appearance:settings:get', () => preferences.appearanceSettings());
-  ipcMain.handle('appearance:settings:save', (_event, settings) => {
+  registerCommand('settings.ai.save', (input, _event) => {
+    const settings = input.settings;
+    return preferences.saveAISettings(settings);
+  });
+  registerCommand('settings.appearance.get', (input, _caller) => {
+    return preferences.appearanceSettings();
+  });
+  registerCommand('settings.appearance.save', (input, _event) => {
+    const settings = input.settings;
     const saved = preferences.saveAppearanceSettings(settings);
     for (const window of BrowserWindow.getAllWindows()) void syncTitleBarOverlay(window);
     return saved;
@@ -1447,18 +1301,23 @@ app.whenReady().then(async () => {
   nativeTheme.on('updated', () => {
     for (const window of BrowserWindow.getAllWindows()) void syncTitleBarOverlay(window);
   });
-  ipcMain.handle('productivity:settings:get', () => preferences.productivitySettings());
-  ipcMain.handle('productivity:settings:save', (_event, settings) =>
-    preferences.saveProductivitySettings(settings),
-  );
-  ipcMain.handle('updates:status', () => ({
-    ok: true,
-    ...updateState,
-    currentVersion: app.getVersion(),
-    packaged: app.isPackaged,
-    ...getUpdateCapabilities(process.platform, app.isPackaged),
-  }));
-  ipcMain.handle('updates:check', async () => {
+  registerCommand('settings.productivity.get', (input, _caller) => {
+    return preferences.productivitySettings();
+  });
+  registerCommand('settings.productivity.save', (input, _event) => {
+    const settings = input.settings;
+    return preferences.saveProductivitySettings(settings);
+  });
+  registerCommand('updates.status', (input, _caller) => {
+    return {
+      ok: true,
+      ...updateState,
+      currentVersion: app.getVersion(),
+      packaged: app.isPackaged,
+      ...getUpdateCapabilities(process.platform, app.isPackaged),
+    };
+  });
+  registerCommand('updates.check', async (input, _caller) => {
     if (acceptanceMode) {
       await acceptanceDoubles.beforeUpdateCheck?.();
       notifyUpdateState({
@@ -1500,7 +1359,7 @@ app.whenReady().then(async () => {
       return { ok: false, currentVersion: app.getVersion(), ...capabilities, error: message };
     }
   });
-  ipcMain.handle('updates:download', async () => {
+  registerCommand('updates.download', async (input, _caller) => {
     const capabilities = getUpdateCapabilities(process.platform, app.isPackaged);
     if (!capabilities.canDownloadUpdate) {
       const error =
@@ -1525,7 +1384,7 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('updates:install', () => {
+  registerCommand('updates.install', (input, _caller) => {
     const capabilities = getUpdateCapabilities(process.platform, app.isPackaged);
     if (!capabilities.canInstallUpdate) {
       const error =
@@ -1563,7 +1422,8 @@ app.whenReady().then(async () => {
     });
     return { ok: true };
   });
-  ipcMain.handle('updates:open-release', async (_event, releaseUrl) => {
+  registerCommand('updates.open-release', async (input, _event) => {
+    const releaseUrl = input.url;
     const fallback = 'https://github.com/LBEILC/NovelAIPromptStudio/releases/latest';
     const candidate = String(releaseUrl || fallback);
     const url = candidate.startsWith('https://github.com/LBEILC/NovelAIPromptStudio/')
@@ -1572,7 +1432,7 @@ app.whenReady().then(async () => {
     await shell.openExternal(url);
     return { ok: true };
   });
-  ipcMain.handle('fonts:list', async () => {
+  registerCommand('fonts.list', async (input, _caller) => {
     try {
       return { ok: true, fonts: await listSystemFonts() };
     } catch (error) {
@@ -1583,7 +1443,7 @@ app.whenReady().then(async () => {
       };
     }
   });
-  ipcMain.handle('ai:models:list', async () => {
+  registerCommand('ai.models', async (input, _caller) => {
     try {
       return { ok: true, models: await listModels(preferences.credentials(), net.fetch) };
     } catch (error) {
@@ -1591,7 +1451,8 @@ app.whenReady().then(async () => {
     }
   });
   const paragraphRequests = new Map();
-  ipcMain.handle('paragraph:transform', async (event, request = {}) => {
+  registerCommand('paragraph.transform', async (input, event) => {
+    const request = input.request;
     const key = `${event.sender.id}:${String(request.id)}`;
     const controller = new AbortController();
     paragraphRequests.get(key)?.abort();
@@ -1614,18 +1475,20 @@ app.whenReady().then(async () => {
       event.sender.removeListener('destroyed', cancel);
     }
   });
-  ipcMain.handle('paragraph:cancel', (event, id) => {
+  registerCommand('paragraph.cancel', (input, event) => {
+    const id = input.id;
     paragraphRequests.get(`${event.sender.id}:${String(id)}`)?.abort();
     return { ok: true };
   });
-  ipcMain.handle('ai:model:test', async () => {
+  registerCommand('ai.test', async (input, _caller) => {
     try {
       return { ok: true, ...(await testModel(preferences.credentials(), net.fetch)) };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle('translation:tags', async (_event, tags) => {
+  registerCommand('dictionary.translate', async (input, _event) => {
+    const tags = input.tags;
     try {
       const cleaned = (tags || []).map((tag) => String(tag || '').trim());
       const aiSettings = preferences.publicSettings();
@@ -1670,8 +1533,45 @@ app.whenReady().then(async () => {
     }
   });
 
+  registerCommand('image.copy', (input, caller) =>
+    input.id ? copyLibraryImage(caller, input.id) : copyWorkbenchImage(caller, input.path),
+  );
+  registerCommand('image.save-as', (input, caller) =>
+    input.id
+      ? saveLibraryImage(caller, input.id)
+      : saveWorkbenchImage(caller, { filePath: input.path, name: input.name }),
+  );
+  registerCommand('file.reveal', (input, caller) => {
+    if (input.vibe) return revealVibe(caller, input.vibe);
+    shell.showItemInFolder(input.path);
+    return { ok: true, filePath: input.path };
+  });
+  registerCommand('import.cancel', async (input) => {
+    const controller = activeImports.get(input.id);
+    if (controller) {
+      controller.abort();
+      return { ok: true };
+    }
+    return { ok: Boolean(await releasePreparedImport(input.id)) };
+  });
   try {
+    const beforeCommand = installAcceptanceLatency(acceptanceMode);
     commandRuntime = await installCommandRuntime({
+      beforeCommand,
+      handlers: commandHandlers,
+      readyLibrary: () => contentBackfill,
+      selectSource: async (caller) => {
+        const owner = caller.sender && BrowserWindow.fromWebContents(caller.sender);
+        const result = await dialog.showOpenDialog(owner, {
+          title: '在工作台中打开 NovelAI 图片',
+          defaultPath: imageDialogDefaultPath(),
+          properties: ['openFile'],
+          filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+        });
+        if (result.canceled || !result.filePaths[0]) return null;
+        rememberImageDirectory(result.filePaths);
+        return { type: 'file', path: result.filePaths[0] };
+      },
       database,
       assetsDirectory: () => assetsDirectory,
       busy: () => storageMigrationActive || permanentDeletionActive,
@@ -1681,10 +1581,9 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('Unable to initialize workbench commands:', error);
     if (!acceptanceMode && !screenshotMode) {
-      // TODO(design): Confirm startup failure copy for unreadable sessions or unavailable local IPC.
       dialog.showErrorBox(
-        '【文案待定：工作台启动失败】',
-        error instanceof Error ? error.message : String(error),
+        '启动失败',
+        `NovelAI Prompt Studio 无法启动。\n\n错误信息：${error instanceof Error ? error.message : String(error)}`,
       );
     }
     database.close();
@@ -1700,6 +1599,7 @@ app.whenReady().then(async () => {
         mode: acceptanceMode,
         doubles: acceptanceDoubles,
         cardCacheControl: acceptanceCardCache,
+        commandHandlers,
         database,
         assetsDirectory,
         preferences,

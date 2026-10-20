@@ -27,7 +27,7 @@ it('does not overwrite an Agent edit arriving after the prepare handshake', asyn
   const local = structuredClone(base);
   local.tabs[0].project!.metadata.prompt_raw = 'user';
   connection.update(local);
-  connection.receive({ source: 'agent', session: remote });
+  connection.receive({ type: 'workbench', source: 'agent', session: remote });
   await expect(connection.flush()).rejects.toThrow('conflict');
   expect(connection.current.tabs[0].project!.metadata.prompt_raw).toBe('user');
   expect(remote.tabs[0].project!.metadata.prompt_raw).toBe('agent');

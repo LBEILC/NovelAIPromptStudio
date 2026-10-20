@@ -48,15 +48,18 @@ export function agentSetup(options) {
     path: command,
     onPath: includesBin(process.env.PATH || '') || includesBin(await userPath()),
     skillPath,
+    platform: process.platform,
   });
   return {
     status,
     skill: () => fs.readFile(skillPath, 'utf8'),
     skillPath,
     async install() {
+      let pathFailed = false;
       await fs.mkdir(bin, { recursive: true });
       for (const file of [
         'agent/nai-studio.mjs',
+        'agent/client.mjs',
         'agent/SKILL.md',
         'electron/commands/registry.js',
         'electron/appProfile.js',
@@ -98,7 +101,9 @@ export function agentSetup(options) {
                 '/f',
               ],
               { windowsHide: true },
-            );
+            ).catch(() => {
+              pathFailed = true;
+            });
         }
       } else {
         const quote = (/** @type {string} */ s) => `'${s.replaceAll("'", "'\\''")}'`;
@@ -109,7 +114,7 @@ export function agentSetup(options) {
         );
         await fs.chmod(command, 0o755);
       }
-      return status();
+      return { ...(await status()), pathFailed };
     },
   };
 }

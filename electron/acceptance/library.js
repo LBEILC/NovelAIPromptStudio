@@ -115,7 +115,7 @@ export async function libraryChecks(env) {
       : [false, true]) {
     h.category(`图片库·${reduced ? '关闭动效' : '正常动效'}`);
     await e(
-      `window.studio.saveAppearanceSettings({motion:${JSON.stringify(reduced ? 'off' : 'full')}})`,
+      `window.studio.invoke('settings.appearance.save',{settings:{motion:${JSON.stringify(reduced ? 'off' : 'full')}}}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})`,
     );
     await refresh();
     await h.checkSoon(
@@ -778,7 +778,7 @@ export async function libraryChecks(env) {
   for (const importReduced of mode.category === '减少动态效果' ? [true] : [false, true]) {
     h.category(`图片库·导入与永久删除·${importReduced ? '关闭动效' : '正常动效'}`);
     await e(
-      `window.studio.saveAppearanceSettings({motion:${JSON.stringify(importReduced ? 'off' : 'full')}})`,
+      `window.studio.invoke('settings.appearance.save',{settings:{motion:${JSON.stringify(importReduced ? 'off' : 'full')}}}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})`,
     );
     await refresh();
     const uniqueName = `library-import-unique-${importReduced}`;

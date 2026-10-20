@@ -1,3 +1,4 @@
+import { invokeUI } from '../lib/commands';
 import { useEffect, useState } from 'react';
 import type { UpdateState } from '../shared/types';
 export function useUpdates() {
@@ -8,7 +9,7 @@ export function useUpdates() {
     const studio = window.studio;
     if (!studio) return;
     let active = true;
-    Promise.all([studio.getUpdateStatus(), studio.getProductivitySettings()])
+    Promise.all([invokeUI('updates.status', {}), invokeUI('settings.productivity.get', {})])
       .then(([status, settings]) => {
         if (active) {
           setState(status);
@@ -16,12 +17,14 @@ export function useUpdates() {
         }
       })
       .catch((e: Error) => setError(e.message));
-    studio.onUpdateState((next) => {
+    const unsubscribe = studio.onCommandEvent((event) => {
+      if (event.type !== 'updates') return;
+      const next = event.data;
       if (active) setState(next);
     });
     return () => {
       active = false;
-      studio.offUpdateState();
+      unsubscribe();
     };
   }, []);
   const check = async () => {
@@ -29,7 +32,7 @@ export function useUpdates() {
     setError('');
     setState((current) => current && { ...current, phase: 'checking' });
     try {
-      const result = await window.studio.checkForUpdates();
+      const result = await invokeUI('updates.check', {});
       if (!result.ok) throw new Error(result.error);
       setState(result);
     } catch (e) {
@@ -39,7 +42,9 @@ export function useUpdates() {
   };
   const changeAutoCheck = async (checked: boolean) => {
     try {
-      const saved = await window.studio?.saveProductivitySettings({ autoCheckUpdates: checked });
+      const saved = await invokeUI('settings.productivity.save', {
+        settings: { autoCheckUpdates: checked },
+      });
       if (saved) setAutoCheck(saved.autoCheckUpdates);
     } catch (e) {
       setError(String(e));
@@ -47,7 +52,7 @@ export function useUpdates() {
   };
   const download = async () => {
     try {
-      const result = await window.studio?.downloadUpdate();
+      const result = await invokeUI('updates.download', {});
       if (result && !result.ok) throw new Error(result.error);
     } catch (e) {
       setError(String(e));

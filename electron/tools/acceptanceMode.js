@@ -176,7 +176,7 @@ export function installAcceptanceDoubles(mode, { dialog, shell, clipboard, nativ
 }
 
 // Delay real disk-backed IPC after the temporary-profile guard; preserve results.
-export function installAcceptanceLatency(mode, ipcMain, fileSystem = fs.promises) {
+export function installAcceptanceLatency(mode, fileSystem = fs.promises) {
   if (!mode || !(mode.slow > 1)) return;
   // Slow the actual asynchronous file operations within our temporary profile.
   // Synchronous SQLite/preferences work is delayed at the IPC boundary below,
@@ -196,16 +196,11 @@ export function installAcceptanceLatency(mode, ipcMain, fileSystem = fs.promises
       };
     }
   }
-  const handle = ipcMain.handle.bind(ipcMain);
-  ipcMain.handle = (channel, listener) =>
-    handle(channel, async (...args) => {
-      if (
-        !['library:import-cancel', 'library:import-prepared:cancel'].includes(channel) &&
-        /^(library:|workbench:|project:|database:|tag-cache:|tag:|ai:settings:|appearance:settings:|productivity:settings:)/.test(
-          channel,
-        )
-      )
-        await new Promise((resolve) => setTimeout(resolve, 40 * mode.slow));
-      return listener(...args);
-    });
+  return async (name) => {
+    if (
+      name !== 'import.cancel' &&
+      /^(library\.|workbench\.|collection\.|storage\.|dictionary\.|settings\.|import\.)/.test(name)
+    )
+      await new Promise((resolve) => setTimeout(resolve, 40 * mode.slow));
+  };
 }

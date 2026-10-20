@@ -156,8 +156,8 @@ export async function runAcceptance(context) {
         '卡片 IPC 保留所有视图、图片宽高并移除完整元数据',
         `(async () => {
       for (const view of ['all', 'favorites', 'trash']) {
-        const full = await window.studio.loadLibrary(view);
-        const cards = await window.studio.loadLibraryCards(view);
+        const full = ${JSON.stringify(Object.fromEntries(['all', 'favorites', 'trash'].map((view) => [view, database.loadLibrary(view)])))}[view];
+        const cards = await window.studio.invoke('library.cards',{view:view}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data});
         if (JSON.stringify(cards.map(p => p.id)) !== JSON.stringify(full.map(p => p.id))) return false;
         if (!cards.every((p, i) => p.metadata.width === full[i].metadata.width && p.metadata.height === full[i].metadata.height && !('prompt_structure' in p) && !('extra_json' in p.metadata))) return false;
       }
@@ -169,9 +169,9 @@ export async function runAcceptance(context) {
       await check(
         '详情 IPC 与旧列表逐项一致，缺失图片返回 null',
         `(async () => {
-      const full = [...await window.studio.loadLibrary(), ...await window.studio.loadLibrary('trash')];
-      for (const p of full) if (JSON.stringify(await window.studio.loadLibraryDetail(p.id)) !== JSON.stringify(p)) return false;
-      return await window.studio.loadLibraryDetail('missing-acceptance-image') === null;
+      const full = ${JSON.stringify([...database.loadLibrary('all'), ...database.loadLibrary('trash')])};
+      for (const p of full) if (JSON.stringify(await window.studio.invoke('library.get',{id:p.id}).then(result=>result.ok?result.data.project:result.error.code==='not_found'?null:Promise.reject(Error(result.error.message)))) !== JSON.stringify(p)) return false;
+      return await window.studio.invoke('library.get',{id:'missing-acceptance-image'}).then(result=>result.ok?result.data.project:result.error.code==='not_found'?null:Promise.reject(Error(result.error.message))) === null;
     })()`,
         undefined,
         'once',
@@ -180,8 +180,8 @@ export async function runAcceptance(context) {
         '持久缓存和热缓存经过真实 IPC 返回逐项一致的卡片',
         `(async () => {
         for (const view of ['all', 'favorites', 'trash']) {
-          const first = await window.studio.loadLibraryCards(view);
-          const second = await window.studio.loadLibraryCards(view);
+          const first = await window.studio.invoke('library.cards',{view:view}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data});
+          const second = await window.studio.invoke('library.cards',{view:view}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data});
           if (JSON.stringify(first) !== JSON.stringify(second)) return false;
         }
         return true;
@@ -194,7 +194,7 @@ export async function runAcceptance(context) {
         database.updateProjectName(cacheProbe.id, `${cacheProbe.name} cache probe`);
         await check(
           '卡片缓存命中时，重命名通过 IPC 立即可见',
-          `(async () => (await window.studio.loadLibraryCards()).find(p => p.id === ${JSON.stringify(cacheProbe.id)}).name === ${JSON.stringify(`${cacheProbe.name} cache probe`)})()`,
+          `(async () => (await window.studio.invoke('library.cards',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})).find(p => p.id === ${JSON.stringify(cacheProbe.id)}).name === ${JSON.stringify(`${cacheProbe.name} cache probe`)})()`,
           undefined,
           'once',
         );

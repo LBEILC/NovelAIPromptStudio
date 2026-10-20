@@ -300,7 +300,9 @@ export async function runReadmeScreenshots({
           .map((t) => t.tag),
       ),
     ];
-    const annotated = await h.evaluate(`window.studio.translateTags(${JSON.stringify(tags)})`);
+    const annotated = await h.evaluate(
+      `window.studio.invoke('dictionary.translate',{tags:${JSON.stringify(tags)}}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})`,
+    );
     if (!annotated.ok) throw Error(annotated.error);
     for (const { tag, translation, category } of dictionaryEdits)
       database.updateTagDictionary(tag, { translation, category });

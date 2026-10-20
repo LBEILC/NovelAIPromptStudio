@@ -525,12 +525,13 @@ export async function interactionCorrectionChecks(env) {
     );
     await wait('!!document.querySelectorAll(".wb-tags")[1].querySelector(".wb-insertion-slot")');
     await settleLayout(h, '.wb-document-scroll [data-wb-tag]');
+    const landing = await center(h, 'document.querySelector(".wb-insertion-slot")');
+    await move('mouseMoved', landing, true);
+    await settleLayout(h, '.wb-document-scroll');
     await h.screenshot('correction-tag-cross-block');
     await e(
       `window.correctionPreview=${tags}.filter(n=>getComputedStyle(n).visibility!=='hidden').map(n=>{const r=n.getBoundingClientRect(),b=${scroll}.getBoundingClientRect();return {text:n.querySelector('.nps-tag-en').textContent,x:r.left-b.left,y:r.top-b.top+${scroll}.scrollTop}})`,
     );
-    const landing = await center(h, 'document.querySelector(".wb-insertion-slot")');
-    await move('mouseMoved', landing, true);
     await move('mouseReleased', landing);
     await wait('!document.querySelector(".wb-drag-feedback")');
     await settleLayout(h, '.wb-document-scroll [data-wb-tag]');

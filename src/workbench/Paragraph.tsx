@@ -1,3 +1,4 @@
+import { invokeUI } from '../lib/commands';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Banner, TextArea } from '../ui';
 import { TransitionSurface } from '../ui/transitions';
@@ -25,20 +26,19 @@ export function ParagraphEditor({
   const handledTranslation = useRef(0);
   useEffect(() => {
     let active = true;
-    window.studio
-      ?.getAISettings()
+    invokeUI('settings.ai.get', {})
       .then((settings) => {
         if (active) setConfigured(!!settings.model);
       })
       .catch(() => {});
     return () => {
       active = false;
-      if (request.current) void window.studio?.cancelParagraph(request.current);
+      if (request.current) void invokeUI('paragraph.cancel', { id: request.current });
       request.current = '';
     };
   }, [editing]);
   const cancel = () => {
-    if (request.current) void window.studio?.cancelParagraph(request.current);
+    if (request.current) void invokeUI('paragraph.cancel', { id: request.current });
     request.current = '';
     setBusy('');
   };
@@ -48,10 +48,12 @@ export function ParagraphEditor({
     setBusy(direction);
     setError('');
     try {
-      const result = await window.studio!.transformParagraph({
-        id,
-        text: text ?? (direction === 'translate' ? english : chinese),
-        direction,
+      const result = await invokeUI('paragraph.transform', {
+        request: {
+          id,
+          text: text ?? (direction === 'translate' ? english : chinese),
+          direction,
+        },
       });
       if (request.current !== id) return;
       if (!result.ok) throw new Error(result.error);
@@ -78,8 +80,7 @@ export function ParagraphEditor({
     }
     setEditing(true);
     let active = true;
-    void window.studio
-      ?.getAISettings()
+    void invokeUI('settings.ai.get', {})
       .then((settings) => {
         if (!active) return;
         setConfigured(!!settings.model);

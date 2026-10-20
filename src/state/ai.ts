@@ -1,3 +1,4 @@
+import { invokeUI } from '../lib/commands';
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react';
 import type { AISettings } from '../shared/types';
 
@@ -51,8 +52,7 @@ export function useAISettings() {
   useEffect(() => {
     if (loaded.current) return;
     let active = true;
-    window.studio
-      ?.getAISettings()
+    invokeUI('settings.ai.get', {})
       .then((saved) => {
         if (active && !loaded.current) {
           loaded.current = true;
@@ -81,17 +81,17 @@ export function useAISettings() {
     setBusy(true);
     try {
       // Preserve the existing API contract: model discovery and testing use saved credentials.
-      const saved = await window.studio.saveAISettings(settings);
+      const saved = await invokeUI('settings.ai.save', { settings: settings });
       loaded.current = true;
       baseline.current = { ...saved, apiKey: '' };
       updateDraft({ settings: { ...saved, apiKey: '' }, edited: [] });
       if (action === 'models') {
-        const result = await window.studio.listAIModels();
+        const result = await invokeUI('ai.models', {});
         if (!result.ok) throw new Error(result.error);
         setModels(result.models);
         setMessage(`已读取 ${result.models.length} 个模型`);
       } else if (action === 'test') {
-        const result = await window.studio.testAIModel();
+        const result = await invokeUI('ai.test', {});
         if (!result.ok) throw new Error(result.error);
         setMessage(`已连接 · ${result.model || saved.model}`);
       } else setMessage('已保存 AI 服务设置');

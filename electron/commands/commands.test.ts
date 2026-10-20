@@ -14,7 +14,7 @@ import {
 } from '../../src/lib/promptStructure.js';
 import { parsePrompt } from '../../src/lib/prompt.js';
 import type { ImageProject } from '../../src/shared/types';
-import type { CommandSession, CommandEvent } from '../../src/shared/commands';
+import type { CommandSession, WorkbenchCommandEvent } from '../../src/shared/commands';
 
 const roots: string[] = [];
 const databases: Awaited<ReturnType<typeof openDatabase>>[] = [];
@@ -58,7 +58,7 @@ async function setup() {
   databases.push(database);
   database.insertProject(fixture());
   database.createCollection({ id: 'collection', name: 'Synthetic collection', kind: 'manual' });
-  const events: CommandEvent[] = [];
+  const events: WorkbenchCommandEvent[] = [];
   let busy = false;
   const commands = await createCommands({
     directory,
@@ -69,7 +69,9 @@ async function setup() {
     readSource: async () => fixture(),
     importImage: async (_path, draft) =>
       draft ? database.saveProjectPrompt('synthetic-image', draft) : fixture(),
-    emit: (event) => events.push(event),
+    emit: (event) => {
+      if (event.type === 'workbench') events.push(event);
+    },
   });
   const call = async (name: string, input: unknown = {}, origin: 'ui' | 'agent' = 'agent') => {
     const result = await commands.dispatch(name, input, origin);
@@ -89,11 +91,128 @@ async function setup() {
 }
 
 describe('command contract', () => {
+  it('keeps sensitive command families UI-only', () => {
+    for (const [name, definition] of Object.entries(commandRegistry)) {
+      if (
+        /^(settings\.|trash\.|ai\.|agent\.)/.test(name) ||
+        ['dictionary.remove', 'library.restore'].includes(name)
+      ) {
+        expect(definition.uiOnly, name).toBe(true);
+        try {
+          validateCommand(name, {}, 'agent');
+          throw Error('Command unexpectedly allowed');
+        } catch (error) {
+          expect(error).toMatchObject({ code: 'forbidden' });
+        }
+      }
+    }
+  });
+  it('passes the UI caller to native handlers but refuses the same handler to agents', async () => {
+    const directory = await temporary();
+    const database = await openDatabase(path.join(directory, 'data'));
+    databases.push(database);
+    const calls: unknown[] = [];
+    const commands = await createCommands({
+      directory,
+      version: 'test',
+      database,
+      busy: () => false,
+      readImage: async () => fixture(),
+      readSource: async () => fixture(),
+      importImage: async () => fixture(),
+      handlers: {
+        'settings.ai.get': (_input, caller) => {
+          calls.push(caller);
+          return {
+            baseUrl: '',
+            model: '',
+            translationPrompt: '',
+            classificationPrompt: '',
+            defaultPrompts: { translation: '', classification: '' },
+            hasApiKey: false,
+            encryptionAvailable: true,
+          };
+        },
+      },
+    });
+    const sender = { id: 42 } as Electron.WebContents;
+    expect(await commands.dispatch('settings.ai.get', {}, 'agent')).toMatchObject({
+      ok: false,
+      error: { code: 'forbidden' },
+    });
+    expect(calls).toHaveLength(0);
+    expect(await commands.dispatch('settings.ai.get', {}, 'ui', sender)).toMatchObject({
+      ok: true,
+    });
+    expect(calls).toEqual([{ source: 'ui', sender }]);
+  });
+  it('validates nested batches before applying any changes and rejects stale revisions', async () => {
+    const app = await setup();
+    const initial = (await app.call('app.status')).revision;
+    for (const entries of [
+      [],
+      [{ tag: 'synthetic' }],
+      [{ tag: 'synthetic', category: 'invalid' }],
+      [{ tag: 'synthetic', translation: '译文', extra: true }],
+    ]) {
+      expect(await app.dispatch('dictionary.set-many', { entries })).toMatchObject({
+        ok: false,
+        error: { code: 'invalid_input' },
+      });
+    }
+    const changed = await app.call('dictionary.set-many', {
+      entries: [{ tag: 'synthetic', translation: '测试', category: 'Body' }],
+      expectedRevision: initial,
+    });
+    expect(changed.items[0]).toMatchObject({ translation: '测试', category: 'Body' });
+    expect(
+      await app.dispatch('dictionary.set-many', {
+        entries: [{ tag: 'synthetic', translation: '失效' }],
+        expectedRevision: initial,
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'conflict' } });
+    expect(
+      (await app.call('dictionary.list', { query: 'synthetic', all: true })).items[0].translation,
+    ).toBe('测试');
+    expect(
+      (await app.call('dictionary.suggest', { query: 'synthetic' })).items[0].translation,
+    ).toBe('测试');
+    expect(await app.call('dictionary.suggest', { query: ' ' })).toEqual({ items: [] });
+    expect(
+      await app.dispatch('library.rename-many', {
+        changes: [
+          { id: 'synthetic-image', name: '新名称' },
+          { id: 'missing', name: '不存在' },
+        ],
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'not_found' } });
+    expect((await app.call('library.get', { id: 'synthetic-image' })).project.name).toBe(
+      'Synthetic',
+    );
+    const renamed = await app.call('library.rename-many', {
+      changes: [{ id: 'synthetic-image', name: '新名称' }],
+      expectedRevision: changed.revision,
+    });
+    expect(renamed.previous[0].name).toBe('Synthetic');
+    expect((await app.call('library.get', { id: 'synthetic-image' })).project.name).toBe('新名称');
+    await app.call('library.rename-many', {
+      changes: renamed.previous,
+      expectedRevision: renamed.revision,
+    });
+    expect((await app.call('library.get', { id: 'synthetic-image' })).project.name).toBe(
+      'Synthetic',
+    );
+  });
   for (const [name, definition] of Object.entries(commandRegistry))
     it(`${name} validates input before execution`, () => {
-      expect(() => validateCommand(name, { unexpected: true }, 'ui')).toThrow();
-      expect(() => validateCommand(name, null, 'ui')).toThrow();
-      expect(() => validateCommand(name, [], 'ui')).toThrow();
+      for (const input of [{ unexpected: true }, null, []]) {
+        try {
+          validateCommand(name, input, 'ui');
+          throw Error('Invalid input unexpectedly allowed');
+        } catch (error) {
+          expect(error).toMatchObject({ code: 'invalid_input' });
+        }
+      }
       if (definition.required?.length) expect(() => validateCommand(name, {}, 'ui')).toThrow();
       if (definition.uiOnly) expect(() => validateCommand(name, {}, 'agent')).toThrow(/只供/);
     });

@@ -207,7 +207,9 @@ async function libraryTransitions({ h }, enabled, theme) {
 export async function transitionChecks({ h, mode, doubles }) {
   h.category('过渡动效');
   const { evaluate: e, check, click, wait } = h;
-  const saved = await e('window.studio.getAppearanceSettings()');
+  const saved = await e(
+    "window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})",
+  );
   const theme = mode.themeDriver.get();
   const size = h.window.getContentSize();
   h.window.setContentSize(1240, 760);

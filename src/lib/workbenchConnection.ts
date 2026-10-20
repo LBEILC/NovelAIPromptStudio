@@ -93,6 +93,7 @@ export class WorkbenchConnection {
     if (this.current !== this.confirmed) await this.flush();
   }
   receive(event: CommandEvent) {
+    if (event.type !== 'workbench') return;
     const remote = event.session;
     const pending = this.current !== this.confirmed;
     if (!pending) {

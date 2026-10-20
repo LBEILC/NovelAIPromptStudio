@@ -1,3 +1,4 @@
+import { invokeUI } from '../lib/commands';
 import {
   Disclosure,
   TransitionSurface,
@@ -65,7 +66,7 @@ function Row({
   children,
 }: {
   title: string;
-  help?: string | string[];
+  help?: ReactNode | ReactNode[];
   children: ReactNode;
 }) {
   return (
@@ -73,7 +74,9 @@ function Row({
       <div>
         {title}
         {help &&
-          (Array.isArray(help) ? help : [help]).map((line) => <small key={line}>{line}</small>)}
+          (Array.isArray(help) ? help : [help]).map((line, index) => (
+            <small key={index}>{line}</small>
+          ))}
       </div>
       {children}
     </div>
@@ -85,13 +88,16 @@ function Agent() {
     path: string;
     onPath: boolean;
     skillPath: string;
+    platform: string;
+    pathFailed?: boolean;
   } | null>(null);
+  const [installedNow, setInstalledNow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   useEffect(() => {
     let active = true;
-    void window.studio
-      ?.getAgentSetup()
+    setInstalledNow(false);
+    void invokeUI('agent.setup', {})
       .then((result) => {
         if (!active) return;
         if (result.ok) setSetup(result);
@@ -107,9 +113,10 @@ function Agent() {
   const install = async () => {
     setBusy(true);
     try {
-      const result = await window.studio!.installAgentCLI();
+      const result = await invokeUI('agent.install', {});
       if (!result.ok) throw Error(result.error);
       setSetup(result);
+      setInstalledNow(true);
       setMessage('');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
@@ -119,7 +126,7 @@ function Agent() {
   };
   const copy = async () => {
     try {
-      const result = await window.studio!.readAgentSkill();
+      const result = await invokeUI('agent.skill', {});
       if (!result.ok) throw Error(result.error);
       await writeClipboardText(result.text);
       setMessage('已复制技能内容');
@@ -138,12 +145,22 @@ function Agent() {
           setup?.installed
             ? [
                 setup.path,
-                // TODO(design): Confirm terminal PATH guidance for platforms without automatic PATH updates.
-                ...(!setup.onPath
-                  ? [
-                      '【文案待定：在终端配置中加入 export PATH="$HOME/.local/bin:$PATH"，然后重新打开终端。】',
-                    ]
-                  : []),
+                ...(setup.platform === 'win32'
+                  ? setup.pathFailed
+                    ? [
+                        '加入 PATH 失败。可以在系统的"编辑账户的环境变量"里把上面的文件夹加进 Path，然后重新打开终端。',
+                      ]
+                    : installedNow && setup.onPath
+                      ? ['已加入 PATH，已经打开的终端要重新打开才能用。']
+                      : []
+                  : !setup.onPath
+                    ? [
+                        '这个位置不在 PATH 里。把下面这行加到 ~/.zshrc（用 bash 的加到 ~/.bashrc），然后重新打开终端：',
+                        <span className="settings-copy">
+                          <code>{'export PATH="$HOME/.local/bin:$PATH"'}</code>
+                        </span>,
+                      ]
+                    : []),
               ]
             : undefined
         }
@@ -160,7 +177,7 @@ function Agent() {
           <Button
             variant="quiet"
             onClick={() => {
-              void window.studio!.revealAgentSkill().then((result) => {
+              void invokeUI('agent.reveal', {}).then((result) => {
                 if (!result.ok) setMessage(result.error);
               });
             }}
@@ -189,8 +206,7 @@ function Appearance() {
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
-    window.studio
-      ?.listSystemFonts()
+    invokeUI('fonts.list', {})
       .then((r) => {
         if (!active) return;
         if (r.ok) setFonts(r.fonts);
@@ -385,7 +401,7 @@ function Storage({
   const [trashBusy, setTrashBusy] = useState(false);
   const [trashError, setTrashError] = useState('');
   const refresh = async () => {
-    const result = await window.studio?.getTrashSummary();
+    const result = await invokeUI('trash.summary', {});
     if (result?.ok) setTrash(result.count);
     else if (result) throw new Error(result.error);
   };
@@ -494,7 +510,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
   const [message, setMessage] = useState('');
   const state = u.state;
   const open = (url?: string) =>
-    void window.studio?.openReleasePage(url).catch((e: Error) => setMessage(e.message));
+    void invokeUI('updates.open-release', { url: url }).catch((e: Error) => setMessage(e.message));
   const copy = async () => {
     try {
       await writeClipboardText(feedbackDiagnostics(state?.currentVersion, state?.platform));

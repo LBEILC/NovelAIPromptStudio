@@ -51,7 +51,10 @@ export async function libraryImportExtras({ h, database, doubles, mode, files, r
     await click('取消剩下的', scope);
     // The cancellation handler is synchronous. A following IPC reply fences the
     // click's request before releasing the genuine in-flight file read.
-    await e('window.studio.getUpdateStatus()', '等待取消请求经过主进程');
+    await e(
+      "window.studio.invoke('updates.status',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})",
+      '等待取消请求经过主进程',
+    );
   } finally {
     readGate.restore();
   }

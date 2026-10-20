@@ -1,3 +1,4 @@
+import { invokeResult } from '../lib/commands';
 import { useEffect, useMemo, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { Autocomplete, Button, type Suggestion } from '../ui';
@@ -31,8 +32,7 @@ export function AddTags({
       return;
     }
     const timer = setTimeout(() => {
-      window.studio
-        ?.suggestTags(value)
+      invokeResult('dictionary.suggest', { query: value })
         .then((result) => {
           if (active && result.ok)
             setItems(

@@ -13,8 +13,9 @@ import {
 } from '../workbench.js';
 import { importLibraryFiles } from '../importer.js';
 /** @typedef {import('../../src/shared/types').ImageProject} Project */
-/** @param {{database:Awaited<ReturnType<import('../database.js').openDatabase>>,assetsDirectory:()=>string,busy:()=>boolean,createWindow:()=>Electron.BrowserWindow,testRoot?:string}} options */
+/** @param {{database:Awaited<ReturnType<import('../database.js').openDatabase>>,assetsDirectory:()=>string,busy:()=>boolean,createWindow:()=>Electron.BrowserWindow,testRoot?:string,handlers?:import('./index.js').Services['handlers'],selectSource?:import('./index.js').Services['selectSource'],readyLibrary?:()=>Promise<void>,beforeCommand?:import('./index.js').Services['beforeCommand']}} options */
 export async function installCommandRuntime(options) {
+  const handlers = options.handlers || {};
   const { database } = options;
   const directory = app.getPath('userData');
   /** @type {Set<number>} */
@@ -54,6 +55,10 @@ export async function installCommandRuntime(options) {
     directory,
     version: app.getVersion(),
     database,
+    handlers,
+    selectSource: options.selectSource,
+    readyLibrary: options.readyLibrary,
+    beforeCommand: options.beforeCommand,
     busy: options.busy,
     readImage: async (file) =>
       /** @type {Project} */ (
@@ -113,7 +118,7 @@ export async function installCommandRuntime(options) {
     else request.resolve();
   });
   ipcMain.handle('studio:command', async (event, name, input) => {
-    const result = await commands.dispatch(String(name), input, 'ui');
+    const result = await commands.dispatch(String(name), input, 'ui', event.sender);
     if (name === 'workbench.session' && result.ok) ready.add(event.sender.id);
     return result;
   });
@@ -125,24 +130,26 @@ export async function installCommandRuntime(options) {
     packaged: app.isPackaged,
     testRoot: options.testRoot,
   });
-  /** @param {()=>Promise<object>} run */
+  /** @template {object} T @param {()=>Promise<T>} run */
   const setupResult = async (run) => {
     try {
-      return { ok: true, ...(await run()) };
+      return { ok: /** @type {const} */ (true), ...(await run()) };
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      return {
+        ok: /** @type {const} */ (false),
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   };
-  ipcMain.handle('agent:setup', () => setupResult(setup.status));
-  ipcMain.handle('agent:install', () => setupResult(setup.install));
-  ipcMain.handle('agent:skill', () => setupResult(async () => ({ text: await setup.skill() })));
-  ipcMain.handle('agent:reveal', () =>
+  handlers['agent.setup'] = () => setupResult(setup.status);
+  handlers['agent.install'] = () => setupResult(setup.install);
+  handlers['agent.skill'] = () => setupResult(async () => ({ text: await setup.skill() }));
+  handlers['agent.reveal'] = () =>
     setupResult(async () => {
       const error = await shell.openPath(path.dirname(setup.skillPath));
       if (error) throw Error(error);
       return {};
-    }),
-  );
+    });
   const server = await startCommandServer({
     directory,
     dispatch: (name, input) => commands.dispatch(name, input, 'agent'),

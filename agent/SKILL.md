@@ -46,12 +46,16 @@ nai-studio library.search --json '{"query":"blue hair","filters":{"includeTags":
 nai-studio library.get --id IMAGE
 nai-studio library.import --path "/path/to/image.png"
 nai-studio library.rename --json '{"id":"IMAGE","name":"窗边","expectedRevision":0}'
+nai-studio library.rename-many --json '{"changes":[{"id":"IMAGE","name":"窗边"}],"expectedRevision":0}'
 nai-studio library.trash --json '{"ids":["IMAGE"],"expectedRevision":0}'
 nai-studio collection.list
 nai-studio collection.add --json '{"collectionId":"COLLECTION","ids":["IMAGE"],"expectedRevision":0}'
 nai-studio collection.remove --json '{"collectionId":"COLLECTION","ids":["IMAGE"],"expectedRevision":0}'
 nai-studio dictionary.lookup --json '{"tags":["blue hair","standing"]}'
+nai-studio dictionary.list --json '{"query":"hair","limit":20}'
+nai-studio dictionary.suggest --json '{"query":"blue"}'
 nai-studio dictionary.set --json '{"tag":"blue hair","translation":"蓝发","category":"Body","expectedRevision":0}'
+nai-studio dictionary.set-many --json '{"entries":[{"tag":"blue hair","translation":"蓝发","category":"Body"}],"expectedRevision":0}'
 ```
 
 `tag.set` 可以用 `text` 改文字，也可同时设置 `text` 和 `weight`。`tag.add` 可用 `before` 指定插入位置。负面范围是 `base:undesired`；角色范围从读取结果取得。

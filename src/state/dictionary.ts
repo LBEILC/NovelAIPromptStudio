@@ -1,3 +1,4 @@
+import { invokeUI, onProgress, invokeResult } from '../lib/commands';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TagCachePatch, DictionaryTranslationProgress } from '../shared/ipc';
 import type { TagDictionaryEntry, TagCategory } from '../shared/types';
@@ -36,7 +37,7 @@ export function useDictionary() {
   const [error, setError] = useState('');
   const refresh = useCallback(async () => {
     const sequence = ++revision.current;
-    const result = await window.studio?.listTagCache({ all: true });
+    const result = await invokeResult('dictionary.list', { all: true });
     if (sequence !== revision.current || !result) return;
     if (!result.ok) throw Error(result.error);
     setAllItems(result.items);
@@ -51,21 +52,20 @@ export function useDictionary() {
       .finally(() => {
         if (active) setPending(false);
       });
-    void window.studio
-      ?.getAISettings?.()
+    void invokeUI('settings.ai.get', {})
       .then((settings) => {
         if (active) setAiReady(!!settings.model.trim());
       })
       .catch((e: Error) => {
         if (active) setError(e.message);
       });
-    window.studio?.onTagRetranslationProgress?.((value) => {
+    const unsubscribe = onProgress('tag-cache:retranslate:progress', (value) => {
       if (value.id === requestId.current) setProgress(value);
     });
     return () => {
       active = false;
       revision.current++;
-      window.studio?.offTagRetranslationProgress?.();
+      unsubscribe();
     };
   }, [refresh]);
   useEffect(() => {
@@ -129,10 +129,18 @@ export function useDictionary() {
     }
   };
   const save = (tag: string, patch: TagCachePatch) =>
-    mutate([tag], () => window.studio!.updateTagCache(tag, patch), true);
+    mutate([tag], () => invokeResult('dictionary.set', { tag: tag, ...patch }), true);
   const categorize = (category: TagCategory) =>
-    mutate(selected, () => window.studio!.updateTagCacheMany(selected, category), true);
-  const remove = (tags: string[]) => mutate(tags, () => window.studio!.deleteTagCacheMany(tags));
+    mutate(
+      selected,
+      () =>
+        invokeResult('dictionary.set-many', {
+          entries: selected.map((tag) => ({ tag, category: category })),
+        }),
+      true,
+    );
+  const remove = (tags: string[]) =>
+    mutate(tags, () => invokeUI('dictionary.remove', { tags: tags }));
   const retranslate = async () => {
     if (running || !selected.length || !aiReady) return;
     const id = crypto.randomUUID();
@@ -148,7 +156,7 @@ export function useDictionary() {
       canceled: false,
     });
     try {
-      const result = await window.studio!.retranslateTagCache(id, selected);
+      const result = await invokeUI('dictionary.retranslate', { id: id, tags: selected });
       if (!result.ok) throw Error(result.error);
       setProgress(result);
       if (['untranslated', 'unsorted'].includes(filters.view))
@@ -163,7 +171,8 @@ export function useDictionary() {
     }
   };
   const cancel = () => {
-    if (requestId.current) void window.studio?.cancelTagRetranslation(requestId.current);
+    if (requestId.current)
+      void invokeUI('dictionary.retranslate-cancel', { id: requestId.current });
   };
   return {
     items,

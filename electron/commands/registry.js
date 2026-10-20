@@ -1,7 +1,7 @@
 // @ts-check
 /** @typedef {import('../../src/shared/commands').CommandName} CommandName */
 /** @typedef {import('../../src/shared/commands').CommandErrorCode} CommandErrorCode */
-/** @typedef {{ fields: Record<string, string>, required?: string[], uiOnly?: boolean, mutation?: boolean }} Definition */
+/** @typedef {{ fields: Record<string, string>, required?: string[], uiOnly?: boolean, mutation?: boolean, example?:object }} Definition */
 const revision = { expectedRevision: 'integer' };
 const tab = { ...revision, tabId: 'string' };
 const scope = { ...tab, scope: 'string' };
@@ -10,55 +10,161 @@ const tag = { ...block, index: 'integer' };
 const scoped = ['tabId', 'scope'];
 const blocked = [...scoped, 'block'];
 const tagged = [...blocked, 'index'];
+const category =
+  'ArtistEra|Subject|Identity|Body|Clothing|Action|Environment|Composition|StyleQuality|Unsorted';
 /** @type {Record<CommandName, Definition>} */
 export const commandRegistry = {
-  'app.status': { fields: {} },
-  'image.read': { fields: { path: 'string' }, required: ['path'] },
-  'workbench.list': { fields: {} },
+  'agent.setup': { fields: {}, uiOnly: true },
+  'agent.install': { fields: {}, uiOnly: true },
+  'agent.skill': { fields: {}, uiOnly: true },
+  'agent.reveal': { fields: {}, uiOnly: true },
+  'image.copy': { fields: { id: 'string', path: 'string' }, uiOnly: true },
+  'image.save-as': { fields: { id: 'string', path: 'string', name: 'text' }, uiOnly: true },
+  'file.reveal': { fields: { path: 'string', vibe: 'vibe' }, uiOnly: true },
+  'workbench.open-many': { fields: { paths: 'strings' }, required: ['paths'], uiOnly: true },
+  'import.prepare': { fields: { paths: 'stringList' }, uiOnly: true },
+  'import.files': { fields: { paths: 'stringList', fromClipboard: 'boolean' }, uiOnly: true },
+  'import.cancel': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
+  'library.cards': { fields: { view: 'all|favorites|trash' }, required: [], uiOnly: true },
+  'collection.create': {
+    fields: { collection: 'collectionInput' },
+    required: ['collection'],
+    uiOnly: true,
+  },
+  'collection.update': {
+    fields: { id: 'string', patch: 'collectionPatch' },
+    required: ['id', 'patch'],
+    uiOnly: true,
+  },
+  'collection.delete': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
+  'library.restore': { fields: { ids: 'strings' }, required: ['ids'], uiOnly: true },
+  'library.set-cover': {
+    fields: { fingerprint: 'string', projectId: 'string' },
+    required: ['fingerprint', 'projectId'],
+    uiOnly: true,
+  },
+  'trash.delete-permanently': { fields: { ids: 'stringList' }, required: [], uiOnly: true },
+  'trash.summary': { fields: {}, required: [], uiOnly: true },
+  'workbench.temp-sync': { fields: { paths: 'stringList' }, required: ['paths'], uiOnly: true },
+  'workbench.save-structure': {
+    fields: { filePath: 'string', structure: 'structure', projectId: 'text' },
+    required: ['filePath', 'structure'],
+    uiOnly: true,
+  },
+  'workbench.open-clipboard': { fields: {}, required: [], uiOnly: true },
+  'dictionary.retranslate': {
+    fields: { id: 'string', tags: 'stringList' },
+    required: ['id', 'tags'],
+    uiOnly: true,
+  },
+  'dictionary.retranslate-cancel': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
+  'dictionary.translate': { fields: { tags: 'stringList' }, required: ['tags'], uiOnly: true },
+  'dictionary.remove': { fields: { tags: 'stringList' }, required: ['tags'], uiOnly: true },
+  'paragraph.transform': {
+    fields: { request: 'paragraphRequest' },
+    required: ['request'],
+    uiOnly: true,
+  },
+  'paragraph.cancel': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
+  'import.previews': { fields: { sessionId: 'string' }, required: ['sessionId'], uiOnly: true },
+  'import.commit': {
+    fields: { sessionId: 'string', entryIds: 'stringList' },
+    required: ['sessionId', 'entryIds'],
+    uiOnly: true,
+  },
+
+  'clipboard.read-text': { fields: {}, required: [], uiOnly: true },
+  'clipboard.write-text': { fields: { text: 'text' }, required: ['text'], uiOnly: true },
+  'settings.ai.get': { fields: {}, required: [], uiOnly: true },
+  'settings.ai.save': { fields: { settings: 'aiSettings' }, required: ['settings'], uiOnly: true },
+  'settings.appearance.get': { fields: {}, required: [], uiOnly: true },
+  'settings.appearance.save': {
+    fields: { settings: 'appearanceSettings' },
+    required: ['settings'],
+    uiOnly: true,
+  },
+  'settings.productivity.get': { fields: {}, required: [], uiOnly: true },
+  'settings.productivity.save': {
+    fields: { settings: 'productivitySettings' },
+    required: ['settings'],
+    uiOnly: true,
+  },
+  'updates.status': { fields: {}, required: [], uiOnly: true },
+  'updates.check': { fields: {}, required: [], uiOnly: true },
+  'updates.download': { fields: {}, required: [], uiOnly: true },
+  'updates.install': { fields: {}, required: [], uiOnly: true },
+  'updates.open-release': { fields: { url: 'text' }, required: [], uiOnly: true },
+  'fonts.list': { fields: {}, required: [], uiOnly: true },
+  'ai.models': { fields: {}, required: [], uiOnly: true },
+  'ai.test': { fields: {}, required: [], uiOnly: true },
+  'storage.get': { fields: {}, required: [], uiOnly: true },
+  'storage.database': { fields: {}, required: [], uiOnly: true },
+  'storage.backups': { fields: {}, required: [], uiOnly: true },
+  'storage.reveal-backup': { fields: { fileName: 'string' }, required: ['fileName'], uiOnly: true },
+  'storage.change': { fields: {}, required: [], uiOnly: true },
+  'storage.reveal': { fields: {}, required: [], uiOnly: true },
+
+  'app.status': { uiOnly: false, fields: {} },
+  'image.read': { uiOnly: false, fields: { path: 'string' }, required: ['path'] },
+  'workbench.list': { uiOnly: false, fields: {} },
   'workbench.open': {
-    fields: { ...revision, path: 'string', libraryId: 'string' },
+    uiOnly: false,
+    fields: { ...revision, path: 'string', libraryId: 'string', source: 'source' },
     mutation: true,
   },
-  'workbench.get': { fields: { tabId: 'string' }, required: ['tabId'] },
-  'workbench.close': { fields: tab, required: ['tabId'], mutation: true },
-  'workbench.save-to-library': { fields: tab, required: ['tabId'], mutation: true },
+  'workbench.get': { uiOnly: false, fields: { tabId: 'string' }, required: ['tabId'] },
+  'workbench.close': { uiOnly: false, fields: tab, required: ['tabId'], mutation: true },
+  'workbench.save-to-library': { uiOnly: false, fields: tab, required: ['tabId'], mutation: true },
   'prompt.set': {
+    uiOnly: false,
     fields: { ...scope, text: 'text' },
     required: [...scoped, 'text'],
     mutation: true,
   },
   'block.set-text': {
+    uiOnly: false,
     fields: { ...block, text: 'text' },
     required: [...blocked, 'text'],
     mutation: true,
   },
   'block.set-type': {
+    uiOnly: false,
     fields: { ...block, type: 'tags|paragraph' },
     required: [...blocked, 'type'],
     mutation: true,
   },
   'tag.add': {
+    uiOnly: false,
     fields: { ...block, text: 'string', before: 'integer' },
     required: [...blocked, 'text'],
     mutation: true,
   },
-  'tag.remove': { fields: tag, required: tagged, mutation: true },
+  'tag.remove': { uiOnly: false, fields: tag, required: tagged, mutation: true },
   'tag.set': {
+    uiOnly: false,
     fields: { ...tag, text: 'string', weight: 'number' },
     required: tagged,
     mutation: true,
   },
-  'character.add': { fields: { ...tab, name: 'text' }, required: ['tabId'], mutation: true },
+  'character.add': {
+    uiOnly: false,
+    fields: { ...tab, name: 'text' },
+    required: ['tabId'],
+    mutation: true,
+  },
   'character.remove': {
+    uiOnly: false,
     fields: { ...tab, characterId: 'string' },
     required: ['tabId', 'characterId'],
     mutation: true,
   },
   'prompt.copy': {
+    uiOnly: false,
     fields: { tabId: 'string', scope: 'string', includeAutomatic: 'boolean' },
     required: ['tabId'],
   },
   'library.search': {
+    uiOnly: false,
     fields: {
       query: 'text',
       filters: 'filters',
@@ -68,27 +174,76 @@ export const commandRegistry = {
       limit: 'integer',
     },
   },
-  'library.get': { fields: { id: 'string' }, required: ['id'] },
-  'library.import': { fields: { ...revision, path: 'string' }, required: ['path'], mutation: true },
+  'library.get': { uiOnly: false, fields: { id: 'string' }, required: ['id'] },
+  'library.import': {
+    uiOnly: false,
+    fields: { ...revision, path: 'string' },
+    required: ['path'],
+    mutation: true,
+  },
   'library.rename': {
+    uiOnly: false,
     fields: { ...revision, id: 'string', name: 'text' },
     required: ['id', 'name'],
     mutation: true,
   },
-  'library.trash': { fields: { ...revision, ids: 'strings' }, required: ['ids'], mutation: true },
-  'collection.list': { fields: {} },
+  'library.trash': {
+    uiOnly: false,
+    fields: { ...revision, ids: 'strings' },
+    required: ['ids'],
+    mutation: true,
+  },
+  'library.rename-many': {
+    uiOnly: false,
+    example: { changes: [{ id: 'IMAGE', name: '窗边' }], expectedRevision: 0 },
+    fields: { ...revision, changes: 'renames' },
+    required: ['changes'],
+    mutation: true,
+  },
+  'dictionary.list': {
+    uiOnly: false,
+    example: { query: 'hair', limit: 20 },
+    fields: {
+      query: 'text',
+      category,
+      source: 'manual|danbooru|dso|rule|ai|cache|builtin|heuristic',
+      limit: 'integer',
+      offset: 'integer',
+      all: 'boolean',
+    },
+  },
+  'dictionary.suggest': {
+    uiOnly: false,
+    fields: { query: 'text' },
+    required: ['query'],
+    example: { query: 'blue' },
+  },
+  'dictionary.set-many': {
+    uiOnly: false,
+    example: {
+      entries: [{ tag: 'blue hair', translation: '蓝发', category: 'Body' }],
+      expectedRevision: 0,
+    },
+    fields: { ...revision, entries: 'dictionaryEntries' },
+    required: ['entries'],
+    mutation: true,
+  },
+  'collection.list': { uiOnly: false, fields: {} },
   'collection.add': {
+    uiOnly: false,
     fields: { ...revision, collectionId: 'string', ids: 'strings' },
     required: ['collectionId', 'ids'],
     mutation: true,
   },
   'collection.remove': {
+    uiOnly: false,
     fields: { ...revision, collectionId: 'string', ids: 'strings' },
     required: ['collectionId', 'ids'],
     mutation: true,
   },
-  'dictionary.lookup': { fields: { tags: 'strings' }, required: ['tags'] },
+  'dictionary.lookup': { uiOnly: false, fields: { tags: 'strings' }, required: ['tags'] },
   'dictionary.set': {
+    uiOnly: false,
     fields: {
       ...revision,
       tag: 'string',
@@ -128,6 +283,135 @@ export function record(value) {
 }
 /** @param {unknown} value @param {string} type @returns {boolean} */
 function valid(value, type) {
+  if (type === 'vibe')
+    return (
+      record(value) &&
+      valid(value.encoding, 'string') &&
+      Object.entries(value).every(
+        ([key, entry]) =>
+          [
+            'id',
+            'name',
+            'encoding',
+            'strength',
+            'information_extracted',
+            'image_path',
+            'thumbnail_path',
+            'file_path',
+            'is_embedded',
+            'source_type',
+            'reference_strength',
+            'description',
+            'model',
+          ].includes(key) &&
+          (typeof entry === 'string' ||
+            typeof entry === 'number' ||
+            typeof entry === 'boolean' ||
+            entry === null),
+      )
+    );
+  if (type === 'source')
+    return (
+      record(value) &&
+      ['file', 'library', 'clipboard'].includes(String(value.type)) &&
+      Object.entries(value).every(
+        ([key, entry]) =>
+          ['type', 'path', 'projectId', 'temporaryId', 'fingerprint', 'id'].includes(key) &&
+          valid(entry, 'text'),
+      )
+    );
+  if (type === 'stringList')
+    return (
+      Array.isArray(value) && value.length <= 10000 && value.every((item) => valid(item, 'string'))
+    );
+  if (type === 'structure')
+    return (
+      record(value) &&
+      typeof value.base_prompt_raw === 'string' &&
+      typeof value.base_undesired_raw === 'string' &&
+      Array.isArray(value.characters) &&
+      Array.isArray(value.base_undesired_tags)
+    );
+  if (type === 'collectionInput' || type === 'collectionPatch' || type === 'paragraphRequest') {
+    /** @type {Record<string,string>} */
+    const fields =
+      type === 'paragraphRequest'
+        ? { id: 'string', text: 'text', direction: 'translate|rewrite' }
+        : { name: 'text', kind: 'manual|smart', filters: 'filters' };
+    const required =
+      type === 'paragraphRequest'
+        ? ['id', 'text', 'direction']
+        : type === 'collectionInput'
+          ? ['name']
+          : [];
+    return (
+      record(value) &&
+      required.every((key) => Object.hasOwn(value, key) && value[key] !== undefined) &&
+      Object.entries(value).every(
+        ([key, entry]) =>
+          Object.hasOwn(fields, key) && (entry === undefined || valid(entry, fields[key])),
+      )
+    );
+  }
+  if (['aiSettings', 'appearanceSettings', 'productivitySettings'].includes(type)) {
+    /** @type {Record<string,Record<string,string>>} */
+    const schemas = {
+      aiSettings: {
+        baseUrl: 'text',
+        model: 'text',
+        apiKey: 'text',
+        translationPrompt: 'text',
+        classificationPrompt: 'text',
+        clearApiKey: 'boolean',
+        hasApiKey: 'boolean',
+        encryptionAvailable: 'boolean',
+        defaultPrompts: 'defaultPrompts',
+      },
+      appearanceSettings: {
+        themeMode: 'auto|dark|light',
+        primaryColor: 'blue|cyan|geekblue|gold|green|lime|magenta|orange|purple|red|volcano|yellow',
+        sansFont: 'text',
+        monoFont: 'text',
+        proseFont: 'text',
+        motion: 'full|reduced|off',
+      },
+      productivitySettings: { recentImageDirectory: 'text', autoCheckUpdates: 'boolean' },
+    };
+    return (
+      record(value) &&
+      Object.entries(value).every(
+        ([key, entry]) => Object.hasOwn(schemas[type], key) && valid(entry, schemas[type][key]),
+      )
+    );
+  }
+  if (type === 'defaultPrompts')
+    return (
+      record(value) &&
+      Object.keys(value).every((key) => ['translation', 'classification'].includes(key)) &&
+      Object.values(value).every((entry) => valid(entry, 'text'))
+    );
+  if (type === 'renames' || type === 'dictionaryEntries') {
+    /** @type {Record<string,string>} */
+    const fields =
+      type === 'renames'
+        ? { id: 'string', name: 'text', has_custom_name: 'boolean' }
+        : { tag: 'string', translation: 'text', category };
+    return (
+      Array.isArray(value) &&
+      value.length > 0 &&
+      value.length <= 10000 &&
+      value.every(
+        (item) =>
+          record(item) &&
+          Object.keys(item).every((key) => Object.hasOwn(fields, key)) &&
+          Object.entries(item).every(([key, entry]) => valid(entry, fields[key])) &&
+          (type === 'renames'
+            ? valid(item.id, 'string') && valid(item.name, 'text')
+            : valid(item.tag, 'string') &&
+              (item.translation !== undefined || item.category !== undefined)),
+      )
+    );
+  }
   if (type === 'text' || type === 'string')
     return (
       typeof value === 'string' && value.length <= 2_000_000 && (type === 'text' || !!value.trim())
@@ -194,8 +478,15 @@ function valid(value, type) {
 /** @param {string} name @param {unknown} input @param {'ui'|'agent'} source @returns {CommandName} */
 export function validateCommand(name, input, source) {
   if (
-    /^(settings?|preferences?|keys?|secrets?|account|generation)\./i.test(name) ||
-    /(?:permanent|empty|delete|purge|restore)/i.test(name)
+    source === 'agent' &&
+    Object.hasOwn(commandRegistry, name) &&
+    commandRegistry[/** @type {CommandName} */ (name)].uiOnly
+  )
+    throw new CommandError('forbidden', '这个命令只供软件界面使用');
+  if (
+    source === 'agent' &&
+    (/^(settings?|preferences?|keys?|secrets?|account|generation)\./i.test(name) ||
+      /(?:permanent|empty|delete|purge|restore)/i.test(name))
   )
     throw new CommandError('forbidden', '这个命令不在 Agent 可用范围内');
   if (!Object.hasOwn(commandRegistry, name))
@@ -207,12 +498,17 @@ export function validateCommand(name, input, source) {
   if (
     !record(input) ||
     Object.keys(input).some((k) => !Object.hasOwn(def.fields, k)) ||
-    (def.required || []).some((k) => !Object.hasOwn(input, k)) ||
-    Object.entries(input).some(([k, v]) => !valid(v, def.fields[k]))
+    (def.required || []).some((k) => !Object.hasOwn(input, k) || input[k] === undefined) ||
+    Object.entries(input).some(([k, v]) => v !== undefined && !valid(v, def.fields[k]))
   )
     throw new CommandError('invalid_input', '输入格式不正确，请按 help 中的格式填写');
   if (
-    (name === 'workbench.open' && Number(!!input.path) + Number(!!input.libraryId) !== 1) ||
+    (['image.copy', 'image.save-as'].includes(name) &&
+      Number(!!input.id) + Number(!!input.path) !== 1) ||
+    (name === 'file.reveal' && Number(!!input.path) + Number(!!input.vibe) !== 1) ||
+    (name === 'workbench.open' &&
+      (Number(!!input.path) + Number(!!input.libraryId) > 1 ||
+        (source === 'agent' && Number(!!input.path) + Number(!!input.libraryId) !== 1))) ||
     (name === 'tag.set' && input.text === undefined && input.weight === undefined) ||
     (name === 'dictionary.set' &&
       input.translation === undefined &&

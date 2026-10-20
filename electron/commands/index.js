@@ -27,6 +27,7 @@ import {
 import { filterGalleryProjects } from '../../src/lib/galleryFilters.js';
 import { galleryCollectionScope } from '../../src/lib/galleryCollections.js';
 import { insertTags } from '../../src/workbench/edits.ts';
+import { searchDsoTags } from '../dsoDictionary.js';
 
 /** @typedef {import('../../src/shared/commands').CommandName} Name */
 /** @typedef {import('../../src/shared/commands').CommandTab} Tab */
@@ -36,7 +37,8 @@ import { insertTags } from '../../src/workbench/edits.ts';
 /** @typedef {import('../../src/shared/types').ImageProject} Project */
 /** @typedef {import('../../src/shared/types').WorkbenchSource} Source */
 /** @typedef {import('../../src/lib/promptDocument').PromptDocument} Document */
-/** @typedef {{[K in Name]:(input:import('../../src/shared/commands').CommandInput<K>)=>Promise<import('../../src/shared/commands').CommandOutput<K>>|import('../../src/shared/commands').CommandOutput<K>}} Handlers */
+/** @typedef {{source:'ui'|'agent', sender?:Electron.WebContents}} Caller */
+/** @typedef {{[K in Name]:(input:import('../../src/shared/commands').CommandInput<K>, caller:Caller)=>Promise<import('../../src/shared/commands').CommandOutput<K>>|import('../../src/shared/commands').CommandOutput<K>}} Handlers */
 /** @typedef {{
  * directory:string, version:string,
  * readImage:(path:string)=>Promise<Project>, readSource:(source:Source)=>Promise<Project>,
@@ -44,6 +46,9 @@ import { insertTags } from '../../src/workbench/edits.ts';
  * database:Awaited<ReturnType<import('../database.js').openDatabase>>,
  * busy:()=>boolean, prepareUI?:()=>Promise<void>, emit?:(event:CommandEvent)=>void,
  * remember?:(tab:Tab)=>void
+ * handlers?:Partial<Handlers>
+ * selectSource?:(caller:Caller)=>Promise<Source|null>, readyLibrary?:()=>Promise<void>
+ * beforeCommand?:(name:Name)=>Promise<void>
  * }} Services */
 
 /** @param {Services} services */
@@ -82,9 +87,9 @@ export async function createCommands(services) {
       revision: value.revision || 0,
     };
   };
-  /** @param {Partial<CommandEvent>} [extra] */
+  /** @param {Partial<import('../../src/shared/commands').WorkbenchCommandEvent>} [extra] */
   const emit = (extra = {}) =>
-    services.emit?.({ session: store.get(), source: source(), ...extra });
+    services.emit?.({ type: 'workbench', session: store.get(), source: source(), ...extra });
   /** @param {EditingTarget} target */
   const unlocked = (target) => {
     if (
@@ -146,7 +151,7 @@ export async function createCommands(services) {
     if (!item) throw new CommandError('not_found', '收藏集不存在');
     return item;
   };
-  /** @type {Handlers} */
+  /** @type {Partial<Handlers>} */
   const handlers = {
     'app.status': async () => ({
       version: services.version,
@@ -169,13 +174,17 @@ export async function createCommands(services) {
       activeTabId: store.get().activeTabId,
     }),
     'workbench.get': (input) => full(tab(input.tabId)),
-    'workbench.open': async (input) => {
+    'workbench.open': async (input, caller) => {
       revision(input.expectedRevision, store.revision());
-      const origin = /** @type {Source} */ (
+      let origin = /** @type {Source|null} */ (
         input.libraryId
           ? { type: 'library', projectId: input.libraryId }
-          : { type: 'file', path: input.path }
+          : input.source || (input.path ? { type: 'file', path: input.path } : null)
       );
+      if (!origin && caller.source === 'ui')
+        origin = (await services.selectSource?.(caller)) || null;
+      if (!origin) return { canceled: true };
+      if (input.path && !origin.path) origin.path = input.path;
       if (input.libraryId) project(input.libraryId);
       const image = await services.readSource(origin);
       origin.path = image.image_path;
@@ -308,7 +317,15 @@ export async function createCommands(services) {
         revision: store.revision(),
       };
     },
-    'library.get': (input) => ({ project: project(input.id), revision: store.revision() }),
+    'library.get': async (input) => {
+      await services.readyLibrary?.();
+      return {
+        project: /** @type {import('../../src/shared/types').ImageRecord} */ (
+          services.database.loadProject(input.id) || project(input.id)
+        ),
+        revision: store.revision(),
+      };
+    },
     'library.import': async (input) => {
       revision(input.expectedRevision, store.revision());
       const p = await services.importImage(input.path);
@@ -326,11 +343,77 @@ export async function createCommands(services) {
     },
     'library.trash': async (input) => {
       revision(input.expectedRevision, store.revision());
-      input.ids.forEach(project);
-      services.database.updateProjects(input.ids, { deleted: true });
+      if (source() === 'agent') input.ids.forEach(project);
+      const results = services.database.updateProjects(input.ids, { deleted: true });
       await store.bump();
       emit({ libraryChanged: true });
-      return { ids: input.ids, revision: store.revision() };
+      return { ids: input.ids, revision: store.revision(), results, summary: summary(results) };
+    },
+    'library.rename-many': async (input) => {
+      revision(input.expectedRevision, store.revision());
+      input.changes.forEach((change) => project(change.id));
+      const previous = services.database.updateProjectNames(input.changes);
+      await store.bump();
+      emit({ libraryChanged: true });
+      return { previous, revision: store.revision() };
+    },
+    'dictionary.list': async (input) => {
+      const result = services.database.listTagDictionary(input);
+      if (input.all) {
+        const counts = await services.database.tagImageCounts();
+        result.items = result.items.map(
+          (/** @type {import('../../src/shared/types').TagDictionaryEntry} */ item) => ({
+            ...item,
+            image_count: counts.get(item.tag.toLowerCase().replaceAll('_', ' ')) || 0,
+          }),
+        );
+      }
+      return result;
+    },
+    'dictionary.suggest': async (input) => {
+      const search = input.query.trim().slice(0, 240);
+      if (!search) return { items: [] };
+      const items = new Map(
+        searchDsoTags(search).map((item) => [item.tag.toLowerCase().replaceAll(' ', '_'), item]),
+      );
+      for (const entry of services.database.listTagDictionary({ query: search, limit: 30 }).items) {
+        items.set(entry.tag.toLowerCase().replaceAll(' ', '_'), {
+          tag: entry.display_tag || entry.tag,
+          translation: entry.translation,
+          category: entry.category,
+        });
+      }
+      const counts = await services.database.tagImageCounts();
+      return {
+        items: [...items.values()]
+          .reverse()
+          .slice(0, 30)
+          .map((item) => ({
+            ...item,
+            tag: item.tag.replaceAll('_', ' '),
+            count: counts.get(item.tag.toLowerCase().replaceAll('_', ' ')) || 0,
+          })),
+      };
+    },
+    'dictionary.set-many': async (input) => {
+      revision(input.expectedRevision, store.revision());
+      services.database.updateTagDictionaries(
+        input.entries.map((entry) => ({
+          tag: entry.tag,
+          ...(entry.translation !== undefined ? { translation: entry.translation } : {}),
+          ...(entry.category !== undefined ? { category: entry.category } : {}),
+        })),
+      );
+      await store.bump();
+      emit({ dictionaryChanged: true });
+      return {
+        items: [
+          ...services.database
+            .lookupTagDictionary(input.entries.map((entry) => entry.tag))
+            .values(),
+        ],
+        revision: store.revision(),
+      };
     },
     'collection.list': () => ({
       items: services.database.listCollections(),
@@ -385,24 +468,43 @@ export async function createCommands(services) {
     revision(input.expectedRevision, store.revision());
     if (collection(input.collectionId).kind !== 'manual')
       throw new CommandError('invalid_input', '智能收藏集按筛选条件收录图片，不能直接修改');
-    input.ids.forEach(project);
-    services.database.updateCollectionProjects(input.collectionId, input.ids, action);
+    if (source() === 'agent') input.ids.forEach(project);
+    const results = services.database.updateCollectionProjects(
+      input.collectionId,
+      input.ids,
+      action,
+    );
     await store.bump();
     emit({ libraryChanged: true });
-    return { revision: store.revision() };
+    return { revision: store.revision(), results, summary: summary(results) };
   }
-  /** @param {string} name @param {unknown} input @param {'ui'|'agent'} [origin] @returns {Promise<import('../../src/shared/commands').CommandResult<unknown>>} */
-  async function dispatch(name, input = {}, origin = 'agent') {
+  /** @param {import('../../src/shared/types').BatchResults} results */
+  function summary(results) {
+    return {
+      success: results.success.length,
+      skipped: results.skipped.length,
+      failed: results.failed.length,
+    };
+  }
+  /** @param {string} name @param {unknown} input @param {'ui'|'agent'} [origin] @param {Electron.WebContents} [sender] @returns {Promise<import('../../src/shared/commands').CommandResult<unknown>>} */
+  async function dispatch(name, input = {}, origin = 'agent', sender) {
     try {
       const key = validateCommand(name, input, origin),
         def = commandRegistry[key];
+      await services.beforeCommand?.(key);
       if (services.busy() && def.mutation)
         throw new CommandError('app_busy', '软件正在处理图片库，请稍后再试');
       if (origin === 'agent' || key === 'workbench.list' || key === 'workbench.get')
         await services.prepareUI?.();
       const run = async () => {
-        const handler = /** @type {(value:unknown)=>unknown} */ (handlers[key]);
-        return { ok: /** @type {const} */ (true), data: await handler(input) };
+        const handler = /** @type {(value:unknown,caller:Caller)=>unknown} */ (
+          services.handlers?.[key] || handlers[key]
+        );
+        if (!handler) throw new CommandError('invalid_input', '命令尚未就绪');
+        return {
+          ok: /** @type {const} */ (true),
+          data: await handler(input, { source: origin, sender }),
+        };
       };
       return await originContext.run(origin, () =>
         def.mutation || key === 'workbench.session' ? store.exclusive(run) : run(),

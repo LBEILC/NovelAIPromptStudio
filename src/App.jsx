@@ -1,3 +1,4 @@
+import { invokeUI, onProgress, invokeResult } from './lib/commands';
 import { writeClipboardText, readClipboardText } from './lib/clipboard';
 import { numberedImageNames } from './lib/imageNaming.js';
 import { deletionDetail } from './library/presentation';
@@ -54,7 +55,7 @@ import {
   normalizeSearch,
   repairLegacyPromptTags,
 } from './lib/prompt.js';
-import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT } from './lib/fonts.js';
+import { previewInvoke } from './lib/previewCommands.js';
 import { assessDroppedFiles, assessWorkbenchDroppedFiles } from './lib/importDrop.js';
 import { isImportActive } from './lib/importProgress.js';
 import { isTextEditingTarget } from './lib/contextMenu.js';
@@ -98,104 +99,11 @@ import {
   overviewTagKey,
 } from './lib/promptOverview.js';
 
-const unavailable = (error) => async () => ({ ok: false, error });
 const studio = window.studio || {
-  loadLibrary: async () => [],
-  loadCollections: async () => ({ ok: true, collections: [] }),
-  createCollection: unavailable('请在桌面应用中创建收藏集'),
-  updateCollection: unavailable('请在桌面应用中修改收藏集'),
-  deleteCollection: unavailable('请在桌面应用中删除收藏集'),
-  updateCollectionProjects: unavailable('请在桌面应用中管理收藏集图片'),
-  getLibraryStorage: async () => ({
-    ok: true,
-    assetsDirectory: '',
-    fileCount: 0,
-    totalBytes: 0,
-    isDefault: true,
-  }),
-  changeLibraryStorage: unavailable('请在桌面应用中更改资源库位置'),
-  revealLibraryStorage: unavailable('请在桌面应用中打开资源库文件夹'),
-  onLibraryStorageProgress: () => {},
-  offLibraryStorageProgress: () => {},
-  openWorkbenchImage: unavailable('请在桌面应用中打开图片'),
-  openDroppedWorkbenchImages: unavailable('请在桌面应用中打开图片'),
-  openClipboardWorkbenchImage: unavailable('请在桌面应用中读取剪贴板'),
-  syncWorkbenchTemporaryImages: async () => ({ ok: true }),
-  revealEmbeddedVibe: unavailable('请在桌面应用中导出 Vibe'),
-  importImages: async () => ({
-    ok: true,
-    canceled: true,
-    imported: [],
-    duplicates: [],
-    errors: [],
-    summary: null,
-  }),
-  importClipboardImage: unavailable('请在桌面应用中读取剪贴板'),
-  importDroppedFiles: unavailable('请在桌面应用中导入'),
-  prepareImport: async () => ({ ok: true, canceled: true }),
-  prepareDroppedImport: unavailable('请在桌面应用中导入'),
-  startPreparedImportPreviews: unavailable('请在桌面应用中预览压缩包'),
-  cancelPreparedImport: async () => ({ ok: true }),
-  commitPreparedImport: unavailable('请在桌面应用中导入'),
-  onPreparedImportPreview: () => {},
-  offPreparedImportPreview: () => {},
-  cancelImport: unavailable('没有进行中的导入'),
-  onImportProgress: () => {},
-  offImportProgress: () => {},
-  updateProjectName: unavailable('请在桌面应用中修改名称'),
-  moveProjectsToTrash: unavailable('请在桌面应用中管理回收站'),
-  restoreProjects: unavailable('请在桌面应用中管理回收站'),
-  permanentlyDeleteProjects: unavailable('请在桌面应用中管理回收站'),
-  getTrashSummary: async () => ({ ok: true, projects: [], count: 0, totalBytes: 0 }),
-  setGroupCover: unavailable('请在桌面应用中设置封面'),
-  copyProjectImage: unavailable('请在桌面应用中复制图片'),
-  downloadProjectImage: unavailable('请在桌面应用中下载图片'),
-  copyWorkbenchImage: unavailable('请在桌面应用中复制图片'),
-  downloadWorkbenchImage: unavailable('请在桌面应用中下载图片'),
-  saveTagAnnotations: async () => ({ ok: true }),
-  listTagCache: async () => ({ ok: true, items: [], limit: 40, offset: 0, total: 0 }),
-  updateTagCache: unavailable('请在桌面应用中修改 Tag 缓存'),
-  updateTagCacheMany: unavailable('请在桌面应用中批量修改 Tag 缓存'),
-  deleteTagCache: unavailable('请在桌面应用中删除 Tag 缓存'),
-  deleteTagCacheMany: unavailable('请在桌面应用中批量删除 Tag 缓存'),
-  revealFile: async () => {},
-  getAISettings: async () => ({
-    baseUrl: 'https://api.openai.com/v1',
-    model: '',
-    hasApiKey: false,
-    encryptionAvailable: true,
-  }),
-  saveAISettings: async (settings) => settings,
-  getAppearanceSettings: async () => ({
-    themeMode: 'dark',
-    primaryColor: 'blue',
-    sansFont: DEFAULT_SANS_FONT,
-    monoFont: DEFAULT_MONO_FONT,
-    motion: 'reduced',
-  }),
-  saveAppearanceSettings: async (settings) => settings,
-  getProductivitySettings: async () => ({ recentImageDirectory: '', autoCheckUpdates: true }),
-  saveProductivitySettings: async (settings) => settings,
-  getUpdateStatus: async () => ({
-    ok: true,
-    currentVersion: '0.0.0',
-    packaged: false,
-    platform: 'web',
-    updateMode: 'manual',
-    canDownloadUpdate: false,
-    canInstallUpdate: false,
-    manualUpdateReason: 'development',
-  }),
-  checkForUpdates: unavailable('请在桌面应用中检查更新'),
-  downloadUpdate: unavailable('请在桌面应用中下载更新'),
-  installUpdate: unavailable('请在桌面应用中安装更新'),
-  onUpdateState: () => {},
-  offUpdateState: () => {},
-  openReleasePage: async () => ({ ok: true }),
-  listSystemFonts: async () => ({ ok: true, fonts: [] }),
-  listAIModels: unavailable('请在桌面应用中配置 API'),
-  testAIModel: unavailable('请在桌面应用中配置 API'),
-  translateTags: unavailable('请在桌面应用中配置 API'),
+  invoke: previewInvoke,
+  onCommandEvent: () => () => {},
+  onCommandPrepare: () => () => {},
+  pathsForFiles: () => [],
 };
 
 const TAG_CONTEXT_CATEGORIES = CATEGORY_OPTIONS.map((category) => [
@@ -330,7 +238,9 @@ export default function App() {
   const [menuDestination, setMenuDestination] = useState(null);
   useEffect(
     () =>
-      studio.onNavigate?.((destination) => {
+      studio.onCommandEvent?.((event) => {
+        if (event.type !== 'navigate') return;
+        const destination = event.destination;
         setMenuDestination({ section: destination === 'about' ? 'updates' : 'appearance' });
         setPage('settings');
       }),
@@ -451,7 +361,7 @@ export default function App() {
       libraryRequestsRef.current[targetView] = requestId;
       setLibraryLoadingByView((current) => ({ ...current, [targetView]: true }));
       try {
-        const items = await studio.loadLibraryCards(targetView);
+        const items = await invokeUI('library.cards', { view: targetView });
         if (libraryRequestsRef.current[targetView] !== requestId) return [];
         const hydrated = items || [];
         setProjectsByView((current) => ({ ...current, [targetView]: hydrated }));
@@ -473,12 +383,12 @@ export default function App() {
 
   const reloadCollections = useCallback(
     async (source = 'user') => {
-      const result = await studio.loadCollections();
+      const result = await invokeResult('collection.list', {});
       if (!result?.ok) {
         showToast(result?.error || '没能加载收藏集', 'error', source);
         return [];
       }
-      const next = (result.collections || []).map(normalizeGalleryCollection);
+      const next = (result.items || []).map(normalizeGalleryCollection);
       setGalleryCollections(next);
       setActiveCollectionId((current) => {
         const restored =
@@ -505,6 +415,7 @@ export default function App() {
     if (!workbenchConnection) return;
     const prepare = studio.onCommandPrepare(() => workbenchConnection.prepare());
     const events = studio.onCommandEvent((event) => {
+      if (event.type !== 'workbench') return;
       const wasCurrent = event.tabId === workbenchConnection.current.activeTabId;
       workbenchConnection.receive(event);
       if (event.libraryChanged) {
@@ -543,9 +454,11 @@ export default function App() {
       if (window.studioScreenshot) {
         const tabs = await Promise.all(
           (window.studioScreenshot.workbenchPaths || []).map(async (filePath) => {
-            const result = await studio.openWorkbenchImage(filePath);
+            const result = await invokeResult('image.read', { path: filePath });
             if (!result.ok) throw new Error(result.error);
-            return createWorkbenchTab(hydrateProject(result.project), { source: result.source });
+            return createWorkbenchTab(hydrateProject(result.project), {
+              source: { type: 'file', path: filePath },
+            });
           }),
         );
         if (!active) return;
@@ -590,18 +503,18 @@ export default function App() {
     const temporaryPaths = workbenchSession.tabs
       .filter((tab) => tab.source?.type === 'clipboard' && tab.source.path)
       .map((tab) => tab.source.path);
-    studio.syncWorkbenchTemporaryImages(temporaryPaths);
+    invokeUI('workbench.temp-sync', { paths: temporaryPaths });
   }, [workbenchSession, workbenchSessionReady]);
 
   useEffect(() => {
-    studio.onImportProgress((progress) =>
+    const unsubscribe = onProgress('library:import-progress', (progress) =>
       setImportProgress(isImportActive(progress) ? progress : null),
     );
-    return () => studio.offImportProgress();
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    studio.onPreparedImportPreview((update) => {
+    const unsubscribe = onProgress('library:import-preview', (update) => {
       setArchiveImport((current) => {
         if (!current || current.sessionId !== update?.sessionId) return current;
         if (update.phase === 'preview') {
@@ -633,13 +546,12 @@ export default function App() {
         return current;
       });
     });
-    return () => studio.offPreparedImportPreview();
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     if (!archiveImport?.sessionId) return;
-    studio
-      .startPreparedImportPreviews(archiveImport.sessionId)
+    invokeUI('import.previews', { sessionId: archiveImport.sessionId })
       .then((result) => {
         if (result?.ok) return;
         setArchiveImport((current) =>
@@ -667,9 +579,9 @@ export default function App() {
 
   useEffect(() => {
     const timer = window.setTimeout(async () => {
-      const settings = await studio.getProductivitySettings().catch(() => null);
+      const settings = await invokeUI('settings.productivity.get', {}).catch(() => null);
       if (!settings?.autoCheckUpdates) return;
-      const result = await studio.checkForUpdates().catch(() => null);
+      const result = await invokeUI('updates.check', {}).catch(() => null);
       if (result?.ok && result.hasUpdate)
         notificationTarget.current.notify({
           text: `发现新版本 v${result.latestVersion}，可在“关于与更新”中查看`,
@@ -734,10 +646,15 @@ export default function App() {
       setWorkbenchLoading(true);
       setWorkbenchError('');
       try {
-        const result = await studio.openWorkbenchImage(filePath, source);
+        await workbenchConnection?.prepare();
+        const result = await invokeResult('workbench.open', {
+          ...(filePath ? { path: filePath } : {}),
+          ...(source ? { source } : {}),
+        });
         if (result?.canceled) return false;
-        if (!result?.ok || !result.project) throw new Error(result?.error || '没能打开图片');
-        acceptWorkbenchProject(result.project, result.source || source);
+        if (!result?.ok || !result.tab?.project) throw new Error(result?.error || '没能打开图片');
+        setWorkbenchFocus({ scopeKey: 'base:prompt', tagId: null });
+        setPage('workbench');
         showToast('已在工作台打开');
         return true;
       } catch (error) {
@@ -754,7 +671,7 @@ export default function App() {
     setWorkbenchLoading(true);
     setWorkbenchError('');
     try {
-      const result = await studio.openClipboardWorkbenchImage();
+      const result = await invokeUI('workbench.open-clipboard', {});
       if (!result?.ok || !result.project) throw new Error(result?.error || '没能打开剪贴板图片');
       acceptWorkbenchProject(result.project, result.source);
       showToast(
@@ -778,7 +695,9 @@ export default function App() {
       }
       setWorkbenchLoading(true);
       try {
-        const result = await studio.openDroppedWorkbenchImages(files);
+        const result = await invokeUI('workbench.open-many', {
+          paths: studio.pathsForFiles(files),
+        });
         if (!result?.ok) throw new Error(result?.error || '没能打开图片');
         for (const item of result.items || []) {
           if (item.ok && item.project) acceptWorkbenchProject(item.project, item.source);
@@ -831,13 +750,13 @@ export default function App() {
       let preparedSessionId = '';
       try {
         if (fromClipboard) {
-          const result = await studio.importClipboardImage();
+          const result = await invokeUI('import.files', { fromClipboard: true });
           if (!result?.canceled) await acceptLibraryImportResult(result);
           return;
         }
         const preparation = files
-          ? await studio.prepareDroppedImport(files)
-          : await studio.prepareImport();
+          ? await invokeUI('import.prepare', { paths: studio.pathsForFiles(files) })
+          : await invokeUI('import.prepare', {});
         if (preparation?.canceled) return;
         if (!preparation?.ok) throw new Error(preparation?.error || '没能准备文件');
         preparedSessionId = preparation.sessionId;
@@ -850,12 +769,15 @@ export default function App() {
           });
           return;
         }
-        const result = await studio.commitPreparedImport(preparation.sessionId, []);
+        const result = await invokeUI('import.commit', {
+          sessionId: preparation.sessionId,
+          entryIds: [],
+        });
         if (result?.canceled) return;
         preparedSessionId = '';
         await acceptLibraryImportResult(result);
       } catch (error) {
-        if (preparedSessionId) studio.cancelPreparedImport(preparedSessionId);
+        if (preparedSessionId) invokeUI('import.cancel', { id: preparedSessionId });
         showToast(error instanceof Error ? error.message : String(error), 'error');
       } finally {
         setImportProgress(null);
@@ -867,7 +789,7 @@ export default function App() {
   const cancelArchiveImport = useCallback(() => {
     const sessionId = archiveImport?.sessionId;
     setArchiveImport(null);
-    if (sessionId) studio.cancelPreparedImport(sessionId);
+    if (sessionId) invokeUI('import.cancel', { id: sessionId });
   }, [archiveImport]);
 
   const commitArchiveImport = useCallback(
@@ -878,7 +800,10 @@ export default function App() {
       setImportResult(null);
       setImportProgress({ phase: 'preparing', processed: 0, total: 0, current: '准备所选图片' });
       try {
-        const result = await studio.commitPreparedImport(sessionId, entryIds);
+        const result = await invokeUI('import.commit', {
+          sessionId: sessionId,
+          entryIds: entryIds,
+        });
         await acceptLibraryImportResult(result);
       } catch (error) {
         showToast(error instanceof Error ? error.message : String(error), 'error');
@@ -1036,7 +961,21 @@ export default function App() {
     );
     if (!entries.length) return;
     annotationTimer.current = window.setTimeout(async () => {
-      const result = await studio.saveTagAnnotations(entries);
+      const result = await invokeResult('dictionary.set-many', {
+        entries: entries
+          .filter(
+            (entry) => entry.translation_source === 'manual' || entry.category_source === 'manual',
+          )
+          .map((entry) => ({
+            tag: entry.tag,
+            ...(entry.translation_source === 'manual'
+              ? { translation: entry.translation || '' }
+              : {}),
+            ...(entry.category_source === 'manual'
+              ? { category: entry.category || 'Unsorted' }
+              : {}),
+          })),
+      });
       if (!result?.ok) showToast(result?.error || '没能保存 Tag 译文和分类', 'error');
     }, 500);
   };
@@ -1055,21 +994,21 @@ export default function App() {
       })),
     );
     scheduleAnnotations(updated);
-    void studio
-      .saveWorkbenchStructure(
-        activeTab.source.path,
-        updated.prompt_structure,
-        activeTab.source.projectId,
-      )
-      .then((result) => {
-        if (!result.ok) showToast(result.error || '没能保存块类型和译文', 'error');
-      });
+    void invokeUI('workbench.save-structure', {
+      filePath: activeTab.source.path,
+      structure: updated.prompt_structure,
+      projectId: activeTab.source.projectId,
+    }).then((result) => {
+      if (!result.ok) showToast(result.error || '没能保存块类型和译文', 'error');
+    });
   };
 
   const translateWorkbenchTags = async (entries) => {
     if (!activeTab?.project) return;
     const tabId = activeTab.id;
-    const result = await studio.translateTags(entries.map((entry) => entry.tag.tag));
+    const result = await invokeUI('dictionary.translate', {
+      tags: entries.map((entry) => entry.tag.tag),
+    });
     if (!result?.ok) {
       showToast(result?.error || '没能完成翻译和分类', 'error');
       return;
@@ -1148,7 +1087,7 @@ export default function App() {
       previewGroup && preview && ids.includes(preview.id)
         ? adjacentGallerySelection(visibleGroups, previewGroup.id, preview.id)
         : null;
-    const result = await studio.moveProjectsToTrash(ids);
+    const result = await invokeResult('library.trash', { ids: ids });
     if (!result?.ok) {
       summarizeBatch(result, '移入回收站', isDetail ? 0 : selectedGroups);
       return;
@@ -1168,7 +1107,7 @@ export default function App() {
   const restoreProjects = async (explicitIds = null, scope = 'selection') => {
     const ids = explicitIds || selectedProjectIds;
     if (!ids.length) return;
-    const result = await studio.restoreProjects(ids);
+    const result = await invokeUI('library.restore', { ids: ids });
     const groupCount = scope === 'group' ? 1 : explicitIds ? 0 : selectedGroupIds.length;
     if (summarizeBatch(result, '恢复', groupCount)) {
       setPreviewGroupId('');
@@ -1214,7 +1153,7 @@ export default function App() {
       }))
     )
       return;
-    const result = await studio.permanentlyDeleteProjects(ids);
+    const result = await invokeUI('trash.delete-permanently', { ids: ids });
     const groupCount = scope === 'group' ? 1 : explicitIds ? 0 : selectedGroupIds.length;
     if (!summarizeBatch(result, '永久删除', groupCount)) return;
     closeDeletedLibraryTabs(result.results?.success || []);
@@ -1224,7 +1163,7 @@ export default function App() {
   };
 
   const emptyTrash = async () => {
-    const summary = await studio.getTrashSummary();
+    const summary = await invokeUI('trash.summary', {});
     if (!summary?.ok) {
       showToast(summary?.error || '没能读取回收站', 'error');
       return;
@@ -1238,9 +1177,9 @@ export default function App() {
 
   const renameProjects = async (ids, name) => {
     const names = numberedImageNames(name, ids.length);
-    const result = await studio.updateProjectNames(
-      ids.map((id, index) => ({ id, name: names[index] })),
-    );
+    const result = await invokeResult('library.rename-many', {
+      changes: ids.map((id, index) => ({ id, name: names[index] })),
+    });
     if (!result?.ok) {
       showToast(result?.error || '没能修改图片名称', 'error');
       return false;
@@ -1252,7 +1191,7 @@ export default function App() {
       action: {
         label: '撤销',
         onClick: async () => {
-          const restored = await studio.updateProjectNames(result.previous);
+          const restored = await invokeResult('library.rename-many', { changes: result.previous });
           if (!restored?.ok) {
             showToast(restored?.error || '没能修改图片名称', 'error');
             return;
@@ -1265,7 +1204,7 @@ export default function App() {
   };
 
   const renameProject = async (project, name) => {
-    const result = await studio.updateProjectName(project.id, name);
+    const result = await invokeResult('library.rename', { id: project.id, name: name });
     if (!result?.ok) {
       showToast(result?.error || '没能修改图片名称', 'error');
       return false;
@@ -1276,7 +1215,10 @@ export default function App() {
   };
 
   const setGroupCover = async (group, project) => {
-    const result = await studio.setGroupCover(group.fingerprint, project.id);
+    const result = await invokeUI('library.set-cover', {
+      fingerprint: group.fingerprint,
+      projectId: project.id,
+    });
     if (!result?.ok) {
       showToast(result?.error || '没能设为封面', 'error');
       return;
@@ -1346,10 +1288,12 @@ export default function App() {
       );
       return false;
     }
-    const result = await studio.createCollection({
-      name,
-      kind,
-      filters: kind === 'smart' ? normalizeGalleryFilters(galleryFilters) : undefined,
+    const result = await invokeUI('collection.create', {
+      collection: {
+        name,
+        kind,
+        filters: kind === 'smart' ? normalizeGalleryFilters(galleryFilters) : undefined,
+      },
     });
     if (!result?.ok) {
       showToast(result?.error || '没能新建收藏集', 'error');
@@ -1362,7 +1306,7 @@ export default function App() {
   };
 
   const renameGalleryCollection = async (collection, name) => {
-    const result = await studio.updateCollection(collection.id, { name });
+    const result = await invokeUI('collection.update', { id: collection.id, patch: { name } });
     if (!result?.ok) {
       showToast(result?.error || '没能修改收藏集名称', 'error');
       return false;
@@ -1398,8 +1342,11 @@ export default function App() {
       showToast('智能收藏集至少需要一个搜索或筛选条件', 'warning');
       return false;
     }
-    const result = await studio.updateCollection(collection.id, {
-      filters: normalizeGalleryFilters(galleryFilters),
+    const result = await invokeUI('collection.update', {
+      id: collection.id,
+      patch: {
+        filters: normalizeGalleryFilters(galleryFilters),
+      },
     });
     if (!result?.ok) {
       showToast(result?.error || '没能更新智能收藏集规则', 'error');
@@ -1428,7 +1375,7 @@ export default function App() {
       }))
     )
       return false;
-    const result = await studio.deleteCollection(collection.id);
+    const result = await invokeUI('collection.delete', { id: collection.id });
     if (!result?.ok) {
       showToast(result?.error || '没能删除收藏集', 'error');
       return false;
@@ -1443,7 +1390,10 @@ export default function App() {
   const updateGalleryCollectionProjects = async (collectionId, ids, action = 'add') => {
     const projectIds = [...new Set((ids || []).map(String).filter(Boolean))];
     if (!projectIds.length) return false;
-    const result = await studio.updateCollectionProjects(collectionId, projectIds, action);
+    const result = await invokeResult(
+      action === 'remove' ? 'collection.remove' : 'collection.add',
+      { collectionId: collectionId, ids: projectIds },
+    );
     if (!result?.ok) {
       showToast(result?.error || '没能更新收藏集里的图片', 'error');
       return false;
@@ -1484,7 +1434,7 @@ export default function App() {
   const installDownloadedUpdate = async () => {
     try {
       await workbenchConnection?.flush();
-      const result = await studio.installUpdate();
+      const result = await invokeUI('updates.install', {});
       if (!result?.ok) throw new Error(result?.error || '没能开始安装更新');
       return true;
     } catch (error) {
@@ -1531,7 +1481,7 @@ export default function App() {
               onClipboardImage={openClipboardWorkbenchImage}
               onCloseTab={closeTab}
               onCopyImage={async (project) => {
-                const result = await studio.copyWorkbenchImage(project.image_path);
+                const result = await invokeUI('image.copy', { path: project.image_path });
                 showToast(
                   result?.ok ? '已复制图片' : result?.error || '没能复制图片',
                   result?.ok ? 'success' : 'error',
@@ -1558,10 +1508,10 @@ export default function App() {
               }}
               onConfirm={requestConfirmation}
               onDownloadImage={async (project) => {
-                const result = await studio.downloadWorkbenchImage(
-                  project.image_path,
-                  project.name,
-                );
+                const result = await invokeUI('image.save-as', {
+                  path: project.image_path,
+                  name: project.name,
+                });
                 if (!result?.canceled)
                   showToast(
                     result?.ok ? '已下载原图' : result?.error || '没能下载原图',
@@ -1570,7 +1520,10 @@ export default function App() {
               }}
               onNotify={showToast}
               onReset={resetWorkbench}
-              onReveal={() => activeTab?.project && studio.revealFile(activeTab.project.image_path)}
+              onReveal={() =>
+                activeTab?.project &&
+                invokeUI('file.reveal', { path: activeTab.project.image_path })
+              }
               onSaveLibrary={async () => {
                 if (!activeTab?.project) return;
                 const tabId = activeTab.id;
@@ -1607,7 +1560,7 @@ export default function App() {
                 setWorkbenchSession((current) => reorderWorkbenchTabs(current, tabId, targetTabId))
               }
               onRevealVibe={async (vibe) => {
-                const result = await studio.revealEmbeddedVibe(vibe);
+                const result = await invokeUI('file.reveal', { vibe: vibe });
                 showToast(
                   result?.ok ? '已在文件夹中显示 Vibe 文件' : result?.error || '没能生成 Vibe 文件',
                   result?.ok ? 'success' : 'error',
@@ -1635,7 +1588,7 @@ export default function App() {
               trashCount={projectsByView.trash.length}
               importProgress={importProgress}
               onCancelImport={() =>
-                importProgress?.batchId && studio.cancelImport(importProgress.batchId)
+                importProgress?.batchId && invokeUI('import.cancel', { id: importProgress.batchId })
               }
               dragState={dragState}
               activeCollection={activeCollection}
@@ -1665,14 +1618,14 @@ export default function App() {
               onCollectionRulesSave={saveSmartCollectionRules}
               onCollectionSelect={selectGalleryCollection}
               onCopyImage={async (project) => {
-                const result = await studio.copyProjectImage(project.id);
+                const result = await invokeUI('image.copy', { id: project.id });
                 showToast(
                   result?.ok ? '已复制图片' : result?.error || '没能复制图片',
                   result?.ok ? 'success' : 'error',
                 );
               }}
               onDownloadImage={async (project) => {
-                const result = await studio.downloadProjectImage(project.id);
+                const result = await invokeUI('image.save-as', { id: project.id });
                 if (!result?.canceled)
                   showToast(
                     result?.ok ? '已下载原图' : result?.error || '没能下载原图',
@@ -1697,7 +1650,7 @@ export default function App() {
               onRename={renameProject}
               onRenameMany={renameProjects}
               onRestore={restoreProjects}
-              onReveal={(project) => studio.revealFile(project.image_path)}
+              onReveal={(project) => invokeUI('file.reveal', { path: project.image_path })}
               onSelectionChange={(groupIds) => {
                 setSelectedGroupIds(groupIds);
                 lastSelectedGroupRef.current = groupIds.at(-1) || '';
@@ -1772,7 +1725,9 @@ export default function App() {
       {page !== 'gallery' && (
         <ImportExperience
           dragState={dragState}
-          onCancel={() => importProgress?.batchId && studio.cancelImport(importProgress.batchId)}
+          onCancel={() =>
+            importProgress?.batchId && invokeUI('import.cancel', { id: importProgress.batchId })
+          }
           onDismiss={() => setImportResult(null)}
           progress={importProgress}
           result={importResult}
