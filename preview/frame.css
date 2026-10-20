@@ -15,3 +15,9 @@ html.pv body { background: var(--pane); }
 html.pv #root { width: var(--win-w); height: var(--win-h); margin: 0 auto; border: 1px solid var(--border); border-radius: var(--r-panel); overflow: hidden; box-shadow: var(--shadow-print); position: relative; }
 /* 窗口按钮：产品里是系统画的，这里只是示意 */
 html.pv .tb .wc { width: auto; display: flex; align-self: stretch; }
+
+/* macOS 的红绿灯：产品里是系统画的，这里只是示意，颜色不是产品的令牌 */
+.tb .lights { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); display: flex; gap: 8px; }
+.tb .lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+.tb .lights i:nth-child(2) { background: #febc2e; }
+.tb .lights i:nth-child(3) { background: #28c840; }

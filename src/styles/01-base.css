@@ -4,7 +4,6 @@
 html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 body { background: var(--pane); color: var(--text); font: var(--fw-regular) var(--fs-body)/var(--lh-body) var(--font-ui); }
 button { font: inherit; color: inherit; cursor: default; }
-[hidden] { display: none !important; }
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .muted { color: var(--text-3); }
 .sp { flex: 1 1 0; }
@@ -13,7 +12,7 @@ button { font: inherit; color: inherit; cursor: default; }
 .btn.icon { width: var(--ctl-sm); height: var(--ctl-sm); padding: 0; }
 .field > [class^="ri-"], .side .it > [class^="ri-"], .mi .k > [class^="ri-"] { color: var(--text-3); }
 .side .it.on > [class^="ri-"] { color: var(--text); }
-.check.on [class^="ri-"] { font-size: 12px; }
+.check.on [class^="ri-"] { font-size: var(--fs-small); }
 :focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
 
 /* ---------- 窗口 ---------- */
@@ -50,7 +49,7 @@ button { font: inherit; color: inherit; cursor: default; }
 .tab.add { padding: 0 9px; color: var(--text-3); }
 .tb-end { display: flex; align-items: center; gap: 6px; padding-right: 6px; }
 .wc { display: flex; align-self: stretch; }
-.wc span { width: 44px; display: grid; place-items: center; color: var(--text-3); font-size: 12px; }
+.wc span { width: 44px; display: grid; place-items: center; color: var(--text-3); font-size: var(--fs-small); }
 
 /* "当前这一张"：朱砂方块，和标志里的方块是同一个东西 */
 .cur { width: var(--mark); height: var(--mark); background: var(--cinnabar); flex: 0 0 auto; }
@@ -169,7 +168,7 @@ button { font: inherit; color: inherit; cursor: default; }
 
 /* 底部操作栏 */
 .bar { height: var(--bar-h); flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 var(--sp-4); border-top: 1px solid var(--border); background: var(--surface); }
-.cost { display: flex; flex-direction: column; align-items: flex-end; font: var(--fs-caption)/14px var(--font-mono); color: var(--text-3); margin: 0 4px 0 8px; }
+.cost { display: flex; flex-direction: column; align-items: flex-end; font: var(--fs-caption)/calc(var(--lh-caption) - var(--sp-0)) var(--font-mono); color: var(--text-3); margin: 0 4px 0 8px; }
 .cost b { font-weight: var(--fw-regular); color: var(--text-2); }
 
 /* 参数页 */
@@ -194,9 +193,8 @@ button { font: inherit; color: inherit; cursor: default; }
 .card { position: relative; }
 .card img { display: block; width: 100%; aspect-ratio: 832 / 1216; object-fit: cover; border-radius: 4px; }
 .card.on img { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
-.card .stack { position: absolute; right: 6px; top: 6px; padding: 1px 6px; border-radius: var(--r-tag); background: var(--surface); color: var(--text-2); font: var(--fs-caption)/16px var(--font-mono); box-shadow: 0 0 0 1px var(--border); }
+.card .stack { position: absolute; right: 6px; top: 6px; padding: 1px 6px; border-radius: var(--r-tag); background: var(--surface); color: var(--text-2); font: var(--fs-caption)/var(--lh-caption) var(--font-mono); box-shadow: 0 0 0 1px var(--border); }
 .detail { width: var(--detail-w); background: var(--surface); border-left: 1px solid var(--border); }
 .detail .pic { padding: 16px 16px 0; }
 .detail .pic img { display: block; width: 100%; max-height: 250px; object-fit: contain; border-radius: 4px; background: var(--bg); }
 
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

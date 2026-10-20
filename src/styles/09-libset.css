@@ -434,13 +434,9 @@ html[data-motion="off"] .spin { animation: none; }
 .setrow .warn-t { color: var(--warn); }
 .zsb.drag { width: var(--sb-w-hover); background: var(--text-3); opacity: 1; }
 
-/* 平台：macOS 的外壳（prototype-fill.js）。红绿灯是系统画的，这里只是示意，颜色不是产品的令牌 */
+/* 平台：macOS 的外壳（prototype-fill.js）。红绿灯是系统画的，整体预览里的示意在 preview/frame.css */
 :root[data-platform="macos"] .tb { padding-left: 80px; position: relative; }
 :root[data-platform="macos"] .tb .wc { display: none; }
-.tb .lights { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); display: flex; gap: 8px; }
-.tb .lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
-.tb .lights i:nth-child(2) { background: #febc2e; }
-.tb .lights i:nth-child(3) { background: #28c840; }
 
 /* 没有令牌时"生成"的引导（prototype-fill.js） */
 .popover.notoken { width: var(--popover-w); }

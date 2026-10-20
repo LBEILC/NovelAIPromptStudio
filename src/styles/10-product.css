@@ -40,7 +40,6 @@ button.tag.ghost { font: inherit; font-size: var(--fs-small); }
 
 /* 退出（2.17）：被拿掉的东西加 .leaving，从现在的样子淡出 --dur-1，不位移；同时取代它的进入动画 */
 @keyframes pf-out { to { opacity: 0; } }
-.leaving { animation: pf-out var(--dur-1) var(--ease-out) forwards !important; }
 .row.lc-new { flex-wrap: nowrap; }
 .lib-grid-col { flex: 1 1 0; }
 

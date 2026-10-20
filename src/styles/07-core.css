@@ -44,7 +44,6 @@
 [data-enter].seen { animation: none; }
 
 /* ---------- 退出：只淡出，--dur-1 ---------- */
-.leaving { pointer-events: none !important; }
 .tag.fading { opacity: 0; transition: opacity var(--dur-1) var(--ease-out); }
 
 /* ---------- 会滑的标记：当前项的底只有一块 ---------- */
@@ -72,7 +71,7 @@
 
 /* ---------- 浮层 ---------- */
 .float { position: absolute; z-index: 20; }
-.backdrop { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; background: var(--scrim, rgba(0, 0, 0, 0.18)); }
+.backdrop { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; background: var(--scrim); }
 .backdrop[data-enter="fade"] .dialog { animation: pf-zoom var(--dur-2) var(--ease-out) both; }
 /* 通知不盖住能点的东西：浮在底栏和图片下方按钮的上面 */
 .toasts { position: absolute; left: 0; right: 0; bottom: calc(var(--bar-h) + var(--sp-3)); z-index: 25; display: flex; justify-content: center; pointer-events: none; }
@@ -105,7 +104,7 @@
 .ver[data-d]::before { display: none; }
 .ver:focus-visible { outline: 2px solid var(--text-2); outline-offset: -2px; }
 .ver .vh { display: flex; align-items: center; gap: 0; min-height: 16px; }
-.ver .vn { font: var(--fs-caption)/16px var(--font-mono); color: var(--text-3); }
+.ver .vn { font: var(--fs-caption)/var(--lh-caption) var(--font-mono); color: var(--text-3); }
 .ver.on .vn { color: var(--text-2); }
 .ver .src.link:hover { color: var(--text); border-color: var(--text-3); }
 .ver .what { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
@@ -164,9 +163,6 @@
 
 /* 原型说明 */
 
-/* ---------- 动效关闭：全部直接到位 ---------- */
-html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after {
-  transition-duration: 1ms !important; animation-duration: 1ms !important; animation-delay: 0s !important; }
 
 .bar > .swap { min-width: 0; overflow: hidden; }
 .bar .gen-now { display: block; overflow: hidden; text-overflow: ellipsis; }
@@ -194,10 +190,10 @@ textarea.raw { font: var(--fs-small)/var(--lh-small) var(--font-mono); }
 
 /* ---------- 图片库 ---------- */
 .lib-grid-col { position: relative; }
-.card .scrub-bar { position: absolute; left: 6px; right: 6px; bottom: 6px; height: 2px; border-radius: 1px; background: rgba(255, 255, 255, 0.5); }
+.card .scrub-bar { position: absolute; left: 6px; right: 6px; bottom: 6px; height: 2px; border-radius: 1px; background: color-mix(in srgb, white 50%, transparent); }
 .card .scrub-bar i { position: absolute; top: 0; bottom: 0; background: var(--ink); border-radius: 1px; }
 .card.picked img { outline: 2px solid var(--ink); outline-offset: 2px; }
-.card .pick-mark { position: absolute; left: 6px; top: 6px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font-size: 12px; }
+.card .pick-mark { position: absolute; left: 6px; top: 6px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font-size: var(--fs-small); }
 .detail .pic img { cursor: zoom-in; }
 .viewer-ov { position: absolute; inset: 0; z-index: 35; display: flex; flex-direction: column; background: color-mix(in srgb, var(--bg) 96%, transparent); }
 .viewer-ov[data-enter="fade3"] { animation: pf-fade var(--dur-3) var(--ease-out) both; }
@@ -226,7 +222,6 @@ textarea.raw { font: var(--fs-small)/var(--lh-small) var(--font-mono); }
 /* 拖动：能拖的东西不被选中文字，图片不触发浏览器自带的拖动；拖动中整页不选文字、光标保持抓取 */
 .win .tag, .win .tab, .win .card, .win .slider { user-select: none; -webkit-user-select: none; }
 .win img { -webkit-user-drag: none; user-select: none; }
-html.is-dragging, html.is-dragging * { user-select: none !important; -webkit-user-select: none !important; cursor: grabbing !important; }
 
 
 /* 浮层里一行一个分段选择：按文字宽度，不撑满整行 */
@@ -309,9 +304,6 @@ html.is-dragging, html.is-dragging * { user-select: none !important; -webkit-use
 .wb-body > .col.versions::after, .wb-body > .col.prompt::after, .col.detail::after { content: ""; position: absolute; top: 0; bottom: 0; width: var(--rule-w); background: var(--text); z-index: 5; pointer-events: none; opacity: 0; transition: opacity var(--dur-1) var(--ease-out); }
 .wb-body > .col.versions::after { right: calc(var(--rule-w) / -2); }
 .wb-body > .col.prompt::after, .col.detail::after { left: calc(var(--rule-w) / -2); }
-.rz-hot::after { opacity: 1 !important; }
-html.rz-cursor, html.rz-cursor *, html.rz-dragging, html.rz-dragging * { cursor: col-resize !important; }
-html.rz-dragging, html.rz-dragging * { user-select: none !important; }
 
 /* ---------- 选中文字的颜色：墨色的半透明，深浅两套都看得清，也不和权重的底色混淆（2.24） ----------
    产品里加令牌 --select-bg（深浅两套各一个值）；原型先用墨色按比例调出来 */
@@ -363,7 +355,6 @@ html.rz-dragging, html.rz-dragging * { user-select: none !important; }
 .marquee-box { display: none; position: fixed; z-index: 1190; pointer-events: none; border: var(--bw) solid var(--text); background: var(--selected); opacity: var(--dim); }
 
 /* ---------- 只显示原文 / 译文：Tag 只有一行，圆点和权重跟字居中；没有译文的显示原文，颜色浅一档 ---------- */
-.tags.tags-view-en .tag.ghost, .tags.tags-view-zh .tag.ghost, .tags.tags-view-en .tag.input, .tags.tags-view-zh .tag.input { min-height: 0 !important; }
 .tags-view-en .tag > .dot, .tags-view-zh .tag > .dot { align-self: center; margin-top: 0; }
 .tags-view-en .tag > .w, .tags-view-zh .tag > .w { align-self: center; }
 .tags-view-zh .tag:not(:has(.zh)) .en { display: inline; color: var(--text-3); }

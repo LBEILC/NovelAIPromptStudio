@@ -20,6 +20,7 @@ import './styles/07-core.css';
 import './styles/08-wb.css';
 import './styles/09-libset.css';
 import './styles/10-product.css';
+import './styles/11-states.css';
 
 if (window.studioScreenshot) {
   window.addEventListener('error', (event) => window.studioScreenshot?.reportError(event.message));

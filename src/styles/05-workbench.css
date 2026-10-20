@@ -48,7 +48,7 @@
 .caption .dirty-line .btn { margin-left: calc(-1 * var(--sp-1)); }
 
 /* 标签很多时两头的翻页按钮 */
-.tabs.clip { overflow: hidden; flex: 0 1 auto; mask-image: linear-gradient(to right, transparent 0, #000 var(--sp-5), #000 calc(100% - var(--sp-5)), transparent 100%); }
+.tabs.clip { overflow: hidden; flex: 0 1 auto; mask-image: linear-gradient(to right, transparent 0, black var(--sp-5), black calc(100% - var(--sp-5)), transparent 100%); }
 .tab.lift { background: var(--surface); box-shadow: var(--shadow-pop); transform: translateY(var(--sp-0)); }
 
 /* 底栏里合在一起的两个按钮 */

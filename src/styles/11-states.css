@@ -1,0 +1,19 @@
+/* 全局状态：要盖过所有组件自己的规则，所以用 !important。只有这个文件可以用（scripts/audit-ui.mjs）。 */
+
+[hidden] { display: none !important; }
+
+/* 动效关闭：全部直接到位 */
+html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after {
+  transition-duration: 1ms !important; animation-duration: 1ms !important; animation-delay: 0s !important; }
+
+/* 退出（2.17）：被拿掉的东西加 .leaving，从现在的样子淡出 --dur-1，不位移；同时取代它的进入动画，不能再点 */
+.leaving { pointer-events: none !important; animation: pf-out var(--dur-1) var(--ease-out) forwards !important; }
+
+/* 拖动 Tag、拖栏宽时：整个窗口的光标跟着变，不选中文字 */
+html.is-dragging, html.is-dragging * { user-select: none !important; -webkit-user-select: none !important; cursor: grabbing !important; }
+.rz-hot::after { opacity: 1 !important; }
+html.rz-cursor, html.rz-cursor *, html.rz-dragging, html.rz-dragging * { cursor: col-resize !important; }
+html.rz-dragging, html.rz-dragging * { user-select: none !important; }
+
+/* 只显示原文 / 译文时，加 Tag 的那一格和 Tag 一样只有一行 */
+.tags.tags-view-en .tag.ghost, .tags.tags-view-zh .tag.ghost, .tags.tags-view-en .tag.input, .tags.tags-view-zh .tag.input { min-height: 0 !important; }

@@ -21,9 +21,9 @@
 .slider::before { content: ""; position: absolute; left: 0; right: 0; top: 8px; height: 2px; border-radius: 1px; background: var(--border); }
 .slider i { position: absolute; left: 0; top: 8px; height: 2px; background: var(--text); }
 .slider b { position: absolute; top: 3px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--surface); box-shadow: 0 0 0 1.5px var(--text); }
-.check { width: var(--check); height: var(--check); border: 1px solid var(--text-3); border-radius: 4px; display: inline-grid; place-items: center; font-size: 10px; line-height: 1; flex: 0 0 auto; }
+.check { width: var(--check); height: var(--check); border: 1px solid var(--text-3); border-radius: 4px; display: inline-grid; place-items: center; font-size: var(--fs-caption); line-height: 1; flex: 0 0 auto; }
 .check.on { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
-.field .chev { margin-left: auto; color: var(--text-3); font-size: 10px; }
+.field .chev { margin-left: auto; color: var(--text-3); font-size: var(--fs-caption); }
 .field.is-error { border-color: var(--danger); }
 .help { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--text-3); }
 .help.err { color: var(--danger); }
@@ -73,7 +73,7 @@
 .empty { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-2); padding: 32px; text-align: center; color: var(--text-2); }
 .empty .mark { display: block; margin-bottom: var(--sp-4); color: var(--text-off); }
 .empty .mark svg { display: block; width: var(--empty-mark); height: var(--empty-mark); }
-.empty h3 { margin: 0; font: var(--fw-strong) var(--fs-title)/22px var(--font-ui); color: var(--text); }
+.empty h3 { margin: 0; font: var(--fw-strong) var(--fs-title)/var(--lh-title) var(--font-ui); color: var(--text); }
 .empty p { margin: 0; max-width: var(--empty-w); }
 .empty .acts { display: flex; gap: var(--sp-2); margin-top: var(--sp-4); }
 .empty .fine { margin-top: var(--sp-5); font-size: var(--fs-small); color: var(--text-3); }
@@ -89,7 +89,7 @@
 .set-foot { position: sticky; bottom: 0; z-index: 2; background: var(--surface); box-shadow: inset 0 1px var(--divider); padding: 0 var(--page-pad-x); }
 .set-foot > div { min-height: var(--page-foot-h); display: flex; align-items: center; gap: var(--sp-2); }
 .set-foot .foot-note { color: var(--text-3); font-size: var(--fs-small); }
-.set h2 { margin: 0 0 2px; font: var(--fw-strong) var(--fs-title)/24px var(--font-ui); }
+.set h2 { margin: 0 0 2px; font: var(--fw-strong) var(--fs-title)/calc(var(--lh-title) + var(--sp-0)) var(--font-ui); }
 .set h2:not(:first-child) { margin-top: 30px; }
 .setrow { display: flex; align-items: center; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--divider); }
 .setrow > div:first-child { flex: 1 1 auto; min-width: 0; }

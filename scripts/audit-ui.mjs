@@ -14,9 +14,9 @@ async function files(directory) {
   ).flat();
 }
 const violations = [];
-// The frozen snapshot of outgoing content has to override every copied rule, whatever its
-// specificity. That is the one sanctioned use of !important; everything else stays forbidden.
-const importantAllowed = new Set([path.join('src', 'ui', 'transitions.tsx')]);
+// Global states (motion off, leaving, dragging cursors) have to override every component rule,
+// whatever its specificity. They live in one file; !important stays forbidden everywhere else.
+const importantAllowed = new Set([path.join('src', 'styles', '11-states.css')]);
 for (const file of await files('src')) {
   const source = await readFile(file, 'utf8');
   if (
