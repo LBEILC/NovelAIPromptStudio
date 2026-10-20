@@ -220,7 +220,14 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   const pending = await call('generate.start', { tabId, count: 1 });
   await wait('document.body.innerText.includes("Agent 待确认 · 1")');
   await check('真实命令行生成进入待确认且没有发请求', () => pending.state === 'pending');
+  await e(`document.querySelector('.wb-version-row.is-current').focus()`);
   await click('Agent 待确认 · 1');
+  // Drain the deferred version preview after focus has moved to confirmation.
+  await e('new Promise(resolve=>setTimeout(resolve,450))');
+  await check(
+    'Agent确认不被已失焦版本的延迟对比浮层关闭',
+    `!!document.querySelector('.wb-generation-title .nps-popover:popover-open')`,
+  );
   await click('生成 1 张');
   await wait('!document.body.innerText.includes("Agent 待确认 · 1")');
   await h.wait(

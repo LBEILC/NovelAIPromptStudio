@@ -45,6 +45,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     scroll = useRef<HTMLDivElement>(null),
     notify = useNotifications();
   useScrollArea(scroll);
+  useEffect(() => () => clearTimeout(timer.current), [tab.id]);
   useEffect(() => {
     let active = true;
     void Promise.resolve(before?.())
@@ -108,15 +109,22 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
       notify({ text: (e as Error).message, tone: 'error' });
     }
   };
-  const rename = (v: WorkVersion) => {
+  const hidePeek = () => {
+    clearTimeout(timer.current);
     setPeek(null);
+  };
+  const rename = (v: WorkVersion) => {
+    hidePeek();
     setRenaming(v);
     setName(v.branchName);
   };
   const hover = (v: WorkVersion, node: HTMLElement) => {
     clearTimeout(timer.current);
     peekAnchor.current = node;
-    timer.current = setTimeout(() => setPeek(v), 400);
+    timer.current = setTimeout(() => {
+      if (node.isConnected && (node.matches(':hover') || node.contains(document.activeElement)))
+        setPeek(v);
+    }, 400);
   };
   const pending = state.jobs.filter((j) => j.tabId === tab.id && j.state === 'pending');
   const tabJobs = state.jobs.filter((j) => j.tabId === tab.id);
@@ -315,10 +323,8 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                       }}
                       onMouseEnter={(e) => hover(v, e.currentTarget)}
                       onFocus={(e) => hover(v, e.currentTarget)}
-                      onMouseLeave={() => {
-                        clearTimeout(timer.current);
-                        setPeek(null);
-                      }}
+                      onBlur={hidePeek}
+                      onMouseLeave={hidePeek}
                     >
                       {v.parentId && v.branchId === v.id && <small>{v.branchName}</small>}
                       <span className="wb-version-number">
@@ -448,10 +454,8 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                             e.currentTarget,
                           )
                         }
-                        onMouseLeave={() => {
-                          clearTimeout(timer.current);
-                          setPeek(null);
-                        }}
+                        onBlur={hidePeek}
+                        onMouseLeave={hidePeek}
                       >
                         未生成
                         {kids(v.id).length
@@ -479,10 +483,8 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                         onClick={() => void open(f)}
                         onMouseEnter={(e) => hover(f, e.currentTarget)}
                         onFocus={(e) => hover(f, e.currentTarget)}
-                        onMouseLeave={() => {
-                          clearTimeout(timer.current);
-                          setPeek(null);
-                        }}
+                        onBlur={hidePeek}
+                        onMouseLeave={hidePeek}
                       >
                         <span>
                           {f.branchName}
@@ -585,7 +587,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         open={!!peek && !!peek.parentId}
         anchor={peekAnchor}
         role="tooltip"
-        onClose={() => setPeek(null)}
+        onClose={hidePeek}
       >
         {peek && (
           <>
