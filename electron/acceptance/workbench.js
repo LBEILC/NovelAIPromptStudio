@@ -584,8 +584,12 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     undefined,
     'once',
   );
+  clipboard.clear();
   await click('复制图片', 'document.querySelector(".stage-acts")');
-  await wait('document.querySelector(".toast:not(.leaving)")?.textContent.includes("已复制图片")');
+  const copiedImageMatches = () =>
+    clipboard.readImage().toPNG().equals(nativeImage.createFromPath(files[0]).toPNG());
+  await h.until(copiedImageMatches, '工作台图片复制完成');
+  await check('工作台复制图片得到原图像素', copiedImageMatches);
   await notificationClearance(h, '工作台', '.stage-acts');
   doubles.selections.push({ canceled: false, filePaths: [files[1]] });
   await click('打开图片', 'document.querySelector(".tb")');
