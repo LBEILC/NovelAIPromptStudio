@@ -248,11 +248,19 @@ export async function libraryNamingChecks({ h, database, doubles }) {
         const records = fixtureIds.map((id) => database.loadProject(id));
         return (
           records.every((p) => p.image_path === source.image_path) &&
-          ordered.every(
-            (cover, index) =>
-              records.find((p) => p.id === cover).name ===
-              `批量验收-${String(index * 2 + 2).padStart(2, '0')}`,
-          ) &&
+          ordered.every((cover, index) => {
+            const fingerprint = records.find((p) => p.id === cover).exact_group_fingerprint;
+            const names = records
+              .filter((p) => p.exact_group_fingerprint === fingerprint)
+              .map((p) => p.name)
+              .sort();
+            return (
+              JSON.stringify(names) ===
+              JSON.stringify(
+                [1, 2].map((offset) => `批量验收-${String(index * 2 + offset).padStart(2, '0')}`),
+              )
+            );
+          }) &&
           new Set(records.map((p) => p.name)).size === 6
         );
       },

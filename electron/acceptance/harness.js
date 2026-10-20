@@ -259,10 +259,11 @@ export function harness(window, mode, checks) {
     await paint();
   };
   const key = async (key, options = {}, target = 'document.activeElement') => {
-    await evaluate(
+    const allowed = await evaluate(
       `${target}.dispatchEvent(new KeyboardEvent('keydown', ${JSON.stringify({ key, bubbles: true, cancelable: true, ...options })}))`,
     );
     await paint();
+    return allowed;
   };
   // Chromium default actions (Tab navigation / dialog cancel), never OS input.
   const nativeKey = async (key, modifiers = 0) => {

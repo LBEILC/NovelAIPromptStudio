@@ -22,6 +22,17 @@ function setup() {
   };
 }
 
+it.each([true, false])(
+  'preserves the keyboard default-action result %s after rendering',
+  async (allowed) => {
+    const { h, evaluate } = setup();
+    evaluate.mockImplementation(async (code) =>
+      code.includes('dispatchEvent') ? allowed : undefined,
+    );
+    expect(await h.key('v', { ctrlKey: true })).toBe(allowed);
+  },
+);
+
 it('records and logs renderer failure details only for a failed assertion', async () => {
   const { h, checks, error } = setup();
   await h.check('progress', () => false, 'progress');

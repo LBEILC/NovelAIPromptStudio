@@ -173,7 +173,7 @@ export async function automaticAndVibeChecks({ h, mode, doubles }) {
       await click('0.20', 'document.querySelector(".vibes")');
       await check(
         'Vibe浮层显示强度、未知信息提取和编码',
-        '[...document.querySelectorAll(".vibe-pop .frow")].some(n=>n.textContent.includes("参考强度")&&n.querySelector(".mono")?.textContent==="0.20")&&document.querySelector(".vibe-pop").textContent.includes("未知 · 原图里没有记录")&&document.querySelector(".vibe-pop").textContent.includes("编码文件")',
+        '[...document.querySelectorAll(".vibe-pop .frow")].some(n=>n.textContent.includes("参考强度")&&n.querySelector(".mono")?.textContent==="0.20")&&document.querySelector(".vibe-pop").textContent.includes("未知 · 原图里没有记录")&&[...document.querySelectorAll(".vibe-pop .frow")].some(n=>n.querySelector(".label")?.textContent==="编码"&&!!n.querySelector(".path")?.textContent)',
       );
       await h.screenshot('workbench-vibe-detail');
       await key('Escape');
