@@ -144,6 +144,10 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   await click('重试');
   await wait('!document.querySelector("[data-generation-state=failed]")');
   await wait('document.querySelectorAll(".wb-version-thumb").length>=5');
+  await wait(
+    `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.filter(j=>j.tabId===${JSON.stringify(tabId)}).every(j=>!['queued','generating'].includes(j.state)))`,
+    '重试生成结束后再编辑下一版',
+  );
   const invoke = (name, args = {}) =>
     e(
       `window.studio.invoke(${JSON.stringify(name)},${JSON.stringify(args)}).then(r=>{if(!r.ok)throw Error(r.error.message);return r.data;})`,
@@ -151,12 +155,23 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   const tree = await invoke('version.list', { tabId }),
     second = tree.versions[1];
   await invoke('prompt.set', { tabId, scope: 'base:prompt', text: 'rain, cloud, sunshine' });
-  await invoke('generate.start', { tabId, count: 1 });
+  const mainJob = await invoke('generate.start', { tabId, count: 1 });
+  await wait(
+    `window.studio.invoke('generate.status',{id:${JSON.stringify(mainJob.id)}}).then(r=>r.data.jobs[0]?.state==='completed')`,
+    '主线生成完成后再切回旧版',
+  );
   await wait('document.querySelectorAll("[data-version-id]").length>=3');
   await e(`document.querySelector('[data-version-id="${second.id}"] .wb-version-row').click()`);
+  await wait(
+    `window.studio.invoke('workbench.get',{tabId:${JSON.stringify(tabId)}}).then(r=>r.data.tab.versionId===${JSON.stringify(second.id)})`,
+    '旧版切换写入后再改提示词',
+  );
   await invoke('prompt.set', { tabId, scope: 'base:prompt', text: 'rain, cloud, snow' });
   const branchJob = await invoke('generate.start', { tabId, count: 1 });
-  await wait('document.body.innerText.includes("已从第 2 版分出分支 1")');
+  await wait(
+    `window.studio.invoke('generate.status',{id:${JSON.stringify(branchJob.id)}}).then(r=>r.data.jobs[0]?.state==='completed'&&r.data.jobs[0].branchNotice==='已从第 2 版分出分支 1')`,
+    '分支生成完成并保留分叉结果',
+  );
   await check(
     '旧版生成分出固定编号分支并显示分叉行',
     'document.body.innerText.includes("版本 · 分支 1")&&!!document.querySelector(".wb-version-fork")',
