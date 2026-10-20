@@ -5,7 +5,8 @@ import { Button, EmptyState, EmptyMark, Progress, ResizablePanel } from '../ui';
 import { useLibraryDetail } from '../state/libraryDetail';
 import { GALLERY_CARD_SIZE_KEY } from '../lib/galleryLayout.js';
 import { GALLERY_PREVIEW_PANEL_WIDTH_KEY } from '../lib/panelLayout.js';
-import { DEFAULT_GALLERY_FILTERS } from '../lib/galleryFilters.js';
+import { DEFAULT_GALLERY_FILTERS, hasActiveGalleryFilters } from '../lib/galleryFilters.js';
+import { libraryCountText } from './presentation';
 import { LibrarySidebar } from './Sidebar';
 import { LibraryToolbar } from './Toolbar';
 import { LibraryGrid } from './Grid';
@@ -52,6 +53,12 @@ export default function LibraryPage(
     () => stored(GALLERY_PREVIEW_PANEL_WIDTH_KEY) || token('--detail-w'),
   );
   const [renaming, setRenaming] = useState(false);
+  const [renameRequest, setRenameRequest] = useState<{ id: string; sequence: number }>();
+  p = {
+    ...p,
+    renameRequest,
+    onRequestRename: (id) => setRenameRequest({ id, sequence: Date.now() }),
+  };
   const [viewer, setViewer] = useState(false);
   const { detail, error } = useLibraryDetail(p.preview?.id || '', p.preview);
   const ids = useMemo(
@@ -65,7 +72,34 @@ export default function LibraryPage(
     if (!p.preview && p.groups.length && !p.loading) p.onPreview(p.groups[0]);
   }, [p.preview, p.groups, p.loading]);
   const empty = !p.loading && !p.groups.length;
-  const noImages = empty && !(p.allCount ?? p.filterCacheSource.length) && p.view !== 'trash';
+  const noImages =
+    empty &&
+    !(p.allCount ?? p.filterCacheSource.length) &&
+    p.view !== 'trash' &&
+    !p.activeCollection;
+  const searching = !!p.query.trim();
+  const filtering = hasActiveGalleryFilters({ ...p.filters, query: '' });
+  const emptyTitle =
+    searching || filtering
+      ? '没有符合的图片'
+      : p.view === 'trash'
+        ? '回收站为空'
+        : p.activeCollection?.kind === 'smart'
+          ? '没有符合规则的图片'
+          : '收藏集为空';
+  const emptyDescription = searching
+    ? filtering
+      ? '当前的搜索和筛选条件下没有图片。'
+      : `文件名和 Tag 中都不包含"${p.query}"。`
+    : filtering
+      ? '当前的筛选条件下没有图片。'
+      : p.view === 'trash'
+        ? '移入回收站的图片会保留在这里，直到恢复或永久删除。'
+        : p.activeCollection?.kind === 'smart'
+          ? '符合规则的新图片会自动显示在这里。'
+          : '在详情栏或卡片的右键菜单中选择"加入收藏集"即可添加图片。';
+  const clearLabel =
+    searching && filtering ? '清除搜索和筛选' : searching ? '清除搜索' : '清除筛选';
   const busyImport =
     p.importProgress && ['preparing', 'importing'].includes(p.importProgress.phase);
   return (
@@ -121,11 +155,11 @@ export default function LibraryPage(
               <div className="library-empty">
                 <EmptyState
                   graphic={noImages ? <EmptyMark /> : null}
-                  title={noImages ? '图片库里还没有图片' : '没有符合条件的图片'}
+                  title={noImages ? '图片库里还没有图片' : emptyTitle}
                   description={
                     noImages
                       ? '把图片或 NovelAI 导出的 ZIP 拖到这里。软件会复制一份保存，并读出每张图的提示词和参数。'
-                      : `图片库里有 ${p.allCount ?? p.filterCacheSource.length} 张图片，但没有一张同时满足现在的搜索和筛选。`
+                      : emptyDescription
                   }
                   actions={
                     noImages ? (
@@ -135,11 +169,11 @@ export default function LibraryPage(
                         </Button>
                         <Button onClick={p.onImportClipboard}>从剪贴板导入</Button>
                       </>
-                    ) : (
+                    ) : searching || filtering ? (
                       <Button onClick={() => p.onFiltersChange(DEFAULT_GALLERY_FILTERS)}>
-                        清除搜索和筛选
+                        {clearLabel}
                       </Button>
-                    )
+                    ) : undefined
                   }
                   fine={noImages ? '导入不会修改或移动你原来的文件。' : undefined}
                 />
@@ -160,9 +194,7 @@ export default function LibraryPage(
         {error && <div role="alert">{error}</div>}
         <Presence show={ids.length > 0} className="library-dock">
           <div className="library-selection-bar" aria-label="多选操作条">
-            <span>
-              已选 {p.selectedGroupIds.length} 组 · {ids.length} 张
-            </span>
+            <span>已选 {libraryCountText(p.selectedGroupIds.length, ids.length)}</span>
             {p.view === 'trash' ? (
               <>
                 <Button variant="quiet" size="small" onClick={() => p.onRestore(ids)}>
@@ -175,6 +207,18 @@ export default function LibraryPage(
               </>
             ) : (
               <>
+                <Button
+                  variant="quiet"
+                  size="small"
+                  onClick={() =>
+                    p.groups
+                      .filter((group) => p.selectedGroupIds.includes(group.id))
+                      .flatMap((group) => group.members)
+                      .forEach(p.onOpenWorkbench)
+                  }
+                >
+                  在工作台打开
+                </Button>
                 <CollectionPicker p={p} ids={ids} />
                 <Button size="small" variant="quiet" onClick={() => setRenaming(true)}>
                   <i className="ri-edit-line" />
@@ -201,15 +245,19 @@ export default function LibraryPage(
             </Button>
           </div>
         </Presence>
-        <Collapse open={!!busyImport && !!p.importProgress} className="library-dock">
+        <Collapse
+          open={!!busyImport && !!p.importProgress}
+          className="library-dock library-import-progress"
+        >
           {p.importProgress && (
             <div className="library-job">
               <div className="library-job-top">
                 <b>
-                  正在导入 {p.importProgress.processed || 0} / {p.importProgress.total || 0}
+                  <span className="nps-loader" aria-hidden /> 正在导入{' '}
+                  {p.importProgress.processed || 0} / {p.importProgress.total || 0}
                 </b>
                 <Button variant="quiet" size="small" onClick={p.onCancelImport}>
-                  取消剩下的
+                  取消剩余
                 </Button>
               </div>
               <Progress
@@ -218,8 +266,9 @@ export default function LibraryPage(
                 max={p.importProgress.total || 0}
               />
               <span className="library-help">
-                已跳过 {'duplicates' in p.importProgress ? p.importProgress.duplicates : 0}{' '}
-                张图片库里已经有的图片
+                {'duplicates' in p.importProgress && p.importProgress.duplicates
+                  ? `已跳过 ${p.importProgress.duplicates} 张图片库里已有的图片`
+                  : '导入不会修改或移动原文件'}
               </span>
             </div>
           )}
@@ -252,9 +301,10 @@ export default function LibraryPage(
           p={p}
           onClose={() => {
             setViewer(false);
-            requestAnimationFrame(() =>
-              document.querySelector<HTMLElement>('.library-card.current')?.focus(),
-            );
+            requestAnimationFrame(() => {
+              if (document.activeElement === document.body)
+                document.querySelector<HTMLElement>('.library-card.current')?.focus();
+            });
           }}
         />
       )}

@@ -92,3 +92,30 @@ describe('release update checks', () => {
     });
   });
 });
+
+it('downloads the release attachment and falls back to Markdown when absent or invalid', async () => {
+  const notes = { schema: 'nps-release-notes/1', version: '1.2.0', date: '2026-10-20', items: [] };
+  const asset =
+    'https://github.com/LBEILC/NovelAIPromptStudio/releases/download/v1.2.0/release-notes.json';
+  const release = {
+    tag_name: 'v1.2.0',
+    body: '# Markdown',
+    assets: [{ name: 'release-notes.json', browser_download_url: asset }],
+  };
+  for (const attachment of [notes, { ...notes, schema: 'unknown' }, null]) {
+    const fetcher = vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (url === asset ? attachment : release),
+    }));
+    const result = await checkForUpdates('1.0.0', fetcher);
+    expect(result.notes).toBe('# Markdown');
+    expect(result.structuredNotes).toEqual(attachment === notes ? notes : null);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  }
+  const failed = await checkForUpdates('1.0.0', async (url) => {
+    if (url === asset) throw Error('offline');
+    return { ok: true, json: async () => release };
+  });
+  expect(failed.structuredNotes).toBeNull();
+  expect(failed.notes).toBe('# Markdown');
+});

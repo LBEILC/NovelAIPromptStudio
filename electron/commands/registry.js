@@ -26,6 +26,11 @@ export const commandRegistry = {
   'import.files': { fields: { paths: 'stringList', fromClipboard: 'boolean' }, uiOnly: true },
   'import.cancel': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
   'library.cards': { fields: { view: 'all|favorites|trash' }, required: [], uiOnly: true },
+  'library.import-days': {
+    fields: { view: 'all|trash', collectionId: 'string', month: 'month' },
+    required: ['month'],
+    uiOnly: true,
+  },
   'collection.create': {
     fields: { collection: 'collectionInput' },
     required: ['collection'],
@@ -283,6 +288,7 @@ export function record(value) {
 }
 /** @param {unknown} value @param {string} type @returns {boolean} */
 function valid(value, type) {
+  if (type === 'month') return typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
   if (type === 'vibe')
     return (
       record(value) &&

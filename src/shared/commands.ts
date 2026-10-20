@@ -138,6 +138,10 @@ export interface CommandDefinitions {
     input: { view?: 'all' | 'favorites' | 'trash' };
     output: Types.LibraryCard[];
   };
+  'library.import-days': {
+    input: { view?: 'all' | 'trash'; collectionId?: string; month: string };
+    output: { days: Record<string, number> };
+  };
   'collection.create': {
     input: { collection: IPC.CollectionInput };
     output: IPC.Result<{ collection: Types.Collection | null }>;

@@ -30,26 +30,31 @@ export async function checkLibraryButtonGaps(h, state) {
   );
 }
 
-export async function checkCollectionContext(h, id) {
+export async function collectionContext(h, id, action) {
   await h.evaluate(
     `document.querySelector('[data-collection-id="${id}"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:80,clientY:180}))`,
   );
   await h.wait('!!document.querySelector(".nps-menu:popover-open")');
+  if (action) await h.click(action, 'document.querySelector(".nps-menu:popover-open")');
+}
+
+export async function checkCollectionContext(h, id) {
+  await collectionContext(h, id);
   await h.check(
-    '收藏集右键菜单包含重命名和危险色删除',
-    `(async()=>{const menu=document.querySelector('.nps-menu:popover-open'),items=[...menu.querySelectorAll('[role=menuitem]')];await Promise.allSettled(items.flatMap(item=>item.getAnimations().map(animation=>animation.finished)));const probe=document.createElement('span');probe.style.color='var(--danger)';menu.append(probe);const danger=getComputedStyle(probe).color;probe.remove();return items.length===2&&items[0].textContent.trim()==='重命名'&&items[1].textContent.trim()==='删除收藏集'&&getComputedStyle(items[1]).color===danger})()`,
+    '收藏集右键菜单包含重命名和危险色删除；智能收藏集提供编辑规则',
+    `(async()=>{const menu=document.querySelector('.nps-menu:popover-open'),items=[...menu.querySelectorAll('[role=menuitem]')];await Promise.allSettled(items.flatMap(item=>item.getAnimations().map(animation=>animation.finished)));const probe=document.createElement('span');probe.style.color='var(--danger)';menu.append(probe);const danger=getComputedStyle(probe).color;probe.remove();return (items.length===2||items.length===3&&items[0].textContent.trim()==='编辑规则…')&&items.at(-2).textContent.trim()==='重命名'&&items.at(-1).textContent.trim()==='删除'&&getComputedStyle(items.at(-1)).color===danger})()`,
     undefined,
     'both',
   );
   await h.click('重命名', 'document.querySelector(".nps-menu:popover-open")');
-  await h.wait('!!document.querySelector("dialog[open]")');
+  await h.wait('!!document.querySelector(".library-side input")');
   await h.check(
-    '右键重命名使用已定占位文案',
-    'document.querySelector("dialog[open] input").placeholder === "收藏集名称"',
+    '右键重命名就地编辑、全选且使用已定占位文案',
+    `(()=>{const input=document.querySelector('.library-side input');return !document.querySelector('dialog[open]')&&input.placeholder==='收藏集名称'&&document.activeElement===input&&input.selectionStart===0&&input.selectionEnd===input.value.length})()`,
     undefined,
     'once',
   );
-  await h.click('取消', 'document.querySelector("dialog[open]")');
+  await h.key('Escape', {}, 'document.activeElement');
 }
 
 export async function libraryFinishChecks({
@@ -118,8 +123,8 @@ export async function libraryFinishChecks({
   await key('Escape');
   await click(empty.name, scope);
   await check(
-    '无条件智能收藏集显示全部图片说明',
-    'document.querySelector(".library-collection-row").textContent.includes("没有规则，包含全部图片")',
+    '无条件智能收藏集仍提供编辑规则且没有虚构条件',
+    'document.querySelector(".library-chips").textContent.trim()==="编辑规则" && !document.querySelector(".library-chip")',
     undefined,
     'once',
   );
@@ -135,12 +140,12 @@ export async function libraryFinishChecks({
     'both',
   );
   await e(
-    `document.querySelector('.library-caption [data-tip]').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
+    `document.querySelector('.library-caption .library-mono [data-tip]').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`,
   );
   await wait('!!document.querySelector("[role=tooltip]:popover-open")');
   await check(
     '详情显示短模型名并提供原名悬停提示',
-    `(()=>{const model=document.querySelector('.library-caption [data-tip]');return model?.textContent==='V5'&&!model.hasAttribute('title')&&${JSON.stringify(models)}.includes(document.querySelector('[role=tooltip]:popover-open')?.textContent)})()`,
+    `(()=>{const model=document.querySelector('.library-caption .library-mono [data-tip]');return model?.textContent==='V5'&&!model.hasAttribute('title')&&${JSON.stringify(models)}.includes(document.querySelector('[role=tooltip]:popover-open')?.textContent)})()`,
     undefined,
     'both',
   );
@@ -169,8 +174,8 @@ export async function libraryFinishChecks({
   );
   await click('筛选', scope);
   await click('存为智能收藏集', popup);
-  await input('input[aria-label="智能收藏集名称"]', '012a合并模型');
-  await click('存为智能收藏集', 'document.querySelector("dialog[open]")');
+  await input('input[aria-label="收藏集名称"]', '012a合并模型');
+  await key('Enter', {}, 'document.activeElement');
   await h.until(
     () => database.listCollections().some((c) => c.name === '012a合并模型'),
     '保存合并模型规则',
@@ -214,7 +219,7 @@ export async function libraryFinishChecks({
   await click('图片排序', popup);
   await check(
     '排序选项使用三条定稿文案',
-    `['最近导入的在前','最早导入的在前','按名称排序'].every(v=>document.body.textContent.includes(v))`,
+    `['最近导入的在前','最早导入的在前','按名称'].every(v=>document.body.textContent.includes(v))`,
     undefined,
     'once',
   );
@@ -241,8 +246,8 @@ export async function libraryFinishChecks({
   await click('清空回收站', scope);
   await wait('!!document.querySelector("dialog[open]")', '清空回收站已读完占用空间并打开确认');
   await check(
-    '清空确认说明包含实际释放空间且不再有占位文字',
-    `(()=>{const text=document.querySelector('dialog[open]').textContent;return /会释放 [\\d.]+ (KB|MB)。/.test(text)&&!text.includes('【')})()`,
+    '清空确认说明实际图片数量、不可撤销和原文件不受影响',
+    `document.querySelector('dialog[open] .nps-dialog-body p').textContent==='将永久删除回收站中的 ${trash.length} 张图片，此操作无法撤销。原文件不受影响。'`,
     undefined,
     'once',
   );
@@ -251,8 +256,8 @@ export async function libraryFinishChecks({
   await refresh();
   await click('回收站', scope);
   await check(
-    '回收站为空时不显示清空按钮',
-    '![...document.querySelectorAll(".library-page button")].some(b=>b.textContent.trim()==="清空回收站")',
+    '回收站为空时清空按钮保留并禁用',
+    '(()=>{const b=[...document.querySelectorAll(".library-page button")].find(b=>b.textContent.trim()==="清空回收站");return !!b&&(b.disabled||b.getAttribute("aria-disabled")==="true")&&b.dataset.tip==="回收站为空"})()',
     undefined,
     'once',
   );

@@ -333,6 +333,7 @@ function configureAutoUpdater() {
       phase: 'available',
       hasUpdate: true,
       latestVersion: info.version,
+      checkedAt: new Date().toISOString(),
       publishedAt: info.releaseDate || '',
       notes: releaseNotesText(info.releaseNotes).slice(0, 4_000),
       progress: 0,
@@ -344,6 +345,7 @@ function configureAutoUpdater() {
       phase: 'current',
       hasUpdate: false,
       latestVersion: info.version || app.getVersion(),
+      checkedAt: new Date().toISOString(),
       publishedAt: info.releaseDate || '',
       notes: '',
       progress: 0,
@@ -1324,6 +1326,8 @@ app.whenReady().then(async () => {
         phase: 'available',
         hasUpdate: true,
         latestVersion: '99.0.0',
+        checkedAt: new Date().toISOString(),
+        structuredNotes: acceptanceDoubles.structuredNotes || null,
         notes: '# 验收发布说明\n\n本地替身。[验收链接](https://example.com/acceptance)',
         releaseUrl: 'https://github.com/LBEILC/NovelAIPromptStudio/releases/tag/v99.0.0',
       });
@@ -1344,6 +1348,16 @@ app.whenReady().then(async () => {
       }
       const result = await autoUpdater.checkForUpdates();
       const info = result?.updateInfo;
+      try {
+        const release = await checkReleaseUpdates(app.getVersion(), net.fetch);
+        if (release.latestVersion === updateState.latestVersion)
+          notifyUpdateState({
+            structuredNotes: release.structuredNotes,
+            checkedAt: release.checkedAt,
+          });
+      } catch {
+        /* Keep the updater's Markdown when GitHub attachments are unavailable. */
+      }
       return {
         ok: true,
         ...updateState,

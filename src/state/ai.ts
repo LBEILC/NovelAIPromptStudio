@@ -12,7 +12,10 @@ const editableFields = [
 ] as const;
 type EditableField = (typeof editableFields)[number];
 
-export function useAISettings() {
+export function useAISettings(notify?: (text: string) => void) {
+  const revision = useRef(0);
+  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [operation, setOperation] = useState('');
   const [draft, updateDraft] = useState<{ settings: SettingsDraft; edited: EditableField[] }>({
     edited: [],
     settings: {
@@ -32,6 +35,9 @@ export function useAISettings() {
     ? editableFields.some((key) => settings[key] !== baseline.current![key])
     : draft.edited.length > 0;
   const setSettings = useCallback((action: SetStateAction<SettingsDraft>) => {
+    revision.current++;
+    setTestResult(null);
+    setMessage('');
     updateDraft((current) => {
       const next = typeof action === 'function' ? action(current.settings) : action;
       return {
@@ -79,27 +85,49 @@ export function useAISettings() {
   const run = async (action: 'save' | 'models' | 'test') => {
     if (!window.studio || busy) return;
     setBusy(true);
+    setOperation(action);
+    const requestRevision = revision.current;
     try {
       // Preserve the existing API contract: model discovery and testing use saved credentials.
       const saved = await invokeUI('settings.ai.save', { settings: settings });
       loaded.current = true;
       baseline.current = { ...saved, apiKey: '' };
-      updateDraft({ settings: { ...saved, apiKey: '' }, edited: [] });
+      updateDraft((current) => {
+        const retained = editableFields.filter((key) => current.settings[key] !== settings[key]);
+        return {
+          settings: {
+            ...saved,
+            apiKey: '',
+            ...Object.fromEntries(retained.map((key) => [key, current.settings[key]])),
+          },
+          edited: retained,
+        };
+      });
       if (action === 'models') {
         const result = await invokeUI('ai.models', {});
         if (!result.ok) throw new Error(result.error);
         setModels(result.models);
-        setMessage(`已读取 ${result.models.length} 个模型`);
+        notify?.(`已读取 ${result.models.length} 个模型`);
       } else if (action === 'test') {
+        const started = performance.now();
         const result = await invokeUI('ai.test', {});
         if (!result.ok) throw new Error(result.error);
-        setMessage(`已连接 · ${result.model || saved.model}`);
-      } else setMessage('已保存 AI 服务设置');
+        if (revision.current === requestRevision)
+          setTestResult({
+            ok: true,
+            text: `连接正常 · ${((performance.now() - started) / 1000).toFixed(1)} 秒`,
+          });
+      } else notify?.('已保存');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      if (action === 'models') setModels([]);
+      const text = error instanceof Error ? error.message : String(error);
+      if (action === 'test' && revision.current === requestRevision)
+        setTestResult({ ok: false, text: `连接失败：${text}` });
+      else setMessage(text);
     } finally {
       setBusy(false);
+      setOperation('');
     }
   };
-  return { settings, setSettings, models, busy, message, run, dirty };
+  return { settings, setSettings, models, busy, message, run, dirty, testResult, operation };
 }

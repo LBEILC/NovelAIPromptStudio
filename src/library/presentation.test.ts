@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  libraryCountText,
   modelDisplayName,
   groupModelOptions,
   generationParameters,
@@ -70,4 +71,11 @@ it('assembles only applicable permanent deletion sentences', () => {
     '2 张正在工作台打开，删除后这些标签页会关闭。其中 1 个标签页里有还没保存的改动，会一起丢弃。会释放 12.4 MB。',
   );
   expect(deletionDetail({ open: 0, dirty: 0 }, '1.0 KB')).toBe('会释放 1.0 KB。');
+});
+
+it('formats group, image and filtered scope counts', () => {
+  expect(libraryCountText(2, 2)).toBe('2 张');
+  expect(libraryCountText(2, 5)).toBe('2 组 · 5 张');
+  expect(libraryCountText(2, 2, 10)).toBe('2 张，共 10 张');
+  expect(libraryCountText(2, 5, 10)).toBe('2 组 · 5 张，共 10 张');
 });

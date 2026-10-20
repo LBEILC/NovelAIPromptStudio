@@ -175,8 +175,9 @@ async function libraryTransitions({ h }, enabled, theme) {
     'once',
   );
   await finish(h);
+  await click('筛选');
   await capture(h, '.library-filter-collapse,.nps-transition-snapshot', () =>
-    h.input('[aria-label="搜索图片库"]', 'transition-no-match'),
+    e('document.querySelector(".library-filter-options [role=checkbox]").click()'),
   );
   await check(
     `${theme} / ${enabled}：筛选行展开只有高度和透明度过渡`,
@@ -189,6 +190,7 @@ async function libraryTransitions({ h }, enabled, theme) {
   );
   if (enabled) await sequence(h, `transition-collapse-${theme}`);
   await finish(h);
+  await h.key('Escape', {}, 'document.activeElement');
   await capture(h, '.library-filter-collapse,.nps-transition-snapshot', () =>
     click('清除', 'document.querySelector(".library-filter-collapse")'),
   );

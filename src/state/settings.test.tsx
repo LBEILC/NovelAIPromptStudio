@@ -219,7 +219,7 @@ describe('settings domain state', () => {
     await act(async () => state.run('test'));
     expect(testAIModel).not.toHaveBeenCalled();
     expect(state.busy).toBe(false);
-    expect(state.message).toBe('安全存储不可用');
+    expect(state.testResult).toEqual({ ok: false, text: '连接失败：安全存储不可用' });
   });
   it('ignores an outdated dictionary snapshot and keeps local search without another query', async () => {
     vi.useFakeTimers();

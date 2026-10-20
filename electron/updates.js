@@ -1,3 +1,4 @@
+import { validateReleaseNotes } from '../src/lib/releaseNotes.js';
 // The installer may fail without quitting the app. Let the caller reopen its
 // database on failure, but never start the installer with an open connection.
 export function installUpdateAfterClosingDatabase(updater, database, onInstallError) {
@@ -60,7 +61,28 @@ export async function checkForUpdates(currentVersion, fetcher) {
   const release = await response.json();
   const version = String(release.tag_name || '').replace(/^v/i, '');
   if (!version) throw new Error('最新 Release 没有有效版本号');
+  let structuredNotes = null;
+  const asset = release.assets?.find((asset) => asset.name === 'release-notes.json');
+  if (asset?.browser_download_url) {
+    try {
+      const url = new URL(asset.browser_download_url);
+      if (
+        url.protocol !== 'https:' ||
+        url.hostname !== 'github.com' ||
+        !url.pathname.startsWith('/LBEILC/NovelAIPromptStudio/releases/download/')
+      )
+        throw Error('Unexpected release asset URL');
+      const response = await fetcher(url.href, { signal: AbortSignal.timeout(10_000) });
+      if (!response.ok) throw Error('Release notes unavailable');
+      const notes = validateReleaseNotes(await response.json());
+      if (notes.version === version) structuredNotes = notes;
+    } catch {
+      /* An optional attachment must never prevent updating. */
+    }
+  }
   return {
+    structuredNotes,
+    checkedAt: new Date().toISOString(),
     currentVersion,
     latestVersion: version,
     hasUpdate: compareVersions(version, currentVersion) > 0,

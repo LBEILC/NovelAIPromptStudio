@@ -1,10 +1,14 @@
-import { DecodedImage, TransitionSurface } from '../ui/transitions';
+import { Collapse, DecodedImage, TransitionSurface } from '../ui/transitions';
 import { writeClipboardText } from '../lib/clipboard';
-import { SurfaceButton } from '../ui';
-import { dimensions, generationParameters, modelDisplayName } from './presentation';
-import { useRef, useState } from 'react';
+import { Shortcut, SurfaceButton } from '../ui';
+import {
+  dimensions,
+  generationParameters,
+  libraryCountText,
+  modelDisplayName,
+} from './presentation';
+import { useEffect, useRef, useState } from 'react';
 import { Button, useScrollArea } from '../ui';
-import { LibraryRename } from './Rename';
 import { hasImageName, imageFileName, imageAccessibleName } from '../lib/imageNaming.js';
 import { mediaUrl } from '../lib/imageStage.js';
 import { LibraryPrompt, libraryPositivePrompt } from './Prompt';
@@ -22,26 +26,81 @@ export function LibraryDetail({
   onViewer: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
+  const [name, setName] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  const nameInput = useRef<HTMLInputElement>(null);
+  const saving = useRef(false);
+  const canceled = useRef(false);
+  const startRename = () => {
+    if (!detail || p.preview?.id !== detail.id || p.view === 'trash') return;
+    canceled.current = false;
+    setName(hasImageName(detail) ? detail.name : '');
+    setRenaming(true);
+  };
+  useEffect(() => {
+    setRenaming(false);
+  }, [detail?.id]);
+  useEffect(() => {
+    setExpanded(false);
+  }, [p.previewGroup?.id]);
+  useEffect(() => {
+    if (p.renameRequest?.id === detail?.id) startRename();
+  }, [p.renameRequest, detail?.id]);
+  useEffect(() => {
+    if (renaming) {
+      nameInput.current?.focus();
+      nameInput.current?.select();
+    }
+  }, [renaming]);
+  const saveName = async () => {
+    if (saving.current || canceled.current || !detail) return;
+    if (!name.trim()) {
+      setRenaming(false);
+      return;
+    }
+    saving.current = true;
+    try {
+      const ids = p.previewGroup?.members.map((member) => member.id) || [detail.id];
+      if (await p.onRenameMany(ids, name.trim())) setRenaming(false);
+    } finally {
+      saving.current = false;
+    }
+  };
   const scroll = useRef<HTMLDivElement>(null);
   useScrollArea(scroll, { enabled: !!detail && !p.selectedGroupIds.length });
-  // TODO(design): Confirm whether switching between the multi-selection summary
-  // and single-image details should fade the whole panel; detail text currently switches directly.
   if (p.selectedGroupIds.length)
     return (
       <aside className="library-detail">
         <div className="library-summary">
+          <b>已选 {libraryCountText(p.selectedGroupIds.length, p.selectedImageCount)}</b>
           <div className="library-fan">
             {p.groups
               .filter((group) => p.selectedGroupIds.includes(group.id))
-              .slice(0, 3)
+              .slice(0, 5)
               .map((group) => (
                 <DecodedImage key={group.id} src={mediaUrl(group.cover.thumbnail_path)} alt="" />
               ))}
           </div>
-          <b>
-            已选 {p.selectedGroupIds.length} 组 · {p.selectedImageCount} 张
-          </b>
-          <span className="library-help">选中一张时，这里显示它的提示词。</span>
+          <span className="library-help">
+            点击图片可继续选择或取消，按住 <Shortcut keys={['Shift']} /> 可连续选择，按{' '}
+            <Shortcut keys={['Esc']} /> 退出多选
+          </span>
+        </div>
+        <div className="library-detail-bar">
+          <Button onClick={p.onClearSelection}>取消选择</Button>
+          {p.view !== 'trash' && (
+            <Button
+              variant="ink"
+              onClick={() => {
+                for (const group of p.groups.filter((group) =>
+                  p.selectedGroupIds.includes(group.id),
+                ))
+                  for (const member of group.members) p.onOpenWorkbench(member);
+              }}
+            >
+              在工作台打开 {p.selectedImageCount} 张
+            </Button>
+          )}
         </div>
       </aside>
     );
@@ -75,27 +134,96 @@ export function LibraryDetail({
             onClick={onViewer}
           />
         </TransitionSurface>
-        {group && group.members.length > 1 && (
-          <div className="library-strip">
-            {group.members.map((member) => (
-              <SurfaceButton
-                kind="image"
-                key={member.id}
-                className={`${member.id === detail.id ? 'is-current' : ''} ${member.id === group.cover.id ? 'is-cover' : ''}`}
-                aria-label={imageAccessibleName(member)}
-                onClick={() => p.onPreview(group, member)}
-              >
-                <DecodedImage src={mediaUrl(member.thumbnail_path)} alt="" />
-              </SurfaceButton>
-            ))}
-            <span className="library-help library-mono">
-              {group.members.findIndex((member) => member.id === detail.id) + 1} /{' '}
-              {group.members.length}
-            </span>
-          </div>
-        )}
+        <Collapse open={!!group && group.members.length > 1}>
+          {group && (
+            <div className="library-strip">
+              {group.members.slice(0, group.members.length > 7 ? 6 : 7).map((member) => (
+                <SurfaceButton
+                  kind="image"
+                  key={member.id}
+                  className={`${member.id === detail.id ? 'is-current' : ''} ${member.id === group.cover.id ? 'is-cover' : ''}`}
+                  aria-label={imageAccessibleName(member)}
+                  onClick={() => p.onPreview(group, member)}
+                >
+                  <DecodedImage src={mediaUrl(member.thumbnail_path)} alt="" />
+                </SurfaceButton>
+              ))}
+              {group.members.length > 7 && (
+                <SurfaceButton
+                  className="library-strip-more library-mono"
+                  aria-label={expanded ? '收起' : `展开其余 ${group.members.length - 6} 张`}
+                  data-tip={expanded ? '收起' : undefined}
+                  onClick={() => setExpanded(!expanded)}
+                >
+                  {expanded ? <i className="ri-arrow-up-s-line" /> : `+${group.members.length - 6}`}
+                </SurfaceButton>
+              )}
+              <span className="library-help library-mono">
+                {group.members.findIndex((member) => member.id === detail.id) + 1} /{' '}
+                {group.members.length}
+              </span>
+              <Collapse open={expanded} className="library-strip-expanded">
+                <div className="library-strip-rest">
+                  {group.members.slice(6).map((member) => (
+                    <SurfaceButton
+                      kind="image"
+                      key={member.id}
+                      className={member.id === detail.id ? 'is-current' : ''}
+                      aria-label={imageAccessibleName(member)}
+                      onClick={() => p.onPreview(group, member)}
+                    >
+                      <DecodedImage src={mediaUrl(member.thumbnail_path)} alt="" />
+                    </SurfaceButton>
+                  ))}
+                </div>
+              </Collapse>
+            </div>
+          )}
+        </Collapse>
         <div className="library-caption">
-          {hasImageName(detail) && <b>{detail.name}</b>}
+          {renaming ? (
+            <div className="library-inline-name">
+              <input
+                ref={nameInput}
+                aria-label="图片名称"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                onBlur={() => void saveName()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    void saveName();
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    canceled.current = true;
+                    setRenaming(false);
+                  }
+                }}
+              />
+              <span className="library-help">
+                <Shortcut keys={['Enter']} /> 保存 <Shortcut keys={['Esc']} /> 取消
+                {group && group.members.length > 1 && (
+                  <> · {group.members.length} 张图片将按顺序编号</>
+                )}
+              </span>
+            </div>
+          ) : (
+            hasImageName(detail) && (
+              <SurfaceButton
+                className="library-name"
+                data-tip={p.view === 'trash' ? undefined : '重命名'}
+                disabled={pending || p.view === 'trash'}
+                onClick={startRename}
+              >
+                {detail.name}
+              </SurfaceButton>
+            )
+          )}
+          {group && group.members.length > 1 && (
+            <span className="library-help">一组 · {group.members.length} 张</span>
+          )}
           <span className="library-mono">
             {dimensions(detail.metadata)}
             {detail.metadata.model && (
@@ -149,13 +277,7 @@ export function LibraryDetail({
           ) : (
             <>
               <CollectionPicker p={p} ids={[detail.id]} />
-              <Button
-                variant="quiet"
-                size="small"
-                onClick={() => {
-                  setRenaming(true);
-                }}
-              >
+              <Button variant="quiet" size="small" disabled={pending} onClick={startRename}>
                 <i className="ri-edit-line" />
                 {hasImageName(detail) ? '重命名' : '起名'}
               </Button>
@@ -196,17 +318,6 @@ export function LibraryDetail({
           </Button>
         )}
       </div>
-      {/* TODO(design): 界面稿未展示单张和整摞初始态；单张沿用原名预填，整摞暂留空。 */}
-      <LibraryRename
-        open={renaming}
-        p={p}
-        ids={group?.members.map((member) => member.id) || [detail.id]}
-        currentId={detail.id}
-        initialName={
-          hasImageName(detail) && (!group || group.members.length === 1) ? detail.name : ''
-        }
-        onClose={() => setRenaming(false)}
-      />
     </aside>
   );
 }

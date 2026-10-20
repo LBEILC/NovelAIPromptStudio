@@ -124,7 +124,7 @@ export function Input({
           autoCorrect="off"
           spellCheck={false}
           {...props}
-          aria-invalid={!!error || undefined}
+          aria-invalid={!!error || props['aria-invalid'] || undefined}
           aria-describedby={
             [props['aria-describedby'], error ? id : ''].filter(Boolean).join(' ') || undefined
           }
@@ -157,6 +157,7 @@ export function Input({
 }
 
 export interface Option {
+  style?: React.CSSProperties;
   value: string;
   label: string;
   prefix?: ReactNode;
@@ -251,6 +252,7 @@ export function Select({
         id={`${id}-trigger`}
         type="button"
         className={cx('nps-field', 'nps-select', size === 'small' && 'nps-small')}
+        style={options.find((option) => option.value === value)?.style}
         disabled={disabled}
         aria-label={label}
         aria-haspopup="listbox"
@@ -329,6 +331,7 @@ export function Select({
             aria-disabled={option.disabled || undefined}
             tabIndex={index === active ? 0 : -1}
             className={cx('nps-menu-item', index === active && 'nps-current')}
+            style={option.style}
             ref={(node) => {
               if (node && open && index === active) node.focus();
             }}
@@ -569,6 +572,7 @@ export function Slider({
         }}
         aria-label={label}
         aria-valuetext={format(value)}
+        aria-disabled={disabled || undefined}
         min={min}
         max={max}
         step={step}

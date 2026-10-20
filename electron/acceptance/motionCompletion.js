@@ -26,7 +26,7 @@ export async function motionCompletion({ h, mode }, enabled, theme, { capture, f
     for(let i=0;i<30;i++){
       await new Promise(requestAnimationFrame);
       const a=marker.getAnimations()[0],r=marker.getBoundingClientRect();
-      rows.push({time:performance.now()-start,y:r.y,progress:a?.effect.getComputedTiming().progress??1,content:!!document.querySelector('.library-collection-row')});
+      rows.push({time:performance.now()-start,y:r.y,progress:a?.effect.getComputedTiming().progress??1,content:document.querySelector('.library-side-item.on')?.dataset.collectionId==='acceptance'});
       if(i>2&&!a)break;
     }
     observer.disconnect();return {first,rows,longTasks};
@@ -35,7 +35,9 @@ export async function motionCompletion({ h, mode }, enabled, theme, { capture, f
     path.join(mode.output, `024-navigation-trace-${theme}-${enabled}.json`),
     JSON.stringify(trace, null, 2),
   );
-  await wait('!!document.querySelector(".library-collection-row")');
+  await wait(
+    'document.querySelector(".library-side-item.on")?.dataset.collectionId==="acceptance" && !document.querySelector("[data-library-updating=true]")',
+  );
   await check(
     label('导航选中收藏集且内容更新'),
     'document.querySelector(".library-side-item.on")?.dataset.collectionId === "acceptance"',
@@ -50,30 +52,30 @@ export async function motionCompletion({ h, mode }, enabled, theme, { capture, f
   );
   await click('全部图片', 'document.querySelector(".library-side")');
   await settle();
-  await capture(
-    h,
-    '.library-nav-indicator,.library-collection-collapse,.nps-transition-snapshot',
-    async () => {
-      await click('验收收藏集', 'document.querySelector(".library-side")');
-      await wait('!!document.querySelector(".library-collection-row")');
-    },
-  );
+  await capture(h, '.library-nav-indicator,.nps-transition-snapshot', async () => {
+    await click('验收收藏集', 'document.querySelector(".library-side")');
+    await wait(
+      'document.querySelector(".library-side-item.on")?.dataset.collectionId==="acceptance"',
+    );
+  });
   await check(
-    label('收藏集规则行展开后控件存在'),
-    '!!document.querySelector(".library-collection-row")',
+    label('手动收藏集不显示旧规则栏，导航保持选中'),
+    '!document.querySelector(".library-collection-row") && document.querySelector(".library-side-item.on")?.dataset.collectionId==="acceptance"',
     undefined,
     'once',
   );
   if (enabled) await sequence(h, `024-sidebar-rules-${theme}`);
   await finish(h);
-  await focusRingChecks(h, '收藏集规则栏');
+  await focusRingChecks(h, '收藏集导航');
   await capture(h, '.library-collection-collapse,.nps-transition-snapshot', async () => {
     await click('全部图片', 'document.querySelector(".library-side")');
-    await wait('!document.querySelector(".library-collection-row")');
+    await wait(
+      'document.querySelector(".library-side-item.on")?.dataset.collectionId!=="acceptance"',
+    );
   });
   await check(
-    label('规则栏退出移除控件'),
-    '!document.querySelector(".library-collection-row")',
+    label('退出手动收藏集更新导航且不保留旧规则栏'),
+    '!document.querySelector(".library-collection-row") && document.querySelector(".library-side-item.on")?.dataset.collectionId!=="acceptance"',
     undefined,
     'once',
   );
@@ -129,9 +131,9 @@ export async function motionCompletion({ h, mode }, enabled, theme, { capture, f
   await click('取消', 'document.querySelector(".library-selection-bar")');
   await click('新建收藏集', 'document.querySelector(".library-side")');
   const name = `motion-fixture-${theme}-${enabled}`;
-  await h.input('dialog[open] [aria-label=收藏集名称]', name);
+  await h.input('.library-side [aria-label=收藏集名称]', name);
   await capture(h, '.library-side .nps-menu-trigger,[data-list-exit]', async () => {
-    await click('新建', 'document.querySelector("dialog[open]")');
+    await h.key('Enter', {}, 'document.activeElement');
     await wait(`!!document.querySelector('.library-side [aria-label="${name}"]')`);
   });
   await check(
@@ -142,10 +144,12 @@ export async function motionCompletion({ h, mode }, enabled, theme, { capture, f
   );
   await finish(h);
   await click(name, 'document.querySelector(".library-side")');
-  await wait('!!document.querySelector(".library-collection-row")');
-  await click('删除收藏集', 'document.querySelector(".library-collection-row")');
+  await h.evaluate(
+    `document.querySelector('.library-side [aria-label="${name}"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:80,clientY:180}))`,
+  );
+  await click('删除', 'document.querySelector(".nps-menu:popover-open")');
   await capture(h, '[data-list-exit],.library-side .nps-menu-trigger', async () => {
-    await click('删除收藏集', 'document.querySelector("dialog[open]")');
+    await click('删除', 'document.querySelector("dialog[open]")');
     await wait(`!document.querySelector('.library-side [aria-label="${name}"]')`);
   });
   await check(

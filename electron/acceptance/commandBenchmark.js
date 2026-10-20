@@ -43,6 +43,7 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
     firstCards: [firstCardsMs],
     import100: [],
     dictionary: [],
+    importDays: [],
   };
   try {
     window.webContents.debugger.attach('1.3');
@@ -105,7 +106,7 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
     await h.key('Escape');
     await h.wait('!document.querySelector("[data-library-updating=true]")');
     samples.filter = await e(
-      `(async()=>{const times=[];for(let i=0;i<12;i++){const half=i%2===0,n=document.querySelector(half?'.library-side [data-collection-id="benchmark-half"]':'.library-side [aria-label="全部图片"]'),start=performance.now();n.click();do{await new Promise(resolve=>requestAnimationFrame(resolve));if(performance.now()-start>10000)throw Error('Filter timeout')}while(document.querySelector('[data-library-updating=true]')||!document.querySelector('.library-count').textContent.includes((half?'2500':'5000')+' 组'));await new Promise(resolve=>requestAnimationFrame(resolve));times.push(performance.now()-start);}return times.slice(2)})()`,
+      `(async()=>{const times=[];for(let i=0;i<12;i++){const half=i%2===0,n=document.querySelector(half?'.library-side [data-collection-id="benchmark-half"]':'.library-side [aria-label="全部图片"]'),start=performance.now();n.click();do{await new Promise(resolve=>requestAnimationFrame(resolve));if(performance.now()-start>10000)throw Error('Filter timeout')}while(document.querySelector('[data-library-updating=true]')||!document.querySelector('.library-count').textContent.includes((half?'2500':'5000')+' 张'));await new Promise(resolve=>requestAnimationFrame(resolve));times.push(performance.now()-start);}return times.slice(2)})()`,
     );
     const importStart = performance.now();
     for (let at = 0; at < 100; at += 25) {
@@ -134,6 +135,9 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
     samples.dictionary = await e(
       `(async()=>{const start=performance.now();[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='翻译词典').click();do{await new Promise(resolve=>requestAnimationFrame(resolve));if(performance.now()-start>10000)throw Error('Dictionary timeout')}while(!document.querySelector('.settings-dictionary-count')?.textContent.includes('2000'));return [performance.now()-start]})()`,
     );
+    samples.importDays = await e(
+      `(async()=>{const month=new Date().toISOString().slice(0,7),times=[];for(let i=0;i<12;i++){const start=performance.now();const result=await window.studio.invoke('library.import-days',{month});if(!result.ok)throw Error(result.error.message);times.push(performance.now()-start)}return times.slice(2)})()`,
+    );
     const metrics = Object.fromEntries(
       Object.entries(samples).map(([key, values]) => [key, median(values)]),
     );
@@ -144,6 +148,8 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
       JSON.stringify({ platform: process.platform, metrics, samples }, null, 2),
     );
     console.log('Agent performance', metrics);
+    if (!process.env.CI && metrics.importDays >= 50)
+      throw Error(`Import-day counts exceeded 50 ms for 5000 images: ${metrics.importDays}`);
   } catch (error) {
     await fs.writeFile(path.join(mode.output, 'failure.txt'), await e('document.body.innerText'));
     throw error;

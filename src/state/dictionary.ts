@@ -116,8 +116,7 @@ export function useDictionary() {
     try {
       const result = await action();
       if (!result.ok) throw Error(result.error);
-      if (keep && ['untranslated', 'unsorted'].includes(filters.view))
-        setHeld((current) => [...new Set([...current, ...tags])]);
+      if (keep) setHeld((current) => [...new Set([...current, ...tags])]);
       await refresh();
       setSelected([]);
       return true;
@@ -159,8 +158,7 @@ export function useDictionary() {
       const result = await invokeUI('dictionary.retranslate', { id: id, tags: selected });
       if (!result.ok) throw Error(result.error);
       setProgress(result);
-      if (['untranslated', 'unsorted'].includes(filters.view))
-        setHeld((current) => [...new Set([...current, ...selected])]);
+      setHeld((current) => [...new Set([...current, ...selected])]);
       await refresh();
       return result;
     } catch (e) {

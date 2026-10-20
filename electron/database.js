@@ -278,6 +278,13 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   );
   ensureColumn(database, 'projects', projectColumns, 'is_favorite', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn(database, 'projects', projectColumns, 'deleted_at', "TEXT NOT NULL DEFAULT ''");
+  // Cover the calendar query without reading image paths and other project fields.
+  database.run(
+    "CREATE INDEX IF NOT EXISTS idx_projects_import_dates_active ON projects(created_at, id) WHERE deleted_at = ''",
+  );
+  database.run(
+    "CREATE INDEX IF NOT EXISTS idx_projects_import_dates_trash ON projects(created_at, id) WHERE deleted_at != ''",
+  );
   database.run(
     "CREATE INDEX IF NOT EXISTS idx_projects_content_hash ON projects(content_hash) WHERE content_hash != ''",
   );
@@ -813,7 +820,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
           ? "projects.deleted_at = '' AND projects.is_favorite = 1"
           : "projects.deleted_at = ''";
     const projects = query(
-      `SELECT projects.* FROM projects WHERE ${where} ORDER BY projects.created_at DESC`,
+      `SELECT projects.* FROM projects WHERE ${where} ORDER BY projects.created_at DESC, projects.rowid ASC`,
     );
     if (!projects.length) return [];
 
@@ -2004,6 +2011,10 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   return {
     loadLibrary,
     loadLibraryCards,
+    listImportDates: (view = 'all') =>
+      query(
+        `SELECT id, created_at FROM projects WHERE deleted_at ${view === 'trash' ? '!=' : '='} ''`,
+      ),
     loadProject,
     listCollections: atomic(listCollections),
     migrateLegacyFavorites: atomic(migrateLegacyFavorites),

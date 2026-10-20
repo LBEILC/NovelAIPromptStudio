@@ -7,6 +7,7 @@ import { libraryCopyChecks } from './libraryCopy.js';
 import {
   checkLibraryButtonGaps,
   checkCollectionContext,
+  collectionContext,
   libraryFinishChecks,
 } from './libraryFinish.js';
 import fs from 'node:fs/promises';
@@ -56,6 +57,9 @@ export async function libraryChecks(env) {
   };
   const all = async () => {
     await click('全部图片', scope);
+    await input('.gallery-search input', '');
+    if (await e('!!document.querySelector(".library-chips .nps-button")'))
+      await click('清除', 'document.querySelector(".library-chips")');
     await wait('document.querySelectorAll(".library-card").length>0');
   };
   const refresh = async (empty = false) => {
@@ -196,7 +200,7 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
-    await selectCard(0, { ctrlKey: true });
+    await selectCard(0);
     await selectCard(1, { metaKey: true });
     await check(
       'Ctrl 与 Cmd 单击均进入多选',
@@ -334,7 +338,7 @@ export async function libraryChecks(env) {
     await wait('!!document.querySelector(".library-empty")');
     await check(
       '组合包含与排除生效',
-      'document.querySelector(".library-empty").textContent.includes("没有符合条件的图片")',
+      'document.querySelector(".library-empty").textContent.includes("没有符合的图片")',
       undefined,
       'once',
     );
@@ -366,7 +370,8 @@ export async function libraryChecks(env) {
       await click('清除', scope);
       await click('筛选', scope);
     }
-    await h.select('导入时间', '最近 7 天');
+    await click('导入时间');
+    await click('最近 7 天', 'document.querySelector(".nps-date-quick")');
     await closePopover();
     await check(
       '导入时间预设生效',
@@ -375,9 +380,12 @@ export async function libraryChecks(env) {
       'once',
     );
     await click('筛选', scope);
-    await h.select('导入时间', '自定义范围');
+    await click('导入时间');
     await input('input[aria-label="开始日期"]', '1990-01-01');
+    await key('Enter', {}, 'document.activeElement');
     await input('input[aria-label="结束日期"]', '1990-01-02');
+    await key('Enter', {}, 'document.activeElement');
+    await key('Escape', {}, 'document.activeElement');
     await closePopover();
     await wait('!!document.querySelector(".library-empty")');
     await check(
@@ -393,18 +401,16 @@ export async function libraryChecks(env) {
     await checkLibraryButtonGaps(h, '筛选');
     if (!reduced) await screen('filter');
     await click('存为智能收藏集');
-    await input('input[aria-label="智能收藏集名称"]', `012智能${reduced}`);
-    await capture(h, '.library-collection-collapse,.library-side .nps-menu-trigger', async () => {
-      await click('存为智能收藏集', dialog);
-      await wait(`!!document.querySelector('.library-side [aria-label="012智能${reduced}"]')`);
-    });
+    await wait('!!document.querySelector(".library-side input")');
     await check(
-      '智能收藏集规则栏按高度展开；关闭动效直接到位',
-      `(()=>{const off=document.documentElement.dataset.motion==='off'||document.documentElement.dataset.motion!=='full'&&matchMedia('(prefers-reduced-motion: reduce)').matches;return off?window.transitionSamples.length===0:window.transitionSamples.some(a=>a.effect.target.matches('.library-collection-collapse')&&a.effect.getKeyframes().some(f=>'height'in f))})()`,
+      '智能收藏集立即创建并以条件值命名，侧栏自动编辑',
+      'document.querySelector(".library-side input").value==="1girl"&&!document.querySelector("dialog[open]")',
       undefined,
       'once',
     );
-    await finish(h);
+    await input('input[aria-label="收藏集名称"]', `012智能${reduced}`);
+    await key('Enter', {}, 'document.activeElement');
+    await wait(`!!document.querySelector('.library-side [aria-label="012智能${reduced}"]')`);
     await focusRingChecks(h, '智能收藏集规则栏');
     const smart = database.listCollections().find((c) => c.name === `012智能${reduced}`);
     await check(
@@ -414,8 +420,8 @@ export async function libraryChecks(env) {
       'once',
     );
     await check(
-      '智能收藏集显示规则和全部管理入口',
-      'document.querySelector(".library-collection-row").textContent.includes("包含 1girl") && document.querySelectorAll(".library-collection-row button").length===3',
+      '智能收藏集显示只读规则和编辑入口',
+      'document.querySelector(".library-chips").textContent.includes("1girl") && !![...document.querySelectorAll(".library-chips button")].find(button=>button.textContent.trim()==="编辑规则") && !document.querySelector(".library-chips [aria-label^=移除]")',
       undefined,
       'both',
     );
@@ -436,33 +442,24 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
-    await click('重命名', 'document.querySelector(".library-collection-row")');
+    await collectionContext(h, smart.id, '重命名');
     await input('input[aria-label="收藏集名称"]', `012改名${reduced}`);
-    await capture(h, '.library-collection-title,.nps-transition-snapshot', async () => {
-      await click('重命名', dialog);
-      await wait(`!!document.querySelector('.library-side [aria-label="012改名${reduced}"]')`);
-    });
-    await check(
-      '收藏集改名原位替换内容；关闭动效直接到位',
-      `(()=>{const off=document.documentElement.dataset.motion==='off'||document.documentElement.dataset.motion!=='full'&&matchMedia('(prefers-reduced-motion: reduce)').matches;return off?window.transitionSamples.length===0:window.transitionSamples.some(a=>a.effect.target.matches('.library-collection-title')&&a.effect.getKeyframes().every(f=>'opacity'in f&&!('transform'in f)))})()`,
-      undefined,
-      'once',
-    );
-    await finish(h);
+    await key('Enter', {}, 'document.activeElement');
+    await wait(`!!document.querySelector('.library-side [aria-label="012改名${reduced}"]')`);
     await check(
       '智能收藏集重命名持久化',
       () => database.listCollections().some((c) => c.name === `012改名${reduced}`),
       undefined,
       'once',
     );
-    await click('删除收藏集', 'document.querySelector(".library-collection-row")');
+    await collectionContext(h, smart.id, '删除');
     await check(
       '删除收藏集先确认且聚焦取消',
       'document.activeElement.textContent.trim()==="取消"',
       undefined,
       'once',
     );
-    await click('删除收藏集', dialog);
+    await click('删除', dialog);
     await wait('!document.querySelector("dialog[open]")');
     await h.until(
       () => !database.listCollections().some((collection) => collection.id === smart.id),
@@ -550,7 +547,7 @@ export async function libraryChecks(env) {
     await wait('document.querySelectorAll(".library-detail .library-strip button").length>1');
     await e('document.querySelectorAll(".library-detail .library-strip button")[1].click()');
     await wait(
-      'document.querySelector(".library-detail .library-strip button.is-current")?.getAttribute("aria-label")===document.querySelector(".library-caption b")?.textContent',
+      'document.querySelector(".library-detail .library-strip button.is-current")?.getAttribute("aria-label")===document.querySelector(".library-caption .library-name")?.textContent',
     );
     const cover = await e('document.querySelector(".library-detail").dataset.detailId');
     await click('设为封面', 'document.querySelector(".library-detail-actions")');
@@ -736,8 +733,8 @@ export async function libraryChecks(env) {
       'both',
     );
     await check(
-      '清空回收站位于说明行且使用安静危险小按钮',
-      "!document.querySelector('.library-tools .nps-button-danger') && !!document.querySelector('.library-chips.library-help .nps-button-danger.nps-small')",
+      '清空回收站位于说明行且使用危险小按钮',
+      "!document.querySelector('.library-tools .nps-button-danger-outline') && !!document.querySelector('.library-chips.library-help .nps-button-danger-outline.nps-small')",
       undefined,
       'both',
     );
@@ -753,7 +750,7 @@ export async function libraryChecks(env) {
     await all();
     await input('.gallery-search input', 'not-a-real-image-012');
     await wait('!!document.querySelector(".library-empty")');
-    await click('清除搜索和筛选', scope);
+    await click('清除搜索', scope);
     await wait('document.querySelectorAll(".library-card").length>0');
     await check(
       '无结果空状态能清除搜索筛选',
@@ -799,7 +796,7 @@ export async function libraryChecks(env) {
     );
     doubles.selections.push({ canceled: false, filePaths: [unique] });
     await click('导入', scope);
-    await wait('document.body.innerText.includes("跳过重复 1 张")');
+    await wait('document.querySelector(".nps-notifications")?.textContent.includes("已导入 0 张")');
     await check(
       '重复图片被跳过',
       () => database.loadLibrary('all').length === before + 1,
@@ -921,11 +918,12 @@ export async function libraryChecks(env) {
       .find((collection) => collection.kind === 'manual');
     await click(emptyCollection.name, 'document.querySelector(".library-side")');
     await check(
-      '全库无图片时收藏集管理行仍可用',
-      '!!document.querySelector(".library-collection-row") && document.querySelectorAll(".library-collection-row button").length===2',
+      '全库无图片时收藏集侧栏仍可用且显示空收藏集说明',
+      '!!document.querySelector(".library-side-item.on[data-collection-id]") && document.querySelector(".library-empty").textContent.includes("收藏集为空")',
       undefined,
       'once',
     );
+    await checkCollectionContext(h, emptyCollection.id);
     database.updateProjects(activeIds, { deleted: false });
     await refresh();
   }

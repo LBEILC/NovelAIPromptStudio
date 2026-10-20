@@ -1,4 +1,5 @@
 // @ts-check
+import { countImportDays } from '../../src/lib/dateRange.js';
 import crypto from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { commandRegistry, validateCommand, CommandError } from './registry.js';
@@ -315,6 +316,19 @@ export async function createCommands(services) {
         items: found.slice(input.offset || 0, (input.offset || 0) + (input.limit || 100)),
         total: found.length,
         revision: store.revision(),
+      };
+    },
+    'library.import-days': async (input) => {
+      const scope = input.collectionId ? collection(input.collectionId) : null;
+      const records =
+        scope?.kind === 'smart'
+          ? await services.database.loadLibraryCards(input.view || 'all')
+          : services.database.listImportDates(input.view || 'all');
+      return {
+        days: countImportDays(
+          scope ? galleryCollectionScope(records, scope) : records,
+          input.month,
+        ),
       };
     },
     'library.get': async (input) => {

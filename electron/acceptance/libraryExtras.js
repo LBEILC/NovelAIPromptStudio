@@ -1,3 +1,4 @@
+import { collectionContext } from './libraryFinish.js';
 /** Additional library behaviors run with both motion settings and both themes. */
 import { filterGalleryProjects, galleryFilterOptions } from '../../src/lib/galleryFilters.js';
 export async function extraLibraryChecks({
@@ -39,14 +40,14 @@ export async function extraLibraryChecks({
   }
   await check(
     '全部都有要求同时命中全部包含 Tag',
-    `document.querySelector('.library-count')?.textContent.trim().endsWith('${filterGalleryProjects(projects, { includeTags, tagMatch: 'all' }).length} 张')===true`,
+    `document.querySelector('.library-count')?.textContent.trim().split('，')[0].endsWith('${filterGalleryProjects(projects, { includeTags, tagMatch: 'all' }).length} 张')===true`,
     undefined,
     'once',
   );
   await click('有任意一个');
   await check(
     '有任意一个接受任一包含 Tag',
-    `document.querySelector('.library-count')?.textContent.trim().endsWith('${filterGalleryProjects(projects, { includeTags, tagMatch: 'any' }).length} 张')===true`,
+    `document.querySelector('.library-count')?.textContent.trim().split('，')[0].endsWith('${filterGalleryProjects(projects, { includeTags, tagMatch: 'any' }).length} 张')===true`,
     undefined,
     'once',
   );
@@ -54,7 +55,7 @@ export async function extraLibraryChecks({
   await click('清除', scope);
   await click('新建收藏集', side);
   await input('input[aria-label="收藏集名称"]', `012多选${reduced}`);
-  await click('新建', dialog);
+  await key('Enter', {}, 'document.activeElement');
   await wait('!document.querySelector("dialog[open]")');
   const collection = database.listCollections().find((c) => c.name === `012多选${reduced}`);
   await check(
@@ -64,8 +65,8 @@ export async function extraLibraryChecks({
     'once',
   );
   await all();
-  await selectCard(0, { ctrlKey: true });
-  await selectCard(1, { ctrlKey: true });
+  await selectCard(0);
+  await selectCard(1, mod);
   const selected = await e(
     '[...document.querySelectorAll(".library-card.picked")].map(c=>c.dataset.projectId)',
   );
@@ -107,14 +108,14 @@ export async function extraLibraryChecks({
     'once',
   );
   await check(
-    '普通收藏集管理移至网格上方，侧栏不展开按钮',
-    'document.querySelector(".library-collection-row").textContent.includes("手动整理，从详情栏或多选条加入图片") && !document.querySelector(".library-side .library-collection-actions")',
+    '普通收藏集管理收进侧栏右键菜单',
+    '!document.querySelector(".library-collection-row") && !document.querySelector(".library-side .library-collection-actions")',
     undefined,
     'both',
   );
-  await click('重命名', 'document.querySelector(".library-collection-row")');
+  await collectionContext(h, collection.id, '重命名');
   await input('input[aria-label="收藏集名称"]', `012多选改名${reduced}`);
-  await click('重命名', dialog);
+  await key('Enter', {}, 'document.activeElement');
   await wait('!document.querySelector("dialog[open]")');
   await check(
     '普通收藏集重命名持久化',
@@ -135,7 +136,7 @@ export async function extraLibraryChecks({
     undefined,
     'once',
   );
-  await click('删除收藏集', 'document.querySelector(".library-collection-row")');
+  await collectionContext(h, collection.id, '删除');
   await click('取消', dialog);
   await check(
     '取消删除收藏集保留集合',
@@ -143,8 +144,8 @@ export async function extraLibraryChecks({
     undefined,
     'once',
   );
-  await click('删除收藏集', 'document.querySelector(".library-collection-row")');
-  await click('删除收藏集', dialog);
+  await collectionContext(h, collection.id, '删除');
+  await click('删除', dialog);
   await wait('!document.querySelector("dialog[open]")');
   await h.until(
     () => !database.listCollections().some((item) => item.id === collection.id),
@@ -165,7 +166,7 @@ export async function extraLibraryChecks({
   const original = database.loadProject(id).name;
   await click('重命名', 'document.querySelector(".library-detail-actions")');
   await input('input[aria-label="图片名称"]', original + ' 012');
-  await click('起名', dialog);
+  await key('Enter', {}, 'document.activeElement');
   await h.until(() => database.loadProject(id).name === original + ' 012', '图片重命名');
   await waitDetail();
   await check(
@@ -190,10 +191,10 @@ export async function extraLibraryChecks({
   );
   await click('重命名', 'document.querySelector(".library-detail-actions")');
   await input('input[aria-label="图片名称"]', original);
-  await click('起名', dialog);
+  await key('Enter', {}, 'document.activeElement');
   await h.until(() => database.loadProject(id).name === original, '恢复测试名称');
-  await selectCard(0, { ctrlKey: true });
-  await selectCard(1, { ctrlKey: true });
+  await selectCard(0);
+  await selectCard(1, mod);
   const trashed = await e(
     '[...document.querySelectorAll(".library-card.picked")].map(c=>c.dataset.projectId)',
   );
@@ -207,7 +208,7 @@ export async function extraLibraryChecks({
   );
   await h.checkSoon(
     '多张回收通知使用数量文案',
-    'document.querySelector(".nps-notifications").textContent.includes("已把 2 张图片移入回收站")',
+    'document.querySelector(".nps-notifications").textContent.includes("已将 2 张移入回收站")',
     undefined,
     undefined,
     undefined,

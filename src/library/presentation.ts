@@ -1,4 +1,11 @@
 /** Display names never replace the raw values stored in collection rules. */
+export function libraryCountText(groups: number, images: number, total?: number) {
+  return (
+    (groups === images ? `${images} 张` : `${groups} 组 · ${images} 张`) +
+    (total === undefined ? '' : `，共 ${total} 张`)
+  );
+}
+
 export function modelDisplayName(raw = '') {
   const name = raw.replace(/\s+[\da-f]{8}$/i, '');
   const known = name.match(/^(?:NovelAI Diffusion )?(V(?:3|4(?:\.5)?|5))(?: (Full|Curated))?$/i);

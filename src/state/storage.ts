@@ -8,6 +8,7 @@ export function useStorage(onLibraryChange: () => Promise<unknown>) {
   const [backups, setBackups] = useState<DatabaseBackup[] | null>(null);
   const [databaseError, setDatabaseError] = useState('');
   const [progress, setProgress] = useState<LibraryStorageProgress | null>(null);
+  const [moved, setMoved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -43,6 +44,7 @@ export function useStorage(onLibraryChange: () => Promise<unknown>) {
   const change = async () => {
     if (!window.studio || busy) return;
     setBusy(true);
+    setMoved(false);
     setProgress(null);
     setError('');
     try {
@@ -50,6 +52,7 @@ export function useStorage(onLibraryChange: () => Promise<unknown>) {
       if (!result.ok) throw new Error(result.error);
       if ('canceled' in result) return;
       setDetails(result);
+      setMoved(!result.cleanupWarning);
       setError(result.cleanupWarning);
       await onLibraryChange();
     } catch (e) {
@@ -77,6 +80,7 @@ export function useStorage(onLibraryChange: () => Promise<unknown>) {
   };
   return {
     details,
+    moved,
     progress,
     busy,
     error,

@@ -1,5 +1,6 @@
 import { invokeUI } from '../lib/commands';
 import {
+  Collapse,
   Disclosure,
   TransitionSurface,
   useMovingIndicator,
@@ -28,6 +29,7 @@ import {
   Dialog,
   Shortcut,
   useScrollArea,
+  useNotifications,
 } from '../ui';
 import { SettingsFrame } from './PageFrame';
 import { useAppearance } from '../state/appearance';
@@ -36,6 +38,8 @@ import { useStorage } from '../state/storage';
 import { useUpdates } from '../state/updates';
 import { BUNDLED_FONTS, partitionFontFamilies, quoteFontFamily } from '../lib/fonts.js';
 import { Dictionary } from './Dictionary';
+import { StructuredReleaseNotes } from './StructuredReleaseNotes';
+import { lastUpdateCheckLabel, releaseCounts } from '../lib/releaseNotes.js';
 import { BrandMark } from '../shell/Titlebar';
 import misansLicense from '../../LICENSES/MiSans/LICENSE?raw';
 import newsreaderLicense from '../../LICENSES/Newsreader/LICENSE?raw';
@@ -237,7 +241,7 @@ function Appearance() {
   const save = (patch: Partial<AppearanceSettings>) =>
     void changeAppearance(patch).catch((e: Error) => setError(e.message));
   return (
-    <SettingsFrame title="外观" description="更改会立刻应用到整个界面。">
+    <SettingsFrame title="外观" description="更改会立即应用到整个界面。">
       <Row title="主题">
         <OptionGroup
           label="主题"
@@ -264,12 +268,13 @@ function Appearance() {
             options={(key === 'monoFont' ? groups.monospace : groups.proportional).map(
               (family: string) => ({
                 value: family,
+                style: { fontFamily: quoteFontFamily(family) },
                 label: BUNDLED_FONTS.includes(family)
                   ? `${family}（内置）`
                   : family === 'system-ui'
-                    ? '系统界面字体'
+                    ? '系统默认'
                     : family === 'monospace'
-                      ? '系统等宽字体'
+                      ? '系统默认'
                       : family,
               }),
             )}
@@ -277,7 +282,7 @@ function Appearance() {
           />
         </Row>
       ))}
-      <Row title="动效" help="关闭后，所有位置变化都立刻完成">
+      <Row title="动效" help="关闭后不播放过渡动画，变化立即完成">
         <OptionGroup
           label="动效"
           value={appearance.motion}
@@ -294,18 +299,43 @@ function Appearance() {
   );
 }
 function AI() {
-  const a = useAISettings();
+  const notify = useNotifications();
+  const a = useAISettings((text) => notify({ tone: 'success', text }));
+  const [replacing, setReplacing] = useState(false);
+  useEffect(() => {
+    if (!a.busy && a.settings.hasApiKey && !a.settings.apiKey) setReplacing(false);
+  }, [a.busy]);
   return (
     <SettingsFrame
       title="AI 服务"
       description="用来补全内置词典没有的 Tag 翻译和分类、翻译段落。不配置也能使用软件的其他功能。"
       footer={
         <>
-          <span role="status">{a.dirty ? '有未保存的修改' : a.message}</span>
-          <Button disabled={a.busy} onClick={() => void a.run('test')}>
-            测试连接
+          <span
+            role="status"
+            className={
+              a.testResult
+                ? a.testResult.ok
+                  ? 'settings-status-ok'
+                  : 'settings-status-error'
+                : undefined
+            }
+          >
+            {a.testResult?.text || (a.dirty ? '有未保存的修改' : a.message)}
+          </span>
+          <Button
+            disabled={a.busy}
+            loading={a.operation === 'test'}
+            onClick={() => void a.run('test')}
+          >
+            {a.operation === 'test' ? '测试中' : '测试连接'}
           </Button>
-          <Button variant="ink" disabled={a.busy || !a.dirty} onClick={() => void a.run('save')}>
+          <Button
+            variant="ink"
+            disabledReason={!a.dirty ? '没有需要保存的修改' : undefined}
+            disabled={a.busy || !a.dirty}
+            onClick={() => void a.run('save')}
+          >
             保存
           </Button>
         </>
@@ -319,36 +349,72 @@ function AI() {
         />
         <small>任何兼容 OpenAI 接口格式的服务</small>
       </label>
-      <label className="settings-column">
+      <div className="settings-column">
         API Key
-        <Input
-          type="password"
-          value={a.settings.apiKey}
-          placeholder={a.settings.hasApiKey ? '已安全保存' : '输入 API Key'}
-          onChange={(e) => a.setSettings((s) => ({ ...s, apiKey: e.target.value }))}
-        />
-        <small>{a.settings.hasApiKey ? '已加密保存；留空可保留现有 Key' : '还未保存'}</small>
+        <div className="settings-actions">
+          {a.settings.hasApiKey && !replacing ? (
+            <>
+              <span className="nps-field settings-saved-key">已保存 ••••••••</span>
+              <Button onClick={() => setReplacing(true)}>更换</Button>
+            </>
+          ) : (
+            <>
+              <Input
+                autoFocus
+                aria-label="API Key"
+                type="password"
+                value={a.settings.apiKey}
+                placeholder={a.settings.hasApiKey ? '粘贴新的 API Key' : '粘贴 API Key'}
+                onChange={(event) =>
+                  a.setSettings((current) => ({ ...current, apiKey: event.target.value }))
+                }
+              />
+              {a.settings.hasApiKey && (
+                <Button
+                  onClick={() => {
+                    a.setSettings((current) => ({ ...current, apiKey: '' }));
+                    setReplacing(false);
+                  }}
+                >
+                  取消
+                </Button>
+              )}
+            </>
+          )}
+        </div>
         <small>加密后保存在这台电脑上，软件不保存明文</small>
-      </label>
+      </div>
       <div className="settings-column">
         模型
         <div className="settings-actions">
-          <Input
-            aria-label="模型"
-            value={a.settings.model}
-            placeholder="输入或读取模型 ID"
-            onChange={(e) => a.setSettings((s) => ({ ...s, model: e.target.value }))}
-          />
-          {a.models.length > 0 && (
+          {a.models.length ? (
             <Select
               label="模型列表"
               value={a.settings.model}
-              options={a.models.map((value) => ({ value, label: value }))}
-              onChange={(model) => a.setSettings((s) => ({ ...s, model }))}
+              options={a.models.map((value) => ({
+                value,
+                label: value,
+                style: { fontFamily: 'var(--font-mono)' },
+              }))}
+              onChange={(model) => a.setSettings((current) => ({ ...current, model }))}
+            />
+          ) : (
+            <Input
+              aria-label="模型"
+              value={a.settings.model}
+              placeholder="输入或读取模型 ID"
+              onChange={(event) =>
+                a.setSettings((current) => ({ ...current, model: event.target.value }))
+              }
             />
           )}
-          <Button variant="quiet" disabled={a.busy} onClick={() => void a.run('models')}>
-            重新读取模型列表
+          <Button
+            variant="quiet"
+            disabled={a.busy}
+            loading={a.operation === 'models'}
+            onClick={() => void a.run('models')}
+          >
+            {a.operation === 'models' ? '读取中' : '重新读取模型列表'}
           </Button>
         </div>
       </div>
@@ -422,10 +488,12 @@ function Storage({
     }
   };
   return (
-    <SettingsFrame title="图片库" description="导入的图片、缩略图和导出的 Vibe 文件都存在这里。">
+    <SettingsFrame title="图片库" description="导入的图片、缩略图和生成的图片都保存在这里。">
       <div className="settings-column">
         <div>图片存放位置</div>
-        <code>{s.details?.assetsDirectory || '正在读取…'}</code>
+        <TransitionSurface change={s.details?.assetsDirectory}>
+          <code>{s.details?.assetsDirectory || '正在读取…'}</code>
+        </TransitionSurface>
         <small>
           {s.details?.fileCount || 0} 个文件 · 占用 {bytes(s.details?.totalBytes || 0)}
         </small>
@@ -433,27 +501,36 @@ function Storage({
           <Button disabled={!s.details || s.busy} onClick={() => void s.reveal()}>
             打开文件夹
           </Button>
-          <Button disabled={!s.details || s.busy} onClick={() => void s.change()}>
+          <Button
+            disabled={!s.details || s.busy}
+            disabledReason={s.busy ? '正在移动' : undefined}
+            onClick={() => void s.change()}
+          >
             更改位置
           </Button>
         </div>
-        <small>更改位置会把现有文件移过去。确认文件完整复制之前，原来的文件不会被删除。</small>
+        <small>更改位置时会把现有文件移到新位置，复制完成前不会删除原文件。</small>
       </div>
-      {s.busy && (
-        <div className="settings-column">
-          正在移动到新位置
-          <Progress
-            max={s.progress?.total || 1}
-            value={s.progress?.completed || 0}
-            label="迁移进度"
-          />
-          <small>
-            {s.progress
-              ? `已复制 ${s.progress.completed} / ${s.progress.total} 个文件 · 可以继续使用，移动完成前不要关闭软件`
-              : '准备迁移…'}
-          </small>
-        </div>
-      )}
+      <Collapse open={s.busy || s.moved}>
+        <TransitionSurface change={s.busy}>
+          {s.busy ? (
+            <div className="settings-column">
+              正在移动到新位置
+              <Progress
+                max={s.progress?.total || 1}
+                value={s.progress?.completed || 0}
+                label="迁移进度"
+              />
+              <small>
+                已复制 {s.progress?.completed || 0} / {s.progress?.total || 0} 个文件 ·
+                移动期间可以继续使用，完成前请勿关闭软件
+              </small>
+            </div>
+          ) : s.moved ? (
+            <div className="settings-status-ok">已移动到新位置，原位置的文件已删除</div>
+          ) : null}
+        </TransitionSurface>
+      </Collapse>
       {s.error && <p role="alert">{s.error}</p>}
       <h2>数据与备份</h2>
       <Row
@@ -505,6 +582,7 @@ export function feedbackDiagnostics(version = '—', platform = '') {
   return `NovelAI Prompt Studio v${version}\n平台：${({ darwin: 'macOS', win32: 'Windows', linux: 'Linux' } as Record<string, string>)[platform] || platform || '未知平台'}`;
 }
 export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unknown> }) {
+  const [notesOpen, setNotesOpen] = useState(true);
   const u = useUpdates();
   const [dialog, setDialog] = useState('');
   const [message, setMessage] = useState('');
@@ -542,51 +620,109 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       </Row>
       <Row
         title={
-          hasUpdate
-            ? `发现新版本 ${state.latestVersion}`
-            : state?.latestVersion
-              ? `已是最新版本 · v${state.latestVersion}`
-              : '官方稳定版本'
+          state?.phase === 'checking'
+            ? '正在检查更新…'
+            : hasUpdate
+              ? `发现新版本 ${state.latestVersion}`
+              : '已是最新版本'
         }
-        help={state?.packaged ? undefined : '开发模式只检查官方稳定版本，不会下载或安装更新。'}
+        help={[
+          `当前版本 ${state?.currentVersion || '—'} · 上次检查：${lastUpdateCheckLabel(state?.checkedAt)}`,
+          ...(state?.packaged ? [] : ['开发模式只检查官方稳定版本，不会下载或安装更新。']),
+        ]}
       >
-        <div className="settings-actions">
-          <Button disabled={state?.phase === 'checking'} onClick={() => void u.check()}>
-            {state?.phase === 'checking' ? '正在检查…' : '检查更新'}
-          </Button>
-          {state?.notes && (
-            <Button variant="quiet" onClick={() => setDialog('notes')}>
-              更新说明
-            </Button>
-          )}
-          {hasUpdate &&
-            state.canDownloadUpdate &&
-            !['downloading', 'downloaded'].includes(state.phase) && (
-              <Button onClick={() => void u.download()}>下载更新</Button>
-            )}
-          {state?.phase === 'downloaded' && state.canInstallUpdate && (
-            <Button variant="ink" onClick={() => void onInstallUpdate()}>
-              重启并安装
-            </Button>
-          )}
-          {hasUpdate && (
-            <Button onClick={() => open(state.releaseUrl)}>
-              {state.platform === 'darwin' && state.updateMode === 'manual'
-                ? '下载 macOS 安装包'
-                : '打开官方 Release'}
-            </Button>
-          )}
-        </div>
+        <Button
+          disabled={state?.phase === 'checking' || hasUpdate}
+          disabledReason={hasUpdate ? '已发现新版本' : undefined}
+          loading={state?.phase === 'checking'}
+          onClick={() => void u.check()}
+        >
+          {state?.phase === 'checking' ? '检查中' : '检查更新'}
+        </Button>
       </Row>
-      {state?.phase === 'downloading' && (
-        <div className="settings-column">
-          正在下载更新 · {Math.round(state.progress)}%
-          <Progress max={100} value={state.progress} label="下载更新进度" />
-          <small>
-            {bytes(state.transferred || 0)} / {bytes(state.total || 0)}
-          </small>
-        </div>
-      )}
+      <Collapse open={hasUpdate}>
+        {hasUpdate && (
+          <>
+            <div className="settings-update-banner">
+              <div className="settings-update-main">
+                <b>
+                  {state.phase === 'downloaded'
+                    ? `新版本 ${state.latestVersion} 已下载`
+                    : `发现新版本 ${state.latestVersion}`}
+                </b>
+                <small>
+                  {state.phase === 'downloaded'
+                    ? '重启后安装，工作台中的标签页和草稿会保留'
+                    : state.phase === 'downloading'
+                      ? `正在下载 · ${Math.round(state.progress)}%`
+                      : state.structuredNotes
+                        ? releaseCounts(state.structuredNotes)
+                        : ''}
+                </small>
+                <Progress
+                  max={100}
+                  value={
+                    state.phase === 'downloaded'
+                      ? 100
+                      : state.phase === 'downloading'
+                        ? state.progress
+                        : 0
+                  }
+                  label="下载更新进度"
+                />
+              </div>
+              <div className="settings-actions">
+                <Button
+                  variant="quiet"
+                  size="small"
+                  aria-expanded={notesOpen}
+                  onClick={() => setNotesOpen(!notesOpen)}
+                >
+                  {notesOpen ? '收起说明' : '更新说明'}
+                </Button>
+                {state.phase === 'downloaded' ? (
+                  <Button
+                    variant="ink"
+                    disabled={!state.canInstallUpdate}
+                    onClick={() => void onInstallUpdate()}
+                  >
+                    重启并安装
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ink"
+                    loading={state.phase === 'downloading'}
+                    disabled={
+                      state.phase === 'downloading' ||
+                      (!state.canDownloadUpdate && state.platform !== 'darwin')
+                    }
+                    onClick={() =>
+                      state.platform === 'darwin' && state.updateMode === 'manual'
+                        ? open(state.releaseUrl)
+                        : void u.download()
+                    }
+                  >
+                    {state.phase === 'downloading'
+                      ? '下载中'
+                      : state.platform === 'darwin' && state.updateMode === 'manual'
+                        ? '下载 macOS 安装包'
+                        : '下载'}
+                  </Button>
+                )}
+              </div>
+            </div>
+            <Collapse open={notesOpen}>
+              {state.structuredNotes ? (
+                <StructuredReleaseNotes notes={state.structuredNotes} />
+              ) : (
+                <Suspense fallback={null}>
+                  <ReleaseNotes>{state.notes || ''}</ReleaseNotes>
+                </Suspense>
+              )}
+            </Collapse>
+          </>
+        )}
+      </Collapse>
       {(u.error || state?.error) && (
         <p role="alert">{u.error || state?.error}。本地功能不受影响，可以稍后重试。</p>
       )}
@@ -598,48 +734,79 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       )}
       <h2>快捷键</h2>
       <p>macOS 上 Ctrl 对应 Command。在输入框里，Ctrl V 仍然是普通的粘贴。</p>
-      {[
-        ['打开图片；在图片库里是导入', [['Mod', 'I']]],
-        ['从剪贴板打开或导入图片', [['Mod', 'V']]],
-        ['聚焦搜索框', [['Mod', 'K']]],
+      {(
         [
-          '下一个 / 上一个标签页',
           [
-            ['Mod', 'Tab'],
-            ['Mod', 'Shift', 'Tab'],
+            '通用',
+            [
+              ['打开图片；在图片库里是导入', [['Mod', 'I']]],
+              ['从剪贴板打开或导入图片', [['Mod', 'V']]],
+              ['聚焦搜索框', [['Mod', 'K']]],
+              [
+                '下一个 / 上一个标签页',
+                [
+                  ['Mod', 'Tab'],
+                  ['Mod', 'Shift', 'Tab'],
+                ],
+              ],
+              ['关闭当前标签页', [['Mod', 'W']]],
+            ],
           ],
-        ],
-        ['关闭当前标签页', [['Mod', 'W']]],
-        ['移动当前 Tag', [['Alt', '方向键']]],
-        ['在图片之间移动', [['方向键']]],
-        ['在一摞图片里切换', [['←'], ['→']]],
-        ['上一组 / 下一组', [['↑'], ['↓']]],
-        ['在工作台打开', [['Enter']]],
-        ['看大图', [['Space']]],
-        ['全选图片', [['Mod', 'A']]],
-        ['取消选择；关闭大图', [['Esc']]],
-      ].map(([title, bindings]) => (
-        <Row key={title as string} title={title as string}>
-          <span className="settings-shortcuts">
-            {(bindings as string[][]).map((keys, index) => (
-              <Fragment key={keys.join('-')}>
-                {index > 0 && <span className="settings-shortcut-separator">/</span>}
-                <span className="settings-shortcut-binding">
-                  {keys.map((key) => (
-                    <Shortcut key={key} keys={[key]} />
-                  ))}
-                </span>
-              </Fragment>
-            ))}
-          </span>
-        </Row>
+          [
+            '工作台',
+            [
+              ['移动当前 Tag 或块', [['Alt', '方向键']]],
+              ['取消选择', [['Esc']]],
+            ],
+          ],
+          [
+            '图片库',
+            [
+              ['在图片之间移动', [['方向键']]],
+              ['在工作台打开', [['Enter']]],
+              ['看大图', [['Space']]],
+              [
+                '大图里换一张 / 换一组',
+                [
+                  ['←', '→'],
+                  ['↑', '↓'],
+                ],
+              ],
+              ['全选图片', [['Mod', 'A']]],
+              ['取消选择；关闭大图', [['Esc']]],
+            ],
+          ],
+        ] as [string, [string, string[][]][]][]
+      ).map(([group, rows]) => (
+        <Fragment key={group}>
+          <div className="settings-shortcut-heading">{group}</div>
+          {rows.map(([title, bindings]) => (
+            <Row key={title} title={title}>
+              <span className="settings-shortcuts">
+                {bindings.map((keys, index) => (
+                  <Fragment key={keys.join('-')}>
+                    {index > 0 && <span className="settings-shortcut-separator">/</span>}
+                    <span className="settings-shortcut-binding">
+                      {keys.map((key) => (
+                        <Shortcut key={key} keys={[key]} />
+                      ))}
+                    </span>
+                  </Fragment>
+                ))}
+              </span>
+            </Row>
+          ))}
+        </Fragment>
       ))}
       <h2>数据与隐私</h2>
-      <Row title="图片和图库数据只存在这台电脑上" help={'位置见"图片库"那一页。软件不会上传图片'}>
+      <Row
+        title="图片和图片库的数据只存在这台电脑上"
+        help={'位置见"图片库"那一页。软件不会上传图片'}
+      >
         {null}
       </Row>
       <Row
-        title="这些时候会联网，都不会发送图片"
+        title="这些时候会联网，都不会发送你的图片"
         help={[
           '检查和下载更新：访问 GitHub。自动检查可以在上面关掉；更新说明里带图片时，会从图片所在的网站加载',
           '翻译与分类：内置词典里没有的 Tag，会把 Tag 的名字发给 Danbooru，查它属于哪一类；配置了 AI 服务时，还没有译文的 Tag 会再发给你配置的服务',
@@ -651,8 +818,14 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         {null}
       </Row>
       <Row
+        title="命令行工具只在这台电脑上和软件通信"
+        help={'不开网络端口；Agent 能做什么见"Agent"那一页'}
+      >
+        {null}
+      </Row>
+      <Row
         title="API Key 加密后保存在这台电脑上"
-        help="用系统自带的加密能力加密，软件不保存明文；诊断信息和报告问题都不会带上它"
+        help="用系统自带的加密能力加密，软件不保存明文；诊断信息和报告问题都不会带上它们"
       >
         {null}
       </Row>
@@ -696,45 +869,39 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       </Row>
       <Dialog
         open={!!dialog}
-        title={dialog === 'notes' ? '更新说明' : '字体与开源组件'}
+        title="字体与开源组件"
         cancelLabel="关闭"
         confirmLabel="确定"
         onCancel={() => setDialog('')}
         onConfirm={() => setDialog('')}
       >
-        {dialog === 'notes' ? (
-          <Suspense fallback={null}>
-            <ReleaseNotes>{state?.notes || ''}</ReleaseNotes>
-          </Suspense>
-        ) : (
-          <>
-            <p>
-              界面字体 MiSans VF（版本
-              4.003），版权归北京小米移动软件有限公司所有，按其许可协议随本软件原样分发。段落字体
-              Newsreader 与等宽字体 IBM Plex Mono 按 SIL Open Font License 1.1 分发。
-            </p>
-            {[
-              ['MiSans VF 4.003', misansLicense],
-              ['Newsreader', newsreaderLicense],
-              ['IBM Plex Mono', plexLicense],
-              ['NovelAI Prompt Studio', projectLicense],
-              ['Remix Icon', remixLicense],
-              ['DanbooruSearchOnline', dictionaryLicense],
-            ].map(([name, license]) => (
-              <Disclosure
-                key={name}
-                summary={
-                  <>
-                    <i className="ri-arrow-right-s-line disclosure-icon" aria-hidden="true" />
-                    {name}
-                  </>
-                }
-              >
-                <pre className="settings-license">{license}</pre>
-              </Disclosure>
-            ))}
-          </>
-        )}
+        <>
+          <p>
+            界面字体 MiSans VF（版本
+            4.003），版权归北京小米移动软件有限公司所有，按其许可协议随本软件原样分发。段落字体
+            Newsreader 与等宽字体 IBM Plex Mono 按 SIL Open Font License 1.1 分发。
+          </p>
+          {[
+            ['MiSans VF 4.003', misansLicense],
+            ['Newsreader', newsreaderLicense],
+            ['IBM Plex Mono', plexLicense],
+            ['NovelAI Prompt Studio', projectLicense],
+            ['Remix Icon', remixLicense],
+            ['DanbooruSearchOnline', dictionaryLicense],
+          ].map(([name, license]) => (
+            <Disclosure
+              key={name}
+              summary={
+                <>
+                  <i className="ri-arrow-right-s-line disclosure-icon" aria-hidden="true" />
+                  {name}
+                </>
+              }
+            >
+              <pre className="settings-license">{license}</pre>
+            </Disclosure>
+          ))}
+        </>
       </Dialog>
     </SettingsFrame>
   );

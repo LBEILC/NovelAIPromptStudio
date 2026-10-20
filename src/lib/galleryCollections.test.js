@@ -52,17 +52,17 @@ describe('gallery collections', () => {
   it('generates a concise smart collection name from the current filters', () => {
     expect(
       gallerySmartCollectionDefaultName({ query: 'portrait lighting', datePreset: '30d' }),
-    ).toBe('搜索 portrait lighting · 最近 30 天');
+    ).toBe('最近 30 天');
     expect(
       gallerySmartCollectionDefaultName({
-        includeTags: ['1girl', 'outdoors', 'day'],
+        includeTags: ['1girl', 'outdoors', 'day', 'rain'],
         tagMatch: 'all',
       }),
-    ).toBe('包含 1girl、outdoors 等');
+    ).toBe('1girl · outdoors · day');
     expect(gallerySmartCollectionDefaultName({ models: ['nai-v4.5'], vibes: ['vibe-a'] })).toBe(
-      'nai-v4.5 · 指定 Vibe',
+      'nai-v4.5 · vibe-a',
     );
-    expect(gallerySmartCollectionDefaultName()).toBe('智能收藏集');
+    expect(gallerySmartCollectionDefaultName()).toBe('新的智能收藏集');
   });
 
   it('persists only a collection id that still exists', () => {

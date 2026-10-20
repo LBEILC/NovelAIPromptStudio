@@ -54,13 +54,13 @@ const categories = CATEGORY_OPTIONS.map((value: string) => ({
 }));
 const views: [DictionaryView, string][] = [
   ['all', '全部'],
-  ['untranslated', '没有译文'],
+  ['untranslated', '暂无译文'],
   ['unsorted', '未分类'],
-  ['ai', 'AI 翻译的'],
-  ['manual', '你改过的'],
+  ['ai', 'AI 翻译'],
+  ['manual', '已修改'],
 ];
 const sourceLabel = (item: TagDictionaryEntry) =>
-  ({ manual: '你改过', ai: 'AI', builtin: '内置' })[dictionarySource(item)];
+  ({ manual: '已修改', ai: 'AI', builtin: '内置' })[dictionarySource(item)];
 
 export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void }) {
   const d = useDictionary();
@@ -95,7 +95,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
     setShowFailures(false);
     const result = await d.retranslate();
     if (result && !result.canceled && !result.failed.length)
-      notify({ tone: 'success', text: `已翻译 ${result.translated} 条` });
+      notify({ tone: 'success', text: `已重新翻译 ${result.translated} 项` });
   };
   useLayoutEffect(() => {
     const node = scroll.current!;
@@ -176,7 +176,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
     {
       id: 'delete',
       label: dictionarySource(item) === 'manual' ? '还原' : '删除',
-      danger: true,
+      danger: dictionarySource(item) !== 'manual',
       onSelect: () => setDeleting([item.tag]),
     },
   ];
@@ -190,7 +190,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
           <h1>翻译词典</h1>
           <p>
             软件认识的 Tag
-            和它们的译文、分类。工作台和图片库里显示的译文都来自这里；改了只影响显示，不会改动图片里的提示词。
+            及其译文和分类。工作台和图片库中显示的译文都来自这里；修改只影响显示，不会改动图片中的提示词。
           </p>
         </div>
       </header>
@@ -201,7 +201,26 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
             aria-label="搜索 Tag 或译文"
             placeholder="搜索 Tag 或译文"
             prefix={<i className="ri-search-line" />}
-            suffix={<Shortcut keys={['Mod', 'K']} />}
+            suffix={
+              d.filters.query ? (
+                <Button
+                  variant="quiet"
+                  size="small"
+                  aria-label="清除搜索"
+                  onClick={() => d.setFilters((f) => ({ ...f, query: '' }))}
+                >
+                  <i className="ri-close-line" />
+                </Button>
+              ) : (
+                <Shortcut keys={['Mod', 'K']} />
+              )
+            }
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                d.setFilters((f) => ({ ...f, query: '' }));
+              }
+            }}
             value={d.filters.query}
             onChange={(e) => d.setFilters((f) => ({ ...f, query: e.target.value }))}
           />
@@ -216,9 +235,9 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
           <Select
             label="排序"
             options={[
-              { value: 'usage', label: '按用到的图片数' },
-              { value: 'tag', label: '按 Tag' },
-              { value: 'recent', label: '按最近修改' },
+              { value: 'usage', label: '按图片数' },
+              { value: 'tag', label: '按 Tag 名称' },
+              { value: 'recent', label: '最近修改' },
             ]}
             value={d.filters.sort}
             onChange={(sort) => d.setFilters((f) => ({ ...f, sort: sort as DictionarySort }))}
@@ -280,7 +299,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
               <th>Tag</th>
               <th>译文</th>
               <th>分类</th>
-              <th className="settings-usage">用到的图片</th>
+              <th className="settings-usage">图片数</th>
               <th>来源</th>
               <th />
             </tr>
@@ -348,8 +367,13 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
                         }}
                       />
                     ) : (
-                      <Button variant="quiet" disabled={d.busy} onClick={() => beginEdit(item)}>
-                        {item.translation || '点击填写'}
+                      <Button
+                        variant="quiet"
+                        className={!item.translation ? 'settings-no-translation' : undefined}
+                        disabled={d.busy}
+                        onClick={() => beginEdit(item)}
+                      >
+                        {item.translation || '暂无译文'}
                       </Button>
                     )}
                   </TransitionSurface>
@@ -418,13 +442,29 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
         {!d.busy && !d.items.length && (
           <EmptyState
             graphic={null}
-            actions={null}
-            title="没有匹配的 Tag 数据"
-            description="试试更换搜索词或筛选条件。"
+            actions={
+              d.filters.query ? (
+                <Button onClick={() => d.setFilters((f) => ({ ...f, query: '' }))}>清除搜索</Button>
+              ) : null
+            }
+            title={
+              d.filters.query
+                ? '没有找到匹配的 Tag'
+                : d.filters.category
+                  ? '此分类下暂无 Tag'
+                  : {
+                      all: '暂无 Tag',
+                      untranslated: '所有 Tag 都已有译文',
+                      unsorted: '所有 Tag 都已分类',
+                      ai: '暂无 AI 翻译的 Tag',
+                      manual: '暂无修改过的 Tag',
+                    }[d.filters.view]
+            }
+            description={d.filters.query ? `Tag 和译文中都不包含"${d.filters.query}"。` : ''}
           />
         )}
         <div className="settings-dictionary-count">
-          {d.busy ? '正在读取…' : `${d.items.length} 条`}
+          {d.busy ? '正在读取…' : `共 ${d.items.length} 项`}
         </div>
       </TransitionSurface>
       {d.progress && (d.running || d.progress.canceled || !!d.progress.failed.length) && (
@@ -474,7 +514,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
           </Collapse>
         </TransitionSurface>
       )}
-      {!!d.selected.length && !d.running && (
+      {!!d.selected.length && (
         <TransitionSurface
           kind="presence"
           enter
@@ -482,7 +522,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
           className="settings-dictionary-selection"
         >
           <div className="nps-selection" role="group" aria-label="词典多选操作">
-            <span>已选 {d.selected.length} 条</span>
+            <span>已选 {d.selected.length} 项</span>
             <Menu
               label="设置分类"
               buttonVariant="quiet"
@@ -490,19 +530,25 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
                 id: category.value,
                 label: category.label,
                 disabled: d.busy,
-                onSelect: () => void d.categorize(category.value as TagCategory),
+                onSelect: async () => {
+                  const count = d.selected.length;
+                  if (await d.categorize(category.value as TagCategory))
+                    notify({ tone: 'success', text: `已将 ${count} 项设为"${category.label}"` });
+                },
               }))}
             />
             <Button
               variant="quiet"
               disabled={d.busy || !d.aiReady}
+              loading={d.running}
               disabledReason={!d.aiReady ? "先在'AI 服务'里配置" : undefined}
               onClick={() =>
                 d.selected.length > 50 ? setConfirmTranslation(true) : void retranslate()
               }
             >
-              用 AI 重新翻译
+              {d.running ? '翻译中' : '用 AI 重新翻译'}
             </Button>
+            <span className="settings-selection-divider" aria-hidden />
             <Button variant="danger" disabled={d.busy} onClick={() => setDeleting(d.selected)}>
               删除
             </Button>
@@ -553,9 +599,9 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
             ? `还原"${deleting[0]}"？`
             : deleting.length === 1
               ? `删除"${deleting[0]}"？`
-              : `删除这 ${deleting.length} 条？`
+              : `删除这 ${deleting.length} 项？`
         }
-        destructive
+        destructive={!reverting}
         cancelLabel="取消"
         confirmLabel={reverting ? '还原' : '删除'}
         confirmDisabled={d.busy}
@@ -563,16 +609,25 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
         onConfirm={() => {
           if (!d.busy)
             void d.remove(deleting).then((ok) => {
-              if (ok) setDeleting([]);
+              if (ok) {
+                notify({
+                  tone: 'success',
+                  text: reverting
+                    ? '已还原'
+                    : deleting.length === 1
+                      ? '已删除'
+                      : `已删除 ${deleting.length} 项`,
+                });
+                setDeleting([]);
+              }
             });
         }}
       >
         <p>
           {reverting
-            ? '会删掉你对这个 Tag 的修改。它再次出现时，软件会重新查内置词典；内置词典里没有的，要再翻译并分类一次才有译文。'
-            : '这些 Tag 再次出现时，软件会重新查内置词典；内置词典里没有的，要再翻译并分类一次才有译文。'}
+            ? '将删除修改过的译文和分类。此 Tag 再次出现时会重新查询内置词典；内置词典中没有的，需要再次"翻译并分类"才会有译文。'
+            : `软件不保存译文的历史记录。${deleting.length === 1 ? '此 Tag' : '这些 Tag'} 再次出现时会重新查询内置词典；内置词典中没有的，需要再次"翻译并分类"才会有译文。`}
         </p>
-        <p>不会改动图片里的提示词。</p>
       </Dialog>
     </div>
   );

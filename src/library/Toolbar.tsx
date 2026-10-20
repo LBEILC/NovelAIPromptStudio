@@ -1,6 +1,10 @@
 import { Collapse } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { DateRange } from '../ui/DateRange';
+import { invokeUI } from '../lib/commands';
+import { dateRangeLabel } from '../lib/dateRange.js';
+import { gallerySmartCollectionDefaultName } from '../lib/galleryCollections.js';
 import {
   Shortcut,
   Button,
@@ -11,12 +15,12 @@ import {
   Slider,
   Switch,
   Checkbox,
-  Dialog,
+  Layer,
+  MenuItems,
   Autocomplete,
 } from '../ui';
 import {
   DEFAULT_GALLERY_FILTERS,
-  GALLERY_DATE_PRESETS,
   GALLERY_UNKNOWN_MODEL_VALUE,
   galleryFilterOptions,
 } from '../lib/galleryFilters.js';
@@ -28,9 +32,13 @@ import { libraryTagSuggestions, type LibraryTagOption } from './tagSuggestions';
 export function FilterChips({
   filters,
   onChange,
+  readOnly = false,
+  onEdit,
 }: {
   filters: GalleryFilters;
   onChange: (patch: Partial<GalleryFilters>) => void;
+  readOnly?: boolean;
+  onEdit?: () => void;
 }) {
   const chips: { id: string; label: string; value: string; title?: string; clear: () => void }[] =
     [];
@@ -42,7 +50,10 @@ export function FilterChips({
     filters[key].forEach((value) =>
       chips.push({
         id: key + value,
-        label,
+        label:
+          key === 'includeTags' && filters.tagMatch === 'any' && filters.includeTags.length > 1
+            ? '包含任意'
+            : label,
         value,
         clear: () => onChange({ [key]: filters[key].filter((item) => item !== value) }),
       }),
@@ -67,32 +78,44 @@ export function FilterChips({
     chips.push({
       id: 'date',
       label: '时间',
-      value:
-        filters.datePreset === 'custom'
-          ? `${filters.dateFrom} 至 ${filters.dateTo}`
-          : GALLERY_DATE_PRESETS.find((item) => item.value === filters.datePreset)?.label || '',
+      value: dateRangeLabel(filters),
       clear: () => onChange({ datePreset: 'all', dateFrom: '', dateTo: '' }),
     });
 
+  if (readOnly && filters.query)
+    chips.unshift({ id: 'query', label: '搜索', value: filters.query, clear: () => {} });
   return (
-    <Collapse open={!!chips.length || !!filters.query} className="library-filter-collapse">
+    <Collapse open={!!chips.length || readOnly} className="library-filter-collapse">
       <div className="library-chips">
-        {chips.map((chip) => (
-          <SurfaceButton
-            kind="chip"
-            className="library-chip"
-            key={chip.id}
-            data-tip={chip.title}
-            onClick={chip.clear}
-            aria-label={`移除${chip.label} ${chip.value}`}
-          >
-            {chip.label}
-            <b>{chip.value}</b>
-            <i className="ri-close-line" />
-          </SurfaceButton>
-        ))}
-        <Button variant="quiet" size="small" onClick={() => onChange(DEFAULT_GALLERY_FILTERS)}>
-          清除
+        {chips.map((chip) =>
+          readOnly ? (
+            <span className="library-chip" key={chip.id} data-tip={chip.title}>
+              {chip.label}
+              <b>{chip.value}</b>
+            </span>
+          ) : (
+            <SurfaceButton
+              kind="chip"
+              className="library-chip"
+              key={chip.id}
+              data-tip={chip.title}
+              onClick={chip.clear}
+              aria-label={`移除${chip.label} ${chip.value}`}
+            >
+              {chip.label}
+              <b>{chip.value}</b>
+              <i className="ri-close-line" />
+            </SurfaceButton>
+          ),
+        )}
+        <Button
+          variant="quiet"
+          size="small"
+          onClick={() =>
+            readOnly ? onEdit?.() : onChange({ ...DEFAULT_GALLERY_FILTERS, query: filters.query })
+          }
+        >
+          {readOnly ? '编辑规则' : '清除'}
         </Button>
       </div>
     </Collapse>
@@ -158,9 +181,18 @@ export function LibraryToolbar({
   onRowHeight: (height: number) => void;
 }) {
   const [open, setOpen] = useState('');
-  const [name, setName] = useState('');
-  const [naming, setNaming] = useState(false);
-  const [renaming, setRenaming] = useState(false);
+  const collectionId = p.activeCollection?.id || p.editingSmartCollection?.id;
+  const loadDays = useCallback(
+    async (month: string) =>
+      (
+        await invokeUI('library.import-days', {
+          view: p.view === 'trash' ? 'trash' : 'all',
+          ...(collectionId ? { collectionId } : {}),
+          month,
+        })
+      ).days,
+    [p.view, collectionId],
+  );
   const filterAnchor = useRef<HTMLButtonElement>(null);
   const viewAnchor = useRef<HTMLButtonElement>(null);
   const importAnchor = useRef<HTMLButtonElement>(null);
@@ -169,34 +201,18 @@ export function LibraryToolbar({
     () => galleryFilterOptions(p.filterCacheSource).tags,
     [p.filterCacheSource],
   );
-  const filters = p.filters;
+  const smart = p.activeCollection?.kind === 'smart' && !p.editingSmartCollection;
+  const filters = smart
+    ? { ...DEFAULT_GALLERY_FILTERS, ...p.activeCollection!.filters }
+    : p.filters;
   const groupedModels = groupModelOptions(options.models);
-  const rules = { ...DEFAULT_GALLERY_FILTERS, ...p.activeCollection?.filters };
-  const ruleParts = [
-    rules.query,
-    ...rules.includeTags.map((v) => '包含 ' + v),
-    ...rules.excludeTags.map((v) => '排除 ' + v),
-    ...groupModelOptions(
-      rules.models.map((v) => ({
-        label: v === GALLERY_UNKNOWN_MODEL_VALUE ? '未知模型' : v,
-        value: v,
-      })),
-    ).map((v) => '模型 ' + v.label),
-    ...rules.vibes.map(
-      (v) => options.vibes.find((option) => option.value === v)?.label || 'Vibe ' + v,
-    ),
-    rules.datePreset === 'custom'
-      ? rules.dateFrom + ' 至 ' + rules.dateTo
-      : rules.datePreset !== 'all'
-        ? GALLERY_DATE_PRESETS.find((v) => v.value === rules.datePreset)?.label
-        : '',
-  ].filter(Boolean);
   const count =
     filters.includeTags.length +
     filters.excludeTags.length +
     groupModelOptions(filters.models.map((value) => ({ label: value, value }))).length +
     filters.vibes.length +
-    Number(filters.datePreset !== 'all');
+    Number(filters.datePreset !== 'all') +
+    Number(!!smart && !!filters.query);
   return (
     <>
       <div className="library-tools">
@@ -205,7 +221,7 @@ export function LibraryToolbar({
             aria-label="搜索图片库"
             placeholder="搜索文件名、Tag、译文或段落里的词"
             prefix={<i className="ri-search-line" />}
-            value={filters.query}
+            value={p.query}
             onChange={(event) => p.onQueryChange(event.target.value)}
             suffix={<Shortcut keys={['Mod', 'K']} />}
           />
@@ -215,8 +231,14 @@ export function LibraryToolbar({
           aria-label="筛选"
           aria-expanded={open === 'filter'}
           variant="quiet"
-          className={count || open === 'filter' ? 'active' : ''}
-          onClick={() => setOpen(open === 'filter' ? '' : 'filter')}
+          className={smart || count || open === 'filter' ? 'active' : ''}
+          onClick={() => {
+            if (smart) p.onCollectionRulesEdit(p.activeCollection!);
+            if (p.editingSmartCollection) {
+              p.onCollectionRulesCancel();
+              setOpen('');
+            } else setOpen(open === 'filter' ? '' : 'filter');
+          }}
         >
           <i className="ri-filter-3-line" />
           <span>筛选</span>
@@ -242,6 +264,7 @@ export function LibraryToolbar({
               variant="ink"
               aria-label="其他导入方式"
               aria-expanded={open === 'import'}
+              disabled={p.importing}
               onClick={() => setOpen(open === 'import' ? '' : 'import')}
             >
               <i className="ri-arrow-down-s-line" />
@@ -249,74 +272,30 @@ export function LibraryToolbar({
           </div>
         )}
       </div>
-      <FilterChips filters={filters} onChange={p.onFiltersChange} />
+      <FilterChips
+        filters={filters}
+        onChange={p.onFiltersChange}
+        readOnly={smart}
+        onEdit={() => {
+          p.onCollectionRulesEdit(p.activeCollection!);
+          setOpen('filter');
+        }}
+      />
       {p.view === 'trash' && (
         <div className="library-chips library-help">
-          <span>回收站里的图片不会自动清理。永久删除只删除图片库里保存的副本。</span>
-          {(p.trashCount ?? 0) > 0 && (
-            <Button
-              className="library-row-end"
-              variant="danger"
-              size="small"
-              onClick={p.onEmptyTrash}
-            >
-              清空回收站
-            </Button>
-          )}
+          <span>回收站中的图片不会自动清理。永久删除只删除图片库中的副本，不影响原文件。</span>
+          <Button
+            className="library-row-end"
+            variant="danger-outline"
+            disabled={!(p.trashCount ?? 0)}
+            disabledReason="回收站为空"
+            size="small"
+            onClick={p.onEmptyTrash}
+          >
+            清空回收站
+          </Button>
         </div>
       )}
-      <Collapse open={!!p.activeCollection} className="library-collection-collapse">
-        {p.activeCollection && (
-          <div className="library-chips library-collection-row">
-            {p.activeCollection.kind === 'smart' ? (
-              ruleParts.length ? (
-                <>
-                  <span className="library-help">规则</span>
-                  {ruleParts.map((part, index) => (
-                    <span className="library-chip" key={index}>
-                      {part}
-                    </span>
-                  ))}
-                </>
-              ) : (
-                <span className="library-help">没有规则，包含全部图片</span>
-              )
-            ) : (
-              <span className="library-help">手动整理，从详情栏或多选条加入图片</span>
-            )}
-            <span className="library-row-end" />
-            {p.activeCollection.kind === 'smart' && (
-              <Button
-                size="small"
-                variant="quiet"
-                onClick={() => {
-                  p.onCollectionRulesEdit(p.activeCollection!);
-                  setOpen('filter');
-                }}
-              >
-                编辑规则
-              </Button>
-            )}
-            <Button
-              size="small"
-              variant="quiet"
-              onClick={() => {
-                setName(p.activeCollection!.name);
-                setRenaming(true);
-              }}
-            >
-              重命名
-            </Button>
-            <Button
-              size="small"
-              variant="danger"
-              onClick={() => p.onCollectionDelete(p.activeCollection!)}
-            >
-              删除收藏集
-            </Button>
-          </div>
-        )}
-      </Collapse>
       <Popover
         open={open === 'filter' || !!p.editingSmartCollection}
         anchor={filterAnchor}
@@ -327,6 +306,7 @@ export function LibraryToolbar({
         }}
       >
         <div className="library-filter-panel">
+          {p.editingSmartCollection && <b>编辑规则 · {p.editingSmartCollection.name}</b>}
           <TagFilter
             label="包含"
             values={filters.includeTags}
@@ -394,57 +374,62 @@ export function LibraryToolbar({
           ))}
           <div className="library-filter-row">
             <span>时间</span>
-            <Select
-              label="导入时间"
-              value={filters.datePreset}
-              options={GALLERY_DATE_PRESETS}
-              onChange={(datePreset) =>
-                p.onFiltersChange({ datePreset: datePreset as GalleryFilters['datePreset'] })
-              }
-            />
+            {(open === 'filter' || !!p.editingSmartCollection) && (
+              <DateRange value={filters} onChange={p.onFiltersChange} loadDays={loadDays} />
+            )}
           </div>
-          {filters.datePreset === 'custom' && (
-            <div className="library-date-range">
-              <Input
-                type="date"
-                aria-label="开始日期"
-                value={filters.dateFrom}
-                onChange={(event) => p.onFiltersChange({ dateFrom: event.target.value })}
-              />
-              <span>至</span>
-              <Input
-                type="date"
-                aria-label="结束日期"
-                value={filters.dateTo}
-                onChange={(event) => p.onFiltersChange({ dateTo: event.target.value })}
-              />
-            </div>
-          )}
           <div className="library-popover-foot">
             <Button
               variant="quiet"
               size="small"
-              onClick={() => p.onFiltersChange(DEFAULT_GALLERY_FILTERS)}
+              onClick={() =>
+                p.onFiltersChange({
+                  ...DEFAULT_GALLERY_FILTERS,
+                  query: p.editingSmartCollection ? '' : p.query,
+                })
+              }
             >
               清除
             </Button>
+            <span className="library-help">
+              符合条件：{p.groups.reduce((n, group) => n + group.members.length, 0)} 张
+            </span>
             {p.editingSmartCollection ? (
-              <Button
-                size="small"
-                onClick={async () => {
-                  await p.onCollectionRulesSave();
-                  setOpen('');
-                }}
-              >
-                保存规则
-              </Button>
+              <>
+                <Button
+                  size="small"
+                  variant="quiet"
+                  onClick={() => {
+                    p.onCollectionRulesCancel();
+                    setOpen('');
+                  }}
+                >
+                  取消
+                </Button>
+                <Button
+                  size="small"
+                  disabled={!count && !filters.query}
+                  disabledReason="至少保留一个条件"
+                  onClick={async () => {
+                    if (await p.onCollectionRulesSave()) setOpen('');
+                  }}
+                >
+                  保存规则
+                </Button>
+              </>
             ) : (
               <Button
                 size="small"
-                disabled={!count && !filters.query}
-                onClick={() => {
-                  setNaming(true);
-                  setOpen('');
+                disabled={!count}
+                disabledReason="请先设置筛选条件"
+                onClick={async () => {
+                  const name = gallerySmartCollectionDefaultName({
+                    ...filters,
+                    models: groupModelOptions(
+                      filters.models.map((value) => ({ value, label: value })),
+                    ).map((option) => option.label),
+                  });
+                  if (await p.onCollectionCreate('smart', name)) setOpen('');
                 }}
               >
                 存为智能收藏集
@@ -475,110 +460,94 @@ export function LibraryToolbar({
               options={[
                 { value: 'recent', label: '最近导入的在前' },
                 { value: 'oldest', label: '最早导入的在前' },
-                { value: 'name', label: '按名称排序' },
+                { value: 'name', label: '按名称' },
               ]}
             />
           </div>
           <div className="library-filter-row">
             <span>合并</span>
-            <OptionGroup
-              label="合并方式"
-              value={p.grouping.promptScope}
-              onChange={(promptScope) => p.onGroupingChange({ promptScope })}
-              options={[
-                { value: 'separate', label: '不合并' },
-                { value: 'full', label: '完全相同' },
-                { value: 'base', label: '基础相同' },
-                { value: 'similar', label: '相似' },
-              ]}
+            <div className="library-merge-options">
+              <OptionGroup
+                label="合并方式"
+                value={p.grouping.promptScope}
+                onChange={(promptScope) => p.onGroupingChange({ promptScope })}
+                options={[
+                  { value: 'separate', label: '不合并' },
+                  { value: 'full', label: '完全相同' },
+                  { value: 'base', label: '基础相同' },
+                  { value: 'similar', label: '相似' },
+                ]}
+              />
+              <span className="library-help library-merge-help">
+                {
+                  {
+                    separate: '每张图片单独显示。',
+                    full: '提示词完全相同的图片合并为一组。',
+                    base: '基础提示词的 Tag 足够接近的图片合并为一组，不考虑角色提示词和位置。',
+                    similar: '提示词相似度达到下方数值的图片合并为一组。',
+                  }[p.grouping.promptScope]
+                }
+              </span>
+            </div>
+          </div>
+          <div
+            className="library-filter-row"
+            data-tip={p.grouping.promptScope !== 'similar' ? '合并方式选"相似"时可调整' : undefined}
+          >
+            <span>相似度</span>
+            <Slider
+              label="相似度"
+              value={p.grouping.similarityThreshold}
+              min={70}
+              max={95}
+              step={5}
+              disabled={p.grouping.promptScope !== 'similar'}
+              format={(value) => `${value}%`}
+              onChange={(similarityThreshold) => p.onGroupingChange({ similarityThreshold })}
             />
           </div>
-          {p.grouping.promptScope === 'similar' && (
-            <>
-              <p className="library-help">
-                基础提示词的 Tag 足够接近的图片叠成一摞，不看角色提示词和位置。
-              </p>
-              <div className="library-filter-row">
-                <span>相似度</span>
-                <Slider
-                  label="相似度"
-                  value={p.grouping.similarityThreshold}
-                  min={70}
-                  max={95}
-                  step={1}
-                  format={(value) => `${value}%`}
-                  onChange={(similarityThreshold) => p.onGroupingChange({ similarityThreshold })}
-                />
-              </div>
-            </>
-          )}
-          <div className="library-view-vibe">
-            <span>Vibe 不同的也合并</span>
-            <Switch
-              label="Vibe 不同的也合并"
-              checked={p.grouping.mergeVibes}
-              onChange={(mergeVibes) => p.onGroupingChange({ mergeVibes })}
-            />
+          <div className="library-filter-row">
+            <span>Vibe</span>
+            <span className="library-view-vibe">
+              <Switch
+                label="Vibe 不同的也合并"
+                checked={p.grouping.mergeVibes}
+                onChange={(mergeVibes) => p.onGroupingChange({ mergeVibes })}
+              />
+              <span>不同的也合并</span>
+            </span>
           </div>
         </div>
       </Popover>
-      <Popover
+      <Layer
         open={open === 'import'}
         anchor={importAnchor}
-        label="其他导入方式"
+        className="nps-menu"
+        focus
         onClose={() => setOpen('')}
       >
-        <Button
-          variant="quiet"
-          onClick={() => {
-            setOpen('');
-            p.onImportClipboard();
-          }}
-        >
-          从剪贴板导入
-        </Button>
-      </Popover>
-      <Dialog
-        open={naming}
-        title="存为智能收藏集"
-        cancelLabel="取消"
-        confirmLabel="存为智能收藏集"
-        onCancel={() => setNaming(false)}
-        onConfirm={async () => {
-          if (name.trim()) {
-            await p.onCollectionCreate('smart', name.trim());
-            setNaming(false);
-            setName('');
-          }
-        }}
-      >
-        <Input
-          aria-label="智能收藏集名称"
-          placeholder="收藏集名称"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
+        <MenuItems
+          label="其他导入方式"
+          closeAll={() => setOpen('')}
+          closeLevel={() => setOpen('')}
+          items={[
+            {
+              id: 'files',
+              label: '选择图片或 ZIP…',
+              prefix: <i className="ri-image-add-line" />,
+              shortcut: ['Mod', 'I'],
+              onSelect: p.onImport,
+            },
+            {
+              id: 'clipboard',
+              label: '从剪贴板导入',
+              prefix: <i className="ri-clipboard-line" />,
+              shortcut: ['Mod', 'V'],
+              onSelect: p.onImportClipboard,
+            },
+          ]}
         />
-      </Dialog>
-      <Dialog
-        open={renaming}
-        title="重命名"
-        cancelLabel="取消"
-        confirmLabel="重命名"
-        onCancel={() => setRenaming(false)}
-        onConfirm={async () => {
-          if (name.trim() && p.activeCollection) {
-            await p.onCollectionRename(p.activeCollection, name.trim());
-            setRenaming(false);
-          }
-        }}
-      >
-        <Input
-          aria-label="收藏集名称"
-          placeholder="收藏集名称"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </Dialog>
+      </Layer>
     </>
   );
 }

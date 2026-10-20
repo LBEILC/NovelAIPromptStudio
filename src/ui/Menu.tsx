@@ -9,6 +9,7 @@ export type MenuItem =
   | {
       id: string;
       label: string;
+      prefix?: ReactNode;
       disabled?: boolean;
       danger?: boolean;
       current?: boolean;
@@ -154,6 +155,7 @@ export function MenuItems({
               }}
             >
               {item.current && <Check {...iconProps} />}
+              {item.prefix}
               {item.label}
               <span className="nps-menu-trailing">
                 {item.trailing}

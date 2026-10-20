@@ -20,6 +20,7 @@ export interface LibraryProps {
   collections: CountedCollection[];
   activeCollection: Collection | null;
   editingSmartCollection: Collection | null;
+  renameCollectionId?: string;
   filters: GalleryFilters;
   grouping: Grouping;
   filterProjects: LibraryCard[];
@@ -42,6 +43,7 @@ export interface LibraryProps {
   onCollectionCreate: (
     kind: string,
     name: string,
+    options?: { select?: boolean },
   ) => Promise<Collection | boolean | null | undefined>;
   onCollectionRename: (collection: Collection, name: string) => Promise<unknown>;
   onCollectionDelete: (collection: Collection) => Promise<unknown>;
@@ -60,9 +62,14 @@ export interface LibraryProps {
   onDownloadImage: (project: LibraryCard | ImageRecord) => Promise<unknown>;
   onReveal: (project: LibraryCard | ImageRecord) => void;
   onSetCover: (group: LibraryGroup, project: LibraryCard | ImageRecord) => Promise<unknown>;
+  renameRequest?: { id: string; sequence: number };
+  onRequestRename?: (id: string) => void;
   onRename: (project: LibraryCard | ImageRecord, name: string) => Promise<boolean>;
   onRenameMany: (ids: string[], name: string) => Promise<boolean>;
-  onToggleSelect: (group: LibraryGroup, event: Pick<MouseEvent, 'shiftKey'>) => void;
+  onToggleSelect: (
+    group: LibraryGroup,
+    event: Pick<MouseEvent, 'shiftKey'> & Partial<Pick<MouseEvent, 'ctrlKey' | 'metaKey'>>,
+  ) => void;
   onSelectionChange: (ids: string[]) => void;
   onSelectAll: () => void;
   onClearSelection: () => void;

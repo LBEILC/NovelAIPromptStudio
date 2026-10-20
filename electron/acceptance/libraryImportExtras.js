@@ -20,7 +20,7 @@ export async function libraryImportExtras({ h, database, doubles, mode, files, r
     nativeImage.createFromPath(files[0]).resize({ width: 355 + Number(reduced) }),
   );
   await click('其他导入方式', scope);
-  await click('从剪贴板导入', 'document.querySelector(".nps-popover:popover-open")');
+  await click('从剪贴板导入', 'document.querySelector(".nps-menu:popover-open")');
   await h.until(() => database.loadLibrary('all').length === before + 1, '菜单从剪贴板导入');
   await check(
     '小箭头菜单从剪贴板导入',
@@ -48,7 +48,7 @@ export async function libraryImportExtras({ h, database, doubles, mode, files, r
       '导入界面显示已处理的第一批图片',
     );
     await h.screenshot(`library-import-${reduced ? 'off' : 'full'}-${mode.theme}`);
-    await click('取消剩下的', scope);
+    await click('取消剩余', scope);
     // The cancellation handler is synchronous. A following IPC reply fences the
     // click's request before releasing the genuine in-flight file read.
     await e(

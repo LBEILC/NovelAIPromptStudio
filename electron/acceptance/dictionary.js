@@ -45,28 +45,28 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     '分页签数量包含全部词典条目',
     `[...document.querySelectorAll('.settings-dictionary-views [role=tab]')].length===5 && Number(document.querySelector('.settings-dictionary-views [role=tab] span').textContent.replaceAll(',',''))>=205`,
   );
-  await tab('AI 翻译的');
+  await tab('AI 翻译');
   await wait(`${count}===102`);
   await check(
     'AI 分页签仅显示 AI 来源',
     `[...${rows}].every(row=>row.querySelector('.settings-source').textContent==='AI')`,
   );
-  await tab('你改过的');
+  await tab('已修改');
   await wait(`${count}===103`);
   await check(
     '手动来源优先',
-    `[...${rows}].every(row=>row.querySelector('.settings-source').textContent==='你改过')`,
+    `[...${rows}].every(row=>row.querySelector('.settings-source').textContent==='已修改')`,
   );
-  for (const label of ['没有译文', '未分类']) {
+  for (const label of ['暂无译文', '未分类']) {
     await tab(label);
     await wait(`${count}===0`);
     await check(
       `${label}分页签按当前筛选显示空状态`,
-      'document.body.innerText.includes("没有匹配的 Tag 数据")',
+      'document.body.innerText.includes("没有找到匹配的 Tag")',
     );
   }
   await tab('全部');
-  await select('排序', '按 Tag');
+  await select('排序', '按 Tag 名称');
   await wait(`${count}===205`);
   await check(
     '按 Tag 排序',
@@ -125,18 +125,25 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       'Environment',
   );
   await h.screenshot('dictionary-inline');
-  await select('排序', '按最近修改');
+  await tab('已修改');
+  await wait(`!!document.querySelector('tr[data-tag="acceptance_005"]')`);
+  await check(
+    '全部分页签的译文修改出现在已修改分页签',
+    `document.querySelector('tr[data-tag="acceptance_005"]').textContent.includes('第五条译文')`,
+  );
+  await tab('全部');
+  await select('排序', '最近修改');
   await check(
     '最近修改排序将刚改分类的条目放在首位',
     `document.querySelector('tr[data-tag]').dataset.tag==='acceptance_005'`,
   );
-  await select('排序', '按 Tag');
+  await select('排序', '按 Tag 名称');
   await input(search, 'acceptance_');
   await wait(`${count}===205`);
   await click('选择当前分页签');
   await check(
     '全选包含窗口外全部筛选结果',
-    'document.querySelector(".settings-dictionary-selection").textContent.includes("已选 205 条")',
+    'document.querySelector(".settings-dictionary-selection").textContent.includes("已选 205 项")',
   );
   await check(
     '未配置 AI 不可重新翻译',
@@ -174,7 +181,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   await click('还原', 'document.querySelector(".nps-layer")');
   await check(
     '还原确认逐字说明删除修改和重新获取译文',
-    `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='还原"acceptance_004"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['会删掉你对这个 Tag 的修改。它再次出现时，软件会重新查内置词典；内置词典里没有的，要再翻译并分类一次才有译文。', '不会改动图片里的提示词。']))}})()`,
+    `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='还原"acceptance_004"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['将删除修改过的译文和分类。此 Tag 再次出现时会重新查询内置词典；内置词典中没有的，需要再次"翻译并分类"才会有译文。']))}})()`,
     undefined,
     'once',
   );
@@ -244,17 +251,17 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   await section('外观');
   await section('翻译词典');
   await input(search, 'view_fixture_');
-  await tab('没有译文');
+  await tab('暂无译文');
   await wait(`${count}===1`);
-  await click('点击填写');
+  await click('暂无译文');
   await input('[aria-label="译文"]', '填写后的译文');
   await key('Enter', {}, 'document.activeElement');
   await wait(
     `document.querySelector('tr[data-tag="view_fixture_empty"]')?.textContent.includes('填写后的译文')`,
   );
-  await check('没有译文分页签编辑后保留当前行', `${count}===1`);
+  await check('暂无译文分页签编辑后保留当前行', `${count}===1`);
   await tab('全部');
-  await tab('没有译文');
+  await tab('暂无译文');
   await wait(`${count}===0`);
   await check('离开分页签后已补译文的行不再匹配', `${count}===0`);
   await tab('未分类');
@@ -269,6 +276,37 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   await tab('未分类');
   await wait(`${count}===0`);
   await check('切换分页签后已分类行不再匹配', `${count}===0`);
+  await tab('全部');
+  database.upsertTagDictionary([
+    {
+      tag: 'view_fixture_ai',
+      translation: 'AI 合成译文',
+      category: 'Body',
+      translation_source: 'ai',
+      category_source: 'ai',
+    },
+  ]);
+  await section('外观');
+  await section('翻译词典');
+  await input(search, 'view_fixture_ai');
+  await tab('AI 翻译');
+  await wait(`${count}===1`);
+  await click('AI 合成译文');
+  await input('[aria-label="译文"]', '人工修订译文');
+  await key('Enter', {}, 'document.activeElement');
+  await wait(
+    `document.querySelector('tr[data-tag="view_fixture_ai"]')?.textContent.includes('人工修订译文')`,
+  );
+  await check('AI 翻译分页签修改来源后保留当前行', `${count}===1`);
+  await tab('已修改');
+  await wait(`${count}===1`);
+  await check(
+    '人工修订出现在已修改分页签',
+    `document.querySelector('tr[data-tag="view_fixture_ai"]').textContent.includes('人工修订译文')`,
+  );
+  await tab('AI 翻译');
+  await wait(`${count}===0`);
+  await check('离开 AI 翻译分页签后已修改行不再匹配', `${count}===0`);
   await tab('全部');
   const prior = preferences.credentials();
   const aiTags = Array.from(
@@ -298,7 +336,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       undefined,
       'once',
     );
-    await wait('document.querySelector(".nps-toast")?.textContent==="已翻译 50 条"');
+    await wait('document.querySelector(".nps-toast")?.textContent==="已重新翻译 50 项"');
     await check(
       '50 条直接翻译成功，未选中的五条保持原样',
       () =>
@@ -348,10 +386,10 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       undefined,
       'once',
     );
-    await wait('document.querySelector(".nps-toast")?.textContent === "已翻译 55 条"');
+    await wait('document.querySelector(".nps-toast")?.textContent === "已重新翻译 55 项"');
     await check(
       '全部成功显示定稿通知',
-      'document.querySelector(".nps-toast").textContent === "已翻译 55 条"',
+      'document.querySelector(".nps-toast").textContent === "已重新翻译 55 项"',
       undefined,
       'once',
     );
@@ -368,7 +406,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     await click('删除', 'document.querySelector(".nps-layer")');
     await check(
       '单条删除确认使用定稿标题、正文与按钮',
-      `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='删除"dictionary_fixture_000"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['这些 Tag 再次出现时，软件会重新查内置词典；内置词典里没有的，要再翻译并分类一次才有译文。', '不会改动图片里的提示词。']))} && [...dialog.querySelectorAll('.nps-actions button')].map(b=>b.textContent).join('|')==='取消|删除'})()`,
+      `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='删除"dictionary_fixture_000"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['软件不保存译文的历史记录。此 Tag 再次出现时会重新查询内置词典；内置词典中没有的，需要再次"翻译并分类"才会有译文。']))} && [...dialog.querySelectorAll('.nps-actions button')].map(b=>b.textContent).join('|')==='取消|删除'})()`,
       undefined,
       'once',
     );
@@ -452,7 +490,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     await click('删除', 'document.querySelector(".settings-dictionary-selection")');
     await check(
       '批量删除确认显示实际条数',
-      'document.querySelector("dialog[open] h3").textContent === "删除这 55 条？"',
+      'document.querySelector("dialog[open] h3").textContent === "删除这 55 项？"',
       undefined,
       'once',
     );

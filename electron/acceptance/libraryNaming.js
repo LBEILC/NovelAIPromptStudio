@@ -8,8 +8,12 @@ export async function libraryNamingChecks({ h, database, doubles }) {
   const actions = 'document.querySelector(".library-detail-actions")';
   const bar = 'document.querySelector(".library-selection-bar")';
   const confirmNaming = async () => {
-    await click('起名', dialog);
-    await wait('!document.querySelector("dialog[open]")', '起名完成后对话框关闭');
+    if (await e('!!document.querySelector("dialog[open]")')) await click('起名', dialog);
+    else await h.key('Enter', {}, 'document.querySelector(".library-inline-name input")');
+    await wait(
+      '!document.querySelector("dialog[open],.library-inline-name")',
+      '起名完成后编辑关闭',
+    );
     await wait(
       '!document.querySelector("[data-library-updating=true]")',
       '起名后的图库排列刷新完成',
@@ -121,7 +125,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await wait('!!document.querySelector("[role=tooltip]:popover-open")');
     await check(
       '未起名详情省略标题，文件行保留完整悬停名称',
-      `!document.querySelector('.library-caption b') && !document.querySelector('.library-file').hasAttribute('title') && document.querySelector('[role=tooltip]:popover-open')?.textContent === ${JSON.stringify(original.original_filename)}`,
+      `!document.querySelector('.library-name') && !document.querySelector('.library-file').hasAttribute('title') && document.querySelector('[role=tooltip]:popover-open')?.textContent === ${JSON.stringify(original.original_filename)}`,
       undefined,
       'both',
     );
@@ -151,22 +155,26 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await saveDefault(original.original_filename);
     await click('关闭 Esc', 'document.querySelector(".library-viewer")');
     await click('起名', actions);
+    await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     await check(
-      '空名称禁用确认',
-      'document.querySelector("dialog[open] .nps-button-ink").disabled',
+      '详情起名使用行内编辑且自动聚焦',
+      '!document.querySelector("dialog[open]")&&document.activeElement===document.querySelector(".library-inline-name input")',
       undefined,
       'once',
     );
     await input('input[aria-label="图片名称"]', '   ');
+    await h.key('Enter', {}, 'document.activeElement');
+    await wait('!document.querySelector(".library-inline-name")');
     await check(
-      '空白名称禁用确认',
-      'document.querySelector("dialog[open] .nps-button-ink").disabled',
+      '空白名称结束编辑且不修改图片',
+      () => !database.loadProject(id).has_custom_name,
       undefined,
       'once',
     );
+    await click('起名', actions);
     await input('input[aria-label="图片名称"]', 's-42');
     await confirmNaming();
-    await wait('document.querySelector(".library-caption b")?.textContent === "s-42"');
+    await wait('document.querySelector(".library-name")?.textContent === "s-42"');
     await check(
       '单张不加编号，形似文件名的显式名称仍显示标题',
       () => database.loadProject(id).name === 's-42' && database.loadProject(id).has_custom_name,
@@ -199,11 +207,11 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await e(
       `document.querySelector('.nps-toast').dispatchEvent(new PointerEvent('pointerout',{bubbles:true,relatedTarget:document.body}))`,
     );
-    await wait('!document.querySelector(".library-caption b")');
+    await wait('!document.querySelector(".library-name")');
     await click('起名', actions);
     await input('input[aria-label="图片名称"]', '命名验收.png');
     await confirmNaming();
-    await wait('document.querySelector(".library-caption b")?.textContent === "命名验收.png"');
+    await wait('document.querySelector(".library-name")?.textContent === "命名验收.png"');
     await e('document.querySelector(".library-detail-picture img").click()');
     await wait('!!document.querySelector(".library-viewer")');
     await saveDefault('命名验收.png');
@@ -220,7 +228,12 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await input('input[aria-label="搜索图片库"]', 'synthetic sample');
     await grouping('完全相同');
     await wait('document.querySelectorAll(".library-card").length === 3');
-    for (const i of [2, 0, 1]) await card(i, true);
+    await card(0);
+    await h.key(
+      'a',
+      process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true },
+      'document.querySelector(".library-card")',
+    );
     await check(
       '多选操作条起名紧跟加入收藏集',
       '(()=>{const b=[...document.querySelectorAll(".library-selection-bar button")];return b.findIndex(e=>e.textContent.trim()==="起名")===b.findIndex(e=>e.textContent.trim()==="加入收藏集")+1})()',
@@ -293,7 +306,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
       '整摞两张起名',
     );
     await wait(
-      'document.querySelector(".library-caption b")?.textContent.startsWith("整摞验收-")',
+      'document.querySelector(".library-name")?.textContent.startsWith("整摞验收-")',
       '整摞起名刷新到详情',
     );
     await wait(
@@ -307,27 +320,16 @@ export async function libraryNamingChecks({ h, database, doubles }) {
       'once',
     );
     await undo();
-    await wait('!document.querySelector(".library-caption b")');
+    await wait('!document.querySelector(".library-name")');
     await click('起名', actions);
-    await input('input[aria-label="图片名称"]', '单张验收');
-    await click('只改这一张', dialog);
+    await input('input[aria-label="图片名称"]', '取消行内编辑');
+    await h.key('Escape', {}, 'document.activeElement');
     await check(
-      '只改这一张预览不加编号',
-      'document.querySelector(".library-rename-result").textContent === "单张验收"',
+      '整组行内起名按 Esc 放弃修改',
+      () => fixtureIds.every((id) => !database.loadProject(id).has_custom_name),
       undefined,
       'once',
     );
-    await confirmNaming();
-    await h.until(() => database.loadProject(current).name === '单张验收', '只改当前张');
-    await check(
-      '只改这一张保持同摞另一张原名',
-      () =>
-        fixtureIds.filter((id) => database.loadProject(id).has_custom_name).length === 1 &&
-        members.length === 2,
-      undefined,
-      'once',
-    );
-    await undo();
     for (let i = 6; i < 100; i++) make(i);
     await refresh();
     await grouping('不合并');

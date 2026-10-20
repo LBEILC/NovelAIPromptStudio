@@ -44,14 +44,22 @@ export function useLibraryComputation({
       : null;
   const galleryComputation = useMemo(
     () => ({
-      activeCollection,
+      activeCollection: editingSmartCollectionId ? null : activeCollection,
       filters: galleryFilters,
       grouping: galleryGrouping,
       projects,
       sort,
       view: galleryView,
     }),
-    [activeCollection, galleryFilters, galleryGrouping, galleryView, projects, sort],
+    [
+      activeCollection,
+      editingSmartCollectionId,
+      galleryFilters,
+      galleryGrouping,
+      galleryView,
+      projects,
+      sort,
+    ],
   );
   const [gatedGalleryComputation, setGatedGalleryComputation] = useState(galleryComputation);
   useEffect(() => {

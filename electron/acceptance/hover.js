@@ -57,8 +57,8 @@ export async function hoverChecks(context) {
   await audit('图片库多选');
   await h.click('取消', 'document.querySelector(".library-selection-bar")');
   await h.click('新建收藏集');
-  await audit('收藏集对话框');
-  await h.click('取消', 'document.querySelector("dialog[open]")');
+  await audit('收藏集行内编辑');
+  await h.key('Escape', {}, 'document.activeElement');
 
   for (const section of ['外观', 'AI 服务', '翻译词典', '图片库', '关于与更新']) {
     await h.section(section);
@@ -71,11 +71,20 @@ export async function hoverChecks(context) {
       await h.nativeKey('Escape');
     }
     if (section === '关于与更新') {
-      await h.click('检查更新');
-      await h.click('更新说明');
-      await h.wait('!!document.querySelector("dialog[open] a[href]")');
+      if (
+        await h.evaluate(
+          "[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='检查更新'&&!b.disabled&&b.getAttribute('aria-disabled')!=='true')",
+        )
+      )
+        await h.click('检查更新');
+      if (
+        await h.evaluate(
+          "[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='更新说明')",
+        )
+      )
+        await h.click('更新说明');
+      await h.wait('!!document.querySelector(".settings-release-notes-content a[href]")');
       await audit('更新说明与外链');
-      await h.click('关闭', 'document.querySelector("dialog[open]")');
       await h.click('查看声明');
       await h.wait('!!document.querySelector("dialog[open] summary")');
       await audit('第三方声明');

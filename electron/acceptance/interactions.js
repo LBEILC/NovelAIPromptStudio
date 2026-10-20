@@ -139,10 +139,10 @@ export async function libraryInteractionChecks(env) {
   try {
     await library(h, 'interaction-fixture-');
     await wait('document.querySelectorAll(".library-card").length===6');
-    for (const record of [records[0], records[3]])
-      await e(
-        `${card(record.id)}.dispatchEvent(new MouseEvent('click',{bubbles:true,...${JSON.stringify(mod)}}))`,
-      );
+    await e(`${card(records[0].id)}.click()`);
+    await e(
+      `${card(records[3].id)}.dispatchEvent(new MouseEvent('click',{bubbles:true,...${JSON.stringify(mod)}}))`,
+    );
     await wait('document.querySelectorAll(".library-card.picked").length===2');
     // Read the colours once the pick transition has settled.
     const checkboxes = `(()=>{const cards=[...document.querySelectorAll('.library-card')];return cards.length===6&&cards.every(c=>{const p=c.querySelector('.library-pick'),s=getComputedStyle(p),picked=c.classList.contains('picked');return +s.zIndex>0&&s.opacity==='1'&&(picked?s.backgroundColor===getComputedStyle(c).getPropertyValue('--ink').trim().replace('#1c1c1c','rgb(28, 28, 28)').replace('#f1efea','rgb(241, 239, 234)'):p.dataset.theme==='light'&&s.backgroundColor.includes('0.12'))})})()`;
@@ -157,7 +157,7 @@ export async function libraryInteractionChecks(env) {
     await context(h, card(records[0].id));
     await expectMenu(h, '多选右键仅提供全部选中图片的操作', [
       '在工作台打开 2 张',
-      '起名…',
+      '起名',
       '加入收藏集',
       '移入回收站',
     ]);
@@ -184,7 +184,7 @@ export async function libraryInteractionChecks(env) {
       '复制提示词',
       '复制图片',
       '另存为…',
-      '起名…',
+      '起名',
       '加入收藏集',
       '在文件夹中显示',
       '移入回收站',
@@ -350,15 +350,15 @@ export async function libraryInteractionChecks(env) {
     );
     await key('Escape', {}, 'document.querySelector(".library-viewer")');
     await context(h, stack);
-    await click('起名…', menu);
-    await wait('!!document.querySelector("dialog[open]")');
+    await click('起名', menu);
+    await wait('!!document.querySelector(".library-inline-name input")');
     await check(
-      '一摞右键起名沿用按顺序编号的对话框',
-      `document.querySelector('dialog[open]').textContent.includes('给这 3 张图片起名')&&document.querySelectorAll('.library-rename-row').length===2`,
+      '一组右键起名进入详情行内编辑并提示按顺序编号',
+      `!document.querySelector('dialog[open]')&&document.querySelector('.library-inline-name').textContent.includes('3 张图片将按顺序编号')`,
       undefined,
       'once',
     );
-    await click('取消', 'document.querySelector("dialog[open]")');
+    await key('Escape', {}, 'document.activeElement');
     await context(h, stack);
     await h.screenshot('interaction-menu-stack');
     await click('移入回收站', menu);

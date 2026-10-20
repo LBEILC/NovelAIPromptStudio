@@ -42,7 +42,7 @@ export async function libraryGroupingChecks({ h, database }) {
     );
     await h.check(
       '相似分组选中、说明和滑块显示，低阈值合并两张',
-      `document.querySelector('[role=radio][aria-checked=true]')?.textContent.includes('相似') && !!document.querySelector('input[aria-label=相似度]') && document.querySelector('.library-help')?.textContent.includes('足够接近') && document.querySelectorAll('.library-card').length===1`,
+      `document.querySelector('[role=radio][aria-checked=true]')?.textContent.includes('相似') && !!document.querySelector('input[aria-label=相似度]') && document.querySelector('.library-merge-help')?.textContent.includes('提示词相似度达到下方数值') && document.querySelectorAll('.library-card').length===1`,
       undefined,
       'once',
     );
@@ -58,7 +58,7 @@ export async function libraryGroupingChecks({ h, database }) {
     );
     await h.click('完全相同', options);
     await h.wait(
-      '!document.querySelector("input[aria-label=相似度]") && !document.querySelector("[data-library-updating=true]")',
+      'document.querySelector("input[aria-label=相似度]")?.disabled && !document.querySelector("[data-library-updating=true]")',
     );
     await h.check(
       '切回完全相同恢复精确分组',

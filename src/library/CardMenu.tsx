@@ -71,7 +71,11 @@ export function CardMenu({
                 { id: 'edit-separator', separator: true as const },
               ]
             : []),
-          { id: 'rename', label: '起名…', onSelect: () => setRename(true) },
+          {
+            id: 'rename',
+            label: hasImageName(image) ? '重命名' : '起名',
+            onSelect: () => (multiple ? setRename(true) : p.onRequestRename?.(image.id)),
+          },
           {
             id: 'collection',
             label: '加入收藏集',
@@ -142,7 +146,7 @@ export function CardMenu({
         onConfirm={async () => {
           setBusy(true);
           try {
-            const collection = await p.onCollectionCreate('manual', name.trim());
+            const collection = await p.onCollectionCreate('manual', name.trim(), { select: false });
             if (collection && typeof collection === 'object') {
               await p.onCollectionProjectsChange(collection.id, ids, 'add');
               setCreate(false);

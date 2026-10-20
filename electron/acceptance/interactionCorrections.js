@@ -245,13 +245,18 @@ export async function interactionCorrectionChecks(env) {
     await press(h, byLabel('视图'));
     await toggle(h, '图片排序下拉框', 'document.querySelector("[aria-label=图片排序]")', listbox);
     await h.nativeKey('Escape');
-    await toggle(h, '导入拆分箭头', byLabel('其他导入方式'), pop('其他导入方式'));
+    await toggle(
+      h,
+      '导入拆分箭头',
+      byLabel('其他导入方式'),
+      'document.querySelector(".nps-menu:popover-open [role=menu][aria-label=其他导入方式]")',
+    );
     await press(h, byLabel('筛选'));
     await toggle(
       h,
-      '日期预设下拉框',
+      '日期范围月历',
       'document.querySelector("[aria-label=导入时间]")',
-      'document.querySelector(".nps-menu[role=listbox]:popover-open")',
+      pop('日期范围'),
     );
     await h.nativeKey('Escape');
     // All close routes pass through the same Layer presence handling.
@@ -274,8 +279,8 @@ export async function interactionCorrectionChecks(env) {
       h,
       '选中下拉选项',
       'document.querySelector("[aria-label=导入时间]")',
-      'document.querySelector(".nps-menu[role=listbox]:popover-open")',
-      () => click('不限时间', 'document.querySelector(".nps-menu[role=listbox]:popover-open")'),
+      pop('日期范围'),
+      () => click('不限时间', 'document.querySelector(".nps-date-range")'),
     );
     await h.nativeKey('Escape');
     for (const ratio of [1, 1.25, 1.5]) {

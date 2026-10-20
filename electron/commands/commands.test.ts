@@ -431,3 +431,38 @@ describe('legacy workbench migration', () => {
     expect(migrated.tabs[0].project?.metadata.prompt_raw).toContain('blue hair');
   });
 });
+
+describe('calendar import-day scope', () => {
+  it('counts all, manual, smart and trash scopes without applying unrelated UI filters', async () => {
+    const app = await setup();
+    for (const [id, day, model] of [
+      ['second', 2, 'other'],
+      ['third', 2, 'synthetic'],
+    ] as const)
+      app.database.insertProject({
+        ...fixture(),
+        id,
+        created_at: new Date(2026, 0, day, 12).toISOString(),
+        metadata: { ...fixture().metadata, model },
+      });
+    app.database.createCollection({
+      id: 'smart',
+      name: 'Synthetic scope',
+      kind: 'smart',
+      filters: { models: ['synthetic'] },
+    });
+    await app.call('collection.add', { collectionId: 'collection', ids: ['second'] });
+    const read = (collectionId?: string, view = 'all') =>
+      app.call('library.import-days', { month: '2026-01', view, collectionId }, 'ui');
+    expect((await read()).days).toEqual({ '2026-01-01': 1, '2026-01-02': 2 });
+    expect((await read('collection')).days).toEqual({ '2026-01-02': 1 });
+    expect((await read('smart')).days).toEqual({ '2026-01-01': 1, '2026-01-02': 1 });
+    await app.call('library.trash', { ids: ['third'] });
+    expect((await read()).days).toEqual({ '2026-01-01': 1, '2026-01-02': 1 });
+    expect((await read(undefined, 'trash')).days).toEqual({ '2026-01-02': 1 });
+    expect(
+      (await app.dispatch('library.import-days', { month: '2026-01', query: 'unmatched' }, 'ui'))
+        .ok,
+    ).toBe(false);
+  });
+});

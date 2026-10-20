@@ -312,6 +312,8 @@ export interface UpdateState extends UpdateCapabilities {
   packaged: boolean;
   hasUpdate?: boolean;
   publishedAt?: string;
+  checkedAt?: string;
+  structuredNotes?: import('../lib/releaseNotes.js').ReleaseNotes | null;
   notes?: string;
   transferred?: number;
   total?: number;

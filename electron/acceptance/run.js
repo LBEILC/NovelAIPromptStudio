@@ -1,3 +1,4 @@
+import { libraryRefinementChecks } from './libraryRefinement.js';
 import { transitionChecks } from './transitions.js';
 import { detailLayoutChecks } from './detailLayout.js';
 import { clientControlChecks } from './clientControls.js';
@@ -430,6 +431,7 @@ export async function runAcceptance(context) {
       else if (mode.category === '详情布局') await detailLayoutChecks(environment);
       else if (mode.category === '图片库·交互') await libraryInteractionChecks(environment);
       else if (mode.category === '图片库·细节') await libraryPolishChecks(environment);
+      else if (mode.category === '图片库·027') await libraryRefinementChecks(environment);
       else if (mode.category === '图片库·起名') await libraryNamingChecks(environment);
       else if (mode.category === '图片库·复制') await libraryCopyChecks(environment);
       else if (['图片库', '图片库·导入', '图片库·收尾', '图片库·滚动条'].includes(mode.category))
@@ -481,6 +483,7 @@ export async function runAcceptance(context) {
           () => shortcutChecks(environment),
           () => libraryNamingChecks(environment),
           () => libraryChecks(environment),
+          () => libraryRefinementChecks(environment),
           () => settingsChecks(environment, false),
         ],
         [

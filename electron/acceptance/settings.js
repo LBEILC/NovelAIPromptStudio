@@ -38,7 +38,7 @@ export async function settingsChecks(context, restart) {
       'once',
     );
     await section('AI 服务');
-    await wait('!!document.querySelector("input[type=password]")');
+    await wait('!!document.querySelector("input[type=password],.settings-saved-key")');
     await wait(
       `(()=>{const fields=[...document.querySelectorAll('textarea')];return document.querySelector('${aiInput(0)}')?.value===${JSON.stringify(expected.ai.baseUrl)} && fields[0]?.value===${JSON.stringify(expected.ai.translationPrompt)} && fields[1]?.value===${JSON.stringify(expected.ai.classificationPrompt)}})()`,
       '重启后的 AI 设置完成异步加载',
@@ -54,8 +54,8 @@ export async function settingsChecks(context, restart) {
     );
     if (encrypted)
       await check(
-        '重启 Key 已安全保存且输入为空',
-        'document.querySelector("input[type=password]").value === "" && document.querySelector("input[type=password]").placeholder === "已安全保存"',
+        '重启 Key 显示已保存状态且不可输入',
+        'document.querySelector(".settings-saved-key")?.textContent === "已保存 ••••••••" && !document.querySelector("input[type=password]")',
         undefined,
         'once',
       );
@@ -80,7 +80,7 @@ export async function settingsChecks(context, restart) {
         'once',
       );
       await click('保存');
-      await wait('document.body.innerText.includes("已保存 AI 服务设置")');
+      await wait('document.body.innerText.includes("已保存")');
       await check(
         '两种提示词分别恢复默认',
         () => {
@@ -270,11 +270,11 @@ export async function settingsChecks(context, restart) {
     await wait('!!document.querySelector("dialog[open]")');
     await check(
       '清空草稿图片时确认框说明工作区草稿影响',
-      'document.querySelector("dialog").textContent.includes("工作区草稿")',
+      'document.querySelector("dialog[open]").textContent.includes("还没保存的改动，会一起丢弃")',
       undefined,
       'once',
     );
-    await click('取消', 'document.querySelector("dialog")');
+    await click('取消', 'document.querySelector("dialog[open]")');
     await wait('!document.querySelector("dialog[open]")');
     await check(
       '清空回收站取消保留图片',
@@ -284,7 +284,7 @@ export async function settingsChecks(context, restart) {
     );
     await click('清空回收站');
     await wait('!!document.querySelector("dialog[open]")');
-    await e('document.querySelector("dialog .nps-actions button:last-child").click()');
+    await e('document.querySelector("dialog[open] .nps-actions button:last-child").click()');
     await wait('document.body.innerText.includes("0 张图片 · 永久删除后无法恢复")');
     await check(
       '清空回收站确认删除图片',
@@ -324,11 +324,13 @@ export async function settingsChecks(context, restart) {
     // fresh renderer after installing the gate so this is truly its first read.
     if (slowAIRead) await h.reload();
     await section('AI 服务');
-    await wait('!!document.querySelector("input[type=password]")');
+    await wait('!!document.querySelector("input[type=password],.settings-saved-key")');
     if (slowAIRead) await h.until(() => aiReads === 1, '首次设置读取已挂起');
     await input(aiInput(0), mode.baseUrl);
-    if (encrypted) await input(aiInput(1), 'acceptance-local-key');
-    else
+    if (encrypted) {
+      if (await e('!!document.querySelector(".settings-saved-key")')) await click('更换');
+      await input(aiInput(1), 'acceptance-local-key');
+    } else
       h.uncovered(
         '保存与恢复安全存储 Key',
         '本平台 safeStorage.isEncryptionAvailable() 返回 false',
@@ -363,8 +365,8 @@ export async function settingsChecks(context, restart) {
     await wait('document.body.innerText.includes("已读取 2 个模型")');
     await select('模型列表', 'acceptance-other');
     await h.checkSoon(
-      '选择模型列表会修改模型输入',
-      'document.querySelector("input[aria-label=模型]").value === "acceptance-other"',
+      '选择模型列表会更新当前模型',
+      'document.querySelector("button[aria-label=模型列表]").textContent.includes("acceptance-other") && !document.querySelector("input[aria-label=模型]")',
       undefined,
       undefined,
       undefined,
@@ -372,13 +374,21 @@ export async function settingsChecks(context, restart) {
     );
     await select('模型列表', 'acceptance-model');
     await click('测试连接');
-    await wait('document.body.innerText.includes("已连接")');
+    await wait('document.body.innerText.includes("连接正常")');
     await check(
       '本地兼容服务读取模型并成功连接',
-      'document.body.innerText.includes("已连接 · acceptance-model")',
+      'document.body.innerText.includes("连接正常")',
       undefined,
       'once',
     );
+    await h.screenshot('027-ai-connected');
+    await input(aiInput(0), mode.baseUrl + '/');
+    await check(
+      '027 修改服务地址清除测试结果并显示未保存状态',
+      'document.querySelector(".settings-page-foot").textContent.includes("有未保存的修改")&&!document.querySelector(".settings-page-foot").textContent.includes("连接正常")',
+    );
+    await h.screenshot('027-ai-dirty');
+    await input(aiInput(0), mode.baseUrl);
     await fetch(mode.baseUrl.replace('/v1', '/control/fail'));
     await click('测试连接');
     await wait('document.body.innerText.includes("验收服务暂时失败")');
@@ -390,12 +400,17 @@ export async function settingsChecks(context, restart) {
     );
     await fetch(mode.baseUrl.replace('/v1', '/control/success'));
     await click('测试连接');
-    await wait('document.body.innerText.includes("已连接")');
-    await check('失败后重试成功', 'document.body.innerText.includes("已连接")', undefined, 'once');
+    await wait('document.body.innerText.includes("连接正常")');
+    await check(
+      '失败后重试成功',
+      'document.body.innerText.includes("连接正常")',
+      undefined,
+      'once',
+    );
   }
   await input('textarea', '验收翻译规则（已保存）');
   await click('保存');
-  await wait('document.body.innerText.includes("已保存 AI 服务设置")');
+  await wait('document.body.innerText.includes("已保存")');
   if (encrypted)
     await check(
       '空 Key 再保存保留加密 Key',
@@ -432,7 +447,12 @@ export async function settingsChecks(context, restart) {
     undefined,
     'once',
   );
-  await click('检查更新');
+  if (
+    await e(
+      "[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='检查更新'&&!b.disabled&&b.getAttribute('aria-disabled')!=='true')",
+    )
+  )
+    await click('检查更新');
   await wait('document.body.innerText.includes("发现新版本 99.0.0")');
   await check(
     '更新结果来自验收替身',
@@ -440,10 +460,56 @@ export async function settingsChecks(context, restart) {
     undefined,
     'once',
   );
+  await check(
+    '发现新版本后检查更新不可用且说明原因',
+    `(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='检查更新');return !!b&&(b.disabled||b.getAttribute('aria-disabled')==='true')&&b.dataset.tip==='已发现新版本'})()`,
+  );
+  await wait(
+    'document.querySelector(".settings-release-notes-content")?.textContent.includes("验收发布说明")',
+  );
+  await check(
+    '缺少 JSON 时在更新横幅下展开 Markdown 说明',
+    '!!document.querySelector(".settings-release-notes-content")&&!document.querySelector("dialog[open]")',
+    undefined,
+    'once',
+  );
+  doubles.structuredNotes = {
+    schema: 'nps-release-notes/1',
+    version: '99.0.0',
+    date: '2026-10-20',
+    items: [
+      {
+        kind: 'new',
+        area: 'lib',
+        title: '日期范围',
+        detail: '支持选择导入日期。',
+        highlight: true,
+        icon: 'calendar',
+      },
+      {
+        kind: 'improved',
+        area: 'set',
+        title: '服务设置',
+        detail: '保存后显示结果。',
+        highlight: true,
+        icon: 'shield',
+      },
+      { kind: 'fixed', area: 'app', title: '窗口显示', detail: '正确显示窗口内容。' },
+    ],
+  };
+  await e("window.studio.invoke('updates.check',{})");
+  await wait('document.querySelectorAll(".rn-card").length===2');
+  await check(
+    '027 结构化更新横幅显示分类计数、两张重点卡片和分组',
+    'document.querySelector(".settings-update-banner").textContent.includes("发现新版本 99.0.0")&&document.querySelector(".settings-update-banner").textContent.includes("新增 1 项 · 改进 1 项 · 修复 1 项")&&document.querySelectorAll(".rn-card").length===2&&document.querySelector(".rn-g").textContent.includes("修复")',
+  );
+  await h.screenshot('027-settings-update');
+  await click('收起说明');
+  await check('027 更新说明可以收起', '!document.querySelector(".rn")');
   await click('更新说明');
-  await wait('document.querySelector("dialog")?.textContent.includes("验收发布说明")');
-  await check('发布说明对话框打开', '!!document.querySelector("dialog[open]")', undefined, 'once');
-  await click('关闭', 'document.querySelector("dialog")');
+  delete doubles.structuredNotes;
+  await e("window.studio.invoke('updates.check',{})");
+  await wait('!!document.querySelector(".settings-release-notes-content")');
   for (const [label, expected] of [
     ['报告问题', 'bug'],
     ['提出建议', 'enhancement'],

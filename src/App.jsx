@@ -227,12 +227,6 @@ function ImportExperience({ dragState, progress, result, target, onCancel, onDis
   );
 }
 
-function formatBytes(bytes) {
-  if (bytes == null) return '';
-  if (bytes < 1024 * 1024) return `${Math.max(0.1, bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
 export default function App() {
   const { appearance } = useAppearance();
   const [menuDestination, setMenuDestination] = useState(null);
@@ -276,6 +270,23 @@ export default function App() {
     selectedGroupIds,
     setSelectedGroupIds,
   } = useLibraryState(window.studioScreenshot?.view);
+  const [smartDraft, setSmartDraft] = useState(DEFAULT_GALLERY_FILTERS);
+  const [renameCollectionId, setRenameCollectionId] = useState('');
+  const isSmartView =
+    galleryView === 'all' &&
+    galleryCollections.some((c) => c.id === activeCollectionId && c.kind === 'smart');
+  const effectiveGalleryFilters = useMemo(
+    () =>
+      editingSmartCollectionId
+        ? smartDraft
+        : isSmartView
+          ? { ...DEFAULT_GALLERY_FILTERS, query: galleryFilters.query }
+          : galleryFilters,
+    [editingSmartCollectionId, smartDraft, isSmartView, galleryFilters],
+  );
+  useEffect(() => {
+    if (page !== 'gallery') setEditingSmartCollectionId('');
+  }, [page]);
   const {
     workbenchSession,
     setWorkbenchSession,
@@ -720,13 +731,47 @@ export default function App() {
     async (result) => {
       setImportResult(result);
       if (!result?.ok && result?.error) showToast(result.error, 'error');
-      if (result?.summary)
-        showToast(
-          `已导入 ${result.summary.imported} 张 · 跳过重复 ${result.summary.duplicates} 张 · 没能导入 ${result.summary.failed} 张`,
-          result.summary.failed > 0 && result.summary.imported === 0 ? 'error' : 'success',
-        );
+      setImportProgress(null);
       await reloadLibrary('all');
-      if (result?.imported?.length) setPreviewProjectId(result.imported.at(-1).id);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const animations =
+        document.querySelector('.library-import-progress')?.getAnimations({ subtree: true }) || [];
+      await Promise.all(
+        animations
+          .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+          .map((animation) => animation.finished.catch(() => {})),
+      );
+      if (result?.summary) {
+        const count = result.summary.imported;
+        const cancelled = result.summary.cancelled;
+        notify({
+          tone: result.summary.failed > 0 && !count ? 'error' : 'success',
+          text: cancelled
+            ? count
+              ? `已导入 ${count} 张，其余已取消`
+              : '已取消导入'
+            : `已导入 ${count} 张`,
+          ...(count
+            ? {
+                action: {
+                  label: '查看',
+                  onClick: () => {
+                    setPage('gallery');
+                    setGalleryView('all');
+                    setActiveCollectionId('');
+                    setEditingSmartCollectionId('');
+                    setGalleryFilters({ ...DEFAULT_GALLERY_FILTERS });
+                    setSelectedGroupIds([]);
+                    setPreviewGroupId('');
+                    setPreviewProjectId(result.imported[0].id);
+                    const grid = document.querySelector('.library-scroll');
+                    if (grid) grid.scrollTop = 0;
+                  },
+                },
+              }
+            : {}),
+        });
+      }
       if (result?.metadataMissing)
         showToast(
           '剪贴板里的图片没有提示词信息。截图或转存过的图片通常会丢掉这些信息。',
@@ -905,7 +950,7 @@ export default function App() {
     galleryView,
     galleryCollections,
     activeCollectionId,
-    galleryFilters,
+    galleryFilters: effectiveGalleryFilters,
     galleryGrouping,
     projects,
     sort,
@@ -1099,7 +1144,7 @@ export default function App() {
     await reloadAfterGalleryAction();
     notify({
       tone: 'success',
-      text: ids.length === 1 ? '已移入回收站' : `已把 ${ids.length} 张图片移入回收站`,
+      text: ids.length === 1 ? '已移入回收站' : `已将 ${ids.length} 张移入回收站`,
       action: { label: '撤销', onClick: () => restoreProjects(result.results?.success || ids) },
     });
   };
@@ -1109,11 +1154,19 @@ export default function App() {
     if (!ids.length) return;
     const result = await invokeUI('library.restore', { ids: ids });
     const groupCount = scope === 'group' ? 1 : explicitIds ? 0 : selectedGroupIds.length;
-    if (summarizeBatch(result, '恢复', groupCount)) {
-      setPreviewGroupId('');
-      setPreviewProjectId('');
-      await reloadAfterGalleryAction();
+    if (!result?.ok || result.summary?.failed) {
+      summarizeBatch(result, '恢复', groupCount);
+      if (!result?.ok) return;
     }
+    setPreviewGroupId('');
+    setPreviewProjectId('');
+    await reloadAfterGalleryAction();
+    const restored = result.results?.success || ids;
+    notify({
+      tone: 'success',
+      text: restored.length === 1 ? '已恢复' : `已恢复 ${restored.length} 张`,
+      action: { label: '撤销', onClick: () => moveToTrash(restored) },
+    });
   };
 
   const closeDeletedLibraryTabs = (ids) => {
@@ -1135,19 +1188,23 @@ export default function App() {
     }));
   };
 
-  const permanentDelete = async (explicitIds = null, knownBytes = null, scope = 'selection') => {
+  const permanentDelete = async (explicitIds = null, _knownBytes = null, scope = 'selection') => {
     const ids = explicitIds || selectedProjectIds;
     if (!ids.length) return;
     const impact = tabImpact(ids);
+    const clearing = scope === 'empty';
     if (
       !(await requestConfirmation({
-        title: `永久删除这 ${ids.length} 张图片？`,
-        message: `会删除图片库里保存的这 ${ids.length} 份副本和它们的记录，删除后无法恢复。你导入时用的原文件不受影响。`,
-        detail:
-          page === 'gallery'
-            ? deletionDetail(impact, formatBytes(knownBytes))
-            : `${impact.open ? `${impact.open} 张仍在工作台打开。` : ''}${impact.dirty ? `其中 ${impact.dirty} 个标签页包含工作区草稿，继续会丢弃。` : ''} 这个操作不可撤销。`,
-        okText: '永久删除',
+        title: clearing
+          ? '清空回收站？'
+          : ids.length === 1
+            ? '永久删除这张图片？'
+            : `永久删除这 ${ids.length} 张图片？`,
+        message: clearing
+          ? `将永久删除回收站中的 ${ids.length} 张图片，此操作无法撤销。原文件不受影响。`
+          : `将删除图片库中保存的${ids.length === 1 ? '副本' : ` ${ids.length} 份副本`}及其记录，此操作无法撤销。原文件不受影响。`,
+        detail: deletionDetail(impact, ''),
+        okText: clearing ? '清空回收站' : '永久删除',
         danger: true,
         primaryDanger: true,
       }))
@@ -1155,7 +1212,13 @@ export default function App() {
       return;
     const result = await invokeUI('trash.delete-permanently', { ids: ids });
     const groupCount = scope === 'group' ? 1 : explicitIds ? 0 : selectedGroupIds.length;
-    if (!summarizeBatch(result, '永久删除', groupCount)) return;
+    if (!result?.ok || result.summary?.failed) {
+      summarizeBatch(result, '永久删除', groupCount);
+      if (!result?.ok) return;
+    } else
+      showToast(
+        clearing ? '已清空回收站' : ids.length === 1 ? '已永久删除' : `已永久删除 ${ids.length} 张`,
+      );
     closeDeletedLibraryTabs(result.results?.success || []);
     setPreviewGroupId('');
     setPreviewProjectId('');
@@ -1171,7 +1234,8 @@ export default function App() {
     if (!summary.projects?.length) return;
     await permanentDelete(
       summary.projects.map((project) => project.id),
-      summary.totalBytes,
+      null,
+      'empty',
     );
   };
 
@@ -1240,6 +1304,13 @@ export default function App() {
         }
       }
       if (current.includes(group.id)) return current.filter((id) => id !== group.id);
+      if (
+        !current.length &&
+        (event.ctrlKey || event.metaKey) &&
+        previewGroup &&
+        previewGroup.id !== group.id
+      )
+        return [previewGroup.id, group.id];
       return [...current, group.id];
     });
     lastSelectedGroupRef.current = group.id;
@@ -1263,7 +1334,9 @@ export default function App() {
   };
 
   const updateGalleryFilters = (patch) => {
-    setGalleryFilters((current) => normalizeGalleryFilters({ ...current, ...patch }));
+    (editingSmartCollectionId ? setSmartDraft : setGalleryFilters)((current) =>
+      normalizeGalleryFilters({ ...current, ...patch }),
+    );
     setSelectedGroupIds([]);
     lastSelectedGroupRef.current = '';
   };
@@ -1273,26 +1346,23 @@ export default function App() {
     setEditingSmartCollectionId('');
     setActiveCollectionId(id);
     setGalleryView('all');
-    setGalleryFilters(DEFAULT_GALLERY_FILTERS);
     setSelectedGroupIds([]);
     setPreviewGroupId('');
     setPreviewProjectId('');
     lastSelectedGroupRef.current = '';
   };
 
-  const createGalleryCollection = async (kind, name) => {
-    if (kind === 'smart' && (activeCollectionId || !hasActiveGalleryFilters(galleryFilters))) {
-      showToast(
-        activeCollectionId ? '请先返回全部图片，再设置要保存的筛选条件' : '请先设置搜索或筛选条件',
-        'warning',
-      );
+  const createGalleryCollection = async (kind, name, options = {}) => {
+    if (kind === 'smart' && !hasActiveGalleryFilters({ ...galleryFilters, query: '' })) {
+      showToast('请先设置筛选条件', 'warning');
       return false;
     }
     const result = await invokeUI('collection.create', {
       collection: {
         name,
         kind,
-        filters: kind === 'smart' ? normalizeGalleryFilters(galleryFilters) : undefined,
+        filters:
+          kind === 'smart' ? normalizeGalleryFilters({ ...galleryFilters, query: '' }) : undefined,
       },
     });
     if (!result?.ok) {
@@ -1300,7 +1370,11 @@ export default function App() {
       return false;
     }
     await reloadCollections();
-    selectGalleryCollection(result.collection.id);
+    if (options.select !== false) selectGalleryCollection(result.collection.id);
+    if (kind === 'smart') {
+      setGalleryFilters({ ...DEFAULT_GALLERY_FILTERS, query: galleryFilters.query });
+      setRenameCollectionId(result.collection.id);
+    }
     showToast(kind === 'smart' ? '已保存智能收藏集' : '已新建收藏集');
     return result.collection;
   };
@@ -1318,11 +1392,11 @@ export default function App() {
 
   const beginSmartCollectionRulesEdit = (collection) => {
     if (collection?.kind !== 'smart') return;
-    writeActiveGalleryCollection(globalThis.localStorage, '');
-    setActiveCollectionId('');
+    writeActiveGalleryCollection(globalThis.localStorage, collection.id);
+    setActiveCollectionId(collection.id);
     setEditingSmartCollectionId(collection.id);
     setGalleryView('all');
-    setGalleryFilters(normalizeGalleryFilters(collection.filters));
+    setSmartDraft(normalizeGalleryFilters(collection.filters));
     setSelectedGroupIds([]);
     setPreviewGroupId('');
     setPreviewProjectId('');
@@ -1338,14 +1412,14 @@ export default function App() {
       setEditingSmartCollectionId('');
       return false;
     }
-    if (!hasActiveGalleryFilters(galleryFilters)) {
+    if (!hasActiveGalleryFilters(smartDraft)) {
       showToast('智能收藏集至少需要一个搜索或筛选条件', 'warning');
       return false;
     }
     const result = await invokeUI('collection.update', {
       id: collection.id,
       patch: {
-        filters: normalizeGalleryFilters(galleryFilters),
+        filters: normalizeGalleryFilters(smartDraft),
       },
     });
     if (!result?.ok) {
@@ -1354,7 +1428,7 @@ export default function App() {
     }
     await reloadCollections();
     selectGalleryCollection(collection.id);
-    showToast('已更新智能收藏集规则');
+    showToast('已保存规则');
     return true;
   };
 
@@ -1365,12 +1439,12 @@ export default function App() {
   const deleteGalleryCollection = async (collection) => {
     if (
       !(await requestConfirmation({
-        title: `删除“${collection.name}”？`,
+        title: `删除${collection.kind === 'smart' ? '智能收藏集' : '收藏集'}"${collection.name}"？`,
         message:
           collection.kind === 'smart'
-            ? '只删除筛选规则，图片不受影响。'
-            : '里面的图片还在图片库里。',
-        okText: '删除收藏集',
+            ? '智能收藏集只保存筛选条件，删除后图片不受影响。'
+            : `收藏集中的 ${collection.active_member_count ?? collection.member_ids?.length ?? 0} 张图片不会被删除，仍可在"全部图片"中找到。`,
+        okText: '删除',
         danger: true,
       }))
     )
@@ -1383,7 +1457,7 @@ export default function App() {
     if (activeCollectionId === collection.id || editingSmartCollectionId === collection.id)
       selectGalleryCollection('');
     await reloadCollections();
-    showToast('已删除收藏集');
+    showToast(`已删除${collection.kind === 'smart' ? '智能收藏集' : '收藏集'}"${collection.name}"`);
     return true;
   };
 
@@ -1398,12 +1472,12 @@ export default function App() {
       showToast(result?.error || '没能更新收藏集里的图片', 'error');
       return false;
     }
-    await reloadCollections();
+    const updated = await reloadCollections();
     if (action === 'remove' && activeCollectionId === collectionId) setSelectedGroupIds([]);
     const success = result.summary?.success || 0;
     const skipped = result.summary?.skipped || 0;
     showToast(
-      `${action === 'remove' ? '已移出' : '已加入'} ${success} 张图片${skipped ? `，跳过 ${skipped} 张` : ''}`,
+      `已${action === 'remove' ? '移出' : '加入'}收藏集"${(updated || galleryCollections).find((collection) => collection.id === collectionId)?.name || ''}"`,
     );
     return true;
   };
@@ -1598,7 +1672,8 @@ export default function App() {
               filterCacheSource={deferredGalleryComputation.projects}
               filterProjects={collectionScopedProjects}
               filterScopeKey={`${deferredGalleryComputation.view}:${deferredGalleryComputation.activeCollection?.id || 'all'}:${deferredGalleryComputation.activeCollection?.updated_at || ''}`}
-              filters={galleryFilters}
+              filters={effectiveGalleryFilters}
+              renameCollectionId={renameCollectionId}
               grouping={galleryGrouping}
               groups={visibleGroups}
               importing={isImportActive(importProgress)}
@@ -1665,7 +1740,6 @@ export default function App() {
                 setActiveCollectionId('');
                 setEditingSmartCollectionId('');
                 setGalleryView(view);
-                setGalleryFilters(DEFAULT_GALLERY_FILTERS);
                 setSelectedGroupIds([]);
                 setPreviewGroupId('');
                 setPreviewProjectId('');

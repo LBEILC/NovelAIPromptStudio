@@ -51,6 +51,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: node scripts/prepare-release-notes.mjs
 
   package:
     needs: prepare-fonts
@@ -175,6 +176,10 @@ jobs:
 
       - name: Verify combined update metadata
         run: node scripts/verify-update-artifacts.mjs release-combined
+
+      - name: Validate and include structured release notes
+        run: node scripts/prepare-release-notes.mjs "${{ github.ref_name }}" release-combined
+        if: github.ref_type == 'tag'
 
       - name: Create checksums
         working-directory: release-combined

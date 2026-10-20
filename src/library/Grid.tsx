@@ -9,6 +9,8 @@ import { mediaUrl } from '../lib/imageStage.js';
 import type { LibraryProps } from './types';
 import { useScrollArea } from '../ui';
 import { CardMenu } from './CardMenu';
+import { libraryCountText } from './presentation';
+import { hasActiveGalleryFilters } from '../lib/galleryFilters.js';
 
 export function LibraryGrid({
   p,
@@ -407,13 +409,14 @@ export function LibraryGrid({
                     />
                     {group.members.length > 1 && (
                       <>
-                        <span
-                          className="library-stack nps-fade-state"
-                          data-visible={hovered === group.id || undefined}
-                        >
-                          {scrub?.group === group.id
-                            ? `${scrub.index + 1} / ${group.members.length}`
-                            : `1 / ${group.members.length}`}
+                        <span className="library-stack" data-tip={`${group.members.length} 张`}>
+                          {scrub?.group === group.id ? (
+                            `${scrub.index + 1} / ${group.members.length}`
+                          ) : (
+                            <>
+                              <i className="ri-stack-line" /> {group.members.length}
+                            </>
+                          )}
                         </span>
                         <Presence
                           show={hovered === group.id}
@@ -459,7 +462,11 @@ export function LibraryGrid({
         ))}
       </div>
       <div className="library-count">
-        {p.groups.length} 组 · {p.groups.reduce((sum, group) => sum + group.members.length, 0)} 张
+        {libraryCountText(
+          p.groups.length,
+          p.groups.reduce((sum, group) => sum + group.members.length, 0),
+          hasActiveGalleryFilters(p.filters) ? p.filterProjects.length : undefined,
+        )}
       </div>
       {marquee && (
         <div

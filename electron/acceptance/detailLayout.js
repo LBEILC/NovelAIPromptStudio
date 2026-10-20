@@ -88,7 +88,13 @@ export async function detailLayoutChecks(env) {
     await h.evaluate(
       `document.querySelector('.library-tags:not(.library-tags-measure) button')?.click()`,
     );
+    // Search no longer creates a condition chip; use an actual filter for this check.
+    await h.click('筛选');
+    await h.evaluate(`document.querySelector('.library-filter-options [role=checkbox]').click()`);
+    await h.key('Escape');
+    await h.wait('!!document.querySelector(".library-chip")');
     await focusRingChecks(h, '图片库筛选条件与更多 Tag');
+    await h.click('清除', 'document.querySelector(".library-chips")');
   } finally {
     await h.evaluate('cancelAnimationFrame(window.detailLayoutFrame)');
     await cleanup(env, records);
