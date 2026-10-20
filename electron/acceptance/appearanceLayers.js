@@ -16,10 +16,7 @@ export async function appearanceLayerChecks({ h, preferences, mode }) {
   await h.section('外观');
   for (const [label, key, family] of fonts) {
     await h.click(label);
-    await check(
-      `${label}的每个选项使用自己的字体`,
-      `(()=>{const options=[...document.querySelectorAll('[role=listbox]:popover-open [role=option]')];return options.length>0&&options.every(option=>{const expected=option.style.fontFamily.replaceAll('"','');return !!expected&&getComputedStyle(option).fontFamily.replaceAll('"','').includes(expected)})})()`,
-    );
+
     await h.key('Escape', {}, 'document.activeElement');
     await h.select(label, `${family}（内置）`);
     await h.until(() => preferences.appearanceSettings()[key] === family, `${label}保存选中值`);

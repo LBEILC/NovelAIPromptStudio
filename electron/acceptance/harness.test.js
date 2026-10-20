@@ -105,7 +105,7 @@ it('keeps slow waits bounded and reports the elapsed budget', async () => {
   await rejected;
 });
 
-it('scales feedback only in slow mode and never repeats a visual check action', async () => {
+it('waits for final state without timing records and never repeats an action', async () => {
   const calls = [];
   const checks = [];
   let theme = 'light';
@@ -132,16 +132,8 @@ it('scales feedback only in slow mode and never repeats a visual check action', 
   h.dualThemes(true);
   await h.checkSoon('布局', 'true', 200, 'performAction()', undefined, 'both');
   expect(calls.filter((code) => code.includes('performAction()'))).toHaveLength(1);
-  expect(calls.find((code) => code.includes('performAction()'))).toContain(',48000,');
-  expect(checks.find((check) => check.timing).timing).toMatchObject({
-    deadlineMs: 800,
-    elapsedMs: 850,
-    exceeded: true,
-  });
-  expect(checks.filter((check) => !check.timing).map((check) => check.theme)).toEqual([
-    'light',
-    'dark',
-  ]);
+  expect(checks.map((check) => check.theme)).toEqual(['light', 'dark']);
+  expect(checks.every((check) => check.status === 'passed' && !('timing' in check))).toBe(true);
   expect(theme).toBe('light');
   checks.length = 0;
   await h.check('数据', () => true, undefined, 'once');

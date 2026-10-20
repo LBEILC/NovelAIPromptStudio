@@ -74,6 +74,7 @@ export function useMarqueeSelection({
   onSelectionChange,
   selectedKeys = /** @type {string[]} */ ([]),
   startOnItems = true,
+  additiveModifiers = false,
 }) {
   const [rect, setRect] = useState(null);
   const dragRef = useRef(null);
@@ -192,7 +193,10 @@ export function useMarqueeSelection({
         }),
         initialKeys: [...selectedKeysRef.current],
         lastSelection: [...selectedKeysRef.current],
-        mode: marqueeMode(event),
+        mode:
+          additiveModifiers && (event.ctrlKey || event.metaKey || event.shiftKey)
+            ? 'add'
+            : marqueeMode(event),
         point: { x: event.clientX, y: event.clientY },
         pointerId: event.pointerId,
         start: { x: event.clientX, y: event.clientY },

@@ -49,10 +49,12 @@ import remixLicense from '../../LICENSES/RemixIcon/LICENSE?raw';
 import dictionaryLicense from '../../third_party/DanbooruSearchOnline/LICENSE?raw';
 import type { AppearanceSettings } from '../shared/types';
 import './settings.css';
+import { NovelAIAccount, GenerationPreferences } from './Generation';
 const ReleaseNotes = lazy(() => import('./ReleaseNotes.jsx'));
 const sections = [
   ['appearance', '外观', 'contrast-2-line'],
   ['storage', '图片库', 'hard-drive-2-line'],
+  ['novelai', 'NovelAI 账号', 'key-2-line'],
   ['ai', 'AI 服务', 'translate-2'],
   ['tags', '翻译词典', 'book-2-line'],
   ['agent', 'Agent', 'terminal-box-line'],
@@ -87,6 +89,7 @@ function Row({
   );
 }
 function Agent() {
+  const notify = useNotifications();
   const [setup, setSetup] = useState<{
     installed: boolean;
     path: string;
@@ -133,7 +136,7 @@ function Agent() {
       const result = await invokeUI('agent.skill', {});
       if (!result.ok) throw Error(result.error);
       await writeClipboardText(result.text);
-      setMessage('已复制技能内容');
+      notify({ text: '已复制技能内容', tone: 'success' });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     }
@@ -194,13 +197,14 @@ function Agent() {
       <Row
         title="Agent 能做什么"
         help={[
-          '读提示词和参数，改工作台，搜索和整理图片库，修改翻译词典。',
+          '读提示词和参数，改工作台，搜索和整理图片库，修改翻译词典，排队生成。',
           '不能永久删除图片，不能改设置，读不到任何密钥。',
         ]}
       >
         {null}
       </Row>
       <p role="status">{message}</p>
+      <GenerationPreferences agent />
     </SettingsFrame>
   );
 }
@@ -755,6 +759,8 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           [
             '工作台',
             [
+              ['切换按块 / 按文本编辑', [['Mod', 'E']]],
+              ['在这一版的图之间切换', [['←', '→']]],
               ['移动当前 Tag 或块', [['Alt', '方向键']]],
               ['取消选择', [['Esc']]],
             ],
@@ -808,6 +814,8 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       <Row
         title="这些时候会联网，都不会发送你的图片"
         help={[
+          '生成图片：用你的持久令牌把提示词和参数发给 NovelAI；带 Vibe 的图会带上图里的 Vibe 编码',
+          '查询余额：打开软件、每次生成结束和点“刷新”时，向 NovelAI 查询 Anlas 余额和用量',
           '检查和下载更新：访问 GitHub。自动检查可以在上面关掉；更新说明里带图片时，会从图片所在的网站加载',
           '翻译与分类：内置词典里没有的 Tag，会把 Tag 的名字发给 Danbooru，查它属于哪一类；配置了 AI 服务时，还没有译文的 Tag 会再发给你配置的服务',
           '段落的"译成中文""按中文改写英文"：把这一段文字发给你配置的 AI 服务',
@@ -824,7 +832,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         {null}
       </Row>
       <Row
-        title="API Key 加密后保存在这台电脑上"
+        title="API Key 和 NovelAI 持久令牌加密后保存在这台电脑上"
         help="用系统自带的加密能力加密，软件不保存明文；诊断信息和报告问题都不会带上它们"
       >
         {null}
@@ -933,6 +941,9 @@ export default function SettingsPage(props: {
         </Activity>
         <Activity mode={section === 'storage' ? 'visible' : 'hidden'}>
           <Storage {...props} />
+        </Activity>
+        <Activity mode={section === 'novelai' ? 'visible' : 'hidden'}>
+          <NovelAIAccount />
         </Activity>
         <Activity mode={section === 'ai' ? 'visible' : 'hidden'}>
           <AI />

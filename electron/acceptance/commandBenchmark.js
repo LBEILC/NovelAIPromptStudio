@@ -67,14 +67,14 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
     await h.wait('document.querySelectorAll(".wb-tab").length===3');
     await settleLayout(h, '.wb-page');
     await h.click('更多');
-    await h.click('编辑原始文本');
-    await h.wait('!!document.querySelector("[aria-label=原始文本]")');
+    await h.click('切换为文本编辑');
+    await h.wait('!!document.querySelector(".wb-text-section textarea")');
     samples.input =
-      await e(`(async()=>{const n=document.querySelector('[aria-label=原始文本]');n.focus();const times=[];for(const char of ' synthetic benchmark text repeated for input measurement'){
+      await e(`(async()=>{const n=document.querySelector('.wb-text-section textarea');n.focus();const times=[];for(const char of ' synthetic benchmark text repeated for input measurement'){
       const start=performance.now();Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(n,n.value+char);n.dispatchEvent(new Event('input',{bubbles:true}));
       await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));times.push(performance.now()-start);
     }return times.slice(5)})()`);
-    await h.click('取消');
+    await h.click('按块编辑（Ctrl E 切换）');
     samples.tabs = await e(
       `(async()=>{const times=[];for(let i=0;i<30;i++){const n=document.querySelectorAll('.wb-tab')[i%3],start=performance.now();n.click();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));if(n.getAttribute('aria-selected')!=='true')throw Error('Tab did not select');times.push(performance.now()-start);}return times.slice(3)})()`,
     );

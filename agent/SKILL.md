@@ -1,6 +1,6 @@
 ---
 name: nai-studio
-description: 通过本机 nai-studio 命令读取 NovelAI 图片和提示词，编辑 NovelAI Prompt Studio 工作台草稿，搜索和整理图片库，修改翻译词典。用于用户已经授权的本地图片与提示词工作，不用于生成图片、修改设置或访问密钥。
+description: 通过本机 nai-studio 命令读取 NovelAI 图片和提示词，编辑 NovelAI Prompt Studio 工作台草稿，搜索和整理图片库，修改翻译词典并排队生成图片。用于用户已经授权的本地图片与提示词工作，不用于修改设置或访问密钥。
 ---
 
 # NovelAI Prompt Studio
@@ -68,6 +68,24 @@ nai-studio dictionary.set-many --json '{"entries":[{"tag":"blue hair","translati
 
 ## 能力边界
 
-可以读取图片里的提示词和参数、工作台草稿、图片库与词典；可以编辑草稿、导入图片、存入图片库、起名、修改普通收藏集和词典。删除只会移入回收站。
+可以读取图片里的提示词和参数、工作台草稿、图片库与词典；可以编辑草稿、导入图片、存入图片库、起名、修改普通收藏集和词典。删除只会移入回收站。可以估算费用、排队生成、查询生成结果、切换版本、改分支名及从图片打开新作品。
 
-不能永久删除、清空回收站、修改设置、读取或修改密钥，也不能生成图片。不要通过其他文件、旧接口或数据库绕过这些边界。安装命令行工具由用户在软件的“设置 → Agent”中完成；技能不自动更改系统或账号设置。
+不能永久删除、清空回收站、修改设置、读取或修改密钥、确认或取消待确认任务、停止生成。不要通过其他文件、旧接口或数据库绕过这些边界。安装命令行工具由用户在软件的“设置 → Agent”中完成；技能不自动更改系统或账号设置。
+
+## 生成与版本
+
+生成始终从已有图片的草稿出发。先估算费用，再按用户授权调用 `generate.start`；默认返回待确认任务，等用户在软件里确认，不能自行确认。用户选择直接生成后才会直接排队；每日花费上限可能使任务转回待确认。每张请求串行发送，失败不会自动重试。Agent 生成另起一版，不替换用户正在看的图片。
+
+```sh
+nai-studio generate.estimate --json '{"tabId":"TAB","count":1}'
+nai-studio generate.start --json '{"tabId":"TAB","count":1,"expectedRevision":0}'
+nai-studio generate.status --json '{"id":"JOB"}'
+nai-studio version.list --tab-id TAB
+nai-studio version.open --json '{"tabId":"TAB","versionId":"VERSION","expectedRevision":0}'
+nai-studio prompt.set-size --json '{"tabId":"TAB","width":832,"height":1216,"expectedRevision":0}'
+nai-studio branch.rename --json '{"branchId":"BRANCH","name":"雨景"}'
+nai-studio work.open-from-image --json '{"tabId":"TAB","versionId":"VERSION","imageId":"IMAGE"}'
+nai-studio work.open --json '{"workId":"WORK"}'
+```
+
+张数是正整数，不设产品上限；请求仍逐张发送。不要用循环自行重试失败任务。`generate.status` 返回任务状态、已生成的图片库 ID 与失败原因；软件退出会取消未发出的任务。尺寸取最近的 64 倍数。账号、生成设置、确认、放弃与停止仅供界面使用，命令行返回 `forbidden`。

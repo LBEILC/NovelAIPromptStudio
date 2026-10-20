@@ -16,10 +16,12 @@ export function Titlebar({
   page,
   onNavigate,
   children,
+  status,
 }: {
   page: string;
   onNavigate: (page: string) => void;
   children?: ReactNode;
+  status?: ReactNode;
 }) {
   return (
     <header className="studio-titlebar">
@@ -47,6 +49,7 @@ export function Titlebar({
       </nav>
       {children}
       <div className="studio-titlebar-space" />
+      {status}
       <Button
         variant="quiet"
         aria-label="设置"

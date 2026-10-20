@@ -194,16 +194,16 @@ describe('Prompt overview operations', () => {
     const tags = parsePrompt(prompt, () => `automatic-${id++}`);
     const project = {
       tags,
-      metadata: { model: 'NovelAI Diffusion V5 0ADF9AB7' },
+      metadata: { model: 'NovelAI Diffusion V4.5 4BDE2A90' },
       prompt_structure: {
         base_prompt_raw: prompt,
         base_undesired_raw: '',
         base_undesired_tags: [],
         characters: [],
         novelai_auto: {
-          model: 'NovelAI Diffusion V5 0ADF9AB7',
+          model: 'NovelAI Diffusion V4.5 4BDE2A90',
           quality_toggle: true,
-          quality_source: 'tag_hint_qt',
+          quality_source: 'qualityToggle',
           uc_preset: 0,
           uc_preset_source: 'tag_hint_uc_preset',
         },

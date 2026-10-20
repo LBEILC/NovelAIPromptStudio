@@ -18,7 +18,7 @@ export async function libraryRefinementChecks({ h, database }) {
   const settle = () => wait('!document.querySelector("[data-library-updating=true]")');
   const count = () =>
     e(
-      'Number(document.querySelector(".library-count").textContent.match(/(?:·\\s*)?(\\d+) 张/)[1])',
+      'Number(document.querySelector(".library-count")?.textContent.match(/(?:·\\s*)?(\\d+) 张/)?.[1])',
     );
   const close = () => key('Escape', {}, 'document.activeElement');
   const screenshot = async (name) => {
@@ -207,6 +207,10 @@ export async function libraryRefinementChecks({ h, database }) {
           .filters.excludeTags.includes('round shape'),
       '027 规则保存',
     );
+    await wait(
+      '[...document.querySelectorAll(".library-chips button")].some(n=>n.textContent.trim()==="编辑规则") && !document.querySelector(".nps-popover:popover-open .library-filter-panel")',
+      '027 规则保存完成并回到只读状态',
+    );
     await check(
       '027 保存规则更新只读条件行',
       'document.querySelector(".library-chips").textContent.includes("round shape")',
@@ -247,15 +251,19 @@ export async function libraryRefinementChecks({ h, database }) {
     );
     await click('筛选');
     await input('[aria-label="包含 Tag"]', 'round shape');
+    await wait(
+      'document.querySelector("[aria-label=\\"包含 Tag\\"]")?.getAttribute("aria-expanded")==="true" && [...document.querySelectorAll("[role=option]")].some(n=>n.textContent.includes("round shape"))',
+    );
     await key('Enter', {}, 'document.activeElement');
+    await wait('document.querySelector(".library-chips")?.textContent.includes("round shape")');
     await close();
-    await settle();
+    await h.until(async () => (await count()) === 4, '027 普通包含条件已更新网格');
     const ordinaryCount = await count();
     await e(`document.querySelector('[data-collection-id="${collections.at(-1)}"]').click()`);
-    await settle();
+    await h.until(async () => (await count()) === 5, '027 智能收藏集规则已更新网格');
     await check('027 智能收藏集不叠加普通筛选', async () => (await count()) === 5);
     await click('全部图片', 'document.querySelector(".library-side")');
-    await settle();
+    await h.until(async () => (await count()) === ordinaryCount, '027 全部图片的普通筛选已恢复');
     await check(
       '027 回到全部图片恢复普通筛选',
       async () => (await count()) === ordinaryCount && ordinaryCount === 4,

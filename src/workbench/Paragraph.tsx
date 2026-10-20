@@ -9,13 +9,17 @@ export function ParagraphEditor({
   children,
   onSave,
   translateRequest = 0,
+  autoEdit = false,
+  onDismiss,
 }: {
   block: PromptBlock;
   children: ReactNode;
   onSave: (text: string, translation: string) => void;
   translateRequest?: number;
+  autoEdit?: boolean;
+  onDismiss?: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(autoEdit);
   const [english, setEnglish] = useState(block.content);
   const [chinese, setChinese] = useState(block.translation || '');
   const [configured, setConfigured] = useState(false);
@@ -73,7 +77,6 @@ export function ParagraphEditor({
     if (!translateRequest || handledTranslation.current === translateRequest) return;
     handledTranslation.current = translateRequest;
     const text = editing ? english : block.content;
-    // TODO(design): 无 AI 配置时块菜单是否直接禁用待定；当前打开编辑器并沿用已有禁用提示。
     if (!editing) {
       setEnglish(block.content);
       setChinese(block.translation || '');
@@ -113,8 +116,15 @@ export function ParagraphEditor({
           {children}
         </div>
       ) : (
-        <div className="wb-paragraph-editor">
+        <div
+          className="wb-paragraph-editor"
+          onBlur={(e) => {
+            if (autoEdit && !english.trim() && !e.currentTarget.contains(e.relatedTarget as Node))
+              onDismiss?.();
+          }}
+        >
           <TextArea
+            autoFocus={autoEdit}
             aria-label="英文段落"
             className="wb-prose-input"
             value={english}
@@ -162,7 +172,10 @@ export function ParagraphEditor({
               variant="quiet"
               onClick={() => {
                 cancel();
-                if (!busy) setEditing(false);
+                if (!busy) {
+                  setEditing(false);
+                  onDismiss?.();
+                }
               }}
             >
               取消

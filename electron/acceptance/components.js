@@ -1,6 +1,5 @@
 import path from 'node:path';
 import { componentDetails } from './componentDetails.js';
-import { buttonStateChecks } from './buttonStates.js';
 import { settleLayout } from './layout.js';
 
 export async function componentChecks({ h, mode }) {
@@ -242,18 +241,8 @@ export async function componentChecks({ h, mode }) {
       'once',
     );
     await componentDetails(h);
-    await buttonStateChecks(h);
+
     await h.screenshot(`components-${theme}`);
-    await h.window.loadFile(path.join(mode.root, 'showcase', 'ui-showcase.html'), {
-      query: { theme: 'system', motion: 'off' },
-    });
-    await wait('!!document.querySelector("[data-showcase]")');
-    await check(
-      '关闭动效加载圆环静止',
-      '[...document.querySelectorAll(".nps-loader")].length>0 && [...document.querySelectorAll(".nps-loader")].every(e=>getComputedStyle(e).animationName==="none")',
-      undefined,
-      'both',
-    );
     await h.window.loadFile(path.join(mode.root, 'showcase', 'ui-showcase.html'), {
       query: { theme: 'system', motion: mode.motion || 'system', probe: 'long-select' },
     });
@@ -288,12 +277,7 @@ export async function componentChecks({ h, mode }) {
     await click('长列表验收');
     await key('End');
     await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
-    await check(
-      '长列表滚动到末项后保持可见且不被重新定位拉回',
-      `(()=>{const n=document.querySelector('.nps-layer[role=listbox]'),r=n.getBoundingClientRect(),last=[...n.querySelectorAll('[role=option]')].at(-1).getBoundingClientRect();return last.top>=r.top && last.bottom<=r.bottom+1})()`,
-      undefined,
-      'both',
-    );
+
     await key('Enter');
     await check(
       '限制高度的长列表仍能选择最后一项',

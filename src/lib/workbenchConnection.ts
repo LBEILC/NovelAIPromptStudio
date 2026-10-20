@@ -62,6 +62,7 @@ export class WorkbenchConnection {
     );
   }
   async flush(): Promise<void> {
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('nps:flush-text'));
     clearTimeout(this.timer);
     if (this.running) {
       await this.running;
@@ -154,7 +155,7 @@ export function editingTargets(tabId: string): EditingTarget[] {
   if (!tabId) return [];
   const targets: EditingTarget[] = [];
   for (const node of document.querySelectorAll<HTMLElement>(
-    '.wb-raw-editor,.wb-paragraph-editor,.wb-tag-editor,.wb-add-tags:has(input),.wb-character-name:has(input)',
+    '.wb-text-section:has(textarea:focus),.wb-raw-editor,.wb-paragraph-editor,.wb-tag-editor,.wb-add-tags:has(input),.wb-character-name:has(input)',
   )) {
     if (!node.checkVisibility()) continue;
     const scope =

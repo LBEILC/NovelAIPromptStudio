@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parsePrompt } from './prompt.js';
-import { getPromptScopes } from './promptStructure.js';
+import { getPromptScopes, formatPositivePromptForCopy } from './promptStructure.js';
 
 function projectFixture({
   model = 'NovelAI Diffusion V5 0ADF9AB7',
@@ -66,7 +66,9 @@ describe('NovelAI automatic prompt recognition', () => {
       status: 'confirmed',
       modelLabel: 'V5',
       tagCount: 3,
-      cleanedRaw: 'A sign beside the girl, teXt: Hello, world!\n\n第二行',
+      cleanedRaw: project.prompt_structure.base_prompt_raw,
+      virtual: true,
+      tagIds: [],
     });
   });
 
@@ -132,11 +134,11 @@ describe('NovelAI automatic prompt recognition', () => {
     expect(undesired.tagIds).toHaveLength(17);
   });
 
-  it('recognizes V5 Heavy, Light, and Human Focus UC hints by their exact prefix', () => {
+  it('recognizes V5 preset integers without removing similarly named user tags', () => {
     const heavy =
       'lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page';
     const light =
-      'lowres, artistic error, scan artifacts, worst quality, bad quality, jpeg artifacts, multiple views, very displeasing, too many watermarks, negative space, blank page';
+      'lowres, bad hands, bad anatomy, artistic error, sepia, white haze, worst quality, very displeasing, jpeg artifacts, 0::ai-generated::';
     const human = `${heavy}, @_@, mismatched pupils, glowing eyes, bad anatomy`;
 
     for (const [label, preset, template] of [
@@ -152,9 +154,10 @@ describe('NovelAI automatic prompt recognition', () => {
       expect(automation).toMatchObject({
         status: 'confirmed',
         label,
-        cleanedRaw: 'custom exclusion',
+        cleanedRaw: `${template}, custom exclusion`,
+        template,
       });
-      expect(automation.tagIds.length).toBeGreaterThan(0);
+      expect(automation.tagIds).toEqual([]);
     }
   });
 
@@ -163,13 +166,38 @@ describe('NovelAI automatic prompt recognition', () => {
       'lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page';
     const automation = getPromptScopes(projectFixture({ undesired: heavy, ucPreset: 0 }))[1]
       .automation;
-    expect(automation.status).toBe('suspected');
+    expect(automation).toMatchObject({
+      status: 'confirmed',
+      label: 'None',
+      cleanedRaw: heavy,
+      tagCount: 0,
+    });
   });
 
-  it('reports an enabled V5 hint with a modified template as a mismatch', () => {
+  it('uses V5 hint independently of user prompt text', () => {
     const automation = getPromptScopes(
       projectFixture({ prompt: '1girl, masterpiece', qualityToggle: true }),
     )[0].automation;
-    expect(automation).toMatchObject({ status: 'mismatch', tagIds: [] });
+    expect(automation).toMatchObject({
+      status: 'confirmed',
+      label: 'Standard',
+      tagIds: [],
+      cleanedRaw: '1girl, masterpiece',
+    });
+  });
+  it('V5 copies user text by default and adds virtual quality tags only on request', () => {
+    const project = projectFixture({ prompt: 'synthetic subject', qualityToggle: true });
+    expect(formatPositivePromptForCopy(project)).toBe('synthetic subject');
+    expect(formatPositivePromptForCopy(project, { includeAutomatic: true })).toBe(
+      'synthetic subject, very aesthetic, masterpiece, no text',
+    );
+    for (const [preset, label] of [
+      [0, 'None'],
+      [2, 'Heavy'],
+      [3, 'Light'],
+      [4, 'Human Focus'],
+      [5, 'Furry Focus'],
+    ])
+      expect(getPromptScopes(projectFixture({ ucPreset: preset }))[1].automation.label).toBe(label);
   });
 });

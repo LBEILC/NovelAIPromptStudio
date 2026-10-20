@@ -36,6 +36,7 @@ import { Titlebar } from './shell/Titlebar';
 import { useAppearance } from './state/appearance';
 import { Dialog, Button, Progress, Layer, MenuItems, useNotifications } from './ui';
 import WorkbenchPage from './workbench/WorkbenchPage';
+import { GenerationTitle } from './workbench/GenerationTitle';
 import { WorkbenchTabs } from './workbench/Tabs';
 import { useWorkbenchState } from './state/workbench';
 import { ZipImport } from './library/ZipImport';
@@ -1484,17 +1485,6 @@ export default function App() {
 
   const resetWorkbench = async () => {
     if (!activeTab?.project) return;
-    if (
-      workbenchTabHasChanges(activeTab) &&
-      !(await requestConfirmation({
-        title: '恢复图片里原来的提示词？',
-        message: '这个标签页里的修改会被清除。',
-        detail: '图片文件本身不会被修改，其他标签页不受影响。',
-        okText: '恢复',
-        danger: true,
-      }))
-    )
-      return;
     setWorkbenchSession((current) =>
       updateWorkbenchTab(current, activeTab.id, (tab) => ({
         ...tab,
@@ -1519,7 +1509,18 @@ export default function App() {
 
   return (
     <div className="app-shell" ref={appShellRef}>
-      <Titlebar onNavigate={setPage} page={page}>
+      <Titlebar
+        onNavigate={setPage}
+        page={page}
+        status={
+          <GenerationTitle
+            onOpen={(id) => {
+              setWorkbenchSession((current) => ({ ...current, activeTabId: id }));
+              setPage('workbench');
+            }}
+          />
+        }
+      >
         {page === 'workbench' && (
           <WorkbenchTabs
             session={workbenchSession}
@@ -1544,6 +1545,7 @@ export default function App() {
         <Activity mode={page === 'workbench' ? 'visible' : 'hidden'}>
           <div className="app-page-surface">
             <WorkbenchPage
+              beforeGeneration={() => workbenchConnection?.flush() || Promise.resolve()}
               error={workbenchError}
               focusScopeKey={workbenchFocus.scopeKey}
               focusTagId={workbenchFocus.tagId}

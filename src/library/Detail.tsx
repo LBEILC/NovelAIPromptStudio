@@ -61,7 +61,10 @@ export function LibraryDetail({
     saving.current = true;
     try {
       const ids = p.previewGroup?.members.map((member) => member.id) || [detail.id];
-      if (await p.onRenameMany(ids, name.trim())) setRenaming(false);
+      if (await p.onRenameMany(ids, name.trim())) {
+        canceled.current = true;
+        setRenaming(false);
+      }
     } finally {
       saving.current = false;
     }

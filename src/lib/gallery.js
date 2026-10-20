@@ -116,6 +116,27 @@ function groupSimilarGalleryProjects(projects, grouping) {
 
 export function groupGalleryProjects(projects = [], groupingValue) {
   const grouping = normalizeGalleryGrouping(groupingValue);
+  const generated = projects.filter((p) => p.generated_work_id);
+  if (generated.length && !groupingValue?.history) {
+    const works = new Map();
+    for (const p of generated) {
+      if (!works.has(p.generated_work_id)) works.set(p.generated_work_id, []);
+      works.get(p.generated_work_id).push(p);
+    }
+    return [
+      ...groupGalleryProjects(
+        projects.filter((p) => !p.generated_work_id),
+        grouping,
+      ),
+      ...Array.from(works, ([id, members]) =>
+        finalizeGalleryGroup(
+          { key: `work:${id}`, fingerprint: `work:${id}`, members },
+          grouping,
+          false,
+        ),
+      ),
+    ];
+  }
   if (grouping.promptScope === 'similar') return groupSimilarGalleryProjects(projects, grouping);
   const exact = isExactGalleryGrouping(grouping);
   const groups = new Map();

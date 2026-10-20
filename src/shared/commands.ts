@@ -11,6 +11,14 @@ import type {
 } from './types';
 import type { PromptDocument } from '../lib/promptDocument';
 import type { normalizeWorkbenchViewState } from '../lib/workbenchSession.js';
+import type {
+  GenerationSettings,
+  GenerationEstimate,
+  GenerationStatus,
+  GenerationJob,
+  WorkVersion,
+  WorkOrigin,
+} from './generation';
 
 export type CommandErrorCode =
   | 'invalid_input'
@@ -33,6 +41,10 @@ export interface CommandTab {
   updatedAt: string;
   error: string;
   revision?: number;
+  workId?: string;
+  versionId?: string;
+  versionImageId?: string;
+  workOrigin?: WorkOrigin;
 }
 export interface CommandSession {
   version: number;
@@ -87,8 +99,51 @@ export type CommandEvent =
   | WorkbenchCommandEvent
   | ProgressCommandEvent
   | { type: 'updates'; data: Types.UpdateState }
+  | { type: 'generation'; data: GenerationStatus }
   | { type: 'navigate'; destination: string };
 export interface CommandDefinitions {
+  'generate.estimate': {
+    input: TabInput & { count: number; width?: number; height?: number };
+    output: GenerationEstimate;
+  };
+  'generate.start': {
+    input: TabInput & { count: number; continuous?: boolean; fixedSeed?: boolean };
+    output: GenerationJob;
+  };
+  'generate.status': { input: { id?: string }; output: GenerationStatus };
+  'generate.confirm': { input: { ids: string[] }; output: GenerationStatus };
+  'generate.cancel': { input: { ids: string[] }; output: GenerationStatus };
+  'generate.stop': { input: { id: string }; output: GenerationStatus };
+  'generate.retry': { input: { id: string }; output: GenerationJob };
+  'account.get': { input: Record<string, never>; output: GenerationStatus };
+  'account.save': { input: { token: string }; output: GenerationStatus };
+  'account.refresh': { input: Record<string, never>; output: GenerationStatus };
+  'settings.generation.save': {
+    input: Partial<Omit<GenerationSettings, 'hasToken' | 'spentDate' | 'spentToday'>>;
+    output: GenerationStatus;
+  };
+  'version.list': {
+    input: { tabId: string };
+    output: {
+      versions: WorkVersion[];
+      origin: WorkOrigin | null;
+      derived: { workId: string; source: WorkOrigin }[];
+    };
+  };
+  'work.open': {
+    input: { workId: string; versionId?: string; imageId?: string };
+    output: TabDocument;
+  };
+  'version.open': {
+    input: TabInput & { versionId: string; imageId?: string };
+    output: TabDocument;
+  };
+  'prompt.set-size': { input: TabInput & { width: number; height: number }; output: TabDocument };
+  'branch.rename': { input: { branchId: string; name: string }; output: { name: string } };
+  'work.open-from-image': {
+    input: TabInput & { versionId: string; imageId: string };
+    output: TabDocument;
+  };
   'agent.setup': {
     input: Record<string, never>;
     output: IPC.Result<{

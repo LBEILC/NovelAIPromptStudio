@@ -3,7 +3,7 @@ import path from 'node:path';
 import { net, session } from 'electron';
 import { importLibraryFiles } from '../importer.js';
 import { harness } from '../acceptance/harness.js';
-import { WORKBENCH_SOURCE_PANEL_WIDTH_KEY } from '../../src/lib/panelLayout.js';
+import { spawn } from 'node:child_process';
 
 const paragraph =
   'A vertical full illustration of a girl waiting at a bus shelter just after the rain. She stands slightly right of centre, the transparent umbrella tilted toward the viewer, while the wet pavement mirrors the pale sky.';
@@ -136,117 +136,151 @@ year2025|2025 年|ArtistEra
   });
 
 export async function runReadmeScreenshots({
+  app,
   mode,
   database,
   assetsDirectory,
   preferences,
   createWindow,
+  generationService,
 }) {
   const output = path.resolve('.codex-runs/readme');
   await fs.mkdir(output, { recursive: true });
   await fs.rm(path.join(output, 'manifest.json'), { force: true });
-  const network = { danbooruEmptyResponses: 0, blockedRequests: 0 };
-  const originalFetch = net.fetch;
-  const originalGlobalFetch = globalThis.fetch;
-  // Intercept before calling a transport: Danbooru is an empty offline double.
-  // All other HTTP(S) traffic fails, including accidental paragraph AI calls.
+  preferences.saveProductivitySettings({ autoCheckUpdates: false });
+  const network = {
+    danbooruEmptyResponses: 0,
+    localRequests: 0,
+    blockedRequests: 0,
+    blockedUrls: [],
+  };
+  const originalFetch = net.fetch,
+    originalGlobalFetch = globalThis.fetch;
+  const local = (url) =>
+    new URL(typeof url === 'string' || url instanceof URL ? String(url) : url.url).origin ===
+    generationService.url;
   net.fetch = async (url, options) => {
     const address = new URL(typeof url === 'string' || url instanceof URL ? String(url) : url.url);
     if (address.protocol === 'file:') return originalFetch(url, options);
+    if (local(url)) {
+      network.localRequests++;
+      return originalFetch(url, options);
+    }
     if (address.protocol === 'https:' && address.pathname === '/tags.json') {
       network.danbooruEmptyResponses++;
       return new Response('[]', { headers: { 'Content-Type': 'application/json' } });
     }
     network.blockedRequests++;
+    network.blockedUrls.push(String(url));
     throw Error('Network disabled for README screenshots');
   };
-  globalThis.fetch = async () => {
+  globalThis.fetch = async (url, options) => {
+    if (local(url)) {
+      network.localRequests++;
+      return originalGlobalFetch(url, options);
+    }
     network.blockedRequests++;
+    network.blockedUrls.push(String(url));
     throw Error('Network disabled for README screenshots');
   };
   session.defaultSession.webRequest.onBeforeRequest(
     { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] },
-    (_request, callback) => {
-      network.blockedRequests++;
-      callback({ cancel: true });
+    (request, callback) => {
+      if (local(request.url)) callback({ cancel: false });
+      else {
+        network.blockedRequests++;
+        network.blockedUrls.push(request.url);
+        callback({ cancel: true });
+      }
     },
   );
-  const checks = [];
-  const screenshots = [];
-  let window;
-  let h;
-  const open = async (state, theme) => {
-    if (window) window.destroy();
-    preferences.saveAppearanceSettings({ themeMode: theme, motion: 'off' });
-    window = createWindow({ ...state, name: state.page, theme, animationsDisabled: true });
-    window.setContentSize(1920, 1080);
-    window.webContents.debugger.attach('1.3');
-    const loaded = new Promise((resolve, reject) => {
-      window.webContents.once('did-finish-load', resolve);
-      window.webContents.once('did-fail-load', (_event, code) =>
-        reject(Error(`Load failed: ${code}`)),
+  const checks = [],
+    screenshots = [];
+  let window, h;
+  const invoke = (name, input = {}) =>
+    h.evaluate(
+      `window.studio.invoke(${JSON.stringify(name)},${JSON.stringify(input)}).then(r=>{if(!r.ok)throw Error(r.error.message);return r.data})`,
+    );
+  const cli = (name, input) =>
+    new Promise((resolve, reject) => {
+      const child = spawn(
+        process.execPath,
+        [
+          path.join(app.getAppPath(), 'agent', 'nai-studio.mjs'),
+          name,
+          '--json',
+          JSON.stringify(input),
+        ],
+        {
+          env: {
+            ...process.env,
+            ELECTRON_RUN_AS_NODE: '1',
+            NAI_STUDIO_USER_DATA: app.getPath('userData'),
+            NAI_STUDIO_NO_LAUNCH: '1',
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true,
+          shell: false,
+        },
       );
+      let stdout = '',
+        stderr = '';
+      child.stdout.on('data', (x) => {
+        stdout += x;
+      });
+      child.stderr.on('data', (x) => {
+        stderr += x;
+      });
+      const timer = setTimeout(() => {
+        child.kill();
+        reject(Error('README CLI timeout'));
+      }, 20000);
+      child.on('error', (error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        try {
+          const result = JSON.parse(stdout.trim());
+          if (code || !result.ok) throw Error(stderr + stdout);
+          resolve(result.data);
+        } catch (error) {
+          reject(error);
+        }
+      });
     });
-    await loaded;
-    h = harness(window, { ...mode, output, screenshots: [], phase: 'readme' }, checks);
-    await h.wait(
-      `document.documentElement.dataset.screenshotReady===${JSON.stringify(state.page)}`,
-    );
-    await h.wait(`document.documentElement.dataset.theme===${JSON.stringify(theme)}`);
-    await h.evaluate('document.fonts.ready.then(()=>true)');
-    const bounds = await h.evaluate(
-      `(()=>{const r=document.querySelector('[aria-label=设置]').getBoundingClientRect();return {width:innerWidth,height:innerHeight,gearX:r.x,gearRight:r.right};})()`,
-    );
-    if (
-      window.getContentSize()[0] !== 1920 ||
-      window.getContentSize()[1] !== 1080 ||
-      bounds.width !== 1920 ||
-      bounds.height !== 1080 ||
-      bounds.gearX < 1700
-    )
-      throw Error('Real window size or titlebar position is incorrect: ' + JSON.stringify(bounds));
-    checks.push({
-      label: state.page + ' real window and titlebar',
-      status: 'passed',
-      bounds,
-      contentSize: window.getContentSize(),
-    });
-  };
   const capture = async (name) => {
     await h.evaluate('document.activeElement?.blur()');
-    await h.wait(
-      '!document.querySelector(".nps-layer,dialog[open],.nps-toast") && !window.studioScreenshot.pending()',
-    );
+    await h.wait('!document.querySelector(".nps-toast") && !window.studioScreenshot.pending()');
     await h.evaluate(
-      `(async()=>{for(const image of document.images) if(image.getClientRects().length) await image.decode();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));})()`,
+      `(async()=>{for(const image of document.images) if(image.getClientRects().length) await image.decode();await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));})()`,
     );
     await h.check(
-      `${name} 没有浮层、通知或本机路径`,
-      `!document.querySelector('.nps-layer,dialog[open],.nps-toast') && !/[A-Z]:\\\\|Users[\\\\/]|nai-app-screens-|https?:\\/\\//i.test(document.body.innerText)`,
+      `${name} 使用指定窗口与浅色主题`,
+      `innerWidth===1240&&innerHeight===760&&document.documentElement.dataset.theme==='light'`,
       undefined,
       'once',
     );
     await h.check(
-      `${name} 可见 Tag 和词典行都有译文`,
-      `(()=>{const visible=e=>{let r=e.getBoundingClientRect();let top=Math.max(0,r.top),bottom=Math.min(innerHeight,r.bottom);for(let p=e.parentElement;p;p=p.parentElement){if(/auto|scroll|hidden/.test(getComputedStyle(p).overflowY)){const b=p.getBoundingClientRect();top=Math.max(top,b.top);bottom=Math.min(bottom,b.bottom);}}return r.width>0&&bottom>top;};return [...document.querySelectorAll('.nps-tag-text')].filter(visible).every(e=>e.querySelector('.nps-tag-zh')?.textContent.trim()) && [...document.querySelectorAll('.settings-table tbody tr')].filter(visible).every(e=>!e.textContent.includes('点击填写'));})()`,
+      `${name} 没有本机路径或服务地址`,
+      `!/[A-Z]:\\\\|Users[\\\\/]|nai-app-screens-|https?:\\/\\//i.test(document.body.innerText)`,
       undefined,
       'once',
     );
-    if (name === 'hero' || name === 'workbench')
-      await h.check(
-        `${name} 提示词栏宽度为 700 像素`,
-        `document.querySelector('[aria-label="提示词栏宽度"]').parentElement.getBoundingClientRect().width===700`,
-        undefined,
-        'once',
-      );
     const { data } = await window.webContents.debugger.sendCommand('Page.captureScreenshot', {
       format: 'png',
       captureBeyondViewport: false,
-      clip: { x: 0, y: 0, width: 1920, height: 1080, scale: 1 },
+      clip: { x: 0, y: 0, width: 1240, height: 760, scale: 2 },
     });
     await fs.writeFile(path.join(output, `${name}.png`), Buffer.from(data, 'base64'));
     screenshots.push(name);
   };
+  const finished = (id) =>
+    h.wait(
+      `window.studio.invoke('generate.status',{id:${JSON.stringify(id)}}).then(r=>r.data.jobs[0]?.state==='completed')`,
+      '演示生成完成',
+    );
   try {
     const source = path.resolve('demo/images/final');
     const files = (await fs.readdir(source))
@@ -257,10 +291,12 @@ export async function runReadmeScreenshots({
     const imported = await importLibraryFiles({ filePaths: files, database, assetsDirectory });
     if (imported.errors.length || imported.imported.length !== 14)
       throw Error('Demo import failed');
-    const projects = database.loadLibrary('all');
-    const current = projects.find((p) => p.name === '雨后候车亭-01');
-    if (!current || current.metadata.width >= current.metadata.height)
-      throw Error('Missing portrait demo');
+    const projects = database.loadLibrary('all'),
+      current = projects.find((p) => p.name === '雨后候车亭-01');
+    if (!current) throw Error('Missing portrait demo');
+    generationService.state.images = await Promise.all(
+      files.filter((f) => path.basename(f).startsWith('雨后候车亭')).map((f) => fs.readFile(f)),
+    );
     for (const [id, name] of [
       ['weekly', '本周精选'],
       ['composition', '构图研究'],
@@ -277,15 +313,26 @@ export async function runReadmeScreenshots({
       kind: 'smart',
       filters: { models: [current.metadata.model] },
     });
-    const state = {
+    preferences.saveAppearanceSettings({ themeMode: 'light', motion: 'off' });
+    window = createWindow({
       page: 'workbench',
+      name: 'workbench',
+      theme: 'light',
+      animationsDisabled: true,
       workbenchPaths: [
         path.join(source, '雨后候车亭-01.png'),
         path.join(source, '海边写生-01.png'),
-        path.join(source, '玻璃花房-01.png'),
       ],
-    };
-    await open(state, 'light');
+    });
+    window.setContentSize(1240, 760);
+    window.webContents.debugger.attach('1.3');
+    await new Promise((resolve, reject) => {
+      window.webContents.once('did-finish-load', resolve);
+      window.webContents.once('did-fail-load', (_e, code) => reject(Error(`Load failed: ${code}`)));
+    });
+    h = harness(window, { ...mode, output, screenshots: [], phase: 'readme' }, checks);
+    await h.wait(`document.documentElement.dataset.screenshotReady==='workbench'`);
+    await h.evaluate('document.fonts.ready.then(()=>true)');
     const tags = [
       ...new Set(
         projects
@@ -300,106 +347,156 @@ export async function runReadmeScreenshots({
           .map((t) => t.tag),
       ),
     ];
-    const annotated = await h.evaluate(
-      `window.studio.invoke('dictionary.translate',{tags:${JSON.stringify(tags)}}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})`,
-    );
-    if (!annotated.ok) throw Error(annotated.error);
+    await invoke('dictionary.translate', { tags });
     for (const { tag, translation, category } of dictionaryEdits)
       database.updateTagDictionary(tag, { translation, category });
-    await h.evaluate(
-      `localStorage.setItem(${JSON.stringify(WORKBENCH_SOURCE_PANEL_WIDTH_KEY)}, '700')`,
-    );
-    await open(state, 'light');
-    await h.click('显示');
-    await h.select('语言', '对照');
-    await h.key('Escape');
-    await h.click('存入图片库');
+    await h.section('NovelAI 账号');
+    await h.input('[aria-label="持久令牌"]', 'acceptance-token');
+    await h.click('保存', 'document.querySelector("[data-settings-section=novelai]")');
     await h.wait(
-      'document.querySelector(".wb-image-actions")?.textContent.includes("已存入图片库")',
+      'document.body.innerText.includes("已保存 ••••••••")&&document.body.innerText.includes("10,000")',
     );
+    await capture('account');
+    await h.click('工作台', 'document.querySelector(".studio-titlebar")');
+    await h.evaluate('document.querySelector(".wb-tab").click()');
+    const tabId = (await invoke('workbench.list')).activeTabId;
     const parts = current.prompt_structure.base_prompt_raw.split(', ');
-    const raw = [
-      parts.slice(0, 2).join(', '),
-      parts.slice(2, 4).join(', '),
-      paragraph,
-      parts.slice(4).join(', '),
-    ].join('\n\n');
-    await h.click('更多', 'document.querySelector(".wb-section")');
-    await h.click('编辑原始文本');
-    await h.input('[aria-label="原始文本"]', raw);
-    await h.click('保存', 'document.querySelector(".wb-raw-editor")');
-    await h.wait('!!document.querySelector("[aria-label=编辑段落]")');
-    await h.evaluate('document.querySelector("[aria-label=编辑段落]").click()');
-    await h.input('[aria-label="中文段落"]', translation);
-    await h.click('完成', 'document.querySelector(".wb-paragraph-editor")');
-    await h.check(
-      '工作台有三个标签、两个含译文及分类圆点的 Tag 块和双语段落',
-      `document.querySelectorAll('.wb-tab').length===3 && [...document.querySelectorAll('.wb-section:first-child .wb-block')].filter(b=>b.querySelector('.nps-tag-zh')&&b.querySelector('.nps-dot')).length>=2 && document.body.innerText.includes(${JSON.stringify(translation)})`,
-      undefined,
-      'once',
-    );
-    await capture('hero');
-    preferences.saveAISettings({
-      baseUrl: 'https://readme.invalid/v1',
-      model: 'offline-demo',
-      clearApiKey: true,
+    const tagText = parts.slice(0, 6).join(', ');
+    const raw = `${tagText}\n\n${paragraph}`;
+    await invoke('prompt.set', { tabId, scope: 'base:prompt', text: raw });
+    await invoke('prompt.set-size', { tabId, width: 832, height: 1216 });
+    for (let i = 0; i < 4; i++) {
+      const text =
+        i === 0
+          ? raw
+          : `${tagText}, ${['', 'soft light', 'rain reflections', 'gentle breeze'][i]}\n\n${i >= 2 ? paragraph.replace('pale sky', 'warm evening sky') : paragraph}`;
+      await invoke('prompt.set', { tabId, scope: 'base:prompt', text });
+      const job = await invoke('generate.start', { tabId, count: 1 });
+      await finished(job.id);
+    }
+    let tree = await invoke('version.list', { tabId });
+    const mainTip = tree.versions.at(-1),
+      fork = tree.versions[1],
+      rewritten = tree.versions[3];
+    await invoke('version.open', { tabId, versionId: fork.id });
+    await invoke('prompt.set', {
+      tabId,
+      scope: 'base:prompt',
+      text: `${tagText}, blue hour\n\n${paragraph.replace('pale sky', 'blue evening sky')}`,
     });
-    await h.evaluate('document.querySelector("[aria-label=编辑段落]").click()');
-    await h.wait(
-      `[...document.querySelectorAll('.wb-paragraph-editor button')].filter(b=>b.textContent.includes('译成中文')||b.textContent.includes('按中文改写英文')).every(b=>!b.disabled && b.getAttribute('aria-disabled')!=='true')`,
-    );
+    const branch = await invoke('generate.start', { tabId, count: 1 });
+    await finished(branch.id);
+    await invoke('version.open', { tabId, versionId: mainTip.id });
+    tree = await invoke('version.list', { tabId });
     await h.check(
-      '段落编辑保留指定中英文且两个 AI 按钮可用',
-      `document.querySelector('[aria-label="英文段落"]').value===${JSON.stringify(paragraph)} && document.querySelector('[aria-label="中文段落"]').value===${JSON.stringify(translation)} && [...document.querySelectorAll('.wb-paragraph-editor button')].filter(b=>b.textContent.includes('译成中文')||b.textContent.includes('按中文改写英文')).length===2`,
+      '演示作品由假服务生成至少五版并有分叉',
+      () => tree.versions.length >= 5 && new Set(tree.versions.map((v) => v.branchId)).size >= 2,
       undefined,
       'once',
     );
-    await capture('workbench');
-    await open({ page: 'gallery', selectedProjectId: current.id }, 'dark');
-    await h.click('视图', 'document.querySelector(".library-page")');
-    await h.input('[aria-label=图片行高]', '300');
-    await h.click('不合并');
+    await h.wait(`!!document.querySelector('[data-version-id="${rewritten.id}"] .wb-version-row')`);
+    const point = await h.evaluate(
+      `(()=>{const n=document.querySelector('[data-version-id="${rewritten.id}"] .wb-version-row');n.scrollIntoView({block:'nearest'});const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+10}})()`,
+    );
+    await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      ...point,
+      button: 'none',
+    });
+    await h.wait(
+      '!!document.querySelector("[role=tooltip] del")&&!!document.querySelector("[role=tooltip] ins")',
+    );
+    await capture('versions');
+    await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: 600,
+      y: 50,
+      button: 'none',
+    });
+    await h.wait('!document.querySelector("[role=tooltip] del")');
+    await invoke('prompt.set', {
+      tabId,
+      scope: 'base:prompt',
+      text: `${tagText}, falling rain\n\n${paragraph}`,
+    });
+    generationService.state.holdAt = generationService.state.requests.length + 2;
+    const generating = await invoke('generate.start', { tabId, count: 3 });
+    await h.wait(
+      'document.querySelector(".wb-generation-bar")?.textContent.includes("生成中 2 / 3")&&document.querySelector(".wb-generation-title")?.textContent.includes("生成中 · 2 / 3")',
+    );
+    await h.check(
+      '三张队列第一张完成、第二张进行中、第三张排队',
+      async () => {
+        const s = await invoke('generate.status', { id: generating.id });
+        return s.jobs[0].completed === 1 && s.jobs[0].state === 'generating';
+      },
+      undefined,
+      'once',
+    );
+    await h.evaluate(
+      '(()=>{const n=document.querySelector(".wb-versions-scroll");n.scrollTop=n.scrollHeight})()',
+    );
+    await h.wait('!!document.querySelector(".wb-generation-slots .is-generating")');
+    await h.wait(
+      '(()=>{const r=document.querySelector(".wb-generation-slots .is-generating").getBoundingClientRect();return r.bottom<=innerHeight&&r.top>0})()',
+    );
+    await capture('generate');
+    generationService.state.resume();
+    await finished(generating.id);
+    const tabs = (await invoke('workbench.list')).tabs;
+    const pending = [];
+    for (const tab of tabs.slice(0, 2))
+      pending.push(await cli('generate.start', { tabId: tab.id, count: 1 }));
+    await h.wait('document.body.innerText.includes("Agent 待确认 · 2")');
+    await h.click('Agent 待确认 · 2');
+    await h.check(
+      '两个作品通过真实 CLI 进入待确认',
+      () =>
+        pending.length === 2 &&
+        pending.every((j) => j.state === 'pending') &&
+        pending[0].workId !== pending[1].workId,
+      undefined,
+      'once',
+    );
+    await capture('agent');
     await h.key('Escape');
+    await invoke('generate.cancel', { ids: pending.map((j) => j.id) });
+    await invoke('prompt.set', {
+      tabId,
+      scope: 'base:prompt',
+      text: `1.3::rain::, {transparent umbrella}, girl, teal eyes, quiet city bus stop, pale blue sky, -1.2::wind::\n\n${paragraph}`,
+    });
+    await h.key('e', process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true });
+    await h.wait('!!document.querySelector(".wb-text-section textarea")');
+    await capture('text');
+    await h.click('图片库', 'document.querySelector(".studio-titlebar")');
+    await h.click('全部图片', 'document.querySelector(".library-side")');
+    await h.click('筛选');
+    await h.click('导入时间');
+    const now = new Date(),
+      day = String(now.getDate()).padStart(2, '0'),
+      month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    await h.evaluate(`document.querySelector('[data-date="${month}-01"]').click()`);
+    await h.evaluate(`document.querySelector('[data-date="${month}-${day}"]').click()`);
     await h.wait(
-      'document.querySelectorAll(".library-card").length===14 && !!document.querySelector(".library-detail .library-tags")',
-    );
-    await h.check(
-      '深色全部图片显示 14 张演示图及三个收藏集',
-      `document.querySelectorAll('.library-card').length===14 && ['本周精选','构图研究','V4.5'].every(t=>document.querySelector('.library-side').textContent.includes(t))`,
-      undefined,
-      'once',
-    );
-    await h.check(
-      '图库展示三到四行且 V4.5 收藏集有 14 张图',
-      `(()=>{const cards=[...document.querySelectorAll('.library-card')];const rows=new Set(cards.map(e=>Math.round(e.getBoundingClientRect().top)));return rows.size>=3 && rows.size<=4 && Math.max(...cards.map(e=>e.getBoundingClientRect().bottom))>950 && [...document.querySelectorAll('.library-side button')].some(e=>e.textContent.includes('V4.5')&&e.textContent.includes('14'));})()`,
-      undefined,
-      'once',
+      '!!document.querySelector(".nps-date-range")&&document.querySelector(".library-chip")?.textContent.includes("至")',
     );
     await capture('library');
-    await open({ page: 'settings', section: 'tags' }, 'light');
+    await h.key('Escape');
+    await h.key('Escape');
+    await h.section('翻译词典');
     await h.wait('document.querySelectorAll(".settings-usage button").length>0');
-    await h.check(
-      '词典仅剩两条未翻译和未分类，已有用户修改',
-      `(()=>{const tabs=[...document.querySelectorAll('.settings-dictionary-views [role=tab]')];return ['没有译文','未分类'].every(label=>tabs.find(e=>e.textContent.startsWith(label))?.querySelector('span').textContent==='2') && Number(tabs.find(e=>e.textContent.startsWith('你改过的'))?.querySelector('span').textContent)>0;})()`,
-      undefined,
-      'once',
-    );
-    await h.check(
-      '词典默认全部按图片数降序且没有选中或编辑行',
-      `(()=>{const counts=[...document.querySelectorAll('.settings-usage button')].map(n=>Number(n.textContent));return counts.length>2 && counts[0]>0 && counts.every((n,i)=>!i||n<=counts[i-1]) && document.querySelector('[role=tab][aria-selected=true]').textContent.startsWith('全部') && !document.querySelector('tr input:not([type=checkbox]),tr [aria-checked=true]')})()`,
-      undefined,
-      'once',
-    );
     await capture('dictionary');
     await h.check(
-      '截图期间没有外网请求且使用离线 Danbooru 替身',
-      () => network.blockedRequests === 0 && network.danbooruEmptyResponses > 0,
+      '全部请求仅使用本地假服务和离线词典替身',
+      () => network.blockedRequests === 0 && network.localRequests > 0,
       undefined,
       'once',
     );
     if (checks.some((c) => c.status !== 'passed'))
       throw Error('README screenshot assertions failed');
   } finally {
+    generationService.state.resume?.();
     await fs.writeFile(
       path.join(output, 'manifest.json'),
       JSON.stringify({ screenshots, checks, network, addedTranslations: dictionaryEdits }, null, 2),

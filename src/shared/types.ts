@@ -72,7 +72,14 @@ export interface PromptStructureRaw {
 export interface PromptStructure extends PromptStructureRaw {
   block_annotations?: Record<
     string,
-    { raw: string; type?: 'tags' | 'paragraph'; translation?: string; start: number }[]
+    {
+      raw: string;
+      textLayout?: boolean;
+      type?: 'tags' | 'paragraph';
+      translation?: string;
+      displayLabel?: string;
+      start: number;
+    }[]
   >;
   base_undesired_tags: Tag[];
   characters: PromptCharacter[];
@@ -85,6 +92,8 @@ export type StoredPromptStructure = Partial<
   characters: PromptCharacter[];
 };
 export interface PromptAutomation {
+  template?: string;
+  virtual?: boolean;
   cleanedRaw: string;
   kind: 'quality' | 'undesired';
   label: string;
@@ -135,6 +144,9 @@ export interface StoredGenerationParameters extends GenerationParameters {
   extra_json: string;
 }
 export interface ImageProject {
+  generated_work_id?: string;
+  version_number?: number;
+  generation_source?: 'user' | 'agent';
   original_filename?: string;
   has_custom_name?: boolean;
   id: string;
@@ -183,6 +195,9 @@ export interface LibraryCard
     | 'vibe_fingerprint'
     | 'group_cover_id'
   > {
+  generated_work_id?: string;
+  version_number?: number;
+  generation_source?: 'user' | 'agent';
   // null reuses JSON.stringify(JSON.parse(prompt_fingerprint).base).
   // The main process only emits it when that equals the stored base fingerprint.
   base_prompt_fingerprint: string | null;

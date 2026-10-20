@@ -1,0 +1,116 @@
+import http from 'node:http';
+import sharp from 'sharp';
+import yazl from 'yazl';
+function pngText(value) {
+  const content = Buffer.from('Comment\0' + JSON.stringify(value)),
+    bytes = Buffer.concat([Buffer.from('tEXt'), content]);
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  const length = Buffer.alloc(4),
+    checksum = Buffer.alloc(4);
+  length.writeUInt32BE(content.length);
+  checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
+  return Buffer.concat([length, bytes, checksum]);
+}
+
+// Local-only acceptance service. No production URL or credential is used here.
+export async function startFakeNovelAI() {
+  const state = {
+    requests: [],
+    active: 0,
+    maxActive: 0,
+    failNext: 0,
+    delay: 20,
+    balance: 10000,
+    tier: 3,
+    usage: 12,
+    images: [],
+    holdAt: 0,
+    resume: null,
+  };
+  const png = await sharp({ create: { width: 64, height: 64, channels: 4, background: '#8899aa' } })
+    .png()
+    .toBuffer();
+  const server = http.createServer(async (req, res) => {
+    if (req.headers.authorization !== 'Bearer acceptance-token') {
+      res.writeHead(401).end('{}');
+      return;
+    }
+    if (req.url === '/user/subscription') {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({
+          active: state.tier > 0,
+          tier: state.tier,
+          trainingStepsLeft: { fixedTrainingStepsLeft: state.balance, purchasedTrainingSteps: 0 },
+          usage: { percent: state.usage, isNegative: false, timeUntilNextPercent: 60 },
+        }),
+      );
+      return;
+    }
+    if (!['/ai/generate-image', '/ai/generate-image-stream'].includes(req.url)) {
+      res.writeHead(404).end();
+      return;
+    }
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = JSON.parse(Buffer.concat(chunks).toString());
+    state.requests.push(body);
+    state.active++;
+    state.maxActive = Math.max(state.maxActive, state.active);
+    await new Promise((r) => setTimeout(r, state.delay));
+    state.active--;
+    if (state.failNext) {
+      const code = state.failNext;
+      state.failNext = 0;
+      res.writeHead(code).end('{}');
+      return;
+    }
+    // Different seeds yield distinct bytes, preserving importer duplicate behavior.
+    const pixels = await sharp(
+      state.images[(state.requests.length - 1) % state.images.length] || png,
+    )
+      .resize(body.parameters.width, body.parameters.height)
+      .png()
+      .toBuffer();
+    const text = pngText({
+      ...body.parameters,
+      model: body.model,
+      uc: body.parameters.negative_prompt,
+    });
+    const image = Buffer.concat([
+      pixels.subarray(0, pixels.length - 12),
+      text,
+      pixels.subarray(pixels.length - 12),
+    ]);
+    if (state.tier < 3) state.balance -= 30;
+    if (req.url.endsWith('-stream')) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.write(`event: intermediate\ndata: ${JSON.stringify({ step_ix: 14, samp_ix: 0 })}\n\n`);
+      if (state.requests.length === state.holdAt) {
+        await new Promise((resolve) => {
+          state.resume = resolve;
+        });
+        state.resume = null;
+      }
+      res.end(
+        `event: final\ndata: ${JSON.stringify({ image: image.toString('base64'), samp_ix: 0 })}\n\n`,
+      );
+      return;
+    }
+    const zip = new yazl.ZipFile();
+    zip.addBuffer(image, 'image_0.png');
+    zip.end();
+    res.setHeader('Content-Type', 'application/zip');
+    zip.outputStream.pipe(res);
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return {
+    state,
+    url: `http://127.0.0.1:${server.address().port}`,
+    close: () => new Promise((resolve) => server.close(resolve)),
+  };
+}

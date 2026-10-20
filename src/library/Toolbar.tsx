@@ -464,7 +464,7 @@ export function LibraryToolbar({
               ]}
             />
           </div>
-          <div className="library-filter-row">
+          <div className="library-filter-row library-filter-row-top">
             <span>合并</span>
             <div className="library-merge-options">
               <OptionGroup

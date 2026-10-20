@@ -1,7 +1,7 @@
 * { box-sizing: border-box; }
 html { user-select: none; cursor: default; }
 :where(input, textarea, [contenteditable="true"], .nps-tag, .wb-prose, .wb-paragraph, .library-prose, .wb-caption strong, .wb-meta, .library-file, .library-mono, [data-generation-parameters], code, pre, .nps-error, .nps-banner, .settings-release-notes-content, .nps-dialog-body p, .nps-dialog-body blockquote) { user-select: text; cursor: text; }
-::selection { background: var(--selected); color: inherit; }
+::selection { background: var(--select-bg); color: inherit; }
 img, svg, a { -webkit-user-drag: none; }
 a[href] { cursor: pointer; }
 .import-status > .nps-progress { flex: 0 0 var(--char-name-w); }

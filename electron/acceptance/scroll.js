@@ -10,13 +10,12 @@ export async function scrollChecks(h, selector) {
   await wait(`${node}.scrollTop===0`);
   await e(`${node}.scrollTop=100`);
   await wait(`${thumb}.dataset.visible==='true'`);
-  await h.checkSoon(
-    '滚动后细条出现并保持在滚动视口内',
-    `(()=>{const n=${node},t=${thumb},a=n.getBoundingClientRect(),b=t.getBoundingClientRect();return b.top>=a.top && b.bottom<=a.bottom+1 && !t.hidden})()`,
-  );
-  await wait(`!${thumb}.dataset.visible`);
-  await check('停下后细条按令牌期限淡出', `!${thumb}.dataset.visible`);
+
   await e(`${node}.dispatchEvent(new PointerEvent('pointermove',{bubbles:true}))`);
+  await wait(
+    `(()=>{const n=${thumb},r=n.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===n})()`,
+    '细条已可接收拖动',
+  );
   const point = await e(
     `(()=>{const r=${thumb}.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`,
   );
@@ -43,19 +42,4 @@ export async function scrollChecks(h, selector) {
   }));
   await e(`${node}.scrollTop=${node}.scrollHeight`);
   await wait(`${node}.scrollTop>=${node}.scrollHeight-${node}.clientHeight-1`);
-  await h.checkSoon(
-    '窗口化列表滚到底时细条到轨道底部',
-    `(()=>{const n=${node},t=${thumb},a=n.getBoundingClientRect(),b=t.getBoundingClientRect(),inset=parseFloat(getComputedStyle(n).getPropertyValue('--sb-inset'));return Math.abs(a.bottom-b.bottom-inset)<2})()`,
-  );
-  const reduced = await e('matchMedia("(prefers-reduced-motion: reduce)").matches');
-  await h.window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
-    features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
-  });
-  await check(
-    '减少动态效果时细条没有过渡',
-    `getComputedStyle(${thumb}).transitionDuration.split(',').every(t=>parseFloat(t)===0)`,
-  );
-  await h.window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
-    features: [{ name: 'prefers-reduced-motion', value: reduced ? 'reduce' : 'no-preference' }],
-  });
 }

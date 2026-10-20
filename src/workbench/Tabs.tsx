@@ -1,9 +1,10 @@
+import { invokeUI } from '../lib/commands';
+import { AnimatedItems } from '../ui/AnimatedItems';
 import { DecodedImage, useMovingIndicator, useNavigationSelection } from '../ui/transitions';
-import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   DndContext,
   closestCenter,
-  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -18,10 +19,12 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Button, ContextMenu, type MenuItem } from '../ui';
 import type { WorkbenchSession, WorkbenchTab } from '../state/workbench';
-import { hasImageName } from '../lib/imageNaming.js';
+import { hasImageName, imageFileName } from '../lib/imageNaming.js';
 import { mediaUrl } from '../lib/imageStage.js';
 import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
 import './workbench.css';
+import { useGeneration } from '../state/generation';
+import { nearestTabSlot } from '../lib/tabSlots.js';
 import { useDragFeedback, restrictDrag } from './DragFeedback';
 
 export interface TabsProps {
@@ -34,6 +37,20 @@ export interface TabsProps {
 }
 function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
   const sortable = useSortable({ id: tab.id });
+  const generation = useGeneration();
+  const job = generation.jobs.find((j) => j.tabId === tab.id && j.state === 'generating');
+  const running = !!job;
+  const [versionCount, setVersionCount] = useState(1);
+  useEffect(() => {
+    let active = true;
+    if (generation.settings.hasToken)
+      void invokeUI('version.list', { tabId: tab.id }).then((r) => {
+        if (active) setVersionCount(r.versions.length);
+      });
+    return () => {
+      active = false;
+    };
+  }, [tab.id, tab.revision, generation.jobs]);
   const image = tab.project;
   const name = image && hasImageName(image) ? image.name : '';
   const index = p.session.tabs.findIndex((item) => item.id === tab.id);
@@ -69,7 +86,18 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
         role="tab"
         aria-selected={tab.id === p.session.activeTabId}
         aria-label={name || '没有起名'}
-        data-tip={name || '没有起名'}
+        data-tip={name || (image ? imageFileName(image) : '')}
+        data-tip-file={!name || undefined}
+        data-tip-details={
+          image ? `${image.metadata.width} × ${image.metadata.height} · ${versionCount} 版` : ''
+        }
+        data-tip-status={
+          running
+            ? `生成中 ${job!.completed + 1} / ${job!.count}`
+            : workbenchTabHasChanges(tab)
+              ? '有未生成的改动'
+              : ''
+        }
         data-tip-image={mediaUrl(image?.thumbnail_path || image?.image_path || '')}
         data-tip-date={image?.created_at || tab.updatedAt}
         onClick={() => p.onActivateTab(tab.id)}
@@ -118,6 +146,11 @@ function Tab({ tab, p }: { tab: WorkbenchTab; p: TabsProps }) {
           src={mediaUrl(image?.thumbnail_path || image?.image_path || '')}
         />
         {name && <span className="wb-tab-name">{name}</span>}
+        {running && (
+          <span className="wb-tab-generating" data-tip="生成中">
+            ●
+          </span>
+        )}
         {workbenchTabHasChanges(tab) && <span className="wb-dirty" aria-label="提示词已修改" />}
       </div>
     </ContextMenu>
@@ -192,9 +225,21 @@ export function WorkbenchTabs(p: TabsProps) {
       <DndContext
         sensors={sensors}
         modifiers={[(args) => restrictDrag(args, list.current, true)]}
-        collisionDetection={(args) =>
-          args.pointerCoordinates ? pointerWithin(args) : closestCenter(args)
-        }
+        collisionDetection={(args) => {
+          if (!args.pointerCoordinates) return closestCenter(args);
+          const ids = p.session.tabs.map((t) => t.id),
+            active = String(args.active.id);
+          const rects = ids.map((id) => args.droppableRects.get(id));
+          if (rects.some((r) => !r)) return closestCenter(args);
+          const gap = parseFloat(getComputedStyle(list.current!).columnGap) || 0;
+          const slot = nearestTabSlot(
+            rects[0]!.left,
+            rects.filter((_, i) => ids[i] !== active).map((r) => r!.width),
+            gap,
+            args.collisionRect.left,
+          );
+          return [{ id: ids[slot] }];
+        }}
         onDragStart={(event) =>
           drag.start(
             event,
@@ -217,9 +262,25 @@ export function WorkbenchTabs(p: TabsProps) {
               className="nps-moving-indicator wb-tab-indicator"
               aria-hidden="true"
             />
-            {p.session.tabs.map((tab) => (
-              <Tab key={tab.id} tab={tab} p={visualProps} />
-            ))}
+            <AnimatedItems
+              ids={[...p.session.tabs.map((t) => t.id), 'new-tab']}
+              attribute="data-workbench-tab-id"
+              parentItem
+            >
+              {p.session.tabs.map((tab) => (
+                <Tab key={tab.id} tab={tab} p={visualProps} />
+              ))}
+              <span>
+                <Button
+                  data-workbench-tab-id="new-tab"
+                  variant="quiet"
+                  aria-label="打开图片"
+                  onClick={p.onChooseImage}
+                >
+                  <i className="ri-add-line" />
+                </Button>
+              </span>
+            </AnimatedItems>
           </div>
         </SortableContext>
         {drag.overlay}
@@ -233,9 +294,6 @@ export function WorkbenchTabs(p: TabsProps) {
           ›
         </Button>
       )}
-      <Button variant="quiet" aria-label="打开图片" onClick={p.onChooseImage}>
-        <i className="ri-add-line" />
-      </Button>
     </div>
   );
 }

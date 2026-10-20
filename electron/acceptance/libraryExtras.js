@@ -125,7 +125,7 @@ export async function extraLibraryChecks({
   await collectionContext(h, collection.id, '重命名');
   await input('input[aria-label="收藏集名称"]', `012多选改名${reduced}`);
   await key('Enter', {}, 'document.activeElement');
-  await wait('!document.querySelector("dialog[open]")');
+  await wait('!document.querySelector("input[aria-label=收藏集名称]")');
   await check(
     '普通收藏集重命名持久化',
     () =>
@@ -177,6 +177,7 @@ export async function extraLibraryChecks({
   await input('input[aria-label="图片名称"]', original + ' 012');
   await key('Enter', {}, 'document.activeElement');
   await h.until(() => database.loadProject(id).name === original + ' 012', '图片重命名');
+  await wait('!document.querySelector("input[aria-label=图片名称]")');
   await waitDetail();
   await check(
     '图片重命名同步到数据库和详情',
@@ -198,6 +199,7 @@ export async function extraLibraryChecks({
     undefined,
     'once',
   );
+  await waitDetail();
   await click('重命名', 'document.querySelector(".library-detail-actions")');
   await input('input[aria-label="图片名称"]', original);
   await key('Enter', {}, 'document.activeElement');

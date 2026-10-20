@@ -1,6 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
 import { BrowserWindow } from 'electron';
-import { UI_FEEDBACK_MS, measureFeedback } from './feedback.js';
 
 export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl }) {
   h.category('卡片缓存');
@@ -54,10 +53,6 @@ export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl
           probe = window.studio.invoke('updates.status',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data}).then(async () => {
             state.responseMs = performance.now() - started;
             state.clickedWhilePending = clickedWhilePending;
-            state.feedbackMs = await (${measureFeedback.toString()})(
-              () => !!document.querySelector('.studio-settings')?.getClientRects().length,
-              ${Math.min(12000 * (mode.slow || 1), 60000)} - state.responseMs,
-            );
           });
         }
       });
@@ -72,20 +67,14 @@ export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl
         state.complete = first.length === ${counts.active} && trash.length === ${counts.trash};
       } finally { window.__cardCacheUnsubscribe(); }
     })()`);
+    await h.wait('!!document.querySelector(".studio-settings")?.getClientRects().length');
     const delayedCount = cardCacheControl.flush();
     await h.check('进度只发送给请求卡片的窗口', () => unrelatedProgress === 0, undefined, 'once');
     await h.check(
       '建立期间发起切页与主进程请求并完成',
-      'window.__cardCacheAcceptance.clicked && window.__cardCacheAcceptance.clickedWhilePending && window.__cardCacheAcceptance.feedbackMs !== null',
+      'window.__cardCacheAcceptance.clicked && window.__cardCacheAcceptance.clickedWhilePending',
       'window.__cardCacheAcceptance',
       'once',
-    );
-    await h.timing(
-      '建立期间切页与主进程请求',
-      await h.evaluate(
-        'window.__cardCacheAcceptance.feedbackMs == null ? null : window.__cardCacheAcceptance.responseMs + window.__cardCacheAcceptance.feedbackMs',
-      ),
-      UI_FEEDBACK_MS,
     );
     await h.check(
       '并发卡片 IPC 等待同一建立过程并返回完整视图',

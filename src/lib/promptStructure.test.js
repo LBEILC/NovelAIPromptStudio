@@ -159,16 +159,16 @@ describe('NovelAI V4 prompt structure', () => {
   it('excludes confirmed NovelAI quality tags by default and can include the generation-ready raw prompt', () => {
     const raw = '1girl, blue hair, very aesthetic, masterpiece, no text, Text: Hello';
     const metadata = {
-      model: 'NovelAI Diffusion V5 0ADF9AB7',
+      model: 'NovelAI Diffusion V4.5 4BDE2A90',
       prompt_raw: raw,
       prompt_structure_raw: {
         base_prompt_raw: raw,
         base_undesired_raw: '',
         characters: [],
         novelai_auto: {
-          model: 'NovelAI Diffusion V5 0ADF9AB7',
+          model: 'NovelAI Diffusion V4.5 4BDE2A90',
           quality_toggle: true,
-          quality_source: 'tag_hint_qt',
+          quality_source: 'qualityToggle',
           uc_preset: 0,
           uc_preset_source: 'tag_hint_uc_preset',
         },

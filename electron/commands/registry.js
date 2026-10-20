@@ -14,6 +14,71 @@ const category =
   'ArtistEra|Subject|Identity|Body|Clothing|Action|Environment|Composition|StyleQuality|Unsorted';
 /** @type {Record<CommandName, Definition>} */
 export const commandRegistry = {
+  'generate.estimate': {
+    fields: { ...tab, count: 'integer', width: 'number', height: 'number' },
+    required: ['tabId', 'count'],
+    example: { tabId: 'tab-id', count: 1 },
+  },
+  'generate.start': {
+    fields: { ...tab, count: 'integer', continuous: 'boolean', fixedSeed: 'boolean' },
+    required: ['tabId', 'count'],
+    mutation: true,
+    example: { tabId: 'tab-id', count: 1 },
+  },
+  'generate.status': { fields: { id: 'string' }, example: {} },
+  'generate.confirm': { fields: { ids: 'strings' }, required: ['ids'], uiOnly: true },
+  'generate.cancel': { fields: { ids: 'strings' }, required: ['ids'], uiOnly: true },
+  'generate.stop': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
+  'generate.retry': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
+  'account.get': { fields: {}, uiOnly: true },
+  'account.save': { fields: { token: 'string' }, required: ['token'], uiOnly: true },
+  'account.refresh': { fields: {}, uiOnly: true },
+  'settings.generation.save': {
+    fields: {
+      continuous: 'boolean',
+      agentMode: 'confirm|direct',
+      limitEnabled: 'boolean',
+      dailyLimit: 'integer',
+    },
+    uiOnly: true,
+  },
+  'version.list': {
+    fields: { tabId: 'string' },
+    required: ['tabId'],
+    // The first read creates the work root and must serialize with draft edits.
+    mutation: true,
+    example: { tabId: 'tab-id' },
+  },
+  'version.open': {
+    fields: { ...tab, versionId: 'string', imageId: 'string' },
+    required: ['tabId', 'versionId'],
+    mutation: true,
+    example: { tabId: 'tab-id', versionId: 'version-id' },
+  },
+  'prompt.set-size': {
+    fields: { ...tab, width: 'number', height: 'number' },
+    required: ['tabId', 'width', 'height'],
+    mutation: true,
+    example: { tabId: 'tab-id', width: 832, height: 1216 },
+  },
+  'branch.rename': {
+    fields: { branchId: 'string', name: 'text' },
+    required: ['branchId', 'name'],
+    mutation: true,
+    example: { branchId: 'branch-id', name: '雨景' },
+  },
+  'work.open-from-image': {
+    fields: { ...tab, versionId: 'string', imageId: 'string' },
+    required: ['tabId', 'versionId', 'imageId'],
+    mutation: true,
+    example: { tabId: 'tab-id', versionId: 'version-id', imageId: 'image-id' },
+  },
+  'work.open': {
+    fields: { workId: 'string', versionId: 'string', imageId: 'string' },
+    required: ['workId'],
+    mutation: true,
+    example: { workId: 'work-id' },
+  },
   'agent.setup': { fields: {}, uiOnly: true },
   'agent.install': { fields: {}, uiOnly: true },
   'agent.skill': { fields: {}, uiOnly: true },

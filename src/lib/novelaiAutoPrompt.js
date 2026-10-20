@@ -1,7 +1,7 @@
 import { findPromptTextBlockStart, parsePrompt } from './prompt.js';
 
 // V4.5 and earlier templates follow NovelAI's public Quality Tags and Undesired Content docs.
-// V5 hints and templates are verified against the metadata embedded in the official 2026-08-21 launch samples.
+// V5 hint IDs and current templates follow the official image client (2026-10-20).
 const V45_FULL_HEAVY =
   'lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page';
 const V45_FULL_LIGHT =
@@ -21,7 +21,11 @@ const MODEL_PROFILES = {
     undesired: [
       { label: 'Furry Focus', template: V45_FULL_FURRY },
       { label: 'Heavy', template: V45_FULL_HEAVY },
-      { label: 'Light', template: V45_FULL_LIGHT },
+      {
+        label: 'Light',
+        template:
+          'lowres, bad hands, bad anatomy, artistic error, sepia, white haze, worst quality, very displeasing, jpeg artifacts, 0::ai-generated::',
+      },
       { label: 'Human Focus', template: V45_FULL_HUMAN },
     ],
   },
@@ -29,9 +33,9 @@ const MODEL_PROFILES = {
     label: 'V4.5 Full',
     quality: {
       // NovelAI imports older V4.5 PNGs with this three-tag suffix as the Standard preset.
-      compatibleTemplates: ['very aesthetic, masterpiece, no text'],
+      compatibleTemplates: ['location, very aesthetic, masterpiece, no text'],
       label: 'Standard',
-      template: 'location, very aesthetic, masterpiece, no text',
+      template: 'very aesthetic, masterpiece, no text',
       position: 'suffix',
     },
     undesired: [
@@ -45,7 +49,8 @@ const MODEL_PROFILES = {
     label: 'V4.5 Curated',
     quality: {
       label: 'Standard',
-      template: 'location, masterpiece, no text, -0.8::feet::, rating:general',
+      template: 'very aesthetic, masterpiece, no text, -0.8::feet::, rating:general',
+      compatibleTemplates: ['location, masterpiece, no text, -0.8::feet::, rating:general'],
       position: 'suffix',
     },
     undesired: [
@@ -90,7 +95,8 @@ const MODEL_PROFILES = {
     label: 'V4 Curated',
     quality: {
       label: 'Standard',
-      template: 'rating:general, amazing quality, very aesthetic, absurdres',
+      template: 'rating:general, best quality, very aesthetic, absurdres',
+      compatibleTemplates: ['rating:general, amazing quality, very aesthetic, absurdres'],
       position: 'suffix',
     },
     undesired: [
@@ -193,6 +199,7 @@ export function extractNovelAIAutoSettings(raw = {}, model = '') {
   return {
     model: String(model || raw.model_name || raw.model || raw.source || ''),
     quality_toggle: normalizeToggle(quality.value),
+    quality_preset: quality.value,
     quality_source: quality.key,
     uc_preset: undesired.value,
     uc_preset_source: undesired.key,
@@ -320,13 +327,36 @@ function emptyAnalysis(kind, status = 'unknown') {
   };
 }
 
+function hintedAnalysis(kind, scope, profile, label, template) {
+  return {
+    ...emptyAnalysis(kind, 'confirmed'),
+    cleanedRaw: scope.raw_prompt,
+    label,
+    modelLabel: profile?.label || '',
+    template,
+    virtual: true,
+    tagCount: template ? parsePrompt(template, () => '').length : 0,
+  };
+}
 function analyzeQuality(settings, scope, profiles) {
+  if (
+    settings.quality_source === 'tag_hint_qt' &&
+    Number(settings.quality_preset ?? settings.quality_toggle) > 0
+  ) {
+    const light = Number(settings.quality_preset) === 3;
+    return hintedAnalysis(
+      'quality',
+      scope,
+      profiles[0],
+      light ? 'Light' : 'Standard',
+      light ? 'very aesthetic, amazing quality, no text' : profiles[0]?.quality.template || '',
+    );
+  }
   if (settings.quality_toggle === false) return emptyAnalysis('quality', 'disabled');
   for (const profile of profiles) {
-    const definitions = [
-      profile.quality.template,
-      ...(profile.quality.compatibleTemplates || []),
-    ].map((template) => ({ ...profile.quality, template }));
+    const definitions = [profile.quality.template, ...(profile.quality.compatibleTemplates || [])]
+      .sort((a, b) => b.length - a.length)
+      .map((template) => ({ ...profile.quality, template }));
     for (const definition of definitions) {
       const match = stripTemplate(scope.raw_prompt, definition);
       if (!match) continue;
@@ -343,6 +373,7 @@ function analyzeQuality(settings, scope, profiles) {
             : `推断为 NovelAI ${profile.label} Quality Tags · ${definition.label || 'Standard'}`,
         tagCount: tagIds.length || parsePrompt(definition.template, () => '').length,
         tagIds,
+        template: definition.template,
       };
     }
   }
@@ -359,6 +390,14 @@ function ucSelectionState(settings) {
 }
 
 function analyzeUndesired(settings, scope, profiles) {
+  if (settings.uc_preset_source === 'tag_hint_uc_preset') {
+    const label =
+      { 0: 'None', 1: 'Standard', 2: 'Heavy', 3: 'Light', 4: 'Human Focus', 5: 'Furry Focus' }[
+        Number(settings.uc_preset)
+      ] || `预设 ${settings.uc_preset}`;
+    const template = profiles[0]?.undesired.find((p) => p.label === label)?.template || '';
+    return hintedAnalysis('undesired', scope, profiles[0], label, template);
+  }
   const selection = ucSelectionState(settings);
   for (const profile of profiles) {
     for (const preset of [...profile.undesired].sort(
@@ -383,6 +422,7 @@ function analyzeUndesired(settings, scope, profiles) {
               : `疑似 NovelAI UC · ${preset.label}`,
         tagCount: tagIds.length || parsePrompt(preset.template, () => '').length,
         tagIds,
+        template: definition.template,
       };
     }
   }

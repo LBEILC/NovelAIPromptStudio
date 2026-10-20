@@ -1,8 +1,9 @@
+import { notificationClearance } from './interactionCorrections.js';
+import { textEditingChecks, automaticAndVibeChecks } from './workbenchText.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { clipboard, nativeImage } from 'electron';
 import { createWorkbenchFixtures, workbenchRaw, workbenchNegative } from './workbenchFixtures.js';
-import { tabOutlineChecks } from './tabOutline.js';
 import { settleElements } from './layout.js';
 import { withWorkbenchState, sessionExpression, draftExpression } from './workbenchState.js';
 
@@ -25,20 +26,23 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     await click(action, 'document.querySelector(".nps-layer [role=menu]")');
   };
   const rawEdit = async (text) => {
-    await menu('更多', '编辑原始文本');
-    await input('[aria-label="原始文本"]', text);
-    await click('保存', 'document.querySelector(".wb-raw-editor")');
+    await menu('更多', '切换为文本编辑');
+    await input('.wb-text-section textarea', text);
+    await click('按块编辑（Ctrl E 切换）');
     await wait(`${raw}===${JSON.stringify(text)}`);
   };
   const reset = async () => {
-    if (await e('!!document.querySelector(".wb-dirty-line")')) {
-      await click('还原成原图的提示词');
-      await click('恢复', 'document.querySelector("dialog[open]")');
+    if (await e('!!document.querySelector(".wb-stage-dirty[data-visible]")')) {
+      await click('恢复', 'document.querySelector(".wb-stage-title")');
       await wait(`${raw}===${JSON.stringify(workbenchRaw)}`);
     }
+    await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    await wait('!document.querySelector("[data-list-exit]")');
     // Reload establishes a remembered block type as the original view. Normalize
     // the fixture through its public menu before subsequent Tag interactions.
-    if (await e('document.querySelector(".wb-block > header")?.textContent.includes("段落")'))
+    if (
+      await e('document.querySelector(".wb-block > header > span")?.textContent.startsWith("段落")')
+    )
       await menu('块操作', '转为 Tag 块', 'document.querySelector(".wb-block")');
   };
   const checkCopy = async (label, predicate) => {
@@ -113,8 +117,8 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await click('打开图片', 'document.querySelector(".studio-titlebar")');
   await wait('document.querySelectorAll(".wb-block").length===4');
   await check(
-    '无角色时节标题为提示词，顶部只保留搜索、显示与翻译动作',
-    `document.querySelector('.wb-section-head > button').textContent.trim()==='提示词' && !document.querySelector('.wb-prompt-head strong') && document.querySelector('.wb-prompt').getAttribute('aria-label')==='提示词' && document.querySelector('.wb-prompt-head input').placeholder==='搜索 Tag 或译文' && document.querySelector('.wb-prompt-head [aria-label="翻译"]').getAttribute('data-tip')==='把全部 Tag 翻译并分类'`,
+    '无角色时节标题为提示词，顶部包含编辑方式、搜索、显示、翻译与复制',
+    `document.querySelector('.wb-section-head > button').textContent.trim()==='提示词' && !document.querySelector('.wb-prompt-head strong') && document.querySelector('.wb-prompt').getAttribute('aria-label')==='提示词' && document.querySelector('.wb-prompt-head input').placeholder==='搜索 Tag 或译文' && document.querySelector('.wb-prompt-head [aria-label="翻译"]').getAttribute('data-tip')==='翻译'&&!!document.querySelector('.wb-prompt-head [aria-label=复制]')`,
   );
   await shot('copy-header');
   await click('块操作', 'document.querySelector(".wb-block")');
@@ -139,7 +143,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     'both',
   );
   await shot('home');
-  await tabOutlineChecks(h);
+
   await click('其他复制方式');
   await check(
     '工作台复制菜单可交互且提供正面、排除和逐节复制',
@@ -237,12 +241,13 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     `${raw}.includes(${JSON.stringify(workbenchRaw.split('\n\n')[1])}) && !${raw}.includes('glass window')`,
   );
   await reset();
-  await click('加一块', 'document.querySelector(".wb-add-block-gap")');
+  await click('段落', 'document.querySelector(".wb-add-block-gap")');
   await check(
-    '块间新增入口打开有分隔位置的原始文本编辑',
-    '!!document.querySelector(".wb-raw-editor") && document.querySelector("[aria-label=原始文本]").value.includes("\\n\\n\\n\\n")',
+    '块间新增段落直接进入空段落编辑',
+    '!!document.querySelector(".wb-new-block [aria-label=英文段落]")',
   );
-  await click('取消', 'document.querySelector(".wb-raw-editor")');
+  await click('取消', 'document.querySelector(".wb-new-block")');
+  await check('取消空段落后不留下块', '!document.querySelector(".wb-new-block")');
   await e('document.querySelector(".wb-tags .nps-tag").click()');
   await wait('!!document.querySelector("[aria-label=Tag]")');
   await check(
@@ -411,10 +416,10 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     `${raw}?.includes('synthetic_tag_one, synthetic_tag_two')`,
   );
   await reset();
-  await menu('更多', '编辑原始文本');
+  await menu('更多', '切换为文本编辑');
   await shot('raw');
-  await input('[aria-label="原始文本"]', workbenchRaw + '\n\nsynthetic final block');
-  await click('保存', 'document.querySelector(".wb-raw-editor")');
+  await input('.wb-text-section textarea', workbenchRaw + '\n\nsynthetic final block');
+  await click('按块编辑（Ctrl E 切换）');
   await check('原始文本保存重新分块', 'document.querySelectorAll(".wb-block").length===5');
   await reset();
   await e('document.querySelector("[aria-label=编辑段落]").click()');
@@ -517,17 +522,31 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     '角色重命名同步正面和排除节',
     'document.body.innerText.includes("合成角色 的负面提示词")',
   );
-  await menu('角色操作', '移除角色', 'document.querySelectorAll(".wb-section")[2]');
-  await click('移除角色', 'document.querySelector("dialog[open]")');
-  await check('角色确认移除同时移除其两节', 'document.querySelectorAll(".wb-section").length===2');
+  await menu('角色操作', '删除角色', 'document.querySelectorAll(".wb-section")[2]');
+  await check('删除角色直接移除其两节', 'document.querySelectorAll(".wb-section").length===2');
+  await click('撤销', 'document.querySelector(".nps-notifications")');
+  await check(
+    '删除角色的撤销恢复原位置和内容',
+    `${draft}.prompt_structure.characters[0].label==='合成角色'&&document.querySelectorAll('.wb-section').length===4`,
+  );
+
   await reset();
+  await textEditingChecks({ h, raw, draft, reset, modifier });
   await key('Home', {}, 'document.querySelector(".wb-body .nps-resizer")');
+  await check(
+    '提示词栏最窄宽度为440',
+    `Math.abs(document.querySelector('.wb-prompt').getBoundingClientRect().width-440)<2`,
+  );
   await check(
     '提示词栏最窄时头部控件保持单行',
     `(()=>{const p=document.querySelector('.wb-prompt-head'),r=p.getBoundingClientRect();return [...p.children].every(x=>{const b=x.getBoundingClientRect();return b.top>=r.top&&b.bottom<=r.bottom&&b.right<=r.right+1})})()`,
   );
   await e(
     'document.querySelector(".wb-body .nps-resizer").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
+  );
+  await check(
+    '双击分隔线恢复520宽度',
+    `Math.abs(document.querySelector('.wb-prompt').getBoundingClientRect().width-520)<2`,
   );
   await click('存入图片库');
   await wait('document.querySelector(".wb-image-actions").textContent.includes("已存入图片库")');
@@ -537,6 +556,9 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     undefined,
     'once',
   );
+  await click('复制图片', 'document.querySelector(".wb-image-actions")');
+  await wait('document.querySelector(".nps-toast")?.textContent.includes("已复制图片")');
+  await notificationClearance(h, '工作台', '.wb-image-actions');
   doubles.selections.push({ canceled: false, filePaths: [files[1]] });
   await click('打开图片', 'document.querySelector(".studio-titlebar")');
   await wait('document.querySelectorAll(".wb-tab").length===2');
@@ -649,9 +671,9 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     '文件缺失时提示词仍然可编辑和复制',
     '!!document.querySelector(".wb-block") && document.body.innerText.includes("这张图片已被移动或删除")',
   );
-  await menu('更多', '编辑原始文本');
-  await input('[aria-label="原始文本"]', 'missing file editable');
-  await click('保存', 'document.querySelector(".wb-raw-editor")');
+  await menu('更多', '切换为文本编辑');
+  await input('.wb-text-section textarea', 'missing file editable');
+  await click('按块编辑（Ctrl E 切换）');
   await click('复制提示词');
   await checkCopy(
     '缺失图片草稿仍可编辑并复制',
@@ -685,5 +707,6 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   for (const project of database.loadLibrary('all')) {
     if (project.metadata.prompt_raw === workbenchRaw) database.deleteProject(project.id);
   }
+  await automaticAndVibeChecks({ h, mode, doubles });
   h.window.setContentSize(...previousSize);
 }

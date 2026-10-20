@@ -1,4 +1,4 @@
-import { promptTagRanges, CATEGORY_LABELS } from '../lib/prompt.js';
+import { promptTagRanges, parsePrompt, CATEGORY_LABELS } from '../lib/prompt.js';
 import { overviewTagKey } from '../lib/promptOverview.js';
 import {
   parsePromptSection,
@@ -71,8 +71,26 @@ export function replaceSection(
     ),
   };
 }
-export function reparseSection(previous: PromptSection, raw: string): PromptSection {
+export function reparseSection(
+  previous: PromptSection,
+  raw: string,
+  textMode = false,
+): PromptSection {
   const next = parsePromptSection(raw);
+  if (textMode)
+    next.blocks = next.blocks.map((block) => {
+      const type =
+        !block.content.includes(',') && block.content.trim().split(/\s+/).length > 8
+          ? 'paragraph'
+          : 'tags';
+      return {
+        ...block,
+        type,
+        textLayout: true,
+        userType: true,
+        tags: type === 'tags' ? parsePrompt(block.content) : [],
+      };
+    });
   const unused = [...previous.blocks];
   next.blocks = next.blocks.map((block) => {
     const at = unused.findIndex((old) => old.raw === block.raw);
@@ -82,6 +100,8 @@ export function reparseSection(previous: PromptSection, raw: string): PromptSect
       ...block,
       ...(old.userType ? { type: old.type, userType: true, tags: old.tags } : {}),
       translation: old.translation,
+      displayLabel: old.displayLabel,
+      textLayout: block.textLayout || old.textLayout,
     };
   });
   return next;

@@ -23,6 +23,7 @@ export function LibraryViewer({
   onClose: () => void;
 }) {
   const [zoom, setZoom] = useState<number | null>(null);
+  const [fitting, setFitting] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [flip, setFlip] = useState(false);
   // Keep the opening order even if background library work completes while viewing.
@@ -95,12 +96,13 @@ export function LibraryViewer({
   const sideways = Math.abs(rotation % 180) === 90;
   const rotatedWidth = sideways ? height : width;
   const rotatedHeight = sideways ? width : height;
-  const fit = Math.min(size.width / rotatedWidth, size.height / rotatedHeight, 1 / size.dpr);
+  const fit = Math.min(size.width / rotatedWidth, size.height / rotatedHeight);
   const scale = zoom == null ? fit : zoom / size.dpr;
   const stageWidth = rotatedWidth * scale;
   const stageHeight = rotatedHeight * scale;
   const applyZoom = (value: number | null, point?: { x: number; y: number }) => {
     if (value === zoom) return;
+    setFitting(value === null);
     const node = canvas.current;
     const stage = node?.querySelector('.library-viewer-image');
     if (node && stage) {
@@ -245,7 +247,13 @@ export function LibraryViewer({
           direction={direction}
           enter
           scale
-          style={{ width: stageWidth, height: stageHeight }}
+          style={{
+            width: stageWidth,
+            height: stageHeight,
+            transition: fitting
+              ? 'width var(--dur-3) var(--ease-move),height var(--dur-3) var(--ease-move)'
+              : 'none',
+          }}
         >
           <DecodedImage
             src={mediaUrl(image.image_path)}
@@ -257,8 +265,11 @@ export function LibraryViewer({
                 height: event.currentTarget.naturalHeight,
               })
             }
-            onDoubleClick={() => applyZoom(zoom == null ? 1 : null)}
+            onDoubleClick={() => applyZoom(null)}
             style={{
+              transition: fitting
+                ? 'width var(--dur-3) var(--ease-move),height var(--dur-3) var(--ease-move)'
+                : 'none',
               width: width * scale,
               height: height * scale,
               transform: `translate(-50%, -50%) rotate(${rotation}deg) scaleX(${flip ? -1 : 1})`,
@@ -303,6 +314,7 @@ export function LibraryViewer({
           </div>
         )}
         <div className="library-selection-bar">
+          <span className="nps-help">滚轮缩放 · 拖动平移 · 双击适应窗口</span>
           <Button
             variant="quiet"
             size="small"
@@ -312,7 +324,7 @@ export function LibraryViewer({
             <i className="ri-zoom-out-line" />
           </Button>
           <Button variant="quiet" size="small" aria-label="100%" onClick={() => applyZoom(1)}>
-            {zoom == null ? '适合窗口' : `${Math.round(zoom * 100)}%`}
+            {`${Math.round((zoom == null ? fit * size.dpr : zoom) * 100)}%`}
           </Button>
           <Button variant="quiet" size="small" aria-label="放大" onClick={() => changeZoom(1.2)}>
             <i className="ri-zoom-in-line" />

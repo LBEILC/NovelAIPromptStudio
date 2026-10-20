@@ -130,7 +130,7 @@ export async function clientChecks({ h, doubles, mode }) {
   await h.section('关于与更新');
   await h.check(
     '版本号可选中且使用主题选择色',
-    `(()=>{const n=document.querySelector('.settings-about-head code'),s=getComputedStyle(n,'::selection'),p=document.createElement('span');p.style.background='var(--selected)';document.body.append(p);const ok=getComputedStyle(n).userSelect==='text'&&s.backgroundColor===getComputedStyle(p).backgroundColor;p.remove();return ok})()`,
+    `(()=>{const n=document.querySelector('.settings-about-head code'),s=getComputedStyle(n,'::selection'),p=document.createElement('span');p.style.background='var(--select-bg)';document.body.append(p);const ok=getComputedStyle(n).userSelect==='text'&&s.backgroundColor===getComputedStyle(p).backgroundColor;p.remove();return ok})()`,
   );
   await h.screenshot('client-content-selection');
 }

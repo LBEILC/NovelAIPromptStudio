@@ -227,6 +227,7 @@ export function Menu({
       onContextMenu={(event) => {
         if (!context) return;
         event.preventDefault();
+        event.stopPropagation();
         onContextOpen?.();
         setPoint({ x: event.clientX, y: event.clientY });
         setOpen(true);
@@ -234,6 +235,7 @@ export function Menu({
       onKeyDown={(event) => {
         if (context && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) {
           event.preventDefault();
+          event.stopPropagation();
           onContextOpen?.();
           setPoint(undefined);
           setOpen(true);

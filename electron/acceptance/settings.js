@@ -1,4 +1,4 @@
-import { settingsLayoutChecks } from './settingsLayout.js';
+import { notificationClearance } from './interactionCorrections.js';
 import { scrollChecks } from './scroll.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -10,7 +10,6 @@ import { createTrashDraft } from './shortcuts.js';
 import { appearanceLayerChecks } from './appearanceLayers.js';
 
 export async function settingsChecks(context, restart) {
-  if (context.mode.category === '设置·版式') return settingsLayoutChecks(context.h);
   const { h, mode, app, database, preferences, doubles, files, encrypted } = context;
   const { evaluate: e, wait, check, click, input, select, section } = h;
   const aiInput = (index) =>
@@ -38,7 +37,9 @@ export async function settingsChecks(context, restart) {
       'once',
     );
     await section('AI 服务');
-    await wait('!!document.querySelector("input[type=password],.settings-saved-key")');
+    await wait(
+      '!!document.querySelector(".settings-column input[type=password],.settings-saved-key")',
+    );
     await wait(
       `(()=>{const fields=[...document.querySelectorAll('textarea')];return document.querySelector('${aiInput(0)}')?.value===${JSON.stringify(expected.ai.baseUrl)} && fields[0]?.value===${JSON.stringify(expected.ai.translationPrompt)} && fields[1]?.value===${JSON.stringify(expected.ai.classificationPrompt)}})()`,
       '重启后的 AI 设置完成异步加载',
@@ -55,7 +56,7 @@ export async function settingsChecks(context, restart) {
     if (encrypted)
       await check(
         '重启 Key 显示已保存状态且不可输入',
-        'document.querySelector(".settings-saved-key")?.textContent === "已保存 ••••••••" && !document.querySelector("input[type=password]")',
+        'document.querySelector(".settings-saved-key")?.textContent === "已保存 ••••••••" && !document.querySelector(".settings-column input[type=password]")',
         undefined,
         'once',
       );
@@ -99,7 +100,6 @@ export async function settingsChecks(context, restart) {
     await h.screenshot(`restart-${mode.phase}`);
     return;
   }
-  if (['全部', '设置', '减少动态效果'].includes(mode.category)) await settingsLayoutChecks(h);
   if (mode.category === '减少动态效果') {
     h.category('设置·翻译词典·关闭动效');
     await section('翻译词典');
@@ -317,14 +317,16 @@ export async function settingsChecks(context, restart) {
       return saved;
     };
   }
-  const aiDraftMatches = `document.querySelector(${JSON.stringify(aiInput(0))})?.value === ${JSON.stringify(mode.baseUrl)} && document.querySelector('[aria-label="模型"]')?.value==='acceptance-model' && document.querySelector('input[type=password]')?.value===${JSON.stringify(encrypted ? 'acceptance-local-key' : '')} && [...document.querySelectorAll('textarea')].map(e=>e.value).join('|') === '验收翻译规则|验收分类规则'`;
-  const aiDraftDetails = `(()=>{const key=document.querySelector('input[type=password]'); const areas=[...document.querySelectorAll('textarea')]; return {baseUrl:document.querySelector(${JSON.stringify(aiInput(0))})?.value, model:document.querySelector('[aria-label="模型"]')?.value, apiKey:{empty:!key?.value,length:key?.value.length ?? 0}, translationPrompt:areas[0]?.value, classificationPrompt:areas[1]?.value}})()`;
+  const aiDraftMatches = `document.querySelector(${JSON.stringify(aiInput(0))})?.value === ${JSON.stringify(mode.baseUrl)} && document.querySelector('[aria-label="模型"]')?.value==='acceptance-model' && document.querySelector('.settings-column input[type=password]')?.value===${JSON.stringify(encrypted ? 'acceptance-local-key' : '')} && [...document.querySelectorAll('textarea')].map(e=>e.value).join('|') === '验收翻译规则|验收分类规则'`;
+  const aiDraftDetails = `(()=>{const key=document.querySelector('.settings-column input[type=password]'); const areas=[...document.querySelectorAll('textarea')]; return {baseUrl:document.querySelector(${JSON.stringify(aiInput(0))})?.value, model:document.querySelector('[aria-label="模型"]')?.value, apiKey:{empty:!key?.value,length:key?.value.length ?? 0}, translationPrompt:areas[0]?.value, classificationPrompt:areas[1]?.value}})()`;
   try {
     // Layout checks may have already loaded and retained the AI page. Start a
     // fresh renderer after installing the gate so this is truly its first read.
     if (slowAIRead) await h.reload();
     await section('AI 服务');
-    await wait('!!document.querySelector("input[type=password],.settings-saved-key")');
+    await wait(
+      '!!document.querySelector(".settings-column input[type=password],.settings-saved-key")',
+    );
     if (slowAIRead) await h.until(() => aiReads === 1, '首次设置读取已挂起');
     await input(aiInput(0), mode.baseUrl);
     if (encrypted) {
@@ -411,6 +413,7 @@ export async function settingsChecks(context, restart) {
   await input('textarea', '验收翻译规则（已保存）');
   await click('保存');
   await wait('document.body.innerText.includes("已保存")');
+  await notificationClearance(h, 'AI服务页脚', '.settings-page-foot');
   if (encrypted)
     await check(
       '空 Key 再保存保留加密 Key',

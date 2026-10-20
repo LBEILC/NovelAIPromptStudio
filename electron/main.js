@@ -1568,9 +1568,19 @@ app.whenReady().then(async () => {
     }
     return { ok: Boolean(await releasePreparedImport(input.id)) };
   });
+  let acceptanceGeneration;
+  if (
+    (acceptanceMode && !acceptanceMode.packaged) ||
+    (screenshotMode && process.argv.includes('--app-screenshot-readme'))
+  ) {
+    const { startFakeNovelAI } = await import('./fixtures/novelAIService.js');
+    acceptanceGeneration = await startFakeNovelAI();
+  }
   try {
     const beforeCommand = installAcceptanceLatency(acceptanceMode);
     commandRuntime = await installCommandRuntime({
+      preferences,
+      generationBaseUrl: acceptanceGeneration?.url,
       beforeCommand,
       handlers: commandHandlers,
       readyLibrary: () => contentBackfill,
@@ -1609,6 +1619,7 @@ app.whenReady().then(async () => {
     try {
       const { runAcceptance } = await import('./acceptance/run.js');
       await runAcceptance({
+        generationService: acceptanceGeneration,
         app,
         mode: acceptanceMode,
         doubles: acceptanceDoubles,
@@ -1619,6 +1630,7 @@ app.whenReady().then(async () => {
         preferences,
         createWindow,
       });
+      await acceptanceGeneration?.close();
       app.quit();
     } catch (error) {
       console.error(error);
@@ -1631,6 +1643,7 @@ app.whenReady().then(async () => {
     try {
       const { runAppScreenshots } = await import('./tools/appScreenshots.js');
       await runAppScreenshots({
+        generationService: acceptanceGeneration,
         app,
         mode: screenshotMode,
         database,
@@ -1638,6 +1651,7 @@ app.whenReady().then(async () => {
         preferences,
         createWindow,
       });
+      await acceptanceGeneration?.close();
       app.quit();
     } catch (error) {
       console.error(error);

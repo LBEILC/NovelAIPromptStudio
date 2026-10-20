@@ -407,6 +407,12 @@ export function LibraryGrid({
                       alt=""
                       draggable={false}
                     />
+                    {!!shown.version_number && (
+                      <span className="library-version-badge">
+                        第 {shown.version_number} 版
+                        {shown.generation_source === 'agent' ? ' · Agent' : ''}
+                      </span>
+                    )}
                     {group.members.length > 1 && (
                       <>
                         <span className="library-stack" data-tip={`${group.members.length} 张`}>

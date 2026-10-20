@@ -114,7 +114,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       '第五条译文',
   );
   await click('分类：acceptance_005');
-  await click('环境背景', 'document.querySelector(".nps-layer")');
+  await click('环境背景', 'document.querySelector(".nps-menu:popover-open")');
   await wait(
     `document.querySelector('tr[data-tag="acceptance_005"]')?.textContent.includes('环境背景')`,
   );
@@ -162,7 +162,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   await e(`document.querySelector(${JSON.stringify(search)}).focus()`);
   await h.screenshot('dictionary-selection');
   await click('设置分类', 'document.querySelector(".settings-dictionary-selection")');
-  await click('环境背景', 'document.querySelector(".nps-layer")');
+  await click('环境背景', 'document.querySelector(".nps-menu:popover-open")');
   await wait(`[...${rows}].every(row=>row.cells[3].textContent.includes('环境背景'))`);
   await check(
     '批量分类包含未渲染条目',
@@ -175,10 +175,10 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   await click('更多：acceptance_004');
   await check(
     '手动条目更多菜单显示还原',
-    'document.querySelector(".nps-layer").textContent.includes("还原")',
+    'document.querySelector(".nps-menu:popover-open").textContent.includes("还原")',
   );
   await h.screenshot('dictionary-more');
-  await click('还原', 'document.querySelector(".nps-layer")');
+  await click('还原', 'document.querySelector(".nps-menu:popover-open")');
   await check(
     '还原确认逐字说明删除修改和重新获取译文',
     `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='还原"acceptance_004"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['将删除修改过的译文和分类。此 Tag 再次出现时会重新查询内置词典；内置词典中没有的，需要再次"翻译并分类"才会有译文。']))}})()`,
@@ -192,7 +192,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     () => database.lookupTagDictionary(['acceptance_004']).size === 1,
   );
   await click('更多：acceptance_004');
-  await click('还原', 'document.querySelector(".nps-layer")');
+  await click('还原', 'document.querySelector(".nps-menu:popover-open")');
   await click('还原', 'document.querySelector("dialog")');
   await wait(`${count}===0`);
   await check(
@@ -209,34 +209,9 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   );
   await scrollChecks(h, '.settings-table-scroll');
   await h.screenshot('dictionary');
-  await e(`(() => {
-    const region = document.querySelector('.settings-table-scroll');
-    const originalHeight = region.scrollHeight;
-    window.dictionaryShrinkTiming = new Promise(resolve => {
-      let started;
-      let frame;
-      const finish = value => {
-        observer.disconnect(); cancelAnimationFrame(frame); clearTimeout(timeout); resolve(value);
-      };
-      const sample = () => {
-        if (started === undefined && region.scrollHeight < originalHeight) started = performance.now();
-        if (started !== undefined && region.querySelector('.nps-scroll-thumb').hidden) {
-          finish(performance.now() - started);
-          return true;
-        }
-        return false;
-      };
-      const observer = new MutationObserver(sample);
-      observer.observe(region, { childList: true, subtree: true, attributes: true });
-      const tick = () => { if (!sample()) frame = requestAnimationFrame(tick); };
-      const timeout = setTimeout(() => finish(null), ${Math.min(12000 * (mode.slow || 1), 60000)});
-      frame = requestAnimationFrame(tick);
-    });
-  })()`);
   await input(search, 'acceptance_204');
   await wait(`${count}===1`);
-  const shrinkElapsed = await e('window.dictionaryShrinkTiming');
-  await h.timing('内容高度变短后细条隐藏（页面内部计时）', shrinkElapsed, 100);
+  await wait("document.querySelector('.settings-table-scroll .nps-scroll-thumb').hidden");
   await check(
     '筛选缩短内容后细条隐藏且不保留虚假滚动高度',
     `(()=>{const n=document.querySelector('.settings-table-scroll');return n.querySelector('.nps-scroll-thumb').hidden && n.scrollHeight===n.clientHeight && n.scrollTop===0})()`,
@@ -267,7 +242,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   await tab('未分类');
   await wait(`${count}===1`);
   await click('分类：view_fixture_unsorted');
-  await click('服装配饰', 'document.querySelector(".nps-layer")');
+  await click('服装配饰', 'document.querySelector(".nps-menu:popover-open")');
   await wait(
     `document.querySelector('tr[data-tag="view_fixture_unsorted"]')?.textContent.includes('服装配饰')`,
   );
@@ -394,7 +369,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       'once',
     );
     await click('更多：dictionary_fixture_000');
-    await click('复制 Tag', 'document.querySelector(".nps-layer")');
+    await click('复制 Tag', 'document.querySelector(".nps-menu:popover-open")');
     await h.until(() => clipboard.readText() === 'dictionary fixture 000', '词典复制 Tag 完成');
     await check(
       '更多菜单复制空格形式的 Tag',
@@ -403,7 +378,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       'once',
     );
     await click('更多：dictionary_fixture_000');
-    await click('删除', 'document.querySelector(".nps-layer")');
+    await click('删除', 'document.querySelector(".nps-menu:popover-open")');
     await check(
       '单条删除确认使用定稿标题、正文与按钮',
       `(()=>{const dialog=document.querySelector('dialog[open]');return dialog.querySelector('h3').textContent==='删除"dictionary_fixture_000"？' && JSON.stringify([...dialog.querySelectorAll('.nps-dialog-body p')].map(p=>p.textContent))===${JSON.stringify(JSON.stringify(['软件不保存译文的历史记录。此 Tag 再次出现时会重新查询内置词典；内置词典中没有的，需要再次"翻译并分类"才会有译文。']))} && [...dialog.querySelectorAll('.nps-actions button')].map(b=>b.textContent).join('|')==='取消|删除'})()`,
@@ -420,7 +395,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       'once',
     );
     await click('更多：dictionary_fixture_001');
-    await click('在图片库里查找', 'document.querySelector(".nps-layer")');
+    await click('在图片库里查找', 'document.querySelector(".nps-menu:popover-open")');
     await wait('!!document.querySelector(".gallery-search input")');
     await check(
       '更多菜单在图片库搜索对应 Tag',

@@ -15,7 +15,7 @@
 .settings-page-head p { margin: var(--sp-0) 0 0; color: var(--text-3); font: var(--fs-small)/var(--lh-small) var(--font-ui); }
 .settings-page-foot { flex: 0 0 auto; background: var(--surface); box-shadow: inset 0 var(--bw) var(--divider); padding: 0 var(--page-pad-x); }
 .settings-page-foot > div { height: var(--page-foot-h); display: flex; align-items: center; gap: var(--sp-2); }
-.settings-page-foot [role="status"] { flex: 1; min-width: 0; color: var(--text-3); font-size: var(--fs-small); }
+.settings-page-foot [role="status"] { flex: 0 1 auto; margin-right:auto; min-width: 0; color: var(--text-3); font-size: var(--fs-small); }
 .settings-copy h2 { font-size: var(--fs-title); line-height: var(--lh-title); font-weight: var(--fw-strong); margin: var(--sp-6) 0 var(--sp-2); }
 .settings-copy h2:first-child { margin-top: 0; }
 .settings-copy p { color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); margin: 0 0 var(--sp-3); }
@@ -29,7 +29,6 @@
 .settings-actions .nps-field input { text-overflow: ellipsis; }
 .settings-line button, .settings-actions button, .settings-page-foot button { flex-shrink: 0; }
 .settings-line .settings-actions, .settings-column .settings-actions { padding-top: 0; }
-.settings-ai-actions > [role="status"] { flex: 1; }
 .settings-copy code { font: var(--fs-small)/var(--lh-small) var(--font-mono); color: var(--text-2); overflow-wrap: anywhere; }
 /* Dictionary viewport uses the complete row extent. */
 .settings-dictionary { position: relative; }
@@ -92,7 +91,7 @@
 .settings-view-indicator { z-index:-1; background:var(--selected); border-radius:var(--r-ctl) var(--r-ctl) 0 0; }
 
 .settings-saved-key { flex:1; font-family:var(--font-mono); display:flex; align-items:center; }
-.settings-status-ok, .settings-page-foot [role="status"].settings-status-ok { color:var(--ok); background:var(--ok-wash); border-radius:var(--r-ctl); padding:var(--sp-1) var(--sp-2); }
+.settings-status-ok, .settings-page-foot [role="status"].settings-status-ok { color:var(--ok); background:var(--ok-wash); border-radius:var(--r-ctl); padding:var(--sp-1) var(--ctl-pad-x); }
 .settings-page-foot [role="status"].settings-status-error { color:var(--danger); }
 
 .settings-table .settings-no-translation { color:var(--text-3); }

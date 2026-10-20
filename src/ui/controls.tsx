@@ -157,6 +157,7 @@ export function Input({
 }
 
 export interface Option {
+  iconOnly?: boolean;
   style?: React.CSSProperties;
   value: string;
   label: string;
@@ -411,7 +412,9 @@ export function OptionGroup({
           role="radio"
           aria-checked={option.value === selected}
           disabled={disabled || option.disabled}
-          className="nps-option"
+          aria-label={option.iconOnly ? option.label : undefined}
+          data-tip={option.iconOnly ? option.label : undefined}
+          className={cx('nps-option', option.iconOnly && 'nps-option-icon')}
           tabIndex={
             option.value === selected ||
             (!enabled.some((item) => item.value === selected) && option === enabled[0])
@@ -420,7 +423,8 @@ export function OptionGroup({
           }
           onClick={() => select(option.value)}
         >
-          {option.label}
+          {option.prefix}
+          {!option.iconOnly && option.label}
         </button>
       ))}
     </div>

@@ -108,7 +108,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const node = layer.current;
     if (!node) return;
     const selector =
-      '.library-dock > *, .settings-dictionary-selection .nps-selection, .import-status, .import-result';
+      '.library-dock > *, .settings-dictionary-selection .nps-selection, .import-status, .import-result, .wb-image-actions, .settings-page-foot';
     const observed = new Set<Element>();
     const update = () => {
       const bars = [...document.querySelectorAll<HTMLElement>(selector)];
@@ -119,7 +119,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         }
       }
       const style = getComputedStyle(node);
-      let bottom = parseFloat(style.getPropertyValue('--sp-6'));
+      const baseline = parseFloat(style.bottom);
+      let bottom = baseline;
       const gap = parseFloat(style.getPropertyValue('--sp-2'));
       for (const bar of bars) {
         if (!observed.has(bar)) {
@@ -135,7 +136,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             top -= new DOMMatrix(getComputedStyle(surface).transform).m42;
         bottom = Math.max(bottom, innerHeight - top + gap);
       }
-      const offset = bottom - parseFloat(style.getPropertyValue('--sp-6'));
+      const offset = bottom - baseline;
       const value = `translate(-50%, ${-offset}px)`;
       if (node.style.transform !== value) node.style.transform = value;
     };

@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync, backup } from 'node:sqlite';
 import { expect, it } from 'vitest';
+import { RETIRED_TABLES } from '../../electron/versions.js';
 import { openDatabase } from '../../electron/database.js';
 import { project, seed } from './fixture.mjs';
 
@@ -24,7 +25,7 @@ it('keeps the synthetic metadata distribution and tag count at the baseline size
 // Still exercises durable production startup, inserts and reopen after shrinking
 // only synthetic padding/cache volume; allow shared CI disk latency (was 9.9s).
 it(
-  'seeds through production, preserves all 21 tables and orphans, and reopens a single file',
+  'seeds through production, migrates the 21-table legacy schema and preserves active rows and orphans, and reopens a single file',
   { timeout: 20000 },
   async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-fixture-test-'));
@@ -60,14 +61,25 @@ it(
             .all()
             .map((row) => row.table),
         ).toEqual(['generation_metadata', 'generation_metadata', 'generation_metadata']);
-        // Opening repairs legacy cover fingerprints; retired tables and orphans stay intact.
+        // Opening repairs cover fingerprints and retires only the named legacy tables.
         for (const [table, rows] of Object.entries(snapshot)) {
+          if (RETIRED_TABLES.includes(table)) {
+            expect(
+              raw.prepare('SELECT name FROM sqlite_master WHERE name=?').get(table),
+            ).toBeUndefined();
+            continue;
+          }
           if (table === 'prompt_group_covers') {
             expect(raw.prepare('SELECT * FROM prompt_group_covers').all()).toEqual([]);
             continue;
           }
           if (table === 'app_meta') {
-            expect(raw.prepare('SELECT * FROM app_meta ORDER BY rowid').all()).toEqual(
+            expect(
+              raw
+                .prepare('SELECT * FROM app_meta ORDER BY rowid')
+                .all()
+                .filter((row) => row.key !== 'generation_versions_v1'),
+            ).toEqual(
               rows.filter(
                 (row) =>
                   !row.key.startsWith('prompt_fingerprints_dirty:') &&

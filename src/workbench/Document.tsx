@@ -1,3 +1,5 @@
+import { EmptyRole } from './AddTags';
+import { AnimatedItems } from '../ui/AnimatedItems';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Button,
@@ -34,9 +36,11 @@ import {
   type DocumentTag,
 } from './model';
 import './workbench.css';
+import { TextSection } from './TextSection';
 import { Collapse, TransitionSurface } from '../ui/transitions';
 
 export interface DocumentProps {
+  generationFooter?: ReactNode;
   scrollRef?: React.RefObject<HTMLDivElement | null>;
   project: ImageProject;
   viewState: WorkbenchTab['viewState'];
@@ -61,11 +65,16 @@ export interface DocumentProps {
   ) => ReactNode;
   renderParagraph?: (section: number, block: number, content: ReactNode) => ReactNode;
   renderAdd?: (section: number, block: number) => ReactNode;
+  onInsertBlock?: (section: number, after: number, type: 'tags' | 'paragraph') => void;
+  renderNewBlock?: (section: number, after: number) => ReactNode;
+  onRenameCharacter?: (section: number) => void;
   onRawEdit?: (section: number, initial?: string) => void;
   onTranslateParagraph?: (section: number, block: number) => void;
   selectedKeys?: string[];
   children?: ReactNode;
   characterActions?: ReactNode;
+  onEditModeChange?: () => void;
+  sectionTitle?: (section: number) => ReactNode;
   sectionActions?: (section: number) => ReactNode;
   sectionEditor?: { section: number; content: ReactNode };
 }
@@ -76,6 +85,18 @@ export function WorkbenchDocument(p: DocumentProps) {
   const doc = useMemo(() => createPromptDocument(p.project), [p.project]);
   const entries = useMemo(() => documentTags(doc), [doc]);
   const [query, setQuery] = useState('');
+  const [mode, setMode] = useState(() => localStorage.getItem('nps.prompt-edit-mode') || 'blocks');
+  const textMode = mode === 'text';
+  const switchMode = (next: string) => {
+    window.dispatchEvent(new Event('nps:flush-text'));
+    setMode(next);
+    p.onEditModeChange?.();
+    localStorage.setItem('nps.prompt-edit-mode', next);
+  };
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const latestDoc = useRef(doc);
+  latestDoc.current = doc;
   const [polarity, setPolarity] = useState('all');
   const [category, setCategory] = useState('All');
   const [viewOpen, setViewOpen] = useState(false);
@@ -85,6 +106,14 @@ export function WorkbenchDocument(p: DocumentProps) {
   const root = useRef<HTMLElement>(null);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 'e' &&
+        root.current?.getClientRects().length
+      ) {
+        event.preventDefault();
+        switchMode(modeRef.current === 'text' ? 'blocks' : 'text');
+      }
       if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === 'k' &&
@@ -130,7 +159,7 @@ export function WorkbenchDocument(p: DocumentProps) {
         : '复制提示词';
   const negativeText = doc.scopes
     .filter((section) => section.scope.polarity === 'undesired')
-    .map(serializePromptSection)
+    .map((section) => copyPromptDocumentScope(doc, section.scope.key))
     .filter(Boolean)
     .join('\n');
   const summary = (scopes: typeof doc.scopes, includeAutomatic = false) => {
@@ -146,9 +175,9 @@ export function WorkbenchDocument(p: DocumentProps) {
       .filter(Boolean)
       .join(' · ');
   };
-  const automaticCount = entries.filter(
-    (entry) => entry.automatic && doc.scopes[entry.section].scope.polarity === 'prompt',
-  ).length;
+  const automaticCount = doc.scopes
+    .filter((s) => s.scope.polarity === 'prompt')
+    .reduce((n, s) => n + (s.scope.automation?.tagCount || 0), 0);
   const copyItems: MenuItem[] = [
     {
       id: 'all',
@@ -302,46 +331,85 @@ export function WorkbenchDocument(p: DocumentProps) {
       />
     );
     return (
-      <span key={entry.key} data-wb-tag={entry.key}>
+      <span
+        key={entry.key}
+        data-wb-tag={entry.key}
+        data-untranslated={(language === 'translated' && !tag.translation) || undefined}
+      >
         {p.renderTag ? p.renderTag(entry, content) : content}
       </span>
     );
   };
   return (
-    <section className="wb-prompt" aria-label="提示词" ref={root}>
+    <section className="wb-prompt" data-edit-mode={mode} aria-label="提示词" ref={root}>
       <div className="wb-prompt-head">
+        <OptionGroup
+          size="small"
+          label="编辑方式"
+          value={mode}
+          onChange={switchMode}
+          options={[
+            {
+              value: 'blocks',
+              label: '按块编辑（Ctrl E 切换）',
+              prefix: <i className="ri-layout-grid-line" />,
+              iconOnly: true,
+            },
+            {
+              value: 'text',
+              label: '按文本编辑（Ctrl E 切换）',
+              prefix: <i className="ri-text" />,
+              iconOnly: true,
+            },
+          ]}
+        />
         <Input
           size="small"
           aria-label="搜索 Tag 或译文"
-          placeholder="搜索 Tag 或译文"
+          placeholder={textMode ? '查找' : '搜索 Tag 或译文'}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           prefix={<i className="ri-search-line" />}
           suffix={<Shortcut keys={['Mod', 'K']} />}
         />
-        <Button
-          variant="quiet"
-          size="small"
-          ref={viewAnchor}
-          aria-label="显示"
-          onClick={() => setViewOpen(!viewOpen)}
-        >
-          <i className="ri-equalizer-line" />
-          <span className="wb-responsive-label">
-            显示
-            {filtered &&
-              ` ${[!!query, polarity !== 'all', category !== 'All'].filter(Boolean).length}`}
-          </span>
-        </Button>
+        {!textMode && (
+          <Button
+            variant="quiet"
+            size="small"
+            ref={viewAnchor}
+            aria-label="显示"
+            data-tip-when-icon=""
+            onClick={() => setViewOpen(!viewOpen)}
+          >
+            <i className="ri-equalizer-line" />
+            <span className="wb-responsive-label">
+              显示
+              {filtered &&
+                ` ${[!!query, polarity !== 'all', category !== 'All'].filter(Boolean).length}`}
+            </span>
+          </Button>
+        )}
         <Button
           variant="quiet"
           size="small"
           aria-label="翻译"
-          data-tip="把全部 Tag 翻译并分类"
+          data-tip="翻译"
+          data-tip-when-icon=""
           onClick={() => translate(entries)}
         >
           <i className="ri-translate-2" />
           <span className="wb-responsive-label">翻译</span>
+        </Button>
+        <Button
+          className="wb-head-copy"
+          size="small"
+          variant="quiet"
+          aria-label="复制"
+          data-tip-when-icon=""
+          onClick={() => copy(copyPromptDocument(doc), '全部提示词')}
+        >
+          <i className="ri-file-copy-line" />
+          <span className="wb-copy-label">复制</span>
         </Button>
       </div>
       <Popover
@@ -441,169 +509,252 @@ export function WorkbenchDocument(p: DocumentProps) {
         {p.viewState.viewMode === 'category' && (
           <p className="nps-help">按分类排列时不能拖动排序</p>
         )}
-        {doc.scopes.map((section, si) => {
-          if (polarity !== 'all' && section.scope.polarity !== polarity) return null;
-          const sectionEntries = entries.filter((entry) => entry.section === si);
-          const sectionKey = section.scope.key;
-          const visibleEntries = sectionEntries.filter(
-            (entry) => !entry.automatic || automatic.includes(sectionKey),
-          );
-          const hiddenBlocks = section.blocks.filter(
-            (block, bi) =>
-              filtered &&
-              (block.type === 'tags'
-                ? !visibleEntries.some((entry) => entry.block === bi && matches(entry))
-                : category !== 'All' ||
-                  !`${block.content}\n${block.translation || ''}`
-                    .toLowerCase()
-                    .includes(query.toLowerCase())),
-          ).length;
-          const renderBlock = (bi: number) => {
-            const block = section.blocks[bi];
-            const tags = visibleEntries.filter((entry) => entry.block === bi);
-            if (
-              filtered &&
-              (block.type === 'tags'
-                ? !tags.some(matches)
-                : category !== 'All' ||
-                  !`${block.content}\n${block.translation || ''}`
-                    .toLowerCase()
-                    .includes(query.toLowerCase()))
-            )
-              return null;
-            if (p.viewState.viewMode === 'category' && block.type === 'tags') return null;
-            const prose = (
-              <div className="wb-prose">
-                <p>{block.content}</p>
-                {block.translation && <p className="wb-translation">{block.translation}</p>}
-              </div>
-            );
-            return (
-              <div key={bi} className="wb-block-group">
-                <div className="wb-block" data-wb-block={`${si}:${bi}`}>
-                  <header>
+        <AnimatedItems
+          className="wb-sections"
+          ids={doc.scopes.map((s) => s.scope.key)}
+          attribute="data-wb-scope"
+        >
+          {doc.scopes.map((section, si) => {
+            if (!textMode && polarity !== 'all' && section.scope.polarity !== polarity) return null;
+            const sectionEntries = entries.filter((entry) => entry.section === si);
+            const sectionKey = section.scope.key;
+            const visibleEntries = sectionEntries.filter((entry) => !entry.automatic);
+            const hiddenBlocks = section.blocks.filter(
+              (block, bi) =>
+                filtered &&
+                (block.type === 'tags'
+                  ? !visibleEntries.some((entry) => entry.block === bi && matches(entry))
+                  : category !== 'All' ||
+                    !`${block.content}\n${block.translation || ''}`
+                      .toLowerCase()
+                      .includes(query.toLowerCase())),
+            ).length;
+            const automation = section.scope.automation;
+            const automaticRow =
+              automation && ['confirmed', 'inferred'].includes(automation.status) ? (
+                <div className="wb-auto-group">
+                  <div className="wb-automatic">
                     <span>
-                      {block.type === 'tags'
-                        ? `Tag 块${block.label ? ` · ${block.label}` : ''} · ${tags.length} 个`
-                        : `段落${block.label ? ` · ${block.label}` : ''}`}
+                      NovelAI 自动添加 · {automation.kind === 'quality' ? '质量 Tag' : '负面预设'} ·{' '}
+                      {automation.label}
+                      {automation.status === 'inferred' && (
+                        <span data-tip="原图里没有记录用了哪个预设，这是按负面提示词比对出来的">
+                          （推断）
+                        </span>
+                      )}{' '}
+                      ·{' '}
+                      {automation.tagCount
+                        ? `${automation.tagCount} 个`
+                        : automation.label === 'None'
+                          ? '0 个'
+                          : '内容未知'}
                     </span>
-                    <Menu
-                      label="块操作"
-                      trigger={<i className="ri-more-line" />}
-                      items={blockMenu(si, bi)}
-                    />
-                  </header>
-                  {block.type === 'tags' ? (
-                    <div className="wb-tags">
-                      {p.renderTagList
-                        ? p.renderTagList(tags, tags.map(drawTag), si, bi)
-                        : tags.map(drawTag)}
-                      {p.renderAdd?.(si, bi)}
+                    <Button
+                      size="small"
+                      variant="quiet"
+                      onClick={() =>
+                        setAutomatic(
+                          automatic.includes(sectionKey)
+                            ? automatic.filter((k) => k !== sectionKey)
+                            : [...automatic, sectionKey],
+                        )
+                      }
+                    >
+                      {automatic.includes(sectionKey) ? '收起' : '显示'}
+                    </Button>
+                  </div>
+                  {automatic.includes(sectionKey) && (
+                    <div className="wb-auto-tags">
+                      {(automation.template || '')
+                        .split(',')
+                        .filter(Boolean)
+                        .map((tag, i) => (
+                          <Tag key={i} text={tag.trim()} categoryLabel="自动添加" />
+                        ))}
+                      {!automation.template && (
+                        <span>{automation.label === 'None' ? '无' : '内容未知'}</span>
+                      )}
                     </div>
-                  ) : p.renderParagraph ? (
-                    p.renderParagraph(si, bi, prose)
-                  ) : (
-                    prose
                   )}
                 </div>
-                <div className="wb-add-block-gap">
-                  <Button
-                    className="wb-add-block"
-                    variant="quiet"
-                    size="small"
-                    onClick={() => {
-                      // TODO(design): No empty-block editor is specified; use the existing raw editor at this separator.
-                      const raw = serializePromptSection(section);
-                      const at = block.range.end;
-                      p.onRawEdit?.(si, raw.slice(0, at) + '\n\n' + raw.slice(at));
-                    }}
-                  >
-                    <i className="ri-add-line" />
-                    加一块
-                  </Button>
+              ) : null;
+            const renderBlock = (bi: number) => {
+              const block = section.blocks[bi];
+              const tags = visibleEntries.filter((entry) => entry.block === bi);
+              if (
+                filtered &&
+                (block.type === 'tags'
+                  ? !tags.some(matches)
+                  : category !== 'All' ||
+                    !`${block.content}\n${block.translation || ''}`
+                      .toLowerCase()
+                      .includes(query.toLowerCase()))
+              )
+                return null;
+              if (p.viewState.viewMode === 'category' && block.type === 'tags') return null;
+              if (block.type === 'tags' && !tags.length && block.tags.length) return null;
+              const prose = (
+                <div className="wb-prose">
+                  <p>
+                    {p.viewState.language === 'translated' && block.translation
+                      ? block.translation
+                      : block.content}
+                  </p>
+                  {p.viewState.language === 'bilingual' && block.translation && (
+                    <p className="wb-translation">{block.translation}</p>
+                  )}
                 </div>
-              </div>
-            );
-          };
-          return (
-            <section key={sectionKey} className="wb-section" data-wb-scope={sectionKey}>
-              <header className="wb-section-head">
-                <Button
-                  variant="quiet"
-                  size="small"
-                  aria-expanded={!collapsed.includes(sectionKey)}
-                  data-disclosure=""
-                  onClick={() =>
-                    setCollapsed(
-                      collapsed.includes(sectionKey)
-                        ? collapsed.filter((key) => key !== sectionKey)
-                        : [...collapsed, sectionKey],
-                    )
-                  }
+              );
+              return (
+                <div key={bi} className="wb-block-group">
+                  <div className="wb-block" data-wb-block={`${si}:${bi}`}>
+                    <header>
+                      <span>
+                        {block.type === 'tags'
+                          ? `Tag 块${block.displayLabel || block.label ? ` · ${block.displayLabel || block.label}` : ''} · ${tags.length} 个`
+                          : `段落${block.label ? ` · ${block.label}` : ''}`}
+                      </span>
+                      <Menu
+                        label="块操作"
+                        trigger={<i className="ri-more-line" />}
+                        items={blockMenu(si, bi)}
+                      />
+                    </header>
+                    {block.type === 'tags' ? (
+                      <div className="wb-tags">
+                        {p.renderTagList
+                          ? p.renderTagList(tags, tags.map(drawTag), si, bi)
+                          : tags.map(drawTag)}
+                        {p.renderAdd?.(si, bi)}
+                      </div>
+                    ) : p.renderParagraph ? (
+                      p.renderParagraph(si, bi, prose)
+                    ) : (
+                      prose
+                    )}
+                  </div>
+                  {p.renderNewBlock?.(si, bi)}
+                  <div className="wb-add-block-gap">
+                    <span className="wb-add-block">
+                      <Button
+                        variant="quiet"
+                        size="small"
+                        onClick={() => p.onInsertBlock?.(si, bi, 'tags')}
+                      >
+                        <i className="ri-add-line" />
+                        Tag 块
+                      </Button>
+                      <span>|</span>
+                      <Button
+                        variant="quiet"
+                        size="small"
+                        onClick={() => p.onInsertBlock?.(si, bi, 'paragraph')}
+                      >
+                        段落
+                      </Button>
+                    </span>
+                  </div>
+                </div>
+              );
+            };
+            return (
+              <section key={sectionKey} className="wb-section" data-wb-scope={sectionKey}>
+                {section.scope.kind === 'character' &&
+                  !doc.scopes.slice(0, si).some((s) => s.scope.kind === 'character') &&
+                  p.characterActions}
+                <header className="wb-section-head">
+                  {p.sectionTitle?.(si) || (
+                    <Button
+                      variant="quiet"
+                      size="small"
+                      aria-expanded={!collapsed.includes(sectionKey)}
+                      data-disclosure=""
+                      onClick={() =>
+                        section.scope.kind === 'character' && section.scope.polarity === 'prompt'
+                          ? p.onRenameCharacter?.(si)
+                          : setCollapsed(
+                              collapsed.includes(sectionKey)
+                                ? collapsed.filter((key) => key !== sectionKey)
+                                : [...collapsed, sectionKey],
+                            )
+                      }
+                    >
+                      {scopeLabel(section)}
+                    </Button>
+                  )}
+                  <span className="nps-help">
+                    {textMode && si === 0
+                      ? '空一行是新的一块'
+                      : filtered
+                        ? `${visibleEntries.filter(matches).length} 个符合，共 ${visibleEntries.length} 个`
+                        : `${section.blocks.length} 块`}
+                  </span>
+                  <span className="wb-section-actions">
+                    <Button
+                      variant="quiet"
+                      size="small"
+                      aria-label="复制这一节"
+                      onClick={() =>
+                        copy(copyPromptDocumentScope(doc, sectionKey), scopeLabel(section))
+                      }
+                    >
+                      <i className="ri-file-copy-line" />
+                    </Button>
+                    {p.sectionActions?.(si)}
+                    {section.scope.kind !== 'character' && (
+                      <Menu
+                        label="更多"
+                        trigger={<i className="ri-more-line" />}
+                        items={[
+                          {
+                            id: 'raw',
+                            label: '切换为文本编辑',
+                            shortcut: ['Mod', 'E'],
+                            onSelect: () => switchMode('text'),
+                          },
+                          {
+                            id: 'translate',
+                            label: '翻译并分类',
+                            onSelect: () => translate(sectionEntries),
+                          },
+                        ]}
+                      />
+                    )}
+                  </span>
+                </header>
+                <TransitionSurface
+                  kind="height"
+                  change={`${collapsed.includes(sectionKey)}:${p.sectionEditor?.section === si}:${automatic.includes(sectionKey)}`}
                 >
-                  {scopeLabel(section)}
-                </Button>
-                <span className="nps-help">
-                  {filtered
-                    ? `${visibleEntries.filter(matches).length} 个符合，共 ${visibleEntries.length} 个`
-                    : `${section.blocks.length} 块`}
-                </span>
-                <span className="wb-section-actions">
-                  {p.sectionActions?.(si)}
-                  <Button
-                    variant="quiet"
-                    size="small"
-                    aria-label="复制这一节"
-                    onClick={() =>
-                      copy(copyPromptDocumentScope(doc, sectionKey), scopeLabel(section))
-                    }
-                  >
-                    <i className="ri-file-copy-line" />
-                  </Button>
-                  <Menu
-                    label="更多"
-                    trigger={<i className="ri-more-line" />}
-                    items={[
-                      { id: 'raw', label: '编辑原始文本', onSelect: () => p.onRawEdit?.(si) },
-                      {
-                        id: 'translate',
-                        label: '翻译并分类',
-                        onSelect: () => translate(sectionEntries),
-                      },
-                    ]}
-                  />
-                </span>
-              </header>
-              <TransitionSurface
-                kind="height"
-                change={`${collapsed.includes(sectionKey)}:${p.sectionEditor?.section === si}:${automatic.includes(sectionKey)}`}
-              >
-                {p.sectionEditor?.section === si
-                  ? p.sectionEditor.content
-                  : !collapsed.includes(sectionKey) && (
+                  {textMode ? (
+                    <>
+                      {section.scope.polarity === 'undesired' && automaticRow}
+                      <TextSection
+                        text={serializePromptSection(section)}
+                        label={scopeLabel(section)}
+                        query={query}
+                        tags={section.scope.tags}
+                        onSave={(text) => {
+                          const current = latestDoc.current;
+                          const index = current.scopes.findIndex((s) => s.scope.key === sectionKey);
+                          if (index < 0) return;
+                          const next = replaceSection(
+                            current,
+                            index,
+                            reparseSection(current.scopes[index], text, true),
+                          );
+                          latestDoc.current = next;
+                          update(next);
+                        }}
+                      />
+                      {section.scope.polarity === 'prompt' && automaticRow}
+                    </>
+                  ) : p.sectionEditor?.section === si ? (
+                    p.sectionEditor.content
+                  ) : (
+                    !collapsed.includes(sectionKey) && (
                       <>
-                        {!!sectionEntries.filter((entry) => entry.automatic).length && (
-                          <div
-                            className="wb-automatic"
-                            data-tip="这些是 NovelAI 按官方预设自动加的 Tag，默认复制时不包含。"
-                          >
-                            {section.scope.automation?.sourceLabel ||
-                              `NovelAI 自动添加 · ${section.scope.automation?.tagCount}`}
-                            <Button
-                              variant="quiet"
-                              size="small"
-                              onClick={() =>
-                                setAutomatic(
-                                  automatic.includes(sectionKey)
-                                    ? automatic.filter((key) => key !== sectionKey)
-                                    : [...automatic, sectionKey],
-                                )
-                              }
-                            >
-                              {automatic.includes(sectionKey) ? '隐藏' : '显示'}
-                            </Button>
-                          </div>
-                        )}
+                        {section.scope.polarity === 'undesired' && automaticRow}
                         {p.viewState.viewMode === 'category' &&
                           CATEGORY_OPTIONS.map((cat) => {
                             const tags = visibleEntries.filter(
@@ -623,11 +774,38 @@ export function WorkbenchDocument(p: DocumentProps) {
                             );
                           })}
                         {section.blocks.map((_, bi) => renderBlock(bi))}
-                        {!section.blocks.length && (
-                          <div className="wb-tags">
-                            {p.renderTagList?.([], [], si, -1)}
-                            {p.renderAdd?.(si, -1)}
-                          </div>
+                        {section.scope.polarity === 'prompt' && automaticRow}
+                        {!section.blocks.length &&
+                        section.scope.kind === 'character' &&
+                        section.scope.polarity === 'prompt' ? (
+                          <>
+                            <EmptyRole section={si}>
+                              <span>这个角色还没有内容，先加一块</span>
+                              {p.renderTagList?.([], [], si, -1)}
+                              <div>
+                                <Button
+                                  size="small"
+                                  onClick={() => p.onInsertBlock?.(si, -1, 'tags')}
+                                >
+                                  ＋ Tag 块
+                                </Button>
+                                <Button
+                                  size="small"
+                                  onClick={() => p.onInsertBlock?.(si, -1, 'paragraph')}
+                                >
+                                  ＋ 段落
+                                </Button>
+                              </div>
+                            </EmptyRole>
+                            {p.renderNewBlock?.(si, -1)}
+                          </>
+                        ) : (
+                          !section.blocks.length && (
+                            <div className="wb-tags">
+                              {p.renderTagList?.([], [], si, -1)}
+                              {p.renderAdd?.(si, -1)}
+                            </div>
+                          )
                         )}
                         {!!hiddenBlocks && (
                           <p className="nps-help">
@@ -635,40 +813,44 @@ export function WorkbenchDocument(p: DocumentProps) {
                           </p>
                         )}
                       </>
-                    )}
-              </TransitionSurface>
-            </section>
-          );
-        })}
-        {p.characterActions}
+                    )
+                  )}
+                </TransitionSurface>
+              </section>
+            );
+          })}
+        </AnimatedItems>
+        {!doc.scopes.some((s) => s.scope.kind === 'character') && p.characterActions}
       </div>
       {p.children}
-      <footer className="wb-copy-bar">
-        <div className="nps-split-button">
-          <Button
-            onClick={() =>
-              p.onCopyText(
-                !filtered && !p.selectedKeys?.length ? copyPromptDocument(doc) : copyContext.text,
-                copyContext.count,
-                !!p.selectedKeys?.length,
-                copyContext.ignored,
-                negativeOnly ? '负面 Tag' : '',
-                copyContext.automaticIgnored,
-              )
-            }
-          >
-            <i className="ri-file-copy-line" />
-            {copyLabel}
-          </Button>
-          <Menu
-            label="其他复制方式"
-            menuClassName="wb-copy-menu"
-            buttonVariant="default"
-            trigger={<i className="ri-arrow-down-s-line" />}
-            items={copyItems}
-          />
-        </div>
-      </footer>
+      {p.generationFooter || (
+        <footer className="wb-copy-bar">
+          <div className="nps-split-button">
+            <Button
+              onClick={() =>
+                p.onCopyText(
+                  !filtered && !p.selectedKeys?.length ? copyPromptDocument(doc) : copyContext.text,
+                  copyContext.count,
+                  !!p.selectedKeys?.length,
+                  copyContext.ignored,
+                  negativeOnly ? '负面 Tag' : '',
+                  copyContext.automaticIgnored,
+                )
+              }
+            >
+              <i className="ri-file-copy-line" />
+              {copyLabel}
+            </Button>
+            <Menu
+              label="其他复制方式"
+              menuClassName="wb-copy-menu"
+              buttonVariant="default"
+              trigger={<i className="ri-arrow-down-s-line" />}
+              items={copyItems}
+            />
+          </div>
+        </footer>
+      )}
     </section>
   );
 }

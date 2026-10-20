@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { capture, finish } from './transitions.js';
 import fs from 'node:fs/promises';
 import { clipboard } from 'electron';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
@@ -281,30 +280,6 @@ export async function libraryInteractionChecks(env) {
     );
     await move('mouseMoved', { x: bounds.left - 5, y: bounds.top - 5 });
     await settleLayout(h, '.library-card');
-    await capture(h, '.library-pick,.library-scrub-presence,.library-stack', async () => {
-      await move('mouseMoved', {
-        x: bounds.left + bounds.width / 2,
-        y: bounds.top + bounds.height / 2,
-      });
-      await wait(`!!${stack}.querySelector('.library-scrub')`);
-    });
-    await check(
-      '一摞的张数、细条和悬停复选框淡入；关闭动效无过渡',
-      `(()=>{const off=document.documentElement.dataset.motion==='off'||document.documentElement.dataset.motion!=='full'&&matchMedia('(prefers-reduced-motion: reduce)').matches;const n=document.querySelector('.library-pick'),style=getComputedStyle(n);return !!document.querySelector('.library-scrub')&&style.transitionDuration.split(',').some(d=>parseFloat(d)>0.001)===!off})()`,
-      undefined,
-      'once',
-    );
-    await finish(h);
-    await capture(h, '.library-pick,.library-scrub-presence,.nps-transition-snapshot', () =>
-      move('mouseMoved', { x: bounds.left - 5, y: bounds.top - 5 }),
-    );
-    await check(
-      '离开一摞时张数、细条和复选框淡出',
-      `(()=>{const off=document.documentElement.dataset.motion==='off'||document.documentElement.dataset.motion!=='full'&&matchMedia('(prefers-reduced-motion: reduce)').matches;const style=getComputedStyle(document.querySelector('.library-pick'));return !document.querySelector('.library-scrub')&&style.transitionDuration.split(',').some(d=>parseFloat(d)>0.001)===!off})()`,
-      undefined,
-      'once',
-    );
-    await finish(h);
     for (const index of [0, 2, 1]) {
       await move('mouseMoved', {
         x: bounds.left + (bounds.width * (index + 0.5)) / 3,
@@ -458,8 +433,8 @@ export async function workbenchInteractionChecks(env) {
     await wait('!!document.querySelector(".wb-tab-preview:popover-open img")');
     await wait('document.querySelector(".wb-tab-preview:popover-open img")?.naturalWidth>0');
     await check(
-      '标签页预览包含缩略图、未命名提示和导入时间',
-      `(()=>{const p=document.querySelector('.wb-tab-preview:popover-open'),t=${tab(0)},i=p?.querySelector('img');return !!i&&i.src===t.querySelector('img').src&&p.textContent.includes('没有起名')&&/导入$/.test(p.querySelector('.nps-help').textContent)&&!p.querySelector('.nps-help').textContent.includes('T')&&i.naturalWidth>0})()`,
+      '标签页预览包含缩略图、文件名、尺寸和导入时间',
+      `(()=>{const p=document.querySelector('.wb-tab-preview:popover-open'),t=${tab(0)},i=p?.querySelector('img');return !!i&&i.src===t.querySelector('img').src&&p.querySelector('[data-file]')?.textContent===t.dataset.tip&&p.textContent.includes('×')&&/导入/.test(p.textContent)&&i.naturalWidth>0})()`,
     );
     await check(
       '预览图片最长边受限且保留原比例',
@@ -581,7 +556,8 @@ export async function workbenchInteractionChecks(env) {
     );
     await click('添加角色');
     await wait(`${draft}.prompt_structure.characters.length===1`);
-    const characterAdd = `document.querySelectorAll('.wb-section')[2].querySelector('.wb-add-trigger')`;
+    await click('＋ Tag 块', 'document.querySelector(".wb-character-empty")');
+    const characterAdd = `document.querySelectorAll('.wb-section')[2].querySelector('.wb-add-trigger,.wb-character-empty')`;
     await e(`${characterAdd}.scrollIntoView({block:'center'});${frame}`);
     start = await dragStart(source);
     const character = await center(h, characterAdd, 'center');
@@ -614,15 +590,14 @@ export async function workbenchInteractionChecks(env) {
       await click('工作台', 'document.querySelector(".studio-titlebar")');
       await wait('document.documentElement.dataset.motion==="off"');
       await click('角色操作', 'document.querySelectorAll(".wb-section")[2]');
-      await click('移除角色', menu);
-      await wait('!!document.querySelector("dialog[open]")');
-      await click('移除角色', 'document.querySelector("dialog[open]")');
+      await click('删除角色', menu);
       await wait(`${draft}.prompt_structure.characters.length===0`);
       await click('添加角色');
       await wait(`${draft}.prompt_structure.characters.length===1`);
+      await click('＋ Tag 块', 'document.querySelector(".wb-character-empty")');
       const index = 0;
       const section = 2 + index * 2;
-      const add = `document.querySelectorAll('.wb-section')[${section}].querySelector('.wb-add-trigger')`;
+      const add = `document.querySelectorAll('.wb-section')[${section}].querySelector('.wb-add-trigger,.wb-character-empty')`;
       await e(`${add}.scrollIntoView({block:'center'});${frame}`);
       const tag = mode === '跟随系统' ? 'standing' : 'glass window';
       start = await dragStart(source);

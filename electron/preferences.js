@@ -256,6 +256,34 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
   };
 
   return {
+    novelAIToken: () => {
+      const value = read().novelAITokenEncrypted;
+      if (!value) return '';
+      try {
+        return safeStorage.decryptString(Buffer.from(value, 'base64'));
+      } catch {
+        throw new Error('无法解密已保存的持久令牌，请重新保存');
+      }
+    },
+    saveNovelAIToken: (token) => {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('当前系统无法安全加密持久令牌');
+      const stored = read();
+      stored.novelAITokenEncrypted = safeStorage.encryptString(token).toString('base64');
+      write(stored);
+    },
+    generationSettings: () => ({
+      hasToken: !!read().novelAITokenEncrypted,
+      continuous: false,
+      agentMode: 'confirm',
+      limitEnabled: false,
+      dailyLimit: 100,
+      ...(read().generation || {}),
+    }),
+    saveGenerationSettings: (next) => {
+      const stored = read();
+      stored.generation = { ...(stored.generation || {}), ...next };
+      write(stored);
+    },
     publicSettings,
     credentials,
     saveAISettings,

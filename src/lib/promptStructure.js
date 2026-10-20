@@ -158,6 +158,10 @@ export function normalizePromptStructure(structure, metadata = {}, idFactory = c
                   .filter((entry) => entry && typeof entry.raw === 'string')
                   .map((entry) => ({
                     raw: entry.raw,
+                    ...(entry.textLayout ? { textLayout: true } : {}),
+                    ...(typeof entry.displayLabel === 'string'
+                      ? { displayLabel: entry.displayLabel }
+                      : {}),
                     start: Number.isFinite(entry.start) ? entry.start : 0,
                     ...(['tags', 'paragraph'].includes(entry.type) ? { type: entry.type } : {}),
                     ...(typeof entry.translation === 'string'
@@ -322,9 +326,16 @@ export function updatePromptCharacter(project, characterId, patch) {
 export function addPromptCharacter(project, idFactory = createId) {
   const structure = normalizePromptStructure(project.prompt_structure, project.metadata, idFactory);
   if (structure.characters.length >= MAX_PROMPT_CHARACTERS) return project;
+  const names = new Set(
+    structure.characters.map((c, i) =>
+      /^Character \d+$/.test(c.label) ? `角色 ${i + 1}` : c.label,
+    ),
+  );
+  let number = 1;
+  while (names.has(`角色 ${number}`)) number++;
   const character = {
     id: idFactory(),
-    label: `Character ${structure.characters.length + 1}`,
+    label: `角色 ${number}`,
     prompt_tags: [],
     undesired_tags: [],
     center: { x: 0.5, y: 0.5 },
@@ -362,15 +373,24 @@ export function formatPositivePrompt(project) {
     .join('\n|\n');
 }
 
+/** Blank lines authored in text mode delimit blocks; imported raw bytes remain unchanged. */
+export function promptForTransmission(raw, project, key) {
+  return project.prompt_structure?.block_annotations?.[key]?.some((b) => b.textLayout)
+    ? String(raw).replace(/,?[ \t]*\n[ \t]*\n\s*/g, ', ')
+    : raw;
+}
 export function formatPositivePromptForCopy(project, { includeAutomatic = false } = {}) {
   return getPromptScopes(project)
     .filter((scope) => scope.polarity === 'prompt')
     .map((scope) => {
-      if (!includeAutomatic && ['confirmed', 'inferred'].includes(scope.automation?.status))
-        return scope.automation.cleanedRaw;
-      return String(scope.raw_prompt || '').trim()
+      let raw = String(scope.raw_prompt || '').trim()
         ? scope.raw_prompt
         : formatPromptInline(scope.tags);
+      if (includeAutomatic && scope.automation?.virtual && scope.automation.template)
+        raw = [raw, scope.automation.template].filter(Boolean).join(', ');
+      else if (!includeAutomatic && ['confirmed', 'inferred'].includes(scope.automation?.status))
+        raw = scope.automation.cleanedRaw;
+      return promptForTransmission(raw, project, scope.key);
     })
     .filter(Boolean)
     .join('\n|\n');
@@ -393,7 +413,7 @@ export function positivePromptCopyOptions(project, { includeAutomatic = false } 
     const excludeAutomatic =
       !includeAutomatic && ['confirmed', 'inferred'].includes(scope.automation?.status);
     const automaticCount = ['confirmed', 'inferred'].includes(scope.automation?.status)
-      ? scope.automation.tagIds.length
+      ? scope.automation.tagCount
       : 0;
     return {
       key: scope.key,
@@ -403,11 +423,17 @@ export function positivePromptCopyOptions(project, { includeAutomatic = false } 
             ? '复制基础提示词（不含自动质量词）'
             : '复制完整基础提示词'
           : `复制角色 ${(scope.characterIndex ?? 0) + 1} 提示词`,
-      text: excludeAutomatic
-        ? scope.automation.cleanedRaw
-        : String(scope.raw_prompt || '').trim()
-          ? scope.raw_prompt
-          : formatPromptInline(scope.tags),
+      text: promptForTransmission(
+        excludeAutomatic
+          ? scope.automation.cleanedRaw
+          : includeAutomatic && scope.automation?.virtual && scope.automation.template
+            ? [scope.raw_prompt, scope.automation.template].filter(Boolean).join(', ')
+            : String(scope.raw_prompt || '').trim()
+              ? scope.raw_prompt
+              : formatPromptInline(scope.tags),
+        project,
+        scope.key,
+      ),
       count: scope.tags.length - (excludeAutomatic ? scope.automation.tagIds.length : 0),
       automaticCount,
     };
