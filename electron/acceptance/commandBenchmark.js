@@ -57,34 +57,36 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
       mobile: false,
     });
     await loaded;
-    await h.wait('!!document.querySelector(".studio-titlebar")');
+    await h.wait('!!document.querySelector(".tb")');
     await e("window.studio.invoke('workbench.list', {})");
     for (const file of files) {
       doubles.selections.push({ canceled: false, filePaths: [file] });
-      await h.click('打开图片', 'document.querySelector(".studio-titlebar")');
-      await h.wait(`document.querySelectorAll('.wb-tab').length===${files.indexOf(file) + 1}`);
+      await h.click('打开图片', 'document.querySelector(".tb")');
+      await h.wait(
+        `document.querySelectorAll('.tabs [data-tab]').length===${files.indexOf(file) + 1}`,
+      );
     }
-    await h.wait('document.querySelectorAll(".wb-tab").length===3');
-    await settleLayout(h, '.wb-page');
+    await h.wait('document.querySelectorAll(".tabs [data-tab]").length===3');
+    await settleLayout(h, '.wb-body');
     await h.click('更多');
     await h.click('切换为文本编辑');
-    await h.wait('!!document.querySelector(".wb-text-section textarea")');
+    await h.wait('!!document.querySelector(".tx-wrap textarea")');
     samples.input =
-      await e(`(async()=>{const n=document.querySelector('.wb-text-section textarea');n.focus();const times=[];for(const char of ' synthetic benchmark text repeated for input measurement'){
+      await e(`(async()=>{const n=document.querySelector('.tx-wrap textarea');n.focus();const times=[];for(const char of ' synthetic benchmark text repeated for input measurement'){
       const start=performance.now();Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(n,n.value+char);n.dispatchEvent(new Event('input',{bubbles:true}));
       await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));times.push(performance.now()-start);
     }return times.slice(5)})()`);
     await h.click('按块编辑（Ctrl E 切换）');
     samples.tabs = await e(
-      `(async()=>{const times=[];for(let i=0;i<30;i++){const n=document.querySelectorAll('.wb-tab')[i%3],start=performance.now();n.click();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));if(n.getAttribute('aria-selected')!=='true')throw Error('Tab did not select');times.push(performance.now()-start);}return times.slice(3)})()`,
+      `(async()=>{const times=[];for(let i=0;i<30;i++){const n=document.querySelectorAll('.tabs [data-tab]')[i%3],start=performance.now();n.click();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));if(n.getAttribute('aria-selected')!=='true')throw Error('Tab did not select');times.push(performance.now()-start);}return times.slice(3)})()`,
     );
-    await settleLayout(h, '.wb-document-scroll');
+    await settleLayout(h, '.col.prompt .scroll');
     const move = pointer(h),
-      start = await center(h, 'document.querySelector(".wb-tags .nps-tag")');
+      start = await center(h, 'document.querySelector(".tags .tag[data-tag-key]")');
     await move('mouseMoved', start);
     await move('mousePressed', start, true);
     await move('mouseMoved', { x: start.x + 12, y: start.y + 5 }, true);
-    await h.wait('!!document.querySelector(".wb-drag-feedback")');
+    await h.wait('!!document.querySelector(".drag-float")');
     await e(
       `window.agentFrames=[];window.agentSampling=true;let before;function tick(now){if(before)window.agentFrames.push(now-before);before=now;if(window.agentSampling)requestAnimationFrame(tick)}requestAnimationFrame(tick)`,
     );
@@ -97,16 +99,16 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
     samples.drag = await e('window.agentSampling=false;window.agentFrames.slice(5)');
     await h.nativeKey('Escape');
     await move('mouseReleased', start);
-    await h.click('图片库', 'document.querySelector(".studio-titlebar")');
+    await h.click('图片库', 'document.querySelector(".tb")');
     await h.wait(
-      '!!document.querySelector(".library-card")&&!document.querySelector("[data-library-updating=true]")',
+      '!!document.querySelector(".card")&&!document.querySelector("[data-library-updating=true]")',
     );
     await h.click('视图');
     await h.click('不合并');
     await h.key('Escape');
     await h.wait('!document.querySelector("[data-library-updating=true]")');
     samples.filter = await e(
-      `(async()=>{const times=[];for(let i=0;i<12;i++){const half=i%2===0,n=document.querySelector(half?'.library-side [data-collection-id="benchmark-half"]':'.library-side [aria-label="全部图片"]'),start=performance.now();n.click();do{await new Promise(resolve=>requestAnimationFrame(resolve));if(performance.now()-start>10000)throw Error('Filter timeout')}while(document.querySelector('[data-library-updating=true]')||!document.querySelector('.library-count').textContent.includes((half?'2500':'5000')+' 张'));await new Promise(resolve=>requestAnimationFrame(resolve));times.push(performance.now()-start);}return times.slice(2)})()`,
+      `(async()=>{const times=[];for(let i=0;i<12;i++){const half=i%2===0,n=document.querySelector(half?'.libp .side [data-key="sv-benchmark-half"]':'.libp .side [aria-label="全部图片"]'),start=performance.now();n.click();do{await new Promise(resolve=>requestAnimationFrame(resolve));if(performance.now()-start>10000)throw Error('Filter timeout')}while(document.querySelector('[data-library-updating=true]')||!document.querySelector('.lcount').textContent.includes((half?'2500':'5000')+' 张'));await new Promise(resolve=>requestAnimationFrame(resolve));times.push(performance.now()-start);}return times.slice(2)})()`,
     );
     const importStart = performance.now();
     for (let at = 0; at < 100; at += 25) {
@@ -131,9 +133,9 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
         category_source: 'manual',
       })),
     );
-    await h.click('设置', 'document.querySelector(".studio-titlebar")');
+    await h.click('设置', 'document.querySelector(".tb")');
     samples.dictionary = await e(
-      `(async()=>{const start=performance.now();[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='翻译词典').click();do{await new Promise(resolve=>requestAnimationFrame(resolve));if(performance.now()-start>10000)throw Error('Dictionary timeout')}while(!document.querySelector('.settings-dictionary-count')?.textContent.includes('2000'));return [performance.now()-start]})()`,
+      `(async()=>{const start=performance.now();[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='翻译词典').click();do{await new Promise(resolve=>requestAnimationFrame(resolve));if(performance.now()-start>10000)throw Error('Dictionary timeout')}while(!document.querySelector('.dict-count')?.textContent.includes('2000'));return [performance.now()-start]})()`,
     );
     samples.importDays = await e(
       `(async()=>{const month=new Date().toISOString().slice(0,7),times=[];for(let i=0;i<12;i++){const start=performance.now();const result=await window.studio.invoke('library.import-days',{month});if(!result.ok)throw Error(result.error.message);times.push(performance.now()-start)}return times.slice(2)})()`,

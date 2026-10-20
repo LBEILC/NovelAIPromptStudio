@@ -35,12 +35,12 @@ export async function runLibraryBenchmark({ mode, preferences, createWindow, dat
       mobile: false,
     });
     await loaded;
-    await h.wait('!!document.querySelector(".studio-titlebar")');
+    await h.wait('!!document.querySelector(".tb")');
     const navigationStart = performance.now();
-    await h.click('图片库', 'document.querySelector(".studio-titlebar")');
+    await h.click('图片库', 'document.querySelector(".tb")');
     while (
       !(await h.evaluate(
-        '!!document.querySelector(".library-card") && !document.querySelector("[data-library-updating=true]")',
+        '!!document.querySelector(".card") && !document.querySelector("[data-library-updating=true]")',
       ))
     ) {
       if (performance.now() - navigationStart > 180000)
@@ -57,13 +57,13 @@ export async function runLibraryBenchmark({ mode, preferences, createWindow, dat
     );
     await h.check(
       `${count} 张完整出现在列表计数中`,
-      `document.querySelector('.library-side [aria-label=全部图片] span').textContent==='${count}'`,
+      `document.querySelector('.libp .side [aria-label=全部图片] span').textContent==='${count}'`,
     );
-    await h.click('工作台', 'document.querySelector(".studio-titlebar")');
+    await h.click('工作台', 'document.querySelector(".tb")');
     const warmStart = performance.now();
-    await h.click('图片库', 'document.querySelector(".studio-titlebar")');
+    await h.click('图片库', 'document.querySelector(".tb")');
     await h.wait(
-      'document.querySelector(".library-card")?.getClientRects().length>0 && !document.querySelector("[data-library-updating=true]")',
+      'document.querySelector(".card")?.getClientRects().length>0 && !document.querySelector("[data-library-updating=true]")',
     );
     const warmOpenMs = performance.now() - warmStart;
     await h.evaluate(
@@ -72,20 +72,20 @@ export async function runLibraryBenchmark({ mode, preferences, createWindow, dat
     console.log(
       '滚动前几何',
       await h.evaluate(
-        `(()=>{const g=document.querySelector('[data-library-grid]');return {height:g.clientHeight,scroll:g.scrollHeight,rows:document.querySelector('.library-rows').style.height,count:document.querySelector('.library-count').textContent,cards:g.querySelectorAll('.library-card').length}})()`,
+        `(()=>{const g=document.querySelector('.lib-grid-col > .scroll');return {height:g.clientHeight,scroll:g.scrollHeight,rows:document.querySelector('.lgrid').style.height,count:document.querySelector('.lcount').textContent,cards:g.querySelectorAll('.card').length}})()`,
       ),
     );
     const scroll =
       count === 20000
         ? await h.evaluate(
-            `(async()=>{const g=document.querySelector('[data-library-grid]');g.scrollTop=g.scrollHeight;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return {reachedBottom:g.scrollTop+g.clientHeight>=g.scrollHeight-1,maxCards:g.querySelectorAll('.library-card').length,frames:0,lastIndex:Number(g.querySelector('.library-row:last-child .library-card:last-child')?.dataset.libraryIndex)}})()`,
+            `(async()=>{const g=document.querySelector('.lib-grid-col > .scroll');g.scrollTop=g.scrollHeight;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return {reachedBottom:g.scrollTop+g.clientHeight>=g.scrollHeight-1,maxCards:g.querySelectorAll('.card').length,frames:0,lastIndex:Number(g.querySelector('.card:last-child')?.dataset.index)}})()`,
           )
         : await h.evaluate(`new Promise(resolve=>{
-      const grid=document.querySelector('[data-library-grid]');
+      const grid=document.querySelector('.lib-grid-col > .scroll');
       const samples=[];let before=performance.now(),frames=0,maxCards=0;
       const tick=now=>{
         if(frames++)samples.push(now-before);
-        before=now;maxCards=Math.max(maxCards,grid.querySelectorAll('.library-card').length);
+        before=now;maxCards=Math.max(maxCards,grid.querySelectorAll('.card').length);
         if(grid.scrollTop+grid.clientHeight>=grid.scrollHeight-1){resolve({maxFrameMs:Math.max(...samples),p95FrameMs:[...samples].sort((a,b)=>a-b)[Math.floor(samples.length*.95)],frames,maxCards,reachedBottom:true,scrollHeight:grid.scrollHeight,top:grid.scrollTop});return;}
         grid.scrollTop+=Math.max(1,grid.clientHeight/2);requestAnimationFrame(tick);
       };requestAnimationFrame(tick);
@@ -106,24 +106,24 @@ export async function runLibraryBenchmark({ mode, preferences, createWindow, dat
       ['全部图片', count],
     ]) {
       const start = performance.now();
-      await h.click(name, 'document.querySelector(".library-side")');
+      await h.click(name, 'document.querySelector(".libp .side")');
       await h.wait(
-        `!document.querySelector('[data-library-updating=true]') && document.querySelector('.library-count')?.textContent.includes('${expected} 组')`,
+        `!document.querySelector('[data-library-updating=true]') && document.querySelector('.lcount')?.textContent.includes('${expected} 组')`,
       );
       collectionSwitchSamplesMs.push(performance.now() - start);
       await h.check(
         '切换收藏集后窗口化行数仍有界',
-        'document.querySelectorAll(".library-card").length < 100',
+        'document.querySelectorAll(".card").length < 100',
         undefined,
         'once',
       );
     }
     const details = await h.evaluate(`(async()=>{
       const times=[];
-      const cards=[...document.querySelectorAll('.library-card')].slice(-5);
+      const cards=[...document.querySelectorAll('.card')].slice(-5);
       for(const card of cards){
         const start=performance.now();card.click();
-        while(document.querySelector('.library-detail')?.dataset.detailId!==card.dataset.projectId){
+        while(document.querySelector('.col.detail')?.dataset.detailId!==card.dataset.projectId){
           if(performance.now()-start>10000)throw Error('Detail timeout');
           await new Promise(resolve=>requestAnimationFrame(resolve));
         }

@@ -20,7 +20,7 @@ export async function prepareLibraryScreenshot({
   if (!scene.libraryState) return async () => {};
   const h = harness(window, { ...mode, screenshots: [] }, []);
   const { evaluate: e, wait, click, input, key } = h;
-  const scope = 'document.querySelector(".library-page")';
+  const scope = 'document.querySelector(".libp")';
   const cleanup = [];
   const settle = async () => {
     await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
@@ -32,9 +32,9 @@ export async function prepareLibraryScreenshot({
     await settle();
   };
   const select = async () => {
-    await e('document.querySelector(".library-card").click()');
+    await e('document.querySelector(".card").click()');
     await wait(
-      'document.querySelector(".library-card.current")?.dataset.projectId === document.querySelector(".library-detail")?.dataset.detailId',
+      '!!document.querySelector(".card.on") && !!document.querySelector(".detail")?.dataset.detailId',
     );
   };
   const group = async () => {
@@ -42,10 +42,9 @@ export async function prepareLibraryScreenshot({
     await click('完全相同');
     await key('Escape');
     await settle();
-    await e(
-      `[...document.querySelectorAll('.library-card')].find(c=>c.querySelector('.library-stack')).click()`,
-    );
-    await wait('document.querySelectorAll(".library-detail .library-strip button").length>1');
+    await wait('!!document.querySelector(".card .stack")');
+    await e(`[...document.querySelectorAll('.card')].find(c=>c.querySelector('.stack')).click()`);
+    await wait('document.querySelectorAll(".detail .lstrip img").length>1');
   };
   try {
     await click('全部图片', scope);
@@ -71,52 +70,51 @@ export async function prepareLibraryScreenshot({
     if (state === 'group' || state === 'viewer') await group();
     if (state === 'filter') {
       await click('筛选', scope);
-      await input('input[aria-label="包含 Tag"]', '1girl');
+      await input('input[aria-label="包含的 Tag"]', '1girl');
       await key('Enter');
       await settle();
     }
     if (state === 'view') await click('视图', scope);
     if (state === 'select') {
       await e(
-        `[...document.querySelectorAll('.library-card')].filter((_,i)=>[0,2,4].includes(i)).forEach(c=>c.dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true})))`,
+        `[...document.querySelectorAll('.card')].filter((_,i)=>[0,2,4].includes(i)).forEach(c=>c.dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true})))`,
       );
-      await wait('!!document.querySelector(".library-selection-bar")');
+      await wait('!!document.querySelector(".ldock .selbar")');
     }
-    if (state === 'collect')
-      await click('加入收藏集', 'document.querySelector(".library-detail-actions")');
+    if (state === 'collect') await click('加入收藏集', 'document.querySelector(".detail")');
     if (state === 'smart') {
-      await click('智能收藏集', 'document.querySelector(".library-side")');
+      await click('智能收藏集', 'document.querySelector(".libp .side")');
       await settle();
     }
     if (state === 'nomatch') {
       await input('.gallery-search input', 'no-such-image');
-      await wait('!!document.querySelector(".library-empty")');
+      await wait('!!document.querySelector(".libp .empty")');
     }
     if (state === 'empty') {
       const ids = database.loadLibrary('all').map((p) => p.id);
       database.updateProjects(ids, { deleted: true });
       cleanup.push(() => database.updateProjects(ids, { deleted: false }));
       await reload();
-      await wait('!!document.querySelector(".library-empty")');
+      await wait('!!document.querySelector(".libp .empty")');
     }
     if (state === 'trash' || state === 'purge') {
       await click('回收站', scope);
       await settle();
       await select();
       if (state === 'purge') {
-        await click('永久删除', 'document.querySelector(".library-detail-actions")');
-        await wait('!!document.querySelector("dialog[open]")');
+        await click('永久删除', 'document.querySelector(".detail")');
+        await wait('!!document.querySelector("[role=dialog]:not(.leaving *)")');
       }
     }
     if (state === 'viewer') {
-      await key(' ', {}, 'document.querySelector("[data-library-grid]")');
-      await wait('!!document.querySelector(".library-viewer")');
+      await key(' ', {}, 'document.querySelector(".lgrid")');
+      await wait('!!document.querySelector(".viewer-ov")');
     }
     if (state === 'drop') {
       await e(
-        `(()=>{const d=new DataTransfer();for(let i=0;i<12;i++)d.items.add(new File(['image'],'reference-'+i+'.png',{type:'image/png'}));const target=document.querySelector('.library-scroll');for(const type of ['dragenter','dragover'])target.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:d,clientX:400,clientY:300}));})()`,
+        `(()=>{const d=new DataTransfer();for(let i=0;i<12;i++)d.items.add(new File(['image'],'reference-'+i+'.png',{type:'image/png'}));const target=document.querySelector('.lib-grid-col > .scroll');for(const type of ['dragenter','dragover'])target.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:d,clientX:400,clientY:300}));})()`,
       );
-      await wait('!!document.querySelector(".library-drop")');
+      await wait('!!document.querySelector(".dropzone")');
     }
     if (state === 'zip' || state === 'import') {
       const doubles = installAcceptanceDoubles(mode, { dialog, shell });
@@ -152,15 +150,15 @@ export async function prepareLibraryScreenshot({
       doubles.selections.push({ canceled: false, filePaths: paths });
       await click('导入', scope);
       if (state === 'zip') {
-        await wait('document.querySelectorAll(".library-zip .library-card").length===12');
-        await wait('document.querySelector(".library-zip")?.textContent.includes("其中 2 张")');
+        await wait('document.querySelectorAll(".zipdlg .ztile").length===12');
+        await wait('document.querySelector(".zipdlg")?.textContent.includes("其中 2 张")');
         await wait(
-          '[...document.querySelectorAll(".library-zip .library-card img")].every(image=>image.complete&&image.naturalWidth>0)',
+          '[...document.querySelectorAll(".zipdlg .ztile img")].every(image=>image.complete&&image.naturalWidth>0)',
         );
       } else {
-        await wait('!!document.querySelector(".library-job")');
+        await wait('!!document.querySelector(".ldock .job")');
         cleanup.push(async () => {
-          if (await e('!!document.querySelector(".library-job")')) await click('取消剩下的', scope);
+          if (await e('!!document.querySelector(".ldock .job")')) await click('取消剩余', scope);
         });
       }
     }

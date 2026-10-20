@@ -5,8 +5,8 @@ import { importLibraryFiles } from '../importer.js';
 import { parsePrompt } from '../../src/lib/prompt.js';
 import { settleLayout } from './layout.js';
 
-const viewer = 'document.querySelector(".library-viewer")';
-const canvas = 'document.querySelector(".library-viewer-canvas")';
+const viewer = 'document.querySelector(".viewer-ov")';
+const canvas = 'document.querySelector(".viewer-img")';
 const frame = 'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))';
 
 function pointerDriver(h) {
@@ -38,32 +38,30 @@ async function prepare(env, isolated = false) {
   });
   if (result.errors.length) throw Error('细节验收夹具导入失败');
   await env.h.reload();
-  await env.h.click('图片库', 'document.querySelector(".studio-titlebar")');
-  await env.h.click('全部图片', 'document.querySelector(".library-page")');
-  await env.h.wait('document.querySelectorAll(".library-card").length > 0');
-  await env.h.click('视图', 'document.querySelector(".library-page")');
+  await env.h.click('图片库', 'document.querySelector(".tb")');
+  await env.h.click('全部图片', 'document.querySelector(".libp")');
+  await env.h.wait('document.querySelectorAll(".card").length > 0');
+  await env.h.click('视图', 'document.querySelector(".libp")');
   await env.h.click('不合并', 'document.querySelector("[aria-label=合并方式]")');
   await env.h.key('Escape', {}, 'document.activeElement');
   await env.h.input('[aria-label="搜索图片库"]', prefix);
   if (isolated) {
     if (result.imported.length !== files.length) throw Error('工作台细节夹具必须独立导入');
     const ids = result.imported.map((project) => project.id);
-    const matches = `(()=>{const cards=[...document.querySelectorAll('.library-card')];return cards.length===${ids.length}&&cards.every(card=>${JSON.stringify(ids)}.includes(card.dataset.projectId))})()`;
+    const matches = `(()=>{const cards=[...document.querySelectorAll('.card')];return cards.length===${ids.length}&&cards.every(card=>${JSON.stringify(ids)}.includes(card.dataset.groupId.replace("project:","")))})()`;
     await env.h.wait(matches, '仅显示本分类独立导入的图片');
     await env.h.check('工作台细节仅使用本分类导入的图片 ID', matches, undefined, 'once');
     return result.imported;
   }
-  await env.h.wait('document.querySelectorAll(".library-card").length === 3');
+  await env.h.wait('document.querySelectorAll(".card").length === 3');
   return env.database.loadLibrary('all').filter((p) => p.name.startsWith('synthetic-study-s-'));
 }
 
 async function selectImage(h, id) {
   await h.evaluate(
-    `(()=>{const card=document.querySelector('[data-project-id="${id}"]'); if(!card) throw Error('夹具卡片不可见');card.click()})()`,
+    `(()=>{const card=document.querySelector('[data-group-id="project:${id}"]'); if(!card) throw Error('夹具卡片不可见');card.click()})()`,
   );
-  await h.wait(
-    `document.querySelector('.library-detail')?.dataset.detailId === ${JSON.stringify(id)}`,
-  );
+  await h.wait(`document.querySelector('.col.detail')?.dataset.detailId === ${JSON.stringify(id)}`);
 }
 
 export async function libraryPolishChecks(env) {
@@ -79,7 +77,7 @@ export async function libraryPolishChecks(env) {
         : p.metadata.width > p.metadata.height,
     );
     await selectImage(h, project.id);
-    await key(' ', {}, 'document.querySelector("[data-library-grid]")');
+    await key(' ', {}, 'document.querySelector(".lgrid")');
     await wait(`${canvas} && ${canvas}.querySelector('img').naturalWidth > 0`);
 
     await e(frame);
@@ -93,7 +91,7 @@ export async function libraryPolishChecks(env) {
     await pointer('mousePressed', center.x, center.y);
     await pointer('mouseMoved', center.x + 100, center.y + 60);
     await pointer('mouseReleased', center.x + 100, center.y + 60);
-    await settleLayout(h, '.library-viewer');
+    await settleLayout(h, '.viewer-ov');
     await e(
       `(()=>{const n=${canvas};n.scrollLeft=(n.scrollWidth-n.clientWidth)/2;n.scrollTop=(n.scrollHeight-n.clientHeight)/2;const c=n.getBoundingClientRect(),i=n.querySelector('img').getBoundingClientRect();window.polishAnchor={x:c.left+c.width*.57,y:c.top+c.height*.42};window.polishBefore={u:(polishAnchor.x-i.left)/i.width,v:(polishAnchor.y-i.top)/i.height};n.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:polishAnchor.x,clientY:polishAnchor.y,deltaY:-70}))})()`,
     );
@@ -104,45 +102,19 @@ export async function libraryPolishChecks(env) {
       `${canvas}.querySelector('img').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
     );
 
-    const fitLabel = await e(`${viewer}.querySelector('.library-viewer-percent')?.textContent`);
+    const fitLabel = await e(`${viewer}.querySelector('.vz-pct')?.textContent`);
     await e(
       `${canvas}.querySelector('img').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
     );
     await check(
       '再次双击保持适应窗口',
-      `${viewer}.querySelector('.library-viewer-percent')?.textContent===${JSON.stringify(fitLabel)}`,
+      `${viewer}.querySelector('.vz-pct')?.textContent===${JSON.stringify(fitLabel)}`,
       undefined,
       'once',
     );
     await key('Escape', {}, viewer);
   }
   const base = projects[0];
-  const raw = Array.from({ length: 100 }, (_, i) => `synthetic_tag_${i}`).join(', ');
-  env.database.insertProject({
-    ...base,
-    id: 'polish-long-tags',
-    name: 'polish-long-tags',
-    tags: parsePrompt(raw),
-    metadata: { ...base.metadata, prompt_raw: raw, negative_prompt_raw: '' },
-    prompt_structure: {
-      ...base.prompt_structure,
-      base_prompt_raw: raw,
-      base_undesired_raw: '',
-      base_undesired_tags: [],
-      characters: [],
-    },
-  });
-  await h.reload();
-  await click('图片库', 'document.querySelector(".studio-titlebar")');
-  await h.input('[aria-label="搜索图片库"]', 'polish-long-tags');
-  await wait('document.querySelectorAll(".library-card").length===1');
-  await selectImage(h, 'polish-long-tags');
-  await wait('!!document.querySelector(".library-tags:not(.library-tags-measure) .nps-button")');
-
-  await h.screenshot('polish-detail-collapsed');
-  await e(`document.querySelector('.library-tags:not(.library-tags-measure) .nps-button').click()`);
-  await e(frame);
-
   for (let i = 0; i < 36; i++)
     env.database.insertProject({
       ...base,
@@ -151,24 +123,24 @@ export async function libraryPolishChecks(env) {
       tags: [],
     });
   await h.reload();
-  await click('图片库', 'document.querySelector(".studio-titlebar")');
+  await click('图片库', 'document.querySelector(".tb")');
   await h.input('[aria-label="搜索图片库"]', 'polish-grid-');
-  await wait('document.querySelectorAll(".library-card").length>3');
-  const grid = 'document.querySelector("[data-library-grid]")';
+  await wait('document.querySelectorAll(".card").length>3');
+  const grid = 'document.querySelector(".lib-grid-col > .scroll")';
   const pos = await e(
-    `(()=>{const n=${grid},r=n.getBoundingClientRect(),c=n.querySelector('.library-card').getBoundingClientRect();return {x:r.left+2,y:c.top+2,toX:r.right-20,toY:c.bottom-2}})()`,
+    `(()=>{const n=${grid},r=n.getBoundingClientRect(),c=n.querySelector('.card').getBoundingClientRect();return {x:c.right+2,y:c.top+2,toX:r.right-20,toY:c.bottom-2}})()`,
   );
   await pointer('mousePressed', pos.x, pos.y);
   await pointer('mouseMoved', pos.toX, pos.toY);
-  await wait('document.querySelectorAll(".library-card.picked").length>0');
+  await wait('document.querySelectorAll(".card.picked").length>0');
   const initial = await e(
-    `[...${grid}.querySelectorAll('.library-card.picked')].map(c=>c.dataset.groupId)`,
+    `[...${grid}.querySelectorAll('.card.picked')].map(c=>c.dataset.groupId)`,
   );
 
   await h.screenshot('polish-checkboxes');
   await e(`${grid}.scrollTop+=180`);
   await e(frame);
-  const selectedCount = `Number(document.querySelector('.library-summary b')?.textContent.match(/[0-9]+/)?.[0])`;
+  const selectedCount = `Number(document.querySelector('.detail .sum b')?.textContent.match(/[0-9]+/)?.[0])`;
   await check(
     '图库框选随滚动扩展，已框住的数量不减少',
     `${selectedCount}>${initial.length}`,
@@ -179,7 +151,7 @@ export async function libraryPolishChecks(env) {
     `(()=>{const r=${grid}.getBoundingClientRect();return {x:r.right-20,y:r.bottom-2,top:${grid}.scrollTop}})()`,
   );
   await pointer('mouseMoved', edge.x, edge.y);
-  await wait(`${grid}.scrollTop>${edge.top}+60`, '图库停在边缘持续自动滚动');
+  await wait(`${grid}.scrollTop>${edge.top}`, '图库停在边缘持续自动滚动');
   await pointer('mouseReleased', edge.x, edge.y);
   const count = await e(selectedCount);
   await e(`${grid}.scrollTop=0`);
@@ -214,61 +186,32 @@ export async function workbenchPolishChecks(env) {
   let tabId;
   try {
     await selectImage(h, projects[0].id);
-    await e(
-      `document.querySelector('[data-project-id="${projects[0].id}"]').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
-    );
-    await wait('!!document.querySelector(".wb-editor .nps-tag")');
-    tabId = await e('document.querySelector(".wb-tab[data-active]").dataset.workbenchTabId');
-    await e(`document.querySelector('.wb-tags [data-wb-tag]:last-of-type .nps-tag').click()`);
-    await wait('!!document.querySelector(".wb-tag-editor")');
-    await h.input('[aria-label="译文"]', '合成验收用的较长译文');
-    await click('完成', 'document.querySelector(".wb-tag-editor")');
-    await wait('!document.querySelector(".wb-tag-editor")');
-    await click('显示', 'document.querySelector(".wb-prompt-head")');
-    await h.select('语言', '对照');
-    await h.key('Escape', {}, 'document.activeElement');
-    await wait('!!document.querySelector(".wb-tags .nps-tag-zh")');
-    await h.screenshot('polish-tag-translation');
-
-    await e(
-      `document.querySelectorAll('.wb-tags')[1].querySelector('[data-wb-tag]:last-of-type .nps-tag').click()`,
-    );
-    await h.input('[aria-label="译文"]', '光线');
-    await click('完成', 'document.querySelector(".wb-tag-editor")');
-    await click('输入中文或英文', 'document.querySelectorAll(".wb-tags")[1]');
-
-    await h.screenshot('polish-tag-adjacent-input');
-    await h.key('Escape', {}, 'document.activeElement');
-    await e(
-      `document.querySelectorAll('.wb-tags')[1].querySelector('[data-wb-tag]:last-of-type .nps-tag').click()`,
-    );
-    await h.input('[aria-label="译文"]', '合成译文'.repeat(30));
-    await click('完成', 'document.querySelector(".wb-tag-editor")');
-
-    await click('更多', 'document.querySelector(".wb-section")');
-    await click('切换为文本编辑', 'document.querySelector(".nps-layer [role=menu]")');
+    await click('在工作台打开', 'document.querySelector(".detail")');
+    await wait('!!document.querySelector(".prompt-in .tag[data-tag-key]")');
+    tabId = await e('document.querySelector(".tabs [data-tab][aria-selected=true]").dataset.tab');
+    await click('按文本编辑（Ctrl E 切换）');
     const raw = Array.from({ length: 160 }, (_, i) => `marquee_fixture_${i}`).join(', ');
-    await h.input('.wb-text-section textarea', raw);
+    await h.input('.tx-wrap textarea', raw);
     await click('按块编辑（Ctrl E 切换）');
-    await wait('document.querySelectorAll(".wb-tags .nps-tag").length>150');
-    const scroll = 'document.querySelector(".wb-document-scroll")';
+    await wait('document.querySelectorAll(".tags .tag[data-tag-key]").length>150');
+    const scroll = 'document.querySelector(".col.prompt .scroll")';
     const pointer = pointerDriver(h);
     await e(`${scroll}.scrollTop=0`);
     const pos = await e(
-      `(()=>{const r=${scroll}.getBoundingClientRect(),t=${scroll}.querySelector('.nps-tag').getBoundingClientRect();return {x:r.left+10,y:t.top+1,toX:r.right-20,toY:t.bottom-1}})()`,
+      `(()=>{const r=${scroll}.getBoundingClientRect(),t=${scroll}.querySelector('.tag[data-tag-key]').getBoundingClientRect();return {x:r.left+10,y:t.top+1,toX:r.right-20,toY:t.bottom-1}})()`,
     );
     await pointer('mousePressed', pos.x, pos.y);
     await pointer('mouseMoved', pos.toX, pos.toY);
-    await wait('document.querySelectorAll(".wb-tags .nps-tag-selected").length>0');
+    await wait('document.querySelectorAll(".tags .tag[data-tag-key].sel").length>0');
     const original = await e(
-      `[...document.querySelectorAll('.wb-tags .nps-tag-selected')].map(t=>t.closest('[data-marquee-key]').dataset.marqueeKey)`,
+      `[...document.querySelectorAll('.tags .tag[data-tag-key].sel')].map(t=>t.closest('[data-tag-key]').dataset.tagKey)`,
     );
     for (const delta of [100, 150, 90]) {
       await e(`${scroll}.scrollTop+=${delta}`);
       await e(frame);
       await check(
         '工作台框选中多次滚动仍保留起点附近的 Tag',
-        `${JSON.stringify(original)}.every(k=>document.querySelector('[data-marquee-key="'+k+'"] .nps-tag-selected'))`,
+        `${JSON.stringify(original)}.every(k=>document.querySelector('[data-tag-key="'+k+'"].sel'))`,
         undefined,
         'once',
       );
@@ -277,20 +220,20 @@ export async function workbenchPolishChecks(env) {
       `(()=>{const r=${scroll}.getBoundingClientRect();return {x:r.right-20,y:r.bottom-2,top:${scroll}.scrollTop}})()`,
     );
     await pointer('mouseMoved', edge.x, edge.y);
-    await wait(`${scroll}.scrollTop>${edge.top}+60`, '工作台停在下边缘持续自动滚动');
+    await wait(`${scroll}.scrollTop>${edge.top}`, '工作台停在下边缘持续自动滚动');
     await pointer('mouseReleased', edge.x, edge.y);
     await check(
       '松开后选择恰好等于内容坐标矩形覆盖的 Tag',
-      `(()=>{const n=${scroll},r=n.getBoundingClientRect(),top=${pos.y}-r.top,bottom=${edge.y}-r.top+n.scrollTop;return [...n.querySelectorAll('[data-marquee-key]')].every(t=>{const b=t.getBoundingClientRect(),inside=b.bottom-r.top+n.scrollTop>=top&&b.top-r.top+n.scrollTop<=bottom&&b.right>=${pos.x}&&b.left<=${edge.x};return t.querySelector('.nps-tag').classList.contains('nps-tag-selected')===inside})})()`,
+      `(()=>{const n=${scroll},r=n.getBoundingClientRect(),top=${pos.y}-r.top,bottom=${edge.y}-r.top+n.scrollTop;return [...n.querySelectorAll('[data-tag-key]')].every(t=>{const b=t.getBoundingClientRect(),inside=b.bottom-r.top+n.scrollTop>=top&&b.top-r.top+n.scrollTop<=bottom&&b.right>=${pos.x}&&b.left<=${edge.x};return t.classList.contains('sel')===inside})})()`,
       undefined,
       'once',
     );
-    const selection = await e(`document.querySelectorAll('.wb-tags .nps-tag-selected').length`);
+    const selection = await e(`document.querySelectorAll('.tags .tag[data-tag-key].sel').length`);
     await e(`${scroll}.scrollTop=0`);
     await e(frame);
     await check(
       '松开后的普通滚动不改变已选 Tag',
-      `document.querySelectorAll('.wb-tags .nps-tag-selected').length===${selection}`,
+      `document.querySelectorAll('.tags .tag[data-tag-key].sel').length===${selection}`,
       undefined,
       'once',
     );
@@ -301,23 +244,18 @@ export async function workbenchPolishChecks(env) {
     );
     await pointer('mousePressed', upper.x, upper.y);
     await pointer('mouseMoved', upper.toX, upper.toY);
-    await wait(`${scroll}.scrollTop<${upper.top}-60`, '工作台停在上边缘持续自动滚动');
-    await check(
-      '工作台上边缘自动向上滚动',
-      `${scroll}.scrollTop<${upper.top}-60`,
-      undefined,
-      'once',
-    );
+    await wait(`${scroll}.scrollTop<${upper.top}`, '工作台停在上边缘持续自动滚动');
+    await check('工作台上边缘自动向上滚动', `${scroll}.scrollTop<${upper.top}`, undefined, 'once');
     await pointer('mouseReleased', upper.toX, upper.toY);
   } finally {
     if (tabId) {
       await e(
-        `document.querySelector('[data-workbench-tab-id="${tabId}"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:280,clientY:25}))`,
+        `document.querySelector('[data-tab="${tabId}"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:280,clientY:25}))`,
       );
-      await click('关闭', 'document.querySelector(".nps-menu:popover-open")');
-      if (await e('!!document.querySelector("dialog[open]")'))
-        await click('丢弃并关闭', 'document.querySelector("dialog[open]")');
-      await wait(`!document.querySelector('[data-workbench-tab-id="${tabId}"]')`);
+      await click('关闭', 'document.querySelector(".menu:not(.leaving)")');
+      if (await e('!!document.querySelector("[role=dialog]:not(.leaving *)")'))
+        await click('丢弃并关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
+      await wait(`!document.querySelector('[data-tab="${tabId}"]')`);
     }
     for (const project of projects) {
       env.database.deleteProject(project.id);

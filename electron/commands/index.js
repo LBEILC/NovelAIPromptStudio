@@ -540,7 +540,7 @@ export async function createCommands(services) {
         ok: false,
         error: {
           code: code === 'ENOENT' ? 'not_found' : 'invalid_input',
-          message: error instanceof Error ? error.message : '没能执行命令',
+          message: error instanceof Error ? error.message : '执行命令失败',
         },
       };
     }

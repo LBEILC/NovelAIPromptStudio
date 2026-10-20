@@ -8,20 +8,20 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
   const modifier = process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true };
   const shortcut = (name, extra = {}, target = 'document.body') =>
     key(name, { ...modifier, ...extra }, target);
-  await click('工作台', 'document.querySelector(".studio-titlebar")');
+  await click('工作台', 'document.querySelector(".tb")');
   for (let index = 0; index < 3; index++) {
     doubles.selections.push({ canceled: false, filePaths: [files[index]] });
     await shortcut('i');
-    await wait(`document.querySelectorAll('.workbench-tab').length===${index + 1}`);
+    await wait(`document.querySelectorAll('.tabs [data-tab]').length===${index + 1}`);
   }
   await check(
     'Mod+I 使用打开对话框并生成三个工作台标签页',
-    'document.querySelectorAll(".workbench-tab").length===3',
+    'document.querySelectorAll(".tabs [data-tab]").length===3',
     undefined,
     'once',
   );
   const active =
-    'document.querySelector(".workbench-tab[data-active]")?.getAttribute("data-workbench-tab-id")';
+    'document.querySelector(".tabs [data-tab][aria-selected=true]")?.getAttribute("data-tab")';
   const last = await e(active);
   await shortcut('Tab');
   await wait(`${active} !== ${JSON.stringify(last)}`);
@@ -40,23 +40,27 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
     'once',
   );
   await shortcut('w');
-  await wait('document.querySelectorAll(".workbench-tab").length===2');
+  await wait('document.querySelectorAll(".tabs [data-tab]").length===2');
   await check(
     'Mod+W 关闭当前标签页',
-    'document.querySelectorAll(".workbench-tab").length===2',
+    'document.querySelectorAll(".tabs [data-tab]").length===2',
     undefined,
     'once',
   );
   clipboard.writeImage(nativeImage.createFromPath(files[3]));
   await shortcut('v');
-  await wait('document.querySelectorAll(".workbench-tab").length===3');
+  await wait('document.querySelectorAll(".tabs [data-tab]").length===3');
   await check(
     'Mod+V 从剪贴板替身打开工作台图片',
-    'document.querySelectorAll(".workbench-tab").length===3',
+    'document.querySelectorAll(".tabs [data-tab]").length===3',
     undefined,
     'once',
   );
-  await click('图片库', 'document.querySelector(".studio-titlebar")');
+  await click('图片库', 'document.querySelector(".tb")');
+  await wait('!!document.querySelector(".libp")?.getClientRects().length');
+  await wait(
+    '!!document.querySelector(".gallery-search input")?.getClientRects().length && !document.querySelector(".app-page-surface.leaving")',
+  );
   await shortcut('k');
   await h.checkSoon(
     '图库 Mod+K 聚焦搜索',
@@ -101,18 +105,19 @@ export async function shortcutChecks({ h, files, doubles, database, mode }) {
 
 export async function createTrashDraft({ h, database }) {
   const { evaluate: e, wait, click, check } = h;
-  await click('图片库', 'document.querySelector(".studio-titlebar")');
-  await wait('!!document.querySelector(".library-card")');
+  await click('图片库', 'document.querySelector(".tb")');
+  await wait('!!document.querySelector(".card")');
   await e(
-    'document.querySelector(".library-card").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
+    'document.querySelector(".card").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
   );
-  await wait('!!document.querySelector(".wb-prompt")');
-  await click('更多', 'document.querySelector(".wb-section")');
-  await click('切换为文本编辑');
-  await wait('!!document.querySelector(".wb-text-section textarea")');
-  await h.input('.wb-text-section textarea', 'acceptance_draft_tag, 1girl');
+  await wait('!!document.querySelector(".viewer-ov")');
+  await click('在工作台打开', 'document.querySelector(".viewer-ov")');
+  await wait('!!document.querySelector(".col.prompt")');
+  await click('按文本编辑（Ctrl E 切换）');
+  await wait('!!document.querySelector(".tx-wrap textarea")');
+  await h.input('.tx-wrap textarea', 'acceptance_draft_tag, 1girl');
   await click('按块编辑（Ctrl E 切换）');
-  await wait('!!document.querySelector(".wb-dirty")');
+  await wait('!!document.querySelector(".dirty-tag")');
   // Read the application's own persisted session to identify the opened library
   // project; setup moves only this disposable fixture into the recycle bin.
   const session = await e(

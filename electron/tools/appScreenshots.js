@@ -314,21 +314,21 @@ export async function runAppScreenshots({
             throw new Error(`Unexpected capture size: ${size.width}x${size.height}`);
           const file = `${scene.name}-${theme}.png`;
           await fs.writeFile(path.join(mode.output, file), image.toPNG());
-          const fontSelectors = [['ui', '.studio-titlebar nav button', 'MiSans']];
+          const fontSelectors = [['ui', '.tb .nav button', 'MiSans']];
           if (scene.name === 'workbench') {
-            fontSelectors.push(['tag', '.wb-prompt .nps-tag-en', 'IBM Plex Mono']);
+            fontSelectors.push(['tag', '.col.prompt .en', 'IBM Plex Mono']);
             if (process.argv.includes('--app-screenshot-workbench'))
               manifest.fontProof.push({
                 theme,
                 file,
                 renderedFonts: await renderedFonts(window.webContents, [
                   ...fontSelectors,
-                  ['prose', '.wb-prose p', 'Newsreader'],
+                  ['prose', '.prose', 'Newsreader'],
                 ]),
               });
           }
           if (scene.name === 'settings-updates')
-            fontSelectors.push(['proseBrand', '.settings-about-name', 'Newsreader']);
+            fontSelectors.push(['proseBrand', '.about-name', 'Newsreader']);
           manifest.screenshots.push({
             file,
             ...scene,
@@ -338,7 +338,7 @@ export async function runAppScreenshots({
             overlayUpdates,
             renderedFonts: await renderedFonts(window.webContents, fontSelectors),
             appearance: await window.webContents.executeJavaScript(`(() => {
-              const selectors = ['html', '.lobe-root', '.studio-titlebar', '.workbench-source-shell', '.workbench-tabs-list', '.studio-settings'];
+              const selectors = ['html', '.lobe-root', '.tb', '.workbench-source-shell', '.tabs', '.setp'];
               return Object.fromEntries(selectors.map(selector => {
                 const element = document.querySelector(selector);
                 if (!element) return [selector, null];
@@ -362,12 +362,12 @@ export async function runAppScreenshots({
           }
           if (scene.name === 'settings-updates') {
             // Screenshot-only specimens: no UI input, saved settings or production layout changes.
-            // The legacy workbench has no prose block yet, so verify the real prose token here.
+            // Collect an isolated multilingual specimen using the production font tokens.
             await window.webContents.executeJavaScript(`(async () => {
-              const host = document.querySelector('.settings-about-name').closest('.settings-copy');
+              const host = document.querySelector('.about-head').parentElement;
               host.innerHTML = '<h2 id="font-ui">界面字体 MiSans · 中文与 English 012345</h2>' +
                 '<p id="font-tag" style="font-family:var(--font-mono)">blue_hair, school_uniform, 1.25</p>' +
-                '<blockquote id="font-prose" class="nps-quote">A quiet studio filled with soft morning light. 一间洒满晨光的画室。</blockquote>' +
+                '<blockquote id="font-prose" class="prose">A quiet studio filled with soft morning light. 一间洒满晨光的画室。</blockquote>' +
                 '<p id="font-mono-500" style="font-family:var(--font-mono);font-weight:var(--fw-strong)">Weight 500: 012345</p>' +
                 '<p id="font-prose-500" style="font-family:var(--font-prose);font-weight:var(--fw-strong)">Newsreader weight 500 with optical sizing.</p>';
               await document.fonts.ready;

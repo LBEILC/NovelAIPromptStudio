@@ -22,47 +22,47 @@ export async function libraryGroupingChecks({ h, database }) {
   }
   try {
     await h.reload();
-    await h.click('图片库', 'document.querySelector(".studio-titlebar")');
-    await h.click('全部图片', 'document.querySelector(".library-page")');
+    await h.click('图片库', 'document.querySelector(".tb")');
+    await h.click('全部图片', 'document.querySelector(".libp")');
     await h.input('input[aria-label="搜索图片库"]', 'similarity-fixture');
     await h.click('视图');
     const options = 'document.querySelector("[role=radiogroup][aria-label=合并方式]")';
     await h.click('完全相同', options);
     await h.wait(
-      '!document.querySelector("[data-library-updating=true]") && document.querySelectorAll(".library-card").length===2',
+      '!document.querySelector("[data-library-updating=true]") && document.querySelectorAll(".card").length===2',
     );
     await h.evaluate(
-      `window.__groupingErrors=[];window.__groupingEmpty=false;window.__groupingErrorListener=e=>window.__groupingErrors.push(e.message);window.addEventListener('error',window.__groupingErrorListener);window.__groupingObserver=new MutationObserver(()=>{if(!document.querySelector('.library-card'))window.__groupingEmpty=true});window.__groupingObserver.observe(document.querySelector('[data-library-grid]'),{childList:true,subtree:true})`,
+      `window.__groupingErrors=[];window.__groupingEmpty=false;window.__groupingErrorListener=e=>window.__groupingErrors.push(e.message);window.addEventListener('error',window.__groupingErrorListener);window.__groupingObserver=new MutationObserver(()=>{if(!document.querySelector('.card'))window.__groupingEmpty=true});window.__groupingObserver.observe(document.querySelector('.lgrid'),{childList:true,subtree:true})`,
     );
     await h.click('相似', options);
-    await h.wait('!!document.querySelector("input[aria-label=相似度]")');
-    await h.key('Home', {}, 'document.querySelector("input[aria-label=相似度]")');
+    await h.wait('!!document.querySelector("[role=slider][aria-label=相似度]")');
+    await h.key('Home', {}, 'document.querySelector("[role=slider][aria-label=相似度]")');
     await h.wait(
-      '!document.querySelector("[data-library-updating=true]") && document.querySelectorAll(".library-card").length===1',
+      '!document.querySelector("[data-library-updating=true]") && document.querySelectorAll(".card").length===1',
     );
     await h.check(
       '相似分组选中、说明和滑块显示，低阈值合并两张',
-      `${options}.querySelector('[role=radio][aria-checked=true]')?.textContent.includes('相似') && !!document.querySelector('input[aria-label=相似度]') && document.querySelector('.library-merge-help')?.textContent.includes('提示词相似度达到下方数值') && document.querySelectorAll('.library-card').length===1`,
+      `${options}.querySelector('[role=radio][aria-checked=true]')?.textContent.includes('相似') && !!document.querySelector('[role=slider][aria-label=相似度]') && document.querySelector('.lmerge-help')?.textContent.includes('提示词相似度达到下方数值') && document.querySelectorAll('.card').length===1`,
       undefined,
       'once',
     );
-    await h.key('End', {}, 'document.querySelector("input[aria-label=相似度]")');
+    await h.key('End', {}, 'document.querySelector("[role=slider][aria-label=相似度]")');
     await h.wait(
-      '!document.querySelector("[data-library-updating=true]") && document.querySelectorAll(".library-card").length===2',
+      '!document.querySelector("[data-library-updating=true]") && document.querySelectorAll(".card").length===2',
     );
     await h.check(
       '提高相似度拆分分组，切换过程中保留原分组且无未捕获错误',
-      'document.querySelectorAll(".library-card").length===2 && !window.__groupingEmpty && window.__groupingErrors.length===0',
+      'document.querySelectorAll(".card").length===2 && !window.__groupingEmpty && window.__groupingErrors.length===0',
       undefined,
       'once',
     );
     await h.click('完全相同', options);
     await h.wait(
-      'document.querySelector("input[aria-label=相似度]")?.disabled && !document.querySelector("[data-library-updating=true]")',
+      'document.querySelector("[role=slider][aria-label=相似度]")?.getAttribute("aria-disabled")==="true" && !document.querySelector("[data-library-updating=true]")',
     );
     await h.check(
       '切回完全相同恢复精确分组',
-      `${options}.querySelector('[role=radio][aria-checked=true]')?.textContent.includes('完全相同') && document.querySelectorAll('.library-card').length===2`,
+      `${options}.querySelector('[role=radio][aria-checked=true]')?.textContent.includes('完全相同') && document.querySelectorAll('.card').length===2`,
       undefined,
       'once',
     );

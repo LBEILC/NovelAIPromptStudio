@@ -1,12 +1,12 @@
-export const motionDetails = `(async()=>({motion:document.documentElement.dataset.motion,appearance:await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data}),systemReduced:matchMedia('(prefers-reduced-motion: reduce)').matches,transitions:[...document.querySelectorAll('.nps-button')].map(b=>getComputedStyle(b).transitionDuration)}))()`;
+export const motionDetails = `(async()=>({motion:document.documentElement.dataset.motion,appearance:await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data}),systemReduced:matchMedia('(prefers-reduced-motion: reduce)').matches,transitions:[...document.querySelectorAll('.btn')].map(b=>getComputedStyle(b).transitionDuration)}))()`;
 
 export async function defaultMotionChecks(h) {
   const { check, wait, window } = h;
   await h.section('外观');
-  await wait("!!document.querySelector('[aria-label=动效] button[aria-checked=true]')");
+  await wait("!!document.querySelector('[aria-label=动效] [role=radio][aria-checked=true]')");
   await check(
     '新临时目录的动效默认显示跟随系统',
-    `(async()=> (await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})).motion === 'reduced' && document.querySelector('[aria-label=动效] button[aria-checked=true]').textContent.trim() === '跟随系统')()`,
+    `(async()=> (await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data})).motion === 'reduced' && document.querySelector('[aria-label=动效] [role=radio][aria-checked=true]').textContent.trim() === '跟随系统')()`,
     undefined,
     'once',
   );

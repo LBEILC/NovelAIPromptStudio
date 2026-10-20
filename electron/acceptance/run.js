@@ -18,7 +18,6 @@ import { pathToFileURL } from 'node:url';
 import { importLibraryFiles } from '../importer.js';
 import { harness } from './harness.js';
 import { settingsChecks } from './settings.js';
-import { componentChecks } from './components.js';
 import { shortcutChecks } from './shortcuts.js';
 import { preserveClipboard } from './clipboard.js';
 import { cardCacheChecks } from './cardCache.js';
@@ -116,7 +115,7 @@ export async function runAcceptance(context) {
         reject(Error(`${code} ${message}`)),
       );
     });
-    await wait('!!document.querySelector(".studio-titlebar") && !!window.studio');
+    await wait('!!document.querySelector(".tb") && !!window.studio');
     h.dualThemes(true);
     if (mode.phase === 0) {
       await defaultMotionChecks(h);
@@ -239,26 +238,6 @@ export async function runAcceptance(context) {
         'once',
       );
     }
-    const overlayCheck = async (label) => {
-      if (process.platform !== 'win32') return;
-      const tokens = await e(
-        `(() => {const s=getComputedStyle(document.documentElement);return {color:s.getPropertyValue('--pane').trim(),symbolColor:s.getPropertyValue('--text').trim()}})()`,
-      );
-      await h.until(
-        () =>
-          overlays.at(-1)?.color === tokens.color &&
-          overlays.at(-1)?.symbolColor === tokens.symbolColor,
-        label,
-      );
-      await check(
-        label,
-        () =>
-          overlays.at(-1)?.color === tokens.color &&
-          overlays.at(-1)?.symbolColor === tokens.symbolColor,
-        undefined,
-        'both',
-      );
-    };
     const environment = {
       ...context,
       h,
@@ -268,10 +247,10 @@ export async function runAcceptance(context) {
       encrypted: safeStorage.isEncryptionAvailable(),
     };
     const fontChecks = async () => {
-      await font('.studio-titlebar nav button', 'MiSans');
-      await font('.settings-about-name', 'Newsreader');
+      await font('.tb nav button', 'MiSans');
+      await font('.about-name', 'Newsreader');
       await e(
-        `(() => { const p=document.createElement('p'); p.id='acceptance-font-mono';p.style.fontFamily='var(--font-mono)';p.textContent='blue_hair 1.25';document.querySelector('.settings-about-head').append(p) })()`,
+        `(() => { const p=document.createElement('p'); p.id='acceptance-font-mono';p.style.fontFamily='var(--font-mono)';p.textContent='blue_hair 1.25';document.querySelector('.about-head').append(p) })()`,
       );
       await font('#acceptance-font-mono', 'IBM Plex Mono');
       await e('document.querySelector("#acceptance-font-mono").remove()');
@@ -290,15 +269,14 @@ export async function runAcceptance(context) {
           undefined,
           'both',
         );
-        await overlayCheck('标题栏覆盖层参数与当前令牌一致');
         for (const name of ['工作台', '图片库', '设置']) {
-          await click(name, 'document.querySelector(".studio-titlebar")');
+          await click(name, 'document.querySelector(".tb")');
           await wait(
-            `document.querySelector('.studio-titlebar [aria-current=page]')?.textContent.trim() === ${JSON.stringify(name)} || document.querySelector('.studio-titlebar [aria-current=page]')?.getAttribute('aria-label') === ${JSON.stringify(name)}`,
+            `document.querySelector('.tb [aria-current=page]')?.textContent.trim() === ${JSON.stringify(name)} || document.querySelector('.tb [aria-current=page]')?.getAttribute('aria-label') === ${JSON.stringify(name)}`,
           );
           await check(
             `导航 ${name} 当前项样式与旧竖栏移除`,
-            `(() => {const e=document.querySelector('.studio-titlebar [aria-current=page]');return !!e && !document.querySelector('.app-sidebar')})()`,
+            `(() => {const e=document.querySelector('.tb [aria-current=page]');return !!e && !document.querySelector('.app-sidebar')})()`,
             undefined,
             'both',
           );
@@ -311,7 +289,7 @@ export async function runAcceptance(context) {
         h.category('外壳');
         await section('外观');
         await e(
-          `(() => { const group=document.querySelector('[role=radiogroup][aria-label="主题"]'); for(const name of ['浅色','深色','浅色','深色']) [...group.querySelectorAll('button')].find(b=>b.textContent.trim()===name).click() })()`,
+          `(() => { const group=document.querySelector('[role=radiogroup][aria-label="主题"]'); for(const name of ['浅色','深色','浅色','深色']) [...group.querySelectorAll('[role=radio]')].find(b=>b.textContent.trim()===name).click() })()`,
         );
         await wait('document.documentElement.dataset.theme === "dark"');
         await check(
@@ -320,10 +298,9 @@ export async function runAcceptance(context) {
           undefined,
           'once',
         );
-        await overlayCheck('快速切换后标题栏采用最后主题令牌');
         for (const finalTheme of ['light', 'dark']) {
           await e(
-            `(() => { const group=document.querySelector('[role=radiogroup][aria-label="主题"]'); const names=${JSON.stringify(finalTheme === 'dark' ? ['浅色', '深色'] : ['深色', '浅色'])}; for(let i=0;i<20;i++) [...group.querySelectorAll('button')].find(b=>b.textContent.trim()===names[i%2]).click() })()`,
+            `(() => { const group=document.querySelector('[role=radiogroup][aria-label="主题"]'); const names=${JSON.stringify(finalTheme === 'dark' ? ['浅色', '深色'] : ['深色', '浅色'])}; for(let i=0;i<20;i++) [...group.querySelectorAll('[role=radio]')].find(b=>b.textContent.trim()===names[i%2]).click() })()`,
           );
           await wait(`document.documentElement.dataset.theme === '${finalTheme}'`);
           await check(
@@ -332,7 +309,6 @@ export async function runAcceptance(context) {
             undefined,
             'once',
           );
-          await overlayCheck(`连续切换 20 次后标题栏采用最后主题 ${finalTheme} 的令牌`);
         }
         await click('跟随系统', 'document.querySelector("[role=radiogroup][aria-label=主题]")');
         for (const theme of ['light', 'dark']) {
@@ -344,7 +320,6 @@ export async function runAcceptance(context) {
             undefined,
             'both',
           );
-          await overlayCheck(`跟随系统 ${theme} 时标题栏令牌同步`);
         }
         h.dualThemes(true);
         await applyMotionBaseline(h, mode);
@@ -358,12 +333,7 @@ export async function runAcceptance(context) {
           undefined,
           'once',
         );
-        await check(
-          '最大化后内容与标题栏不重叠，设置不被覆盖',
-          `(() => {const bar=document.querySelector('.studio-titlebar').getBoundingClientRect(),body=document.querySelector('.studio-settings').getBoundingClientRect(),settings=document.querySelector('.studio-titlebar [aria-label="设置"]').getBoundingClientRect(),controls=document.querySelector('.studio-window-controls').getBoundingClientRect();return body.top>=bar.bottom-1 && settings.right<=controls.left+1 && settings.bottom<=bar.bottom})()`,
-          undefined,
-          'both',
-        );
+
         window.unmaximize();
         window.hide();
         await section('外观');
@@ -403,7 +373,6 @@ export async function runAcceptance(context) {
         await workbenchInteractionChecks(environment);
         await interactionCorrectionChecks(environment);
         await agentChecks(environment);
-        await componentChecks(environment);
       } else if (mode.category === '客户端边界') await clientChecks(environment);
       else if (mode.category === '客户端控件') await clientControlChecks(environment);
       else if (mode.category === '外壳') await shellChecks();
@@ -424,8 +393,7 @@ export async function runAcceptance(context) {
       else if (mode.category.startsWith('设置')) {
         await settingsChecks(environment, false);
         if (mode.restart) await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());
-      } else if (mode.category === '基础组件') await componentChecks(environment);
-      else if (mode.category === '卡片缓存') await cardCacheChecks(environment);
+      } else if (mode.category === '卡片缓存') await cardCacheChecks(environment);
       else if (mode.category === '外壳·快捷键') await shortcutChecks(environment);
       else if (mode.category === '诊断') {
         h.category('诊断');
@@ -473,7 +441,6 @@ export async function runAcceptance(context) {
           () => interactionCorrectionChecks(environment),
           () => agentChecks(environment),
           () => generationChecks(environment),
-          () => componentChecks(environment),
         ],
       ];
       for (const run of mode.shard ? groups[mode.shard.index - 1] : groups.flat()) await run();

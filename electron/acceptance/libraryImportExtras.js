@@ -6,7 +6,7 @@ import { pauseFileRead } from './readGate.js';
 
 export async function libraryImportExtras({ h, database, doubles, mode, files, reduced, click }) {
   const { evaluate: e, wait, check } = h;
-  const scope = 'document.querySelector(".library-page")';
+  const scope = 'document.querySelector(".libp")';
   const before = database.loadLibrary('all').length;
   doubles.selections.push({ canceled: true, filePaths: [] });
   await click('导入', scope);
@@ -19,8 +19,8 @@ export async function libraryImportExtras({ h, database, doubles, mode, files, r
   clipboard.writeImage(
     nativeImage.createFromPath(files[0]).resize({ width: 355 + Number(reduced) }),
   );
-  await click('其他导入方式', scope);
-  await click('从剪贴板导入', 'document.querySelector(".nps-menu:popover-open")');
+  await click('更多导入方式', scope);
+  await click('从剪贴板导入', 'document.querySelector(".menu:not(.leaving)")');
   await h.until(() => database.loadLibrary('all').length === before + 1, '菜单从剪贴板导入');
   await check(
     '小箭头菜单从剪贴板导入',
@@ -44,7 +44,7 @@ export async function libraryImportExtras({ h, database, doubles, mode, files, r
     await click('导入', scope);
     await h.until(readGate.reached, '第一批提交后暂停第 26 张图片的真实读取');
     await wait(
-      'Number(document.querySelector(".library-job [role=progressbar]")?.getAttribute("aria-valuenow"))>=25',
+      'document.querySelector(".ldock .job b")?.textContent.includes("26 / 60")',
       '导入界面显示已处理的第一批图片',
     );
     await h.screenshot(`library-import-${reduced ? 'off' : 'full'}-${mode.theme}`);
@@ -58,7 +58,7 @@ export async function libraryImportExtras({ h, database, doubles, mode, files, r
   } finally {
     readGate.restore();
   }
-  await wait('!document.querySelector(".library-job")');
+  await wait('!document.querySelector(".ldock .job")');
   const imported = database.loadLibrary('all').length - count;
   await check(
     '取消剩余导入保留已完成的图片',
@@ -69,7 +69,7 @@ export async function libraryImportExtras({ h, database, doubles, mode, files, r
   const file = batch.at(-1);
   await fs.access(file);
   await wait(
-    '!!document.querySelector(".library-scroll") && !document.querySelector("[data-library-updating=true]")',
+    '!!document.querySelector(".lib-grid-col > .scroll") && !document.querySelector("[data-library-updating=true]")',
     '取消导入后的拖入目标已就绪',
   );
   await e(
@@ -84,16 +84,16 @@ export async function libraryImportExtras({ h, database, doubles, mode, files, r
   });
   await cdp.sendCommand('DOM.setFileInputFiles', { nodeId, files: [file] });
   await wait(
-    'document.querySelector("#acceptance-drop-file")?.files?.length === 1 && !!document.querySelector(".library-scroll")',
+    'document.querySelector("#acceptance-drop-file")?.files?.length === 1 && !!document.querySelector(".lib-grid-col > .scroll")',
     '拖入文件与目标元素均已就绪',
   );
   await e(
-    `(()=>{const source=document.querySelector('#acceptance-drop-file');const data=new DataTransfer();data.items.add(source.files[0]);window.__acceptanceDrop=data;const target=document.querySelector('.library-scroll');for(const type of ['dragenter','dragover'])target.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:data,clientX:400,clientY:300}));})()`,
+    `(()=>{const source=document.querySelector('#acceptance-drop-file');const data=new DataTransfer();data.items.add(source.files[0]);window.__acceptanceDrop=data;const target=document.querySelector('.lib-grid-col > .scroll');for(const type of ['dragenter','dragover'])target.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:data,clientX:400,clientY:300}));})()`,
   );
-  await wait('!!document.querySelector(".library-drop")');
+  await wait('!!document.querySelector(".dropzone")');
   await h.screenshot(`library-drop-${reduced ? 'off' : 'full'}-${mode.theme}`);
   await e(
-    `(()=>{document.querySelector('.library-scroll').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:window.__acceptanceDrop,clientX:400,clientY:300}));document.querySelector('#acceptance-drop-file').remove();delete window.__acceptanceDrop;})()`,
+    `(()=>{document.querySelector('.lib-grid-col > .scroll').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:window.__acceptanceDrop,clientX:400,clientY:300}));document.querySelector('#acceptance-drop-file').remove();delete window.__acceptanceDrop;})()`,
   );
   await h.until(
     () => database.loadLibrary('all').some((p) => p.name === path.basename(file, '.png')),

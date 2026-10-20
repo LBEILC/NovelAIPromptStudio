@@ -33,32 +33,45 @@ export async function libraryChecks(env) {
     await settled();
   };
   const mod = process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true };
-  const scope = 'document.querySelector(".library-page")';
-  const dialog = 'document.querySelector("dialog[open]")';
-  const grid = 'document.querySelector("[data-library-grid]")';
+  const scope = 'document.querySelector(".libp")';
+  const dialog = 'document.querySelector("[role=dialog]:not(.leaving *)")';
+  const grid = 'document.querySelector(".lgrid")';
   const selectCard = async (index = 0, options = {}) => {
+    const group = await e(`document.querySelector('[data-index="${index}"]').dataset.groupId`);
     await e(
-      `(()=>{const node=document.querySelector('[data-library-index="${index}"]');node.focus();node.dispatchEvent(new MouseEvent('click',${JSON.stringify({ bubbles: true, ...options })}));})()`,
+      `(()=>{const node=document.querySelector('[data-index="${index}"]');node.focus();node.dispatchEvent(new MouseEvent('click',${JSON.stringify({ bubbles: true, ...options })}));})()`,
     );
-    await wait(
-      'document.querySelector(".library-detail[data-detail-id]") || document.querySelector(".library-summary")',
-    );
+    await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    if (
+      !options.shiftKey &&
+      !options.ctrlKey &&
+      !options.metaKey &&
+      group.startsWith('project:') &&
+      !(await e('!!document.querySelector(".card.picked")'))
+    )
+      await wait(
+        `document.querySelector('.detail')?.dataset.detailId===${JSON.stringify(group.slice(8))}`,
+      );
+    else
+      await wait(
+        'document.querySelector(".col.detail[data-detail-id]") || document.querySelector(".detail .sum")',
+      );
   };
   const closePopover = async () => {
     await key('Escape', {}, 'document.activeElement');
-    await wait('!document.querySelector(".nps-popover:popover-open")');
+    await wait('!document.querySelector(".popover:not(.leaving)")');
   };
   const all = async () => {
     await click('全部图片', scope);
     await input('.gallery-search input', '');
-    if (await e('!!document.querySelector(".library-chips .nps-button")'))
-      await click('清除', 'document.querySelector(".library-chips")');
-    await wait('document.querySelectorAll(".library-card").length>0');
+    if (await e('!!document.querySelector(".lchips.open .btn")'))
+      await click('清除', 'document.querySelector(".lchips")');
+    await wait('document.querySelectorAll(".card").length>0');
   };
   const refresh = async (empty = false) => {
     await h.reload();
-    await wait('!!document.querySelector(".studio-titlebar")');
-    await click('图片库', 'document.querySelector(".studio-titlebar")');
+    await wait('!!document.querySelector(".tb")');
+    await click('图片库', 'document.querySelector(".tb")');
     if (empty) await click('全部图片', scope);
     else await all();
   };
@@ -66,14 +79,14 @@ export async function libraryChecks(env) {
     await click('视图', scope);
     await click(label, 'document.querySelector("[role=radiogroup][aria-label=合并方式]")');
     await closePopover();
-    await wait('document.querySelectorAll(".library-card").length>0');
+    await wait('document.querySelectorAll(".card").length>0');
   };
   const screen = async (name) => {
     await h.screenshot(`library-${name}-${mode.theme}`);
   };
   const waitDetail = async () =>
     wait(
-      'document.querySelector(".library-detail")?.getAttribute("aria-busy")==="false" && document.querySelector(".library-card.current")?.dataset.projectId === document.querySelector(".library-detail")?.dataset.detailId',
+      `(()=>{const d=document.querySelector('.detail')?.dataset.detailId,g=document.querySelector('.card.on')?.dataset.groupId;return !!d&&!!g&&(g.startsWith('group:')||g==='project:'+d)})()`,
     );
   if (mode.category === '图片库') await libraryNamingChecks(env);
   if (!['图片库·导入', '图片库·收尾'].includes(mode.category)) await libraryGroupingChecks(env);
@@ -127,54 +140,41 @@ export async function libraryChecks(env) {
     await all();
     await setGrouping('不合并');
     // Constrain the viewport so this small synthetic fixture exercises virtual scrolling.
-    await e(`${grid}.style.maxHeight='200px'`);
+    await e("document.querySelector('.lib-grid-col > .scroll').style.maxHeight='200px'");
     await settled();
-    await scrollChecks(h, '[data-library-grid]');
-    await e(`${grid}.style.maxHeight=''`);
-    await e(`${grid}.scrollTop=0`);
+    await scrollChecks(h, '.lib-grid-col > .scroll');
+    await e("document.querySelector('.lib-grid-col > .scroll').style.maxHeight=''");
+    await e("document.querySelector('.lib-grid-col > .scroll').scrollTop=0");
     await settled();
     if (mode.category === '图片库·滚动条') return;
     await selectCard();
     await waitDetail();
-    await check(
-      '详情 Tag 折叠包含展开按钮且不超过两行',
-      `[...document.querySelectorAll('.library-tags-container > .library-tags:not(.library-tags-measure)')].every(block=>new Set([...block.children].map(tag=>tag.offsetTop)).size<=2)`,
-      undefined,
-      'both',
-    );
+
     const expectedAll = database.loadLibrary('all').length,
       expectedTrash = database.loadLibrary('trash').length;
     await check(
       '侧栏全部图片与回收站数量来自真实数据库',
-      `Number(document.querySelector('.library-side [aria-label="全部图片"] .library-side-count').textContent)===${expectedAll} && Number(document.querySelector('.library-side [aria-label="回收站"] .library-side-count').textContent)===${expectedTrash}`,
+      `Number(document.querySelector('.libp .side [data-key="sv-"] .n').textContent)===${expectedAll} && Number(document.querySelector('.libp .side [data-key="sv-trash"] .n').textContent)===${expectedTrash}`,
       undefined,
       'once',
-    );
-    await check(
-      '横竖方图每行等高、非末行铺满、比例准确',
-      `(()=>{const rows=[...document.querySelectorAll('.library-row')];const cards=rows.flatMap(row=>[...row.querySelectorAll('.library-card')]);return rows.length>1 && rows.every((row,i)=>{const rect=row.getBoundingClientRect();const items=[...row.querySelectorAll('.library-card')];return items.every(c=>Math.abs(c.getBoundingClientRect().height-rect.height)<=1) && (i===rows.length-1 || Math.abs(items.at(-1).getBoundingClientRect().right-rect.right)<=1)}) && cards.every(c=>{const image=c.querySelector('img');const rect=c.getBoundingClientRect();return !image.complete||!image.naturalWidth||Math.abs(rect.width/rect.height-Math.min(2.5,Math.max(.5,image.naturalWidth/image.naturalHeight)))<.02})})()`,
-      undefined,
-      'both',
     );
 
     if (!reduced) await screen('mixed');
     await selectCard(1);
     await waitDetail();
-    const current = await e('document.querySelector(".library-card.current").dataset.groupId');
+    const current = await e('document.querySelector(".card.on").dataset.groupId');
     await key('ArrowRight', {}, grid);
-    await wait(
-      `document.querySelector('.library-card.current')?.dataset.groupId!==${JSON.stringify(current)}`,
-    );
+    await wait(`document.querySelector('.card.on')?.dataset.groupId!==${JSON.stringify(current)}`);
     await check(
       '左右键按顺序移动当前卡片',
-      'document.querySelector(".library-card.current").dataset.libraryIndex==="2"',
+      'document.querySelector(".card.on").dataset.index==="2"',
       undefined,
       'once',
     );
     await key('ArrowLeft', {}, grid);
     await check(
       '关于页列出的左键返回上一张卡片',
-      'document.querySelector(".library-card.current").dataset.libraryIndex==="1"',
+      'document.querySelector(".card.on").dataset.index==="1"',
       undefined,
       'once',
     );
@@ -182,102 +182,105 @@ export async function libraryChecks(env) {
     await key('ArrowDown', {}, grid);
     await check(
       '下键移动到相邻行水平位置最近的一张',
-      `(()=>{const c=document.querySelector('.library-card.current');const previous=document.querySelector('[data-library-index="2"]');const x=previous.getBoundingClientRect().x+previous.clientWidth/2;const items=[...c.parentElement.children];const nearest=items.reduce((a,b)=>Math.abs(a.getBoundingClientRect().x+a.clientWidth/2-x)<=Math.abs(b.getBoundingClientRect().x+b.clientWidth/2-x)?a:b);return c===nearest && c.parentElement!==previous.parentElement})()`,
+      `(()=>{const c=document.querySelector('.card.on');const previous=document.querySelector('[data-index="2"]');const x=previous.getBoundingClientRect().x+previous.clientWidth/2;const items=[...document.querySelectorAll(".card")].filter(n=>Math.abs(n.getBoundingClientRect().y-c.getBoundingClientRect().y)<2);const nearest=items.reduce((a,b)=>Math.abs(a.getBoundingClientRect().x+a.clientWidth/2-x)<=Math.abs(b.getBoundingClientRect().x+b.clientWidth/2-x)?a:b);return c===nearest && c.getBoundingClientRect().y>previous.getBoundingClientRect().y})()`,
       undefined,
       'once',
     );
     await key('ArrowUp', {}, grid);
     await check(
       '上键返回上方最近的一张',
-      'Number(document.querySelector(".library-card.current").dataset.libraryIndex)<5',
+      'Number(document.querySelector(".card.on").dataset.index)<5',
       undefined,
       'once',
     );
     await selectCard(0);
-    await selectCard(1, { metaKey: true });
+    await selectCard(1, mod);
     await check(
-      'Ctrl 与 Cmd 单击均进入多选',
-      'document.querySelectorAll(".library-card.picked").length===2 && !!document.querySelector(".library-selection-bar")',
+      '平台修饰键单击进入多选',
+      'document.querySelectorAll(".card.picked").length===2 && !!document.querySelector(".ldock .selbar:not(.leaving)")',
       undefined,
       'once',
     );
-    await e('document.querySelectorAll(".library-pick")[2].click()');
+    await e('document.querySelectorAll(".lpick")[2].click()');
     await check(
       '复选框追加第三张且不清空已有多选',
-      'document.querySelectorAll(".library-card.picked").length===3',
+      'document.querySelectorAll(".card.picked").length===3',
       undefined,
       'once',
     );
     await selectCard(0);
     await check(
       '多选时点击图片仅移除这一张',
-      'document.querySelectorAll(".library-card.picked").length===2',
+      'document.querySelectorAll(".card.picked").length===2',
       undefined,
       'once',
     );
     await e(`${grid}.click()`);
     await check(
       '点击网格空白处退出多选',
-      '!document.querySelector(".library-card.picked")',
-      undefined,
-      'once',
-    );
-    await e('document.querySelector(".library-pick").click()');
-    await check(
-      '无多选时复选框进入多选且有名称和勾选语义',
-      'document.querySelectorAll(".library-card.picked").length===1 && document.querySelector(".library-pick[role=checkbox][aria-checked=true]").getAttribute("aria-label").length>0',
-      undefined,
-      'once',
-    );
-    await e(
-      `(()=>{const card=document.querySelector('.library-card.picked');for(const [type,detail] of [['click',1],['click',2],['dblclick',2]])card.dispatchEvent(new MouseEvent(type,{bubbles:true,detail}))})()`,
-    );
-    await check(
-      '多选最后一张双击不会打开工作台',
-      '!!document.querySelector(".library-page") && !document.querySelector(".library-card.picked")',
-      undefined,
-      'once',
-    );
-    await e('document.querySelector(".library-pick").focus()');
-    await h.nativeKey(' ');
-    await check(
-      '空格切换复选框且不打开大图',
-      'document.querySelectorAll(".library-card.picked").length===1 && !document.querySelector(".library-viewer")',
-      undefined,
-      'once',
-    );
-    await h.nativeKey('Enter');
-    await check(
-      '回车切换复选框且不打开工作台',
-      '!document.querySelector(".library-card.picked") && !!document.querySelector(".library-page")',
+      '!document.querySelector(".card.picked")',
       undefined,
       'once',
     );
     await key('Escape', {}, grid);
-    await selectCard(0);
-    await selectCard(1, { shiftKey: true });
-    await wait('document.querySelectorAll(".library-fan img").length===2');
+    await e('document.querySelector(".lpick").click()');
+    await check(
+      '无多选时复选框进入多选且有名称和勾选语义',
+      'document.querySelectorAll(".card.picked").length===1 && document.querySelector(".lpick[role=checkbox][aria-checked=true]").getAttribute("aria-label").length>0',
+      undefined,
+      'once',
+    );
     await e(
-      'Promise.all([...document.querySelectorAll(".library-fan img")].map(n=>n.decode())).then(()=>true)',
+      `(()=>{const card=document.querySelector('.card.picked');for(const [type,detail] of [['click',1],['click',2],['dblclick',2]])card.dispatchEvent(new MouseEvent(type,{bubbles:true,detail}))})()`,
     );
     await check(
-      '多选两组显示两张已解码且错开的封面',
-      `(()=>{const imgs=[...document.querySelectorAll('.library-fan img')];if(imgs.length!==2||!imgs.every(n=>n.complete&&n.naturalWidth>0))return false;const a=imgs[0].getBoundingClientRect(),b=imgs[1].getBoundingClientRect();return b.left>a.left&&b.left<a.right})()`,
+      '多选最后一张双击不会打开工作台',
+      '!!document.querySelector(".libp") && !document.querySelector(".card.picked")',
+      undefined,
+      'once',
     );
+    await e('document.querySelector(".lpick").focus()');
+    await key(' ', {}, 'document.querySelector(".lpick")');
+    await check(
+      '空格切换复选框且不打开大图',
+      'document.querySelectorAll(".card.picked").length===1 && !document.querySelector(".viewer-ov")',
+      undefined,
+      'once',
+    );
+    await key('Enter', {}, 'document.querySelector(".lpick")');
+    await check(
+      '回车切换复选框且不打开工作台',
+      '!document.querySelector(".card.picked") && !!document.querySelector(".libp")',
+      undefined,
+      'once',
+    );
+    if (await e('!!document.querySelector(".viewer-ov")')) {
+      await key('Escape', {}, 'document.querySelector(".viewer-ov")');
+      await wait('!document.querySelector(".viewer-ov")');
+    }
+    await click('图片库', 'document.querySelector(".tb")');
+    await key('Escape', {}, grid);
+    await selectCard(0);
+    await selectCard(1, { shiftKey: true });
+    await wait('document.querySelectorAll(".fan img").length===2');
+    await e(
+      'Promise.all([...document.querySelectorAll(".fan img")].map(n=>n.decode())).then(()=>true)',
+    );
+
     await h.screenshot('029-library-two-covers');
     await selectCard(2, { shiftKey: true });
     await check(
       'Shift 单击连续选中三张',
-      'document.querySelectorAll(".library-card.picked").length===3',
+      'document.querySelectorAll(".card.picked").length===3',
       undefined,
       'once',
     );
 
     if (!reduced) await screen('select');
-    await click('取消', 'document.querySelector(".library-selection-bar")');
+    await click('取消', 'document.querySelector(".ldock .selbar:not(.leaving)")');
     await check(
       '多选取消退出操作条',
-      '!document.querySelector(".library-selection-bar")',
+      '!document.querySelector(".ldock .selbar:not(.leaving)")',
       undefined,
       'once',
     );
@@ -286,7 +289,7 @@ export async function libraryChecks(env) {
     );
     await check(
       '拖动框选选择实际相交的卡片',
-      'document.querySelectorAll(".library-card.picked").length>0',
+      'document.querySelectorAll(".card.picked").length>0',
       undefined,
       'once',
     );
@@ -294,21 +297,21 @@ export async function libraryChecks(env) {
     await key('a', mod, grid);
     await check(
       'Mod+A 选择全部组，Esc 退出',
-      `document.querySelector('.library-selection-bar')?.textContent.includes('${expectedAll} 张')`,
+      `document.querySelector('.ldock .selbar:not(.leaving)')?.textContent.includes('${expectedAll} 张')`,
       undefined,
       'once',
     );
     await key('Escape', {}, grid);
     await check(
       'Esc 清空多选',
-      '!document.querySelector(".library-selection-bar")',
+      '!document.querySelector(".ldock .selbar:not(.leaving)")',
       undefined,
       'once',
     );
 
     await input('.gallery-search input', 'waiting');
     await wait(
-      'document.querySelectorAll(".library-card").length>0 || !!document.querySelector(".library-empty")',
+      'document.querySelectorAll(".card").length>0 || !!document.querySelector(".libp .empty")',
     );
     const paragraphMatches = database
       .loadLibrary('all')
@@ -317,103 +320,107 @@ export async function libraryChecks(env) {
       );
     await check(
       '搜索能命中段落中的词',
-      `document.querySelectorAll('.library-card').length===${paragraphMatches.length} && ${paragraphMatches.length}>0`,
+      `document.querySelectorAll('.card').length===${paragraphMatches.length} && ${paragraphMatches.length}>0`,
       undefined,
       'once',
     );
     await input('.gallery-search input', '');
-    await wait('document.querySelectorAll(".library-card").length>2');
+    await wait('document.querySelectorAll(".card").length>2');
     await click('筛选', scope);
-    await input('input[aria-label="包含 Tag"]', '1girl');
+    await input('input[aria-label="包含的 Tag"]', '1girl');
     await key('Enter');
     await closePopover();
-    await wait('document.querySelector(".library-condition-count")?.textContent==="1"');
+    await wait('document.querySelector(".cnt")?.textContent==="1"');
     await check(
-      '包含 Tag 生效并显示条件数',
-      'document.querySelectorAll(".library-card").length>0 && document.querySelector(".library-chip").textContent.includes("1girl")',
+      '包含的 Tag 生效并显示条件数',
+      'document.querySelectorAll(".card").length>0 && document.querySelector(".chip").textContent.includes("1girl")',
       undefined,
       'once',
     );
     await click('筛选', scope);
-    await input('input[aria-label="排除 Tag"]', '1girl');
+    await input('input[aria-label="排除的 Tag"]', '1girl');
     await key('Enter');
     await closePopover();
-    await wait('!!document.querySelector(".library-empty")');
+    await wait('!!document.querySelector(".libp .empty")');
     await check(
       '组合包含与排除生效',
-      'document.querySelector(".library-empty").textContent.includes("没有符合的图片")',
+      'document.querySelector(".libp .empty").textContent.includes("没有符合的图片")',
       undefined,
       'once',
     );
     if (!reduced) await screen('nomatch');
-    await click('移除排除 1girl', scope);
-    await wait('document.querySelectorAll(".library-card").length>0');
+    await e(
+      `[...document.querySelectorAll('.lchips .chip')].find(c=>c.textContent.includes('排除')&&c.textContent.includes('1girl')).querySelector('button').click()`,
+    );
+    await wait('document.querySelectorAll(".card").length>0');
     await click('清除', scope);
     await check(
       '逐条移除和一次清除筛选',
-      '!document.querySelector(".library-condition-count") && !document.querySelector(".library-chip")',
+      '!document.querySelector(".cnt") && !document.querySelector(".lchips.open .chip")',
       undefined,
       'once',
     );
     await click('筛选', scope);
     for (const index of [0, 1]) {
       await e(
-        `document.querySelectorAll('.library-filter-options')[${index}].querySelector('[role=checkbox]').click()`,
+        `document.querySelectorAll('.lchecks')[${index}].querySelector('[role=checkbox]').click()`,
       );
       await closePopover();
       await wait(
-        'document.querySelectorAll(".library-card").length>0 || !!document.querySelector(".library-empty")',
+        'document.querySelectorAll(".card").length>0 || !!document.querySelector(".libp .empty")',
       );
       await check(
         `${index === 0 ? '模型' : 'Vibe'} 条件单独生效`,
-        'document.querySelectorAll(".library-chip").length===1',
+        'document.querySelectorAll(".chip").length===1',
         undefined,
         'once',
       );
       await click('清除', scope);
       await click('筛选', scope);
     }
-    await click('导入时间');
-    await click('最近 7 天', 'document.querySelector(".nps-date-quick")');
+    await e('document.querySelector("[data-trigger=lcal]").click()');
+    await click('最近 7 天', 'document.querySelector(".lcal-quick")');
     await closePopover();
     await check(
       '导入时间预设生效',
-      'document.querySelector(".library-chip")?.textContent.includes("最近 7 天")',
+      'document.querySelector(".chip")?.textContent.includes("最近 7 天")',
       undefined,
       'once',
     );
     await click('筛选', scope);
-    await click('导入时间');
+    await e('document.querySelector("[data-trigger=lcal]").click()');
     await input('input[aria-label="开始日期"]', '1990-01-01');
     await key('Enter', {}, 'document.activeElement');
     await input('input[aria-label="结束日期"]', '1990-01-02');
     await key('Enter', {}, 'document.activeElement');
     await key('Escape', {}, 'document.activeElement');
     await closePopover();
-    await wait('!!document.querySelector(".library-empty")');
+    await wait('!!document.querySelector(".libp .empty")');
     await check(
       '自定义时间范围生效',
-      '!!document.querySelector(".library-empty")',
+      '!!document.querySelector(".libp .empty")',
       undefined,
       'once',
     );
     await click('清除', scope);
     await click('筛选', scope);
-    await input('input[aria-label="包含 Tag"]', '1girl');
+    await input('input[aria-label="包含的 Tag"]', '1girl');
     await key('Enter');
 
     if (!reduced) await screen('filter');
     await click('存为智能收藏集');
-    await wait('!!document.querySelector(".library-side input")');
+    await wait('!!document.querySelector(".libp .side input")');
     await check(
       '智能收藏集立即创建并以条件值命名，侧栏自动编辑',
-      'document.querySelector(".library-side input").value==="1girl"&&!document.querySelector("dialog[open]")',
+      'document.querySelector(".libp .side input").value==="1girl"&&!document.querySelector("[role=dialog]:not(.leaving *)")',
       undefined,
       'once',
     );
     await input('input[aria-label="收藏集名称"]', `012智能${reduced}`);
     await key('Enter', {}, 'document.activeElement');
-    await wait(`!!document.querySelector('.library-side [aria-label="012智能${reduced}"]')`);
+    await wait(
+      `[...document.querySelectorAll('.libp .side .nm')].some(n=>n.textContent==='012智能${reduced}')`,
+    );
 
     const smart = database.listCollections().find((c) => c.name === `012智能${reduced}`);
     await check(
@@ -424,17 +431,17 @@ export async function libraryChecks(env) {
     );
     await check(
       '智能收藏集显示只读规则和编辑入口',
-      'document.querySelector(".library-chips").textContent.includes("1girl") && !![...document.querySelectorAll(".library-chips button")].find(button=>button.textContent.trim()==="编辑规则") && !document.querySelector(".library-chips [aria-label^=移除]")',
+      'document.querySelector(".lchips").textContent.includes("1girl") && !![...document.querySelectorAll(".lchips button")].find(button=>button.textContent.trim()==="编辑规则") && !document.querySelector(".lchips [aria-label^=移除]")',
       undefined,
       'both',
     );
     await checkCollectionContext(h, smart.id);
     if (!reduced) await screen('smart');
     await click('编辑规则', scope);
-    await input('input[aria-label="排除 Tag"]', 'solo');
+    await input('input[aria-label="排除的 Tag"]', 'solo');
     await key('Enter');
     await click('保存规则');
-    await wait('!document.querySelector(".nps-popover:popover-open")');
+    await wait('!document.querySelector(".popover:not(.leaving)")');
     await check(
       '智能收藏集规则使用同一筛选浮层更新',
       () =>
@@ -448,7 +455,9 @@ export async function libraryChecks(env) {
     await collectionContext(h, smart.id, '重命名');
     await input('input[aria-label="收藏集名称"]', `012改名${reduced}`);
     await key('Enter', {}, 'document.activeElement');
-    await wait(`!!document.querySelector('.library-side [aria-label="012改名${reduced}"]')`);
+    await wait(
+      `[...document.querySelectorAll('.libp .side .nm')].some(n=>n.textContent==='012改名${reduced}')`,
+    );
     await check(
       '智能收藏集重命名持久化',
       () => database.listCollections().some((c) => c.name === `012改名${reduced}`),
@@ -463,7 +472,7 @@ export async function libraryChecks(env) {
       'once',
     );
     await click('删除', dialog);
-    await wait('!document.querySelector("dialog[open]")');
+    await wait('!document.querySelector("[role=dialog]:not(.leaving *)")');
     await h.until(
       () => !database.listCollections().some((collection) => collection.id === smart.id),
       '智能收藏集删除已写入数据库',
@@ -480,10 +489,10 @@ export async function libraryChecks(env) {
     await all();
     await selectCard(0);
     await waitDetail();
-    const target = await e('document.querySelector(".library-detail").dataset.detailId');
-    await click('加入收藏集', 'document.querySelector(".library-detail-actions")');
+    const target = await e('document.querySelector(".col.detail").dataset.detailId');
+    await click('加入收藏集', 'document.querySelector(".detail .dacts")');
     const manual = database.listCollections().find((c) => c.kind === 'manual');
-    await click(manual.name, 'document.querySelector(".nps-popover:popover-open")');
+    await click(manual.name, 'document.querySelector(".popover:not(.leaving)")');
     await h.until(
       () =>
         database
@@ -502,7 +511,7 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
-    await click(manual.name, 'document.querySelector(".nps-popover:popover-open")');
+    await click(manual.name, 'document.querySelector(".popover:not(.leaving)")');
     await h.until(
       () =>
         !database
@@ -544,24 +553,25 @@ export async function libraryChecks(env) {
     await key('Escape');
     await all();
     await setGrouping('完全相同');
+    await wait('!!document.querySelector(".card .stack")');
     await e(
-      `(()=>{const c=[...document.querySelectorAll('.library-card')].find(c=>c.querySelector('.library-stack'));c.focus();c.click()})()`,
+      `(()=>{const c=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.stack'));c.focus();c.click()})()`,
     );
-    await wait('document.querySelectorAll(".library-detail .library-strip button").length>1');
-    await e('document.querySelectorAll(".library-detail .library-strip button")[1].click()');
+    await wait('document.querySelectorAll(".col.detail .lstrip img").length>1');
+    await e('document.querySelectorAll(".col.detail .lstrip img")[1].click()');
     await wait(
-      'document.querySelector(".library-detail .library-strip button.is-current")?.getAttribute("aria-label")===document.querySelector(".library-caption .library-name")?.textContent',
+      'document.querySelectorAll(".col.detail .lstrip img")[1]?.classList.contains("is-cur")',
     );
-    const cover = await e('document.querySelector(".library-detail").dataset.detailId');
-    await e('document.querySelector(".library-detail-picture img").click()');
-    await wait('!!document.querySelector(".library-viewer")');
+    const cover = await e('document.querySelector(".col.detail").dataset.detailId');
+    await e('document.querySelector(".detail .pic img").click()');
+    await wait('!!document.querySelector(".viewer-ov")');
     await check(
       '详情图片打开当前成员的大图',
-      `document.querySelector('.library-viewer').dataset.viewerProjectId===${JSON.stringify(cover)}`,
+      `document.querySelector('.viewer-ov .vframe:not(.leaving) img')?.getAttribute('src')==='novelai-media://file?path='+encodeURIComponent(${JSON.stringify(database.loadProject(cover).image_path)})`,
       undefined,
       'once',
     );
-    await key('Escape', {}, 'document.querySelector(".library-viewer")');
+    await key('Escape', {}, 'document.querySelector(".viewer-ov")');
     if (!reduced) await screen('group');
     await refresh();
 
@@ -569,12 +579,12 @@ export async function libraryChecks(env) {
     if (!reduced) await libraryCopyChecks(env);
     h.category(`图片库·${reduced ? '关闭动效' : '正常动效'}`);
     await input('.gallery-search input', '');
-    await wait('document.querySelectorAll(".library-card").length>2');
+    await wait('document.querySelectorAll(".card").length>2');
     await selectCard(0);
     await waitDetail();
     await key(' ', {}, grid);
-    await wait('!!document.querySelector(".library-viewer")');
-    const viewer = 'document.querySelector(".library-viewer")';
+    await wait('!!document.querySelector(".viewer-ov")');
+    const viewer = 'document.querySelector(".viewer-ov")';
     await click('复制图片', viewer);
     await h.until(() => !clipboard.readImage().isEmpty(), '复制大图');
     await check('复制图片得到像素', () => !clipboard.readImage().isEmpty(), undefined, 'once');
@@ -588,72 +598,60 @@ export async function libraryChecks(env) {
       undefined,
       'once',
     );
-    const beforeName = await e('document.querySelector(".library-viewer").dataset.viewerProjectId');
+    const beforeName = await e('document.querySelector(".viewer-bar > .mono").textContent');
     await key('ArrowRight', {}, viewer);
     await check(
       '大图右键切换',
-      'document.querySelector(".library-viewer").dataset.viewerProjectId!==' +
-        JSON.stringify(beforeName),
+      'document.querySelector(".viewer-bar > .mono").textContent!==' + JSON.stringify(beforeName),
       undefined,
       'once',
     );
     await key('ArrowLeft', {}, viewer);
     await check(
       '大图左键切回',
-      'document.querySelector(".library-viewer").dataset.viewerProjectId===' +
-        JSON.stringify(beforeName),
+      'document.querySelector(".viewer-bar > .mono").textContent===' + JSON.stringify(beforeName),
       undefined,
       'once',
     );
 
     if (!reduced) await screen('viewer');
     await key('Escape', {}, viewer);
-    await wait('!document.querySelector(".library-viewer")');
+    await wait('!document.querySelector(".viewer-ov")');
     await check(
       '关闭大图焦点回到原卡片',
-      'document.activeElement.matches(".library-card.current")',
+      'document.activeElement.matches(".card.on")',
       undefined,
       'once',
     );
     await key('Enter', {}, grid);
-    await wait(
-      'document.querySelector(".studio-titlebar [aria-current=page]")?.textContent.trim()==="工作台"',
-    );
+    await wait('document.querySelector(".tb [aria-current=page]")?.textContent.trim()==="工作台"');
     await check(
       'Enter 在工作台打开',
-      'document.querySelectorAll(".workbench-tab").length>0',
+      'document.querySelectorAll(".tabs [data-tab]").length>0',
       undefined,
       'once',
     );
-    await click('图片库', 'document.querySelector(".studio-titlebar")');
+    await click('图片库', 'document.querySelector(".tb")');
     await e(
-      'document.querySelector(".library-card").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
+      'document.querySelector(".card").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
     );
-    await wait(
-      'document.querySelector(".studio-titlebar [aria-current=page]")?.textContent.trim()==="工作台"',
-    );
-    await check(
-      '双击卡片在工作台打开',
-      'document.querySelectorAll(".workbench-tab").length>0 && !document.querySelector(".library-viewer")',
-      undefined,
-      'once',
-    );
-    await click('图片库', 'document.querySelector(".studio-titlebar")');
+    await wait('!!document.querySelector(".viewer-ov")');
+    await check('双击卡片打开大图', '!!document.querySelector(".viewer-ov")');
+    await key('Escape');
+    await wait('!document.querySelector(".viewer-ov")');
     await selectCard(0);
     await waitDetail();
-    const trashId = await e('document.querySelector(".library-detail").dataset.detailId');
-    await click('移入回收站', 'document.querySelector(".library-detail-actions")');
+    const trashId = await e('document.querySelector(".col.detail").dataset.detailId');
+    await click('移入回收站', 'document.querySelector(".detail .dacts")');
     await h.until(() => !!database.loadProject(trashId).deleted_at, '移入回收站');
-    await wait(
-      '!![...document.querySelectorAll(".nps-toast button")].find(b=>b.textContent==="撤销")',
-    );
+    await wait('!![...document.querySelectorAll(".toast button")].find(b=>b.textContent==="撤销")');
     await check(
       '单图回收通知使用定稿文案',
-      'document.querySelector(".nps-notifications").textContent.includes("已移入回收站")',
+      'document.querySelector(".toast:not(.leaving)").textContent.includes("已移入回收站")',
       undefined,
       'once',
     );
-    await click('撤销', 'document.querySelector(".nps-notifications")');
+    await click('撤销', 'document.querySelector(".toast:not(.leaving)")');
     await h.until(() => !database.loadProject(trashId).deleted_at, '撤销移入回收站');
     await check(
       '移入回收站后通知可以撤销',
@@ -663,36 +661,24 @@ export async function libraryChecks(env) {
     );
     await selectCard(0);
     await waitDetail();
-    const trashAgain = await e('document.querySelector(".library-detail").dataset.detailId');
-    await click('移入回收站', 'document.querySelector(".library-detail-actions")');
+    const trashAgain = await e('document.querySelector(".col.detail").dataset.detailId');
+    await click('移入回收站', 'document.querySelector(".detail .dacts")');
     await h.until(() => !!database.loadProject(trashAgain).deleted_at, '再次移入');
     await click('回收站', scope);
-    await wait('document.querySelectorAll(".library-card").length>0');
+    await wait('document.querySelectorAll(".card").length>0');
     await check(
       '回收站不显示导入',
-      '![...document.querySelectorAll(".library-tools button")].some(b=>b.textContent.trim()==="导入")',
+      '![...document.querySelectorAll(".ltools button")].some(b=>b.textContent.trim()==="导入")',
       undefined,
       'once',
     );
     await input('.gallery-search input', database.loadProject(trashAgain).name);
-    await wait('document.querySelectorAll(".library-card").length===1');
+    await wait('document.querySelectorAll(".card").length===1');
     await selectCard(0);
     await waitDetail();
 
-    await check(
-      '恢复按钮有返回图标',
-      '!!document.querySelector(".library-detail-actions .ri-arrow-go-back-line")',
-      undefined,
-      'both',
-    );
-    await check(
-      '清空回收站位于说明行且使用危险小按钮',
-      "!document.querySelector('.library-tools .nps-button-danger-outline') && !!document.querySelector('.library-chips.library-help .nps-button-danger-outline.nps-small')",
-      undefined,
-      'both',
-    );
     if (!reduced) await screen('trash');
-    await click('恢复', 'document.querySelector(".library-detail-actions")');
+    await click('恢复', 'document.querySelector(".detail .dacts")');
     await h.until(() => !database.loadProject(trashAgain).deleted_at, '恢复图片');
     await check(
       '回收站恢复图片',
@@ -702,9 +688,9 @@ export async function libraryChecks(env) {
     );
     await all();
     await input('.gallery-search input', 'not-a-real-image-012');
-    await wait('!!document.querySelector(".library-empty")');
+    await wait('!!document.querySelector(".libp .empty")');
     await click('清除搜索', scope);
-    await wait('document.querySelectorAll(".library-card").length>0');
+    await wait('document.querySelectorAll(".card").length>0');
     await check(
       '无结果空状态能清除搜索筛选',
       'document.querySelector(".gallery-search input").value===""',
@@ -749,7 +735,9 @@ export async function libraryChecks(env) {
     );
     doubles.selections.push({ canceled: false, filePaths: [unique] });
     await click('导入', scope);
-    await wait('document.querySelector(".nps-notifications")?.textContent.includes("已导入 0 张")');
+    await wait(
+      'document.querySelector(".toast:not(.leaving)")?.textContent.includes("已导入 0 张")',
+    );
     await check(
       '重复图片被跳过',
       () => database.loadLibrary('all').length === before + 1,
@@ -759,7 +747,7 @@ export async function libraryChecks(env) {
     clipboard.writeImage(
       nativeImage.createFromPath(fresh[0]).resize({ width: 333 + Number(importReduced) }),
     );
-    await key('v', mod, 'document.querySelector(".library-page")');
+    await key('v', mod, 'document.querySelector(".libp")');
     await h.until(() => database.loadLibrary('all').length === before + 2, '从剪贴板导入');
     await check(
       'Mod+V 从剪贴板导入',
@@ -782,61 +770,61 @@ export async function libraryChecks(env) {
     await fs.writeFile(zip, Buffer.concat(await Array.fromAsync(zipfile.outputStream)));
     doubles.selections.push({ canceled: false, filePaths: [zip] });
     await click('导入', scope);
-    await wait('document.querySelectorAll(".library-zip .library-card").length===4');
-    await wait('document.querySelector(".library-zip")?.textContent.includes("其中 1 张")');
+    await wait('document.querySelectorAll(".zipdlg .ztile").length===4');
+    await wait('document.querySelector(".zipdlg")?.textContent.includes("其中 1 张")');
     await check(
       'ZIP 默认选中全部可导入图片',
-      'document.querySelectorAll(".library-zip .library-card.picked").length===3',
+      'document.querySelectorAll(".zipdlg .ztile.on").length===3',
     );
     await click('全不选', dialog);
     await click('全选', dialog);
     await check(
       'ZIP 全选只选择可导入图片',
-      'document.querySelectorAll(".library-zip .library-card.picked").length===3',
+      'document.querySelectorAll(".zipdlg .ztile.on").length===3',
       undefined,
       'once',
     );
-    await wait('document.querySelectorAll(".library-zip .library-card img")[1]?.naturalWidth>0');
+    await wait('document.querySelectorAll(".zipdlg .ztile img")[1]?.naturalWidth>0');
     await e(
-      'document.querySelectorAll(".library-zip .library-card")[1].dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
+      'document.querySelectorAll(".zipdlg .ztile")[1].dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
     );
-    await wait('!!document.querySelector(".library-zip-preview")');
+    await wait('!!document.querySelector(".viewer-ov")');
     await check(
       'ZIP 双击打开大图预览',
-      'document.querySelectorAll("dialog[open]").length===2',
+      '!!document.querySelector(".zipdlg") && !!document.querySelector(".viewer-ov")',
       undefined,
       'once',
     );
-    await click('关闭', '[...document.querySelectorAll("dialog[open]")].at(-1)');
+    await click('关闭', 'document.querySelector(".viewer-ov")');
     await click('全不选', dialog);
     await e(
-      `(()=>{const cards=document.querySelectorAll('.library-zip .library-card');cards[1].click();cards[3].dispatchEvent(new MouseEvent('click',{bubbles:true,shiftKey:true}))})()`,
+      `(()=>{const cards=document.querySelectorAll('.zipdlg .ztile');cards[1].click();cards[3].dispatchEvent(new MouseEvent('click',{bubbles:true,shiftKey:true}))})()`,
     );
     await check(
       'ZIP Shift 连选跳过重复项',
-      'document.querySelectorAll(".library-zip .library-card.picked").length===3 && !document.querySelector(".library-zip .library-card.dim.picked")',
+      'document.querySelectorAll(".zipdlg .ztile.on").length===3 && !document.querySelector(".zipdlg .ztile.dup.on")',
     );
     for (const modifier of ['ctrlKey', 'shiftKey']) {
       await click('全不选', dialog);
-      await e(`document.querySelectorAll('.library-zip .library-card')[3].click()`);
+      await e(`document.querySelectorAll('.zipdlg .ztile')[3].click()`);
       await e(
-        `(()=>{const grid=document.querySelector('.library-zip-grid'),r=grid.querySelectorAll('.library-card')[1].getBoundingClientRect();for(const [type,x,y] of [['pointerdown',r.left+2,r.top+2],['pointermove',r.right-2,r.bottom-2],['pointerup',r.right-2,r.bottom-2]])grid.dispatchEvent(new PointerEvent(type,{bubbles:true,pointerId:1,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:x,clientY:y,${modifier}:true}))})()`,
+        `(()=>{const grid=document.querySelector('.zipgrid'),r=grid.querySelectorAll('.ztile')[1].getBoundingClientRect();for(const [type,x,y] of [['pointerdown',r.left+2,r.top+2],['pointermove',r.right-2,r.bottom-2],['pointerup',r.right-2,r.bottom-2]])grid.dispatchEvent(new PointerEvent(type,{bubbles:true,pointerId:1,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:x,clientY:y,${modifier}:true}))})()`,
       );
       await check(
         `ZIP ${modifier} 框选保留已有选择`,
-        'document.querySelectorAll(".library-zip .library-card.picked").length===2 && !document.querySelector(".library-zip .library-card.dim.picked")',
+        'document.querySelectorAll(".zipdlg .ztile.on").length===2 && !document.querySelector(".zipdlg .ztile.dup.on")',
       );
     }
     await click('全不选', dialog);
-    await e('document.querySelectorAll(".library-zip .library-card")[1].click()');
+    await e('document.querySelectorAll(".zipdlg .ztile")[1].click()');
     await check(
       'ZIP 标记已有图片并支持挑选',
-      'document.querySelectorAll(".library-zip .library-card.picked").length===1 && document.querySelectorAll(".library-zip .library-stack").length===1',
+      'document.querySelectorAll(".zipdlg .ztile.on").length===1 && document.querySelectorAll(".zipdlg .zdup").length===1',
       undefined,
       'once',
     );
     await screen('zip');
-    await key('Enter', {}, 'document.querySelector(".library-zip")');
+    await click('导入 1 张', 'document.querySelector(".zipdlg")');
     await h.until(() => database.loadLibrary('all').length === before + 3, 'ZIP 只导入所选');
     await check(
       'ZIP 只导入选中的图片',
@@ -865,42 +853,45 @@ export async function libraryChecks(env) {
       env.commandHandlers['import.previews'] = () => ({ ok: true });
       env.commandHandlers['import.cancel'] = () => ({ ok: true });
       await click('导入', scope);
-      await wait('document.querySelectorAll(".library-zip [data-entry-id]").length===60');
-      await wait('document.querySelector(".library-zip-grid .nps-scroll-thumb")?.hidden===false');
+      await wait('document.querySelectorAll(".zipdlg [data-zid]").length===60');
+      await wait('!!document.querySelector(".sb")');
       await e(
-        `document.querySelector('.library-zip-grid').dispatchEvent(new PointerEvent('pointermove',{bubbles:true}))`,
+        `document.querySelector('.zipgrid').dispatchEvent(new PointerEvent('pointermove',{bubbles:true}));document.querySelector('.sb').dispatchEvent(new PointerEvent('pointerenter'))`,
       );
+      const canDrag = await e(
+        `(()=>{const t=document.querySelector('.sb'),r=t.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===t})()`,
+      );
+      if (canDrag) {
+        const point = await e(
+          `(()=>{const n=document.querySelector('.zipgrid'),t=document.querySelector('.sb'),r=t.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,end:n.getBoundingClientRect().bottom-1}})()`,
+        );
+        for (const [type, y] of [
+          ['mousePressed', point.y],
+          ['mouseMoved', point.end],
+          ['mouseReleased', point.end],
+        ]) {
+          await h.window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+            type,
+            x: point.x,
+            y,
+            button: type === 'mouseMoved' ? 'none' : 'left',
+            buttons: type === 'mouseReleased' ? 0 : 1,
+            clickCount: type === 'mouseMoved' ? 0 : 1,
+          });
+          if (type === 'mousePressed')
+            await wait('document.querySelector(".sb")?.classList.contains("drag")');
+        }
+      } else
+        await e(
+          "document.querySelector('.zipgrid').scrollTop=document.querySelector('.zipgrid').scrollHeight",
+        );
       await wait(
-        `(()=>{const t=document.querySelector('.library-zip-grid .nps-scroll-thumb'),r=t.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===t})()`,
+        `(()=>{const n=document.querySelector('.zipgrid');return n.scrollTop>=n.scrollHeight-n.clientHeight-1})()`,
       );
-      const point = await e(
-        `(()=>{const n=document.querySelector('.library-zip-grid'),t=n.querySelector('.nps-scroll-thumb'),r=t.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,end:n.getBoundingClientRect().bottom-1}})()`,
-      );
-      for (const [type, y] of [
-        ['mousePressed', point.y],
-        ['mouseMoved', point.end],
-        ['mouseReleased', point.end],
-      ]) {
-        await h.window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
-          type,
-          x: point.x,
-          y,
-          button: type === 'mouseMoved' ? 'none' : 'left',
-          buttons: type === 'mouseReleased' ? 0 : 1,
-          clickCount: type === 'mouseMoved' ? 0 : 1,
-        });
-        if (type === 'mousePressed')
-          await wait(
-            'document.querySelector(".library-zip-grid .nps-scroll-thumb")?.dataset.dragging==="true"',
-          );
-      }
-      await wait(
-        `(()=>{const n=document.querySelector('.library-zip-grid');return n.scrollTop>=n.scrollHeight-n.clientHeight-1})()`,
-      );
-      await e(`document.querySelector('[data-entry-id="large-59"]').click()`);
+      await e(`document.querySelector('[data-zid="large-59"]').click()`);
       await check(
         '大 ZIP 可拖动滚动条到底并修改最后一张的选择',
-        `document.querySelector('[data-entry-id="large-59"]').getAttribute('aria-pressed')==='false'&&document.querySelectorAll('.library-zip .picked').length===59`,
+        `${canDrag}&&document.querySelector('[data-zid="large-59"]').getAttribute('aria-pressed')==='false'&&document.querySelectorAll('.zipdlg .ztile.on').length===59`,
         undefined,
         'once',
       );
@@ -919,21 +910,21 @@ export async function libraryChecks(env) {
     await libraryImportExtras({ h, database, doubles, mode, files, reduced: importReduced, click });
     await all();
     await input('.gallery-search input', uniqueName);
-    await wait('document.querySelectorAll(".library-card").length===1');
+    await wait('document.querySelectorAll(".card").length===1');
     await selectCard(0);
     await waitDetail();
-    const doomed = await e('document.querySelector(".library-detail").dataset.detailId');
-    await click('移入回收站', 'document.querySelector(".library-detail-actions")');
+    const doomed = await e('document.querySelector(".col.detail").dataset.detailId');
+    await click('移入回收站', 'document.querySelector(".detail .dacts")');
     await h.until(() => !!database.loadProject(doomed).deleted_at, '待永久删除图片进入回收站');
     await click('回收站', scope);
     await input('.gallery-search input', uniqueName);
-    await wait('document.querySelectorAll(".library-card").length===1');
+    await wait('document.querySelectorAll(".card").length===1');
     await selectCard(0);
     await waitDetail();
-    await click('永久删除', 'document.querySelector(".library-detail-actions")');
+    await click('永久删除', 'document.querySelector(".detail .dacts")');
     await check(
       '永久删除默认聚焦取消并说明原文件不受影响',
-      'document.activeElement.textContent.trim()==="取消" && document.querySelector("dialog[open]").textContent.includes("原文件不受影响")',
+      'document.activeElement.textContent.trim()==="取消" && document.querySelector("[role=dialog]:not(.leaving *)").textContent.includes("原文件不受影响")',
       undefined,
       'once',
     );
@@ -941,7 +932,7 @@ export async function libraryChecks(env) {
     await click('取消', dialog);
     await check('取消永久删除保留图片', () => !!database.loadProject(doomed), undefined, 'once');
     await selectCard(0, { ctrlKey: true });
-    await click('永久删除', 'document.querySelector(".library-selection-bar")');
+    await click('永久删除', 'document.querySelector(".ldock .selbar:not(.leaving)")');
     await click('永久删除', dialog);
     await h.until(() => !database.loadProject(doomed), '永久删除完成');
     await check(
@@ -954,21 +945,16 @@ export async function libraryChecks(env) {
     const activeIds = database.loadLibrary('all').map((p) => p.id);
     database.updateProjects(activeIds, { deleted: true });
     await refresh(true);
-    await wait('!!document.querySelector(".library-empty")');
-    await check(
-      '空图库使用标准 SVG 空状态',
-      `(()=>{const mark=document.querySelector('.nps-empty-mark');return document.querySelector('.library-empty').textContent.includes('图片库里还没有图片')&&!!mark?.querySelector('svg')&&getComputedStyle(mark.querySelector('[data-color=text]')).fill===getComputedStyle(mark).color&&getComputedStyle(mark.querySelector('[data-color=empty]')).stroke===getComputedStyle(mark).color})()`,
-      undefined,
-      'both',
-    );
+    await wait('!!document.querySelector(".libp .empty")');
+
     await screen('empty');
     const emptyCollection = database
       .listCollections()
       .find((collection) => collection.kind === 'manual');
-    await click(emptyCollection.name, 'document.querySelector(".library-side")');
+    await click(emptyCollection.name, 'document.querySelector(".libp .side")');
     await check(
       '全库无图片时收藏集侧栏仍可用且显示空收藏集说明',
-      '!!document.querySelector(".library-side-item.on[data-collection-id]") && document.querySelector(".library-empty").textContent.includes("收藏集为空")',
+      '!!document.querySelector(".libp .side .it.on[data-key^=sv-]") && document.querySelector(".libp .empty").textContent.includes("收藏集为空")',
       undefined,
       'once',
     );

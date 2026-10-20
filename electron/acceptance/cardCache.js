@@ -15,7 +15,7 @@ export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl
     return originalSend(channel, event, ...args);
   };
   try {
-    await h.click('工作台', 'document.querySelector(".studio-titlebar")');
+    await h.click('工作台', 'document.querySelector(".tb")');
     await database.loadLibraryCards();
     database.insertProjects(
       ids.map((id) => ({
@@ -46,7 +46,7 @@ export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl
         if (!state.clicked && value.completed < value.total) {
           const started = performance.now();
           const clickedWhilePending = state.pending;
-          document.querySelector('.studio-titlebar [aria-label="设置"]').click();
+          document.querySelector('.tb [aria-label="设置"]').click();
           state.clicked = true;
           // Probe the main event loop without deliberately delayed disk I/O.
           // A fast build may legitimately finish before the response returns.
@@ -67,7 +67,7 @@ export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl
         state.complete = first.length === ${counts.active} && trash.length === ${counts.trash};
       } finally { window.__cardCacheUnsubscribe(); }
     })()`);
-    await h.wait('!!document.querySelector(".studio-settings")?.getClientRects().length');
+    await h.wait('!!document.querySelector(".setp")?.getClientRects().length');
     const delayedCount = cardCacheControl.flush();
     await h.check('进度只发送给请求卡片的窗口', () => unrelatedProgress === 0, undefined, 'once');
     await h.check(

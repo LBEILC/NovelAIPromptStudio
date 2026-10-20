@@ -5,9 +5,6 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import electron from 'electron';
 import { verifyNativePackage } from './verify-native-package.mjs';
-import { build } from 'vite';
-import react from '@vitejs/plugin-react';
-import { bundledMiSans } from './font-vite.mjs';
 
 import { acceptanceOptions } from './acceptance-options.mjs';
 const options = acceptanceOptions();
@@ -187,17 +184,6 @@ try {
     });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
-  if (!packaged && ['全部', '客户端控件', '基础组件', '减少动态效果'].includes(options.category))
-    await build({
-      configFile: false,
-      base: './',
-      plugins: [react(), bundledMiSans()],
-      build: {
-        outDir: path.join(root, 'showcase'),
-        emptyOutDir: true,
-        rolldownOptions: { input: path.resolve('ui-showcase.html') },
-      },
-    });
   let executable = electron;
   if (packaged) {
     if (!process.argv.includes('--existing-package'))

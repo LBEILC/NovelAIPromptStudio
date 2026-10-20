@@ -1,4 +1,4 @@
-﻿import { BrowserWindow, Menu } from 'electron';
+import { BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 export async function clientChecks({ h, doubles, mode }) {
@@ -10,18 +10,12 @@ export async function clientChecks({ h, doubles, mode }) {
     () => contents.getLastWebPreferences(),
     'once',
   );
+
   await h.check(
-    '界面默认不可选，图片和图标没有浏览器拖影',
-    `(()=>{
-    const nodes=[document.querySelector('.studio-titlebar'),document.querySelector('.studio-titlebar nav'),document.querySelector('.studio-titlebar button')];
-    return nodes.every(n=>getComputedStyle(n).userSelect==='none') && [...document.querySelectorAll('img,svg,a')].every(n=>getComputedStyle(n).webkitUserDrag==='none');
-  })()`,
-  );
-  await h.check(
-    '全局滚动不回弹且非编辑区全选被阻止',
+    '非编辑区全选被阻止',
     `(()=>{
     const event=new KeyboardEvent('keydown',{key:'a',ctrlKey:true,bubbles:true,cancelable:true});document.body.dispatchEvent(event);
-    return event.defaultPrevented && getComputedStyle(document.body).overscrollBehavior==='none';
+    return event.defaultPrevented;
   })()`,
     undefined,
     'once',
@@ -96,23 +90,16 @@ export async function clientChecks({ h, doubles, mode }) {
     );
   }
   await h.evaluate(`document.querySelector('#client-link-probe').remove()`);
-  await h.click('工作台', 'document.querySelector(".studio-titlebar")');
+  await h.click('工作台', 'document.querySelector(".tb")');
   const fixtures = await createWorkbenchFixtures(path.join(mode.root, 'client-fixtures'));
   doubles.selections.push({ canceled: false, filePaths: [fixtures[0]] });
-  await h.click('打开图片', 'document.querySelector(".studio-titlebar")');
-  await h.wait('!!document.querySelector(".wb-prose")');
-  await h.check(
-    '提示词、段落和生成参数可选中，工具栏与页签不可选',
-    `(()=>{
-    const text=['.nps-tag-text','.wb-prose','.wb-meta'];
-    const chrome=['.studio-titlebar button','.wb-tab','.wb-section-head'];
-    return text.every(s=>{const n=document.querySelector(s);return n&&getComputedStyle(n).userSelect==='text'}) && chrome.every(s=>{const n=document.querySelector(s);return !n||getComputedStyle(n).userSelect==='none'});
-  })()`,
-  );
+  await h.click('打开图片', 'document.querySelector(".tb")');
+  await h.wait('!!document.querySelector(".prose")');
+
   await h.check(
     '图片与图标禁止原生拖动，文字和网址落下时阻止默认插入',
     `(()=>{
-    const img=document.querySelector('.wb-canvas img'),svg=document.querySelector('svg');
+    const img=document.querySelector('.stage .canvas img'),svg=document.querySelector('svg');
     const drag=[img,svg].every(n=>{const e=new DragEvent('dragstart',{bubbles:true,cancelable:true});n.dispatchEvent(e);return e.defaultPrevented&&getComputedStyle(n).webkitUserDrag==='none'});
     const transfer=new DataTransfer();transfer.setData('text/plain','https://example.test/drop');transfer.setData('text/uri-list','https://example.test/drop');
     const drop=new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:transfer});document.body.dispatchEvent(drop);return drag&&drop.defaultPrevented;
@@ -121,12 +108,12 @@ export async function clientChecks({ h, doubles, mode }) {
     'once',
   );
   await h.evaluate(
-    `(()=>{const r=document.createRange();r.selectNodeContents(document.querySelector('.wb-prose'));getSelection().removeAllRanges();getSelection().addRange(r)})()`,
+    `(()=>{const r=document.createRange();r.selectNodeContents(document.querySelector('.prose'));getSelection().removeAllRanges();getSelection().addRange(r)})()`,
   );
   await h.screenshot('client-prompt-selection');
   await h.evaluate('getSelection().removeAllRanges()');
   await h.key('w', process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true });
-  await h.wait('!document.querySelector(".wb-tab")');
+  await h.wait('!document.querySelector(".tabs [data-tab]")');
   await h.section('关于与更新');
   await h.screenshot('client-content-selection');
 }

@@ -253,7 +253,7 @@ export async function runReadmeScreenshots({
     });
   const capture = async (name) => {
     await h.evaluate('document.activeElement?.blur()');
-    await h.wait('!document.querySelector(".nps-toast") && !window.studioScreenshot.pending()');
+    await h.wait('!document.querySelector(".toast") && !window.studioScreenshot.pending()');
     await h.evaluate(
       `(async()=>{for(const image of document.images) if(image.getClientRects().length) await image.decode();await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));})()`,
     );
@@ -374,12 +374,13 @@ export async function runReadmeScreenshots({
     await h.section('NovelAI 账号');
     await h.input('[aria-label="持久令牌"]', 'acceptance-token');
     await h.click('保存', 'document.querySelector("[data-settings-section=novelai]")');
+    await h.section('NovelAI 账号');
     await h.wait(
       'document.body.innerText.includes("已保存 ••••••••")&&document.body.innerText.includes("10,000")',
     );
     await capture('account');
-    await h.click('工作台', 'document.querySelector(".studio-titlebar")');
-    await h.evaluate('document.querySelector(".wb-tab").click()');
+    await h.click('工作台', 'document.querySelector(".tb")');
+    await h.evaluate('document.querySelector(".tab").click()');
     const tabId = (await invoke('workbench.list')).activeTabId;
     const parts = current.prompt_structure.base_prompt_raw.split(', ');
     const tagText = parts.slice(0, 6).join(', ');
@@ -431,9 +432,9 @@ export async function runReadmeScreenshots({
       undefined,
       'once',
     );
-    await h.wait(`!!document.querySelector('[data-version-id="${rewritten.id}"] .wb-version-row')`);
+    await h.wait(`!!document.querySelector('[data-key="ver-${rewritten.id}"]')`);
     const point = await h.evaluate(
-      `(()=>{const n=document.querySelector('[data-version-id="${rewritten.id}"] .wb-version-row');n.scrollIntoView({block:'nearest'});const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+10}})()`,
+      `(()=>{const n=document.querySelector('[data-key="ver-${rewritten.id}"]');n.scrollIntoView({block:'nearest'});const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+10}})()`,
     );
     await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
       type: 'mouseMoved',
@@ -441,7 +442,7 @@ export async function runReadmeScreenshots({
       button: 'none',
     });
     await h.wait(
-      '!!document.querySelector("[role=tooltip] del")&&!!document.querySelector("[role=tooltip] ins")',
+      '!!document.querySelector(".ver-peek del")&&!!document.querySelector(".ver-peek ins")',
     );
     await capture('versions');
     await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
@@ -450,7 +451,7 @@ export async function runReadmeScreenshots({
       y: 50,
       button: 'none',
     });
-    await h.wait('!document.querySelector("[role=tooltip] del")');
+    await h.wait('!document.querySelector(".ver-peek del")');
     await invoke('prompt.set', {
       tabId,
       scope: 'base:prompt',
@@ -459,7 +460,7 @@ export async function runReadmeScreenshots({
     generationService.state.holdAt = generationService.state.requests.length + 2;
     const generating = await invoke('generate.start', { tabId, count: 3 });
     await h.wait(
-      'document.querySelector(".wb-generation-bar")?.textContent.includes("生成中 2 / 3")&&document.querySelector(".wb-generation-title")?.textContent.includes("生成中 · 2 / 3")',
+      'document.querySelector(".gen-bar")?.textContent.includes("生成中 2 / 3")&&!!document.querySelector(".slot.run")',
     );
     await h.check(
       '三张队列第一张完成、第二张进行中、第三张排队',
@@ -471,11 +472,11 @@ export async function runReadmeScreenshots({
       'once',
     );
     await h.evaluate(
-      '(()=>{const n=document.querySelector(".wb-versions-scroll");n.scrollTop=n.scrollHeight})()',
+      '(()=>{const n=document.querySelector(".versions > .scroll");n.scrollTop=n.scrollHeight})()',
     );
-    await h.wait('!!document.querySelector(".wb-generation-slots .is-generating")');
+    await h.wait('!!document.querySelector(".slot.run")');
     await h.wait(
-      '(()=>{const r=document.querySelector(".wb-generation-slots .is-generating").getBoundingClientRect();return r.bottom<=innerHeight&&r.top>0})()',
+      '(()=>{const r=document.querySelector(".slot.run").getBoundingClientRect();return r.bottom<=innerHeight&&r.top>0})()',
     );
     await capture('generate');
     generationService.state.resume();
@@ -504,25 +505,29 @@ export async function runReadmeScreenshots({
       text: `1.3::rain::, {transparent umbrella}, girl, teal eyes, quiet city bus stop, pale blue sky, -1.2::wind::\n\n${paragraph}`,
     });
     await h.key('e', process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true });
-    await h.wait('!!document.querySelector(".wb-text-section textarea")');
+    await h.wait('!!document.querySelector(".tx-wrap textarea")');
     await capture('text');
-    await h.click('图片库', 'document.querySelector(".studio-titlebar")');
-    await h.click('全部图片', 'document.querySelector(".library-side")');
+    await h.click('图片库', 'document.querySelector(".tb")');
+    await h.click('全部图片', 'document.querySelector(".libp .side")');
     await h.click('筛选');
-    await h.click('导入时间');
+    await h.evaluate('document.querySelector("[data-trigger=lcal]").click()');
     const now = new Date(),
       day = String(now.getDate()).padStart(2, '0'),
       month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    await h.evaluate(`document.querySelector('[data-date="${month}-01"]').click()`);
-    await h.evaluate(`document.querySelector('[data-date="${month}-${day}"]').click()`);
+    await h.evaluate(
+      `[...document.querySelectorAll('.lcal-d')].find(n=>n.querySelector('span').textContent==='1').click()`,
+    );
+    await h.evaluate(
+      `[...document.querySelectorAll('.lcal-d')].find(n=>n.querySelector('span').textContent==='${Number(day)}').click()`,
+    );
     await h.wait(
-      '!!document.querySelector(".nps-date-range")&&document.querySelector(".library-chip")?.textContent.includes("至")',
+      '!!document.querySelector(".lcal")&&document.querySelector(".chip")?.textContent.includes("至")',
     );
     await capture('library');
     await h.key('Escape');
     await h.key('Escape');
     await h.section('翻译词典');
-    await h.wait('document.querySelectorAll(".settings-usage button").length>0');
+    await h.wait('document.querySelectorAll(".drow .num").length>0');
     await capture('dictionary');
     await h.check(
       '全部请求仅使用本地假服务和离线词典替身',

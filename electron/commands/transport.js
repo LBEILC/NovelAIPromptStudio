@@ -26,7 +26,7 @@ export async function protectDirectory(directory) {
       { windowsHide: true },
     );
     const sid = stdout.match(/S-1-[0-9-]+/)?.[0];
-    if (!sid) throw Error('没能确定当前用户，命令行连接没有启用');
+    if (!sid) throw Error('无法确定当前用户，命令行连接没有启用');
     await execute(
       path.join(system, 'icacls.exe'),
       [directory, '/inheritance:r', '/grant:r', `*${sid}:(OI)(CI)F`],

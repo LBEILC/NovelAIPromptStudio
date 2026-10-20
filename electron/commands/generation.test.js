@@ -52,6 +52,10 @@ it('runs generation through the command boundary with agent confirmation and ver
     updated_at: new Date().toISOString(),
   };
   let count = 0;
+  let finish;
+  const completed = new Promise((resolve) => {
+    finish = resolve;
+  });
   const commands = await createCommands({
     directory: root,
     version: 'test',
@@ -59,6 +63,12 @@ it('runs generation through the command boundary with agent confirmation and ver
     preferences,
     generationBaseUrl: service.url,
     busy: () => false,
+    emit: (event) => {
+      if (event.type === 'generation') {
+        const job = event.data.jobs.find((item) => ['completed', 'failed'].includes(item.state));
+        if (job) finish(job);
+      }
+    },
     readImage: async () => project,
     readSource: async () => project,
     importImage: async (file) => {
@@ -104,12 +114,10 @@ it('runs generation through the command boundary with agent confirmation and ver
     ])
       expect((await commands.dispatch(name, {}, 'agent')).error.code).toBe('forbidden');
     await call('generate.confirm', { ids: [pending.id] }, 'ui');
-    await expect
-      .poll(async () => {
-        const j = (await call('generate.status', { id: pending.id })).jobs[0];
-        return j.state === 'failed' ? j.error : j.state;
-      })
-      .toBe('completed');
+    // Await the real queue completion event, not a one-second polling budget.
+    const finished = await completed;
+    expect(finished.error || finished.state).toBe('completed');
+    expect((await call('generate.status', { id: pending.id })).jobs[0].state).toBe('completed');
     expect(service.state.requests).toHaveLength(2);
     expect(service.state.maxActive).toBe(1);
     const tree = await call('version.list', { tabId });

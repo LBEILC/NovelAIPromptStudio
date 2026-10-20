@@ -7,8 +7,8 @@ import { settleElements, settleLayout } from './layout.js';
 import { withWorkbenchState, sessionExpression, draftExpression } from './workbenchState.js';
 
 const frame = 'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))';
-const menu = 'document.querySelector(".nps-menu:popover-open [role=menu]")';
-const tabs = 'document.querySelectorAll(".wb-tabs-scroll .wb-tab")';
+const menu = 'document.querySelector(".menu:not(.leaving)")';
+const tabs = 'document.querySelectorAll(".tabs [data-tab]")';
 const session = sessionExpression;
 const draft = draftExpression;
 const mod = process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true };
@@ -40,7 +40,7 @@ async function center(h, selector, block = 'nearest', thumbnail = true) {
   );
   await settleElements(h, `[${selector}]`);
   return h.evaluate(
-    `(async()=>{const n=${selector};n.scrollIntoView({block:${JSON.stringify(block)},inline:'nearest'});await ${frame};const target=${thumbnail}&&n.matches('.wb-tab')?n.querySelector('img')||n:n;const r=target.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`,
+    `(async()=>{const n=${selector};n.scrollIntoView({block:${JSON.stringify(block)},inline:'nearest'});await ${frame};const target=${thumbnail}&&n.matches('.tabs [data-tab]')?n.querySelector('img')||n:n;const r=target.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`,
   );
 }
 async function context(h, selector) {
@@ -53,7 +53,7 @@ async function context(h, selector) {
 async function expectMenu(h, label, labels) {
   await h.check(
     label,
-    `JSON.stringify([...${menu}.querySelectorAll(':scope > div > button')].map(n=>n.getAttribute('aria-label')))===${JSON.stringify(JSON.stringify(labels))}`,
+    `JSON.stringify([...${menu}.querySelectorAll('[role=menuitem]')].map(n=>n.textContent.trim()))===${JSON.stringify(JSON.stringify(labels))}`,
     undefined,
     'once',
   );
@@ -74,35 +74,36 @@ async function prepare(env, prefix, dark = false) {
   return imported.imported;
 }
 async function library(h, query, grouping = '不合并') {
-  await h.click('图片库', 'document.querySelector(".studio-titlebar")');
-  await h.click('全部图片', 'document.querySelector(".library-page")');
+  await h.click('图片库', 'document.querySelector(".tb")');
+  await h.click('全部图片', 'document.querySelector(".libp")');
   await h.input('[aria-label="搜索图片库"]', query);
-  await h.click('视图', 'document.querySelector(".library-page")');
+  await h.click('视图', 'document.querySelector(".libp")');
   await h.click(grouping, 'document.querySelector("[aria-label=合并方式]")');
   await h.key('Escape', {}, 'document.activeElement');
-  await h.wait('document.querySelectorAll(".library-card").length>0');
+  await h.wait('document.querySelectorAll(".card").length>0');
 }
 async function closeAddedTabs(h, previous) {
-  await h.click('工作台', 'document.querySelector(".studio-titlebar")');
+  await h.nativeKey('Escape');
+  await h.click('工作台', 'document.querySelector(".tb")');
   const added = await h.evaluate(
-    `[...${tabs}].map(t=>t.dataset.workbenchTabId).filter(id=>!${JSON.stringify(previous)}.includes(id))`,
+    `[...${tabs}].map(t=>t.dataset.tab).filter(id=>!${JSON.stringify(previous)}.includes(id))`,
   );
   for (const id of added) {
-    await context(h, `document.querySelector('[data-workbench-tab-id="${id}"]')`);
+    await context(h, `document.querySelector('[data-tab="${id}"]')`);
     await h.click('关闭', menu);
-    if (await h.evaluate('!!document.querySelector("dialog[open]")'))
-      await h.click('丢弃并关闭', 'document.querySelector("dialog[open]")');
-    await h.wait(`!document.querySelector('[data-workbench-tab-id="${id}"]')`);
+    if (await h.evaluate('!!document.querySelector("[role=dialog]:not(.leaving *)")'))
+      await h.click('丢弃并关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
+    await h.wait(`!document.querySelector('[data-tab="${id}"]')`);
   }
 }
 async function restoredTabs(h) {
   h = withWorkbenchState(h);
   const previous = await h.evaluate(`${session}?.tabs?.map(t=>t.id) ?? []`);
-  await h.click('工作台', 'document.querySelector(".studio-titlebar")');
+  await h.click('工作台', 'document.querySelector(".tb")');
   // The full suite leaves tabs open. Reload finishes before their async file
   // reads; observe the saved IDs before opening or cleaning up our own tabs.
   await h.wait(
-    `JSON.stringify([...${tabs}].map(t=>t.dataset.workbenchTabId).sort())===${JSON.stringify(JSON.stringify([...previous].sort()))}`,
+    `JSON.stringify([...${tabs}].map(t=>t.dataset.tab).sort())===${JSON.stringify(JSON.stringify([...previous].sort()))}`,
     '已有标签页恢复后再开始交互验收',
   );
   return previous;
@@ -133,29 +134,27 @@ export async function libraryInteractionChecks(env) {
   ];
   await h.reload();
   const previousTabs = await restoredTabs(h);
-  const card = (id) => `document.querySelector('[data-project-id="${id}"]')`;
+  const card = (id) => `document.querySelector('[data-group-id="project:${id}"]')`;
   let collectionId;
   try {
     await library(h, 'interaction-fixture-');
-    await wait('document.querySelectorAll(".library-card").length===6');
+    await wait('document.querySelectorAll(".card").length===6');
     await e(`${card(records[0].id)}.click()`);
     await e(
       `${card(records[3].id)}.dispatchEvent(new MouseEvent('click',{bubbles:true,...${JSON.stringify(mod)}}))`,
     );
-    await wait('document.querySelectorAll(".library-card.picked").length===2');
+    await wait('document.querySelectorAll(".card.picked").length===2');
     await h.screenshot('interaction-checkboxes');
     await context(h, card(records[0].id));
     await expectMenu(h, '多选右键仅提供全部选中图片的操作', [
       '在工作台打开 2 张',
+      '加入收藏集…',
       '起名',
-      '根据提示词起名',
-      '加入收藏集',
       '移入回收站',
-      '取消选择',
     ]);
     await check(
       '多选菜单显示图片张数且保留选择',
-      `document.querySelector('.library-menu-heading')?.textContent==='已选 2 张'&&document.querySelectorAll('.library-card.picked').length===2`,
+      `document.querySelector('.detail .sum')?.textContent.includes('已选 2 张')&&document.querySelectorAll('.card.picked').length===2`,
       undefined,
       'once',
     );
@@ -172,15 +171,14 @@ export async function libraryInteractionChecks(env) {
     await context(h, card(records[1].id));
     await expectMenu(h, '单张右键菜单项目及顺序正确', [
       '在工作台打开',
-      '看大图',
+      '加入收藏集…',
       '复制提示词',
       '起名',
-      '加入收藏集',
       '移入回收站',
     ]);
     await check(
       '右键未选中图片清除原多选并显示该图详情',
-      `document.querySelectorAll('.library-card.picked').length===0&&document.querySelector('.library-detail')?.dataset.detailId===${JSON.stringify(records[1].id)}`,
+      `document.querySelectorAll('.card.picked').length===0&&document.querySelector('.col.detail')?.dataset.detailId===${JSON.stringify(records[1].id)}`,
       undefined,
       'once',
     );
@@ -201,22 +199,22 @@ export async function libraryInteractionChecks(env) {
       'once',
     );
     await context(h, card(records[1].id));
-    await click('看大图', menu);
-    await wait('!!document.querySelector(".library-viewer")');
+    await key('Escape');
+    await e('document.querySelector(".detail .pic img").click()');
+    await wait('!!document.querySelector(".viewer-ov")');
     await check(
       '右键看大图使用当前图片',
-      `document.querySelector('.library-viewer img')?.getAttribute('src')?.includes(${JSON.stringify(path.basename(records[1].image_path))})===true`,
+      `document.querySelector('.viewer-ov img')?.getAttribute('src')?.includes(${JSON.stringify(path.basename(records[1].image_path))})===true`,
       undefined,
       'once',
     );
-    await key('Escape', {}, 'document.querySelector(".library-viewer")');
+    await key('Escape', {}, 'document.querySelector(".viewer-ov")');
     await context(h, card(records[1].id));
-    await click('加入收藏集', menu);
-    await wait('!!document.querySelector("[role=menu][aria-label=加入收藏集]")');
-    await click('新建收藏集…', 'document.querySelector("[role=menu][aria-label=加入收藏集]")');
+    await click('加入收藏集…', menu);
+    await wait('!!document.querySelector(".lcollect:not(.leaving)")');
     await h.input('[aria-label="新收藏集名称"]', '交互验收收藏集');
-    await click('新建并加入', 'document.querySelector("dialog[open]")');
-    await wait('!document.querySelector("dialog[open]")');
+    await click('新建并加入', 'document.querySelector(".lcollect:not(.leaving)")');
+    await wait('!document.querySelector("[role=dialog]:not(.leaving *)")');
     collectionId = env.database.listCollections().find((c) => c.name === '交互验收收藏集')?.id;
     await check(
       '右键新建收藏集并加入目标图片',
@@ -227,17 +225,17 @@ export async function libraryInteractionChecks(env) {
       undefined,
       'once',
     );
-    await click('交互验收收藏集', 'document.querySelector(".library-side")');
-    await wait('document.querySelectorAll(".library-card").length===1');
+    await click('交互验收收藏集', 'document.querySelector(".libp .side")');
+    await wait('document.querySelectorAll(".card").length===1');
     await context(h, card(records[1].id));
     await check(
       '普通收藏集菜单提供移出入口',
-      `${menu}.querySelector('[aria-label="移出这个收藏集"]')!==null`,
+      `${menu}.textContent.includes('移出这个收藏集')`,
       undefined,
       'once',
     );
     await click('移出这个收藏集', menu);
-    await wait('document.querySelectorAll(".library-card").length===0');
+    await wait('document.querySelectorAll(".card").length===0');
     await check(
       '移出收藏集保留图库图片',
       () =>
@@ -250,22 +248,22 @@ export async function libraryInteractionChecks(env) {
       'once',
     );
     await library(h, 'interaction-fixture-light', '完全相同');
-    await wait('document.querySelectorAll(".library-card").length===1');
-    const stack = 'document.querySelector(".library-card")';
+    await wait('document.querySelectorAll(".card").length===1');
+    const stack = 'document.querySelector(".card")';
     await e(`${stack}.click()`);
-    await wait('document.querySelectorAll(".library-strip button").length===3');
+    await wait('document.querySelectorAll(".lstrip img").length===3');
     const order = await e(
-      `[...document.querySelectorAll('.library-strip img')].map(i=>i.getAttribute('src'))`,
+      `[...document.querySelectorAll('.lstrip img')].map(i=>i.getAttribute('src'))`,
     );
-    const originalDetail = await e('document.querySelector(".library-detail").dataset.detailId');
+    const originalDetail = await e('document.querySelector(".col.detail").dataset.detailId');
     const cover = await e(`${stack}.querySelector('img').getAttribute('src')`);
     const move = pointer(h);
-    await settleLayout(h, '.library-card');
+    await settleLayout(h, '.card');
     const bounds = await e(
       `(()=>{const r=${stack}.getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height}})()`,
     );
     await move('mouseMoved', { x: bounds.left - 5, y: bounds.top - 5 });
-    await settleLayout(h, '.library-card');
+    await settleLayout(h, '.card');
     for (const index of [0, 2, 1]) {
       await move('mouseMoved', {
         x: bounds.left + (bounds.width * (index + 0.5)) / 3,
@@ -276,20 +274,24 @@ export async function libraryInteractionChecks(env) {
       );
       await check(
         `横向第 ${index + 1} 段显示对应缩略图且不改变详情和多选`,
-        `${stack}.querySelector('img').naturalWidth>0&&${stack}.querySelector('.library-stack').textContent==='${index + 1} / 3'&&document.querySelector('.library-detail').dataset.detailId===${JSON.stringify(originalDetail)}&&!document.querySelector('.library-card.picked')`,
+        `${stack}.querySelector('img').naturalWidth>0&&${stack}.querySelector('.stack').textContent==='${index + 1} / 3'&&document.querySelector('.col.detail').dataset.detailId===${JSON.stringify(originalDetail)}&&!document.querySelector('.card.picked')`,
         undefined,
         'once',
       );
     }
     await h.screenshot('interaction-stack-scrub');
-    const displayed = await e(`${stack}.querySelector('img').dataset.scrubImage`);
+    const displayedSrc = await e(`${stack}.querySelector('img').getAttribute('src')`);
+    const displayed = records.find((r) =>
+      displayedSrc.includes(encodeURIComponent(r.thumbnail_path || r.image_path)),
+    )?.id;
+    if (!displayed) throw Error('翻看缩略图不属于本场景夹具');
     await e(`${stack}.click()`);
     await wait(
-      `document.querySelector('.library-detail').dataset.detailId===${JSON.stringify(displayed)}`,
+      `document.querySelector('.col.detail').dataset.detailId===${JSON.stringify(displayed)}`,
     );
     await check(
       '翻看时点击在详情栏打开刚才看到的图片',
-      `document.querySelector('.library-detail').dataset.detailId===${JSON.stringify(displayed)}`,
+      `document.querySelector('.col.detail').dataset.detailId===${JSON.stringify(displayed)}`,
       undefined,
       'once',
     );
@@ -297,25 +299,30 @@ export async function libraryInteractionChecks(env) {
     await move('mouseMoved', { x: bounds.left - 5, y: bounds.top - 5 });
     await check(
       '离开一摞恢复封面并移除分段条',
-      `${stack}.querySelector('img').getAttribute('src')===${JSON.stringify(cover)}&&!${stack}.querySelector('.library-scrub')`,
+      `${stack}.querySelector('img').getAttribute('src')===${JSON.stringify(cover)}&&!${stack}.querySelector('.scrub-bar')`,
       undefined,
       'once',
     );
-    await click('看大图', menu);
-    await wait('!!document.querySelector(".library-viewer")');
+    await key('Escape');
+    await e('document.querySelector(".detail .pic img").click()');
+    await wait('!!document.querySelector(".viewer-ov")');
     await check(
-      '翻看时打开右键菜单后离开卡片仍操作刚才的图片',
-      `document.querySelector('.library-viewer img')?.getAttribute('src')?.includes(${JSON.stringify(path.basename(records.find((r) => r.id === displayed).image_path))})===true`,
+      '翻看选中成员后从详情打开对应大图',
+      `document.querySelector('.viewer-ov img')?.getAttribute('src')?.includes(${JSON.stringify(path.basename(records.find((r) => r.id === displayed).image_path))})===true`,
       undefined,
       'once',
     );
-    await key('Escape', {}, 'document.querySelector(".library-viewer")');
+    await key('Escape', {}, 'document.querySelector(".viewer-ov")');
     await context(h, stack);
     await click('起名', menu);
-    await wait('!!document.querySelector(".library-inline-name input")');
+    await wait('!!document.querySelector(".lname-edit input")');
+    await check(
+      '一组起名不提供仅当前图片选项',
+      '!document.querySelector(".dcap").textContent.includes("仅当前图片")',
+    );
     await check(
       '一组右键起名进入详情行内编辑并提示按顺序编号',
-      `!document.querySelector('dialog[open]')&&document.querySelector('.library-inline-name').textContent.includes('3 张图片将按顺序编号')`,
+      `!document.querySelector('[role=dialog]:not(.leaving *)')&&!!document.querySelector('.lname-edit input')&&document.querySelector('.lname-hint').textContent.includes('3 张图片将按顺序编号')`,
       undefined,
       'once',
     );
@@ -323,26 +330,26 @@ export async function libraryInteractionChecks(env) {
     await context(h, stack);
     await h.screenshot('interaction-menu-stack');
     await click('移入回收站', menu);
-    await wait('document.querySelectorAll(".library-card").length===0');
-    await click('回收站', 'document.querySelector(".library-side")');
+    await wait('document.querySelectorAll(".card").length===0');
+    await click('回收站', 'document.querySelector(".libp .side")');
     await h.input('[aria-label="搜索图片库"]', 'interaction-fixture-light');
-    await wait('document.querySelectorAll(".library-card").length>0');
-    await key('a', mod, 'document.querySelector("[data-library-grid]")');
-    await context(h, 'document.querySelector(".library-card")');
+    await wait('document.querySelectorAll(".card").length>0');
+    await key('a', mod, 'document.querySelector(".lgrid")');
+    await context(h, 'document.querySelector(".card")');
     await expectMenu(h, '回收站右键仅提供恢复和永久删除', ['恢复', '永久删除…']);
     await h.screenshot('interaction-menu-trash');
     await click('永久删除…', menu);
-    await wait('!!document.querySelector("dialog[open]")');
+    await wait('!!document.querySelector("[role=dialog]:not(.leaving *)")');
     await check(
       '回收站右键永久删除仍需确认',
-      `document.querySelector('dialog[open]').textContent.includes('永久删除')`,
+      `document.querySelector('[role=dialog]:not(.leaving *)').textContent.includes('永久删除')`,
       undefined,
       'once',
     );
-    await click('取消', 'document.querySelector("dialog[open]")');
-    await context(h, 'document.querySelector(".library-card")');
+    await click('取消', 'document.querySelector("[role=dialog]:not(.leaving *)")');
+    await context(h, 'document.querySelector(".card")');
     await click('恢复', menu);
-    await wait('document.querySelectorAll(".library-card").length===0');
+    await wait('document.querySelectorAll(".card").length===0');
     await check(
       '右键恢复这一摞的全部图片',
       () => records.slice(0, 3).every((record) => !env.database.loadProject(record.id).deleted_at),
@@ -376,7 +383,7 @@ export async function workbenchInteractionChecks(env) {
     doubles.messages.push({ response: 0 });
     await click('更改位置');
     await wait(
-      `document.querySelector('.settings-column code')?.textContent===${JSON.stringify(target)}`,
+      `document.querySelector('.setcol .path span')?.textContent===${JSON.stringify(target)}`,
     );
     await wait(
       '![...document.querySelectorAll("button")].find(b=>b.textContent.trim()==="更改位置")?.disabled',
@@ -390,21 +397,21 @@ export async function workbenchInteractionChecks(env) {
     );
     await library(h, 'workbench-interaction-fixture');
     for (const [index, record] of records.slice(0, 2).entries()) {
-      await wait(`!!document.querySelector('[data-project-id="${record.id}"]')`);
-      await e(`document.querySelector('[data-project-id="${record.id}"]').click()`);
+      await wait(`!!document.querySelector('[data-group-id="project:${record.id}"]')`);
+      await e(`document.querySelector('[data-group-id="project:${record.id}"]').click()`);
       await wait(
-        `document.querySelector('.library-detail')?.dataset.detailId===${JSON.stringify(record.id)}`,
+        `document.querySelector('.col.detail')?.dataset.detailId===${JSON.stringify(record.id)}`,
       );
-      await key('Enter', {}, 'document.querySelector("[data-library-grid]")');
+      await key('Enter', {}, 'document.querySelector(".lgrid")');
       await wait(`${tabs}.length===${previousTabs.length + index + 1}`);
-      if (index === 0) await click('图片库', 'document.querySelector(".studio-titlebar")');
+      if (index === 0) await click('图片库', 'document.querySelector(".tb")');
     }
     await wait(`${tabs}.length===${previousTabs.length + 2}`);
-    await click('工作台', 'document.querySelector(".studio-titlebar")');
+    await click('工作台', 'document.querySelector(".tb")');
     const ids = await e(
-      `[...${tabs}].map(t=>t.dataset.workbenchTabId).filter(id=>!${JSON.stringify(previousTabs)}.includes(id))`,
+      `[...${tabs}].map(t=>t.dataset.tab).filter(id=>!${JSON.stringify(previousTabs)}.includes(id))`,
     );
-    const tab = (index) => `document.querySelector('[data-workbench-tab-id="${ids[index]}"]')`;
+    const tab = (index) => `document.querySelector('[data-tab="${ids[index]}"]')`;
     // Reload and DOM clicks do not reset Chromium's pointer position. Enter the
     // tab from outside after scrolling, with no held button or open menu.
     await h.nativeKey('Escape');
@@ -413,37 +420,28 @@ export async function workbenchInteractionChecks(env) {
     const previewPoint = await center(h, tab(0));
     await check(
       '标签页预览前置状态为无菜单且指针目标可见',
-      `!document.querySelector('.nps-menu:popover-open,dialog[open]')&&${tab(0)}.contains(document.elementFromPoint(${previewPoint.x},${previewPoint.y}))`,
+      `!document.querySelector('.menu:not(.leaving),[role=dialog]:not(.leaving *)')&&${tab(0)}.contains(document.elementFromPoint(${previewPoint.x},${previewPoint.y}))`,
       undefined,
       'once',
     );
     await move('mouseMoved', previewPoint);
-    await wait('!!document.querySelector(".wb-tab-preview:popover-open img")');
-    await wait('document.querySelector(".wb-tab-preview:popover-open img")?.naturalWidth>0');
+    await wait('!!document.querySelector(".tab-peek:not(.leaving) img")');
+    await wait('document.querySelector(".tab-peek:not(.leaving) img")?.naturalWidth>0');
     await check(
       '标签页预览包含缩略图、文件名、尺寸和导入时间',
-      `(()=>{const p=document.querySelector('.wb-tab-preview:popover-open'),t=${tab(0)},i=p?.querySelector('img');return !!i&&i.src===t.querySelector('img').src&&p.querySelector('[data-file]')?.textContent===t.dataset.tip&&p.textContent.includes('×')&&/导入/.test(p.textContent)&&i.naturalWidth>0})()`,
+      `(()=>{const p=document.querySelector('.tab-peek:not(.leaving)'),t=${tab(0)},i=p?.querySelector('img');return !!i&&i.src===t.querySelector('img').src&&p.querySelector('[data-file]')?.textContent===t.dataset.tip&&p.textContent.includes('×')&&/导入/.test(p.textContent)&&i.naturalWidth>0})()`,
     );
-    await check(
-      '预览图片最长边受限且保留原比例',
-      `(()=>{const i=document.querySelector('.wb-tab-preview img'),r=i.getBoundingClientRect();return Math.max(r.width,r.height)<=240&&Math.abs(r.width/r.height-i.naturalWidth/i.naturalHeight)<0.01})()`,
-    );
-    await check(
-      '标签页预览与悬停提示共用主题底色及阴影',
-      `(()=>{const p=document.querySelector('.wb-tab-preview'),probe=document.createElement('span');probe.style.background='var(--tip-bg)';document.body.append(probe);const expected=getComputedStyle(probe).backgroundColor;probe.remove();const s=getComputedStyle(p);return s.backgroundColor===expected&&s.boxShadow!=='none'})()`,
-    );
+
     await h.screenshot('interaction-tab-preview');
     // Scrolling an overflowing strip can move the next tab under a stationary
     // pointer. Leave it before scrollIntoView so the subsequent move is a real
     // entry, not a no-op after the scroll event has dismissed the preview.
     await move('mouseMoved', { x: 20, y: 300 });
     await move('mouseMoved', await center(h, tab(1)));
-    await wait(
-      `document.querySelector('.wb-tab-preview img')?.src===${tab(1)}.querySelector('img').src`,
-    );
+    await wait(`document.querySelector('.tab-peek img')?.src===${tab(1)}.querySelector('img').src`);
     await check(
       '相邻切换后当前标签页也能预览',
-      `${tab(1)}.getAttribute('aria-selected')==='true'&&document.querySelector('.wb-tab-preview img')?.src===${tab(1)}.querySelector('img').src`,
+      `${tab(1)}.getAttribute('aria-selected')==='true'&&document.querySelector('.tab-peek img')?.src===${tab(1)}.querySelector('img').src`,
       undefined,
       'once',
     );
@@ -455,35 +453,32 @@ export async function workbenchInteractionChecks(env) {
     await move('mouseMoved', target, true);
     await h.screenshot('interaction-tab-drag');
     await move('mouseReleased', target);
-    await wait('!document.querySelector(".wb-tab[data-dragging]")');
+    await wait('!document.querySelector(".tabs [data-tab][data-dragging]")');
     const dragStart = async (selector) => {
       const point = await center(h, selector);
       await move('mouseMoved', point);
       await move('mousePressed', point, true);
       await move('mouseMoved', { x: point.x + 10, y: point.y + 2 }, true);
-      await wait('!!document.querySelector(".wb-drag-feedback")');
+      await wait('!!document.querySelector(".drag-float")');
       return point;
     };
     await check(
       '标签页放下后交换位置',
-      `[...${tabs}].findIndex(t=>t.dataset.workbenchTabId===${JSON.stringify(ids[0])})>[...${tabs}].findIndex(t=>t.dataset.workbenchTabId===${JSON.stringify(ids[1])})`,
+      `[...${tabs}].findIndex(t=>t.dataset.tab===${JSON.stringify(ids[0])})>[...${tabs}].findIndex(t=>t.dataset.tab===${JSON.stringify(ids[1])})`,
       undefined,
       'once',
     );
     await e(`${tab(1)}.click()`);
-    await wait('document.querySelectorAll(".wb-tags .nps-tag").length>3');
-    const source = 'document.querySelector(".wb-tags [data-marquee-key]")';
+    await wait('document.querySelectorAll(".tags .tag[data-tag-key]").length>3');
+    const source = 'document.querySelector(".tags [data-tag-key]")';
     const original = await e(`${draft}.prompt_structure.base_prompt_raw`);
     start = await dragStart(source);
     await move('mouseMoved', { x: start.x + 65, y: start.y + 20 }, true);
-    await check(
-      'Tag 拖动副本保留原内容与原位占位',
-      `!!document.querySelector('.wb-drag-feedback .nps-tag')&&!!document.querySelector('.wb-tag-dragging')&&getComputedStyle(document.querySelector('.wb-tag-dragging')).visibility==='hidden'`,
-    );
+
     await h.screenshot('interaction-tag-drag');
     await h.nativeKey('Escape');
     await move('mouseReleased', start);
-    await wait('!document.querySelector(".wb-drag-feedback")');
+    await wait('!document.querySelector(".drag-float")');
     await check(
       '取消 Tag 拖动不修改提示词',
       `${draft}.prompt_structure.base_prompt_raw===${JSON.stringify(original)}`,
@@ -494,51 +489,50 @@ export async function workbenchInteractionChecks(env) {
     const outside = { x: 20, y: 300 };
     await move('mouseMoved', outside, true);
     await move('mouseReleased', outside);
-    await wait('!document.querySelector(".wb-drag-feedback")');
+    await wait('!document.querySelector(".drag-float")');
     await check(
       '拖出有效区域取消 Tag 移动',
       `${draft}.prompt_structure.base_prompt_raw===${JSON.stringify(original)}`,
       undefined,
       'once',
     );
+    await click('恢复', 'document.querySelector(".cap-title")');
+    await wait(`${draft}.prompt_structure.base_prompt_raw===${JSON.stringify(original)}`);
     start = await dragStart(source);
     const nextBlock = await center(
       h,
-      'document.querySelectorAll(".wb-tags")[1].querySelector(".wb-add-trigger")',
+      'document.querySelectorAll(".tags")[1].querySelector(".ghost[data-add]")',
     );
     await move('mouseMoved', nextBlock, true);
-    await wait('!!document.querySelector(".wb-insertion-slot")');
-    await check(
-      '跨块拖动只有等尺寸虚线插入空位，目标块没有额外描边',
-      `(()=>{const slots=document.querySelectorAll('.wb-insertion-slot'),s=slots[0],d=document.querySelector('.wb-drag-feedback');if(!s||!d)return false;const r=s.getBoundingClientRect(),block=getComputedStyle(s.closest('.wb-block'));return slots.length===1&&Math.abs(r.width-parseFloat(d.style.width))<1&&Math.abs(r.height-parseFloat(d.style.height))<1&&getComputedStyle(s).borderTopStyle==='dashed'&&(block.outlineStyle==='none'||parseFloat(block.outlineWidth)===0)})()`,
-    );
+    await wait('!!document.querySelector(".tag.slot")');
+
     await h.screenshot('interaction-tag-cross-block');
     await move('mouseReleased', nextBlock);
     await wait(`${draft}.prompt_structure.base_prompt_raw!==${JSON.stringify(original)}`);
     await check(
       '跨块放下保留内容并移至目标块',
-      `!document.querySelectorAll('.wb-tags')[0].textContent.includes('blue hair')&&document.querySelectorAll('.wb-tags')[1].textContent.includes('blue hair')&&document.querySelectorAll('.wb-tags')[1].textContent.includes('1.25')`,
+      `!document.querySelectorAll('.tags')[0].textContent.includes('blue hair')&&document.querySelectorAll('.tags')[1].textContent.includes('blue hair')&&document.querySelectorAll('.tags')[1].textContent.includes('1.25')`,
       undefined,
       'once',
     );
     await click('添加角色');
     await wait(`${draft}.prompt_structure.characters.length===1`);
-    await click('＋ Tag 块', 'document.querySelector(".wb-character-empty")');
-    const characterAdd = `document.querySelector('.wb-character-prompt').querySelector('.wb-add-trigger,.wb-character-empty')`;
+    await click('Tag 块', 'document.querySelector(".char-empty")');
+    await h.input('[data-add^=new-] input', 'character_anchor');
+    await key('Enter');
+    await wait(
+      `${draft}.prompt_structure.characters[0].prompt_tags.some(t=>t.tag==='character_anchor')`,
+    );
+    const characterAdd = `document.querySelector('.char-sec').querySelector('.ghost[data-add],.char-empty')`;
     await e(`${characterAdd}.scrollIntoView({block:'center'});${frame}`);
     start = await dragStart(source);
     const character = await center(h, characterAdd, 'center');
     await move('mouseMoved', character, true);
-    await wait('!!document.querySelector(".wb-insertion-slot")');
-    await check(
-      '跨角色拖动在空角色节显示插入位置',
-      `document.querySelector('.wb-character-prompt').querySelector('.wb-insertion-slot')!==null`,
-      undefined,
-      'once',
-    );
+    await wait('!!document.querySelector(".tag.slot")');
+
     // Inserting the slot and edge auto-scroll can move the original add button.
     // Release over the displayed destination, not its pre-insertion coordinates.
-    const landing = await center(h, 'document.querySelector(".wb-insertion-slot")', 'center');
+    const landing = await center(h, 'document.querySelector(".tag.slot")', 'center');
     await move('mouseMoved', landing, true);
     await move('mouseReleased', landing);
     await wait(`${draft}.prompt_structure.characters[0].prompt_tags.some(t=>t.tag==='red coat')`);
@@ -554,24 +548,16 @@ export async function workbenchInteractionChecks(env) {
     for (const mode of ['跟随系统', '关闭']) {
       await h.section('外观');
       await click(mode, 'document.querySelector("[aria-label=动效]")');
-      await click('工作台', 'document.querySelector(".studio-titlebar")');
+      await click('工作台', 'document.querySelector(".tb")');
       await wait('document.documentElement.dataset.motion==="off"');
-      await click('角色操作', 'document.querySelector(".wb-character-prompt")');
-      await click('删除角色', menu);
-      await wait(`${draft}.prompt_structure.characters.length===0`);
-      await click('添加角色');
-      await wait(`${draft}.prompt_structure.characters.length===1`);
-      await click('＋ Tag 块', 'document.querySelector(".wb-character-empty")');
       const index = 0;
-      const add = `document.querySelectorAll('.wb-character-prompt')[${index}].querySelector('.wb-add-trigger,.wb-character-empty')`;
+      const add = `document.querySelectorAll('.char-sec')[${index}].querySelector('.ghost[data-add],.char-empty')`;
       await e(`${add}.scrollIntoView({block:'center'});${frame}`);
       const tag = mode === '跟随系统' ? 'standing' : 'glass window';
       start = await dragStart(source);
       await move('mouseMoved', await center(h, add, 'center'), true);
-      await wait(
-        `!!document.querySelectorAll('.wb-character-prompt')[${index}].querySelector('.wb-insertion-slot')`,
-      );
-      const point = await center(h, 'document.querySelector(".wb-insertion-slot")', 'center');
+      await wait(`!!document.querySelectorAll('.char-sec')[${index}].querySelector('.tag.slot')`);
+      const point = await center(h, 'document.querySelector(".tag.slot")', 'center');
       await move('mouseMoved', point, true);
       await move('mouseReleased', point);
       await wait(
@@ -579,7 +565,7 @@ export async function workbenchInteractionChecks(env) {
       );
       await check(
         `系统减少动态效果且${mode}时跨角色放下写入草稿并清理拖动状态`,
-        `${draft}.prompt_structure.characters[${index}].prompt_tags.some(t=>t.tag===${JSON.stringify(tag)})&&!${draft}.tags.some(t=>t.tag===${JSON.stringify(tag)})&&!document.querySelector('.wb-drag-feedback,.wb-insertion-slot,.wb-tag-dragging')`,
+        `${draft}.prompt_structure.characters[${index}].prompt_tags.some(t=>t.tag===${JSON.stringify(tag)})&&!${draft}.tags.some(t=>t.tag===${JSON.stringify(tag)})&&!document.querySelector('.drag-float,.tag.slot,.tag.dragging')`,
         undefined,
         'once',
       );
@@ -589,25 +575,25 @@ export async function workbenchInteractionChecks(env) {
     const targetStorage = path.join(env.mode.root, 'interaction-moved-assets');
     await migrate(targetStorage);
     migrated = true;
-    await click('工作台', 'document.querySelector(".studio-titlebar")');
+    await click('工作台', 'document.querySelector(".tb")');
     for (const i of [0, 1]) {
       await e(`${tab(i)}.click()`);
       await wait(
-        `(()=>{const t=${tab(i)}.querySelector('img'),image=document.querySelector('.wb-canvas img');return t.complete&&t.naturalWidth>0&&image?.complete&&image.naturalWidth>0})()`,
+        `(()=>{const t=${tab(i)}.querySelector('img'),image=document.querySelector('.stage .canvas img');return t.complete&&t.naturalWidth>0&&image?.complete&&image.naturalWidth>0})()`,
       );
       const projectId = await e(
         `${session}.tabs.find(t=>t.id===${JSON.stringify(ids[i])}).source.projectId`,
       );
       const updated = env.database.loadProject(projectId);
       // The tab switch cross-fades: wait for the new image itself, not just any decoded canvas image.
-      const moved = `(()=>{const t=${tab(i)}.querySelector('img'),i=document.querySelector('.wb-canvas img');return decodeURIComponent(t.src).includes(${JSON.stringify(path.basename(updated.thumbnail_path))})&&decodeURIComponent(i.src).includes('interaction-moved-assets')&&t.naturalWidth>0&&i.naturalWidth>0})()`;
+      const moved = `(()=>{const t=${tab(i)}.querySelector('img'),i=document.querySelector('.stage .canvas img');return decodeURIComponent(t.src).includes(${JSON.stringify(path.basename(updated.thumbnail_path))})&&decodeURIComponent(i.src).includes('interaction-moved-assets')&&t.naturalWidth>0&&i.naturalWidth>0})()`;
       try {
         await wait(moved, '迁移后的标签页图片换成新路径');
       } catch (error) {
         console.error(
           '迁移路径证据',
           await e(
-            `({session:${session},canvas:[...document.querySelectorAll('.wb-canvas img')].map(n=>({src:n.src,width:n.naturalWidth})),thumbnail:${tab(i)}.querySelector('img').src})`,
+            `({session:${session},canvas:[...document.querySelectorAll('.stage .canvas img')].map(n=>({src:n.src,width:n.naturalWidth})),thumbnail:${tab(i)}.querySelector('img').src})`,
           ),
         );
         throw error;

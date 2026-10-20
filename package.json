@@ -21,8 +21,6 @@
     "package": "npm run fonts:check && npm run build && electron-builder --publish never",
     "screenshots:app": "npm run build && node scripts/app-screenshots.mjs",
     "screenshots:readme": "npm run build && node scripts/readme-screenshots.mjs",
-    "dev:ui": "node scripts/ui-showcase.mjs --serve",
-    "screenshots:ui": "node scripts/ui-showcase.mjs",
     "audit:ui": "node scripts/audit-ui.mjs",
     "verify:update-artifacts": "node scripts/verify-update-artifacts.mjs release",
     "start": "electron .",

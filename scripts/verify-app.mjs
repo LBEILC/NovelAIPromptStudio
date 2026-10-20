@@ -54,7 +54,7 @@ if (process.argv.includes('--packaged')) {
   await fs.writeFile(path.join(output, 'manifest.json'), JSON.stringify(summary, null, 2));
   const failed = checks.filter((check) => check.status === 'failed');
   console.log(
-    `验收（行为一次，颜色相关的检查两套主题）：${checks.filter((check) => check.status === 'passed').length} 条通过，${failed.length} 条失败，${checks.filter((check) => check.status === 'recorded').length} 条动效取样只记录，${checks.filter((check) => check.status === 'uncovered').length} 条本平台未覆盖；${(summary.wallMs / 1000).toFixed(1)} 秒`,
+    `验收：${checks.filter((check) => check.status === 'passed').length} 条通过，${failed.length} 条失败，${checks.filter((check) => check.status === 'uncovered').length} 条本平台未覆盖；${(summary.wallMs / 1000).toFixed(1)} 秒`,
   );
   process.exitCode = exit === 0 && failed.length === 0 && checks.length > 0 ? 0 : 1;
 }

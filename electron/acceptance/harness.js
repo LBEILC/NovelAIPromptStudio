@@ -29,7 +29,7 @@ export function harness(window, mode, checks) {
     const evidence = { category, lastPassed, operation, reason };
     // Only roles and control labels from the isolated fixture. Never input values,
     // image contents, paragraphs, passwords or full body text.
-    const structure = `(() => [...document.querySelectorAll('.studio-titlebar button,.workbench-header-actions button,.nps-layer [role],dialog[open] button,.settings-sidebar button,.library-detail-bar button')].slice(0,100).map(e=>({role:e.getAttribute('role')||e.tagName.toLowerCase(),name:(e.getAttribute('aria-label')||e.textContent||'').trim().slice(0,80),visible:!!e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden',disabled:e.matches(':disabled')||e.getAttribute('aria-disabled')==='true'})))()`;
+    const structure = `(() => [...document.querySelectorAll('.tb button,.workbench-header-actions button,[data-pop] [role],[role=dialog]:not(.leaving *) button,.set-side button,.detail .bar button')].slice(0,100).map(e=>({role:e.getAttribute('role')||e.tagName.toLowerCase(),name:(e.getAttribute('aria-label')||e.textContent||'').trim().slice(0,80),visible:!!e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden',disabled:e.matches(':disabled')||e.getAttribute('aria-disabled')==='true'})))()`;
     try {
       evidence.structure = await bounded(
         window.webContents.executeJavaScript(structure, true),
@@ -134,15 +134,6 @@ export function harness(window, mode, checks) {
       window.webContents.removeListener('did-finish-load', loaded);
     }
   };
-  // Motion is reviewed by eye from the screenshots, not gated by assertions:
-  // with full motion on, a check that inspects sampled animations is recorded
-  // (status "recorded") instead of failing the run. With motion off, the same
-  // checks still gate, since "nothing animates" is a behaviour, not a feel.
-  const MOTION_SAMPLE =
-    /transitionSamples|stateOperationEffects|polishAnimations|getKeyframes\(|getAnimations\(/;
-  const motionIsFull = async () =>
-    !mode.reducedMotion &&
-    (await evaluate('document.documentElement.dataset.motion').catch(() => null)) === 'full';
   let dualThemes = false;
   const withOtherTheme = async (run) => {
     const original = mode.themeDriver.get();
@@ -200,23 +191,12 @@ export function harness(window, mode, checks) {
           record.details = { error: String(detailsError) };
         }
       }
-      if (
-        typeof expression === 'string' &&
-        MOTION_SAMPLE.test(expression) &&
-        (await motionIsFull())
-      ) {
-        record.status = 'recorded';
-        console.log(
-          `RECORD [${category}] ${label}（动效取样只记录）\n${record.error}${record.details === undefined ? '' : `\n失败说明：${JSON.stringify(record.details)}`}`,
-        );
-      } else {
-        record.context = await evaluate('document.body.innerText.slice(-6000)').catch(
-          () => 'renderer unavailable',
-        );
-        console.error(
-          `FAIL [${category}] ${label}\n${record.error}${record.details === undefined ? '' : `\n失败说明：${JSON.stringify(record.details)}`}\n${record.context}`,
-        );
-      }
+      record.context = await evaluate('document.body.innerText.slice(-6000)').catch(
+        () => 'renderer unavailable',
+      );
+      console.error(
+        `FAIL [${category}] ${label}\n${record.error}${record.details === undefined ? '' : `\n失败说明：${JSON.stringify(record.details)}`}\n${record.context}`,
+      );
     }
     // A process-level watchdog cannot run our finally block. Keep bounded-cost
     // partial evidence so a later hard exit does not hide preceding failures.
@@ -259,25 +239,31 @@ export function harness(window, mode, checks) {
     if (dualThemes && themeScope === 'both')
       await withOtherTheme(() => checkOne(label, expression, failureDetails, themeScope));
   };
+  const paint = () =>
+    evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
   const click = async (text, scope = 'document', index = 0) => {
     console.log(`操作：点击 ${text}`);
     // Find and act in one renderer turn: a temporary control can disappear
     // between separate wait/evaluate calls (for example Cancel during import).
     await wait(
-      `(() => { const e = [...(${scope})?.querySelectorAll('button') || []].filter(e => e.getClientRects().length && !e.closest('[inert], [aria-hidden="true"]') && !e.matches(':disabled') && e.getAttribute('aria-disabled') !== 'true' && (e.textContent.trim() === ${JSON.stringify(text)} || e.getAttribute('aria-label') === ${JSON.stringify(text)}))[${index}]; if(!e) return false; e.focus(); e.click(); return true; })()`,
+      `(() => { const e = [...(${scope})?.querySelectorAll('button,[role=button],[role=radio],[role=menuitem],[role=switch],[role=checkbox],[role=option]') || []].filter(e => e.getClientRects().length && !e.closest('[inert], [aria-hidden="true"], .leaving') && !e.matches(':disabled') && e.getAttribute('aria-disabled') !== 'true' && ((()=>{const n=e.cloneNode(true);n.querySelectorAll('.k,.submenu,.n,.cnt').forEach(x=>x.remove());return n.textContent.trim()})() === ${JSON.stringify(text)} || e.getAttribute('aria-label') === ${JSON.stringify(text)}))[${index}]; if(!e) return false; e.focus(); e.click(); return true; })()`,
       '等待并点击可操作按钮：' + text,
     );
+    await paint();
   };
   const input = async (selector, value) => {
     await wait(
       `(() => { const e=document.querySelector(${JSON.stringify(selector)}); if(!e || !e.getClientRects().length || e.disabled || e.readOnly) return false; e.focus(); Object.getOwnPropertyDescriptor(e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)}); e.dispatchEvent(new Event('input',{bubbles:true})); return true; })()`,
       '等待并输入 ' + selector,
     );
+    await paint();
   };
-  const key = (key, options = {}, target = 'document.activeElement') =>
-    evaluate(
+  const key = async (key, options = {}, target = 'document.activeElement') => {
+    await evaluate(
       `${target}.dispatchEvent(new KeyboardEvent('keydown', ${JSON.stringify({ key, bubbles: true, cancelable: true, ...options })}))`,
     );
+    await paint();
+  };
   // Chromium default actions (Tab navigation / dialog cancel), never OS input.
   const nativeKey = async (key, modifiers = 0) => {
     const windowsVirtualKeyCode = { Tab: 9, Escape: 27, Enter: 13, ' ': 32 }[key];
@@ -308,19 +294,17 @@ export function harness(window, mode, checks) {
       return;
     }
     await click(label);
-    await wait(
-      '!!document.querySelector(".nps-layer:popover-open:not([aria-hidden=true]) [role=option]")',
-    );
+    await wait('!!document.querySelector(".menu:not(.leaving) [role=menuitem]")');
     await evaluate(
-      `(() => {const e=[...document.querySelectorAll('.nps-layer:popover-open:not([aria-hidden=true]) [role=option]')].find(e=>e.textContent.trim()===${JSON.stringify(text)}); if(!e)throw Error('缺少选项');e.click()})()`,
+      `(() => {const e=[...document.querySelectorAll('.menu:not(.leaving) [role=menuitem]')].find(e=>e.textContent.trim()===${JSON.stringify(text)}); if(!e)throw Error('缺少选项');e.click()})()`,
     );
   };
   const section = async (name) => {
     await click('设置');
-    await wait('!!document.querySelector(".settings-sidebar")');
-    await click(name, 'document.querySelector(".settings-sidebar")');
+    await wait('!!document.querySelector(".set-side")');
+    await click(name, 'document.querySelector(".set-side")');
     await wait(
-      `(()=>{const selected=[...document.querySelectorAll('.settings-sidebar [aria-current=page]')].find(e=>e.textContent.trim()===${JSON.stringify(name)});return !!selected&&document.querySelector('.settings-body')?.dataset.settingsSection===selected.dataset.settingsTarget})()`,
+      `(()=>{const selected=[...document.querySelectorAll('.set-side [aria-current=page]')].find(e=>e.textContent.trim()===${JSON.stringify(name)});return !!selected&&document.querySelector('[data-settings-section="'+selected.dataset.settingsTarget+'"]:not(.leaving)')?.getClientRects().length>0})()`,
     );
   };
   const capture = async (name) => {

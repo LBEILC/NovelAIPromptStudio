@@ -26,7 +26,7 @@ export async function settingsExceptionChecks({ h, commandHandlers, preferences,
       ...preferences.publicSettings(),
       encryptionAvailable: false,
     });
-    commandHandlers['ai.models'] = () => ({ ok: false, error: '合成服务不提供模型列表' });
+    commandHandlers['ai.models'] = () => ({ ok: false, error: '合成服务不提供模型' });
     await h.reload();
     await h.section('AI 服务');
     await h.wait('document.body.innerText.includes("这台电脑的系统加密不可用")');
@@ -37,10 +37,10 @@ export async function settingsExceptionChecks({ h, commandHandlers, preferences,
     await h.click('重新读取模型列表');
     await h.wait('!!document.querySelector(\'input[aria-label="模型"]\')');
     await h.input('input[aria-label="模型"]', 'manual-model');
-    await h.click('保存', 'document.querySelector(".settings-page-foot")');
+    await h.click('保存', 'document.querySelector(".set-foot")');
     await h.until(() => preferences.publicSettings().model === 'manual-model', '手填模型保存');
     await h.check(
-      '模型列表失败仍可保存手填 ID',
+      '模型失败仍可保存手填 ID',
       () => preferences.publicSettings().model === 'manual-model',
     );
     await h.screenshot('032-ai-manual-model');

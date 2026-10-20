@@ -24,9 +24,7 @@ export async function settingsGenerationChecks({
   await input('[aria-label="持久令牌"]', 'acceptance-token');
   await click('保存', 'document.querySelector("[data-settings-section=novelai]")');
   if (firstToken)
-    await wait(
-      'document.querySelector(".studio-titlebar [aria-current=page]")?.textContent.trim()==="工作台"',
-    );
+    await wait('document.querySelector(".tb [aria-current=page]")?.textContent.trim()==="工作台"');
   await section('NovelAI 账号');
   await wait('document.body.innerText.includes("10,000 Anlas")');
   await check(
@@ -61,12 +59,12 @@ export async function settingsGenerationChecks({
     'document.querySelector(\'[aria-label="无人值守连续生成"]\')?.getAttribute("aria-checked")==="false"',
   );
   await click('无人值守连续生成');
-  await wait('!!document.querySelector("dialog[open]")');
+  await wait('!!document.querySelector("[role=dialog]:not(.leaving *)")');
   await check('确认前不启用无人值守', () => !preferences.generationSettings().continuous);
-  await click('取消', 'document.querySelector("dialog[open]")');
+  await click('取消', 'document.querySelector("[role=dialog]:not(.leaving *)")');
   await check('取消后保持关闭', () => !preferences.generationSettings().continuous);
   await click('无人值守连续生成');
-  await click('仍然开启', 'document.querySelector("dialog[open]")');
+  await click('仍然开启', 'document.querySelector("[role=dialog]:not(.leaving *)")');
   await h.until(() => preferences.generationSettings().continuous, '确认后保存连续生成偏好');
   await check(
     '确认后开关与持久化值一致',
@@ -94,15 +92,19 @@ export async function settingsGenerationChecks({
   );
   h.window.setContentSize(...size);
   await click('直接生成');
-  await wait('!!document.querySelector("dialog[open]")');
+  await wait(
+    `document.querySelector('[role=dialog]:not(.leaving *)')?.textContent.includes('允许 Agent 直接生成？')`,
+  );
+  await wait('!!document.querySelector("[role=dialog]:not(.leaving *)")');
   await check(
     '直接生成确认前保持排队',
     () => preferences.generationSettings().agentMode === 'confirm',
   );
-  await click('取消', 'document.querySelector("dialog[open]")');
+  await click('取消', 'document.querySelector("[role=dialog]:not(.leaving *)")');
   await click('花费上限');
   await wait('!!document.querySelector(\'[aria-label="每日上限"]\')');
   await input('[aria-label="每日上限"]', '500');
+  await h.key('Enter');
   await h.until(() => preferences.generationSettings().dailyLimit === 500, '每日上限保存');
   await check(
     '开启上限并保存金额',

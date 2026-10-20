@@ -22,7 +22,7 @@ export async function appearanceLayerChecks({ h, preferences, mode }) {
     await h.until(() => preferences.appearanceSettings()[key] === family, `${label}保存选中值`);
     await check(
       `${label}选中后已保存且列表关闭`,
-      `(async()=>(await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data}))[${JSON.stringify(key)}]===${JSON.stringify(family)} && !document.querySelector('.nps-layer[role=listbox]:popover-open'))()`,
+      `(async()=>(await window.studio.invoke('settings.appearance.get',{}).then(result=>{if(!result.ok)throw Error(result.error.message);return result.data}))[${JSON.stringify(key)}]===${JSON.stringify(family)} && !document.querySelector('.menu:not(.leaving)'))()`,
       undefined,
       'once',
     );
@@ -40,11 +40,10 @@ export async function appearanceLayerChecks({ h, preferences, mode }) {
           buttons: type === 'mousePressed' ? 1 : 0,
           clickCount: type === 'mouseMoved' ? 0 : 1,
         });
-      await wait(
-        `!!document.querySelector('.nps-layer[role=listbox]:popover-open')===${count % 2 === 1}`,
-      );
+      await wait(`!!document.querySelector('.menu:not(.leaving)')===${count % 2 === 1}`);
     }
     await h.nativeKey('Escape');
+    await wait('!document.querySelector(".menu")');
     await check(
       `${label}连续点击开关不改值并归还焦点`,
       `document.activeElement===${trigger} && ${trigger}.textContent.includes(${JSON.stringify(expected[key])})`,
@@ -54,12 +53,12 @@ export async function appearanceLayerChecks({ h, preferences, mode }) {
     for (const keyName of ['Enter', ' ']) {
       await e(`${trigger}.focus()`);
       await h.nativeKey(keyName);
-      await wait('!!document.querySelector(".nps-layer[role=listbox]:popover-open")');
+      await wait('!!document.querySelector(".menu:not(.leaving)")');
       await e(`${trigger}.focus()`);
       await h.nativeKey(keyName);
       await check(
         `${label} ${keyName === ' ' ? '空格' : 'Enter'}关闭不改值并同步归还焦点`,
-        `!document.querySelector('.nps-layer[role=listbox]:popover-open') && document.activeElement===${trigger} && ${trigger}.textContent.includes(${JSON.stringify(expected[key])})`,
+        `!document.querySelector('.menu:not(.leaving)') && document.activeElement===${trigger} && ${trigger}.textContent.includes(${JSON.stringify(expected[key])})`,
         `({active:document.activeElement.outerHTML.slice(0,400),value:${trigger}.textContent})`,
         'once',
       );
@@ -76,7 +75,7 @@ export async function appearanceLayerChecks({ h, preferences, mode }) {
     if (original[key] !== expected[key]) {
       await h.click(label);
       await e(
-        `(()=>{const option=[...document.querySelectorAll('.nps-layer[role=listbox] [role=option]')].find(n=>n.textContent.trim()===${JSON.stringify(original[key])} || n.textContent.trim()===${JSON.stringify(original[key] + '（内置）')});if(!option)throw Error('缺少原字体');option.click()})()`,
+        `(()=>{const option=[...document.querySelectorAll('.menu:not(.leaving) [role=menuitem]')].find(n=>n.textContent.trim()===${JSON.stringify(original[key])} || n.textContent.trim()===${JSON.stringify(original[key] + '（内置）')});if(!option)throw Error('缺少原字体');option.click()})()`,
       );
     }
     await h.until(

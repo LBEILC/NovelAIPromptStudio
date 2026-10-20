@@ -163,13 +163,3 @@ jobs:
           path: |
             .codex-runs/screens/
           if-no-files-found: ignore
-      - run: npm run screenshots:ui
-      - name: Upload screenshots-ui
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: screenshots-ui-${{ matrix.os }}-node24
-          path: |
-            .codex-runs/004a/*.png
-            .codex-runs/004a/*.json
-          if-no-files-found: ignore

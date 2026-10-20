@@ -96,7 +96,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   await h.section('Agent');
   await h.check(
     'Agent 位于词典与关于之间，包含工具、能力和生成设置',
-    `(()=>{const pages=[...document.querySelectorAll('.settings-sidebar button')].map(n=>n.textContent.trim()),at=pages.indexOf('Agent'),page=document.querySelector('[data-settings-section=agent]');return pages[at-1]==='翻译词典'&&pages[at+1]==='关于与更新'&&['命令行工具','Agent 技能','Agent 能做什么','生成方式','花费上限'].every(label=>page.textContent.includes(label))})()`,
+    `(()=>{const pages=[...document.querySelectorAll('.set-side button')].map(n=>n.textContent.trim()),at=pages.indexOf('Agent'),page=document.querySelector('[data-settings-section=agent]');return pages[at-1]==='翻译词典'&&pages[at+1]==='关于与更新'&&['命令行工具','Agent 技能','Agent 能做什么','生成方式','花费上限'].every(label=>page.textContent.includes(label))})()`,
     undefined,
     'once',
   );
@@ -115,12 +115,14 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     'once',
   );
   await h.click('重新安装');
-  await h.wait('!document.querySelector("[data-settings-section=agent] [aria-busy=true]")');
+  await h.wait('!document.querySelector("[data-settings-section=agent] .loading")');
   await h.click('复制内容');
-  await h.wait('document.querySelector(".nps-toast")?.textContent.includes("已复制技能内容")');
+  await h.wait(
+    'document.querySelector(".toast:not(.leaving)")?.textContent.includes("已复制技能内容")',
+  );
   await h.check(
     '复制技能用通知反馈，页面不插入状态文字',
-    'document.querySelector(".nps-toast")?.textContent.includes("已复制技能内容")&&!document.querySelector("[data-settings-section=agent]").textContent.includes("已复制技能内容")',
+    'document.querySelector(".toast:not(.leaving)")?.textContent.includes("已复制技能内容")&&!document.querySelector("[data-settings-section=agent]").textContent.includes("已复制技能内容")',
   );
   const skill = await fs.readFile(
     path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'agent', 'SKILL.md'),
@@ -151,7 +153,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   await h.screenshot('agent-settings');
   if (mode.packaged) return;
 
-  await h.click('工作台', 'document.querySelector(".studio-titlebar")');
+  await h.click('工作台', 'document.querySelector(".tb")');
   const files = await createWorkbenchFixtures(path.join(mode.root, 'agent-fixtures'), {
     prefix: 'agent-synthetic',
   });
@@ -167,9 +169,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   );
   const opened = await call('workbench.open', { path: files[0] });
   const tabId = opened.tab.id;
-  await h.wait(
-    `!!document.querySelector('[data-workbench-tab-id="${tabId}"][aria-selected=true]')`,
-  );
+  await h.wait(`!!document.querySelector('[data-tab="${tabId}"][aria-selected=true]')`);
   const draft = await call('workbench.get', { tabId });
   const changed = await call('tag.set', {
     tabId,
@@ -180,15 +180,15 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     expectedRevision: draft.revision,
   });
   await h.wait(
-    `document.querySelector('.wb-document-scroll').textContent.includes('agent synthetic hair')`,
+    `document.querySelector('.col.prompt .scroll').textContent.includes('agent synthetic hair')`,
   );
   await h.check(
     'CLI 修改后当前草稿立即可见并显示可撤销通知',
-    `document.querySelector('.nps-toast')?.textContent.includes('Agent 修改了提示词')&&[...document.querySelectorAll('.nps-toast button')].some(n=>n.textContent==='撤销')`,
+    `document.querySelector('.toast')?.textContent.includes('Agent 修改了提示词')&&[...document.querySelectorAll('.toast button')].some(n=>n.textContent==='撤销')`,
     undefined,
     'once',
   );
-  await settleLayout(h, '.wb-document-scroll');
+  await settleLayout(h, '.col.prompt .scroll');
   await h.screenshot('agent-edit');
   const stale = await cli('tag.set', {
     tabId,
@@ -204,9 +204,9 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     undefined,
     'once',
   );
-  await h.click('撤销', 'document.querySelector(".nps-toast")');
+  await h.click('撤销', 'document.querySelector(".toast:not(.leaving)")');
   await h.wait(
-    `!document.querySelector('.wb-document-scroll').textContent.includes('agent synthetic hair')`,
+    `!document.querySelector('.col.prompt .scroll').textContent.includes('agent synthetic hair')`,
   );
   const restored = await call('workbench.get', { tabId });
   await h.check(
@@ -218,9 +218,9 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     'once',
   );
 
-  await h.evaluate(`document.querySelector('.wb-tags .nps-tag').click()`);
-  await h.wait('!!document.querySelector(".wb-tag-editor [aria-label=Tag]")');
-  await h.input('.wb-tag-editor [aria-label=Tag]', 'user unfinished hair');
+  await h.evaluate(`document.querySelector('.tags .tag[data-tag-key]').click()`);
+  await h.wait('!!document.querySelector(".tag-pop [aria-label=Tag]")');
+  await h.input('.tag-pop [aria-label=Tag]', 'user unfinished hair');
   const locked = await cli('tag.set', {
     tabId,
     scope: 'base:prompt',
@@ -233,7 +233,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     async () =>
       locked.result.error.code === 'conflict' &&
       (await h.evaluate(
-        `document.querySelector('.wb-tag-editor [aria-label=Tag]').value==='user unfinished hair'`,
+        `document.querySelector('.tag-pop [aria-label=Tag]').value==='user unfinished hair'`,
       )),
     undefined,
     'once',
@@ -246,11 +246,12 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   });
   await h.check(
     'Agent 修改其他块不会清掉编辑器里的用户输入',
-    `document.querySelector('.wb-tag-editor [aria-label=Tag]').value==='user unfinished hair'`,
+    `document.querySelector('.tag-pop [aria-label=Tag]').value==='user unfinished hair'`,
     undefined,
     'once',
   );
-  await h.click('完成', 'document.querySelector(".wb-tag-editor")');
+  await h.key('Enter', {}, 'document.querySelector(".tag-pop [aria-label=Tag]")');
+  await h.wait('!document.querySelector(".tag-pop:not(.leaving)")');
   const merged = await call('workbench.get', { tabId });
   await h.check(
     '保存用户输入后两个块的修改都保留',
@@ -292,7 +293,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   });
   await h.check(
     '修改其他标签页保留当前页并显示修改标记',
-    `!!document.querySelector('[data-workbench-tab-id="${second.tab.id}"][aria-selected=true]')&&!!document.querySelector('[data-workbench-tab-id="${tabId}"] .wb-dirty')`,
+    `!!document.querySelector('[data-tab="${second.tab.id}"][aria-selected=true]')&&!!document.querySelector('[data-tab="${tabId}"] .dirty')`,
     undefined,
     'once',
   );
@@ -315,14 +316,14 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     ],
     expectedRevision: imported.revision,
   });
-  await h.click('图片库', 'document.querySelector(".studio-titlebar")');
+  await h.click('图片库', 'document.querySelector(".tb")');
   await h.input('[aria-label="搜索图片库"]', '命令批量起名');
   await h.wait(
-    '!!document.querySelector(\'.library-card[aria-label="命令批量起名 1"]\') && !!document.querySelector(\'.library-card[aria-label="命令批量起名 2"]\')',
+    '!!document.querySelector(\'.card[aria-label="命令批量起名 1"]\') && !!document.querySelector(\'.card[aria-label="命令批量起名 2"]\')',
   );
   await h.check(
     '批量起名后图片库卡片显示两个新名称',
-    '!!document.querySelector(\'.library-card[aria-label="命令批量起名 1"]\') && !!document.querySelector(\'.library-card[aria-label="命令批量起名 2"]\')',
+    '!!document.querySelector(\'.card[aria-label="命令批量起名 1"]\') && !!document.querySelector(\'.card[aria-label="命令批量起名 2"]\')',
     undefined,
     'once',
   );
