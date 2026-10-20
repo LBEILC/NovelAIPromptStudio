@@ -1,5 +1,6 @@
+import { Button, Input, OptionGroup } from './Controls';
 import { useState } from 'react';
-import { Button, Input, Progress, Switch, OptionGroup, Dialog } from '../ui';
+import { Progress, Switch, Dialog } from '../ui';
 import { Collapse } from '../ui/transitions';
 import { SettingsFrame } from './PageFrame';
 import { useGeneration } from '../state/generation';
@@ -51,7 +52,7 @@ export function GenerationPreferences({ agent = false }: { agent?: boolean }) {
       </div>
       {agent && (
         <>
-          <div className="settings-line">
+          <div className="settings-line settings-limit-toggle">
             <div>
               花费上限
               <small>默认关闭。开启后可设置每日 Anlas 上限，达到上限时暂停 Agent 的生成。</small>
@@ -63,7 +64,7 @@ export function GenerationPreferences({ agent = false }: { agent?: boolean }) {
             />
           </div>
           <Collapse open={s.limitEnabled}>
-            <div className="settings-actions">
+            <div className="settings-actions settings-limit">
               每日上限{' '}
               <Input
                 aria-label="每日上限"
@@ -92,20 +93,22 @@ export function GenerationPreferences({ agent = false }: { agent?: boolean }) {
         }}
         confirmLabel={agent ? '直接生成' : '仍然开启'}
       >
-        <p>
-          {agent
-            ? '开启后，Agent 发起的生成无需确认，将直接发送并消耗 Anlas。NovelAI 的接口说明里写着：'
-            : 'NovelAI 的接口说明里写着：'}
-        </p>
-        <blockquote>
-          “All generation requests must be initiated by a human action.”
-          {!agent && '（所有生成请求必须由人的操作发起）'}
-        </blockquote>
-        <p>
-          {agent
-            ? '建议同时开启下面的“花费上限”。'
-            : '连续生成可能不符合 NovelAI 的服务条款，账号受到的影响由你自行承担。请求仍逐张发送。'}
-        </p>
+        <div className="settings-confirm">
+          <p>
+            {agent
+              ? '开启后，Agent 发起的生成无需确认，将直接发送并消耗 Anlas。NovelAI 的接口说明里写着：'
+              : 'NovelAI 的接口说明里写着：'}
+          </p>
+          <blockquote className="settings-quote">
+            “All generation requests must be initiated by a human action.”
+            {!agent && '（所有生成请求必须由人的操作发起）'}
+          </blockquote>
+          <p>
+            {agent
+              ? '建议同时开启下面的“花费上限”。'
+              : '连续生成可能不符合 NovelAI 的服务条款，账号受到的影响由你自行承担。请求仍逐张发送。'}
+          </p>
+        </div>
       </Dialog>
     </>
   );
@@ -134,9 +137,9 @@ export function NovelAIAccount() {
       title="NovelAI 账号"
       description="用你自己的 NovelAI 账号在这里生成图片。本软件是非官方工具，与 NovelAI 没有隶属关系；这样使用是否符合 NovelAI 的服务条款，由你自己判断并承担。"
     >
-      <div className="settings-field">
+      <div className="settings-column">
         <label>持久令牌</label>
-        <div className="settings-actions">
+        <div className="settings-actions settings-credential">
           {editing || !state.settings.hasToken ? (
             <>
               <Input
@@ -162,31 +165,28 @@ export function NovelAIAccount() {
             </>
           ) : (
             <>
-              <span>已保存 ••••••••</span>
+              <span className="nps-field nps-small settings-saved-key">已保存 ••••••••</span>
               <Button onClick={() => setEditing(true)}>更换</Button>
             </>
           )}
         </div>
-        <p className="nps-help">
+        <small>
           在 NovelAI 网站的账号设置里创建持久令牌（Persistent API
           Token）。加密后保存在这台电脑上，软件不保存明文。
-        </p>
+        </small>
       </div>
       {state.settings.hasToken && (
         <div className="settings-line">
           <div>
             余额
             <small>
-              {
-                ['未订阅', 'Tablet', 'Scroll', 'Opus'][
-                  state.subscription?.active ? state.subscription.tier : 0
-                ]
-              }{' '}
-              · 每次生成前显示本次消耗
+              {state.subscription?.active
+                ? `${['未订阅', 'Tablet', 'Scroll', 'Opus'][state.subscription.tier]} · 每次生成前显示本次消耗`
+                : '未订阅 · 每次生成都要花 Anlas'}
             </small>
           </div>
           <div className="settings-actions">
-            <span>{state.balance.toLocaleString('en-US')} Anlas</span>
+            <span className="settings-mono">{state.balance.toLocaleString('en-US')} Anlas</span>
             <Button
               variant="quiet"
               loading={busy}
@@ -203,14 +203,13 @@ export function NovelAIAccount() {
         </div>
       )}
       {!!state.subscription?.active && (
-        <div className="settings-field">
+        <div className="settings-column">
           <label>V5 免费用量</label>
           <Progress label="V5 免费用量" value={state.subscription.usage?.percent || 0} />
-          <p className="nps-help">
-            已用 {state.subscription.usage?.percent || 0}%，大约每{' '}
-            {Math.ceil((state.subscription.usage?.timeUntilNextPercent || 0) / 60)} 分钟恢复
-            1%。用完后 V5 的生成要花 Anlas；V4.5 及更早的模型不受这个限制。
-          </p>
+          <small>
+            已用 {state.subscription.usage?.percent || 0}%，大约每 20 分钟恢复 1%。用完后 V5
+            的生成要花 Anlas；V4.5 及更早的模型不受这个限制。
+          </small>
         </div>
       )}
       {(error || state.accountError) && <p role="status">{error || state.accountError}</p>}

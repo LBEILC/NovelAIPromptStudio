@@ -338,6 +338,11 @@ export async function runReadmeScreenshots({
       return await compareLibrary({ app, window, h, invoke, database });
     }
 
+    if (process.env.NPS_COMPARE_SETTINGS_DIR) {
+      const { compareSettings } = await import('./compareSettings.js');
+      await compareSettings({ app, window, h, invoke, preferences, database, generationService });
+      return;
+    }
     const tags = [
       ...new Set(
         projects

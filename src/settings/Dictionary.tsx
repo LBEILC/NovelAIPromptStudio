@@ -1,3 +1,4 @@
+import { Button, Input, Select } from './Controls';
 import { writeClipboardText } from '../lib/clipboard';
 import {
   Collapse,
@@ -8,9 +9,6 @@ import {
 import { SurfaceButton } from '../ui';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  Button,
-  Input,
-  Select,
   Checkbox,
   Dialog,
   EmptyState,
@@ -91,6 +89,19 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
   const shownMenu = menu ?? lastMenu.current;
   const menuAnchor = useRef<HTMLElement | null>(null);
   const [message, setMessage] = useState('');
+  const edit = useRef({ tag: editing, translation });
+  edit.current = { tag: editing, translation };
+  useEffect(() => {
+    const commitOutside = (event: PointerEvent) => {
+      const current = edit.current;
+      if (!current.tag || !(event.target instanceof Element)) return;
+      if (event.target.closest('[data-tag]')?.getAttribute('data-tag') === current.tag) return;
+      setEditing(null);
+      void d.save(current.tag, { translation: current.translation.trim() });
+    };
+    document.addEventListener('pointerdown', commitOutside, true);
+    return () => document.removeEventListener('pointerdown', commitOutside, true);
+  }, [d.save]);
   const retranslate = async () => {
     setShowFailures(false);
     const result = await d.retranslate();
@@ -116,6 +127,13 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if (
+        event.key === 'Escape' &&
+        !editing &&
+        root.current?.getClientRects().length &&
+        !document.querySelector('.nps-layer:popover-open, dialog[open]')
+      )
+        d.setSelected([]);
+      if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === 'k' &&
         root.current?.getClientRects().length
@@ -126,7 +144,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, []);
+  }, [editing, d.setSelected]);
   useEffect(() => {
     if (scroll.current) scroll.current.scrollTop = 0;
   }, [d.filters]);
@@ -141,11 +159,13 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
       const row = [...root.current!.querySelectorAll<HTMLTableRowElement>('tr[data-tag]')].find(
         (row) => row.dataset.tag === tag,
       );
-      row?.querySelector<HTMLButtonElement>('.settings-table-category button')?.focus();
+      const button = row?.querySelector<HTMLButtonElement>('.settings-table-category button');
+      button?.focus();
+      button?.click();
     });
   const saveTranslation = async (item: TagDictionaryEntry, next: 'next' | 'category') => {
     const following = d.items[d.items.findIndex((row) => row.tag === item.tag) + 1];
-    if (!(await d.save(item.tag, { translation }))) return;
+    if (!(await d.save(item.tag, { translation: translation.trim() }))) return;
     setEditing(null);
     if (next === 'category') focusCategory(item.tag);
     else if (following) {
@@ -346,7 +366,10 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
                   </span>
                 </td>
                 <td>
-                  <TransitionSurface change={editing === item.tag ? 'edit' : item.translation}>
+                  <TransitionSurface
+                    className="settings-translation"
+                    change={editing === item.tag ? 'edit' : item.translation}
+                  >
                     {editing === item.tag ? (
                       <Input
                         size="small"
@@ -373,7 +396,9 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
                         disabled={d.busy}
                         onClick={() => beginEdit(item)}
                       >
-                        {item.translation || '暂无译文'}
+                        <span className="settings-cell-content">
+                          {item.translation || '暂无译文'}
+                        </span>
                       </Button>
                     )}
                   </TransitionSurface>
@@ -384,14 +409,16 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
                     buttonVariant="quiet"
                     label={`分类：${item.tag}`}
                     trigger={
-                      <>
+                      <span className="settings-cell-content">
                         {categories.find((c) => c.value === item.category)?.prefix}
                         {CATEGORY_LABELS[item.category || 'Unsorted']}
-                      </>
+                      </span>
                     }
                     items={categories.map((category) => ({
                       id: category.value,
                       label: category.label,
+                      prefix: category.prefix,
+                      current: category.value === item.category,
                       disabled: d.busy,
                       onSelect: () =>
                         void d.save(item.tag, { category: category.value as TagCategory }),
@@ -529,6 +556,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
               items={categories.map((category) => ({
                 id: category.value,
                 label: category.label,
+                prefix: category.prefix,
                 disabled: d.busy,
                 onSelect: async () => {
                   const count = d.selected.length;
