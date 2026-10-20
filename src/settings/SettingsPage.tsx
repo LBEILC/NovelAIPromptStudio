@@ -1,3 +1,4 @@
+import { Button, Input, Select, OptionGroup } from './Controls';
 import { invokeUI } from '../lib/commands';
 import {
   Collapse,
@@ -19,17 +20,14 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  Button,
   Progress,
-  Input,
   TextArea,
-  Select,
-  OptionGroup,
   Switch,
   Dialog,
   Shortcut,
   useScrollArea,
   useNotifications,
+  SurfaceButton,
 } from '../ui';
 import { SettingsFrame } from './PageFrame';
 import { useAppearance } from '../state/appearance';
@@ -99,11 +97,17 @@ function Agent() {
     pathFailed?: boolean;
   } | null>(null);
   const [installedNow, setInstalledNow] = useState(false);
+  const [version, setVersion] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   useEffect(() => {
     let active = true;
     setInstalledNow(false);
+    void invokeUI('updates.status', {})
+      .then((result) => {
+        if (active) setVersion(result.currentVersion);
+      })
+      .catch(() => {});
     void invokeUI('agent.setup', {})
       .then((result) => {
         if (!active) return;
@@ -144,14 +148,15 @@ function Agent() {
   return (
     <SettingsFrame
       title="Agent"
-      description="让你自己的 Agent（比如 Claude Code、Codex）通过命令行使用这个软件：读提示词、改工作台、搜图片库。"
+      description="让你的 Agent（如 Claude Code、Codex）通过命令行使用本软件：读取提示词、修改工作台、搜索图片库、添加生成任务。"
     >
       <Row
         title="命令行工具"
         help={
           setup?.installed
             ? [
-                setup.path,
+                `已安装 · nai-studio${version ? ` ${version}` : ''}`,
+                <code>{setup.path}</code>,
                 ...(setup.platform === 'win32'
                   ? setup.pathFailed
                     ? [
@@ -169,17 +174,16 @@ function Agent() {
                       ]
                     : []),
               ]
-            : undefined
+            : '未安装'
         }
       >
         <div className="settings-actions">
-          <span>{setup?.installed ? '已安装' : '未安装'}</span>
           <Button loading={busy} onClick={() => void install()}>
             {setup?.installed ? '重新安装' : '安装'}
           </Button>
         </div>
       </Row>
-      <Row title="Agent 技能" help="一份教 Agent 怎么用这些命令的说明，放进你的 Agent 的技能目录。">
+      <Row title="Agent 技能" help="说明这些命令用法的技能文件，放入 Agent 的技能目录即可使用。">
         <div className="settings-actions">
           <Button
             variant="quiet"
@@ -198,12 +202,12 @@ function Agent() {
         title="Agent 能做什么"
         help={[
           '读提示词和参数，改工作台，搜索和整理图片库，修改翻译词典，排队生成。',
-          '不能永久删除图片，不能改设置，读不到任何密钥。',
+          '不能永久删除图片、修改设置或读取任何密钥。',
         ]}
       >
         {null}
       </Row>
-      <p role="status">{message}</p>
+      {message && <p role="status">{message}</p>}
       <GenerationPreferences agent />
     </SettingsFrame>
   );
@@ -306,6 +310,7 @@ function AI() {
   const notify = useNotifications();
   const a = useAISettings((text) => notify({ tone: 'success', text }));
   const [replacing, setReplacing] = useState(false);
+  const [manualModel, setManualModel] = useState(false);
   useEffect(() => {
     if (!a.busy && a.settings.hasApiKey && !a.settings.apiKey) setReplacing(false);
   }, [a.busy]);
@@ -328,6 +333,7 @@ function AI() {
             {a.testResult?.text || (a.dirty ? '有未保存的修改' : a.message)}
           </span>
           <Button
+            size="default"
             disabled={a.busy}
             loading={a.operation === 'test'}
             onClick={() => void a.run('test')}
@@ -335,6 +341,7 @@ function AI() {
             {a.operation === 'test' ? '测试中' : '测试连接'}
           </Button>
           <Button
+            size="default"
             variant="ink"
             disabledReason={!a.dirty ? '没有需要保存的修改' : undefined}
             disabled={a.busy || !a.dirty}
@@ -348,6 +355,8 @@ function AI() {
       <label className="settings-column">
         服务地址
         <Input
+          size="default"
+          className="settings-mono"
           value={a.settings.baseUrl}
           onChange={(e) => a.setSettings((s) => ({ ...s, baseUrl: e.target.value }))}
         />
@@ -355,10 +364,12 @@ function AI() {
       </label>
       <div className="settings-column">
         API Key
-        <div className="settings-actions">
+        <div className="settings-actions settings-credential">
           {a.settings.hasApiKey && !replacing ? (
             <>
-              <span className="nps-field settings-saved-key">已保存 ••••••••</span>
+              <span className="nps-field nps-small settings-saved-key settings-ai-key">
+                已保存 ••••••••
+              </span>
               <Button onClick={() => setReplacing(true)}>更换</Button>
             </>
           ) : (
@@ -375,6 +386,7 @@ function AI() {
               />
               {a.settings.hasApiKey && (
                 <Button
+                  variant="quiet"
                   onClick={() => {
                     a.setSettings((current) => ({ ...current, apiKey: '' }));
                     setReplacing(false);
@@ -390,16 +402,18 @@ function AI() {
       </div>
       <div className="settings-column">
         模型
-        <div className="settings-actions">
-          {a.models.length ? (
+        <div className="settings-actions settings-model">
+          {a.models.length || (a.settings.model && !manualModel) ? (
             <Select
               label="模型列表"
               value={a.settings.model}
-              options={a.models.map((value) => ({
-                value,
-                label: value,
-                style: { fontFamily: 'var(--font-mono)' },
-              }))}
+              options={[...new Set([a.settings.model, ...a.models].filter(Boolean))].map(
+                (value) => ({
+                  value,
+                  label: value,
+                  style: { fontFamily: 'var(--font-mono)' },
+                }),
+              )}
               onChange={(model) => a.setSettings((current) => ({ ...current, model }))}
             />
           ) : (
@@ -407,9 +421,10 @@ function AI() {
               aria-label="模型"
               value={a.settings.model}
               placeholder="输入或读取模型 ID"
-              onChange={(event) =>
-                a.setSettings((current) => ({ ...current, model: event.target.value }))
-              }
+              onChange={(event) => {
+                setManualModel(true);
+                a.setSettings((current) => ({ ...current, model: event.target.value }));
+              }}
             />
           )}
           <Button
@@ -610,7 +625,9 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         <BrandMark />
         <div>
           <div className="settings-about-name">NovelAI Prompt Studio</div>
-          <code>版本 {state?.currentVersion || '—'}</code>
+          <span className="settings-about-version settings-mono">
+            版本 {state?.currentVersion || '—'}
+          </span>
         </div>
       </div>
       <p>非官方工具，与 NovelAI 没有隶属关系。</p>
@@ -647,7 +664,9 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       <Collapse open={hasUpdate}>
         {hasUpdate && (
           <>
-            <div className="settings-update-banner">
+            <div
+              className={`settings-update-banner${state.phase === 'downloading' ? ' downloading' : ''}`}
+            >
               <div className="settings-update-main">
                 <b>
                   {state.phase === 'downloaded'
@@ -760,8 +779,8 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
             '工作台',
             [
               ['切换按块 / 按文本编辑', [['Mod', 'E']]],
-              ['在这一版的图之间切换', [['←', '→']]],
               ['移动当前 Tag 或块', [['Alt', '方向键']]],
+              ['在这一版的图之间切换', [['←'], ['→']]],
               ['取消选择', [['Esc']]],
             ],
           ],
@@ -784,7 +803,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           ],
         ] as [string, [string, string[][]][]][]
       ).map(([group, rows]) => (
-        <Fragment key={group}>
+        <div className="settings-key-group" key={group}>
           <div className="settings-shortcut-heading">{group}</div>
           {rows.map(([title, bindings]) => (
             <Row key={title} title={title}>
@@ -802,7 +821,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
               </span>
             </Row>
           ))}
-        </Fragment>
+        </div>
       ))}
       <h2>数据与隐私</h2>
       <Row
@@ -865,7 +884,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           复制
         </Button>
       </Row>
-      <p role="status">{message}</p>
+      {message && <p role="status">{message}</p>}
       <h2>字体与开源组件</h2>
       <Row
         title="界面字体 MiSans · 段落字体 Newsreader · 等宽字体 IBM Plex Mono"
@@ -965,16 +984,16 @@ export default function SettingsPage(props: {
     <main className="studio-settings">
       <nav className="settings-sidebar" aria-label="设置分类" ref={sidebar}>
         {sections.map(([key, label, icon]) => (
-          <Button
+          <SurfaceButton
             key={key}
-            variant="quiet"
+            className="settings-nav-item"
             aria-current={key === selected ? 'page' : undefined}
             data-settings-target={key}
             onClick={() => select(key)}
           >
             <i className={`ri-${icon}`} aria-hidden="true" />
             {label}
-          </Button>
+          </SurfaceButton>
         ))}
         <span
           ref={marker}

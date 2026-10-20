@@ -333,6 +333,11 @@ export async function runReadmeScreenshots({
     h = harness(window, { ...mode, output, screenshots: [], phase: 'readme' }, checks);
     await h.wait(`document.documentElement.dataset.screenshotReady==='workbench'`);
     await h.evaluate('document.fonts.ready.then(()=>true)');
+    if (process.env.NPS_COMPARE_SETTINGS_DIR) {
+      const { compareSettings } = await import('./compareSettings.js');
+      await compareSettings({ app, window, h, invoke, preferences, database, generationService });
+      return;
+    }
     const tags = [
       ...new Set(
         projects

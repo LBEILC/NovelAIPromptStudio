@@ -90,9 +90,23 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       database.lookupTagDictionary(['acceptance_004']).get('acceptance_004').translation ===
       '验收译文4',
   );
+  await click('验收译文4');
+  await input('[aria-label="译文"]', '点外部保存译文');
+  await e(
+    `document.querySelector('.settings-dictionary h1').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))`,
+  );
+  await wait(
+    '!document.querySelector(\'[aria-label="译文"]\') && document.body.innerText.includes("点外部保存译文")',
+  );
+  await check(
+    '点击编辑行外保存译文',
+    () =>
+      database.lookupTagDictionary(['acceptance_004']).get('acceptance_004').translation ===
+      '点外部保存译文',
+  );
   await input(search, 'acceptance_00');
   await wait(`${count}===10`);
-  await click('验收译文4');
+  await click('点外部保存译文');
   await input('[aria-label="译文"]', '已修改译文');
   await key('Enter', {}, 'document.activeElement');
   await wait(
@@ -106,14 +120,13 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
   );
   await input('[aria-label="译文"]', '第五条译文');
   await key('Tab', {}, 'document.activeElement');
-  await wait(`document.activeElement?.getAttribute('aria-label')==='分类：acceptance_005'`);
+  await wait(`!!document.querySelector('.nps-menu:popover-open')`);
   await check(
-    'Tab 保存并聚焦分类',
+    'Tab 保存译文并打开分类菜单',
     () =>
       database.lookupTagDictionary(['acceptance_005']).get('acceptance_005').translation ===
       '第五条译文',
   );
-  await click('分类：acceptance_005');
   await click('环境背景', 'document.querySelector(".nps-menu:popover-open")');
   await wait(
     `document.querySelector('tr[data-tag="acceptance_005"]')?.textContent.includes('环境背景')`,
@@ -186,14 +199,14 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     'once',
   );
   await h.screenshot('dictionary-revert-confirm');
-  await click('取消', 'document.querySelector("dialog")');
+  await click('取消', 'document.querySelector("dialog[open]")');
   await check(
     '取消还原保留数据',
     () => database.lookupTagDictionary(['acceptance_004']).size === 1,
   );
   await click('更多：acceptance_004');
   await click('还原', 'document.querySelector(".nps-menu:popover-open")');
-  await click('还原', 'document.querySelector("dialog")');
+  await click('还原', 'document.querySelector("dialog[open]")');
   await wait(`${count}===0`);
   await check(
     '还原移除当前词典记录',
@@ -386,7 +399,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       'once',
     );
     await h.screenshot('dictionary-delete-confirm');
-    await click('删除', 'document.querySelector("dialog")');
+    await click('删除', 'document.querySelector("dialog[open]")');
     await wait(`${count}===54`);
     await check(
       '非手动条目删除当前记录',

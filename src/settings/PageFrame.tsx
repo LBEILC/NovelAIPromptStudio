@@ -15,14 +15,14 @@ export function SettingsFrame({
   const scroll = useRef<HTMLDivElement>(null);
   useScrollArea(scroll);
   return (
-    <section className="settings-page">
+    <section className="settings-page settings-scroll" ref={scroll}>
       <header className="settings-page-head">
         <div>
           <h1>{title}</h1>
           {description && <p>{description}</p>}
         </div>
       </header>
-      <div className="settings-scroll" ref={scroll}>
+      <div className="settings-main">
         <div className="settings-copy">{children}</div>
       </div>
       {footer && (

@@ -8,6 +8,7 @@ import { describeAssetDirectory } from '../libraryStorage.js';
 import { dictionaryChecks } from './dictionary.js';
 import { createTrashDraft } from './shortcuts.js';
 import { appearanceLayerChecks } from './appearanceLayers.js';
+import { settingsGenerationChecks } from './settingsGeneration.js';
 
 export async function settingsChecks(context, restart) {
   const { h, mode, app, database, preferences, doubles, files, encrypted } = context;
@@ -18,6 +19,7 @@ export async function settingsChecks(context, restart) {
   if (!restart) {
     await appearanceLayerChecks(context);
     if (mode.category === '设置·外观') return;
+    if (['设置', '全部'].includes(mode.category)) await settingsGenerationChecks(context);
   }
   if (restart) {
     const expected = JSON.parse(await fs.readFile(savedFile, 'utf8'));
@@ -38,7 +40,7 @@ export async function settingsChecks(context, restart) {
     );
     await section('AI 服务');
     await wait(
-      '!!document.querySelector(".settings-column input[type=password],.settings-saved-key")',
+      '!!document.querySelector(".settings-column input[type=password],.settings-ai-key")',
     );
     await wait(
       `(()=>{const fields=[...document.querySelectorAll('textarea')];return document.querySelector('${aiInput(0)}')?.value===${JSON.stringify(expected.ai.baseUrl)} && fields[0]?.value===${JSON.stringify(expected.ai.translationPrompt)} && fields[1]?.value===${JSON.stringify(expected.ai.classificationPrompt)}})()`,
@@ -56,7 +58,7 @@ export async function settingsChecks(context, restart) {
     if (encrypted)
       await check(
         '重启 Key 显示已保存状态且不可输入',
-        'document.querySelector(".settings-saved-key")?.textContent === "已保存 ••••••••" && !document.querySelector(".settings-column input[type=password]")',
+        'document.querySelector(".settings-ai-key")?.textContent === "已保存 ••••••••" && !document.querySelector(".settings-column input[type=password]")',
         undefined,
         'once',
       );
@@ -317,7 +319,7 @@ export async function settingsChecks(context, restart) {
       return saved;
     };
   }
-  const aiDraftMatches = `document.querySelector(${JSON.stringify(aiInput(0))})?.value === ${JSON.stringify(mode.baseUrl)} && document.querySelector('[aria-label="模型"]')?.value==='acceptance-model' && document.querySelector('.settings-column input[type=password]')?.value===${JSON.stringify(encrypted ? 'acceptance-local-key' : '')} && [...document.querySelectorAll('textarea')].map(e=>e.value).join('|') === '验收翻译规则|验收分类规则'`;
+  const aiDraftMatches = `document.querySelector(${JSON.stringify(aiInput(0))})?.value === ${JSON.stringify(mode.baseUrl)} && (document.querySelector('input[aria-label="模型"]')?.value==='acceptance-model' || document.querySelector('[aria-label="模型列表"]')?.textContent.includes('acceptance-model')) && document.querySelector('.settings-column input[type=password]')?.value===${JSON.stringify(encrypted ? 'acceptance-local-key' : '')} && [...document.querySelectorAll('textarea')].map(e=>e.value).join('|') === '验收翻译规则|验收分类规则'`;
   const aiDraftDetails = `(()=>{const key=document.querySelector('.settings-column input[type=password]'); const areas=[...document.querySelectorAll('textarea')]; return {baseUrl:document.querySelector(${JSON.stringify(aiInput(0))})?.value, model:document.querySelector('[aria-label="模型"]')?.value, apiKey:{empty:!key?.value,length:key?.value.length ?? 0}, translationPrompt:areas[0]?.value, classificationPrompt:areas[1]?.value}})()`;
   try {
     // Layout checks may have already loaded and retained the AI page. Start a
@@ -325,19 +327,21 @@ export async function settingsChecks(context, restart) {
     if (slowAIRead) await h.reload();
     await section('AI 服务');
     await wait(
-      '!!document.querySelector(".settings-column input[type=password],.settings-saved-key")',
+      '!!document.querySelector(".settings-column input[type=password],.settings-ai-key")',
     );
     if (slowAIRead) await h.until(() => aiReads === 1, '首次设置读取已挂起');
     await input(aiInput(0), mode.baseUrl);
     if (encrypted) {
-      if (await e('!!document.querySelector(".settings-saved-key")')) await click('更换');
+      if (await e('!!document.querySelector(".settings-ai-key")')) await click('更换');
       await input(aiInput(1), 'acceptance-local-key');
     } else
       h.uncovered(
         '保存与恢复安全存储 Key',
         '本平台 safeStorage.isEncryptionAvailable() 返回 false',
       );
-    await input(aiInput(2), 'acceptance-model');
+    if (await e('!!document.querySelector(\'input[aria-label="模型"]\')'))
+      await input(aiInput(2), 'acceptance-model');
+    else await select('模型列表', 'acceptance-model');
     await input('textarea', '验收翻译规则');
     await e(
       `(() => {const e=[...document.querySelectorAll('textarea')][1]; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'验收分类规则');e.dispatchEvent(new Event('input',{bubbles:true}))})()`,
@@ -599,7 +603,7 @@ export async function settingsChecks(context, restart) {
       'both',
     );
   }
-  await h.font('.settings-sidebar button:nth-child(3) .nps-button-label', 'IBM Plex Mono');
+  await h.font('.settings-sidebar button:nth-child(3)', 'IBM Plex Mono');
   await section('翻译词典');
   await wait('!!document.querySelector(".settings-tag")');
   await h.font('.settings-tag', 'MiSans');
