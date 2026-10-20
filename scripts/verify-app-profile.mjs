@@ -26,8 +26,15 @@ const output = path.resolve(
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nai-acceptance-'));
 let failure = false;
 let continueDictionary;
+let continueAI;
 const requests = [];
 const server = createServer((request, response) => {
+  if (request.url === '/control/ai-continue') {
+    continueAI?.();
+    continueAI = undefined;
+    response.end('ok');
+    return;
+  }
   if (request.url === '/control/dictionary-continue') {
     continueDictionary?.();
     continueDictionary = undefined;
@@ -64,6 +71,27 @@ const server = createServer((request, response) => {
     });
     request.on('end', () => {
       const parsed = JSON.parse(body);
+      if (parsed.model === 'materials-acceptance') {
+        const input = JSON.parse(parsed.messages[1].content);
+        const result = parsed.messages[0].content.startsWith('Organize')
+          ? {
+              changes: input.map((b) => ({
+                ...b,
+                after: b.text
+                  .replace('flim', 'film')
+                  .replace('umbrela', 'umbrella')
+                  .replace('1.2::', '1.3::'),
+                title: '拼写',
+                reason: '修正明显的拼写错误',
+              })),
+            }
+          : { names: input.map((_, i) => `合成名称 ${i + 1}`) };
+        continueAI = () =>
+          response.end(
+            JSON.stringify({ choices: [{ message: { content: JSON.stringify(result) } }] }),
+          );
+        return;
+      }
       if (parsed.model === 'dictionary-cancel') return;
       if (String(parsed.model).startsWith('dictionary-')) {
         const tags = JSON.parse(parsed.messages[1].content).tags;

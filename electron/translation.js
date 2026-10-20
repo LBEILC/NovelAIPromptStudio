@@ -82,6 +82,29 @@ function chatBody(model, messages) {
   return { model, messages };
 }
 
+export async function requestStructuredAI(instruction, input, settings, signal) {
+  const body = await requestJson(
+    `${normalizeBaseUrl(settings.baseUrl)}/chat/completions`,
+    {
+      method: 'POST',
+      headers: requestHeaders(settings.apiKey),
+      signal,
+      body: JSON.stringify(
+        chatBody(requireModel(settings), [
+          { role: 'system', content: instruction },
+          { role: 'user', content: JSON.stringify(input) },
+        ]),
+      ),
+    },
+    globalThis.fetch,
+  );
+  return JSON.parse(
+    chatContent(body)
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, ''),
+  );
+}
+
 export async function transformParagraph(
   text,
   direction,

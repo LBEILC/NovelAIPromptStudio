@@ -1,3 +1,4 @@
+import { NameAI } from './NameAI';
 import { Collapse, DecodedImage, TransitionSurface } from '../ui/transitions';
 import { writeClipboardText } from '../lib/clipboard';
 import { Shortcut, SurfaceButton } from '../ui';
@@ -280,6 +281,7 @@ export function LibraryDetail({
                 <i className="ri-edit-line" />
                 {hasImageName(detail) ? '重命名' : '起名'}
               </Button>
+              {group && <NameAI p={p} groups={[group]} compact />}
 
               <Button
                 variant="quiet"

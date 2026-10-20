@@ -1,0 +1,21 @@
+.materials-scroll { flex:1; min-height:0; overflow:auto; padding:0 var(--sp-5); }
+.materials-page .library-side-item.on { background:var(--selected); }
+.material-row { border-bottom:var(--bw) solid var(--divider); }
+.material-head { display:flex; align-items:center; gap:var(--sp-3); width:100%; min-height:calc(var(--table-row-h) + var(--sp-4)); padding:var(--sp-2); border:0; background:transparent; color:var(--text); text-align:left; border-radius:var(--r-ctl); transition:background-color var(--dur-1) var(--ease-out); }
+.material-head:hover,.material-insert-row:hover,.material-insert-row.on { background:var(--hover); }
+.material-head.open { background:var(--selected); }
+.material-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--sp-0); }
+.material-preview { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; color:var(--text-2); font-size:var(--fs-small); line-height:var(--lh-small); margin:0; }
+.material-body { display:flex; flex-direction:column; gap:var(--sp-3); padding:var(--sp-3) var(--sp-2) var(--sp-4); }
+.material-examples { display:inline-flex; flex-shrink:0; gap:var(--sp-1); }
+.material-examples img { width:var(--ctl); height:var(--ctl); object-fit:cover; border-radius:var(--r-thumb); }
+.material-source { display:flex; align-items:center; gap:var(--sp-2); }
+.material-source img { width:var(--ctl); height:var(--ctl); object-fit:cover; }
+.material-picker { width:var(--popover-w); overflow:visible; }
+.material-insert-list { display:flex; flex-direction:column; gap:var(--sp-0); max-height:calc(var(--table-row-h) * 6); overflow:auto; margin:0 calc(-1 * var(--sp-1)); }
+.material-insert-row { display:flex; flex-direction:column; gap:var(--sp-0); padding:var(--sp-2); border-radius:var(--r-ctl); cursor:pointer; transition:background-color var(--dur-1) var(--ease-out); }
+.material-peek { position:absolute; right:calc(100% + var(--sp-2)); top:0; width:var(--popover-w); padding:var(--sp-3); background:var(--pane); border:var(--bw) solid var(--border); border-radius:var(--r-ctl); box-shadow:var(--shadow-pop); pointer-events:none; }
+.material-peek img { width:100%; display:block; }
+.material-insert-bottom { display:flex; align-items:flex-end; gap:var(--sp-2); min-width:0; }
+.material-insert-bottom .material-preview { flex:1 1 auto; min-width:0; font-size:var(--fs-caption); }
+.material-insert-bottom .material-examples { margin-left:auto; }

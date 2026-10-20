@@ -1,3 +1,4 @@
+import { MaterialsPage } from './materials/Materials';
 import { invokeUI, onProgress, invokeResult } from './lib/commands';
 import { writeClipboardText, readClipboardText } from './lib/clipboard';
 import { numberedImageNames } from './lib/imageNaming.js';
@@ -242,6 +243,7 @@ export default function App() {
     [],
   );
   const [page, setPage] = useState(window.studioScreenshot?.page || 'workbench');
+  const [materialKind, setMaterialKind] = useState('block');
   const notify = useNotifications();
   const notificationTarget = useRef({ page, notify });
   notificationTarget.current = { page, notify };
@@ -1544,6 +1546,10 @@ export default function App() {
         <Activity mode={page === 'workbench' ? 'visible' : 'hidden'}>
           <div className="app-page-surface">
             <WorkbenchPage
+              onShowMaterials={(kind = 'block') => {
+                setMaterialKind(kind);
+                setPage('materials');
+              }}
               onConfigureGeneration={() => {
                 setMenuDestination({ section: 'novelai' });
                 setPage('settings');
@@ -1758,6 +1764,9 @@ export default function App() {
               view={galleryView}
             />
           </div>
+        </Activity>
+        <Activity mode={page === 'materials' ? 'visible' : 'hidden'}>
+          <MaterialsPage initialKind={materialKind} />
         </Activity>
         <Activity mode={page === 'settings' ? 'visible' : 'hidden'}>
           <div className="app-page-surface">

@@ -36,6 +36,7 @@ export function Titlebar({
         {[
           ['workbench', '工作台'],
           ['gallery', '图片库'],
+          ['materials', '素材'],
         ].map(([key, label]) => (
           <button
             key={key}

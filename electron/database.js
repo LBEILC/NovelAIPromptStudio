@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { migrateMaterials, createMaterialStore } from './materials.js';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash } from 'node:crypto';
@@ -245,6 +246,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     'PRAGMA journal_mode=DELETE; PRAGMA synchronous=EXTRA; PRAGMA fullfsync=ON; PRAGMA foreign_keys=OFF',
   );
   migrateGenerationVersions(connection, filePath);
+  migrateMaterials(connection, filePath);
   begin();
   database.run(CORE_SCHEMA);
 
@@ -2016,6 +2018,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   commit();
   return {
     versions: createVersionStore(connection),
+    materials: createMaterialStore(connection),
     loadLibrary,
     loadLibraryCards,
     listImportDates: (view = 'all') =>

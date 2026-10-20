@@ -21,6 +21,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
       '减少动态效果',
 
       '工作台',
+      '内置AI与素材',
       '工作台·细节',
       '工作台·交互',
       '交互修正',
@@ -67,6 +68,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
   if (motion && !['system', 'off'].includes(motion)) throw Error('--motion must be system or off');
   const suffix = `${slow > 1 ? `-slow-${slow}` : ''}${reducedMotion ? '-reduced' : ''}${motion ? `-${motion}` : ''}${category === '全部' ? '' : `-${category.replaceAll('·', '-')}`}${shard ? `-shard-${shard.index}` : ''}`;
   const needsLibrary = [
+    '内置AI与素材',
     '客户端控件',
     '减少动态效果',
     '全部',

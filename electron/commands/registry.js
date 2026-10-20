@@ -14,6 +14,39 @@ const category =
   'ArtistEra|Subject|Identity|Body|Clothing|Action|Environment|Composition|StyleQuality|Unsorted';
 /** @type {Record<CommandName, Definition>} */
 export const commandRegistry = {
+  'prompt.tidy': {
+    fields: { ...tab, requestId: 'string' },
+    required: ['tabId', 'requestId'],
+    uiOnly: true,
+  },
+  'ai.cancel': { fields: { requestId: 'string' }, required: ['requestId'], uiOnly: true },
+  'library.suggest-names': {
+    fields: { requestId: 'string', groups: 'imageGroups' },
+    required: ['requestId', 'groups'],
+    uiOnly: true,
+  },
+  'material.vibes': { fields: {}, uiOnly: true },
+  'material.list': { fields: {}, example: {} },
+  'material.save': {
+    fields: { ...scope, block: 'integer', name: 'string' },
+    required: [...scoped, 'name'],
+    mutation: true,
+    example: { tabId: 'tab-id', scope: 'base:prompt', block: 0, name: '常用场景' },
+  },
+  'material.insert': {
+    fields: { ...tab, id: 'string', scope: 'string', before: 'integer' },
+    required: ['tabId', 'id'],
+    mutation: true,
+    example: { tabId: 'tab-id', id: 'material-id', scope: 'base:prompt', before: 0 },
+  },
+  'material.rename': {
+    fields: { id: 'string', name: 'string' },
+    required: ['id', 'name'],
+    mutation: true,
+    uiOnly: true,
+  },
+  'material.delete': { fields: { id: 'string' }, required: ['id'], mutation: true, uiOnly: true },
+
   'generate.estimate': {
     fields: { ...tab, count: 'integer', width: 'number', height: 'number' },
     required: ['tabId', 'count'],
@@ -348,6 +381,14 @@ export function record(value) {
 }
 /** @param {unknown} value @param {string} type @returns {boolean} */
 function valid(value, type) {
+  if (type === 'imageGroups')
+    return (
+      Array.isArray(value) &&
+      value.length > 0 &&
+      value.length <= 100 &&
+      value.every((v) => valid(v, 'strings')) &&
+      new Set(value.flat()).size === value.flat().length
+    );
   if (type === 'month') return typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
   if (type === 'vibe')
     return (

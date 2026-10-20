@@ -95,7 +95,8 @@ export async function seed(directory, count, progress = () => {}, { compact = fa
     // Recreate the pre-generation schema for migration and compatibility checks.
     for (const table of ['version_images', 'work_versions', 'work_branch_names', 'works'])
       raw.run(`DROP TABLE IF EXISTS ${table}`);
-    raw.run("DELETE FROM app_meta WHERE key='generation_versions_v1'");
+    raw.run('DROP TABLE IF EXISTS materials');
+    raw.run("DELETE FROM app_meta WHERE key IN ('generation_versions_v1','materials_v1')");
     progress('seed:orphan-metadata');
     raw.run('BEGIN');
     for (let index = 0; index < Math.round((count * 147) / 159); index++) {

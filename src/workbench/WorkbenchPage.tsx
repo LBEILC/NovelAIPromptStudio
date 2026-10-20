@@ -18,6 +18,7 @@ export interface WorkbenchPageProps
     'onCopyText' | 'onConfirm' | 'onNotify' | 'onTranslateTags' | 'onUpdateProject'
   > {
   session: WorkbenchSession;
+  onShowMaterials?: (kind?: string) => void;
   beforeGeneration?: () => Promise<void>;
   onConfigureGeneration: () => void;
   error: string;
@@ -34,6 +35,7 @@ export interface WorkbenchPageProps
 }
 export default function WorkbenchPage(p: WorkbenchPageProps) {
   const generation = useGeneration();
+  const [proposal, setProposal] = useState(false);
   const defaultWidth = parseFloat(
     getComputedStyle(document.documentElement).getPropertyValue('--prompt-w'),
   );
@@ -129,6 +131,9 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
                 key={tab.id}
                 {...p}
                 project={tab.project}
+                tabId={tab.id}
+                before={p.beforeGeneration}
+                onProposalChange={setProposal}
                 generationSetup={
                   !generation.settings.hasToken ? (
                     <GenerationSetup onConfigure={p.onConfigureGeneration} />
@@ -136,7 +141,7 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
                 }
                 generationFooter={
                   generation.settings.hasToken ? (
-                    <GenerationBar tab={tab} before={p.beforeGeneration} />
+                    <GenerationBar tab={tab} before={p.beforeGeneration} proposal={proposal} />
                   ) : undefined
                 }
                 viewState={tab.viewState}

@@ -1,6 +1,7 @@
 // @ts-check
 import { countImportDays } from '../../src/lib/dateRange.js';
 import crypto from 'node:crypto';
+import { materialCommands } from './materials.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { commandRegistry, validateCommand, CommandError } from './registry.js';
 import { openCommandSession, mergeSession } from './session.js';
@@ -480,7 +481,11 @@ export async function createCommands(services) {
     },
   };
   const generation = generationCommands({ services, store, tab, revision, unlocked, emit });
-  Object.assign(handlers, generation.handlers);
+  Object.assign(
+    handlers,
+    generation.handlers,
+    materialCommands({ services, tab, full, edit, locate, revision }),
+  );
   /** @param {import('../../src/shared/commands').CommandInput<'collection.add'>} input @param {'add'|'remove'} action */
   async function members(input, action) {
     revision(input.expectedRevision, store.revision());

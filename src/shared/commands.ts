@@ -102,6 +102,43 @@ export type CommandEvent =
   | { type: 'generation'; data: GenerationStatus }
   | { type: 'navigate'; destination: string };
 export interface CommandDefinitions {
+  'prompt.tidy': {
+    input: TabInput & { requestId: string };
+    output: { changes: import('./materials').TidyChange[]; revision: number };
+  };
+  'ai.cancel': { input: { requestId: string }; output: Record<string, never> };
+  'library.suggest-names': {
+    input: { requestId: string; groups: string[][] };
+    output: { changes: { id: string; name: string; original: string; thumbnail: string }[] };
+  };
+  'material.vibes': {
+    input: Record<string, never>;
+    output: {
+      items: {
+        id: string;
+        name: string;
+        sources: { id: string; name: string; thumbnail: string }[];
+      }[];
+    };
+  };
+  'material.list': {
+    input: Record<string, never>;
+    output: { items: import('./materials').Material[] };
+  };
+  'material.save': {
+    input: ScopeInput & { block?: number; name: string };
+    output: { item: import('./materials').Material };
+  };
+  'material.insert': {
+    input: TabInput & { id: string; scope?: string; before?: number };
+    output: TabDocument;
+  };
+  'material.rename': {
+    input: { id: string; name: string };
+    output: { item: import('./materials').Material };
+  };
+  'material.delete': { input: { id: string }; output: Record<string, never> };
+
   'generate.estimate': {
     input: TabInput & { count: number; width?: number; height?: number };
     output: GenerationEstimate;

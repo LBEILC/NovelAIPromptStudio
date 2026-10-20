@@ -39,7 +39,15 @@ export function GenerationSetup({ onConfigure }: { onConfigure: () => void }) {
     </>
   );
 }
-export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () => Promise<void> }) {
+export function GenerationBar({
+  tab,
+  before,
+  proposal,
+}: {
+  tab: CommandTab;
+  before?: () => Promise<void>;
+  proposal?: boolean;
+}) {
   const state = useGeneration(),
     notify = useNotifications();
   const [count, setCount] = useState(1),
@@ -276,6 +284,10 @@ export function GenerationBar({ tab, before }: { tab: CommandTab; before?: () =>
                 onClick={async () => {
                   setStarting(true);
                   try {
+                    if (proposal) {
+                      notify({ text: '先处理 AI 提案' });
+                      return;
+                    }
                     await before?.();
                     await invokeUI('generate.start', {
                       tabId: tab.id,

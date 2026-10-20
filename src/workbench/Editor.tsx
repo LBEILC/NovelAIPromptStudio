@@ -1,3 +1,6 @@
+import { MaterialPicker } from '../materials/Materials';
+import { invokeUI } from '../lib/commands';
+import { useTidy } from './Tidy';
 import {
   cloneElement,
   useMemo,
@@ -112,6 +115,10 @@ function EditableTag({
   );
 }
 export interface EditorProps extends DocumentProps {
+  tabId?: string;
+  onShowMaterials?: (kind?: string) => void;
+  before?: () => Promise<void>;
+  onProposalChange?: (value: boolean) => void;
   onConfirm: (options: {
     title: string;
     message: string;
@@ -121,6 +128,24 @@ export interface EditorProps extends DocumentProps {
   }) => Promise<boolean>;
 }
 export function WorkbenchEditor(p: EditorProps) {
+  const tidy = useTidy(p);
+  const updateProject = p.onUpdateProject;
+  p = {
+    ...p,
+    onUpdateProject: (next) => {
+      if (tidy.active) {
+        p.onNotify('先处理 AI 提案');
+        return;
+      }
+      updateProject(next);
+    },
+  };
+  const materialAnchor = useRef<HTMLElement | null>(null);
+  const [saveMaterial, setSaveMaterial] = useState<{
+    section: number;
+    block: number;
+    name: string;
+  } | null>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const dragFeedback = useDragFeedback(scroll);
   const [dragging, setDragging] = useState<{
@@ -136,6 +161,25 @@ export function WorkbenchEditor(p: EditorProps) {
   } | null>(null);
   const doc = useMemo(() => createPromptDocument(p.project), [p.project]);
   const entries = useMemo(() => documentTags(doc), [doc]);
+  const saveCurrentMaterial = async () => {
+    if (!saveMaterial?.name.trim()) return;
+    try {
+      await p.before?.();
+      await invokeUI('material.save', {
+        tabId: p.tabId!,
+        scope: doc.scopes[saveMaterial.section].scope.key,
+        block: saveMaterial.block,
+        name: saveMaterial.name,
+      });
+      setSaveMaterial(null);
+      notify({
+        text: '已存为常用块',
+        action: { label: '查看', onClick: () => p.onShowMaterials?.() },
+      });
+    } catch (error) {
+      p.onNotify((error as Error).message, 'error');
+    }
+  };
   const [selected, setSelected] = useState<string[]>([]);
   const [paragraphTranslation, setParagraphTranslation] = useState({
     section: -1,
@@ -172,6 +216,10 @@ export function WorkbenchEditor(p: EditorProps) {
   });
   const guard = (operation: () => void) => {
     try {
+      if (tidy.active) {
+        p.onNotify('先处理 AI 提案');
+        return;
+      }
       operation();
     } catch (error) {
       p.onNotify(
@@ -357,6 +405,39 @@ export function WorkbenchEditor(p: EditorProps) {
       >
         <WorkbenchDocument
           {...p}
+          viewState={tidy.active ? { ...p.viewState, viewMode: 'structure' } : p.viewState}
+          proposalActive={tidy.active}
+          onSaveMaterial={(section, block) => {
+            if (block === undefined) return;
+            const b = doc.scopes[section].blocks[block];
+            materialAnchor.current =
+              root.current?.querySelector(`[data-wb-block="${section}:${block}"]`) || null;
+            setSaveMaterial({
+              section,
+              block,
+              name:
+                b.displayLabel ||
+                b.label ||
+                b.tags
+                  .slice(0, 2)
+                  .map((t) => t.translation || t.tag)
+                  .join('、') ||
+                b.content.slice(0, 12),
+            });
+          }}
+          renderMaterialInsert={(section, before) =>
+            p.tabId && (
+              <MaterialPicker
+                tabId={p.tabId}
+                scope={doc.scopes[section].scope.key}
+                before={before}
+                flush={p.before}
+              />
+            )
+          }
+          tidyButton={tidy.button}
+          proposalBar={tidy.bar}
+          renderProposal={tidy.render}
           renderTagList={(tags, content, section, block) => {
             const moving = new Set(dragging?.items.map((item) => item.key));
             const children = content.filter((_, index) => !moving.has(tags[index].key));
@@ -540,6 +621,14 @@ export function WorkbenchEditor(p: EditorProps) {
                 <i className="ri-add-line" />
                 添加角色
               </Button>
+              {p.tabId && (
+                <MaterialPicker
+                  tabId={p.tabId}
+                  character
+                  flush={p.before}
+                  onManage={() => p.onShowMaterials?.('character')}
+                />
+              )}
             </div>
           }
           sectionActions={(si) => {
@@ -567,6 +656,26 @@ export function WorkbenchEditor(p: EditorProps) {
                         0,
                         character.label,
                       ),
+                  },
+                  {
+                    id: 'save-character',
+                    label: '存为角色…',
+                    onSelect: async () => {
+                      try {
+                        await p.before?.();
+                        await invokeUI('material.save', {
+                          tabId: p.tabId!,
+                          scope: scope.key,
+                          name: character.label,
+                        });
+                        notify({
+                          text: '已存为角色',
+                          action: { label: '查看', onClick: () => p.onShowMaterials?.() },
+                        });
+                      } catch (e) {
+                        p.onNotify((e as Error).message, 'error');
+                      }
+                    },
                   },
                   { id: 'separator', separator: true },
                   {
@@ -789,6 +898,40 @@ export function WorkbenchEditor(p: EditorProps) {
             </Button>
           </SelectionBar>
           {p.children}
+          <Popover
+            open={!!saveMaterial}
+            anchor={materialAnchor}
+            onClose={() => setSaveMaterial(null)}
+            label="存为常用块"
+            className="material-picker"
+          >
+            <b>存为常用块</b>
+            <p className="nps-help">存进素材，以后可以插入任何一张图的提示词</p>
+            <Input
+              autoFocus
+              aria-label="常用块的名字"
+              value={saveMaterial?.name || ''}
+              onChange={(e) => setSaveMaterial((v) => v && { ...v, name: e.target.value })}
+              onKeyDown={async (e) => {
+                if (e.key !== 'Enter' || !saveMaterial?.name.trim()) return;
+                e.preventDefault();
+                await saveCurrentMaterial();
+              }}
+            />
+            <div className="nps-actions">
+              <span className="nps-help">Enter 保存　Esc 取消</span>
+              <Button size="small" variant="quiet" onClick={() => setSaveMaterial(null)}>
+                取消
+              </Button>
+              <Button
+                size="small"
+                onClick={() => void saveCurrentMaterial()}
+                disabled={!saveMaterial?.name.trim()}
+              >
+                保存
+              </Button>
+            </div>
+          </Popover>
         </WorkbenchDocument>
         {dragFeedback.overlay}
       </DndContext>

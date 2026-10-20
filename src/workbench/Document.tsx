@@ -41,6 +41,13 @@ import { Collapse, TransitionSurface } from '../ui/transitions';
 
 export interface DocumentProps {
   generationFooter?: ReactNode;
+  tidyButton?: ReactNode;
+  proposalBar?: ReactNode;
+  proposalActive?: boolean;
+  renderProposal?: (scope: string, block: number) => ReactNode;
+  readonly?: boolean;
+  onSaveMaterial?: (section: number, block?: number) => void;
+  renderMaterialInsert?: (section: number, before: number) => ReactNode;
   generationSetup?: ReactNode;
   scrollRef?: React.RefObject<HTMLDivElement | null>;
   project: ImageProject;
@@ -94,7 +101,7 @@ export function WorkbenchDocument(p: DocumentProps) {
     });
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState(() => localStorage.getItem('nps.prompt-edit-mode') || 'blocks');
-  const textMode = mode === 'text';
+  const textMode = mode === 'text' && !p.proposalActive;
   const switchMode = (next: string) => {
     window.dispatchEvent(new Event('nps:flush-text'));
     setMode(next);
@@ -110,6 +117,14 @@ export function WorkbenchDocument(p: DocumentProps) {
   const [viewOpen, setViewOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const [automatic, setAutomatic] = useState<string[]>([]);
+  useEffect(() => {
+    if (p.proposalActive) {
+      setQuery('');
+      setPolarity('all');
+      setCategory('All');
+      setCollapsed([]);
+    }
+  }, [p.proposalActive]);
   const viewAnchor = useRef<HTMLButtonElement>(null);
   const root = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -283,6 +298,7 @@ export function WorkbenchDocument(p: DocumentProps) {
         },
       },
       { id: 'copy', label: '复制', onSelect: () => copy(block.raw) },
+      { id: 'save-material', label: '存为常用块…', onSelect: () => p.onSaveMaterial?.(si, bi) },
       { id: 'copy-separator', separator: true },
       {
         id: 'up',
@@ -408,6 +424,7 @@ export function WorkbenchDocument(p: DocumentProps) {
           <i className="ri-translate-2" />
           <span className="wb-responsive-label">翻译</span>
         </Button>
+        {p.tidyButton}
         <div className="nps-split-button wb-head-copy-group">
           <Button
             className="wb-head-copy"
@@ -532,6 +549,7 @@ export function WorkbenchDocument(p: DocumentProps) {
           <span className="nps-help wb-filter-note">复制时只包含筛选出的内容</span>
         </div>
       </Collapse>
+      {p.proposalBar}
       <div className="wb-document-scroll" ref={scroll}>
         {p.viewState.viewMode === 'category' && (
           <p className="nps-help">按分类排列时不能拖动排序</p>
@@ -650,18 +668,19 @@ export function WorkbenchDocument(p: DocumentProps) {
                         />
                       </header>
                     )}
-                    {block.type === 'tags' ? (
-                      <div className="wb-tags">
-                        {p.renderTagList
-                          ? p.renderTagList(tags, tags.map(drawTag), si, bi)
-                          : tags.map(drawTag)}
-                        {p.renderAdd?.(si, bi)}
-                      </div>
-                    ) : p.renderParagraph ? (
-                      p.renderParagraph(si, bi, prose)
-                    ) : (
-                      prose
-                    )}
+                    {p.renderProposal?.(section.scope.key, bi) ||
+                      (block.type === 'tags' ? (
+                        <div className="wb-tags">
+                          {p.renderTagList
+                            ? p.renderTagList(tags, tags.map(drawTag), si, bi)
+                            : tags.map(drawTag)}
+                          {p.renderAdd?.(si, bi)}
+                        </div>
+                      ) : p.renderParagraph ? (
+                        p.renderParagraph(si, bi, prose)
+                      ) : (
+                        prose
+                      ))}
                   </div>
                   {p.renderNewBlock?.(si, bi)}
                   <div className="wb-add-block-gap">
@@ -681,6 +700,7 @@ export function WorkbenchDocument(p: DocumentProps) {
                       >
                         段落
                       </Button>
+                      {p.renderMaterialInsert?.(si, bi + 1)}
                     </span>
                   </div>
                 </div>
@@ -838,6 +858,7 @@ export function WorkbenchDocument(p: DocumentProps) {
                                 >
                                   ＋ 段落
                                 </Button>
+                                {p.renderMaterialInsert?.(si, 0)}
                               </div>
                             </EmptyRole>
                             {p.renderNewBlock?.(si, -1)}

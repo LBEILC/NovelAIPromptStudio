@@ -1,3 +1,4 @@
+import { materialsChecks } from './materials.js';
 import { libraryRefinementChecks } from './libraryRefinement.js';
 import { clientControlChecks } from './clientControls.js';
 import { clientChecks } from './client.js';
@@ -406,6 +407,7 @@ export async function runAcceptance(context) {
       else if (mode.category === '外壳') await shellChecks();
       else if (mode.category === 'Agent') await agentChecks(environment);
       else if (mode.category === '生成') await generationChecks(environment);
+      else if (mode.category === '内置AI与素材') await materialsChecks(environment);
       else if (mode.category === '工作台') await workbenchChecks(environment);
       else if (mode.category === '工作台·细节') await workbenchPolishChecks(environment);
       else if (mode.category === '工作台·交互') await workbenchInteractionChecks(environment);
@@ -461,6 +463,7 @@ export async function runAcceptance(context) {
           () => settingsChecks(environment, false),
         ],
         [
+          () => materialsChecks(environment),
           () => libraryPolishChecks(environment),
           () => workbenchPolishChecks(environment),
           () => libraryInteractionChecks(environment),

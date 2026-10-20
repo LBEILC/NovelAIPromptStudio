@@ -108,6 +108,7 @@ describe('native engine upgrade', () => {
         ).toEqual(
           [
             ...Object.keys(expected.tables).filter((name) => !RETIRED_TABLES.includes(name)),
+            'materials',
             'version_images',
             'work_branch_names',
             'work_versions',
@@ -121,7 +122,11 @@ describe('native engine upgrade', () => {
             name === 'app_meta'
               ? actual.filter(
                   (row) =>
-                    !['prompt_fingerprints_version', 'generation_versions_v1'].includes(row.key),
+                    ![
+                      'prompt_fingerprints_version',
+                      'generation_versions_v1',
+                      'materials_v1',
+                    ].includes(row.key),
                 )
               : actual,
             name,
@@ -142,6 +147,7 @@ describe('native engine upgrade', () => {
       reopened.close();
       expect(fs.readdirSync(directory).sort()).toEqual([
         'studio.pre-generation-versions.sqlite',
+        'studio.pre-materials.sqlite',
         'studio.pre-node-sqlite.sqlite',
         'studio.pre-phase2.sqlite',
         'studio.sqlite',

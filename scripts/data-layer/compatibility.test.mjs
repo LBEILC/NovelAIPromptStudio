@@ -78,7 +78,7 @@ it(
               raw
                 .prepare('SELECT * FROM app_meta ORDER BY rowid')
                 .all()
-                .filter((row) => row.key !== 'generation_versions_v1'),
+                .filter((row) => !['generation_versions_v1', 'materials_v1'].includes(row.key)),
             ).toEqual(
               rows.filter(
                 (row) =>

@@ -22,6 +22,16 @@ description: 通过本机 nai-studio 命令读取 NovelAI 图片和提示词，�
 
 ## 最小例子
 
+常用块和角色保存在本机素材中。`material.save` 保存整个块；省略 `block` 时保存指定角色的块和负面提示词。`material.insert` 复制到草稿并登记一次使用，不修改素材原件。删除与改名只开放给界面。
+
+```sh
+nai-studio material.list
+nai-studio material.save --json '{"tabId":"TAB","scope":"base:prompt","block":0,"name":"常用场景","expectedRevision":0}'
+nai-studio material.save --json '{"tabId":"TAB","scope":"character:CHARACTER:prompt","name":"角色素材","expectedRevision":0}'
+nai-studio material.insert --json '{"tabId":"TAB","id":"MATERIAL","scope":"base:prompt","before":0,"expectedRevision":0}'
+nai-studio material.insert --json '{"tabId":"TAB","id":"CHARACTER_MATERIAL","expectedRevision":0}'
+```
+
 下列 `TAB`、`IMAGE`、`COLLECTION`、`CHARACTER` 和修订号是占位值，执行时替换成读取结果。文件路径使用用户指定的路径。
 
 ```sh

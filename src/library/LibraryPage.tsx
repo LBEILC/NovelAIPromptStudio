@@ -1,3 +1,4 @@
+import { NameAI } from './NameAI';
 import { Collapse, Presence, TransitionSurface } from '../ui/transitions';
 import { LibraryRename } from './Rename';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -211,6 +212,7 @@ export default function LibraryPage(
                   <i className="ri-edit-line" />
                   起名
                 </Button>
+                <NameAI p={p} groups={p.groups.filter((g) => p.selectedGroupIds.includes(g.id))} />
                 {p.activeCollection?.kind === 'manual' && (
                   <Button
                     size="small"
