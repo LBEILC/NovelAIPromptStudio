@@ -159,7 +159,7 @@ export function useLibraryComputation({
       if (groupingRequestRef.current !== requestId) return;
       setSimilarGroupingState({ groups: [], loading: false, requestId });
       showToast(
-        `没能合并相似提示词图片：${error instanceof Error ? error.message : String(error)}`,
+        `合并相似提示词的图片失败：${error instanceof Error ? error.message : String(error)}`,
         'error',
       );
     };

@@ -8,20 +8,7 @@ import {
   type PromptSection,
 } from '../lib/promptDocument.ts';
 import type { Tag } from '../shared/types';
-import type { TagCategory } from '../ui';
 
-export const categoryColors: Record<string, TagCategory> = {
-  ArtistEra: 'artist-era',
-  Subject: 'subject',
-  Identity: 'identity',
-  Body: 'body',
-  Clothing: 'clothing',
-  Action: 'action',
-  Environment: 'environment',
-  Composition: 'composition',
-  StyleQuality: 'style',
-  Unsorted: 'unsorted',
-};
 export const categoryLabel = (category: string) =>
   CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS] || category;
 export function scopeLabel(section: PromptDocumentScope) {

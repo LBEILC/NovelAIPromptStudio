@@ -1,4 +1,10 @@
-import type { Suggestion } from '../ui/Autocomplete';
+/** 补全列表的一项 */
+export interface Suggestion {
+  id: string;
+  text: string;
+  translation: string;
+  count: string;
+}
 
 export interface LibraryTagOption {
   label: string;

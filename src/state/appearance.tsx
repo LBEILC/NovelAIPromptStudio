@@ -1,7 +1,6 @@
 import { invokeUI } from '../lib/commands';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppearanceSettings } from '../shared/types';
-import { ThemeProvider } from '../ui';
 import { quoteFontFamily } from '../lib/fonts.js';
 import tokenSource from '../../design/tokens.css?raw';
 
@@ -67,7 +66,22 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       `${quoteFontFamily(appearance.proseFont)}, ${tokenFont('prose')}`,
     );
     html.dataset.themeMode = resolvedTheme;
+    html.dataset.theme = resolvedTheme;
   }, [appearance, resolvedTheme]);
+  // 动效：完整、跟随系统（系统要求减少动态效果时关掉）、关闭
+  useEffect(() => {
+    const html = document.documentElement;
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => {
+      html.dataset.motion =
+        appearance.motion === 'off' || (appearance.motion === 'reduced' && reduced.matches)
+          ? 'off'
+          : 'full';
+    };
+    update();
+    reduced.addEventListener('change', update);
+    return () => reduced.removeEventListener('change', update);
+  }, [appearance.motion]);
   const changeAppearance = async (patch: Partial<AppearanceSettings>) => {
     const request = ++revision.current;
     const saved = await invokeUI('settings.appearance.save', { settings: patch });
@@ -77,12 +91,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   };
   return (
     <AppearanceContext.Provider value={{ appearance, resolvedTheme, changeAppearance }}>
-      <ThemeProvider
-        theme={resolvedTheme}
-        motion={appearance.motion === 'reduced' ? 'system' : appearance.motion}
-      >
-        {children}
-      </ThemeProvider>
+      {children}
     </AppearanceContext.Provider>
   );
 }

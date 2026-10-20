@@ -1097,6 +1097,7 @@ export function WorkbenchEditor(p: EditorProps) {
           data-key={`b-${key}`}
           data-flip=""
           data-block={key}
+          data-wb-scope={doc.scopes[si].scope.key}
         >
           <div className="blk-h">
             <span className="label">
@@ -1132,6 +1133,7 @@ export function WorkbenchEditor(p: EditorProps) {
         data-key={`b-${key}`}
         data-flip=""
         data-block={key}
+        data-wb-scope={doc.scopes[si].scope.key}
       >
         {!negative && (
           <div className="blk-h">
@@ -1180,7 +1182,12 @@ export function WorkbenchEditor(p: EditorProps) {
   };
   const newBlockEl = (si: number, after: number) =>
     newBlock && newBlock.si === si && newBlock.after === after ? (
-      <div className="blk" key={`new-${si}-${after}`} data-enter="fade">
+      <div
+        className="blk"
+        key={`new-${si}-${after}`}
+        data-enter="fade"
+        data-wb-scope={doc.scopes[si].scope.key}
+      >
         <div className="blk-h">
           <span className="label">
             {newBlock.type === 'tags' ? 'TAG 块 · 新的块 · 0 个' : '段落 · 编辑中'}
@@ -1416,6 +1423,7 @@ export function WorkbenchEditor(p: EditorProps) {
             data-flip=""
             data-exit="lift"
             data-enter="fade"
+            data-wb-scope={si >= 0 ? doc.scopes[si].scope.key : undefined}
           >
             {polarity !== 'undesired' && si >= 0 && (
               <>
@@ -1552,6 +1560,7 @@ export function WorkbenchEditor(p: EditorProps) {
     return (
       <TextSection
         key={`tx-${key}`}
+        scope={key}
         text={serializePromptSection(section)}
         label={label}
         query={query}
@@ -1838,6 +1847,10 @@ export function WorkbenchEditor(p: EditorProps) {
       >
         {editing && (
           <>
+            <span
+              data-command-scope={doc.scopes[editing.section]?.scope.key}
+              data-command-block={editing.block}
+            />
             <div className="frow">
               <span className="label">Tag</span>
               <label className="field sm">

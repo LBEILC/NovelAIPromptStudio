@@ -29,13 +29,13 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react';
-import { Collapse, Presence, TransitionSurface } from './ui/transitions';
+import { Presence } from './kit/motion';
 import GalleryPage from './gallery/GalleryPage';
 import { useLibraryCacheProgress } from './state/libraryCacheProgress';
 import SettingsPage from './settings/SettingsPage';
 import { Titlebar } from './shell/Titlebar';
 import { useAppearance } from './state/appearance';
-import { Button, Progress, useNotifications } from './ui';
+import { useNotifications } from './kit/toast';
 import WorkbenchPage from './workbench/WorkbenchPage';
 import { GenerationStatus } from './shell/GenerationStatus';
 import { Confirm } from './kit/dialog';
@@ -172,63 +172,52 @@ async function runTextEditAction(selection, action) {
   if (command) document.execCommand(command);
 }
 
-function ImportExperience({ dragState, progress, result, target, onCancel, onDismiss }) {
+// 不在图片库时：拖进来出现一圈虚线；导入进度停在窗口底部（和图片库里的一样）
+function ImportExperience({ dragState, progress, target, onCancel }) {
   const importing = isImportActive(progress);
-  const percent = progress?.total
-    ? Math.min(100, Math.round(((progress.processed || 0) / progress.total) * 100))
-    : 0;
+  const last = useRef(progress);
+  if (importing) last.current = progress;
+  const ip = last.current;
+  const done = ip?.processed || 0;
+  const total = ip?.total || 0;
   const workbench = target === 'workbench';
   return (
     <>
       {dragState.active && (
-        <div className={`file-drop-overlay ${dragState.valid ? 'accept' : 'reject'}`}>
-          <div className="file-drop-target">
-            <i className={dragState.valid ? 'ri-upload-line' : 'ri-close-line'} />
-            <strong>
-              {dragState.valid
-                ? workbench
-                  ? '松开，在工作台打开'
-                  : '松开以保存到图片库'
-                : '这些文件暂不支持'}
-            </strong>
-            <span>
-              {workbench
-                ? 'PNG / JPG / WEBP，每张图片一个标签页'
-                : 'PNG / JPG / WEBP / ZIP，可批量导入'}
-            </span>
-          </div>
+        <div className="dropzone app-drop" data-enter="fade">
+          {dragState.valid
+            ? workbench
+              ? '松开后在工作台打开，每张图片一个标签页'
+              : '松开后导入图片库'
+            : workbench
+              ? '只能打开 PNG、JPG、WEBP 图片'
+              : '只能导入 PNG、JPG、WEBP 图片和 ZIP'}
         </div>
       )}
-      <Collapse open={importing} className="import-transition">
-        {importing && (
-          <div className="import-status">
-            <div>
-              <strong>{progress.phase === 'preparing' ? '正在检查文件' : '正在导入图片'}</strong>
-              <span>
-                {progress.current || '准备中'} · {percent}%
-              </span>
+      <div className="dock app-dock">
+        <Presence show={importing}>
+          {(leaving) => (
+            <div className={`job ljob ${leaving ? 'leaving' : ''}`} data-enter="up">
+              <div className="top">
+                <span className="spin" />
+                <b>
+                  {ip?.phase === 'preparing'
+                    ? '正在检查文件'
+                    : `正在导入 ${Math.min(done + 1, Math.max(total, 1))} / ${total}`}
+                </b>
+                <span className="sp" />
+                <button className="btn quiet sm" onClick={onCancel}>
+                  取消剩余
+                </button>
+              </div>
+              <div className="progress ink">
+                <i style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
+              </div>
+              <small>导入不会修改或移动原文件</small>
             </div>
-            <Progress value={percent} label="导入进度" />
-            <Button onClick={onCancel} size="small">
-              取消
-            </Button>
-          </div>
-        )}
-      </Collapse>
-      <Presence show={!!result} className="import-transition">
-        {result && (
-          <div className="import-result">
-            <i className={result.errors?.length ? 'ri-alert-line' : 'ri-check-line'} />
-            <span>
-              已导入 {result.imported?.length || 0} 张 · 跳过重复 {result.duplicates?.length || 0}{' '}
-              张{result.errors?.length ? ` · 没能导入 ${result.errors.length} 张` : ''}
-            </span>
-            <Button onClick={onDismiss} size="small" variant="quiet">
-              关闭
-            </Button>
-          </div>
-        )}
-      </Presence>
+          )}
+        </Presence>
+      </div>
     </>
   );
 }
@@ -309,7 +298,6 @@ export default function App() {
   } = useWorkbenchState();
   const [dragState, setDragState] = useState({ active: false, valid: false });
   const [importProgress, setImportProgress] = useState(null);
-  const [importResult, setImportResult] = useState(null);
   const [archiveImport, setArchiveImport] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
@@ -419,7 +407,7 @@ export default function App() {
     async (source = 'user') => {
       const result = await invokeResult('collection.list', {});
       if (!result?.ok) {
-        showToast(result?.error || '没能加载收藏集', 'error', source);
+        showToast(result?.error || '加载收藏集失败', 'error', source);
         return [];
       }
       const next = (result.items || []).map(normalizeGalleryCollection);
@@ -593,7 +581,7 @@ export default function App() {
             ? {
                 ...current,
                 previewComplete: true,
-                previewError: result?.error || '没能打开压缩包预览',
+                previewError: result?.error || '打开压缩包预览失败',
               }
             : current,
         );
@@ -631,7 +619,7 @@ export default function App() {
       const editable = event.target.closest('textarea, input, [contenteditable="true"]');
       const selection = captureTextSelection(editable);
       const invoke = (action) =>
-        runTextEditAction(selection, action).catch(() => showToast('没能完成文本操作', 'error'));
+        runTextEditAction(selection, action).catch(() => showToast('文本操作失败', 'error'));
       openContextMenu(event, [
         { key: 'undo', label: '撤销', icon: Undo2, onClick: () => invoke('undo') },
         { key: 'redo', label: '重做', icon: Redo2, onClick: () => invoke('redo') },
@@ -686,7 +674,7 @@ export default function App() {
           ...(source ? { source } : {}),
         });
         if (result?.canceled) return false;
-        if (!result?.ok || !result.tab?.project) throw new Error(result?.error || '没能打开图片');
+        if (!result?.ok || !result.tab?.project) throw new Error(result?.error || '打开图片失败');
         setWorkbenchFocus({ scopeKey: 'base:prompt', tagId: null });
         setPage('workbench');
         showToast('已在工作台打开');
@@ -706,7 +694,7 @@ export default function App() {
     setWorkbenchError('');
     try {
       const result = await invokeUI('workbench.open-clipboard', {});
-      if (!result?.ok || !result.project) throw new Error(result?.error || '没能打开剪贴板图片');
+      if (!result?.ok || !result.project) throw new Error(result?.error || '打开剪贴板图片失败');
       acceptWorkbenchProject(result.project, result.source);
       showToast(
         result.metadataMissing
@@ -732,13 +720,13 @@ export default function App() {
         const result = await invokeUI('workbench.open-many', {
           paths: studio.pathsForFiles(files),
         });
-        if (!result?.ok) throw new Error(result?.error || '没能打开图片');
+        if (!result?.ok) throw new Error(result?.error || '打开图片失败');
         for (const item of result.items || []) {
           if (item.ok && item.project) acceptWorkbenchProject(item.project, item.source);
         }
         const failures = (result.items || []).filter((item) => !item.ok);
         if (failures.length)
-          setWorkbenchError(`没能打开 ${failures.length} 张图片：${failures[0].error}`);
+          setWorkbenchError(`${failures.length} 张图片打开失败：${failures[0].error}`);
         if (result.items?.some((item) => item.ok))
           showToast(`已打开 ${result.items.filter((item) => item.ok).length} 个工作台标签页`);
       } catch (error) {
@@ -752,7 +740,6 @@ export default function App() {
 
   const acceptLibraryImportResult = useCallback(
     async (result) => {
-      setImportResult(result);
       if (!result?.ok && result?.error) showToast(result.error, 'error');
       setImportProgress(null);
       await reloadLibrary('all');
@@ -787,7 +774,7 @@ export default function App() {
                     setSelectedGroupIds([]);
                     setPreviewGroupId('');
                     setPreviewProjectId(result.imported[0].id);
-                    const grid = document.querySelector('.library-scroll');
+                    const grid = document.querySelector('.lib-grid-col > .scroll');
                     if (grid) grid.scrollTop = 0;
                   },
                 },
@@ -813,7 +800,6 @@ export default function App() {
       }
       setPage('gallery');
       setGalleryView('all');
-      setImportResult(null);
       setImportProgress({ phase: 'preparing', processed: 0, total: 0, current: '准备中' });
       let preparedSessionId = '';
       try {
@@ -826,7 +812,7 @@ export default function App() {
           ? await invokeUI('import.prepare', { paths: studio.pathsForFiles(files) })
           : await invokeUI('import.prepare', {});
         if (preparation?.canceled) return;
-        if (!preparation?.ok) throw new Error(preparation?.error || '没能准备文件');
+        if (!preparation?.ok) throw new Error(preparation?.error || '准备文件失败');
         preparedSessionId = preparation.sessionId;
         if (preparation.requiresSelection) {
           setArchiveImport({
@@ -865,7 +851,6 @@ export default function App() {
       const sessionId = archiveImport?.sessionId;
       if (!sessionId) return;
       setArchiveImport(null);
-      setImportResult(null);
       setImportProgress({ phase: 'preparing', processed: 0, total: 0, current: '准备所选图片' });
       try {
         const result = await invokeUI('import.commit', {
@@ -1044,7 +1029,7 @@ export default function App() {
               : {}),
           })),
       });
-      if (!result?.ok) showToast(result?.error || '没能保存 Tag 译文和分类', 'error');
+      if (!result?.ok) showToast(result?.error || '保存 Tag 译文和分类失败', 'error');
     }, 500);
   };
 
@@ -1067,7 +1052,7 @@ export default function App() {
       structure: updated.prompt_structure,
       projectId: activeTab.source.projectId,
     }).then((result) => {
-      if (!result.ok) showToast(result.error || '没能保存块类型和译文', 'error');
+      if (!result.ok) showToast(result.error || '保存块类型和译文失败', 'error');
     });
   };
 
@@ -1078,7 +1063,7 @@ export default function App() {
       tags: entries.map((entry) => entry.tag.tag),
     });
     if (!result?.ok) {
-      showToast(result?.error || '没能完成翻译和分类', 'error');
+      showToast(result?.error || '翻译和分类失败', 'error');
       return;
     }
     setWorkbenchSession((current) =>
@@ -1120,14 +1105,14 @@ export default function App() {
 
   const summarizeBatch = (result, action, groupCount = 0) => {
     if (!result?.ok) {
-      showToast(result?.error || `没能${action}`, 'error');
+      showToast(result?.error || `${action}失败`, 'error');
       return false;
     }
     const summary = result.summary || {};
     const imageCount = (summary.success || 0) + (summary.skipped || 0) + (summary.failed || 0);
     const scope = groupCount ? `共 ${groupCount} 组、${imageCount} 张图片` : '';
     showToast(
-      `已${action} ${summary.success || 0} 张${scope ? `（${scope}）` : ''}，跳过 ${summary.skipped || 0} 张，没能${action} ${summary.failed || 0} 张`,
+      `已${action} ${summary.success || 0} 张${scope ? `（${scope}）` : ''}，跳过 ${summary.skipped || 0} 张，${action}失败 ${summary.failed || 0} 张`,
       summary.failed ? 'warning' : 'success',
     );
     return true;
@@ -1251,7 +1236,7 @@ export default function App() {
   const emptyTrash = async () => {
     const summary = await invokeUI('trash.summary', {});
     if (!summary?.ok) {
-      showToast(summary?.error || '没能读取回收站', 'error');
+      showToast(summary?.error || '读取回收站失败', 'error');
       return;
     }
     if (!summary.projects?.length) return;
@@ -1268,7 +1253,7 @@ export default function App() {
       changes: ids.map((id, index) => ({ id, name: names[index] })),
     });
     if (!result?.ok) {
-      showToast(result?.error || '没能修改图片名称', 'error');
+      showToast(result?.error || '修改图片名称失败', 'error');
       return false;
     }
     await reloadLibrary(galleryView);
@@ -1280,7 +1265,7 @@ export default function App() {
         onClick: async () => {
           const restored = await invokeResult('library.rename-many', { changes: result.previous });
           if (!restored?.ok) {
-            showToast(restored?.error || '没能修改图片名称', 'error');
+            showToast(restored?.error || '修改图片名称失败', 'error');
             return;
           }
           await reloadLibrary(galleryView);
@@ -1293,7 +1278,7 @@ export default function App() {
   const renameProject = async (project, name) => {
     const result = await invokeResult('library.rename', { id: project.id, name: name });
     if (!result?.ok) {
-      showToast(result?.error || '没能修改图片名称', 'error');
+      showToast(result?.error || '修改图片名称失败', 'error');
       return false;
     }
     showToast('已修改图片名称');
@@ -1376,7 +1361,7 @@ export default function App() {
       },
     });
     if (!result?.ok) {
-      showToast(result?.error || '没能新建收藏集', 'error');
+      showToast(result?.error || '新建收藏集失败', 'error');
       return false;
     }
     await reloadCollections();
@@ -1392,7 +1377,7 @@ export default function App() {
   const renameGalleryCollection = async (collection, name) => {
     const result = await invokeUI('collection.update', { id: collection.id, patch: { name } });
     if (!result?.ok) {
-      showToast(result?.error || '没能修改收藏集名称', 'error');
+      showToast(result?.error || '修改收藏集名称失败', 'error');
       return false;
     }
     await reloadCollections();
@@ -1433,7 +1418,7 @@ export default function App() {
       },
     });
     if (!result?.ok) {
-      showToast(result?.error || '没能更新智能收藏集规则', 'error');
+      showToast(result?.error || '更新智能收藏集规则失败', 'error');
       return false;
     }
     await reloadCollections();
@@ -1461,7 +1446,7 @@ export default function App() {
       return false;
     const result = await invokeUI('collection.delete', { id: collection.id });
     if (!result?.ok) {
-      showToast(result?.error || '没能删除收藏集', 'error');
+      showToast(result?.error || '删除收藏集失败', 'error');
       return false;
     }
     if (activeCollectionId === collection.id || editingSmartCollectionId === collection.id)
@@ -1479,7 +1464,7 @@ export default function App() {
       { collectionId: collectionId, ids: projectIds },
     );
     if (!result?.ok) {
-      showToast(result?.error || '没能更新收藏集里的图片', 'error');
+      showToast(result?.error || '更新收藏集里的图片失败', 'error');
       return false;
     }
     const updated = await reloadCollections();
@@ -1508,10 +1493,10 @@ export default function App() {
     try {
       await workbenchConnection?.flush();
       const result = await invokeUI('updates.install', {});
-      if (!result?.ok) throw new Error(result?.error || '没能开始安装更新');
+      if (!result?.ok) throw new Error(result?.error || '安装更新失败');
       return true;
     } catch (error) {
-      showToast(`没能重启安装：${error instanceof Error ? error.message : String(error)}`, 'error');
+      showToast(`重启安装失败：${error instanceof Error ? error.message : String(error)}`, 'error');
       return false;
     }
   };
@@ -1579,7 +1564,7 @@ export default function App() {
               onCopyImage={async (project) => {
                 const result = await invokeUI('image.copy', { path: project.image_path });
                 showToast(
-                  result?.ok ? '已复制图片' : result?.error || '没能复制图片',
+                  result?.ok ? '已复制图片' : result?.error || '复制图片失败',
                   result?.ok ? 'success' : 'error',
                 );
               }}
@@ -1610,7 +1595,7 @@ export default function App() {
                 });
                 if (!result?.canceled)
                   showToast(
-                    result?.ok ? '已下载原图' : result?.error || '没能下载原图',
+                    result?.ok ? '已下载原图' : result?.error || '下载原图失败',
                     result?.ok ? 'success' : 'error',
                   );
               }}
@@ -1658,7 +1643,7 @@ export default function App() {
               onRevealVibe={async (vibe) => {
                 const result = await invokeUI('file.reveal', { vibe: vibe });
                 showToast(
-                  result?.ok ? '已在文件夹中显示 Vibe 文件' : result?.error || '没能生成 Vibe 文件',
+                  result?.ok ? '已在文件夹中显示 Vibe 文件' : result?.error || '生成 Vibe 文件失败',
                   result?.ok ? 'success' : 'error',
                 );
               }}
@@ -1717,7 +1702,7 @@ export default function App() {
               onCopyImage={async (project) => {
                 const result = await invokeUI('image.copy', { id: project.id });
                 showToast(
-                  result?.ok ? '已复制图片' : result?.error || '没能复制图片',
+                  result?.ok ? '已复制图片' : result?.error || '复制图片失败',
                   result?.ok ? 'success' : 'error',
                 );
               }}
@@ -1725,7 +1710,7 @@ export default function App() {
                 const result = await invokeUI('image.save-as', { id: project.id });
                 if (!result?.canceled)
                   showToast(
-                    result?.ok ? '已下载原图' : result?.error || '没能下载原图',
+                    result?.ok ? '已下载原图' : result?.error || '下载原图失败',
                     result?.ok ? 'success' : 'error',
                   );
               }}
@@ -1838,9 +1823,7 @@ export default function App() {
           onCancel={() =>
             importProgress?.batchId && invokeUI('import.cancel', { id: importProgress.batchId })
           }
-          onDismiss={() => setImportResult(null)}
           progress={importProgress}
-          result={importResult}
           target={page}
         />
       )}

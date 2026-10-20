@@ -154,15 +154,16 @@ export class WorkbenchConnection {
 export function editingTargets(tabId: string): EditingTarget[] {
   if (!tabId) return [];
   const targets: EditingTarget[] = [];
+  // 正在编辑的地方：按文本编辑的输入框、正在改的段落、Tag 的编辑浮层、正在加的 Tag、正在改的角色名
   for (const node of document.querySelectorAll<HTMLElement>(
-    '.wb-text-section:has(textarea:focus),.wb-raw-editor,.wb-paragraph-editor,.wb-tag-editor,.wb-add-tags:has(input),.wb-character-name:has(input)',
+    '.tx-wrap:has(textarea:focus),.blk.on[data-block],.tag-pop [data-command-scope],.tag.input:has(input),.char-name:has(input)',
   )) {
     if (!node.checkVisibility()) continue;
     const scope =
       node.dataset.commandScope || node.closest<HTMLElement>('[data-wb-scope]')?.dataset.wbScope;
     const block =
       node.dataset.commandBlock ??
-      node.closest<HTMLElement>('[data-wb-block]')?.dataset.wbBlock?.split(':')[1];
+      node.closest<HTMLElement>('[data-block]')?.dataset.block?.split(':')[1];
     targets.push({
       tabId,
       ...(scope ? { scope } : {}),

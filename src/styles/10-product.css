@@ -1,3 +1,19 @@
+/* 通用：表单控件用界面字体；按钮默认没有边框（有边框的按钮在 .btn、.field 里写）；可以选中的文字；折叠块不显示系统的三角 */
+button, input, select, textarea { font: inherit; }
+button { border: 0; }
+html { cursor: default; }
+a[href] { cursor: pointer; }
+img, svg, a { -webkit-user-drag: none; }
+summary { list-style: none; }
+summary::-webkit-details-marker { display: none; }
+:where(input, textarea, [contenteditable="true"]) { user-select: text; cursor: text; }
+/* 每一页撑满窗口里标题栏以下的部分 */
+.app-page-surface { width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+
+/* 不在图片库时拖进图片：虚线框盖住标题栏以下；导入进度停在窗口底部 */
+.dropzone.app-drop { top: calc(var(--titlebar-h) + var(--sp-2)); z-index: 25; pointer-events: none; }
+.dock.app-dock { z-index: 25; }
+
 /* 产品里补的规则：原型用内联样式或原型外框实现、产品要用类名写的地方。只用 tokens.css 的令牌。 */
 
 /* 对话框里的引文（原型是内联样式） */
@@ -67,8 +83,7 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 /* 张数："3 张"排在一行（.stepper b 是 grid，数字和"张"会被排成上下两格） */
 .count-step .count-n { display: flex; align-items: center; justify-content: center; padding: 0 var(--sp-1); white-space: nowrap; }
 
-/* 设置：主题外层撑满窗口；侧栏的分类是按钮；每一页叠在同一个格子里，页本身是一列 */
-#root > .nps-root { height: 100%; }
+/* 设置：侧栏的分类是按钮；每一页叠在同一个格子里，页本身是一列 */
 .set-side button.it { width: 100%; border: 0; background: transparent; text-align: left; }
 .setp .set-col { flex: 1 1 0; background: var(--surface); }
 .set-pane { display: flex; flex-direction: column; min-height: 0; }

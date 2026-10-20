@@ -5,9 +5,9 @@ import { installClientDefaults } from './lib/clientDefaults';
 import { AppearanceProvider } from './state/appearance';
 import { NotificationProvider } from './kit/toast';
 import { Win } from './shell/Win';
+import '../design/tokens.css';
 import './fonts.css';
 import 'virtual:misans.css';
-import './styles.css';
 import 'remixicon/fonts/remixicon.css';
 // 界面的样式（035 起以产品为准）：顺序和原来的交互原型一样，后面的覆盖前面的
 import './styles/01-base.css';

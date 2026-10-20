@@ -15,7 +15,9 @@ export function TextSection({
   query,
   tags,
   onSave,
+  scope,
 }: {
+  scope?: string;
   text: string;
   label: string;
   query: string;
@@ -194,7 +196,7 @@ export function TextSection({
   const position = caret.current?.getBoundingClientRect();
   return (
     <>
-      <div className="tx-wrap">
+      <div className="tx-wrap" data-wb-scope={scope}>
         <div className="tx-hl" ref={mirror} aria-hidden="true">
           {parts}
           {cursor === value.length && <span ref={caret} />}{' '}
