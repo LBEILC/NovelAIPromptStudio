@@ -94,7 +94,11 @@ export async function libraryNamingChecks({ h, database, doubles }) {
   const saveDefault = async (expected) => {
     doubles.saves.push({ canceled: true });
     const count = doubles.calls.length;
-    await click('另存为', 'document.querySelector(".library-viewer")');
+    await h.key('Escape', {}, 'document.querySelector(".library-viewer")');
+    await e(
+      'document.querySelector(".library-card.current").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,clientX:300,clientY:180}))',
+    );
+    await click('另存为…', 'document.querySelector("[role=menu]")');
     await h.until(() => doubles.calls.length > count, '另存为默认名称已传给原生对话框');
     await check(
       '另存为默认名称：' + expected,
@@ -105,6 +109,8 @@ export async function libraryNamingChecks({ h, database, doubles }) {
       undefined,
       'once',
     );
+    await h.key(' ', {}, 'document.querySelector("[data-library-grid]")');
+    await wait('!!document.querySelector(".library-viewer")');
   };
   try {
     for (let i = 0; i < 6; i++) make(i);
@@ -146,14 +152,9 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await h.font('.library-file-start', 'IBM Plex Mono');
     await e('document.querySelector(".library-detail-picture img").click()');
     await wait('!!document.querySelector(".library-viewer")');
-    await check(
-      '未起名大图顶部只有尺寸和位置，没有名称',
-      '!document.querySelector(".library-viewer-top b") && !!document.querySelector(".library-viewer-top .library-mono").textContent.trim()',
-      undefined,
-      'both',
-    );
+
     await saveDefault(original.original_filename);
-    await click('关闭 Esc', 'document.querySelector(".library-viewer")');
+    await click('关闭', 'document.querySelector(".library-viewer")');
     await click('起名', actions);
     await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     await check(
@@ -215,7 +216,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await e('document.querySelector(".library-detail-picture img").click()');
     await wait('!!document.querySelector(".library-viewer")');
     await saveDefault('命名验收.png');
-    await click('关闭 Esc', 'document.querySelector(".library-viewer")');
+    await click('关闭', 'document.querySelector(".library-viewer")');
     await input('input[aria-label="搜索图片库"]', original.original_filename);
     await wait('document.querySelectorAll(".library-card").length === 1');
     await check(

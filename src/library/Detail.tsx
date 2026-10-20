@@ -112,6 +112,7 @@ export function LibraryDetail({
   const filename = imageFileName(detail);
   const filenameCharacters = Array.from(filename);
   const pending = p.preview?.id !== detail.id;
+  // TODO(design): The prototype does not specify generation parameters or the set-cover action.
   const parameters = generationParameters(detail.metadata);
   return (
     <aside className="library-detail" data-detail-id={detail.id} aria-busy={pending}>
@@ -123,7 +124,6 @@ export function LibraryDetail({
             height={detail.metadata.height || undefined}
             style={{
               aspectRatio: `${detail.metadata.width || 1} / ${detail.metadata.height || 1}`,
-              height: 'auto',
             }}
             alt={imageAccessibleName(detail)}
             role="button"
@@ -279,7 +279,10 @@ export function LibraryDetail({
             </>
           ) : (
             <>
-              <CollectionPicker p={p} ids={[detail.id]} />
+              <CollectionPicker
+                p={p}
+                ids={group?.members.map((member) => member.id) || [detail.id]}
+              />
               <Button variant="quiet" size="small" disabled={pending} onClick={startRename}>
                 <i className="ri-edit-line" />
                 {hasImageName(detail) ? '重命名' : '起名'}
@@ -301,7 +304,9 @@ export function LibraryDetail({
                 variant="danger"
                 size="small"
                 aria-label="移入回收站"
-                onClick={() => p.onTrash([detail.id], 'detail')}
+                onClick={() =>
+                  p.onTrash(group?.members.map((member) => member.id) || [detail.id], 'detail')
+                }
               >
                 <i className="ri-delete-bin-line" />
               </Button>

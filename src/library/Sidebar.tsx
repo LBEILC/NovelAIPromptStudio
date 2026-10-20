@@ -98,20 +98,21 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
         onClick={() => select('collection:')}
       >
         <i className="ri-image-2-line" />
-        全部图片<span>{p.allCount ?? p.filterCacheSource.length}</span>
+        <span className="library-side-name">全部图片</span>
+        <span className="library-side-count">{p.allCount ?? p.filterCacheSource.length}</span>
       </SurfaceButton>
-      <div className="library-side-label">
-        <SurfaceButton
-          kind="row"
-          aria-label="生成记录"
-          className={`library-side-item ${selected === 'collection:__generated__' ? 'on' : ''}`}
-          onClick={() => select('collection:__generated__')}
-        >
-          <i className="ri-history-line" />
-          生成记录
-          <span>{p.filterCacheSource.filter((image) => image.generated_work_id).length}</span>
-        </SurfaceButton>
-      </div>
+      <SurfaceButton
+        kind="row"
+        aria-label="生成记录"
+        className={`library-side-item ${selected === 'collection:__generated__' ? 'on' : ''}`}
+        onClick={() => select('collection:__generated__')}
+      >
+        <i className="ri-history-line" />
+        <span className="library-side-name">生成记录</span>
+        <span className="library-side-count">
+          {p.filterCacheSource.filter((image) => image.generated_work_id).length}
+        </span>
+      </SurfaceButton>
       <div className="library-side-label">
         收藏集
         <Button
@@ -182,13 +183,10 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
                       <i
                         className={kind === 'manual' ? 'ri-folder-line' : 'ri-folder-settings-line'}
                       />
-                      <TransitionSurface
-                        className="library-collection-title"
-                        change={collection.name}
-                      >
+                      <TransitionSurface className="library-side-name" change={collection.name}>
                         {collection.name}
                       </TransitionSurface>
-                      <span>{collection.image_count ?? 0}</span>
+                      <span className="library-side-count">{collection.image_count ?? 0}</span>
                     </SurfaceButton>
                   )}
                 </ContextMenu>
@@ -204,7 +202,8 @@ export function LibrarySidebar({ p }: { p: LibraryProps }) {
         onClick={() => select('trash')}
       >
         <i className="ri-delete-bin-line" />
-        回收站<span>{p.trashCount ?? 0}</span>
+        <span className="library-side-name">回收站</span>
+        <span className="library-side-count">{p.trashCount ?? 0}</span>
       </SurfaceButton>
       <span
         ref={marker}

@@ -246,20 +246,21 @@ export async function extraLibraryChecks({
   await wait('!!document.querySelector(".library-viewer")');
   const viewer = 'document.querySelector(".library-viewer")';
   await click('下一张', viewer);
-  const next = await e('document.querySelector(".library-viewer-top b").textContent');
+  const next = await e('document.querySelector(".library-viewer").dataset.viewerProjectId');
   await click('上一张', viewer);
   await check(
     '大图上一张和下一张按钮切换图片',
-    'document.querySelector(".library-viewer-top b").textContent!==' + JSON.stringify(next),
+    'document.querySelector(".library-viewer").dataset.viewerProjectId!==' + JSON.stringify(next),
     undefined,
     'once',
   );
-  await click('在工作台打开', viewer);
+  await key('Escape', {}, viewer);
+  await click('在工作台打开', 'document.querySelector(".library-detail")');
   await wait(
     'document.querySelector(".studio-titlebar [aria-current=page]")?.textContent.trim()==="工作台"',
   );
   await check(
-    '大图在工作台打开并关闭覆盖层',
+    '关闭大图后从详情栏在工作台打开',
     '!document.querySelector(".library-viewer")',
     undefined,
     'once',

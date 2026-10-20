@@ -100,6 +100,7 @@ export default function LibraryPage(
           : '在详情栏或卡片的右键菜单中选择"加入收藏集"即可添加图片。';
   const clearLabel =
     searching && filtering ? '清除搜索和筛选' : searching ? '清除搜索' : '清除筛选';
+  // TODO(design): Upgrade-cache progress and bulk naming are not covered by the reference.
   const busyImport =
     p.importProgress && ['preparing', 'importing'].includes(p.importProgress.phase);
   return (
@@ -220,6 +221,7 @@ export default function LibraryPage(
                   在工作台打开
                 </Button>
                 <CollectionPicker p={p} ids={ids} />
+                {/* TODO(design): The reference has no bulk rename or collection-removal entry. */}
                 <Button size="small" variant="quiet" onClick={() => setRenaming(true)}>
                   <i className="ri-edit-line" />
                   起名

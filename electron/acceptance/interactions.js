@@ -406,7 +406,7 @@ export async function workbenchInteractionChecks(env) {
     for (const [index, record] of records.slice(0, 2).entries()) {
       await wait(`!!document.querySelector('[data-project-id="${record.id}"]')`);
       await e(
-        `document.querySelector('[data-project-id="${record.id}"]').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
+        `document.querySelector('[data-project-id="${record.id}"]').click();document.querySelector('[data-library-grid]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`,
       );
       await wait(`${tabs}.length===${previousTabs.length + index + 1}`);
       if (index === 0) await click('图片库', 'document.querySelector(".studio-titlebar")');

@@ -1,3 +1,4 @@
+import { LibraryLayer, LibraryPopover } from './Popover';
 import { Collapse } from '../ui/transitions';
 import { SurfaceButton } from '../ui';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -10,12 +11,9 @@ import {
   Button,
   Input,
   OptionGroup,
-  Popover,
   Select,
   Slider,
   Switch,
-  Checkbox,
-  Layer,
   MenuItems,
   Autocomplete,
 } from '../ui';
@@ -127,7 +125,9 @@ function TagFilter({
   values,
   options,
   onChange,
+  children,
 }: {
+  children?: React.ReactNode;
   label: string;
   values: string[];
   options: LibraryTagOption[];
@@ -142,30 +142,33 @@ function TagFilter({
   return (
     <div className="library-filter-row library-filter-tag-row">
       <span>{label}</span>
-      <div className="library-filter-tags">
-        {values.map((value) => (
-          <SurfaceButton
-            kind="chip"
-            key={value}
-            className="library-chip"
-            aria-label={`移除${label} ${value}`}
-            onClick={() => onChange(values.filter((item) => item !== value))}
-          >
-            {value}
-            <i className="ri-close-line" />
-          </SurfaceButton>
-        ))}
-        <Autocomplete
-          label={`${label} Tag`}
-          placeholder="搜索 Tag 或译文"
-          value={text}
-          onChange={setText}
-          items={libraryTagSuggestions(options, text, values)}
-          onSelect={(item) => add(item.text)}
-          selectOnTab
-          onEmptyBackspace={() => onChange(values.slice(0, -1))}
-          emptyMessage={text.trim() ? '图片库里没有带这个 Tag 的图片' : undefined}
-        />
+      <div className="library-filter-column">
+        <div className="library-filter-tags">
+          {values.map((value) => (
+            <SurfaceButton
+              kind="chip"
+              key={value}
+              className="library-chip"
+              aria-label={`移除${label} ${value}`}
+              onClick={() => onChange(values.filter((item) => item !== value))}
+            >
+              {value}
+              <i className="ri-close-line" />
+            </SurfaceButton>
+          ))}
+          <Autocomplete
+            label={`${label} Tag`}
+            placeholder="搜索 Tag 或译文"
+            value={text}
+            onChange={setText}
+            items={libraryTagSuggestions(options, text, values)}
+            onSelect={(item) => add(item.text)}
+            selectOnTab
+            onEmptyBackspace={() => onChange(values.slice(0, -1))}
+            emptyMessage={text.trim() ? '图片库里没有带这个 Tag 的图片' : undefined}
+          />
+        </div>
+        {children}
       </div>
     </div>
   );
@@ -223,7 +226,20 @@ export function LibraryToolbar({
             prefix={<i className="ri-search-line" />}
             value={p.query}
             onChange={(event) => p.onQueryChange(event.target.value)}
-            suffix={<Shortcut keys={['Mod', 'K']} />}
+            suffix={
+              p.query ? (
+                <Button
+                  variant="quiet"
+                  size="small"
+                  aria-label="清除搜索"
+                  onClick={() => p.onQueryChange('')}
+                >
+                  <i className="ri-close-line" />
+                </Button>
+              ) : (
+                <Shortcut keys={['Mod', 'K']} />
+              )
+            }
           />
         </div>
         <Button
@@ -247,6 +263,7 @@ export function LibraryToolbar({
         <Button
           ref={viewAnchor}
           aria-expanded={open === 'view'}
+          className={open === 'view' ? 'active' : ''}
           variant="quiet"
           onClick={() => setOpen(open === 'view' ? '' : 'view')}
         >
@@ -296,7 +313,7 @@ export function LibraryToolbar({
           </Button>
         </div>
       )}
-      <Popover
+      <LibraryPopover
         open={open === 'filter' || !!p.editingSmartCollection}
         anchor={filterAnchor}
         label="筛选"
@@ -306,24 +323,32 @@ export function LibraryToolbar({
         }}
       >
         <div className="library-filter-panel">
-          {p.editingSmartCollection && <b>编辑规则 · {p.editingSmartCollection.name}</b>}
+          {p.editingSmartCollection && (
+            <div className="library-rule-heading">
+              <i className="ri-folder-settings-line" />
+              <b>编辑规则</b>
+              <span>·</span>
+              <span>{p.editingSmartCollection.name}</span>
+            </div>
+          )}
           <TagFilter
             label="包含"
             values={filters.includeTags}
             options={tagOptions}
             onChange={(includeTags) => p.onFiltersChange({ includeTags })}
-          />
-          {filters.includeTags.length >= 2 && (
-            <OptionGroup
-              label="包含方式"
-              options={[
-                { value: 'all', label: '全部都有' },
-                { value: 'any', label: '有任意一个' },
-              ]}
-              value={filters.tagMatch}
-              onChange={(tagMatch) => p.onFiltersChange({ tagMatch: tagMatch as 'all' | 'any' })}
-            />
-          )}
+          >
+            {filters.includeTags.length >= 2 && (
+              <OptionGroup
+                label="包含方式"
+                options={[
+                  { value: 'all', label: '全部都有' },
+                  { value: 'any', label: '有任意一个' },
+                ]}
+                value={filters.tagMatch}
+                onChange={(tagMatch) => p.onFiltersChange({ tagMatch: tagMatch as 'all' | 'any' })}
+              />
+            )}
+          </TagFilter>
           <TagFilter
             label="排除"
             values={filters.excludeTags}
@@ -333,41 +358,55 @@ export function LibraryToolbar({
           {(['models', 'vibes'] as const).map((key) => (
             <div className="library-filter-row" key={key}>
               <span>{key === 'models' ? '模型' : 'Vibe'}</span>
-              <div className="library-filter-options">
+              <div className={`library-filter-options ${key === 'vibes' ? 'two' : ''}`}>
                 {(key === 'models'
                   ? groupedModels
                   : options.vibes.map((option) => ({ label: option.label, values: [option.value] }))
                 ).map((option) => (
-                  <label
+                  <button
+                    type="button"
+                    className="library-filter-check"
                     key={key === 'models' ? option.label : option.values[0]}
+                    role="checkbox"
+                    aria-label={option.label}
+                    aria-checked={
+                      option.values.every((value) => filters[key].includes(value))
+                        ? true
+                        : option.values.some((value) => filters[key].includes(value))
+                          ? 'mixed'
+                          : false
+                    }
                     data-tip={
                       key === 'models'
                         ? option.values
                             .map(
                               (value) =>
-                                options.models.find((item) => item.value === value)?.label || value,
+                                options.models.find((model) => model.value === value)?.label ||
+                                value,
                             )
                             .join('\n')
                         : undefined
                     }
+                    onClick={() =>
+                      p.onFiltersChange({
+                        [key]: option.values.every((value) => filters[key].includes(value))
+                          ? filters[key].filter((value) => !option.values.includes(value))
+                          : [...new Set([...filters[key], ...option.values])],
+                      })
+                    }
                   >
-                    <Checkbox
-                      label={option.label}
-                      checked={option.values.every((value) => filters[key].includes(value))}
-                      mixed={
-                        option.values.some((value) => filters[key].includes(value)) &&
-                        !option.values.every((value) => filters[key].includes(value))
-                      }
-                      onChange={(checked) =>
-                        p.onFiltersChange({
-                          [key]: checked
-                            ? [...new Set([...filters[key], ...option.values])]
-                            : filters[key].filter((v) => !option.values.includes(v)),
-                        })
-                      }
-                    />
-                    {option.label}
-                  </label>
+                    <span className="library-check">
+                      <i
+                        className={
+                          option.values.some((value) => filters[key].includes(value)) &&
+                          !option.values.every((value) => filters[key].includes(value))
+                            ? 'ri-subtract-line'
+                            : 'ri-check-line'
+                        }
+                      />
+                    </span>
+                    <span>{option.label}</span>
+                  </button>
                 ))}
               </div>
             </div>
@@ -382,6 +421,7 @@ export function LibraryToolbar({
             <Button
               variant="quiet"
               size="small"
+              disabled={!count}
               onClick={() =>
                 p.onFiltersChange({
                   ...DEFAULT_GALLERY_FILTERS,
@@ -408,6 +448,7 @@ export function LibraryToolbar({
                 </Button>
                 <Button
                   size="small"
+                  variant="ink"
                   disabled={!count && !filters.query}
                   disabledReason="至少保留一个条件"
                   onClick={async () => {
@@ -437,9 +478,14 @@ export function LibraryToolbar({
             )}
           </div>
         </div>
-      </Popover>
-      <Popover open={open === 'view'} anchor={viewAnchor} label="视图" onClose={() => setOpen('')}>
-        <div className="library-filter-panel">
+      </LibraryPopover>
+      <LibraryPopover
+        open={open === 'view'}
+        anchor={viewAnchor}
+        label="视图"
+        onClose={() => setOpen('')}
+      >
+        <div className="library-filter-panel library-view-panel">
           <div className="library-filter-row">
             <span>大小</span>
             <Slider
@@ -518,8 +564,8 @@ export function LibraryToolbar({
             </span>
           </div>
         </div>
-      </Popover>
-      <Layer
+      </LibraryPopover>
+      <LibraryLayer
         open={open === 'import'}
         anchor={importAnchor}
         className="nps-menu"
@@ -547,7 +593,7 @@ export function LibraryToolbar({
             },
           ]}
         />
-      </Layer>
+      </LibraryLayer>
     </>
   );
 }

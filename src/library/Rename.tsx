@@ -3,6 +3,7 @@ import { Checkbox, Dialog, Input } from '../ui';
 import { numberedImageNames } from '../lib/imageNaming.js';
 import type { LibraryProps } from './types';
 
+// TODO(design): This workflow has no matching state in the reference; retain its existing presentation.
 export function LibraryRename({
   open,
   p,

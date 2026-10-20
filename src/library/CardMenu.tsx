@@ -31,6 +31,8 @@ export function CardMenu({
     ? p.groups.filter((g) => p.selectedGroupIds.includes(g.id)).flatMap((g) => g.members)
     : group.members;
   const ids = images.map((item) => item.id);
+  // TODO(design): The reference omits copy/save/reveal and multi-selection menu states.
+  // Keep those existing actions until their placement is defined.
   const items: MenuItem[] =
     p.view === 'trash'
       ? [
