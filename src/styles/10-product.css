@@ -136,3 +136,7 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 .popover.seed-pop .frow { display: grid; grid-template-columns: 44px 1fr; align-items: center; }
 .popover.seed-pop .field { width: 100%; }
 .sb-layer.over { z-index: 45; }
+
+/* 图片库：悬停细线那条规则（.lgrid .card img）在后面，会把当前卡片的朱砂框和多选的墨色框盖掉 */
+.lgrid .card.on img { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
+.lgrid .card.picked img { outline: 2px solid var(--ink); outline-offset: 2px; }
