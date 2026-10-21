@@ -19,6 +19,7 @@ import { useNotifications } from '../kit/toast';
 import { useSwap } from '../kit/motion';
 import { Viewer } from '../kit/Viewer';
 import { trashNotice } from '../lib/trashNotice';
+import { originGone, originMenu } from './original';
 
 export interface ImageProps {
   tab: WorkbenchTab;
@@ -127,13 +128,31 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
     return () => removeEventListener('keydown', key);
   });
   const dirty = workbenchTabHasChanges(tab);
+  // 停在原图上（不是生成出来的某一张）
+  const atOrigin =
+    !!version &&
+    !version.parentId &&
+    !version.isStart &&
+    (!tab.versionImageId || tab.versionImageId === version.project.id);
+  // 原图移入回收站或从作品里去掉以后（1.5.1），第一行是"起点"，舞台和空白作品一样是虚线框
+  const gone = atOrigin && originGone(version);
   // 空白作品还没有图（2.26a）：舞台是按尺寸比例的虚线框，第一行版本是"起点"
-  const blank = !!image && !image.image_path;
-  const vlabel = version?.isStart ? '起点' : version?.parentId ? `第 ${version.number} 版` : '原图';
+  const blank = (!!image && !image.image_path) || gone;
+  const blankText = gone
+    ? version?.originState === 'trashed'
+      ? '原图在回收站'
+      : '已去掉原图'
+    : '写好提示词后生成第一张';
+  const vlabel =
+    version?.isStart || originGone(version)
+      ? '起点'
+      : version?.parentId
+        ? `第 ${version.number} 版`
+        : '原图';
   const title =
     image && hasImageName(image)
       ? `${image.name} · ${vlabel}`
-      : blank
+      : blank && !gone
         ? `空白作品 · ${vlabel}`
         : vlabel;
   const m = image?.metadata;
@@ -151,7 +170,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   );
   const enter = dir < 0 ? 'left' : dir > 0 ? 'right' : 'fade';
   const menuItems: MenuEntry[] =
-    version && stageId
+    version && stageId && !gone
       ? [
           {
             label: '作为新作品打开',
@@ -162,25 +181,30 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                 imageId: stageId,
               }).then(() => notify({ text: '已作为新作品打开' })),
           },
-          {
-            label: '移入回收站',
-            danger: true,
-            disabled: tab.source.type !== 'library' ? '请先存入图片库' : false,
-            onSelect: () =>
-              void invokeUI('library.trash', { ids: [stageId] }).then((r) => {
-                setRefresh((n) => n + 1);
-                notify({
-                  text: trashNotice('已移入回收站', r.versions),
-                  action: {
-                    label: '撤销',
-                    onClick: () =>
-                      void invokeUI('library.restore', { ids: [stageId] }).then(() =>
-                        setRefresh((n) => n + 1),
-                      ),
-                  },
-                });
-              }),
-          },
+          atOrigin
+            ? originMenu(version, tab.id, {
+                notify,
+                refresh: () => setRefresh((n) => n + 1),
+              })
+            : {
+                label: '移入回收站',
+                danger: true,
+                disabled: tab.source.type !== 'library' ? '请先存入图片库' : false,
+                onSelect: () =>
+                  void invokeUI('library.trash', { ids: [stageId] }).then((r) => {
+                    setRefresh((n) => n + 1);
+                    notify({
+                      text: trashNotice('已移入回收站', r.versions),
+                      action: {
+                        label: '撤销',
+                        onClick: () =>
+                          void invokeUI('library.restore', { ids: [stageId] }).then(() =>
+                            setRefresh((n) => n + 1),
+                          ),
+                      },
+                    });
+                  }),
+              },
         ]
       : [];
   const vibes = image?.vibes || [];
@@ -194,7 +218,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   );
   return (
     <div className="col stage">
-      {(missing || !image) && (
+      {(missing || !image) && !gone && (
         <div className="stage-banner">
           <div className="banner warn">
             <Icon name="alert-line" />
@@ -209,7 +233,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
           value.blank ? (
             <div key={key} className={`canvas-blank ${leaving ? 'leaving' : ''}`} data-enter="fade">
               <img src={blankSrc} alt="" draggable={false} />
-              <span>写好提示词后生成第一张</span>
+              <span>{blankText}</span>
             </div>
           ) : allTrashed && !leaving ? (
             <div key={key} className="canvas-empty" data-enter="fade">

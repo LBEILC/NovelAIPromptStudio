@@ -2,7 +2,21 @@
 // 这一版跟着移走，通知里说一句；是一条分支的最后一版时说分支。
 type Moved = { workName: string; number: number; branchName: string; lastOfBranch: boolean };
 
-export function trashNotice(base: string, versions: Moved[] = [], withWork = false) {
+// 1.5.1：移走的图里有某个作品的原图时也说一句，作品照旧、从起点继续
+export function trashNotice(
+  base: string,
+  versions: Moved[] = [],
+  withWork = false,
+  originsOf: string[] = [],
+) {
+  const origin = !originsOf.length
+    ? ''
+    : originsOf.length > 1
+      ? `，其中有 ${originsOf.length} 个作品的原图，这些作品从起点继续`
+      : `，其中有「${originsOf[0]}」的原图，这个作品从起点继续`;
+  return moved(base, versions, withWork) + origin;
+}
+function moved(base: string, versions: Moved[], withWork: boolean) {
   if (!versions.length) return base;
   if (versions.length > 1) return `${base}，${versions.length} 个没有图的版本一起移走`;
   const [v] = versions;

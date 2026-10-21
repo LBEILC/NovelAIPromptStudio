@@ -1171,6 +1171,7 @@ export default function App() {
         ids.length === 1 ? '已移入回收站' : `已将 ${ids.length} 张移入回收站`,
         result.versions,
         true,
+        result.originsOf,
       ),
       action: { label: '撤销', onClick: () => restoreProjects(result.results?.success || ids) },
     });

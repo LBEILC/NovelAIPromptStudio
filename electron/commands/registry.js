@@ -65,6 +65,12 @@ export const commandRegistry = {
     fields: { name: 'string', width: 'number', height: 'number', params: 'generationPatch' },
     mutation: true,
   },
+  'work.remove-original': {
+    fields: { tabId: 'string', expectedRevision: 'integer' },
+    required: ['tabId'],
+    mutation: true,
+  },
+  'work.restore-original': { fields: { undo: 'string' }, required: ['undo'], mutation: true },
   'version.delete': {
     fields: { versionId: 'string', confirmed: 'boolean' },
     required: ['versionId'],

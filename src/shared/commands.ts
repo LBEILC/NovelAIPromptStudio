@@ -198,6 +198,16 @@ export interface CommandDefinitions {
     output: TabDocument;
   };
   /**
+   * 不满意原图（1.5.1）：原图在图片库里时移入回收站，从文件打开的从作品里去掉（不动文件）。
+   * 根版本留下来变成"起点"（originState 是 trashed / removed），提示词、参数和后面各版都不变。
+   * 撤销用 work.restore-original；原图在回收站时从回收站恢复它也一样。
+   */
+  'work.remove-original': {
+    input: TabInput;
+    output: { trashed: boolean; undo: string };
+  };
+  'work.restore-original': { input: { undo: string }; output: { restored: boolean } };
+  /**
    * 删除一版和它之后的各版（用户 10-21，doc/design.md 2.23）：整棵子树软删除，图进回收站，用 branch.restore 撤销。
    * 原图和起点不能删。子树不止这一版时，没有 confirmed 返回 needs_confirm，details 是 {versions, branches, images}。
    * 正在走的线被删掉时回到上一版，草稿保留。
@@ -627,6 +637,8 @@ export interface CommandDefinitions {
        * 这里列出跟着移走的版本（界面写进通知）。从回收站恢复那张图时它们一起回来。
        */
       versions?: { workName: string; number: number; branchName: string; lastOfBranch: boolean }[];
+      /** 移走的图里有某个作品的原图：这些作品的名字（作品照旧，第一行变成起点） */
+      originsOf?: string[];
     };
   };
   'library.rename-many': {

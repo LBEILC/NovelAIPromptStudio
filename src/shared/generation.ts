@@ -36,6 +36,11 @@ export interface VersionImage {
 }
 export interface WorkVersion {
   isStart?: boolean;
+  /**
+   * 只在根版本上（1.5.1，doc/design.md 2.23"不满意原图"）：原图在图片库里 / 从文件打开的 /
+   * 原图移入了回收站 / 已从作品里去掉。后两种时这一行是"起点"，提示词和参数照旧
+   */
+  originState?: 'library' | 'file' | 'trashed' | 'removed';
   id: string;
   workId: string;
   parentId: string | null;
@@ -54,6 +59,8 @@ export interface WorkOrigin {
   projectId: string;
   name?: string;
   number?: number;
+  /** 另起它的那个作品已经删掉了：界面写"来自的作品已删除"，不能点 */
+  deleted?: true;
 }
 export interface GenerationJob {
   progress?: number | null;

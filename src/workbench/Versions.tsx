@@ -9,6 +9,7 @@ import { errorCode, errorDetails, invokeUI } from '../lib/commands';
 import { mediaUrl } from '../lib/imageStage.js';
 import { versionDiff } from '../lib/versionDiff';
 import { trashNotice } from '../lib/trashNotice';
+import { originGone, originMenu } from './original';
 import { VersionDifference, VersionSummary } from './VersionDifference';
 import { Icon, Kbd } from '../kit/controls';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
@@ -128,7 +129,9 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
   const kids = (id: string) => versions.filter((v) => v.parentId === id);
   const subtree = (v: WorkVersion): WorkVersion[] => [v, ...kids(v.id).flatMap(subtree)];
   const byId = (id: string | null) => versions.find((v) => v.id === id);
-  const name = (v: WorkVersion) => (v.isStart ? '起点' : v.parentId ? `第 ${v.number} 版` : '原图');
+  // 原图移入回收站或从作品里去掉以后，第一行是"起点"（1.5.1）
+  const name = (v: WorkVersion) =>
+    v.isStart || originGone(v) ? '起点' : v.parentId ? `第 ${v.number} 版` : '原图';
   const delta = (v: WorkVersion) => versionDiff(byId(v.parentId)?.project || v.project, v.project);
   const go = async (v: WorkVersion, imageId?: string) => {
     try {
@@ -309,7 +312,12 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
               }),
           },
         ]
-      : []),
+      : v.parentId
+        ? []
+        : [
+            'sep' as const,
+            originMenu(v, tab.id, { before, notify, refresh: () => setRefresh((n) => n + 1) }),
+          ]),
   ];
   // 生成中：一版一张张出来，正在生成的格子是实底加墨色细条，排队的是虚线框；失败的格子是绛红色的叉
   const jobs = state.jobs.filter((j) => j.tabId === tab.id);
@@ -335,7 +343,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     const cells: Cell[] = [];
     const cur = (id: string) =>
       on && (tab.versionImageId ? tab.versionImageId === id : id === v.project.id);
-    if (!v.parentId && !v.isStart)
+    if (!v.parentId && !v.isStart && !originGone(v))
       cells.push({
         key: 'orig',
         pin: cur(v.project.id),
@@ -516,6 +524,12 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             </span>
             {v.parentId ? (
               <VersionSummary diff={delta(v)} />
+            ) : originGone(v) ? (
+              <span className="what">
+                {v.originState === 'trashed' ? '原图在回收站' : '已去掉原图'}
+              </span>
+            ) : origin?.deleted ? (
+              <span className="what">来自的作品已删除</span>
             ) : origin ? (
               <span
                 className="what from"
@@ -724,7 +738,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
   // 原图算一张；空白作品的起点没有图
   const images = versions.reduce(
     (n, v) => n + v.images.filter((i) => !i.deleted).length,
-    versions.length && !versions[0].isStart ? 1 : 0,
+    versions.length && !versions[0].isStart && !originGone(versions[0]) ? 1 : 0,
   );
   return (
     <div className="col versions" ref={col}>

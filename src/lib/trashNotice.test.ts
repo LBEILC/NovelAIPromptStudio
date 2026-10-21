@@ -20,3 +20,12 @@ it('mentions versions that leave together with their last image', () => {
     '已将 3 张移入回收站，2 个没有图的版本一起移走',
   );
 });
+
+it('mentions works whose original went to the recycle bin', () => {
+  expect(trashNotice('已移入回收站', [], true, ['雨后微光'])).toBe(
+    '已移入回收站，其中有「雨后微光」的原图，这个作品从起点继续',
+  );
+  expect(trashNotice('已将 3 张移入回收站', [], true, ['a', 'b'])).toBe(
+    '已将 3 张移入回收站，其中有 2 个作品的原图，这些作品从起点继续',
+  );
+});
