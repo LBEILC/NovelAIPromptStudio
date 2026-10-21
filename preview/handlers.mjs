@@ -1214,9 +1214,20 @@ export function createPreviewHandlers({
   });
 
   let agentInstalled = false;
+  const agentSkills = {
+    claude: {
+      state: 'installed',
+      path: path.join(dataDirectory, 'home', '.claude', 'skills', 'nai-studio', 'SKILL.md'),
+    },
+    codex: {
+      state: 'missing',
+      path: path.join(dataDirectory, 'home', '.codex', 'skills', 'nai-studio', 'SKILL.md'),
+    },
+  };
   const agentStatus = () => ({
     ok: true,
     installed: agentInstalled,
+    skills: structuredClone(agentSkills),
     path: path.join(dataDirectory, 'bin', 'nai-studio'),
     onPath: agentInstalled,
     skillPath: path.join(dataDirectory, 'agent', 'SKILL.md'),
@@ -1227,6 +1238,17 @@ export function createPreviewHandlers({
     agentInstalled = true;
     return agentStatus();
   });
+  registerCommand('agent.uninstall', () => {
+    agentInstalled = false;
+    return agentStatus();
+  });
+  for (const action of ['install', 'uninstall']) {
+    registerCommand(`agent.skill-${action}`, ({ target }) => {
+      if (target !== 'claude' && target !== 'codex') throw Error('Invalid skill target');
+      agentSkills[target].state = action === 'install' ? 'installed' : 'missing';
+      return { ok: true, skills: structuredClone(agentSkills) };
+    });
+  }
   registerCommand('agent.skill', () => ({
     ok: true,
     text: '# 预览 Agent\n使用场景面板模拟 Agent 修改提示词和排队生成。',

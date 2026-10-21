@@ -246,6 +246,7 @@ export interface CommandDefinitions {
       skillPath: string;
       platform: string;
       pathFailed?: boolean;
+      skills?: AgentSkills;
     }>;
   };
   'agent.skill': { input: Record<string, never>; output: IPC.Result<{ text: string }> };

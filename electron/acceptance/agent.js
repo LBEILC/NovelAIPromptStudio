@@ -84,7 +84,14 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     undefined,
     'once',
   );
-  for (const name of ['settings.ai.get', 'trash.delete-permanently']) {
+  for (const name of [
+    'settings.ai.get',
+    'trash.delete-permanently',
+    'agent.install',
+    'agent.uninstall',
+    'agent.skill-install',
+    'agent.skill-uninstall',
+  ]) {
     const result = await cli(name);
     await h.check(
       `CLI 拒绝 ${name}`,
@@ -93,6 +100,15 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
       'once',
     );
   }
+  const setupRoot = path.join(mode.root, 'agent-install');
+  const claudeRoot = path.join(setupRoot, 'home', '.claude');
+  const codexSkill = path.join(setupRoot, 'home', '.codex', 'skills', 'nai-studio', 'SKILL.md');
+  await fs.mkdir(claudeRoot, { recursive: true });
+  await fs.mkdir(path.dirname(codexSkill), { recursive: true });
+  await fs.writeFile(codexSkill, 'synthetic old skill');
+  const row = (title) =>
+    `[...document.querySelectorAll('[data-settings-section=agent] div')].find(e=>e.firstChild?.nodeType===3&&e.firstChild.textContent===${JSON.stringify(title)})?.parentElement`;
+  const setupState = () => h.evaluate(`window.studio.invoke('agent.setup',{}).then(r=>r.data)`);
   await h.section('Agent');
   await h.check(
     'Agent 位于词典与关于之间，包含工具、能力和生成设置',
@@ -100,7 +116,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     undefined,
     'once',
   );
-  await h.click('安装');
+  await h.click('安装', row('命令行工具'));
   await h.wait(
     `document.querySelector('[data-settings-section=agent]').textContent.includes('已安装')`,
   );
@@ -114,8 +130,52 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     undefined,
     'once',
   );
-  await h.click('重新安装');
+  await h.click('重新安装', row('命令行工具'));
   await h.wait('!document.querySelector("[data-settings-section=agent] .loading")');
+  for (const [target, title, action] of [
+    ['claude', 'Claude Code', '安装'],
+    ['codex', 'Codex', '更新'],
+  ]) {
+    await h.click(action, row(title));
+    await h.wait(`(${row(title)}).textContent.includes('已安装，新开的会话就能用')`);
+    await h.check(`${title} 一键${action}写入隔离技能目录`, async () => {
+      const info = (await setupState()).skills[target];
+      return (
+        info.state === 'installed' &&
+        info.path.startsWith(setupRoot) &&
+        (await fs.readFile(info.path)).equals(
+          await fs.readFile(
+            path.join(
+              app.isPackaged ? process.resourcesPath : app.getAppPath(),
+              'agent',
+              'SKILL.md',
+            ),
+          ),
+        )
+      );
+    });
+    await h.click('卸载', row(title));
+    await h.wait(`(${row(title)}).textContent.includes('还没装技能')`);
+    await h.check(
+      `${title} 卸载后状态为 missing`,
+      async () => (await setupState()).skills[target].state === 'missing',
+    );
+  }
+  await h.click('卸载', row('命令行工具'));
+  await h.wait(
+    `(${row('命令行工具')}).textContent.includes('安装')&&!(${row('命令行工具')}).textContent.includes('重新安装')`,
+  );
+  await h.check(
+    '命令行工具卸载移除运行目录',
+    async () =>
+      !(await setupState()).installed &&
+      !(await fs.access(path.join(setupRoot, 'runtime')).then(
+        () => true,
+        () => false,
+      )),
+  );
+  await h.click('安装', row('命令行工具'));
+  await h.wait(`(${row('命令行工具')}).textContent.includes('重新安装')`);
   await h.click('复制内容');
   await h.wait(
     'document.querySelector(".toast:not(.leaving)")?.textContent.includes("已复制技能内容")',
