@@ -15,8 +15,15 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
   const [open, setOpen] = useState(false);
   const seen = useRef(new Map<string, string>());
   const branchSeen = useRef(new Set<string>());
+  // 打开软件之前就有的任务（上次留下的失败、待确认）只记下状态，不再通知（用户 10-21：每次重新打开都弹一遍）
+  const opened = useRef(Date.now());
   useEffect(() => {
     for (const job of state.jobs) {
+      if (!seen.current.has(job.id) && Date.parse(job.createdAt) < opened.current) {
+        seen.current.set(job.id, job.state);
+        branchSeen.current.add(job.id);
+        continue;
+      }
       if (job.branchNotice && !branchSeen.current.has(job.id)) {
         branchSeen.current.add(job.id);
         notify({ text: job.branchNotice });

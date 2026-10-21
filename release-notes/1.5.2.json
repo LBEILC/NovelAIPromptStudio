@@ -1,0 +1,45 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "1.5.2",
+  "date": "2026-10-21",
+  "items": [
+    {
+      "kind": "new",
+      "area": "gen",
+      "title": "关掉窗口也能接着跑",
+      "detail": "Windows 上关闭主窗口时会问一次：最小化到托盘，还是退出。缩到托盘后生成和 Agent 接入在后台继续，点托盘图标就回来；右键托盘图标能看到生成进度，也可以退出。勾上“不再询问”就记住这次的选择。",
+      "highlight": true,
+      "icon": "speed"
+    },
+    {
+      "kind": "improved",
+      "area": "set",
+      "title": "设置里的“外观”改名为“通用”",
+      "detail": "主题、字体和动效还在这一页；Windows 上多了“关闭主窗口时”：每次询问、最小化到托盘或退出。"
+    },
+    {
+      "kind": "improved",
+      "area": "set",
+      "title": "再次打开时回到已开着的窗口",
+      "detail": "软件在托盘里时，再双击桌面或开始菜单的图标，会把原来的窗口显示出来，不会再开一个。"
+    },
+    {
+      "kind": "fixed",
+      "area": "gen",
+      "title": "带 Vibe 的图生成被拒",
+      "detail": "有的带 Vibe 的图点生成会失败，提示 Vibe 的几个数组长度不一致。现在发请求前按 Vibe 一一对齐，缺的值用 NovelAI 的默认值补上。"
+    },
+    {
+      "kind": "fixed",
+      "area": "gen",
+      "title": "重新打开时又弹一遍通知",
+      "detail": "上次留下的生成失败、Agent 待确认，不再在每次打开软件时重新通知。"
+    },
+    {
+      "kind": "fixed",
+      "area": "set",
+      "title": "任务栏图标变成默认图标",
+      "detail": "1.5.1 在 Windows 任务栏上显示的是 Electron 的默认图标，现在换回软件自己的图标。"
+    }
+  ]
+}
