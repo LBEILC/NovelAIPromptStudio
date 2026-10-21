@@ -304,7 +304,6 @@ function createWindow(captureState = null) {
         prepare: (window) => commandRuntime.prepareWindow(window),
         quit: requestQuit,
         request: (window) => sendWindowEvent(window, { type: 'close-request' }),
-        notice: () => trayController?.notice(),
         error: (error) => console.error('Unable to save workbench before closing:', error),
       }),
     );
@@ -1702,7 +1701,6 @@ app.whenReady().then(async () => {
     trayController = createTray({
       app,
       shell,
-      preferences,
       showMain: showMainWindow,
       isQuitting: () => quitRequested,
       quit: requestQuit,

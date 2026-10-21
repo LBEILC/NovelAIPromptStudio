@@ -14,7 +14,6 @@ export function installWindowClose(window, options) {
         .then(() => {
           if (options.isQuitting() || window.isDestroyed()) return;
           window.hide();
-          options.notice();
         })
         .finally(() => {
           saving = undefined;

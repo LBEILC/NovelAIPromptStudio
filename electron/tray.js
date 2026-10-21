@@ -1,19 +1,10 @@
 import path from 'node:path';
-import { BrowserWindow, Tray, Notification, screen } from 'electron';
+import { BrowserWindow, Tray, screen } from 'electron';
 import { guardClientWindow } from './clientWindow.js';
 import { registerTrayContents, sendWindowEvent } from './windowAccess.js';
 import { trayMenuPosition } from './trayPosition.js';
 
-export function createTray({
-  app,
-  shell,
-  preferences,
-  showMain,
-  quit,
-  isQuitting,
-  icon,
-  developmentUrl,
-}) {
+export function createTray({ app, shell, showMain, quit, isQuitting, icon, developmentUrl }) {
   const tray = new Tray(icon);
   const menu = new BrowserWindow({
     width: 260,
@@ -41,7 +32,6 @@ export function createTray({
   let anchor;
   let opening = false;
   let loaded = false;
-  let notice;
   const hide = () => {
     opening = false;
     menu.hide();
@@ -117,19 +107,7 @@ export function createTray({
       hide();
       menu.reload();
     },
-    notice() {
-      if (preferences.trayNoticeShown() || !Notification.isSupported()) return;
-      notice = new Notification({
-        title: 'NovelAI Prompt Studio',
-        body: '仍在后台运行，可以从托盘图标打开',
-        icon,
-      });
-      notice.on('click', showMain);
-      notice.show();
-      preferences.markTrayNoticeShown();
-    },
     destroy() {
-      notice?.close();
       tray.destroy();
       if (!menu.isDestroyed()) menu.destroy();
     },

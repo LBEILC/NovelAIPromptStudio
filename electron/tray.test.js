@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ notices: [], cursor: { x: 400, y: 600 } }));
+const mocks = vi.hoisted(() => ({ cursor: { x: 400, y: 600 } }));
 vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events');
   class Window extends EventEmitter {
@@ -25,21 +25,9 @@ vi.mock('electron', async () => {
     setToolTip = vi.fn();
     destroy = vi.fn();
   }
-  class Notification extends EventEmitter {
-    static isSupported() {
-      return true;
-    }
-    constructor() {
-      super();
-      mocks.notices.push(this);
-    }
-    show = vi.fn();
-    close = vi.fn();
-  }
   return {
     BrowserWindow: Window,
     Tray,
-    Notification,
     screen: {
       getCursorScreenPoint: () => ({ ...mocks.cursor }),
       getDisplayNearestPoint: () => ({
@@ -52,7 +40,6 @@ vi.mock('electron', async () => {
 vi.mock('./clientWindow.js', () => ({ guardClientWindow: vi.fn() }));
 import { createTray } from './tray.js';
 function setup() {
-  let shown = false;
   const showMain = vi.fn();
   const quit = vi.fn();
   const controller = createTray({
@@ -62,25 +49,10 @@ function setup() {
     showMain,
     quit,
     isQuitting: () => quit.mock.calls.length > 0,
-    preferences: {
-      trayNoticeShown: () => shown,
-      markTrayNoticeShown: () => {
-        shown = true;
-      },
-    },
   });
   return { ...controller, showMain, quit };
 }
 describe('tray lifecycle', () => {
-  it('notifies only once and notification activation opens the main window', () => {
-    const c = setup();
-    const start = mocks.notices.length;
-    c.notice();
-    c.notice();
-    expect(mocks.notices.length - start).toBe(1);
-    mocks.notices.at(-1).emit('click');
-    expect(c.showMain).toHaveBeenCalledOnce();
-  });
   it('keeps the original cursor anchor when content resizes after focus', () => {
     const c = setup();
     mocks.cursor = { x: 400, y: 600 };

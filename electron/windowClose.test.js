@@ -17,7 +17,6 @@ function setup(platform = 'win32', action = 'ask') {
     prepare: vi.fn(async () => {}),
     quit: vi.fn(),
     request: vi.fn(),
-    notice: vi.fn(),
     error: vi.fn(),
   };
   const controller = installWindowClose(window, options);
@@ -52,14 +51,12 @@ describe('window close lifecycle', () => {
     await Promise.all([first, second]);
     expect(options.prepare).toHaveBeenCalledOnce();
     expect(window.hide).toHaveBeenCalledOnce();
-    expect(options.notice).toHaveBeenCalledOnce();
   });
-  it('does not hide or notify when saving fails', async () => {
+  it('does not hide when saving fails', async () => {
     const { window, options, controller } = setup();
     options.prepare.mockRejectedValue(Error('save failed'));
     await expect(controller.choose('tray')).rejects.toThrow('save failed');
     expect(window.hide).not.toHaveBeenCalled();
-    expect(options.notice).not.toHaveBeenCalled();
   });
   it('quit choice and remembered quit enter application quit without asking', async () => {
     const { window, options, controller, event } = setup('win32', 'quit');

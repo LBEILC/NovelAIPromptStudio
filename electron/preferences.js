@@ -369,12 +369,6 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     saveAppearanceSettings,
     librarySettings,
     saveLibrarySettings,
-    trayNoticeShown: () => read().trayNoticeShown === true,
-    markTrayNoticeShown: () => {
-      const stored = read();
-      stored.trayNoticeShown = true;
-      write(stored);
-    },
     productivitySettings,
     saveProductivitySettings,
     filePath,

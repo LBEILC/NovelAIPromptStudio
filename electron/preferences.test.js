@@ -281,23 +281,24 @@ describe('removed bundled font compatibility', () => {
 });
 
 describe('tray preferences', () => {
-  it('reads old preferences without migration and persists close action and internal notice independently', () => {
+  it('reads old preferences without migration and persists close action while ignoring a legacy notice flag', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-tray-preferences-'));
     temporaryDirectories.push(directory);
     const file = path.join(directory, 'preferences.json');
     fs.writeFileSync(
       file,
-      JSON.stringify({ productivity: { autoCheckUpdates: false }, untouched: 'keep' }),
+      JSON.stringify({
+        productivity: { autoCheckUpdates: false },
+        untouched: 'keep',
+        trayNoticeShown: true,
+      }),
     );
     const p = openPreferences(directory, safeStorage);
     expect(p.productivitySettings().closeAction).toBe('ask');
-    expect(p.trayNoticeShown()).toBe(false);
     p.saveProductivitySettings({ closeAction: 'tray' });
-    p.markTrayNoticeShown();
     p.saveProductivitySettings({ autoCheckUpdates: true });
     const reopened = openPreferences(directory, safeStorage);
     expect(reopened.productivitySettings().closeAction).toBe('tray');
-    expect(reopened.trayNoticeShown()).toBe(true);
     expect(JSON.parse(fs.readFileSync(file, 'utf8')).untouched).toBe('keep');
     expect(reopened.productivitySettings()).not.toHaveProperty('trayNoticeShown');
     expect(() => p.saveProductivitySettings({ closeAction: 'invalid' })).toThrow();
