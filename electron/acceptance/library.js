@@ -143,6 +143,12 @@ export async function libraryChecks(env) {
     // Constrain the viewport so this small synthetic fixture exercises virtual scrolling.
     await e("document.querySelector('.lib-grid-col > .scroll').style.maxHeight='200px'");
     await settled();
+    // Group changes retain the outgoing grid briefly. Wait for the final grid before
+    // dragging: removing the outgoing content can otherwise reset the scroll offset.
+    await wait(
+      'document.querySelectorAll(".lib-grid-col .lgrid").length===1 && !document.querySelector(".lib-grid-col .lgrid.leaving,.lib-grid-col .lgrid.jump")',
+      '分组切换及视口调整完成后再拖动滚动条',
+    );
     await scrollChecks(h, '.lib-grid-col > .scroll');
     await e("document.querySelector('.lib-grid-col > .scroll').style.maxHeight=''");
     await e("document.querySelector('.lib-grid-col > .scroll').scrollTop=0");
