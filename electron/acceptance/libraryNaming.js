@@ -84,7 +84,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     );
     if (!multi)
       await wait(
-        `(async()=>{const detail=document.querySelector('.col.detail'), card=document.querySelector('.card.on');if(!detail?.dataset.detailId||!card||!detail.querySelector('.dcap'))return false;const a=await window.studio.invoke('library.get',{id:detail.dataset.detailId}).then(r=>r.data.project);return card.dataset.groupId==='project:'+a.id||card.dataset.groupId==='group:'+a.exact_group_fingerprint})()`,
+        `(async()=>{const detail=document.querySelector('.col.detail'), card=document.querySelector('.card.on');if(!detail?.dataset.detailId||!card||!detail.querySelector('.dcap'))return false;const a=await window.studio.invoke('library.get',{id:detail.dataset.detailId}).then(r=>r.data.project);return card.dataset.groupId==='project:'+a.id||card.dataset.groupId==='group:'+a.exact_group_fingerprint||(!!a.generated_work_id&&card.dataset.groupId==='work:'+a.generated_work_id)})()`,
       );
   };
   const undo = async () => {
@@ -212,7 +212,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     );
     await undo();
     await input('input[aria-label="搜索图片库"]', 'synthetic sample');
-    await grouping('完全相同');
+    await grouping('按作品');
     await wait('document.querySelectorAll(".card").length === 3');
     const ordered = [];
     for (let i = 0; i < 3; i++) {

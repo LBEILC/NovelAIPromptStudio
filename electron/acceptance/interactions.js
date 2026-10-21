@@ -329,7 +329,7 @@ export async function libraryInteractionChecks(env) {
     await key('Escape', {}, 'document.activeElement');
     await context(h, stack);
     await h.screenshot('interaction-menu-stack');
-    await click('移入回收站', menu);
+    await click('整组移入回收站（3 张）', menu);
     await wait('document.querySelectorAll(".card").length===0');
     await click('回收站', 'document.querySelector(".libp .side")');
     await h.input('[aria-label="搜索图片库"]', 'interaction-fixture-light');

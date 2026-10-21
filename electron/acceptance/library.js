@@ -28,6 +28,11 @@ export async function libraryChecks(env) {
     await h.click(...args);
     await settled();
   };
+  const trashDetailImage = async () => {
+    const actions = 'document.querySelector(".detail .dacts")';
+    const grouped = await e(`!!${actions}?.querySelector('[aria-label="把这一张移入回收站"]')`);
+    await click(grouped ? '把这一张移入回收站' : '移入回收站', actions);
+  };
   const input = async (...args) => {
     await h.input(...args);
     await settled();
@@ -666,7 +671,7 @@ export async function libraryChecks(env) {
     await selectCard(0);
     await waitDetail();
     const trashId = await e('document.querySelector(".col.detail").dataset.detailId');
-    await click('移入回收站', 'document.querySelector(".detail .dacts")');
+    await trashDetailImage();
     await h.until(() => !!database.loadProject(trashId).deleted_at, '移入回收站');
     await wait('!![...document.querySelectorAll(".toast button")].find(b=>b.textContent==="撤销")');
     await check(
@@ -692,7 +697,7 @@ export async function libraryChecks(env) {
     await selectCard(0);
     await waitDetail();
     const trashAgain = await e('document.querySelector(".col.detail").dataset.detailId');
-    await click('移入回收站', 'document.querySelector(".detail .dacts")');
+    await trashDetailImage();
     await h.until(() => !!database.loadProject(trashAgain).deleted_at, '再次移入');
     // The database write precedes the gallery reload and selection reset.
     // Wait for the action's completion notice before selecting in the trash view.
@@ -950,7 +955,7 @@ export async function libraryChecks(env) {
     await selectCard(0);
     await waitDetail();
     const doomed = await e('document.querySelector(".col.detail").dataset.detailId');
-    await click('移入回收站', 'document.querySelector(".detail .dacts")');
+    await trashDetailImage();
     await h.until(() => !!database.loadProject(doomed).deleted_at, '待永久删除图片进入回收站');
     await click('回收站', scope);
     await input('.gallery-search input', uniqueName);
