@@ -657,6 +657,12 @@ export async function libraryChecks(env) {
     );
     await click('撤销', 'document.querySelector(".toast:not(.leaving)")');
     await h.until(() => !database.loadProject(trashId).deleted_at, '撤销移入回收站');
+    // Restore commits before the renderer clears selection and reloads the library.
+    // Its completion notification is emitted after that reload; select only then.
+    await wait(
+      '[...document.querySelectorAll(".toast:not(.leaving)")].some(n=>n.textContent.includes("已恢复"))',
+      '撤销恢复已完成界面刷新',
+    );
     await check(
       '移入回收站后通知可以撤销',
       () => !database.loadProject(trashId).deleted_at,

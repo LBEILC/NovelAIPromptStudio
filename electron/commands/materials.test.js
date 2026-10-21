@@ -111,6 +111,8 @@ it('rejects empty text, invalid indices, invalid negative targets and conflictin
   const block = save();
   const character = save({ kind: 'character' });
   const before = store.list();
+  for (const text of ['', ' \n '])
+    expect(() => update({ id: block.id, text })).toThrow('素材内容不能为空');
   for (const input of [
     { id: block.id, text: '' },
     { id: block.id, text: ' \n ' },

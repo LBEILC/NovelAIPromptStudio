@@ -50,7 +50,7 @@ export const commandRegistry = {
       id: 'string',
       block: 'integer',
       negative: 'boolean',
-      text: 'string',
+      text: 'text',
       asNew: 'boolean',
     },
     required: ['id', 'text'],
