@@ -18,7 +18,10 @@ export function resetText(iso: string | null, now = Date.now()) {
   if (!Number.isFinite(t)) return '';
   const min = Math.max(0, Math.round((t - now) / 60000));
   if (min < 60) return `${Math.max(1, min)} 分钟后重置`;
-  if (min < 24 * 60) return `${Math.floor(min / 60)} 小时 ${min % 60} 分后重置`;
+  if (min < 24 * 60)
+    return min % 60
+      ? `${Math.floor(min / 60)} 小时 ${min % 60} 分后重置`
+      : `${min / 60} 小时后重置`;
   const d = new Date(t);
   const hh = String(d.getHours()).padStart(2, '0'),
     mm = String(d.getMinutes()).padStart(2, '0');
