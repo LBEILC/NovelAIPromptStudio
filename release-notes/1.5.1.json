@@ -1,0 +1,35 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "1.5.1",
+  "date": "2026-10-21",
+  "items": [
+    {
+      "kind": "new",
+      "area": "wb",
+      "title": "不满意原图可以去掉",
+      "detail": "版本栏或舞台右键原图选“移入回收站”（从文件打开的是“从作品里去掉原图”，不动文件）。原图那一行变成“起点”，提示词、参数和后面各版都不变，可以撤销。",
+      "highlight": true,
+      "icon": "restart"
+    },
+    {
+      "kind": "fixed",
+      "area": "wb",
+      "title": "Tag 乱跳、译文挂错",
+      "detail": "多次修改提示词后，新加的 Tag 可能撞号，导致切换版本后多出一个 Tag、点击时乱跳，译文显示在别的 Tag 下面。已修复；已经存下来的作品打开时自动恢复正常。",
+      "highlight": true,
+      "icon": "shield"
+    },
+    {
+      "kind": "fixed",
+      "area": "wb",
+      "title": "拖动后留下多余的逗号",
+      "detail": "删除或拖动 Tag 以后，不再留下“, ,”、空的权重组和括号、多余的首尾逗号。"
+    },
+    {
+      "kind": "fixed",
+      "area": "set",
+      "title": "剩余额度的重置时间",
+      "detail": "整点时写“5 小时后重置”，不再写“5 小时 0 分”。"
+    }
+  ]
+}
