@@ -24,6 +24,7 @@ import {
   setPromptBlockType,
   editPromptParagraph,
   editPromptTag,
+  editPromptBlockText,
   createPromptDocument,
   promptDocumentProject,
   copyPromptDocument,
@@ -777,4 +778,38 @@ describe('block document structure and legacy copy policy', () => {
     expect(copied).not.toContain('blur, noise');
     expect(project.prompt_structure.base_prompt_raw).toBe(mixed);
   });
+});
+it('gives tags added in separate edits ids that never collide', () => {
+  const edit = (project: ReturnType<typeof syntheticProject>, text: string) => {
+    const document = createPromptDocument(project);
+    const base = document.scopes.findIndex((s) => s.scope.key === 'base:prompt');
+    const scopes = document.scopes.map((s, i) =>
+      i === base ? { ...s, ...editPromptBlockText(s, 0, text) } : s,
+    );
+    return promptDocumentProject({ ...document, scopes }) as ReturnType<typeof syntheticProject>;
+  };
+  const once = edit(syntheticProject('sky'), 'sky, rain');
+  // 新的 Tag 插在旧的那个当初的位置上（rain 是第 1 个，cloud 插到第 1 个）
+  const twice = edit(once, 'sky, cloud, rain');
+  const ids = twice.tags.map((t: { id: string }) => t.id);
+  expect(new Set(ids).size).toBe(ids.length);
+});
+it('heals duplicate tag ids already stored by older versions', () => {
+  const project = syntheticProject('sky, rain, cloud');
+  const [sky, rain, cloud] = project.tags;
+  // 1.5.0 及以前保存下来的数据：rain 和 cloud 撞号
+  const stored = {
+    ...project,
+    tags: [sky, { ...rain, id: 'base:prompt:edited:1' }, { ...cloud, id: 'base:prompt:edited:1' }],
+  } as typeof project;
+  const document = createPromptDocument(stored);
+  const base = document.scopes.find((s) => s.scope.key === 'base:prompt')!;
+  const ids = base.scope.tags.map((t: { id: string }) => t.id);
+  expect(new Set(ids).size).toBe(3);
+  // 同一份数据每次得到同样的 id，界面的 key 不会跟着重画变
+  expect(
+    createPromptDocument(stored).scopes[0].scope.tags.map((t: { id: string }) => t.id),
+  ).toEqual(ids);
+  const saved = promptDocumentProject(document) as typeof project;
+  expect(new Set(saved.tags.map((t: { id: string }) => t.id)).size).toBe(3);
 });

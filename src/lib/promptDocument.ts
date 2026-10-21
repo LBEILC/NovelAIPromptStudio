@@ -400,6 +400,29 @@ export interface PromptDocument {
   project: PromptDocumentSource;
 }
 
+/**
+ * 同一节里重复的 Tag id 换成新的（1.5.0 及以前，新加的 Tag 按位置编号，几次编辑后会撞号；
+ * 撞号会让界面上的 Tag 对不上号、乱跳）。新 id 由原 id 派生，同一份数据每次得到同样的结果，保存时写回去。
+ */
+function uniqueTagIds<T extends { tags: { id?: string }[] }>(scope: T): T {
+  const seen = new Set<string>();
+  let changed = false;
+  const tags = scope.tags.map((tag) => {
+    if (!tag?.id || !seen.has(tag.id)) {
+      if (tag?.id) seen.add(tag.id);
+      return tag;
+    }
+    changed = true;
+    let n = 1,
+      id = '';
+    do id = `${tag.id}~${n++}`;
+    while (seen.has(id));
+    seen.add(id);
+    return { ...tag, id };
+  });
+  return changed ? { ...scope, tags } : scope;
+}
+
 export function createPromptDocument(
   source: PromptDocumentSource,
   overrides: Record<string, readonly BlockTypeOverride[]> = {},
@@ -412,7 +435,7 @@ export function createPromptDocument(
   };
   return {
     project,
-    scopes: (getPromptScopes(project) as PromptScope[]).map((scope) => {
+    scopes: (getPromptScopes(project) as PromptScope[]).map(uniqueTagIds).map((scope) => {
       const section = parsePromptSection(scope.raw_prompt, { overrides: overrides[scope.key] });
       const annotations = [...(structure.block_annotations?.[scope.key] || [])];
       section.blocks = section.blocks.map((block) => {
@@ -466,10 +489,17 @@ export function promptDocumentProject(document: PromptDocument) {
     const raw = serializePromptSection(section);
     const scope = section.scope;
     let nextId = 0;
+    // 新 Tag 的 id 跳过这一节已经用掉的：每次编辑都从 0 数，会和上次编辑新加的撞号
+    const used = new Set(scope.tags.map((tag: { id?: string }) => tag.id));
+    const createId = () => {
+      let id = '';
+      do id = `${scope.key}:edited:${nextId++}`;
+      while (used.has(id));
+      used.add(id);
+      return id;
+    };
     const nextTags =
-      raw === scope.raw_prompt
-        ? scope.tags
-        : parsePromptPreservingEdits(raw, scope.tags, () => `${scope.key}:edited:${nextId++}`);
+      raw === scope.raw_prompt ? scope.tags : parsePromptPreservingEdits(raw, scope.tags, createId);
     if (scope.kind === 'base') {
       if (scope.polarity === 'prompt') {
         structure.base_prompt_raw = raw;
