@@ -647,8 +647,13 @@ export async function libraryChecks(env) {
       'once',
     );
     await click('图片库', 'document.querySelector(".tb")');
+    const doubleClickCard = '.lgrid:not(.leaving) [data-group-id]:not(.leaving)';
+    await wait(
+      `document.querySelector('.tb [aria-current=page]')?.textContent.trim()==='图片库' && !document.querySelector('.app-page-surface.leaving') && document.querySelector(${JSON.stringify(doubleClickCard)})?.checkVisibility()`,
+      '图片库换页完成且目标卡片可见后再双击',
+    );
     await e(
-      'document.querySelector(".card").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))',
+      `document.querySelector(${JSON.stringify(doubleClickCard)}).dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
     );
     await wait('!!document.querySelector(".viewer-ov")');
     await check('双击卡片打开大图', '!!document.querySelector(".viewer-ov")');

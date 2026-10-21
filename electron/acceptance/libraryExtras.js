@@ -264,7 +264,12 @@ export async function extraLibraryChecks({
     'once',
   );
   await click('图片库', 'document.querySelector(".tb")');
+  await wait(
+    `document.querySelector('.tb [aria-current=page]')?.textContent.trim()==='图片库' && !document.querySelector('.app-page-surface.leaving') && document.querySelector('.gallery-search input')?.checkVisibility()`,
+    '图片库换页完成后再使用搜索快捷键',
+  );
   await key('k', mod, scope);
+  await wait('document.activeElement.matches(".gallery-search input")');
   await check(
     'Mod+K 聚焦图片库搜索',
     'document.activeElement.matches(".gallery-search input")',
