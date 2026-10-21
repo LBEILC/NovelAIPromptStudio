@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { errorCode, invokeUI } from '../lib/commands';
 import { mediaUrl } from '../lib/imageStage.js';
-import { Icon, Seg, Slider, Switch } from '../kit/controls';
+import { Icon, Seg, Slider, Stepper, Switch } from '../kit/controls';
 import { useAsk } from '../kit/dialog';
 import { MenuPop, type MenuEntry } from '../kit/menu';
 import { useIndicator } from '../kit/motion';
@@ -221,55 +221,6 @@ function Row({
         </span>
       </div>
     </div>
-  );
-}
-function Stepper({
-  value,
-  step,
-  min,
-  max,
-  digits,
-  label,
-  off,
-  tip,
-  onChange,
-}: {
-  value: number;
-  step: number;
-  min: number;
-  max: number;
-  digits: number;
-  label: string;
-  off?: boolean;
-  tip?: string;
-  onChange: (v: number) => void;
-}) {
-  const bump = (d: number) => {
-    const v = Math.min(max, Math.max(min, +(value + d * step).toFixed(digits)));
-    if (v !== value) onChange(v);
-  };
-  return (
-    <span className={`stepper ${off ? 'off' : ''}`} data-tip={off ? tip : undefined}>
-      <span
-        role="button"
-        aria-label={`减少${label}`}
-        data-act={off ? undefined : 'pStep'}
-        onClick={() => !off && bump(-1)}
-      >
-        −
-      </span>
-      <b className="mono" aria-label={label}>
-        {value.toFixed(digits)}
-      </b>
-      <span
-        role="button"
-        aria-label={`增加${label}`}
-        data-act={off ? undefined : 'pStep'}
-        onClick={() => !off && bump(1)}
-      >
-        +
-      </span>
-    </span>
   );
 }
 function Drop({

@@ -287,7 +287,7 @@ function stripTemplate(rawPrompt, definition) {
 
 function normalizedTag(tag) {
   return {
-    braceDepth: Math.max(0, Math.trunc(Number(tag.brace_depth) || 0)),
+    braceDepth: Math.trunc(Number(tag.brace_depth) || 0),
     tag: String(tag.tag || '')
       .trim()
       .toLocaleLowerCase('en-US'),

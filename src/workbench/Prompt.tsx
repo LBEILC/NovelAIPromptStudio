@@ -47,7 +47,7 @@ import { ParagraphEditor } from './Paragraph';
 import { TextSection } from './TextSection';
 import { InsertPop, CharacterPick } from './Insert';
 import { useTidy } from './Tidy';
-import { Icon, Kbd, Seg, isMod } from '../kit/controls';
+import { Icon, Kbd, Seg, Stepper, isMod } from '../kit/controls';
 import { Pop } from '../kit/layer';
 import { ContextMenu, MenuButton, MenuPop, type MenuEntry } from '../kit/menu';
 import { useNotifications } from '../kit/toast';
@@ -999,6 +999,12 @@ export function WorkbenchEditor(p: EditorProps) {
   });
 
   // ---------- 画 Tag ----------
+  const braces = (depth = 0) =>
+    depth > 0
+      ? ['{'.repeat(depth), '}'.repeat(depth)]
+      : depth < 0
+        ? ['['.repeat(-depth), ']'.repeat(-depth)]
+        : ['', ''];
   const clickTag = (e: DocumentTag, ev: React.MouseEvent) => {
     if (isMod(ev)) {
       setSelected(
@@ -1076,7 +1082,12 @@ export function WorkbenchEditor(p: EditorProps) {
       >
         <span className="dot" style={{ background: `var(--cat-${catVar(t.category)})` }} />
         <span className="t">
-          <span className="en">{t.tag}</span>
+          <span className="en">
+            {/* 括号强调：{} 加强、[] 减弱，括号画淡一点 */}
+            {braces(t.brace_depth)[0] && <span className="br">{braces(t.brace_depth)[0]}</span>}
+            {t.tag}
+            {braces(t.brace_depth)[1] && <span className="br">{braces(t.brace_depth)[1]}</span>}
+          </span>
           {zh && <span className="zh">{zh}</span>}
         </span>
         {t.weight !== 1 && <span className="w">{t.weight}</span>}
@@ -2010,29 +2021,16 @@ export function WorkbenchEditor(p: EditorProps) {
             <div className="frow">
               <span className="label">权重</span>
               <span className="row">
-                <span className="stepper">
-                  <span
-                    role="button"
-                    aria-label="减小权重"
-                    onClick={() =>
-                      setDraft({ ...draft, weight: Math.round((draft.weight - 0.1) * 100) / 100 })
-                    }
-                  >
-                    −
-                  </span>
-                  <b className="mono">
-                    {Number(draft.weight).toFixed(Number.isInteger(draft.weight * 10) ? 1 : 2)}
-                  </b>
-                  <span
-                    role="button"
-                    aria-label="增加权重"
-                    onClick={() =>
-                      setDraft({ ...draft, weight: Math.round((draft.weight + 0.1) * 100) / 100 })
-                    }
-                  >
-                    +
-                  </span>
-                </span>
+                <Stepper
+                  value={draft.weight}
+                  step={0.1}
+                  min={-10}
+                  max={10}
+                  digits={2}
+                  label="权重"
+                  format={(v) => v.toFixed(Math.abs(v * 10 - Math.round(v * 10)) < 1e-9 ? 1 : 2)}
+                  onChange={(weight) => setDraft({ ...draft, weight })}
+                />
                 {draft.weight !== 1 && (
                   <button
                     className="btn quiet sm"
@@ -2158,12 +2156,15 @@ export function WorkbenchEditor(p: EditorProps) {
         )}
       </Pop>
       {drag && (
-        <span
-          ref={float}
-          className="tag dragging drag-float"
-          style={{ width: drag.w, height: drag.h }}
-          dangerouslySetInnerHTML={{ __html: drag.inner }}
-        />
+        // 套一层显示语言的类：只显示原文 / 译文时，拖着走的那个也一样
+        <span className={lang}>
+          <span
+            ref={float}
+            className="tag dragging drag-float"
+            style={{ width: drag.w, height: drag.h }}
+            dangerouslySetInnerHTML={{ __html: drag.inner }}
+          />
+        </span>
       )}
       {marq && (
         <div

@@ -430,3 +430,5 @@ html[data-motion="off"] .btn.loading [class^="ri-loader"] { animation: none; }
 .count-step .count-in input { width: calc(var(--ctl) * 1.25); border: 0; padding: 0; background: transparent; color: var(--text); font: inherit; text-align: center; outline: none; }
 .count-step .cont-btn { border-left: var(--bw) solid var(--border); font-family: var(--font-mono); }
 .count-step .cont-btn.on { background: var(--selected); color: var(--text); }
+/* Tag 上的括号强调：{} 加强、[] 减弱，括号用淡色 */
+.tag .en .br { color: var(--text-3); }

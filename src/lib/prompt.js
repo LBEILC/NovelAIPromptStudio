@@ -109,19 +109,34 @@ export function normalizeCategory(category, tag = '') {
   return legacyCategoryMap[category] || 'Unsorted';
 }
 
+// 括号强调：{} 每层 ×1.05，[] 每层 ÷1.05（用户 10-21 补上 []）。层数是带符号的：[] 记成负数
+const BRACKETS = { '{': '}', '[': ']' };
 function braceGroupAt(source, cursor) {
-  if (source[cursor] !== '{') return null;
+  const opener = source[cursor];
+  const closer = BRACKETS[opener];
+  if (!closer) return null;
   let depth = 0;
-  while (source[cursor + depth] === '{') depth += 1;
-  const closing = '}'.repeat(depth);
+  while (source[cursor + depth] === opener) depth += 1;
+  const closing = closer.repeat(depth);
   const close = source.indexOf(closing, cursor + depth);
   if (close === -1) return null;
   return {
     depth,
+    signed: opener === '{' ? depth : -depth,
+    open: opener.repeat(depth),
+    closing,
     close,
     end: close + depth,
     content: source.slice(cursor + depth, close),
   };
+}
+/** 带符号的括号层数写成括号：2 是 {{}}，-1 是 [] */
+function bracketText(depth, content) {
+  return depth > 0
+    ? `${'{'.repeat(depth)}${content}${'}'.repeat(depth)}`
+    : depth < 0
+      ? `${'['.repeat(-depth)}${content}${']'.repeat(-depth)}`
+      : content;
 }
 
 const QUOTE_PAIRS = new Map([
@@ -236,8 +251,8 @@ function scanPromptSegments(source, state, offset = 0, wrappers = []) {
         kind: 'brace',
         start: offset + cursor,
         end: offset + braceGroup.end,
-        open: '{'.repeat(braceGroup.depth),
-        close: '}'.repeat(braceGroup.depth),
+        open: braceGroup.open,
+        close: braceGroup.closing,
       };
       scanPromptSegments(braceGroup.content, state, offset + cursor + braceGroup.depth, [
         ...wrappers,
@@ -245,7 +260,7 @@ function scanPromptSegments(source, state, offset = 0, wrappers = []) {
       ]).forEach((segment) =>
         segments.push({
           ...segment,
-          brace_depth: braceGroup.depth + Number(segment.brace_depth || 0),
+          brace_depth: braceGroup.signed + Number(segment.brace_depth || 0),
           brace_group: group,
           brace_trailing_comma: trailingComma,
         }),
@@ -437,9 +452,9 @@ export function repairLegacyPromptTags(
       (item) =>
         /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)::/.test(item.tag) ||
         /::$/.test(item.tag) ||
-        /[{}]/.test(item.tag),
+        /[{}[\]]/.test(item.tag),
     ) ||
-    (hasBraceGroups(prompt) && !tags.some((item) => Number(item.brace_depth) > 0));
+    (hasBraceGroups(prompt) && !tags.some((item) => Number(item.brace_depth) !== 0));
   if (!hasLegacyFragments || !prompt.trim()) return tags;
 
   const existingByTag = new Map();
@@ -486,9 +501,8 @@ function formatTagContent(tag) {
 }
 
 export function formatTagLabel(tag, value = tag.tag) {
-  const depth = Math.max(0, Math.trunc(Number(tag.brace_depth) || 0));
-  const content = String(value || '').trim();
-  return depth ? `${'{'.repeat(depth)}${content}${'}'.repeat(depth)}` : content;
+  const depth = Math.trunc(Number(tag.brace_depth) || 0);
+  return bracketText(depth, String(value || '').trim());
 }
 
 export function formatTag(tag) {
@@ -545,7 +559,7 @@ export function formatPromptGroupedInline(tags = []) {
       index += 1;
       continue;
     }
-    const depth = Math.max(0, Math.trunc(Number(tag.brace_depth) || 0));
+    const depth = Math.trunc(Number(tag.brace_depth) || 0);
     if (!depth || !tag.brace_group) {
       values.push(formatTag(tag));
       index += 1;
@@ -562,7 +576,7 @@ export function formatPromptGroupedInline(tags = []) {
       cursor += 1;
     }
     const trailing = tag.brace_trailing_comma && members.length ? ', ' : '';
-    values.push(`${'{'.repeat(depth)}${members.join(', ')}${trailing}${'}'.repeat(depth)}`);
+    values.push(bracketText(depth, `${members.join(', ')}${trailing}`));
     index = cursor;
   }
   return values.join(', ');

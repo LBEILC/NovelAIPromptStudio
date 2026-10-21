@@ -1,5 +1,5 @@
 // 小控件（doc/design.md 2.18、2.19）：样子在 src/styles 里（.segc、.switch、.check、.slider、.stepper）。
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useIndicator } from './motion';
 
 export const Icon = ({ name, className = '' }: { name: string; className?: string }) => (
@@ -231,6 +231,116 @@ export function Slider({
 }
 
 /** 空状态的图形：括号里还没有图（design/identity/logo/symbol-empty.svg）。 */
+/**
+ * 步进器：两边加减，点中间的数字可以直接输入（回车或移开确定，Esc 取消），获得焦点时上下方向键加减。
+ * 输入的值收到 min 到 max 之间，按 digits 位小数取整；输入不是数字时恢复原值。
+ */
+export function Stepper({
+  value,
+  step,
+  min,
+  max,
+  digits,
+  label,
+  off,
+  tip,
+  format,
+  onChange,
+}: {
+  value: number;
+  step: number;
+  min: number;
+  max: number;
+  digits: number;
+  label: string;
+  /** 不能改（悬停写 tip） */
+  off?: boolean;
+  tip?: string;
+  /** 显示的写法；不写就是 digits 位小数 */
+  format?: (v: number) => string;
+  onChange: (v: number) => void;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  const shown = format ? format(value) : value.toFixed(digits);
+  const clamp = (v: number) => Math.min(max, Math.max(min, +v.toFixed(digits)));
+  const set = (v: number) => {
+    const next = clamp(v);
+    if (next !== value) onChange(next);
+  };
+  const commit = (save: boolean) => {
+    if (text === null) return;
+    const v = Number(text.trim());
+    if (save && text.trim() && Number.isFinite(v)) set(v);
+    setText(null);
+  };
+  const key = (e: KeyboardEvent) => {
+    if (off) return;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      set(value + (e.key === 'ArrowUp' ? step : -step));
+    }
+  };
+  return (
+    <span className={`stepper ${off ? 'off' : ''}`} data-tip={off ? tip : undefined}>
+      <span
+        role="button"
+        aria-label={`减少${label}`}
+        data-act={off ? undefined : 'pStep'}
+        onClick={() => !off && set(value - step)}
+      >
+        −
+      </span>
+      {text !== null ? (
+        <b className="step-in">
+          <input
+            className="mono"
+            autoFocus
+            inputMode="decimal"
+            value={text}
+            aria-label={label}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={() => commit(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                commit(e.key === 'Enter');
+              } else key(e);
+            }}
+          />
+        </b>
+      ) : (
+        <b
+          className={`mono ${off ? '' : 'step-n'}`}
+          aria-label={label}
+          role={off ? undefined : 'button'}
+          tabIndex={off ? undefined : 0}
+          data-tip={off ? undefined : '点击输入'}
+          onClick={() => !off && setText(shown)}
+          onKeyDown={(e) => {
+            if (!off && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault();
+              setText(shown);
+            } else key(e);
+          }}
+        >
+          {shown}
+        </b>
+      )}
+      <span
+        role="button"
+        aria-label={`增加${label}`}
+        data-act={off ? undefined : 'pStep'}
+        onClick={() => !off && set(value + step)}
+      >
+        +
+      </span>
+    </span>
+  );
+}
+
 export function EmptyMark() {
   return (
     <span className="mark" aria-hidden="true">

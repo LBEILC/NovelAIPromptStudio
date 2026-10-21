@@ -31,7 +31,14 @@ export function documentTags(document: PromptDocument): DocumentTag[] {
         const at = block.contentRange.start + local[index].start;
         const position = ranges.findIndex((range) => range.start === at);
         const annotation = section.scope.tags[position];
-        const merged = { ...tag, ...annotation, weight: tag.weight, tag: tag.tag } as Tag;
+        // 权重、括号层数以这次解析的原文为准（存下来的注解可能是旧的，比如 1.5.0 以前不认中括号）
+        const merged = {
+          ...tag,
+          ...annotation,
+          weight: tag.weight,
+          brace_depth: tag.brace_depth,
+          tag: tag.tag,
+        } as Tag;
         return {
           key: overviewTagKey(section.scope.key, merged.id),
           section: si,

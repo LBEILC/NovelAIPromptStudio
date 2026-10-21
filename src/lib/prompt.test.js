@@ -431,3 +431,19 @@ describe('NovelAI prompt codec', () => {
     expect(expandSearch('银发')).toContain('银色头发');
   });
 });
+
+it('parses [] as weakening and {} as strengthening, including groups of several tags', () => {
+  const tags = legacyParsePrompt('{{a, b}}, [c, d], [[x]], {e, [f], g}');
+  expect(tags.map((t) => [t.tag, t.brace_depth])).toEqual([
+    ['a', 2],
+    ['b', 2],
+    ['c', -1],
+    ['d', -1],
+    ['x', -2],
+    ['e', 1],
+    ['f', 0],
+    ['g', 1],
+  ]);
+  expect(tags.map(formatTag).slice(2, 5)).toEqual(['[c]', '[d]', '[[x]]']);
+  expect(formatPromptGroupedInline(legacyParsePrompt('{a, b}, [c, d]'))).toBe('{a, b}, [c, d]');
+});

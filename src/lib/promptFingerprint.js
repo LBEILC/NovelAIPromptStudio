@@ -9,7 +9,7 @@ function normalizedTag(tag = {}) {
     raw: String(tag.raw_segment || '')
       .trim()
       .replace(/\s+/g, ' '),
-    braceDepth: Math.max(0, Math.trunc(Number(tag.brace_depth) || 0)),
+    braceDepth: Math.trunc(Number(tag.brace_depth) || 0),
     braceGroup: String(tag.brace_group || ''),
     trailingComma: Boolean(tag.brace_trailing_comma),
   };

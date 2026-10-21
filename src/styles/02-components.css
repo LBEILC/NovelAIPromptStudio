@@ -28,7 +28,7 @@
 .help { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--text-3); }
 .help.err { color: var(--danger); }
 .stepper { display: inline-flex; align-items: center; height: var(--ctl-sm); border: 1px solid var(--border); border-radius: var(--r-ctl); overflow: hidden; }
-.stepper span { width: 24px; text-align: center; color: var(--text-2); }
+.stepper > span { width: 24px; text-align: center; color: var(--text-2); }
 .stepper b { min-width: 44px; align-self: stretch; display: grid; place-items: center; border-left: 1px solid var(--border); border-right: 1px solid var(--border); font: var(--fw-regular) var(--fs-small)/1 var(--font-mono); }
 
 /* ---------- 浮在上面的东西 ---------- */

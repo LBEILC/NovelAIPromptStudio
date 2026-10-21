@@ -175,3 +175,7 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 /* 更新日志（关于与更新）：上面一排版本，下面是那一版的更新说明 */
 .rn-log .rn-log-v { align-self: flex-start; margin-top: var(--sp-2); }
 .rn-log .rn-log-body { padding-top: var(--sp-3); }
+
+/* 步进器：点中间的数字直接输入（权重、步数、引导强度），输入框和数字一样宽，不跳 */
+.stepper .step-n { cursor: text; }
+.stepper .step-in input { width: 44px; border: 0; padding: 0; background: transparent; color: var(--text); font: inherit; text-align: center; outline: none; }

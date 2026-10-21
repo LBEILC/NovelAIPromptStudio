@@ -112,7 +112,7 @@ function normalizeTag(tag, idFactory) {
     translation: String(tag?.translation || ''),
     category: normalizeCategory(tag?.category, tag?.tag),
     weight: Number.isFinite(Number(tag?.weight)) ? Number(tag.weight) : 1,
-    brace_depth: Math.max(0, Math.trunc(Number(tag?.brace_depth) || 0)),
+    brace_depth: Math.trunc(Number(tag?.brace_depth) || 0),
     brace_group: String(tag?.brace_group || ''),
     brace_trailing_comma: Boolean(tag?.brace_trailing_comma),
     note: String(tag?.note || ''),
