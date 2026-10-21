@@ -66,6 +66,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       t.versionId = root.id;
       await store.save(session);
       Object.assign(current, t);
+      versions.touch(workId, root.id);
     }
     return versions.get(current.versionId) || root;
   }
@@ -156,6 +157,10 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           seed,
           versionId: job.versionId,
         });
+        versions.touch(
+          job.workId,
+          job.source === 'user' && job.completed === 0 ? version.id : undefined,
+        );
         job.versionId = version.id;
         services.database.refreshGeneratedCards();
         if (version.branchId === version.id && version.branchNumber && job.completed === 0)
@@ -235,6 +240,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       revision: (current.revision || 0) + 1,
     });
     await store.save(session);
+    versions.touch(version.workId, version.id);
     emit({ tabId: next.id });
     return full(next);
   }
@@ -261,6 +267,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         : { type: 'file', path: original.image_path };
       current.error = '';
       current.revision = (current.revision || 0) + 1;
+      versions.touch(parent.workId, parent.id);
     }
   }
   async function deleteSubtree(input, version = false) {
@@ -487,6 +494,14 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     'work.open': async (input) => {
       const work = versions.work(input.workId);
       if (!work) throw new CommandError('not_found', '作品不存在');
+      const target = input.versionId
+        ? versions.get(input.versionId)
+        : input.imageId
+          ? versions.forImage(input.imageId, input.workId) ||
+            versions.list(input.workId).find((v) => !v.parentId && v.project.id === input.imageId)
+          : versions.lastVersion(input.workId);
+      if (!target || target.workId !== input.workId)
+        throw new CommandError('not_found', '版本不存在');
       const session = store.get();
       let next = session.tabs.find((t) => t.workId === input.workId);
       if (!next) {
@@ -495,15 +510,12 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         });
         next.identity = `work:${input.workId}`;
         next.workId = input.workId;
-        next.versionId = versions.list(input.workId)[0].id;
+        next.versionId = target.id;
         session.tabs.push(next);
       }
       session.activeTabId = next.id;
       await store.save(session);
-      if (input.versionId)
-        return openVersion({ tabId: next.id, versionId: input.versionId, imageId: input.imageId });
-      emit({ tabId: next.id });
-      return full(next);
+      return openVersion({ tabId: next.id, versionId: target.id, imageId: input.imageId });
     },
     'version.open': openVersion,
     'branch.rename': (input) => {
@@ -536,8 +548,10 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       return full(next);
     },
     'work.open-from-image': async (input) => {
-      const current = tab(input.tabId),
-        version = versions.get(input.versionId);
+      const current = input.tabId ? tab(input.tabId) : null,
+        version = input.versionId
+          ? versions.get(input.versionId)
+          : versions.forImage(input.imageId);
       if (
         !version ||
         (!version.images.some((i) => i.projectId === input.imageId) &&
@@ -568,12 +582,13 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         workId: version.workId,
         versionId: version.id,
         projectId: image.id,
-        name: current.displayName,
+        name: current?.displayName || versions.work(version.workId).origin.name,
         number: version.number,
       };
       next.versionId = versions.ensure(next.workId, snapshot, next.workOrigin).id;
+      versions.touch(next.workId, next.versionId);
       const session = store.get();
-      session.tabs.splice(session.tabs.findIndex((t) => t.id === current.id) + 1, 0, next);
+      session.tabs.push(next);
       session.activeTabId = next.id;
       await store.save(session);
       emit({ tabId: next.id });
@@ -584,6 +599,19 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   if (settings().hasToken) void refresh().catch(() => {});
   return {
     handlers,
+    initialize: ensure,
+    async openSource(source, image) {
+      const generated = source.type === 'library' && versions.forImage(source.projectId);
+      if (generated)
+        return handlers['work.open']({
+          workId: generated.workId,
+          versionId: generated.id,
+          imageId: source.projectId,
+        });
+      const workId = versions.findOrigin(source, image);
+      if (workId) return handlers['work.open']({ workId });
+      return null;
+    },
     retreatDeleted(session) {
       for (const current of session.tabs) {
         if (!current.versionId) continue;

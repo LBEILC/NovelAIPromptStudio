@@ -32,7 +32,8 @@ async function fixture(run) {
     busy: () => false,
     generationBaseUrl: service.url,
     readImage: readWorkbenchImage,
-    readSource: ({ path: file }) => readWorkbenchImage(file),
+    readSource: ({ path: file, type, projectId }) =>
+      type === 'library' ? database.loadProject(projectId) : readWorkbenchImage(file),
     importImage: async (source) => {
       const file = path.join(directory, `synthetic-${++imported}.png`);
       await fs.copyFile(source, file);
@@ -799,4 +800,150 @@ it('blocks only-version deletion for a queued parent and a version receiving ano
     service.state.resume();
     await waitJob(active.id);
     await waitJob(queued.id);
+  }));
+
+it('reopens generated images and original sources, remembers usage, and supports explicit new works', () =>
+  fixture(async ({ directory, call, database, append, restart }) => {
+    const [file] = await createWorkbenchFixtures(directory, { sizes: [[64, 64]] });
+    const image = await readWorkbenchImage(file);
+    database.insertProject(image);
+    const first = (await call('workbench.open', { libraryId: image.id })).tab;
+    const second = append(first.workId, first.versionId, 'return-second');
+    const third = append(first.workId, second.id, 'return-third');
+    await call('workbench.close', { tabId: first.id });
+    const reopened = (await call('workbench.open', { libraryId: second.images[0].projectId })).tab;
+    expect(reopened.workId).toBe(first.workId);
+    expect(reopened.versionId).toBe(second.id);
+    expect(reopened.versionImageId).toBe(second.images[0].projectId);
+    expect((await call('version.list', { tabId: reopened.id })).versions).toHaveLength(3);
+    const original = (
+      await call('workbench.open', { source: { type: 'library', projectId: image.id } }, 'ui')
+    ).tab;
+    expect(original.id).toBe(reopened.id);
+    expect(original.versionId).toBe(second.id);
+    const fresh = (await call('workbench.open', { libraryId: image.id, fresh: true })).tab;
+    expect(fresh.workId).not.toBe(first.workId);
+    expect((await call('workbench.open', { libraryId: image.id })).tab.id).toBe(fresh.id);
+    await call('work.open', { workId: first.workId, imageId: third.images[0].projectId });
+    expect((await call('workbench.open', { libraryId: image.id })).tab.versionId).toBe(third.id);
+    await call('workbench.close', { tabId: reopened.id });
+    await restart();
+    expect((await call('workbench.open', { libraryId: image.id })).tab.workId).toBe(first.workId);
+    const derived = (await call('work.open-from-image', { imageId: second.images[0].projectId }))
+      .tab;
+    expect(derived.workOrigin).toMatchObject({ workId: first.workId, versionId: second.id });
+    expect((await call('workbench.list')).tabs.at(-1).id).toBe(derived.id);
+    const raw = new DatabaseSync(database.filePath);
+    try {
+      raw.prepare('DELETE FROM works WHERE id=?').run(first.workId);
+    } finally {
+      raw.close();
+    }
+    expect(
+      (await call('workbench.open', { libraryId: third.images[0].projectId })).tab.workId,
+    ).not.toBe(first.workId);
+  }));
+
+it('matches file signatures and upgrades only matching legacy metadata without rewriting snapshots', () =>
+  fixture(async ({ directory, call, database, append }) => {
+    const [file] = await createWorkbenchFixtures(directory, { sizes: [[64, 64]] });
+    const first = (await call('workbench.open', { path: file })).tab;
+    const latest = append(first.workId, first.versionId, 'file-latest');
+    await call('workbench.close', { tabId: first.id });
+    const raw = new DatabaseSync(database.filePath);
+    try {
+      const origin = database.versions.work(first.workId).origin;
+      delete origin.fileSignature;
+      raw
+        .prepare('UPDATE works SET origin_json=? WHERE id=?')
+        .run(JSON.stringify(origin), first.workId);
+      raw.prepare('DELETE FROM work_activity WHERE work_id=?').run(first.workId);
+      const reopened = (await call('workbench.open', { path: file })).tab;
+      expect(reopened.workId).toBe(first.workId);
+      expect(reopened.versionId).toBe(latest.id);
+      expect(
+        raw.prepare('SELECT * FROM work_file_signatures WHERE work_id=?').get(first.workId),
+      ).toBeDefined();
+      expect(database.versions.work(first.workId).origin.fileSignature).toBeUndefined();
+      await fs.appendFile(file, Buffer.from('changed'));
+      const changed = (await call('workbench.open', { path: file })).tab;
+      expect(changed.workId).not.toBe(first.workId);
+      expect(database.versions.list(first.workId)).toHaveLength(2);
+      await call('work.remove-original', { tabId: changed.id });
+      expect((await call('workbench.open', { path: file })).tab.workId).not.toBe(changed.workId);
+    } finally {
+      raw.close();
+    }
+  }));
+
+it('rejects legacy mismatches and missing metadata, and selects the most recently used legacy candidate', () =>
+  fixture(async ({ directory, call, database }) => {
+    const [file] = await createWorkbenchFixtures(directory, { sizes: [[64, 64]] });
+    const a = (await call('workbench.open', { path: file })).tab;
+    const b = (await call('workbench.open', { path: file, fresh: true })).tab;
+    const raw = new DatabaseSync(database.filePath);
+    try {
+      for (const tab of [a, b]) {
+        const origin = database.versions.work(tab.workId).origin;
+        delete origin.fileSignature;
+        raw
+          .prepare('UPDATE works SET origin_json=? WHERE id=?')
+          .run(JSON.stringify(origin), tab.workId);
+      }
+      await call('work.open', { workId: a.workId });
+      expect((await call('workbench.open', { path: file })).tab.workId).toBe(a.workId);
+      raw.prepare('DELETE FROM work_file_signatures').run();
+      for (const tab of [a, b]) {
+        const origin = database.versions.work(tab.workId).origin;
+        origin.metadata.seed = '999';
+        raw
+          .prepare('UPDATE works SET origin_json=? WHERE id=?')
+          .run(JSON.stringify(origin), tab.workId);
+      }
+      const mismatch = (await call('workbench.open', { path: file })).tab;
+      expect([a.workId, b.workId]).not.toContain(mismatch.workId);
+      const sharp = (await import('sharp')).default;
+      await sharp({ create: { width: 64, height: 64, channels: 3, background: 'white' } })
+        .png()
+        .toFile(file + '.png');
+      await fs.copyFile(file + '.png', file);
+      const missing = (await call('workbench.open', { path: file })).tab;
+      const origin = database.versions.work(missing.workId).origin;
+      delete origin.fileSignature;
+      raw
+        .prepare('UPDATE works SET origin_json=? WHERE id=?')
+        .run(JSON.stringify(origin), missing.workId);
+      expect((await call('workbench.open', { path: file })).tab.workId).not.toBe(missing.workId);
+      expect(database.versions.work(a.workId)).toBeDefined();
+    } finally {
+      raw.close();
+    }
+  }));
+
+it('requires all signature fields, including a hash when size and modification time are unchanged', () =>
+  fixture(async ({ directory, call, database }) => {
+    const [file] = await createWorkbenchFixtures(directory, { sizes: [[64, 64]] });
+    const first = (await call('workbench.open', { path: file })).tab;
+    const signature = database.versions.work(first.workId).origin.fileSignature;
+    const original = database.versions.work(first.workId).origin;
+    const source = { type: 'file', path: file };
+    for (const changed of [
+      { ...signature, size: signature.size + 1 },
+      { ...signature, mtimeMs: signature.mtimeMs + 1 },
+      { ...signature, sha256: 'different-content' },
+    ])
+      expect(
+        database.versions.findOrigin(source, { ...original, fileSignature: changed }),
+      ).toBeUndefined();
+    expect(database.versions.findOrigin(source, original)).toBe(first.workId);
+    const bytes = await fs.readFile(file);
+    const edited = Buffer.from(bytes);
+    const position = edited.indexOf(Buffer.from('42000'));
+    expect(position).toBeGreaterThan(0);
+    edited[position] = '5'.charCodeAt(0);
+    await fs.writeFile(file, edited);
+    const changed = await readWorkbenchImage(file);
+    changed.fileSignature.mtimeMs = signature.mtimeMs;
+    expect(changed.fileSignature.size).toBe(signature.size);
+    expect(database.versions.findOrigin(source, changed)).toBeUndefined();
   }));

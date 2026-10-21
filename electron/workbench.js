@@ -87,6 +87,11 @@ export async function readWorkbenchImage(
     id: `workbench-${crypto.randomUUID()}`,
     name: safeName(resolvedPath),
     image_path: resolvedPath,
+    fileSignature: {
+      size: stat.size,
+      mtimeMs: stat.mtimeMs,
+      sha256: crypto.createHash('sha256').update(fs.readFileSync(resolvedPath)).digest('hex'),
+    },
     thumbnail_path: '',
     created_at: now,
     updated_at: now,

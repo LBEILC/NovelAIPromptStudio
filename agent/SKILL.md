@@ -141,3 +141,5 @@ nai-studio branch.restore --json '{"undo":"UNDO"}'
 ```
 
 `version.delete` 支持 `only: true`：只删除指定版本、保留后续版本，不要求 `confirmed`；返回的 `undo` 仍交给 `branch.restore` 撤销。原图和起点不可使用。
+
+打开图片（`workbench.open`）会回到所属作品和对应版本；打开原图会恢复最近使用的作品及上次查看的版本。需要另起新作品时传 `fresh: true`，例如 `nai-studio workbench.open --json '{"libraryId":"IMAGE","fresh":true}'`。

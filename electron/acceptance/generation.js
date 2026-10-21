@@ -1,8 +1,17 @@
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
+import { importLibraryFiles } from '../importer.js';
 
-export async function generationChecks({ app, h, mode, doubles, database, generationService }) {
+export async function generationChecks({
+  app,
+  h,
+  mode,
+  doubles,
+  database,
+  generationService,
+  preferences,
+}) {
   const { evaluate: e, click, input, wait, check } = h;
   h.category('生成');
   const script = path.join(app.getAppPath(), 'agent', 'nai-studio.mjs');
@@ -707,4 +716,67 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
     .filter(a=>a.effect?.getTiming().iterations!==Infinity)
     .map(a=>a.finished.catch(()=>{}))).then(()=>undefined)`);
   await h.screenshot('053-only-version-restored');
+  const returnFiles = await createWorkbenchFixtures(path.join(mode.root, 'return-work'), {
+    prefix: 'synthetic-return-work',
+    sizes: [[64, 64]],
+    prompts: ['synthetic return origin'],
+  });
+  const imported = await importLibraryFiles({
+    filePaths: returnFiles,
+    database,
+    assetsDirectory: preferences.librarySettings().assetsDirectory,
+  });
+  if (imported.errors.length || imported.imported.length !== 1) throw Error('作品恢复夹具导入失败');
+  const original = imported.imported[0];
+  const opened = (await invoke('workbench.open', { libraryId: original.id })).tab;
+  for (const text of ['synthetic return origin', 'synthetic return second']) {
+    await invoke('prompt.set', { tabId: opened.id, scope: 'base:prompt', text });
+    const job = await invoke('generate.start', { tabId: opened.id, count: 1 });
+    await wait(
+      `window.studio.invoke('generate.status',{id:${JSON.stringify(job.id)}}).then(r=>r.data.jobs[0]?.state==='completed')`,
+      '作品恢复夹具生成完成',
+    );
+  }
+  const returnTree = (await invoke('version.list', { tabId: opened.id })).versions;
+  const target = returnTree.at(-1);
+  const targetImage = target.images[0].projectId;
+  await invoke('workbench.close', { tabId: opened.id });
+  await h.reload();
+  const openLibraryCard = async (id, query) => {
+    await click('图片库', 'document.querySelector(".tb")');
+    await click('全部图片', 'document.querySelector(".libp")');
+    await input('[aria-label="搜索图片库"]', query);
+    await click('视图', 'document.querySelector(".libp")');
+    await click('不合并', 'document.querySelector("[aria-label=合并方式]")');
+    await h.key('Escape');
+    const card = `[data-group-id="project:${id}"]`;
+    await wait(`!!document.querySelector(${JSON.stringify(card)})`, '待恢复作品的图库图片可见');
+    await e(
+      `document.querySelector(${JSON.stringify(card)}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:200,clientY:200}))`,
+    );
+    await click('在工作台打开', 'document.querySelector("[role=menu]:not(.leaving *)")');
+    await wait(`!!document.querySelector('[data-key="ver-${target.id}"]')`, '恢复作品版本栏');
+  };
+  await openLibraryCard(targetImage, 'synthetic return second');
+  const restoredList = await invoke('workbench.list');
+  const restored = (await invoke('workbench.get', { tabId: restoredList.activeTabId })).tab;
+  await check(
+    '图库生成图恢复原作品的两版历史并选中第二版和指定图片',
+    () =>
+      returnTree.length === 2 &&
+      restored.workId === opened.workId &&
+      restored.versionId === target.id &&
+      restored.versionImageId === targetImage,
+  );
+  await openLibraryCard(original.id, 'synthetic return origin');
+  await check('图库原图回到同一个作品标签并保留上次版本', async () => {
+    const list = await invoke('workbench.list');
+    const current = (await invoke('workbench.get', { tabId: list.activeTabId })).tab;
+    return (
+      list.tabs.length === restoredList.tabs.length &&
+      current.id === restored.id &&
+      current.versionId === target.id
+    );
+  });
+  await h.screenshot('056-reopened-work');
 }

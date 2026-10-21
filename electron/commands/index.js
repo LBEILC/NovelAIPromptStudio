@@ -9,6 +9,7 @@ import { commandRegistry, validateCommand, CommandError } from './registry.js';
 import { openCommandSession, mergeSession } from './session.js';
 import {
   addWorkbenchTab,
+  createWorkbenchTab,
   closeWorkbenchTab,
   workbenchTabHasChanges,
 } from '../../src/lib/workbenchSession.js';
@@ -203,9 +204,21 @@ export async function createCommands(services) {
       if (input.libraryId) project(input.libraryId);
       const image = hydrateParameters(await services.readSource(origin));
       origin.path = image.image_path;
-      const next = /** @type {Session} */ (addWorkbenchTab(store.get(), image, { source: origin }));
+      const fresh = /** @type {{fresh?: boolean}} */ (input).fresh;
+      if (!fresh) {
+        const reopened = await generation.openSource?.(origin, image);
+        if (reopened) return reopened;
+      }
+      const session = store.get();
+      let next = /** @type {Session} */ (addWorkbenchTab(session, image, { source: origin }));
+      if (fresh || session.tabs.some((t) => t.id === next.activeTabId && t.workId)) {
+        const created = createWorkbenchTab(image, { source: origin });
+        created.identity = `work:${created.id}`;
+        next = { ...session, tabs: [...session.tabs, created], activeTabId: created.id };
+      }
       for (const t of next.tabs) t.revision ??= 0;
       await store.save(next);
+      await generation.initialize?.(tab(next.activeTabId));
       emit({ tabId: next.activeTabId });
       return full(tab(next.activeTabId));
     },
@@ -506,8 +519,12 @@ export async function createCommands(services) {
     },
     'workbench.session': (input) => store.migrate(input),
     'workbench.commit': async (input) => {
-      const next = mergeSession(store.get(), input.base, input.next);
+      const previous = store.get();
+      const next = mergeSession(previous, input.base, input.next);
       await store.save(next);
+      const active = next.tabs.find((t) => t.id === next.activeTabId);
+      if (active?.workId && previous.activeTabId !== next.activeTabId)
+        services.database.versions.touch(active.workId, active.versionId);
       return store.get();
     },
     'workbench.editing': (input) => {

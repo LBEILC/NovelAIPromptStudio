@@ -109,6 +109,8 @@ export function createVersionStore(connection) {
     CREATE TABLE IF NOT EXISTS removed_originals (work_id TEXT PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS original_undo (token TEXT PRIMARY KEY, work_id TEXT NOT NULL, project_id TEXT NOT NULL, kind TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS work_sequences (work_id TEXT PRIMARY KEY, version INTEGER NOT NULL, branch INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS work_activity (work_id TEXT PRIMARY KEY, used_at INTEGER NOT NULL, version_id TEXT);
+    CREATE TABLE IF NOT EXISTS work_file_signatures (work_id TEXT PRIMARY KEY, signature_json TEXT NOT NULL);
     INSERT INTO work_sequences SELECT work_id, MAX(number), MAX(branch_number) FROM work_versions GROUP BY work_id
       ON CONFLICT(work_id) DO UPDATE SET version=MAX(version,excluded.version), branch=MAX(branch,excluded.branch);
   `);
@@ -200,6 +202,24 @@ export function createVersionStore(connection) {
       branchId: branches.get(v.branchId),
     }));
   };
+  const touch = (workId, versionId) => {
+    const previous = connection.prepare('SELECT MAX(used_at) AS time FROM work_activity').get();
+    connection
+      .prepare(
+        'INSERT INTO work_activity VALUES (?,?,?) ON CONFLICT(work_id) DO UPDATE SET used_at=excluded.used_at, version_id=COALESCE(excluded.version_id,version_id)',
+      )
+      .run(workId, Math.max(Date.now(), (previous.time || 0) + 1), versionId || null);
+  };
+  const forImage = (imageId, workId) => {
+    const rows = connection
+      .prepare(
+        `SELECT v.id FROM version_images vi JOIN work_versions v ON v.id=vi.version_id
+      JOIN projects p ON p.id=vi.project_id JOIN works w ON w.id=v.work_id
+      WHERE vi.project_id=? AND p.deleted_at = '' ORDER BY vi.rowid DESC`,
+      )
+      .all(imageId);
+    return rows.map((r) => get(r.id)).find((v) => v && (!workId || v.workId === workId));
+  };
   function atomic(fn) {
     connection.exec('SAVEPOINT version_write');
     try {
@@ -249,6 +269,68 @@ export function createVersionStore(connection) {
     getAny,
     list,
     originsOf,
+    touch,
+    forImage,
+    lastVersion(workId) {
+      const activity = connection
+        .prepare('SELECT version_id FROM work_activity WHERE work_id=?')
+        .get(workId);
+      const remembered = activity && get(activity.version_id);
+      return remembered?.workId === workId ? remembered : list(workId).at(-1);
+    },
+    findOrigin(source, image) {
+      const candidates = connection
+        .prepare(
+          `SELECT w.*, s.signature_json FROM works w
+        LEFT JOIN work_activity a ON a.work_id=w.id LEFT JOIN work_file_signatures s ON s.work_id=w.id
+        ORDER BY COALESCE(a.used_at,0) DESC, w.created_at DESC, w.rowid DESC`,
+        )
+        .all();
+      const normalize = (p) =>
+        process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p);
+      for (const row of candidates) {
+        const original = JSON.parse(row.origin_json);
+        if (original.blank || !['library', 'file'].includes(originState(row.id, original)))
+          continue;
+        if (source.type === 'library') {
+          if (originalImage(original)?.id === source.projectId) return row.id;
+          continue;
+        }
+        if (!original.image_path || normalize(original.image_path) !== normalize(image.image_path))
+          continue;
+        const signature = row.signature_json
+          ? JSON.parse(row.signature_json)
+          : original.fileSignature;
+        if (signature) {
+          if (
+            image.fileSignature &&
+            ['size', 'mtimeMs', 'sha256'].every(
+              (key) => signature[key] === image.fileSignature[key],
+            )
+          )
+            return row.id;
+          continue;
+        }
+        const a = original.metadata,
+          b = image.metadata;
+        // Empty/default metadata is not evidence that an old source is unchanged.
+        if (!b?.model || b.seed === '' || !b.width || !b.height || !image.fileSignature) continue;
+        if (
+          !['prompt_raw', 'negative_prompt', 'seed', 'width', 'height', 'model'].every(
+            (key) => a?.[key] !== undefined && String(a[key]) === String(b[key]),
+          )
+        )
+          continue;
+        const characters = (p) =>
+          (p.prompt_structure?.characters || []).map((c) => [c.prompt_raw, c.undesired_raw]);
+        if (JSON.stringify(characters(original)) !== JSON.stringify(characters(image))) continue;
+        connection
+          .prepare('INSERT OR REPLACE INTO work_file_signatures VALUES (?,?)')
+          .run(row.id, JSON.stringify(image.fileSignature));
+        return row.id;
+      }
+      return undefined;
+    },
     removeOriginal(workId, update) {
       return atomic(() => {
         const root = list(workId)[0];

@@ -182,7 +182,7 @@ export const commandRegistry = {
   },
   'work.open-from-image': {
     fields: { ...tab, versionId: 'string', imageId: 'string' },
-    required: ['tabId', 'versionId', 'imageId'],
+    required: ['imageId'],
     mutation: true,
     example: { tabId: 'tab-id', versionId: 'version-id', imageId: 'image-id' },
   },
@@ -312,7 +312,13 @@ export const commandRegistry = {
   'workbench.list': { uiOnly: false, fields: {} },
   'workbench.open': {
     uiOnly: false,
-    fields: { ...revision, path: 'string', libraryId: 'string', source: 'source' },
+    fields: {
+      ...revision,
+      path: 'string',
+      libraryId: 'string',
+      source: 'source',
+      fresh: 'boolean',
+    },
     mutation: true,
   },
   'workbench.get': { uiOnly: false, fields: { tabId: 'string' }, required: ['tabId'] },

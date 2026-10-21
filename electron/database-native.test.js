@@ -116,6 +116,8 @@ describe('native engine upgrade', () => {
             'removed_originals',
             'deleted_versions',
             'work_sequences',
+            'work_activity',
+            'work_file_signatures',
             'reference_vibes',
             'version_images',
             'work_branch_names',
