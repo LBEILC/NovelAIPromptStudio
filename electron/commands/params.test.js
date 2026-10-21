@@ -96,7 +96,8 @@ it('edits parameters and references through Agent commands, with revision, undo,
       sampler: 'k_euler_ancestral',
       uc: 'Heavy',
     });
-    expect(changed.notes.length).toBeGreaterThan(0);
+    // Medium 锁住的值界面上显示锁定，不另发通知
+    expect(changed.notes).toEqual([]);
     expect((await call('workbench.list')).tabs[0].dirty).toBe(true);
     const undoId = events.findLast((e) => e.undoId).undoId;
     expect(
@@ -116,7 +117,10 @@ it('edits parameters and references through Agent commands, with revision, undo,
       effort: null,
       noise: 'karras',
     });
-    expect(downgraded.notes.length).toBeGreaterThan(0);
+    expect(downgraded.notes).toEqual([
+      '质量 Tag 改成了 Standard（V4 Full 没有 Light）',
+      '负面预设改成了 Heavy（V4 Full 没有 Furry Focus）',
+    ]);
     await call('params.set', { tabId, patch: { model: 'nai-diffusion-5-full' } });
     for (let i = 0; i < 7; i++) await call('character.add', { tabId });
     expect(

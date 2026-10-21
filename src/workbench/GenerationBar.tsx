@@ -128,6 +128,14 @@ export function GenerationBar({
   );
   const busyElsewhere = state.jobs.some((j) => j.state === 'generating' && j.tabId !== tab.id);
   const left = useSwap(job ? 'busy' : 'normal', (k) => k);
+  const setSteps28 = async () => {
+    try {
+      await before?.();
+      await invokeUI('params.set', { tabId: tab.id, patch: { steps: 28 } });
+    } catch (e) {
+      notify({ text: (e as Error).message, tone: 'error' });
+    }
+  };
   const choose = async (width: number, height: number) => {
     try {
       await before?.();
@@ -192,16 +200,21 @@ export function GenerationBar({
   const usage = state.subscription?.usage?.percent || 0;
   const sub = estimate?.free ? `用量 ${usage}%` : `余额 ${state.balance.toLocaleString('en-US')}`;
   // 不在免费范围（订阅了的账号才说；未订阅的每次都花，不出横幅）
+  // 1.4 起按草稿的参数和参考算（没有参数的旧数据退回元数据）
+  const params = tab.project?.params,
+    refs = tab.project?.references;
+  const steps = Number(params?.steps ?? m?.steps);
   const why = [
     !free(w, h) ? `尺寸 ${w}×${h} 超过 1024×1024` : '',
-    Number(m?.steps) > 28 ? `步数 ${m?.steps} 超过 28` : '',
-    /(?:^|[^.\d])5(?:[^.\d]|$)/.test(String(m?.model)) && state.subscription?.usage?.isNegative
+    steps > 28 ? `步数 ${steps} 超过 28` : '',
+    (params
+      ? params.model.startsWith('nai-diffusion-5')
+      : /(?:^|[^.\d])5(?:[^.\d]|$)/.test(String(m?.model))) && state.subscription?.usage?.isNegative
       ? 'V5 免费用量已用尽'
       : '',
-    ((tab.project as (NonNullable<typeof tab.project> & { vibes?: unknown[] }) | null)?.vibes
-      ?.length || 0) > 4
-      ? 'Vibe 超过 4 个'
-      : '',
+    (refs?.vibes.length || 0) > 4 ? 'Vibe 超过 4 个' : '',
+    refs?.vibes.some((v) => v.encode) ? 'Vibe 需要编码' : '',
+    refs?.precise.length ? '带精确参考' : '',
   ].filter(Boolean);
   const fix = PRESETS.find(([, pw, ph]) => Math.sign(pw - ph) === Math.sign(w - h))!;
   const banner =
@@ -250,6 +263,11 @@ export function GenerationBar({
                 改成 {fix[1]}×{fix[2]}
               </button>
             )}
+            {steps > 28 && params && (
+              <button className="btn sm" onClick={() => void setSteps28()}>
+                改成 28 步
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -278,36 +296,6 @@ export function GenerationBar({
                 style={{ flexWrap: 'nowrap' }}
               >
                 <span className={`field sm seedf ${seedText !== null ? 'editing' : ''}`}>
-                  <span className="muted seed-lbl">Seed</span>
-                  {seedText !== null ? (
-                    <input
-                      className="seed-val mono"
-                      autoFocus
-                      inputMode="numeric"
-                      value={seedText}
-                      placeholder="随机"
-                      aria-label="Seed"
-                      autoComplete="off"
-                      spellCheck={false}
-                      onChange={(e) => setSeedText(e.target.value)}
-                      onBlur={() => commitSeed(true)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === 'Escape') {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          commitSeed(e.key === 'Enter');
-                        }
-                      }}
-                    />
-                  ) : (
-                    <button
-                      className={`seed-val mono ${seed === null ? 'rand' : ''}`}
-                      data-tip="点击输入 Seed，清空就是随机"
-                      onClick={() => setSeedText(seed === null ? '' : String(seed))}
-                    >
-                      {seed ?? '随机'}
-                    </button>
-                  )}
                   <button
                     ref={seedBtn}
                     className={`seed-t ${seedPop ? 'is-hover' : ''}`}
@@ -344,6 +332,36 @@ export function GenerationBar({
                   >
                     <Icon name={seed === null ? 'shuffle-line' : 'lock-line'} />
                   </button>
+                  <span className="muted seed-lbl">Seed</span>
+                  {seedText !== null ? (
+                    <input
+                      className="seed-val mono"
+                      autoFocus
+                      inputMode="numeric"
+                      value={seedText}
+                      placeholder="随机"
+                      aria-label="Seed"
+                      autoComplete="off"
+                      spellCheck={false}
+                      onChange={(e) => setSeedText(e.target.value)}
+                      onBlur={() => commitSeed(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === 'Escape') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          commitSeed(e.key === 'Enter');
+                        }
+                      }}
+                    />
+                  ) : (
+                    <button
+                      className={`seed-val mono ${seed === null ? 'rand' : ''}`}
+                      data-tip="点击输入 Seed，清空就是随机"
+                      onClick={() => setSeedText(seed === null ? '' : String(seed))}
+                    >
+                      {seed ?? '随机'}
+                    </button>
+                  )}
                 </span>
                 <Pop
                   open={seedPop}

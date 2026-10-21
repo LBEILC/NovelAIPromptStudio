@@ -452,10 +452,12 @@ textarea.para-in { resize: none; overflow: hidden; }
 /* 大图工具条右边的分隔 */
 .viewer-bar .vz-sep { width: var(--bw); height: var(--ctl-sm); margin: 0 var(--sp-1); background: var(--divider); }
 /* Seed：一个框里放标签、数值和随机/固定的小图标；编辑时只有数值变成输入，字体和宽度不变，框的边框加深（和其他输入框一样） */
-.seedf { gap: var(--ctl-gap); padding-right: var(--sp-0); cursor: default; transition: border-color var(--dur-1) var(--ease-out); }
+/* Seed：左边的图标兼作标签（随机是交叉箭头，固定是锁），点它切换；数值宽度跟着内容，输入时才按 10 位留宽 */
+.seedf { gap: var(--sp-1); padding-left: var(--sp-0); cursor: default; transition: border-color var(--dur-1) var(--ease-out); }
 .seedf:hover { border-color: var(--text-2); }
-.seedf .seed-val { width: 10.5ch; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-family: var(--font-mono); text-align: left; cursor: text; outline: none; }
+.seedf .seed-val { width: auto; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-family: var(--font-mono); text-align: left; cursor: text; outline: none; }
 .seedf .seed-val.rand, .seedf .seed-val::placeholder { color: var(--text-2); font-family: var(--font-ui); }
-.seedf .seed-t { display: inline-grid; place-items: center; width: calc(var(--ctl-sm) - 2 * var(--sp-0)); height: calc(var(--ctl-sm) - 2 * var(--sp-0)); padding: 0; border: 0; border-radius: var(--r-ctl); background: none; color: var(--text-2); transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
-.seedf .seed-t:hover { background: var(--hover); color: var(--text); }
-.seedf .seed-t:active { background: var(--selected); }
+.seedf input.seed-val { width: 10.5ch; }
+.seedf .seed-t { display: inline-grid; place-items: center; width: calc(var(--ctl-sm) - 2 * var(--sp-0)); height: calc(var(--ctl-sm) - 2 * var(--sp-0)); padding: 0; border: 0; border-radius: var(--r-ctl); background: none; color: var(--text-3); transition: color var(--dur-1) var(--ease-out); }
+.seedf .seed-t:hover, .seedf .seed-t.is-hover { color: var(--text); }
+.seedf .seed-t:active { color: var(--text-2); }

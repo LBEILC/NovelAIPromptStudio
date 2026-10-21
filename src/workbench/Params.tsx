@@ -141,9 +141,15 @@ function useEdit(tab: CommandTab, before?: () => Promise<void>) {
         patch,
         ...(dropReferences ? { dropReferences } : {}),
       });
+    const tell = (notes: string[]) =>
+      notes.length &&
+      notify({
+        text: patch.model
+          ? `已换成 ${modelName(patch.model)}：${notes.join('；')}`
+          : notes.join('；'),
+      });
     try {
-      const r = await call();
-      r.notes.forEach((text) => notify({ text }));
+      tell((await call()).notes);
     } catch (e) {
       if (errorCode(e) !== 'needs_confirm') {
         notify({ text: (e as Error).message, tone: 'error' });
@@ -159,8 +165,7 @@ function useEdit(tab: CommandTab, before?: () => Promise<void>) {
       )
         return;
       try {
-        const r = await call(true);
-        r.notes.forEach((text) => notify({ text }));
+        tell((await call(true)).notes);
       } catch (err) {
         notify({ text: (err as Error).message, tone: 'error' });
       }

@@ -94,10 +94,14 @@ export function parameterCommands({ services, tab, edit, revision, unlocked }) {
         throw new CommandError('needs_confirm', '切换模型需要移除参考图');
       const next = normalizeSettings(requested),
         notes = [];
-      // TODO(design): 校准自动调整通知文案；目前逐项报告字段名和调整前后的值。
-      for (const key of Object.keys(next))
-        if (JSON.stringify(next[key]) !== JSON.stringify(requested[key]))
-          notes.push(`${key}: ${requested[key]} → ${next[key]}`);
+      // 只报目标模型没有的档位被换掉（doc/design.md 2.26）；Effort、噪声计划这类跟着模型走的不报。
+      // 界面把它们接在"已换成 V4 Full："后面
+      for (const [key, label, list] of [
+        ['quality', '质量 Tag 改成了', caps.qualities],
+        ['uc', '负面预设改成了', caps.ucPresets],
+      ])
+        if (requested[key] !== next[key] && !list.includes(requested[key]))
+          notes.push(`${label} ${next[key]}（${caps.name} 没有 ${requested[key]}）`);
       const references = structuredClone(p.references);
       if (!caps.references && input.dropReferences) {
         references.vibes = [];
