@@ -824,7 +824,8 @@ export function WorkbenchEditor(p: EditorProps) {
       setTimeout(() => (swallowRef.current = false), 0);
       const commit = () => {
         setDrag(null);
-        if (cancel || d.out) return;
+        if (cancel || d.out || (d.keys.length === 1 && d.to === d.from && d.index === d.home))
+          return;
         const [si, bi] = d.to.split(':').map(Number);
         const moving = entries.filter((x) => d.keys.includes(x.key));
         const remaining = entries.filter(
@@ -834,7 +835,13 @@ export function WorkbenchEditor(p: EditorProps) {
           d.index < remaining.length
             ? remaining[d.index].index
             : entries.filter((x) => x.section === si && x.block === bi).length;
-        guard(() => save(moveTags(doc, moving, { section: si, block: bi, index })));
+        guard(() => {
+          const next = moveTags(doc, moving, { section: si, block: bi, index });
+          // 放回原处（或换来换去结果一样）不算改动（用户 10-21）
+          const text = (x: PromptDocument) =>
+            JSON.stringify(x.scopes.map((s) => [s.separators, s.blocks.map((b) => b.content)]));
+          if (text(next) !== text(doc)) save(next);
+        });
       };
       const slot = scroll.current?.querySelector<HTMLElement>('.tag.slot'),
         fl = float.current;

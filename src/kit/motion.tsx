@@ -15,9 +15,14 @@ import {
 } from 'react';
 
 const root = () => document.documentElement;
-/** 读一个以毫秒为单位的令牌（`--dur-2`、`--thumb-gap`……）。 */
+/**
+ * 读一个令牌的数值（`--dur-2`、`--thumb-gap`……）：时长换成毫秒，长度是像素。
+ * 正式版的 CSS 压缩会把 240ms 写成 .24s（用户 10-21：1.5.1 里拖拽松手没有归位动效），所以要认单位。
+ */
 export function ms(name: string) {
-  return parseFloat(getComputedStyle(root()).getPropertyValue(name)) || 0;
+  const value = getComputedStyle(root()).getPropertyValue(name).trim();
+  const n = parseFloat(value) || 0;
+  return /[^m]s$/.test(value) ? n * 1000 : n;
 }
 export const motionOff = () => root().dataset.motion === 'off';
 /** --dur-1 / --dur-2 / --dur-3，动效关闭时是 0。 */
