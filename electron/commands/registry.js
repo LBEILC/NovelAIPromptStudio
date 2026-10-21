@@ -65,6 +65,11 @@ export const commandRegistry = {
     fields: { name: 'string', width: 'number', height: 'number', params: 'generationPatch' },
     mutation: true,
   },
+  'version.delete': {
+    fields: { versionId: 'string', confirmed: 'boolean' },
+    required: ['versionId'],
+    mutation: true,
+  },
   'branch.delete': {
     fields: { branchId: 'string', confirmed: 'boolean' },
     required: ['branchId'],
@@ -276,6 +281,7 @@ export const commandRegistry = {
   'ai.chatgpt.sign-out': { fields: {}, required: [], uiOnly: true },
   'ai.chatgpt.models': { fields: {}, required: [], uiOnly: true },
   'ai.chatgpt.quota': { fields: {}, required: [], uiOnly: true },
+  'ai.chatgpt.manage-usage': { fields: {}, required: [], uiOnly: true },
   'ai.test': { fields: {}, required: [], uiOnly: true },
   'storage.get': { fields: {}, required: [], uiOnly: true },
   'storage.database': { fields: {}, required: [], uiOnly: true },

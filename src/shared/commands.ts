@@ -176,6 +176,21 @@ export interface CommandDefinitions {
     };
     output: TabDocument;
   };
+  /**
+   * 删除一版和它之后的各版（用户 10-21，doc/design.md 2.23）：整棵子树软删除，图进回收站，用 branch.restore 撤销。
+   * 原图和起点不能删。子树不止这一版时，没有 confirmed 返回 needs_confirm，details 是 {versions, branches, images}。
+   * 正在走的线被删掉时回到上一版，草稿保留。
+   */
+  'version.delete': {
+    input: { versionId: string; confirmed?: boolean };
+    output: {
+      branches: number;
+      versions: number;
+      images: number;
+      cancelledJobs: number;
+      undo: string;
+    };
+  };
   'branch.delete': {
     input: { branchId: string; confirmed?: boolean };
     output: {
@@ -486,6 +501,8 @@ export interface CommandDefinitions {
     input: Record<string, never>;
     output: { models: { slug: string; name: string }[] };
   };
+  /** 在浏览器里打开 ChatGPT 的"设置 → 用量"（固定地址，不接受别的网址） */
+  'ai.chatgpt.manage-usage': { input: Record<string, never>; output: { ok: true } };
   /** 刷新剩余额度（Codex 方式）；取不到时 quota.error 有原因 */
   'ai.chatgpt.quota': { input: Record<string, never>; output: Types.ChatGPTQuota | null };
   'ai.test': {
@@ -584,6 +601,11 @@ export interface CommandDefinitions {
       revision: number;
       results: Types.BatchResults;
       summary: Types.BatchSummary;
+      /**
+       * 1.4.1：移走的是一版剩下的最后一张、而且这一版后面没有别的版本时，这一版跟着进回收站；
+       * 这里列出跟着移走的版本（界面写进通知）。从回收站恢复那张图时它们一起回来。
+       */
+      versions?: { workName: string; number: number; branchName: string; lastOfBranch: boolean }[];
     };
   };
   'library.rename-many': {

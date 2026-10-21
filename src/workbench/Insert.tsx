@@ -296,7 +296,7 @@ export function InsertPop({
         onClose={() => setPeek(null)}
         anchor=".ins-pop:not(.leaving)"
         place="left-top"
-        className="popover ins-peek"
+        className={`popover ins-peek ${peek?.kind === 'img' ? 'is-img' : ''}`}
         passive
         deps={[peek?.id, peek?.kind]}
       >

@@ -1,9 +1,14 @@
-// 关于与更新（doc/design.md 2.11）：版本、更新（发现新版本时展开横幅和更新说明）、快捷键、数据与隐私、反馈、字体与开源组件。
+// 关于与更新（doc/design.md 2.11）：版本、更新（发现新版本时展开横幅和更新说明）、更新日志、快捷键、数据与隐私、反馈、字体与开源组件。
+// 更新日志只读：构建时把仓库里的 release-notes/*.json（1.2.0 起才有）打包进来，离线也能看，不联网。
 import { Fragment, lazy, Suspense, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { writeClipboardText } from '../lib/clipboard';
-import { lastUpdateCheckLabel, releaseCounts } from '../lib/releaseNotes.js';
-import { Icon, Kbd, Logo, Switch } from '../kit/controls';
+import {
+  lastUpdateCheckLabel,
+  releaseCounts,
+  type ReleaseNotes as Notes,
+} from '../lib/releaseNotes.js';
+import { Icon, Kbd, Logo, Seg, Switch } from '../kit/controls';
 import { Dialog } from '../kit/dialog';
 import { useNotifications } from '../kit/toast';
 import { useUpdates } from '../state/updates';
@@ -62,9 +67,23 @@ const NET = [
   '翻译与分类：内置词典里没有的 Tag，会把 Tag 的名字发给 Danbooru，查它属于哪一类；配置了 AI 服务时，还没有译文的 Tag 会再发给你配置的服务',
   '起名：把这张图的提示词发给你配置的 AI 服务',
   '段落的“翻译成中文”“根据中文改写英文”：把这一段文字发给你配置的 AI 服务',
+  '整理提示词：把这一版的提示词发给你配置的 AI 服务',
+  '用 ChatGPT 账号时：上面发给 AI 服务的内容发给 OpenAI（api.openai.com），算在你登录的账号的套餐里；登录在浏览器里完成，经过 auth.openai.com。打开“用 Codex 的方式登录”后改发到 Codex 用的地址（chatgpt.com），并向它查询剩余额度',
   '读取模型列表、测试连接：只和你配置的 AI 服务通信，不带你的提示词',
   '报告问题、提出建议：在浏览器里打开 GitHub，不自动附带任何数据',
 ];
+const cmpVersion = (a: string, b: string) => {
+  const x = a.split('.').map(Number),
+    y = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0);
+  return 0;
+};
+/** 新的在前 */
+const CHANGELOG = (
+  Object.values(
+    import.meta.glob('../../release-notes/*.json', { eager: true, import: 'default' }),
+  ) as Notes[]
+).sort((a, b) => cmpVersion(b.version, a.version));
 const LICENSES = [
   ['MiSans VF 4.003', misansLicense],
   ['Newsreader', newsreaderLicense],
@@ -80,6 +99,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
   const u = useUpdates();
   const [notesOpen, setNotesOpen] = useState(true);
   const [licenses, setLicenses] = useState(false);
+  const [log, setLog] = useState<string | null>(null);
   const st = u.state;
   const open = (url?: string) =>
     void invokeUI('updates.open-release', { url }).then(
@@ -225,6 +245,13 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         </button>
       </Row>
       <Expand open={found}>{banner}</Expand>
+      {CHANGELOG.length > 0 && (
+        <Row title="更新日志" help={`${CHANGELOG.at(-1)!.version} 以来每个版本的更新说明`}>
+          <button className="btn sm" onClick={() => setLog(CHANGELOG[0].version)}>
+            查看
+          </button>
+        </Row>
+      )}
       <h2>快捷键</h2>
       <div className="help">macOS 上 Ctrl 对应 Command。在输入框里，Ctrl V 仍然是普通的粘贴。</div>
       {KEYS.map(([group, rows]) => (
@@ -258,7 +285,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         help="不开网络端口；Agent 能做什么见“Agent”那一页"
       />
       <Row
-        title="API Key 和 NovelAI 持久令牌加密后保存在这台电脑上"
+        title="API Key、ChatGPT 登录信息和 NovelAI 持久令牌加密后保存在这台电脑上"
         help="用系统自带的加密能力加密，软件不保存明文；诊断信息和报告问题都不会带上它们"
       />
       <h2>反馈与支持</h2>
@@ -317,6 +344,32 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         </div>
         <div className="acts">
           <button className="btn ink" onClick={() => setLicenses(false)}>
+            关闭
+          </button>
+        </div>
+      </Dialog>
+      <Dialog open={!!log} onClose={() => setLog(null)} label="更新日志" className="lic-dlg rn-log">
+        <h3>更新日志</h3>
+        <Seg
+          label="版本"
+          className="rn-log-v"
+          items={CHANGELOG.map(
+            (n) =>
+              [
+                n.version,
+                n.version === st?.currentVersion ? `${n.version} · 当前` : n.version,
+              ] as const,
+          )}
+          value={log || CHANGELOG[0]?.version || ''}
+          onChange={setLog}
+        />
+        <div className="lic-list scroll rn-log-body">
+          {CHANGELOG.filter((n) => n.version === log).map((n) => (
+            <StructuredReleaseNotes key={n.version} notes={n} />
+          ))}
+        </div>
+        <div className="acts">
+          <button className="btn ink" onClick={() => setLog(null)}>
             关闭
           </button>
         </div>

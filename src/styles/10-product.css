@@ -115,7 +115,8 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 /* 字体与开源组件：每一份许可可以展开 */
 .dialog.lic-dlg { width: calc(var(--dialog-w) + var(--popover-w) * 0.6); display: flex; flex-direction: column; max-height: calc(100% - var(--sp-8) * 2); }
 .backdrop:has(.lic-dlg) { grid-template-rows: minmax(0, 1fr); }
-.lic-dlg .lic-list { flex: 1 1 auto; min-height: 0; margin-top: var(--sp-3); border-top: var(--bw) solid var(--divider); }
+/* 右边留出滚动条（最粗时）的宽度，滚动条不压在内容上 */
+.lic-dlg .lic-list { flex: 1 1 auto; min-height: 0; margin-top: var(--sp-3); border-top: var(--bw) solid var(--divider); padding-right: calc(var(--sb-w-hover) + var(--sb-inset) * 2); }
 .lic summary { display: flex; align-items: center; gap: var(--ctl-gap); height: var(--table-row-h); border-bottom: var(--bw) solid var(--divider); list-style: none; color: var(--text); }
 .lic summary::-webkit-details-marker { display: none; }
 .lic summary [class^="ri-"] { color: var(--text-3); transition: transform var(--dur-1) var(--ease-out); }
@@ -160,3 +161,17 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 .ptab-body { display: flex; flex-direction: column; min-height: 0; }
 .ptab-body > .pane-swap { flex: 1 1 auto; min-height: 0; }
 .ptabs .pt-n { color: var(--text-3); font-size: var(--fs-caption); }
+
+/* 设置·AI 服务的 ChatGPT 账号（1.5）：登录按钮照 OpenAI 的按钮样子，墨色底、白字、标志在左；剩余额度每个窗口一条墨色进度 */
+.btn.cg-signin { background: var(--text); border-color: var(--text); color: var(--bg); }
+.btn.cg-signin:hover:not(:disabled) { background: var(--text-2); border-color: var(--text-2); }
+.btn.cg-signin > i { color: inherit; }
+.cg-acct { gap: 0; flex-wrap: nowrap; }
+.cg-quota { display: flex; flex-direction: column; gap: var(--sp-2); width: calc(var(--popover-w) * 0.9); }
+.cg-win { display: flex; flex-direction: column; gap: var(--sp-1); }
+.cg-bar { display: block; height: 4px; border-radius: var(--r-pill); background: var(--hover); overflow: hidden; }
+.cg-bar > i { display: block; height: 100%; background: var(--text); border-radius: inherit; transition: width var(--dur-3) var(--ease-out); }
+
+/* 更新日志（关于与更新）：上面一排版本，下面是那一版的更新说明 */
+.rn-log .rn-log-v { align-self: flex-start; margin-top: var(--sp-2); }
+.rn-log .rn-log-body { padding-top: var(--sp-3); }

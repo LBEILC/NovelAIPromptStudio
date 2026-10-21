@@ -8,6 +8,7 @@ import { useGeneration } from '../state/generation';
 import { errorCode, errorDetails, invokeUI } from '../lib/commands';
 import { mediaUrl } from '../lib/imageStage.js';
 import { versionDiff } from '../lib/versionDiff';
+import { trashNotice } from '../lib/trashNotice';
 import { VersionDifference, VersionSummary } from './VersionDifference';
 import { Icon, Kbd } from '../kit/controls';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
@@ -174,12 +175,15 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         (tree.has(j.versionId || '') || tree.has(j.parentId || '')),
     );
   };
-  const deleteBranch = async (v: WorkVersion) => {
-    const label = v.branchName || `分支 ${v.branchNumber}`;
+  // 删除分支 / 删除这一版（2.23）：都是删掉一棵子树，图进回收站；不止一版时先确认，通知里可以撤销
+  const remove = async (kind: 'branch' | 'version', v: WorkVersion) => {
+    const label = kind === 'branch' ? v.branchName || `分支 ${v.branchNumber}` : name(v);
     // 名字以数字或英文结尾时和后面的汉字隔一个空格（"分支 2 下面"）
     const sp = /[!-~]$/.test(label) ? ' ' : '';
     const run = (confirmed?: boolean) =>
-      invokeUI('branch.delete', { branchId: v.branchId, ...(confirmed ? { confirmed } : {}) });
+      kind === 'branch'
+        ? invokeUI('branch.delete', { branchId: v.branchId, ...(confirmed ? { confirmed } : {}) })
+        : invokeUI('version.delete', { versionId: v.id, ...(confirmed ? { confirmed } : {}) });
     let r: Awaited<ReturnType<typeof run>>;
     try {
       await before?.();
@@ -188,32 +192,33 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
       } catch (e) {
         if (errorCode(e) !== 'needs_confirm') throw e;
         const d = errorDetails<{ branches: number; versions: number; images: number }>(e);
-        if (
-          !(await ask({
-            title: `删除${label}？`,
-            body: d
-              ? `${label}${sp}下面还有 ${Math.max(1, d.branches - 1)} 个分支，会一起删除。共 ${d.versions} 版，${d.images} 张图移入回收站。`
-              : `${label}${sp}下面还有别的分支，会一起删除。`,
-            ok: '删除',
-            danger: true,
-          }))
-        )
-          return;
+        const body = !d
+          ? `${label}${sp}后面还有别的版本，会一起删除。`
+          : kind === 'branch'
+            ? `${label}${sp}下面还有 ${Math.max(1, d.branches - 1)} 个分支，会一起删除。共 ${d.versions} 版，${d.images} 张图移入回收站。`
+            : `${label}${sp}后面还有 ${d.versions - 1} 版${d.branches ? `（其中有 ${d.branches} 个分支）` : ''}，会一起删除。共 ${d.versions} 版，${d.images} 张图移入回收站。`;
+        if (!(await ask({ title: `删除${label}？`, body, ok: '删除', danger: true }))) return;
         r = await run(true);
       }
     } catch (e) {
       notify({
         text:
           errorCode(e) === 'branch_generating'
-            ? '这条分支正在生成'
+            ? kind === 'branch'
+              ? '这条分支正在生成'
+              : '这一版或之后的版本正在生成'
             : `删除失败：${(e as Error).message}`,
         tone: 'error',
       });
       return;
     }
     const { undo } = r;
+    const what =
+      kind === 'branch'
+        ? `${label}：${r.versions} 版`
+        : `${label}${r.versions > 1 ? `和之后的 ${r.versions - 1} 版` : ''}`;
     notify({
-      text: `已删除${label}：${r.versions} 版${r.images ? `，${r.images} 张图已移入回收站` : ''}${r.cancelledJobs ? `，取消了 ${r.cancelledJobs} 个待确认的 Agent 生成` : ''}`,
+      text: `已删除${what}${r.images ? `，${r.images} 张图已移入回收站` : ''}${r.cancelledJobs ? `，取消了 ${r.cancelledJobs} 个待确认的 Agent 生成` : ''}`,
       action: {
         label: '撤销',
         onClick: () =>
@@ -223,17 +228,46 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
       },
     });
   };
-  const renameMenu = (v: WorkVersion, anchor: string, fork?: boolean): MenuEntry[] => [
+  const treeBusy = (v: WorkVersion) => {
+    const tree = new Set(subtree(v).map((x) => x.id));
+    return state.jobs.some(
+      (j) =>
+        j.tabId === tab.id &&
+        ['generating', 'queued'].includes(j.state) &&
+        (tree.has(j.versionId || '') || tree.has(j.parentId || '')),
+    );
+  };
+  // row：版本行上的菜单多一项"删除这一版"（原图和起点没有）；分叉行和分支名只有"删除分支"（主线没有）
+  const renameMenu = (
+    v: WorkVersion,
+    anchor: string,
+    fork?: boolean,
+    row?: boolean,
+  ): MenuEntry[] => [
     ...(fork ? [{ label: '切换到这一支', onSelect: () => void go(v) }, 'sep' as const] : []),
     { label: '重命名分支…', onSelect: () => setRename({ v, anchor, text: v.branchName }) },
-    ...(v.branchNumber
+    ...(row && v.parentId
       ? [
           'sep' as const,
+          {
+            label:
+              subtree(v).length > 1
+                ? `删除这一版和之后的 ${subtree(v).length - 1} 版`
+                : '删除这一版',
+            danger: true,
+            disabled: treeBusy(v) ? '这一版或之后的版本正在生成' : false,
+            onSelect: () => void remove('version', v),
+          },
+        ]
+      : []),
+    ...(v.branchNumber
+      ? [
+          ...(row && v.parentId ? [] : ['sep' as const]),
           {
             label: '删除分支',
             danger: true,
             disabled: branchBusy(v) ? '这条分支正在生成' : false,
-            onSelect: () => void deleteBranch(v),
+            onSelect: () => void remove('branch', v),
           },
         ]
       : []),
@@ -260,10 +294,10 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             label: '移入回收站',
             danger: true,
             onSelect: () =>
-              void invokeUI('library.trash', { ids: [imageId] }).then(() => {
+              void invokeUI('library.trash', { ids: [imageId] }).then((r) => {
                 setRefresh((n) => n + 1);
                 notify({
-                  text: '已移入回收站',
+                  text: trashNotice('已移入回收站', r.versions),
                   action: {
                     label: '撤销',
                     onClick: () =>
@@ -461,7 +495,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             aria-current={on || undefined}
             onClick={() => void go(v)}
             onKeyDown={(e) => e.key === 'Enter' && void go(v)}
-            onContextMenu={ctx(renameMenu(v, `[data-key="ver-${v.id}"]`))}
+            onContextMenu={ctx(renameMenu(v, `[data-key="ver-${v.id}"]`, false, true))}
             {...peekProps(`ver-${v.id}`, v, name(v))}
           >
             <span className="vh">

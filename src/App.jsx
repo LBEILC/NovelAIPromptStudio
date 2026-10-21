@@ -98,6 +98,7 @@ import {
 } from './lib/galleryCollections.js';
 import { writeGalleryGrouping } from './lib/galleryGrouping.js';
 import { useStudioReducedMotion } from './lib/motion.js';
+import { trashNotice } from './lib/trashNotice';
 import {
   moveOverviewTags,
   overviewMoveContext,
@@ -1166,7 +1167,11 @@ export default function App() {
     await reloadAfterGalleryAction();
     notify({
       tone: 'success',
-      text: ids.length === 1 ? '已移入回收站' : `已将 ${ids.length} 张移入回收站`,
+      text: trashNotice(
+        ids.length === 1 ? '已移入回收站' : `已将 ${ids.length} 张移入回收站`,
+        result.versions,
+        true,
+      ),
       action: { label: '撤销', onClick: () => restoreProjects(result.results?.success || ids) },
     });
   };

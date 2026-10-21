@@ -91,7 +91,9 @@ export function useAISettings(notify?: (text: string) => void) {
     const requestRevision = revision.current;
     try {
       // Preserve the existing API contract: model discovery and testing use saved credentials.
-      const saved = await invokeUI('settings.ai.save', { settings: settings });
+      // provider 和 ChatGPT 账号由各自的操作即时保存，这里只存 API Key 那一半
+      const { provider: _p, chatgpt: _c, ...apiKeySettings } = settings;
+      const saved = await invokeUI('settings.ai.save', { settings: apiKeySettings });
       loaded.current = true;
       baseline.current = { ...saved, apiKey: '' };
       updateDraft((current) => {

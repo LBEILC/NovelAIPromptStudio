@@ -112,6 +112,9 @@
 .ir-b .mex-row { flex: 0 0 auto; margin-left: auto; }
 /* 完整内容的悬停卡片：不接收鼠标，宽度和浮层一样；不做渐隐（影响阅读），Tag 太多时列前 24 个加"还有 N 个" */
 .ins-peek { width: var(--popover-w); pointer-events: none; }
+/* 示例小图的预览：框跟着图片的比例，长边有上限，图片尽量大 */
+.ins-peek.is-img { width: auto; padding: var(--sp-1); }
+.ins-peek.is-img .tp-img img { display: block; max-width: min(420px, 40vw); max-height: 360px; border-radius: var(--r-thumb); }
 .ins-peek-b { }
 .ins-peek-b .prose, .ins-peek-b .trans { margin: 0 0 var(--sp-2); }
 .ir-p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: var(--fs-caption); line-height: var(--lh-small); color: var(--text-2); }

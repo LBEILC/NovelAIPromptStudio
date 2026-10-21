@@ -18,6 +18,7 @@ import { Pop } from '../kit/layer';
 import { useNotifications } from '../kit/toast';
 import { useSwap } from '../kit/motion';
 import { Viewer } from '../kit/Viewer';
+import { trashNotice } from '../lib/trashNotice';
 
 export interface ImageProps {
   tab: WorkbenchTab;
@@ -166,10 +167,10 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
             danger: true,
             disabled: tab.source.type !== 'library' ? '请先存入图片库' : false,
             onSelect: () =>
-              void invokeUI('library.trash', { ids: [stageId] }).then(() => {
+              void invokeUI('library.trash', { ids: [stageId] }).then((r) => {
                 setRefresh((n) => n + 1);
                 notify({
-                  text: '已移入回收站',
+                  text: trashNotice('已移入回收站', r.versions),
                   action: {
                     label: '撤销',
                     onClick: () =>

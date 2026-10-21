@@ -291,6 +291,12 @@ export async function settingsChecks(context, restart) {
     // fresh renderer after installing the gate so this is truly its first read.
     if (slowAIRead) await h.reload();
     await section('AI 服务');
+    // 1.5 起没填 API Key 时默认是"ChatGPT 账号"：这一段验收的是 API Key 方式，先切过去
+    const apiKeyTab = `[...document.querySelectorAll('[data-settings-section=ai] [role=radio]')].find((x)=>x.textContent.trim()==='API Key')`;
+    await wait(`!!${apiKeyTab}`);
+    await e(
+      `(()=>{if(document.querySelector('[data-settings-section=ai] input[type=password],[data-settings-section=ai] .field:not(label)')) return true; ${apiKeyTab}.click(); return true})()`,
+    );
     await wait(
       '!!document.querySelector("[data-settings-section=ai] input[type=password],[data-settings-section=ai] .field:not(label)")',
     );

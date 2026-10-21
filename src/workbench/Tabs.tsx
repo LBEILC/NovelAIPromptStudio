@@ -88,7 +88,21 @@ export function WorkbenchTabs(p: TabsProps) {
   useLayoutEffect(() => {
     const el = list.current;
     if (!el) return;
-    const update = () => setOverflow(el.scrollWidth > el.clientWidth + 1);
+    // 按第一个和最后一个标签页的位置量内容宽度：不算会滑的标记（它是绝对定位的），也不受缩放下小数像素的影响；
+    // 翻页按钮出现以后它们占的宽度算回可用宽度里，免得按钮自己把判断撑成"放不下"
+    const update = () => {
+      const tabs = el.querySelectorAll<HTMLElement>('.tab');
+      if (!tabs.length) return setOverflow(false);
+      const content =
+        tabs[tabs.length - 1].getBoundingClientRect().right - tabs[0].getBoundingClientRect().left;
+      const pages = [
+        ...(el.parentElement?.querySelectorAll<HTMLElement>(':scope > .tabs-page') || []),
+      ];
+      const room =
+        el.getBoundingClientRect().width +
+        pages.reduce((w, b) => w + b.getBoundingClientRect().width + 2, 0);
+      setOverflow(content > room + 2);
+    };
     const ro = new ResizeObserver(update);
     ro.observe(el);
     update();

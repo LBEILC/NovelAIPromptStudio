@@ -4,7 +4,7 @@
 /* 版本栏：标题、来源标记、还没生成的那一行 */
 .versions .col-h .muted { margin-left: auto; font: var(--fs-caption)/1 var(--font-mono); color: var(--text-3); }
 .ver[data-d="3"] { margin-left: 42px; }
-.ver .src { margin-left: 6px; padding: 0 5px; border: var(--bw) solid var(--border); border-radius: var(--r-pill); font-size: var(--fs-caption); line-height: 16px; color: var(--text-3); }
+.ver .src, .cg-acct .src { margin-left: 6px; padding: 0 5px; border: var(--bw) solid var(--border); border-radius: var(--r-pill); font-size: var(--fs-caption); line-height: 16px; color: var(--text-3); }
 .ver.draft { border: var(--bw) dashed var(--border); background: transparent; }
 .ver.draft .what { color: var(--text-3); }
 .ver .ths .slot { display: block; width: 28px; height: 38px; border-radius: 3px; border: var(--bw) dashed var(--border); box-sizing: border-box; }
