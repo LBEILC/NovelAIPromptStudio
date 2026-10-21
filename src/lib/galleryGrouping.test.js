@@ -5,6 +5,7 @@ import {
   GALLERY_PROMPT_SCOPES,
   galleryBasePromptSimilarity,
   galleryGroupingStatusLabel,
+  galleryProjectGroupingFingerprints,
   isExactGalleryGrouping,
   readGalleryGrouping,
   writeGalleryGrouping,
@@ -13,6 +14,19 @@ import {
 describe('gallery grouping settings', () => {
   it('keeps the five grouping modes in their stable progressive order', () => {
     expect(GALLERY_PROMPT_SCOPES).toEqual(['separate', 'work', 'full', 'base', 'similar']);
+  });
+
+  // 存进图片库的精确指纹和界面默认的合并方式无关（默认改成"按作品"时曾被算成空字符串）
+  it('keeps the stored exact fingerprint on full Prompt whatever the default merge is', () => {
+    const fingerprints = galleryProjectGroupingFingerprints({
+      tags: [{ tag: 'sky', weight: 1 }],
+      metadata: { model: 'nai-diffusion-4-5-full' },
+    });
+    expect(DEFAULT_GALLERY_GROUPING.promptScope).toBe('work');
+    expect(JSON.parse(fingerprints.exactGroupFingerprint)).toMatchObject({
+      promptScope: 'full',
+      model: 'nai-diffusion-4-5-full',
+    });
   });
 
   it('only treats full Prompt without cross-Vibe merging as exact', () => {

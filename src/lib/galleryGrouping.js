@@ -19,6 +19,13 @@ export const DEFAULT_GALLERY_GROUPING = Object.freeze({
   mergeVibes: false,
   similarityThreshold: GALLERY_SIMILARITY_DEFAULT,
 });
+// 存进图片库的精确分组指纹（exact_group_fingerprint、封面关联）固定按"完全相同、不跨 Vibe"算，
+// 和界面默认的合并方式无关：默认改成"按作品"时曾把它算成空字符串（055 发版前拦下）
+export const EXACT_GALLERY_GROUPING = Object.freeze({
+  promptScope: 'full',
+  mergeVibes: false,
+  similarityThreshold: GALLERY_SIMILARITY_DEFAULT,
+});
 
 const CATEGORY_SIMILARITY_WEIGHTS = {
   ArtistEra: 2.4,
@@ -86,7 +93,7 @@ function storedBasePromptFingerprint(project) {
   );
 }
 
-export function galleryGroupingFingerprint(project = {}, value = DEFAULT_GALLERY_GROUPING) {
+export function galleryGroupingFingerprint(project = {}, value = EXACT_GALLERY_GROUPING) {
   const grouping = normalizeGalleryGrouping(value);
   if (['separate', 'work', 'similar'].includes(grouping.promptScope)) return '';
 
@@ -197,6 +204,7 @@ export function galleryBasePromptSimilarity(leftProject = {}, rightProject = {})
 export function galleryGroupingStatusLabel(value = DEFAULT_GALLERY_GROUPING) {
   const grouping = normalizeGalleryGrouping(value);
   if (grouping.promptScope === 'separate') return '全部分开';
+  if (grouping.promptScope === 'work') return '按作品';
   if (grouping.promptScope === 'full') return grouping.mergeVibes ? '同提示词' : '精确';
   if (grouping.promptScope === 'base') return grouping.mergeVibes ? '基础 · 跨 Vibe' : '基础';
   return `相似 ${grouping.similarityThreshold}%${grouping.mergeVibes ? ' · 跨 Vibe' : ''}`;
@@ -204,8 +212,7 @@ export function galleryGroupingStatusLabel(value = DEFAULT_GALLERY_GROUPING) {
 
 export function exactGalleryGroupFingerprint(project = {}) {
   return String(
-    project.exact_group_fingerprint ||
-      galleryGroupingFingerprint(project, DEFAULT_GALLERY_GROUPING),
+    project.exact_group_fingerprint || galleryGroupingFingerprint(project, EXACT_GALLERY_GROUPING),
   );
 }
 
@@ -221,6 +228,6 @@ export function galleryProjectGroupingFingerprints(project = {}) {
   return {
     promptFingerprint: fullPrompt,
     basePromptFingerprint: basePrompt,
-    exactGroupFingerprint: galleryGroupingFingerprint(enriched, DEFAULT_GALLERY_GROUPING),
+    exactGroupFingerprint: galleryGroupingFingerprint(enriched, EXACT_GALLERY_GROUPING),
   };
 }
