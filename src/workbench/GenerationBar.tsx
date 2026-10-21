@@ -12,6 +12,7 @@ import { useSwap } from '../kit/motion';
 import type { CommandTab } from '../shared/commands';
 import type { GenerationEstimate } from '../shared/generation';
 
+const MAX_AREA = 1536 * 2048;
 const norm = (n: string) => Math.min(2048, Math.max(64, Math.round(Number(n) / 64) * 64));
 const PRESETS = [
   ['竖图', 832, 1216],
@@ -243,7 +244,10 @@ export function GenerationBar({
       /^\d+$/.test(custom.h.trim()) &&
       Number(custom.w) > 0 &&
       Number(custom.h) > 0,
-    cFixed = cOk && (String(cw) !== custom!.w.trim() || String(ch) !== custom!.h.trim());
+    cFixed = cOk && (String(cw) !== custom!.w.trim() || String(ch) !== custom!.h.trim()),
+    // NovelAI 的上限是面积（047 实测：2048×1536 可以，2112×1536 被拒，"Maximum allowed resolution is 1536x2048"）
+    cBig = cOk && cw * ch > MAX_AREA,
+    cGo = cOk && !cBig;
   return (
     <>
       {banner && (
@@ -610,7 +614,7 @@ export function GenerationBar({
                   onChange={(e) =>
                     /^\d*$/.test(e.target.value) && setCustom({ ...custom, w: e.target.value })
                   }
-                  onKeyDown={(e) => e.key === 'Enter' && cOk && void choose(cw, ch)}
+                  onKeyDown={(e) => e.key === 'Enter' && cGo && void choose(cw, ch)}
                 />
               </label>
               <button
@@ -630,13 +634,17 @@ export function GenerationBar({
                   onChange={(e) =>
                     /^\d*$/.test(e.target.value) && setCustom({ ...custom, h: e.target.value })
                   }
-                  onKeyDown={(e) => e.key === 'Enter' && cOk && void choose(cw, ch)}
+                  onKeyDown={(e) => e.key === 'Enter' && cGo && void choose(cw, ch)}
                 />
               </label>
             </div>
             <div className="size-note">
               {!cOk ? (
                 <span className="help danger">填写宽和高</span>
+              ) : cBig ? (
+                <span className="help danger">
+                  {cFixed ? `将使用 ${cw}×${ch} · ` : ''}超过 NovelAI 的上限：面积最大 1536×2048
+                </span>
               ) : free(cw, ch) ? (
                 <span className="help">{cFixed ? `将使用 ${cw}×${ch} · ` : ''}在免费范围内</span>
               ) : (
@@ -659,8 +667,9 @@ export function GenerationBar({
                 取消
               </button>
               <button
-                className={`btn ink sm ${cOk ? '' : 'is-off'}`}
-                onClick={() => cOk && void choose(cw, ch)}
+                className={`btn ink sm ${cGo ? '' : 'is-off'}`}
+                data-tip={cBig ? '面积最大 1536×2048' : undefined}
+                onClick={() => cGo && void choose(cw, ch)}
               >
                 确定
               </button>
