@@ -66,14 +66,14 @@ export async function generationChecks({
   doubles.selections.push({ canceled: false, filePaths: [files[0]] });
   await click('打开图片', 'document.querySelector(".tb")');
   await wait(
-    `(async()=>{const list=(await window.studio.invoke('workbench.list',{})).data;if(!list.activeTabId)return false;const current=(await window.studio.invoke('workbench.get',{tabId:list.activeTabId})).data;return current.tab.source.path===${JSON.stringify(files[0])}&&!!document.querySelector('.doc')})()`,
+    `(async()=>{const list=(await window.studio.invoke('workbench.list',{})).data;if(!list.activeTabId)return false;const current=(await window.studio.invoke('workbench.get',{tabId:list.activeTabId})).data;return current.tab.source.path===${JSON.stringify(files[0])}&&document.querySelector('.wb-body')?.dataset.projectId===current.tab.project.id&&document.querySelector('[data-tab="'+list.activeTabId+'"]')?.getAttribute('aria-selected')==='true'&&!document.querySelector('.app-page-surface.leaving')&&!!document.querySelector('.doc')})()`,
     '新生成夹具打开完成后再进入设置',
   );
   await check(
     '没有令牌时底栏提供生成引导且不展示生成参数',
     '!!document.querySelector(".gen-bar")&&!document.querySelector(".gen-bar .seedf")',
   );
-  await click('生成');
+  await click('生成', 'document.querySelector(".wb-body .gen-bar")');
   await wait('!!document.querySelector(".notoken:not(.leaving)")');
   await check(
     '无令牌生成显示配置引导',
