@@ -146,10 +146,20 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   );
   await h.screenshot('generation-three-images');
   await h.screenshot('034-08-versions-multiple');
-  generationService.state.delay = 500;
+  await wait(
+    `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.filter(j=>j.tabId===${JSON.stringify(tabId)}).every(j=>j.state==='completed'))`,
+    '上一批完成结算后再测试停止',
+  );
+  generationService.state.holdAt = generationService.state.requests.length + 1;
   await click('生成', 'document.querySelector(".gen-bar")');
+  await h.until(() => !!generationService.state.resume, '当前图片请求到达假服务后再停止');
   await wait('document.body.innerText.includes("停止")');
   await click('停止', 'document.querySelector(".gen-bar")');
+  await wait(
+    `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.some(j=>j.tabId===${JSON.stringify(tabId)}&&j.state==='generating'&&j.stop))`,
+    '停止命令已写入队列后返回当前图片',
+  );
+  generationService.state.resume();
   await wait('document.body.innerText.includes("已停止：完成 1 张，其余已取消")');
   await check(
     '停止后只完成当前这一张',
