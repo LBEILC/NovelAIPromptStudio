@@ -17,7 +17,6 @@ export interface LibraryGroup {
   fingerprint: string;
   cover: LibraryCard;
   members: LibraryCard[];
-  coverImage?: LibraryCard['work_cover'];
   grouping: Grouping;
 }
 export type CountedCollection = Collection & { image_count: number | null };

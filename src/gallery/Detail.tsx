@@ -382,7 +382,7 @@ function Summary({ p, a }: { p: LibraryProps; a: DetailActions }) {
           <b>已选 {libraryCountText(groups.length, p.selectedImageCount)}</b>
           <div className="fan">
             {groups.slice(0, 5).map((g) => (
-              <img key={g.id} src={thumb(g.coverImage || g.cover)} alt="" draggable={false} />
+              <img key={g.id} src={thumb(g.cover)} alt="" draggable={false} />
             ))}
           </div>
           <span className="help">

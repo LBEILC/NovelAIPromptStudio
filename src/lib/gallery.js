@@ -72,13 +72,12 @@ function finalizeGalleryGroup(group, grouping, exact = false) {
   const members = [...group.members].sort(
     (left, right) => galleryProjectDate(right) - galleryProjectDate(left),
   );
-  const cover = group.key.startsWith('work:')
-    ? members.find((member) => member.version_number === 1) || members.at(-1)
-    : members.at(-1);
+  // 封面是组里最早的一张（作品就是第 1 版的第一张）。不用作品的原图：原图不在这一组里，
+  // 提示词改得多了会和组里的图对不上（用户 10-21）
+  const cover = members.at(-1);
   return {
     ...group,
     cover,
-    ...(group.key.startsWith('work:') && cover.work_cover ? { coverImage: cover.work_cover } : {}),
     grouping,
     members,
     id: group.key,

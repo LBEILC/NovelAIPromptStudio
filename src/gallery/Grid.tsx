@@ -20,7 +20,7 @@ import type { LibraryGroup, LibraryProps } from '../library/types';
 import type { LibraryCard } from '../shared/types';
 
 const ratioOf = (g: LibraryGroup) => {
-  const { width, height } = (g.coverImage || g.cover).metadata;
+  const { width, height } = g.cover.metadata;
   return width && height ? width / height : fallbackRatio;
 };
 const thumb = (c: Pick<LibraryCard, 'thumbnail_path' | 'image_path'>) =>
@@ -458,11 +458,7 @@ function Cards({
               }}
               onPointerLeave={() => setScrub((s) => (s?.id === g.id ? null : s))}
             >
-              <img
-                src={sc ? thumb(shown) : thumb(g.coverImage || g.cover)}
-                alt=""
-                draggable={false}
-              />
+              <img src={sc ? thumb(shown) : thumb(g.cover)} alt="" draggable={false} />
               {!sc && (n > 1 || genNote) && (
                 <span
                   className={`stack ${n > 1 ? 'lstack' : ''}`}
