@@ -531,6 +531,10 @@ export async function libraryChecks(env) {
           .member_ids.includes(target),
       '移出收藏集',
     );
+    await wait(
+      `${collectionRow}?.getAttribute('aria-checked')==='false'`,
+      '移出收藏集已呈现在界面',
+    );
     await check(
       '详情浮层取消勾选移出收藏集',
       () =>
