@@ -1,0 +1,71 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "1.5.0",
+  "date": "2026-10-21",
+  "items": [
+    {
+      "kind": "new",
+      "area": "set",
+      "title": "ChatGPT 账号登录",
+      "detail": "“设置 → AI 服务”可以选“ChatGPT 账号”：点“登录 ChatGPT”在浏览器里授权，起名、翻译和整理提示词就算在你的 Plus 或 Pro 套餐里，不用另外配置 API Key。API Key 方式保留，已经填过 API Key 的照旧使用。",
+      "highlight": true,
+      "icon": "sparkle"
+    },
+    {
+      "kind": "new",
+      "area": "wb",
+      "title": "删除这一版",
+      "detail": "版本栏右键一版选“删除这一版”，主线上的版本也能删；后面还有版本时会一起删，先确认。把一版的最后一张图移进回收站时，没有后续版本的这一版跟着移走，从回收站恢复时一起回来。",
+      "highlight": true,
+      "icon": "restart"
+    },
+    {
+      "kind": "new",
+      "area": "set",
+      "title": "Codex 方式登录（非官方）",
+      "detail": "AI 服务里多了一个默认关闭的开关，打开后能看到剩余额度（5 小时内、本周）。它不是 OpenAI 给其他软件开放的方式，打开前会说明风险。"
+    },
+    {
+      "kind": "new",
+      "area": "set",
+      "title": "更新日志",
+      "detail": "“关于与更新”里可以查看 1.2.0 以来每个版本的更新说明，不用联网。"
+    },
+    {
+      "kind": "improved",
+      "area": "wb",
+      "title": "示例图预览更大",
+      "detail": "常用块和角色菜单里悬停示例小图时，预览框跟着图片比例，图片显示得更大。"
+    },
+    {
+      "kind": "fixed",
+      "area": "gen",
+      "title": "过大的自定义尺寸",
+      "detail": "自定义尺寸按 NovelAI 的上限检查面积（最大 1536×2048），2048×2048 这类会被拒绝的尺寸不能再选。"
+    },
+    {
+      "kind": "fixed",
+      "area": "wb",
+      "title": "标签栏没排满就出现翻页按钮",
+      "detail": "标签页放得下时不再显示左右翻页按钮。"
+    },
+    {
+      "kind": "fixed",
+      "area": "app",
+      "title": "标题栏余额压住设置按钮",
+      "detail": "标签页很多时，标题栏右边的余额和设置按钮不再被挤压，由标签页翻页。"
+    },
+    {
+      "kind": "fixed",
+      "area": "wb",
+      "title": "示例图预览超出边框",
+      "detail": "横图的示例图不再超出预览框。"
+    },
+    {
+      "kind": "fixed",
+      "area": "app",
+      "title": "滚动条压住内容",
+      "detail": "“字体与开源组件”等对话框里，滚动条不再压在内容上。"
+    }
+  ]
+}
