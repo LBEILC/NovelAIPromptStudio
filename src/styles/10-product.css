@@ -151,3 +151,6 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 .ztile.on .zthumb { outline: 2px solid var(--ink); outline-offset: 2px; }
 .ztile.on .zthumb img { outline: none; }
 .zload { color: var(--text-3); }
+
+/* Agent：技能装到哪几个 Agent，作为"Agent 技能"下面缩进的小行 */
+.setrow.set-sub { padding: var(--sp-2) 0 var(--sp-2) var(--sp-4); }

@@ -101,6 +101,15 @@ export type CommandEvent =
   | { type: 'updates'; data: Types.UpdateState }
   | { type: 'generation'; data: GenerationStatus }
   | { type: 'navigate'; destination: string };
+/**
+ * 技能在某个 Agent 里的情况：installed 已装且和软件里的一样；outdated 已装但和软件里的不一样（软件升级后）；
+ * missing 这个 Agent 装了但还没有技能；unavailable 这台电脑上没找到这个 Agent（没有 ~/.claude 或 ~/.codex）。
+ */
+export type AgentSkillState = 'installed' | 'outdated' | 'missing' | 'unavailable';
+export interface AgentSkills {
+  claude: { state: AgentSkillState; path: string };
+  codex: { state: AgentSkillState; path: string };
+}
 export interface CommandDefinitions {
   'prompt.tidy': {
     input: TabInput & { requestId: string };
@@ -199,7 +208,34 @@ export interface CommandDefinitions {
       onPath: boolean;
       skillPath: string;
       platform: string;
+      /** 技能装到各个 Agent 的全局技能目录的情况 */
+      skills?: AgentSkills;
     }>;
+  };
+  /**
+   * 卸载命令行工具：删掉软件装的启动脚本（nai-studio、nai-studio.cmd）和软件数据目录里的运行文件；
+   * 不改 PATH（那个文件夹里可能还有别的工具）。返回和 agent.setup 一样的状态。
+   */
+  'agent.uninstall': {
+    input: Record<string, never>;
+    output: IPC.Result<{
+      installed: boolean;
+      path: string;
+      onPath: boolean;
+      skillPath: string;
+      platform: string;
+      skills?: AgentSkills;
+    }>;
+  };
+  /** 从 Claude Code 或 Codex 里删掉这个技能（只删 skills/nai-studio 这一个文件夹） */
+  'agent.skill-uninstall': {
+    input: { target: 'claude' | 'codex' };
+    output: IPC.Result<{ skills: AgentSkills }>;
+  };
+  /** 把技能装进 Claude Code（~/.claude/skills/nai-studio）或 Codex（~/.codex/skills/nai-studio），已有的直接覆盖 */
+  'agent.skill-install': {
+    input: { target: 'claude' | 'codex' };
+    output: IPC.Result<{ skills: AgentSkills }>;
   };
   'agent.install': {
     input: Record<string, never>;

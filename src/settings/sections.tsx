@@ -13,6 +13,7 @@ import { useStorage } from '../state/storage';
 import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, bytes, errorText } from './parts';
 import type { AppearanceSettings } from '../shared/types';
+import type { AgentSkills } from '../shared/commands';
 
 /** 确认框：ask() 返回用户是否确认 */
 export function useAsk() {
@@ -727,13 +728,14 @@ type AgentSetup = {
   skillPath: string;
   platform: string;
   pathFailed?: boolean;
+  skills?: AgentSkills;
 };
 export function Agent() {
   const notify = useNotifications();
   const [setup, setSetup] = useState<AgentSetup | null>(null);
   const [installedNow, setInstalledNow] = useState(false);
   const [version, setVersion] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [cliBusy, setCliBusy] = useState<'' | 'install' | 'uninstall'>('');
   const [error, setError] = useState('');
   useEffect(() => {
     let live = true;
@@ -751,19 +753,43 @@ export function Agent() {
       live = false;
     };
   }, []);
-  const install = async () => {
-    setBusy(true);
+  const install = async (remove = false) => {
+    setCliBusy(remove ? 'uninstall' : 'install');
     try {
-      const r = await invokeUI('agent.install', {});
+      const r = await invokeUI(remove ? 'agent.uninstall' : 'agent.install', {});
       if (!r.ok) throw Error(r.error);
       setSetup(r);
-      setInstalledNow(true);
+      setInstalledNow(!remove);
       setError('');
-      notify({ text: setup?.installed ? '已重新安装' : '已安装', tone: 'success' });
+      notify({
+        text: remove ? '已卸载命令行工具' : setup?.installed ? '已重新安装' : '已安装',
+        tone: 'success',
+      });
     } catch (e) {
-      setError(errorText(e));
+      setError(`${remove ? '卸载' : '安装'}失败：${errorText(e)}`);
     } finally {
-      setBusy(false);
+      setCliBusy('');
+    }
+  };
+  // 把技能装进 Claude Code 或 Codex 的全局技能目录
+  const [skillBusy, setSkillBusy] = useState('');
+  const installSkill = async (target: 'claude' | 'codex', remove = false) => {
+    const name = target === 'claude' ? 'Claude Code' : 'Codex';
+    setSkillBusy(`${target}:${remove ? 'remove' : 'add'}`);
+    try {
+      const r = await invokeUI(remove ? 'agent.skill-uninstall' : 'agent.skill-install', {
+        target,
+      });
+      if (!r.ok) throw Error(r.error);
+      setSetup((cur) => (cur ? { ...cur, skills: r.skills } : cur));
+      notify({
+        text: remove ? `已从 ${name} 里卸载技能` : `已把技能装进 ${name}`,
+        tone: 'success',
+      });
+    } catch (e) {
+      notify({ text: `${remove ? '卸载' : '安装'}技能失败：${errorText(e)}`, tone: 'error' });
+    } finally {
+      setSkillBusy('');
     }
   };
   const copySkill = async () => {
@@ -782,7 +808,7 @@ export function Agent() {
     : !setup.installed
       ? ['未安装']
       : [
-          `已安装 · nai-studio${version ? ` ${version}` : ''}`,
+          `已安装 · nai-studio${version ? ` ${version}` : ''} · 软件更新后自动跟着更新`,
           !setup.onPath && (
             <span className="warn-t">
               命令所在的文件夹不在 PATH 里，终端里找不到 nai-studio。把下面的文件夹加进
@@ -809,7 +835,7 @@ export function Agent() {
       title="Agent"
       desc="让你的 Agent（如 Claude Code、Codex）通过命令行使用本软件：读取提示词、修改工作台、搜索图片库、添加生成任务。"
     >
-      <Fail>{error && `安装失败：${error}`}</Fail>
+      <Fail>{error}</Fail>
       <Row title="命令行工具" help={help}>
         <span className="row set-nowrap">
           {setup?.installed && !setup.onPath && (
@@ -824,17 +850,31 @@ export function Agent() {
               复制位置
             </button>
           )}
+          {setup?.installed && (
+            <button
+              className={`btn quiet sm ${cliBusy === 'uninstall' ? 'loading' : ''}`}
+              disabled={!!cliBusy}
+              data-tip="删掉软件装的命令，不改 PATH"
+              onClick={() => void install(true)}
+            >
+              {cliBusy === 'uninstall' && <Icon name="loader-4-line" />}
+              卸载
+            </button>
+          )}
           <button
-            className={`btn sm ${busy ? 'loading' : ''}`}
-            disabled={busy || !setup}
+            className={`btn sm ${setup?.installed ? 'quiet' : ''} ${cliBusy === 'install' ? 'loading' : ''}`}
+            disabled={!!cliBusy || !setup}
             onClick={() => void install()}
           >
-            {busy && <Icon name="loader-4-line" />}
+            {cliBusy === 'install' && <Icon name="loader-4-line" />}
             {setup?.installed ? '重新安装' : '安装'}
           </button>
         </span>
       </Row>
-      <Row title="Agent 技能" help="说明这些命令用法的技能文件，放入 Agent 的技能目录即可使用。">
+      <Row
+        title="Agent 技能"
+        help="说明这些命令用法的技能文件。装进 Agent 的全局技能目录后，新开的会话就能用；也可以自己复制。"
+      >
         <span className="row">
           <button
             className="btn quiet sm"
@@ -851,6 +891,55 @@ export function Agent() {
           </button>
         </span>
       </Row>
+      {(['claude', 'codex'] as const).map((target) => {
+        const info = setup?.skills?.[target];
+        const name = target === 'claude' ? 'Claude Code' : 'Codex';
+        const state = info?.state;
+        return (
+          <Row
+            key={target}
+            className="set-sub"
+            title={name}
+            help={
+              !info
+                ? '正在检查…'
+                : state === 'unavailable'
+                  ? `这台电脑上没找到 ${name}`
+                  : state === 'missing'
+                    ? '还没装技能'
+                    : state === 'outdated'
+                      ? '软件更新了技能，装的是旧的，点“更新”换成新的'
+                      : [
+                          '已安装，新开的会话就能用',
+                          <span className="path selectable">{info.path}</span>,
+                        ]
+            }
+          >
+            {info && state !== 'unavailable' && (
+              <span className="row set-nowrap">
+                {state !== 'missing' && (
+                  <button
+                    className={`btn quiet sm ${skillBusy === `${target}:remove` ? 'loading' : ''}`}
+                    disabled={!!skillBusy}
+                    onClick={() => void installSkill(target, true)}
+                  >
+                    {skillBusy === `${target}:remove` && <Icon name="loader-4-line" />}
+                    卸载
+                  </button>
+                )}
+                <button
+                  className={`btn sm ${state === 'installed' ? 'quiet' : ''} ${skillBusy === `${target}:add` ? 'loading' : ''}`}
+                  disabled={!!skillBusy}
+                  onClick={() => void installSkill(target)}
+                >
+                  {skillBusy === `${target}:add` && <Icon name="loader-4-line" />}
+                  {state === 'missing' ? '安装' : state === 'outdated' ? '更新' : '重新安装'}
+                </button>
+              </span>
+            )}
+          </Row>
+        );
+      })}
       <Row
         title="Agent 能做什么"
         help={[
