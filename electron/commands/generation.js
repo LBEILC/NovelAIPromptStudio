@@ -358,6 +358,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       const current = tab(input.tabId);
       try {
         const { request, pendingEncodes } = await requestFor(current);
+        if (
+          (input.width ?? request.parameters.width) * (input.height ?? request.parameters.height) >
+          1536 * 2048
+        )
+          throw new Error('面积最大 1536×2048');
         for (const key of ['width', 'height'])
           if (input[key] !== undefined) {
             if (!Number.isFinite(input[key]) || input[key] <= 0) throw new Error('尺寸无效');
@@ -487,6 +492,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       };
       const session = store.get(),
         next = session.tabs.find((t) => t.id === current.id);
+      if (input.width * input.height > 1536 * 2048) throw new Error('面积最大 1536×2048');
       if (norm(input.width) * norm(input.height) > 1536 * 2048)
         throw new Error('面积最大 1536×2048');
       next.project.metadata = {

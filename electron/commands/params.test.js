@@ -90,6 +90,12 @@ it('edits parameters and references through Agent commands, with revision, undo,
       '面积最大 1536×2048',
     );
     expect((await call('workbench.get', { tabId })).tab.project.metadata).toEqual(sizeBefore);
+    await expect(call('prompt.set-size', { tabId, width: 2112, height: 1536 })).rejects.toThrow(
+      '面积最大 1536×2048',
+    );
+    expect(
+      (await call('generate.estimate', { tabId, width: 2112, height: 1536, count: 1 })).unavailable,
+    ).toBe('面积最大 1536×2048');
     expect(
       (await call('generate.estimate', { tabId, width: 2048, height: 2048, count: 1 })).unavailable,
     ).toBe('面积最大 1536×2048');

@@ -70,6 +70,7 @@ export async function startFakeChatGPT() {
           refresh = p.get('grant_type') === 'refresh_token';
         if (refresh) {
           state.refreshes++;
+          if (state.refreshGate) await state.refreshGate;
           if (state.refreshDelay) await new Promise((r) => setTimeout(r, state.refreshDelay));
           if (state.refreshError) return json({ error: state.refreshError }, 400);
         }

@@ -46,9 +46,9 @@ export function createChatGPT({
   const assertEpoch = (m, epoch) => {
     if (epochs[m] !== epoch) throw authError('canceled', '操作已取消');
   };
-  function clear(m) {
+  function clear(m, reason) {
     epochs[m]++;
-    for (const controller of operations[m]) controller.abort();
+    for (const controller of operations[m]) controller.abort(reason);
     preferences.clearChatGPTRecord(m);
     notify();
   }
@@ -335,13 +335,14 @@ export function createChatGPT({
               .split(' ')
               .includes('chatgpt.tokens.use.direct')
           ) {
-            clear(m);
-            throw authError('reauth', 'ChatGPT 套餐授权已失效');
+            const error = authError('reauth', 'ChatGPT 套餐授权已失效');
+            clear(m, error);
+            throw error;
           }
           save(m, next);
           return next;
         } catch (error) {
-          if (error.code === 'reauth' && epochs[m] === epoch) clear(m);
+          if (error.code === 'reauth' && epochs[m] === epoch) clear(m, error);
           throw error;
         }
       })().finally(() => {
@@ -364,6 +365,22 @@ export function createChatGPT({
         : {}),
     };
   }
+  async function accessForRequest(m, signal, force = false) {
+    if (signal.aborted) throw authError('canceled', '操作已取消');
+    let cancel;
+    const canceled = new Promise((_, reject) => {
+      cancel = () =>
+        reject(
+          signal.reason?.code === 'reauth' ? signal.reason : authError('canceled', '操作已取消'),
+        );
+      signal.addEventListener('abort', cancel, { once: true });
+    });
+    try {
+      return await Promise.race([access(m, force), canceled]);
+    } finally {
+      signal.removeEventListener('abort', cancel);
+    }
+  }
   async function authorized(m, url, options, consume) {
     const epoch = epochs[m],
       controller = new AbortController();
@@ -375,7 +392,7 @@ export function createChatGPT({
     try {
       let refreshed = false;
       for (let attempt = 0; ; attempt++) {
-        const token = await access(m);
+        const token = await accessForRequest(m, signal);
         assertEpoch(m, epoch);
         signal.throwIfAborted();
         const response = await request(url, {
@@ -399,7 +416,7 @@ export function createChatGPT({
         } catch (error) {
           assertEpoch(m, epoch);
           if (error.details?.status === 401 && !refreshed) {
-            await access(m, true);
+            await accessForRequest(m, signal, true);
             refreshed = true;
             continue;
           }

@@ -314,6 +314,29 @@ describe('ChatGPT inference and quota', () => {
     controller.abort();
     expect(await result).toBeInstanceOf(Error);
   });
+  it('cancels a caller waiting for a shared refresh without aborting other callers', async () => {
+    await login();
+    expire();
+    let release;
+    fixture.state.refreshGate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const controller = new AbortController();
+    const canceled = service
+      .complete([{ role: 'user', content: 'OK' }], controller.signal)
+      .catch((e) => e);
+    const remaining = service.models();
+    try {
+      while (!fixture.state.refreshes) await new Promise((r) => setTimeout(r, 5));
+      controller.abort();
+      expect(await canceled).toMatchObject({ code: 'canceled' });
+      expect(fixture.state.tokens).toBe(1);
+    } finally {
+      release();
+    }
+    expect((await remaining).models[0].slug).toBe('fixture-text');
+    expect(fixture.state.refreshes).toBe(1);
+  });
   it('bounded retry for unavailable, structured errors and no API key fallback', async () => {
     await login();
     preferences.saveAISettings({ apiKey: 'synthetic-fallback-key' });
