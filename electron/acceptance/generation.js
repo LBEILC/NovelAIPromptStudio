@@ -159,12 +159,26 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
     `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.some(j=>j.tabId===${JSON.stringify(tabId)}&&j.state==='generating'&&j.stop))`,
     '停止命令已写入队列后返回当前图片',
   );
-  generationService.state.resume();
-  await wait('document.body.innerText.includes("已停止：完成 1 张，其余已取消")');
-  await check(
-    '停止后只完成当前这一张',
-    'document.body.innerText.includes("已停止：完成 1 张，其余已取消")',
+  const stoppedId = await e(
+    `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.find(j=>j.tabId===${JSON.stringify(tabId)}&&j.state==='generating'&&j.stop).id)`,
   );
+  const requestsAtStop = generationService.state.requests.length;
+  generationService.state.resume();
+  await wait(
+    `window.studio.invoke('generate.status',{id:${JSON.stringify(stoppedId)}}).then(r=>r.data.jobs[0].state==='canceled')`,
+    '停止后的当前图片已入库且队列结束',
+  );
+  await check('停止后只完成当前这一张', async () => {
+    const job = await e(
+      `window.studio.invoke('generate.status',{id:${JSON.stringify(stoppedId)}}).then(r=>r.data.jobs[0])`,
+    );
+    return (
+      job.completed === 1 &&
+      job.images.length === 1 &&
+      !!database.loadProject(job.images[0]) &&
+      generationService.state.requests.length === requestsAtStop
+    );
+  });
   generationService.state.delay = 20;
   generationService.state.failNext = 500;
   await click('生成', 'document.querySelector(".gen-bar")');
