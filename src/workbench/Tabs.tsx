@@ -67,8 +67,16 @@ export function WorkbenchTabs(p: TabsProps) {
     if (d && me)
       me.style.transform = `translateX(${d.want - me.offsetLeft}px) scale(var(--drag-scale))`;
   });
-  // 版数（有账号时才有版本）
+  // 版数（有账号时才有版本）；删除版本、撤销、从回收站恢复不改标签页的 revision，跟着 libraryChanged 再数一遍
   const revisions = p.session.tabs.map((t) => `${t.id}:${t.revision}`).join('|');
+  const [changed, setChanged] = useState(0);
+  useEffect(
+    () =>
+      window.studio?.onCommandEvent((e) => {
+        if (e.type === 'workbench' && e.libraryChanged) setChanged((n) => n + 1);
+      }),
+    [],
+  );
   useEffect(() => {
     if (!generation.settings.hasToken) return;
     let live = true;
@@ -83,7 +91,7 @@ export function WorkbenchTabs(p: TabsProps) {
     return () => {
       live = false;
     };
-  }, [revisions, generation.jobs.length, generation.settings.hasToken]);
+  }, [revisions, changed, generation.jobs.length, generation.settings.hasToken]);
   // 放不下时两头出现翻页按钮
   useLayoutEffect(() => {
     const el = list.current;
