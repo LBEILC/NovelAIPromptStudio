@@ -1,0 +1,21 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "1.5.3",
+  "date": "2026-10-21",
+  "items": [
+    {
+      "kind": "fixed",
+      "area": "wb",
+      "title": "标签页多了挤掉右上角",
+      "detail": "打开的作品多、窗口又不够宽时，右上角的余额和设置按钮会被挤到窗口按钮底下。现在标签页自己收窄、出现翻页按钮，右上角一直完整。",
+      "highlight": true,
+      "icon": "shield"
+    },
+    {
+      "kind": "fixed",
+      "area": "wb",
+      "title": "删除版本后标签页的版数不对",
+      "detail": "删除版本、撤销删除或从回收站恢复后，标签页上的版数跟着更新。"
+    }
+  ]
+}
