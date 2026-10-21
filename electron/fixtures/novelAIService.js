@@ -70,6 +70,23 @@ export async function startFakeNovelAI() {
     for await (const chunk of req) chunks.push(chunk);
     const body = JSON.parse(Buffer.concat(chunks).toString());
     state.requests.push(body);
+    // 和真实服务一样校验 Vibe 的三个数组一样长（用户 10-21 实测被拒）
+    const vibeLengths = [
+      'reference_image_multiple',
+      'reference_strength_multiple',
+      'reference_information_extracted_multiple',
+    ].map((key) => body.parameters?.[key]?.length || 0);
+    if (vibeLengths.some((n) => n !== vibeLengths[0])) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          statusCode: 400,
+          message:
+            'Validation error: error validating request: reference_information_extracted_multiple and reference_image_multiple must be the same length',
+        }),
+      );
+      return;
+    }
     state.active++;
     state.maxActive = Math.max(state.maxActive, state.active);
     await new Promise((r) => setTimeout(r, state.delay));

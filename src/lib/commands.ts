@@ -25,11 +25,17 @@ export async function invokeUI<N extends CommandName>(
   }
   const result = await window.studio.invoke(name, input);
   // 错误码挂在抛出的错误上（例如 needs_confirm：界面先确认再重试）
-  if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code });
+  if (!result.ok)
+    throw Object.assign(new Error(result.error.message), {
+      code: result.error.code,
+      details: (result.error as { details?: unknown }).details,
+    });
   return result.data;
 }
 /** invokeUI 抛出的错误的错误码 */
 export const errorCode = (e: unknown) => (e as { code?: string } | null)?.code || '';
+/** 错误附带的数据（例如 needs_confirm 时要确认的数量） */
+export const errorDetails = <T>(e: unknown) => (e as { details?: T } | null)?.details;
 
 export async function invokeResult<N extends CommandName>(
   name: N,

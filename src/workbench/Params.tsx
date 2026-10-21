@@ -108,7 +108,11 @@ export function useBaseProject(tab: CommandTab | null, hasVersions: boolean) {
       .then((r) => {
         if (!live) return;
         const v = r.versions.find((x) => x.id === tab.versionId) || r.versions[0];
-        if (v) setBase({ project: v.project, name: v.parentId ? `第 ${v.number} 版` : '原图' });
+        if (v)
+          setBase({
+            project: v.project,
+            name: v.isStart ? '起点' : v.parentId ? `第 ${v.number} 版` : '原图',
+          });
         else fallback();
       })
       .catch(() => live && fallback());
@@ -346,7 +350,9 @@ export function ParamsPane({
   return (
     <div className="doc pdoc">
       <p className="help pnote">
-        参数取自{vn}，改过的会标出来，生成时只改这些。
+        {vn === '起点'
+          ? `参数取自${tab.project?.paramsSource === 'defaults' ? '默认设置' : '上次生成的设置'}，改过的会标出来。`
+          : `参数取自${vn}，改过的会标出来，生成时只改这些。`}
         {keptList.length > 0 &&
           `原图里还有 ${keptList.length} 项界面上不能改的参数，原样带上，见最下面。`}
       </p>

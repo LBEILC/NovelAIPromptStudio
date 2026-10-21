@@ -689,6 +689,20 @@ export default function App() {
     [acceptWorkbenchProject, showToast],
   );
 
+  // 空白作品（doc/design.md 2.26a）：参数按设置里的起点，提示词是空的；标签页由命令事件加进来
+  const newBlankWork = useCallback(async () => {
+    setWorkbenchError('');
+    try {
+      await workbenchConnection?.prepare();
+      const result = await invokeResult('workbench.new', {});
+      if (!result?.ok) throw new Error(result?.error || '新建失败');
+      setWorkbenchFocus({ scopeKey: 'base:prompt', tagId: null });
+      setPage('workbench');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), 'error');
+    }
+  }, [showToast, workbenchConnection]);
+
   const openClipboardWorkbenchImage = useCallback(async () => {
     setWorkbenchLoading(true);
     setWorkbenchError('');
@@ -1526,6 +1540,7 @@ export default function App() {
               setWorkbenchSession((current) => reorderWorkbenchTabs(current, id, target))
             }
             onChooseImage={() => openWorkbenchPath()}
+            onNewBlank={newBlankWork}
             onOpenClipboard={() => openClipboardWorkbenchImage()}
             onBrowseLibrary={() => setPage('gallery')}
             onShowLibrary={(tab) => {
@@ -1559,6 +1574,7 @@ export default function App() {
                 setWorkbenchSession((current) => ({ ...current, activeTabId: id }))
               }
               onChooseImage={() => openWorkbenchPath()}
+              onNewBlank={newBlankWork}
               onClipboardImage={openClipboardWorkbenchImage}
               onCloseTab={closeTab}
               onCopyImage={async (project) => {

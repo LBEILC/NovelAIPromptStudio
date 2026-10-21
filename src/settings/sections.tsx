@@ -14,6 +14,7 @@ import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, bytes, errorText } from './parts';
 import type { AppearanceSettings } from '../shared/types';
 import type { AgentSkills } from '../shared/commands';
+import { MODEL_CAPS, MODEL_ORDER } from '../shared/params';
 
 const Fail = ({ children }: { children: ReactNode }) =>
   children ? (
@@ -431,6 +432,34 @@ export function GenerationPreferences({ agent = false }: { agent?: boolean }) {
   if (!agent)
     return (
       <>
+        <h2>新建空白作品</h2>
+        <Row
+          title="模型"
+          help="跟随上次生成时，用最近一次生成的参数和尺寸；选了模型时，用这个模型的默认参数。"
+        >
+          <Dropdown
+            label="新建空白作品的模型"
+            className="set-dd"
+            value={
+              !s.blankModel || s.blankModel === 'last'
+                ? '跟随上次生成'
+                : MODEL_CAPS[s.blankModel].name
+            }
+            items={[
+              {
+                label: '跟随上次生成',
+                checked: !s.blankModel || s.blankModel === 'last',
+                onSelect: () => save({ blankModel: 'last' }),
+              },
+              'sep',
+              ...MODEL_ORDER.map((id) => ({
+                label: MODEL_CAPS[id].name,
+                checked: s.blankModel === id,
+                onSelect: () => save({ blankModel: id }),
+              })),
+            ]}
+          />
+        </Row>
         <h2>连续生成</h2>
         <Row
           title="无人值守连续生成"

@@ -115,13 +115,16 @@ export async function buildProjectRequest(project, library, { seed, encode } = {
   if (medium) delete parameters.cfg_rescale;
   const pending = new Set();
   if (refs.vibes.length) {
+    // 三个数组必须一样长（NovelAI 校验）；编码好的 Vibe 也带信息提取，原图没记录的按 1
     parameters.reference_image_multiple = [];
     parameters.reference_strength_multiple = [];
+    parameters.reference_information_extracted_multiple = [];
     for (const ref of refs.vibes) {
       const resolved = await library.resolve(ref, settings.model, encode);
       if (resolved.pending) pending.add(resolved.cacheKey);
       parameters.reference_image_multiple.push(resolved.encoding || 'pending');
       parameters.reference_strength_multiple.push(ref.strength);
+      parameters.reference_information_extracted_multiple.push(ref.information ?? 1);
       if (encode) {
         ref.encode = null;
         ref.file = resolved.file || ref.file;

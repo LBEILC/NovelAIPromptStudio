@@ -1,7 +1,8 @@
 // 工作台的标签页（doc/design.md 2.14、2.17）：一个标签页是一个作品。没起名的只显示缩略图（按比例），起过名的后面写名称和版数。
 // 当前标签页的底和外框是一块会滑的标记；有改动的带小圆点，生成中的带墨色小圆点。悬停 400ms 弹出预览卡片。
 // 拖动换位置（只能横着拖）：按被拖的标签页自己的位置判断，过了到相邻空位的一半就换；其他的让位。中键关闭。
-// 右键：关闭、关闭其他标签页、关闭右侧标签页、在图片库中显示。最右边的"+"点击打开图片，右键是打开方式的菜单。
+// 右键：关闭、关闭其他标签页、关闭右侧标签页、在图片库中显示。最右边的"+"点击新建空白作品（2.26a；没填令牌时是打开图片），
+// 右键是菜单：新建空白作品和几种打开方式。还没有图的空白作品按尺寸比例显示一个虚线框。
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { hasImageName, imageFileName } from '../lib/imageNaming.js';
@@ -22,6 +23,7 @@ export interface TabsProps {
   onCloseTab: (id: string) => Promise<void> | void;
   onReorderTab: (id: string, target: string) => void;
   onChooseImage: () => void;
+  onNewBlank: () => void;
   onOpenClipboard: () => void;
   onBrowseLibrary: () => void;
   onShowLibrary: (tab: WorkbenchTab) => void;
@@ -72,13 +74,11 @@ export function WorkbenchTabs(p: TabsProps) {
     let live = true;
     for (const t of p.session.tabs)
       void invokeUI('version.list', { tabId: t.id })
-        .then(
-          (r) =>
-            live &&
-            setCounts((c) =>
-              c[t.id] === r.versions.length ? c : { ...c, [t.id]: r.versions.length },
-            ),
-        )
+        .then((r) => {
+          // 空白作品的起点不算一版
+          const n = r.versions.filter((v) => !v.isStart).length;
+          if (live) setCounts((c) => (c[t.id] === n ? c : { ...c, [t.id]: n }));
+        })
         .catch(() => {});
     return () => {
       live = false;
@@ -244,6 +244,13 @@ export function WorkbenchTabs(p: TabsProps) {
         })()
       : [
           {
+            label: '新建空白作品',
+            icon: 'file-add-line',
+            disabled: generation.settings.hasToken ? false : '填了 NovelAI 令牌才能生成',
+            onSelect: p.onNewBlank,
+          },
+          'sep' as const,
+          {
             label: '打开图片…',
             icon: 'folder-open-line',
             hint: 'Ctrl I',
@@ -385,16 +392,22 @@ export function WorkbenchTabs(p: TabsProps) {
                 }}
               >
                 {on && <span className="cur" />}
-                <img
-                  className={shapeOf(img?.metadata.width, img?.metadata.height)}
-                  src={mediaUrl(img?.thumbnail_path || img?.image_path || '')}
-                  alt=""
-                  draggable={false}
-                />
+                {img && !img.image_path ? (
+                  <span
+                    className={`tab-blank ${shapeOf(img.metadata.width, img.metadata.height)}`}
+                  />
+                ) : (
+                  <img
+                    className={shapeOf(img?.metadata.width, img?.metadata.height)}
+                    src={mediaUrl(img?.thumbnail_path || img?.image_path || '')}
+                    alt=""
+                    draggable={false}
+                  />
+                )}
                 {name && (
                   <>
                     <span className="nm">{name}</span>
-                    {counts[t.id] != null && <span className="n mono">{counts[t.id]} 版</span>}
+                    {!!counts[t.id] && <span className="n mono">{counts[t.id]} 版</span>}
                   </>
                 )}
                 {busy ? (
@@ -418,9 +431,13 @@ export function WorkbenchTabs(p: TabsProps) {
       )}
       <button
         className="tab add"
-        aria-label="打开图片"
-        data-tip="打开图片 · 右键选择打开方式"
-        onClick={p.onChooseImage}
+        aria-label={generation.settings.hasToken ? '新建空白作品' : '打开图片'}
+        data-tip={
+          generation.settings.hasToken
+            ? '新建空白作品 · 右键可以打开图片'
+            : '打开图片 · 右键选择打开方式'
+        }
+        onClick={generation.settings.hasToken ? p.onNewBlank : p.onChooseImage}
         onContextMenu={(e) => {
           e.preventDefault();
           setMenu({ at: [e.clientX, e.clientY], tab: null });
@@ -437,7 +454,25 @@ export function WorkbenchTabs(p: TabsProps) {
         passive
         deps={[peek]}
       >
-        {peekTab?.project && (
+        {peekTab?.project && !peekTab.project.image_path && (
+          <>
+            <div className="tp-img tp-blank">
+              <span
+                style={{
+                  aspectRatio: `${peekTab.project.metadata.width} / ${peekTab.project.metadata.height}`,
+                }}
+              />
+            </div>
+            <b className="tp-name">
+              {hasImageName(peekTab.project) ? peekTab.project.name : '空白作品'}
+            </b>
+            <span className="help mono">
+              {peekTab.project.metadata.width} × {peekTab.project.metadata.height}
+            </span>
+            <span className="help">{peekState(peekTab) || '还没有生成'}</span>
+          </>
+        )}
+        {peekTab?.project?.image_path && (
           <>
             <div className="tp-img">
               <img

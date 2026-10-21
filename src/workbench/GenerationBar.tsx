@@ -93,7 +93,8 @@ export function GenerationBar({
   useEffect(() => {
     if (state.settings.hasToken)
       void invokeUI('version.list', { tabId: tab.id }).then((r) =>
-        setOriginal(r.versions[0]?.project.metadata || null),
+        // 空白作品的起点没有图，尺寸菜单里不列"原图"
+        setOriginal(r.versions[0]?.isStart ? null : r.versions[0]?.project.metadata || null),
       );
   }, [tab.id, state.settings.hasToken]);
   useEffect(() => {

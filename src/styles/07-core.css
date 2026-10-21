@@ -145,6 +145,10 @@
 .ver-peek ins { color: var(--add); text-decoration: underline; text-underline-offset: 2px; }
 .stage .canvas-empty { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); color: var(--text-3); font-size: var(--fs-small); }
 .stage .canvas-empty i { font-size: calc(var(--icon) * 1.5); }
+.stage .canvas-blank { display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); place-items: center; align-self: stretch; justify-self: stretch; }
+.stage .canvas-blank > * { grid-area: 1 / 1; }
+.stage .canvas-blank img { box-sizing: border-box; max-width: 100%; max-height: 100%; border: var(--bw) dashed var(--text-3); border-radius: 4px; box-shadow: none; }
+.stage .canvas-blank span { color: var(--text-3); font-size: var(--fs-small); }
 .tb-end .gen-chip::after { width: var(--p, 0%); transition: width 400ms linear; }
 .tb-end .gen-chip { cursor: default; }
 
@@ -215,6 +219,12 @@ textarea.raw { font: var(--fs-small)/var(--lh-small) var(--font-mono); }
 .tab-peek { width: calc(var(--popover-w) - var(--sp-8) * 2); gap: var(--sp-1); padding: var(--sp-2); }
 .tab-peek .tp-img { display: grid; place-items: center; margin-bottom: var(--sp-1); border-radius: var(--r-thumb); background: var(--hover); overflow: hidden; }
 .tab-peek .tp-img img { display: block; max-width: 100%; max-height: 160px; object-fit: contain; }
+/* 空白作品（2.26a）：还没有图，按尺寸比例的虚线框 */
+.tab .tab-blank { display: block; flex: none; width: var(--tab-thumb-min-w); height: var(--tab-thumb-h); border: var(--bw) dashed var(--text-3); border-radius: 3px; }
+.tab .tab-blank.wide { width: var(--tab-thumb-max-w); }
+.tab .tab-blank.square { width: var(--tab-thumb-h); }
+.tab-peek .tp-blank { background: none; height: 160px; }
+.tab-peek .tp-blank > span { display: block; height: 100%; max-width: 100%; border: var(--bw) dashed var(--text-3); border-radius: var(--r-thumb); }
 .tab-peek .tp-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-weight: var(--fw-strong); font-size: var(--fs-small); line-height: var(--lh-small); }
 .tab-peek .tp-file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-caption); color: var(--text-2); }
 .tab-peek .tp-state { color: var(--text-2); }

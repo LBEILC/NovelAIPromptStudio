@@ -126,13 +126,25 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
     return () => removeEventListener('keydown', key);
   });
   const dirty = workbenchTabHasChanges(tab);
-  const vlabel = version?.parentId ? `第 ${version.number} 版` : '原图';
-  const title = image && hasImageName(image) ? `${image.name} · ${vlabel}` : vlabel;
+  // 空白作品还没有图（2.26a）：舞台是按尺寸比例的虚线框，第一行版本是"起点"
+  const blank = !!image && !image.image_path;
+  const vlabel = version?.isStart ? '起点' : version?.parentId ? `第 ${version.number} 版` : '原图';
+  const title =
+    image && hasImageName(image)
+      ? `${image.name} · ${vlabel}`
+      : blank
+        ? `空白作品 · ${vlabel}`
+        : vlabel;
   const m = image?.metadata;
+  // 占位图：和作品一样大的透明图，缩放和真图一样
+  const blankSrc = `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${m?.width || 832}" height="${m?.height || 1216}"/>`,
+  )}`;
   const pics = useSwap(
     {
       src: image && !missing ? mediaUrl(image.image_path) : '',
-      key: `${tab.id}:${image?.image_path}:${allTrashed}`,
+      key: `${tab.id}:${image?.image_path}:${allTrashed}:${blank}`,
+      blank,
     },
     (v) => v.key,
   );
@@ -193,7 +205,12 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
       )}
       <div className="canvas swap">
         {pics.map(({ key, value, leaving }) =>
-          allTrashed && !leaving ? (
+          value.blank ? (
+            <div key={key} className={`canvas-blank ${leaving ? 'leaving' : ''}`} data-enter="fade">
+              <img src={blankSrc} alt="" draggable={false} />
+              <span>写好提示词后生成第一张</span>
+            </div>
+          ) : allTrashed && !leaving ? (
             <div key={key} className="canvas-empty" data-enter="fade">
               <Icon name="delete-bin-line" />
               这一版的图片都在回收站
@@ -260,7 +277,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                 .filter(Boolean)
                 .join(' · ')}
             </span>
-            {!hasImageName(image) && (
+            {!hasImageName(image) && !blank && (
               <span className="meta file" data-tip={imageFileName(image)}>
                 文件 <span className="mono selectable">{midEll(imageFileName(image), 56)}</span>
               </span>
@@ -287,7 +304,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
               </div>
             )}
           </div>
-          <div className="stage-acts">
+          <div className="stage-acts" hidden={blank}>
             {tab.source.type === 'library' ? (
               <span className="saved">
                 <Icon name="check-line" />

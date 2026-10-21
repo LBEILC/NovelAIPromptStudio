@@ -268,6 +268,33 @@ describe('parameter metadata and request contracts', () => {
 });
 
 describe('reference encoding and pricing', () => {
+  it('rebuilds every Vibe array from the draft instead of reusing the source image', async () => {
+    const db = new DatabaseSync(':memory:'),
+      library = createVibeLibrary(db);
+    try {
+      const p = fixture('nai-diffusion-4-5-full', {
+        reference_image_multiple: ['synthetic-encoding-a', 'synthetic-encoding-b'],
+        reference_strength_multiple: [0.6, 0.4],
+        reference_information_extracted_multiple: [1, 0.8],
+      });
+      expect(p.references.vibes).toHaveLength(2);
+      p.references.vibes.pop();
+      const one = (await buildProjectRequest(p, library)).request.parameters;
+      expect(one.reference_image_multiple).toHaveLength(1);
+      expect(one.reference_strength_multiple).toEqual([0.6]);
+      expect(one.reference_information_extracted_multiple).toEqual([1]);
+      p.references.vibes = [];
+      const none = (await buildProjectRequest(p, library)).request.parameters;
+      for (const key of [
+        'reference_image_multiple',
+        'reference_strength_multiple',
+        'reference_information_extracted_multiple',
+      ])
+        expect(none).not.toHaveProperty(key);
+    } finally {
+      db.close();
+    }
+  });
   it('caches real binary responses by content, model and extraction, including after reopen', async () => {
     const db = new DatabaseSync(':memory:'),
       library = createVibeLibrary(db),
@@ -297,9 +324,8 @@ describe('reference encoding and pricing', () => {
       const first = await buildProjectRequest(p, library, { encode: client.encodeVibe });
       expect(service.state.encodes).toHaveLength(1);
       expect(first.request.parameters.reference_strength_multiple).toEqual([0.6]);
-      expect(first.request.parameters).not.toHaveProperty(
-        'reference_information_extracted_multiple',
-      );
+      // NovelAI 要求三个数组一样长，编码好的也带信息提取
+      expect(first.request.parameters.reference_information_extracted_multiple).toEqual([0.7]);
       expect(library.list()).toHaveLength(1);
       await buildProjectRequest(p, createVibeLibrary(db), { encode: client.encodeVibe });
       expect(service.state.encodes).toHaveLength(1);

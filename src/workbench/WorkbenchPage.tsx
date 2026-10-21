@@ -28,6 +28,7 @@ export interface WorkbenchPageProps
   loading: boolean;
   onChooseImage: () => void;
   onClipboardImage: () => void;
+  onNewBlank?: () => void;
   onBrowseLibrary?: () => void;
   onReset: () => void;
   onCopyImage: (project: ImageProject) => void;
@@ -99,6 +100,11 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
             {p.onBrowseLibrary && (
               <button className="btn" onClick={p.onBrowseLibrary}>
                 从图片库打开
+              </button>
+            )}
+            {generation.settings.hasToken && p.onNewBlank && (
+              <button className="btn" onClick={p.onNewBlank}>
+                新建空白作品
               </button>
             )}
             <button className="btn quiet" onClick={p.onClipboardImage}>
