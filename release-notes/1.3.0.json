@@ -57,6 +57,12 @@
     },
     {
       "kind": "improved",
+      "area": "agent",
+      "title": "Agent 一键配置",
+      "detail": "设置的 Agent 页可以把技能一键装进 Claude Code 和 Codex，技能过期时提示更新；命令行工具在 Git Bash 里也能用，跟着软件自动更新，两者都可以卸载。"
+    },
+    {
+      "kind": "improved",
       "area": "wb",
       "title": "标签页加号的打开方式",
       "detail": "标签页最右边的“+”点击打开图片，右键可以选择从剪贴板或从图片库打开。"
