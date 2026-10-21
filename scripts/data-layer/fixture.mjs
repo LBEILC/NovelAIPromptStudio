@@ -93,7 +93,15 @@ export async function seed(directory, count, progress = () => {}, { compact = fa
   try {
     raw.run('PRAGMA foreign_keys=OFF');
     // Recreate the pre-generation schema for migration and compatibility checks.
-    for (const table of ['version_images', 'work_versions', 'work_branch_names', 'works'])
+    for (const table of [
+      'branch_undo',
+      'deleted_versions',
+      'work_sequences',
+      'version_images',
+      'work_versions',
+      'work_branch_names',
+      'works',
+    ])
       raw.run(`DROP TABLE IF EXISTS ${table}`);
     raw.run('DROP TABLE IF EXISTS materials');
     raw.run('DROP TABLE IF EXISTS reference_vibes');

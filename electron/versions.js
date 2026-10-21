@@ -102,8 +102,17 @@ export function versionSignature(project) {
 }
 
 export function createVersionStore(connection) {
+  // Additive tables keep every existing snapshot readable without rewriting it.
+  connection.exec(`
+    CREATE TABLE IF NOT EXISTS deleted_versions (version_id TEXT PRIMARY KEY, token TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS branch_undo (token TEXT PRIMARY KEY, payload TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS work_sequences (work_id TEXT PRIMARY KEY, version INTEGER NOT NULL, branch INTEGER NOT NULL);
+    INSERT INTO work_sequences SELECT work_id, MAX(number), MAX(branch_number) FROM work_versions GROUP BY work_id
+      ON CONFLICT(work_id) DO UPDATE SET version=MAX(version,excluded.version), branch=MAX(branch,excluded.branch);
+  `);
   const decode = (row) =>
     row && {
+      isStart: row.number === 0,
       id: row.id,
       workId: row.work_id,
       parentId: row.parent_id,
@@ -131,10 +140,17 @@ export function createVersionStore(connection) {
           createdAt: image.created_at,
         })),
     };
-  const get = (id) => decode(connection.prepare('SELECT * FROM work_versions WHERE id=?').get(id));
+  const getAny = (id) =>
+    decode(connection.prepare('SELECT * FROM work_versions WHERE id=?').get(id));
+  const get = (id) =>
+    connection.prepare('SELECT 1 FROM deleted_versions WHERE version_id=?').get(id)
+      ? undefined
+      : getAny(id);
   const list = (workId) =>
     connection
-      .prepare('SELECT * FROM work_versions WHERE work_id=? ORDER BY number')
+      .prepare(
+        'SELECT * FROM work_versions WHERE work_id=? AND id NOT IN (SELECT version_id FROM deleted_versions) ORDER BY number',
+      )
       .all(workId)
       .map(decode);
   function atomic(fn) {
@@ -148,9 +164,136 @@ export function createVersionStore(connection) {
       throw error;
     }
   }
+  function restoreAncestors(id) {
+    while (id) {
+      const v = getAny(id);
+      if (!v) break;
+      connection.prepare('DELETE FROM deleted_versions WHERE version_id=?').run(id);
+      id = v.parentId;
+    }
+  }
+  function trashImages(rows) {
+    const ids = new Set(rows.map((v) => v.id));
+    return [
+      ...new Set(rows.flatMap((v) => v.images.filter((i) => !i.deleted).map((i) => i.projectId))),
+    ].filter(
+      (id) =>
+        !connection
+          .prepare(
+            `SELECT vi.version_id FROM version_images vi
+        WHERE vi.project_id=? AND vi.version_id NOT IN (SELECT version_id FROM deleted_versions)`,
+          )
+          .all(id)
+          .some((image) => !ids.has(image.version_id)),
+    );
+  }
   return {
     get,
     list,
+    latest: () => {
+      const row = connection
+        .prepare(
+          'SELECT v.snapshot_json FROM version_images vi JOIN work_versions v ON v.id=vi.version_id ORDER BY vi.rowid DESC LIMIT 1',
+        )
+        .get();
+      return row ? hydrateParameters(JSON.parse(row.snapshot_json)) : null;
+    },
+    discardEmpty(workId) {
+      const work = connection.prepare('SELECT origin_json FROM works WHERE id=?').get(workId);
+      if (
+        !work ||
+        !JSON.parse(work.origin_json).blank ||
+        connection
+          .prepare(
+            'SELECT 1 FROM version_images vi JOIN work_versions v ON v.id=vi.version_id WHERE v.work_id=?',
+          )
+          .get(workId)
+      )
+        return;
+      atomic(() => {
+        connection.prepare('DELETE FROM work_versions WHERE work_id=?').run(workId);
+        connection.prepare('DELETE FROM works WHERE id=?').run(workId);
+        connection.prepare('DELETE FROM work_sequences WHERE work_id=?').run(workId);
+      });
+    },
+    subtree(branchId) {
+      const first = connection
+        .prepare(
+          'SELECT * FROM work_versions WHERE branch_id=? AND id NOT IN (SELECT version_id FROM deleted_versions) ORDER BY number LIMIT 1',
+        )
+        .get(branchId);
+      if (!first) throw new Error('分支不存在');
+      if (!first.branch_number) throw new Error('主线不能删除');
+      const rows = connection
+        .prepare(
+          `WITH RECURSIVE tree(id) AS (
+        SELECT id FROM work_versions WHERE id=? UNION ALL SELECT v.id FROM work_versions v JOIN tree t ON v.parent_id=t.id
+      ) SELECT v.* FROM work_versions v JOIN tree t ON v.id=t.id WHERE v.id NOT IN (SELECT version_id FROM deleted_versions)`,
+        )
+        .all(first.id)
+        .map(decode);
+      return { rows, parent: get(first.parent_id), images: trashImages(rows) };
+    },
+    trash(rows) {
+      return atomic(() => {
+        const token = crypto.randomUUID();
+        // Fixed-seed results may deduplicate to an image still used by another live branch.
+        const images = trashImages(rows);
+        connection
+          .prepare('INSERT INTO branch_undo VALUES (?,?)')
+          .run(token, JSON.stringify({ versions: rows.map((v) => v.id), images }));
+        for (const v of rows)
+          connection.prepare('INSERT INTO deleted_versions VALUES (?,?)').run(v.id, token);
+        for (const id of images)
+          connection
+            .prepare('UPDATE projects SET deleted_at=? WHERE id=?')
+            .run(new Date().toISOString(), id);
+        return token;
+      });
+    },
+    restore(token) {
+      return atomic(() => {
+        const row = connection.prepare('SELECT payload FROM branch_undo WHERE token=?').get(token);
+        if (!row) throw new Error('撤销记录不存在');
+        const payload = JSON.parse(row.payload);
+        if (
+          payload.versions.some((id) => !getAny(id)) ||
+          payload.images.some(
+            (id) => !connection.prepare('SELECT 1 FROM projects WHERE id=?').get(id),
+          )
+        )
+          throw new Error('图片已永久删除，无法撤销');
+        for (const id of payload.versions) restoreAncestors(id);
+        for (const id of payload.images)
+          connection.prepare("UPDATE projects SET deleted_at='' WHERE id=?").run(id);
+        connection.prepare('DELETE FROM branch_undo WHERE token=?').run(token);
+        return true;
+      });
+    },
+    restoreImage(projectId) {
+      for (const row of connection
+        .prepare('SELECT version_id FROM version_images WHERE project_id=?')
+        .all(projectId))
+        restoreAncestors(row.version_id);
+    },
+    purgeImage(projectId) {
+      connection.prepare('DELETE FROM version_images WHERE project_id=?').run(projectId);
+      // Remove empty deleted leaves, then their empty ancestors. Active versions are retained.
+      let rows;
+      do {
+        rows = connection
+          .prepare(
+            `SELECT v.id FROM work_versions v JOIN deleted_versions d ON d.version_id=v.id
+          WHERE NOT EXISTS (SELECT 1 FROM version_images i WHERE i.version_id=v.id)
+          AND NOT EXISTS (SELECT 1 FROM work_versions child WHERE child.parent_id=v.id)`,
+          )
+          .all();
+        for (const row of rows) {
+          connection.prepare('DELETE FROM work_versions WHERE id=?').run(row.id);
+          connection.prepare('DELETE FROM deleted_versions WHERE version_id=?').run(row.id);
+        }
+      } while (rows.length);
+    },
     derived: (id) =>
       connection
         .prepare('SELECT id,source_json FROM works WHERE source_json IS NOT NULL')
@@ -177,7 +320,20 @@ export function createVersionStore(connection) {
           .run(workId, JSON.stringify(original), JSON.stringify(source), time);
         connection
           .prepare('INSERT INTO work_versions VALUES (?,?,?,?,?,?,?,?,?)')
-          .run(id, workId, null, 1, id, 0, JSON.stringify(original), 'user', time);
+          .run(
+            id,
+            workId,
+            null,
+            original.blank ? 0 : 1,
+            id,
+            0,
+            JSON.stringify(original),
+            'user',
+            time,
+          );
+        connection
+          .prepare('INSERT INTO work_sequences VALUES (?,?,?)')
+          .run(workId, original.blank ? 0 : 1, 0);
         return get(id);
       });
     },
@@ -187,18 +343,26 @@ export function createVersionStore(connection) {
         if (!parent || parent.workId !== workId) throw new Error('版本不存在');
         let target = versionId
           ? get(versionId)
-          : source !== 'agent' && versionSignature(project) === versionSignature(parent.project)
+          : !parent.isStart &&
+              source !== 'agent' &&
+              versionSignature(project) === versionSignature(parent.project)
             ? parent
             : null;
         if (!target) {
           const versions = list(workId),
             children = versions.filter((v) => v.parentId === parent.id);
           const id = crypto.randomUUID(),
-            number = Math.max(...versions.map((v) => v.number)) + 1;
+            number =
+              connection.prepare('SELECT version FROM work_sequences WHERE work_id=?').get(workId)
+                .version + 1;
           const branchNumber = children.length
-            ? Math.max(...versions.map((v) => v.branchNumber)) + 1
+            ? connection.prepare('SELECT branch FROM work_sequences WHERE work_id=?').get(workId)
+                .branch + 1
             : parent.branchNumber;
           const branchId = children.length ? id : parent.branchId;
+          connection
+            .prepare('UPDATE work_sequences SET version=?, branch=MAX(branch,?) WHERE work_id=?')
+            .run(number, branchNumber, workId);
           connection
             .prepare('INSERT INTO work_versions VALUES (?,?,?,?,?,?,?,?,?)')
             .run(
@@ -208,7 +372,7 @@ export function createVersionStore(connection) {
               number,
               branchId,
               branchNumber,
-              JSON.stringify(project),
+              JSON.stringify({ ...project, blank: undefined }),
               source,
               new Date().toISOString(),
             );

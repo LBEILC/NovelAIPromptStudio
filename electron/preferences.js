@@ -1,3 +1,4 @@
+import { MODEL_ORDER } from '../src/shared/params.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_BASE_URL, normalizeBaseUrl } from './translation.js';
@@ -256,6 +257,7 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       write(stored);
     },
     generationSettings: () => ({
+      blankModel: 'last',
       hasToken: !!read().novelAITokenEncrypted,
       continuous: false,
       agentMode: 'confirm',
@@ -264,6 +266,8 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       ...(read().generation || {}),
     }),
     saveGenerationSettings: (next) => {
+      if (next.blankModel !== undefined && !['last', ...MODEL_ORDER].includes(next.blankModel))
+        throw new Error('模型无效');
       const stored = read();
       stored.generation = { ...(stored.generation || {}), ...next };
       write(stored);

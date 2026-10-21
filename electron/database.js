@@ -775,18 +775,9 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     };
   };
 
-  const originalCover = (json) => {
-    const original = safeJson(json);
-    if (!original?.image_path) return undefined;
-    return {
-      image_path: original.image_path,
-      thumbnail_path: original.thumbnail_path || original.image_path,
-      metadata: { width: original.metadata?.width, height: original.metadata?.height },
-    };
-  };
   const generatedFields = (id) => {
     const row = query(
-      'SELECT v.work_id, v.number, v.source, w.origin_json FROM version_images vi JOIN work_versions v ON v.id=vi.version_id JOIN works w ON w.id=v.work_id WHERE vi.project_id=$id ORDER BY vi.rowid DESC LIMIT 1',
+      'SELECT v.work_id, v.number, v.source FROM version_images vi JOIN work_versions v ON v.id=vi.version_id WHERE vi.project_id=$id ORDER BY (v.id IN (SELECT version_id FROM deleted_versions)), vi.rowid DESC LIMIT 1',
       { $id: id },
     )[0];
     return row
@@ -794,7 +785,6 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
           generated_work_id: row.work_id,
           version_number: row.number,
           generation_source: row.source,
-          work_cover: originalCover(row.origin_json),
         }
       : {};
   };
@@ -1373,14 +1363,13 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       ORDER BY created_at DESC, project_order`);
     const generated = new Map(
       query(
-        'SELECT vi.project_id,v.work_id,v.number,v.source,w.origin_json FROM version_images vi JOIN work_versions v ON v.id=vi.version_id JOIN works w ON w.id=v.work_id ORDER BY vi.rowid',
+        'SELECT vi.project_id,v.work_id,v.number,v.source FROM version_images vi JOIN work_versions v ON v.id=vi.version_id ORDER BY (v.id IN (SELECT version_id FROM deleted_versions)) DESC, vi.rowid',
       ).map((row) => [
         row.project_id,
         {
           generated_work_id: row.work_id,
           version_number: row.number,
           generation_source: row.source,
-          work_cover: originalCover(row.origin_json),
         },
       ]),
     );
@@ -1804,8 +1793,10 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       throw error;
     }
   };
+  const versionStore = createVersionStore(connection);
   const deleteProject = (id) => {
     const projectId = String(id || '');
+    versionStore.purgeImage(projectId);
     database.run('DELETE FROM gallery_collection_projects WHERE project_id = $id', {
       $id: projectId,
     });
@@ -1874,6 +1865,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
           'UPDATE projects SET is_favorite = $favorite, deleted_at = $deleted_at, updated_at = $updated_at WHERE id = $id',
           { $id: id, $favorite: favorite, $deleted_at: deletedAt, $updated_at: nowValue },
         );
+        if (patch.deleted === false) versionStore.restoreImage(id);
         results.success.push(id);
       }
       database.run('COMMIT');
@@ -2027,7 +2019,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   backfillPromptFingerprints(false);
   commit();
   return {
-    versions: createVersionStore(connection),
+    versions: versionStore,
     vibeLibrary: createVibeLibrary(connection),
     materials: createMaterialStore(connection),
     loadLibrary,

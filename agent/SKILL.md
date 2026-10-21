@@ -84,7 +84,7 @@ nai-studio dictionary.set-many --json '{"entries":[{"tag":"blue hair","translati
 
 ## 生成与版本
 
-生成始终从已有图片的草稿出发。先估算费用，再按用户授权调用 `generate.start`；默认返回待确认任务，等用户在软件里确认，不能自行确认。用户选择直接生成后才会直接排队；每日花费上限可能使任务转回待确认。每张请求串行发送，失败不会自动重试。Agent 生成另起一版，不替换用户正在看的图片。
+生成可以从已有图片或空白作品的草稿出发。先估算费用，再按用户授权调用 `generate.start`；默认返回待确认任务，等用户在软件里确认，不能自行确认。用户选择直接生成后才会直接排队；每日花费上限可能使任务转回待确认。每张请求串行发送，失败不会自动重试。Agent 生成另起一版，不替换用户正在看的图片。
 
 ```sh
 nai-studio generate.estimate --json '{"tabId":"TAB","count":1}'
@@ -114,3 +114,16 @@ nai-studio reference.add-vibe --json '{"tabId":"tab-id","libraryId":"vibe-id"}'
 ```
 
 Vibe 和精确参考互斥。换模型返回 `needs_confirm` 时，只有用户已授权移除参考图才用 `dropReferences:true` 重试。Medium 的固定参数由命令层执行。添加图片和费用估算不会编码；生成获准执行后才编码，并按图片、模型和信息提取值复用缓存。Agent 必须显式给出参考来源，不能打开文件选择框。
+
+### 从零开始做一幅作品
+
+```sh
+nai-studio workbench.new --json '{"name":"云间练习","width":832,"height":1216}'
+nai-studio prompt.set --json '{"tabId":"TAB","scope":"base:prompt","text":"clouds, blue sky"}'
+nai-studio params.set --json '{"tabId":"TAB","patch":{"steps":28,"scale":5}}'
+nai-studio generate.queue --json '{"tabId":"TAB","count":1}'
+```
+
+将 `TAB` 替换成新建结果的 `tab.id`。新建不要求持久令牌；生成仍须用户授权并遵守待确认规则。
+`branch.delete {branchId, confirmed?}` 可将非主线分支及后代移入回收站；有子分支时先返回 `needs_confirm`，错误的 `details` 提供 `branches`、`versions`、`images` 数量。确认范围后传 `confirmed:true`。生成中的分支不能删除；待确认任务随分支取消。
+返回的 `undo` 可交给 `branch.restore {undo}` 撤销。Agent 不能永久删除图片、清空回收站或更改账号设置。

@@ -1,3 +1,4 @@
+import { createBlankProject } from '../workbench.js';
 import { buildProjectRequest } from '../parameterRequest.js';
 import fs from 'node:fs/promises';
 import syncFs from 'node:fs';
@@ -117,6 +118,16 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       return true;
     },
     changed: (jobs) => {
+      const openWorks = new Set(store.get().tabs.map((t) => t.workId));
+      for (const job of jobs) {
+        if (
+          !openWorks.has(job.workId) &&
+          !jobs.some(
+            (j) => j.workId === job.workId && ['pending', 'queued', 'generating'].includes(j.state),
+          )
+        )
+          versions.discardEmpty(job.workId);
+      }
       for (const job of jobs)
         if (job.source === 'agent' && job.spent > (spent.get(job.id) || 0)) {
           const s = settings();
@@ -159,6 +170,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           const changed = JSON.stringify(current.project) !== JSON.stringify(job.project);
           const snapshot = {
             ...job.project,
+            blank: undefined,
             id: image.id,
             image_path: image.image_path,
             thumbnail_path: image.thumbnail_path,
@@ -200,6 +212,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     const p = image ? services.database.loadProject(image.projectId) : version.project;
     const snapshot = {
       ...version.project,
+      blank: image ? undefined : version.project.blank,
       image_path: p.image_path,
       thumbnail_path: p.thumbnail_path,
       id: p.id,
@@ -226,6 +239,85 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     return full(next);
   }
   const handlers = {
+    'workbench.new': async (input, caller) => {
+      const project = createBlankProject(input, {
+        model: settings().blankModel || 'last',
+        latest: versions.latest(),
+      });
+      const next = createWorkbenchTab(project);
+      next.revision = 0;
+      next.workId = next.id;
+      next.versionId = versions.ensure(next.id, project).id;
+      const session = store.get();
+      session.tabs.push(next);
+      if (caller.source !== 'agent') session.activeTabId = next.id;
+      await store.save(session);
+      emit({ tabId: next.id });
+      return full(next);
+    },
+    'branch.delete': async (input) => {
+      const { rows, parent, images } = versions.subtree(input.branchId);
+      const ids = new Set(rows.map((v) => v.id));
+      const jobs = queue.status().filter((j) => ids.has(j.parentId) || ids.has(j.versionId));
+      if (jobs.some((j) => ['generating', 'queued'].includes(j.state)))
+        throw new CommandError('branch_generating', '这条分支正在生成');
+      const counts = {
+        branches: new Set(rows.map((v) => v.branchId)).size,
+        versions: rows.length,
+        images: images.length,
+      };
+      if (counts.branches > 1 && !input.confirmed) {
+        const error = new CommandError('needs_confirm', '删除分支需要确认');
+        error.details = counts;
+        throw error;
+      }
+      const pending = jobs.filter((j) => j.state === 'pending').map((j) => j.id);
+      const undo = versions.trash(rows);
+      if (pending.length) queue.cancel(pending);
+      const session = store.get();
+      for (const current of session.tabs) {
+        if (!ids.has(current.versionId)) continue;
+        current.versionId = parent.id;
+        current.versionImageId = parent.images.find((i) => !i.deleted)?.projectId || '';
+        const image =
+          current.versionImageId && services.database.loadProject(current.versionImageId);
+        current.originalProject = structuredClone({
+          ...parent.project,
+          ...(image
+            ? {
+                blank: undefined,
+                image_path: image.image_path,
+                thumbnail_path: image.thumbnail_path,
+                id: image.id,
+              }
+            : {}),
+        });
+        const original = current.originalProject;
+        current.source = services.database.loadProject(original.id)
+          ? { type: 'library', projectId: original.id, path: original.image_path }
+          : { type: 'file', path: original.image_path };
+        current.error = '';
+        current.revision = (current.revision || 0) + 1;
+      }
+      try {
+        await store.save(session);
+      } catch (error) {
+        versions.restore(undo);
+        services.database.refreshGeneratedCards();
+        throw error;
+      }
+      services.database.refreshGeneratedCards();
+      emit({ libraryChanged: true });
+      publish();
+      return { ...counts, cancelledJobs: pending.length, undo };
+    },
+    'branch.restore': ({ undo }) => {
+      const restored = versions.restore(undo);
+      services.database.refreshGeneratedCards();
+      emit({ libraryChanged: true });
+      publish();
+      return { restored };
+    },
     'account.get': () => status(),
     'account.refresh': async () => {
       await refresh();
@@ -327,7 +419,12 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       queue.stop(input.id);
       return status();
     },
-    'generate.retry': (input) => queue.retry(input.id),
+    'generate.retry': (input) => {
+      const job = queue.status(input.id);
+      if (!versions.get(job.parentId) || (job.versionId && !versions.get(job.versionId)))
+        throw new CommandError('not_found', '版本不存在');
+      return queue.retry(input.id);
+    },
     'version.list': async (input) => {
       const current = tab(input.tabId),
         parent = await ensure(current),
@@ -436,6 +533,19 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       return full(next);
     },
   };
+  handlers['generate.queue'] = handlers['generate.start'];
   if (settings().hasToken) void refresh().catch(() => {});
-  return { handlers, close: () => queue.close() };
+  return {
+    handlers,
+    close: () => queue.close(),
+    discardEmpty: (workId) => {
+      if (
+        workId &&
+        !queue
+          .status()
+          .some((j) => j.workId === workId && ['pending', 'queued', 'generating'].includes(j.state))
+      )
+        versions.discardEmpty(workId);
+    },
+  };
 }

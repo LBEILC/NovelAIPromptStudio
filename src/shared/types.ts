@@ -144,12 +144,9 @@ export interface StoredGenerationParameters extends GenerationParameters {
   extra_json: string;
 }
 export interface ImageProject {
+  blank?: true;
+  paramsSource?: 'last' | 'defaults';
   generated_work_id?: string;
-  work_cover?: {
-    image_path: string;
-    thumbnail_path: string;
-    metadata: { width?: number; height?: number };
-  };
   version_number?: number;
   generation_source?: 'user' | 'agent';
   original_filename?: string;
@@ -207,11 +204,6 @@ export interface LibraryCard
     | 'group_cover_id'
   > {
   generated_work_id?: string;
-  work_cover?: {
-    image_path: string;
-    thumbnail_path: string;
-    metadata: { width?: number; height?: number };
-  };
   version_number?: number;
   generation_source?: 'user' | 'agent';
   // null reuses JSON.stringify(JSON.parse(prompt_fingerprint).base).

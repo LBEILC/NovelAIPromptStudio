@@ -889,7 +889,7 @@ it.each([1, 25])(
     expect(performance.now).toBe(clock);
   },
 );
-it('uses the original work image for its cover without changing generated image identities', async () => {
+it('keeps generated image identities without projecting an original work cover', async () => {
   const directory = temporary();
   const api = await open(directory);
   api.insertProject(sample(0));
@@ -911,11 +911,7 @@ it('uses the original work image for its cover without changing generated image 
       .run('image', 'version', 'p0', '1', '2026-01-02');
   });
   const cards = await api.loadLibraryCards();
-  expect(cards[0].work_cover).toEqual({
-    image_path: original.image_path,
-    thumbnail_path: original.thumbnail_path,
-    metadata: original.metadata,
-  });
+  expect(cards[0]).not.toHaveProperty('work_cover');
   expect(cards[0].id).toBe('p0');
-  expect(api.loadProject('p0').work_cover).toEqual(cards[0].work_cover);
+  expect(api.loadProject('p0')).not.toHaveProperty('work_cover');
 });

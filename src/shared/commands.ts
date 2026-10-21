@@ -21,6 +21,7 @@ import type {
 } from './generation';
 
 export type CommandErrorCode =
+  | 'branch_generating'
   | 'needs_confirm'
   | 'invalid_input'
   | 'not_found'
@@ -29,7 +30,14 @@ export type CommandErrorCode =
   | 'app_busy';
 export type CommandResult<T> =
   | { ok: true; data: T }
-  | { ok: false; error: { code: CommandErrorCode; message: string } };
+  | {
+      ok: false;
+      error: {
+        code: CommandErrorCode;
+        message: string;
+        details?: { branches: number; versions: number; images: number };
+      };
+    };
 export interface CommandTab {
   id: string;
   identity: string;
@@ -159,6 +167,27 @@ export interface CommandDefinitions {
   };
   'material.delete': { input: { id: string }; output: Record<string, never> };
 
+  'workbench.new': {
+    input: {
+      name?: string;
+      width?: number;
+      height?: number;
+      params?: Partial<import('./params').GenerationSettings>;
+    };
+    output: TabDocument;
+  };
+  'branch.delete': {
+    input: { branchId: string; confirmed?: boolean };
+    output: {
+      branches: number;
+      versions: number;
+      images: number;
+      cancelledJobs: number;
+      undo: string;
+    };
+  };
+  'branch.restore': { input: { undo: string }; output: { restored: boolean } };
+  'generate.queue': { input: TabInput & { count: number }; output: GenerationJob };
   /**
    * 改第二层参数（1.4）。patch 只写要改的项。换模型时：
    * - 目标模型角色数不够：invalid_input，不改；

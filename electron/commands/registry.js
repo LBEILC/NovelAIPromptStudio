@@ -1,4 +1,5 @@
 // @ts-check
+import { MODEL_ORDER } from '../../src/shared/params.ts';
 import { validSettingsPatch } from './parameterValidation.js';
 /** @typedef {import('../../src/shared/commands').CommandName} CommandName */
 /** @typedef {import('../../src/shared/commands').CommandErrorCode} CommandErrorCode */
@@ -60,6 +61,21 @@ export const commandRegistry = {
   },
   'material.delete': { fields: { id: 'string' }, required: ['id'], mutation: true, uiOnly: true },
 
+  'workbench.new': {
+    fields: { name: 'string', width: 'number', height: 'number', params: 'generationPatch' },
+    mutation: true,
+  },
+  'branch.delete': {
+    fields: { branchId: 'string', confirmed: 'boolean' },
+    required: ['branchId'],
+    mutation: true,
+  },
+  'branch.restore': { fields: { undo: 'string' }, required: ['undo'], mutation: true },
+  'generate.queue': {
+    fields: { ...tab, count: 'integer' },
+    required: ['tabId', 'count'],
+    mutation: true,
+  },
   'params.set': {
     fields: { ...tab, patch: 'generationPatch', dropReferences: 'boolean' },
     required: ['tabId', 'patch'],
@@ -120,6 +136,7 @@ export const commandRegistry = {
   'account.refresh': { fields: {}, uiOnly: true },
   'settings.generation.save': {
     fields: {
+      blankModel: ['last', ...MODEL_ORDER].join('|'),
       continuous: 'boolean',
       agentMode: 'confirm|direct',
       limitEnabled: 'boolean',
@@ -432,6 +449,8 @@ export class CommandError extends Error {
   constructor(code, message) {
     super(message);
     this.code = code;
+    /** @type {{branches:number,versions:number,images:number}|undefined} */
+    this.details = undefined;
   }
 }
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
@@ -645,6 +664,7 @@ export function validateCommand(name, input, source) {
     throw new CommandError('forbidden', '这个命令只供软件界面使用');
   if (
     source === 'agent' &&
+    !['branch.delete', 'branch.restore'].includes(name) &&
     (/^(settings?|preferences?|keys?|secrets?|account|generation)\./i.test(name) ||
       /(?:permanent|empty|delete|purge|restore)/i.test(name))
   )

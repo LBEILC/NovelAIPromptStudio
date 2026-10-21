@@ -447,4 +447,66 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
       p.references.vibes.length + p.references.precise.length === 0
     );
   });
+
+  const blank = await call('workbench.new', {
+    width: 64,
+    height: 64,
+    params: { model: 'nai-diffusion-5-full', effort: 'High' },
+  });
+  const blankId = blank.tab.id;
+  await call('prompt.set', { tabId: blankId, scope: 'base:prompt', text: 'synthetic cloud study' });
+  const firstBlankJob = await call('generate.queue', { tabId: blankId, count: 1 });
+  await invoke('generate.confirm', { ids: [firstBlankJob.id] });
+  await wait(
+    `window.studio.invoke('generate.status',{id:${JSON.stringify(firstBlankJob.id)}}).then(r=>r.data.jobs[0].state==='completed')`,
+    '空白作品首张生成完成',
+  );
+  const blankTree = (await call('version.list', { tabId: blankId })).versions;
+  await check('新建空白作品生成首张后成为第1版并进入图片库', async () => {
+    const cards = await database.loadLibraryCards();
+    return (
+      blankTree.length === 2 &&
+      blankTree[0].isStart &&
+      blankTree[0].number === 0 &&
+      blankTree[1].number === 1 &&
+      blankTree[1].images.length === 1 &&
+      cards.some(
+        (card) =>
+          card.id === blankTree[1].images[0].projectId &&
+          card.generated_work_id === blank.tab.workId,
+      )
+    );
+  });
+  await call('version.open', { tabId: blankId, versionId: blankTree[0].id });
+  await call('prompt.set', {
+    tabId: blankId,
+    scope: 'base:prompt',
+    text: 'synthetic alternate clouds',
+  });
+  const blankBranchJob = await invoke('generate.start', { tabId: blankId, count: 1 });
+  await wait(
+    `window.studio.invoke('generate.status',{id:${JSON.stringify(blankBranchJob.id)}}).then(r=>r.data.jobs[0].state==='completed')`,
+    '空白作品分支生成完成',
+  );
+  const branchVersion = (await call('version.list', { tabId: blankId })).versions.at(-1);
+  await call('branch.rename', { branchId: branchVersion.branchId, name: 'Synthetic branch' });
+  const draftBeforeDelete = (await call('workbench.get', { tabId: blankId })).tab.project;
+  const deletedBranch = await call('branch.delete', { branchId: branchVersion.branchId });
+  const deletedTab = (await call('workbench.get', { tabId: blankId })).tab;
+  const inTrash = database.loadProject(branchVersion.images[0].projectId).deleted_at;
+  await call('branch.restore', { undo: deletedBranch.undo });
+  await check('删除分支回到分叉版且保留草稿，撤销恢复图片、名称和编号', async () => {
+    const restored = (await call('version.list', { tabId: blankId })).versions.find(
+      (v) => v.id === branchVersion.id,
+    );
+    return (
+      !!inTrash &&
+      deletedTab.versionId === blankTree[0].id &&
+      JSON.stringify(deletedTab.project) === JSON.stringify(draftBeforeDelete) &&
+      restored?.branchName === 'Synthetic branch' &&
+      restored.number === branchVersion.number &&
+      restored.branchNumber === branchVersion.branchNumber &&
+      !restored.images[0].deleted
+    );
+  });
 }

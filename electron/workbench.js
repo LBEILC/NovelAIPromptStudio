@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { hydrateParameters } from './params.js';
+import { normalizeSettings, hydrateParameters } from './params.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -103,4 +103,56 @@ export async function readWorkbenchImage(
     })),
   };
   return hydrateParameters(enrichProjectTags(project));
+}
+
+export function createBlankProject(input = {}, { model = 'last', latest = null } = {}) {
+  const inherited = model === 'last' ? latest : null;
+  const params = normalizeSettings({
+    model: model === 'last' ? 'nai-diffusion-5-full' : model,
+    effort: 'High',
+    steps: 28,
+    scale: 5,
+    rescale: 0,
+    sampler: 'k_euler_ancestral',
+    noise: 'karras',
+    quality: 'Standard',
+    uc: 'Heavy',
+    ...(inherited?.params || {}),
+    aiPositions: true,
+    positions: {},
+    ...input.params,
+  });
+  const dimension = (value) => {
+    if (!Number.isFinite(value) || value <= 0) throw new Error('尺寸无效');
+    return Math.min(2048, Math.max(64, Math.round(value / 64) * 64));
+  };
+  const metadata = {
+    model: params.model,
+    width: dimension(input.width ?? (inherited?.metadata.width || 832)),
+    height: dimension(input.height ?? (inherited?.metadata.height || 1216)),
+    prompt_raw: '',
+    negative_prompt: '',
+    seed: '',
+    steps: params.steps,
+    guidance: params.scale,
+    sampler: params.sampler,
+    extra_json: '',
+  };
+  const now = new Date().toISOString();
+  return {
+    id: `blank-${crypto.randomUUID()}`,
+    name: input.name || '空白作品',
+    blank: true,
+    paramsSource: inherited ? 'last' : 'defaults',
+    image_path: '',
+    thumbnail_path: '',
+    created_at: now,
+    updated_at: now,
+    metadata,
+    params,
+    tags: [],
+    prompt_structure: createPromptStructure(metadata),
+    references: { vibes: [], precise: [] },
+    keptParameters: [],
+  };
 }

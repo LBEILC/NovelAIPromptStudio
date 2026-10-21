@@ -214,6 +214,7 @@ export async function createCommands(services) {
       revision(input.expectedRevision, value.revision || 0);
       unlocked(input);
       await store.save(closeWorkbenchTab(store.get(), input.tabId));
+      generation.discardEmpty?.(value.workId);
       emit();
       return { closed: input.tabId };
     },
@@ -546,7 +547,14 @@ export async function createCommands(services) {
       );
     } catch (error) {
       if (error instanceof CommandError)
-        return { ok: false, error: { code: error.code, message: error.message } };
+        return {
+          ok: false,
+          error: {
+            code: error.code,
+            message: error.message,
+            ...(error.details ? { details: error.details } : {}),
+          },
+        };
       const code = /** @type {NodeJS.ErrnoException} */ (error).code;
       return {
         ok: false,

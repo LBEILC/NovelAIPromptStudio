@@ -1,5 +1,6 @@
 import type { ImageProject } from './types';
 export interface GenerationSettings {
+  blankModel?: 'last' | import('./params').ModelId;
   hasToken: boolean;
   continuous: boolean;
   agentMode: 'confirm' | 'direct';
@@ -34,6 +35,7 @@ export interface VersionImage {
   createdAt: string;
 }
 export interface WorkVersion {
+  isStart?: boolean;
   id: string;
   workId: string;
   parentId: string | null;

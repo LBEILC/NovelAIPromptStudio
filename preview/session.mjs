@@ -244,6 +244,16 @@ export async function createSession(services, images, emit, empty = false) {
         const job = await call('generate.start', { tabId, count: 1 });
         await waitJob(job.id);
       }
+      const branchRoot = (await call('version.list', { tabId })).versions.find(
+        (v) => v.branchNumber === 1,
+      );
+      await call('version.open', { tabId, versionId: branchRoot.id });
+      await call('prompt.set', {
+        tabId,
+        scope: 'base:prompt',
+        text: 'synthetic nested branch, evening clouds',
+      });
+      await waitJob((await call('generate.start', { tabId, count: 1 })).id);
       const trash = structuredClone(database.loadProject(cards[13].id));
       trash.id = crypto.randomUUID();
       trash.tags.forEach((t) => (t.id = crypto.randomUUID()));
