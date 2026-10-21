@@ -267,12 +267,44 @@ export interface AISettings {
   model: string;
   hasApiKey: boolean;
   encryptionAvailable: boolean;
+  /** 1.5：内置 AI 用哪一种（doc/design.md 2.27）。没登录 ChatGPT、也没填 API Key 时是 'chatgpt' */
+  provider: 'chatgpt' | 'apiKey';
+  chatgpt: ChatGPTAccount;
+}
+/** ChatGPT 账号（1.5）。两种登录方式各自登录、各自保存令牌；这里是当前方式的状态 */
+export interface ChatGPTAccount {
+  /** 'official' 是 OpenAI 开放的 Sign in with ChatGPT；'codex' 是非官方的 Codex 方式，默认关闭 */
+  mode: 'official' | 'codex';
+  signedIn: boolean;
+  /** 只用来显示；不是稳定身份 */
+  email: string | null;
+  /** 选中的模型 slug；没选过时是模型列表的第一个 */
+  model: string;
+  /** 第一次登录成功后的说明弹过了 */
+  introShown: boolean;
+  /** 剩余额度：Codex 方式才有（官方方式响应里有额度信息时也填）；取不到是 null */
+  quota: ChatGPTQuota | null;
+  /** 最近一次 AI 请求因为额度用完被拒：界面出"已达到用量上限"横幅 */
+  limited: { resetsAt: string | null } | null;
+}
+export interface ChatGPTQuota {
+  /** 每个窗口一行；Pro 没有 5 小时的窗口。label 是界面上的名字（"5 小时内""本周"） */
+  windows: { label: string; remainingPercent: number; resetsAt: string | null }[];
+  updatedAt: string;
+  /** 上次刷新失败的原因；windows 仍是上一次成功的值 */
+  error?: string;
 }
 export interface AISettingsInput {
   baseUrl?: string;
   model?: string;
   apiKey?: string;
   clearApiKey?: boolean;
+  provider?: 'chatgpt' | 'apiKey';
+  /** 选 ChatGPT 的模型 */
+  chatgptModel?: string;
+  /** 打开或关上 Codex 方式；关上时清掉 Codex 方式的令牌 */
+  codexMode?: boolean;
+  introShown?: true;
 }
 export interface AppearanceSettings {
   themeMode: 'auto' | 'dark' | 'light';

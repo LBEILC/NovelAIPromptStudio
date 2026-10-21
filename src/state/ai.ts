@@ -18,6 +18,16 @@ export function useAISettings(notify?: (text: string) => void) {
       apiKey: '',
       hasApiKey: false,
       encryptionAvailable: true,
+      provider: 'chatgpt' as const,
+      chatgpt: {
+        mode: 'official' as const,
+        signedIn: false,
+        email: null,
+        model: '',
+        introShown: false,
+        quota: null,
+        limited: null,
+      },
     },
   });
   const settings = draft.settings;

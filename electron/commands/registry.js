@@ -270,6 +270,12 @@ export const commandRegistry = {
   'updates.open-release': { fields: { url: 'text' }, required: [], uiOnly: true },
   'fonts.list': { fields: {}, required: [], uiOnly: true },
   'ai.models': { fields: {}, required: [], uiOnly: true },
+  // 1.5 ChatGPT 账号：只给界面用（账号和令牌，Agent 和命令行不能碰）
+  'ai.chatgpt.sign-in': { fields: {}, required: [], uiOnly: true },
+  'ai.chatgpt.cancel-sign-in': { fields: {}, required: [], uiOnly: true },
+  'ai.chatgpt.sign-out': { fields: {}, required: [], uiOnly: true },
+  'ai.chatgpt.models': { fields: {}, required: [], uiOnly: true },
+  'ai.chatgpt.quota': { fields: {}, required: [], uiOnly: true },
   'ai.test': { fields: {}, required: [], uiOnly: true },
   'storage.get': { fields: {}, required: [], uiOnly: true },
   'storage.database': { fields: {}, required: [], uiOnly: true },

@@ -468,6 +468,26 @@ export interface CommandDefinitions {
     input: Record<string, never>;
     output: IPC.Result<{ models: string[] }>;
   };
+  /**
+   * 用 ChatGPT 账号登录（1.5，当前方式）：在本机开回调、打开系统浏览器，等用户在网页上完成后返回。
+   * 失败的错误码：canceled（用户关了网页或点了取消）、denied（拒绝授权）、
+   * not_eligible（免费账号或 workspace 不允许，界面给"改用 API Key"）、network
+   */
+  'ai.chatgpt.sign-in': { input: Record<string, never>; output: Types.AISettings };
+  /** 放弃正在等待的登录 */
+  'ai.chatgpt.cancel-sign-in': { input: Record<string, never>; output: Record<string, never> };
+  /** 退出登录：撤销远端令牌（没确认也清本地），remoteRevoked 告诉界面远端是否确认了 */
+  'ai.chatgpt.sign-out': {
+    input: Record<string, never>;
+    output: Types.AISettings & { remoteRevoked: boolean };
+  };
+  /** 这个账号能用的模型（按服务器的顺序；name 是显示名，slug 用来请求） */
+  'ai.chatgpt.models': {
+    input: Record<string, never>;
+    output: { models: { slug: string; name: string }[] };
+  };
+  /** 刷新剩余额度（Codex 方式）；取不到时 quota.error 有原因 */
+  'ai.chatgpt.quota': { input: Record<string, never>; output: Types.ChatGPTQuota | null };
   'ai.test': {
     input: Record<string, never>;
     output: IPC.Result<{ model: string; latencyMs: number; response: string }>;
