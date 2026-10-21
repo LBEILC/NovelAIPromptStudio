@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { settleLayout } from './layout.js';
 
@@ -8,6 +9,16 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   h.category('Agent');
   const script = path.join(app.getAppPath(), 'agent', 'nai-studio.mjs');
   const userData = app.getPath('userData');
+  const execute = promisify(execFile);
+  const launcherResult = async (executable, args) => {
+    const { stdout } = await execute(executable, args, {
+      env: { ...process.env, NAI_STUDIO_USER_DATA: userData, NAI_STUDIO_NO_LAUNCH: '1' },
+      windowsHide: true,
+      timeout: 20000,
+    });
+    const result = JSON.parse(stdout.trim());
+    return result.ok && result.data.version === app.getVersion();
+  };
   const cli = (name, input = {}, entry = script) =>
     new Promise((resolve, reject) => {
       const child = spawn(process.execPath, [entry, name, '--json', JSON.stringify(input)], {
@@ -132,6 +143,42 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   );
   await h.click('重新安装', row('命令行工具'));
   await h.wait('!document.querySelector("[data-settings-section=agent] .loading")');
+  // Real shell startup belongs to the process acceptance harness, not parallel unit tests.
+  if (process.platform === 'win32') {
+    const runner = path.join(setupRoot, 'run launcher.ps1');
+    await fs.writeFile(runner, '& $args[0] $args[1]\nexit $LASTEXITCODE\n');
+    await h.check('PowerShell 通过已安装 cmd 脚本连接隔离应用', () =>
+      launcherResult(
+        path.join(
+          process.env.SystemRoot || 'C:\\Windows',
+          'System32',
+          'WindowsPowerShell',
+          'v1.0',
+          'powershell.exe',
+        ),
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          runner,
+          path.join(setupRoot, 'bin', 'nai-studio.cmd'),
+          'app.status',
+        ],
+      ),
+    );
+    await h.check('Git Bash 通过已安装无扩展名脚本连接隔离应用', () =>
+      launcherResult(
+        path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'bin', 'bash.exe'),
+        [path.join(setupRoot, 'bin', 'nai-studio'), 'app.status'],
+      ),
+    );
+  } else {
+    await h.check('POSIX 启动脚本连接隔离应用', () =>
+      launcherResult(path.join(setupRoot, 'bin', 'nai-studio'), ['app.status']),
+    );
+  }
   for (const [target, title, action] of [
     ['claude', 'Claude Code', '安装'],
     ['codex', 'Codex', '更新'],

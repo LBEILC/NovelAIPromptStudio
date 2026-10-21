@@ -1,7 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { agentSetup, launcherScripts, writeWindowsPath, environmentBroadcast } from './setup.js';
 import { validateCommand } from './registry.js';
@@ -23,54 +21,6 @@ const options = () => ({
   packaged: false,
 });
 const agentHome = (target: string) => path.join(root, 'home', `.${target}`);
-
-it.runIf(process.platform === 'win32')(
-  'runs both installed Windows launchers with the real Electron executable',
-  async () => {
-    const execute = promisify(execFile);
-    const setup = agentSetup({
-      ...options(),
-      executable: path.resolve('node_modules/electron/dist/electron.exe'),
-    });
-    await setup.install();
-    const runner = path.join(root, 'run-launcher.ps1');
-    await fs.writeFile(runner, '& $args[0] $args[1]\nexit $LASTEXITCODE\n');
-    const ps = path.join(
-      process.env.SystemRoot || 'C:\\Windows',
-      'System32',
-      'WindowsPowerShell',
-      'v1.0',
-      'powershell.exe',
-    );
-    const cmd = await execute(
-      ps,
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        runner,
-        path.join(root, 'bin', 'nai-studio.cmd'),
-        'help',
-      ],
-      { windowsHide: true },
-    );
-    const bash = path.join(
-      process.env.ProgramFiles || 'C:\\Program Files',
-      'Git',
-      'bin',
-      'bash.exe',
-    );
-    const sh = await execute(bash, [path.join(root, 'bin', 'nai-studio'), 'help'], {
-      windowsHide: true,
-    });
-    const fromCmd = JSON.parse(cmd.stdout.trim());
-    expect(fromCmd.ok).toBe(true);
-    expect(fromCmd.data.commands.some((c: { name: string }) => c.name === 'app.status')).toBe(true);
-    expect(JSON.parse(sh.stdout.trim())).toEqual(fromCmd);
-  },
-);
 
 it('preserves long unexpanded PATH text and broadcasts only after the registry write', async () => {
   const previous = '%USERPROFILE%\\bin;' + 'C:\\Long Folder;'.repeat(100);
