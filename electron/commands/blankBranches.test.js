@@ -23,6 +23,7 @@ async function fixture(run) {
   });
   let imported = 0;
   const events = [];
+  const listeners = new Set();
   const services = {
     directory,
     database,
@@ -39,7 +40,10 @@ async function fixture(run) {
       database.insertProject(image);
       return image;
     },
-    emit: (event) => events.push(event),
+    emit: (event) => {
+      events.push(event);
+      for (const listener of listeners) listener(event);
+    },
   };
   let commands = await createCommands(services);
   const dispatch = (...args) => commands.dispatch(...args);
@@ -49,10 +53,25 @@ async function fixture(run) {
     return result.data;
   };
   const waitJob = async (id) => {
-    await expect
-      .poll(async () => (await call('generate.status', { id })).jobs[0].state)
-      .toMatch(/^(completed|failed)$/);
-    const job = (await call('generate.status', { id })).jobs[0];
+    // Subscribe before reading status so completion cannot fall between the read
+    // and subscription. The fixture's database budget guards stalled jobs.
+    const job = await new Promise((resolve, reject) => {
+      const observe = (event) => {
+        if (event.type !== 'generation') return;
+        const current = event.data.jobs.find((item) => item.id === id);
+        if (!current || !['completed', 'failed', 'canceled'].includes(current.state)) return;
+        listeners.delete(observe);
+        resolve(current);
+      };
+      listeners.add(observe);
+      call('generate.status', { id }).then(
+        (data) => observe({ type: 'generation', data }),
+        (error) => {
+          listeners.delete(observe);
+          reject(error);
+        },
+      );
+    });
     expect(job.error || job.state).toBe('completed');
     return job;
   };
@@ -89,6 +108,7 @@ async function fixture(run) {
       },
     });
   } finally {
+    listeners.clear();
     service.state.resume?.();
     await commands.close();
     await service.close();
