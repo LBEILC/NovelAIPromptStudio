@@ -12,12 +12,24 @@
       "icon": "restart"
     },
     {
+      "kind": "improved",
+      "area": "wb",
+      "title": "适配 <artist> 分组写法",
+      "detail": "用 <artist>…</artist> 这类标记给提示词分组时，结尾的 </artist> 算作这一块的结尾，不再当成一个 Tag；它后面不空行也会另起一块。原文一个字也不改。"
+    },
+    {
       "kind": "fixed",
       "area": "wb",
       "title": "Tag 乱跳、译文挂错",
       "detail": "多次修改提示词后，新加的 Tag 可能撞号，导致切换版本后多出一个 Tag、点击时乱跳，译文显示在别的 Tag 下面。已修复；已经存下来的作品打开时自动恢复正常。",
       "highlight": true,
       "icon": "shield"
+    },
+    {
+      "kind": "fixed",
+      "area": "wb",
+      "title": "转换块被算作改动",
+      "detail": "把 Tag 块转成段落、改块名或块的译文，不再在版本栏出现“未生成”，生成时也不会多出一版。"
     },
     {
       "kind": "fixed",
