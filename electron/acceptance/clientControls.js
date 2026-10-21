@@ -18,7 +18,7 @@ export async function clientControlChecks({ h, mode, doubles }) {
     await h.wait('!!document.querySelector(".prose")');
   }
   await h.wait('document.querySelectorAll(".tabs [data-tab]").length===2');
-  await h.click('显示', 'document.querySelector(".prompt-in > .col-h")');
+  await h.click('显示', 'document.querySelector(".prompt-in")');
   await h.screenshot('022-segments-workbench');
   await h.key('Escape');
   await h.wait('!document.querySelector(".view-pop")');

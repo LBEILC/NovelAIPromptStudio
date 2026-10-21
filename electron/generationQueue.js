@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 export function createGenerationQueue({
   generate,
   accept,
+  prepare = async () => {},
   balance,
   beforeEach = () => true,
   initial = [],
@@ -49,6 +50,7 @@ export function createGenerationQueue({
           let before;
           try {
             before = await balance();
+            await prepare(job);
             const request = structuredClone(job.request);
             if (!job.fixedSeed) request.parameters.seed = crypto.randomInt(0, 0x100000000);
             const png = await generate(request, (progress) => {

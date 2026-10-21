@@ -142,7 +142,7 @@ export interface GenerationSettings {
   effort: Effort | null;
   steps: number;
   scale: number;
-  /** 只有 V5 有 Rescale；Medium 和其他模型是 null */
+  /** 六个基础模型支持 Rescale；Medium 是 null */
   rescale: number | null;
   sampler: Sampler;
   /** V5 是 null（不能调） */
@@ -174,6 +174,9 @@ export interface VibeReference {
   encode: 'new' | 'changed' | null;
   /** 来自 Vibe 库的那一项 */
   libraryId?: string;
+  /** 从 PNG 恢复或生成前取得的编码；仅适用于记录的模型。 */
+  encoding?: string;
+  model?: ModelId;
 }
 export type PreciseReferenceType = 'character' | 'style' | 'character&style';
 /** 一个精确参考（指定角色或画风） */

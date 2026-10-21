@@ -1,15 +1,9 @@
-import { promptForTransmission } from '../../src/lib/promptStructure.js';
+import { buildProjectRequest } from '../parameterRequest.js';
 import fs from 'node:fs/promises';
 import syncFs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {
-  buildGenerationRequest,
-  createNovelAIClient,
-  estimateGeneration,
-  generationModel,
-  generationUnavailable,
-} from '../generation.js';
+import { createNovelAIClient, estimateGeneration } from '../generation.js';
 import { createGenerationQueue } from '../generationQueue.js';
 import { createWorkbenchTab } from '../../src/lib/workbenchSession.js';
 import { createPromptDocument } from '../../src/lib/promptDocument.ts';
@@ -75,75 +69,13 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     return versions.get(current.versionId) || root;
   }
   async function requestFor(current, fixedSeed = false, explicitSeed) {
-    const original = current.originalProject || current.project;
-    let metadata = original.metadata;
-    if (!metadata.extra_json && original.image_path)
-      metadata = (await services.readImage(original.image_path)).metadata;
-    let raw;
-    try {
-      raw = JSON.parse(metadata.extra_json || '{}').parsed || {};
-    } catch {
-      raw = {};
-    }
-    // Older imported records still provide normalized parameters as a fallback.
-    raw = {
-      width: metadata.width,
-      height: metadata.height,
-      steps: metadata.steps,
-      scale: metadata.guidance,
-      sampler: metadata.sampler,
-      ...raw,
-    };
-    const model =
-      generationModel(raw.model_name) ||
-      generationModel(raw.model) ||
-      generationModel(metadata.model);
-    const reason = generationUnavailable(raw, model);
-    if (reason) throw new Error(reason);
-    const draft = current.project,
-      edits = { width: draft.metadata.width, height: draft.metadata.height };
+    let seed;
     if (fixedSeed) {
-      const seed = explicitSeed ?? Number(draft.metadata.seed);
+      seed = explicitSeed ?? Number(current.project.metadata.seed);
       if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff)
         throw new Error('Seed 无效');
-      edits.seed = seed;
     }
-    if (draft.metadata.prompt_raw !== original.metadata.prompt_raw)
-      edits.prompt = promptForTransmission(draft.metadata.prompt_raw, draft, 'base:prompt');
-    if (draft.metadata.negative_prompt !== original.metadata.negative_prompt)
-      edits.negative = promptForTransmission(
-        draft.metadata.negative_prompt,
-        draft,
-        'base:undesired',
-      );
-    const chars = (p) =>
-      (p.prompt_structure?.characters || []).map((c) => [c.prompt_raw, c.undesired_raw, c.center]);
-    if (JSON.stringify(chars(draft)) !== JSON.stringify(chars(original))) {
-      for (const [key, field, base] of [
-        ['v4_prompt', 'prompt_raw', draft.metadata.prompt_raw],
-        ['v4_negative_prompt', 'undesired_raw', draft.metadata.negative_prompt],
-      ]) {
-        edits[key] = {
-          ...(raw[key] || {}),
-          caption: {
-            base_caption: promptForTransmission(
-              base,
-              draft,
-              key === 'v4_prompt' ? 'base:prompt' : 'base:undesired',
-            ),
-            char_captions: draft.prompt_structure.characters.map((c) => ({
-              char_caption: promptForTransmission(
-                c[field],
-                draft,
-                `character:${c.id}:${field === 'prompt_raw' ? 'prompt' : 'undesired'}`,
-              ),
-              centers: [c.center],
-            })),
-          },
-        };
-      }
-    }
-    return buildGenerationRequest(raw, model, edits);
+    return buildProjectRequest(current.project, services.database.vibeLibrary, { seed });
   }
   const spent = new Map();
   const queueFile = path.join(services.directory, 'generation-queue.json');
@@ -158,6 +90,17 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       syncFs.renameSync(temporary, queueFile);
     },
     generate: (request, progress) => client().generate(request, progress),
+    prepare: async (job) => {
+      if (job.referencesPrepared) return;
+      const prepared = await buildProjectRequest(job.project, services.database.vibeLibrary, {
+        seed: job.request.parameters.seed,
+        encode: (body) => client().encodeVibe(body),
+      });
+      job.request = prepared.request;
+      job.project = prepared.project;
+      job.referencesPrepared = true;
+      emit({ tabId: job.tabId });
+    },
     balance: refresh,
     beforeEach: async (job) => {
       const s = settings();
@@ -315,7 +258,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     'generate.estimate': async (input) => {
       const current = tab(input.tabId);
       try {
-        const request = await requestFor(current);
+        const { request, pendingEncodes } = await requestFor(current);
         for (const key of ['width', 'height'])
           if (input[key] !== undefined) {
             if (!Number.isFinite(input[key]) || input[key] <= 0) throw new Error('尺寸无效');
@@ -325,7 +268,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
             );
           }
         return {
-          ...estimateGeneration(request, subscription, input.count),
+          ...estimateGeneration(request, subscription, input.count, pendingEncodes),
           balance: balance(),
           usage: subscription?.usage?.percent,
         };
@@ -347,8 +290,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       if (!settings().hasToken) throw new Error('没有持久令牌');
       if (input.continuous && (caller.source === 'agent' || !settings().continuous))
         throw new CommandError('forbidden', '持续生成未开启');
-      const request = await requestFor(current, input.fixedSeed, input.seed),
-        price = estimateGeneration(request, subscription, input.count),
+      const { request, pendingEncodes } = await requestFor(current, input.fixedSeed, input.seed),
+        price = estimateGeneration(request, subscription, input.count, pendingEncodes),
         s = settings();
       if (balance() < (input.continuous ? price.perImage : price.anlas))
         throw new Error('Anlas 不足');

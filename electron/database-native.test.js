@@ -97,8 +97,10 @@ describe('native engine upgrade', () => {
           original_filename: record.name + (path.extname(record.image_path) || '.png'),
           has_custom_name: false,
         }));
-      expect(database.loadLibrary()).toEqual(withNaming(expected.library));
-      expect(database.loadLibrary('trash')).toEqual(withNaming(expected.trash));
+      const originalFields = (records) =>
+        records.map(({ params, references, keptParameters, ...record }) => record);
+      expect(originalFields(database.loadLibrary())).toEqual(withNaming(expected.library));
+      expect(originalFields(database.loadLibrary('trash'))).toEqual(withNaming(expected.trash));
       inspect(directory, (raw) => {
         expect(
           raw
@@ -109,6 +111,7 @@ describe('native engine upgrade', () => {
           [
             ...Object.keys(expected.tables).filter((name) => !RETIRED_TABLES.includes(name)),
             'materials',
+            'reference_vibes',
             'version_images',
             'work_branch_names',
             'work_versions',

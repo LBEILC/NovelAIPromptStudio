@@ -96,6 +96,7 @@ export async function seed(directory, count, progress = () => {}, { compact = fa
     for (const table of ['version_images', 'work_versions', 'work_branch_names', 'works'])
       raw.run(`DROP TABLE IF EXISTS ${table}`);
     raw.run('DROP TABLE IF EXISTS materials');
+    raw.run('DROP TABLE IF EXISTS reference_vibes');
     raw.run("DELETE FROM app_meta WHERE key IN ('generation_versions_v1','materials_v1')");
     progress('seed:orphan-metadata');
     raw.run('BEGIN');

@@ -1,6 +1,8 @@
 // @ts-check
 import { countImportDays } from '../../src/lib/dateRange.js';
 import crypto from 'node:crypto';
+import { parameterCommands } from './params.js';
+import { hydrateParameters } from '../params.js';
 import { materialCommands } from './materials.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { commandRegistry, validateCommand, CommandError } from './registry.js';
@@ -57,7 +59,15 @@ import { generationCommands } from './generation.js';
 
 /** @param {Services} services */
 export async function createCommands(services) {
-  const store = await openCommandSession(services.directory, services.readSource);
+  const store = await openCommandSession(services.directory, async (source) =>
+    hydrateParameters(await services.readSource(source)),
+  );
+  const restored = store.get();
+  for (const t of restored.tabs) {
+    if (t.project) t.project = hydrateParameters(t.project);
+    if (t.originalProject) t.originalProject = hydrateParameters(t.originalProject);
+  }
+  if (restored.tabs.length) await store.save(restored);
   /** @type {EditingTarget[]} */
   let editing = [];
   /** @type {AsyncLocalStorage<'ui'|'agent'>} */
@@ -85,9 +95,10 @@ export async function createCommands(services) {
   /** @param {Tab} value */
   const full = (value) => {
     if (!value.project) throw new CommandError('not_found', '这个标签页没有可读取的提示词');
+    const refreshed = services.database.vibeLibrary.refresh(value.project);
     return {
-      tab: value,
-      document: createPromptDocument(value.project),
+      tab: { ...value, project: refreshed },
+      document: createPromptDocument(refreshed),
       revision: value.revision || 0,
     };
   };
@@ -190,7 +201,7 @@ export async function createCommands(services) {
       if (!origin) return { canceled: true };
       if (input.path && !origin.path) origin.path = input.path;
       if (input.libraryId) project(input.libraryId);
-      const image = await services.readSource(origin);
+      const image = hydrateParameters(await services.readSource(origin));
       origin.path = image.image_path;
       const next = /** @type {Session} */ (addWorkbenchTab(store.get(), image, { source: origin }));
       for (const t of next.tabs) t.revision ??= 0;
@@ -485,6 +496,7 @@ export async function createCommands(services) {
     handlers,
     generation.handlers,
     materialCommands({ services, tab, full, edit, locate, revision }),
+    parameterCommands({ services, tab, edit, revision, unlocked }),
   );
   /** @param {import('../../src/shared/commands').CommandInput<'collection.add'>} input @param {'add'|'remove'} action */
   async function members(input, action) {

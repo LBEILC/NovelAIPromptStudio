@@ -82,6 +82,7 @@
       "dist/**/*",
       "electron/**/*",
       "src/lib/**/*",
+      "src/shared/params.ts",
       "src/workbench/edits.ts",
       "src/workbench/model.ts",
       "agent/**/*",

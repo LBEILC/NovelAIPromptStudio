@@ -38,6 +38,7 @@ export const GENERATION_MODELS = Object.freeze(
   Object.fromEntries(
     [
       'nai-diffusion-5-full',
+      'nai-diffusion-5-full-medium',
       'nai-diffusion-5-curated',
       'nai-diffusion-4-5-full',
       'nai-diffusion-4-5-curated',
@@ -55,7 +56,7 @@ export function generationModel(value) {
     .toLowerCase()
     .replace(/-inpainting$/, '');
   if (GENERATION_MODELS[text]) return text;
-  if (/medium|93f4bd30|70ab5786/.test(text)) return null;
+  if (/medium|93f4bd30|70ab5786/.test(text)) return 'nai-diffusion-5-full-medium';
   if (/657484a5|0adf9ab7/.test(text)) return 'nai-diffusion-5-full';
   if (/db276663/.test(text)) return 'nai-diffusion-5-curated';
   if (/37442fca|4f49ec75|ca4b7203|79f47848|f6302a9d/.test(text)) return 'nai-diffusion-4-full';
@@ -148,11 +149,13 @@ export function buildGenerationRequest(raw, model, edits = {}) {
   return { action: 'generate', input: prompt, model, parameters };
 }
 
-export function estimateGeneration(request, subscription, count = 1) {
+export function estimateGeneration(request, subscription, count = 1, pendingEncodes = 0) {
   if (!Number.isSafeInteger(count) || count < 1) throw new Error('张数必须是正整数');
   const p = request.parameters;
   const v5 = request.model.startsWith('nai-diffusion-5-');
   const free =
+    // TODO: verify Opus precise-reference base pricing with an authorized paid experiment.
+    !p.director_reference_images?.length &&
     subscription?.active === true &&
     subscription.tier >= 3 &&
     p.width * p.height <= 1048576 &&
@@ -160,14 +163,28 @@ export function estimateGeneration(request, subscription, count = 1) {
     !(v5 && subscription.usage?.isNegative);
   // Formula from the official image client's checkStableDiffusionPrice (2026-10-20).
   const base = Math.ceil(
-    2.951823174884865e-6 * p.width * p.height + 5.753298233447344e-7 * p.width * p.height * p.steps,
+    2.951823174884865e-6 * p.width * p.height +
+      5.753298233447344e-7 *
+        p.width *
+        p.height *
+        p.steps *
+        (request.model.endsWith('-medium') ? 1 / 1.06521739 : 1),
   );
-  const perImage =
-    (free
-      ? 0
-      : Math.max(2, Math.ceil(base * (p.sm_dyn && p.sm ? 1.4 : p.sm ? 1.2 : 1) * (v5 ? 1.5 : 1)))) +
-    2 * Math.max(0, (p.reference_image_multiple?.length || 0) - 4);
-  return { anlas: perImage * count, perImage, free: perImage === 0, count };
+  const basePrice = free
+    ? 0
+    : Math.max(2, Math.ceil(base * (p.sm_dyn && p.sm ? 1.4 : p.sm ? 1.2 : 1) * (v5 ? 1.5 : 1)));
+  // TODO: verify multi-image Vibe surcharge; conservatively charge per image.
+  const vibeExtra = 2 * Math.max(0, (p.reference_image_multiple?.length || 0) - 4);
+  const precise = 5 * (p.director_reference_images?.length || 0);
+  const perImage = basePrice + vibeExtra + precise;
+  const parts = {
+    base: basePrice * count,
+    encode: pendingEncodes * 2,
+    vibeExtra: vibeExtra * count,
+    precise: precise * count,
+  };
+  const anlas = perImage * count + parts.encode;
+  return { anlas, perImage, free: anlas === 0, count, parts };
 }
 
 export function generationError(status, reason = '') {
@@ -267,6 +284,8 @@ export function createNovelAIClient({
     }
   }
   return {
+    encodeVibe: async (body) =>
+      Buffer.from(await (await send('/ai/encode-vibe', body)).arrayBuffer()).toString('base64'),
     subscription: async () => (await send('/user/subscription')).json(),
     generate: async (request, onProgress = () => {}) => {
       const response = await send('/ai/generate-image-stream', {

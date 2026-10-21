@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { hydrateParameters } from './params.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
@@ -81,6 +82,7 @@ export function migrateGenerationVersions(connection, filePath, { copy = fs.copy
 }
 
 export function versionSignature(project) {
+  project = hydrateParameters(project);
   const s = project.prompt_structure;
   return JSON.stringify([
     project.metadata.prompt_raw,
@@ -89,6 +91,13 @@ export function versionSignature(project) {
     // Serialized prompt order matters; translations and display labels do not.
     project.metadata.width,
     project.metadata.height,
+    project.params,
+    project.references?.vibes.map((r) => [
+      r.thumbnail || r.encoding || r.libraryId,
+      r.strength,
+      r.information,
+    ]),
+    project.references?.precise.map((r) => [r.thumbnail, r.type, r.strength, r.fidelity]),
   ]);
 }
 
@@ -105,7 +114,7 @@ export function createVersionStore(connection) {
         connection
           .prepare('SELECT name FROM work_branch_names WHERE branch_id=?')
           .get(row.branch_id)?.name || (row.branch_number ? `分支 ${row.branch_number}` : '主线'),
-      project: JSON.parse(row.snapshot_json),
+      project: hydrateParameters(JSON.parse(row.snapshot_json)),
       source: row.source,
       createdAt: row.created_at,
       images: connection
@@ -153,7 +162,7 @@ export function createVersionStore(connection) {
       return (
         w && {
           id: w.id,
-          origin: JSON.parse(w.origin_json),
+          origin: hydrateParameters(JSON.parse(w.origin_json)),
           source: JSON.parse(w.source_json || 'null'),
         }
       );

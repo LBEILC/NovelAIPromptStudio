@@ -372,4 +372,69 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
     '!!document.querySelector("[role=dialog]:not(.leaving *)")&&document.body.innerText.includes("允许 Agent 直接生成？")',
   );
   await click('取消', 'document.querySelector("[role=dialog]:not(.leaving *)")');
+  // Exercise the public CLI and real main-process queue using only the local fake service.
+  const refTab = (await call('workbench.open', { path: files[1] })).tab.id;
+  await call('params.set', {
+    tabId: refTab,
+    patch: { model: 'nai-diffusion-4-5-full', steps: 23 },
+    dropReferences: true,
+  });
+  const reference = await call('reference.add-vibe', { tabId: refTab, path: files[0] });
+  const referenceId = reference.tab.project.references.vibes[0].id;
+  await call('reference.set', { tabId: refTab, id: referenceId, strength: 0.4 });
+  const needsConfirm = await cli('params.set', {
+    tabId: refTab,
+    patch: { model: 'nai-diffusion-5-full' },
+  });
+  await check(
+    '命令行换模型要求显式移除参考且保留草稿',
+    async () =>
+      needsConfirm.result.error?.code === 'needs_confirm' &&
+      (await call('workbench.get', { tabId: refTab })).tab.project.references.vibes.length === 1,
+  );
+  const encodesBefore = generationService.state.encodes.length;
+  const referenceJob = await call('generate.start', { tabId: refTab, count: 2 });
+  await check(
+    'Agent待确认时不编码参考图',
+    () =>
+      referenceJob.state === 'pending' && generationService.state.encodes.length === encodesBefore,
+  );
+  await invoke('generate.confirm', { ids: [referenceJob.id] });
+  await wait(
+    `window.studio.invoke('generate.status',{id:${JSON.stringify(referenceJob.id)}}).then(r=>r.data.jobs[0].state==='completed')`,
+    '参考生成完成',
+  );
+  await check('两张生成只编码一次并保存参考库及版本参数', async () => {
+    const tree = await call('version.list', { tabId: refTab }),
+      library = await call('vibe.library'),
+      price = await call('generate.estimate', { tabId: refTab, count: 1 });
+    return (
+      generationService.state.encodes.length === encodesBefore + 1 &&
+      library.items.length > 0 &&
+      price.parts.encode === 0 &&
+      tree.versions.every(
+        (v) => v.project.params && v.project.references && v.project.keptParameters,
+      )
+    );
+  });
+  await call('reference.remove', { tabId: refTab, id: referenceId });
+  await call('reference.add-precise', { tabId: refTab, path: files[0] });
+  await check('精确参考费用包含基础价和附加费', async () => {
+    const price = await call('generate.estimate', { tabId: refTab, count: 2 });
+    return price.parts.precise === 10 && price.parts.base > 0 && price.parts.encode === 0;
+  });
+  await call('params.set', {
+    tabId: refTab,
+    patch: { model: 'nai-diffusion-5-full', effort: 'Medium', steps: 50, uc: 'None' },
+    dropReferences: true,
+  });
+  await check('命令行Medium固定项与参考移除生效', async () => {
+    const p = (await call('workbench.get', { tabId: refTab })).tab.project;
+    return (
+      p.params.steps === 14 &&
+      p.params.uc === 'Heavy' &&
+      p.params.rescale === null &&
+      p.references.vibes.length + p.references.precise.length === 0
+    );
+  });
 }

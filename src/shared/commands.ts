@@ -21,6 +21,7 @@ import type {
 } from './generation';
 
 export type CommandErrorCode =
+  | 'needs_confirm'
   | 'invalid_input'
   | 'not_found'
   | 'conflict'

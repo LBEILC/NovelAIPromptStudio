@@ -150,7 +150,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await wait('document.querySelectorAll(".blk[data-block]").length===4');
   await check(
     '无角色时节标题为提示词，顶部包含编辑方式、搜索、显示、翻译与复制',
-    `document.querySelector('.sec-h').textContent.includes('提示词') && ['编辑方式','搜索 Tag 或译文','显示','翻译','其他复制方式'].every(label=>document.querySelector('.prompt-in > .col-h [aria-label="'+label+'"]'))`,
+    `document.querySelector('.sec-h').textContent.includes('提示词') && ['编辑方式','搜索 Tag 或译文','显示','翻译','其他复制方式'].every(label=>document.querySelector('.prompt-in [aria-label="'+label+'"]'))`,
   );
   await shot('copy-header');
   await click('这一块的操作', 'document.querySelector(".blk[data-block]")');

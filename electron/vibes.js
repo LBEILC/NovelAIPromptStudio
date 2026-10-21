@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { generationModel } from './generation.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -29,13 +30,21 @@ function finiteNumber(value, fallback = null) {
 }
 
 function normalizedModel(value = '') {
-  return String(value).toLowerCase().includes('curated')
-    ? 'nai-diffusion-4-5-curated'
-    : 'nai-diffusion-4-5-full';
+  return (
+    generationModel(value) ||
+    (String(value).toLowerCase() === 'curated'
+      ? 'nai-diffusion-4-5-curated'
+      : 'nai-diffusion-4-5-full')
+  );
 }
-
-function modelKey(value = '') {
-  return String(value).toLowerCase().includes('curated') ? 'v4-5curated' : 'v4-5full';
+export function modelKey(value = '') {
+  const model = normalizedModel(value);
+  return {
+    'nai-diffusion-4-full': 'v4full',
+    'nai-diffusion-4-curated-preview': 'v4curated',
+    'nai-diffusion-4-5-full': 'v4-5full',
+    'nai-diffusion-4-5-curated': 'v4-5curated',
+  }[model];
 }
 
 export function createEmbeddedVibeDocument(vibe = {}) {
@@ -83,11 +92,11 @@ export function extractEmbeddedVibes(raw, modelLabel = '') {
     ? raw.reference_information_extracted_multiple
     : [];
   return encodings
-    .filter((encoding) => typeof encoding === 'string' && encoding.length > 100)
     .map((encoding, index) => ({
       encoding,
       strength: finiteNumber(strengths[index], 0.6),
       information_extracted: finiteNumber(information[index]),
       model: normalizedModel(modelLabel),
-    }));
+    }))
+    .filter((vibe) => typeof vibe.encoding === 'string' && vibe.encoding.length > 100);
 }

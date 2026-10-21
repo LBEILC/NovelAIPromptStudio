@@ -1,4 +1,5 @@
 // @ts-check
+import { validSettingsPatch } from '../params.js';
 /** @typedef {import('../../src/shared/commands').CommandName} CommandName */
 /** @typedef {import('../../src/shared/commands').CommandErrorCode} CommandErrorCode */
 /** @typedef {{ fields: Record<string, string>, required?: string[], uiOnly?: boolean, mutation?: boolean, example?:object }} Definition */
@@ -60,7 +61,7 @@ export const commandRegistry = {
   'material.delete': { fields: { id: 'string' }, required: ['id'], mutation: true, uiOnly: true },
 
   'params.set': {
-    fields: { ...tab, patch: 'object', dropReferences: 'boolean' },
+    fields: { ...tab, patch: 'generationPatch', dropReferences: 'boolean' },
     required: ['tabId', 'patch'],
     mutation: true,
   },
@@ -78,10 +79,10 @@ export const commandRegistry = {
     fields: {
       ...tab,
       id: 'string',
-      strength: 'number',
-      information: 'number',
-      type: 'string',
-      fidelity: 'number',
+      strength: 'unit',
+      information: 'unit',
+      type: 'character|style|character&style',
+      fidelity: 'unit',
     },
     required: ['tabId', 'id'],
     mutation: true,
@@ -572,6 +573,9 @@ function valid(value, type) {
     return (
       typeof value === 'string' && value.length <= 2_000_000 && (type === 'text' || !!value.trim())
     );
+  if (type === 'generationPatch') return validSettingsPatch(value);
+  if (type === 'unit')
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
   if (type === 'integer') return Number.isSafeInteger(value) && Number(value) >= 0;
   if (type === 'number') return typeof value === 'number' && Number.isFinite(value);
   if (type === 'boolean') return typeof value === 'boolean';

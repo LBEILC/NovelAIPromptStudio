@@ -99,3 +99,18 @@ nai-studio work.open --json '{"workId":"WORK"}'
 ```
 
 张数是正整数，不设产品上限；请求仍逐张发送。不要用循环自行重试失败任务。`generate.status` 返回任务状态、已生成的图片库 ID 与失败原因；软件退出会取消未发出的任务。尺寸取最近的 64 倍数。账号、生成设置、确认、放弃与停止仅供界面使用，命令行返回 `forbidden`。
+# 参数与参考
+
+读取 `workbench.get` 的 `tab.project.params`、`references` 和修订号后修改草稿；这些命令沿用编辑冲突与撤销规则。
+
+```sh
+nai-studio params.set --json '{"tabId":"tab-id","expectedRevision":0,"patch":{"steps":23,"quality":"Standard"}}'
+nai-studio reference.add-vibe --json '{"tabId":"tab-id","path":"/path/to/reference.png"}'
+nai-studio reference.add-precise --json '{"tabId":"tab-id","imageId":"image-id"}'
+nai-studio reference.set --json '{"tabId":"tab-id","id":"reference-id","strength":0.6}'
+nai-studio reference.remove --json '{"tabId":"tab-id","id":"reference-id"}'
+nai-studio vibe.library --json '{}'
+nai-studio reference.add-vibe --json '{"tabId":"tab-id","libraryId":"vibe-id"}'
+```
+
+Vibe 和精确参考互斥。换模型返回 `needs_confirm` 时，只有用户已授权移除参考图才用 `dropReferences:true` 重试。Medium 的固定参数由命令层执行。添加图片和费用估算不会编码；生成获准执行后才编码，并按图片、模型和信息提取值复用缓存。Agent 必须显式给出参考来源，不能打开文件选择框。

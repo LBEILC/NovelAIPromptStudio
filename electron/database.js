@@ -11,6 +11,8 @@ import {
 } from '../src/lib/galleryGrouping.js';
 import { extractV4PromptData, normalizePromptStructure } from '../src/lib/promptStructure.js';
 import { danbooruLookupName } from './danbooru.js';
+import { hydrateParameters } from './params.js';
+import { createVibeLibrary } from './vibeLibrary.js';
 import { extractEmbeddedVibes, fingerprintVibes } from './vibes.js';
 import { imageFileName } from '../src/lib/imageNaming.js';
 import { migrateGenerationVersions, createVersionStore } from './versions.js';
@@ -809,12 +811,12 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       metadata,
       prompt_structure: safeJson(metadata.prompt_structure_json),
     });
-    return {
+    return hydrateParameters({
       ...hydrated,
       ...generatedFields(project.id),
       ...namingFields(project, metadata),
       group_cover_id: '',
-    };
+    });
   };
 
   const namingFields = (project, metadata) => {
@@ -877,7 +879,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     const cached = lookupTagDictionary(
       hydrated.flatMap((project) => projectTags(project).map((tag) => tag.tag)),
     );
-    return hydrated.map((project) => enrichProjectTags(project, cached));
+    return hydrated.map((project) => hydrateParameters(enrichProjectTags(project, cached)));
   };
 
   const cardDirtyPrefix = 'library_cards_dirty:';
@@ -1695,12 +1697,20 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
           },
         );
       database.run(
-        'UPDATE generation_metadata SET prompt_raw=$prompt, negative_prompt=$negative, prompt_structure_json=$structure WHERE project_id=$id',
+        'UPDATE generation_metadata SET prompt_raw=$prompt, negative_prompt=$negative, prompt_structure_json=$structure, extra_json=$extra WHERE project_id=$id',
         {
           $id: id,
           $prompt: next.metadata.prompt_raw,
           $negative: next.metadata.negative_prompt,
           $structure: JSON.stringify(next.prompt_structure),
+          $extra: JSON.stringify({
+            ...safeJson(existing.metadata.extra_json),
+            studio_generation: {
+              params: draft.params,
+              references: draft.references,
+              keptParameters: draft.keptParameters,
+            },
+          }),
         },
       );
       database.run(
@@ -2018,6 +2028,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   commit();
   return {
     versions: createVersionStore(connection),
+    vibeLibrary: createVibeLibrary(connection),
     materials: createMaterialStore(connection),
     loadLibrary,
     loadLibraryCards,

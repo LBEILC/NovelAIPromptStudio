@@ -14,6 +14,7 @@ import {
 } from '../electron/workbench.js';
 import { createPreviewHandlers } from './handlers.mjs';
 import { pause } from './services.mjs';
+import { hydrateParameters, normalizeSettings } from '../electron/params.js';
 
 export async function createSession(services, images, emit, empty = false) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-ui-preview-'));
@@ -132,6 +133,39 @@ export async function createSession(services, images, emit, empty = false) {
       if (result.imported.length !== 14)
         throw Error(`需要14张演示图，实际导入${result.imported.length}`);
       const cards = await database.loadLibraryCards();
+      // Isolated preview drafts exercise both parameter/reference capability groups.
+      for (const [index, model] of [
+        [1, 'nai-diffusion-4-5-full'],
+        [2, 'nai-diffusion-5-full'],
+      ]) {
+        const project = hydrateParameters(database.loadProject(cards[index].id));
+        project.params = normalizeSettings({ ...project.params, model });
+        project.references = { vibes: [], precise: [] };
+        if (index === 1)
+          project.references.vibes = [
+            {
+              id: 'preview-image-vibe',
+              name: '色彩参考',
+              thumbnail: `data:image/png;base64,${fs.readFileSync(copies[0]).toString('base64')}`,
+              file: null,
+              strength: 0.6,
+              information: 0.7,
+              encode: 'new',
+            },
+            {
+              id: 'preview-encoded-vibe',
+              name: '编码参考',
+              thumbnail: null,
+              file: null,
+              strength: 0.4,
+              information: null,
+              encode: null,
+              model,
+              encoding: Buffer.alloc(128, 1).toString('base64'),
+            },
+          ];
+        database.saveProjectPrompt(project.id, project);
+      }
       for (const [name, ids] of [
         ['本周精选', cards.slice(0, 4).map((c) => c.id)],
         ['构图研究', cards.slice(4, 7).map((c) => c.id)],

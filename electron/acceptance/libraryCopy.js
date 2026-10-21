@@ -4,7 +4,7 @@ import { formatPositivePromptForCopy, getPromptScopes } from '../../src/lib/prom
 export async function libraryCopyChecks(env) {
   const { h, database, files, mode, doubles } = env;
   const { evaluate: e, wait, click, input, check } = h;
-  const copyButton = `document.querySelector('.prompt-in > .col-h [aria-label="其他复制方式"]')`;
+  const copyButton = `document.querySelector('.prompt-in [aria-label="其他复制方式"]')`;
   h.category('图片库·复制');
   if (mode.category === '图片库·复制') {
     // Exercise the resident legacy menu across Activity hide/show, matching the

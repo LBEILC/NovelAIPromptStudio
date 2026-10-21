@@ -379,6 +379,64 @@ export function expandV5AutomaticPrompt(prompt, negative, model, hints) {
   }
   return { prompt, negative };
 }
+
+// Explicit draft presets use the same templates as import recognition.
+export function stripAutomaticAtBoundary(raw, automation, model) {
+  if (!automation?.template || !['confirmed', 'inferred'].includes(automation.status)) return raw;
+  const template = automation.template;
+  if (automation.kind === 'quality') return stripSuffixTemplate(raw, template)?.cleanedRaw ?? raw;
+  const templates =
+    model?.startsWith('nai-diffusion-4-') && !model.startsWith('nai-diffusion-4-5-')
+      ? [`${template}, white blank page, blank page`, template]
+      : [template];
+  for (const candidate of templates) {
+    const match =
+      stripPrefixTemplate(raw, `nsfw, ${candidate}`) || stripPrefixTemplate(raw, candidate);
+    if (match) return match.cleanedRaw;
+  }
+  return raw;
+}
+
+export function expandDraftAutomaticPrompt(prompt, negative, model, quality, uc) {
+  const profile = MODEL_PROFILES[modelProfileKeys(model)[0]];
+  const suffix =
+    quality === 'Light'
+      ? 'very aesthetic, amazing quality, no text'
+      : quality === 'Standard'
+        ? profile?.quality.template
+        : '';
+  if (suffix && !stripSuffixTemplate(prompt, suffix)) {
+    const start = findPromptTextBlockStart(prompt),
+      boundary = start < 0 ? prompt.length : start;
+    prompt = [
+      prompt
+        .slice(0, boundary)
+        .trim()
+        .replace(/[,，]\s*$/, ''),
+      suffix,
+      prompt.slice(boundary),
+    ]
+      .filter(Boolean)
+      .join(', ');
+  }
+  let template = profile?.undesired.find((p) => p.label === uc)?.template;
+  if (template && model.startsWith('nai-diffusion-4-') && !model.startsWith('nai-diffusion-4-5-'))
+    template += ', white blank page, blank page';
+  if (template) {
+    if (
+      !stripPrefixTemplate(negative, template) &&
+      !stripPrefixTemplate(negative, `nsfw, ${template}`)
+    )
+      negative = [template, negative].filter(Boolean).join(', ');
+    if (
+      model.includes('-full') &&
+      !prompt.toLowerCase().includes('nsfw') &&
+      !negative.startsWith('nsfw, ')
+    )
+      negative = `nsfw, ${negative}`;
+  }
+  return { prompt, negative };
+}
 function analyzeQuality(settings, scope, profiles) {
   if (
     settings.quality_source === 'tag_hint_qt' &&

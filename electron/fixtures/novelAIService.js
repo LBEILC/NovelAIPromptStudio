@@ -20,6 +20,7 @@ function pngText(value) {
 export async function startFakeNovelAI() {
   const state = {
     requests: [],
+    encodes: [],
     active: 0,
     maxActive: 0,
     failNext: 0,
@@ -49,6 +50,16 @@ export async function startFakeNovelAI() {
           usage: { percent: state.usage, isNegative: false, timeUntilNextPercent: 60 },
         }),
       );
+      return;
+    }
+    if (req.url === '/ai/encode-vibe') {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const body = JSON.parse(Buffer.concat(chunks).toString());
+      state.encodes.push(body);
+      state.balance -= 2;
+      res.writeHead(201, { 'Content-Type': 'application/binary' });
+      res.end(Buffer.from(JSON.stringify(body)));
       return;
     }
     if (!['/ai/generate-image', '/ai/generate-image-stream'].includes(req.url)) {

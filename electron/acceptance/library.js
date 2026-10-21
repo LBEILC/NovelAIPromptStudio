@@ -37,9 +37,10 @@ export async function libraryChecks(env) {
   const dialog = 'document.querySelector("[role=dialog]:not(.leaving *)")';
   const grid = 'document.querySelector(".lgrid")';
   const selectCard = async (index = 0, options = {}) => {
-    const group = await e(`document.querySelector('[data-index="${index}"]').dataset.groupId`);
-    await e(
-      `(()=>{const node=document.querySelector('[data-index="${index}"]');node.focus();node.dispatchEvent(new MouseEvent('click',${JSON.stringify({ bubbles: true, ...options })}));})()`,
+    await settled();
+    // Read identity and dispatch in one renderer turn: undo can replace/reorder cards.
+    const group = await e(
+      `(()=>{const node=document.querySelector('.card:not(.leaving)[data-index="${index}"]');const id=node.dataset.groupId;node.focus();node.dispatchEvent(new MouseEvent('click',${JSON.stringify({ bubbles: true, ...options })}));return id;})()`,
     );
     await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     if (

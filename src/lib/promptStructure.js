@@ -462,6 +462,8 @@ export function promptSnapshot(project) {
   return {
     tags: project.tags || [],
     prompt_structure: normalizePromptStructure(project.prompt_structure, project.metadata),
+    ...(project.params ? { params: structuredClone(project.params) } : {}),
+    ...(project.references ? { references: structuredClone(project.references) } : {}),
   };
 }
 
@@ -471,5 +473,7 @@ export function restorePromptSnapshot(project, snapshot) {
     ...project,
     tags: Array.isArray(snapshot?.tags) ? snapshot.tags : project.tags,
     prompt_structure: normalizePromptStructure(snapshot?.prompt_structure, project.metadata),
+    ...(snapshot?.params ? { params: structuredClone(snapshot.params) } : {}),
+    ...(snapshot?.references ? { references: structuredClone(snapshot.references) } : {}),
   };
 }

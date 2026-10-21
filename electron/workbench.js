@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { hydrateParameters } from './params.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -49,6 +50,9 @@ export function applyWorkbenchLibraryDetails(project, libraryProject) {
     thumbnail_path: String(libraryProject.thumbnail_path || '').trim(),
     tags: libraryProject.tags ?? project.tags,
     prompt_structure: libraryProject.prompt_structure ?? project.prompt_structure,
+    params: libraryProject.params ?? project.params,
+    references: libraryProject.references ?? project.references,
+    keptParameters: libraryProject.keptParameters ?? project.keptParameters,
     metadata: {
       ...project.metadata,
       prompt_raw: libraryProject.metadata?.prompt_raw ?? project.metadata?.prompt_raw,
@@ -98,5 +102,5 @@ export async function readWorkbenchImage(
       information_extracted: vibe.information_extracted,
     })),
   };
-  return enrichProjectTags(project);
+  return hydrateParameters(enrichProjectTags(project));
 }
