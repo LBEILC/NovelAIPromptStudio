@@ -19,7 +19,7 @@ import {
 } from '../state/dictionary';
 import { useIndicator } from '../kit/motion';
 import { Dropdown, Swap } from './parts';
-import { useAsk } from './sections';
+import { useAsk } from '../kit/dialog';
 import type { TagCategory, TagDictionaryEntry } from '../shared/types';
 
 const VIEWS: [DictionaryView, string][] = [

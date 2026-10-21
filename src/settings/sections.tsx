@@ -5,7 +5,7 @@ import { invokeUI } from '../lib/commands';
 import { writeClipboardText } from '../lib/clipboard';
 import { BUNDLED_FONTS, partitionFontFamilies, quoteFontFamily } from '../lib/fonts.js';
 import { Icon, Seg, Switch } from '../kit/controls';
-import { Confirm, type ConfirmOptions } from '../kit/dialog';
+import { useAsk } from '../kit/dialog';
 import { useNotifications } from '../kit/toast';
 import { useAppearance } from '../state/appearance';
 import { useAISettings } from '../state/ai';
@@ -14,27 +14,6 @@ import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, bytes, errorText } from './parts';
 import type { AppearanceSettings } from '../shared/types';
 import type { AgentSkills } from '../shared/commands';
-
-/** 确认框：ask() 返回用户是否确认 */
-export function useAsk() {
-  const [options, setOptions] = useState<ConfirmOptions | null>(null);
-  const answer = useRef<(ok: boolean) => void>(() => {});
-  const ask = (o: ConfirmOptions) =>
-    new Promise<boolean>((resolve) => {
-      answer.current = resolve;
-      setOptions(o);
-    });
-  const node = (
-    <Confirm
-      options={options}
-      onAnswer={(ok) => {
-        setOptions(null);
-        answer.current(ok);
-      }}
-    />
-  );
-  return [node, ask] as const;
-}
 
 const Fail = ({ children }: { children: ReactNode }) =>
   children ? (

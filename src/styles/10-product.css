@@ -154,3 +154,9 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 
 /* Agent：技能装到哪几个 Agent，作为"Agent 技能"下面缩进的小行 */
 .setrow.set-sub { padding: var(--sp-2) 0 var(--sp-2) var(--sp-4); }
+
+/* 提示词栏的页签（1.4）：提示词、参数、参考叠在同一个格子里换内容，每一页是一列 */
+.ptab-swap { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
+.ptab-body { display: flex; flex-direction: column; min-height: 0; }
+.ptab-body > .pane-swap { flex: 1 1 auto; min-height: 0; }
+.ptabs .pt-n { color: var(--text-3); font-size: var(--fs-caption); }

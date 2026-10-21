@@ -5,6 +5,7 @@ import { WorkbenchEditor, type EditorProps } from './Prompt';
 import { WorkbenchImage } from './Image';
 import { GenerationBar, GenerationSetup } from './GenerationBar';
 import { Versions } from './Versions';
+import { ParamsPane, PromptTabs, RefsPane, useBaseProject, type PromptTab } from './Params';
 import { useGeneration } from '../state/generation';
 import { activeWorkbenchTab } from '../lib/workbenchSession.js';
 import { WORKBENCH_SOURCE_PANEL_WIDTH_KEY } from '../lib/panelLayout.js';
@@ -46,6 +47,12 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
   const generation = useGeneration();
   const [proposal, setProposal] = useState(false);
   const tab = activeWorkbenchTab(p.session);
+  // 提示词栏的页签：每个标签页记住自己停在哪一页；从舞台的 Vibe 小块点过来时切到"参考"并高亮那一行
+  const [ptabs, setPtabs] = useState<Record<string, PromptTab>>({});
+  const [refHighlight, setRefHighlight] = useState('');
+  const ptab = (tab && ptabs[tab.id]) || 'prompt';
+  const setPtab = (t: PromptTab) => tab && setPtabs((m) => ({ ...m, [tab.id]: t }));
+  const base = useBaseProject(tab || null, generation.settings.hasToken);
   const prompt = useRef<HTMLDivElement>(null);
   const rz = useResizable(prompt, {
     key: 'prompt',
@@ -120,6 +127,16 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
         onSaveLibrary={p.onSaveLibrary}
         onReveal={p.onReveal}
         onRevealVibe={p.onRevealVibe}
+        onShowReference={
+          tab.project?.references?.vibes.length
+            ? (i) => {
+                const v = tab.project?.references?.vibes[i];
+                if (!v) return;
+                setRefHighlight(v.id);
+                setPtab('refs');
+              }
+            : undefined
+        }
       />
       <div className="col prompt" ref={prompt}>
         {rz.handle}
@@ -141,6 +158,39 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
               onProposalChange={setProposal}
               viewState={tab.viewState}
               onViewStateChange={(state) => p.onUpdateViewState(tab.id, state)}
+              header={
+                tab.project?.params ? (
+                  <PromptTabs
+                    value={ptab}
+                    onChange={(t) => {
+                      setRefHighlight('');
+                      setPtab(t);
+                    }}
+                    tab={tab}
+                    base={base?.project || null}
+                  />
+                ) : null
+              }
+              pane={
+                ptab === 'params' && tab.project?.params
+                  ? {
+                      key: `params-${tab.id}`,
+                      node: <ParamsPane tab={tab} base={base} before={p.beforeGeneration} />,
+                    }
+                  : ptab === 'refs' && tab.project?.params
+                    ? {
+                        key: `refs-${tab.id}`,
+                        node: (
+                          <RefsPane
+                            tab={tab}
+                            base={base}
+                            before={p.beforeGeneration}
+                            highlight={refHighlight}
+                          />
+                        ),
+                      }
+                    : null
+              }
               footer={
                 generation.settings.hasToken ? (
                   <GenerationBar tab={tab} before={p.beforeGeneration} proposal={proposal} />

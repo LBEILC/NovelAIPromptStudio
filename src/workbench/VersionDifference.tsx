@@ -75,7 +75,8 @@ export function VersionDifference({
   against: string;
 }) {
   const groups = [...new Set(diff.items.map((x) => x.label))];
-  const count = diff.items.length + diff.paras.length + (diff.size ? 1 : 0);
+  const count =
+    diff.items.length + diff.paras.length + (diff.size ? 1 : 0) + (diff.params?.length || 0);
   return (
     <>
       <div className="vp-h">
@@ -84,13 +85,20 @@ export function VersionDifference({
           与{against}相比{count ? ` · ${count} 处改动` : ''}
         </span>
       </div>
-      {diff.size && (
+      {(diff.size || !!diff.params?.length) && (
         <div className="vp-g">
           <span className="label">参数</span>
           <div className="vp-tags mono">
-            <span className="wchg">
-              尺寸 {diff.size.from.join('×')}→{diff.size.to.join('×')}
-            </span>
+            {diff.size && (
+              <span className="wchg">
+                尺寸 {diff.size.from.join('×')}→{diff.size.to.join('×')}
+              </span>
+            )}
+            {diff.params?.map((x) => (
+              <span key={x} className="wchg">
+                {x}
+              </span>
+            ))}
           </div>
         </div>
       )}

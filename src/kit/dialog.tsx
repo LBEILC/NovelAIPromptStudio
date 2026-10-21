@@ -1,7 +1,7 @@
 // 对话框（doc/design.md 2.11、2.18）：盖住整个窗口的浅色遮罩，中间一张纸；Esc、点遮罩取消。
 // 打开时焦点给"取消"（危险的确认不让回车误触），但程序给的焦点不画焦点框（只有键盘操作时才画）。
 // Tab 在对话框里循环。
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Presence } from './motion';
 import { ToWin, useDismiss } from './layer';
 
@@ -143,4 +143,25 @@ export function Confirm({
       )}
     </Dialog>
   );
+}
+
+/** 确认框：ask() 返回用户是否确认 */
+export function useAsk() {
+  const [options, setOptions] = useState<ConfirmOptions | null>(null);
+  const answer = useRef<(ok: boolean) => void>(() => {});
+  const ask = (o: ConfirmOptions) =>
+    new Promise<boolean>((resolve) => {
+      answer.current = resolve;
+      setOptions(o);
+    });
+  const node = (
+    <Confirm
+      options={options}
+      onAnswer={(ok) => {
+        setOptions(null);
+        answer.current(ok);
+      }}
+    />
+  );
+  return [node, ask] as const;
 }

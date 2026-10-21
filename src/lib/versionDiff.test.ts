@@ -69,3 +69,47 @@ it('pairs a repeated tag by occurrence instead of merging it by name', () => {
     ),
   ).toBe('artist:kushima yu 1.1→1.3');
 });
+it('lists second-layer parameter and reference changes beside the size', () => {
+  const params = {
+    model: 'nai-diffusion-4-5-full',
+    effort: 'High',
+    steps: 28,
+    scale: 5,
+    rescale: 0,
+    sampler: 'k_euler_ancestral',
+    noise: 'karras',
+    quality: 'On',
+    uc: 'Heavy',
+    aiPositions: true,
+    positions: [],
+  } as unknown as NonNullable<ImageProject['params']>;
+  const vibe = {
+    id: 'v1',
+    name: 'a',
+    thumbnail: null,
+    file: null,
+    strength: 0.6,
+    information: 1,
+    encode: null,
+  };
+  const a = {
+      ...project('rain'),
+      params,
+      references: { vibes: [vibe], precise: [] },
+    } as ImageProject,
+    b = {
+      ...project('rain'),
+      params: { ...params, steps: 29, rescale: 0.2 },
+      references: { vibes: [vibe, { ...vibe, id: 'v2' }], precise: [] },
+    } as ImageProject;
+  const d = versionDiff(a, b);
+  expect(d.params).toEqual(['步数 28→29', 'Rescale 0.00→0.20', 'Vibe 1→2']);
+  expect(d.empty).toBe(false);
+  expect(oneLine(d)).toBe('步数 28→29 · Rescale 0.00→0.20 · Vibe 1→2');
+  expect(versionDiff(a, { ...a }).empty).toBe(true);
+  const tuned = {
+    ...a,
+    references: { vibes: [{ ...vibe, strength: 0.8 }], precise: [] },
+  } as ImageProject;
+  expect(versionDiff(a, tuned).params).toEqual(['调整了参考图']);
+});

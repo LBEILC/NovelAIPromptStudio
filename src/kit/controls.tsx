@@ -137,11 +137,17 @@ export function Slider({
   label,
   disabled,
   className = 'lslider',
+  page = 4,
+  onCommit,
 }: {
   value: number;
   min: number;
   max: number;
   step: number;
+  /** PageUp / PageDown 一次走几步 */
+  page?: number;
+  /** 松开指针、按完键时：适合在这里保存（拖动中的 onChange 只更新显示） */
+  onCommit?: (v: number) => void;
   onChange: (v: number) => void;
   label: string;
   disabled?: boolean;
@@ -165,6 +171,7 @@ export function Slider({
     const up = () => {
       setDrag(false);
       document.documentElement.classList.remove('is-dragging');
+      onCommit?.(value);
     };
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
@@ -200,16 +207,20 @@ export function Slider({
           ArrowDown: -1,
           ArrowRight: 1,
           ArrowUp: 1,
-          PageDown: -4,
-          PageUp: 4,
+          PageDown: -page,
+          PageUp: page,
         }[e.key];
         if (d) {
           e.preventDefault();
-          set(value + d * step);
+          const n = snap(value + d * step);
+          set(n);
+          onCommit?.(n);
         }
         if (e.key === 'Home' || e.key === 'End') {
           e.preventDefault();
-          set(e.key === 'Home' ? min : max);
+          const n = e.key === 'Home' ? min : max;
+          set(n);
+          onCommit?.(n);
         }
       }}
     >

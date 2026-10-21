@@ -29,6 +29,8 @@ export interface ImageProps {
   onDownloadImage: (project: ImageProject) => void;
   onReset: () => void;
   onRevealVibe: (vibe: Vibe) => void;
+  /** 1.4：有参考页签时，点 Vibe 小块切到"参考"并高亮这一个（第几个 Vibe） */
+  onShowReference?: (index: number) => void;
 }
 const midEll = (s: string, max: number) =>
   s.length <= max
@@ -272,7 +274,9 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                     className={`vibe-chip ${vibe === i ? 'on' : ''}`}
                     data-trigger={`vibe-${i}`}
                     data-tip={`Vibe ${i + 1} · 参考强度 ${Number(v.strength).toFixed(2)} · 信息提取 ${v.information_extracted == null ? '未知' : Number(v.information_extracted).toFixed(2)}`}
-                    onClick={() => setVibe(vibe === i ? null : i)}
+                    onClick={() =>
+                      p.onShowReference ? p.onShowReference(i) : setVibe(vibe === i ? null : i)
+                    }
                   >
                     <span className="vph">
                       <Icon name="image-line" />

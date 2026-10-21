@@ -24,9 +24,12 @@ export async function invokeUI<N extends CommandName>(
     return result.data as CommandOutput<N>;
   }
   const result = await window.studio.invoke(name, input);
-  if (!result.ok) throw new Error(result.error.message);
+  // 错误码挂在抛出的错误上（例如 needs_confirm：界面先确认再重试）
+  if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code });
   return result.data;
 }
+/** invokeUI 抛出的错误的错误码 */
+export const errorCode = (e: unknown) => (e as { code?: string } | null)?.code || '';
 
 export async function invokeResult<N extends CommandName>(
   name: N,

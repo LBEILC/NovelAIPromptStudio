@@ -1,7 +1,15 @@
 // 提示词栏（doc/design.md 2.4a、2.14、2.24、2.25）：顶部是编辑方式、搜索、显示、翻译、整理、复制；中间是提示词（按块或按文本）；
 // 底部固定一条底栏。节：基础提示词、每个角色（和它的负面提示词）、负面提示词。块：Tag 块或段落；两块之间可以加一块。
 // Tag：点一下打开编辑浮层，右键菜单；拖动换位置（按被拖的那一个自己的位置判断落点）；Ctrl / Shift 点击、框选是多选，底部出现操作条。
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  Activity,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { invokeUI } from '../lib/commands';
 import { CATEGORY_OPTIONS, formatTag } from '../lib/prompt.js';
 import {
@@ -78,6 +86,10 @@ export interface EditorProps {
   }) => Promise<boolean>;
   /** 底栏（有账号时是 GenerationBar，没有时是 GenerationSetup） */
   footer?: ReactNode;
+  /** 页签那一行（提示词 / 参数 / 参考），放在列头上面 */
+  header?: ReactNode;
+  /** 参数或参考页签的内容；没有时显示提示词。key 变了就换内容 */
+  pane?: { key: string; node: ReactNode } | null;
 }
 let dragging = false;
 blockTips(() => dragging);
@@ -1687,6 +1699,8 @@ export function WorkbenchEditor(p: EditorProps) {
     </div>
   );
   const docs = useSwap(textMode ? 'text' : 'blocks', (k) => k);
+  // 提示词 / 参数 / 参考：换内容时旧的淡出、新的淡入；提示词一直挂着（编辑的状态不丢）
+  const paneSwap = useSwap(p.pane || null, (v) => v?.key || 'prompt');
   const moveTargets: MenuEntry[] = (() => {
     if (!chosen.length) return [];
     const pol = doc.scopes[chosen[0].section].scope.polarity;
@@ -1724,86 +1738,114 @@ export function WorkbenchEditor(p: EditorProps) {
   const docks = useExitList(chosen.length && !textMode ? ['sel'] : [], (k) => k);
   const lastCount = useRef(chosen.length);
   if (chosen.length) lastCount.current = chosen.length;
+  const promptShown = paneSwap.some((x) => x.key === 'prompt');
+  const promptLeaving = paneSwap.some((x) => x.key === 'prompt' && x.leaving);
   return (
     <>
-      <div className="col-h" ref={col}>
-        <Seg
-          className="mode-sw"
-          items={[
-            ['blocks', <Icon key="b" name="layout-grid-line" />, '按块编辑（Ctrl E 切换）'],
-            ['text', <Icon key="t" name="text" />, '按文本编辑（Ctrl E 切换）'],
-          ]}
-          value={mode}
-          onChange={setMode}
-          label="编辑方式"
-        />
-        <label className="field sm grow" data-tip={textMode ? '在文本里查找' : '搜索 Tag 或译文'}>
-          <Icon name="search-line" />
-          <input
-            ref={search}
-            placeholder={textMode ? '查找' : '搜索 Tag 或译文'}
-            aria-label="搜索 Tag 或译文"
-            value={query}
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape' && query) {
-                e.stopPropagation();
-                setQuery('');
-              }
-            }}
-          />
-          <Kbd keys="Mod K" />
-        </label>
-        {!textMode && (
-          <button
-            className={`btn quiet sm ${pop === 'view' || view.language !== 'bilingual' || polarity !== 'all' || view.viewMode !== 'structure' ? 'on' : ''}`}
-            data-trigger="view"
-            aria-label="显示"
-            onClick={() => setPop(pop === 'view' ? '' : 'view')}
-          >
-            <Icon name="equalizer-line" />
-            <span className="lbl">显示</span>
-          </button>
-        )}
-        <button
-          className={`btn quiet sm ${translating ? 'loading' : ''}`}
-          aria-label="翻译"
-          onClick={() => void translate(entries)}
-        >
-          <Icon name={translating ? 'loader-4-line' : 'translate-2'} />
-          <span className="lbl">{translating ? '翻译中' : '翻译'}</span>
-        </button>
-        {tidy.button}
-        <span className="split" data-trigger="copy">
-          <button className="btn sm" data-act="copy" aria-label={copyLabel} onClick={copyMain}>
-            <Icon name="file-copy-line" />
-            <span className="lbl">{copyLabel}</span>
-          </button>
-          <button
-            className={`btn sm ${pop === 'copy' ? 'is-hover' : ''}`}
-            aria-label="其他复制方式"
-            data-trigger="copy-more"
-            onClick={() => setPop(pop === 'copy' ? '' : 'copy')}
-          >
-            <Icon name="arrow-down-s-line" />
-          </button>
-        </span>
-      </div>
-      {tidy.bar}
-      <div className="swap pane-swap">
-        <FlipScope root={scroll}>
-          <div className="scroll" ref={scroll}>
-            <div className="swap">
-              {docs.map(({ key, leaving }) => (
-                <div key={key} className={leaving ? 'leaving' : ''} data-enter="fade">
-                  {key === 'text' ? textDoc : blockDoc}
+      {p.header}
+      <div className="swap ptab-swap">
+        <Activity mode={promptShown ? 'visible' : 'hidden'}>
+          <div className={`ptab-body ${promptLeaving ? 'leaving' : ''}`} data-enter="fade">
+            <div className="col-h" ref={col}>
+              <Seg
+                className="mode-sw"
+                items={[
+                  ['blocks', <Icon key="b" name="layout-grid-line" />, '按块编辑（Ctrl E 切换）'],
+                  ['text', <Icon key="t" name="text" />, '按文本编辑（Ctrl E 切换）'],
+                ]}
+                value={mode}
+                onChange={setMode}
+                label="编辑方式"
+              />
+              <label
+                className="field sm grow"
+                data-tip={textMode ? '在文本里查找' : '搜索 Tag 或译文'}
+              >
+                <Icon name="search-line" />
+                <input
+                  ref={search}
+                  placeholder={textMode ? '查找' : '搜索 Tag 或译文'}
+                  aria-label="搜索 Tag 或译文"
+                  value={query}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape' && query) {
+                      e.stopPropagation();
+                      setQuery('');
+                    }
+                  }}
+                />
+                <Kbd keys="Mod K" />
+              </label>
+              {!textMode && (
+                <button
+                  className={`btn quiet sm ${pop === 'view' || view.language !== 'bilingual' || polarity !== 'all' || view.viewMode !== 'structure' ? 'on' : ''}`}
+                  data-trigger="view"
+                  aria-label="显示"
+                  onClick={() => setPop(pop === 'view' ? '' : 'view')}
+                >
+                  <Icon name="equalizer-line" />
+                  <span className="lbl">显示</span>
+                </button>
+              )}
+              <button
+                className={`btn quiet sm ${translating ? 'loading' : ''}`}
+                aria-label="翻译"
+                onClick={() => void translate(entries)}
+              >
+                <Icon name={translating ? 'loader-4-line' : 'translate-2'} />
+                <span className="lbl">{translating ? '翻译中' : '翻译'}</span>
+              </button>
+              {tidy.button}
+              <span className="split" data-trigger="copy">
+                <button
+                  className="btn sm"
+                  data-act="copy"
+                  aria-label={copyLabel}
+                  onClick={copyMain}
+                >
+                  <Icon name="file-copy-line" />
+                  <span className="lbl">{copyLabel}</span>
+                </button>
+                <button
+                  className={`btn sm ${pop === 'copy' ? 'is-hover' : ''}`}
+                  aria-label="其他复制方式"
+                  data-trigger="copy-more"
+                  onClick={() => setPop(pop === 'copy' ? '' : 'copy')}
+                >
+                  <Icon name="arrow-down-s-line" />
+                </button>
+              </span>
+            </div>
+            {tidy.bar}
+            <div className="swap pane-swap">
+              <FlipScope root={scroll}>
+                <div className="scroll" ref={scroll}>
+                  <div className="swap">
+                    {docs.map(({ key, leaving }) => (
+                      <div key={key} className={leaving ? 'leaving' : ''} data-enter="fade">
+                        {key === 'text' ? textDoc : blockDoc}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              </FlipScope>
             </div>
           </div>
-        </FlipScope>
+        </Activity>
+        {paneSwap
+          .filter((x) => x.key !== 'prompt')
+          .map((x) => (
+            <div
+              key={x.key}
+              className={`ptab-body ${x.leaving ? 'leaving' : ''}`}
+              data-enter="fade"
+            >
+              <div className="scroll ptab-scroll">{x.value?.node}</div>
+            </div>
+          ))}
       </div>
       {p.footer}
       <div className="dock" data-dock="">
