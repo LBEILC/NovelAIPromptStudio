@@ -38,6 +38,10 @@ export async function libraryChecks(env) {
   const grid = 'document.querySelector(".lgrid")';
   const selectCard = async (index = 0, options = {}) => {
     await settled();
+    await wait(
+      `document.querySelector('.card:not(.leaving)[data-index="${index}"]')?.checkVisibility()`,
+      '目标卡片已完成渲染并可见',
+    );
     // Read identity and dispatch in one renderer turn: undo can replace/reorder cards.
     const group = await e(
       `(()=>{const node=document.querySelector('.card:not(.leaving)[data-index="${index}"]');const id=node.dataset.groupId;node.focus();node.dispatchEvent(new MouseEvent('click',${JSON.stringify({ bubbles: true, ...options })}));return id;})()`,
