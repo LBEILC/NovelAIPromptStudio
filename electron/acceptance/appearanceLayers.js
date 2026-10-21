@@ -5,7 +5,7 @@ import { applyMotionBaseline } from './motion.js';
 
 export async function appearanceLayerChecks({ h, preferences, mode }) {
   const { evaluate: e, check, wait } = h;
-  h.category('设置·外观·浮层');
+  h.category('设置·通用·浮层');
   await applyMotionBaseline(h, mode);
   const original = preferences.appearanceSettings();
   const fonts = [
@@ -13,7 +13,7 @@ export async function appearanceLayerChecks({ h, preferences, mode }) {
     ['等宽字体', 'monoFont', 'MiSans'],
     ['段落字体', 'proseFont', 'MiSans'],
   ];
-  await h.section('外观');
+  await h.section('通用');
   for (const [label, key, family] of fonts) {
     await h.click(label);
 

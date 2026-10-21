@@ -3,7 +3,7 @@ import { createWorkbenchFixtures } from './workbenchFixtures.js';
 
 export async function clientControlChecks({ h, mode, doubles }) {
   h.category('客户端控件');
-  await h.section('外观');
+  await h.section('通用');
   await h.screenshot('022-segments-appearance');
   await h.click('图片库', 'document.querySelector(".tb")');
   await h.click('视图');

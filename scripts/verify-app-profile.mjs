@@ -141,7 +141,9 @@ async function run(executable, args, timeout = options.processTimeoutMs) {
     const child = spawn(executable, args, {
       env,
       stdio: 'inherit',
-      windowsHide: true,
+      // SW_HIDE suppresses the first native ShowWindow call on Windows.
+      // Visibility checks must launch Electron without that startup override.
+      windowsHide: !args.some((arg) => arg.startsWith('--verify-app=')),
       shell: false,
     });
     const timer = setTimeout(() => {

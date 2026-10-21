@@ -201,11 +201,12 @@ describe('AI preferences', () => {
         recentImageDirectory: recent,
         autoCheckUpdates: false,
       }),
-    ).toEqual({ recentImageDirectory: recent, autoCheckUpdates: false });
+    ).toEqual({ recentImageDirectory: recent, autoCheckUpdates: false, closeAction: 'ask' });
     fs.rmSync(recent, { recursive: true });
     expect(preferences.productivitySettings()).toEqual({
       recentImageDirectory: '',
       autoCheckUpdates: false,
+      closeAction: 'ask',
     });
     expect(() =>
       preferences.saveProductivitySettings({ recentImageDirectory: 'relative' }),
@@ -276,5 +277,29 @@ describe('removed bundled font compatibility', () => {
         primaryColor: 'legacy-custom',
       },
     });
+  });
+});
+
+describe('tray preferences', () => {
+  it('reads old preferences without migration and persists close action and internal notice independently', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-tray-preferences-'));
+    temporaryDirectories.push(directory);
+    const file = path.join(directory, 'preferences.json');
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ productivity: { autoCheckUpdates: false }, untouched: 'keep' }),
+    );
+    const p = openPreferences(directory, safeStorage);
+    expect(p.productivitySettings().closeAction).toBe('ask');
+    expect(p.trayNoticeShown()).toBe(false);
+    p.saveProductivitySettings({ closeAction: 'tray' });
+    p.markTrayNoticeShown();
+    p.saveProductivitySettings({ autoCheckUpdates: true });
+    const reopened = openPreferences(directory, safeStorage);
+    expect(reopened.productivitySettings().closeAction).toBe('tray');
+    expect(reopened.trayNoticeShown()).toBe(true);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).untouched).toBe('keep');
+    expect(reopened.productivitySettings()).not.toHaveProperty('trayNoticeShown');
+    expect(() => p.saveProductivitySettings({ closeAction: 'invalid' })).toThrow();
   });
 });

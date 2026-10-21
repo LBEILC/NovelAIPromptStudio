@@ -236,7 +236,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     translation: '合成未分类',
     category: 'Unsorted',
   });
-  await section('外观');
+  await section('通用');
   await section('翻译词典');
   await input(search, 'view_fixture_');
   await tab('暂无译文');
@@ -274,7 +274,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       category_source: 'ai',
     },
   ]);
-  await section('外观');
+  await section('通用');
   await section('翻译词典');
   await input(search, 'view_fixture_ai');
   await tab('AI 翻译');
@@ -307,7 +307,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     );
   const configure = async (model) => {
     preferences.saveAISettings({ baseUrl: mode.baseUrl, model });
-    await section('外观');
+    await section('通用');
     await section('翻译词典');
     await input(search, 'dictionary_fixture_');
     await wait(`${count}===55`);

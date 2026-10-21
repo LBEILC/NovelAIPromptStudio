@@ -49,11 +49,11 @@ it('keeps the system-reduced full run separate from the subset and explicit-off 
     outputName: 'acceptance-reduced-system',
   });
   expect(
-    acceptanceOptions(['--reduced-motion', '--motion=off', '--category=设置·外观'], {}),
+    acceptanceOptions(['--reduced-motion', '--motion=off', '--category=设置·通用'], {}),
   ).toMatchObject({
-    category: '设置·外观',
+    category: '设置·通用',
     motion: 'off',
-    outputName: 'acceptance-reduced-off-设置-外观',
+    outputName: 'acceptance-reduced-off-设置-通用',
     needsLibrary: false,
     needsDictionary: false,
   });

@@ -21,7 +21,7 @@ export async function settingsChecks(context, restart) {
   const savedFile = path.join(mode.root, 'settings-expected.json');
   if (!restart) {
     await appearanceLayerChecks(context);
-    if (mode.category === '设置·外观') return;
+    if (mode.category === '设置·通用') return;
     if (['设置', '全部'].includes(mode.category)) await settingsGenerationChecks(context);
   }
   if (restart) {
@@ -122,7 +122,7 @@ export async function settingsChecks(context, restart) {
     await fs.writeFile(retainedBackup, 'retained backup evidence');
     await fs.writeFile(backup, 'acceptance metadata only');
     const backupRow = `[...document.querySelectorAll('.setrow')].find(row=>row.textContent.includes('studio.pre-acceptance.sqlite'))`;
-    await section('外观');
+    await section('通用');
     await section('图片库');
     await wait('document.body.innerText.includes("studio.pre-acceptance.sqlite")');
     await check(
@@ -150,7 +150,7 @@ export async function settingsChecks(context, restart) {
       undefined,
       'once',
     );
-    await section('外观');
+    await section('通用');
     await section('图片库');
     await wait(
       '![...document.querySelectorAll(".setrow small")].some(e=>e.textContent.includes("studio.pre-acceptance.sqlite"))',
@@ -315,7 +315,7 @@ export async function settingsChecks(context, restart) {
       await input(aiInput(2), 'acceptance-model');
     else await select('模型', 'acceptance-model');
 
-    await section('外观');
+    await section('通用');
     await section('AI 服务');
     await check('分页切换保留 AI 草稿', aiDraftMatches, aiDraftDetails, 'once');
     if (slowAIRead) {
@@ -541,9 +541,9 @@ export async function settingsChecks(context, restart) {
     undefined,
     'once',
   );
-  h.category('设置·外观');
+  h.category('设置·通用');
   const libraryBefore = JSON.stringify(database.loadLibrary('all'));
-  await section('外观');
+  await section('通用');
   for (const [label, family] of [
     ['界面字体', 'IBM Plex Mono'],
     ['等宽字体', 'MiSans'],

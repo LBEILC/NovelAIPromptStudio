@@ -283,6 +283,9 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     return {
       recentImageDirectory: normalizeRecentImageDirectory(stored.recentImageDirectory),
       autoCheckUpdates: stored.autoCheckUpdates !== false,
+      closeAction: ['ask', 'tray', 'quit'].includes(stored.closeAction)
+        ? stored.closeAction
+        : 'ask',
     };
   };
 
@@ -297,6 +300,10 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     }
     if (next.autoCheckUpdates !== undefined)
       productivity.autoCheckUpdates = Boolean(next.autoCheckUpdates);
+    if (next.closeAction !== undefined) {
+      if (!['ask', 'tray', 'quit'].includes(next.closeAction)) throw new Error('无效的关闭行为');
+      productivity.closeAction = next.closeAction;
+    }
     const stored = read();
     stored.productivity = productivity;
     write(stored);
@@ -362,6 +369,12 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     saveAppearanceSettings,
     librarySettings,
     saveLibrarySettings,
+    trayNoticeShown: () => read().trayNoticeShown === true,
+    markTrayNoticeShown: () => {
+      const stored = read();
+      stored.trayNoticeShown = true;
+      write(stored);
+    },
     productivitySettings,
     saveProductivitySettings,
     filePath,

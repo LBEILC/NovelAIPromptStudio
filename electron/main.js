@@ -1,3 +1,6 @@
+import { createTray } from './tray.js';
+import { installWindowClose } from './windowClose.js';
+import { isTrayContents, sendWindowEvent } from './windowAccess.js';
 import { CommandError } from './commands/registry.js';
 import {
   guardClientWindow,
@@ -100,14 +103,6 @@ if (databaseProbeDirectory) {
 } else if (!screenshotMode && !acceptanceMode) configureAppProfile(app);
 if (!databaseProbeDirectory && !screenshotMode && !acceptanceMode) {
   if (!app.requestSingleInstanceLock()) app.exit(0);
-  app.on('second-instance', () => {
-    const window = BrowserWindow.getAllWindows()[0];
-    if (window) {
-      if (window.isMinimized()) window.restore();
-      window.show();
-      window.focus();
-    }
-  });
 }
 if (process.platform === 'win32') app.setAppUserModelId('studio.novelai.prompt');
 protocol.registerSchemesAsPrivileged([
@@ -127,6 +122,39 @@ let permanentDeletionActive = false;
 let workbenchTemporaryDirectory;
 let commandRuntime;
 let quitPrepared = false;
+let quitPreparing;
+let quitRequested = false;
+let trayController;
+const windowClosers = new WeakMap();
+function mainWindows() {
+  return BrowserWindow.getAllWindows().filter((w) => !isTrayContents(w.webContents));
+}
+function showMainWindow() {
+  if (!preferences || !commandRuntime) return;
+  const window = mainWindows()[0] || createWindow();
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+}
+app.on('second-instance', showMainWindow);
+function requestQuit() {
+  quitRequested = true;
+  app.quit();
+}
+async function prepareQuit() {
+  quitRequested = true;
+  if (!quitPreparing)
+    quitPreparing = commandRuntime.flush().then(() => {
+      quitPrepared = true;
+    });
+  try {
+    await quitPreparing;
+  } catch (error) {
+    quitPreparing = undefined;
+    quitRequested = false;
+    throw error;
+  }
+}
 let updateState = {
   phase: 'idle',
   progress: 0,
@@ -266,18 +294,20 @@ function createWindow(captureState = null) {
     },
   });
   guardClientWindow(window, { packaged: app.isPackaged, shell });
-  let closePrepared = false;
-  window.on('close', (event) => {
-    if (acceptanceMode || captureState || quitPrepared || closePrepared || !commandRuntime) return;
-    event.preventDefault();
-    void commandRuntime
-      .prepareWindow(window)
-      .then(() => {
-        closePrepared = true;
-        window.close();
-      })
-      .catch((error) => console.error('Unable to save workbench before closing:', error));
-  });
+  if (!captureState)
+    windowClosers.set(
+      window,
+      installWindowClose(window, {
+        platform: process.platform,
+        preferences,
+        isQuitting: () => quitRequested || quitPrepared,
+        prepare: (window) => commandRuntime.prepareWindow(window),
+        quit: requestQuit,
+        request: (window) => sendWindowEvent(window, { type: 'close-request' }),
+        notice: () => trayController?.notice(),
+        error: (error) => console.error('Unable to save workbench before closing:', error),
+      }),
+    );
   window.once('ready-to-show', async () => {
     await syncTitleBarOverlay(window);
     if (!acceptanceMode && !captureState && !window.isDestroyed()) window.show();
@@ -299,8 +329,7 @@ function notifyUpdateState(patch = {}) {
     ...getUpdateCapabilities(process.platform, app.isPackaged),
   };
   for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed())
-      window.webContents.send('studio:command-event', { type: 'updates', data: updateState });
+    sendWindowEvent(window, { type: 'updates', data: updateState });
   }
 }
 
@@ -1290,12 +1319,32 @@ app.whenReady().then(async () => {
   registerCommand('settings.appearance.save', (input, _event) => {
     const settings = input.settings;
     const saved = preferences.saveAppearanceSettings(settings);
-    for (const window of BrowserWindow.getAllWindows()) void syncTitleBarOverlay(window);
+    for (const window of mainWindows()) void syncTitleBarOverlay(window);
+    trayController?.reload();
     return saved;
   });
   nativeTheme.on('updated', () => {
-    for (const window of BrowserWindow.getAllWindows()) void syncTitleBarOverlay(window);
+    for (const window of mainWindows()) void syncTitleBarOverlay(window);
+    trayController?.reload();
   });
+  registerCommand('window.close-choice', async (input, caller) => {
+    const window = BrowserWindow.fromWebContents(caller.sender);
+    const closer = window && windowClosers.get(window);
+    if (!closer || process.platform !== 'win32')
+      throw new CommandError('forbidden', '此窗口不支持关闭选择');
+    await closer.choose(input.action, input.remember);
+    return {};
+  });
+  for (const [name, method] of [
+    ['tray.menu-size', 'resize'],
+    ['tray.action', 'action'],
+  ]) {
+    registerCommand(name, (input, caller) => {
+      if (!trayController || !isTrayContents(caller.sender))
+        throw new CommandError('forbidden', '仅托盘窗口可调用');
+      return trayController[method](input);
+    });
+  }
   registerCommand('settings.productivity.get', (input, _caller) => {
     return preferences.productivitySettings();
   });
@@ -1403,10 +1452,14 @@ app.whenReady().then(async () => {
     if (storageMigrationActive || activeImports.size || permanentDeletionActive)
       return { ok: false, error: '请等待导入、迁移或删除操作完成后再安装更新' };
     if (updateState.phase !== 'downloaded') return { ok: false, error: '更新尚未下载完成' };
-    setImmediate(() => {
+    setImmediate(async () => {
       try {
+        await prepareQuit();
         installUpdateAfterClosingDatabase(autoUpdater, database, async (error) => {
           if (quitting) return;
+          quitPrepared = false;
+          quitRequested = false;
+          quitPreparing = undefined;
           try {
             const reopened = await openDatabase(dataDirectory);
             if (quitting) reopened.close();
@@ -1421,6 +1474,9 @@ app.whenReady().then(async () => {
           });
         });
       } catch (error) {
+        quitPrepared = false;
+        quitRequested = false;
+        quitPreparing = undefined;
         notifyUpdateState({
           phase: 'error',
           error: error instanceof Error ? error.message : String(error),
@@ -1582,9 +1638,7 @@ app.whenReady().then(async () => {
       : (url) => shell.openExternal(url),
     endpoints: chatGPTFixture?.endpoints,
     emit: (event) => {
-      for (const window of BrowserWindow.getAllWindows())
-        if (!window.webContents.isDestroyed())
-          window.webContents.send('studio:command-event', event);
+      for (const window of BrowserWindow.getAllWindows()) sendWindowEvent(window, event);
     },
   });
   Object.assign(
@@ -1605,6 +1659,9 @@ app.whenReady().then(async () => {
       preferences,
       generationBaseUrl: acceptanceGeneration?.url,
       beforeCommand,
+      onEvent: (event) => {
+        if (event.type === 'generation') trayController?.generation(event.data);
+      },
       handlers: commandHandlers,
       readyLibrary: () => contentBackfill,
       selectSource: async (caller) => {
@@ -1641,11 +1698,25 @@ app.whenReady().then(async () => {
     return;
   }
 
+  if (process.platform === 'win32' && !screenshotMode) {
+    trayController = createTray({
+      app,
+      shell,
+      preferences,
+      showMain: showMainWindow,
+      quit: requestQuit,
+      icon: appIconPath,
+      developmentUrl:
+        process.env.NOVELAI_DEV_URL ||
+        (process.argv.includes('--dev') ? 'http://127.0.0.1:5173' : ''),
+    });
+  }
   if (acceptanceMode) {
     try {
       const { runAcceptance } = await import('./acceptance/run.js');
       await runAcceptance({
         chatGPTFixture,
+        trayController,
         generationService: acceptanceGeneration,
         app,
         mode: acceptanceMode,
@@ -1700,10 +1771,10 @@ app.on('window-all-closed', () => {
   if (!screenshotMode && !acceptanceMode && process.platform !== 'darwin') app.quit();
 });
 app.on('before-quit', (event) => {
+  quitRequested = true;
   if (!quitPrepared && commandRuntime && !acceptanceMode && !screenshotMode) {
     event.preventDefault();
-    void commandRuntime
-      .flush()
+    void prepareQuit()
       .then(() => {
         quitPrepared = true;
         app.quit();
@@ -1712,6 +1783,7 @@ app.on('before-quit', (event) => {
     return;
   }
   quitting = true;
+  trayController?.destroy();
   void commandRuntime?.close();
   database?.close();
   for (const sessionId of preparedImports.keys()) releasePreparedImport(sessionId).catch(() => {});

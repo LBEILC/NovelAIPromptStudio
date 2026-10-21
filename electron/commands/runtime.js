@@ -6,6 +6,7 @@ import { createCommands } from './index.js';
 import { startCommandServer } from './transport.js';
 import { agentSetup } from './setup.js';
 import { CommandError } from './registry.js';
+import { isTrayContents, allowsWindowCommand, sendWindowEvent } from '../windowAccess.js';
 import {
   readWorkbenchImage,
   applyWorkbenchStructure,
@@ -13,7 +14,7 @@ import {
 } from '../workbench.js';
 import { importLibraryFiles } from '../importer.js';
 /** @typedef {import('../../src/shared/types').ImageProject} Project */
-/** @param {{preferences?:ReturnType<import('../preferences.js').openPreferences>, generationBaseUrl?:string, database:Awaited<ReturnType<import('../database.js').openDatabase>>,assetsDirectory:()=>string,busy:()=>boolean,createWindow:()=>Electron.BrowserWindow,testRoot?:string,handlers?:import('./index.js').Services['handlers'],selectSource?:import('./index.js').Services['selectSource'],readyLibrary?:()=>Promise<void>,beforeCommand?:import('./index.js').Services['beforeCommand']}} options */
+/** @param {{preferences?:ReturnType<import('../preferences.js').openPreferences>, generationBaseUrl?:string, database:Awaited<ReturnType<import('../database.js').openDatabase>>,assetsDirectory:()=>string,busy:()=>boolean,createWindow:()=>Electron.BrowserWindow,testRoot?:string,handlers?:import('./index.js').Services['handlers'],selectSource?:import('./index.js').Services['selectSource'],readyLibrary?:()=>Promise<void>,onEvent?:(event:import('../../src/shared/commands').CommandEvent)=>void,beforeCommand?:import('./index.js').Services['beforeCommand']}} options */
 export async function installCommandRuntime(options) {
   const handlers = options.handlers || {};
   const { database } = options;
@@ -102,14 +103,13 @@ export async function installCommandRuntime(options) {
         database.rememberWorkbenchStructure(tab.source.path, tab.project.prompt_structure);
     },
     prepareUI: async () => {
-      const windows = BrowserWindow.getAllWindows();
+      const windows = BrowserWindow.getAllWindows().filter((w) => !isTrayContents(w.webContents));
       if (!windows.length) windows.push(options.createWindow());
       for (const window of windows) await prepareWindow(window);
     },
     emit: (event) => {
-      for (const window of BrowserWindow.getAllWindows())
-        if (!window.webContents.isDestroyed())
-          window.webContents.send('studio:command-event', event);
+      options.onEvent?.(event);
+      for (const window of BrowserWindow.getAllWindows()) sendWindowEvent(window, event);
     },
   });
   ipcMain.on('studio:command-prepared', (event, id, error) => {
@@ -120,6 +120,11 @@ export async function installCommandRuntime(options) {
     else request.resolve();
   });
   ipcMain.handle('studio:command', async (event, name, input) => {
+    if (
+      !allowsWindowCommand(event.sender, String(name)) ||
+      event.senderFrame !== event.sender.mainFrame
+    )
+      return { ok: false, error: { code: 'forbidden', message: '此窗口不允许调用该命令' } };
     const result = await commands.dispatch(String(name), input, 'ui', event.sender);
     if (name === 'workbench.session' && result.ok) ready.add(event.sender.id);
     return result;

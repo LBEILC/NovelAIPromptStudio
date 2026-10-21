@@ -390,7 +390,7 @@ export async function workbenchInteractionChecks(env) {
     );
   };
   try {
-    await h.section('外观');
+    await h.section('通用');
     await click(
       env.mode.reducedMotion ? '跟随系统' : '完整',
       'document.querySelector("[aria-label=动效]")',
@@ -544,7 +544,7 @@ export async function workbenchInteractionChecks(env) {
       features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
     });
     for (const mode of ['跟随系统', '关闭']) {
-      await h.section('外观');
+      await h.section('通用');
       await click(mode, 'document.querySelector("[aria-label=动效]")');
       await click('工作台', 'document.querySelector(".tb")');
       await wait('document.documentElement.dataset.motion==="off"');
@@ -611,7 +611,7 @@ export async function workbenchInteractionChecks(env) {
     await move('mouseReleased', { x: 20, y: 300 });
     await h.window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
     if (migrated) await migrate(originalStorage);
-    await h.section('外观');
+    await h.section('通用');
     await click(
       { full: '完整', reduced: '跟随系统', off: '关闭' }[originalMotion],
       'document.querySelector("[aria-label=动效]")',

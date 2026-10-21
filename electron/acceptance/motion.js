@@ -2,7 +2,7 @@ export const motionDetails = `(async()=>({motion:document.documentElement.datase
 
 export async function defaultMotionChecks(h) {
   const { check, wait, window } = h;
-  await h.section('外观');
+  await h.section('通用');
   await wait("!!document.querySelector('[aria-label=动效] [role=radio][aria-checked=true]')");
   await check(
     '新临时目录的动效默认显示跟随系统',
@@ -28,7 +28,7 @@ export async function defaultMotionChecks(h) {
 
 export async function applyMotionBaseline(h, mode) {
   if (!mode.motion) return;
-  await h.section('外观');
+  await h.section('通用');
   await h.click(
     mode.motion === 'off' ? '关闭' : '跟随系统',
     'document.querySelector("[aria-label=动效]")',

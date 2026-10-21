@@ -37,7 +37,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
       '图片库·收尾',
       '图片库·滚动条',
       '设置',
-      '设置·外观',
+      '设置·通用',
       '设置·AI 服务',
       '设置·翻译词典',
 

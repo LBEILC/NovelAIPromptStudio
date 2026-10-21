@@ -1,3 +1,4 @@
+import { trayChecks } from './tray.js';
 import { materialsChecks } from './materials.js';
 import { libraryRefinementChecks } from './libraryRefinement.js';
 import { clientControlChecks } from './clientControls.js';
@@ -258,11 +259,12 @@ export async function runAcceptance(context) {
       await e('document.querySelector("#acceptance-font-mono").remove()');
     };
     const shellChecks = async () => {
+      await trayChecks(environment);
       h.dualThemes(false);
       for (const theme of ['light', 'dark']) {
         nativeTheme.themeSource = theme;
         h.category(`外壳·${theme}`);
-        await section('外观');
+        await section('通用');
         await click(theme === 'light' ? '浅色' : '深色');
         await wait(`document.documentElement.dataset.theme === '${theme}'`);
         await check(
@@ -289,7 +291,7 @@ export async function runAcceptance(context) {
       }
       if (!mode.packaged) {
         h.category('外壳');
-        await section('外观');
+        await section('通用');
         await e(
           `(() => { const group=document.querySelector('[role=radiogroup][aria-label="主题"]'); for(const name of ['浅色','深色','浅色','深色']) [...group.querySelectorAll('[role=radio]')].find(b=>b.textContent.trim()===name).click() })()`,
         );
@@ -325,7 +327,7 @@ export async function runAcceptance(context) {
         }
         h.dualThemes(true);
         await applyMotionBaseline(h, mode);
-        await section('外观');
+        await section('通用');
         window.showInactive();
         window.maximize();
         await new Promise((resolve) => setTimeout(resolve, 300));
@@ -338,7 +340,7 @@ export async function runAcceptance(context) {
 
         window.unmaximize();
         window.hide();
-        await section('外观');
+        await section('通用');
         await click('跟随系统');
         nativeTheme.themeSource = 'light';
         await wait(`document.documentElement.dataset.theme === 'light'`);
