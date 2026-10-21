@@ -252,17 +252,18 @@ export async function interactionCorrectionChecks(env) {
       pop('加入收藏集'),
     );
     for (const record of records.slice(0, 2)) {
+      const card = `.lgrid:not(.leaving) .card:not(.leaving)[data-group-id="project:${record.id}"]`;
       await wait(
-        `document.querySelector('[data-group-id="project:${record.id}"]')?.checkVisibility() && document.querySelector('.tb [aria-current=page]')?.textContent.trim()==='图片库' && !document.querySelector('.viewer-ov') && !document.querySelector('.libp')?.closest('.leaving')`,
-        '换页后图片库和目标卡片已可见，上一张大图已关闭',
+        `document.querySelector(${JSON.stringify(card)})?.checkVisibility() && document.querySelector('.tb [aria-current=page]')?.textContent.trim()==='图片库' && !document.querySelector('.viewer-ov, .app-page-surface.leaving, .lcollect')`,
+        '换页完成且目标卡片可见，上一张大图和收藏集浮层已关闭',
       );
       await e(
-        `document.querySelector('[data-group-id="project:${record.id}"]').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
+        `document.querySelector(${JSON.stringify(card)}).dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
       );
       await wait('!!document.querySelector(".viewer-ov")');
       await click('在工作台打开', 'document.querySelector(".viewer-ov")');
       await wait(
-        `document.querySelector('.wb-body[data-project-id="${record.id}"]')?.checkVisibility() && document.querySelector('.tb [aria-current=page]')?.textContent.trim()==='工作台'`,
+        `document.querySelector('.wb-body[data-project-id="${record.id}"]')?.checkVisibility() && document.querySelector('.tb [aria-current=page]')?.textContent.trim()==='工作台' && !document.querySelector('.app-page-surface.leaving')`,
         '双击的图片已完成加载并成为当前工作台页面',
       );
       if (record === records[0]) await click('图片库', 'document.querySelector(".tb")');
