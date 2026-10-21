@@ -15,6 +15,7 @@ import {
 import { createPreviewHandlers } from './handlers.mjs';
 import { pause } from './services.mjs';
 import { hydrateParameters, normalizeSettings } from '../electron/params.js';
+import { createChatGPT, chatGPTCommands } from '../electron/chatgpt.js';
 
 export async function createSession(services, images, emit, empty = false) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-ui-preview-'));
@@ -32,6 +33,7 @@ export async function createSession(services, images, emit, empty = false) {
   );
   const setAI = (enabled) =>
     preferences.saveAISettings({
+      provider: 'apiKey',
       baseUrl: services.aiUrl,
       model: enabled ? 'preview-model' : '',
       apiKey: enabled ? 'preview-key' : '',
@@ -68,6 +70,16 @@ export async function createSession(services, images, emit, empty = false) {
     emit,
     state: services.state,
   });
+  const chatGPT = createChatGPT({
+    preferences,
+    emit,
+    endpoints: services.chatgpt.endpoints,
+    openExternal: (url) => services.chatgpt.openExternal(url, services.allowPort),
+  });
+  Object.assign(
+    adapter.handlers,
+    chatGPTCommands(chatGPT, preferences, async () => {}),
+  );
   const commands = await createCommands({
     directory,
     version: 'preview',
@@ -296,7 +308,32 @@ export async function createSession(services, images, emit, empty = false) {
       call,
       allowedPath,
       setAI,
+      async setChatGPT(scenario) {
+        await chatGPT.signOut();
+        services.chatgpt.state.plan =
+          scenario === 'codex-pro' ? 'pro' : scenario === 'free' ? 'free' : 'plus';
+        services.chatgpt.state.error = null;
+        preferences.saveAISettings({
+          provider: 'chatgpt',
+          introShown: true,
+          codexMode: scenario.startsWith('codex'),
+        });
+        if (scenario !== 'signed-out') {
+          try {
+            await chatGPT.signIn();
+            await chatGPT.models();
+          } catch (error) {
+            if (scenario !== 'free') throw error;
+          }
+          if (scenario.startsWith('codex')) await chatGPT.quota();
+          if (scenario === 'limited') {
+            services.chatgpt.state.error = 'subscription_sharing_usage_limit_exceeded';
+            await chatGPT.complete([{ role: 'user', content: 'OK' }]).catch(() => {});
+          }
+        }
+      },
       async close() {
+        chatGPT.close();
         await commands.close();
         await adapter.close();
         database.close();
@@ -304,6 +341,7 @@ export async function createSession(services, images, emit, empty = false) {
       },
     };
   } catch (error) {
+    chatGPT.close();
     await commands.close();
     await adapter.close();
     database.close();

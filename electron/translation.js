@@ -62,6 +62,10 @@ async function requestJson(url, options, fetcher, timeoutMs = 30000) {
 }
 
 function requireModel(settings) {
+  if (settings.provider === 'chatgpt') {
+    if (!settings.chatgpt?.signedIn) throw new Error('请先在设置中登录 ChatGPT');
+    return settings.chatgpt.model || 'chatgpt';
+  }
   const model = String(settings.model || '').trim();
   if (!model) throw new Error('请先选择模型');
   return model;
@@ -82,8 +86,17 @@ function chatBody(model, messages) {
   return { model, messages };
 }
 
+async function requestAIJson(settings, url, options, fetcher, timeoutMs) {
+  if (settings.provider !== 'chatgpt') return requestJson(url, options, fetcher, timeoutMs);
+  if (!settings.chatGPT) throw new Error('请先在设置中登录 ChatGPT');
+  const messages = JSON.parse(options.body).messages;
+  const content = await settings.chatGPT.complete(messages, options.signal);
+  return { choices: [{ message: { content } }] };
+}
+
 export async function requestStructuredAI(instruction, input, settings, signal) {
-  const body = await requestJson(
+  const body = await requestAIJson(
+    settings,
     `${normalizeBaseUrl(settings.baseUrl)}/chat/completions`,
     {
       method: 'POST',
@@ -114,7 +127,8 @@ export async function transformParagraph(
 ) {
   if (!['translate', 'rewrite'].includes(direction)) throw new Error('Invalid paragraph direction');
   const model = requireModel(settings);
-  const body = await requestJson(
+  const body = await requestAIJson(
+    settings,
     `${normalizeBaseUrl(settings.baseUrl)}/chat/completions`,
     {
       method: 'POST',
@@ -161,7 +175,8 @@ export async function testModel(settings, fetcher = globalThis.fetch) {
   const baseUrl = normalizeBaseUrl(settings.baseUrl);
   const model = requireModel(settings);
   const startedAt = Date.now();
-  const body = await requestJson(
+  const body = await requestAIJson(
+    settings,
     `${baseUrl}/chat/completions`,
     {
       method: 'POST',
@@ -219,7 +234,8 @@ function parseTranslationJson(content, expectedLength) {
 async function translateTagBatch(cleaned, baseUrl, model, settings, fetcher, signal) {
   const translationPrompt = DEFAULT_TRANSLATION_PROMPT;
   const classificationPrompt = DEFAULT_CLASSIFICATION_PROMPT;
-  const body = await requestJson(
+  const body = await requestAIJson(
+    settings,
     `${baseUrl}/chat/completions`,
     {
       method: 'POST',

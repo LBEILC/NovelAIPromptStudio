@@ -72,6 +72,7 @@ describe('AI preferences', () => {
     temporaryDirectories.push(directory);
     const preferences = openPreferences(directory, safeStorage);
     preferences.saveAISettings({
+      provider: 'apiKey',
       baseUrl: 'https://api.example.com/v1',
       model: 'qwen-plus',
       apiKey: 'top-secret',
@@ -103,6 +104,7 @@ describe('AI preferences', () => {
     const preferences = openPreferences(directory, unavailable);
     expect(preferences.publicSettings()).not.toHaveProperty('translationPrompt');
     preferences.saveAISettings({
+      provider: 'apiKey',
       baseUrl: 'https://api.example.com/v1',
       model: 'test',
       apiKey: 'session-only-secret',

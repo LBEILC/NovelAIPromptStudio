@@ -230,6 +230,7 @@ const act = (action, value) => async () => {
   if (action.startsWith('agent-')) await prepareUI();
   const r = await request('scenario', { action, value });
   if (r.reload) {
+    if (action === 'chatgpt') sessionStorage.setItem('preview-chatgpt-scene', String(value));
     for (const key of Object.keys(localStorage))
       if (key.includes('workbench')) localStorage.removeItem(key);
     location.reload();
@@ -315,10 +316,38 @@ group('生成', [
   ['恢复速度', act('slow-generation', false)],
 ]);
 group('AI 服务', [
+  ['ChatGPT 未登录', act('chatgpt', 'signed-out')],
+  ['ChatGPT Plus', act('chatgpt', 'plus')],
+  ['ChatGPT 免费账号', act('chatgpt', 'free')],
+  ['ChatGPT 额度用完', act('chatgpt', 'limited')],
+  ['Codex 两个窗口', act('chatgpt', 'codex-plus')],
+  ['Codex Pro 一个窗口', act('chatgpt', 'codex-pro')],
   ['未配置', act('ai', false)],
   ['已配置', act('ai', true)],
   ['下次 AI 失败', act('ai-error')],
 ]);
+const chatGPTScene = sessionStorage.getItem('preview-chatgpt-scene');
+if (chatGPTScene) {
+  sessionStorage.removeItem('preview-chatgpt-scene');
+  const clickWhenReady = async (label) => {
+    const deadline = Date.now() + 10000;
+    while (Date.now() < deadline) {
+      const button = [...document.querySelectorAll('button')].find(
+        (b) => b.textContent.trim() === label && b.getClientRects().length && !b.disabled,
+      );
+      if (button) {
+        button.click();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
+  void (async () => {
+    await clickWhenReady('设置');
+    await clickWhenReady('AI 服务');
+    if (chatGPTScene === 'free') await clickWhenReady('登录 ChatGPT');
+  })();
+}
 group('Agent', [
   ['改提示词', act('agent-edit')],
   ['排两次生成', act('agent-generate')],

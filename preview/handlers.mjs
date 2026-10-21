@@ -1,3 +1,4 @@
+import { CommandError } from '../electron/commands/registry.js';
 // Preview-only adapters copied from main.js. Keep database/import contracts identical.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -1105,6 +1106,7 @@ export function createPreviewHandlers({
     try {
       return { ok: true, models: await listModels(preferences.credentials(), net.fetch) };
     } catch (error) {
+      if (error instanceof CommandError) throw error;
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
@@ -1127,6 +1129,7 @@ export function createPreviewHandlers({
       );
       return { ok: true, text };
     } catch (error) {
+      if (error instanceof CommandError) throw error;
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     } finally {
       if (paragraphRequests.get(key) === controller) paragraphRequests.delete(key);
@@ -1142,6 +1145,7 @@ export function createPreviewHandlers({
     try {
       return { ok: true, ...(await testModel(preferences.credentials(), net.fetch)) };
     } catch (error) {
+      if (error instanceof CommandError) throw error;
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
@@ -1155,7 +1159,9 @@ export function createPreviewHandlers({
         dsoDictionary: lookupDsoTags(cleaned),
         danbooruCache: database.lookupDanbooruTagCache(cleaned),
         lookupDanbooru: (values) => Promise.resolve([]),
-        translateMissing: aiSettings.model
+        translateMissing: (
+          aiSettings.provider === 'chatgpt' ? aiSettings.chatgpt.signedIn : aiSettings.model
+        )
           ? (values) => translateTags(values, preferences.credentials(), net.fetch)
           : null,
       });
@@ -1187,6 +1193,7 @@ export function createPreviewHandlers({
         ).length,
       };
     } catch (error) {
+      if (error instanceof CommandError) throw error;
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });

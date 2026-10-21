@@ -461,7 +461,7 @@ export class CommandError extends Error {
   constructor(code, message) {
     super(message);
     this.code = code;
-    /** @type {{branches:number,versions:number,images:number}|undefined} */
+    /** @type {Record<string, unknown>|undefined} */
     this.details = undefined;
   }
 }
@@ -558,6 +558,10 @@ function valid(value, type) {
         model: 'text',
         apiKey: 'text',
         clearApiKey: 'boolean',
+        provider: 'chatgpt|apiKey',
+        chatgptModel: 'text',
+        codexMode: 'boolean',
+        introShown: 'boolean',
         hasApiKey: 'boolean',
         encryptionAvailable: 'boolean',
       },
@@ -574,7 +578,10 @@ function valid(value, type) {
     return (
       record(value) &&
       Object.entries(value).every(
-        ([key, entry]) => Object.hasOwn(schemas[type], key) && valid(entry, schemas[type][key]),
+        ([key, entry]) =>
+          (type === 'aiSettings' &&
+            ['chatgpt', 'hasApiKey', 'encryptionAvailable'].includes(key)) ||
+          (Object.hasOwn(schemas[type], key) && valid(entry, schemas[type][key])),
       )
     );
   }

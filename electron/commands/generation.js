@@ -366,6 +366,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
               Math.max(64, Math.round(input[key] / 64) * 64),
             );
           }
+        if (request.parameters.width * request.parameters.height > 1536 * 2048)
+          throw new Error('面积最大 1536×2048');
         return {
           ...estimateGeneration(request, subscription, input.count, pendingEncodes),
           balance: balance(),
@@ -485,6 +487,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       };
       const session = store.get(),
         next = session.tabs.find((t) => t.id === current.id);
+      if (norm(input.width) * norm(input.height) > 1536 * 2048)
+        throw new Error('面积最大 1536×2048');
       next.project.metadata = {
         ...next.project.metadata,
         width: norm(input.width),

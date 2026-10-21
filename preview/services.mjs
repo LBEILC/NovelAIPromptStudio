@@ -2,10 +2,12 @@
 import net from 'node:net';
 import fs from 'node:fs';
 import { startFakeNovelAI } from '../electron/fixtures/novelAIService.js';
+import { startFakeChatGPT } from '../electron/fixtures/chatGPTService.js';
 
 export const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function startServices(images) {
   const novel = await startFakeNovelAI();
+  const chatgpt = await startFakeChatGPT();
   novel.state.images = images.map((file) => fs.readFileSync(file));
   novel.state.delay = 1500;
   const state = { aiFail: false, slowImport: false, disconnect: false, aiDelay: 1000 };
@@ -74,7 +76,7 @@ export async function startServices(images) {
   });
   await new Promise((resolve) => ai.listen(0, '127.0.0.1', resolve));
   const aiUrl = `http://127.0.0.1:${ai.address().port}/v1`;
-  const allowed = new Set([new URL(novel.url).origin, new URL(aiUrl).origin]);
+  const allowed = new Set([new URL(novel.url).origin, new URL(aiUrl).origin, chatgpt.origin]);
   const blocked = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, options) => {
@@ -116,17 +118,25 @@ export async function startServices(images) {
     return connect.apply(this, args);
   };
   return {
+    chatgpt,
     novel,
     state,
     aiUrl,
     blocked,
-    allowPort: (port) => ports.add(port),
+    allowPort: (port) => {
+      ports.add(port);
+      allowed.add(`http://127.0.0.1:${port}`);
+    },
     async close() {
       globalThis.fetch = originalFetch;
       net.Socket.prototype.connect = connect;
       novel.state.resume?.();
       ai.closeAllConnections();
-      await Promise.all([novel.close(), new Promise((resolve) => ai.close(resolve))]);
+      await Promise.all([
+        chatgpt.close(),
+        novel.close(),
+        new Promise((resolve) => ai.close(resolve)),
+      ]);
     },
   };
 }

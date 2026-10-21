@@ -76,6 +76,7 @@ function normalizeRecentImageDirectory(value, strict = false) {
 export function openPreferences(dataDirectory, safeStorage, options = {}) {
   const filePath = path.join(dataDirectory, 'preferences.json');
   let sessionApiKey = '';
+  let chatGPT;
   const defaultAssetsDirectory = path.resolve(
     options.defaultAssetsDirectory || path.join(dataDirectory, '..', 'assets'),
   );
@@ -106,15 +107,52 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
 
   const publicSettings = () => {
     const preferences = read();
+    const mode = preferences.codexMode ? 'codex' : 'official';
+    const account = chatGPTRecord(mode);
     return {
       baseUrl: preferences.aiBaseUrl || DEFAULT_BASE_URL,
       model: preferences.aiModel || '',
       hasApiKey: Boolean(sessionApiKey || preferences.aiApiKeyEncrypted),
       encryptionAvailable: safeStorage.isEncryptionAvailable(),
+      provider:
+        preferences.aiProvider ||
+        (sessionApiKey || preferences.aiApiKeyEncrypted ? 'apiKey' : 'chatgpt'),
+      chatgpt: {
+        mode,
+        signedIn: Boolean(account.accessToken),
+        email: account.email || null,
+        model: account.model || '',
+        introShown: Boolean(preferences.chatGPTIntroShown),
+        quota: account.quota || null,
+        limited: account.limited || null,
+      },
     };
   };
 
-  const credentials = () => ({ ...publicSettings(), apiKey: decryptKey(read()) });
+  const credentials = () => {
+    const settings = publicSettings();
+    if (settings.provider === 'chatgpt')
+      return { ...settings, model: settings.chatgpt.model, chatGPT };
+    return { ...settings, apiKey: decryptKey(read()) };
+  };
+
+  function chatGPTRecord(mode) {
+    const encrypted = read().chatGPTEncrypted?.[mode];
+    if (!encrypted) return {};
+    try {
+      return JSON.parse(safeStorage.decryptString(Buffer.from(encrypted, 'base64')));
+    } catch {
+      return {};
+    }
+  }
+  function saveChatGPTRecord(mode, record) {
+    if (!['official', 'codex'].includes(mode)) throw new Error('登录方式无效');
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('当前系统无法安全加密登录令牌');
+    const encrypted = safeStorage.encryptString(JSON.stringify(record)).toString('base64');
+    const stored = read();
+    stored.chatGPTEncrypted = { ...stored.chatGPTEncrypted, [mode]: encrypted };
+    write(stored);
+  }
 
   const resolveFont = (value, fallback) => {
     const family = normalizeFontFamily(value, fallback);
@@ -168,10 +206,30 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     return appearanceSettings();
   };
 
-  const saveAISettings = ({ baseUrl, model, apiKey, clearApiKey = false }) => {
+  const saveAISettings = (next = {}) => {
+    const {
+      baseUrl,
+      model,
+      apiKey,
+      clearApiKey = false,
+      provider,
+      codexMode,
+      chatgptModel,
+      introShown,
+    } = next;
     const preferences = read();
-    preferences.aiBaseUrl = normalizeBaseUrl(baseUrl);
-    preferences.aiModel = String(model || '').trim();
+    if (!preferences.aiProvider) preferences.aiProvider = publicSettings().provider;
+    if (provider !== undefined) {
+      if (!['apiKey', 'chatgpt'].includes(provider)) throw new Error('AI 服务类型无效');
+      preferences.aiProvider = provider;
+    }
+    if (baseUrl !== undefined) preferences.aiBaseUrl = normalizeBaseUrl(baseUrl);
+    if (model !== undefined) preferences.aiModel = String(model || '').trim();
+    if (codexMode !== undefined) {
+      preferences.codexMode = Boolean(codexMode);
+      if (!codexMode && preferences.chatGPTEncrypted) delete preferences.chatGPTEncrypted.codex;
+    }
+    if (introShown === true) preferences.chatGPTIntroShown = true;
     delete preferences.aiTranslationPrompt;
     delete preferences.aiClassificationPrompt;
     if (clearApiKey) {
@@ -190,6 +248,11 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     delete preferences.translationProvider;
     delete preferences.deepLKeyEncrypted;
     write(preferences);
+    if (chatgptModel !== undefined) {
+      const mode = preferences.codexMode ? 'codex' : 'official';
+      saveChatGPTRecord(mode, { ...chatGPTRecord(mode), model: String(chatgptModel).trim() });
+    }
+    chatGPT?.settingsChanged(next);
     return publicSettings();
   };
 
@@ -273,6 +336,26 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       write(stored);
     },
     publicSettings,
+    chatGPTRecord,
+    saveChatGPTRecord,
+    clearChatGPTRecord: (mode) => {
+      const old = chatGPTRecord(mode),
+        stored = read();
+      if (old.clientId || old.hostId) {
+        saveChatGPTRecord(mode, {
+          clientId: old.clientId,
+          hostId: old.hostId,
+          sub: old.sub,
+          issuer: old.issuer,
+        });
+      } else if (stored.chatGPTEncrypted) {
+        delete stored.chatGPTEncrypted[mode];
+        write(stored);
+      }
+    },
+    attachChatGPT: (service) => {
+      chatGPT = service;
+    },
     credentials,
     saveAISettings,
     appearanceSettings,

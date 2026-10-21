@@ -140,6 +140,7 @@ async function scenario({ action, value }) {
   }
   if (action === 'token') session.preferences.saveNovelAIToken(value ? 'acceptance-token' : '');
   else if (action === 'ai') session.setAI(Boolean(value));
+  else if (action === 'chatgpt') await session.setChatGPT(String(value));
   else if (action === 'generation-error') {
     if (value === 'offline') services.state.disconnect = true;
     else services.novel.state.failNext = Number(value);
@@ -202,7 +203,7 @@ async function scenario({ action, value }) {
         await session.call('generate.start', { tabId, count: 1 }, 'agent');
     }
   } else if (!['token', 'ai'].includes(action)) throw Error('未知场景');
-  return { reload: ['token', 'ai', 'many'].includes(action) };
+  return { reload: ['token', 'ai', 'chatgpt', 'many'].includes(action) };
 }
 async function shutdown() {
   if (shuttingDown) return;

@@ -21,6 +21,18 @@ import type {
 } from './generation';
 
 export type CommandErrorCode =
+  | 'canceled'
+  | 'denied'
+  | 'not_eligible'
+  | 'network'
+  | 'reauth'
+  | 'usage_limit'
+  | 'unavailable'
+  | 'invalid_token'
+  | 'request_failed'
+  | 'response_failed'
+  | 'response_incomplete'
+  | 'stream_disconnected'
   | 'branch_generating'
   | 'needs_confirm'
   | 'invalid_input'
@@ -35,7 +47,15 @@ export type CommandResult<T> =
       error: {
         code: CommandErrorCode;
         message: string;
-        details?: { branches: number; versions: number; images: number };
+        details?: {
+          branches?: number;
+          versions?: number;
+          images?: number;
+          status?: number | null;
+          machineCode?: string | null;
+          requestId?: string | null;
+          param?: string | null;
+        };
       };
     };
 export interface CommandTab {
@@ -107,6 +127,7 @@ export type ProgressCommandEvent = {
 export type CommandEvent =
   | WorkbenchCommandEvent
   | ProgressCommandEvent
+  | { type: 'ai-settings' }
   | { type: 'updates'; data: Types.UpdateState }
   | { type: 'generation'; data: GenerationStatus }
   | { type: 'navigate'; destination: string };

@@ -85,6 +85,17 @@ it('edits parameters and references through Agent commands, with revision, undo,
     const opened = await call('workbench.open', { path: file }),
       tabId = opened.tab.id;
     expect(opened.tab.project.params.model).toBe('nai-diffusion-5-full');
+    const sizeBefore = (await call('workbench.get', { tabId })).tab.project.metadata;
+    await expect(call('prompt.set-size', { tabId, width: 2048, height: 2048 })).rejects.toThrow(
+      '面积最大 1536×2048',
+    );
+    expect((await call('workbench.get', { tabId })).tab.project.metadata).toEqual(sizeBefore);
+    expect(
+      (await call('generate.estimate', { tabId, width: 2048, height: 2048, count: 1 })).unavailable,
+    ).toBe('面积最大 1536×2048');
+    expect(
+      (await call('generate.estimate', { tabId, width: 2048, height: 1536, count: 1 })).unavailable,
+    ).toBeUndefined();
     const changed = await call('params.set', {
       tabId,
       expectedRevision: opened.revision,

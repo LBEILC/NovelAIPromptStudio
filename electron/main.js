@@ -1,3 +1,4 @@
+import { CommandError } from './commands/registry.js';
 import {
   guardClientWindow,
   themeBackground,
@@ -37,6 +38,7 @@ import {
   inspectLibraryImportFiles,
 } from './importer.js';
 import { openPreferences } from './preferences.js';
+import { createChatGPT, chatGPTCommands } from './chatgpt.js';
 import { listModels, testModel, translateTags, transformParagraph } from './translation.js';
 import { lookupDanbooruTags } from './danbooru.js';
 import { lookupDsoTags } from './dsoDictionary.js';
@@ -1452,6 +1454,7 @@ app.whenReady().then(async () => {
     try {
       return { ok: true, models: await listModels(preferences.credentials(), net.fetch) };
     } catch (error) {
+      if (error instanceof CommandError) throw error;
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
@@ -1474,6 +1477,7 @@ app.whenReady().then(async () => {
       );
       return { ok: true, text };
     } catch (error) {
+      if (error instanceof CommandError) throw error;
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     } finally {
       if (paragraphRequests.get(key) === controller) paragraphRequests.delete(key);
@@ -1489,6 +1493,7 @@ app.whenReady().then(async () => {
     try {
       return { ok: true, ...(await testModel(preferences.credentials(), net.fetch)) };
     } catch (error) {
+      if (error instanceof CommandError) throw error;
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
@@ -1502,7 +1507,9 @@ app.whenReady().then(async () => {
         dsoDictionary: lookupDsoTags(cleaned),
         danbooruCache: database.lookupDanbooruTagCache(cleaned),
         lookupDanbooru: (values) => lookupDanbooruTags(values, net.fetch),
-        translateMissing: aiSettings.model
+        translateMissing: (
+          aiSettings.provider === 'chatgpt' ? aiSettings.chatgpt.signedIn : aiSettings.model
+        )
           ? (values) => translateTags(values, preferences.credentials(), net.fetch)
           : null,
       });
@@ -1534,6 +1541,7 @@ app.whenReady().then(async () => {
         ).length,
       };
     } catch (error) {
+      if (error instanceof CommandError) throw error;
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
@@ -1560,6 +1568,30 @@ app.whenReady().then(async () => {
     return { ok: Boolean(await releasePreparedImport(input.id)) };
   });
   let acceptanceGeneration;
+  let chatGPTFixture;
+  if (acceptanceMode && !acceptanceMode.packaged) {
+    const { startFakeChatGPT } = await import('./fixtures/chatGPTService.js');
+    chatGPTFixture = await startFakeChatGPT();
+  }
+  const chatGPT = createChatGPT({
+    preferences,
+    clientVersion: app.getVersion(),
+    fetcher: chatGPTFixture?.fetcher,
+    openExternal: chatGPTFixture
+      ? (url) => chatGPTFixture.openExternal(url)
+      : (url) => shell.openExternal(url),
+    endpoints: chatGPTFixture?.endpoints,
+    emit: (event) => {
+      for (const window of BrowserWindow.getAllWindows())
+        if (!window.webContents.isDestroyed())
+          window.webContents.send('studio:command-event', event);
+    },
+  });
+  Object.assign(
+    commandHandlers,
+    chatGPTCommands(chatGPT, preferences, (url) => shell.openExternal(url)),
+  );
+  app.once('before-quit', () => chatGPT.close());
   if (
     (acceptanceMode && !acceptanceMode.packaged) ||
     (screenshotMode && process.argv.includes('--app-screenshot-readme'))
@@ -1613,6 +1645,7 @@ app.whenReady().then(async () => {
     try {
       const { runAcceptance } = await import('./acceptance/run.js');
       await runAcceptance({
+        chatGPTFixture,
         generationService: acceptanceGeneration,
         app,
         mode: acceptanceMode,
@@ -1625,6 +1658,8 @@ app.whenReady().then(async () => {
         createWindow,
       });
       await acceptanceGeneration?.close();
+      chatGPT.close();
+      await chatGPTFixture?.close();
       app.quit();
     } catch (error) {
       console.error(error);
