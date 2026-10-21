@@ -1742,6 +1742,16 @@ export default function App() {
               onEmptyTrash={emptyTrash}
               onImport={() => importImages()}
               onImportClipboard={() => importImages(null, true)}
+              onOpenAsNewWork={(project) =>
+                void workbenchConnection
+                  ?.prepare()
+                  .then(() => invokeUI('work.open-from-image', { imageId: project.id }))
+                  .then(() => {
+                    setPage('workbench');
+                    showToast('已作为新作品打开');
+                  })
+                  .catch((error) => showToast(error.message, 'error'))
+              }
               onOpenWorkbench={(project) =>
                 openWorkbenchPath(project.image_path, {
                   type: 'library',

@@ -319,7 +319,8 @@ export interface CommandDefinitions {
   'prompt.set-size': { input: TabInput & { width: number; height: number }; output: TabDocument };
   'branch.rename': { input: { branchId: string; name: string }; output: { name: string } };
   'work.open-from-image': {
-    input: TabInput & { versionId: string; imageId: string };
+    /** 只给 imageId 时（图片库里）自己找这张图所在的作品和版本（1.5.5） */
+    input: Partial<TabInput> & { versionId?: string; imageId: string };
     output: TabDocument;
   };
   'agent.setup': {

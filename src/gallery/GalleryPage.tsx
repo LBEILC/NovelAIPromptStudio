@@ -150,6 +150,10 @@ export default function GalleryPage(
             p.onOpenWorkbench(m);
         },
       },
+      // 软件生成的图："在工作台打开"回到它的作品，另起要用这一项（1.5.5）
+      ...(!multi && menu.member.generated_work_id && p.onOpenAsNewWork
+        ? [{ label: '作为新作品打开', onSelect: () => p.onOpenAsNewWork!(menu.member) }]
+        : []),
       {
         label: '加入收藏集…',
         onSelect: () => {
