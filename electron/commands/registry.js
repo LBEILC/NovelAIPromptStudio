@@ -1,5 +1,5 @@
 // @ts-check
-import { validSettingsPatch } from '../params.js';
+import { validSettingsPatch } from './parameterValidation.js';
 /** @typedef {import('../../src/shared/commands').CommandName} CommandName */
 /** @typedef {import('../../src/shared/commands').CommandErrorCode} CommandErrorCode */
 /** @typedef {{ fields: Record<string, string>, required?: string[], uiOnly?: boolean, mutation?: boolean, example?:object }} Definition */

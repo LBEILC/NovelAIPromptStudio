@@ -3,6 +3,8 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { agentSetup, launcherScripts, writeWindowsPath, environmentBroadcast } from './setup.js';
 import { validateCommand } from './registry.js';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 let root: string;
 beforeEach(async () => {
@@ -21,6 +23,24 @@ const options = () => ({
   packaged: false,
 });
 const agentHome = (target: string) => path.join(root, 'home', `.${target}`);
+
+it('runs installed CLI help and parameter validation without application dependencies', async () => {
+  await agentSetup(options()).install();
+  const script = path.join(root, 'runtime', 'agent', 'nai-studio.mjs');
+  const { stdout } = await promisify(execFile)(process.execPath, [script, 'help'], {
+    windowsHide: true,
+  });
+  const help = JSON.parse(stdout);
+  expect(help.ok).toBe(true);
+  expect(help.data.commands.some((c: { name: string }) => c.name === 'params.set')).toBe(true);
+  await expect(
+    promisify(execFile)(
+      process.execPath,
+      [script, 'params.set', '--json', JSON.stringify({ tabId: 'synthetic', patch: { steps: 0 } })],
+      { windowsHide: true },
+    ),
+  ).rejects.toMatchObject({ stdout: expect.stringContaining('invalid_input') });
+});
 
 it('preserves long unexpanded PATH text and broadcasts only after the registry write', async () => {
   const previous = '%USERPROFILE%\\bin;' + 'C:\\Long Folder;'.repeat(100);

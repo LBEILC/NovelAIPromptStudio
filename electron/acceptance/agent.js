@@ -4,6 +4,7 @@ import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { settleLayout } from './layout.js';
+import { commandRegistry } from '../commands/registry.js';
 
 export async function agentChecks({ app, h, mode, doubles, database }) {
   h.category('Agent');
@@ -74,7 +75,15 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   await h.check(
     'help 列出全部公开命令和输入格式',
     () =>
-      help.commands.length === 42 &&
+      help.commands.length === Object.values(commandRegistry).filter((c) => !c.uiOnly).length &&
+      [
+        'params.set',
+        'reference.add-vibe',
+        'reference.add-precise',
+        'reference.set',
+        'reference.remove',
+        'vibe.library',
+      ].every((name) => help.commands.some((c) => c.name === name)) &&
       ['material.list', 'material.save', 'material.insert'].every((name) =>
         help.commands.some((c) => c.name === name && c.example),
       ) &&

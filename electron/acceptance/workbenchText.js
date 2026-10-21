@@ -171,9 +171,10 @@ export async function automaticAndVibeChecks({ h, mode, doubles }) {
     } else {
       await wait('!!document.querySelector(".vibes button")');
       await click('0.20', 'document.querySelector(".vibes")');
+      await wait('!!document.querySelector("[data-vrow]")');
       await check(
-        'Vibe浮层显示强度、未知信息提取和编码',
-        '[...document.querySelectorAll(".vibe-pop .frow")].some(n=>n.textContent.includes("参考强度")&&n.querySelector(".mono")?.textContent==="0.20")&&document.querySelector(".vibe-pop").textContent.includes("未知 · 原图里没有记录")&&[...document.querySelectorAll(".vibe-pop .frow")].some(n=>n.querySelector(".label")?.textContent==="编码"&&!!n.querySelector(".path")?.textContent)',
+        'Vibe进入参考面板并显示强度、未知信息提取和编码',
+        '(()=>{const row=document.querySelector("[data-vrow]");return row.querySelector("[aria-label=参考强度]")?.getAttribute("aria-valuenow")==="0.2"&&row.textContent.includes("未知")&&row.querySelector("[aria-label=信息提取]")?.getAttribute("aria-disabled")==="true"&&row.textContent.includes(".naiv4vibe")})()',
       );
       await h.screenshot('workbench-vibe-detail');
       await key('Escape');

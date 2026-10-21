@@ -1,9 +1,10 @@
+import { validSettingsPatch } from './commands/parameterValidation.js';
 import { describe, it, expect } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import sharp from 'sharp';
 import { MODEL_CAPS } from '../src/shared/params.ts';
 import { createPromptStructure } from '../src/lib/promptStructure.js';
-import { hydrateParameters, gridCell, gridCenter, validSettingsPatch } from './params.js';
+import { hydrateParameters, gridCell, gridCenter } from './params.js';
 import { buildProjectRequest } from './parameterRequest.js';
 import { createVibeLibrary, preciseImage } from './vibeLibrary.js';
 import { estimateGeneration, createNovelAIClient } from './generation.js';

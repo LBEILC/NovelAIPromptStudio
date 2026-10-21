@@ -157,6 +157,8 @@ export function agentSetup(options) {
       'agent/client.mjs',
       'agent/SKILL.md',
       'electron/commands/registry.js',
+      'electron/commands/parameterValidation.js',
+      'src/shared/params.ts',
       'electron/appProfile.js',
     ]) {
       files.set(
