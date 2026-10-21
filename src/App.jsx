@@ -99,6 +99,7 @@ import {
 import { writeGalleryGrouping } from './lib/galleryGrouping.js';
 import { useStudioReducedMotion } from './lib/motion.js';
 import { trashNotice } from './lib/trashNotice';
+import { CloseAsk } from './shell/CloseAsk';
 import {
   moveOverviewTags,
   overviewMoveContext,
@@ -1855,6 +1856,8 @@ export default function App() {
         onCancel={cancelArchiveImport}
         onImport={commitArchiveImport}
       />
+
+      <CloseAsk />
 
       <Confirm
         options={

@@ -19,7 +19,7 @@ const handlers = {
     }))(),
   'settings.appearance.save': (input) => (async (settings) => settings)(input.settings),
   'settings.productivity.get': (input) =>
-    (async () => ({ recentImageDirectory: '', autoCheckUpdates: true }))(),
+    (async () => ({ recentImageDirectory: '', autoCheckUpdates: true, closeAction: 'ask' }))(),
   'settings.productivity.save': (input) => (async (settings) => settings)(input.settings),
   'updates.status': (input) =>
     (async () => ({

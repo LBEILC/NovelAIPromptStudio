@@ -3,6 +3,8 @@
   uploads = new Map();
 const files = new WeakMap();
 let resetting = false;
+// 托盘菜单（doc/design.md 2.28）：外框里用一个 iframe 打开 #tray-menu 来模拟托盘的菜单窗口
+const TRAY = location.hash === '#tray-menu';
 let preparation;
 async function prepareUI() {
   if (!preparation) {
@@ -116,6 +118,20 @@ window.studio = {
       const paths = pathsForFiles(selected);
       input = name === 'workbench.open' ? { ...input, path: paths[0] } : { ...input, paths };
     }
+    // 关闭弹框和托盘菜单在产品里由主进程处理；预览里只在外框上显示结果
+    if (name === 'window.close-choice') {
+      out.textContent = `关闭窗口：${input.action === 'tray' ? '最小化到托盘' : '退出'}${input.remember ? '（不再询问）' : ''}`;
+      if (input.remember)
+        await request('invoke', {
+          name: 'settings.productivity.save',
+          input: { settings: { closeAction: input.action } },
+        });
+      return { ok: true, data: {} };
+    }
+    if (name === 'tray.menu-size' || name === 'tray.action') {
+      parent.postMessage({ trayMenu: name, input }, location.origin);
+      return { ok: true, data: {} };
+    }
     if (name === 'clipboard.write-text') {
       await navigator.clipboard?.writeText(input.text).catch(() => {});
     }
@@ -163,6 +179,11 @@ stream.onmessage = (event) => {
   }
   for (const callback of events) callback(message);
 };
+// 外框发给托盘菜单 iframe 的事件（tray-menu-open）
+addEventListener('message', (event) => {
+  if (event.origin !== location.origin || !event.data?.pvEvent) return;
+  for (const callback of events) callback(event.data.pvEvent);
+});
 // 预览的外框：上面一排模拟按钮，下面一个 1240×760 的窗口（和原来的交互原型一样）；平台可以切 Windows / macOS
 const PLATFORM_KEY = 'nps-preview-platform';
 const platform = (() => {
@@ -173,6 +194,8 @@ const platform = (() => {
   }
 })();
 await import('/src/main.tsx');
+// 托盘菜单的 iframe 只要菜单本身，不要外框：停在这里，下面的外框代码不再执行
+if (TRAY) await new Promise(() => {});
 await import('/preview/frame.css');
 const html = document.documentElement;
 html.classList.add('pv');
@@ -351,6 +374,51 @@ if (chatGPTScene) {
 group('Agent', [
   ['改提示词', act('agent-edit')],
   ['排两次生成', act('agent-generate')],
+]);
+// 托盘菜单：贴着外框右下角弹出（像任务栏在下面时从托盘图标往上弹）；点外面、Esc、点了一项就关
+let trayFrame = null;
+const trayMessages = (event) => {
+  if (event.origin !== location.origin || !event.data?.trayMenu || !trayFrame) return;
+  const { trayMenu, input } = event.data;
+  if (trayMenu === 'tray.menu-size') {
+    trayFrame.style.width = input.width + 'px';
+    trayFrame.style.height = input.height + 'px';
+    trayFrame.style.visibility = 'visible';
+    trayFrame.focus();
+  } else {
+    trayFrame.style.visibility = 'hidden';
+    if (input.action !== 'close')
+      out.textContent = `托盘菜单：${input.action === 'show' ? '打开主窗口' : '退出'}`;
+  }
+};
+addEventListener('message', trayMessages);
+addEventListener('pointerdown', (event) => {
+  if (trayFrame && event.target !== trayFrame) trayFrame.style.visibility = 'hidden';
+});
+const openTray = async () => {
+  if (!trayFrame) {
+    trayFrame = document.createElement('iframe');
+    trayFrame.src = '/preview/#tray-menu';
+    trayFrame.title = '托盘菜单';
+    Object.assign(trayFrame.style, {
+      position: 'fixed',
+      right: '8px',
+      bottom: '8px',
+      border: '0',
+      background: 'transparent',
+      colorScheme: 'normal',
+      visibility: 'hidden',
+      zIndex: '1000',
+    });
+    trayFrame.setAttribute('allowtransparency', 'true');
+    document.body.append(trayFrame);
+    return;
+  }
+  trayFrame.contentWindow.postMessage({ pvEvent: { type: 'tray-menu-open' } }, location.origin);
+};
+group('窗口', [
+  ['关闭窗口', async () => events.forEach((callback) => callback({ type: 'close-request' }))],
+  ['托盘菜单', openTray],
 ]);
 group('更新', [
   ['有新版本', act('update', true)],

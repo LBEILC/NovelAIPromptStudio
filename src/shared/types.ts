@@ -329,6 +329,8 @@ export interface AppearanceSettings {
 export interface ProductivitySettings {
   recentImageDirectory: string;
   autoCheckUpdates: boolean;
+  /** 关闭主窗口时（doc/design.md 2.28，只在 Windows）：每次询问 / 最小化到托盘 / 退出 */
+  closeAction: 'ask' | 'tray' | 'quit';
 }
 export interface LibrarySettings {
   assetsDirectory: string;

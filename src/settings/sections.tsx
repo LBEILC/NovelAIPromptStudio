@@ -1,4 +1,4 @@
-// 设置的各页（doc/design.md 2.11、2.22、2.23）：外观、图片库、NovelAI 账号、AI 服务、Agent。
+// 设置的各页（doc/design.md 2.11、2.22、2.23、2.28）：通用、图片库、NovelAI 账号、AI 服务、Agent。
 // 翻译词典在 Dictionary.tsx，关于与更新在 About.tsx。
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { invokeUI } from '../lib/commands';
@@ -12,7 +12,7 @@ import { useAISettings } from '../state/ai';
 import { useStorage } from '../state/storage';
 import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, bytes, errorText } from './parts';
-import type { AppearanceSettings } from '../shared/types';
+import type { AppearanceSettings, ProductivitySettings } from '../shared/types';
 import type { AgentSkills } from '../shared/commands';
 import { MODEL_CAPS, MODEL_ORDER } from '../shared/params';
 import { ChatGPTAccount } from './ChatGPT';
@@ -26,10 +26,25 @@ const Fail = ({ children }: { children: ReactNode }) =>
     </div>
   ) : null;
 
-// ---------- 外观 ----------
+// ---------- 通用（外观和关闭窗口） ----------
 export function Appearance() {
   const notify = useNotifications();
   const { appearance, changeAppearance } = useAppearance();
+  // 关闭主窗口时（2.28）：只在 Windows；macOS 照系统习惯，关窗口后程序留在 Dock
+  const windows = document.documentElement.dataset.platform === 'windows';
+  const [closeAction, setCloseAction] = useState<ProductivitySettings['closeAction']>('ask');
+  useEffect(() => {
+    if (!windows) return;
+    invokeUI('settings.productivity.get', {})
+      .then((s) => setCloseAction(s.closeAction || 'ask'))
+      .catch(() => {});
+  }, [windows]);
+  const saveClose = (value: ProductivitySettings['closeAction']) => {
+    setCloseAction(value);
+    invokeUI('settings.productivity.save', { settings: { closeAction: value } })
+      .then((s) => setCloseAction(s.closeAction || value))
+      .catch((e) => notify({ text: errorText(e), tone: 'error' }));
+  };
   const [fonts, setFonts] = useState<{ family: string; monospace: boolean }[]>([]);
   useEffect(() => {
     let live = true;
@@ -92,7 +107,7 @@ export function Appearance() {
     );
   };
   return (
-    <SetPage title="外观" desc="更改会立即应用到整个界面。">
+    <SetPage title="通用" desc="更改会立即生效。">
       <Row title="主题">
         <Seg
           label="主题"
@@ -120,6 +135,20 @@ export function Appearance() {
           onChange={(motion) => save({ motion })}
         />
       </Row>
+      {windows && (
+        <Row title="关闭主窗口时" help="最小化到托盘后，生成和 Agent 接入在后台继续">
+          <Seg
+            label="关闭主窗口时"
+            items={[
+              ['ask', '每次询问'],
+              ['tray', '最小化到托盘'],
+              ['quit', '退出'],
+            ]}
+            value={closeAction}
+            onChange={saveClose}
+          />
+        </Row>
+      )}
     </SetPage>
   );
 }

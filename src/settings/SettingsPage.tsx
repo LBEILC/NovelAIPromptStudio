@@ -10,7 +10,7 @@ import { Account, Agent, AI, Appearance, Storage } from './sections';
 export { About, feedbackDiagnostics } from './About';
 
 const SECS = [
-  ['appearance', '外观', 'contrast-2-line'],
+  ['appearance', '通用', 'equalizer-line'],
   ['storage', '图片库', 'hard-drive-2-line'],
   ['novelai', 'NovelAI 账号', 'key-2-line'],
   ['ai', 'AI 服务', 'translate-2'],

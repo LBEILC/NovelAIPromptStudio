@@ -130,7 +130,11 @@ export type CommandEvent =
   | { type: 'ai-settings' }
   | { type: 'updates'; data: Types.UpdateState }
   | { type: 'generation'; data: GenerationStatus }
-  | { type: 'navigate'; destination: string };
+  | { type: 'navigate'; destination: string }
+  /** 主窗口要关闭、"关闭主窗口时"是每次询问（doc/design.md 2.28，只在 Windows） */
+  | { type: 'close-request' }
+  /** 托盘菜单每次弹出前发给菜单页面 */
+  | { type: 'tray-menu-open' };
 /**
  * 技能在某个 Agent 里的情况：installed 已装且和软件里的一样；outdated 已装但和软件里的不一样（软件升级后）；
  * missing 这个 Agent 装了但还没有技能；unavailable 这台电脑上没找到这个 Agent（没有 ~/.claude 或 ~/.codex）。
@@ -490,6 +494,21 @@ export interface CommandDefinitions {
   'settings.productivity.save': {
     input: { settings: Partial<Types.ProductivitySettings> };
     output: Types.ProductivitySettings;
+  };
+  /** 关闭弹框的选择；remember 为真时先把这次的选择存成"关闭主窗口时" */
+  'window.close-choice': {
+    input: { action: 'tray' | 'quit'; remember: boolean };
+    output: Record<string, never>;
+  };
+  /** 托盘菜单页面报告内容尺寸（CSS 像素），主进程据此定位后显示 */
+  'tray.menu-size': {
+    input: { width: number; height: number };
+    output: Record<string, never>;
+  };
+  /** 托盘菜单的操作：show 打开主窗口，quit 直接退出（不弹框），close 只关菜单 */
+  'tray.action': {
+    input: { action: 'show' | 'quit' | 'close' };
+    output: Record<string, never>;
   };
   'updates.status': {
     input: Record<string, never>;

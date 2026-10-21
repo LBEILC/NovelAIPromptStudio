@@ -269,6 +269,17 @@ export const commandRegistry = {
     uiOnly: true,
   },
   'settings.productivity.get': { fields: {}, required: [], uiOnly: true },
+  'window.close-choice': {
+    fields: { action: 'tray|quit', remember: 'boolean' },
+    required: ['action', 'remember'],
+    uiOnly: true,
+  },
+  'tray.menu-size': {
+    fields: { width: 'integer', height: 'integer' },
+    required: ['width', 'height'],
+    uiOnly: true,
+  },
+  'tray.action': { fields: { action: 'show|quit|close' }, required: ['action'], uiOnly: true },
   'settings.productivity.save': {
     fields: { settings: 'productivitySettings' },
     required: ['settings'],
@@ -579,7 +590,11 @@ function valid(value, type) {
         proseFont: 'text',
         motion: 'full|reduced|off',
       },
-      productivitySettings: { recentImageDirectory: 'text', autoCheckUpdates: 'boolean' },
+      productivitySettings: {
+        recentImageDirectory: 'text',
+        autoCheckUpdates: 'boolean',
+        closeAction: 'ask|tray|quit',
+      },
     };
     return (
       record(value) &&

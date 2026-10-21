@@ -5,6 +5,7 @@ import { installClientDefaults } from './lib/clientDefaults';
 import { AppearanceProvider } from './state/appearance';
 import { NotificationProvider } from './kit/toast';
 import { Win } from './shell/Win';
+import { TrayMenu } from './shell/TrayMenu';
 import '../design/tokens.css';
 import './fonts.css';
 import 'virtual:misans.css';
@@ -34,14 +35,19 @@ document.documentElement.dataset.platform = navigator.platform.startsWith('Win')
     ? 'macos'
     : 'other';
 installClientDefaults();
+// 托盘的菜单窗口和主窗口同一个入口，地址带 #tray-menu 时只渲染托盘菜单（doc/design.md 2.28）
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppearanceProvider>
-      <Win>
-        <NotificationProvider>
-          <App />
-        </NotificationProvider>
-      </Win>
+      {location.hash === '#tray-menu' ? (
+        <TrayMenu />
+      ) : (
+        <Win>
+          <NotificationProvider>
+            <App />
+          </NotificationProvider>
+        </Win>
+      )}
     </AppearanceProvider>
   </StrictMode>,
 );

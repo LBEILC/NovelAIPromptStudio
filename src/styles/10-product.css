@@ -179,3 +179,12 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 /* 步进器：点中间的数字直接输入（权重、步数、引导强度），输入框和数字一样宽，不跳 */
 .stepper .step-n { cursor: text; }
 .stepper .step-in input { width: 44px; border: 0; padding: 0; background: transparent; color: var(--text); font: inherit; text-align: center; outline: none; }
+
+/* 关闭弹框（2.28）："不再询问"在左下角，两个按钮在右边 */
+.dialog.close-ask .acts { align-items: center; }
+.dialog.close-ask .ca-remember { margin-right: auto; }
+
+/* 托盘菜单窗口（2.28）：窗口透明，只看得见菜单；外面一圈透明的边给阴影留地方 */
+html.tray, html.tray body, html.tray #root { width: auto; height: auto; background: transparent; }
+.tray-wrap { display: inline-block; padding: var(--sp-3); }
+.tray-wrap .menu { display: flex; }
