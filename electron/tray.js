@@ -4,7 +4,16 @@ import { guardClientWindow } from './clientWindow.js';
 import { registerTrayContents, sendWindowEvent } from './windowAccess.js';
 import { trayMenuPosition } from './trayPosition.js';
 
-export function createTray({ app, shell, preferences, showMain, quit, icon, developmentUrl }) {
+export function createTray({
+  app,
+  shell,
+  preferences,
+  showMain,
+  quit,
+  isQuitting,
+  icon,
+  developmentUrl,
+}) {
   const tray = new Tray(icon);
   const menu = new BrowserWindow({
     width: 260,
@@ -40,6 +49,7 @@ export function createTray({ app, shell, preferences, showMain, quit, icon, deve
   const openEvent = () => sendWindowEvent(menu, { type: 'tray-menu-open' });
   menu.on('blur', hide);
   menu.on('close', (event) => {
+    if (isQuitting()) return;
     event.preventDefault();
     hide();
   });

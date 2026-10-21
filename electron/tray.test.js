@@ -61,6 +61,7 @@ function setup() {
     icon: 'icon.ico',
     showMain,
     quit,
+    isQuitting: () => quit.mock.calls.length > 0,
     preferences: {
       trayNoticeShown: () => shown,
       markTrayNoticeShown: () => {
@@ -105,6 +106,13 @@ describe('tray lifecycle', () => {
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(c.menu.hide).toHaveBeenCalledOnce();
     expect(c.menu.destroy).not.toHaveBeenCalled();
+  });
+  it('allows the menu window to close during application quit', () => {
+    const c = setup();
+    c.action({ action: 'quit' });
+    const event = { preventDefault: vi.fn() };
+    c.menu.emit('close', event);
+    expect(event.preventDefault).not.toHaveBeenCalled();
   });
   it('updates generation tooltip and reloads appearance without showing the menu', () => {
     const c = setup();

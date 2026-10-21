@@ -1704,6 +1704,7 @@ app.whenReady().then(async () => {
       shell,
       preferences,
       showMain: showMainWindow,
+      isQuitting: () => quitRequested,
       quit: requestQuit,
       icon: appIconPath,
       developmentUrl:
@@ -1783,8 +1784,9 @@ app.on('before-quit', (event) => {
     return;
   }
   quitting = true;
-  trayController?.destroy();
   void commandRuntime?.close();
   database?.close();
   for (const sessionId of preparedImports.keys()) releasePreparedImport(sessionId).catch(() => {});
 });
+
+app.on('will-quit', () => trayController?.destroy());
