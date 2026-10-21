@@ -28,7 +28,8 @@ describe('minimal workbench tag edits', () => {
     const doc = fixture('1.5::sky,  river::, {clouds}\n\nsoft light, fog');
     const next = moveTags(doc, [documentTags(doc)[1]], { section: 0, block: 1, index: 1 });
     const raw = serializePromptSection(next.scopes[0]);
-    expect(raw.startsWith('1.5::sky,  ::, {clouds}\n\n')).toBe(true);
+    // 移走组里的一个以后不留空项（用户 10-21：拖动后留下 ", ,"）
+    expect(raw.startsWith('1.5::sky::, {clouds}\n\n')).toBe(true);
     expect(parsePrompt(raw).map((tag) => [tag.tag, tag.weight, tag.brace_depth])).toEqual([
       ['sky', 1.5, 0],
       ['clouds', 1, 1],
@@ -58,6 +59,6 @@ describe('minimal workbench tag edits', () => {
     const next = moveTags(doc, [documentTags(doc)[1]], { section: 0, block: 1 });
     const moved = promptDocumentProject(next).tags?.find((tag) => tag.tag === 'river');
     expect(moved).toMatchObject({ translation: '河流', category: 'Environment' });
-    expect(serializePromptSection(next.scopes[0])).toBe('sky, \n\nsoft light, fog, river');
+    expect(serializePromptSection(next.scopes[0])).toBe('sky\n\nsoft light, fog, river');
   });
 });

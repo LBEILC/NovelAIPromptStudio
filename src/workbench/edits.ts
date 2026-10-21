@@ -4,6 +4,7 @@ import {
   serializePromptSection,
   createPromptDocument,
   promptDocumentProject,
+  tidyTagSeparators,
   type PromptDocument,
 } from '../lib/promptDocument.ts';
 import { formatTag, promptTagRanges } from '../lib/prompt.js';
@@ -45,6 +46,8 @@ export function insertTags(
       open +
       block.content.slice(range.start);
   }
+  // 插在权重组或括号的边界上时会拆出空组，收拾一下
+  content = tidyTagSeparators(content, block.content);
   return replaceSection(document, sectionIndex, editPromptBlockText(section, blockIndex, content));
 }
 export function deleteTags(document: PromptDocument, entries: DocumentTag[]): PromptDocument {

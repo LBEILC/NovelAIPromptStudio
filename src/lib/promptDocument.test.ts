@@ -25,6 +25,7 @@ import {
   editPromptParagraph,
   editPromptTag,
   editPromptBlockText,
+  tidyTagSeparators,
   createPromptDocument,
   promptDocumentProject,
   copyPromptDocument,
@@ -531,7 +532,8 @@ describe('lossless block document', () => {
     const weighted = editPromptTag(section, 0, 1, { weight: -2 });
     expect(serializePromptSection(weighted)).toBe(source.replace('1.3::', '-2::'));
     const deleted = editPromptTag(section, 0, 0, { delete: true });
-    expect(serializePromptSection(deleted)).toBe(source.replace('sky', ''));
+    // 删除时连同它后面的分隔符一起去掉（用户 10-21：不留 ", ,"），其余字节不变
+    expect(serializePromptSection(deleted)).toBe(source.replace('sky,\t', ''));
     const paragraph = editPromptParagraph(section, 1, paragraphs[2] + '\n\n' + paragraphs[1]);
     expect(serializePromptSection(paragraph)).toBe(
       source.replace(paragraphs[0], paragraphs[2] + '\n\n' + paragraphs[1]),
@@ -574,7 +576,10 @@ describe('lossless block document', () => {
         })),
       );
       const deleted = serializePromptSection(editPromptTag(section, 0, index, { delete: true }));
-      expect(deleted).toBe(source.slice(0, range.start) + source.slice(range.end));
+      expect(deleted).toBe(
+        tidyTagSeparators(source.slice(0, range.start) + source.slice(range.end), source),
+      );
+      expect(deleted).not.toMatch(/,\s*,|^\s*,|,\s*$/);
       expect(
         parsePrompt(deleted).map(({ tag, weight, brace_depth }) => ({ tag, weight, brace_depth })),
       ).toEqual(
@@ -812,4 +817,24 @@ it('heals duplicate tag ids already stored by older versions', () => {
   ).toEqual(ids);
   const saved = promptDocumentProject(document) as typeof project;
   expect(new Set(saved.tags.map((t: { id: string }) => t.id)).size).toBe(3);
+});
+
+it('leaves no empty items, groups or stray commas after deleting a tag', () => {
+  const del = (raw: string, index: number) =>
+    serializePromptSection(editPromptTag(parsePromptSection(raw), 0, index, { delete: true }));
+  expect(del('a,b,c', 1)).toBe('a,c');
+  expect(del('a, b, c', 0)).toBe('b, c');
+  expect(del('a, 0.8::b::, c', 1)).toBe('a, c');
+  expect(del('a, 0.8::b::, c', 2)).toBe('a, 0.8::b::');
+  expect(del('1.2::a, b, c::, d', 0)).toBe('1.2::b, c::, d');
+  expect(del('1.2::a, b, c::, d', 2)).toBe('1.2::a, b::, d');
+  expect(del('a, [b], c', 1)).toBe('a, c');
+  expect(del('a, b,\nc, d', 1)).toBe('a,\nc, d');
+  // 原来末尾有逗号的保留
+  expect(del('a, b, c,', 2)).toBe('a, b,');
+});
+it('removes the empty group left when inserting at a group boundary', () => {
+  expect(tidyTagSeparators('0.8::::, a, 0.8::b, c::, d', 'a, 0.8::b, c::, d')).toBe(
+    'a, 0.8::b, c::, d',
+  );
 });

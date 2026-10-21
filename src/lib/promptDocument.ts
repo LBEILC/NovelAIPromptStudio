@@ -305,6 +305,29 @@ function decimalWeight(value: number): string {
   );
 }
 
+/**
+ * 删除、移动、插入 Tag 以后收拾文本：合并连续的逗号、去掉开头和多出来的结尾逗号、去掉变空的权重组和括号、
+ * 去掉组结尾前多出的空格。不改其余写法。original 是改之前的内容，用来判断原来末尾有没有逗号
+ */
+export function tidyTagSeparators(content: string, original: string) {
+  let s = content,
+    last = '';
+  while (s !== last) {
+    last = s;
+    s = s
+      .replace(/(^|[\s,{[(])-?\d+(?:\.\d+)?::[\s,]*::/g, '$1') // 空的权重组
+      .replace(/\{[\s,]*\}|\[[\s,]*\]/g, '') // 空括号
+      .replace(/((?:^|[\s,{[])-?\d+(?:\.\d+)?::)\s*,\s*/g, '$1') // 组开头紧跟的逗号
+      .replace(/([{[])\s*,\s*/g, '$1')
+      .replace(/,\s*(::)(?=\s*(?:,|$))/g, '$1') // 组结尾前的逗号
+      .replace(/,\s*([}\]])/g, '$1')
+      .replace(/,(\s*\n[ \t]*),[ \t]*/g, ',$1') // 跨行的空项，保留换行
+      .replace(/,[ \t]*(?=,)/g, '') // 同一行的空项
+      .replace(/^\s*,[ \t]*/, '');
+  }
+  if (!/,\s*$/.test(original)) s = s.replace(/[\s,]*,\s*$/, '');
+  return s;
+}
 export function editPromptTag(
   section: PromptSection,
   blockIndex: number,
@@ -360,8 +383,9 @@ export function editPromptTag(
       replacement = `${weight}::${tag.tag}::`;
     }
   }
-  // Deletion intentionally leaves separators and empty wrappers; the legacy parser ignores them.
-  const content = block.content.slice(0, start) + replacement + block.content.slice(end);
+  const spliced = block.content.slice(0, start) + replacement + block.content.slice(end);
+  // 删掉以后收拾留下的分隔符和空的权重组、括号（用户 10-21：拖动 Tag 后会留下 ", ,"）
+  const content = 'delete' in edit ? tidyTagSeparators(spliced, block.content) : spliced;
   const expected = block.tags.flatMap((item, index) =>
     index === tagIndex
       ? 'delete' in edit
