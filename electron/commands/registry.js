@@ -59,6 +59,39 @@ export const commandRegistry = {
   },
   'material.delete': { fields: { id: 'string' }, required: ['id'], mutation: true, uiOnly: true },
 
+  'params.set': {
+    fields: { ...tab, patch: 'object', dropReferences: 'boolean' },
+    required: ['tabId', 'patch'],
+    mutation: true,
+  },
+  'reference.add-vibe': {
+    fields: { ...tab, libraryId: 'string', imageId: 'string', path: 'string' },
+    required: ['tabId'],
+    mutation: true,
+  },
+  'reference.add-precise': {
+    fields: { ...tab, imageId: 'string', path: 'string' },
+    required: ['tabId'],
+    mutation: true,
+  },
+  'reference.set': {
+    fields: {
+      ...tab,
+      id: 'string',
+      strength: 'number',
+      information: 'number',
+      type: 'string',
+      fidelity: 'number',
+    },
+    required: ['tabId', 'id'],
+    mutation: true,
+  },
+  'reference.remove': {
+    fields: { ...tab, id: 'string' },
+    required: ['tabId', 'id'],
+    mutation: true,
+  },
+  'vibe.library': { fields: {} },
   'generate.estimate': {
     fields: { ...tab, count: 'integer', width: 'number', height: 'number' },
     required: ['tabId', 'count'],

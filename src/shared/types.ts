@@ -163,6 +163,12 @@ export interface ImageProject {
   metadata: GenerationParameters;
   tags: Tag[];
   prompt_structure: PromptStructure;
+  /** 第二层参数（1.4）：工作台的草稿和每一版都带；从原图元数据读出，改了以后生成用它 */
+  params?: import('./params').GenerationSettings;
+  /** Vibe 和精确参考（1.4） */
+  references?: import('./params').References;
+  /** 原图里有、界面不能改的参数，原样带上（只读） */
+  keptParameters?: import('./params').KeptParameter[];
 }
 // Import returns the pre-insert object, not the hydrated database row.
 export interface ImportedImage extends ImageProject {

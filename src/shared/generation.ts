@@ -19,6 +19,8 @@ export interface GenerationEstimate {
   perImage: number;
   free: boolean;
   count: number;
+  /** 费用拆开（1.4）：基础、首次或重新编码 Vibe（一次性）、超过 4 个 Vibe 的附加、精确参考的附加；都是这次一共多少 */
+  parts?: { base: number; encode: number; vibeExtra: number; precise: number };
   unavailable?: string;
   balance?: number;
   usage?: number;

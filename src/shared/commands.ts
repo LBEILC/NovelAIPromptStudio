@@ -158,6 +158,47 @@ export interface CommandDefinitions {
   };
   'material.delete': { input: { id: string }; output: Record<string, never> };
 
+  /**
+   * 改第二层参数（1.4）。patch 只写要改的项。换模型时：
+   * - 目标模型角色数不够：invalid_input，不改；
+   * - 目标模型不支持参考图而草稿里有参考图：没写 dropReferences 时返回 needs_confirm（界面先确认），写了就去掉参考图；
+   * - 目标模型没有的质量档位或负面预设改成 Standard / Heavy，只对这个模型有效的参数（Effort、Rescale、噪声计划）跟着换，
+   *   改了什么写进 notes（"负面预设改成了 Heavy（V4 Full 没有 Furry Focus）"），界面放进通知。
+   */
+  'params.set': {
+    input: TabInput & {
+      patch: Partial<import('./params').GenerationSettings>;
+      dropReferences?: boolean;
+    };
+    output: TabDocument & { notes: string[] };
+  };
+  /** 加一个 Vibe：从 Vibe 库（libraryId），或者从一张图片（图片库里的 imageId，或者文件 path；没有就弹出选择框） */
+  'reference.add-vibe': {
+    input: TabInput & { libraryId?: string; imageId?: string; path?: string };
+    output: TabDocument;
+  };
+  /** 加一个精确参考：图片库里的 imageId，或者文件 path；没有就弹出选择框 */
+  'reference.add-precise': {
+    input: TabInput & { imageId?: string; path?: string };
+    output: TabDocument;
+  };
+  /** 改一个 Vibe 或精确参考：Vibe 改 strength、information；精确参考改 type、strength、fidelity */
+  'reference.set': {
+    input: TabInput & {
+      id: string;
+      strength?: number;
+      information?: number;
+      type?: import('./params').PreciseReferenceType;
+      fidelity?: number;
+    };
+    output: TabDocument;
+  };
+  'reference.remove': { input: TabInput & { id: string }; output: TabDocument };
+  /** Vibe 库：编码过的 Vibe（生成时编码的会自动存进来） */
+  'vibe.library': {
+    input: Record<string, never>;
+    output: { items: import('./params').VibeLibraryItem[] };
+  };
   'generate.estimate': {
     input: TabInput & { count: number; width?: number; height?: number };
     output: GenerationEstimate;
