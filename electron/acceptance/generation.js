@@ -509,4 +509,66 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
       !restored.images[0].deleted
     );
   });
+  await click('工作台', 'document.querySelector(".tb")');
+  const linear = await invoke('workbench.new', { width: 64, height: 64 });
+  await invoke('prompt.set', {
+    tabId: linear.tab.id,
+    scope: 'base:prompt',
+    text: 'synthetic linear deletion study',
+  });
+  const linearJob = await invoke('generate.start', { tabId: linear.tab.id, count: 1 });
+  await wait(
+    `window.studio.invoke('generate.status',{id:${JSON.stringify(linearJob.id)}}).then(r=>r.data.jobs[0].state==='completed')`,
+    '主线删除夹具生成完成',
+  );
+  const linearVersion = (await call('version.list', { tabId: linear.tab.id })).versions.at(-1);
+  await call('library.rename', {
+    id: linearVersion.images[0].projectId,
+    name: 'synthetic-linear-trash-restore',
+  });
+  const versionSelector = `[data-key="ver-${linearVersion.id}"]`;
+  await wait(`!!document.querySelector(${JSON.stringify(versionSelector)})`);
+  await e(
+    `document.querySelector(${JSON.stringify(versionSelector)}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:200}))`,
+  );
+  await click('删除这一版', 'document.querySelector("[role=menu]:not(.leaving *)")');
+  await h.until(() => !database.versions.get(linearVersion.id), '主线版本已删除');
+  const mainDeleted = !!database.loadProject(linearVersion.images[0].projectId).deleted_at;
+  await click('撤销', 'document.querySelector(".toast:not(.leaving)")');
+  await h.until(() => !!database.versions.get(linearVersion.id), '主线版本撤销完成');
+  await check(
+    '删除主线上的一版并撤销，版本与图片恢复',
+    () => mainDeleted && !database.versions.get(linearVersion.id).images[0].deleted,
+  );
+  await wait(`!!document.querySelector('[data-key="ths-${linearVersion.id}"] img')`);
+  await e(
+    `document.querySelector('[data-key="ths-${linearVersion.id}"] span:has(img)').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:240}))`,
+  );
+  await click('移入回收站', 'document.querySelector("[role=menu]:not(.leaving *)")');
+  await h.until(() => !database.versions.get(linearVersion.id), '最后一张图片带走版本');
+  await check('删掉最后一张图后主线版本移走，标签页回到起点', async () => {
+    const current = (await call('workbench.get', { tabId: linear.tab.id })).tab;
+    return (
+      current.versionId === linear.tab.versionId &&
+      !!database.loadProject(linearVersion.images[0].projectId).deleted_at
+    );
+  });
+  await click('图片库', 'document.querySelector(".tb")');
+  await click('回收站', 'document.querySelector(".libp .side")');
+  await input('[aria-label="搜索图片库"]', 'synthetic-linear-trash-restore');
+  await wait('document.querySelectorAll(".card").length===1');
+  await e(
+    'document.querySelector(".card").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,clientX:400,clientY:300}))',
+  );
+  await click('恢复', 'document.querySelector("[role=menu]:not(.leaving *)")');
+  await h.until(() => !!database.versions.get(linearVersion.id), '回收站恢复版本');
+  await check('回收站恢复最后一张图时带回版本且编号和分支名不变', () => {
+    const restored = database.versions.get(linearVersion.id);
+    return (
+      restored.number === linearVersion.number &&
+      restored.branchName === linearVersion.branchName &&
+      !restored.images[0].deleted
+    );
+  });
+  await click('工作台', 'document.querySelector(".tb")');
 }

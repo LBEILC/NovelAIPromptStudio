@@ -127,3 +127,11 @@ nai-studio generate.queue --json '{"tabId":"TAB","count":1}'
 将 `TAB` 替换成新建结果的 `tab.id`。新建不要求持久令牌；生成仍须用户授权并遵守待确认规则。
 `branch.delete {branchId, confirmed?}` 可将非主线分支及后代移入回收站；有子分支时先返回 `needs_confirm`，错误的 `details` 提供 `branches`、`versions`、`images` 数量。确认范围后传 `confirmed:true`。生成中的分支不能删除；待确认任务随分支取消。
 返回的 `undo` 可交给 `branch.restore {undo}` 撤销。Agent 不能永久删除图片、清空回收站或更改账号设置。
+
+`version.delete` 将指定版本及后代移入回收站，支持主线；原图和起点不能删除。多版时返回 `needs_confirm`，`details.branches` 只计其他分支；确认范围后传 `confirmed:true`。生成中拒绝，待确认任务取消，撤销仍使用返回的 `undo`。
+
+```sh
+nai-studio version.delete --json '{"versionId":"VERSION"}'
+nai-studio version.delete --json '{"versionId":"VERSION","confirmed":true}'
+nai-studio branch.restore --json '{"undo":"UNDO"}'
+```

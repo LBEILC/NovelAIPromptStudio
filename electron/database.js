@@ -1832,7 +1832,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     return loadProject(project.id);
   };
 
-  const updateProjects = (ids = [], patch = {}) => {
+  const updateProjects = (ids = [], patch = {}, afterUpdate = (_results) => {}) => {
     const uniqueIds = [...new Set(ids.map(String).filter(Boolean))];
     const results = { success: [], skipped: [], failed: [] };
     const nowValue = new Date().toISOString();
@@ -1852,7 +1852,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
           patch.deleted === undefined
             ? String(project.deleted_at || '')
             : patch.deleted
-              ? nowValue
+              ? String(project.deleted_at || nowValue)
               : '';
         if (
           favorite === Number(project.is_favorite) &&
@@ -1868,6 +1868,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
         if (patch.deleted === false) versionStore.restoreImage(id);
         results.success.push(id);
       }
+      afterUpdate(results);
       database.run('COMMIT');
       persist();
       return results;
@@ -2110,6 +2111,13 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       return previous;
     }),
     updateProjects: atomic(updateProjects),
+    trashProjects: atomic((ids) => {
+      let versions = [];
+      const results = updateProjects(ids, { deleted: true }, (result) => {
+        versions = versionStore.pruneImages(result.success);
+      });
+      return { results, versions };
+    }),
     loadTrashSummary,
     backfillPromptFingerprints: atomic(backfillPromptFingerprints),
     // One synchronous chunk, with an independent savepoint for each image.

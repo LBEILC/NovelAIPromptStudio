@@ -254,6 +254,16 @@ export async function createSession(services, images, emit, empty = false) {
         text: 'synthetic nested branch, evening clouds',
       });
       await waitJob((await call('generate.start', { tabId, count: 1 })).id);
+      // A separate linear work exercises single-version and descendant deletion.
+      const linear = await call('workbench.new', { name: '主线三版', width: 64, height: 64 });
+      for (let i = 1; i <= 3; i++) {
+        await call('prompt.set', {
+          tabId: linear.tab.id,
+          scope: 'base:prompt',
+          text: `synthetic cloud study ${i}`,
+        });
+        await waitJob((await call('generate.start', { tabId: linear.tab.id, count: 1 })).id);
+      }
       const trash = structuredClone(database.loadProject(cards[13].id));
       trash.id = crypto.randomUUID();
       trash.tags.forEach((t) => (t.id = crypto.randomUUID()));

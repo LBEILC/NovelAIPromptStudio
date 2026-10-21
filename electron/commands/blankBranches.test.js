@@ -1,4 +1,4 @@
-import { it, expect } from 'vitest';
+import { it, expect, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -80,6 +80,7 @@ async function fixture(run) {
       waitJob,
       append,
       events,
+      store: commands.store,
       restart: async () => {
         await commands.close();
         commands = await createCommands(services);
@@ -347,4 +348,188 @@ it('preserves shared images in surviving branches and purges a deleted version o
     } finally {
       raw.close();
     }
+  }));
+
+it('deletes mainline versions with confirmation, cancels pending jobs and restores their subtree', () =>
+  fixture(async ({ call, dispatch, database, append, restart }) => {
+    const { tab } = await call('workbench.new');
+    const first = append(tab.workId, tab.versionId, 'linear-first');
+    const second = append(tab.workId, first.id, 'linear-second');
+    expect((await dispatch('version.delete', { versionId: first.id })).error).toMatchObject({
+      code: 'needs_confirm',
+      details: { versions: 2, branches: 0, images: 2 },
+    });
+    const fork = append(tab.workId, first.id, 'linear-fork');
+    expect((await dispatch('version.delete', { versionId: tab.versionId })).error.code).toBe(
+      'invalid_input',
+    );
+    const origin = database.versions.ensure('synthetic-import', first.project);
+    expect((await dispatch('version.delete', { versionId: origin.id })).error.code).toBe(
+      'invalid_input',
+    );
+    const confirm = await dispatch('version.delete', { versionId: first.id });
+    expect(confirm.error).toMatchObject({
+      code: 'needs_confirm',
+      details: { versions: 3, branches: 1, images: 3 },
+    });
+    await call('version.open', { tabId: tab.id, versionId: second.id });
+    await call('prompt.set', {
+      tabId: tab.id,
+      scope: 'base:prompt',
+      text: 'synthetic retained draft',
+    });
+    const draft = (await call('workbench.get', { tabId: tab.id })).tab.project;
+    await call('account.save', { token: 'acceptance-token' }, 'ui');
+    const pending = await call('generate.queue', { tabId: tab.id, count: 1 });
+    const removed = await call('version.delete', { versionId: first.id, confirmed: true });
+    expect(removed).toMatchObject({ versions: 3, branches: 1, images: 3, cancelledJobs: 1 });
+    expect((await call('generate.status', { id: pending.id })).jobs[0].state).toBe('canceled');
+    expect((await call('workbench.get', { tabId: tab.id })).tab).toMatchObject({
+      versionId: tab.versionId,
+      project: draft,
+    });
+    expect(database.versions.list(tab.workId)).toHaveLength(1);
+    await restart();
+    await call('branch.restore', { undo: removed.undo });
+    expect(database.versions.list(tab.workId)).toHaveLength(4);
+    expect(database.versions.get(fork.id).branchId).toBe(fork.branchId);
+    const single = await call('version.delete', { versionId: second.id });
+    expect(single).toMatchObject({ versions: 1, branches: 0, images: 1 });
+    expect(database.versions.get(fork.id)).toBeDefined();
+    await call('branch.restore', { undo: single.undo });
+    expect(database.versions.get(second.id).images[0].deleted).toBe(false);
+    expect((await dispatch('trash.delete-permanently', { ids: [] })).error.code).toBe('forbidden');
+    expect((await dispatch('library.restore', { ids: [] })).error.code).toBe('forbidden');
+  }));
+
+it('rolls image and version deletion back when pruning or session persistence fails', () =>
+  fixture(async ({ call, dispatch, database, append, store }) => {
+    const { tab } = await call('workbench.new');
+    const leaf = append(tab.workId, tab.versionId, 'rollback-leaf');
+    const id = leaf.images[0].projectId;
+    const prune = vi.spyOn(database.versions, 'pruneImages').mockImplementationOnce(() => {
+      throw Error('synthetic database failure');
+    });
+    try {
+      expect((await dispatch('library.trash', { ids: [id] })).ok).toBe(false);
+      expect(database.loadProject(id).deleted_at).toBe('');
+      expect(database.versions.get(leaf.id)).toBeDefined();
+    } finally {
+      prune.mockRestore();
+    }
+    const save = vi.spyOn(store, 'save').mockRejectedValueOnce(Error('synthetic session failure'));
+    try {
+      expect((await dispatch('library.trash', { ids: [id] })).ok).toBe(false);
+      expect(database.loadProject(id).deleted_at).toBe('');
+      expect(database.versions.get(leaf.id)).toBeDefined();
+    } finally {
+      save.mockRestore();
+    }
+  }));
+
+it('can trash images while an unrelated tab has no version tree yet', () =>
+  fixture(async ({ call, database, append, store }) => {
+    const { tab } = await call('workbench.new');
+    const leaf = append(tab.workId, tab.versionId, 'uninitialized-tab');
+    const session = store.get();
+    delete session.tabs[0].versionId;
+    await store.save(session);
+    const result = await call('library.trash', { ids: [leaf.images[0].projectId] });
+    expect(result.versions).toHaveLength(1);
+    expect(database.versions.get(leaf.id)).toBeUndefined();
+    expect(store.get().tabs[0].project).toEqual(tab.project);
+  }));
+
+it('refuses version deletion while generating', () =>
+  fixture(async ({ call, dispatch, append, service, waitJob }) => {
+    const { tab } = await call('workbench.new', { width: 64, height: 64 });
+    const first = append(tab.workId, tab.versionId, 'active-linear');
+    await call('version.open', { tabId: tab.id, versionId: first.id });
+    await call('account.save', { token: 'acceptance-token' }, 'ui');
+    service.state.holdAt = 1;
+    const job = await call('generate.queue', { tabId: tab.id, count: 1 }, 'ui');
+    await expect.poll(() => typeof service.state.resume).toBe('function');
+    expect(
+      (await dispatch('version.delete', { versionId: first.id, confirmed: true })).error.code,
+    ).toBe('branch_generating');
+    service.state.resume();
+    await waitJob(job.id);
+  }));
+
+it('prunes empty leaves and ancestors after image trash, preserves drafts and restores or purges ancestry', () =>
+  fixture(async ({ call, database, append, restart }) => {
+    const { tab } = await call('workbench.new');
+    const first = append(tab.workId, tab.versionId, 'empty-parent');
+    const leaf = append(tab.workId, first.id, 'empty-leaf');
+    await call('version.open', { tabId: tab.id, versionId: leaf.id });
+    await call('prompt.set', {
+      tabId: tab.id,
+      scope: 'base:prompt',
+      text: 'synthetic draft survives trash',
+    });
+    const draft = (await call('workbench.get', { tabId: tab.id })).tab.project;
+    const parentTrash = await call('library.trash', { ids: [first.images[0].projectId] });
+    expect(parentTrash.versions).toEqual([]);
+    expect(database.versions.get(first.id)).toBeDefined();
+    const removed = await call('library.trash', { ids: [leaf.images[0].projectId] });
+    expect(removed.versions.map((v) => v.number)).toEqual([leaf.number, first.number]);
+    expect(removed.versions.every((v) => !v.lastOfBranch)).toBe(true);
+    expect((await call('workbench.get', { tabId: tab.id })).tab).toMatchObject({
+      versionId: tab.versionId,
+      project: draft,
+    });
+    await restart();
+    database.updateProjects([leaf.images[0].projectId], { deleted: false });
+    expect(database.versions.get(first.id)).toBeDefined();
+    expect(database.versions.get(leaf.id)).toMatchObject({
+      number: leaf.number,
+      branchId: leaf.branchId,
+    });
+    expect(database.versions.get(first.id).images[0].deleted).toBe(true);
+    await call('library.trash', { ids: [leaf.images[0].projectId] });
+    database.deleteProject(leaf.images[0].projectId);
+    database.deleteProject(first.images[0].projectId);
+    expect(database.versions.getAny(leaf.id)).toBeUndefined();
+    expect(database.versions.getAny(first.id)).toBeUndefined();
+    expect(database.versions.get(tab.versionId)).toBeDefined();
+  }));
+
+it('keeps versions with another image or child and removes the last version of a named branch', () =>
+  fixture(async ({ call, database, append }) => {
+    const { tab } = await call('workbench.new');
+    const main = append(tab.workId, tab.versionId, 'kept-main');
+    const branch = append(tab.workId, tab.versionId, 'one-branch');
+    database.versions.rename(branch.branchId, 'Synthetic named branch');
+    database.versions.append({
+      workId: tab.workId,
+      parentId: tab.versionId,
+      versionId: branch.id,
+      project: branch.project,
+      source: 'agent',
+      image: main.project,
+      seed: 2,
+    });
+    expect((await call('library.trash', { ids: [branch.images[0].projectId] })).versions).toEqual(
+      [],
+    );
+    const removed = await call(
+      'library.trash',
+      { ids: [main.images[0].projectId, main.images[0].projectId, 'missing-synthetic'] },
+      'ui',
+    );
+    expect(removed.results.failed).toHaveLength(1);
+    expect(removed.versions).toContainEqual({
+      workName: tab.displayName,
+      number: branch.number,
+      branchName: 'Synthetic named branch',
+      lastOfBranch: true,
+    });
+    database.updateProjects([main.images[0].projectId, branch.images[0].projectId], {
+      deleted: false,
+    });
+    expect(database.versions.get(branch.id)).toMatchObject({
+      number: branch.number,
+      branchName: 'Synthetic named branch',
+    });
+    expect(database.versions.get(main.id)).toBeDefined();
   }));

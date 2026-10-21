@@ -373,10 +373,41 @@ export async function createCommands(services) {
     'library.trash': async (input) => {
       revision(input.expectedRevision, store.revision());
       if (source() === 'agent') input.ids.forEach(project);
-      const results = services.database.updateProjects(input.ids, { deleted: true });
-      await store.bump();
+      const { results, versions: removed } = services.database.trashProjects(input.ids);
+      const session = store.get();
+      try {
+        generation.retreatDeleted?.(session);
+        await store.save(session);
+      } catch (error) {
+        services.database.updateProjects(results.success, { deleted: false });
+        services.database.refreshGeneratedCards();
+        throw error;
+      }
+      services.database.refreshGeneratedCards();
       emit({ libraryChanged: true });
-      return { ids: input.ids, revision: store.revision(), results, summary: summary(results) };
+      const versions = removed.map(
+        (/** @type {import("../../src/shared/generation").WorkVersion} */ v) => ({
+          workName:
+            session.tabs.find((t) => t.workId === v.workId)?.displayName ||
+            services.database.versions.work(v.workId)?.origin.name ||
+            '',
+          number: v.number,
+          branchName: v.branchName,
+          lastOfBranch: !services.database.versions
+            .list(v.workId)
+            .some(
+              (/** @type {import("../../src/shared/generation").WorkVersion} */ other) =>
+                other.branchId === v.branchId,
+            ),
+        }),
+      );
+      return {
+        ids: input.ids,
+        revision: store.revision(),
+        results,
+        summary: summary(results),
+        versions,
+      };
     },
     'library.rename-many': async (input) => {
       revision(input.expectedRevision, store.revision());

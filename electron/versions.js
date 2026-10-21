@@ -189,6 +189,7 @@ export function createVersionStore(connection) {
   }
   return {
     get,
+    getAny,
     list,
     latest: () => {
       const row = connection
@@ -216,14 +217,21 @@ export function createVersionStore(connection) {
         connection.prepare('DELETE FROM work_sequences WHERE work_id=?').run(workId);
       });
     },
-    subtree(branchId) {
-      const first = connection
-        .prepare(
-          'SELECT * FROM work_versions WHERE branch_id=? AND id NOT IN (SELECT version_id FROM deleted_versions) ORDER BY number LIMIT 1',
-        )
-        .get(branchId);
+    subtree(branchId, versionId) {
+      const first = versionId
+        ? connection
+            .prepare(
+              'SELECT * FROM work_versions WHERE id=? AND id NOT IN (SELECT version_id FROM deleted_versions)',
+            )
+            .get(versionId)
+        : connection
+            .prepare(
+              'SELECT * FROM work_versions WHERE branch_id=? AND id NOT IN (SELECT version_id FROM deleted_versions) ORDER BY number LIMIT 1',
+            )
+            .get(branchId);
       if (!first) throw new Error('分支不存在');
-      if (!first.branch_number) throw new Error('主线不能删除');
+      if (!first.parent_id) throw new Error('原图和起点不能删除');
+      if (!versionId && !first.branch_number) throw new Error('主线不能删除');
       const rows = connection
         .prepare(
           `WITH RECURSIVE tree(id) AS (
@@ -233,6 +241,32 @@ export function createVersionStore(connection) {
         .all(first.id)
         .map(decode);
       return { rows, parent: get(first.parent_id), images: trashImages(rows) };
+    },
+    pruneImages(projectIds) {
+      return atomic(() => {
+        const removed = [];
+        const pending = projectIds.flatMap((id) =>
+          connection
+            .prepare('SELECT version_id FROM version_images WHERE project_id=?')
+            .all(id)
+            .map((row) => row.version_id),
+        );
+        while (pending.length) {
+          const v = get(pending.pop());
+          if (
+            !v?.parentId ||
+            v.images.some((i) => !i.deleted) ||
+            list(v.workId).some((child) => child.parentId === v.id)
+          )
+            continue;
+          connection
+            .prepare('INSERT INTO deleted_versions VALUES (?,?)')
+            .run(v.id, crypto.randomUUID());
+          removed.push(v);
+          pending.push(v.parentId);
+        }
+        return removed;
+      });
     },
     trash(rows) {
       return atomic(() => {
