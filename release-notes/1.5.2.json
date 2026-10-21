@@ -12,6 +12,14 @@
       "icon": "speed"
     },
     {
+      "kind": "new",
+      "area": "wb",
+      "title": "只删除中间的一版",
+      "detail": "不满意中间的某一版、但后面的满意时，右键这一版选“只删除这一版”：它的图移入回收站，后面的版本接到它的上一版下面，内容不变，通知里可以撤销。",
+      "highlight": true,
+      "icon": "restart"
+    },
+    {
       "kind": "improved",
       "area": "set",
       "title": "设置里的“外观”改名为“通用”",

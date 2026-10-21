@@ -178,15 +178,20 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         (tree.has(j.versionId || '') || tree.has(j.parentId || '')),
     );
   };
-  // 删除分支 / 删除这一版（2.23）：都是删掉一棵子树，图进回收站；不止一版时先确认，通知里可以撤销
-  const remove = async (kind: 'branch' | 'version', v: WorkVersion) => {
+  // 删除分支 / 删除这一版（2.23）：都是删掉一棵子树，图进回收站；不止一版时先确认，通知里可以撤销。
+  // 只删这一版（1.5.2）：后面的版本接到它的上一版下面，只删一版所以不确认
+  const remove = async (kind: 'branch' | 'version' | 'only', v: WorkVersion) => {
     const label = kind === 'branch' ? v.branchName || `分支 ${v.branchNumber}` : name(v);
     // 名字以数字或英文结尾时和后面的汉字隔一个空格（"分支 2 下面"）
     const sp = /[!-~]$/.test(label) ? ' ' : '';
     const run = (confirmed?: boolean) =>
       kind === 'branch'
         ? invokeUI('branch.delete', { branchId: v.branchId, ...(confirmed ? { confirmed } : {}) })
-        : invokeUI('version.delete', { versionId: v.id, ...(confirmed ? { confirmed } : {}) });
+        : invokeUI('version.delete', {
+            versionId: v.id,
+            ...(kind === 'only' ? { only: true } : {}),
+            ...(confirmed ? { confirmed } : {}),
+          });
     let r: Awaited<ReturnType<typeof run>>;
     try {
       await before?.();
@@ -219,9 +224,11 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     const what =
       kind === 'branch'
         ? `${label}：${r.versions} 版`
-        : `${label}${r.versions > 1 ? `和之后的 ${r.versions - 1} 版` : ''}`;
+        : kind === 'only'
+          ? label
+          : `${label}${r.versions > 1 ? `和之后的 ${r.versions - 1} 版` : ''}`;
     notify({
-      text: `已删除${what}${r.images ? `，${r.images} 张图已移入回收站` : ''}${r.cancelledJobs ? `，取消了 ${r.cancelledJobs} 个待确认的 Agent 生成` : ''}`,
+      text: `已删除${what}${r.images ? `，${r.images} 张图已移入回收站` : ''}${kind === 'only' && byId(v.parentId) ? `，后面的版本接到${name(byId(v.parentId)!)}下面` : ''}${r.cancelledJobs ? `，取消了 ${r.cancelledJobs} 个待确认的 Agent 生成` : ''}`,
       action: {
         label: '撤销',
         onClick: () =>
@@ -240,6 +247,13 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         (tree.has(j.versionId || '') || tree.has(j.parentId || '')),
     );
   };
+  const ownBusy = (v: WorkVersion) =>
+    state.jobs.some(
+      (j) =>
+        j.tabId === tab.id &&
+        ['generating', 'queued'].includes(j.state) &&
+        (j.versionId === v.id || j.parentId === v.id),
+    );
   // row：版本行上的菜单多一项"删除这一版"（原图和起点没有）；分叉行和分支名只有"删除分支"（主线没有）
   const renameMenu = (
     v: WorkVersion,
@@ -252,6 +266,17 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     ...(row && v.parentId
       ? [
           'sep' as const,
+          // 后面还有版本时：只删这一版，后面的接到上一版下面
+          ...(subtree(v).length > 1
+            ? [
+                {
+                  label: '只删除这一版',
+                  danger: true,
+                  disabled: ownBusy(v) ? '这一版正在生成' : false,
+                  onSelect: () => void remove('only', v),
+                },
+              ]
+            : []),
           {
             label:
               subtree(v).length > 1

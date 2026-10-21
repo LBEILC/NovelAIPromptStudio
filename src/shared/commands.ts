@@ -217,7 +217,8 @@ export interface CommandDefinitions {
    * 正在走的线被删掉时回到上一版，草稿保留。
    */
   'version.delete': {
-    input: { versionId: string; confirmed?: boolean };
+    /** only：只删这一版，后面的版本接到它的上一版下面（1.5.2，doc/design.md 2.23） */
+    input: { versionId: string; confirmed?: boolean; only?: boolean };
     output: {
       branches: number;
       versions: number;
