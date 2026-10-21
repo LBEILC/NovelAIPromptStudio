@@ -2,6 +2,12 @@ import { it, expect } from 'vitest';
 import { versionDiff, diffSummary, oneLine } from './versionDiff';
 import { createPromptStructure, addPromptCharacter } from './promptStructure.js';
 import { parsePrompt } from './prompt.js';
+import {
+  createPromptDocument,
+  editPromptBlockText,
+  promptDocumentProject,
+  setPromptBlockType,
+} from './promptDocument';
 import type { ImageProject } from '../shared/types';
 const project = (prompt: string, negative = 'lowres') => {
   const metadata = {
@@ -112,4 +118,24 @@ it('lists second-layer parameter and reference changes beside the size', () => {
     references: { vibes: [{ ...vibe, strength: 0.8 }], precise: [] },
   } as ImageProject;
   expect(versionDiff(a, tuned).params).toEqual(['调整了参考图']);
+});
+it('ignores block conversions, which do not change the prompt that is sent', () => {
+  const a = project('rain, umbrella, bus stop\n\nsoft light, film grain');
+  const doc = createPromptDocument(a);
+  const converted = (text?: string) =>
+    promptDocumentProject({
+      ...doc,
+      scopes: doc.scopes.map((s, i) =>
+        i === 0
+          ? {
+              ...s,
+              ...(text
+                ? editPromptBlockText(setPromptBlockType(s, 0, 'paragraph'), 1, text)
+                : setPromptBlockType(s, 0, 'paragraph')),
+            }
+          : s,
+      ),
+    }) as ImageProject;
+  expect(versionDiff(a, converted()).empty).toBe(true);
+  expect(oneLine(versionDiff(a, converted('soft light, film grain, fog')))).toBe('+fog');
 });
