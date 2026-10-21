@@ -838,3 +838,25 @@ it('removes the empty group left when inserting at a group boundary', () => {
     'a, 0.8::b, c::, d',
   );
 });
+it('treats a matching </label> line as the end of a <label> block, not as a tag', () => {
+  const source =
+    '<artist>\nartist:alpha, artist:beta, \n</artist>\n<style>\nsoft light, film grain\n</style>\nA quiet street after the rain, the girl waits under the shelter holding a clear umbrella.\n\n</orphan>';
+  const section = parsePromptSection(source);
+  expect(serializePromptSection(section)).toBe(source);
+  const [artist, style, paragraph] = section.blocks;
+  expect(artist.label).toBe('<artist>');
+  expect(artist.tags.map((t) => t.tag)).toEqual(['artist:alpha', 'artist:beta']);
+  expect(artist.suffix).toBe(' \n</artist>');
+  // </style> 后面不空行也另起一块
+  expect(style.tags.map((t) => t.tag)).toEqual(['soft light', 'film grain']);
+  expect(paragraph.type).toBe('paragraph');
+  // 没有配对块名的 </orphan> 不动
+  expect(section.blocks.at(-1)!.content).toBe('</orphan>');
+  // 在块里加 Tag 时加在结束标记前面
+  const added = editPromptBlockText(section, 0, artist.content + ' artist:gamma');
+  expect(
+    serializePromptSection(added).startsWith(
+      '<artist>\nartist:alpha, artist:beta, artist:gamma \n</artist>',
+    ),
+  ).toBe(true);
+});

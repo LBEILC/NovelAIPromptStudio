@@ -162,13 +162,24 @@ export function classifyPromptBlock(content: string): BlockType {
   return 'paragraph';
 }
 
+const CLOSING_LINE = /^\s*<\/[\p{L}][\p{L}\p{N}_ -]*>\s*$/u;
 function makeBlock(raw: string, start: number, options: ParseBlockOptions): PromptBlock {
   const prefix = raw.match(/^\s*/)?.[0] || '';
-  const suffix = raw.slice(prefix.length).match(/\s*$/)?.[0] || '';
-  const body = raw.slice(prefix.length, raw.length - suffix.length);
+  const trailing = raw.slice(prefix.length).match(/\s*$/)?.[0] || '';
+  const body = raw.slice(prefix.length, raw.length - trailing.length);
   const label = blockLabel(body);
-  const labelSpacing = label ? body.slice(label.length).match(/^\s*/)?.[0] || '' : '';
-  const content = body.slice(label.length + labelSpacing.length);
+  // 块名是 <artist> 时，结尾配对的 </artist> 算块的结尾标记，不当成 Tag；原文一个字节都不改
+  let closing = '';
+  const tag = label.startsWith('<') ? `</${label.slice(1)}` : '';
+  if (tag && body.length >= label.length + tag.length && body.endsWith(tag)) {
+    let at = body.length - tag.length;
+    while (at > label.length && /\s/.test(body[at - 1])) at--;
+    closing = body.slice(at);
+  }
+  const suffix = closing + trailing;
+  const inner = body.slice(0, body.length - closing.length);
+  const labelSpacing = label ? inner.slice(label.length).match(/^\s*/)?.[0] || '' : '';
+  const content = inner.slice(label.length + labelSpacing.length);
   const range = { start, end: start + raw.length };
   const override =
     options.overrides?.find(
@@ -209,8 +220,11 @@ export function parsePromptSection(source: string, options: ParseBlockOptions = 
     const body = line[0].replace(/(?:\r\n|\r|\n)$/, '');
     if (!body.trim()) finish();
     else {
+      const closes = blockStart !== undefined && CLOSING_LINE.test(body);
       blockStart ??= line.index;
       blockEnd = line.index + body.length;
+      // 单独一行的 </artist> 结束这一块（社区常见的 <artist>…</artist> 写法，后面不空行也另起一块）
+      if (closes) finish();
     }
   }
   finish();
