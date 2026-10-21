@@ -677,6 +677,10 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   );
   await click('只删除这一版', 'document.querySelector("[role=menu]:not(.leaving *)")');
   await h.until(() => !database.versions.get(middle.id), '仅第三版删除完成');
+  await wait(
+    `!document.querySelector(${JSON.stringify(selector)}) && !!document.querySelector('[data-key="ver-${last.id}"]')`,
+    '单版删除后的版本列表更新完成',
+  );
   await check('只删第三版：第四版接到第二版，内容和图片不变，当前跳到第四版', async () => {
     const v = database.versions.get(last.id);
     const current = (await invoke('workbench.get', { tabId: only.tab.id })).tab;
@@ -695,5 +699,12 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
       database.versions.get(last.id).parentId === middle.id &&
       !database.versions.get(middle.id).images[0].deleted,
   );
+  await wait(
+    `!!document.querySelector(${JSON.stringify(selector)}) && !!document.querySelector('[data-key="ver-${last.id}"]')`,
+    '撤销后的版本列表更新完成',
+  );
+  await e(`Promise.all(document.querySelector('.versions').getAnimations({subtree:true})
+    .filter(a=>a.effect?.getTiming().iterations!==Infinity)
+    .map(a=>a.finished.catch(()=>{}))).then(()=>undefined)`);
   await h.screenshot('053-only-version-restored');
 }

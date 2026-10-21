@@ -690,6 +690,12 @@ export async function libraryChecks(env) {
     const trashAgain = await e('document.querySelector(".col.detail").dataset.detailId');
     await click('移入回收站', 'document.querySelector(".detail .dacts")');
     await h.until(() => !!database.loadProject(trashAgain).deleted_at, '再次移入');
+    // The database write precedes the gallery reload and selection reset.
+    // Wait for the action's completion notice before selecting in the trash view.
+    await wait(
+      '[...document.querySelectorAll(".toast:not(.leaving)")].some(n=>n.textContent.startsWith("已移入回收站"))',
+      '再次移入回收站已完成列表刷新和选择清理',
+    );
     await click('回收站', scope);
     await wait('document.querySelectorAll(".card").length>0');
     await check(
