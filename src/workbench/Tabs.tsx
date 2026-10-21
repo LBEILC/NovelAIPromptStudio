@@ -96,26 +96,32 @@ export function WorkbenchTabs(p: TabsProps) {
   useLayoutEffect(() => {
     const el = list.current;
     if (!el) return;
-    // 按第一个和最后一个标签页的位置量内容宽度：不算会滑的标记（它是绝对定位的），也不受缩放下小数像素的影响；
+    // 按第一个和最后一个标签页的位置量内容宽度：不算会滑的标记（它是绝对定位的），也不算正在退出的。
+    // 用布局位置（offset*），不用 getBoundingClientRect：后者带着让位动画的位移，新开、关闭标签页的那一刻
+    // 会量大，判成"放不下"，动画结束后尺寸没变也不会再量，箭头就一直留着（用户 10-21）。
     // 翻页按钮出现以后它们占的宽度算回可用宽度里，免得按钮自己把判断撑成"放不下"
     const update = () => {
-      const tabs = el.querySelectorAll<HTMLElement>('.tab');
+      const tabs = [...el.querySelectorAll<HTMLElement>('.tab:not(.leaving)')];
       if (!tabs.length) return setOverflow(false);
-      const content =
-        tabs[tabs.length - 1].getBoundingClientRect().right - tabs[0].getBoundingClientRect().left;
+      const last = tabs[tabs.length - 1];
+      const content = last.offsetLeft + last.offsetWidth - tabs[0].offsetLeft;
       const pages = [
         ...(el.parentElement?.querySelectorAll<HTMLElement>(':scope > .tabs-page') || []),
       ];
-      const room =
-        el.getBoundingClientRect().width +
-        pages.reduce((w, b) => w + b.getBoundingClientRect().width + 2, 0);
+      const room = el.clientWidth + pages.reduce((w, b) => w + b.offsetWidth + 2, 0);
       setOverflow(content > room + 2);
     };
     const ro = new ResizeObserver(update);
     ro.observe(el);
+    // 退出的标签页真正拿掉、标签页内容变了（名字、版数）时也再量一次
+    const mo = new MutationObserver(update);
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
     update();
     el.querySelector('.tab.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
   }, [p.session.tabs.length, p.session.activeTabId]);
   useEffect(() => {
     const el = list.current;

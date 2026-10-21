@@ -2,9 +2,11 @@ import { basePromptFingerprint, promptFingerprint } from './promptFingerprint.js
 import { normalizePromptStructure } from './promptStructure.js';
 
 export const GALLERY_GROUPING_KEY = 'novelai-prompt-studio.gallery-grouping.v1';
-export const GALLERY_PROMPT_SCOPES = ['separate', 'full', 'base', 'similar'];
+// work：同一个作品生成的图合为一组（用户 10-21：原来生成的图不管选什么都按作品合并，其他几个选项对它们不生效）
+export const GALLERY_PROMPT_SCOPES = ['separate', 'work', 'full', 'base', 'similar'];
 export const GALLERY_PROMPT_SCOPE_LABELS = {
   separate: '全部分开',
+  work: '按作品',
   full: '完整提示词',
   base: '基础提示词',
   similar: '相似提示词',
@@ -13,7 +15,7 @@ export const GALLERY_SIMILARITY_MIN = 70;
 export const GALLERY_SIMILARITY_MAX = 95;
 export const GALLERY_SIMILARITY_DEFAULT = 85;
 export const DEFAULT_GALLERY_GROUPING = Object.freeze({
-  promptScope: 'full',
+  promptScope: 'work',
   mergeVibes: false,
   similarityThreshold: GALLERY_SIMILARITY_DEFAULT,
 });
@@ -86,7 +88,7 @@ function storedBasePromptFingerprint(project) {
 
 export function galleryGroupingFingerprint(project = {}, value = DEFAULT_GALLERY_GROUPING) {
   const grouping = normalizeGalleryGrouping(value);
-  if (grouping.promptScope === 'separate' || grouping.promptScope === 'similar') return '';
+  if (['separate', 'work', 'similar'].includes(grouping.promptScope)) return '';
 
   const prompt =
     grouping.promptScope === 'base'

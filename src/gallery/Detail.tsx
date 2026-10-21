@@ -277,10 +277,11 @@ function One({
                 <Icon name="folder-open-line" />
               </button>
               <span className="sp" />
+              {/* 一组时只删正在看的这一张；整组在卡片的右键菜单里 */}
               <button
                 className="btn danger sm icon"
-                aria-label="移入回收站"
-                onClick={() => p.onTrash(ids, 'detail')}
+                aria-label={n > 1 ? '把这一张移入回收站' : '移入回收站'}
+                onClick={() => p.onTrash(n > 1 ? [detail.id] : ids, 'detail')}
               >
                 <Icon name="delete-bin-line" />
               </button>

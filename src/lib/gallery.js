@@ -114,8 +114,10 @@ function groupSimilarGalleryProjects(projects, grouping) {
 
 export function groupGalleryProjects(projects = [], groupingValue) {
   const grouping = normalizeGalleryGrouping(groupingValue);
-  const generated = projects.filter((p) => p.generated_work_id);
-  if (generated.length && !groupingValue?.history) {
+  // 按作品（默认，和 1.5.3 以前的样子一样）：生成的图按作品合为一组，其他图片提示词完全相同的合为一组；
+  // 选别的选项时，生成的图和其他图片一样按那个选项合并
+  if (grouping.promptScope === 'work') {
+    const generated = groupingValue?.history ? [] : projects.filter((p) => p.generated_work_id);
     const works = new Map();
     for (const p of generated) {
       if (!works.has(p.generated_work_id)) works.set(p.generated_work_id, []);
@@ -123,8 +125,8 @@ export function groupGalleryProjects(projects = [], groupingValue) {
     }
     return [
       ...groupGalleryProjects(
-        projects.filter((p) => !p.generated_work_id),
-        grouping,
+        groupingValue?.history ? projects : projects.filter((p) => !p.generated_work_id),
+        { ...grouping, promptScope: 'full' },
       ),
       ...Array.from(works, ([id, members]) =>
         finalizeGalleryGroup(

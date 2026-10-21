@@ -11,8 +11,8 @@ import {
 } from './galleryGrouping.js';
 
 describe('gallery grouping settings', () => {
-  it('keeps the four grouping modes in their stable progressive order', () => {
-    expect(GALLERY_PROMPT_SCOPES).toEqual(['separate', 'full', 'base', 'similar']);
+  it('keeps the five grouping modes in their stable progressive order', () => {
+    expect(GALLERY_PROMPT_SCOPES).toEqual(['separate', 'work', 'full', 'base', 'similar']);
   });
 
   it('only treats full Prompt without cross-Vibe merging as exact', () => {

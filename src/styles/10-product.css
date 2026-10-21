@@ -188,3 +188,6 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 html.tray, html.tray body, html.tray #root { width: auto; height: auto; background: transparent; }
 .tray-wrap { display: inline-block; padding: var(--sp-3); }
 .tray-wrap .menu { display: flex; }
+
+/* 视图浮层：合并方式五个选项（多了"按作品"），比别的宽浮层宽一点，最后一项不贴边 */
+.popover.wide.lview-pop { width: calc(var(--popover-w-wide) + var(--sp-3)); }

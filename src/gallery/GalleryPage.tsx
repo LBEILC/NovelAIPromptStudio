@@ -181,7 +181,21 @@ export default function GalleryPage(
           ]
         : []),
       'sep',
-      { label: '移入回收站', danger: true, onSelect: () => void p.onTrash(ids) },
+      // 一组里可以只删指针停着的这一张（用户 10-21：原来只能整组删，要单删得去工作台）
+      ...(!multi && ids.length > 1
+        ? [
+            {
+              label: '把这一张移入回收站',
+              danger: true,
+              onSelect: () => void p.onTrash([menu.member.id]),
+            },
+            {
+              label: `整组移入回收站（${ids.length} 张）`,
+              danger: true,
+              onSelect: () => void p.onTrash(ids),
+            },
+          ]
+        : [{ label: '移入回收站', danger: true, onSelect: () => void p.onTrash(ids) }]),
     ];
   })();
 

@@ -42,6 +42,30 @@ const similarItem = (id, tags, { model = 'nai-v4.5', vibe = 'vibe-a', undesired 
 });
 
 describe('gallery grouping and selection', () => {
+  // 用户 10-21：原来生成的图不管选什么合并方式都按作品合成一组
+  it('folds generated images by work only when merging by work', () => {
+    const work = (id, fp, workId) => ({ ...item(id, fp, '2026-01-01'), generated_work_id: workId });
+    const projects = [
+      work('a1', 'v1', 'w1'),
+      work('a2', 'v1', 'w1'),
+      work('a3', 'v2', 'w1'),
+      work('b1', 'v1', 'w2'),
+      item('i1', 'v1', '2026-01-02'),
+      item('i2', 'v1', '2026-01-03'),
+    ];
+    const ids = (scope) =>
+      groupGalleryProjects(projects, { promptScope: scope })
+        .map((g) =>
+          g.members
+            .map((m) => m.id)
+            .sort()
+            .join('+'),
+        )
+        .sort();
+    expect(ids('work')).toEqual(['a1+a2+a3', 'b1', 'i1+i2']);
+    expect(ids('separate')).toEqual(['a1', 'a2', 'a3', 'b1', 'i1', 'i2']);
+    expect(ids('full')).toEqual(['a1+a2+b1+i1+i2', 'a3']);
+  });
   it('groups matching fingerprints using the earliest import as cover', () => {
     const groups = groupGalleryProjects([
       item('older', 'same', '2026-01-01', 'older'),

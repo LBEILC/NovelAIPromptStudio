@@ -28,12 +28,14 @@ const SORTS = [
 ] as const;
 const MERGE = [
   ['separate', '不合并'],
+  ['work', '按作品'],
   ['full', '完全相同'],
   ['base', '基础相同'],
   ['similar', '相似'],
 ] as const;
 const MERGE_HELP: Record<string, string> = {
   separate: '每张图片单独显示。',
+  work: '同一个作品生成的图合并为一组；其他图片提示词完全相同的合并为一组。',
   full: '提示词完全相同的图片合并为一组。',
   base: '基础提示词的 Tag 足够接近的图片合并为一组，不考虑角色提示词和位置。',
   similar: '提示词相似度达到下方数值的图片合并为一组。',
