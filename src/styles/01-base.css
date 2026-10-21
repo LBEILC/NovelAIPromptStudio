@@ -47,7 +47,7 @@ button { font: inherit; color: inherit; cursor: default; }
 .tab .n { color: var(--text-3); font-size: var(--fs-small); }
 .tab .dirty { width: 5px; height: 5px; border-radius: 50%; background: var(--text-3); }
 .tab.add { padding: 0 9px; color: var(--text-3); }
-.tb-end { display: flex; align-items: center; gap: 6px; padding-right: 6px; }
+.tb-end { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding-right: 6px; }
 .wc { display: flex; align-self: stretch; }
 .wc span { width: 44px; display: grid; place-items: center; color: var(--text-3); font-size: var(--fs-small); }
 
