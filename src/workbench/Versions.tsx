@@ -650,7 +650,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         onClose={() => setPeek(null)}
         anchor={peek ? `[data-peek="${peek.key}"]` : undefined}
         place="right-top"
-        className="popover ver-peek"
+        className="popover ver-peek scroll"
         passive
         deps={[peek?.key]}
       >

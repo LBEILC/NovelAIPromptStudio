@@ -198,7 +198,7 @@ export function NameAI({
           <>
             <p>名称可以直接修改，接受后才会生效。</p>
             <FlipScope root={box}>
-              <div className="lnm-list" ref={box}>
+              <div className="lnm-list scroll" ref={box}>
                 {list.map(({ item: r, leaving }) => (
                   <div
                     key={r.key}
