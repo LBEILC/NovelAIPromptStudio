@@ -253,8 +253,8 @@ export async function interactionCorrectionChecks(env) {
     );
     for (const record of records.slice(0, 2)) {
       await wait(
-        `!!document.querySelector('[data-group-id="project:${record.id}"]')`,
-        '换页后目标图片已渲染',
+        `document.querySelector('[data-group-id="project:${record.id}"]')?.checkVisibility() && document.querySelector('.tb [aria-current=page]')?.textContent.trim()==='图片库' && !document.querySelector('.viewer-ov') && !document.querySelector('.libp')?.closest('.leaving')`,
+        '换页后图片库和目标卡片已可见，上一张大图已关闭',
       );
       await e(
         `document.querySelector('[data-group-id="project:${record.id}"]').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
