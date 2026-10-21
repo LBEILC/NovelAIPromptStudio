@@ -104,7 +104,11 @@ if (databaseProbeDirectory) {
 if (!databaseProbeDirectory && !screenshotMode && !acceptanceMode) {
   if (!app.requestSingleInstanceLock()) app.exit(0);
 }
-if (process.platform === 'win32') app.setAppUserModelId('studio.novelai.prompt');
+// Windows 按这个 ID 找开始菜单快捷方式来画任务栏图标。从仓库直接跑的 electron.exe 发系统通知时，
+// Electron 会建一个指向 electron.exe 的 Electron.lnk 并登记这个 ID，正式版的任务栏就会变成 Electron 的图标
+// （用户 10-21），所以开发和验收用另一个 ID。
+if (process.platform === 'win32')
+  app.setAppUserModelId(app.isPackaged ? 'studio.novelai.prompt' : 'studio.novelai.prompt.dev');
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'novelai-media',

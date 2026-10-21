@@ -51,7 +51,7 @@ button.tag.ghost { font: inherit; font-size: var(--fs-small); }
 .tb button, .tb .tab, .tb .tabs, .tb input, .tb .field, .tb [role="button"] { -webkit-app-region: no-drag; }
 /* Windows：系统的窗口按钮画在标题栏最右边，这里留出它们的宽度 */
 html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px))); }
-.tb .wc { align-self: stretch; }
+.tb .wc { align-self: stretch; flex: 0 0 auto; } /* 系统窗口按钮的位置不能被标签页挤窄，否则右边的额度和设置会钻到按钮底下（用户 10-21） */
 .tb-set.on { background: var(--selected); color: var(--text); }
 
 /* 自绘滚动条：带 data-scroll 的区域也不显示系统滚动条（.scroll 已经在 01-base.css 里藏了） */
