@@ -39,6 +39,10 @@ export function createTray({ app, shell, preferences, showMain, quit, icon, deve
   };
   const openEvent = () => sendWindowEvent(menu, { type: 'tray-menu-open' });
   menu.on('blur', hide);
+  menu.on('close', (event) => {
+    event.preventDefault();
+    hide();
+  });
   menu.webContents.on('did-start-loading', () => {
     loaded = false;
   });

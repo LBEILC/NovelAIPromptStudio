@@ -98,6 +98,14 @@ describe('tray lifecycle', () => {
     expect(c.menu.hide).toHaveBeenCalledOnce();
     expect(c.quit).toHaveBeenCalledOnce();
   });
+  it('native menu close hides the reusable window instead of destroying it', () => {
+    const c = setup();
+    const event = { preventDefault: vi.fn() };
+    c.menu.emit('close', event);
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(c.menu.hide).toHaveBeenCalledOnce();
+    expect(c.menu.destroy).not.toHaveBeenCalled();
+  });
   it('updates generation tooltip and reloads appearance without showing the menu', () => {
     const c = setup();
     c.generation({ jobs: [{ state: 'generating', index: 3, count: 8 }] });
