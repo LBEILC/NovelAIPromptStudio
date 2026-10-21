@@ -195,6 +195,7 @@ html[data-motion="off"] .spin { animation: none; }
 .set-scroll > .set-main { flex: 1 0 auto; }
 .set-foot .foot-status { flex-wrap: nowrap; gap: var(--sp-2); }
 .setrow > .sdd, .setrow > .segc { flex: 0 0 auto; }
+.setrow > .row { flex: 0 0 auto; flex-wrap: nowrap; }
 .sdd { justify-content: flex-start; }
 .sdd > [class*="ri-arrow-down-s"] { margin-left: auto; }
 .setp .path.swap > * { justify-self: start; }

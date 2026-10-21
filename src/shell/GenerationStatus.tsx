@@ -135,7 +135,10 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
             <img src={mediaUrl(job.project.thumbnail_path || job.project.image_path)} alt="" />
             <div>
               <b>
-                {job.name} · {job.parentNumber === 1 ? '原图' : `基于第 ${job.parentNumber} 版`}
+                <span className="q-name" data-tip={job.name}>
+                  {job.name}
+                </span>
+                <span> · {job.parentNumber === 1 ? '原图' : `基于第 ${job.parentNumber} 版`}</span>
               </b>
               {job.summary && <small>{job.summary}</small>}
               <small>

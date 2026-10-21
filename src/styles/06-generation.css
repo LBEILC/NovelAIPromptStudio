@@ -22,11 +22,13 @@
 .queue { width: 360px; gap: 0; padding: var(--sp-2) 0 0; }
 .queue .q-h { padding: var(--sp-1) var(--sp-3) var(--sp-2); font-weight: var(--fw-strong); }
 .queue .q-h small { display: block; font-weight: var(--fw-regular); color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); }
-.queue .q-item { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 8px var(--sp-3); border-top: var(--bw) solid var(--divider); }
+.queue .q-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px var(--sp-3); border-top: var(--bw) solid var(--divider); }
 .queue .q-item img { width: 28px; height: 38px; object-fit: cover; border-radius: 3px; display: block; }
-.queue .q-item b { font-weight: var(--fw-regular); }
+.queue .q-item b { font-weight: var(--fw-regular); display: flex; min-width: 0; white-space: nowrap; }
+.queue .q-item b > * { flex: none; }
+.queue .q-item .q-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .queue .q-item .mono { font-size: var(--fs-caption); }
-.queue .q-item small { display: block; color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); }
+.queue .q-item small { display: block; color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .queue .q-foot { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3); border-top: var(--bw) solid var(--divider); }
 .queue .q-foot .cost { margin: 0 auto 0 0; align-items: flex-start; }
 
