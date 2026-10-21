@@ -174,17 +174,32 @@ export function createVersionStore(connection) {
     };
   const getAny = (id) =>
     decode(connection.prepare('SELECT * FROM work_versions WHERE id=?').get(id));
-  const get = (id) =>
-    connection.prepare('SELECT 1 FROM deleted_versions WHERE version_id=?').get(id)
-      ? undefined
-      : getAny(id);
-  const list = (workId) =>
-    connection
+  const isDeleted = (id) =>
+    !!connection.prepare('SELECT 1 FROM deleted_versions WHERE version_id=?').get(id);
+  const visibleParent = (id) => {
+    while (id && isDeleted(id)) id = getAny(id)?.parentId;
+    return id || null;
+  };
+  const get = (id) => {
+    if (isDeleted(id)) return undefined;
+    const v = getAny(id);
+    return v && { ...v, parentId: visibleParent(v.parentId) };
+  };
+  const list = (workId) => {
+    const rows = connection
       .prepare(
         'SELECT * FROM work_versions WHERE work_id=? AND id NOT IN (SELECT version_id FROM deleted_versions) ORDER BY number',
       )
       .all(workId)
       .map(decode);
+    const branches = new Map();
+    for (const v of rows) if (!branches.has(v.branchId)) branches.set(v.branchId, v.id);
+    return rows.map((v) => ({
+      ...v,
+      parentId: visibleParent(v.parentId),
+      branchId: branches.get(v.branchId),
+    }));
+  };
   function atomic(fn) {
     connection.exec('SAVEPOINT version_write');
     try {
@@ -197,10 +212,20 @@ export function createVersionStore(connection) {
     }
   }
   function restoreAncestors(id) {
+    const start = id;
     while (id) {
       const v = getAny(id);
       if (!v) break;
-      connection.prepare('DELETE FROM deleted_versions WHERE version_id=?').run(id);
+      const deletion = connection
+        .prepare(
+          'SELECT b.payload FROM deleted_versions d LEFT JOIN branch_undo b ON b.token=d.token WHERE d.version_id=?',
+        )
+        .get(id);
+      // Explicit single-version deletions remain independent when descendants return.
+      const only = JSON.parse(deletion?.payload || '{}').only;
+      if (id === start || !only)
+        connection.prepare('DELETE FROM deleted_versions WHERE version_id=?').run(id);
+      if (id === start && only) return;
       id = v.parentId;
     }
   }
@@ -281,7 +306,8 @@ export function createVersionStore(connection) {
         connection.prepare('DELETE FROM work_sequences WHERE work_id=?').run(workId);
       });
     },
-    subtree(branchId, versionId) {
+    subtree(branchId, versionId, only = false) {
+      branchId = (branchId && getAny(branchId)?.branchId) || branchId;
       const first = versionId
         ? connection
             .prepare(
@@ -296,15 +322,17 @@ export function createVersionStore(connection) {
       if (!first) throw new Error('分支不存在');
       if (!first.parent_id) throw new Error('原图和起点不能删除');
       if (!versionId && !first.branch_number) throw new Error('主线不能删除');
-      const rows = connection
-        .prepare(
-          `WITH RECURSIVE tree(id) AS (
+      const rows = only
+        ? [decode(first)]
+        : connection
+            .prepare(
+              `WITH RECURSIVE tree(id) AS (
         SELECT id FROM work_versions WHERE id=? UNION ALL SELECT v.id FROM work_versions v JOIN tree t ON v.parent_id=t.id
       ) SELECT v.* FROM work_versions v JOIN tree t ON v.id=t.id WHERE v.id NOT IN (SELECT version_id FROM deleted_versions)`,
-        )
-        .all(first.id)
-        .map(decode);
-      return { rows, parent: get(first.parent_id), images: trashImages(rows) };
+            )
+            .all(first.id)
+            .map(decode);
+      return { rows, parent: get(visibleParent(first.parent_id)), images: trashImages(rows) };
     },
     pruneImages(projectIds) {
       return atomic(() => {
@@ -332,14 +360,14 @@ export function createVersionStore(connection) {
         return removed;
       });
     },
-    trash(rows) {
+    trash(rows, only = false) {
       return atomic(() => {
         const token = crypto.randomUUID();
         // Fixed-seed results may deduplicate to an image still used by another live branch.
         const images = trashImages(rows);
         connection
           .prepare('INSERT INTO branch_undo VALUES (?,?)')
-          .run(token, JSON.stringify({ versions: rows.map((v) => v.id), images }));
+          .run(token, JSON.stringify({ versions: rows.map((v) => v.id), images, only }));
         for (const v of rows)
           connection.prepare('INSERT INTO deleted_versions VALUES (?,?)').run(v.id, token);
         for (const id of images)
@@ -361,7 +389,11 @@ export function createVersionStore(connection) {
           )
         )
           throw new Error('图片已永久删除，无法撤销');
-        for (const id of payload.versions) restoreAncestors(id);
+        for (const id of payload.versions) {
+          if (payload.only)
+            connection.prepare('DELETE FROM deleted_versions WHERE version_id=?').run(id);
+          else restoreAncestors(id);
+        }
         for (const id of payload.images)
           connection.prepare("UPDATE projects SET deleted_at='' WHERE id=?").run(id);
         connection.prepare('DELETE FROM branch_undo WHERE token=?').run(token);
@@ -498,6 +530,7 @@ export function createVersionStore(connection) {
       });
     },
     rename(branchId, name) {
+      branchId = (branchId && getAny(branchId)?.branchId) || branchId;
       if (!connection.prepare('SELECT 1 FROM work_versions WHERE branch_id=?').get(branchId))
         throw new Error('分支不存在');
       const value = String(name).trim();

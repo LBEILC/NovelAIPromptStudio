@@ -14,7 +14,7 @@ import { applyMotionBaseline, defaultMotionChecks } from './motion.js';
 import { motionOffChecks } from './motionOff.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { nativeTheme, safeStorage } from 'electron';
+import { nativeTheme, safeStorage, nativeImage } from 'electron';
 import { pathToFileURL } from 'node:url';
 import { importLibraryFiles } from '../importer.js';
 import { harness } from './harness.js';
@@ -231,6 +231,41 @@ export async function runAcceptance(context) {
       }
     }
     if (mode.packaged) {
+      await check('包内应用图标存在且主窗口使用它', async () => {
+        await fs.access(context.appIconPath);
+        const expected = nativeImage.createFromPath(context.appIconPath);
+        return !expected.isEmpty() && context.windowIcons.get(window) === context.appIconPath;
+      });
+      await check('可执行程序或 Dock 图标使用应用资源', async () => {
+        if (process.platform === 'win32') {
+          const ico = await fs.readFile(context.appIconPath);
+          const exe = await fs.readFile(process.execPath);
+          const count = ico.readUInt16LE(4);
+          return (
+            count > 0 &&
+            Array.from({ length: count }, (_, index) => {
+              const entry = 6 + index * 16;
+              const length = ico.readUInt32LE(entry + 8),
+                offset = ico.readUInt32LE(entry + 12);
+              return exe.includes(ico.subarray(offset, offset + length));
+            }).every(Boolean)
+          );
+        }
+        if (process.platform === 'darwin') {
+          const source = await fs.readFile(path.join(app.getAppPath(), 'build/icons/icon.icns'));
+          const plist = await fs.readFile(
+            path.join(process.resourcesPath, '../Info.plist'),
+            'utf8',
+          );
+          const name = /<key>CFBundleIconFile<\/key>\s*<string>([^<]+)<\/string>/.exec(plist)?.[1];
+          if (!name) return false;
+          const bundled = await fs.readFile(
+            path.join(process.resourcesPath, name.endsWith('.icns') ? name : `${name}.icns`),
+          );
+          return bundled.equals(source);
+        }
+        return true;
+      });
       await check('正在运行真正的打包程序', () => app.isPackaged === true, undefined, 'once');
       await check(
         '渲染页面来自目录包内部',

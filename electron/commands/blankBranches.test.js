@@ -326,6 +326,9 @@ it('refuses deletion while generation is active anywhere in the subtree', () =>
       (await dispatch('branch.delete', { branchId: branch.branchId, confirmed: true })).error.code,
     ).toBe('branch_generating');
     expect(database.versions.get(branch.id)).toBeDefined();
+    expect(
+      (await dispatch('version.delete', { versionId: branch.id, only: true })).error.code,
+    ).toBe('branch_generating');
     service.state.resume();
     await waitJob(job.id);
   }));
@@ -650,4 +653,150 @@ it('tracks external original trash, recovery and purge, names affected works and
     } finally {
       raw.close();
     }
+  }));
+
+it('deletes only one fork version, preserves lineage and images, and restores independently', () =>
+  fixture(async ({ call, dispatch, database, append, directory, restart }) => {
+    const { tab } = await call('workbench.new');
+    const first = append(tab.workId, tab.versionId, 'only-first');
+    const middle = append(tab.workId, first.id, 'only-middle');
+    const last = append(tab.workId, middle.id, 'only-last');
+    const fork = append(tab.workId, middle.id, 'only-fork');
+    await call('version.open', { tabId: tab.id, versionId: middle.id });
+    const result = await call('version.delete', { versionId: middle.id, only: true });
+    expect(result).toMatchObject({ versions: 1, images: 1, cancelledJobs: 0 });
+    expect(database.versions.get(last.id)).toMatchObject({
+      parentId: first.id,
+      project: last.project,
+    });
+    expect(database.versions.get(fork.id).parentId).toBe(first.id);
+    expect(database.loadProject(middle.images[0].projectId).deleted_at).not.toBe('');
+    expect(database.loadProject(last.images[0].projectId).deleted_at).toBe('');
+    expect((await call('workbench.get', { tabId: tab.id })).tab).toMatchObject({
+      versionId: last.id,
+      project: expect.objectContaining({ id: last.project.id }),
+    });
+    const raw = new DatabaseSync(path.join(directory, 'studio.sqlite'), { readOnly: true });
+    try {
+      expect(
+        raw.prepare('SELECT parent_id FROM work_versions WHERE id=?').get(last.id).parent_id,
+      ).toBe(middle.id);
+    } finally {
+      raw.close();
+    }
+    await restart();
+    await call('branch.restore', { undo: result.undo });
+    expect(database.versions.get(last.id).parentId).toBe(middle.id);
+    const deleted = await call('version.delete', { versionId: middle.id, only: true });
+    const childDeleted = await call('version.delete', { versionId: last.id, only: true });
+    await call('branch.restore', { undo: childDeleted.undo });
+    expect(database.versions.get(middle.id)).toBeUndefined();
+    await call('branch.restore', { undo: deleted.undo });
+    expect(database.versions.get(last.id).parentId).toBe(middle.id);
+    const again = await call('version.delete', { versionId: middle.id, only: true });
+    database.updateProjects([middle.images[0].projectId], { deleted: false });
+    expect(database.versions.get(last.id).parentId).toBe(middle.id);
+    await call('branch.restore', { undo: again.undo });
+    const next = append(tab.workId, last.id, 'only-next');
+    expect(next.number).toBeGreaterThan(fork.number);
+    expect((await dispatch('version.delete', { versionId: tab.versionId, only: true })).ok).toBe(
+      false,
+    );
+    const origin = database.versions.ensure('only-import', first.project);
+    expect((await dispatch('version.delete', { versionId: origin.id, only: true })).ok).toBe(false);
+  }));
+
+it('retains branch identity on the surviving first version and moves drafts to the visible parent', () =>
+  fixture(async ({ call, database, append }) => {
+    const { tab } = await call('workbench.new');
+    const main = append(tab.workId, tab.versionId, 'only-main');
+    const fork = append(tab.workId, tab.versionId, 'only-branch');
+    const tail = append(tab.workId, fork.id, 'only-tail');
+    await call('branch.rename', { branchId: fork.id, name: 'Synthetic branch' });
+    await call('version.open', { tabId: tab.id, versionId: fork.id });
+    await call('prompt.set', {
+      tabId: tab.id,
+      scope: 'base:prompt',
+      text: 'synthetic retained only draft',
+    });
+    const draft = (await call('workbench.get', { tabId: tab.id })).tab.project;
+    const deleted = await call('version.delete', { versionId: fork.id, only: true });
+    expect((await call('workbench.get', { tabId: tab.id })).tab).toMatchObject({
+      versionId: tab.versionId,
+      project: draft,
+    });
+    expect(database.versions.list(tab.workId).find((v) => v.id === tail.id)).toMatchObject({
+      branchId: tail.id,
+      branchNumber: fork.branchNumber,
+      branchName: 'Synthetic branch',
+      parentId: tab.versionId,
+    });
+    await call('branch.rename', { branchId: tail.id, name: 'Renamed synthetic' });
+    await call('branch.restore', { undo: deleted.undo });
+    expect(database.versions.get(fork.id).branchName).toBe('Renamed synthetic');
+    await call('version.delete', { versionId: fork.id, only: true });
+    await call('branch.delete', { branchId: tail.id });
+    expect(database.versions.get(tail.id)).toBeUndefined();
+    expect(database.versions.get(main.id)).toBeDefined();
+  }));
+
+it('keeps later ancestor deletions independent and rolls back a failed only-version session save', () =>
+  fixture(async ({ call, dispatch, database, append, store }) => {
+    const { tab } = await call('workbench.new');
+    const first = append(tab.workId, tab.versionId, 'only-independent-parent');
+    const middle = append(tab.workId, first.id, 'only-independent-middle');
+    const last = append(tab.workId, middle.id, 'only-independent-last');
+    const deleted = await call('version.delete', { versionId: middle.id, only: true });
+    const ancestor = await call('version.delete', { versionId: first.id, confirmed: true });
+    await call('branch.restore', { undo: deleted.undo });
+    expect(database.versions.get(first.id)).toBeUndefined();
+    expect(database.versions.get(last.id)).toBeUndefined();
+    expect(database.versions.get(middle.id).parentId).toBe(tab.versionId);
+    await call('branch.restore', { undo: ancestor.undo });
+    await call('version.open', { tabId: tab.id, versionId: middle.id });
+    const session = store.get();
+    const fail = vi
+      .spyOn(store, 'save')
+      .mockRejectedValueOnce(Error('synthetic persistence failure'));
+    try {
+      expect((await dispatch('version.delete', { versionId: middle.id, only: true })).ok).toBe(
+        false,
+      );
+      expect(database.versions.get(last.id).parentId).toBe(middle.id);
+      expect(database.versions.get(middle.id).images[0].deleted).toBe(false);
+      expect(store.get()).toEqual(session);
+    } finally {
+      fail.mockRestore();
+    }
+  }));
+
+it('blocks only-version deletion for a queued parent and a version receiving another image', () =>
+  fixture(async ({ call, dispatch, database, append, service, waitJob }) => {
+    const { tab } = await call('workbench.new', { width: 64, height: 64 });
+    const first = append(tab.workId, tab.versionId, 'only-queue-first');
+    const second = append(tab.workId, first.id, 'only-queue-second');
+    await call('version.open', { tabId: tab.id, versionId: first.id });
+    await call('account.save', { token: 'acceptance-token' }, 'ui');
+    service.state.holdAt = 1;
+    const active = await call('generate.queue', { tabId: tab.id, count: 2 }, 'ui');
+    await expect.poll(() => typeof service.state.resume).toBe('function');
+    await call('version.open', { tabId: tab.id, versionId: second.id });
+    const queued = await call('generate.queue', { tabId: tab.id, count: 1 }, 'ui');
+    expect(
+      (await dispatch('version.delete', { versionId: second.id, only: true })).error.code,
+    ).toBe('branch_generating');
+    service.state.holdAt = 2;
+    const resume = service.state.resume;
+    service.state.resume = null;
+    resume();
+    await expect.poll(() => typeof service.state.resume).toBe('function');
+    const job = (await call('generate.status', { id: active.id })).jobs[0];
+    expect(job.versionId).toBeTruthy();
+    expect(
+      (await dispatch('version.delete', { versionId: job.versionId, only: true })).error.code,
+    ).toBe('branch_generating');
+    expect(database.versions.get(job.versionId)).toBeDefined();
+    service.state.resume();
+    await waitJob(active.id);
+    await waitJob(queued.id);
   }));

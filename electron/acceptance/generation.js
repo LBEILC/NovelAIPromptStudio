@@ -622,4 +622,78 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
   });
   await click('工作台', 'document.querySelector(".tb")');
   await h.screenshot('049-original-restored');
+  const vibeFiles = await createWorkbenchFixtures(path.join(mode.root, 'vibe-length-fixtures'), {
+    sizes: [[64, 64]],
+    parameters: [
+      {
+        reference_image_multiple: ['synthetic-vibe-a', 'synthetic-vibe-b'],
+        reference_strength_multiple: [0.25],
+        reference_information_extracted_multiple: [],
+      },
+    ],
+  });
+  const vibeTab = (await invoke('workbench.open', { path: vibeFiles[0] })).tab.id;
+  await wait(
+    `window.studio.invoke('workbench.list',{}).then(r=>r.data.activeTabId===${JSON.stringify(vibeTab)})`,
+    'Vibe 夹具打开',
+  );
+  const requestCount = generationService.state.requests.length;
+  await click('生成', 'document.querySelector(".gen-bar")');
+  await wait(
+    `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.some(j=>j.tabId===${JSON.stringify(vibeTab)}&&j.state==='completed'))`,
+    '缺失 Vibe 数值的图片生成成功',
+  );
+  await check('界面生成自动补齐三个 Vibe 数组且假服务接受', () => {
+    const p = generationService.state.requests[requestCount].parameters;
+    return (
+      JSON.stringify(p.reference_strength_multiple) === '[0.25,0.6]' &&
+      JSON.stringify(p.reference_information_extracted_multiple) === '[1,1]' &&
+      p.reference_image_multiple.length === 2
+    );
+  });
+  const only = await invoke('workbench.new', { width: 64, height: 64 });
+  const chain = [];
+  for (let n = 1; n <= 4; n++) {
+    await invoke('prompt.set', {
+      tabId: only.tab.id,
+      scope: 'base:prompt',
+      text: `synthetic only-version ${n}`,
+    });
+    const job = await invoke('generate.start', { tabId: only.tab.id, count: 1 });
+    await wait(
+      `window.studio.invoke('generate.status',{id:${JSON.stringify(job.id)}}).then(r=>r.data.jobs[0].state==='completed')`,
+      '单版删除夹具生成完成',
+    );
+    chain.push((await invoke('version.list', { tabId: only.tab.id })).versions.at(-1));
+  }
+  const middle = chain[2],
+    last = chain[3],
+    previous = chain[1];
+  await invoke('version.open', { tabId: only.tab.id, versionId: middle.id });
+  const selector = `[data-key="ver-${middle.id}"]`;
+  await wait(`!!document.querySelector(${JSON.stringify(selector)})`);
+  await e(
+    `document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:200}))`,
+  );
+  await click('只删除这一版', 'document.querySelector("[role=menu]:not(.leaving *)")');
+  await h.until(() => !database.versions.get(middle.id), '仅第三版删除完成');
+  await check('只删第三版：第四版接到第二版，内容和图片不变，当前跳到第四版', async () => {
+    const v = database.versions.get(last.id);
+    const current = (await invoke('workbench.get', { tabId: only.tab.id })).tab;
+    return (
+      v.parentId === previous.id &&
+      JSON.stringify(v.project) === JSON.stringify(last.project) &&
+      !v.images[0].deleted &&
+      current.versionId === last.id
+    );
+  });
+  await click('撤销', 'document.querySelector(".toast:not(.leaving)")');
+  await h.until(() => !!database.versions.get(middle.id), '单版删除撤销完成');
+  await check(
+    '撤销单版删除恢复第三版和第四版原始关系',
+    () =>
+      database.versions.get(last.id).parentId === middle.id &&
+      !database.versions.get(middle.id).images[0].deleted,
+  );
+  await h.screenshot('053-only-version-restored');
 }

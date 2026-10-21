@@ -194,7 +194,7 @@ try {
         '--dir',
         '--publish',
         'never',
-        '-c.win.signAndEditExecutable=false',
+        '-c.win.signExecutable=false',
         '-c.mac.identity=null',
       ]);
     executable =

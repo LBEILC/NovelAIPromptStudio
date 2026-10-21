@@ -139,3 +139,5 @@ nai-studio version.delete --json '{"versionId":"VERSION"}'
 nai-studio version.delete --json '{"versionId":"VERSION","confirmed":true}'
 nai-studio branch.restore --json '{"undo":"UNDO"}'
 ```
+
+`version.delete` 支持 `only: true`：只删除指定版本、保留后续版本，不要求 `confirmed`；返回的 `undo` 仍交给 `branch.restore` 撤销。原图和起点不可使用。

@@ -71,19 +71,36 @@ export function generationModel(value) {
   return GENERATION_MODELS[model] ? model : null;
 }
 
+export function normalizeVibeParameters(raw) {
+  const images = raw.reference_image_multiple || [];
+  if (
+    !Array.isArray(images) ||
+    Math.max(
+      raw.reference_strength_multiple?.length || 0,
+      raw.reference_information_extracted_multiple?.length || 0,
+    ) > images.length ||
+    Array.from(images).some((x) => typeof x !== 'string' || !x)
+  )
+    throw new Error('这张图的 Vibe 编码没有保存在图片里');
+  if (!images.length) return { ...raw };
+  return {
+    ...raw,
+    reference_strength_multiple: images.map((_, i) => raw.reference_strength_multiple?.[i] ?? 0.6),
+    reference_information_extracted_multiple: images.map(
+      (_, i) => raw.reference_information_extracted_multiple?.[i] ?? 1,
+    ),
+  };
+}
+
 export function generationUnavailable(raw, model) {
   if (!GENERATION_MODELS[model]) return '这个模型暂不支持生成';
   if (Object.keys(raw).some((key) => key.startsWith('director_reference_') && raw[key]?.length))
     return '带参考图的图暂不支持生成';
-  const count = Math.max(
-    raw.reference_strength_multiple?.length || 0,
-    raw.reference_information_extracted_multiple?.length || 0,
-  );
-  if (
-    count &&
-    (raw.reference_image_multiple?.length !== count || raw.reference_image_multiple.some((x) => !x))
-  )
-    return '这张图的 Vibe 编码没有保存在图片里';
+  try {
+    normalizeVibeParameters(raw);
+  } catch (error) {
+    return error.message;
+  }
   if (
     raw.reference_image_multiple?.length &&
     !GENERATION_MODELS[model].includes('reference_image_multiple')
@@ -100,6 +117,7 @@ export function buildGenerationRequest(raw, model, edits = {}) {
       .filter((key) => raw[key] !== undefined)
       .map((key) => [key, structuredClone(raw[key])]),
   );
+  Object.assign(parameters, normalizeVibeParameters(parameters));
   let prompt = edits.prompt ?? raw.prompt ?? raw.v4_prompt?.caption?.base_caption ?? '';
   let negative =
     edits.negative ??
@@ -290,7 +308,7 @@ export function createNovelAIClient({
     generate: async (request, onProgress = () => {}) => {
       const response = await send('/ai/generate-image-stream', {
         ...request,
-        parameters: { ...request.parameters, stream: 'sse' },
+        parameters: { ...normalizeVibeParameters(request.parameters), stream: 'sse' },
       });
       if (!response.headers.get('content-type')?.includes('text/event-stream'))
         return extractGeneratedPng(Buffer.from(await response.arrayBuffer()));

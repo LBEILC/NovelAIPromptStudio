@@ -95,6 +95,9 @@ export function hydrateParameters(project) {
   const encodings = Array.isArray(raw.reference_image_multiple) ? raw.reference_image_multiple : [];
   const vibeCount = Math.max(
     encodings.length,
+    Array.isArray(raw.reference_information_extracted_multiple)
+      ? raw.reference_information_extracted_multiple.length
+      : 0,
     Array.isArray(raw.reference_strength_multiple) ? raw.reference_strength_multiple.length : 0,
   );
   const vibes = Array.from({ length: vibeCount }, (_, i) => ({

@@ -400,3 +400,17 @@ describe('reference encoding and pricing', () => {
     });
   });
 });
+
+it('rejects information-only embedded Vibes instead of silently dropping them', async () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    await expect(
+      buildProjectRequest(
+        fixture('nai-diffusion-4-5-full', { reference_information_extracted_multiple: [1] }),
+        createVibeLibrary(db),
+      ),
+    ).rejects.toThrow();
+  } finally {
+    db.close();
+  }
+});

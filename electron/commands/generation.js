@@ -267,6 +267,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     const { rows, parent, images } = versions.subtree(
       input.branchId,
       version ? input.versionId : undefined,
+      version && input.only,
     );
     const ids = new Set(rows.map((v) => v.id));
     const jobs = queue.status().filter((j) => ids.has(j.parentId) || ids.has(j.versionId));
@@ -277,16 +278,31 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       versions: rows.length,
       images: images.length,
     };
-    if ((version ? counts.versions > 1 : counts.branches > 1) && !input.confirmed) {
+    if (!input.only && (version ? counts.versions > 1 : counts.branches > 1) && !input.confirmed) {
       const error = new CommandError('needs_confirm', '删除分支需要确认');
       error.details = counts;
       throw error;
     }
     const pending = jobs.filter((j) => j.state === 'pending').map((j) => j.id);
-    const undo = versions.trash(rows);
+    const before = input.only ? versions.list(rows[0].workId) : [];
+    const next = before.find(
+      (v) =>
+        v.parentId === rows[0].id &&
+        v.branchId === before.find((r) => r.id === rows[0].id)?.branchId,
+    );
+    const undo = versions.trash(rows, !!input.only);
     if (pending.length) queue.cancel(pending);
     const session = store.get();
+    const viewing = input.only
+      ? session.tabs
+          .filter((t) => ids.has(t.versionId) && versionDiff(rows[0].project, t.project).empty)
+          .map((t) => t.id)
+      : [];
     retreatTabs(session, ids, parent);
+    for (const t of session.tabs.filter((t) => viewing.includes(t.id))) {
+      if (next) retreatTabs({ tabs: [t] }, new Set([parent.id]), versions.get(next.id));
+      t.project = structuredClone(t.originalProject);
+    }
     try {
       await store.save(session);
     } catch (error) {

@@ -443,3 +443,72 @@ describe('model request compatibility and HTTP failures', () => {
     expect(generationError(403)).toBe('NovelAI 拒绝了这次请求');
   });
 });
+it.each([
+  [undefined, undefined, [0.6, 0.6], [1, 1]],
+  [[0], [], [0, 0.6], [1, 1]],
+  [[], [0], [0.6, 0.6], [0, 1]],
+  [
+    [0.2, null],
+    [null, 0.7],
+    [0.2, 0.6],
+    [1, 0.7],
+  ],
+])(
+  'fills missing Vibe values by image index without mutating metadata (%j, %j)',
+  (strength, information, expectedStrength, expectedInformation) => {
+    const p = {
+      ...raw,
+      reference_image_multiple: ['synthetic-a', 'synthetic-b'],
+      reference_strength_multiple: strength,
+      reference_information_extracted_multiple: information,
+    };
+    const original = structuredClone(p);
+    const request = buildGenerationRequest(p, 'nai-diffusion-4-5-full');
+    expect(request.parameters.reference_strength_multiple).toEqual(expectedStrength);
+    expect(request.parameters.reference_information_extracted_multiple).toEqual(
+      expectedInformation,
+    );
+    expect(p).toEqual(original);
+  },
+);
+it.each([
+  { reference_strength_multiple: [0.6] },
+  { reference_information_extracted_multiple: [1] },
+  { reference_image_multiple: ['a'], reference_strength_multiple: [0.6, 0.6] },
+  { reference_image_multiple: ['a'], reference_information_extracted_multiple: [1, 1] },
+  { reference_image_multiple: ['a', ''] },
+  { reference_image_multiple: [null] },
+])('rejects Vibe metadata with no matching encoding (%j)', (refs) => {
+  expect(() => buildGenerationRequest({ ...raw, ...refs }, 'nai-diffusion-4-5-full')).toThrow(
+    'Vibe',
+  );
+});
+
+it('normalizes persisted requests at the network boundary and never sends missing encodings', async () => {
+  const sent = [];
+  const png = Buffer.from('89504e470d0a1a0a010203', 'hex');
+  const client = createNovelAIClient({
+    token: () => 'synthetic',
+    fetchImpl: async (_, options) => {
+      sent.push(JSON.parse(options.body));
+      return new Response(
+        `event: final\ndata: ${JSON.stringify({ image: png.toString('base64') })}\n\n`,
+        { headers: { 'content-type': 'text/event-stream' } },
+      );
+    },
+  });
+  const request = {
+    model: 'nai-diffusion-4-5-full',
+    parameters: { reference_image_multiple: ['synthetic'], reference_strength_multiple: [] },
+  };
+  expect(await client.generate(request)).toEqual(png);
+  expect(sent[0].parameters).toMatchObject({
+    reference_strength_multiple: [0.6],
+    reference_information_extracted_multiple: [1],
+  });
+  expect(request.parameters.reference_strength_multiple).toEqual([]);
+  await expect(
+    client.generate({ ...request, parameters: { reference_strength_multiple: [0.6] } }),
+  ).rejects.toThrow('Vibe');
+  expect(sent).toHaveLength(1);
+});

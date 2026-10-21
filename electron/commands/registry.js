@@ -72,7 +72,7 @@ export const commandRegistry = {
   },
   'work.restore-original': { fields: { undo: 'string' }, required: ['undo'], mutation: true },
   'version.delete': {
-    fields: { versionId: 'string', confirmed: 'boolean' },
+    fields: { versionId: 'string', confirmed: 'boolean', only: 'boolean' },
     required: ['versionId'],
     mutation: true,
   },

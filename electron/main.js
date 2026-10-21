@@ -165,6 +165,7 @@ let updateState = {
 };
 const activeImports = new Map();
 const preparedImports = new Map();
+const windowIcons = new WeakMap();
 const appIconPath = path.join(
   import.meta.dirname,
   '..',
@@ -251,7 +252,7 @@ function createWindow(captureState = null) {
   const { width: workAreaWidth, height: workAreaHeight } = screen.getPrimaryDisplay().workAreaSize;
   const defaultWidth = Math.min(1720, Math.max(960, workAreaWidth - 16));
   const defaultHeight = Math.min(1040, Math.max(680, workAreaHeight - 16));
-  const window = new BrowserWindow({
+  const windowOptions = {
     width: captureState ? 1240 : defaultWidth,
     height: captureState ? 760 : defaultHeight,
     minWidth: Math.min(1080, defaultWidth),
@@ -292,7 +293,9 @@ function createWindow(captureState = null) {
           }
         : {}),
     },
-  });
+  };
+  const window = new BrowserWindow(windowOptions);
+  windowIcons.set(window, windowOptions.icon);
   guardClientWindow(window, { packaged: app.isPackaged, shell });
   if (!captureState)
     windowClosers.set(
@@ -1714,6 +1717,8 @@ app.whenReady().then(async () => {
     try {
       const { runAcceptance } = await import('./acceptance/run.js');
       await runAcceptance({
+        appIconPath,
+        windowIcons,
         chatGPTFixture,
         trayController,
         generationService: acceptanceGeneration,

@@ -124,12 +124,14 @@
       }
     ],
     "win": {
+      "icon": "build/icons/icon.ico",
       "target": [
         "nsis"
       ],
       "artifactName": "NovelAI-Prompt-Studio-Setup-${version}-${arch}.${ext}"
     },
     "mac": {
+      "icon": "build/icons/icon.icns",
       "target": [
         "dmg",
         "zip"
@@ -138,6 +140,8 @@
       "category": "public.app-category.graphics-design"
     },
     "nsis": {
+      "installerIcon": "build/icons/icon.ico",
+      "uninstallerIcon": "build/icons/icon.ico",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

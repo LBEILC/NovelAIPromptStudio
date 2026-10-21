@@ -123,7 +123,7 @@ export async function buildProjectRequest(project, library, { seed, encode } = {
       const resolved = await library.resolve(ref, settings.model, encode);
       if (resolved.pending) pending.add(resolved.cacheKey);
       parameters.reference_image_multiple.push(resolved.encoding || 'pending');
-      parameters.reference_strength_multiple.push(ref.strength);
+      parameters.reference_strength_multiple.push(ref.strength ?? 0.6);
       parameters.reference_information_extracted_multiple.push(ref.information ?? 1);
       if (encode) {
         ref.encode = null;
