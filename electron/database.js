@@ -2111,6 +2111,18 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       return previous;
     }),
     updateProjects: atomic(updateProjects),
+    removeWorkOriginal: atomic((workId) =>
+      versionStore.removeOriginal(workId, (id, deleted) => {
+        const result = updateProjects([id], { deleted });
+        if (result.failed.length) throw new Error('原图状态更新失败');
+      }),
+    ),
+    restoreWorkOriginal: atomic((undo) =>
+      versionStore.restoreOriginal(undo, (id, deleted) => {
+        const result = updateProjects([id], { deleted });
+        if (result.failed.length) throw new Error('原图状态更新失败');
+      }),
+    ),
     trashProjects: atomic((ids) => {
       let versions = [];
       const results = updateProjects(ids, { deleted: true }, (result) => {

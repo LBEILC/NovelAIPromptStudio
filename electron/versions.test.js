@@ -73,7 +73,7 @@ describe('version persistence', () => {
     fixture((db, file) => {
       migrateGenerationVersions(db, file);
       db.exec(
-        "CREATE TABLE projects(id TEXT PRIMARY KEY, deleted_at TEXT); INSERT INTO projects VALUES ('image','')",
+        "CREATE TABLE projects(id TEXT PRIMARY KEY, deleted_at TEXT, image_path TEXT DEFAULT ''); INSERT INTO projects(id,deleted_at) VALUES ('image','')",
       );
       const store = createVersionStore(db);
       const p = {
@@ -136,7 +136,7 @@ it('matches branch numbering for the approved 21-version prototype tree', () =>
     // Batch writes while retaining the store's nested savepoints and every assertion.
     db.exec('BEGIN');
     db.exec(
-      "CREATE TABLE projects(id TEXT PRIMARY KEY, deleted_at TEXT); INSERT INTO projects VALUES ('synthetic-image','')",
+      "CREATE TABLE projects(id TEXT PRIMARY KEY, deleted_at TEXT, image_path TEXT DEFAULT ''); INSERT INTO projects(id,deleted_at) VALUES ('synthetic-image','')",
     );
     const store = createVersionStore(db),
       versions = [];

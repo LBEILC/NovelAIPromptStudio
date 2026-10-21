@@ -407,6 +407,12 @@ export async function createCommands(services) {
         results,
         summary: summary(results),
         versions,
+        originsOf: services.database.versions
+          .originsOf(results.success)
+          .map(
+            (/** @type {{workId:string,name:string}} */ w) =>
+              session.tabs.find((t) => t.workId === w.workId)?.displayName || w.name || '',
+          ),
       };
     },
     'library.rename-many': async (input) => {

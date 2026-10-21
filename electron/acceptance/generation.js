@@ -584,5 +584,42 @@ export async function generationChecks({ app, h, mode, doubles, database, genera
       !restored.images[0].deleted
     );
   });
+  const originalWork = (
+    await call('work.open-from-image', {
+      tabId: linear.tab.id,
+      versionId: linearVersion.id,
+      imageId: linearVersion.images[0].projectId,
+    })
+  ).tab;
+  const originalRoot = (await call('version.list', { tabId: originalWork.id })).versions[0];
+  const originalUndo = await call('work.remove-original', { tabId: originalWork.id });
+  await call('version.open', { tabId: originalWork.id, versionId: originalRoot.id });
+  const continued = await e(
+    `window.studio.invoke('generate.start',${JSON.stringify({ tabId: originalWork.id, count: 1 })}).then(r=>{if(!r.ok)throw Error(r.error.message);return r.data})`,
+  );
+  await wait(
+    `window.studio.invoke('generate.status',{id:${JSON.stringify(continued.id)}}).then(r=>r.data.jobs[0].state==='completed')`,
+    '原图移入回收站后从起点生成完成',
+  );
+  await check('原图进入回收站后保持根快照并继续生成', async () => {
+    const tree = (await call('version.list', { tabId: originalWork.id })).versions;
+    const job = (await call('generate.status', { id: continued.id })).jobs[0];
+    return (
+      originalUndo.trashed &&
+      tree[0].originState === 'trashed' &&
+      JSON.stringify(tree[0].project) === JSON.stringify(originalRoot.project) &&
+      job.completed === 1 &&
+      job.images.every((id) => !!database.loadProject(id))
+    );
+  });
+  await call('work.restore-original', { undo: originalUndo.undo });
+  await check('撤销恢复原图并保留后续生成结果', async () => {
+    const tree = (await call('version.list', { tabId: originalWork.id })).versions;
+    return (
+      tree[0].originState === 'library' &&
+      tree.some((v) => v.images.some((image) => !image.deleted))
+    );
+  });
   await click('工作台', 'document.querySelector(".tb")');
+  await h.screenshot('049-original-restored');
 }

@@ -95,6 +95,8 @@ export async function seed(directory, count, progress = () => {}, { compact = fa
     // Recreate the pre-generation schema for migration and compatibility checks.
     for (const table of [
       'branch_undo',
+      'original_undo',
+      'removed_originals',
       'deleted_versions',
       'work_sequences',
       'version_images',

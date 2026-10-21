@@ -96,7 +96,11 @@ nai-studio prompt.set-size --json '{"tabId":"TAB","width":832,"height":1216,"exp
 nai-studio branch.rename --json '{"branchId":"BRANCH","name":"雨景"}'
 nai-studio work.open-from-image --json '{"tabId":"TAB","versionId":"VERSION","imageId":"IMAGE"}'
 nai-studio work.open --json '{"workId":"WORK"}'
+nai-studio work.remove-original --json '{"tabId":"TAB"}'
+nai-studio work.restore-original --json '{"undo":"UNDO"}'
 ```
+
+`work.remove-original` 保留根版本的提示词、参数和后续版本。图库原图只移入回收站；文件原图仅从作品中去掉，不删除文件。将返回的 `undo` 传给 `work.restore-original` 可撤销，永久删除仍不向 Agent 开放。
 
 张数是正整数，不设产品上限；请求仍逐张发送。不要用循环自行重试失败任务。`generate.status` 返回任务状态、已生成的图片库 ID 与失败原因；软件退出会取消未发出的任务。尺寸取最近的 64 倍数。账号、生成设置、确认、放弃与停止仅供界面使用，命令行返回 `forbidden`。
 # 参数与参考

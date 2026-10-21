@@ -106,12 +106,44 @@ export function createVersionStore(connection) {
   connection.exec(`
     CREATE TABLE IF NOT EXISTS deleted_versions (version_id TEXT PRIMARY KEY, token TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS branch_undo (token TEXT PRIMARY KEY, payload TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS removed_originals (work_id TEXT PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS original_undo (token TEXT PRIMARY KEY, work_id TEXT NOT NULL, project_id TEXT NOT NULL, kind TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS work_sequences (work_id TEXT PRIMARY KEY, version INTEGER NOT NULL, branch INTEGER NOT NULL);
     INSERT INTO work_sequences SELECT work_id, MAX(number), MAX(branch_number) FROM work_versions GROUP BY work_id
       ON CONFLICT(work_id) DO UPDATE SET version=MAX(version,excluded.version), branch=MAX(branch,excluded.branch);
   `);
+  const originalImage = (project) =>
+    connection.prepare('SELECT id,deleted_at FROM projects WHERE id=?').get(project.id || '') ||
+    (project.image_path
+      ? connection
+          .prepare('SELECT id,deleted_at FROM projects WHERE image_path=? LIMIT 1')
+          .get(project.image_path)
+      : undefined);
+  const originState = (workId, project) => {
+    if (project.blank) return undefined;
+    if (connection.prepare('SELECT 1 FROM removed_originals WHERE work_id=?').get(workId))
+      return 'removed';
+    const image = originalImage(project);
+    return image ? (image.deleted_at ? 'trashed' : 'library') : 'file';
+  };
+  const originsOf = (ids) =>
+    connection
+      .prepare('SELECT id,origin_json FROM works')
+      .all()
+      .filter((w) => {
+        const original = JSON.parse(w.origin_json);
+        return (
+          !original.blank &&
+          ids.includes(originalImage(original)?.id || original.id) &&
+          originState(w.id, original) !== 'removed'
+        );
+      })
+      .map((w) => ({ workId: w.id, name: JSON.parse(w.origin_json).name }));
   const decode = (row) =>
     row && {
+      ...(!row.parent_id
+        ? { originState: originState(row.work_id, JSON.parse(row.snapshot_json)) }
+        : {}),
       isStart: row.number === 0,
       id: row.id,
       workId: row.work_id,
@@ -191,6 +223,38 @@ export function createVersionStore(connection) {
     get,
     getAny,
     list,
+    originsOf,
+    removeOriginal(workId, update) {
+      return atomic(() => {
+        const root = list(workId)[0];
+        if (!root || !['library', 'file'].includes(root.originState))
+          throw new Error('原图已移除或不存在');
+        const undo = crypto.randomUUID();
+        const projectId = originalImage(root.project)?.id || root.project.id;
+        connection
+          .prepare('INSERT INTO original_undo VALUES (?,?,?,?)')
+          .run(undo, workId, projectId, root.originState);
+        if (root.originState === 'library') update(projectId, true);
+        else connection.prepare('INSERT INTO removed_originals VALUES (?)').run(workId);
+        return { trashed: root.originState === 'library', undo };
+      });
+    },
+    restoreOriginal(token, update) {
+      return atomic(() => {
+        const undo = connection.prepare('SELECT * FROM original_undo WHERE token=?').get(token);
+        if (!undo) throw new Error('撤销记录不存在');
+        if (!connection.prepare('SELECT 1 FROM works WHERE id=?').get(undo.work_id))
+          throw new Error('作品不存在');
+        if (undo.kind === 'library') {
+          if (!connection.prepare('SELECT 1 FROM projects WHERE id=?').get(undo.project_id))
+            throw new Error('图片已永久删除，无法撤销');
+          update(undo.project_id, false);
+        } else
+          connection.prepare('DELETE FROM removed_originals WHERE work_id=?').run(undo.work_id);
+        connection.prepare('DELETE FROM original_undo WHERE token=?').run(token);
+        return true;
+      });
+    },
     latest: () => {
       const row = connection
         .prepare(
@@ -311,6 +375,8 @@ export function createVersionStore(connection) {
         restoreAncestors(row.version_id);
     },
     purgeImage(projectId) {
+      for (const work of originsOf([projectId]))
+        connection.prepare('INSERT OR IGNORE INTO removed_originals VALUES (?)').run(work.workId);
       connection.prepare('DELETE FROM version_images WHERE project_id=?').run(projectId);
       // Remove empty deleted leaves, then their empty ancestors. Active versions are retained.
       let rows;
@@ -336,11 +402,23 @@ export function createVersionStore(connection) {
         .filter((w) => w.source?.workId === id),
     work: (id) => {
       const w = connection.prepare('SELECT * FROM works WHERE id=?').get(id);
+      const source = JSON.parse(w?.source_json || 'null');
+      if (
+        source &&
+        (!connection.prepare('SELECT 1 FROM works WHERE id=?').get(source.workId) ||
+          (!list(source.workId).some(
+            (v) => v.parentId || v.images.some((image) => !image.deleted),
+          ) &&
+            connection
+              .prepare('SELECT version FROM work_sequences WHERE work_id=?')
+              .get(source.workId)?.version > (list(source.workId)[0]?.number ?? 0)))
+      )
+        source.deleted = true;
       return (
         w && {
           id: w.id,
           origin: hydrateParameters(JSON.parse(w.origin_json)),
-          source: JSON.parse(w.source_json || 'null'),
+          source,
         }
       );
     },
@@ -378,6 +456,7 @@ export function createVersionStore(connection) {
         let target = versionId
           ? get(versionId)
           : !parent.isStart &&
+              !['trashed', 'removed'].includes(parent.originState) &&
               source !== 'agent' &&
               versionSignature(project) === versionSignature(parent.project)
             ? parent

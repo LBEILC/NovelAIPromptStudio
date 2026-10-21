@@ -9,6 +9,7 @@ import { openPreferences } from '../preferences.js';
 import { createBlankProject, readWorkbenchImage } from '../workbench.js';
 import { startFakeNovelAI } from '../fixtures/novelAIService.js';
 import { MODEL_ORDER } from '../../src/shared/params.ts';
+import { createWorkbenchFixtures } from '../acceptance/workbenchFixtures.js';
 
 async function fixture(run) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-blank-branches-'));
@@ -532,4 +533,100 @@ it('keeps versions with another image or child and removes the last version of a
       branchName: 'Synthetic named branch',
     });
     expect(database.versions.get(main.id)).toBeDefined();
+  }));
+
+for (const library of [false, true]) {
+  it(`removes and restores a ${library ? 'library' : 'file'} original without changing snapshots or drafts`, () =>
+    fixture(async ({ directory, call, dispatch, database, append, store, restart, waitJob }) => {
+      const [file] = await createWorkbenchFixtures(directory, { sizes: [[64, 64]] });
+      const image = await readWorkbenchImage(file);
+      if (library) database.insertProject(image);
+      const { tab } = await call('workbench.open', { path: file });
+      const root = (await call('version.list', { tabId: tab.id })).versions[0];
+      expect(root.originState).toBe(library ? 'library' : 'file');
+      append(root.workId, root.id, 'original-descendant');
+      await call('prompt.set', {
+        tabId: tab.id,
+        scope: 'base:prompt',
+        text: 'synthetic unsaved draft',
+      });
+      const before = store.get();
+      const tree = database.versions.list(root.workId);
+      const bytes = await fs.readFile(file);
+      expect(
+        (await dispatch('work.remove-original', { tabId: tab.id, expectedRevision: -1 })).ok,
+      ).toBe(false);
+      const result = await call('work.remove-original', { tabId: tab.id });
+      expect(result.trashed).toBe(library);
+      expect(store.get()).toEqual(before);
+      expect(database.versions.list(root.workId)).toEqual(
+        tree.map((v, i) => (i ? v : { ...v, originState: library ? 'trashed' : 'removed' })),
+      );
+      expect(await fs.readFile(file)).toEqual(bytes);
+      expect((await dispatch('work.remove-original', { tabId: tab.id })).ok).toBe(false);
+      await restart();
+      expect((await call('version.list', { tabId: tab.id })).versions[0].originState).toBe(
+        library ? 'trashed' : 'removed',
+      );
+      await call('version.open', { tabId: tab.id, versionId: root.id });
+      await fs.unlink(file);
+      await call('account.save', { token: 'acceptance-token' }, 'ui');
+      const generated = await waitJob(
+        (await call('generate.start', { tabId: tab.id, count: 1 }, 'ui')).id,
+      );
+      expect(generated.versionId).not.toBe(root.id);
+      expect(database.versions.get(generated.versionId).project.metadata.prompt_raw).toBe(
+        root.project.metadata.prompt_raw,
+      );
+      expect(await call('work.restore-original', { undo: result.undo })).toEqual({
+        restored: true,
+      });
+      expect(database.versions.get(root.id).originState).toBe(library ? 'library' : 'file');
+      expect((await dispatch('work.restore-original', { undo: result.undo })).ok).toBe(false);
+    }));
+}
+
+it('tracks external original trash, recovery and purge, names affected works and survives source deletion', () =>
+  fixture(async ({ directory, call, dispatch, database, append, waitJob }) => {
+    const [file] = await createWorkbenchFixtures(directory, { sizes: [[64, 64]] });
+    const image = await readWorkbenchImage(file);
+    database.insertProject(image);
+    const { tab } = await call('workbench.open', { path: file });
+    const root = (await call('version.list', { tabId: tab.id })).versions[0];
+    const first = append(root.workId, root.id, 'derived-source');
+    const derived = (
+      await call('work.open-from-image', {
+        tabId: tab.id,
+        versionId: first.id,
+        imageId: first.images[0].projectId,
+      })
+    ).tab;
+    expect((await call('version.list', { tabId: derived.id })).origin.deleted).toBeUndefined();
+    const removed = await call('library.trash', { ids: [image.id, first.images[0].projectId] });
+    expect(removed.originsOf).toEqual(
+      expect.arrayContaining([tab.displayName, derived.displayName]),
+    );
+    expect(database.versions.get(root.id).originState).toBe('trashed');
+    expect((await call('version.list', { tabId: derived.id })).versions[0].originState).toBe(
+      'trashed',
+    );
+    expect((await call('version.list', { tabId: derived.id })).origin.deleted).toBe(true);
+    database.updateProjects([image.id, first.images[0].projectId], { deleted: false });
+    expect(database.versions.get(root.id).originState).toBe('library');
+    expect((await call('version.list', { tabId: derived.id })).origin.deleted).toBeUndefined();
+    const removal = await call('work.remove-original', { tabId: tab.id });
+    database.deleteProject(image.id);
+    await fs.unlink(file);
+    expect(database.versions.get(root.id).originState).toBe('removed');
+    expect((await dispatch('work.restore-original', { undo: removal.undo })).ok).toBe(false);
+    await call('account.save', { token: 'acceptance-token' }, 'ui');
+    await waitJob((await call('generate.start', { tabId: tab.id, count: 1 }, 'ui')).id);
+    expect(database.versions.get(root.id).project).toEqual(root.project);
+    const raw = new DatabaseSync(database.filePath);
+    try {
+      raw.prepare('DELETE FROM works WHERE id=?').run(root.workId);
+      expect((await call('version.list', { tabId: derived.id })).origin.deleted).toBe(true);
+    } finally {
+      raw.close();
+    }
   }));

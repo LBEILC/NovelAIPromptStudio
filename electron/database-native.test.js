@@ -112,6 +112,8 @@ describe('native engine upgrade', () => {
             ...Object.keys(expected.tables).filter((name) => !RETIRED_TABLES.includes(name)),
             'materials',
             'branch_undo',
+            'original_undo',
+            'removed_originals',
             'deleted_versions',
             'work_sequences',
             'reference_vibes',

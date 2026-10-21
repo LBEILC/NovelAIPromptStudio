@@ -16,6 +16,7 @@ import { createPreviewHandlers } from './handlers.mjs';
 import { pause } from './services.mjs';
 import { hydrateParameters, normalizeSettings } from '../electron/params.js';
 import { createChatGPT, chatGPTCommands } from '../electron/chatgpt.js';
+import { createWorkbenchFixtures } from '../electron/acceptance/workbenchFixtures.js';
 
 export async function createSession(services, images, emit, empty = false) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-ui-preview-'));
@@ -275,6 +276,28 @@ export async function createSession(services, images, emit, empty = false) {
           text: `synthetic cloud study ${i}`,
         });
         await waitJob((await call('generate.start', { tabId: linear.tab.id, count: 1 })).id);
+      }
+      const libraryOriginal = (await call('workbench.open', { libraryId: cards[3].id })).tab;
+      for (let i = 1; i <= 2; i++) {
+        await call('prompt.set', {
+          tabId: libraryOriginal.id,
+          scope: 'base:prompt',
+          text: `synthetic library study ${i}`,
+        });
+        await waitJob((await call('generate.start', { tabId: libraryOriginal.id, count: 1 })).id);
+      }
+      const [externalFile] = await createWorkbenchFixtures(
+        path.join(directory, 'external-original'),
+        { sizes: [[512, 768]], seed: 49000 },
+      );
+      const external = (await call('workbench.open', { path: externalFile })).tab;
+      for (let i = 1; i <= 2; i++) {
+        await call('prompt.set', {
+          tabId: external.id,
+          scope: 'base:prompt',
+          text: `synthetic external study ${i}`,
+        });
+        await waitJob((await call('generate.start', { tabId: external.id, count: 1 })).id);
       }
       const trash = structuredClone(database.loadProject(cards[13].id));
       trash.id = crypto.randomUUID();

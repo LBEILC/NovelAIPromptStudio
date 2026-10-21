@@ -300,6 +300,20 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     return { ...counts, cancelledJobs: pending.length, undo };
   }
   const handlers = {
+    'work.remove-original': async (input) => {
+      const current = tab(input.tabId);
+      revision(input.expectedRevision, current.revision || 0);
+      unlocked(input);
+      const parent = await ensure(current);
+      const result = services.database.removeWorkOriginal(parent.workId);
+      emit({ libraryChanged: true });
+      return result;
+    },
+    'work.restore-original': ({ undo }) => {
+      const restored = services.database.restoreWorkOriginal(undo);
+      emit({ libraryChanged: true });
+      return { restored };
+    },
     'workbench.new': async (input, caller) => {
       const project = createBlankProject(input, {
         model: settings().blankModel || 'last',
