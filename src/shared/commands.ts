@@ -602,7 +602,13 @@ export interface CommandDefinitions {
     };
   };
   'workbench.open': {
-    input: Revision & { path?: string; libraryId?: string; source?: WorkbenchSource };
+    /** 默认回到这张图所在的作品（1.5.5，doc/design.md 2.23）；fresh 为真时照旧另起新作品 */
+    input: Revision & {
+      path?: string;
+      libraryId?: string;
+      source?: WorkbenchSource;
+      fresh?: boolean;
+    };
     output: TabDocument | { canceled: true };
   };
   'workbench.get': { input: { tabId: string }; output: TabDocument };

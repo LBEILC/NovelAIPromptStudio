@@ -191,3 +191,6 @@ html.tray, html.tray body, html.tray #root { width: auto; height: auto; backgrou
 
 /* 视图浮层：合并方式五个选项（多了"按作品"），比别的宽浮层宽一点，最后一项不贴边 */
 .popover.wide.lview-pop { width: calc(var(--popover-w-wide) + var(--sp-3)); }
+
+/* 版本栏：缩略图的文件找不到时是同样大小的虚线框 */
+.ver .ths .th-miss { display: block; width: var(--w, 28px); height: 38px; box-sizing: border-box; border: var(--bw) dashed var(--border); border-radius: 3px; }

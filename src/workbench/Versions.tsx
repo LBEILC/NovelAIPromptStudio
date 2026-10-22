@@ -38,7 +38,10 @@ function thumbOf(id: string) {
 }
 function Thumb({ id, src }: { id: string; src?: string }) {
   const [url, setUrl] = useState(src || '');
+  // 文件找不到时画一个虚线框，不显示浏览器的破图标（用户 10-22：从剪贴板打开、存入图片库后原图丢了）
+  const [broken, setBroken] = useState(false);
   useEffect(() => {
+    setBroken(false);
     if (src) return setUrl(src);
     let live = true;
     void thumbOf(id)
@@ -48,7 +51,8 @@ function Thumb({ id, src }: { id: string; src?: string }) {
       live = false;
     };
   }, [id, src]);
-  return url ? <img src={url} alt="" draggable={false} /> : null;
+  if (broken) return <span className="th-miss" data-tip="图片文件找不到了" />;
+  return url ? <img src={url} alt="" draggable={false} onError={() => setBroken(true)} /> : null;
 }
 /** 按宽度一格一格往下排，返回占几行 */
 function rowsOf(widths: number[], rowW: number) {
