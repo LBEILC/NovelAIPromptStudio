@@ -554,6 +554,15 @@ export async function settingsChecks(context, restart) {
     ['等宽字体', 'MiSans'],
     ['段落字体', 'MiSans'],
   ]) {
+    // A previous Chromium drag may leave the pointer over a newly opened option.
+    // Move it outside before exercising keyboard-only menu navigation.
+    await h.window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: 1,
+      y: 1,
+      button: 'none',
+      buttons: 0,
+    });
     await click(label);
     await h.checkSoon(
       `${label}三种内置字体排在最前`,
@@ -563,9 +572,11 @@ export async function settingsChecks(context, restart) {
       undefined,
       'both',
     );
-    await h.key('ArrowDown');
-    if (family === 'IBM Plex Mono') await h.key('ArrowDown');
-    await h.key('Enter');
+    const fontMenu = 'document.querySelector(".menu:not(.leaving) [role=menu]")';
+    await wait(`${fontMenu}?.checkVisibility()`);
+    await h.key('ArrowDown', {}, fontMenu);
+    if (family === 'IBM Plex Mono') await h.key('ArrowDown', {}, fontMenu);
+    await h.key('Enter', {}, fontMenu);
     await wait(
       `document.querySelector('[aria-label="${label}"]').textContent.includes('${family}')`,
     );

@@ -18,6 +18,7 @@ function pngText(value) {
 
 // Local-only acceptance service. No production URL or credential is used here.
 export async function startFakeNovelAI() {
+  const heldWaiters = new Set();
   const state = {
     requests: [],
     encodes: [],
@@ -121,6 +122,8 @@ export async function startFakeNovelAI() {
       if (state.requests.length === state.holdAt) {
         await new Promise((resolve) => {
           state.resume = resolve;
+          for (const notify of heldWaiters) notify();
+          heldWaiters.clear();
         });
         state.resume = null;
       }
@@ -138,6 +141,10 @@ export async function startFakeNovelAI() {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   return {
     state,
+    // Tests wait for the exact suspended-request boundary instead of polling
+    // against a short assertion timeout on busy Windows CI runners.
+    waitForHold: () =>
+      state.resume ? Promise.resolve() : new Promise((resolve) => heldWaiters.add(resolve)),
     url: `http://127.0.0.1:${server.address().port}`,
     close: () => new Promise((resolve) => server.close(resolve)),
   };

@@ -113,6 +113,7 @@ async function fixture(run) {
     });
   } finally {
     listeners.clear();
+    service.state.holdAt = 0;
     service.state.resume?.();
     await commands.close();
     await service.close();
@@ -325,7 +326,7 @@ it('refuses deletion while generation is active anywhere in the subtree', () =>
     await call('account.save', { token: 'acceptance-token' }, 'ui');
     service.state.holdAt = 1;
     const job = await call('generate.queue', { tabId: tab.id, count: 1 }, 'ui');
-    await expect.poll(() => typeof service.state.resume).toBe('function');
+    await service.waitForHold();
     expect(
       (await dispatch('branch.delete', { branchId: branch.branchId, confirmed: true })).error.code,
     ).toBe('branch_generating');
@@ -477,7 +478,7 @@ it('refuses version deletion while generating', () =>
     await call('account.save', { token: 'acceptance-token' }, 'ui');
     service.state.holdAt = 1;
     const job = await call('generate.queue', { tabId: tab.id, count: 1 }, 'ui');
-    await expect.poll(() => typeof service.state.resume).toBe('function');
+    await service.waitForHold();
     expect(
       (await dispatch('version.delete', { versionId: first.id, confirmed: true })).error.code,
     ).toBe('branch_generating');
@@ -783,7 +784,7 @@ it('blocks only-version deletion for a queued parent and a version receiving ano
     await call('account.save', { token: 'acceptance-token' }, 'ui');
     service.state.holdAt = 1;
     const active = await call('generate.queue', { tabId: tab.id, count: 2 }, 'ui');
-    await expect.poll(() => typeof service.state.resume).toBe('function');
+    await service.waitForHold();
     await call('version.open', { tabId: tab.id, versionId: second.id });
     const queued = await call('generate.queue', { tabId: tab.id, count: 1 }, 'ui');
     expect(
@@ -793,7 +794,7 @@ it('blocks only-version deletion for a queued parent and a version receiving ano
     const resume = service.state.resume;
     service.state.resume = null;
     resume();
-    await expect.poll(() => typeof service.state.resume).toBe('function');
+    await service.waitForHold();
     const job = (await call('generate.status', { id: active.id })).jobs[0];
     expect(job.versionId).toBeTruthy();
     expect(
@@ -1052,7 +1053,7 @@ it('retains generating and queued targets, then removes canceled and failed empt
     await call('version.open', { tabId: tab.id, versionId: first.id });
     service.state.holdAt = 1;
     const active = await call('generate.start', { tabId: tab.id, count: 1 }, 'ui');
-    await expect.poll(() => typeof service.state.resume).toBe('function');
+    await service.waitForHold();
     await call('version.open', { tabId: tab.id, versionId: second.id });
     const queued = await call('generate.start', { tabId: tab.id, count: 1 }, 'ui');
     expect(queued.state).toBe('queued');
@@ -1136,7 +1137,7 @@ it.each(['file', 'clipboard'])(
       await call('account.save', { token: 'acceptance-token' }, 'ui');
       service.state.holdAt = 1;
       const first = await call('generate.start', { tabId: tab.id, count: 1 }, 'ui');
-      await expect.poll(() => !!service.state.resume).toBe(true);
+      await service.waitForHold();
       const saved = (await call('workbench.get', { tabId: tab.id })).tab;
       const root = database.versions.list(tab.workId)[0];
       expect(saved.source.type).toBe('library');
