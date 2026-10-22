@@ -259,7 +259,15 @@ export async function generationChecks({
   });
   await e(`document.querySelector('.versions .from').click()`);
   await wait(
-    `window.studio.invoke('workbench.list',{}).then(r=>r.data.activeTabId===${JSON.stringify(tabId)})`,
+    `(async()=>{
+      const list=(await window.studio.invoke('workbench.list',{})).data;
+      if(list.activeTabId!==${JSON.stringify(tabId)})return false;
+      const current=(await window.studio.invoke('workbench.get',{tabId:list.activeTabId})).data.tab;
+      return document.querySelector('[data-tab="'+current.id+'"]')?.getAttribute('aria-selected')==='true' &&
+        document.querySelector('.wb-body')?.dataset.projectId===(current.source.projectId||current.project.id) &&
+        !document.querySelector('.versions .from');
+    })()`,
+    '来源作品与当前工作台已完成切换',
   );
   await check(
     '来源标记可以跳回原作品',
