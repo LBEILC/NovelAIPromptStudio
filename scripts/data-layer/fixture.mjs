@@ -95,6 +95,8 @@ export async function seed(directory, count, progress = () => {}, { compact = fa
     // Recreate the pre-generation schema for migration and compatibility checks.
     for (const table of [
       'branch_undo',
+      'saved_works',
+      'detached_images_undo',
       'original_undo',
       'removed_originals',
       'deleted_versions',
@@ -111,7 +113,7 @@ export async function seed(directory, count, progress = () => {}, { compact = fa
     raw.run('DROP TABLE IF EXISTS materials');
     raw.run('DROP TABLE IF EXISTS reference_vibes');
     raw.run(
-      "DELETE FROM app_meta WHERE key IN ('generation_versions_v1','materials_v1','work_originals_v1')",
+      "DELETE FROM app_meta WHERE key IN ('generation_versions_v1','materials_v1','work_originals_v1','saved_works_v1')",
     );
     progress('seed:orphan-metadata');
     raw.run('BEGIN');

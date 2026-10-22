@@ -1,3 +1,4 @@
+import { createWorkSharing } from './workSharing.js';
 import fs from 'node:fs';
 import { hydrateParameters } from './params.js';
 import path from 'node:path';
@@ -266,7 +267,19 @@ export function createVersionStore(connection) {
           .some((image) => !ids.has(image.version_id)),
     );
   }
-  return {
+  let api;
+  const sharing = createWorkSharing(
+    connection,
+    {
+      list,
+      getAny,
+      work: (id) => api.work(id),
+      pruneImages: (...args) => api.pruneImages(...args),
+    },
+    atomic,
+  );
+  return (api = {
+    ...sharing,
     setActiveVersions(ids) {
       activeVersions = new Set(ids);
     },
@@ -427,7 +440,7 @@ export function createVersionStore(connection) {
       const work = connection.prepare('SELECT origin_json FROM works WHERE id=?').get(workId);
       if (
         !work ||
-        !JSON.parse(work.origin_json).blank ||
+        sharing.isSaved(workId) ||
         connection
           .prepare(
             'SELECT 1 FROM version_images vi JOIN work_versions v ON v.id=vi.version_id WHERE v.work_id=?',
@@ -439,6 +452,8 @@ export function createVersionStore(connection) {
         connection.prepare('DELETE FROM work_versions WHERE work_id=?').run(workId);
         connection.prepare('DELETE FROM works WHERE id=?').run(workId);
         connection.prepare('DELETE FROM work_sequences WHERE work_id=?').run(workId);
+        connection.prepare('DELETE FROM work_activity WHERE work_id=?').run(workId);
+        connection.prepare('DELETE FROM work_file_signatures WHERE work_id=?').run(workId);
       });
     },
     subtree(branchId, versionId, only = false) {
@@ -673,6 +688,7 @@ export function createVersionStore(connection) {
         connection
           .prepare('INSERT INTO version_images VALUES (?,?,?,?,?)')
           .run(crypto.randomUUID(), target.id, image.id, String(seed), new Date().toISOString());
+        sharing.save(workId);
         return get(target.id);
       });
     },
@@ -694,5 +710,5 @@ export function createVersionStore(connection) {
           'SELECT vi.project_id, v.work_id, v.number FROM version_images vi JOIN work_versions v ON v.id=vi.version_id',
         )
         .all(),
-  };
+  });
 }

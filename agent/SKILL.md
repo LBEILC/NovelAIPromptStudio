@@ -143,3 +143,11 @@ nai-studio branch.restore --json '{"undo":"UNDO"}'
 `version.delete` 支持 `only: true`：只删除指定版本、保留后续版本，不要求 `confirmed`；返回的 `undo` 仍交给 `branch.restore` 撤销。原图和起点不可使用。
 
 打开图片（`workbench.open`）会回到所属作品和对应版本；打开原图会恢复最近使用的作品及上次查看的版本。需要另起新作品时传 `fresh: true`，例如 `nai-studio workbench.open --json '{"libraryId":"IMAGE","fresh":true}'`。
+
+### 作品归属与共用图片
+
+图片库记录的 `work_refs` 列出已建立的作品及原图／版本图角色。同一张图片可以属于多个作品；用 `workbench.open {libraryId, workId}` 返回指定作品并定位图片，不匹配时按默认规则打开。
+
+`work.save {tabId, expectedRevision}` 将原图保存到图片库并建立作品，返回的 `tab.workSaved` 为真；`workbench.save-to-library` 同样建立作品。仅打开的新作品未保存、未生成时，关闭会丢弃它。
+
+`work.detach-images {workId, imageIds}` 只从指定作品移除图片，不移入回收站，也不影响其他作品。返回一个 `undo` 令牌，可用 `work.restore-detached {undo}` 撤销。需要在所有作品中移入回收站时仍用 `library.trash`，永久删除仍不向 Agent 开放。

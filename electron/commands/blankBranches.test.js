@@ -1256,3 +1256,79 @@ it.each(['blank', 'library', 'legacy'])('does not auto-save a %s work', (kind) =
     expect(imports).toHaveBeenCalledTimes(1); // generated image only
   }),
 );
+
+it('saves shared origins, opens each work explicitly, detaches only one work and restores it', () =>
+  fixture(async ({ call, database, append, restart }) => {
+    const b = (await call('workbench.new', { name: 'Synthetic B' })).tab;
+    const one = append(b.workId, b.versionId, 'shared-one');
+    const two = append(b.workId, one.id, 'shared-two');
+    const three = append(b.workId, two.id, 'shared-three');
+    const imageId = three.images[0].projectId;
+    const a = (await call('work.open-from-image', { versionId: three.id, imageId })).tab;
+    expect(a.workSaved).toBe(false);
+    expect(database.loadProject(imageId).work_refs).toEqual([
+      expect.objectContaining({ workId: b.workId, role: 'version', number: 3 }),
+    ]);
+    const saved = await call('work.save', { tabId: a.id });
+    expect(saved.tab.workSaved).toBe(true);
+    await call('workbench.close', { tabId: a.id });
+    expect(database.versions.work(a.workId)).toBeDefined();
+    await restart();
+    const refs = (await database.loadLibraryCards()).find((p) => p.id === imageId).work_refs;
+    expect(refs).toHaveLength(2);
+    expect(refs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ workId: a.workId, role: 'origin' }),
+        expect.objectContaining({ workId: b.workId, role: 'version' }),
+      ]),
+    );
+    const openedA = (await call('workbench.open', { libraryId: imageId, workId: a.workId })).tab;
+    const openedB = (await call('workbench.open', { libraryId: imageId, workId: b.workId })).tab;
+    expect(openedA).toMatchObject({ workId: a.workId, versionId: a.versionId, workSaved: true });
+    expect(openedB).toMatchObject({
+      workId: b.workId,
+      versionId: three.id,
+      versionImageId: imageId,
+    });
+    const detached = await call('work.detach-images', {
+      workId: a.workId,
+      imageIds: [imageId, one.images[0].projectId],
+    });
+    expect(database.versions.list(a.workId)[0].originState).toBe('removed');
+    expect(database.loadProject(imageId).deleted_at).toBe('');
+    expect(database.loadProject(imageId).work_refs).toHaveLength(1);
+    expect(database.versions.get(one.id)).toBeDefined();
+    expect(await call('work.restore-detached', { undo: detached.undo })).toEqual({
+      restored: true,
+    });
+    expect(database.loadProject(imageId).work_refs).toHaveLength(2);
+    const versionDetached = await call('work.detach-images', {
+      workId: b.workId,
+      imageIds: [imageId],
+    });
+    expect(versionDetached.versions).toHaveLength(1);
+    expect(database.versions.get(three.id)).toBeUndefined();
+    expect(database.loadProject(imageId).work_refs).toEqual([
+      expect.objectContaining({ workId: a.workId, role: 'origin' }),
+    ]);
+    await call('work.restore-detached', { undo: versionDetached.undo });
+    expect(database.versions.get(three.id).images).toEqual(three.images);
+    expect(database.loadProject(imageId).work_refs).toHaveLength(2);
+  }));
+
+it('discards unsaved image works but retains explicitly saved originals with no generated versions', () =>
+  fixture(async ({ call, database, directory }) => {
+    const [file] = await createWorkbenchFixtures(path.join(directory, 'synthetic-unsaved'), {
+      sizes: [[64, 64]],
+    });
+    const temporary = (await call('workbench.open', { path: file })).tab;
+    await call('workbench.close', { tabId: temporary.id });
+    expect(database.versions.work(temporary.workId)).toBeUndefined();
+    const saved = (await call('workbench.open', { path: file })).tab;
+    const document = await call('work.save', { tabId: saved.id });
+    expect(document.tab.workSaved).toBe(true);
+    await call('workbench.close', { tabId: saved.id });
+    expect(database.loadProject(document.tab.project.id).work_refs).toEqual([
+      expect.objectContaining({ workId: saved.workId, role: 'origin' }),
+    ]);
+  }));

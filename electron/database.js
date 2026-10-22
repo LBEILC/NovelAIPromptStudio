@@ -805,6 +805,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     return hydrateParameters({
       ...hydrated,
       ...generatedFields(project.id),
+      work_refs: versionStore.workRefs(project.id).get(project.id) || [],
       ...namingFields(project, metadata),
       group_cover_id: '',
     });
@@ -856,6 +857,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       if (!tagsByProject.has(tag.project_id)) tagsByProject.set(tag.project_id, []);
       tagsByProject.get(tag.project_id).push(tag);
     }
+    const refs = versionStore.workRefs();
     const hydrated = projects.map((project) => {
       const metadata = metadataByProject.get(project.id) || {};
       return {
@@ -863,6 +865,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
         tags: tagsByProject.get(project.id) || [],
         metadata,
         prompt_structure: safeJson(metadata.prompt_structure_json),
+        work_refs: refs.get(project.id) || [],
         ...namingFields(project, metadata),
         group_cover_id: '',
       };
@@ -1374,11 +1377,13 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
         },
       ]),
     );
+    const refs = versionStore.workRefs();
     return rows.map((row) => {
       const entry = cardMemory.get(row.project_id);
       return {
         ...entry.card,
         ...generated.get(row.project_id),
+        work_refs: refs.get(row.project_id) || [],
         group_cover_id: '',
       };
     });

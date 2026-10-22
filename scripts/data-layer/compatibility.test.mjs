@@ -80,9 +80,12 @@ it(
                 .all()
                 .filter(
                   (row) =>
-                    !['generation_versions_v1', 'materials_v1', 'work_originals_v1'].includes(
-                      row.key,
-                    ),
+                    ![
+                      'generation_versions_v1',
+                      'materials_v1',
+                      'work_originals_v1',
+                      'saved_works_v1',
+                    ].includes(row.key),
                 ),
             ).toEqual(
               rows.filter(

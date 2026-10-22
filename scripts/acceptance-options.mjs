@@ -15,6 +15,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
       '全部',
       'Agent',
       '生成',
+      '作品共用',
       '客户端边界',
 
       '客户端控件',

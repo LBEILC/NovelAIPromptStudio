@@ -1,3 +1,4 @@
+import { workSharingChecks } from './workSharing.js';
 import { trayChecks } from './tray.js';
 import { materialsChecks } from './materials.js';
 import { libraryRefinementChecks } from './libraryRefinement.js';
@@ -416,6 +417,7 @@ export async function runAcceptance(context) {
       else if (mode.category === '客户端控件') await clientControlChecks(environment);
       else if (mode.category === '外壳') await shellChecks();
       else if (mode.category === 'Agent') await agentChecks(environment);
+      else if (mode.category === '作品共用') await workSharingChecks(environment);
       else if (mode.category === '生成') await generationChecks(environment);
       else if (mode.category === '内置AI与素材') await materialsChecks(environment);
       else if (mode.category === 'ChatGPT') await chatGPTChecks(environment);
@@ -482,6 +484,7 @@ export async function runAcceptance(context) {
           () => interactionCorrectionChecks(environment),
           () => agentChecks(environment),
           () => generationChecks(environment),
+          () => workSharingChecks(environment),
         ],
       ];
       for (const run of mode.shard ? groups[mode.shard.index - 1] : groups.flat()) await run();

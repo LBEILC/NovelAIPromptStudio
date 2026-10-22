@@ -64,7 +64,18 @@ export async function createCommands(services) {
   const store = await openCommandSession(services.directory, async (source) =>
     hydrateParameters(await services.readSource(source)),
   );
-  const restored = store.get();
+  /** @param {Session} session */
+  const savedSession = (session) => ({
+    ...session,
+    tabs: session.tabs.map((t) => ({
+      ...t,
+      workSaved: services.database.versions?.isSaved(t.workId) || false,
+    })),
+  });
+  services.database.versions?.setWorkNameResolver(
+    () => new Map(store.get().tabs.map((t) => [t.workId, t.displayName])),
+  );
+  const restored = savedSession(store.get());
   for (const t of restored.tabs) {
     if (t.project) t.project = hydrateParameters(t.project);
     if (t.originalProject) t.originalProject = hydrateParameters(t.originalProject);
@@ -99,14 +110,23 @@ export async function createCommands(services) {
     if (!value.project) throw new CommandError('not_found', '这个标签页没有可读取的提示词');
     const refreshed = services.database.vibeLibrary.refresh(value.project);
     return {
-      tab: { ...value, project: refreshed },
+      tab: {
+        ...value,
+        workSaved: services.database.versions?.isSaved(value.workId) || false,
+        project: refreshed,
+      },
       document: createPromptDocument(refreshed),
       revision: value.revision || 0,
     };
   };
   /** @param {Partial<import('../../src/shared/commands').WorkbenchCommandEvent>} [extra] */
   const emit = (extra = {}) =>
-    services.emit?.({ type: 'workbench', session: store.get(), source: source(), ...extra });
+    services.emit?.({
+      type: 'workbench',
+      session: savedSession(store.get()),
+      source: source(),
+      ...extra,
+    });
   /** @param {EditingTarget} target */
   const unlocked = (target) => {
     if (
@@ -207,7 +227,7 @@ export async function createCommands(services) {
       origin.path = image.image_path;
       const fresh = /** @type {{fresh?: boolean}} */ (input).fresh;
       if (!fresh) {
-        const reopened = await generation.openSource?.(origin, image);
+        const reopened = await generation.openSource?.(origin, image, input.workId);
         if (reopened) return reopened;
       }
       const session = store.get();
@@ -237,7 +257,12 @@ export async function createCommands(services) {
       revision(input.expectedRevision, value.revision || 0);
       unlocked(input);
       if (!value.project) throw new CommandError('not_found', '图片源已不可用');
+      await generation.initialize?.(value);
       return saveWorkbenchImage({ services, store, emit }, value);
+    },
+    'work.save': async (input) => {
+      await handlers['workbench.save-to-library']?.(input, { source: source() });
+      return full(tab(input.tabId));
     },
     'prompt.set': (input) =>
       edit(input, (doc) => {
@@ -503,15 +528,17 @@ export async function createCommands(services) {
         revision: store.revision(),
       };
     },
-    'workbench.session': (input) => store.migrate(input),
+    'workbench.session': async (input) => savedSession(await store.migrate(input)),
     'workbench.commit': async (input) => {
       const previous = store.get();
       const next = mergeSession(previous, input.base, input.next);
       await store.save(next);
+      for (const old of previous.tabs)
+        if (!next.tabs.some((t) => t.id === old.id)) generation.discardEmpty?.(old.workId);
       const active = next.tabs.find((t) => t.id === next.activeTabId);
       if (active?.workId && previous.activeTabId !== next.activeTabId)
         services.database.versions.touch(active.workId, active.versionId);
-      return store.get();
+      return savedSession(store.get());
     },
     'workbench.editing': (input) => {
       editing = input.targets;
@@ -529,7 +556,7 @@ export async function createCommands(services) {
       await store.save(next);
       undo.delete(input.undoId);
       emit({ tabId: item.tabId });
-      return store.get();
+      return savedSession(store.get());
     },
   };
   const generation = generationCommands({ services, store, tab, revision, unlocked, emit });

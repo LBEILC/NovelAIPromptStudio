@@ -1,3 +1,4 @@
+import { deleteLibraryImages } from './deleteLibraryImages.js';
 import { createTray } from './tray.js';
 import { installWindowClose } from './windowClose.js';
 import { isTrayContents, sendWindowEvent } from './windowAccess.js';
@@ -74,7 +75,6 @@ import {
   copyManagedImageToClipboard,
   copyOriginalAsset,
   copyOriginalImage,
-  removeManagedAsset,
   resolveImageFile,
   resolveManagedAsset,
 } from './assetFiles.js';
@@ -1118,39 +1118,9 @@ app.whenReady().then(async () => {
     if (activeImports.size) return { ok: false, error: '请等待当前图片导入完成后再永久删除' };
     if (permanentDeletionActive) return { ok: false, error: '永久删除正在进行，请稍候' };
     permanentDeletionActive = true;
-    const results = { success: [], skipped: [], failed: [] };
     try {
-      for (const id of [...new Set(ids.map(String).filter(Boolean))]) {
-        const project = database.loadProject(id);
-        if (!project) {
-          results.skipped.push(id);
-          continue;
-        }
-        if (!project.deleted_at) {
-          results.failed.push({ id, error: '图片尚未进入回收站' });
-          continue;
-        }
-        try {
-          for (const filePath of [project.thumbnail_path, project.image_path])
-            removeManagedAsset(assetsDirectory, filePath);
-          database.deleteProject(id);
-          results.success.push(id);
-        } catch (error) {
-          const remainingFiles = [project.thumbnail_path, project.image_path].filter((filePath) => {
-            try {
-              return fs.existsSync(filePath);
-            } catch {
-              return false;
-            }
-          });
-          results.failed.push({
-            id,
-            error: error instanceof Error ? error.message : String(error),
-            remainingFiles,
-          });
-        }
-      }
-      return { ok: true, results, summary: batchSummary(results) };
+      const { results, keptFiles } = deleteLibraryImages(database, assetsDirectory, ids);
+      return { ok: true, results, summary: batchSummary(results), keptFiles };
     } finally {
       permanentDeletionActive = false;
     }

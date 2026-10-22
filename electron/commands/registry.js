@@ -722,9 +722,13 @@ export function validateCommand(name, input, source) {
     throw new CommandError('forbidden', '这个命令只供软件界面使用');
   if (
     source === 'agent' &&
-    !['version.delete', 'branch.delete', 'branch.restore', 'work.restore-original'].includes(
-      name,
-    ) &&
+    ![
+      'version.delete',
+      'branch.delete',
+      'branch.restore',
+      'work.restore-original',
+      'work.restore-detached',
+    ].includes(name) &&
     (/^(settings?|preferences?|keys?|secrets?|account|generation)\./i.test(name) ||
       /(?:permanent|empty|delete|purge|restore)/i.test(name))
   )

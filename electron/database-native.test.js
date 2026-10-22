@@ -98,7 +98,7 @@ describe('native engine upgrade', () => {
           has_custom_name: false,
         }));
       const originalFields = (records) =>
-        records.map(({ params, references, keptParameters, ...record }) => record);
+        records.map(({ params, references, keptParameters, work_refs, ...record }) => record);
       expect(originalFields(database.loadLibrary())).toEqual(withNaming(expected.library));
       expect(originalFields(database.loadLibrary('trash'))).toEqual(withNaming(expected.trash));
       inspect(directory, (raw) => {
@@ -114,6 +114,8 @@ describe('native engine upgrade', () => {
             'branch_undo',
             'original_undo',
             'removed_originals',
+            'saved_works',
+            'detached_images_undo',
             'deleted_versions',
             'deferred_version_prunes',
             'work_sequences',
@@ -138,6 +140,7 @@ describe('native engine upgrade', () => {
                       'generation_versions_v1',
                       'materials_v1',
                       'work_originals_v1',
+                      'saved_works_v1',
                     ].includes(row.key),
                 )
               : actual,

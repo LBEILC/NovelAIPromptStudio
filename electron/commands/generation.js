@@ -244,7 +244,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     },
   });
   const full = (current) => ({
-    tab: current,
+    tab: { ...current, workSaved: versions.isSaved(current.workId) },
     document: createPromptDocument(current.project),
     revision: current.revision || 0,
   });
@@ -409,6 +409,39 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     return { ...counts, cancelledJobs: pending.length, undo };
   }
   const handlers = {
+    'work.detach-images': async ({ workId, imageIds }) => {
+      const result = versions.detachImages(workId, imageIds);
+      const session = store.get();
+      retreatDeleted(session);
+      try {
+        await store.save(session);
+      } catch (error) {
+        versions.restoreDetached(result.undo);
+        throw error;
+      }
+      services.database.refreshGeneratedCards();
+      emit({ libraryChanged: true });
+      return {
+        undo: result.undo,
+        versions: result.versions.map((v) => ({
+          workName:
+            session.tabs.find((t) => t.workId === v.workId)?.displayName ||
+            versions.work(v.workId)?.origin.name ||
+            '',
+          number: v.number,
+          branchName: v.branchName,
+          lastOfBranch: !versions
+            .list(v.workId)
+            .some((other) => other.branchNumber === v.branchNumber),
+        })),
+      };
+    },
+    'work.restore-detached': ({ undo }) => {
+      const restored = versions.restoreDetached(undo);
+      services.database.refreshGeneratedCards();
+      emit({ libraryChanged: true });
+      return { restored };
+    },
     'work.remove-original': async (input) => {
       const current = tab(input.tabId);
       revision(input.expectedRevision, current.revision || 0);
@@ -692,7 +725,19 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     handlers,
     initialize: ensure,
     ready: settlePruned,
-    async openSource(source, image) {
+    async openSource(source, image, requestedWorkId) {
+      if (requestedWorkId && source.type === 'library') {
+        const ref = versions
+          .workRefs()
+          .get(source.projectId)
+          ?.find((r) => r.workId === requestedWorkId);
+        if (ref)
+          return handlers['work.open']({
+            workId: requestedWorkId,
+            versionId: ref.role === 'origin' ? versions.list(requestedWorkId)[0].id : ref.versionId,
+            imageId: source.projectId,
+          });
+      }
       const generated = source.type === 'library' && versions.forImage(source.projectId);
       if (generated)
         return handlers['work.open']({
