@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import { parsePrompt } from '../../src/lib/prompt.js';
 import { createPromptStructure } from '../../src/lib/promptStructure.js';
 
@@ -72,7 +73,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
   };
   const grouping = async (name) => {
     await click('视图');
-    await click(name, 'document.querySelector("[role=radiogroup][aria-label=合并方式]")');
+    await selectGalleryGrouping(h, name);
     await h.key('Escape', {}, 'document.activeElement');
     await wait(
       '!document.querySelector(".popover:not(.leaving)") && !document.querySelector("[data-library-updating=true]")',

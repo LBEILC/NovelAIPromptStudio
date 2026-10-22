@@ -16,25 +16,17 @@ export async function scrollChecks(h, selector) {
     `(()=>{const n=${thumb},r=n.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===n})()`,
     '细条已可接收拖动',
   );
-  const point = await e(
-    `(()=>{const r=${thumb}.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`,
-  );
-  const mouse = (type, y) =>
-    h.window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
-      type,
-      x: point.x,
-      y,
-      button: type === 'mouseMoved' ? 'none' : 'left',
-      buttons: type === 'mouseReleased' ? 0 : 1,
-      clickCount: 1,
-    });
-  await mouse('mousePressed', point.y);
+  // Dispatch the drag in one renderer turn so layout changes between IPC calls
+  // cannot move the thumb away from a previously sampled screen coordinate.
   const pressed = await e(
-    `({dragging:${thumb}.dataset.dragging,hit:document.elementFromPoint(${point.x},${point.y})?.className,top:${node}.scrollTop})`,
+    `(()=>{const n=${thumb},r=n.getBoundingClientRect(),y=r.y+r.height/2;
+      n.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,clientY:y}));
+      const pressed={dragging:n.classList.contains('drag'),top:${node}.scrollTop};
+      window.dispatchEvent(new PointerEvent('pointermove',{clientY:y+40}));
+      window.dispatchEvent(new PointerEvent('pointerup',{button:0,clientY:y+40}));
+      n.dispatchEvent(new PointerEvent('pointerleave'));
+      return pressed;})()`,
   );
-  await mouse('mouseMoved', point.y + 40);
-  await mouse('mouseReleased', point.y + 40);
-  await e(`${thumb}.dispatchEvent(new PointerEvent('pointerleave'))`);
   await check('拖动细条能滚动内容', `${node}.scrollTop>100`, async () => ({
     pressed,
     current: await e(

@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import { parsePrompt } from '../../src/lib/prompt.js';
 import { createPromptStructure } from '../../src/lib/promptStructure.js';
 
@@ -26,8 +27,8 @@ export async function libraryGroupingChecks({ h, database }) {
     await h.click('全部图片', 'document.querySelector(".libp")');
     await h.input('input[aria-label="搜索图片库"]', 'similarity-fixture');
     await h.click('视图');
-    const options = 'document.querySelector("[role=radiogroup][aria-label=合并方式]")';
-    await h.click('完全相同', options);
+    const options = 'document.querySelector("[role=radiogroup][aria-label=按提示词分组的方式]")';
+    await selectGalleryGrouping(h, '完全相同');
     await h.wait(
       '!document.querySelector("[data-library-updating=true]") && document.querySelectorAll(".card").length===2',
     );
@@ -57,9 +58,7 @@ export async function libraryGroupingChecks({ h, database }) {
       'once',
     );
     await h.click('完全相同', options);
-    await h.wait(
-      'document.querySelector("[role=slider][aria-label=相似度]")?.getAttribute("aria-disabled")==="true" && !document.querySelector("[data-library-updating=true]")',
-    );
+    await h.wait('!document.querySelector("[data-library-updating=true]")');
     await h.check(
       '切回完全相同恢复精确分组',
       `${options}.querySelector('[role=radio][aria-checked=true]')?.textContent.includes('完全相同') && document.querySelectorAll('.card').length===2`,

@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 export async function collectionContext(h, id, action) {
   await h.evaluate(
     `document.querySelector('[data-key="sv-${id}"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:80,clientY:180}))`,
@@ -71,7 +72,7 @@ export async function libraryFinishChecks({
   });
   await refresh();
   await click('视图', scope);
-  await click('不合并', popup);
+  await selectGalleryGrouping(h, '不合并');
   await key('Escape');
   await click(legacy.name, scope);
   await wait('document.querySelectorAll(".card").length===1');

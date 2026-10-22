@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
@@ -42,7 +43,7 @@ async function prepare(env, isolated = false) {
   await env.h.click('全部图片', 'document.querySelector(".libp")');
   await env.h.wait('document.querySelectorAll(".card").length > 0');
   await env.h.click('视图', 'document.querySelector(".libp")');
-  await env.h.click('不合并', 'document.querySelector("[aria-label=合并方式]")');
+  await selectGalleryGrouping(env.h, '不合并');
   await env.h.key('Escape', {}, 'document.activeElement');
   await env.h.input('[aria-label="搜索图片库"]', prefix);
   if (isolated) {

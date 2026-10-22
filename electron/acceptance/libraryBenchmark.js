@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { harness } from './harness.js';
@@ -49,7 +50,7 @@ export async function runLibraryBenchmark({ mode, preferences, createWindow, dat
     }
     const coldOpenMs = performance.now() - navigationStart;
     await h.click('视图');
-    await h.click('不合并');
+    await selectGalleryGrouping(h, '不合并');
     await h.key('Escape');
     await h.wait('!document.querySelector("[data-library-updating=true]")');
     await h.evaluate(

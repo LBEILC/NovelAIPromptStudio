@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryGroupingChecks } from './libraryGrouping.js';
 import { libraryViewerChecks } from './libraryViewer.js';
@@ -87,7 +88,7 @@ export async function libraryChecks(env) {
   };
   const setGrouping = async (label) => {
     await click('视图', scope);
-    await click(label, 'document.querySelector("[role=radiogroup][aria-label=合并方式]")');
+    await selectGalleryGrouping(h, label);
     await closePopover();
     await wait('document.querySelectorAll(".card").length>0');
   };

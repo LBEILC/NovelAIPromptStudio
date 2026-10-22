@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { mediaUrl } from '../../src/lib/imageStage.js';
@@ -42,7 +43,7 @@ export async function libraryViewerChecks({ h, database, mode }) {
     await h.click('视图');
     await h.evaluate('document.querySelector("[data-trigger=lsort]").click()');
     await h.click('最近导入的在前');
-    await h.click('完全相同', 'document.querySelector("[role=radiogroup][aria-label=合并方式]")');
+    await selectGalleryGrouping(h, '完全相同');
     await h.key('Escape');
     await h.wait(
       '!document.querySelector("[data-library-updating=true]") && document.querySelectorAll(".card").length===3',

@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { clipboard } from 'electron';
@@ -78,7 +79,7 @@ async function library(h, query, grouping = '不合并') {
   await h.click('全部图片', 'document.querySelector(".libp")');
   await h.input('[aria-label="搜索图片库"]', query);
   await h.click('视图', 'document.querySelector(".libp")');
-  await h.click(grouping, 'document.querySelector("[aria-label=合并方式]")');
+  await selectGalleryGrouping(h, grouping);
   await h.key('Escape', {}, 'document.activeElement');
   await h.wait('document.querySelectorAll(".card").length>0');
 }

@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import fs from 'node:fs';
 import { clipboard } from 'electron';
 import path from 'node:path';
@@ -749,7 +750,7 @@ export async function generationChecks({
     await click('全部图片', 'document.querySelector(".libp")');
     await input('[aria-label="搜索图片库"]', query);
     await click('视图', 'document.querySelector(".libp")');
-    await click('不合并', 'document.querySelector("[aria-label=合并方式]")');
+    await selectGalleryGrouping(h, '不合并');
     await h.key('Escape');
     const card = `[data-group-id="project:${id}"]`;
     await wait(`!!document.querySelector(${JSON.stringify(card)})`, '待恢复作品的图库图片可见');

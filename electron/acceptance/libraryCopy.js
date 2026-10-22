@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import path from 'node:path';
 import { clipboard } from 'electron';
 import { formatPositivePromptForCopy, getPromptScopes } from '../../src/lib/promptStructure.js';
@@ -23,7 +24,7 @@ export async function libraryCopyChecks(env) {
   };
   await click('图片库', 'document.querySelector(".tb")');
   await click('视图', 'document.querySelector(".libp")');
-  await click('不合并', 'document.querySelector("[role=radiogroup][aria-label=合并方式]")');
+  await selectGalleryGrouping(h, '不合并');
   await h.key('Escape');
   const selectCard = async () => {
     await e('document.querySelector(".card").click()');

@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { project } from '../../scripts/data-layer/fixture.mjs';
@@ -104,7 +105,7 @@ export async function runCommandBenchmark({ mode, database, createWindow, prefer
       '!!document.querySelector(".card")&&!document.querySelector("[data-library-updating=true]")',
     );
     await h.click('视图');
-    await h.click('不合并');
+    await selectGalleryGrouping(h, '不合并');
     await h.key('Escape');
     await h.wait('!document.querySelector("[data-library-updating=true]")');
     samples.filter = await e(

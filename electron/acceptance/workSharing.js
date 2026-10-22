@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import path from 'node:path';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { importLibraryFiles } from '../importer.js';
@@ -65,7 +66,7 @@ export async function workSharingChecks({ h, mode, database, preferences }) {
   await h.click('全部图片', 'document.querySelector(".libp")');
   await h.input('[aria-label="搜索图片库"]', 'synthetic-shared-060');
   await h.click('视图', 'document.querySelector(".libp")');
-  await h.click('按作品', 'document.querySelector("[aria-label=合并方式]")');
+  await selectGalleryGrouping(h, '按作品');
   await h.click('最新生成', 'document.querySelector("[aria-label=封面]")');
   await h.key('Escape');
   const selector = (id) => `[data-group-id="work:${id}"]`;

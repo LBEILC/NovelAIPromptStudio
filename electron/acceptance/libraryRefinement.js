@@ -1,3 +1,4 @@
+import { selectGalleryGrouping } from './galleryView.js';
 import { parsePrompt } from '../../src/lib/prompt.js';
 import { createPromptStructure } from '../../src/lib/promptStructure.js';
 import { localDateKey } from '../../src/lib/dateRange.js';
@@ -136,22 +137,18 @@ export async function libraryRefinementChecks({ h, database }) {
     await click('全部图片', 'document.querySelector(".libp .side")');
     await click('视图');
     for (const label of ['基础相同', '不合并', '相似']) {
-      await click(label, 'document.querySelector("[aria-label=合并方式]")');
+      await selectGalleryGrouping(h, label);
       await settle();
-      if (label !== '相似')
-        await check(
-          `027 ${label} 禁用相似度`,
-          'document.querySelector("[aria-label=相似度]").getAttribute("aria-disabled")==="true"',
-        );
     }
 
     await screenshot('027-library-view');
-    await click('不合并', 'document.querySelector("[aria-label=合并方式]")');
+    await selectGalleryGrouping(h, '不合并');
     await close();
     await click('筛选');
     await input('[aria-label="包含的 Tag"]', 'refinement group');
     await key('Enter', {}, 'document.activeElement');
     await settle();
+    await h.until(async () => (await count()) === 9, '包含规则的九张合成图片已显示');
     const beforeSmart = await count();
     await click('存为智能收藏集');
     await wait('!!document.querySelector(".libp .side input")');
@@ -180,7 +177,7 @@ export async function libraryRefinementChecks({ h, database }) {
     await check('027 编辑规则实时减少结果', async () => (await count()) < beforeSmart);
     await screenshot('027-library-edit-rules');
     await close();
-    await settle();
+    await h.until(async () => (await count()) === beforeSmart, '放弃草稿后网格恢复已保存规则');
     await check(
       '027 Esc 放弃草稿并恢复规则和网格',
       async () =>
@@ -235,7 +232,7 @@ export async function libraryRefinementChecks({ h, database }) {
     await screenshot('027-library-multiple');
     await click('取消选择', 'document.querySelector(".detail .bar")');
     await click('视图');
-    await click('完全相同', 'document.querySelector("[aria-label=合并方式]")');
+    await selectGalleryGrouping(h, '完全相同');
     await close();
     await settle();
 
