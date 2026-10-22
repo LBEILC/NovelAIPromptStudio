@@ -295,7 +295,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     for (let i = 0; i < 2; i++) {
       await e(`document.querySelectorAll('.lstrip img')[${i}].click()`);
       await wait(
-        `document.querySelector('.lstrip img:nth-child(${i + 1})')?.classList.contains('is-cur')`,
+        `document.querySelectorAll('.lstrip img')[${i}]?.classList.contains('is-cur')`,
       );
       stripNames.push(await e('document.querySelector(".lname").textContent'));
     }
