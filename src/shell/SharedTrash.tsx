@@ -4,6 +4,7 @@
 import { useRef, useState } from 'react';
 import { Dialog } from '../kit/dialog';
 import type { WorkRef } from '../shared/types';
+import { namedWork, workLabel } from '../lib/workNames';
 
 export type TrashChoice = 'cancel' | 'detach' | 'trash';
 type Ask = {
@@ -14,10 +15,12 @@ type Ask = {
   /** 在哪个作品里删的（图片库的作品组、工作台的标签页）；没有作品上下文时只能移入回收站 */
   workId?: string;
 };
-type Shown = { title: string; body: string; detach: string; trash: string; context?: string };
+type Shown = { title: string; body: string; detach: string; trash: string };
 
+// 没起名的作品不写名字（名字就是原图文件名，多半是哈希）：说"另一个作品"
 const role = (r: WorkRef) =>
-  `「${r.workName}」${r.role === 'origin' ? '的原图' : `第 ${r.number} 版的图`}`;
+  workLabel(r.workName, '另一个作品') +
+  (r.role === 'origin' ? '的原图' : `${namedWork(r.workName) ? '' : '的'}第 ${r.number} 版的图`);
 
 /** ask() 返回用户的选择和共用的那几张；没有共用的直接返回 trash，不弹框 */
 export function useSharedTrash() {
@@ -36,16 +39,28 @@ export function useSharedTrash() {
     );
     if (!shared.length) return Promise.resolve({ choice: 'trash', shared });
     const refs = shared.flatMap((id) => refsOf(id) || []);
-    const here = refs.find((r) => r.workId === workId);
-    const elsewhere = [...new Set(refs.filter((r) => r.workId !== workId).map((r) => r.workName))];
+    const here = refs.some((r) => r.workId === workId);
+    // 有作品上下文时只说别处；当前这个作品不再列一遍
+    const elsewhere = refs.filter((r) => r.workId !== workId);
+    const otherWorks = new Map(elsewhere.map((r) => [r.workId, r.workName]));
+    const names = [...otherWorks.values()];
+    const allNamed = names.every((n) => namedWork(n)) && names.length <= 2;
     const rest = ids.length - shared.length;
     const one = shared.length === 1;
-    const title = one
-      ? `这张图也在「${elsewhere.join('」「')}」里`
-      : `其中 ${shared.length} 张也在别的作品里`;
+    const where = allNamed ? `「${names.join('」「')}」` : '别的作品';
+    const title = workId
+      ? one
+        ? `这张图也在${where}里`
+        : `其中 ${shared.length} 张也在${where}里`
+      : one
+        ? `这张图在 ${otherWorks.size} 个作品里`
+        : `其中 ${shared.length} 张在几个作品里`;
+    const roles = [...new Set((one ? elsewhere : []).map(role))];
     const body = one
-      ? `它是${(refsOf(shared[0]) || []).map(role).join('，也是')}。`
-      : `这几张也在「${elsewhere.join('」「')}」里。`;
+      ? `它${workId ? '也' : ''}是${roles.join('，也是')}。`
+      : allNamed
+        ? `这几张也在${where}里。`
+        : `这几张也在另外 ${otherWorks.size} 个作品里。`;
     return new Promise((resolve) => {
       answer.current = (choice) => resolve({ choice, shared });
       setShown({
@@ -53,9 +68,9 @@ export function useSharedTrash() {
         body: workId
           ? `${body}${rest ? `其余 ${rest} 张照常移入回收站。` : ''}`
           : `${body}移入回收站后各处都没有了。`,
-        detach: here ? `只从「${here.workName}」里去掉` : '',
+        // 按钮不带作品名：名字可能很长，弹框里"这个作品"已经清楚
+        detach: here ? '只从这个作品里去掉' : '',
         trash: one ? '移入回收站' : '全部移入回收站',
-        context: here?.workName,
       });
     });
   };

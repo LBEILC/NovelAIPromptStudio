@@ -23,6 +23,7 @@ import { Tools } from './Tools';
 import { Grid, type GalleryDisplay } from './Grid';
 import { normalizeGalleryDisplay } from '../lib/gallery.js';
 import { useSharedTrash } from '../shell/SharedTrash';
+import { workLabel } from '../lib/workNames';
 
 const GALLERY_DISPLAY_KEY = 'novelai-prompt-studio.gallery-display.v1';
 import { Detail } from './Detail';
@@ -218,7 +219,8 @@ export default function GalleryPage(
       return !ids.length && records.length
         ? [
             {
-              label: records.length === 1 ? `放回「${records[0].workName}」` : '放回',
+              label:
+                records.length === 1 ? `放回${workLabel(records[0].workName, '作品')}` : '放回',
               onSelect: () => void p.onPutBack?.(records),
             },
             'sep',

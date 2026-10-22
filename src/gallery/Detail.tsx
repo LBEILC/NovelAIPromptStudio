@@ -21,6 +21,7 @@ const ratioOf = (m: { metadata?: { width?: number | null; height?: number | null
   return width && height ? Math.min(2, Math.max(0.5, width / height)) : 832 / 1216;
 };
 import { WORK_ICON, stillIn } from './Grid';
+import { workLabel } from '../lib/workNames';
 
 export { CAT_VAR, CAT_NAME } from '../kit/categories';
 import { CAT_VAR, CAT_NAME } from '../kit/categories';
@@ -231,7 +232,8 @@ function One({
           </span>
           {gone ? (
             <span className="meta">
-              {gone.detachedAt.slice(0, 10)} 已从「{gone.workName}」里去掉 · {stillIn(gone)}
+              {gone.detachedAt ? `${gone.detachedAt.slice(0, 10)} ` : ''}已从
+              {workLabel(gone.workName, '作品')}里去掉 · {stillIn(gone)}
             </span>
           ) : (
             <span className="meta">
@@ -260,7 +262,8 @@ function One({
               }}
             >
               <Icon name={WORK_ICON} />
-              也是「{r.workName}」的{r.role === 'origin' ? '原图' : `第 ${r.number} 版`}
+              也是{workLabel(r.workName, '另一个作品')}的
+              {r.role === 'origin' ? '原图' : `第 ${r.number} 版`}
             </button>
           ))}
         </div>
@@ -269,7 +272,7 @@ function One({
             <>
               <button className="btn quiet sm" onClick={() => void p.onPutBack?.([gone])}>
                 <Icon name="arrow-go-back-line" />
-                放回「{gone.workName}」
+                放回{workLabel(gone.workName, '作品')}
               </button>
               <span className="sp" />
               {/* 不叫"永久删除"：只丢掉这条记录，图还在别的作品里，什么都不从磁盘删 */}

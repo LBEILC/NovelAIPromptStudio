@@ -3,6 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { importLibraryFiles } from '../importer.js';
+import { isUnnamedImage } from '../../src/lib/imageNaming.js';
 
 export async function workSharingChecks({ h, mode, database, preferences }) {
   h.category('作品共用');
@@ -149,7 +150,7 @@ export async function workSharingChecks({ h, mode, database, preferences }) {
     `document.querySelector(${JSON.stringify(selector(a.workId))}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:200,clientY:200}))`,
   );
   await h.click('移入回收站', 'document.querySelector("[role=menu]:not(.leaving *)")');
-  await h.click(`只从「${openedA.displayName}」里去掉`, 'document.querySelector("[role=dialog]")');
+  await h.click('只从这个作品里去掉', 'document.querySelector("[role=dialog]")');
   await h.wait(
     `window.studio.invoke('library.get',{id:${JSON.stringify(imageId)}}).then(r=>r.data.project.work_refs.length===1)`,
     'A 的引用已移除',
@@ -180,10 +181,7 @@ export async function workSharingChecks({ h, mode, database, preferences }) {
       `document.querySelector(${JSON.stringify(selector(a.workId))}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:200,clientY:200}))`,
     );
     await h.click('移入回收站', 'document.querySelector("[role=menu]:not(.leaving *)")');
-    await h.click(
-      `只从「${openedA.displayName}」里去掉`,
-      'document.querySelector("[role=dialog]")',
-    );
+    await h.click('只从这个作品里去掉', 'document.querySelector("[role=dialog]")');
     await h.wait(
       `window.studio.invoke('trash.detached',{}).then(r=>r.data.items.some(x=>x.workId===${JSON.stringify(a.workId)}))`,
       '去掉记录已保存',
@@ -210,7 +208,8 @@ export async function workSharingChecks({ h, mode, database, preferences }) {
     `(${firstCard}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:200,clientY:200}))`,
   );
   await h.click(
-    `放回「${openedA.displayName}」`,
+    // 没起名的作品不写名字（1.6.0）
+    isUnnamedImage(openedA.displayName) ? '放回作品' : `放回「${openedA.displayName}」`,
     'document.querySelector("[role=menu]:not(.leaving *)")',
   );
   await h.wait(

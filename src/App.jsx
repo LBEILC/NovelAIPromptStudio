@@ -100,6 +100,7 @@ import {
 import { writeGalleryGrouping } from './lib/galleryGrouping.js';
 import { useStudioReducedMotion } from './lib/motion.js';
 import { trashNotice } from './lib/trashNotice';
+import { workLabel } from './lib/workNames';
 import { CloseAsk } from './shell/CloseAsk';
 import {
   moveOverviewTags,
@@ -1323,7 +1324,7 @@ export default function App() {
       try {
         const result = await invokeUI('work.restore-detached', { undo: record.undo });
         if (result?.restored) back.push(record);
-        else failed.push(`「${record.workName}」已经不在了`);
+        else failed.push(`${workLabel(record.workName, '那个作品')}已经不在了`);
       } catch (error) {
         failed.push(error instanceof Error ? error.message : String(error));
       }
@@ -1333,13 +1334,13 @@ export default function App() {
     await reloadAfterGalleryAction();
     if (failed.length) showToast(`放回失败：${[...new Set(failed)].join('；')}`, 'error');
     if (!back.length) return;
-    const works = [...new Set(back.map((r) => r.workName))];
+    const works = [...new Set(back.map((r) => r.workId))];
     notify({
       tone: 'success',
       text:
         back.length === 1
-          ? `已放回「${back[0].workName}」`
-          : `已放回 ${back.length} 张${works.length === 1 ? `到「${works[0]}」` : ''}`,
+          ? `已放回${workLabel(back[0].workName, '作品')}`
+          : `已放回 ${back.length} 张${works.length === 1 ? `到${workLabel(back[0].workName, '作品')}` : ''}`,
       action: {
         label: '撤销',
         onClick: async () => {

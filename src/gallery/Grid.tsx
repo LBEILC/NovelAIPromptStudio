@@ -25,6 +25,7 @@ import {
 import { GENERATED } from './Side';
 import type { LibraryGroup, LibraryProps } from '../library/types';
 import type { DetachedRecord, LibraryCard } from '../shared/types';
+import { namedWork, workLabel } from '../lib/workNames';
 
 const cardRatio = (c: LibraryCard) => {
   const { width, height } = c.metadata;
@@ -45,14 +46,21 @@ export const WORK_ICON = 'git-branch-line';
 export const stillIn = (r: DetachedRecord) => {
   const refs = r.image.work_refs || [];
   return refs.length
-    ? refs
-        .map((x) =>
-          x.role === 'origin' ? `「${x.workName}」的原图` : `「${x.workName}」第 ${x.number} 版`,
-        )
-        .join('、') + '里还在'
+    ? [
+        ...new Set(
+          refs.map(
+            (x) =>
+              workLabel(x.workName, '另一个作品') +
+              (x.role === 'origin'
+                ? '的原图'
+                : `${namedWork(x.workName) ? '' : '的'}第 ${x.number} 版`),
+          ),
+        ),
+      ].join('、') + '里还在'
     : '图片库里还在';
 };
-const detachedTip = (r: DetachedRecord) => `只从「${r.workName}」里去掉，${stillIn(r)}`;
+const detachedTip = (r: DetachedRecord) =>
+  `只从${workLabel(r.workName, '一个作品')}里去掉，${stillIn(r)}`;
 const thumb = (c: Pick<LibraryCard, 'thumbnail_path' | 'image_path'>) =>
   mediaUrl(c.thumbnail_path || c.image_path);
 
