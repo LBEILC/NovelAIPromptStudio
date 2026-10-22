@@ -301,6 +301,7 @@ export function createVersionStore(connection) {
         const root = list(workId)[0];
         if (!root || root.parentId || root.project.blank) return;
         const fields = {
+          autoSaveOriginal: false,
           id: image.id,
           image_path: image.image_path,
           thumbnail_path: image.thumbnail_path,

@@ -11,6 +11,7 @@ import { createBlankProject, readWorkbenchImage } from '../workbench.js';
 import { startFakeNovelAI } from '../fixtures/novelAIService.js';
 import { MODEL_ORDER } from '../../src/shared/params.ts';
 import { createWorkbenchFixtures } from '../acceptance/workbenchFixtures.js';
+import { importLibraryFiles } from '../importer.js';
 
 async function fixture(run) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-blank-branches-'));
@@ -94,6 +95,7 @@ async function fixture(run) {
   };
   try {
     await run({
+      services,
       directory,
       database,
       preferences,
@@ -1018,7 +1020,7 @@ it('persists a clipboard original across closing and rebinds the root when saved
     });
     const { tab } = await call('workbench.open', { path: file });
     const root = database.versions.list(tab.workId)[0];
-    expect(root.project.image_path).not.toBe(file);
+    expect(root.project.image_path).toBe(file);
     await fs.access(root.project.image_path);
     await call('prompt.set', {
       tabId: tab.id,
@@ -1034,7 +1036,7 @@ it('persists a clipboard original across closing and rebinds the root when saved
     expect(database.versions.work(tab.workId).origin.image_path).toBe(saved.project.image_path);
     await call('workbench.close', { tabId: tab.id });
     await fs.unlink(file);
-    await fs.access(root.project.image_path);
+    await fs.access(saved.project.image_path);
     const reopened = await call('workbench.open', { libraryId: saved.project.id });
     expect(reopened.tab.workId).toBe(tab.workId);
     expect(reopened.tab.project.metadata.prompt_raw).toBe('synthetic saved original draft');
@@ -1119,3 +1121,138 @@ it('finishes deferred pruning after shutdown and image purging without migrating
     expect(database.versions.get(target.id)).toBeUndefined();
     expect(database.versions.get(oldEmpty.id)).toBeDefined();
   }));
+
+it.each(['file', 'clipboard'])(
+  'saves a new %s original once before generation, including after restart',
+  (type) =>
+    fixture(async ({ directory, call, database, services, service, waitJob, restart }) => {
+      const [file] = await createWorkbenchFixtures(path.join(directory, 'workbench-temp'), {
+        sizes: [[64, 64]],
+      });
+      const originalBytes = await fs.readFile(file);
+      const imports = vi.spyOn(services, 'importImage');
+      const { tab } = await call('workbench.open', { source: { type, path: file } }, 'ui');
+      await restart();
+      await call('account.save', { token: 'acceptance-token' }, 'ui');
+      service.state.holdAt = 1;
+      const first = await call('generate.start', { tabId: tab.id, count: 1 }, 'ui');
+      await expect.poll(() => !!service.state.resume).toBe(true);
+      const saved = (await call('workbench.get', { tabId: tab.id })).tab;
+      const root = database.versions.list(tab.workId)[0];
+      expect(saved.source.type).toBe('library');
+      expect(root.project.id).toBe(saved.project.id);
+      expect(database.versions.work(tab.workId).origin.id).toBe(saved.project.id);
+      expect(imports).toHaveBeenCalledTimes(1);
+      expect(await fs.readFile(file)).toEqual(originalBytes);
+      await expect(fs.access(path.join(directory, 'work-originals'))).rejects.toThrow();
+      service.state.resume();
+      await waitJob(first.id);
+      await waitJob((await call('generate.start', { tabId: tab.id, count: 1 }, 'ui')).id);
+      expect(imports).toHaveBeenCalledTimes(3); // original plus two generated images
+    }),
+);
+
+it('deduplicates the original through the real importer and binds all references to the existing image', () =>
+  fixture(async ({ directory, call, database, services, waitJob }) => {
+    const [file] = await createWorkbenchFixtures(directory, { sizes: [[64, 64]] });
+    const { tab } = await call('workbench.open', { path: file });
+    services.importImage = async (file, draft) => {
+      const result = await importLibraryFiles({
+        filePaths: [file],
+        assetsDirectory: path.join(directory, 'assets'),
+        database,
+      });
+      const id = result.imported[0]?.id || result.duplicates[0]?.projectId;
+      if (draft) database.saveProjectPrompt(id, draft);
+      return database.loadProject(id);
+    };
+    const existing = await services.importImage(file);
+    await call('account.save', { token: 'acceptance-token' }, 'ui');
+    await call('settings.generation.save', { agentMode: 'direct' }, 'ui');
+    await waitJob((await call('generate.queue', { tabId: tab.id, count: 1 })).id);
+    const current = (await call('workbench.get', { tabId: tab.id })).tab;
+    expect(current.source.projectId).toBe(existing.id);
+    expect(current.project.id).toBe(existing.id);
+    expect(database.versions.list(tab.workId)[0].project.id).toBe(existing.id);
+    expect(database.versions.work(tab.workId).origin.id).toBe(existing.id);
+    expect(await database.loadLibraryCards()).toHaveLength(2);
+  }));
+
+it('waits for agent confirmation and saves even when the original tab has closed', () =>
+  fixture(async ({ directory, call, database, services, service, waitJob }) => {
+    const [file] = await createWorkbenchFixtures(directory, { sizes: [[64, 64]] });
+    const { tab } = await call('workbench.open', { path: file });
+    const imports = vi.spyOn(services, 'importImage');
+    await call('account.save', { token: 'acceptance-token' }, 'ui');
+    const job = await call('generate.queue', { tabId: tab.id, count: 1 });
+    expect(job.state).toBe('pending');
+    expect(imports).not.toHaveBeenCalled();
+    expect(service.state.requests).toHaveLength(0);
+    await call('workbench.close', { tabId: tab.id });
+    await call('generate.confirm', { ids: [job.id] }, 'ui');
+    await waitJob(job.id);
+    expect(imports.mock.calls[0][0]).toBe(file);
+    expect(database.versions.list(tab.workId)[0].originState).toBe('library');
+  }));
+
+it.each(['read', 'write'])(
+  'blocks all paid requests when original %s fails and allows retry',
+  (failure) =>
+    fixture(async ({ directory, call, services, service, waitJob }) => {
+      const [file] = await createWorkbenchFixtures(directory, { sizes: [[64, 64]] });
+      const { tab } = await call('workbench.open', { path: file });
+      const bytes = await fs.readFile(file);
+      const originalImport = services.importImage;
+      if (failure === 'read') await fs.unlink(file);
+      else
+        services.importImage = async () => {
+          throw new Error('ENOSPC: synthetic disk full');
+        };
+      await call('account.save', { token: 'acceptance-token' }, 'ui');
+      const job = await call('generate.start', { tabId: tab.id, count: 1 }, 'ui');
+      await expect
+        .poll(async () => (await call('generate.status', { id: job.id })).jobs[0].state)
+        .toBe('failed');
+      const failed = (await call('generate.status', { id: job.id })).jobs[0];
+      expect(failed.error).toContain(failure === 'read' ? 'ENOENT' : 'ENOSPC');
+      expect(failed.spent).toBe(0);
+      expect(service.state.requests).toHaveLength(0);
+      services.importImage = originalImport;
+      if (failure === 'read') await fs.writeFile(file, bytes);
+      await call('generate.retry', { id: job.id }, 'ui');
+      await waitJob(job.id);
+    }),
+);
+
+it.each(['blank', 'library', 'legacy'])('does not auto-save a %s work', (kind) =>
+  fixture(async ({ directory, call, database, services, waitJob, store }) => {
+    let tab;
+    if (kind === 'blank') ({ tab } = await call('workbench.new', { width: 64, height: 64 }));
+    else {
+      const [file] = await createWorkbenchFixtures(directory, { sizes: [[64, 64]] });
+      const image = await readWorkbenchImage(file);
+      if (kind === 'library') database.insertProject(image);
+      ({ tab } = await call(
+        'workbench.open',
+        kind === 'library' ? { libraryId: image.id } : { path: file },
+      ));
+      if (kind === 'legacy') {
+        // Old snapshots have no opt-in marker. Preserve their on-disk format.
+        const raw = new DatabaseSync(database.filePath);
+        const original = { ...database.versions.list(tab.workId)[0].project };
+        delete original.autoSaveOriginal;
+        raw
+          .prepare('UPDATE work_versions SET snapshot_json=? WHERE id=?')
+          .run(JSON.stringify(original), tab.versionId);
+        raw
+          .prepare('UPDATE works SET origin_json=? WHERE id=?')
+          .run(JSON.stringify(original), tab.workId);
+        raw.close();
+      }
+    }
+    const imports = vi.spyOn(services, 'importImage');
+    await call('account.save', { token: 'acceptance-token' }, 'ui');
+    await waitJob((await call('generate.start', { tabId: tab.id, count: 1 }, 'ui')).id);
+    expect(imports).toHaveBeenCalledTimes(1); // generated image only
+  }),
+);

@@ -34,6 +34,7 @@ import { galleryCollectionScope } from '../../src/lib/galleryCollections.js';
 import { insertTags } from '../../src/workbench/edits.ts';
 import { searchDsoTags } from '../dsoDictionary.js';
 import { generationCommands } from './generation.js';
+import { saveWorkbenchImage } from './saveWorkbenchImage.js';
 
 /** @typedef {import('../../src/shared/commands').CommandName} Name */
 /** @typedef {import('../../src/shared/commands').CommandTab} Tab */
@@ -236,35 +237,7 @@ export async function createCommands(services) {
       revision(input.expectedRevision, value.revision || 0);
       unlocked(input);
       if (!value.project) throw new CommandError('not_found', '图片源已不可用');
-      const saved = await services.importImage(value.project.image_path, value.project);
-      const root = value.workId && services.database.versions.list(value.workId)[0];
-      if (
-        root &&
-        (root.id === value.versionId || root.project.image_path === value.project.image_path)
-      )
-        services.database.versions.bindOriginal(value.workId, saved);
-      const next = store.get(),
-        item = next.tabs.find((t) => t.id === value.id);
-      if (item) {
-        item.source = { type: 'library', projectId: saved.id, path: saved.image_path };
-        item.project = {
-          ...value.project,
-          id: saved.id,
-          image_path: saved.image_path,
-          thumbnail_path: saved.thumbnail_path,
-        };
-        if (item.originalProject?.image_path === value.project.image_path)
-          item.originalProject = {
-            ...item.originalProject,
-            id: saved.id,
-            image_path: saved.image_path,
-            thumbnail_path: saved.thumbnail_path,
-          };
-        item.revision = (item.revision || 0) + 1;
-      }
-      await store.save(next);
-      emit({ tabId: value.id, libraryChanged: true });
-      return { project: saved, revision: item?.revision || 0 };
+      return saveWorkbenchImage({ services, store, emit }, value);
     },
     'prompt.set': (input) =>
       edit(input, (doc) => {

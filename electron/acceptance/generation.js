@@ -862,13 +862,31 @@ export async function generationChecks({
     scope: 'base:prompt',
     text: 'synthetic clipboard generated',
   });
-  const clipboardJob = await invoke('generate.start', { tabId: clipboardTab.id, count: 1 });
+  const beforeClipboardCount = (await database.loadLibraryCards()).length;
+  await wait('!document.querySelector(".gen-bar button.seal")?.disabled');
+  await click('生成', 'document.querySelector(".gen-bar")');
+  await wait(
+    `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.some(j=>j.tabId===${JSON.stringify(clipboardTab.id)}))`,
+  );
+  const clipboardJob = (await invoke('generate.status')).jobs.find(
+    (j) => j.tabId === clipboardTab.id,
+  );
   await wait(
     `window.studio.invoke('generate.status',{id:${JSON.stringify(clipboardJob.id)}}).then(r=>r.data.jobs[0].state==='completed')`,
     '剪贴板作品生成完成',
   );
   await invoke('version.open', { tabId: clipboardTab.id, versionId: clipboardRoot.id });
-  const savedOriginal = await invoke('workbench.save-to-library', { tabId: clipboardTab.id });
+  const savedOriginal = { project: database.versions.list(clipboardTab.workId)[0].project };
+  await wait('document.body.innerText.includes("已存入图片库")');
+  await check(
+    '首次生成自动保存剪贴板原图和生成图',
+    async () =>
+      (await database.loadLibraryCards()).length === beforeClipboardCount + 2 &&
+      !!database.loadProject(savedOriginal.project.id) &&
+      database.versions.work(clipboardTab.workId).origin.id === savedOriginal.project.id &&
+      !fs.existsSync(path.join(userData, 'work-originals')),
+  );
+  await h.screenshot('058-clipboard-original-saved');
   await invoke('workbench.close', { tabId: clipboardTab.id });
   await e(`window.studio.invoke('workbench.temp-sync',{paths:[]})`);
   const reopenedOriginal = await invoke('workbench.open', { libraryId: savedOriginal.project.id });
@@ -881,7 +899,7 @@ export async function generationChecks({
     () =>
       reopenedOriginal.tab.workId === clipboardTab.workId &&
       database.versions.list(clipboardTab.workId)[0].project.id === savedOriginal.project.id &&
-      fs.existsSync(clipboardRoot.project.image_path),
+      fs.existsSync(savedOriginal.project.image_path),
   );
   await h.screenshot('057-clipboard-original-restored');
 }

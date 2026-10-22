@@ -1,4 +1,4 @@
-import { preserveWorkOriginal } from '../workOriginals.js';
+import { saveWorkbenchImage } from './saveWorkbenchImage.js';
 import { createBlankProject } from '../workbench.js';
 import { buildProjectRequest } from '../parameterRequest.js';
 import fs from 'node:fs/promises';
@@ -60,7 +60,13 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       workId,
       versions.work(workId)
         ? current.originalProject || current.project
-        : preserveWorkOriginal(current.originalProject || current.project, services.directory),
+        : {
+            ...(current.originalProject || current.project),
+            autoSaveOriginal:
+              current.source?.type !== 'library' &&
+              !current.project.blank &&
+              !services.database.loadProject(current.project.id),
+          },
       current.workOrigin || null,
     );
     if (!current.workId) {
@@ -104,6 +110,30 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     },
     generate: (request, progress) => client().generate(request, progress),
     prepare: async (job) => {
+      // Persist before any paid reference encoding or image request. Pending jobs
+      // reach this point only after confirmation; closed tabs are supported too.
+      await store.exclusive(async () => {
+        const root = versions.list(job.workId)[0];
+        if (!job.originalPending || ['removed', 'trashed'].includes(root?.originState)) return;
+        const saved = root?.project.autoSaveOriginal
+          ? await saveWorkbenchImage(
+              { services, store, emit },
+              {
+                id: job.tabId,
+                workId: job.workId,
+                versionId: root.id,
+                project: { ...job.project, image_path: root.project.image_path },
+              },
+            )
+          : { project: root.project };
+        job.originalPending = false;
+        job.project = {
+          ...job.project,
+          id: saved.project.id,
+          image_path: saved.project.image_path,
+          thumbnail_path: saved.project.thumbnail_path,
+        };
+      });
       if (job.referencesPrepared) return;
       const prepared = await buildProjectRequest(job.project, services.database.vibeLibrary, {
         seed: job.request.parameters.seed,
@@ -501,6 +531,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         tabId: current.id,
         workId: parent.workId,
         parentId: parent.id,
+        originalPending: !!versions.list(parent.workId)[0]?.project.autoSaveOriginal,
         project: current.project,
         name: current.displayName,
         parentNumber: parent.number,
@@ -643,7 +674,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       };
       next.versionId = versions.ensure(
         next.workId,
-        preserveWorkOriginal(snapshot, services.directory),
+        { ...snapshot, autoSaveOriginal: !storedImage && !snapshot.blank },
         next.workOrigin,
       ).id;
       versions.touch(next.workId, next.versionId);
