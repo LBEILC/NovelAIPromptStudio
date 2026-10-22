@@ -44,6 +44,11 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const generation = useGeneration();
   const image = tab.project as (ImageProject & { vibes?: Vibe[] }) | null;
   const [missing, setMissing] = useState(!!tab.error);
+  // 图片文件找不到时，舞台下面这几个按钮不可用并说明原因，不再弹出 ENOENT（用户 10-22：剪贴板打开的图被临时清理删掉了）
+  const lost = (run: () => void) =>
+    missing
+      ? { 'aria-disabled': true, 'data-tip': '图片文件找不到了', onClick: () => {} }
+      : { onClick: run };
   const [version, setVersion] = useState<WorkVersion | null>(null);
   const [members, setMembers] = useState<ImageRecord[]>([]);
   const [refresh, setRefresh] = useState(0);
@@ -336,19 +341,25 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                 已存入图片库
               </span>
             ) : (
-              <button className="btn sm" onClick={p.onSaveLibrary}>
+              <button className={`btn sm ${missing ? 'is-off' : ''}`} {...lost(p.onSaveLibrary)}>
                 存入图片库
               </button>
             )}
-            <button className="btn quiet sm" onClick={p.onReveal}>
+            <button className={`btn quiet sm ${missing ? 'is-off' : ''}`} {...lost(p.onReveal)}>
               <Icon name="folder-open-line" />
               在文件夹中显示
             </button>
-            <button className="btn quiet sm" onClick={() => p.onCopyImage(image)}>
+            <button
+              className={`btn quiet sm ${missing ? 'is-off' : ''}`}
+              {...lost(() => p.onCopyImage(image))}
+            >
               <Icon name="file-copy-line" />
               复制图片
             </button>
-            <button className="btn quiet sm" onClick={() => p.onDownloadImage(image)}>
+            <button
+              className={`btn quiet sm ${missing ? 'is-off' : ''}`}
+              {...lost(() => p.onDownloadImage(image))}
+            >
               <Icon name="download-2-line" />
               另存为
             </button>
