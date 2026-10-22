@@ -44,8 +44,8 @@
 .popover { display: inline-flex; flex-direction: column; gap: var(--sp-3); width: var(--popover-w); padding: var(--sp-3); border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--shadow-pop); }
 .popover .frow { display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 8px; }
 .dialog { width: var(--dialog-w); padding: var(--sp-5); border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--shadow-pop); }
-.dialog h3 { margin: 0 0 var(--sp-2); font: var(--fw-strong) var(--fs-title)/var(--lh-title) var(--font-ui); }
-.dialog p { margin: 0; color: var(--text-2); }
+.dialog h3 { margin: 0 0 var(--sp-2); overflow-wrap: anywhere; font: var(--fw-strong) var(--fs-title)/var(--lh-title) var(--font-ui); }
+.dialog p { margin: 0; color: var(--text-2); overflow-wrap: anywhere; }
 .dialog .acts { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-5); }
 .quote { margin: var(--sp-3) 0; padding: var(--sp-0) 0 var(--sp-0) var(--sp-3); border-left: var(--rule-w) solid var(--border); font: var(--fs-body)/var(--lh-body) var(--font-prose); color: var(--text-2); }
 .toast { display: inline-flex; align-items: center; gap: var(--sp-3); height: var(--toast-h); padding: 0 var(--sp-2) 0 var(--sp-4); border-radius: var(--r-ctl); background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-pop); }

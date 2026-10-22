@@ -1,7 +1,7 @@
 import { MaterialsPage } from './materials/Materials';
 import { invokeUI, onProgress, invokeResult } from './lib/commands';
 import { writeClipboardText, readClipboardText } from './lib/clipboard';
-import { numberedImageNames } from './lib/imageNaming.js';
+import { hasImageName, numberedImageNames } from './lib/imageNaming.js';
 import { deletionDetail } from './library/presentation';
 import { useLibraryComputation } from './state/libraryComputation';
 import { useLibraryState } from './state/library';
@@ -903,7 +903,11 @@ export default function App() {
         workbenchTabHasChanges(tab) &&
         !(await requestConfirmation({
           title: '关闭已修改的标签页？',
-          message: `“${tab.displayName}”的提示词改过了。`,
+          // 和标签页一样：起过名字才写名字，没起名的不拿文件名（图片库里是一串哈希）凑数
+          message:
+            tab.project && hasImageName(tab.project)
+              ? `「${tab.project.name}」的提示词改过了。`
+              : '这个标签页的提示词改过了。',
           detail: '关闭后这些修改会丢失，其他标签页不受影响。',
           okText: '丢弃并关闭',
           danger: true,
