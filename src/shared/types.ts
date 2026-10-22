@@ -143,8 +143,17 @@ export interface StoredGenerationParameters extends GenerationParameters {
   guidance: number | null;
   extra_json: string;
 }
+/** 一张图属于哪几个作品（1.5.6，doc/design.md 2.0）：作品的原图（origin），或某一版的图（version） */
+export interface WorkRef {
+  workId: string;
+  role: 'origin' | 'version';
+  versionId?: string;
+  number?: number;
+  workName: string;
+}
 export interface ImageProject {
   blank?: true;
+  work_refs?: WorkRef[];
   paramsSource?: 'last' | 'defaults';
   generated_work_id?: string;
   version_number?: number;
@@ -206,6 +215,7 @@ export interface LibraryCard
   generated_work_id?: string;
   version_number?: number;
   generation_source?: 'user' | 'agent';
+  work_refs?: WorkRef[];
   // null reuses JSON.stringify(JSON.parse(prompt_fingerprint).base).
   // The main process only emits it when that equals the stored base fingerprint.
   base_prompt_fingerprint: string | null;

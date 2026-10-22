@@ -71,6 +71,17 @@ export const commandRegistry = {
     mutation: true,
   },
   'work.restore-original': { fields: { undo: 'string' }, required: ['undo'], mutation: true },
+  'work.save': {
+    fields: { tabId: 'string', expectedRevision: 'integer' },
+    required: ['tabId'],
+    mutation: true,
+  },
+  'work.detach-images': {
+    fields: { workId: 'string', imageIds: 'stringList' },
+    required: ['workId', 'imageIds'],
+    mutation: true,
+  },
+  'work.restore-detached': { fields: { undo: 'string' }, required: ['undo'], mutation: true },
   'version.delete': {
     fields: { versionId: 'string', confirmed: 'boolean', only: 'boolean' },
     required: ['versionId'],
@@ -318,6 +329,7 @@ export const commandRegistry = {
       libraryId: 'string',
       source: 'source',
       fresh: 'boolean',
+      workId: 'string',
     },
     mutation: true,
   },

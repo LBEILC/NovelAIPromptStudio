@@ -74,6 +74,8 @@ export interface CommandTab {
   versionId?: string;
   versionImageId?: string;
   workOrigin?: WorkOrigin;
+  /** 作品已经存进图片库（生成过，或点过"存入图片库""存为新作品"；1.5.6） */
+  workSaved?: boolean;
 }
 export interface CommandSession {
   version: number;
@@ -211,6 +213,17 @@ export interface CommandDefinitions {
     output: { trashed: boolean; undo: string };
   };
   'work.restore-original': { input: { undo: string }; output: { restored: boolean } };
+  /** 把这个作品存进图片库：原图不在图片库就先存，再建立作品（1.5.6，"存为新作品""存入图片库"） */
+  'work.save': { input: TabInput; output: TabDocument };
+  /** 只从这个作品里去掉这些图（共用的图），图本身不进回收站（1.5.6） */
+  'work.detach-images': {
+    input: { workId: string; imageIds: string[] };
+    output: {
+      undo: string;
+      versions?: { workName: string; number: number; branchName: string; lastOfBranch: boolean }[];
+    };
+  };
+  'work.restore-detached': { input: { undo: string }; output: { restored: boolean } };
   /**
    * 删除一版和它之后的各版（用户 10-21，doc/design.md 2.23）：整棵子树软删除，图进回收站，用 branch.restore 撤销。
    * 原图和起点不能删。子树不止这一版时，没有 confirmed 返回 needs_confirm，details 是 {versions, branches, images}。
@@ -608,6 +621,8 @@ export interface CommandDefinitions {
       libraryId?: string;
       source?: WorkbenchSource;
       fresh?: boolean;
+      /** 从图片库某个作品组打开时：回到这个作品（1.5.6） */
+      workId?: string;
     };
     output: TabDocument | { canceled: true };
   };
