@@ -670,7 +670,25 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           imageId: source.projectId,
         });
       const workId = versions.findOrigin(source, image);
-      if (workId) return handlers['work.open']({ workId });
+      if (workId) {
+        const alreadyOpen = store.get().tabs.some((t) => t.workId === workId);
+        const opened = await handlers['work.open']({ workId });
+        // Reopening a saved original must retain its library draft without rewriting history.
+        if (
+          source.type === 'library' &&
+          !alreadyOpen &&
+          !versions.get(opened.tab.versionId).parentId
+        ) {
+          const session = store.get(),
+            current = session.tabs.find((t) => t.id === opened.tab.id);
+          current.project = structuredClone(image);
+          current.revision = (current.revision || 0) + 1;
+          await store.save(session);
+          emit({ tabId: current.id });
+          return full(current);
+        }
+        return opened;
+      }
       return null;
     },
     retreatDeleted,

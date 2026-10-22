@@ -34,12 +34,13 @@ async function fixture(run) {
     readImage: readWorkbenchImage,
     readSource: ({ path: file, type, projectId }) =>
       type === 'library' ? database.loadProject(projectId) : readWorkbenchImage(file),
-    importImage: async (source) => {
+    importImage: async (source, draft) => {
       const file = path.join(directory, `synthetic-${++imported}.png`);
       await fs.copyFile(source, file);
       const image = await readWorkbenchImage(file);
       database.insertProject(image);
-      return image;
+      if (draft) database.saveProjectPrompt(image.id, draft);
+      return database.loadProject(image.id);
     },
     emit: (event) => {
       events.push(event);
@@ -1019,6 +1020,11 @@ it('persists a clipboard original across closing and rebinds the root when saved
     const root = database.versions.list(tab.workId)[0];
     expect(root.project.image_path).not.toBe(file);
     await fs.access(root.project.image_path);
+    await call('prompt.set', {
+      tabId: tab.id,
+      scope: 'base:prompt',
+      text: 'synthetic saved original draft',
+    });
     const saved = await call('workbench.save-to-library', { tabId: tab.id });
     expect(database.versions.list(tab.workId)[0].project).toMatchObject({
       id: saved.project.id,
@@ -1031,6 +1037,8 @@ it('persists a clipboard original across closing and rebinds the root when saved
     await fs.access(root.project.image_path);
     const reopened = await call('workbench.open', { libraryId: saved.project.id });
     expect(reopened.tab.workId).toBe(tab.workId);
+    expect(reopened.tab.project.metadata.prompt_raw).toBe('synthetic saved original draft');
+    expect(database.versions.list(tab.workId)[0].project.metadata).toEqual(root.project.metadata);
   }));
 
 it('retains generating and queued targets, then removes canceled and failed empty targets', () =>

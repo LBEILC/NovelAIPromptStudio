@@ -78,10 +78,15 @@ export async function settingsChecks(context, restart) {
     await dictionaryChecks(context);
     if (mode.category === '设置·翻译词典') return;
     h.category('设置·图片库');
-    await section('图片库');
-    await wait(
-      'document.body.innerText.includes("还没有升级前的备份。软件在升级数据格式之前会自动留一份，升级出问题时可以用它恢复。")',
+    const dbPath = path.join(app.getPath('userData'), 'data', 'studio.sqlite');
+    const startupBackup = (await fs.readdir(path.dirname(dbPath))).find(
+      (name) => name.startsWith('studio.pre-work-originals-') && name.endsWith('.sqlite'),
     );
+    if (!startupBackup) throw Error('启动原图迁移没有留下数据库备份');
+    const startupBackupPath = path.join(path.dirname(dbPath), startupBackup);
+    const startupBackupHash = hash('sha256', await fs.readFile(startupBackupPath));
+    await section('图片库');
+    await wait(`document.body.innerText.includes(${JSON.stringify(startupBackup)})`);
     const initial = await describeAssetDirectory(context.assetsDirectory);
     const size =
       initial.totalBytes < 1024
@@ -96,12 +101,11 @@ export async function settingsChecks(context, restart) {
       'once',
     );
     await check(
-      '无备份显示正确空状态',
-      'document.body.innerText.includes("还没有升级前的备份。软件在升级数据格式之前会自动留一份，升级出问题时可以用它恢复。")',
+      '启动原图迁移的数据库备份在设置中可见',
+      `document.body.innerText.includes(${JSON.stringify(startupBackup)})`,
       undefined,
       'once',
     );
-    const dbPath = path.join(app.getPath('userData'), 'data', 'studio.sqlite');
     await check(
       '数据库路径属于隔离目录',
       `document.body.innerText.includes(${JSON.stringify(dbPath)})`,
@@ -165,6 +169,7 @@ export async function settingsChecks(context, restart) {
       '备份查看与删除测试未改动数据库及其他备份',
       async () =>
         hash('sha256', await fs.readFile(dbPath)) === beforeDatabase &&
+        hash('sha256', await fs.readFile(startupBackupPath)) === startupBackupHash &&
         (await fs.readFile(retainedBackup, 'utf8')) === 'retained backup evidence',
       undefined,
       'once',

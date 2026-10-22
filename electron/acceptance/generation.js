@@ -850,10 +850,11 @@ export async function generationChecks({
   );
   await h.key('v', process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true });
   await wait(
-    `window.studio.invoke('workbench.list',{}).then(r=>r.data.tabs.some(t=>t.source.type==='clipboard'))`,
+    `window.studio.invoke('workbench.list',{}).then(r=>r.data.tabs.find(t=>t.id===r.data.activeTabId)?.source.type==='clipboard')`,
     '剪贴板打开原图',
   );
   const clipboardList = await invoke('workbench.list');
+  await invoke('version.list', { tabId: clipboardList.activeTabId });
   const clipboardTab = (await invoke('workbench.get', { tabId: clipboardList.activeTabId })).tab;
   const clipboardRoot = database.versions.list(clipboardTab.workId)[0];
   await invoke('prompt.set', {
