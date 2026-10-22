@@ -495,10 +495,10 @@ it('prunes empty leaves and ancestors after image trash, preserves drafts and re
     });
     const draft = (await call('workbench.get', { tabId: tab.id })).tab.project;
     const parentTrash = await call('library.trash', { ids: [first.images[0].projectId] });
-    expect(parentTrash.versions).toEqual([]);
-    expect(database.versions.get(first.id)).toBeDefined();
+    expect(parentTrash.versions.map((v) => v.number)).toEqual([first.number]);
+    expect(database.versions.get(first.id)).toBeUndefined();
     const removed = await call('library.trash', { ids: [leaf.images[0].projectId] });
-    expect(removed.versions.map((v) => v.number)).toEqual([leaf.number, first.number]);
+    expect(removed.versions.map((v) => v.number)).toEqual([leaf.number]);
     expect(removed.versions.every((v) => !v.lastOfBranch)).toBe(true);
     expect((await call('workbench.get', { tabId: tab.id })).tab).toMatchObject({
       versionId: tab.versionId,
@@ -506,12 +506,12 @@ it('prunes empty leaves and ancestors after image trash, preserves drafts and re
     });
     await restart();
     database.updateProjects([leaf.images[0].projectId], { deleted: false });
-    expect(database.versions.get(first.id)).toBeDefined();
+    expect(database.versions.get(first.id)).toBeUndefined();
     expect(database.versions.get(leaf.id)).toMatchObject({
       number: leaf.number,
       branchId: leaf.branchId,
     });
-    expect(database.versions.get(first.id).images[0].deleted).toBe(true);
+    expect(database.versions.getAny(first.id).images[0].deleted).toBe(true);
     await call('library.trash', { ids: [leaf.images[0].projectId] });
     database.deleteProject(leaf.images[0].projectId);
     database.deleteProject(first.images[0].projectId);
@@ -946,4 +946,168 @@ it('requires all signature fields, including a hash when size and modification t
     changed.fileSignature.mtimeMs = signature.mtimeMs;
     expect(changed.fileSignature.size).toBe(signature.size);
     expect(database.versions.findOrigin(source, changed)).toBeUndefined();
+  }));
+
+it('prunes an intermediate fork through library trash, keeps raw lineage, and restores images independently', () =>
+  fixture(async ({ call, database, append, directory }) => {
+    const { tab } = await call('workbench.new');
+    const first = append(tab.workId, tab.versionId, 'prune-first');
+    const middle = append(tab.workId, first.id, 'prune-middle');
+    const last = append(tab.workId, middle.id, 'prune-last');
+    const fork = append(tab.workId, middle.id, 'prune-fork');
+    await call('version.open', { tabId: tab.id, versionId: middle.id });
+    await call('library.trash', { ids: [middle.images[0].projectId] });
+    expect(database.versions.get(middle.id)).toBeUndefined();
+    for (const v of [last, fork]) {
+      expect(database.versions.get(v.id)).toMatchObject({ parentId: first.id, project: v.project });
+      expect(database.versions.getAny(v.id).parentId).toBe(middle.id);
+    }
+    expect((await call('workbench.get', { tabId: tab.id })).tab.versionId).toBe(last.id);
+    database.updateProjects([middle.images[0].projectId], { deleted: false });
+    expect(database.versions.get(last.id).parentId).toBe(middle.id);
+    await call('version.open', { tabId: tab.id, versionId: middle.id });
+    await call('prompt.set', {
+      tabId: tab.id,
+      scope: 'base:prompt',
+      text: 'synthetic surviving draft',
+    });
+    const draft = (await call('workbench.get', { tabId: tab.id })).tab.project;
+    await call('library.trash', { ids: [middle.images[0].projectId] });
+    expect((await call('workbench.get', { tabId: tab.id })).tab).toMatchObject({
+      versionId: first.id,
+      project: draft,
+    });
+    const branchNext = append(tab.workId, fork.id, 'prune-branch-next');
+    database.versions.rename(fork.id, 'Synthetic retained branch');
+    const branchTrash = await call('library.trash', { ids: [fork.images[0].projectId] });
+    expect(branchTrash.versions[0].lastOfBranch).toBe(false);
+    expect(database.versions.list(tab.workId).find((v) => v.id === branchNext.id)).toMatchObject({
+      branchId: branchNext.id,
+      branchName: 'Synthetic retained branch',
+      branchNumber: fork.branchNumber,
+    });
+    database.updateProjects([fork.images[0].projectId], { deleted: false });
+    expect(database.versions.get(middle.id)).toBeUndefined();
+    database.updateProjects([middle.images[0].projectId], { deleted: false });
+    expect(database.versions.get(fork.id).parentId).toBe(middle.id);
+  }));
+
+it('protects queued version targets and prunes the emptied version after cancellation', () =>
+  fixture(async ({ call, database, append, events, store }) => {
+    const { tab } = await call('workbench.new');
+    const first = append(tab.workId, tab.versionId, 'pending-target');
+    await call('version.open', { tabId: tab.id, versionId: first.id });
+    await call('account.save', { token: 'acceptance-token' }, 'ui');
+    const job = await call('generate.start', { tabId: tab.id, count: 1 });
+    expect(job.state).toBe('pending');
+    expect((await call('library.trash', { ids: [first.images[0].projectId] })).versions).toEqual(
+      [],
+    );
+    expect(database.versions.get(first.id)).toBeDefined();
+    await call('generate.cancel', { ids: [job.id] }, 'ui');
+    await store.exclusive(async () => {});
+    expect(database.versions.get(first.id)).toBeUndefined();
+    expect(database.versions.get(tab.versionId)).toBeDefined();
+  }));
+
+it('persists a clipboard original across closing and rebinds the root when saved to the library', () =>
+  fixture(async ({ directory, call, database }) => {
+    const [file] = await createWorkbenchFixtures(path.join(directory, 'workbench-temp'), {
+      sizes: [[64, 64]],
+    });
+    const { tab } = await call('workbench.open', { path: file });
+    const root = database.versions.list(tab.workId)[0];
+    expect(root.project.image_path).not.toBe(file);
+    await fs.access(root.project.image_path);
+    const saved = await call('workbench.save-to-library', { tabId: tab.id });
+    expect(database.versions.list(tab.workId)[0].project).toMatchObject({
+      id: saved.project.id,
+      image_path: saved.project.image_path,
+      thumbnail_path: saved.project.thumbnail_path,
+    });
+    expect(database.versions.work(tab.workId).origin.image_path).toBe(saved.project.image_path);
+    await call('workbench.close', { tabId: tab.id });
+    await fs.unlink(file);
+    await fs.access(root.project.image_path);
+    const reopened = await call('workbench.open', { libraryId: saved.project.id });
+    expect(reopened.tab.workId).toBe(tab.workId);
+  }));
+
+it('retains generating and queued targets, then removes canceled and failed empty targets', () =>
+  fixture(async ({ call, database, append, service, waitJob, store }) => {
+    const { tab } = await call('workbench.new', { width: 64, height: 64 });
+    const first = append(tab.workId, tab.versionId, 'active-prune');
+    const second = append(tab.workId, first.id, 'queued-prune');
+    await call('account.save', { token: 'acceptance-token' }, 'ui');
+    await call('version.open', { tabId: tab.id, versionId: first.id });
+    service.state.holdAt = 1;
+    const active = await call('generate.start', { tabId: tab.id, count: 1 }, 'ui');
+    await expect.poll(() => typeof service.state.resume).toBe('function');
+    await call('version.open', { tabId: tab.id, versionId: second.id });
+    const queued = await call('generate.start', { tabId: tab.id, count: 1 }, 'ui');
+    expect(queued.state).toBe('queued');
+    await call('library.trash', { ids: [first.images[0].projectId, second.images[0].projectId] });
+    expect(database.versions.get(first.id)).toBeDefined();
+    expect(database.versions.get(second.id)).toBeDefined();
+    await call('generate.cancel', { ids: [queued.id] }, 'ui');
+    await store.exclusive(async () => {});
+    expect(database.versions.get(second.id)).toBeUndefined();
+    service.state.resume();
+    const done = await waitJob(active.id);
+    await store.exclusive(async () => {});
+    expect(database.versions.get(done.versionId).images.some((i) => !i.deleted)).toBe(true);
+    const failedTarget = append(tab.workId, done.versionId, 'failed-prune');
+    await call('version.open', { tabId: tab.id, versionId: failedTarget.id });
+    const pending = await call('generate.start', { tabId: tab.id, count: 1 });
+    await call('library.trash', { ids: [failedTarget.images[0].projectId] });
+    service.state.failNext = 500;
+    await call('generate.confirm', { ids: [pending.id] }, 'ui');
+    await expect
+      .poll(async () => (await call('generate.status', { id: pending.id })).jobs[0].state)
+      .toBe('failed');
+    await store.exclusive(async () => {});
+    expect(database.versions.get(failedTarget.id)).toBeUndefined();
+  }));
+
+it('restores a version after either of two separately deleted images returns', () =>
+  fixture(async ({ call, database, append }) => {
+    const { tab } = await call('workbench.new');
+    const first = append(tab.workId, tab.versionId, 'split-trash');
+    const secondImage = append(tab.workId, tab.versionId, 'split-image');
+    database.versions.append({
+      workId: tab.workId,
+      parentId: tab.versionId,
+      versionId: first.id,
+      project: first.project,
+      source: 'agent',
+      image: secondImage.project,
+      seed: 2,
+    });
+    const last = append(tab.workId, first.id, 'split-last');
+    await call('library.trash', { ids: [first.images[0].projectId] });
+    expect(database.versions.get(first.id)).toBeDefined();
+    await call('library.trash', { ids: [secondImage.images[0].projectId] });
+    expect(database.versions.get(first.id)).toBeUndefined();
+    database.updateProjects([first.images[0].projectId], { deleted: false });
+    expect(database.versions.get(last.id).parentId).toBe(first.id);
+    expect(database.versions.get(first.id).images.filter((i) => !i.deleted)).toHaveLength(1);
+    database.updateProjects([secondImage.images[0].projectId], { deleted: false });
+    expect(database.versions.get(first.id).images.filter((i) => !i.deleted)).toHaveLength(2);
+  }));
+
+it('finishes deferred pruning after shutdown and image purging without migrating older empty versions', () =>
+  fixture(async ({ call, database, append, restart }) => {
+    const { tab } = await call('workbench.new');
+    const oldEmpty = append(tab.workId, tab.versionId, 'legacy-empty');
+    database.updateProjects([oldEmpty.images[0].projectId], { deleted: true });
+    const target = append(tab.workId, tab.versionId, 'restart-prune');
+    await call('version.open', { tabId: tab.id, versionId: target.id });
+    await call('account.save', { token: 'acceptance-token' }, 'ui');
+    await call('generate.start', { tabId: tab.id, count: 1 });
+    await call('library.trash', { ids: [target.images[0].projectId] });
+    expect(database.versions.get(target.id)).toBeDefined();
+    database.deleteProject(target.images[0].projectId);
+    await restart();
+    expect(database.versions.get(target.id)).toBeUndefined();
+    expect(database.versions.get(oldEmpty.id)).toBeDefined();
   }));

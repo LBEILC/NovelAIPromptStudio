@@ -749,7 +749,7 @@ app.whenReady().then(async () => {
     }
   });
   registerCommand('workbench.temp-sync', (input, _event) => {
-    const referencedPaths = input.paths;
+    const referencedPaths = [...input.paths, ...database.versions.referencedPaths()];
     try {
       return {
         ok: true,

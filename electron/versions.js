@@ -102,8 +102,10 @@ export function versionSignature(project) {
 }
 
 export function createVersionStore(connection) {
+  let activeVersions = new Set();
   // Additive tables keep every existing snapshot readable without rewriting it.
   connection.exec(`
+    CREATE TABLE IF NOT EXISTS deferred_version_prunes (version_id TEXT PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS deleted_versions (version_id TEXT PRIMARY KEY, token TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS branch_undo (token TEXT PRIMARY KEY, payload TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS removed_originals (work_id TEXT PRIMARY KEY);
@@ -242,10 +244,10 @@ export function createVersionStore(connection) {
         )
         .get(id);
       // Explicit single-version deletions remain independent when descendants return.
-      const only = JSON.parse(deletion?.payload || '{}').only;
+      const { only, automatic } = JSON.parse(deletion?.payload || '{}');
       if (id === start || !only)
         connection.prepare('DELETE FROM deleted_versions WHERE version_id=?').run(id);
-      if (id === start && only) return;
+      if (id === start && only && !automatic) return;
       id = v.parentId;
     }
   }
@@ -265,6 +267,56 @@ export function createVersionStore(connection) {
     );
   }
   return {
+    setActiveVersions(ids) {
+      activeVersions = new Set(ids);
+    },
+    retryPrune(rows) {
+      atomic(() => {
+        for (const v of rows) {
+          connection.prepare('DELETE FROM deleted_versions WHERE version_id=?').run(v.id);
+          connection.prepare('INSERT OR IGNORE INTO deferred_version_prunes VALUES (?)').run(v.id);
+        }
+      });
+    },
+    pruneDeferred() {
+      connection.exec(`DELETE FROM deferred_version_prunes WHERE NOT EXISTS (SELECT 1 FROM work_versions v WHERE v.id=version_id)
+        OR EXISTS (SELECT 1 FROM version_images vi JOIN projects p ON p.id=vi.project_id WHERE vi.version_id=deferred_version_prunes.version_id AND p.deleted_at='')`);
+      const ids = connection
+        .prepare('SELECT version_id FROM deferred_version_prunes')
+        .all()
+        .map((r) => r.version_id);
+      return this.pruneImages([], ids);
+    },
+    referencedPaths() {
+      return connection
+        .prepare('SELECT snapshot_json FROM work_versions UNION ALL SELECT origin_json FROM works')
+        .all()
+        .flatMap((row) => {
+          const p = JSON.parse(row.snapshot_json);
+          return [p.image_path, p.thumbnail_path].filter(Boolean);
+        });
+    },
+    bindOriginal(workId, image) {
+      return atomic(() => {
+        const root = list(workId)[0];
+        if (!root || root.parentId || root.project.blank) return;
+        const fields = {
+          id: image.id,
+          image_path: image.image_path,
+          thumbnail_path: image.thumbnail_path,
+        };
+        const origin = JSON.parse(
+          connection.prepare('SELECT origin_json FROM works WHERE id=?').get(workId).origin_json,
+        );
+        connection
+          .prepare('UPDATE works SET origin_json=? WHERE id=?')
+          .run(JSON.stringify({ ...origin, ...fields }), workId);
+        connection
+          .prepare('UPDATE work_versions SET snapshot_json=? WHERE id=?')
+          .run(JSON.stringify({ ...root.project, ...fields }), root.id);
+        connection.prepare('DELETE FROM work_file_signatures WHERE work_id=?').run(workId);
+      });
+    },
     get,
     getAny,
     list,
@@ -416,7 +468,7 @@ export function createVersionStore(connection) {
             .map(decode);
       return { rows, parent: get(visibleParent(first.parent_id)), images: trashImages(rows) };
     },
-    pruneImages(projectIds) {
+    pruneImages(projectIds, deferredIds = []) {
       return atomic(() => {
         const removed = [];
         const pending = projectIds.flatMap((id) =>
@@ -425,17 +477,29 @@ export function createVersionStore(connection) {
             .all(id)
             .map((row) => row.version_id),
         );
+        pending.push(...deferredIds);
+        const directlyAffected = new Set(pending);
         while (pending.length) {
           const v = get(pending.pop());
           if (
             !v?.parentId ||
             v.images.some((i) => !i.deleted) ||
-            list(v.workId).some((child) => child.parentId === v.id)
+            (!directlyAffected.has(v.id) && list(v.workId).some((child) => child.parentId === v.id))
           )
             continue;
-          connection
-            .prepare('INSERT INTO deleted_versions VALUES (?,?)')
-            .run(v.id, crypto.randomUUID());
+          if (activeVersions.has(v.id)) {
+            connection
+              .prepare('INSERT OR IGNORE INTO deferred_version_prunes VALUES (?)')
+              .run(v.id);
+            continue;
+          }
+          connection.prepare('DELETE FROM deferred_version_prunes WHERE version_id=?').run(v.id);
+          const token = crypto.randomUUID();
+          if (directlyAffected.has(v.id))
+            connection
+              .prepare('INSERT INTO branch_undo VALUES (?,?)')
+              .run(token, JSON.stringify({ only: true, automatic: true }));
+          connection.prepare('INSERT INTO deleted_versions VALUES (?,?)').run(v.id, token);
           removed.push(v);
           pending.push(v.parentId);
         }

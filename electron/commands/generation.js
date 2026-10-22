@@ -1,3 +1,4 @@
+import { preserveWorkOriginal } from '../workOriginals.js';
 import { createBlankProject } from '../workbench.js';
 import { buildProjectRequest } from '../parameterRequest.js';
 import fs from 'node:fs/promises';
@@ -19,6 +20,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   const preferences = services.preferences;
   if (!preferences) return { handlers: {}, close: () => {} };
   const versions = services.database.versions;
+  let shuttingDown = false;
   let subscription = null,
     accountError = '';
   const balance = () =>
@@ -56,7 +58,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     const workId = current.workId || current.id;
     const root = versions.ensure(
       workId,
-      current.originalProject || current.project,
+      versions.work(workId)
+        ? current.originalProject || current.project
+        : preserveWorkOriginal(current.originalProject || current.project, services.directory),
       current.workOrigin || null,
     );
     if (!current.workId) {
@@ -78,6 +82,13 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         throw new Error('Seed 无效');
     }
     return buildProjectRequest(current.project, services.database.vibeLibrary, { seed });
+  }
+  function protectJobs(jobs) {
+    versions.setActiveVersions(
+      jobs
+        .filter((j) => ['pending', 'queued', 'generating'].includes(j.state))
+        .flatMap((j) => [j.parentId, j.versionId].filter(Boolean)),
+    );
   }
   const spent = new Map();
   const queueFile = path.join(services.directory, 'generation-queue.json');
@@ -119,6 +130,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       return true;
     },
     changed: (jobs) => {
+      protectJobs(jobs);
+      if (!shuttingDown)
+        void settlePruned().catch((error) => {
+          cleanupError = error;
+        });
       const openWorks = new Set(store.get().tabs.map((t) => t.workId));
       for (const job of jobs) {
         if (
@@ -162,6 +178,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           job.source === 'user' && job.completed === 0 ? version.id : undefined,
         );
         job.versionId = version.id;
+        protectJobs(queue.status());
         services.database.refreshGeneratedCards();
         if (version.branchId === version.id && version.branchNumber && job.completed === 0)
           job.branchNotice = `已从第 ${versions.get(job.parentId).number} 版分出分支 ${version.branchNumber}`;
@@ -269,6 +286,45 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       current.revision = (current.revision || 0) + 1;
       versions.touch(parent.workId, parent.id);
     }
+  }
+  function retreatDeleted(session) {
+    for (const current of session.tabs) {
+      const deleted = current.versionId && versions.getAny(current.versionId);
+      if (!deleted || versions.get(deleted.id)) continue;
+      let parent = versions.getAny(deleted.parentId);
+      while (parent && !versions.get(parent.id)) parent = versions.getAny(parent.parentId);
+      if (!parent) continue;
+      const viewing = versionDiff(deleted.project, current.project).empty;
+      const next = versions.list(deleted.workId).find((v) => {
+        if (versions.getAny(v.id).branchId !== deleted.branchId) return false;
+        let ancestor = versions.getAny(v.id).parentId;
+        while (ancestor && ancestor !== deleted.id) ancestor = versions.getAny(ancestor)?.parentId;
+        return ancestor === deleted.id;
+      });
+      retreatTabs(
+        { tabs: [current] },
+        new Set([deleted.id]),
+        viewing && next ? next : versions.get(parent.id),
+      );
+      if (viewing) current.project = structuredClone(current.originalProject);
+    }
+  }
+  let cleanupError, closing;
+  function settlePruned() {
+    return store.exclusive(async () => {
+      const removed = versions.pruneDeferred();
+      if (!removed.length) return;
+      const session = store.get();
+      retreatDeleted(session);
+      try {
+        await store.save(session);
+      } catch (error) {
+        versions.retryPrune(removed);
+        throw error;
+      }
+      services.database.refreshGeneratedCards();
+      emit({ libraryChanged: true });
+    });
   }
   async function deleteSubtree(input, version = false) {
     const { rows, parent, images } = versions.subtree(
@@ -585,7 +641,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         name: current?.displayName || versions.work(version.workId).origin.name,
         number: version.number,
       };
-      next.versionId = versions.ensure(next.workId, snapshot, next.workOrigin).id;
+      next.versionId = versions.ensure(
+        next.workId,
+        preserveWorkOriginal(snapshot, services.directory),
+        next.workOrigin,
+      ).id;
       versions.touch(next.workId, next.versionId);
       const session = store.get();
       session.tabs.push(next);
@@ -600,6 +660,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   return {
     handlers,
     initialize: ensure,
+    ready: settlePruned,
     async openSource(source, image) {
       const generated = source.type === 'library' && versions.forImage(source.projectId);
       if (generated)
@@ -612,16 +673,14 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       if (workId) return handlers['work.open']({ workId });
       return null;
     },
-    retreatDeleted(session) {
-      for (const current of session.tabs) {
-        if (!current.versionId) continue;
-        let parent = versions.getAny(current.versionId);
-        if (!parent || versions.get(parent.id)) continue;
-        while (parent && !versions.get(parent.id)) parent = versions.getAny(parent.parentId);
-        if (parent) retreatTabs(session, new Set([current.versionId]), parent);
-      }
-    },
-    close: () => queue.close(),
+    retreatDeleted,
+    close: () =>
+      (closing ??= (async () => {
+        shuttingDown = true;
+        await queue.close();
+        await store.exclusive(async () => {});
+        if (cleanupError) throw cleanupError;
+      })()),
     discardEmpty: (workId) => {
       if (
         workId &&

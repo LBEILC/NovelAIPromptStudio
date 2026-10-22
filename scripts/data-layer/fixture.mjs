@@ -98,6 +98,7 @@ export async function seed(directory, count, progress = () => {}, { compact = fa
       'original_undo',
       'removed_originals',
       'deleted_versions',
+      'deferred_version_prunes',
       'work_sequences',
       'work_activity',
       'work_file_signatures',
@@ -109,7 +110,9 @@ export async function seed(directory, count, progress = () => {}, { compact = fa
       raw.run(`DROP TABLE IF EXISTS ${table}`);
     raw.run('DROP TABLE IF EXISTS materials');
     raw.run('DROP TABLE IF EXISTS reference_vibes');
-    raw.run("DELETE FROM app_meta WHERE key IN ('generation_versions_v1','materials_v1')");
+    raw.run(
+      "DELETE FROM app_meta WHERE key IN ('generation_versions_v1','materials_v1','work_originals_v1')",
+    );
     progress('seed:orphan-metadata');
     raw.run('BEGIN');
     for (let index = 0; index < Math.round((count * 147) / 159); index++) {

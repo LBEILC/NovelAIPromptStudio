@@ -1,3 +1,4 @@
+import { migrateWorkOriginals } from './workOriginals.js';
 import fs from 'node:fs';
 import { migrateMaterials, createMaterialStore } from './materials.js';
 import path from 'node:path';
@@ -2019,7 +2020,14 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
 
   backfillPromptFingerprints(false);
   commit();
+  const workOriginalsMigration = migrateWorkOriginals(
+    connection,
+    filePath,
+    versionStore,
+    loadProject,
+  );
   return {
+    workOriginalsMigration,
     versions: versionStore,
     vibeLibrary: createVibeLibrary(connection),
     materials: createMaterialStore(connection),

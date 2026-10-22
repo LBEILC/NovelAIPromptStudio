@@ -237,6 +237,12 @@ export async function createCommands(services) {
       unlocked(input);
       if (!value.project) throw new CommandError('not_found', '图片源已不可用');
       const saved = await services.importImage(value.project.image_path, value.project);
+      const root = value.workId && services.database.versions.list(value.workId)[0];
+      if (
+        root &&
+        (root.id === value.versionId || root.project.image_path === value.project.image_path)
+      )
+        services.database.versions.bindOriginal(value.workId, saved);
       const next = store.get(),
         item = next.tabs.find((t) => t.id === value.id);
       if (item) {
@@ -247,6 +253,13 @@ export async function createCommands(services) {
           image_path: saved.image_path,
           thumbnail_path: saved.thumbnail_path,
         };
+        if (item.originalProject?.image_path === value.project.image_path)
+          item.originalProject = {
+            ...item.originalProject,
+            id: saved.id,
+            image_path: saved.image_path,
+            thumbnail_path: saved.thumbnail_path,
+          };
         item.revision = (item.revision || 0) + 1;
       }
       await store.save(next);
@@ -410,7 +423,7 @@ export async function createCommands(services) {
             .list(v.workId)
             .some(
               (/** @type {import("../../src/shared/generation").WorkVersion} */ other) =>
-                other.branchId === v.branchId,
+                other.branchNumber === v.branchNumber,
             ),
         }),
       );
@@ -547,6 +560,7 @@ export async function createCommands(services) {
     },
   };
   const generation = generationCommands({ services, store, tab, revision, unlocked, emit });
+  await generation.ready?.();
   Object.assign(
     handlers,
     generation.handlers,

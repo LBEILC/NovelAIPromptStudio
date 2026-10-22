@@ -115,6 +115,7 @@ describe('native engine upgrade', () => {
             'original_undo',
             'removed_originals',
             'deleted_versions',
+            'deferred_version_prunes',
             'work_sequences',
             'work_activity',
             'work_file_signatures',
@@ -136,6 +137,7 @@ describe('native engine upgrade', () => {
                       'prompt_fingerprints_version',
                       'generation_versions_v1',
                       'materials_v1',
+                      'work_originals_v1',
                     ].includes(row.key),
                 )
               : actual,
@@ -155,7 +157,16 @@ describe('native engine upgrade', () => {
       expect(fs.readFileSync(reopened.engineBackupPath)).toEqual(before);
       expect(fs.readFileSync(reopened.backupPath)).toEqual(before);
       reopened.close();
-      expect(fs.readdirSync(directory).sort()).toEqual([
+      const originalBackups = fs
+        .readdirSync(directory)
+        .filter((name) => name.startsWith('studio.pre-work-originals-'));
+      expect(originalBackups).toHaveLength(1);
+      expect(
+        fs
+          .readdirSync(directory)
+          .filter((name) => !originalBackups.includes(name))
+          .sort(),
+      ).toEqual([
         'studio.pre-generation-versions.sqlite',
         'studio.pre-materials.sqlite',
         'studio.pre-node-sqlite.sqlite',

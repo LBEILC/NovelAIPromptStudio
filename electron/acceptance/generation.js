@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import { clipboard } from 'electron';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
@@ -779,4 +781,106 @@ export async function generationChecks({
     );
   });
   await h.screenshot('056-reopened-work');
+  // Library trash removes an intermediate version without rewriting its descendants.
+  {
+    const middle = target,
+      previous = returnTree[0];
+    await invoke('prompt.set', {
+      tabId: restored.id,
+      scope: 'base:prompt',
+      text: 'synthetic return third',
+    });
+    const thirdJob = await invoke('generate.start', { tabId: restored.id, count: 1 });
+    await wait(
+      `window.studio.invoke('generate.status',{id:${JSON.stringify(thirdJob.id)}}).then(r=>r.data.jobs[0].state==='completed')`,
+      '第三版生成完成',
+    );
+    const last = database.versions.list(opened.workId).at(-1);
+    await invoke('work.open', { workId: opened.workId, versionId: middle.id });
+    await click('图片库', 'document.querySelector(".tb")');
+    await click('全部图片', 'document.querySelector(".libp")');
+    await input('[aria-label="搜索图片库"]', 'synthetic return second');
+    const trashCard = `[data-group-id="project:${middle.images[0].projectId}"]`;
+    await wait(`!!document.querySelector(${JSON.stringify(trashCard)})`);
+    await e(
+      `document.querySelector(${JSON.stringify(trashCard)}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:200,clientY:200}))`,
+    );
+    await click('移入回收站', 'document.querySelector("[role=menu]:not(.leaving *)")');
+    await h.until(() => !database.versions.get(middle.id), '图库删除中间版最后一图');
+    await check(
+      '图库删光中间版后后版接到上一版，原始父关系和内容不变',
+      () =>
+        database.versions.get(last.id).parentId === previous.id &&
+        database.versions.getAny(last.id).parentId === middle.id &&
+        JSON.stringify(database.versions.get(last.id).project) === JSON.stringify(last.project),
+    );
+    await click('工作台', 'document.querySelector(".tb")');
+    await wait(
+      `!document.querySelector('[data-key="ver-${middle.id}"]') && !!document.querySelector('[data-key="ver-${last.id}"]')`,
+      '第二版消失且第三版仍在版本栏',
+    );
+    await click('撤销', 'document.querySelector(".toast:not(.leaving)")');
+    await h.until(() => !!database.versions.get(middle.id), '图库删除撤销恢复版本');
+    await check(
+      '图库撤销恢复中间版原始位置',
+      () => database.versions.get(last.id).parentId === middle.id,
+    );
+    await invoke('work.open', { workId: opened.workId, versionId: last.id });
+    await click('工作台', 'document.querySelector(".tb")');
+    await wait(`!!document.querySelector('[data-key="ver-${middle.id}"]')`);
+    await h.screenshot('057-library-trash-restored');
+  }
+
+  const [clipboardFile] = await createWorkbenchFixtures(
+    path.join(mode.root, 'clipboard-original'),
+    {
+      prefix: 'synthetic-clipboard-original',
+      sizes: [[64, 64]],
+      prompts: ['synthetic clipboard original'],
+    },
+  );
+  clipboard.clear();
+  clipboard.writeBuffer(
+    process.platform === 'darwin'
+      ? 'public.png'
+      : process.platform === 'win32'
+        ? 'PNG'
+        : 'image/png',
+    fs.readFileSync(clipboardFile),
+  );
+  await h.key('v', process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true });
+  await wait(
+    `window.studio.invoke('workbench.list',{}).then(r=>r.data.tabs.some(t=>t.source.type==='clipboard'))`,
+    '剪贴板打开原图',
+  );
+  const clipboardList = await invoke('workbench.list');
+  const clipboardTab = (await invoke('workbench.get', { tabId: clipboardList.activeTabId })).tab;
+  const clipboardRoot = database.versions.list(clipboardTab.workId)[0];
+  await invoke('prompt.set', {
+    tabId: clipboardTab.id,
+    scope: 'base:prompt',
+    text: 'synthetic clipboard generated',
+  });
+  const clipboardJob = await invoke('generate.start', { tabId: clipboardTab.id, count: 1 });
+  await wait(
+    `window.studio.invoke('generate.status',{id:${JSON.stringify(clipboardJob.id)}}).then(r=>r.data.jobs[0].state==='completed')`,
+    '剪贴板作品生成完成',
+  );
+  await invoke('version.open', { tabId: clipboardTab.id, versionId: clipboardRoot.id });
+  const savedOriginal = await invoke('workbench.save-to-library', { tabId: clipboardTab.id });
+  await invoke('workbench.close', { tabId: clipboardTab.id });
+  await e(`window.studio.invoke('workbench.temp-sync',{paths:[]})`);
+  const reopenedOriginal = await invoke('workbench.open', { libraryId: savedOriginal.project.id });
+  await wait(
+    `Array.from(document.querySelectorAll('[data-key="ver-${clipboardRoot.id}"] img')).some(i=>i.complete && i.naturalWidth>0)`,
+    '重新打开作品的原图缩略图加载成功',
+  );
+  await check(
+    '剪贴板原图存入图库关闭后仍回到同一作品并加载原图',
+    () =>
+      reopenedOriginal.tab.workId === clipboardTab.workId &&
+      database.versions.list(clipboardTab.workId)[0].project.id === savedOriginal.project.id &&
+      fs.existsSync(clipboardRoot.project.image_path),
+  );
+  await h.screenshot('057-clipboard-original-restored');
 }
