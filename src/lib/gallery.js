@@ -168,8 +168,8 @@ export function groupGalleryProjects(projects = [], groupingValue) {
 
 // ---------- 卡片的主图和多张预览（1.5.6，doc/design.md 2.23） ----------
 export const GALLERY_COVERS = ['origin', 'earliest', 'latest'];
-export const GALLERY_DISPLAY_DEFAULT = Object.freeze({ cover: 'earliest', mosaic: false });
-/** 多张预览：大小到这个行高以上才显示右边那一列 */
+export const GALLERY_DISPLAY_DEFAULT = Object.freeze({ cover: 'earliest' });
+/** 多张预览：大小到这个行高以上、一组 3 张以上就自动显示右边那一列（用户 10-22：不再是开关） */
 export const GALLERY_MOSAIC_MIN_ROW = 240;
 /** 右边那一列的宽度，按行高的比例 */
 export const GALLERY_MOSAIC_RATIO = 0.25;
@@ -177,7 +177,10 @@ export const GALLERY_MOSAIC_RATIO = 0.25;
 export function normalizeGalleryDisplay(value = {}) {
   return {
     cover: GALLERY_COVERS.includes(value?.cover) ? value.cover : GALLERY_DISPLAY_DEFAULT.cover,
-    mosaic: Boolean(value?.mosaic),
+    // 从"按提示词"切走再切回来时，回到上次选的方式
+    promptScope: ['full', 'base', 'similar'].includes(value?.promptScope)
+      ? value.promptScope
+      : undefined,
   };
 }
 /** @template {{ created_at?: string }} T @param {T[]} list @returns {T[]} */

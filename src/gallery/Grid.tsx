@@ -31,12 +31,16 @@ const cardRatio = (c: LibraryCard) => {
   return width && height ? width / height : fallbackRatio;
 };
 /** 卡片显示的样子（1.5.6）：主图按"封面"选；多张预览时右边多一列，卡片宽出行高的 GALLERY_MOSAIC_RATIO */
-export type GalleryDisplay = { cover: 'origin' | 'earliest' | 'latest'; mosaic: boolean };
-const mosaicOn = (g: LibraryGroup, d: GalleryDisplay, rowHeight: number) =>
-  d.mosaic && rowHeight >= GALLERY_MOSAIC_MIN_ROW && g.members.length >= 3;
+export type GalleryDisplay = {
+  cover: 'origin' | 'earliest' | 'latest';
+  /** 上次在"按提示词"里选的方式 */
+  promptScope?: 'full' | 'base' | 'similar';
+};
+const mosaicOn = (g: LibraryGroup, _d: GalleryDisplay, rowHeight: number) =>
+  rowHeight >= GALLERY_MOSAIC_MIN_ROW && g.members.length >= 3;
 const isWork = (g: LibraryGroup) => g.id.startsWith('work:');
-/** 作品的角标图标：在预览里比较 node-tree、git-branch-line、git-commit-line 后定 */
-export const WORK_ICON = 'node-tree';
+/** 作品的角标图标：分支（用户 10-22 在预览里比较几种后定："比较直观"） */
+export const WORK_ICON = 'git-branch-line';
 const thumb = (c: Pick<LibraryCard, 'thumbnail_path' | 'image_path'>) =>
   mediaUrl(c.thumbnail_path || c.image_path);
 
@@ -189,7 +193,7 @@ function Cards({
         ms('--thumb-ratio-min') || 0.5,
         ms('--thumb-ratio-max') || 2.5,
       ),
-    [exit.map((x) => x.key).join('|'), vp.width, rowHeight, gap, display.cover, display.mosaic],
+    [exit.map((x) => x.key).join('|'), vp.width, rowHeight, gap, display.cover],
   );
   const height = rows.length ? rows[rows.length - 1].top + rows[rows.length - 1].height : 0;
   // 新出现的（导入、生成的图）淡入；第一次画出来的不淡入

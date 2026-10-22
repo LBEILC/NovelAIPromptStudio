@@ -19,7 +19,6 @@ import { DateRangePop } from './DateRange';
 import type { GalleryFilters } from '../shared/types';
 import type { LibraryProps } from '../library/types';
 import type { GalleryDisplay } from './Grid';
-import { GALLERY_MOSAIC_MIN_ROW } from '../lib/gallery.js';
 
 const ROW = { min: 120, max: 360, step: 20 };
 const SIM = { min: 70, max: 95, step: 5 };
@@ -28,9 +27,12 @@ const SORTS = [
   ['oldest', '最早导入的在前'],
   ['name', '按名称'],
 ] as const;
-const MERGE = [
-  ['separate', '不合并'],
+const GROUPS = [
   ['work', '按作品'],
+  ['prompt', '按提示词'],
+  ['separate', '不分组'],
+] as const;
+const PROMPT_SCOPES = [
   ['full', '完全相同'],
   ['base', '基础相同'],
   ['similar', '相似'],
@@ -720,6 +722,10 @@ function ViewPop({
 }) {
   const [sort, setSort] = useState(false);
   const sim = p.grouping.promptScope === 'similar';
+  const group =
+    p.grouping.promptScope === 'work' || p.grouping.promptScope === 'separate'
+      ? p.grouping.promptScope
+      : 'prompt';
   return (
     <>
       <Pop
@@ -752,69 +758,84 @@ function ViewPop({
             <Icon name="arrow-down-s-line" />
           </button>
         </div>
+        {/* 分组（1.5.6，用户 10-22："给用户太多选项可能增加使用负担"）：三选一，按提示词的三种方式收在里面，选了才展开 */}
         <div className="frow top">
-          <span className="label">合并</span>
+          <span className="label">分组</span>
           <div className="lcolm">
             <Seg
-              items={MERGE}
-              value={p.grouping.promptScope as (typeof MERGE)[number][0]}
-              label="合并方式"
-              onChange={(promptScope) => p.onGroupingChange({ promptScope })}
+              items={GROUPS}
+              value={group}
+              label="分组"
+              onChange={(g) =>
+                p.onGroupingChange({
+                  promptScope: g === 'prompt' ? display.promptScope || 'full' : g,
+                })
+              }
             />
             <span className="help lmerge-help">{MERGE_HELP[p.grouping.promptScope]}</span>
           </div>
         </div>
-        <div className={`frow ${sim ? '' : 'off'}`}>
-          <span className="label">相似度</span>
-          <span className="lsize" data-tip={sim ? undefined : '合并方式选"相似"时可调整'}>
-            <Slider
-              {...SIM}
-              value={p.grouping.similarityThreshold}
-              disabled={!sim}
-              label="相似度"
-              onChange={(similarityThreshold) => p.onGroupingChange({ similarityThreshold })}
-            />
-            <span className="lval mono">{p.grouping.similarityThreshold}%</span>
-          </span>
+        <div className={`expand ${group === 'work' ? 'open' : ''}`}>
+          <div>
+            <div className="frow">
+              <span className="label">封面</span>
+              <Seg
+                label="封面"
+                items={COVERS}
+                value={display.cover}
+                onChange={(cover) => onDisplay({ cover })}
+              />
+            </div>
+          </div>
         </div>
-        <div className="frow">
-          <span className="label">Vibe</span>
-          <span className="lswrow">
-            <Switch
-              on={p.grouping.mergeVibes}
-              label="Vibe 不同的也合并"
-              onChange={(mergeVibes) => p.onGroupingChange({ mergeVibes })}
-            />
-            <span>不同的也合并</span>
-          </span>
-        </div>
-        {/* 封面和多张预览（1.5.6）：只影响卡片怎么画，不重新分组 */}
-        <div className="frow">
-          <span className="label">封面</span>
-          <Seg
-            label="封面"
-            items={COVERS}
-            value={display.cover}
-            onChange={(cover) => onDisplay({ cover })}
-          />
-        </div>
-        <div className={`frow ${rowHeight >= GALLERY_MOSAIC_MIN_ROW ? '' : 'off'}`}>
-          <span className="label">多张</span>
-          <span
-            className="lswrow"
-            data-tip={
-              rowHeight >= GALLERY_MOSAIC_MIN_ROW
-                ? undefined
-                : `大小调到 ${GALLERY_MOSAIC_MIN_ROW} 以上时显示`
-            }
-          >
-            <Switch
-              on={display.mosaic}
-              label="放得下时显示多张"
-              onChange={(mosaic) => onDisplay({ mosaic })}
-            />
-            <span>放得下时显示多张</span>
-          </span>
+        <div className={`expand ${group === 'prompt' ? 'open' : ''}`}>
+          <div>
+            <div className="frow">
+              <span className="label">方式</span>
+              <Seg
+                label="按提示词分组的方式"
+                items={PROMPT_SCOPES}
+                value={
+                  (group === 'prompt'
+                    ? p.grouping.promptScope
+                    : display.promptScope || 'full') as (typeof PROMPT_SCOPES)[number][0]
+                }
+                onChange={(promptScope) => {
+                  onDisplay({ promptScope });
+                  p.onGroupingChange({ promptScope });
+                }}
+              />
+            </div>
+            <div className={`expand ${sim ? 'open' : ''}`}>
+              <div>
+                <div className="frow">
+                  <span className="label">相似度</span>
+                  <span className="lsize">
+                    <Slider
+                      {...SIM}
+                      value={p.grouping.similarityThreshold}
+                      label="相似度"
+                      onChange={(similarityThreshold) =>
+                        p.onGroupingChange({ similarityThreshold })
+                      }
+                    />
+                    <span className="lval mono">{p.grouping.similarityThreshold}%</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="frow">
+              <span className="label">Vibe</span>
+              <span className="lswrow">
+                <Switch
+                  on={p.grouping.mergeVibes}
+                  label="Vibe 不同的也合并"
+                  onChange={(mergeVibes) => p.onGroupingChange({ mergeVibes })}
+                />
+                <span>不同的也合并</span>
+              </span>
+            </div>
+          </div>
         </div>
       </Pop>
       <Pop

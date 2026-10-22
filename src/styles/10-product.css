@@ -189,8 +189,6 @@ html.tray, html.tray body, html.tray #root { width: auto; height: auto; backgrou
 .tray-wrap { display: inline-block; padding: var(--sp-3); }
 .tray-wrap .menu { display: flex; }
 
-/* 视图浮层：合并方式五个选项（多了"按作品"），比别的宽浮层宽一点，最后一项不贴边 */
-.popover.wide.lview-pop { width: calc(var(--popover-w-wide) + var(--sp-3)); }
 
 /* 版本栏：缩略图的文件找不到时是同样大小的虚线框 */
 .ver .ths .th-miss { display: block; width: var(--w, 28px); height: 38px; box-sizing: border-box; border: var(--bw) dashed var(--border); border-radius: 3px; }
@@ -221,3 +219,9 @@ html.tray, html.tray body, html.tray #root { width: auto; height: auto; backgrou
 .detail .sum .fan { --fan-h: calc(var(--fan-w) * 1216 / 832); }
 .detail .sum .fan img { flex: 0 0 auto; height: var(--fan-h); aspect-ratio: auto; }
 .detail .sum .fan img + img { margin-left: calc(var(--fan-h) * -0.27); }
+
+/* 视图浮层（1.5.6）：封面、按提示词的细项按需展开。收起时把浮层的行距（--sp-3）收回来，展开后在里面补上 */
+.lview-pop .expand { margin-top: calc(-1 * var(--sp-3)); }
+.lview-pop .expand > div > div:first-child { margin-top: var(--sp-3); }
+.lview-pop .expand > div { display: flex; flex-direction: column; gap: var(--sp-3); }
+.lview-pop .lmerge-help { min-height: 0; }
