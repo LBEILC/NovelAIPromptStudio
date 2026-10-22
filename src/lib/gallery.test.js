@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   adjacentGallerySelection,
+  detachedGalleryGroups,
+  trashedGroups,
   galleryEmptyState,
   galleryGroupMember,
   galleryGroupMenuLabels,
@@ -15,6 +17,7 @@ import {
   reconcileGallerySelection,
   shouldCollapseGalleryPreview,
 } from './gallery.js';
+import { DEFAULT_GALLERY_FILTERS } from './galleryFilters.js';
 
 const item = (id, fingerprint, createdAt, cover = '') => ({
   base_prompt_fingerprint:
@@ -366,5 +369,38 @@ describe('gallery grouping and selection', () => {
     items[1].onClick();
     expect(onRestore).toHaveBeenCalledWith();
     expect(onPermanentDelete).toHaveBeenCalledWith();
+  });
+});
+
+describe('回收站里去掉的记录', () => {
+  const image = (id, name) => ({ id, name, created_at: '2026-10-22T00:00:00Z', tags: [] });
+  const record = (undo, img, workName = '作品 A') => ({
+    undo,
+    workId: 'w-' + workName,
+    workName,
+    role: 'origin',
+    detachedAt: '2026-10-22T01:00:00Z',
+    image: img,
+  });
+
+  it('一条记录一张卡片，同一张图从两个作品去掉就是两张', () => {
+    const img = image('p1', 'one');
+    const groups = detachedGalleryGroups(
+      [record('u1', img), record('u2', img, '作品 C')],
+      DEFAULT_GALLERY_FILTERS,
+      { promptScope: 'work' },
+    );
+    expect(groups.map((g) => g.id)).toEqual(['detached:u1', 'detached:u2']);
+    expect(groups[1].detached.workName).toBe('作品 C');
+  });
+
+  it('选中去掉的记录时，恢复和永久删除不算这张图', () => {
+    const groups = [
+      { id: 'g1', members: [{ id: 'trashed' }] },
+      ...detachedGalleryGroups([record('u1', image('live', 'x'))], DEFAULT_GALLERY_FILTERS, {}),
+    ];
+    expect(gallerySelectionProjectIds(trashedGroups(groups), ['g1', 'detached:u1'])).toEqual([
+      'trashed',
+    ]);
   });
 });

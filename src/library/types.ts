@@ -1,5 +1,6 @@
 import type {
   Collection,
+  DetachedRecord,
   GalleryFilters,
   ImageRecord,
   ImageProject,
@@ -18,6 +19,8 @@ export interface LibraryGroup {
   cover: LibraryCard;
   members: LibraryCard[];
   grouping: Grouping;
+  /** 回收站里"只从某个作品去掉"的一条记录（1.6.0）：这张卡片不是回收站里的图 */
+  detached?: DetachedRecord;
 }
 export type CountedCollection = Collection & { image_count: number | null };
 export interface LibraryProps {
@@ -88,8 +91,14 @@ export interface LibraryProps {
     ids?: string[] | null,
     bytes?: number | null,
     scope?: string,
+    /** 一起选中的去掉的记录：确认后一起丢掉 */
+    records?: DetachedRecord[],
   ) => Promise<unknown>;
   onEmptyTrash: () => Promise<unknown>;
+  /** 放回去掉它的那个作品（1.6.0） */
+  onPutBack?: (records: DetachedRecord[]) => Promise<unknown>;
+  /** 不再恢复：只丢掉记录，图还在别的作品里 */
+  onDiscardDetached?: (records: DetachedRecord[]) => Promise<unknown>;
   onImport: () => void;
   onImportClipboard: () => void;
 }

@@ -255,6 +255,36 @@ export function galleryViewGroups(
   return sortGalleryGroups(groupGalleryProjects(filteredProjects, grouping), sort);
 }
 
+/**
+ * 回收站里"只从某个作品去掉"的记录（1.6.0，doc/design.md 2.0）：一条记录一张卡片，和移入回收站的图排在一起。
+ * 筛选和搜索照样生效；id 用撤销令牌，同一张图从两个作品去掉就是两张卡片。
+ * @param {any[]} records
+ * @param {any} filters
+ * @param {any} grouping
+ */
+export function detachedGalleryGroups(records = [], filters, grouping, nowValue = new Date()) {
+  const images = [...new Map(records.map((r) => [r.image.id, r.image])).values()];
+  const kept = new Set(filterGalleryProjects(images, filters, nowValue).map((image) => image.id));
+  return records
+    .filter((r) => kept.has(r.image.id))
+    .map((r) => ({
+      id: `detached:${r.undo}`,
+      key: `detached:${r.undo}`,
+      fingerprint: '',
+      cover: r.image,
+      members: [r.image],
+      grouping,
+      latestAt: r.image.created_at || '',
+      count: 1,
+      detached: r,
+    }));
+}
+
+/** 去掉的记录不是回收站里的图：恢复、永久删除这些按图操作的都不算它们 */
+export function trashedGroups(groups = []) {
+  return groups.filter((group) => !group.detached);
+}
+
 export function gallerySelectionProjectIds(groups = [], selectedGroupIds = []) {
   const selected = new Set(selectedGroupIds);
   // 共用的图在几个组里各有一份，按图去重（1.5.6）

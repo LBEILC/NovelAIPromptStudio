@@ -1,8 +1,8 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { galleryViewGroups } from '../lib/gallery.js';
+import { detachedGalleryGroups, galleryViewGroups, sortGalleryGroups } from '../lib/gallery.js';
 import { galleryCollectionScope } from '../lib/galleryCollections.js';
 import { scheduleGalleryComputation } from '../lib/galleryTransition.js';
-import type { Collection, GalleryFilters, LibraryCard } from '../shared/types';
+import type { Collection, DetachedRecord, GalleryFilters, LibraryCard } from '../shared/types';
 import type { Grouping, LibraryGroup } from '../library/types';
 interface Options {
   galleryView: string;
@@ -19,6 +19,8 @@ interface Options {
   libraryLoading: boolean;
   previewGroupId: string;
   previewProjectId: string;
+  /** 回收站里"只从某个作品去掉"的记录 */
+  detached?: DetachedRecord[];
 }
 export function useLibraryComputation({
   galleryView,
@@ -35,6 +37,7 @@ export function useLibraryComputation({
   libraryLoading,
   previewGroupId,
   previewProjectId,
+  detached = [],
 }: Options) {
   const groupingWorkerRef = useRef<Worker | null>(null);
   const groupingRequestRef = useRef(0);
@@ -207,10 +210,36 @@ export function useLibraryComputation({
     showToast,
   ]);
 
-  const visibleGroups: LibraryGroup[] =
+  const baseGroups: LibraryGroup[] =
     deferredGalleryComputation.grouping.promptScope === 'similar'
       ? similarGroupingState.groups
       : exactVisibleGroups || [];
+  // 回收站里两种东西排在一起：移入回收站的图，和只从某个作品去掉的图（1.6.0）
+  const trashView = deferredGalleryComputation.view === 'trash';
+  const visibleGroups: LibraryGroup[] = useMemo(
+    () =>
+      trashView && detached.length
+        ? sortGalleryGroups(
+            [
+              ...baseGroups,
+              ...detachedGalleryGroups(
+                detached,
+                deferredGalleryComputation.filters,
+                deferredGalleryComputation.grouping,
+              ),
+            ],
+            deferredGalleryComputation.sort,
+          )
+        : baseGroups,
+    [
+      baseGroups,
+      detached,
+      trashView,
+      deferredGalleryComputation.filters,
+      deferredGalleryComputation.grouping,
+      deferredGalleryComputation.sort,
+    ],
+  );
   const galleryUpdating =
     libraryLoading ||
     deferredGalleryComputation !== galleryComputation ||

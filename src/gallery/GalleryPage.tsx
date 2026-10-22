@@ -31,7 +31,7 @@ import { BatchNamePop } from './BatchName';
 import { NameAI } from './NameAI';
 import type { LibraryGroup, LibraryProps } from '../library/types';
 import type { LibraryCardCacheProgress } from '../shared/ipc';
-import type { ImportProgress, LibraryCard } from '../shared/types';
+import type { DetachedRecord, ImportProgress, LibraryCard } from '../shared/types';
 
 const stored = (key: string) => {
   try {
@@ -157,8 +157,20 @@ export default function GalleryPage(
   }, [p.preview, p.groups, p.loading]);
   const picked = p.groups.filter((g) => p.selectedGroupIds.includes(g.id));
   // 共用的图可能在几个选中的组里各有一份：按图去重（1.5.6）
-  const pickedIds = [...new Set(picked.flatMap((g) => g.members.map((m) => m.id)))];
+  // 回收站里去掉的记录不是回收站里的图（1.6.0）：恢复是放回，永久删除是不再恢复
+  const pickedIds = [
+    ...new Set(picked.filter((g) => !g.detached).flatMap((g) => g.members.map((m) => m.id))),
+  ];
+  const pickedDetached = picked.flatMap((g) => (g.detached ? [g.detached] : []));
   const trash = p.view === 'trash';
+  const restorePicked = (ids: string[], records: DetachedRecord[]) => {
+    if (ids.length) void p.onRestore(ids);
+    if (records.length) void p.onPutBack?.(records);
+  };
+  const deletePicked = (ids: string[], records: DetachedRecord[]) => {
+    if (!ids.length) return void p.onDiscardDetached?.(records);
+    void p.onPermanentDelete(ids, null, 'selection', records);
+  };
 
   // 大图：按图片库当前的顺序，遇到一组依次走完
   const [viewer, setViewer] = useState<{ items: ViewerItem[]; index: number } | null>(null);
@@ -200,13 +212,27 @@ export default function GalleryPage(
   const menuItems: MenuEntry[] = (() => {
     if (!menu) return [];
     const multi = p.selectedGroupIds.includes(menu.group.id) && pickedIds.length > 1;
-    const ids = multi ? pickedIds : menu.group.members.map((m) => m.id);
+    const ids = multi ? pickedIds : menu.group.detached ? [] : menu.group.members.map((m) => m.id);
+    const records = multi ? pickedDetached : menu.group.detached ? [menu.group.detached] : [];
     if (trash)
-      return [
-        { label: '恢复', onSelect: () => void p.onRestore(ids) },
-        'sep',
-        { label: '永久删除…', danger: true, onSelect: () => void p.onPermanentDelete(ids) },
-      ];
+      return !ids.length && records.length
+        ? [
+            {
+              label: records.length === 1 ? `放回「${records[0].workName}」` : '放回',
+              onSelect: () => void p.onPutBack?.(records),
+            },
+            'sep',
+            {
+              label: '不再恢复',
+              danger: true,
+              onSelect: () => void p.onDiscardDetached?.(records),
+            },
+          ]
+        : [
+            { label: '恢复', onSelect: () => restorePicked(ids, records) },
+            'sep',
+            { label: '永久删除…', danger: true, onSelect: () => deletePicked(ids, records) },
+          ];
     return [
       {
         label: multi ? `在工作台打开 ${ids.length} 张` : '在工作台打开',
@@ -350,8 +376,9 @@ export default function GalleryPage(
   if (busyImport) lastImport.current = busyImport;
   const lastCache = useRef(p.cacheProgress);
   if (p.cacheProgress) lastCache.current = p.cacheProgress;
-  const lastPick = useRef({ groups: picked.length, images: pickedIds.length });
-  if (picked.length) lastPick.current = { groups: picked.length, images: pickedIds.length };
+  const pickedImages = pickedIds.length + pickedDetached.length;
+  const lastPick = useRef({ groups: picked.length, images: pickedImages });
+  if (picked.length) lastPick.current = { groups: picked.length, images: pickedImages };
   const dock = (key: string, leaving: boolean) => {
     if (key === 'import') {
       const ip = lastImport.current!;
@@ -412,11 +439,17 @@ export default function GalleryPage(
         </span>
         {trash ? (
           <>
-            <button className="btn quiet sm" onClick={() => p.onRestore(pickedIds)}>
-              恢复
+            <button
+              className="btn quiet sm"
+              onClick={() => restorePicked(pickedIds, pickedDetached)}
+            >
+              {pickedIds.length ? '恢复' : '放回'}
             </button>
-            <button className="btn danger sm" onClick={() => p.onPermanentDelete(pickedIds)}>
-              永久删除
+            <button
+              className="btn danger sm"
+              onClick={() => deletePicked(pickedIds, pickedDetached)}
+            >
+              {pickedIds.length ? '永久删除' : '不再恢复'}
             </button>
           </>
         ) : (

@@ -24,7 +24,7 @@ import {
 } from '../lib/gallery.js';
 import { GENERATED } from './Side';
 import type { LibraryGroup, LibraryProps } from '../library/types';
-import type { LibraryCard } from '../shared/types';
+import type { DetachedRecord, LibraryCard } from '../shared/types';
 
 const cardRatio = (c: LibraryCard) => {
   const { width, height } = c.metadata;
@@ -41,6 +41,18 @@ const mosaicOn = (g: LibraryGroup, _d: GalleryDisplay, rowHeight: number) =>
 const isWork = (g: LibraryGroup) => g.id.startsWith('work:');
 /** 作品的角标图标：分支（用户 10-22 在预览里比较几种后定："比较直观"） */
 export const WORK_ICON = 'git-branch-line';
+/** 这张图现在还在哪儿：「B」第 3 版、「C」的原图；哪个作品都不在就是图片库 */
+export const stillIn = (r: DetachedRecord) => {
+  const refs = r.image.work_refs || [];
+  return refs.length
+    ? refs
+        .map((x) =>
+          x.role === 'origin' ? `「${x.workName}」的原图` : `「${x.workName}」第 ${x.number} 版`,
+        )
+        .join('、') + '里还在'
+    : '图片库里还在';
+};
+const detachedTip = (r: DetachedRecord) => `只从「${r.workName}」里去掉，${stillIn(r)}`;
 const thumb = (c: Pick<LibraryCard, 'thumbnail_path' | 'image_path'>) =>
   mediaUrl(c.thumbnail_path || c.image_path);
 
@@ -517,8 +529,15 @@ function Cards({
                   ))}
                 </span>
               )}
+              {/* 回收站里只从某个作品去掉的图（1.6.0）：分支图标加减号 */}
+              {g.detached && (
+                <span className="stack lstack ldetached" data-tip={detachedTip(g.detached)}>
+                  <Icon name={WORK_ICON} />
+                  <Icon name="subtract-line" />
+                </span>
+              )}
               {/* 角标：作品是作品图标，按提示词合并的一组是叠放图标；只有一张的作品只有图标、不带数字 */}
-              {!sc && (n > 1 || work || genNote) && (
+              {!sc && !g.detached && (n > 1 || work || genNote) && (
                 <span
                   className={`stack ${n > 1 || work ? 'lstack' : ''}`}
                   data-tip={

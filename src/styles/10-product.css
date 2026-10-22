@@ -225,3 +225,5 @@ html.tray, html.tray body, html.tray #root { width: auto; height: auto; backgrou
 .lview-pop .expand > div > div:first-child { margin-top: var(--sp-3); }
 .lview-pop .expand > div { display: flex; flex-direction: column; gap: var(--sp-3); }
 .lview-pop .lmerge-help { min-height: 0; }
+/* 回收站里只从某个作品去掉的图（1.6.0）：分支图标加减号，两个图标挨紧 */
+.lgrid .card .ldetached [class^="ri-"] + [class^="ri-"] { margin-left: calc(-1 * var(--sp-0)); }

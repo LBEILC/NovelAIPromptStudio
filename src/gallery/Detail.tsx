@@ -20,7 +20,7 @@ const ratioOf = (m: { metadata?: { width?: number | null; height?: number | null
   const { width, height } = m.metadata || {};
   return width && height ? Math.min(2, Math.max(0.5, width / height)) : 832 / 1216;
 };
-import { WORK_ICON } from './Grid';
+import { WORK_ICON, stillIn } from './Grid';
 
 export { CAT_VAR, CAT_NAME } from '../kit/categories';
 import { CAT_VAR, CAT_NAME } from '../kit/categories';
@@ -120,7 +120,9 @@ function One({
   const pics = useSwap(detail, (d) => d.id);
   const ids = group.members.map((m) => m.id);
   const refs = group.members.find((m) => m.id === detail.id)?.work_refs || detail.work_refs || [];
-  const others = refs.filter((r) => `work:${r.workId}` !== group.id);
+  // 回收站里不列"也是…"：放回之前点过去也看不到（去掉的记录在下面单独写）
+  const others = trash ? [] : refs.filter((r) => `work:${r.workId}` !== group.id);
+  const gone = group.detached;
   return (
     <div className="col detail" data-detail-id={detail.id} ref={a.colRef}>
       {a.handle}
@@ -227,10 +229,16 @@ function One({
             )}
             {detail.vibe_fingerprint && ` · Vibe ${detail.vibe_fingerprint.slice(0, 8)}`}
           </span>
-          <span className="meta">
-            {(trash ? detail.deleted_at : detail.created_at).slice(0, 10)}{' '}
-            {trash ? '移入回收站' : '导入'}
-          </span>
+          {gone ? (
+            <span className="meta">
+              {gone.detachedAt.slice(0, 10)} 已从「{gone.workName}」里去掉 · {stillIn(gone)}
+            </span>
+          ) : (
+            <span className="meta">
+              {(trash ? detail.deleted_at : detail.created_at).slice(0, 10)}{' '}
+              {trash ? '移入回收站' : '导入'}
+            </span>
+          )}
           {!named && (
             <span className="meta mono lfile selectable" data-tip-overflow={file}>
               文件 {file}
@@ -257,7 +265,23 @@ function One({
           ))}
         </div>
         <div className="stage-acts dacts">
-          {trash ? (
+          {gone ? (
+            <>
+              <button className="btn quiet sm" onClick={() => void p.onPutBack?.([gone])}>
+                <Icon name="arrow-go-back-line" />
+                放回「{gone.workName}」
+              </button>
+              <span className="sp" />
+              {/* 不叫"永久删除"：只丢掉这条记录，图还在别的作品里，什么都不从磁盘删 */}
+              <button
+                className="btn quiet sm"
+                data-tip="丢掉这条记录，图片本身不删"
+                onClick={() => void p.onDiscardDetached?.([gone])}
+              >
+                不再恢复
+              </button>
+            </>
+          ) : trash ? (
             <>
               <button className="btn quiet sm" onClick={() => p.onRestore(ids, 'detail')}>
                 <Icon name="arrow-go-back-line" />

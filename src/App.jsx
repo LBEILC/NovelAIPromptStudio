@@ -85,6 +85,7 @@ import {
   galleryGroupMember,
   gallerySelectionProjectIds,
   reconcileGallerySelection,
+  trashedGroups,
 } from './lib/gallery.js';
 import {
   DEFAULT_GALLERY_FILTERS,
@@ -326,6 +327,8 @@ export default function App() {
   const lastSelectedGroupRef = useRef('');
   const libraryRequestsRef = useRef({ all: 0, trash: 0 });
   const loadedLibraryViewsRef = useRef(new Set());
+  // 回收站里"只从某个作品去掉"的记录（1.6.0）：和回收站的图一起刷新
+  const [detachedRecords, setDetachedRecords] = useState([]);
   const activeTab = activeWorkbenchTab(workbenchSession);
   const projects = projectsByView[galleryView] || [];
   const libraryLoading = Boolean(libraryLoadingByView[galleryView]);
@@ -384,6 +387,12 @@ export default function App() {
       const requestId = (libraryRequestsRef.current[targetView] || 0) + 1;
       libraryRequestsRef.current[targetView] = requestId;
       setLibraryLoadingByView((current) => ({ ...current, [targetView]: true }));
+      if (targetView === 'trash')
+        void invokeUI('trash.detached', {}).then(
+          (r) =>
+            libraryRequestsRef.current.trash === requestId && setDetachedRecords(r?.items || []),
+          () => {},
+        );
       try {
         const items = await invokeUI('library.cards', { view: targetView });
         if (libraryRequestsRef.current[targetView] !== requestId) return [];
@@ -990,6 +999,7 @@ export default function App() {
     libraryLoading,
     previewGroupId,
     previewProjectId,
+    detached: detachedRecords,
   });
   useEffect(() => {
     const capture = window.studioScreenshot;
@@ -1006,7 +1016,8 @@ export default function App() {
   }, [workbenchSessionReady, galleryUpdating, visibleGroups]);
 
   const selectedProjectIds = useMemo(
-    () => gallerySelectionProjectIds(visibleGroups, selectedGroupIds),
+    // 去掉的记录不是回收站里的图，恢复、永久删除不算它们
+    () => gallerySelectionProjectIds(trashedGroups(visibleGroups), selectedGroupIds),
     [selectedGroupIds, visibleGroups],
   );
 
@@ -1222,11 +1233,20 @@ export default function App() {
     }));
   };
 
-  const permanentDelete = async (explicitIds = null, _knownBytes = null, scope = 'selection') => {
+  const permanentDelete = async (
+    explicitIds = null,
+    _knownBytes = null,
+    scope = 'selection',
+    records = [],
+  ) => {
     const ids = explicitIds || selectedProjectIds;
-    if (!ids.length) return;
+    if (!ids.length && !records.length) return;
     const impact = tabImpact(ids);
     const clearing = scope === 'empty';
+    // 清空回收站时两种一起清，确认框写各有几条（1.6.0）
+    const detachedNote = records.length
+      ? `另有 ${records.length} 张只从作品去掉的图，清空后不能再放回，它们在别的作品里还在。`
+      : '';
     if (
       !(await requestConfirmation({
         title: clearing
@@ -1235,8 +1255,10 @@ export default function App() {
             ? '永久删除这张图片？'
             : `永久删除这 ${ids.length} 张图片？`,
         message: clearing
-          ? `将永久删除回收站中的 ${ids.length} 张图片，此操作无法撤销。原文件不受影响。`
-          : `将删除图片库中保存的${ids.length === 1 ? '副本' : ` ${ids.length} 份副本`}及其记录，此操作无法撤销。原文件不受影响。`,
+          ? ids.length
+            ? `将永久删除回收站中的 ${ids.length} 张图片，此操作无法撤销。原文件不受影响。${detachedNote}`
+            : `回收站里有 ${records.length} 张只从作品去掉的图，清空后不能再放回。它们在别的作品里还在，不会被删除。`
+          : `将删除图片库中保存的${ids.length === 1 ? '副本' : ` ${ids.length} 份副本`}及其记录，此操作无法撤销。原文件不受影响。${detachedNote}`,
         detail: deletionDetail(impact, ''),
         okText: clearing ? '清空回收站' : '永久删除',
         danger: true,
@@ -1244,6 +1266,21 @@ export default function App() {
       }))
     )
       return;
+    if (records.length) {
+      try {
+        await invokeUI('work.discard-detached', { undos: records.map((r) => r.undo) });
+      } catch (error) {
+        showToast(`清空回收站失败：${error instanceof Error ? error.message : error}`, 'error');
+        return;
+      }
+      if (!ids.length) {
+        showToast('已清空回收站');
+        setPreviewGroupId('');
+        setPreviewProjectId('');
+        await reloadAfterGalleryAction();
+        return;
+      }
+    }
     const result = await invokeUI('trash.delete-permanently', { ids: ids });
     const groupCount = scope === 'group' ? 1 : explicitIds ? 0 : selectedGroupIds.length;
     if (!result?.ok || result.summary?.failed) {
@@ -1260,16 +1297,81 @@ export default function App() {
   };
 
   const emptyTrash = async () => {
-    const summary = await invokeUI('trash.summary', {});
+    const [summary, detached] = await Promise.all([
+      invokeUI('trash.summary', {}),
+      invokeUI('trash.detached', {}).catch(() => ({ items: [] })),
+    ]);
     if (!summary?.ok) {
       showToast(summary?.error || '读取回收站失败', 'error');
       return;
     }
-    if (!summary.projects?.length) return;
+    const records = detached?.items || [];
+    if (!summary.projects?.length && !records.length) return;
     await permanentDelete(
-      summary.projects.map((project) => project.id),
+      (summary.projects || []).map((project) => project.id),
       null,
       'empty',
+      records,
+    );
+  };
+
+  // 放回去掉它的那个作品（1.6.0）；撤销就是再去掉一次
+  const putBackDetached = async (records) => {
+    const back = [];
+    const failed = [];
+    for (const record of records) {
+      try {
+        const result = await invokeUI('work.restore-detached', { undo: record.undo });
+        if (result?.restored) back.push(record);
+        else failed.push(`「${record.workName}」已经不在了`);
+      } catch (error) {
+        failed.push(error instanceof Error ? error.message : String(error));
+      }
+    }
+    setPreviewGroupId('');
+    setPreviewProjectId('');
+    await reloadAfterGalleryAction();
+    if (failed.length) showToast(`放回失败：${[...new Set(failed)].join('；')}`, 'error');
+    if (!back.length) return;
+    const works = [...new Set(back.map((r) => r.workName))];
+    notify({
+      tone: 'success',
+      text:
+        back.length === 1
+          ? `已放回「${back[0].workName}」`
+          : `已放回 ${back.length} 张${works.length === 1 ? `到「${works[0]}」` : ''}`,
+      action: {
+        label: '撤销',
+        onClick: async () => {
+          const byWork = new Map();
+          for (const r of back) byWork.set(r.workId, [...(byWork.get(r.workId) || []), r.image.id]);
+          try {
+            for (const [workId, imageIds] of byWork)
+              await invokeUI('work.detach-images', { workId, imageIds });
+          } catch (error) {
+            showToast(`撤销失败：${error instanceof Error ? error.message : error}`, 'error');
+          }
+          await reloadAfterGalleryAction();
+        },
+      },
+    });
+  };
+
+  // 不再恢复：只丢掉记录，图片和文件都不动
+  const discardDetached = async (records) => {
+    try {
+      await invokeUI('work.discard-detached', { undos: records.map((r) => r.undo) });
+    } catch (error) {
+      showToast(`操作失败：${error instanceof Error ? error.message : error}`, 'error');
+      return;
+    }
+    setPreviewGroupId('');
+    setPreviewProjectId('');
+    await reloadAfterGalleryAction();
+    showToast(
+      records.length === 1
+        ? '已不再恢复，这张图在别的作品里还在'
+        : `已不再恢复 ${records.length} 张，它们在别的作品里还在`,
     );
   };
 
@@ -1694,7 +1796,7 @@ export default function App() {
             <GalleryPage
               cacheProgress={cacheProgress}
               allCount={projectsByView.all.length}
-              trashCount={projectsByView.trash.length}
+              trashCount={projectsByView.trash.length + detachedRecords.length}
               importProgress={importProgress}
               onCancelImport={() =>
                 importProgress?.batchId && invokeUI('import.cancel', { id: importProgress.batchId })
@@ -1771,6 +1873,8 @@ export default function App() {
               onRename={renameProject}
               onRenameMany={renameProjects}
               onRestore={restoreProjects}
+              onPutBack={putBackDetached}
+              onDiscardDetached={discardDetached}
               onReveal={(project) => invokeUI('file.reveal', { path: project.image_path })}
               onSelectionChange={(groupIds) => {
                 setSelectedGroupIds(groupIds);
