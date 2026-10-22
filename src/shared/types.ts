@@ -151,6 +151,20 @@ export interface WorkRef {
   number?: number;
   workName: string;
 }
+/**
+ * 回收站里"只从某个作品去掉"的一条记录（1.5.6，doc/design.md 2.0）：图本身还在别的作品或图片库里，
+ * 放回就是重新放进这个作品。
+ */
+export interface DetachedRecord {
+  /** work.detach-images 给的撤销令牌，放回和不再恢复都用它 */
+  undo: string;
+  workId: string;
+  workName: string;
+  role: 'origin' | 'version';
+  number?: number;
+  detachedAt: string;
+  image: LibraryCard;
+}
 export interface ImageProject {
   blank?: true;
   work_refs?: WorkRef[];

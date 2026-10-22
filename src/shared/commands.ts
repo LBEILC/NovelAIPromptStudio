@@ -225,6 +225,13 @@ export interface CommandDefinitions {
   };
   'work.restore-detached': { input: { undo: string }; output: { restored: boolean } };
   /**
+   * 回收站里"只从某个作品去掉"的记录（061，doc/design.md 2.0"删掉的东西都进回收站"）：一张图一条，最近的在前；
+   * 图本身进了回收站或被永久删除的不列。放回用 work.restore-detached，作品已经不在时报错。
+   */
+  'trash.detached': { input: Record<string, never>; output: { items: Types.DetachedRecord[] } };
+  /** "不再恢复"：只丢掉记录，图片和文件都不动 */
+  'work.discard-detached': { input: { undos: string[] }; output: { discarded: number } };
+  /**
    * 删除一版和它之后的各版（用户 10-21，doc/design.md 2.23）：整棵子树软删除，图进回收站，用 branch.restore 撤销。
    * 原图和起点不能删。子树不止这一版时，没有 confirmed 返回 needs_confirm，details 是 {versions, branches, images}。
    * 正在走的线被删掉时回到上一版，草稿保留。

@@ -82,6 +82,12 @@ export const commandRegistry = {
     mutation: true,
   },
   'work.restore-detached': { fields: { undo: 'string' }, required: ['undo'], mutation: true },
+  'work.discard-detached': {
+    fields: { undos: 'stringList' },
+    required: ['undos'],
+    mutation: true,
+    uiOnly: true,
+  },
   'version.delete': {
     fields: { versionId: 'string', confirmed: 'boolean', only: 'boolean' },
     required: ['versionId'],
@@ -241,6 +247,7 @@ export const commandRegistry = {
   'library.restore': { fields: { ids: 'strings' }, required: ['ids'], uiOnly: true },
   'trash.delete-permanently': { fields: { ids: 'stringList' }, required: [], uiOnly: true },
   'trash.summary': { fields: {}, required: [], uiOnly: true },
+  'trash.detached': { fields: {}, required: [], uiOnly: true },
   'workbench.temp-sync': { fields: { paths: 'stringList' }, required: ['paths'], uiOnly: true },
   'workbench.save-structure': {
     fields: { filePath: 'string', structure: 'structure', projectId: 'text' },
