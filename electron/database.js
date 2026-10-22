@@ -1802,6 +1802,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   const versionStore = createVersionStore(connection);
   const deleteProject = (id) => {
     const projectId = String(id || '');
+    versionStore.discardDetachedImage(projectId);
     versionStore.purgeImage(projectId);
     database.run('DELETE FROM gallery_collection_projects WHERE project_id = $id', {
       $id: projectId,

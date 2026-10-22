@@ -409,6 +409,22 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     return { ...counts, cancelledJobs: pending.length, undo };
   }
   const handlers = {
+    'trash.detached': async () => {
+      const cards = new Map(
+        (await services.database.loadLibraryCards()).map((card) => [card.id, card]),
+      );
+      return {
+        items: versions.detachedImages().flatMap(({ imageId, ...record }) => {
+          const image = cards.get(imageId);
+          return image ? [{ ...record, image }] : [];
+        }),
+      };
+    },
+    'work.discard-detached': ({ undos }) => {
+      const discarded = versions.discardDetached(undos);
+      emit({ libraryChanged: true });
+      return { discarded };
+    },
     'work.detach-images': async ({ workId, imageIds }) => {
       const result = versions.detachImages(workId, imageIds);
       const session = store.get();

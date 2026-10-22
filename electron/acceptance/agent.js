@@ -107,6 +107,8 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   for (const name of [
     'settings.ai.get',
     'trash.delete-permanently',
+    'trash.detached',
+    'work.discard-detached',
     'agent.install',
     'agent.uninstall',
     'agent.skill-install',

@@ -1259,7 +1259,7 @@ it.each(['blank', 'library', 'legacy'])('does not auto-save a %s work', (kind) =
 );
 
 it('saves shared origins, opens each work explicitly, detaches only one work and restores it', () =>
-  fixture(async ({ call, database, append, restart }) => {
+  fixture(async ({ call, database, append, restart, dispatch }) => {
     const b = (await call('workbench.new', { name: 'Synthetic B' })).tab;
     const one = append(b.workId, b.versionId, 'shared-one');
     const two = append(b.workId, one.id, 'shared-two');
@@ -1299,7 +1299,20 @@ it('saves shared origins, opens each work explicitly, detaches only one work and
     expect(database.loadProject(imageId).deleted_at).toBe('');
     expect(database.loadProject(imageId).work_refs).toHaveLength(1);
     expect(database.versions.get(one.id)).toBeDefined();
-    expect(await call('work.restore-detached', { undo: detached.undo })).toEqual({
+    const listed = (await call('trash.detached', {}, 'ui')).items;
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({
+      workId: a.workId,
+      role: 'origin',
+      image: { id: imageId, work_refs: [expect.objectContaining({ workId: b.workId })] },
+    });
+    expect((await dispatch('trash.detached', {}, 'agent')).error.code).toBe('forbidden');
+    expect(
+      (await dispatch('work.discard-detached', { undos: [listed[0].undo] }, 'agent')).error.code,
+    ).toBe('forbidden');
+    await restart();
+    expect((await call('trash.detached', {}, 'ui')).items).toEqual(listed);
+    expect(await call('work.restore-detached', { undo: listed[0].undo })).toEqual({
       restored: true,
     });
     expect(database.loadProject(imageId).work_refs).toHaveLength(2);
@@ -1315,6 +1328,15 @@ it('saves shared origins, opens each work explicitly, detaches only one work and
     await call('work.restore-detached', { undo: versionDetached.undo });
     expect(database.versions.get(three.id).images).toEqual(three.images);
     expect(database.loadProject(imageId).work_refs).toHaveLength(2);
+    await call('work.detach-images', { workId: a.workId, imageIds: [imageId] });
+    const discarded = (await call('trash.detached', {}, 'ui')).items[0];
+    expect(await call('work.discard-detached', { undos: [discarded.undo] }, 'ui')).toEqual({
+      discarded: 1,
+    });
+    expect((await call('trash.detached', {}, 'ui')).items).toEqual([]);
+    expect(database.loadProject(imageId).work_refs).toEqual([
+      expect.objectContaining({ workId: b.workId }),
+    ]);
   }));
 
 it('discards unsaved image works but retains explicitly saved originals with no generated versions', () =>

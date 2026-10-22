@@ -572,6 +572,8 @@ export function createVersionStore(connection) {
       for (const work of originsOf([projectId]))
         connection.prepare('INSERT OR IGNORE INTO removed_originals VALUES (?)').run(work.workId);
       connection.prepare('DELETE FROM version_images WHERE project_id=?').run(projectId);
+      // Retain detached image targets so deleting another image cannot invalidate
+      // their undo records. Keeping each target also retains its ancestors.
       // Remove empty deleted leaves, then their empty ancestors. Active versions are retained.
       let rows;
       do {
@@ -579,6 +581,8 @@ export function createVersionStore(connection) {
           .prepare(
             `SELECT v.id FROM work_versions v JOIN deleted_versions d ON d.version_id=v.id
           WHERE NOT EXISTS (SELECT 1 FROM version_images i WHERE i.version_id=v.id)
+          AND NOT EXISTS (SELECT 1 FROM detached_images_undo u, json_each(u.payload, '$.rows') r
+            WHERE json_extract(r.value, '$.version_id')=v.id)
           AND NOT EXISTS (SELECT 1 FROM work_versions child WHERE child.parent_id=v.id)`,
           )
           .all();

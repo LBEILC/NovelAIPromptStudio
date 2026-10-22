@@ -24,6 +24,53 @@ export function createWorkSharing(connection, versions, atomic) {
     connection.prepare('INSERT OR IGNORE INTO saved_works VALUES (?)').run(workId);
   };
   let resolveNames = () => new Map();
+  const imageIds = (payload) => [
+    ...new Set([payload.origin, ...payload.rows.map((r) => r.project_id)].filter(Boolean)),
+  ];
+  // Keep the original batch token for notification undo. A trash entry scopes
+  // that same durable payload to one image, including records written by 060.
+  const imageToken = (token, id) => `image:${JSON.stringify([token, id])}`;
+  function readUndo(undo) {
+    let token = undo,
+      id;
+    if (undo.startsWith('image:')) {
+      try {
+        [token, id] = JSON.parse(undo.slice(6));
+      } catch {
+        throw Error('撤销记录不存在');
+      }
+      if (typeof token !== 'string' || typeof id !== 'string' || !id) throw Error('撤销记录不存在');
+    }
+    const record = connection
+      .prepare('SELECT payload FROM detached_images_undo WHERE token=?')
+      .get(token);
+    if (!record) return null;
+    const original = JSON.parse(record.payload);
+    if (id && !imageIds(original).includes(id)) return null;
+    const payload = id
+      ? {
+          ...original,
+          origin: original.origin === id ? id : null,
+          rows: original.rows.filter((r) => r.project_id === id),
+        }
+      : original;
+    return { token, id, original, payload };
+  }
+  function consumeUndo(record) {
+    const { token, id, original } = record;
+    const remaining = id
+      ? {
+          ...original,
+          origin: original.origin === id ? null : original.origin,
+          rows: original.rows.filter((r) => r.project_id !== id),
+        }
+      : null;
+    if (remaining && imageIds(remaining).length)
+      connection
+        .prepare('UPDATE detached_images_undo SET payload=? WHERE token=?')
+        .run(JSON.stringify(remaining), token);
+    else connection.prepare('DELETE FROM detached_images_undo WHERE token=?').run(token);
+  }
   let cachedRefs;
   const changes = connection.prepare('SELECT total_changes() AS count');
   const dataVersion = connection.prepare('PRAGMA data_version');
@@ -128,6 +175,61 @@ export function createWorkSharing(connection, versions, atomic) {
     isSaved,
     save,
     workRefs,
+    detachedImages() {
+      const names = resolveNames();
+      return connection
+        .prepare('SELECT token,payload FROM detached_images_undo ORDER BY rowid DESC')
+        .all()
+        .flatMap((record) => {
+          const payload = JSON.parse(record.payload);
+          return imageIds(payload).flatMap((id) => {
+            const image = connection
+              .prepare("SELECT 1 FROM projects WHERE id=? AND deleted_at=''")
+              .get(id);
+            if (!image) return [];
+            const row = payload.rows.find((r) => r.project_id === id);
+            return [
+              {
+                undo: imageToken(record.token, id),
+                workId: payload.workId,
+                workName:
+                  names.get(payload.workId) ||
+                  versions.work(payload.workId)?.origin.name ||
+                  payload.workName ||
+                  '',
+                role: payload.origin === id ? 'origin' : 'version',
+                ...(payload.origin !== id
+                  ? { number: versions.getAny(row.version_id)?.number }
+                  : {}),
+                detachedAt: payload.detachedAt || '',
+                imageId: id,
+              },
+            ];
+          });
+        });
+    },
+    discardDetached(undos) {
+      return atomic(() => {
+        let discarded = 0;
+        for (const undo of new Set(undos)) {
+          const record = readUndo(undo);
+          if (!record) continue;
+          discarded += imageIds(record.payload).length;
+          consumeUndo(record);
+        }
+        return discarded;
+      });
+    },
+    discardDetachedImage(id) {
+      return atomic(() => {
+        for (const { token, payload } of connection
+          .prepare('SELECT token,payload FROM detached_images_undo')
+          .all()) {
+          if (imageIds(JSON.parse(payload)).includes(id))
+            consumeUndo(readUndo(imageToken(token, id)));
+        }
+      });
+    },
     detachImages(workId, imageIds) {
       return atomic(() => {
         const root = versions.list(workId)[0];
@@ -161,6 +263,8 @@ export function createWorkSharing(connection, versions, atomic) {
           undo,
           JSON.stringify({
             workId,
+            workName: resolveNames().get(workId) || root.project.name || '',
+            detachedAt: new Date().toISOString(),
             origin,
             originLibrary: root.originState === 'library',
             rows,
@@ -173,13 +277,19 @@ export function createWorkSharing(connection, versions, atomic) {
     },
     restoreDetached(undo) {
       return atomic(() => {
-        const record = connection
-          .prepare('SELECT payload FROM detached_images_undo WHERE token=?')
-          .get(undo);
+        const record = readUndo(undo);
         if (!record) throw Error('撤销记录不存在');
-        const payload = JSON.parse(record.payload);
+        const { payload } = record;
+        if (!versions.work(payload.workId) || !versions.list(payload.workId).length)
+          throw Error(`「${payload.workName || payload.workId}」已经不在了`);
         if (
-          !versions.work(payload.workId) ||
+          imageIds(payload).some(
+            (id) =>
+              connection.prepare('SELECT deleted_at FROM projects WHERE id=?').get(id)?.deleted_at,
+          )
+        )
+          throw Error('请先从回收站恢复图片');
+        if (
           (payload.origin &&
             payload.originLibrary &&
             !connection.prepare('SELECT 1 FROM projects WHERE id=?').get(payload.origin)) ||
@@ -218,8 +328,6 @@ export function createWorkSharing(connection, versions, atomic) {
             .prepare('DELETE FROM deferred_version_prunes WHERE version_id=?')
             .run(r.version_id);
         }
-        for (const id of payload.removed)
-          connection.prepare('DELETE FROM deleted_versions WHERE version_id=?').run(id);
         // A protected empty version may have been pruned after the detach call.
         // Undo only automatic pruning, leaving subsequent explicit deletions alone.
         for (const r of payload.rows) {
@@ -240,7 +348,7 @@ export function createWorkSharing(connection, versions, atomic) {
             id = versions.getAny(id)?.parentId;
           }
         }
-        connection.prepare('DELETE FROM detached_images_undo WHERE token=?').run(undo);
+        consumeUndo(record);
         return true;
       });
     },
