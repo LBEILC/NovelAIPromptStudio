@@ -666,7 +666,7 @@ export default function App() {
   );
 
   const openWorkbenchPath = useCallback(
-    async (filePath = '', source = null) => {
+    async (filePath = '', source = null, extra = {}) => {
       setWorkbenchLoading(true);
       setWorkbenchError('');
       try {
@@ -674,6 +674,7 @@ export default function App() {
         const result = await invokeResult('workbench.open', {
           ...(filePath ? { path: filePath } : {}),
           ...(source ? { source } : {}),
+          ...extra,
         });
         if (result?.canceled) return false;
         if (!result?.ok || !result.tab?.project) throw new Error(result?.error || '打开图片失败');
@@ -1752,12 +1753,13 @@ export default function App() {
                   })
                   .catch((error) => showToast(error.message, 'error'))
               }
-              onOpenWorkbench={(project) =>
-                openWorkbenchPath(project.image_path, {
-                  type: 'library',
-                  projectId: project.id,
-                  path: project.image_path,
-                })
+              onOpenWorkbench={(project, group) =>
+                openWorkbenchPath(
+                  project.image_path,
+                  { type: 'library', projectId: project.id, path: project.image_path },
+                  // 从作品组打开时回到这个作品（1.5.6）
+                  group?.id?.startsWith('work:') ? { workId: group.id.slice(5) } : {},
+                )
               }
               onPermanentDelete={permanentDelete}
               onPreview={previewGalleryGroup}

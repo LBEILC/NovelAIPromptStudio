@@ -19,7 +19,8 @@ import { useNotifications } from '../kit/toast';
 import { useSwap } from '../kit/motion';
 import { Viewer } from '../kit/Viewer';
 import { trashNotice } from '../lib/trashNotice';
-import { originGone, originMenu } from './original';
+import { originGone, originMenu, trashImage } from './original';
+import { useSharedTrash } from '../shell/SharedTrash';
 
 export interface ImageProps {
   tab: WorkbenchTab;
@@ -44,7 +45,13 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const generation = useGeneration();
   const image = tab.project as (ImageProject & { vibes?: Vibe[] }) | null;
   const [missing, setMissing] = useState(!!tab.error);
+  const [sharedDialog, askShared] = useSharedTrash();
   // 图片文件找不到时，舞台下面这几个按钮不可用并说明原因，不再弹出 ENOENT（用户 10-22：剪贴板打开的图被临时清理删掉了）
+  const saveWork = () =>
+    // 按钮变成"已存入图片库"就是反馈，不另外通知
+    invokeUI('work.save', { tabId: tab.id }).catch((e) =>
+      notify({ text: `保存失败：${(e as Error).message}`, tone: 'error' }),
+    );
   const lost = (run: () => void) =>
     missing
       ? { 'aria-disabled': true, 'data-tip': '图片文件找不到了', onClick: () => {} }
@@ -190,24 +197,18 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
             ? originMenu(version, tab.id, {
                 notify,
                 refresh: () => setRefresh((n) => n + 1),
+                ask: askShared,
+                workId: tab.workId,
               })
             : {
                 label: '移入回收站',
                 danger: true,
                 disabled: tab.source.type !== 'library' ? '请先存入图片库' : false,
                 onSelect: () =>
-                  void invokeUI('library.trash', { ids: [stageId] }).then((r) => {
-                    setRefresh((n) => n + 1);
-                    notify({
-                      text: trashNotice('已移入回收站', r.versions),
-                      action: {
-                        label: '撤销',
-                        onClick: () =>
-                          void invokeUI('library.restore', { ids: [stageId] }).then(() =>
-                            setRefresh((n) => n + 1),
-                          ),
-                      },
-                    });
+                  void trashImage(stageId, tab.workId, {
+                    notify,
+                    refresh: () => setRefresh((n) => n + 1),
+                    ask: askShared,
                   }),
               },
         ]
@@ -335,7 +336,16 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
             )}
           </div>
           <div className="stage-acts" hidden={blank}>
-            {tab.source.type === 'library' ? (
+            {/* "把这个作品存进图片库"（1.5.6）：作为新作品打开、还没存的写"存为新作品"（原图本来就在图片库里） */}
+            {tab.source.type === 'library' && tab.workOrigin && !tab.workSaved ? (
+              <button
+                className={`btn sm ${missing ? 'is-off' : ''}`}
+                data-tip="另起的这个作品存进图片库，关掉标签页也能找回来"
+                {...lost(() => void saveWork())}
+              >
+                存为新作品
+              </button>
+            ) : tab.source.type === 'library' ? (
               <span className="saved">
                 <Icon name="check-line" />
                 已存入图片库
@@ -367,6 +377,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
         </>
       )}
       <ContextMenu at={menu} onClose={() => setMenu(null)} items={menuItems} />
+      {sharedDialog}
       <Pop
         open={vibe != null && !!vibes[vibe]}
         onClose={() => setVibe(null)}

@@ -9,6 +9,8 @@ import {
   gallerySelectionProjectIds,
   galleryViewGroups,
   groupGalleryProjects,
+  galleryCoverMember,
+  galleryMosaicMembers,
   isGalleryBlankClickTarget,
   reconcileGallerySelection,
   shouldCollapseGalleryPreview,
@@ -42,6 +44,32 @@ const similarItem = (id, tags, { model = 'nai-v4.5', vibe = 'vibe-a', undesired 
 });
 
 describe('gallery grouping and selection', () => {
+  // 1.5.6：原图进作品组（存一份、显示几份）；作品组原图在前、从早到晚；封面三种；多张预览挑原图加最新
+  it('puts a shared image into every work it belongs to and picks covers by time', () => {
+    const ref = (workId, role) => ({ workId, role, workName: workId });
+    const img = (id, day, refs) => ({ ...item(id, id, `2026-01-0${day}`), work_refs: refs });
+    const projects = [
+      img('o', 1, [ref('A', 'origin'), ref('B', 'version')]),
+      img('b0', 1, [ref('B', 'version')]),
+      img('a1', 2, [ref('A', 'version')]),
+      img('a2', 3, [ref('A', 'version')]),
+      img('a3', 4, [ref('A', 'version')]),
+      img('a4', 5, [ref('A', 'version')]),
+    ];
+    const groups = groupGalleryProjects(projects, { promptScope: 'work' });
+    const a = groups.find((g) => g.id === 'work:A');
+    const b = groups.find((g) => g.id === 'work:B');
+    expect(a.members.map((m) => m.id)).toEqual(['o', 'a1', 'a2', 'a3', 'a4']);
+    expect(b.members.map((m) => m.id).sort()).toEqual(['b0', 'o']);
+    expect(galleryCoverMember(a, 'origin').id).toBe('o');
+    expect(galleryCoverMember(a, 'earliest').id).toBe('a1');
+    expect(galleryCoverMember(a, 'latest').id).toBe('a4');
+    const latest = galleryMosaicMembers(a, galleryCoverMember(a, 'latest'));
+    expect(latest.picks.map((m) => m.id)).toEqual(['o', 'a3', 'a2']);
+    expect(latest.more).toBe(1);
+    const origin = galleryMosaicMembers(a, galleryCoverMember(a, 'origin'));
+    expect(origin.picks.map((m) => m.id)).toEqual(['a4', 'a3', 'a2']);
+  });
   // 用户 10-21：原来生成的图不管选什么合并方式都按作品合成一组
   it('folds generated images by work only when merging by work', () => {
     const work = (id, fp, workId) => ({ ...item(id, fp, '2026-01-01'), generated_work_id: workId });

@@ -20,7 +20,11 @@ import { libraryPositivePrompt } from '../library/Prompt';
 import { useLibraryDetail } from '../state/libraryDetail';
 import { Side } from './Side';
 import { Tools } from './Tools';
-import { Grid } from './Grid';
+import { Grid, type GalleryDisplay } from './Grid';
+import { normalizeGalleryDisplay } from '../lib/gallery.js';
+import { useSharedTrash } from '../shell/SharedTrash';
+
+const GALLERY_DISPLAY_KEY = 'novelai-prompt-studio.gallery-display.v1';
 import { Detail } from './Detail';
 import { CollectPop } from './Collect';
 import { BatchNamePop } from './BatchName';
@@ -62,10 +66,51 @@ export default function GalleryPage(
     };
   }, []);
   const [renameRequest, setRenameRequest] = useState<{ id: string; sequence: number }>();
+  // 删除共用的图之前先问（1.5.6）：在作品组里删时可以只从这个作品去掉
+  const [sharedDialog, askShared] = useSharedTrash();
+  const trashShared = async (
+    ids?: string[] | null,
+    scope?: string,
+    group?: LibraryGroup | null,
+  ) => {
+    const list = ids || [];
+    const workId = group?.id.startsWith('work:') ? group.id.slice(5) : undefined;
+    const cards = new Map(props.groups.flatMap((g) => g.members).map((m) => [m.id, m]));
+    const { choice, shared } = await askShared({
+      ids: list,
+      refsOf: (id) => cards.get(id)?.work_refs,
+      workId,
+    });
+    if (choice === 'cancel') return;
+    if (choice === 'detach' && workId) {
+      try {
+        const r = await invokeUI('work.detach-images', { workId, imageIds: shared });
+        notify({
+          text: `已从这个作品里去掉 ${shared.length} 张，其他作品里还在`,
+          action: {
+            label: '撤销',
+            onClick: () =>
+              void invokeUI('work.restore-detached', { undo: r.undo }).catch((e) =>
+                notify({ text: `撤销失败：${(e as Error).message}`, tone: 'error' }),
+              ),
+          },
+        });
+      } catch (e) {
+        notify({ text: `操作失败：${(e as Error).message}`, tone: 'error' });
+        return;
+      }
+      const rest = list.filter((id) => !shared.includes(id));
+      if (rest.length) await props.onTrash(rest, scope);
+      return;
+    }
+    return props.onTrash(list, scope);
+  };
   const p = {
     ...props,
     aiConfigured,
     renameRequest,
+    onTrash: (ids?: string[] | null, scope?: string) =>
+      trashShared(ids, scope, scope === 'detail' ? props.previewGroup : null),
     onRequestRename: (id: string) => setRenameRequest({ id, sequence: Date.now() }),
   };
   const [rowHeight, setRowHeight] = useState(() => {
@@ -76,6 +121,24 @@ export default function GalleryPage(
     setRowHeight(h);
     persist(GALLERY_CARD_SIZE_KEY, h * fallbackRatio);
   };
+  // 封面和多张预览（1.5.6）：只是怎么看，和合并分开存，改了不用重新分组
+  const [display, setDisplay] = useState<GalleryDisplay>(() => {
+    try {
+      return normalizeGalleryDisplay(JSON.parse(localStorage.getItem(GALLERY_DISPLAY_KEY) || '{}'));
+    } catch {
+      return normalizeGalleryDisplay({});
+    }
+  });
+  const onDisplay = (patch: Partial<GalleryDisplay>) =>
+    setDisplay((d) => {
+      const next = normalizeGalleryDisplay({ ...d, ...patch }) as GalleryDisplay;
+      try {
+        localStorage.setItem(GALLERY_DISPLAY_KEY, JSON.stringify(next));
+      } catch {
+        /* 记不住也照常能用 */
+      }
+      return next;
+    });
   const search = useRef<HTMLInputElement>(null);
   const detailCol = useRef<HTMLDivElement>(null);
   const rz = useResizable(detailCol, {
@@ -93,7 +156,8 @@ export default function GalleryPage(
     if (!p.preview && p.groups.length && !p.loading) p.onPreview(p.groups[0]);
   }, [p.preview, p.groups, p.loading]);
   const picked = p.groups.filter((g) => p.selectedGroupIds.includes(g.id));
-  const pickedIds = picked.flatMap((g) => g.members.map((m) => m.id));
+  // 共用的图可能在几个选中的组里各有一份：按图去重（1.5.6）
+  const pickedIds = [...new Set(picked.flatMap((g) => g.members.map((m) => m.id)))];
   const trash = p.view === 'trash';
 
   // 大图：按图片库当前的顺序，遇到一组依次走完
@@ -108,7 +172,8 @@ export default function GalleryPage(
       items,
       index: Math.max(
         0,
-        items.findIndex((x) => x.id === start),
+        // 共用的图在几个组里各有一份：从哪一组打开就停在哪一份
+        items.findIndex((x) => x.id === start && x.group === group.id),
       ),
     });
   };
@@ -146,8 +211,8 @@ export default function GalleryPage(
       {
         label: multi ? `在工作台打开 ${ids.length} 张` : '在工作台打开',
         onSelect: () => {
-          for (const m of multi ? picked.flatMap((g) => g.members) : [menu.member])
-            p.onOpenWorkbench(m);
+          if (!multi) return p.onOpenWorkbench(menu.member, menu.group);
+          for (const g of picked) for (const m of g.members) p.onOpenWorkbench(m, g);
         },
       },
       // 软件生成的图："在工作台打开"回到它的作品，另起要用这一项（1.5.5）
@@ -191,15 +256,21 @@ export default function GalleryPage(
             {
               label: '把这一张移入回收站',
               danger: true,
-              onSelect: () => void p.onTrash([menu.member.id]),
+              onSelect: () => void trashShared([menu.member.id], undefined, menu.group),
             },
             {
               label: `整组移入回收站（${ids.length} 张）`,
               danger: true,
-              onSelect: () => void p.onTrash(ids),
+              onSelect: () => void trashShared(ids, undefined, menu.group),
             },
           ]
-        : [{ label: '移入回收站', danger: true, onSelect: () => void p.onTrash(ids) }]),
+        : [
+            {
+              label: '移入回收站',
+              danger: true,
+              onSelect: () => void trashShared(ids, undefined, multi ? null : menu.group),
+            },
+          ]),
     ];
   })();
 
@@ -352,7 +423,9 @@ export default function GalleryPage(
           <>
             <button
               className="btn quiet sm"
-              onClick={() => picked.flatMap((g) => g.members).forEach(p.onOpenWorkbench)}
+              onClick={() => {
+                for (const g of picked) for (const m of g.members) p.onOpenWorkbench(m, g);
+              }}
             >
               在工作台打开
             </button>
@@ -391,7 +464,12 @@ export default function GalleryPage(
                 移出这个收藏集
               </button>
             )}
-            <button className="btn danger sm" onClick={() => p.onTrash(pickedIds)}>
+            <button
+              className="btn danger sm"
+              onClick={() =>
+                void trashShared(pickedIds, undefined, picked.length === 1 ? picked[0] : null)
+              }
+            >
               移入回收站
             </button>
           </>
@@ -411,14 +489,23 @@ export default function GalleryPage(
         if (e.key === 'Escape' && p.selectedGroupIds.length) p.onClearSelection();
       }}
     >
+      {sharedDialog}
       <Side p={p} />
       <div className="col lib-grid-col">
         {showTools && (
-          <Tools p={p} rowHeight={rowHeight} onRowHeight={onRowHeight} searchRef={search} />
+          <Tools
+            p={p}
+            rowHeight={rowHeight}
+            onRowHeight={onRowHeight}
+            display={display}
+            onDisplay={onDisplay}
+            searchRef={search}
+          />
         )}
         <Grid
           p={p}
           rowHeight={rowHeight}
+          display={display}
           onRowHeight={onRowHeight}
           onViewer={openViewer}
           onCardMenu={(at, group, member) => {
@@ -510,7 +597,7 @@ export default function GalleryPage(
                 const m = memberOf(it.id);
                 if (m) {
                   setViewer(null);
-                  p.onOpenWorkbench(m);
+                  p.onOpenWorkbench(m, it.group ? { id: it.group } : undefined);
                 }
               }
         }

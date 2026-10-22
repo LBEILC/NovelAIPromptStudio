@@ -9,7 +9,8 @@ import { errorCode, errorDetails, invokeUI } from '../lib/commands';
 import { mediaUrl } from '../lib/imageStage.js';
 import { versionDiff } from '../lib/versionDiff';
 import { trashNotice } from '../lib/trashNotice';
-import { originGone, originMenu } from './original';
+import { originGone, originMenu, trashImage } from './original';
+import { useSharedTrash } from '../shell/SharedTrash';
 import { VersionDifference, VersionSummary } from './VersionDifference';
 import { Icon, Kbd } from '../kit/controls';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
@@ -72,6 +73,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
   const state = useGeneration();
   const notify = useNotifications();
   const [dialog, ask] = useAsk();
+  const [sharedDialog, askShared] = useSharedTrash();
   const col = useRef<HTMLDivElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const rz = useResizable(col, {
@@ -326,18 +328,10 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             label: '移入回收站',
             danger: true,
             onSelect: () =>
-              void invokeUI('library.trash', { ids: [imageId] }).then((r) => {
-                setRefresh((n) => n + 1);
-                notify({
-                  text: trashNotice('已移入回收站', r.versions),
-                  action: {
-                    label: '撤销',
-                    onClick: () =>
-                      void invokeUI('library.restore', { ids: [imageId] }).then(() =>
-                        setRefresh((n) => n + 1),
-                      ),
-                  },
-                });
+              void trashImage(imageId, tab.workId, {
+                notify,
+                refresh: () => setRefresh((n) => n + 1),
+                ask: askShared,
               }),
           },
         ]
@@ -345,7 +339,13 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         ? []
         : [
             'sep' as const,
-            originMenu(v, tab.id, { before, notify, refresh: () => setRefresh((n) => n + 1) }),
+            originMenu(v, tab.id, {
+              before,
+              notify,
+              refresh: () => setRefresh((n) => n + 1),
+              ask: askShared,
+              workId: tab.workId,
+            }),
           ]),
   ];
   // 生成中：一版一张张出来，正在生成的格子是实底加墨色细条，排队的是虚线框；失败的格子是绛红色的叉
@@ -822,6 +822,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
       </Pop>
       <ContextMenu at={menu?.at || null} onClose={() => setMenu(null)} items={menu?.items || []} />
       {dialog}
+      {sharedDialog}
       <Pop
         open={!!rename}
         onClose={() => setRename(null)}

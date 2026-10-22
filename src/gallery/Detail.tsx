@@ -13,6 +13,8 @@ import { dimensions, libraryCountText, modelDisplayName } from '../library/prese
 import { libraryPositivePrompt } from '../library/Prompt';
 import type { ImageRecord, Tag, TagCategory } from '../shared/types';
 import type { LibraryGroup, LibraryProps } from '../library/types';
+import { isGroupOrigin } from '../lib/gallery.js';
+import { WORK_ICON } from './Grid';
 
 export { CAT_VAR, CAT_NAME } from '../kit/categories';
 import { CAT_VAR, CAT_NAME } from '../kit/categories';
@@ -111,6 +113,8 @@ function One({
   if (n > 1) lastStrip.current = group;
   const pics = useSwap(detail, (d) => d.id);
   const ids = group.members.map((m) => m.id);
+  const refs = group.members.find((m) => m.id === detail.id)?.work_refs || detail.work_refs || [];
+  const others = refs.filter((r) => `work:${r.workId}` !== group.id);
   return (
     <div className="col detail" data-detail-id={detail.id} ref={a.colRef}>
       {a.handle}
@@ -226,6 +230,25 @@ function One({
               文件 {file}
             </span>
           )}
+          {/* 这张图在别的作品里的身份（1.5.6）：点一下选中图片库里的那一组，那一组不在当前结果里时去工作台打开 */}
+          {others.map((r) => (
+            <button
+              key={r.workId + r.role}
+              className="meta lalso"
+              onClick={() => {
+                const other = p.groups.find((g) => g.id === `work:${r.workId}`);
+                if (other)
+                  p.onPreview(
+                    other,
+                    other.members.find((m) => m.id === detail.id),
+                  );
+                else p.onOpenWorkbench(detail, { id: `work:${r.workId}` });
+              }}
+            >
+              <Icon name={WORK_ICON} />
+              也是「{r.workName}」的{r.role === 'origin' ? '原图' : `第 ${r.number} 版`}
+            </button>
+          ))}
         </div>
         <div className="stage-acts dacts">
           {trash ? (
@@ -307,7 +330,7 @@ function One({
           复制提示词
         </button>
         {!trash && (
-          <button className="btn ink" onClick={() => p.onOpenWorkbench(detail)}>
+          <button className="btn ink" onClick={() => p.onOpenWorkbench(detail, group)}>
             在工作台打开
           </button>
         )}
@@ -331,17 +354,23 @@ function Strip({
 }) {
   const n = group.members.length,
     fold = n > STRIP_ROW + 1;
-  const th = (m: LibraryGroup['members'][number], i: number) => (
-    <img
-      key={m.id}
-      className={i === si ? 'is-cur' : ''}
-      src={thumb(m)}
-      alt=""
-      draggable={false}
-      data-tip={`第 ${i + 1} 张`}
-      onClick={() => p.onPreview(group, m)}
-    />
-  );
+  // 作品组里原图那一张左上角一个很小的作品图标（1.5.6）
+  const th = (m: LibraryGroup['members'][number], i: number) => {
+    const origin = isGroupOrigin(group, m);
+    return (
+      <span key={m.id} className={`lth ${origin ? 'origin' : ''}`}>
+        <img
+          className={i === si ? 'is-cur' : ''}
+          src={thumb(m)}
+          alt=""
+          draggable={false}
+          data-tip={origin ? '原图' : `第 ${i + 1} 张`}
+          onClick={() => p.onPreview(group, m)}
+        />
+        {origin && <Icon name={WORK_ICON} />}
+      </span>
+    );
+  };
   return (
     <div className="strip lstrip">
       <div className="lstrip-row">
@@ -401,7 +430,7 @@ function Summary({ p, a }: { p: LibraryProps; a: DetailActions }) {
           <button
             className="btn ink"
             onClick={() => {
-              for (const g of groups) for (const m of g.members) p.onOpenWorkbench(m);
+              for (const g of groups) for (const m of g.members) p.onOpenWorkbench(m, g);
             }}
           >
             在工作台打开 {p.selectedImageCount} 张

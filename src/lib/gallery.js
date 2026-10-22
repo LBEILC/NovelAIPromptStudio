@@ -72,16 +72,22 @@ function finalizeGalleryGroup(group, grouping, exact = false) {
   const members = [...group.members].sort(
     (left, right) => galleryProjectDate(right) - galleryProjectDate(left),
   );
-  // 封面是组里最早的一张（作品就是第 1 版的第一张）。不用作品的原图：原图不在这一组里，
-  // 提示词改得多了会和组里的图对不上（用户 10-21）
+  // 封面是组里最早的一张（作品就是第 1 版的第一张）；卡片上实际画哪张由"封面"设置决定（galleryCoverMember）
   const cover = members.at(-1);
+  const latestAt = members[0]?.created_at || '';
+  // 作品那一组按版本栏的读法排：原图在最前，后面从早到晚（1.5.6）；其他组照旧从新到旧
+  if (String(group.key).startsWith('work:')) {
+    const probe = { id: group.key, members };
+    members.reverse();
+    members.sort((a, b) => Number(isGroupOrigin(probe, b)) - Number(isGroupOrigin(probe, a)));
+  }
   return {
     ...group,
     cover,
     grouping,
     members,
     id: group.key,
-    latestAt: members[0]?.created_at || '',
+    latestAt,
     count: members.length,
   };
 }
@@ -116,16 +122,27 @@ export function groupGalleryProjects(projects = [], groupingValue) {
   const grouping = normalizeGalleryGrouping(groupingValue);
   // 按作品（默认，和 1.5.3 以前的样子一样）：生成的图按作品合为一组，其他图片提示词完全相同的合为一组；
   // 选别的选项时，生成的图和其他图片一样按那个选项合并
+  // 1.5.6：一张图按 work_refs 进它所属的每个作品组（原图和版本里的图都算，存一份、显示几份）；
+  // 没有 work_refs 的旧数据照旧按 generated_work_id
   if (grouping.promptScope === 'work') {
-    const generated = groupingValue?.history ? [] : projects.filter((p) => p.generated_work_id);
     const works = new Map();
-    for (const p of generated) {
-      if (!works.has(p.generated_work_id)) works.set(p.generated_work_id, []);
-      works.get(p.generated_work_id).push(p);
-    }
+    const inWork = new Set();
+    if (!groupingValue?.history)
+      for (const p of projects) {
+        const ids = p.work_refs?.length
+          ? [...new Set(p.work_refs.map((/** @type {{ workId: string }} */ r) => r.workId))]
+          : p.generated_work_id
+            ? [p.generated_work_id]
+            : [];
+        for (const id of ids) {
+          if (!works.has(id)) works.set(id, []);
+          works.get(id).push(p);
+          inWork.add(p.id);
+        }
+      }
     return [
       ...groupGalleryProjects(
-        groupingValue?.history ? projects : projects.filter((p) => !p.generated_work_id),
+        projects.filter((p) => !inWork.has(p.id)),
         { ...grouping, promptScope: 'full' },
       ),
       ...Array.from(works, ([id, members]) =>
@@ -147,6 +164,68 @@ export function groupGalleryProjects(projects = [], groupingValue) {
     groups.get(key).members.push(project);
   }
   return [...groups.values()].map((group) => finalizeGalleryGroup(group, grouping, exact));
+}
+
+// ---------- 卡片的主图和多张预览（1.5.6，doc/design.md 2.23） ----------
+export const GALLERY_COVERS = ['origin', 'earliest', 'latest'];
+export const GALLERY_DISPLAY_DEFAULT = Object.freeze({ cover: 'earliest', mosaic: false });
+/** 多张预览：大小到这个行高以上才显示右边那一列 */
+export const GALLERY_MOSAIC_MIN_ROW = 240;
+/** 右边那一列的宽度，按行高的比例 */
+export const GALLERY_MOSAIC_RATIO = 0.25;
+
+export function normalizeGalleryDisplay(value = {}) {
+  return {
+    cover: GALLERY_COVERS.includes(value?.cover) ? value.cover : GALLERY_DISPLAY_DEFAULT.cover,
+    mosaic: Boolean(value?.mosaic),
+  };
+}
+/** @template {{ created_at?: string }} T @param {T[]} list @returns {T[]} */
+const byNewest = (list) => [...list].sort((a, b) => galleryProjectDate(b) - galleryProjectDate(a));
+const groupWorkId = (group) =>
+  String(group?.id || '').startsWith('work:') ? group.id.slice(5) : '';
+/** 这张图是不是这一组（作品）的原图 */
+export function isGroupOrigin(group, member) {
+  const workId = groupWorkId(group);
+  return Boolean(
+    workId && member?.work_refs?.some((r) => r.workId === workId && r.role === 'origin'),
+  );
+}
+/**
+ * 卡片上的主图：原图 / 最早生成 / 最新生成（成员按新到旧排）。不是作品的一组没有原图，"原图"用最早的那张；
+ * "最早""最新"都跳过原图，只算生成的图（组里只有原图时就是它）。
+ */
+/**
+ * @template {{ id: string; work_refs?: { workId: string; role: string }[] }} M
+ * @param {{ id: string; cover: M; members: M[] }} group
+ * @param {'origin' | 'earliest' | 'latest'} [mode]
+ * @returns {M}
+ */
+export function galleryCoverMember(group, mode = 'earliest') {
+  const members = group?.members || [];
+  // 按时间从新到旧，不依赖组内的排法（作品组是原图在前、从早到晚）
+  const made = byNewest(members.filter((m) => !isGroupOrigin(group, m)));
+  if (mode === 'origin')
+    return members.find((m) => isGroupOrigin(group, m)) || members.at(-1) || group.cover;
+  if (mode === 'latest') return made[0] || group.cover;
+  return made.at(-1) || group.cover;
+}
+/**
+ * 多张预览右边那一列：主图不是原图时放原图加最新的几张（看得到起点和现在），主图是原图时放最新的几张；
+ * 放不下的算进 more（最后一格写"+N"）。
+ */
+/**
+ * @template {{ id: string; work_refs?: { workId: string; role: string }[] }} M
+ * @param {{ id: string; members: M[] }} group
+ * @param {M} main
+ * @returns {{ picks: M[]; more: number }}
+ */
+export function galleryMosaicMembers(group, main, max = 3) {
+  const others = (group?.members || []).filter((m) => m.id !== main?.id);
+  const origin = others.find((m) => isGroupOrigin(group, m));
+  const latest = byNewest(others.filter((m) => m !== origin));
+  const picks = origin ? [origin, ...latest.slice(0, max - 1)] : latest.slice(0, max);
+  return { picks, more: others.length - picks.length };
 }
 
 export function sortGalleryGroups(groups = [], sort = 'recent') {
@@ -175,9 +254,14 @@ export function galleryViewGroups(
 
 export function gallerySelectionProjectIds(groups = [], selectedGroupIds = []) {
   const selected = new Set(selectedGroupIds);
-  return groups
-    .filter((group) => selected.has(group.id))
-    .flatMap((group) => group.members.map((project) => project.id));
+  // 共用的图在几个组里各有一份，按图去重（1.5.6）
+  return [
+    ...new Set(
+      groups
+        .filter((group) => selected.has(group.id))
+        .flatMap((group) => group.members.map((project) => project.id)),
+    ),
+  ];
 }
 
 export function galleryScrubMemberIndex(pointerX, boundsLeft, boundsWidth, memberCount) {

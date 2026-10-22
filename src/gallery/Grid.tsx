@@ -15,14 +15,28 @@ import {
 } from '../library/layout';
 import { libraryCountText } from '../library/presentation';
 import { hasActiveGalleryFilters } from '../lib/galleryFilters.js';
+import {
+  GALLERY_MOSAIC_MIN_ROW,
+  GALLERY_MOSAIC_RATIO,
+  galleryCoverMember,
+  galleryMosaicMembers,
+  isGroupOrigin,
+} from '../lib/gallery.js';
 import { GENERATED } from './Side';
 import type { LibraryGroup, LibraryProps } from '../library/types';
 import type { LibraryCard } from '../shared/types';
 
-const ratioOf = (g: LibraryGroup) => {
-  const { width, height } = g.cover.metadata;
+const cardRatio = (c: LibraryCard) => {
+  const { width, height } = c.metadata;
   return width && height ? width / height : fallbackRatio;
 };
+/** 卡片显示的样子（1.5.6）：主图按"封面"选；多张预览时右边多一列，卡片宽出行高的 GALLERY_MOSAIC_RATIO */
+export type GalleryDisplay = { cover: 'origin' | 'earliest' | 'latest'; mosaic: boolean };
+const mosaicOn = (g: LibraryGroup, d: GalleryDisplay, rowHeight: number) =>
+  d.mosaic && rowHeight >= GALLERY_MOSAIC_MIN_ROW && g.members.length > 1;
+const isWork = (g: LibraryGroup) => g.id.startsWith('work:');
+/** 作品的角标图标：在预览里比较 node-tree、git-branch-line、git-commit-line 后定 */
+export const WORK_ICON = 'node-tree';
 const thumb = (c: Pick<LibraryCard, 'thumbnail_path' | 'image_path'>) =>
   mediaUrl(c.thumbnail_path || c.image_path);
 
@@ -34,6 +48,7 @@ export interface GridHandle {
 export function Grid({
   p,
   rowHeight,
+  display,
   onRowHeight,
   onViewer,
   onCardMenu,
@@ -41,6 +56,7 @@ export function Grid({
 }: {
   p: LibraryProps;
   rowHeight: number;
+  display: GalleryDisplay;
   onRowHeight: (h: number) => void;
   onViewer: (group: LibraryGroup, member?: LibraryCard) => void;
   onCardMenu: (at: [number, number], group: LibraryGroup, member: LibraryCard) => void;
@@ -117,6 +133,7 @@ export function Grid({
                 leaving={leaving}
                 vp={vp}
                 rowHeight={rowHeight}
+                display={display}
                 jump={jump}
                 scroll={scroll}
                 onViewer={onViewer}
@@ -136,6 +153,7 @@ function Cards({
   leaving: gridLeaving,
   vp,
   rowHeight,
+  display,
   jump,
   scroll,
   onViewer,
@@ -146,6 +164,7 @@ function Cards({
   leaving: boolean;
   vp: { width: number; height: number; top: number };
   rowHeight: number;
+  display: GalleryDisplay;
   jump: boolean;
   scroll: React.RefObject<HTMLDivElement | null>;
   onViewer: (group: LibraryGroup, member?: LibraryCard) => void;
@@ -159,14 +178,18 @@ function Cards({
   const rows: LibraryRow[] = useMemo(
     () =>
       layoutLibraryRows(
-        groups.map(ratioOf),
+        groups.map(
+          (g) =>
+            cardRatio(galleryCoverMember(g, display.cover)) +
+            (mosaicOn(g, display, rowHeight) ? GALLERY_MOSAIC_RATIO : 0),
+        ),
         vp.width,
         rowHeight,
         gap,
         ms('--thumb-ratio-min') || 0.5,
         ms('--thumb-ratio-max') || 2.5,
       ),
-    [exit.map((x) => x.key).join('|'), vp.width, rowHeight, gap],
+    [exit.map((x) => x.key).join('|'), vp.width, rowHeight, gap, display.cover, display.mosaic],
   );
   const height = rows.length ? rows[rows.length - 1].top + rows[rows.length - 1].height : 0;
   // 新出现的（导入、生成的图）淡入；第一次画出来的不淡入
@@ -374,7 +397,7 @@ function Cards({
         }
         if (e.key === 'Enter' && p.preview && !picking) {
           e.preventDefault();
-          if (p.view !== 'trash') p.onOpenWorkbench(p.preview);
+          if (p.view !== 'trash') p.onOpenWorkbench(p.preview, p.previewGroup || undefined);
           return;
         }
         if (e.key === ' ' && p.previewGroup && !picking) {
@@ -410,7 +433,13 @@ function Cards({
           const leaving = exit[i].leaving;
           const n = g.members.length;
           const sc = scrub?.id === g.id ? scrub : null;
-          const shown = sc ? g.members[Math.min(sc.i, n - 1)] : g.cover;
+          const main = galleryCoverMember(g, display.cover);
+          const shown = sc ? g.members[Math.min(sc.i, n - 1)] : main;
+          const mosaic = mosaicOn(g, display, rowHeight) ? galleryMosaicMembers(g, main) : null;
+          // 翻看到比例和主图差得多的图时完整缩进框里，不裁切（用户 10-22：一个作品里横图竖图都有）
+          const fit = sc && Math.abs(cardRatio(shown) / cardRatio(main) - 1) > 0.15;
+          const work = isWork(g);
+          const originOnly = work && n === 1 && isGroupOrigin(g, g.members[0]);
           const picked = p.selectedGroupIds.includes(g.id);
           const on = g.id === p.previewGroup?.id && !picking;
           const genNote =
@@ -420,7 +449,7 @@ function Cards({
           return (
             <div
               key={g.id}
-              className={`card ${on ? 'on' : ''} ${picked ? 'picked' : ''} ${leaving ? 'leaving fading' : ''}`}
+              className={`card ${on ? 'on' : ''} ${picked ? 'picked' : ''} ${leaving ? 'leaving fading' : ''} ${mosaic ? 'mosaic' : ''}`}
               data-enter={fresh.has(g.id) ? 'fade' : undefined}
               data-index={i}
               data-group-id={g.id}
@@ -428,7 +457,15 @@ function Cards({
               aria-selected={picked || on}
               aria-label={imageAccessibleName(g.cover)}
               tabIndex={on || (index < 0 && i === 0) ? 0 : -1}
-              style={{ left: x, top: row.top, width: w, height: row.height }}
+              style={
+                {
+                  left: x,
+                  top: row.top,
+                  width: w,
+                  height: row.height,
+                  '--mw': `${Math.round(row.height * GALLERY_MOSAIC_RATIO)}px`,
+                } as React.CSSProperties
+              }
               onClick={(e) => {
                 if (e.detail > 1) return;
                 select(i, e);
@@ -458,16 +495,42 @@ function Cards({
               }}
               onPointerLeave={() => setScrub((s) => (s?.id === g.id ? null : s))}
             >
-              <img src={sc ? thumb(shown) : thumb(g.cover)} alt="" draggable={false} />
-              {!sc && (n > 1 || genNote) && (
+              <img
+                className={`lmain ${fit ? 'fit' : ''}`}
+                src={thumb(shown)}
+                alt=""
+                draggable={false}
+              />
+              {mosaic && (
+                <span className="lmosaic" aria-hidden="true">
+                  {mosaic.picks.map((m, k) => (
+                    <span key={m.id}>
+                      <img src={thumb(m)} alt="" draggable={false} />
+                      {k === mosaic.picks.length - 1 && mosaic.more > 0 && (
+                        <b className="mono">+{mosaic.more}</b>
+                      )}
+                    </span>
+                  ))}
+                </span>
+              )}
+              {/* 角标：作品是作品图标，按提示词合并的一组是叠放图标；只有一张的作品只有图标、不带数字 */}
+              {!sc && (n > 1 || work || genNote) && (
                 <span
-                  className={`stack ${n > 1 ? 'lstack' : ''}`}
-                  data-tip={n > 1 ? `${n} 张` : undefined}
+                  className={`stack ${n > 1 || work ? 'lstack' : ''}`}
+                  data-tip={
+                    originOnly
+                      ? '作品 · 还没生成'
+                      : work
+                        ? `作品 · ${n} 张`
+                        : n > 1
+                          ? `${n} 张`
+                          : undefined
+                  }
                 >
-                  {n > 1 ? (
+                  {n > 1 || work ? (
                     <>
-                      <Icon name="stack-line" />
-                      <span className="mono">{n}</span>
+                      <Icon name={work ? WORK_ICON : 'stack-line'} />
+                      {n > 1 && <span className="mono">{n}</span>}
                     </>
                   ) : (
                     genNote

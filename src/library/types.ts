@@ -64,7 +64,8 @@ export interface LibraryProps {
   onQueryChange: (query: string) => void;
   onViewChange: (view: string) => void;
   onPreview: (group: LibraryGroup, project?: LibraryCard) => void;
-  onOpenWorkbench: (project: Pick<ImageRecord, 'id'>) => void;
+  /** group：从哪一组打开（作品组时回到这个作品，1.5.6） */
+  onOpenWorkbench: (project: Pick<ImageRecord, 'id'>, group?: Pick<LibraryGroup, 'id'>) => void;
   /** 软件生成的图另起一个新作品（doc/design.md 2.23，1.5.5） */
   onOpenAsNewWork?: (project: Pick<ImageRecord, 'id'>) => void;
   onCopyImage: (project: LibraryCard | ImageRecord | ImageProject) => Promise<unknown>;

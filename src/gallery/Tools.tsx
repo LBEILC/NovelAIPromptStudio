@@ -18,6 +18,8 @@ import { libraryTagSuggestions, type LibraryTagOption } from '../library/tagSugg
 import { DateRangePop } from './DateRange';
 import type { GalleryFilters } from '../shared/types';
 import type { LibraryProps } from '../library/types';
+import type { GalleryDisplay } from './Grid';
+import { GALLERY_MOSAIC_MIN_ROW } from '../lib/gallery.js';
 
 const ROW = { min: 120, max: 360, step: 20 };
 const SIM = { min: 70, max: 95, step: 5 };
@@ -32,6 +34,11 @@ const MERGE = [
   ['full', '完全相同'],
   ['base', '基础相同'],
   ['similar', '相似'],
+] as const;
+const COVERS = [
+  ['origin', '原图'],
+  ['earliest', '最早生成'],
+  ['latest', '最新生成'],
 ] as const;
 const MERGE_HELP: Record<string, string> = {
   separate: '每张图片单独显示。',
@@ -114,11 +121,15 @@ export function Tools({
   p,
   rowHeight,
   onRowHeight,
+  display,
+  onDisplay,
   searchRef,
 }: {
   p: LibraryProps;
   rowHeight: number;
   onRowHeight: (h: number) => void;
+  display: GalleryDisplay;
+  onDisplay: (patch: Partial<GalleryDisplay>) => void;
   searchRef: React.RefObject<HTMLInputElement | null>;
 }) {
   const [pop, setPop] = useState<'' | 'filter' | 'view' | 'import'>('');
@@ -282,6 +293,8 @@ export function Tools({
         onClose={() => setPop('')}
         rowHeight={rowHeight}
         onRowHeight={onRowHeight}
+        display={display}
+        onDisplay={onDisplay}
       />
       <MenuPop
         open={pop === 'import'}
@@ -694,12 +707,16 @@ function ViewPop({
   onClose,
   rowHeight,
   onRowHeight,
+  display,
+  onDisplay,
 }: {
   p: LibraryProps;
   open: boolean;
   onClose: () => void;
   rowHeight: number;
   onRowHeight: (h: number) => void;
+  display: GalleryDisplay;
+  onDisplay: (patch: Partial<GalleryDisplay>) => void;
 }) {
   const [sort, setSort] = useState(false);
   const sim = p.grouping.promptScope === 'similar';
@@ -769,6 +786,34 @@ function ViewPop({
               onChange={(mergeVibes) => p.onGroupingChange({ mergeVibes })}
             />
             <span>不同的也合并</span>
+          </span>
+        </div>
+        {/* 封面和多张预览（1.5.6）：只影响卡片怎么画，不重新分组 */}
+        <div className="frow">
+          <span className="label">封面</span>
+          <Seg
+            label="封面"
+            items={COVERS}
+            value={display.cover}
+            onChange={(cover) => onDisplay({ cover })}
+          />
+        </div>
+        <div className={`frow ${rowHeight >= GALLERY_MOSAIC_MIN_ROW ? '' : 'off'}`}>
+          <span className="label">多张</span>
+          <span
+            className="lswrow"
+            data-tip={
+              rowHeight >= GALLERY_MOSAIC_MIN_ROW
+                ? undefined
+                : `大小调到 ${GALLERY_MOSAIC_MIN_ROW} 以上时显示`
+            }
+          >
+            <Switch
+              on={display.mosaic}
+              label="放得下时显示多张"
+              onChange={(mosaic) => onDisplay({ mosaic })}
+            />
+            <span>放得下时显示多张</span>
           </span>
         </div>
       </Pop>
