@@ -1,5 +1,6 @@
 import { selectGalleryGrouping } from './galleryView.js';
 import path from 'node:path';
+import fs from 'node:fs';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { importLibraryFiles } from '../importer.js';
 
@@ -40,7 +41,22 @@ export async function workSharingChecks({ h, mode, database, preferences }) {
       source: 'agent',
     }).id;
   const imageId = imported.imported[2].id;
-  const a = (await invoke('work.open-from-image', { versionId, imageId })).tab;
+  await invoke('workbench.open', { libraryId: imageId, workId: b.workId });
+  await h.click('工作台', 'document.querySelector(".tb")');
+  await h.wait(
+    `document.querySelector('.wb-body')?.dataset.projectId===${JSON.stringify(imageId)} && !!document.querySelector('.stage [data-stage]')`,
+    'B 第三版图片已显示',
+  );
+  await h.evaluate(
+    `document.querySelector('.stage [data-stage]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:400,clientY:200}))`,
+  );
+  await h.click('作为新作品打开', 'document.querySelector("[role=menu]:not(.leaving *)")');
+  await h.wait(
+    `window.studio.invoke('workbench.list',{}).then(r=>r.data.activeTabId!==${JSON.stringify(b.id)})`,
+    '从 B 创建新作品',
+  );
+  const tabs = await invoke('workbench.list');
+  const a = (await invoke('workbench.get', { tabId: tabs.activeTabId })).tab;
   await h.check(
     '从 B 第三版打开的新作品尚未建立',
     () => !a.workSaved && database.versions.get(versionId).number === 3,
@@ -157,4 +173,79 @@ export async function workSharingChecks({ h, mode, database, preferences }) {
     '撤销后恢复 A 原图归属',
     () => database.loadProject(imageId).work_refs.length === 2,
   );
+  const detachA = async () => {
+    await h.click('全部图片', 'document.querySelector(".libp")');
+    await h.wait(`!!document.querySelector(${JSON.stringify(selector(a.workId))})`);
+    await h.evaluate(
+      `document.querySelector(${JSON.stringify(selector(a.workId))}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:200,clientY:200}))`,
+    );
+    await h.click('移入回收站', 'document.querySelector("[role=menu]:not(.leaving *)")');
+    await h.click(
+      `只从「${openedA.displayName}」里去掉`,
+      'document.querySelector("[role=dialog]")',
+    );
+    await h.wait(
+      `window.studio.invoke('trash.detached',{}).then(r=>r.data.items.some(x=>x.workId===${JSON.stringify(a.workId)}))`,
+      '去掉记录已保存',
+    );
+    await h.click('回收站', 'document.querySelector(".libp")');
+    const { items } = await invoke('trash.detached');
+    const entry = items.find((r) => r.workId === a.workId);
+    const card = `[...document.querySelectorAll('[data-group-id]')].find(e=>e.dataset.groupId===${JSON.stringify(`detached:${entry.undo}`)})`;
+    await h.wait(`!!(${card})`, '回收站显示 A 的去掉记录');
+    return card;
+  };
+  const firstCard = await detachA();
+  await h.check('回收站命令返回 A 的原图记录及 B 的现有引用', async () => {
+    const { items } = await invoke('trash.detached');
+    const entry = items.find((r) => r.workId === a.workId);
+    return (
+      entry?.role === 'origin' &&
+      entry.image.id === imageId &&
+      entry.image.work_refs.some((r) => r.workId === b.workId)
+    );
+  });
+  await h.screenshot('061-detached-in-trash');
+  await h.evaluate(
+    `(${firstCard}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:200,clientY:200}))`,
+  );
+  await h.click(
+    `放回「${openedA.displayName}」`,
+    'document.querySelector("[role=menu]:not(.leaving *)")',
+  );
+  await h.wait(
+    `window.studio.invoke('trash.detached',{}).then(r=>!r.data.items.some(x=>x.workId===${JSON.stringify(a.workId)}))`,
+    '回收站放回完成',
+  );
+  await h.click('全部图片', 'document.querySelector(".libp")');
+  await h.wait(
+    `!!document.querySelector(${JSON.stringify(selector(a.workId))})`,
+    '放回后 A 组重新出现',
+  );
+  await h.check(
+    '从回收站放回后 A 与 B 都引用原图',
+    () => database.loadProject(imageId).work_refs.length === 2,
+  );
+  const secondCard = await detachA();
+  await h.evaluate(
+    `(${secondCard}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:200,clientY:200}))`,
+  );
+  await h.click('不再恢复', 'document.querySelector("[role=menu]:not(.leaving *)")');
+  await h.wait(
+    `window.studio.invoke('trash.detached',{}).then(r=>!r.data.items.some(x=>x.workId===${JSON.stringify(a.workId)}))`,
+    '不再恢复已丢掉记录',
+  );
+  await h.wait(`!(${secondCard})`, '丢掉记录后卡片消失');
+  await h.check('丢掉记录后 B 第三版、图片和文件仍在', () => {
+    const p = database.loadProject(imageId);
+    return (
+      !p.deleted_at &&
+      p.work_refs.length === 1 &&
+      p.work_refs[0].workId === b.workId &&
+      database.versions.get(versionId).images.some((i) => i.projectId === imageId && !i.deleted) &&
+      fs.existsSync(p.image_path) &&
+      fs.existsSync(p.thumbnail_path)
+    );
+  });
+  await h.screenshot('061-detached-discarded');
 }
