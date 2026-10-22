@@ -33,7 +33,7 @@ const cardRatio = (c: LibraryCard) => {
 /** 卡片显示的样子（1.5.6）：主图按"封面"选；多张预览时右边多一列，卡片宽出行高的 GALLERY_MOSAIC_RATIO */
 export type GalleryDisplay = { cover: 'origin' | 'earliest' | 'latest'; mosaic: boolean };
 const mosaicOn = (g: LibraryGroup, d: GalleryDisplay, rowHeight: number) =>
-  d.mosaic && rowHeight >= GALLERY_MOSAIC_MIN_ROW && g.members.length > 1;
+  d.mosaic && rowHeight >= GALLERY_MOSAIC_MIN_ROW && g.members.length >= 3;
 const isWork = (g: LibraryGroup) => g.id.startsWith('work:');
 /** 作品的角标图标：在预览里比较 node-tree、git-branch-line、git-commit-line 后定 */
 export const WORK_ICON = 'node-tree';

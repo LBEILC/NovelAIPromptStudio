@@ -14,6 +14,12 @@ import { libraryPositivePrompt } from '../library/Prompt';
 import type { ImageRecord, Tag, TagCategory } from '../shared/types';
 import type { LibraryGroup, LibraryProps } from '../library/types';
 import { isGroupOrigin } from '../lib/gallery.js';
+
+/** 缩略图等高、宽度按图自己的比例（1.5.6，用户 10-22："很多地方的比例都是直接默认竖屏的"）；太宽太窄的收在 0.5～2 */
+const ratioOf = (m: { metadata?: { width?: number | null; height?: number | null } }) => {
+  const { width, height } = m.metadata || {};
+  return width && height ? Math.min(2, Math.max(0.5, width / height)) : 832 / 1216;
+};
 import { WORK_ICON } from './Grid';
 
 export { CAT_VAR, CAT_NAME } from '../kit/categories';
@@ -364,6 +370,7 @@ function Strip({
           src={thumb(m)}
           alt=""
           draggable={false}
+          style={{ width: `calc(var(--strip-h) * ${ratioOf(m)})` }}
           data-tip={origin ? '原图' : `第 ${i + 1} 张`}
           onClick={() => p.onPreview(group, m)}
         />
@@ -412,7 +419,13 @@ function Summary({ p, a }: { p: LibraryProps; a: DetailActions }) {
           <b>已选 {libraryCountText(groups.length, p.selectedImageCount)}</b>
           <div className="fan">
             {groups.slice(0, 5).map((g) => (
-              <img key={g.id} src={thumb(g.cover)} alt="" draggable={false} />
+              <img
+                key={g.id}
+                src={thumb(g.cover)}
+                alt=""
+                draggable={false}
+                style={{ width: `calc(var(--fan-h) * ${ratioOf(g.cover)})` }}
+              />
             ))}
           </div>
           <span className="help">

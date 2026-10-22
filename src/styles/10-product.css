@@ -215,3 +215,9 @@ html.tray, html.tray body, html.tray #root { width: auto; height: auto; backgrou
 .detail .lalso { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0; border: 0; background: none; color: var(--text-2); cursor: default; text-align: left; }
 .detail .lalso:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .detail .lalso [class^="ri-"] { font-size: var(--icon-sm); color: var(--text-3); }
+
+/* 详情栏小图条、多选时叠放的那几张：等高，宽度由界面按每张的比例写进 style（1.5.6） */
+.detail .strip img { height: var(--strip-h); object-fit: cover; }
+.detail .sum .fan { --fan-h: calc(var(--fan-w) * 1216 / 832); }
+.detail .sum .fan img { flex: 0 0 auto; height: var(--fan-h); aspect-ratio: auto; }
+.detail .sum .fan img + img { margin-left: calc(var(--fan-h) * -0.27); }

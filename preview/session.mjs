@@ -286,6 +286,23 @@ export async function createSession(services, images, emit, empty = false) {
         });
         await waitJob((await call('generate.start', { tabId: libraryOriginal.id, count: 1 })).id);
       }
+      // 一个作品里横图、竖图、方图都有（1.5.6：看翻看、小图条、多张预览在比例不同时的样子）
+      const mixed = (await call('workbench.open', { libraryId: cards[5].id })).tab;
+      for (const [i, [width, height]] of [
+        [832, 1216],
+        [1216, 832],
+        [1216, 832],
+        [1024, 1024],
+        [832, 1216],
+      ].entries()) {
+        await call('prompt.set-size', { tabId: mixed.id, width, height });
+        await call('prompt.set', {
+          tabId: mixed.id,
+          scope: 'base:prompt',
+          text: `synthetic mixed ratio ${i + 1}`,
+        });
+        await waitJob((await call('generate.start', { tabId: mixed.id, count: 1 })).id);
+      }
       const [externalFile] = await createWorkbenchFixtures(
         path.join(directory, 'external-original'),
         { sizes: [[512, 768]], seed: 49000 },

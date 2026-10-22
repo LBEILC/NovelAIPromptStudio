@@ -420,6 +420,41 @@ group('窗口', [
   ['关闭窗口', async () => events.forEach((callback) => callback({ type: 'close-request' }))],
   ['托盘菜单', openTray],
 ]);
+// 作品角标的候选图标（1.5.6，用户挑完就删掉这一组）：把产品里画出来的 ri-node-tree 换成别的
+const WORK_ICONS = [
+  ['树形', 'node-tree'],
+  ['分支', 'git-branch-line'],
+  ['分叉', 'git-fork-line'],
+  ['版本节点', 'git-commit-line'],
+  ['脑图', 'mind-map'],
+];
+let workIcon = 'node-tree';
+const paintWorkIcons = () => {
+  if (workIcon === 'node-tree') return;
+  for (const i of rootEl.querySelectorAll('i.ri-node-tree')) {
+    i.classList.remove('ri-node-tree');
+    i.classList.add('ri-' + workIcon, 'pv-work-icon');
+  }
+};
+new MutationObserver(paintWorkIcons).observe(rootEl, { childList: true, subtree: true });
+group(
+  '作品图标',
+  WORK_ICONS.map(([label, name]) => [
+    label,
+    async () => {
+      for (const i of rootEl.querySelectorAll('i.pv-work-icon')) {
+        i.classList.remove('ri-' + workIcon, 'pv-work-icon');
+        i.classList.add('ri-node-tree');
+      }
+      workIcon = name;
+      paintWorkIcons();
+      for (const b of bar.querySelectorAll('.pv-group button'))
+        if (b.parentElement.firstChild.textContent === '作品图标')
+          b.classList.toggle('on', b.textContent === label);
+    },
+    () => name === workIcon,
+  ]),
+);
 group('更新', [
   ['有新版本', act('update', true)],
   ['已是最新', act('update', false)],
