@@ -10,6 +10,8 @@ export async function workSharingChecks({ h, mode, database, preferences }) {
     if (!result.ok) throw Error(JSON.stringify(result.error));
     return result.data;
   })()`);
+  // Match the full-suite state, where version UI is enabled by the local fake account.
+  await invoke('account.save', { token: 'acceptance-token' });
   const files = await createWorkbenchFixtures(path.join(mode.root, 'shared-work-fixtures'), {
     prefix: 'synthetic-shared-060',
     sizes: [
@@ -88,7 +90,13 @@ export async function workSharingChecks({ h, mode, database, preferences }) {
     );
     await h.click('在工作台打开', 'document.querySelector("[role=menu]:not(.leaving *)")');
     await h.wait(
-      `window.studio.invoke('workbench.list',{}).then(async r=>(await window.studio.invoke('workbench.get',{tabId:r.data.activeTabId})).data.tab.workId===${JSON.stringify(workId)})`,
+      `window.studio.invoke('workbench.list',{}).then(async r=>{
+        const tab=(await window.studio.invoke('workbench.get',{tabId:r.data.activeTabId})).data.tab;
+        return tab.workId===${JSON.stringify(workId)} &&
+          document.querySelector('[data-tab="'+tab.id+'"]')?.getAttribute('aria-selected')==='true' &&
+          document.querySelector('.wb-body')?.dataset.projectId===tab.project.id &&
+          !document.querySelector('.app-page-surface.leaving');
+      })`,
       '按组打开完成',
     );
     const list = await invoke('workbench.list');
@@ -104,6 +112,19 @@ export async function workSharingChecks({ h, mode, database, preferences }) {
       openedB.workId === b.workId &&
       openedB.versionId === versionId &&
       openedB.versionImageId === imageId,
+    () => ({
+      expected: { a: a.workId, aVersion: a.versionId, b: b.workId, bVersion: versionId, imageId },
+      openedA: {
+        workId: openedA.workId,
+        versionId: openedA.versionId,
+        imageId: openedA.versionImageId,
+      },
+      openedB: {
+        workId: openedB.workId,
+        versionId: openedB.versionId,
+        imageId: openedB.versionImageId,
+      },
+    }),
   );
   await h.click('图片库', 'document.querySelector(".tb")');
   await h.wait(`!!document.querySelector(${JSON.stringify(selector(a.workId))})`);
