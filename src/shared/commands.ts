@@ -130,6 +130,7 @@ export type CommandEvent =
   | WorkbenchCommandEvent
   | ProgressCommandEvent
   | { type: 'ai-settings' }
+  | { type: 'network'; data: Types.NetworkState }
   | { type: 'updates'; data: Types.UpdateState }
   | { type: 'generation'; data: GenerationStatus }
   | { type: 'navigate'; destination: string }
@@ -147,6 +148,9 @@ export interface AgentSkills {
   codex: { state: AgentSkillState; path: string };
 }
 export interface CommandDefinitions {
+  'settings.network.get': { input: Record<string, never>; output: Types.NetworkState };
+  'settings.network.save': { input: Types.NetworkSettings; output: Types.NetworkState };
+  'settings.network.test': { input: Types.NetworkSettings; output: Types.NetworkTestResult };
   'prompt.tidy': {
     input: TabInput & { requestId: string };
     output: { changes: import('./materials').TidyChange[]; revision: number };

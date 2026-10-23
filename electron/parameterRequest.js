@@ -5,7 +5,11 @@ import {
   gridCenter,
   HINTS,
 } from './params.js';
-import { buildGenerationRequest, generationModel } from './generation.js';
+import {
+  buildGenerationRequest,
+  generationModel,
+  validateGenerationRequest,
+} from './generation.js';
 import { getPromptScopes, promptForTransmission } from '../src/lib/promptStructure.js';
 import {
   expandDraftAutomaticPrompt,
@@ -114,6 +118,7 @@ export async function buildProjectRequest(project, library, { seed, encode } = {
   }
   if (medium) delete parameters.cfg_rescale;
   const pending = new Set();
+  validateGenerationRequest(request);
   if (refs.vibes.length) {
     // 三个数组必须一样长（NovelAI 校验）；编码好的 Vibe 也带信息提取，原图没记录的按 1
     parameters.reference_image_multiple = [];

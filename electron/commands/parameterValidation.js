@@ -1,14 +1,18 @@
-import { MODEL_CAPS, SAMPLERS, NOISE_SCHEDULES } from '../../src/shared/params.ts';
+import {
+  MODEL_CAPS,
+  SAMPLERS,
+  NOISE_SCHEDULES,
+  validParameterNumber,
+} from '../../src/shared/params.ts';
 
 export function validSettingsPatch(patch) {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return false;
-  const range = (n, lo, hi) => typeof n === 'number' && Number.isFinite(n) && n >= lo && n <= hi;
   const checks = {
     model: (v) => Object.hasOwn(MODEL_CAPS, v),
     effort: (v) => v === null || ['High', 'Medium'].includes(v),
-    steps: (v) => Number.isInteger(v) && range(v, 1, 50),
-    scale: (v) => range(v, 0, 10),
-    rescale: (v) => v === null || range(v, 0, 1),
+    steps: (v) => validParameterNumber('steps', v),
+    scale: (v) => validParameterNumber('scale', v),
+    rescale: (v) => v === null || validParameterNumber('rescale', v),
     sampler: (v) => SAMPLERS.some((s) => s.id === v),
     noise: (v) => v === null || NOISE_SCHEDULES.includes(v),
     quality: (v) => ['None', 'Standard', 'Light'].includes(v),

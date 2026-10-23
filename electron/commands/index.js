@@ -48,6 +48,7 @@ import { saveWorkbenchImage } from './saveWorkbenchImage.js';
 /** @typedef {{[K in Name]:(input:import('../../src/shared/commands').CommandInput<K>, caller:Caller)=>Promise<import('../../src/shared/commands').CommandOutput<K>>|import('../../src/shared/commands').CommandOutput<K>}} Handlers */
 /** @typedef {{
  * directory:string, version:string,
+ * network?:ReturnType<import('../network.js').createNetworkManager>, fetcher?:typeof fetch,
  * readImage:(path:string)=>Promise<Project>, readSource:(source:Source)=>Promise<Project>,
  * importImage:(path:string,draft?:Project)=>Promise<Project>,
  * database:Awaited<ReturnType<import('../database.js').openDatabase>>,

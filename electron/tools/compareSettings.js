@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { BrowserWindow, net } from 'electron';
+import { BrowserWindow, session } from 'electron';
 import sharp from 'sharp';
 
 // Reuses the screenshot harness's disposable profile and offline service doubles.
@@ -57,8 +57,9 @@ export async function compareSettings({
     },
   });
   const shots = [];
-  const originalFetch = net.fetch;
-  net.fetch = async (input, options) => {
+  const networkSession = session.fromPartition('studio-network');
+  const originalFetch = networkSession.fetch.bind(networkSession);
+  networkSession.fetch = async (input, options) => {
     const address = new URL(
       typeof input === 'string' || input instanceof URL ? String(input) : input.url,
     );
@@ -409,7 +410,7 @@ export async function compareSettings({
     );
     await fs.writeFile(path.join(output, 'manifest.json'), JSON.stringify({ shots }, null, 2));
   } finally {
-    net.fetch = originalFetch;
+    networkSession.fetch = originalFetch;
     reference.destroy();
   }
 }

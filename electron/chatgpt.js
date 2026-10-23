@@ -18,6 +18,7 @@ const SCOPES = 'openid profile email offline_access resource.invoke chatgpt.toke
 // Protocol implementation; no third-party login source is bundled.
 export function createChatGPT({
   preferences,
+  runNetwork = (operation) => operation(),
   openExternal,
   emit = () => {},
   fetcher = (...args) => globalThis.fetch(...args),
@@ -503,6 +504,7 @@ export function createChatGPT({
           }),
         );
         remoteRevoked = response.ok;
+        await response.body?.cancel();
       }
     } catch {
       /* Local logout is unconditional. */
@@ -531,11 +533,11 @@ export function createChatGPT({
     return get(m).quota || null;
   }
   const service = {
-    complete,
-    models,
-    signIn,
-    signOut,
-    quota,
+    complete: (...args) => runNetwork(() => complete(...args)),
+    models: (...args) => runNetwork(() => models(...args)),
+    signIn: () => runNetwork(signIn),
+    signOut: () => runNetwork(signOut),
+    quota: () => runNetwork(quota),
     cancel: () => {
       pending?.controller.abort();
       return {};

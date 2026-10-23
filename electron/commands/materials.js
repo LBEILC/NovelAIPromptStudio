@@ -85,6 +85,7 @@ export function materialCommands({ services, tab, full, edit, locate, revision }
         payload,
         services.preferences?.credentials() || {},
         controller.signal,
+        services.fetcher,
       );
       if (controller.signal.aborted) throw new Error('已取消');
       return result;

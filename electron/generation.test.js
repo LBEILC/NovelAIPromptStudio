@@ -442,6 +442,32 @@ describe('model request compatibility and HTTP failures', () => {
     expect(generationError(0)).toBe('无法连接到 NovelAI');
     expect(generationError(403)).toBe('NovelAI 拒绝了这次请求');
   });
+  it('exposes bounded status classifications without interpreting a network outage as bad credentials', async () => {
+    for (const [status, code, machineCode] of [
+      [401, 'invalid_token', 'auth'],
+      [403, 'forbidden', 'auth'],
+      [429, 'usage_limit', 'rate_limit'],
+      [503, 'request_failed', 'server'],
+    ]) {
+      const client = createNovelAIClient({
+        token: () => 'synthetic',
+        fetchImpl: async () => new Response('{}', { status }),
+      });
+      await expect(client.subscription()).rejects.toMatchObject({
+        code,
+        details: { status, machineCode },
+      });
+    }
+    const client = createNovelAIClient({
+      token: () => 'synthetic',
+      fetchImpl: async () => {
+        throw Error('net::ERR_PROXY_CONNECTION_FAILED https://user:secret@proxy.invalid');
+      },
+    });
+    const error = await client.subscription().catch((error) => error);
+    expect(error).toMatchObject({ code: 'network', details: { status: 0, machineCode: 'proxy' } });
+    expect(error.message).not.toContain('secret');
+  });
 });
 it.each([
   [undefined, undefined, [0.6, 0.6], [1, 1]],
@@ -499,7 +525,12 @@ it('normalizes persisted requests at the network boundary and never sends missin
   });
   const request = {
     model: 'nai-diffusion-4-5-full',
-    parameters: { reference_image_multiple: ['synthetic'], reference_strength_multiple: [] },
+    parameters: {
+      steps: 28,
+      scale: 5,
+      reference_image_multiple: ['synthetic'],
+      reference_strength_multiple: [],
+    },
   };
   expect(await client.generate(request)).toEqual(png);
   expect(sent[0].parameters).toMatchObject({

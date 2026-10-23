@@ -16,6 +16,27 @@ const category =
   'ArtistEra|Subject|Identity|Body|Clothing|Action|Environment|Composition|StyleQuality|Unsorted';
 /** @type {Record<CommandName, Definition>} */
 export const commandRegistry = {
+  'settings.network.get': { fields: {}, uiOnly: true },
+  'settings.network.save': {
+    fields: {
+      mode: 'system|direct|manual',
+      protocol: 'http|socks5',
+      host: 'string',
+      port: 'integer',
+    },
+    required: ['mode'],
+    uiOnly: true,
+  },
+  'settings.network.test': {
+    fields: {
+      mode: 'system|direct|manual',
+      protocol: 'http|socks5',
+      host: 'string',
+      port: 'integer',
+    },
+    required: ['mode'],
+    uiOnly: true,
+  },
   'prompt.tidy': {
     fields: { ...tab, requestId: 'string' },
     required: ['tabId', 'requestId'],
@@ -499,12 +520,12 @@ export const commandRegistry = {
 };
 
 export class CommandError extends Error {
-  /** @param {CommandErrorCode} code @param {string} message */
-  constructor(code, message) {
+  /** @param {CommandErrorCode} code @param {string} message @param {Record<string, unknown>} [details] */
+  constructor(code, message, details) {
     super(message);
     this.code = code;
     /** @type {Record<string, unknown>|undefined} */
-    this.details = undefined;
+    this.details = details;
   }
 }
 /** @param {unknown} value @returns {value is Record<string, unknown>} */

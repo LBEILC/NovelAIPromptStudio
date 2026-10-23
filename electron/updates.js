@@ -57,7 +57,10 @@ export async function checkForUpdates(currentVersion, fetcher) {
       headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'NovelAI-Prompt-Studio' },
     },
   );
-  if (!response.ok) throw new Error(`GitHub Release 请求失败（${response.status}）`);
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(`GitHub Release 请求失败（${response.status}）`);
+  }
   const release = await response.json();
   const version = String(release.tag_name || '').replace(/^v/i, '');
   if (!version) throw new Error('最新 Release 没有有效版本号');
@@ -73,7 +76,10 @@ export async function checkForUpdates(currentVersion, fetcher) {
       )
         throw Error('Unexpected release asset URL');
       const response = await fetcher(url.href, { signal: AbortSignal.timeout(10_000) });
-      if (!response.ok) throw Error('Release notes unavailable');
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw Error('Release notes unavailable');
+      }
       const notes = validateReleaseNotes(await response.json());
       if (notes.version === version) structuredNotes = notes;
     } catch {

@@ -14,7 +14,7 @@ import {
 } from '../workbench.js';
 import { importLibraryFiles } from '../importer.js';
 /** @typedef {import('../../src/shared/types').ImageProject} Project */
-/** @param {{preferences?:ReturnType<import('../preferences.js').openPreferences>, generationBaseUrl?:string, database:Awaited<ReturnType<import('../database.js').openDatabase>>,assetsDirectory:()=>string,busy:()=>boolean,createWindow:()=>Electron.BrowserWindow,testRoot?:string,handlers?:import('./index.js').Services['handlers'],selectSource?:import('./index.js').Services['selectSource'],readyLibrary?:()=>Promise<void>,onEvent?:(event:import('../../src/shared/commands').CommandEvent)=>void,beforeCommand?:import('./index.js').Services['beforeCommand']}} options */
+/** @param {{network?:import('./index.js').Services['network'], fetcher?:typeof fetch, preferences?:ReturnType<import('../preferences.js').openPreferences>, generationBaseUrl?:string, database:Awaited<ReturnType<import('../database.js').openDatabase>>,assetsDirectory:()=>string,busy:()=>boolean,createWindow:()=>Electron.BrowserWindow,testRoot?:string,handlers?:import('./index.js').Services['handlers'],selectSource?:import('./index.js').Services['selectSource'],readyLibrary?:()=>Promise<void>,onEvent?:(event:import('../../src/shared/commands').CommandEvent)=>void,beforeCommand?:import('./index.js').Services['beforeCommand']}} options */
 export async function installCommandRuntime(options) {
   const handlers = options.handlers || {};
   const { database } = options;
@@ -54,6 +54,8 @@ export async function installCommandRuntime(options) {
   }
   const commands = await createCommands({
     preferences: options.preferences,
+    network: options.network,
+    fetcher: options.fetcher,
     generationBaseUrl: options.generationBaseUrl,
     directory,
     version: app.getVersion(),

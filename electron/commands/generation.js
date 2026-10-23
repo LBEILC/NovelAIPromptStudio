@@ -27,7 +27,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     Number(subscription?.trainingStepsLeft?.fixedTrainingStepsLeft || 0) +
     Number(subscription?.trainingStepsLeft?.purchasedTrainingSteps || 0);
   const client = () =>
-    createNovelAIClient({ token: preferences.novelAIToken, baseUrl: services.generationBaseUrl });
+    createNovelAIClient({
+      token: preferences.novelAIToken,
+      baseUrl: services.generationBaseUrl,
+      fetchImpl: services.fetcher,
+    });
   const settings = () => {
     const s = preferences.generationSettings();
     return { ...s, spentToday: s.spentDate === today() ? s.spentToday || 0 : 0 };
@@ -103,6 +107,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   for (const job of initial) spent.set(job.id, job.spent || 0);
   const queue = createGenerationQueue({
     initial,
+    run: services.network?.run,
     persist: (jobs) => {
       const temporary = `${queueFile}.tmp`;
       syncFs.writeFileSync(temporary, JSON.stringify(jobs));
@@ -134,7 +139,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           thumbnail_path: saved.project.thumbnail_path,
         };
       });
-      if (job.referencesPrepared) return;
+      // Rehydrate restored jobs too; previously prepared requests can contain legacy bad values.
       const prepared = await buildProjectRequest(job.project, services.database.vibeLibrary, {
         seed: job.request.parameters.seed,
         encode: (body) => client().encodeVibe(body),
@@ -508,9 +513,12 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         next = await createNovelAIClient({
           token: () => token.trim(),
           baseUrl: services.generationBaseUrl,
+          fetchImpl: services.fetcher,
         }).subscription();
-      } catch {
-        throw new Error('保存失败：持久令牌无效');
+      } catch (error) {
+        if (error.code === 'invalid_token')
+          throw new CommandError('invalid_token', '保存失败：持久令牌无效', error.details);
+        throw error;
       }
       preferences.saveNovelAIToken(token.trim());
       subscription = next;

@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { net, session } from 'electron';
+import { session } from 'electron';
 import { importLibraryFiles } from '../importer.js';
 import { harness } from '../acceptance/harness.js';
 import { spawn } from 'node:child_process';
@@ -155,12 +155,13 @@ export async function runReadmeScreenshots({
     blockedRequests: 0,
     blockedUrls: [],
   };
-  const originalFetch = net.fetch,
+  const networkSession = session.fromPartition('studio-network');
+  const originalFetch = networkSession.fetch.bind(networkSession),
     originalGlobalFetch = globalThis.fetch;
   const local = (url) =>
     new URL(typeof url === 'string' || url instanceof URL ? String(url) : url.url).origin ===
     generationService.url;
-  net.fetch = async (url, options) => {
+  networkSession.fetch = async (url, options) => {
     const address = new URL(typeof url === 'string' || url instanceof URL ? String(url) : url.url);
     if (address.protocol === 'file:') return originalFetch(url, options);
     if (local(url)) {
@@ -544,7 +545,7 @@ export async function runReadmeScreenshots({
       JSON.stringify({ screenshots, checks, network, addedTranslations: dictionaryEdits }, null, 2),
     );
     window?.destroy();
-    net.fetch = originalFetch;
+    networkSession.fetch = originalFetch;
     globalThis.fetch = originalGlobalFetch;
     session.defaultSession.webRequest.onBeforeRequest(null);
   }

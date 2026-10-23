@@ -26,12 +26,14 @@ import {
   nativeImage,
   nativeTheme,
   net,
+  session,
   protocol,
   safeStorage,
   screen,
   shell,
 } from 'electron';
 import electronUpdater from 'electron-updater';
+import { createNetworkManager, networkCommands } from './network.js';
 import { openDatabase } from './database.js';
 import { retranslateDictionary } from './dictionaryTranslation.js';
 import {
@@ -496,6 +498,16 @@ app.whenReady().then(async () => {
     defaultAssetsDirectory,
     systemFonts,
   });
+  const network = createNetworkManager({
+    session: session.fromPartition('studio-network', { cache: false }),
+    updaterSession: autoUpdater.netSession,
+    createTestSession: () => session.fromPartition('studio-network-test', { cache: false }),
+    preferences,
+    emit: (event) => {
+      for (const window of BrowserWindow.getAllWindows()) sendWindowEvent(window, event);
+    },
+  });
+  await network.initialize();
   configureAutoUpdater();
   workbenchTemporaryDirectory = path.join(app.getPath('userData'), 'workbench-temp');
   assetsDirectory = preferences.librarySettings().assetsDirectory;
@@ -1229,7 +1241,7 @@ app.whenReady().then(async () => {
         tags: Array.isArray(request.tags) ? request.tags : [],
         database,
         settings: preferences.credentials(),
-        fetcher: net.fetch,
+        fetcher: network.fetch,
         signal: controller.signal,
         progress: (progress) => {
           if (!event.sender.isDestroyed())
@@ -1355,7 +1367,7 @@ app.whenReady().then(async () => {
     try {
       if (!capabilities.canDownloadUpdate) {
         notifyUpdateState({ phase: 'checking', error: '', progress: 0 });
-        const release = await checkReleaseUpdates(app.getVersion(), net.fetch);
+        const release = await checkReleaseUpdates(app.getVersion(), network.fetch);
         notifyUpdateState({
           ...release,
           phase: release.hasUpdate ? 'available' : 'current',
@@ -1364,10 +1376,10 @@ app.whenReady().then(async () => {
         });
         return { ok: true, ...updateState };
       }
-      const result = await autoUpdater.checkForUpdates();
+      const result = await network.run(() => autoUpdater.checkForUpdates());
       const info = result?.updateInfo;
       try {
-        const release = await checkReleaseUpdates(app.getVersion(), net.fetch);
+        const release = await checkReleaseUpdates(app.getVersion(), network.fetch);
         if (release.latestVersion === updateState.latestVersion)
           notifyUpdateState({
             structuredNotes: release.structuredNotes,
@@ -1406,7 +1418,7 @@ app.whenReady().then(async () => {
       return { ok: false, error: '请先检查并确认有可用更新' };
     try {
       notifyUpdateState({ phase: 'downloading', progress: 0, error: '' });
-      await autoUpdater.downloadUpdate();
+      await network.run(() => autoUpdater.downloadUpdate());
       return { ok: true };
     } catch (error) {
       notifyUpdateState({
@@ -1484,7 +1496,7 @@ app.whenReady().then(async () => {
   });
   registerCommand('ai.models', async (input, _caller) => {
     try {
-      return { ok: true, models: await listModels(preferences.credentials(), net.fetch) };
+      return { ok: true, models: await listModels(preferences.credentials(), network.fetch) };
     } catch (error) {
       if (error instanceof CommandError) throw error;
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -1504,7 +1516,7 @@ app.whenReady().then(async () => {
         request.text,
         request.direction,
         preferences.credentials(),
-        net.fetch,
+        network.fetch,
         controller.signal,
       );
       return { ok: true, text };
@@ -1523,7 +1535,7 @@ app.whenReady().then(async () => {
   });
   registerCommand('ai.test', async (input, _caller) => {
     try {
-      return { ok: true, ...(await testModel(preferences.credentials(), net.fetch)) };
+      return { ok: true, ...(await testModel(preferences.credentials(), network.fetch)) };
     } catch (error) {
       if (error instanceof CommandError) throw error;
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -1538,11 +1550,11 @@ app.whenReady().then(async () => {
         dictionary: database.lookupTagDictionary(cleaned),
         dsoDictionary: lookupDsoTags(cleaned),
         danbooruCache: database.lookupDanbooruTagCache(cleaned),
-        lookupDanbooru: (values) => lookupDanbooruTags(values, net.fetch),
+        lookupDanbooru: (values) => lookupDanbooruTags(values, network.fetch),
         translateMissing: (
           aiSettings.provider === 'chatgpt' ? aiSettings.chatgpt.signedIn : aiSettings.model
         )
-          ? (values) => translateTags(values, preferences.credentials(), net.fetch)
+          ? (values) => translateTags(values, preferences.credentials(), network.fetch)
           : null,
       });
       const { items, generated, danbooruChecks } = resolved;
@@ -1608,7 +1620,8 @@ app.whenReady().then(async () => {
   const chatGPT = createChatGPT({
     preferences,
     clientVersion: app.getVersion(),
-    fetcher: chatGPTFixture?.fetcher,
+    fetcher: chatGPTFixture?.fetcher || network.fetch,
+    runNetwork: network.run,
     openExternal: chatGPTFixture
       ? (url) => chatGPTFixture.openExternal(url)
       : (url) => shell.openExternal(url),
@@ -1619,6 +1632,7 @@ app.whenReady().then(async () => {
   });
   Object.assign(
     commandHandlers,
+    networkCommands(network),
     chatGPTCommands(chatGPT, preferences, (url) => shell.openExternal(url)),
   );
   app.once('before-quit', () => chatGPT.close());
@@ -1634,6 +1648,8 @@ app.whenReady().then(async () => {
     commandRuntime = await installCommandRuntime({
       preferences,
       generationBaseUrl: acceptanceGeneration?.url,
+      network,
+      fetcher: network.fetch,
       beforeCommand,
       onEvent: (event) => {
         if (event.type === 'generation') trayController?.generation(event.data);

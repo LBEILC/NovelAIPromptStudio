@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { NEW_WORK_DEFAULTS } from '../src/shared/params.ts';
 import { normalizeSettings, hydrateParameters } from './params.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -115,13 +116,10 @@ export function createBlankProject(input = {}, { model = 'last', latest = null }
   const params = normalizeSettings({
     model: model === 'last' ? 'nai-diffusion-5-full' : model,
     effort: 'High',
-    steps: 28,
-    scale: 5,
+    ...NEW_WORK_DEFAULTS,
     rescale: 0,
     sampler: 'k_euler_ancestral',
     noise: 'karras',
-    quality: 'Standard',
-    uc: 'Heavy',
     ...(inherited?.params || {}),
     aiPositions: true,
     positions: {},

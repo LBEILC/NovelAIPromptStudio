@@ -17,6 +17,28 @@ afterEach(() => {
 });
 
 describe('AI preferences', () => {
+  it('persists independent network settings and rejects invalid stored configuration', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-preferences-'));
+    temporaryDirectories.push(directory);
+    const preferences = openPreferences(directory, safeStorage);
+    expect(preferences.networkSettings()).toEqual({ mode: 'system' });
+    preferences.saveAISettings({
+      provider: 'apiKey',
+      baseUrl: 'https://example.com/v1',
+      apiKey: 'synthetic',
+    });
+    const next = { mode: 'manual', protocol: 'socks5', host: 'localhost', port: 1080 };
+    preferences.saveNetworkSettings(next);
+    expect(openPreferences(directory, safeStorage).networkSettings()).toEqual(next);
+    expect(preferences.credentials().apiKey).toBe('synthetic');
+    expect(preferences.credentials().baseUrl).toBe('https://example.com/v1');
+    expect(() => preferences.saveNetworkSettings({ ...next, host: 'remote.invalid' })).toThrow();
+    expect(preferences.networkSettings()).toEqual(next);
+    const file = path.join(directory, 'preferences.json');
+    const stored = JSON.parse(fs.readFileSync(file, 'utf8'));
+    fs.writeFileSync(file, JSON.stringify({ ...stored, network: { mode: 'broken' } }));
+    expect(() => openPreferences(directory, safeStorage).networkSettings()).toThrow();
+  });
   it.each([undefined, 'full', 'reduced', 'off'])(
     'preserves stored motion %s across unrelated appearance saves',
     (motion) => {

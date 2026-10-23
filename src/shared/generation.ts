@@ -88,6 +88,8 @@ export interface GenerationJob {
   spentKnown: boolean;
   stop: boolean;
   error: string;
+  errorCode?: import('./commands').CommandErrorCode;
+  errorDetails?: { status?: number; machineCode?: string };
   createdAt: string;
   project: ImageProject;
 }

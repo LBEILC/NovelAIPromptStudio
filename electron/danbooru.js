@@ -57,7 +57,10 @@ async function fetchTagBatch(names, fetcher) {
   } finally {
     clearTimeout(timeout);
   }
-  if (!response.ok) throw new Error(`Danbooru Tag 查询失败（HTTP ${response.status}）`);
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(`Danbooru Tag 查询失败（HTTP ${response.status}）`);
+  }
   return responseItems(await response.json());
 }
 

@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 import yauzl from 'yauzl';
+import { validParameterNumber, MEDIUM_FIXED } from '../src/shared/params.ts';
+import { CommandError } from './commands/registry.js';
 import { expandV5AutomaticPrompt } from '../src/lib/novelaiAutoPrompt.js';
 
 // Explicit allowlists: image metadata also contains internal, non-request fields.
@@ -209,9 +211,53 @@ export function generationError(status, reason = '') {
   if (status === 401) return '持久令牌无效，请在设置里更换';
   if (status === 402) return 'Anlas 不足';
   if (status === 429) return '请求太频繁，请稍后再试';
-  if (status >= 500) return 'NovelAI 服务繁忙';
+  if (status >= 500) return `NovelAI 服务繁忙（HTTP ${status}）${reason ? `：${reason}` : ''}`;
   if (status >= 400) return `NovelAI 拒绝了这次请求${reason ? `：${reason}` : ''}`;
   return '无法连接到 NovelAI';
+}
+
+function httpError(status, reason) {
+  return Object.assign(
+    new CommandError(
+      status === 401
+        ? 'invalid_token'
+        : status === 403
+          ? 'forbidden'
+          : status === 429
+            ? 'usage_limit'
+            : 'request_failed',
+      generationError(status, reason),
+      {
+        status,
+        machineCode:
+          status >= 500
+            ? 'server'
+            : status === 401 || status === 403
+              ? 'auth'
+              : status === 429
+                ? 'rate_limit'
+                : 'http',
+      },
+    ),
+    { status, safe: true },
+  );
+}
+
+export function validateGenerationRequest(request) {
+  const p = request?.parameters;
+  const medium = request?.model === 'nai-diffusion-5-full-medium';
+  if (
+    !Object.hasOwn(GENERATION_MODELS, request?.model) ||
+    !p ||
+    !validParameterNumber('steps', p.steps) ||
+    !validParameterNumber('scale', p.scale) ||
+    (p.cfg_rescale !== undefined && !validParameterNumber('rescale', p.cfg_rescale)) ||
+    (medium && (p.steps !== MEDIUM_FIXED.steps || p.sampler !== MEDIUM_FIXED.sampler))
+  ) {
+    throw new CommandError('invalid_input', '生成参数无效', {
+      machineCode: 'invalid_generation_parameters',
+    });
+  }
 }
 
 function serverReason(body, secret = '') {
@@ -286,19 +332,16 @@ export function createNovelAIClient({
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        throw Object.assign(
-          new Error(generationError(response.status, serverReason(body, secret))),
-          {
-            status: response.status,
-            safe: true,
-          },
-        );
+        throw httpError(response.status, serverReason(body, secret));
       }
       return response;
     } catch (error) {
       // Only the bounded, redacted server reason may reach the UI.
-      if (error.safe) throw error;
-      throw Object.assign(new Error(generationError(error.status)), { status: error.status || 0 });
+      if (error.safe || error instanceof CommandError) throw error;
+      throw new CommandError('network', generationError(error.status), {
+        status: error.status || 0,
+        machineCode: /proxy|tunnel|socks/i.test(String(error.message)) ? 'proxy' : 'network',
+      });
     }
   }
   return {
@@ -306,9 +349,11 @@ export function createNovelAIClient({
       Buffer.from(await (await send('/ai/encode-vibe', body)).arrayBuffer()).toString('base64'),
     subscription: async () => (await send('/user/subscription')).json(),
     generate: async (request, onProgress = () => {}) => {
+      const normalized = normalizeVibeParameters(request.parameters);
+      validateGenerationRequest(request);
       const response = await send('/ai/generate-image-stream', {
         ...request,
-        parameters: { ...normalizeVibeParameters(request.parameters), stream: 'sse' },
+        parameters: { ...normalized, stream: 'sse' },
       });
       if (!response.headers.get('content-type')?.includes('text/event-stream'))
         return extractGeneratedPng(Buffer.from(await response.arrayBuffer()));
@@ -337,14 +382,9 @@ export function createNovelAIClient({
             ?.slice(6)
             .trim();
         if (type === 'error')
-          throw Object.assign(
-            new Error(
-              generationError(
-                Number(value.status || value.status_code) || 500,
-                serverReason(value, secret),
-              ),
-            ),
-            { safe: true },
+          throw httpError(
+            Number(value.status || value.status_code) || 500,
+            serverReason(value, secret),
           );
         if (type === 'intermediate' && Number.isFinite(value.step_ix))
           onProgress(Math.max(0, Math.min(1, value.step_ix / request.parameters.steps)));

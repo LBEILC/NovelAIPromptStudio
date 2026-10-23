@@ -1,5 +1,6 @@
 import { MODEL_ORDER } from '../src/shared/params.ts';
 import fs from 'node:fs';
+import { normalizeNetworkSettings } from './network.js';
 import path from 'node:path';
 import { DEFAULT_BASE_URL, normalizeBaseUrl } from './translation.js';
 
@@ -341,6 +342,12 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       const stored = read();
       stored.generation = { ...(stored.generation || {}), ...next };
       write(stored);
+    },
+    networkSettings: () => normalizeNetworkSettings(read().network),
+    saveNetworkSettings: (value) => {
+      const settings = normalizeNetworkSettings(value);
+      write({ ...read(), network: settings });
+      return settings;
     },
     publicSettings,
     chatGPTRecord,

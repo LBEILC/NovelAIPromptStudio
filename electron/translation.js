@@ -94,7 +94,13 @@ async function requestAIJson(settings, url, options, fetcher, timeoutMs) {
   return { choices: [{ message: { content } }] };
 }
 
-export async function requestStructuredAI(instruction, input, settings, signal) {
+export async function requestStructuredAI(
+  instruction,
+  input,
+  settings,
+  signal,
+  fetcher = globalThis.fetch,
+) {
   const body = await requestAIJson(
     settings,
     `${normalizeBaseUrl(settings.baseUrl)}/chat/completions`,
@@ -109,7 +115,7 @@ export async function requestStructuredAI(instruction, input, settings, signal) 
         ]),
       ),
     },
-    globalThis.fetch,
+    fetcher,
   );
   return JSON.parse(
     chatContent(body)

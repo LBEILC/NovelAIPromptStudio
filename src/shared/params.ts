@@ -135,6 +135,29 @@ export const MEDIUM_FIXED = {
 /** 免费范围的步数上限 */
 export const FREE_STEPS = 28;
 
+export const PARAMETER_LIMITS = {
+  steps: { min: 1, max: 50, integer: true },
+  scale: { min: 0, max: 10, integer: false },
+  rescale: { min: 0, max: 1, integer: false },
+} as const;
+
+export function validParameterNumber(
+  key: keyof typeof PARAMETER_LIMITS,
+  value: unknown,
+): value is number {
+  const rule = PARAMETER_LIMITS[key];
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= rule.min &&
+    value <= rule.max &&
+    (!rule.integer || Number.isInteger(value))
+  );
+}
+
+// TODO(design): confirm the existing blank-work defaults for metadata-free imports.
+export const NEW_WORK_DEFAULTS = { steps: 28, scale: 5, quality: 'Standard', uc: 'Heavy' } as const;
+
 /** 一版的第二层参数（尺寸、Seed、张数不在这里） */
 export interface GenerationSettings {
   model: ModelId;

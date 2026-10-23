@@ -17,6 +17,34 @@ export async function generationChecks({
 }) {
   const { evaluate: e, click, input, wait, check } = h;
   h.category('生成');
+  await check(
+    '网络接口返回默认系统模式',
+    `
+    (async () => {
+      const result = await window.studio.invoke('settings.network.get', {});
+      return result.ok && result.data.settings.mode === 'system' && result.data.phase === 'ready';
+    })()
+  `,
+  );
+  await check(
+    '网络保存接口切换直连并返回已生效状态',
+    `
+    (async () => {
+      const result = await window.studio.invoke('settings.network.save', { mode: 'direct' });
+      return result.ok && result.data.settings.mode === 'direct' && result.data.phase === 'ready';
+    })()
+  `,
+  );
+  await check(
+    '网络接口拒绝任意目标地址',
+    `
+    (async () => {
+      const result = await window.studio.invoke('settings.network.test', { mode: 'direct', url: 'https://example.invalid' });
+      return !result.ok && result.error.code === 'invalid_input';
+    })()
+  `,
+  );
+  await e(`window.studio.invoke('settings.network.save', { mode: 'system' })`);
   const script = path.join(app.getAppPath(), 'agent', 'nai-studio.mjs');
   const userData = app.getPath('userData');
   const cli = (name, input = {}, entry = script) =>

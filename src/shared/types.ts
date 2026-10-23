@@ -459,3 +459,25 @@ export interface BatchSummary {
   skipped: number;
   failed: number;
 }
+/** Application-owned external HTTP traffic; manual proxies are local and unauthenticated. */
+export type NetworkSettings =
+  | { mode: 'system' | 'direct' }
+  | {
+      mode: 'manual';
+      protocol: 'http' | 'socks5';
+      host: 'localhost' | '127.0.0.1' | '[::1]';
+      port: number;
+    };
+export interface NetworkState {
+  settings: NetworkSettings | null;
+  pending: NetworkSettings | null;
+  phase: 'ready' | 'pending' | 'applying' | 'error' | 'blocked';
+  error: 'initialization_failed' | 'apply_failed' | 'rollback_failed' | null;
+  active: number;
+}
+export interface NetworkTestResult {
+  reachable: boolean;
+  status: number | null;
+  failure: 'proxy' | 'proxy_auth' | 'timeout' | 'dns' | 'tls' | 'network' | null;
+  elapsedMs: number;
+}

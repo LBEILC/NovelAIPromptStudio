@@ -15,7 +15,7 @@ import { applyMotionBaseline, defaultMotionChecks } from './motion.js';
 import { motionOffChecks } from './motionOff.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { nativeTheme, safeStorage, nativeImage } from 'electron';
+import { nativeTheme, safeStorage, nativeImage, session } from 'electron';
 import { pathToFileURL } from 'node:url';
 import { importLibraryFiles } from '../importer.js';
 import { harness } from './harness.js';
@@ -27,6 +27,7 @@ import { agentChecks } from './agent.js';
 import { generationChecks } from './generation.js';
 import { referenceEvidence } from './referenceEvidence.js';
 import { chatGPTChecks } from './chatgpt.js';
+import electronUpdater from 'electron-updater';
 
 export async function runAcceptance(context) {
   if (context.mode.commandBenchmark) {
@@ -98,14 +99,25 @@ export async function runAcceptance(context) {
     referenceEvidence(h, database);
     const { evaluate: e, wait, check, click, section, font } = h;
     const blockedRequests = [];
-    window.webContents.session.webRequest.onBeforeRequest(
-      { urls: ['http://*/*', 'https://*/*'] },
-      (request, callback) => {
-        const allowed = new URL(request.url).origin === new URL(mode.baseUrl).origin;
-        if (!allowed) blockedRequests.push(request.url);
-        callback({ cancel: !allowed });
-      },
+    const allowedOrigins = new Set(
+      [mode.baseUrl, context.generationService?.url]
+        .filter(Boolean)
+        .map((url) => new URL(url).origin),
     );
+    for (const target of [
+      window.webContents.session,
+      session.fromPartition('studio-network'),
+      session.fromPartition('studio-network-test'),
+      electronUpdater.autoUpdater.netSession,
+    ])
+      target.webRequest.onBeforeRequest(
+        { urls: ['http://*/*', 'https://*/*'] },
+        (request, callback) => {
+          const allowed = allowedOrigins.has(new URL(request.url).origin);
+          if (!allowed) blockedRequests.push(request.url);
+          callback({ cancel: !allowed });
+        },
+      );
     window.webContents.debugger.attach('1.3');
     await window.webContents.debugger.sendCommand('Emulation.setCPUThrottlingRate', {
       rate: mode.slow || 1,

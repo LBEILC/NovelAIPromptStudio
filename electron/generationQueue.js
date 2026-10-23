@@ -1,8 +1,10 @@
 import crypto from 'node:crypto';
+import { CommandError } from './commands/registry.js';
 
 // One worker for the entire application. The worker never retries a request itself.
 export function createGenerationQueue({
   generate,
+  run = (operation) => operation(),
   accept,
   prepare = async () => {},
   balance,
@@ -47,31 +49,47 @@ export function createGenerationQueue({
           job.index = job.completed + 1;
           job.progress = null;
           publish();
-          let before;
           try {
-            before = await balance();
-            await prepare(job);
-            const request = structuredClone(job.request);
-            if (!job.fixedSeed) request.parameters.seed = crypto.randomInt(0, 0x100000000);
-            const png = await generate(request, (progress) => {
-              job.progress = progress;
-              publish();
+            await run(async () => {
+              if (closed || job.stop) return;
+              let before;
+              try {
+                before = await balance();
+                await prepare(job);
+                const request = structuredClone(job.request);
+                if (!job.fixedSeed) request.parameters.seed = crypto.randomInt(0, 0x100000000);
+                const png = await generate(request, (progress) => {
+                  job.progress = progress;
+                  publish();
+                });
+                // Persist the file and version before reporting success to any caller.
+                const image = await accept(job, png, request.parameters.seed);
+                job.images.push(image);
+                job.completed++;
+              } catch (error) {
+                job.state = 'failed';
+                job.error = error.message;
+                if (error instanceof CommandError) {
+                  job.errorCode = error.code;
+                  job.errorDetails = error.details;
+                }
+              } finally {
+                try {
+                  const after = await balance();
+                  if (Number.isFinite(before) && Number.isFinite(after))
+                    job.spent += Math.max(0, before - after);
+                  else job.spentKnown = false;
+                } catch {
+                  job.spentKnown = false;
+                }
+              }
             });
-            // Persist the file and version before reporting success to any caller.
-            const image = await accept(job, png, request.parameters.seed);
-            job.images.push(image);
-            job.completed++;
           } catch (error) {
             job.state = 'failed';
             job.error = error.message;
-          } finally {
-            try {
-              const after = await balance();
-              if (Number.isFinite(before) && Number.isFinite(after))
-                job.spent += Math.max(0, before - after);
-              else job.spentKnown = false;
-            } catch {
-              job.spentKnown = false;
+            if (error instanceof CommandError) {
+              job.errorCode = error.code;
+              job.errorDetails = error.details;
             }
           }
           publish();
@@ -144,6 +162,8 @@ export function createGenerationQueue({
       job.continuous = false;
       job.stop = false;
       job.error = '';
+      delete job.errorCode;
+      delete job.errorDetails;
       job.state = 'queued';
       publish();
       void drain();

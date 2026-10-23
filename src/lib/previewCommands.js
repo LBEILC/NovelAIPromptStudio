@@ -1,6 +1,25 @@
 import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT } from './fonts.js';
 const unavailable = (error) => async () => ({ ok: false, error });
+let previewNetwork = { mode: 'system' };
+const networkState = () => ({
+  settings: structuredClone(previewNetwork),
+  pending: null,
+  phase: 'ready',
+  error: null,
+  active: 0,
+});
 const handlers = {
+  'settings.network.get': () => networkState(),
+  'settings.network.save': (input) => {
+    previewNetwork = structuredClone(input);
+    return networkState();
+  },
+  'settings.network.test': () => ({
+    reachable: false,
+    status: null,
+    failure: 'network',
+    elapsedMs: 0,
+  }),
   'settings.ai.get': (input) =>
     (async () => ({
       baseUrl: 'https://api.openai.com/v1',
