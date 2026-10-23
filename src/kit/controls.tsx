@@ -230,10 +230,27 @@ export function Slider({
   );
 }
 
-/** 空状态的图形：括号里还没有图（design/identity/logo/symbol-empty.svg）。 */
+/**
+ * 把输入框里的文字读成数字：只认十进制写法（也认全角数字、全角负号和句号），
+ * 空的、"1e3"、"0x10"、"Infinity" 这类都不算，返回 null。
+ */
+export function readNumber(text: string): number | null {
+  const t = text
+    .trim()
+    .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .replace(/[－−]/g, '-')
+    .replace(/＋/g, '+')
+    .replace(/[。．]/g, '.');
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
  * 步进器：两边加减，点中间的数字可以直接输入（回车或移开确定，Esc 取消），获得焦点时上下方向键加减。
- * 输入的值收到 min 到 max 之间，按 digits 位小数取整；输入不是数字时恢复原值。
+ * 显示、开始输入、加减、方向键、确定都用同一个安全的数：收到 min 到 max 之间、按 digits 位小数取整；
+ * 传进来的 value 不是有效数字（旧数据里的空串、NaN）时按 fallback 显示并从它起算，不会把坏值传出去。
+ * 输入的不是数字时恢复原值。
  */
 export function Stepper({
   value,
@@ -245,6 +262,7 @@ export function Stepper({
   off,
   tip,
   format,
+  fallback = min,
   onChange,
 }: {
   value: number;
@@ -258,27 +276,48 @@ export function Stepper({
   tip?: string;
   /** 显示的写法；不写就是 digits 位小数 */
   format?: (v: number) => string;
+  /** value 不是有效数字时用的值；默认 min */
+  fallback?: number;
   onChange: (v: number) => void;
 }) {
   const [text, setText] = useState<string | null>(null);
-  const shown = format ? format(value) : value.toFixed(digits);
-  const clamp = (v: number) => Math.min(max, Math.max(min, +v.toFixed(digits)));
+  // 正在输入的文字也放在 ref 里：Esc 之后输入框被移走时还会来一次 blur，那时不能再按旧文字保存
+  const draft = useRef<string | null>(null);
+  const num = useRef<HTMLElement>(null);
+  const refocus = useRef(false);
+  const clamp = (v: number) => Math.min(max, Math.max(min, Number(v.toFixed(digits)) || 0));
+  const valid = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  const current = clamp(valid(value) ? value : valid(fallback) ? fallback : min);
+  const shown = format ? format(current) : current.toFixed(digits);
+  /** 输入框里的写法：显示的写法能读回同一个数时就用它 */
+  const plain = () => (readNumber(shown) === current ? shown : current.toFixed(digits));
   const set = (v: number) => {
     const next = clamp(v);
-    if (next !== value) onChange(next);
+    if (Number.isFinite(next) && next !== value) onChange(next);
+    return next;
+  };
+  const edit = (t: string | null) => {
+    draft.current = t;
+    setText(t);
   };
   const commit = (save: boolean) => {
-    if (text === null) return;
-    const v = Number(text.trim());
-    if (save && text.trim() && Number.isFinite(v)) set(v);
-    setText(null);
+    const t = draft.current;
+    if (t === null) return;
+    edit(null);
+    const v = readNumber(t);
+    if (save && !off && v !== null) set(v);
   };
-  const key = (e: KeyboardEvent) => {
-    if (off) return;
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      set(value + (e.key === 'ArrowUp' ? step : -step));
-    }
+  useEffect(() => {
+    if (text !== null || !refocus.current) return;
+    refocus.current = false;
+    num.current?.focus();
+  }, [text]);
+  const nudge = (e: KeyboardEvent, editing: boolean) => {
+    if (off || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    const from = editing ? (readNumber(draft.current || '') ?? current) : current;
+    const next = set(from + (e.key === 'ArrowUp' ? step : -step));
+    if (editing && Number.isFinite(next)) edit(next.toFixed(digits));
   };
   return (
     <span className={`stepper ${off ? 'off' : ''}`} data-tip={off ? tip : undefined}>
@@ -286,11 +325,11 @@ export function Stepper({
         role="button"
         aria-label={`减少${label}`}
         data-act={off ? undefined : 'pStep'}
-        onClick={() => !off && set(value - step)}
+        onClick={() => !off && set(current - step)}
       >
         −
       </span>
-      {text !== null ? (
+      {text !== null && !off ? (
         <b className="step-in">
           <input
             className="mono"
@@ -300,30 +339,33 @@ export function Stepper({
             aria-label={label}
             autoComplete="off"
             spellCheck={false}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => edit(e.target.value)}
             onBlur={() => commit(true)}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) return;
               if (e.key === 'Enter' || e.key === 'Escape') {
                 e.preventDefault();
                 e.stopPropagation();
+                refocus.current = true;
                 commit(e.key === 'Enter');
-              } else key(e);
+              } else nudge(e, true);
             }}
           />
         </b>
       ) : (
         <b
+          ref={num}
           className={`mono ${off ? '' : 'step-n'}`}
           aria-label={label}
           role={off ? undefined : 'button'}
           tabIndex={off ? undefined : 0}
           data-tip={off ? undefined : '点击输入'}
-          onClick={() => !off && setText(shown)}
+          onClick={() => !off && edit(plain())}
           onKeyDown={(e) => {
             if (!off && (e.key === 'Enter' || e.key === ' ')) {
               e.preventDefault();
-              setText(shown);
-            } else key(e);
+              edit(plain());
+            } else nudge(e, false);
           }}
         >
           {shown}
@@ -333,7 +375,7 @@ export function Stepper({
         role="button"
         aria-label={`增加${label}`}
         data-act={off ? undefined : 'pStep'}
-        onClick={() => !off && set(value + step)}
+        onClick={() => !off && set(current + step)}
       >
         +
       </span>
@@ -341,6 +383,7 @@ export function Stepper({
   );
 }
 
+/** 空状态的图形：括号里还没有图（design/identity/logo/symbol-empty.svg）。 */
 export function EmptyMark() {
   return (
     <span className="mark" aria-hidden="true">

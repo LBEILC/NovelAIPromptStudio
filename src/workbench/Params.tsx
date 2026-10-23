@@ -16,7 +16,9 @@ import {
   MEDIUM_FIXED,
   MODEL_CAPS,
   MODEL_ORDER,
+  NEW_WORK_DEFAULTS,
   NOISE_SCHEDULES,
+  PARAMETER_LIMITS,
   PRECISE_COST,
   SAMPLERS,
   VIBE_ENCODE_COST,
@@ -359,9 +361,10 @@ export function ParamsPane({
           label="步数"
           value={med ? MEDIUM_FIXED.steps : p.steps}
           step={1}
-          min={1}
-          max={50}
+          min={PARAMETER_LIMITS.steps.min}
+          max={PARAMETER_LIMITS.steps.max}
           digits={0}
+          fallback={FREE_STEPS}
           off={med}
           tip="Medium 固定 14 步"
           onChange={(steps) => void setParams({ steps })}
@@ -380,9 +383,10 @@ export function ParamsPane({
           label="引导强度"
           value={p.scale}
           step={0.1}
-          min={0}
-          max={10}
+          min={PARAMETER_LIMITS.scale.min}
+          max={PARAMETER_LIMITS.scale.max}
           digits={1}
+          fallback={NEW_WORK_DEFAULTS.scale}
           onChange={(scale) => void setParams({ scale })}
         />,
         '0 到 10',
@@ -397,8 +401,8 @@ export function ParamsPane({
             label="Rescale"
             value={p.rescale}
             step={0.02}
-            min={0}
-            max={1}
+            min={PARAMETER_LIMITS.rescale.min}
+            max={PARAMETER_LIMITS.rescale.max}
             digits={2}
             onChange={(rescale) => void setParams({ rescale })}
           />,

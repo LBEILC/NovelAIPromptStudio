@@ -5,6 +5,7 @@ import { Icon } from '../kit/controls';
 import { useIndicator, useSwap } from '../kit/motion';
 import { About } from './About';
 import { Dictionary } from './Dictionary';
+import { Network } from './Network';
 import { Account, Agent, AI, Appearance, Storage } from './sections';
 
 export { About, feedbackDiagnostics } from './About';
@@ -14,6 +15,7 @@ const SECS = [
   ['storage', '图片库', 'hard-drive-2-line'],
   ['novelai', 'NovelAI 账号', 'key-2-line'],
   ['ai', 'AI 服务', 'translate-2'],
+  ['network', '网络', 'global-line'],
   ['tags', '翻译词典', 'book-2-line'],
   ['agent', 'Agent', 'terminal-box-line'],
   ['updates', '关于与更新', 'information-line'],
@@ -55,6 +57,8 @@ export default function SettingsPage(props: {
         return <Dictionary onFindTag={props.onFindTag} />;
       case 'agent':
         return <Agent />;
+      case 'network':
+        return <Network />;
       default:
         return <About onInstallUpdate={props.onInstallUpdate} />;
     }

@@ -2034,6 +2034,7 @@ export function WorkbenchEditor(p: EditorProps) {
                   min={-10}
                   max={10}
                   digits={2}
+                  fallback={1}
                   label="权重"
                   format={(v) => v.toFixed(Math.abs(v * 10 - Math.round(v * 10)) < 1e-9 ? 1 : 2)}
                   onChange={(weight) => setDraft({ ...draft, weight })}

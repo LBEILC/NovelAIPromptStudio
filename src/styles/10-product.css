@@ -97,6 +97,10 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 .set-limit { border-bottom: var(--bw) solid var(--divider); }
 .set-limit-row { padding: 0 0 13px; }
 .field.set-limit-in { width: 90px; }
+/* 网络：本机代理的端口；联网暂停的横幅在页头下面、第一行之前 */
+.field.set-port { width: 96px; }
+.set > .net-blocked { margin: var(--sp-3) 0; }
+.set-foot .foot-note.row { gap: var(--sp-2); flex-wrap: nowrap; }
 .set-foot .foot-ok { padding: var(--sp-1) var(--ctl-pad-x); }
 .setrow small .path { display: block; }
 /* 翻译词典：勾选框是按钮；分类小圆点；出错时的横幅 */

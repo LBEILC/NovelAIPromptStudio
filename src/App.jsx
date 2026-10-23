@@ -33,6 +33,7 @@ import { Presence } from './kit/motion';
 import GalleryPage from './gallery/GalleryPage';
 import { useLibraryCacheProgress } from './state/libraryCacheProgress';
 import SettingsPage from './settings/SettingsPage';
+import { onNetworkChange } from './state/network';
 import { Titlebar } from './shell/Titlebar';
 import { useAppearance } from './state/appearance';
 import { useNotifications } from './kit/toast';
@@ -244,6 +245,36 @@ export default function App() {
   const notify = useNotifications();
   const notificationTarget = useRef({ page, notify });
   notificationTarget.current = { page, notify };
+  // 网络设置切换的结果（doc/design.md 2.11）：保存后可能要等任务做完才切换，用户已经去了别的页，所以在这里通知
+  useEffect(() => {
+    let previous = '';
+    return onNetworkChange((state) => {
+      const was = previous;
+      previous = state.phase;
+      if (was !== 'applying' || state.phase === 'applying') return;
+      const target = notificationTarget.current;
+      if (state.phase === 'ready')
+        target.notify({ text: '网络设置已生效', tone: 'success', source: 'background' });
+      else if (state.phase === 'error')
+        target.notify({
+          text: '网络设置切换失败，仍在使用原来的设置',
+          tone: 'error',
+          source: 'background',
+        });
+      else if (state.phase === 'blocked')
+        target.notify({
+          text: '网络设置切换失败，已暂停联网',
+          tone: 'error',
+          action: {
+            label: '查看',
+            onClick: () => {
+              setMenuDestination({ section: 'network' });
+              setPage('settings');
+            },
+          },
+        });
+    });
+  }, []);
   const {
     projectsByView,
     setProjectsByView,

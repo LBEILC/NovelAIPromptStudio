@@ -155,7 +155,7 @@ export function validParameterNumber(
   );
 }
 
-// TODO(design): confirm the existing blank-work defaults for metadata-free imports.
+/** 新建空白作品和没有生成信息的导入共用的参数（设计 10-23 确认） */
 export const NEW_WORK_DEFAULTS = { steps: 28, scale: 5, quality: 'Standard', uc: 'Heavy' } as const;
 
 /** 一版的第二层参数（尺寸、Seed、张数不在这里） */
