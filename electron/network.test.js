@@ -71,7 +71,10 @@ it('initializes both sessions before allowing traffic; invalid startup remains b
   const bad = fixture({ mode: 'manual', host: 'remote' });
   expect((await bad.network.initialize()).phase).toBe('blocked');
   expect(bad.session.setProxy).not.toHaveBeenCalled();
-  await expect(bad.network.run(() => 1)).rejects.toMatchObject({ code: 'network' });
+  await expect(bad.network.run(() => 1)).rejects.toMatchObject({
+    code: 'network',
+    message: '网络设置没能生效，已暂停联网，请到设置的“网络”里重新保存',
+  });
   expect((await bad.network.save({ mode: 'system' })).phase).toBe('ready');
 });
 

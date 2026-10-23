@@ -211,9 +211,17 @@ export function generationError(status, reason = '') {
   if (status === 401) return '持久令牌无效，请在设置里更换';
   if (status === 402) return 'Anlas 不足';
   if (status === 429) return '请求太频繁，请稍后再试';
-  if (status >= 500) return `NovelAI 服务繁忙（HTTP ${status}）${reason ? `：${reason}` : ''}`;
+  if (status >= 500) {
+    const message =
+      status === 502 || status === 504
+        ? 'NovelAI 暂时无法访问'
+        : status === 503
+          ? 'NovelAI 服务繁忙'
+          : 'NovelAI 服务器出错';
+    return `${message}（HTTP ${status}）${reason ? `：${reason}` : status === 503 ? '，请稍后再试' : ''}`;
+  }
   if (status >= 400) return `NovelAI 拒绝了这次请求${reason ? `：${reason}` : ''}`;
-  return '无法连接到 NovelAI';
+  return '无法连接到 NovelAI，请检查网络';
 }
 
 function httpError(status, reason) {
@@ -338,10 +346,14 @@ export function createNovelAIClient({
     } catch (error) {
       // Only the bounded, redacted server reason may reach the UI.
       if (error.safe || error instanceof CommandError) throw error;
-      throw new CommandError('network', generationError(error.status), {
-        status: error.status || 0,
-        machineCode: /proxy|tunnel|socks/i.test(String(error.message)) ? 'proxy' : 'network',
-      });
+      const machineCode = /proxy|tunnel|socks/i.test(String(error.message)) ? 'proxy' : 'network';
+      throw new CommandError(
+        'network',
+        machineCode === 'proxy'
+          ? '无法通过代理连接到 NovelAI，请检查设置里的网络'
+          : '无法连接到 NovelAI，请检查网络',
+        { status: error.status || 0, machineCode },
+      );
     }
   }
   return {

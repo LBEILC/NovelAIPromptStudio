@@ -222,7 +222,7 @@ export async function generationChecks({
   generationService.state.delay = 20;
   generationService.state.failNext = 500;
   await click('生成', 'document.querySelector(".gen-bar")');
-  await wait('document.body.innerText.includes("生成失败：NovelAI 服务繁忙")');
+  await wait('document.body.innerText.includes("生成失败：NovelAI 服务器出错（HTTP 500）")');
   await check(
     '失败显示叉与准确错误',
     '!!document.querySelector(".slot.fail")&&document.body.innerText.includes("本次未消耗 Anlas")',

@@ -110,7 +110,13 @@ export function createNetworkManager({
   async function acquire() {
     while (pending || applying) await new Promise((resolve) => waiters.add(resolve));
     if (phase === 'blocked')
-      throw new CommandError('network', '网络配置不可用', { machineCode: error });
+      throw new CommandError(
+        'network',
+        '网络设置没能生效，已暂停联网，请到设置的“网络”里重新保存',
+        {
+          machineCode: error,
+        },
+      );
     active++;
     let released = false;
     return () => {

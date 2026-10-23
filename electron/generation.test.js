@@ -208,7 +208,7 @@ describe('generation request contract', () => {
       },
     });
     await expect(client.generate(buildGenerationRequest(raw, model))).rejects.toThrow(
-      'NovelAI 服务繁忙',
+      'NovelAI 服务器出错（HTTP 500）',
     );
     expect(calls).toBe(1);
   });
@@ -339,7 +339,7 @@ describe('application-wide generation worker', () => {
     const r = createGenerationQueue({
       generate: async () => {
         n++;
-        if (fail) throw new Error('NovelAI 服务繁忙');
+        if (fail) throw new Error('NovelAI 服务器出错（HTTP 500）');
         return Buffer.alloc(0);
       },
       accept: async () => 'result',
@@ -404,7 +404,11 @@ describe('model request compatibility and HTTP failures', () => {
     [400, 'NovelAI 拒绝了这次请求：Invalid sampler'],
     [422, 'NovelAI 拒绝了这次请求：Invalid sampler'],
     [429, '请求太频繁，请稍后再试'],
-    [503, 'NovelAI 服务繁忙'],
+    [500, 'NovelAI 服务器出错（HTTP 500）：Invalid sampler'],
+    [502, 'NovelAI 暂时无法访问（HTTP 502）：Invalid sampler'],
+    [503, 'NovelAI 服务繁忙（HTTP 503）：Invalid sampler'],
+    [504, 'NovelAI 暂时无法访问（HTTP 504）：Invalid sampler'],
+    [507, 'NovelAI 服务器出错（HTTP 507）：Invalid sampler'],
   ])('reports status %s without retrying', async (status, message) => {
     let calls = 0;
     const client = createNovelAIClient({
@@ -416,6 +420,36 @@ describe('model request compatibility and HTTP failures', () => {
     });
     await expect(client.generate(buildGenerationRequest(raw, model))).rejects.toThrow(message);
     expect(calls).toBe(1);
+  });
+  it.each([
+    [500, 'NovelAI 服务器出错（HTTP 500）'],
+    [502, 'NovelAI 暂时无法访问（HTTP 502）'],
+    [503, 'NovelAI 服务繁忙（HTTP 503），请稍后再试'],
+    [504, 'NovelAI 暂时无法访问（HTTP 504）'],
+    [507, 'NovelAI 服务器出错（HTTP 507）'],
+  ])('reports status %s without a server reason', async (status, message) => {
+    const client = createNovelAIClient({
+      token: () => 'synthetic',
+      fetchImpl: async () => new Response('{}', { status }),
+    });
+    await expect(client.subscription()).rejects.toMatchObject({
+      message,
+      code: 'request_failed',
+      details: { status, machineCode: 'server' },
+    });
+  });
+  it('reports a connection failure without exposing the transport error', async () => {
+    const client = createNovelAIClient({
+      token: () => 'synthetic',
+      fetchImpl: async () => {
+        throw Error('connection failed: synthetic-secret');
+      },
+    });
+    await expect(client.subscription()).rejects.toMatchObject({
+      message: '无法连接到 NovelAI，请检查网络',
+      code: 'network',
+      details: { status: 0, machineCode: 'network' },
+    });
   });
   it('redacts the token from structured HTTP and SSE reasons', async () => {
     for (const stream of [false, true]) {
@@ -439,7 +473,7 @@ describe('model request compatibility and HTTP failures', () => {
       for (const value of ['private-token', 'Bearer abc', 'https://'])
         expect(error.message).not.toContain(value);
     }
-    expect(generationError(0)).toBe('无法连接到 NovelAI');
+    expect(generationError(0)).toBe('无法连接到 NovelAI，请检查网络');
     expect(generationError(403)).toBe('NovelAI 拒绝了这次请求');
   });
   it('exposes bounded status classifications without interpreting a network outage as bad credentials', async () => {
@@ -466,6 +500,7 @@ describe('model request compatibility and HTTP failures', () => {
     });
     const error = await client.subscription().catch((error) => error);
     expect(error).toMatchObject({ code: 'network', details: { status: 0, machineCode: 'proxy' } });
+    expect(error.message).toBe('无法通过代理连接到 NovelAI，请检查设置里的网络');
     expect(error.message).not.toContain('secret');
   });
 });
