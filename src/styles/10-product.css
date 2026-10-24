@@ -176,9 +176,14 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 .cg-bar { display: block; height: 4px; border-radius: var(--r-pill); background: var(--hover); overflow: hidden; }
 .cg-bar > i { display: block; height: 100%; background: var(--text); border-radius: inherit; transition: width var(--dur-3) var(--ease-out); }
 
-/* 更新日志（关于与更新）：上面一排版本，下面是那一版的更新说明 */
-.rn-log .rn-log-v { align-self: flex-start; margin-top: var(--sp-2); }
-.rn-log .rn-log-body { padding-top: var(--sp-3); }
+/* 更新日志（关于与更新）：左边一列版本（竖排，版本多了这一列自己滚），右边是那一版的更新说明。
+   以前是上面一排，版本一多就撑出弹框（用户 10-24） */
+.dialog.lic-dlg.rn-log { width: calc(var(--dialog-w) + var(--popover-w)); }
+.rn-log .rn-log-main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-4); margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: var(--bw) solid var(--divider); }
+.rn-log .rn-log-vs { min-height: 0; }
+.rn-log .rn-log-v { flex-direction: column; align-items: stretch; height: auto; }
+.rn-log .rn-log-v > span { height: var(--ctl-sm); padding-right: var(--sp-4); }
+.rn-log .rn-log-body { min-height: 0; margin-top: 0; border-top: 0; }
 
 /* 步进器：点中间的数字直接输入（权重、步数、引导强度），输入框和数字一样宽，不跳 */
 .stepper .step-n { cursor: text; }

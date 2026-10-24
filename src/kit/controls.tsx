@@ -19,7 +19,7 @@ export const modKey = () => (isMac() ? '⌘' : 'Ctrl');
 export const isMod = (e: { ctrlKey: boolean; metaKey: boolean }) =>
   isMac() ? e.metaKey : e.ctrlKey;
 
-/** 分段选择：一条槽，里面一个滑块停在当前项下面；换选项时滑块滑过去。左右方向键切换。 */
+/** 分段选择：一条槽，里面一个滑块停在当前项下面；换选项时滑块滑过去。方向键切换（竖排时用上下）。 */
 export function Seg<K extends string>({
   items,
   value,
@@ -43,7 +43,12 @@ export function Seg<K extends string>({
       role="radiogroup"
       aria-label={label}
       onKeyDown={(e) => {
-        const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        const d =
+          e.key === 'ArrowRight' || e.key === 'ArrowDown'
+            ? 1
+            : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+              ? -1
+              : 0;
         if (!d) return;
         e.preventDefault();
         const i = Math.max(0, Math.min(keys.length - 1, keys.indexOf(value) + d));

@@ -1,6 +1,6 @@
 // 关于与更新（doc/design.md 2.11）：版本、更新（发现新版本时展开横幅和更新说明）、更新日志、快捷键、数据与隐私、反馈、字体与开源组件。
 // 更新日志只读：构建时把仓库里的 release-notes/*.json（1.2.0 起才有）打包进来，离线也能看，不联网。
-import { Fragment, lazy, Suspense, useState } from 'react';
+import { Fragment, lazy, Suspense, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { writeClipboardText } from '../lib/clipboard';
 import {
@@ -100,6 +100,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
   const [notesOpen, setNotesOpen] = useState(true);
   const [licenses, setLicenses] = useState(false);
   const [log, setLog] = useState<string | null>(null);
+  const logBody = useRef<HTMLDivElement>(null);
   const st = u.state;
   const open = (url?: string) =>
     void invokeUI('updates.open-release', { url }).then(
@@ -350,23 +351,30 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       </Dialog>
       <Dialog open={!!log} onClose={() => setLog(null)} label="更新日志" className="lic-dlg rn-log">
         <h3>更新日志</h3>
-        <Seg
-          label="版本"
-          className="rn-log-v"
-          items={CHANGELOG.map(
-            (n) =>
-              [
-                n.version,
-                n.version === st?.currentVersion ? `${n.version} · 当前` : n.version,
-              ] as const,
-          )}
-          value={log || CHANGELOG[0]?.version || ''}
-          onChange={setLog}
-        />
-        <div className="lic-list scroll rn-log-body">
-          {CHANGELOG.filter((n) => n.version === log).map((n) => (
-            <StructuredReleaseNotes key={n.version} notes={n} />
-          ))}
+        <div className="rn-log-main">
+          <div className="scroll rn-log-vs">
+            <Seg
+              label="版本"
+              className="rn-log-v"
+              items={CHANGELOG.map(
+                (n) =>
+                  [
+                    n.version,
+                    n.version === st?.currentVersion ? `${n.version} · 当前` : n.version,
+                  ] as const,
+              )}
+              value={log || CHANGELOG[0]?.version || ''}
+              onChange={(v) => {
+                setLog(v);
+                logBody.current?.scrollTo({ top: 0 });
+              }}
+            />
+          </div>
+          <div ref={logBody} className="lic-list scroll rn-log-body">
+            {CHANGELOG.filter((n) => n.version === log).map((n) => (
+              <StructuredReleaseNotes key={n.version} notes={n} />
+            ))}
+          </div>
         </div>
         <div className="acts">
           <button className="btn ink" onClick={() => setLog(null)}>

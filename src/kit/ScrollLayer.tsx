@@ -69,8 +69,32 @@ export function ScrollLayer() {
       sb.style.transform = `translate(${r.left + el.clientWidth - ms('--sb-inset') - ms('--sb-w')}px, ${r.top + g.offset}px)`;
       return g;
     };
+    // 正在显示的那块区域变大变小、或里面换了内容（例如更新日志切到短的一版、对话框跟着变矮）时重新量，
+    // 不让滚动条停在旧的位置和长度上
+    const refit = () => {
+      if (sb.classList.contains('show')) place();
+    };
+    const sizes = new ResizeObserver(refit);
+    const kids = new MutationObserver(() => {
+      if (watched) watchKids(watched);
+      refit();
+    });
+    let watched: HTMLElement | null = null;
+    const watchKids = (el: HTMLElement) => {
+      sizes.disconnect();
+      sizes.observe(el);
+      for (const c of el.children) sizes.observe(c);
+    };
+    const watch = (el: HTMLElement) => {
+      if (watched === el) return;
+      watched = el;
+      kids.disconnect();
+      kids.observe(el, { childList: true });
+      watchKids(el);
+    };
     const wake = (el: HTMLElement) => {
       active = el;
+      watch(el);
       if (!place()) return;
       sb.classList.add('show');
       clearTimeout(idle);
@@ -124,6 +148,8 @@ export function ScrollLayer() {
     sb.addEventListener('pointerenter', enter);
     sb.addEventListener('pointerleave', leave);
     return () => {
+      sizes.disconnect();
+      kids.disconnect();
       removeEventListener('scroll', onScroll, true);
       removeEventListener('pointermove', onMove, true);
       removeEventListener('pointerdown', onDown, true);
