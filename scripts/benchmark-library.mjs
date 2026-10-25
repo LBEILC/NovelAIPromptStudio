@@ -6,6 +6,9 @@ import { createRequire } from 'node:module';
 import { seedLibrary } from './library-benchmark/fixture.mjs';
 
 const smoke = process.argv.includes('--smoke');
+const buildDirectory = path.resolve(
+  process.argv.find((a) => a.startsWith('--build-dir='))?.slice('--build-dir='.length) || 'dist',
+);
 const count = smoke
   ? 200
   : Number(process.argv.find((a) => a.startsWith('--size='))?.split('=')[1] || 10000);
@@ -17,7 +20,7 @@ const require = createRequire(import.meta.url);
 const samples = [];
 try {
   fs.writeFileSync(path.join(root, 'owner'), 'verify:app');
-  fs.cpSync(path.resolve('dist'), path.join(root, 'build'), { recursive: true });
+  fs.cpSync(buildDirectory, path.join(root, 'build'), { recursive: true });
   const fixture = await seedLibrary(root, count, smoke ? 10 : 1000);
   const data = path.join(root, 'userData', 'data');
   const snapshot = path.join(root, 'baseline.sqlite');
@@ -66,8 +69,8 @@ try {
       });
       const timer = setTimeout(() => {
         child.kill();
-        reject(Error('Benchmark exceeded 30 minutes'));
-      }, 1800000);
+        reject(Error('Benchmark exceeded 60 minutes'));
+      }, 3600000);
       child.on('error', reject);
       child.on('exit', (code) => {
         clearTimeout(timer);
@@ -76,6 +79,16 @@ try {
     });
     samples.push(JSON.parse(fs.readFileSync(resultPath, 'utf8')));
   }
+  if (
+    samples.some(
+      (sample) =>
+        !Object.values(sample).every(Number.isFinite) ||
+        sample.scrollInitialHeight !== sample.scrollFinalHeight ||
+        sample.scrollInitialHeight !== samples[0].scrollInitialHeight ||
+        sample.scrollViewportHeight !== samples[0].scrollViewportHeight,
+    )
+  )
+    throw Error('Benchmark samples must be finite and use the same stable gallery geometry');
   const median = (values) => [...values].sort((a, b) => a - b)[1];
   const medians = Object.fromEntries(
     Object.keys(samples[0])

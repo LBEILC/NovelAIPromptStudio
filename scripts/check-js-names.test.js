@@ -11,7 +11,10 @@ it('reports undefined JS names while ignoring other type errors and TypeScript f
     fs.mkdirSync(path.join(root, 'electron'));
     fs.writeFileSync(
       path.join(root, 'tsconfig.json'),
-      JSON.stringify({ compilerOptions: { noLib: true }, include: ['src/**/*', 'electron/**/*'] }),
+      JSON.stringify({
+        compilerOptions: { noLib: true, types: [] },
+        include: ['src/**/*', 'electron/**/*'],
+      }),
     );
     fs.writeFileSync(
       path.join(root, 'src', 'fixture.jsx'),

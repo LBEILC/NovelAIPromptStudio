@@ -68,7 +68,21 @@ materials（JSON 素材） ──按内容引用── reference_vibes（参考�
 
 ## 启动迁移顺序
 
-工程没有一个连续递增的全局 schema 数字。下列版本是实际迁移键；不能从键名可靠推导发行版本号。
+工程没有一个连续递增的全局 schema 数字。发行版本根据引入迁移的提交及首次包含它的 Git 标签核对；实际启动仍以迁移键和缺表/缺列检查为准。
+
+| 首次发行 | 启动迁移 |
+|---|---|
+| v0.1.0 | `phase2-core` 基础表及旧库备份；后续缺列检查在原表上增补字段。 |
+| v0.8.0 | `gallery_favorites_collection_v1`，把旧收藏标记迁入收藏集。 |
+| v1.0.0 | 切换原生 SQLite 并备份旧库；提示词指纹版本、逐图失效触发器和持久卡片缓存；本版发行前缓存格式已演进至 `6:image-naming`。 |
+| v1.2.0 | `generation_versions_v1`，备份并退役旧实验/系列等表，建立作品与版本模型。 |
+| v1.3.0 | `materials_v1`，备份并新增素材表。 |
+| v1.4.0 | 新增参考编码库、版本删除/分支撤销及作品编号序列表。 |
+| v1.5.1 | 新增原图去掉标记及原图操作撤销表。 |
+| v1.5.5 | 新增延迟版本清理、作品活动与文件签名表；`work_originals_v1` 修复唯一匹配的旧原图引用。 |
+| v1.6.0 | `saved_works_v1` 补已保存作品标记，并增加按图去掉/恢复的撤销存储。 |
+
+当前打开数据库时按以下依赖顺序处理：
 
 1. 旧文件首次打开前保留 `studio.pre-phase2.sqlite`；切换原生 SQLite 时另保留 `studio.pre-node-sqlite.sqlite`。后者先同步副本再独占发布，失败不继续打开原库。
 2. `generation_versions_v1`：在事务中建立作品/版本/关联/分支命名表，移除旧 series、experiments、prompt_versions、旧 collections 和旧 vibe 系列表。存在旧表时先备份为 `studio.pre-generation-versions*.sqlite`。旧图片主表仍可读取；被退役表保留在备份里，并非转换成新作品。

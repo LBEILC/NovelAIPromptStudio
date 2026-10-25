@@ -48,8 +48,12 @@ export async function runFullLibraryBenchmark({
     await loaded;
     // The acceptance window is offscreen; showInactive establishes native readiness without stealing focus.
     window.showInactive();
-    await h.wait("!!document.querySelector('.tb') && !!document.querySelector('.pages .body')");
-    await e("window.studio.invoke('workbench.list', {})");
+    await h.wait(
+      "!!document.querySelector('.tb') && !!document.querySelector('.pages .body .empty .btn.ink:not(.loading)')",
+    );
+    const initialSession = await e("window.studio.invoke('workbench.list', {})");
+    if (!initialSession.ok || initialSession.data.tabs.length)
+      throw Error('Benchmark must begin with an empty, ready workbench');
     results.coldStartMs = Date.now() - mode.startedAt;
     memory('idle');
     const first = performance.now();
@@ -108,9 +112,15 @@ export async function runFullLibraryBenchmark({
     const opened = performance.now();
     await h.click('在工作台打开', 'document.querySelector(".detail")');
     await h.wait(
-      "!!document.querySelector('.doc .tag') && [...document.querySelectorAll('.wb-body img')].some(i=>i.complete&&i.naturalWidth>0)",
+      "document.querySelector('.wb-body')?.checkVisibility() && !document.querySelector('.app-page-surface.leaving') && !!document.querySelector('.doc .tag') && [...document.querySelectorAll('.wb-body img')].some(i=>i.complete&&i.naturalWidth>0)",
     );
     results.openWorkMs = performance.now() - opened;
+    const openedWork = await e(`(async()=>{
+      const list=await window.studio.invoke('workbench.list',{});
+      const current=await window.studio.invoke('workbench.get',{tabId:list.data.activeTabId});
+      return current.data.tab.workId;
+    })()`);
+    if (openedWork !== workId) throw Error('Benchmark opened a different work');
     results.openedWorkVersions = versions.length;
     results.databaseBytes = fs.statSync(path.join(mode.root, 'userData/data/studio.sqlite')).size;
     results.thumbnailBytes = diskBytes(path.join(assetsDirectory, 'thumbnails'));
@@ -118,6 +128,10 @@ export async function runFullLibraryBenchmark({
     fs.writeFileSync(
       path.join(mode.output, `renderer-${mode.run}.cpuprofile`),
       JSON.stringify(profile),
+    );
+    fs.writeFileSync(
+      path.join(mode.output, `navigation-${mode.run}.json`),
+      JSON.stringify(results, null, 2),
     );
     const files = fs
       .readdirSync(path.join(mode.root, 'import-input'))

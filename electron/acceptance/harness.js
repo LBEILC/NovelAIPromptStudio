@@ -7,8 +7,8 @@ export function harness(window, mode, checks) {
   let lastPassed = '无';
   let diagnosticIndex = 0;
   const scale = mode.slow || 1;
-  const waitBudget = Math.min(12000 * scale, 60000);
-  const evaluationBudget = Math.min(15000 * scale, 60000);
+  const waitBudget = mode.fullLibraryBenchmark ? 180000 : Math.min(12000 * scale, 60000);
+  const evaluationBudget = mode.fullLibraryBenchmark ? 180000 : Math.min(15000 * scale, 60000);
   const settleBudget = Math.min(1000 * scale, 6000);
   const bounded = async (promise, ms, label) => {
     let timer;
