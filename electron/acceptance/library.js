@@ -91,6 +91,11 @@ export async function libraryChecks(env) {
     await selectGalleryGrouping(h, label);
     await closePopover();
     await wait('document.querySelectorAll(".card").length>0');
+    if (label === '不合并')
+      await wait(
+        `(()=>{const grids=[...document.querySelectorAll('.lib-grid-col .lgrid')];const cards=[...document.querySelectorAll('.lib-grid-col .lgrid .card')];return grids.length===1 && !grids[0].classList.contains('leaving') && cards.length>0 && cards.every(c=>c.dataset.groupId?.startsWith('project:'))})()`,
+        '不分组后的独立图片列表已替换旧分组',
+      );
   };
   const screen = async (name) => {
     await h.screenshot(`library-${name}-${mode.theme}`);
@@ -171,6 +176,10 @@ export async function libraryChecks(env) {
     await check(
       '滚动到底后存在可检查相邻顺序的图片卡片',
       () => Number.isInteger(lastIndex) && lastIndex > 0,
+      () =>
+        e(
+          `(()=>{const s=document.querySelector('.lib-grid-col > .scroll');return {top:s.scrollTop,height:s.scrollHeight,viewport:s.clientHeight,cards:[...document.querySelectorAll('.lgrid .card')].map(c=>({kind:c.dataset.groupId?.split(':')[0],index:c.dataset.index,visible:c.checkVisibility()}))}})()`,
+        ),
     );
     await selectCard(lastIndex);
     await check(
