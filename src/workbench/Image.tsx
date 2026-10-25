@@ -16,7 +16,7 @@ import { Icon } from '../kit/controls';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
 import { Pop } from '../kit/layer';
 import { useNotifications } from '../kit/toast';
-import { useSwap } from '../kit/motion';
+import { useDecoded, useSwap } from '../kit/motion';
 import { Viewer } from '../kit/Viewer';
 import { markLoaded } from '../kit/alpha';
 import { trashNotice } from '../lib/trashNotice';
@@ -173,12 +173,17 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const blankSrc = `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${m?.width || 832}" height="${m?.height || 1216}"/>`,
   )}`;
+  // 换标签页、换版本时新图解码好了再换，不然淡入时图还没画出来，看着像闪一下（用户 10-25）
   const pics = useSwap(
-    {
-      src: image && !missing ? mediaUrl(image.image_path) : '',
-      key: `${tab.id}:${image?.image_path}:${allTrashed}:${blank}`,
-      blank,
-    },
+    useDecoded(
+      {
+        src: image && !missing ? mediaUrl(image.image_path) : '',
+        key: `${tab.id}:${image?.image_path}:${allTrashed}:${blank}`,
+        blank,
+      },
+      (v) => v.key,
+      (v) => v.src,
+    ),
     (v) => v.key,
   );
   const enter = dir < 0 ? 'left' : dir > 0 ? 'right' : 'fade';
