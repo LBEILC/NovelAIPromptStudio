@@ -1,4 +1,4 @@
-import { Activity } from 'react';
+import { Activity, cloneElement, isValidElement } from 'react';
 import { Icon, Kbd, Seg, Stepper } from '../../kit/controls';
 import { Pop } from '../../kit/layer';
 import { ContextMenu, MenuPop } from '../../kit/menu';
@@ -188,6 +188,7 @@ export function renderPromptView({
                 <button
                   className={`btn quiet sm ${pop === 'view' || view.language !== 'bilingual' || polarity !== 'all' || view.viewMode !== 'structure' ? 'on' : ''}`}
                   data-trigger="view"
+                  data-enter="fade"
                   aria-label="显示"
                   onClick={() => setPop(pop === 'view' ? '' : 'view')}
                 >
@@ -229,11 +230,22 @@ export function renderPromptView({
               <FlipScope root={scroll}>
                 <div className="scroll" ref={scroll}>
                   <div className="swap">
-                    {docs.map(({ key, leaving }) => (
-                      <div key={key} className={leaving ? 'leaving' : ''} data-enter="fade">
-                        {key === 'text' ? textDoc : blockDoc}
-                      </div>
-                    ))}
+                    {/* 当前这份排在前面：离开的叠在上面淡出，querySelector 先找到当前的 */}
+                    {[...docs.filter((d) => !d.leaving), ...docs.filter((d) => d.leaving)].map(
+                      ({ key, value, leaving }) => (
+                        <div
+                          key={key}
+                          className={leaving ? 'leaving' : ''}
+                          inert={leaving || undefined}
+                          data-enter="fade"
+                        >
+                          {/* 离开的那份去掉文档根的 ref：它卸载时会把共用的 ref 清空，当前这份的拖动、框选就找不到根了 */}
+                          {leaving && isValidElement(value.node)
+                            ? cloneElement(value.node, { ref: null } as never)
+                            : value.node}
+                        </div>
+                      ),
+                    )}
                   </div>
                 </div>
               </FlipScope>

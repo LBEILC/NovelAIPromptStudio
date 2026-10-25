@@ -346,7 +346,15 @@ export function usePromptDocumentView({
       )}
     </div>
   );
-  const docs = useSwap(textMode ? 'text' : 'blocks', (k) => k);
+  // 文本方式 ↔ Tag 方式、换版本都整块淡出淡入：以前换版本时 Tag 块直接换（用户 10-25）。
+  // 版本按图认（和舞台的大图一样，改 Tag 时不变）；离开的那份照最后的样子留着淡出
+  const docs = useSwap(
+    {
+      key: `${textMode ? 'text' : 'blocks'}:${p.project.image_path || ''}`,
+      node: textMode ? textDoc : blockDoc,
+    },
+    (v) => v.key,
+  );
   // 提示词 / 参数 / 参考：换内容时旧的淡出、新的淡入；提示词一直挂着（编辑的状态不丢）
   const paneSwap = useSwap(p.pane || null, (v) => v?.key || 'prompt');
   const moveTargets: MenuEntry[] = (() => {
