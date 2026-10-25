@@ -291,3 +291,5 @@ img.matte-black { background: var(--matte-black); }
 .gen-acts { justify-items: end; align-items: center; }
 .gen-acts > .gen-act { display: inline-flex; align-items: center; gap: inherit; }
 .gen-bar .row > .gen-acts { gap: var(--sp-2); }
+/* 切换标签页：旧的提示词栏叠在原处淡出，不占位置（src/workbench/WorkbenchPage.tsx） */
+.col.prompt > .prompt-in.leaving { position: absolute; inset: 0; z-index: 1; background: var(--surface); }

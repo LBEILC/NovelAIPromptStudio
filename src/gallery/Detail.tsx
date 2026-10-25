@@ -76,7 +76,12 @@ export function Detail({
       {a.handle}
       <div className="swap dswap">
         {ordered.map(({ key, value, leaving }) => (
-          <div key={key} className={`dframe ${leaving ? 'leaving' : ''}`} data-enter="fade">
+          <div
+            key={key}
+            className={`dframe ${leaving ? 'leaving' : ''}`}
+            inert={leaving || undefined}
+            data-enter="fade"
+          >
             {value.mode === 'sum' ? (
               <Summary p={value.p} />
             ) : value.mode !== 'none' && value.detail && value.group ? (

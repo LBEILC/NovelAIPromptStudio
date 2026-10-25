@@ -450,7 +450,8 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         ),
       });
   }
-  const shown = useExitList(rows, (r) => r.key);
+  // key 带上标签页：两个标签页里同 key 的行（草稿、同一作品的版本）切换时会被当成同一行、原地直接换内容（用户 10-25）
+  const shown = useExitList(rows, (r) => `${tab.id}:${r.key}`);
   // 原图算一张；空白作品的起点没有图
   const images = versions.reduce(
     (n, v) => n + v.images.filter((i) => !i.deleted).length,

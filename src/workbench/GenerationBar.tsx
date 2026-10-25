@@ -541,7 +541,12 @@ export function GenerationBar({
         <span className="sp" />
         <span className="swap gen-acts">
           {right.map(({ key, value, leaving }) => (
-            <span key={key} className={`gen-act ${leaving ? 'leaving' : ''}`} data-enter="fade">
+            <span
+              key={key}
+              className={`gen-act ${leaving ? 'leaving' : ''}`}
+              inert={leaving || undefined}
+              data-enter="fade"
+            >
               {value.job ? (
                 <GenBusy job={value.job} />
               ) : (

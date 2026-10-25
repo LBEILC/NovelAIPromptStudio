@@ -10,7 +10,7 @@ import { useGeneration } from '../state/generation';
 import { activeWorkbenchTab } from '../lib/workbenchSession.js';
 import { WORKBENCH_SOURCE_PANEL_WIDTH_KEY } from '../lib/panelLayout.js';
 import { EmptyMark, Icon } from '../kit/controls';
-import { ms } from '../kit/motion';
+import { ms, useSwap } from '../kit/motion';
 import { useResizable } from '../kit/resize';
 import type { WorkbenchSession } from '../state/workbench';
 import type { ImageProject, Vibe } from '../shared/types';
@@ -85,6 +85,61 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
     el.addEventListener('scroll', remember);
     return () => el.removeEventListener('scroll', remember);
   }, [tab?.id]);
+  // 切换标签页时提示词栏旧的淡出、新的淡入（2.17）：以前 key={tab.id} 只有新的淡入，旧的直接没了（用户 10-25）。
+  // 旧标签页那份照最后的样子留着淡出（叠在上面，不能点）；当前这份排在前面，querySelector 先找到它
+  const editor = tab?.project ? (
+    <WorkbenchEditor
+      {...p}
+      project={tab.project}
+      tabId={tab.id}
+      before={p.beforeGeneration}
+      onProposalChange={setProposal}
+      viewState={tab.viewState}
+      onViewStateChange={(state) => p.onUpdateViewState(tab.id, state)}
+      header={
+        tab.project?.params ? (
+          <PromptTabs
+            value={ptab}
+            onChange={(t) => {
+              setRefHighlight('');
+              setPtab(t);
+            }}
+            tab={tab}
+            base={base?.project || null}
+          />
+        ) : null
+      }
+      pane={
+        ptab === 'params' && tab.project?.params
+          ? {
+              key: `params-${tab.id}`,
+              node: <ParamsPane tab={tab} base={base} before={p.beforeGeneration} />,
+            }
+          : ptab === 'refs' && tab.project?.params
+            ? {
+                key: `refs-${tab.id}`,
+                node: (
+                  <RefsPane
+                    tab={tab}
+                    base={base}
+                    before={p.beforeGeneration}
+                    highlight={refHighlight}
+                  />
+                ),
+              }
+            : null
+      }
+      footer={
+        generation.settings.hasToken ? (
+          <GenerationBar tab={tab} before={p.beforeGeneration} proposal={proposal} />
+        ) : (
+          <GenerationSetup onConfigure={p.onConfigureGeneration} />
+        )
+      }
+    />
+  ) : null;
+  const editorSwap = useSwap({ key: tab?.id || '', node: editor }, (v) => v.key);
+  const editors = [...editorSwap.filter((f) => !f.leaving), ...editorSwap.filter((f) => f.leaving)];
   if (!tab)
     return (
       <div className="body" data-enter="fade">
@@ -154,58 +209,18 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
             </div>
           </div>
         )}
-        {tab.project && (
-          <div className="prompt-in" key={tab.id} data-enter="fade">
-            <WorkbenchEditor
-              {...p}
-              project={tab.project}
-              tabId={tab.id}
-              before={p.beforeGeneration}
-              onProposalChange={setProposal}
-              viewState={tab.viewState}
-              onViewStateChange={(state) => p.onUpdateViewState(tab.id, state)}
-              header={
-                tab.project?.params ? (
-                  <PromptTabs
-                    value={ptab}
-                    onChange={(t) => {
-                      setRefHighlight('');
-                      setPtab(t);
-                    }}
-                    tab={tab}
-                    base={base?.project || null}
-                  />
-                ) : null
-              }
-              pane={
-                ptab === 'params' && tab.project?.params
-                  ? {
-                      key: `params-${tab.id}`,
-                      node: <ParamsPane tab={tab} base={base} before={p.beforeGeneration} />,
-                    }
-                  : ptab === 'refs' && tab.project?.params
-                    ? {
-                        key: `refs-${tab.id}`,
-                        node: (
-                          <RefsPane
-                            tab={tab}
-                            base={base}
-                            before={p.beforeGeneration}
-                            highlight={refHighlight}
-                          />
-                        ),
-                      }
-                    : null
-              }
-              footer={
-                generation.settings.hasToken ? (
-                  <GenerationBar tab={tab} before={p.beforeGeneration} proposal={proposal} />
-                ) : (
-                  <GenerationSetup onConfigure={p.onConfigureGeneration} />
-                )
-              }
-            />
-          </div>
+        {editors.map(
+          ({ key, value, leaving }) =>
+            value.node && (
+              <div
+                key={key}
+                className={`prompt-in ${leaving ? 'leaving' : ''}`}
+                inert={leaving || undefined}
+                data-enter="fade"
+              >
+                {value.node}
+              </div>
+            ),
         )}
       </div>
     </div>
