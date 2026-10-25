@@ -114,6 +114,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             <span
               key={`slot-${i}`}
               className={`slot ${run ? 'run' : ''} ${fail ? 'fail' : ''}`}
+              data-enter="fade"
               style={
                 {
                   '--w': `${w}px`,
@@ -435,6 +436,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             <div className="ths">
               <span
                 className="slot run"
+                data-enter="fade"
                 style={
                   {
                     '--w': `${Math.round(TH_H * ratio(current))}px`,

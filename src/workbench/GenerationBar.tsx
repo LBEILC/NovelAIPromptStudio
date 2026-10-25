@@ -62,6 +62,26 @@ export function GenerationSetup({ onConfigure }: { onConfigure: () => void }) {
   );
 }
 
+/** 底栏右边生成中的样子："停止"和"生成中" */
+function GenBusy({ job }: { job: { id: string; stop?: boolean } }) {
+  return (
+    <>
+      <button
+        className="btn quiet sm"
+        disabled={job.stop}
+        onClick={() => void invokeUI('generate.stop', { id: job.id })}
+      >
+        <Icon name="stop-line" />
+        {job.stop ? '正在停止' : '停止'}
+      </button>
+      <button className="btn seal is-off busy" aria-disabled="true">
+        <span className="spin" />
+        生成中
+      </button>
+    </>
+  );
+}
+
 export function GenerationBar({
   tab,
   before,
@@ -130,6 +150,10 @@ export function GenerationBar({
   );
   const busyElsewhere = state.jobs.some((j) => j.state === 'generating' && j.tabId !== tab.id);
   const left = useSwap(job ? 'busy' : 'normal', (k) => k);
+  // 右边（费用和"生成" ↔ "停止"和"生成中"）也原地换内容；以前直接换（用户 10-25）。
+  // 当前这份排在前面，querySelector 先找到它
+  const rightSwap = useSwap({ key: job ? 'busy' : 'normal', job }, (v) => v.key);
+  const right = [...rightSwap.filter((f) => !f.leaving), ...rightSwap.filter((f) => f.leaving)];
   const setSteps28 = async () => {
     try {
       await before?.();
@@ -515,42 +539,38 @@ export function GenerationBar({
           )}
         </span>
         <span className="sp" />
-        {job ? (
-          <>
-            <button
-              className="btn quiet sm"
-              disabled={job.stop}
-              onClick={() => void invokeUI('generate.stop', { id: job.id })}
-            >
-              <Icon name="stop-line" />
-              {job.stop ? '正在停止' : '停止'}
-            </button>
-            <button className="btn seal is-off busy" aria-disabled="true">
-              <span className="spin" />
-              生成中
-            </button>
-          </>
-        ) : (
-          <>
-            <span className={`cost ${short ? 'short' : ''}`} data-tip={short ? '余额不够' : sub}>
-              <b>
-                {estimate ? cost : '…'} Anlas{continuous ? ' / 张' : ''}
-              </b>
-              <span>{sub}</span>
+        <span className="swap gen-acts">
+          {right.map(({ key, value, leaving }) => (
+            <span key={key} className={`gen-act ${leaving ? 'leaving' : ''}`} data-enter="fade">
+              {value.job ? (
+                <GenBusy job={value.job} />
+              ) : (
+                <>
+                  <span
+                    className={`cost ${short ? 'short' : ''}`}
+                    data-tip={short ? '余额不够' : sub}
+                  >
+                    <b>
+                      {estimate ? cost : '…'} Anlas{continuous ? ' / 张' : ''}
+                    </b>
+                    <span>{sub}</span>
+                  </span>
+                  <button
+                    className={`btn seal ${starting || !estimate || unavailable || short ? 'is-off' : ''}`}
+                    aria-disabled={starting || !estimate || !!unavailable || short || undefined}
+                    data-tip={goTip || undefined}
+                    onClick={() => {
+                      if (starting || !estimate || unavailable || short) return;
+                      void go();
+                    }}
+                  >
+                    {busyElsewhere ? '排队生成' : '生成'}
+                  </button>
+                </>
+              )}
             </span>
-            <button
-              className={`btn seal ${starting || !estimate || unavailable || short ? 'is-off' : ''}`}
-              aria-disabled={starting || !estimate || !!unavailable || short || undefined}
-              data-tip={goTip || undefined}
-              onClick={() => {
-                if (starting || !estimate || unavailable || short) return;
-                void go();
-              }}
-            >
-              {busyElsewhere ? '排队生成' : '生成'}
-            </button>
-          </>
-        )}
+          ))}
+        </span>
       </div>
       <MenuPop
         open={sizeMenu && !custom}
