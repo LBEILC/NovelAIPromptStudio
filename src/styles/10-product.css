@@ -262,3 +262,23 @@ html.tray, html.tray body, html.tray #root { width: auto; height: auto; backgrou
 .ob-dots { display: inline-flex; gap: var(--sp-1); margin-right: auto; }
 .ob-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: background-color var(--dur-2) var(--ease-out); }
 .ob-dots i.on { background: var(--text); }
+
+/* 透明图（1.6.4，doc/design.md 2.32）：图片下面垫浅灰棋盘格，不透明的图会把它盖住，所以不用先判断是不是透明图。
+   图片加载完才铺（data-loaded），免得滚动时一格格先闪出棋盘格。棋盘格铺在 <img> 自己身上，图片的框必须和画面一样大，
+   不能用 object-fit: contain 留边（详情栏因此改成按比例缩放）；叠图预览时比例不同的那一张（.fit）留边，仍用原来的底色。
+   大图里 --vz 是当前缩放倍数，格子跟着缩小，屏幕上始终一样大 */
+img.alpha-bg[data-loaded] {
+  background-color: var(--checker-a);
+  background-image: repeating-conic-gradient(var(--checker-b) 0 25%, var(--checker-a) 0 50%);
+  background-size: calc(var(--checker) * 2 / var(--vz, 1)) calc(var(--checker) * 2 / var(--vz, 1));
+}
+img.matte-white { background: var(--matte-white); }
+img.matte-black { background: var(--matte-black); }
+.libp .detail .pic.swap { grid-template-rows: 250px; grid-template-columns: minmax(0, 1fr); }
+.libp .detail .pic img { width: auto; height: auto; max-width: 100%; max-height: 100%; }
+/* 大图工具条：底色切换，三个色块 */
+.segc.vbg span { padding: 0 var(--sp-2); }
+.vbg-sw { display: block; width: var(--fs-small); height: var(--fs-small); border-radius: calc(var(--r-tag) / 2); box-shadow: 0 0 0 var(--bw) var(--border); }
+.vbg-sw.checker { background-color: var(--checker-a); background-image: repeating-conic-gradient(var(--checker-b) 0 25%, var(--checker-a) 0 50%); background-size: 50% 50%; }
+.vbg-sw.white { background: var(--matte-white); }
+.vbg-sw.black { background: var(--matte-black); }

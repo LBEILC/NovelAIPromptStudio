@@ -194,6 +194,9 @@
   --seg-pad: 2px;           /* 分段选择：槽到滑块的距离；滑块的圆角 = --r-ctl 减去它 */
   --cal-cell: 30px;         /* 月历：一天的格子，宽高相同；和默认按钮一样高 */
   --cal-dot: 4px;           /* 月历："这一天有导入的图片"的小点，在数字下面 */
+  --checker: 8px;           /* 透明图下面垫的棋盘格，一格的边长；大图放大时跟着缩小，屏幕上始终这么大 */
+  --matte-white: #ffffff;   /* 大图的底色可以换成纯白、纯黑，两套主题相同 */
+  --matte-black: #000000;
 }
 
 [data-theme="light"] {
@@ -273,6 +276,10 @@
   --scrim: rgba(28, 28, 28, 0.28);
   --shadow-print: 0 1px 2px rgba(28, 28, 28, 0.06), 0 8px 24px rgba(28, 28, 28, 0.08);   /* 图片：像一张放在纸上的照片 */
   --shadow-pop: 0 8px 28px rgba(28, 28, 28, 0.14), 0 0 0 1px var(--border);              /* 菜单、浮层 */
+
+  /* 透明图下面的浅灰棋盘格。不透明的图会把它盖住 */
+  --checker-a: #f6f6f4;
+  --checker-b: #e3e2de;
 }
 
 [data-theme="dark"] {
@@ -338,4 +345,8 @@
   --scrim: rgba(0, 0, 0, 0.55);
   --shadow-print: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.45);
   --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border);
+
+  /* 深色主题也用浅灰：深色线稿在深色格子上看不清。比浅色主题暗一档，不刺眼 */
+  --checker-a: #d6d5d1;
+  --checker-b: #bdbcb7;
 }

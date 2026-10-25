@@ -26,6 +26,7 @@ import { GENERATED } from './Side';
 import type { LibraryGroup, LibraryProps } from '../library/types';
 import type { DetachedRecord, LibraryCard } from '../shared/types';
 import { namedWork, workLabel } from '../lib/workNames';
+import { markLoaded } from '../kit/alpha';
 
 const cardRatio = (c: LibraryCard) => {
   const { width, height } = c.metadata;
@@ -520,16 +521,23 @@ function Cards({
               onPointerLeave={() => setScrub((s) => (s?.id === g.id ? null : s))}
             >
               <img
-                className={`lmain ${fit ? 'fit' : ''}`}
+                className={`lmain alpha-bg ${fit ? 'fit' : ''}`}
                 src={thumb(shown)}
                 alt=""
                 draggable={false}
+                onLoad={markLoaded}
               />
               {mosaic && (
                 <span className="lmosaic" aria-hidden="true">
                   {mosaic.picks.map((m, k) => (
                     <span key={m.id}>
-                      <img src={thumb(m)} alt="" draggable={false} />
+                      <img
+                        className="alpha-bg"
+                        src={thumb(m)}
+                        alt=""
+                        draggable={false}
+                        onLoad={markLoaded}
+                      />
                       {k === mosaic.picks.length - 1 && mosaic.more > 0 && (
                         <b className="mono">+{mosaic.more}</b>
                       )}

@@ -18,6 +18,7 @@ import { Pop } from '../kit/layer';
 import { useNotifications } from '../kit/toast';
 import { useSwap } from '../kit/motion';
 import { Viewer } from '../kit/Viewer';
+import { markLoaded } from '../kit/alpha';
 import { trashNotice } from '../lib/trashNotice';
 import { originGone, originMenu, trashImage } from './original';
 import { useSharedTrash } from '../shell/SharedTrash';
@@ -249,7 +250,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
           ) : value.src ? (
             <img
               key={key}
-              className={leaving ? 'leaving' : ''}
+              className={`alpha-bg ${leaving ? 'leaving' : ''}`}
               data-enter={enter}
               data-stage=""
               src={value.src}
@@ -257,6 +258,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
               draggable={false}
               role="button"
               tabIndex={leaving ? -1 : 0}
+              onLoad={markLoaded}
               onError={() => setMissing(true)}
               onClick={() => setViewer(index)}
               onKeyDown={(e) => {

@@ -2,10 +2,12 @@
 // 打开时适应窗口（整张图放得下、尽量大，小图也放大）；工具条上的比例按实际像素算。
 // 滚轮以指针为中心缩放、拖动平移，都跟手；双击回到适应窗口。← / → 一张一张走；↑ / ↓ 跳到上一组 / 下一组的第一张；到头就停。
 // 打开 --dur-3（底色淡入，图片从 --enter-scale 放大）；关闭淡出 --dur-1；换一张朝那个方向换内容。
+// 图片下面的底色（2.32）：默认浅灰棋盘格，工具条上可以换成白、黑，记住选择。
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Presence, dur, useSwap } from './motion';
 import { ToWin, useDismiss } from './layer';
-import { Icon } from './controls';
+import { Icon, Seg } from './controls';
+import { markLoaded, readMatte, writeMatte, type Matte } from './alpha';
 
 export interface ViewerItem {
   id: string;
@@ -44,6 +46,7 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
   const [dir, setDir] = useState<'zoom3' | 'left' | 'right'>('zoom3');
   const [seq, setSeq] = useState(0);
   const [pct, setPct] = useState<number | null>(null);
+  const [matte, setMatte] = useState<Matte>(readMatte);
   const img = useRef<HTMLImageElement | null>(null);
   const pan = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
   const i = clamp(p.index, 0, p.items.length - 1);
@@ -182,18 +185,22 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
           <div key={key} className={`vframe ${leaving ? 'leaving' : ''}`} data-enter={value.dir}>
             <img
               ref={leaving ? undefined : img}
-              className="vz"
+              className={`vz ${matte === 'checker' ? 'alpha-bg' : `matte-${matte}`}`}
               src={value.item.src}
               alt=""
               draggable={false}
-              onLoad={leaving ? undefined : measure}
+              onLoad={(e) => {
+                markLoaded(e);
+                if (!leaving) measure();
+              }}
               style={
                 leaving
                   ? undefined
-                  : {
+                  : ({
                       transform,
                       transition: animate ? 'transform var(--dur-3) var(--ease-move)' : 'none',
-                    }
+                      '--vz': z.z,
+                    } as React.CSSProperties)
               }
               onPointerDown={(e) => {
                 if (leaving || e.button !== 0) return;
@@ -227,6 +234,21 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
         </button>
         <span className="help">滚轮缩放 · 拖动平移 · 双击适应窗口</span>
         <span className="sp" />
+        <Seg
+          className="vbg"
+          label="底色"
+          value={matte}
+          onChange={(v) => {
+            setMatte(v);
+            writeMatte(v);
+          }}
+          items={[
+            ['checker', <i className="vbg-sw checker" />, '底色：棋盘格'],
+            ['white', <i className="vbg-sw white" />, '底色：白'],
+            ['black', <i className="vbg-sw black" />, '底色：黑'],
+          ]}
+        />
+        <span className="vz-sep" />
         {p.onCopy && (
           <button
             className="btn quiet sm icon"

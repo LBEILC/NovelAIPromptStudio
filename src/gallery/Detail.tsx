@@ -25,6 +25,7 @@ import { workLabel } from '../lib/workNames';
 
 export { CAT_VAR, CAT_NAME } from '../kit/categories';
 import { CAT_VAR, CAT_NAME } from '../kit/categories';
+import { markLoaded } from '../kit/alpha';
 const thumb = (c: { thumbnail_path?: string; image_path: string }) =>
   mediaUrl(c.thumbnail_path || c.image_path);
 const STRIP_ROW = 6;
@@ -132,8 +133,9 @@ function One({
           {pics.map(({ key, value, leaving }) => (
             <img
               key={key}
-              className={leaving ? 'leaving' : ''}
+              className={`alpha-bg ${leaving ? 'leaving' : ''}`}
               data-enter="fade"
+              onLoad={markLoaded}
               src={mediaUrl(value.image_path)}
               alt={imageAccessibleName(value)}
               draggable={false}
@@ -393,7 +395,8 @@ function Strip({
     return (
       <span key={m.id} className={`lth ${origin ? 'origin' : ''}`}>
         <img
-          className={i === si ? 'is-cur' : ''}
+          className={`alpha-bg ${i === si ? 'is-cur' : ''}`}
+          onLoad={markLoaded}
           src={thumb(m)}
           alt=""
           draggable={false}
@@ -448,6 +451,8 @@ function Summary({ p, a }: { p: LibraryProps; a: DetailActions }) {
             {groups.slice(0, 5).map((g) => (
               <img
                 key={g.id}
+                className="alpha-bg"
+                onLoad={markLoaded}
                 src={thumb(g.cover)}
                 alt=""
                 draggable={false}
