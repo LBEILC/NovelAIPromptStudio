@@ -517,3 +517,11 @@ textarea.para-in { resize: none; overflow: hidden; }
 .stage-acts { container-type: inline-size; }
 @container (max-width: 600px) { .stage-acts .btn.quiet .lbl { display: none; } .stage-acts .btn.quiet:has(> .lbl) { width: var(--ctl-sm); padding: 0; justify-content: center; } }
 .stage-acts .saved { white-space: nowrap; }
+/* 更新说明还没读到（用户 10-26：先显示上一版的说明，过一会才换）：同样的轮廓占位，一道微光扫过 */
+.rn-wait .sk { position: relative; overflow: hidden; background: var(--hover); }
+.rn-wait .sk::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--surface) 70%, transparent) 50%, transparent 70%); transform: translateX(-100%); animation: zshine calc(var(--dur-spin) * 2) var(--ease-move) infinite; }
+.rn-wait .rn-card.sk { height: calc(var(--lh-small) * 5 + var(--sp-3) * 2); border-color: transparent; }
+.rn-sk-lines { display: flex; flex-direction: column; gap: var(--sp-2); }
+.rn-sk-lines .sk { display: block; height: var(--lh-small); border-radius: var(--r-tag); }
+.rn-sk-lines .sk:nth-child(2) { width: 80%; }
+.rn-sk-lines .sk:nth-child(3) { width: 60%; }

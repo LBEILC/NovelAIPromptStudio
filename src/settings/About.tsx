@@ -1,6 +1,6 @@
 // 关于与更新（doc/design.md 2.11）：版本、更新（发现新版本时展开横幅和更新说明）、更新日志、快捷键、数据与隐私、反馈、字体与开源组件。
 // 更新日志只读：构建时把仓库里的 release-notes/*.json（1.2.0 起才有）打包进来，离线也能看，不联网。
-import { Fragment, lazy, Suspense, useRef, useState } from 'react';
+import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { writeClipboardText } from '../lib/clipboard';
 import {
@@ -14,7 +14,7 @@ import { useNotifications } from '../kit/toast';
 import { useUpdates } from '../state/updates';
 import { StructuredReleaseNotes } from './StructuredReleaseNotes';
 import { replayOnboarding } from '../shell/Onboarding';
-import { Expand, Row, SetPage, errorText } from './parts';
+import { Expand, Row, SetPage, Swap, errorText } from './parts';
 import misansLicense from '../../LICENSES/MiSans/LICENSE?raw';
 import newsreaderLicense from '../../LICENSES/Newsreader/LICENSE?raw';
 import plexLicense from '../../LICENSES/IBMPlexMono/LICENSE?raw';
@@ -96,6 +96,31 @@ const LICENSES = [
 ];
 const ISSUES = 'https://github.com/LBEILC/NovelAIPromptStudio/issues/new';
 
+/** 更新说明还没读到时的占位：和说明一样的轮廓（标题、两张卡片、几行），一道微光扫过 */
+function NotesLoading({ version }: { version?: string }) {
+  return (
+    <div
+      className="rn rn-wait"
+      aria-busy="true"
+      aria-label={`正在读取 ${version || ''} 的更新说明`}
+    >
+      <div className="rn-head">
+        <b>{version} 更新说明</b>
+        <span>正在读取…</span>
+      </div>
+      <div className="rn-hl">
+        <div className="rn-card sk" />
+        <div className="rn-card sk" />
+      </div>
+      <div className="rn-sk-lines">
+        <i className="sk" />
+        <i className="sk" />
+        <i className="sk" />
+      </div>
+    </div>
+  );
+}
+
 export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unknown> }) {
   const notify = useNotifications();
   const u = useUpdates();
@@ -123,6 +148,20 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
   const failed = !found && !checking && !!(u.error || st?.error);
   const manual = st?.platform === 'darwin' && st.updateMode === 'manual';
   const p = Math.round(st?.progress || 0);
+  // 自动更新先报出新版本号，结构化的更新说明要再去 GitHub 读一次；这期间手里还是上一次的说明。
+  // 版本号对上了才用；对不上时先是加载态，8 秒还没读到就退回安装包自带的 Markdown 说明（用户 10-26）
+  const fresh =
+    st?.structuredNotes && st.structuredNotes.version === st.latestVersion
+      ? st.structuredNotes
+      : null;
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    setWaited(false);
+    if (!found || fresh) return;
+    const t = setTimeout(() => setWaited(true), 8000);
+    return () => clearTimeout(t);
+  }, [found, !!fresh, st?.latestVersion]);
+  const notesView = fresh ? 'fresh' : waited ? 'markdown' : 'loading';
   const banner = found && st && (
     <>
       <div className={`banner info upd ${st.phase === 'downloading' ? 'down' : ''}`}>
@@ -139,9 +178,11 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
                 ? `正在下载 · ${p}%`
                 : manual
                   ? 'macOS 上需要到下载页手动安装（安装包没有签名）'
-                  : st.structuredNotes
-                    ? releaseCounts(st.structuredNotes)
-                    : ''}
+                  : fresh
+                    ? releaseCounts(fresh)
+                    : waited
+                      ? ''
+                      : '正在读取更新说明'}
           </small>
           <div className="progress ink">
             <i
@@ -189,13 +230,24 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         </span>
       </div>
       <Expand open={notesOpen}>
-        {st.structuredNotes ? (
-          <StructuredReleaseNotes notes={st.structuredNotes} />
-        ) : (
-          <Suspense fallback={null}>
-            <ReleaseNotes>{st.notes || ''}</ReleaseNotes>
-          </Suspense>
-        )}
+        <Swap k={notesView}>
+          {fresh ? (
+            <StructuredReleaseNotes notes={fresh} />
+          ) : !waited ? (
+            <NotesLoading version={st.latestVersion} />
+          ) : st.notes ? (
+            <Suspense fallback={null}>
+              <ReleaseNotes>{st.notes}</ReleaseNotes>
+            </Suspense>
+          ) : (
+            <p className="help rn-miss">
+              没有读到 {st.latestVersion} 的更新说明。
+              <button className="btn quiet sm" onClick={() => open(st.releaseUrl)}>
+                在浏览器里看
+              </button>
+            </p>
+          )}
+        </Swap>
       </Expand>
     </>
   );
