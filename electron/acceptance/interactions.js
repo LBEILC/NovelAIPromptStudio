@@ -172,6 +172,7 @@ export async function libraryInteractionChecks(env) {
     await context(h, card(records[1].id));
     await expectMenu(h, '单张右键菜单项目及顺序正确', [
       '在工作台打开',
+      '在工作台用作底图',
       '加入收藏集…',
       '复制提示词',
       '起名',

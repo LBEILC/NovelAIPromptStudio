@@ -29,6 +29,7 @@ import { preserveClipboard } from './clipboard.js';
 import { cardCacheChecks } from './cardCache.js';
 import { agentChecks } from './agent.js';
 import { generationChecks } from './generation.js';
+import { imageOperationChecks } from './imageOperations.js';
 import { referenceEvidence } from './referenceEvidence.js';
 import { chatGPTChecks } from './chatgpt.js';
 import electronUpdater from 'electron-updater';
@@ -451,6 +452,7 @@ export async function runAcceptance(context) {
       else if (mode.category === 'Agent') await agentChecks(environment);
       else if (mode.category === '作品共用') await workSharingChecks(environment);
       else if (mode.category === '生成') await generationChecks(environment);
+      else if (mode.category === '放大与图生图') await imageOperationChecks(environment);
       else if (mode.category === '备份') await backupChecks(environment);
       else if (mode.category === '图片库·文件夹') await folderImportChecks(environment);
       else if (mode.category === '内置AI与素材') await materialsChecks(environment);
@@ -518,6 +520,7 @@ export async function runAcceptance(context) {
           () => interactionCorrectionChecks(environment),
           () => agentChecks(environment),
           () => generationChecks(environment),
+          () => imageOperationChecks(environment),
           () => workSharingChecks(environment),
           () => backupChecks(environment),
           () => folderImportChecks(environment),
