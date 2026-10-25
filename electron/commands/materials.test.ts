@@ -1,4 +1,5 @@
 import { afterEach, expect, it } from 'vitest';
+import '../fixtures/databaseTestBudget.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
