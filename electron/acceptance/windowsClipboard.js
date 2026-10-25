@@ -99,5 +99,10 @@ export async function windowsClipboardChecks({ h, mode, doubles, database }) {
     for (const tab of tabs.tabs.filter((tab) => tab.source.path === file))
       await invoke('workbench.close', { tabId: tab.id });
     await h.reload();
+    await h.click('图片库', 'document.querySelector(".tb")');
+    await h.wait(
+      '!!document.querySelector(".gallery-search input")?.getClientRects().length',
+      '返回图片库继续原有验收',
+    );
   }
 }
