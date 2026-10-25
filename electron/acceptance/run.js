@@ -168,11 +168,11 @@ export async function runAcceptance(context) {
       'SQLite 已打开且演示图库可读',
       async () =>
         database.loadLibrary('all').length >=
-        (mode.phase > 0
-          ? JSON.parse(await fs.readFile(path.join(mode.root, 'snapshot.json'), 'utf8')).library
-              .length
-          : mode.needsLibrary === false
-            ? 0
+        (mode.needsLibrary === false
+          ? 0
+          : mode.phase > 0
+            ? JSON.parse(await fs.readFile(path.join(mode.root, 'snapshot.json'), 'utf8')).library
+                .length
             : Math.min(files.length, 13)),
       undefined,
       'once',

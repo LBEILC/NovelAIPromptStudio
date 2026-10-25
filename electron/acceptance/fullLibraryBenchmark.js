@@ -58,12 +58,13 @@ export async function runFullLibraryBenchmark({
     await h.wait(images);
     results.firstScreenMs = performance.now() - first;
     console.log('first screen', results.firstScreenMs);
+    await e('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
     const scroll = await window.webContents.executeJavaScript(
       `new Promise(resolve=>{
-      const g=document.querySelector('.lib-grid-col > .scroll');let last=performance.now(),down=true,frames=0,longFrames=0,max=0;
+      const g=document.querySelector('.lib-grid-col > .scroll');const initialHeight=g.scrollHeight,viewportHeight=g.clientHeight;let last=performance.now(),down=true,frames=0,longFrames=0,max=0;
       const tick=now=>{const dt=now-last;last=now;if(frames++){if(dt>50)longFrames++;max=Math.max(max,dt)}
         if(down&&g.scrollTop+g.clientHeight>=g.scrollHeight-1)down=false;
-        if(!down&&g.scrollTop<=0){resolve({scrollLongFrames:longFrames,scrollMaxFrameMs:max,scrollFrames:frames});return;}
+        if(!down&&g.scrollTop<=0){resolve({scrollLongFrames:longFrames,scrollMaxFrameMs:max,scrollFrames:frames,scrollInitialHeight:initialHeight,scrollFinalHeight:g.scrollHeight,scrollViewportHeight:viewportHeight});return;}
         g.scrollTop+= (down?1:-1)*Math.max(1,g.clientHeight*2);requestAnimationFrame(tick);
       };requestAnimationFrame(tick);
     })`,

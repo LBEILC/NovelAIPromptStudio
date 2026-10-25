@@ -39,9 +39,8 @@ try {
     }
     // Each process starts with an empty workbench and renderer storage.
     fs.rmSync(path.join(root, 'userData/workbench-session.json'), { force: true });
-    const storage = path.join(root, 'userData', 'Local Storage');
-    if (path.dirname(storage) !== path.join(root, 'userData'))
-      throw Error('Invalid storage cleanup');
+    const storage = path.join(root, 'sessionData');
+    if (path.dirname(storage) !== root) throw Error('Invalid storage cleanup');
     fs.rmSync(storage, { recursive: true, force: true });
     const resultPath = path.join(output, `run-${run}.json`);
     fs.writeFileSync(
