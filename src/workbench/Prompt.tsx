@@ -1093,6 +1093,8 @@ export function WorkbenchEditor(p: EditorProps) {
       fading.includes(e.key) ? 'fading' : '',
       selected.includes(e.key) ? 'sel' : '',
       syntax ? 'warn' : '',
+      ctl ? 'ctl' : '',
+      ctl && !v5 ? 'off' : '',
     ]
       .filter(Boolean)
       .join(' ');
@@ -1103,9 +1105,16 @@ export function WorkbenchEditor(p: EditorProps) {
         data-key={`t-${e.key}`}
         data-flip=""
         data-tag-key={e.key}
+        data-tc={ctl ? 'ctl' : catVar(t.category)}
         role="button"
         tabIndex={0}
-        data-tip={syntax ? undefined : ctl ? `V5 控制词 · ${ctl.name}` : categoryLabel(t.category)}
+        data-tip={
+          syntax
+            ? undefined
+            : ctl
+              ? `V5 控制词 · ${ctl.name}${v5 ? '' : ' · 当前模型不是 V5，不起作用'}`
+              : categoryLabel(t.category)
+        }
         onClick={(ev) => clickTag(e, ev)}
         onKeyDown={(ev) => {
           if (ev.key === 'Enter' || ev.key === ' ') {
@@ -1140,11 +1149,8 @@ export function WorkbenchEditor(p: EditorProps) {
           setMenu({ at: [ev.clientX, ev.clientY], items: tagMenu(e) });
         }}
       >
-        {ctl ? (
-          <span className="dot ctl" />
-        ) : (
-          <span className="dot" style={{ background: `var(--cat-${catVar(t.category)})` }} />
-        )}
+        {/* 分类用英文的文字颜色表示（data-tc）；控制词不是分类，左边嵌一小段"V5" */}
+        {ctl && <span className="v5">V5</span>}
         <span className="t">
           <span className="en">
             {/* 括号强调：{} 加强、[] 减弱，括号画淡一点 */}
@@ -1255,6 +1261,29 @@ export function WorkbenchEditor(p: EditorProps) {
       </span>
     </div>
   );
+  /** 块标题上的图例：这块里每种分类各有几个，文字用分类色；悬停一项时块里其他 Tag 淡下去（聚光写在样式里） */
+  const legend = (list: DocumentTag[]) => {
+    const n = new Map<string, number>();
+    for (const e of list) {
+      const k = matchControl(e.tag.tag) ? 'ctl' : catVar(e.tag.category);
+      n.set(k, (n.get(k) || 0) + 1);
+    }
+    const order = [
+      ...CATEGORY_OPTIONS.map((c: string) => [catVar(c), categoryLabel(c)]),
+      ['ctl', 'V5 控制'],
+    ];
+    return n.size ? (
+      <span className="cat-lg">
+        {order
+          .filter(([k]) => n.has(k))
+          .map(([k, name]) => (
+            <span key={k} data-tc={k}>
+              {name} {n.get(k)}
+            </span>
+          ))}
+      </span>
+    ) : null;
+  };
   // ---------- 一块 ----------
   const blockEl = (si: number, bi: number, b: PromptBlock, negative: boolean) => {
     const key = blockKey(si, bi);
@@ -1314,6 +1343,7 @@ export function WorkbenchEditor(p: EditorProps) {
             <span className="label">
               TAG 块{label ? ` · ${label}` : ''} · {list.length} 个
             </span>
+            {!proposal && legend(list)}
             {!proposal && acts(() => blockMenu(si, bi), '这一块的操作', `blk-${key}`)}
           </div>
         )}
@@ -1405,14 +1435,23 @@ export function WorkbenchEditor(p: EditorProps) {
     const out: ReactNode[] = [];
     if (view.viewMode === 'category' && !tidy.active) {
       const list = entries.filter((e) => e.section === si && !e.automatic);
-      for (const c of CATEGORY_OPTIONS) {
-        const tags = list.filter((e) => (e.tag.category || 'Unsorted') === c);
+      // 小节标题用分类色；V5 控制词不是分类，单独放在最后一节
+      const ctls = list.filter((e) => matchControl(e.tag.tag));
+      const groups: [string, string, DocumentTag[]][] = [
+        ...CATEGORY_OPTIONS.map((c: string): [string, string, DocumentTag[]] => [
+          catVar(c),
+          categoryLabel(c),
+          list.filter((e) => !ctls.includes(e) && (e.tag.category || 'Unsorted') === c),
+        ]),
+        ['ctl', 'V5 控制词', ctls],
+      ];
+      for (const [k, name, tags] of groups) {
         if (!tags.length) continue;
         out.push(
-          <div className="blk" key={`cat-${si}-${c}`}>
+          <div className="blk" key={`cat-${si}-${k}`}>
             <div className="blk-h">
-              <span className="label">
-                {categoryLabel(c)} · {tags.length} 个
+              <span className="label" data-tc={k}>
+                {name} · {tags.length} 个
               </span>
             </div>
             <div className={`tags ${lang}`}>{tags.map(tagEl)}</div>
@@ -2063,9 +2102,9 @@ export function WorkbenchEditor(p: EditorProps) {
               return (
                 <div className="ctl-pop">
                   <div className="ctl-pop-h">
-                    <span className="dot ctl" />
+                    <span className={`v5-badge ${v5 ? '' : 'off'}`}>V5</span>
                     <b>{m.name}</b>
-                    <span className="muted">V5 控制词</span>
+                    <span className="muted">控制词</span>
                   </div>
                   <p className="help">{m.item.help}</p>
                   {m.group.exclusive && (

@@ -148,7 +148,6 @@ button { font: inherit; color: inherit; cursor: default; }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .tag { display: inline-flex; align-items: center; gap: var(--ctl-gap); padding: var(--tag-pad-y) var(--tag-pad-x) calc(var(--tag-pad-y) + 1px); border: 1px solid var(--border); border-radius: var(--r-tag); background: var(--surface); }
 .tag:hover { background: var(--hover); }
-.tag .dot { width: 5px; height: 5px; border-radius: 50%; flex: 0 0 auto; align-self: flex-start; margin-top: 6px; }
 .tag .t { display: flex; flex-direction: column; }
 .tag .en { font: var(--fs-small)/var(--lh-small) var(--font-mono); color: var(--text); }
 .tag .zh { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-3); }

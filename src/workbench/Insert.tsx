@@ -4,12 +4,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { mediaUrl } from '../lib/imageStage.js';
-import { CAT_VAR } from '../kit/categories';
+import { catKey } from '../kit/categories';
 import { Icon, Kbd } from '../kit/controls';
 import { Pop, type Place } from '../kit/layer';
 import { useNotifications } from '../kit/toast';
 import type { Material } from '../shared/materials';
-import type { TagCategory } from '../shared/types';
 
 const ROW = 3;
 const examplesCache = new Map<string, Promise<string>>();
@@ -62,7 +61,7 @@ const typeOf = (m: Material) =>
 const matText = (m: Material) =>
   m.blocks.map((b) => (b.type === 'tags' ? b.content : b.content)).join('\n\n');
 
-/** 一块素材的完整内容：Tag 带圆点、译文和权重（超过 24 个写"还有 N 个"）；段落是原文加译文 */
+/** 一块素材的完整内容：Tag 带分类色、译文和权重（超过 24 个写"还有 N 个"）；段落是原文加译文 */
 export function MaterialContent({ m, max = 24 }: { m: Material; max?: number }) {
   return (
     <>
@@ -70,13 +69,7 @@ export function MaterialContent({ m, max = 24 }: { m: Material; max?: number }) 
         b.type === 'tags' ? (
           <div className="tags" key={i}>
             {b.tags.slice(0, max).map((t, k) => (
-              <span className="tag ro" key={k}>
-                <span
-                  className="dot"
-                  style={{
-                    background: `var(--cat-${CAT_VAR[(t.category as TagCategory) || 'Unsorted'] || 'unsorted'})`,
-                  }}
-                />
+              <span className="tag ro" key={k} data-tc={catKey(t.category)}>
                 <span className="t">
                   <span className="en">{t.tag}</span>
                   {t.translation && <span className="zh">{t.translation}</span>}

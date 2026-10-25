@@ -106,7 +106,8 @@
   /* Tag */
   --tag-pad-y: 3px;       /* 上 3px，下比上多 1px，让两行文字看起来居中 */
   --tag-pad-x: 8px;
-  --cat-dot: 5px;         /* 分类圆点，是一个元素，不是字符；和英文那一行垂直居中 */
+  --cat-dot: 5px;         /* 分类色的小色块：只用在分类名旁边（菜单、编辑浮层、翻译词典），Tag 本身不画圆点 */
+  --v5-seg-pad: 6px;      /* V5 控制词左边那一小段"V5"的左右内边距 */
 
   /* 空状态 */
   --empty-mark: 64px;     /* 空状态图形的边长，用 design/identity/logo/symbol-empty.svg，颜色 --text-off */
@@ -253,20 +254,21 @@
   --remove: #a82a40;
   --remove-wash: rgba(168, 42, 64, 0.08);
 
-  /* Tag 分类色：只做成小圆点，不做底色。独立于品牌色。
-   * 色相沿用原来的含义，明度和彩度按实测调整：任意两种的色差 ΔE2000 ≥ 15；
-   * 三种色觉障碍模拟下最小色差约 7（原来约 2）。十种颜色不可能在色觉障碍下全部分清，
-   * 所以分类必须同时有文字：按分类查看时的小节标题、悬停提示、编辑浮层里的分类名。 */
+  /* Tag 分类色（10-25 改版）：用在 Tag 英文的文字上，像代码高亮；不做底色，也不再画圆点。独立于品牌色。
+   * 当 12px 文字用，所以在内容面（--surface）上对比度都不低于 5:1（未分类 4.5:1）；
+   * 任意两种的色差 ΔE2000 ≥ 15，三种色觉障碍模拟下最小色差约 7。十种颜色不可能在色觉障碍下全部分清，
+   * 所以分类必须同时有文字：块标题上的图例、按分类查看时的小节标题、悬停提示、编辑浮层里的分类名。
+   * 未分类是中性灰，"有颜色 = 分好了"。V5 控制词不是分类，文字用墨色，靠左边的"V5"小段区分。 */
   --cat-artist-era: #a04a61;
   --cat-subject: #005e7b;
-  --cat-identity: #437ec7;
-  --cat-body: #13766c;
+  --cat-identity: #2f6ad0;
+  --cat-body: #12766c;
   --cat-clothing: #72629d;
-  --cat-action: #814822;
-  --cat-environment: #5b9b55;
+  --cat-action: #804822;
+  --cat-environment: #4a7a37;
   --cat-composition: #635747;
-  --cat-style: #8d7931;
-  --cat-unsorted: #85847e;
+  --cat-style: #7f610a;
+  --cat-unsorted: #717782;
 
   --scrim: rgba(28, 28, 28, 0.28);
   --shadow-print: 0 1px 2px rgba(28, 28, 28, 0.06), 0 8px 24px rgba(28, 28, 28, 0.08);   /* 图片：像一张放在纸上的照片 */
@@ -322,16 +324,16 @@
   --remove: #fe818c;
   --remove-wash: rgba(254, 129, 140, 0.11);
 
-  --cat-artist-era: #e687b2;
-  --cat-subject: #66ddf6;
+  --cat-artist-era: #e98abc;
+  --cat-subject: #6adef6;
   --cat-identity: #92bbff;
-  --cat-body: #42aba1;
+  --cat-body: #42aaa0;
   --cat-clothing: #a785d9;
-  --cat-action: #c88660;
+  --cat-action: #c9865f;
   --cat-environment: #95c994;
-  --cat-composition: #a19589;
+  --cat-composition: #c0b3a9;
   --cat-style: #cbb164;
-  --cat-unsorted: #cccac5;
+  --cat-unsorted: #8a877f;
 
   --scrim: rgba(0, 0, 0, 0.55);
   --shadow-print: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.45);

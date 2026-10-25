@@ -83,7 +83,7 @@
 .tag.input { border-style: solid; border-color: var(--text); padding: 3px 9px 4px; }
 .tag.input input { width: 140px; border: 0; outline: 0; background: transparent; color: var(--text); font: var(--fs-small)/var(--lh-small) var(--font-ui); padding: 0; }
 .tags-view-zh .tag .en { display: none; }
-.tags-view-zh .tag .zh { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--text); }
+.tags-view-zh .tag .zh { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--c, var(--text)); }
 .tags-view-en .tag .zh { display: none; }
 /* 只显示原文或译文时 Tag 是一行，虚线框和输入框也是一行高 */
 .tags-view-en .tag.ghost, .tags-view-zh .tag.ghost, .tags-view-en .tag.input, .tags-view-zh .tag.input { min-height: 0; }
@@ -366,7 +366,6 @@ textarea.raw { font: var(--fs-small)/var(--lh-small) var(--font-mono); }
 .marquee-box { display: none; position: fixed; z-index: 1190; pointer-events: none; border: var(--bw) solid var(--text); background: var(--selected); opacity: var(--dim); }
 
 /* ---------- 只显示原文 / 译文：Tag 只有一行，圆点和权重跟字居中；没有译文的显示原文，颜色浅一档 ---------- */
-.tags-view-en .tag > .dot, .tags-view-zh .tag > .dot { align-self: center; margin-top: 0; }
 .tags-view-en .tag > .w, .tags-view-zh .tag > .w { align-self: center; }
 .tags-view-zh .tag:not(:has(.zh)) .en { display: inline; color: var(--text-3); }
 /* ---------- 角色：标题、块、自己的负面提示词 ---------- */

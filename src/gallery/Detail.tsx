@@ -563,9 +563,9 @@ function Block({
               role="button"
               tabIndex={0}
               data-tip={`复制 · ${CAT_NAME[cat]}`}
+              data-tc={CAT_VAR[cat]}
               onClick={() => onCopyTag(t.tag)}
             >
-              <span className="dot" style={{ background: `var(--cat-${CAT_VAR[cat]})` }} />
               <span className="t">
                 <span className="en">{t.tag}</span>
                 {ann?.translation && <span className="zh">{ann.translation}</span>}

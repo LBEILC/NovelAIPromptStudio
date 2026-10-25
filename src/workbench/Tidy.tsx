@@ -10,12 +10,12 @@ import {
   promptDocumentProject,
   setPromptBlockType,
 } from '../lib/promptDocument';
-import { CAT_VAR } from '../kit/categories';
+import { catKey } from '../kit/categories';
 import { Icon } from '../kit/controls';
 import { Confirm } from '../kit/dialog';
 import { useNotifications } from '../kit/toast';
 import { useSwap } from '../kit/motion';
-import type { ImageProject, TagCategory } from '../shared/types';
+import type { ImageProject } from '../shared/types';
 import type { TidyChange } from '../shared/materials';
 
 const signature = (project: ImageProject) =>
@@ -270,13 +270,7 @@ export function useTidy(p: {
   );
   const tags = (text: string, cls: '' | 'new' | 'gone') =>
     parsePrompt(text).map((t, i) => (
-      <span key={`${cls}-${i}`} className={`tag ro ${cls}`}>
-        <span
-          className="dot"
-          style={{
-            background: `var(--cat-${CAT_VAR[(t.category as TagCategory) || 'Unsorted'] || 'unsorted'})`,
-          }}
-        />
+      <span key={`${cls}-${i}`} className={`tag ro ${cls}`} data-tc={catKey(t.category)}>
         <span className="t">
           <span className="en">{t.tag}</span>
           {t.translation && <span className="zh">{t.translation}</span>}

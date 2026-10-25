@@ -16,5 +16,6 @@ export const CAT_VAR: Record<TagCategory, string> = {
 };
 export const CAT_NAME = CATEGORY_LABELS as Record<TagCategory, string>;
 export const CATEGORIES = CATEGORY_OPTIONS as TagCategory[];
-export const catColor = (c?: string | null) =>
-  `var(--cat-${CAT_VAR[(c as TagCategory) || 'Unsorted'] || 'unsorted'})`;
+export const catKey = (c?: string | null) =>
+  CAT_VAR[(c as TagCategory) || 'Unsorted'] || 'unsorted';
+export const catColor = (c?: string | null) => `var(--cat-${catKey(c)})`;

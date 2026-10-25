@@ -238,11 +238,9 @@ html.tray, html.tray body, html.tray #root { width: auto; height: auto; backgrou
 .lgrid .card .ldetached [class^="ri-"] + [class^="ri-"] { margin-left: calc(-1 * var(--sp-0)); }
 
 /* V5 控制词（10-25）：Tag 上的圆点换成墨色小菱形；编辑浮层顶部一段说明和换档；节标题上的按钮打开点选面板 */
-.tag .dot.ctl { width: 5px; height: 5px; border-radius: 1px; background: var(--text-2); transform: rotate(45deg); }
 .popover.tag-pop .ctl-pop { display: flex; flex-direction: column; gap: var(--sp-1); padding-bottom: var(--sp-3); border-bottom: var(--bw) solid var(--divider); }
 .ctl-pop-h { display: flex; align-items: center; gap: var(--ctl-gap); }
 .ctl-pop-h b { font-weight: var(--fw-strong); }
-.ctl-pop .dot.ctl { width: 6px; height: 6px; border-radius: 1px; background: var(--text-2); transform: rotate(45deg); flex: 0 0 auto; }
 .ctl-pop > .segc { align-self: flex-start; }
 .help.warn-note { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-1); color: var(--warn); }
 .sec-h .btn.icon.on { background: var(--selected); color: var(--text); }

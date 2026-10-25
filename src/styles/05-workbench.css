@@ -18,7 +18,7 @@
 .tag.input { border-style: solid; border-color: var(--text); padding: var(--tag-pad-y) var(--tag-pad-x) calc(var(--tag-pad-y) + 1px); min-width: var(--tag-input-min); font: var(--fs-small)/var(--lh-small) var(--font-mono); color: var(--text); }
 .tag.input .caret { width: var(--bw); height: var(--lh-small); background: var(--text); margin-left: var(--sp-0); }
 .tags + .help { margin-top: var(--sp-2); }
-.tag.sel .w, .tag.sel .en { color: var(--text); }
+.tag.sel .w { color: var(--text); }
 
 /* NovelAI 自动添加的内容：一行说明，默认收起 */
 .auto { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0 0; padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3); border: var(--bw) dashed var(--border); border-radius: var(--r-ctl); color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small); }
@@ -60,5 +60,49 @@
 .tags .tag.ghost, .tags .tag.input { align-self: stretch; }
 .tags:has(.zh) .tag.ghost, .tags:has(.zh) .tag.input { min-height: calc(var(--tag-pad-y) * 2 + 1px + var(--lh-small) + var(--lh-caption) + var(--bw) * 2); }
 /* 没有译文的 Tag 只有一行字，被同一行两行高的 Tag 拉高时，圆点和权重跟着字上下居中（用户 2026-10-19） */
-.tag:not(:has(.zh)) > .dot { align-self: center; margin-top: 0; }
 .tag:not(:has(.zh)) > .w { align-self: center; }
+
+/* Tag 分类（10-25 改版）：不画圆点，英文用分类色，像代码高亮；data-tc 是分类的颜色名，控制词是 ctl。
+ * 块标题上的图例写出这块里每种分类各有几个；悬停图例的一项，块里其他 Tag 和其他图例淡下去；悬停一个 Tag，图例里它那一类加下划线。 */
+[data-tc="artist-era"] { --c: var(--cat-artist-era); }
+[data-tc="subject"] { --c: var(--cat-subject); }
+[data-tc="identity"] { --c: var(--cat-identity); }
+[data-tc="body"] { --c: var(--cat-body); }
+[data-tc="clothing"] { --c: var(--cat-clothing); }
+[data-tc="action"] { --c: var(--cat-action); }
+[data-tc="environment"] { --c: var(--cat-environment); }
+[data-tc="composition"] { --c: var(--cat-composition); }
+[data-tc="style"] { --c: var(--cat-style); }
+[data-tc="unsorted"] { --c: var(--cat-unsorted); }
+[data-tc="ctl"] { --c: var(--text); }
+.tag .en { color: var(--c, var(--text)); }
+.blk-h .label[data-tc] { color: var(--c); }
+.blk-h .cat-lg { display: flex; flex-wrap: wrap; gap: 0 var(--sp-3); flex: 1; min-width: 0; margin-left: var(--sp-1); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.cat-lg > span { color: var(--c); cursor: default; text-decoration: underline transparent; text-underline-offset: 3px; transition: opacity var(--dur-1) var(--ease-out), text-decoration-color var(--dur-1) var(--ease-out); }
+.blk:has(.cat-lg > [data-tc="artist-era"]:hover) :is(.tag[data-tc]:not([data-tc="artist-era"]), .cat-lg > :not([data-tc="artist-era"])) { opacity: var(--dim); }
+.blk:has(.cat-lg > [data-tc="subject"]:hover) :is(.tag[data-tc]:not([data-tc="subject"]), .cat-lg > :not([data-tc="subject"])) { opacity: var(--dim); }
+.blk:has(.cat-lg > [data-tc="identity"]:hover) :is(.tag[data-tc]:not([data-tc="identity"]), .cat-lg > :not([data-tc="identity"])) { opacity: var(--dim); }
+.blk:has(.cat-lg > [data-tc="body"]:hover) :is(.tag[data-tc]:not([data-tc="body"]), .cat-lg > :not([data-tc="body"])) { opacity: var(--dim); }
+.blk:has(.cat-lg > [data-tc="clothing"]:hover) :is(.tag[data-tc]:not([data-tc="clothing"]), .cat-lg > :not([data-tc="clothing"])) { opacity: var(--dim); }
+.blk:has(.cat-lg > [data-tc="action"]:hover) :is(.tag[data-tc]:not([data-tc="action"]), .cat-lg > :not([data-tc="action"])) { opacity: var(--dim); }
+.blk:has(.cat-lg > [data-tc="environment"]:hover) :is(.tag[data-tc]:not([data-tc="environment"]), .cat-lg > :not([data-tc="environment"])) { opacity: var(--dim); }
+.blk:has(.cat-lg > [data-tc="composition"]:hover) :is(.tag[data-tc]:not([data-tc="composition"]), .cat-lg > :not([data-tc="composition"])) { opacity: var(--dim); }
+.blk:has(.cat-lg > [data-tc="style"]:hover) :is(.tag[data-tc]:not([data-tc="style"]), .cat-lg > :not([data-tc="style"])) { opacity: var(--dim); }
+.blk:has(.cat-lg > [data-tc="unsorted"]:hover) :is(.tag[data-tc]:not([data-tc="unsorted"]), .cat-lg > :not([data-tc="unsorted"])) { opacity: var(--dim); }
+.blk:has(.cat-lg > [data-tc="ctl"]:hover) :is(.tag[data-tc]:not([data-tc="ctl"]), .cat-lg > :not([data-tc="ctl"])) { opacity: var(--dim); }
+.blk:has(.tag[data-tc="artist-era"]:hover) .cat-lg > [data-tc="artist-era"] { text-decoration-color: currentColor; }
+.blk:has(.tag[data-tc="subject"]:hover) .cat-lg > [data-tc="subject"] { text-decoration-color: currentColor; }
+.blk:has(.tag[data-tc="identity"]:hover) .cat-lg > [data-tc="identity"] { text-decoration-color: currentColor; }
+.blk:has(.tag[data-tc="body"]:hover) .cat-lg > [data-tc="body"] { text-decoration-color: currentColor; }
+.blk:has(.tag[data-tc="clothing"]:hover) .cat-lg > [data-tc="clothing"] { text-decoration-color: currentColor; }
+.blk:has(.tag[data-tc="action"]:hover) .cat-lg > [data-tc="action"] { text-decoration-color: currentColor; }
+.blk:has(.tag[data-tc="environment"]:hover) .cat-lg > [data-tc="environment"] { text-decoration-color: currentColor; }
+.blk:has(.tag[data-tc="composition"]:hover) .cat-lg > [data-tc="composition"] { text-decoration-color: currentColor; }
+.blk:has(.tag[data-tc="style"]:hover) .cat-lg > [data-tc="style"] { text-decoration-color: currentColor; }
+.blk:has(.tag[data-tc="unsorted"]:hover) .cat-lg > [data-tc="unsorted"] { text-decoration-color: currentColor; }
+.blk:has(.tag[data-tc="ctl"]:hover) .cat-lg > [data-tc="ctl"] { text-decoration-color: currentColor; }
+/* V5 控制词：方形不变，左边嵌一小段"V5"（槽色底、等宽小字），和 Tag 本体之间一条细线；当前模型不是 V5 时这段变琥珀色 */
+.tag.ctl { padding-left: 0; overflow: hidden; }
+.tag .v5 { align-self: stretch; display: flex; align-items: center; margin: calc(var(--tag-pad-y) * -1) calc(var(--tag-pad-x) - var(--ctl-gap)) calc((var(--tag-pad-y) + 1px) * -1) 0; padding: 0 var(--v5-seg-pad); border-right: var(--bw) solid var(--border); background: var(--seg-track); font: var(--fs-caption)/var(--lh-caption) var(--font-mono); color: var(--text-2); transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
+.v5-badge { display: inline-flex; align-items: center; padding: 0 var(--v5-seg-pad); border-radius: var(--r-check); background: var(--seg-track); font: var(--fs-caption)/var(--lh-caption) var(--font-mono); color: var(--text-2); }
+.tag.ctl.off .v5, .v5-badge.off { background: var(--warn-wash); color: var(--warn); }
