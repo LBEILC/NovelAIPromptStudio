@@ -19,6 +19,28 @@ export const WinProvider = WinContext.Provider;
 export const useWin = () => useContext(WinContext);
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
+// 最近一次操作是鼠标还是键盘。浮层关掉后把焦点还给触发它的元素时，如果焦点原来在浮层的输入框里，
+// 浏览器会当成键盘操作、画出焦点框（用户 10-25：点开 Tag 再点一下，Tag 上多了个白框）。
+// 鼠标关的就先不画，标上 data-pointer-focus；之后一按键或焦点离开就去掉，键盘用户照常看得到。
+let pointerLast = false;
+if (typeof document !== 'undefined') {
+  document.addEventListener('pointerdown', () => (pointerLast = true), true);
+  document.addEventListener('keydown', () => (pointerLast = false), true);
+}
+function focusQuietly(el: HTMLElement) {
+  if (pointerLast) {
+    el.dataset.pointerFocus = '';
+    const clear = () => {
+      delete el.dataset.pointerFocus;
+      el.removeEventListener('blur', clear);
+      el.removeEventListener('keydown', clear);
+    };
+    el.addEventListener('blur', clear);
+    el.addEventListener('keydown', clear);
+  }
+  el.focus({ preventScroll: true });
+}
+
 export type Place =
   | 'below-left'
   | 'below-right'
@@ -237,7 +259,7 @@ function PopBody(p: PopProps & { leaving: boolean; nodeRef: RefObject<HTMLElemen
         (el): el is HTMLElement =>
           el instanceof HTMLElement && el.isConnected && el !== document.body,
       );
-    target?.focus({ preventScroll: true });
+    if (target) focusQuietly(target);
   };
   const restoreRef = useRef(restore);
   restoreRef.current = restore;

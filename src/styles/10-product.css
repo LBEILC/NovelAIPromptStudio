@@ -282,3 +282,5 @@ img.matte-black { background: var(--matte-black); }
 .vbg-sw.checker { background-color: var(--checker-a); background-image: repeating-conic-gradient(var(--checker-b) 0 25%, var(--checker-a) 0 50%); background-size: 50% 50%; }
 .vbg-sw.white { background: var(--matte-white); }
 .vbg-sw.black { background: var(--matte-black); }
+/* 鼠标关掉浮层后焦点回到触发它的元素，不画焦点框；一按键就恢复（src/kit/layer.tsx 的 focusQuietly） */
+[data-pointer-focus]:focus-visible { outline: none; }
