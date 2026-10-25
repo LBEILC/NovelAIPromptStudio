@@ -610,7 +610,8 @@ export function renderPromptView({
         <span className={lang}>
           <span
             ref={float}
-            className="tag dragging drag-float"
+            className={`tag dragging drag-float ${drag.cls}`}
+            data-tc={drag.tc}
             style={{ width: drag.w, height: drag.h }}
             dangerouslySetInnerHTML={{ __html: drag.inner }}
           />

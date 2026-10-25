@@ -28,11 +28,20 @@ export interface ViewerProps {
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 export function Viewer(p: ViewerProps) {
+  // 关的时候照最后打开时的那张淡出：调用方多半一关就把图片列表清空（图片库），
+  // 不留住的话淡出那一帧没东西可画，大图直接消失（用户 10-25）
+  const last = useRef(p);
+  if (p.open && p.items.length) last.current = p;
   return (
     <Presence show={p.open && p.items.length > 0}>
       {(leaving, ref) => (
         <ToWin>
-          <Body {...p} leaving={leaving} nodeRef={ref} />
+          {/* 不能等 leaving：关上后的第一次渲染 leaving 还没变成 true，这时就要用留住的那份 */}
+          <Body
+            {...(p.open && p.items.length ? p : last.current)}
+            leaving={leaving}
+            nodeRef={ref}
+          />
         </ToWin>
       )}
     </Presence>

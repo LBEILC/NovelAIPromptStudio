@@ -48,6 +48,9 @@ export function usePromptDrag({
     w: number;
     h: number;
     inner: string;
+    /** 原 Tag 的样式类（V5 控制词的 ctl / off、语法问题的 warn）和分类色，浮起来的那个照样带上 */
+    cls: string;
+    tc?: string;
   } | null>(null);
   const float = useRef<HTMLSpanElement>(null);
   const dragRef = useRef(drag);
@@ -184,6 +187,10 @@ export function usePromptDrag({
           w: r.width,
           h: r.height,
           inner: pressRef.current.el.innerHTML,
+          cls: ['ctl', 'off', 'warn']
+            .filter((c) => pressRef.current!.el.classList.contains(c))
+            .join(' '),
+          tc: pressRef.current.el.dataset.tc,
         });
         return;
       }
