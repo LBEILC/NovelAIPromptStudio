@@ -141,13 +141,17 @@ export async function startFakeNovelAI() {
       : body.parameters;
     // Different seeds yield distinct bytes, preserving importer duplicate behavior.
     const pixels = await sharp(
-      state.images[(state.requests.length - 1) % state.images.length] || png,
+      body.action === 'infill'
+        ? { create: { width: size.width, height: size.height, channels: 4, background: '#ee5533' } }
+        : state.images[(state.requests.length - 1) % state.images.length] || png,
     )
       .resize(size.width, size.height)
       .png()
       .toBuffer();
     const text = pngText({
-      ...Object.fromEntries(Object.entries(body.parameters).filter(([key]) => key !== 'image')),
+      ...Object.fromEntries(
+        Object.entries(body.parameters).filter(([key]) => !['image', 'mask'].includes(key)),
+      ),
       request_type: body.action === 'img2img' ? 'Img2ImgRequest' : 'PromptGenerateRequest',
       model: body.model,
       uc: body.parameters.negative_prompt,

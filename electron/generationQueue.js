@@ -22,7 +22,7 @@ export function createGenerationQueue({
   let finished;
   let complete;
   const publicJob = (job) => {
-    const { request, ...view } = job;
+    const { request, inpaintMask, ...view } = job;
     return structuredClone(view);
   };
   const publish = () => {

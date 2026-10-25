@@ -130,3 +130,7 @@ materials（JSON 素材） ──按内容引用── reference_vibes（参考�
 `work_versions.snapshot_json` 可含 `operation`（kind、sourceProjectId、strength、noise、magnitude、scale）。旧快照省略该字段仍可读取。底图保存在 `references.base`，path 指向资源目录 references 下的软件副本，随备份资源树保存并重链接。移除草稿底图保留历史素材。
 
 放大和增强始终新建一版，父版本为来源图片所在版本；快照沿用父版本，增强更新为实际随机 seed。`operation.sourceProjectId` 记录来源图片 ID（图生图仅在底图来自图库时有值）。放大和增强文件中的旧 width/height 不覆盖入库尺寸，图库尺寸以 PNG IHDR 的实际像素为准。删除、撤销和备份沿用整个版本快照，不另加表。
+
+局部重绘的 `operation.kind` 为 `inpaint`，增加 `rect`（源图像素坐标）、`maskId`（原始 PNG 遮罩 SHA-256）、`generated`（实际请求宽高和模型）、`fullSize`、`strength` 和 `prompt`（提交时草稿的 metadata、tags、prompt_structure、params、keptParameters）。请求使用该草稿，结果版本的父版本和主快照沿用源图所在版本；结果文件为源图完整尺寸，文本块也沿用源图。草稿里的底图、Vibe 和精确参考不进入请求。
+
+遮罩位于资源库 `inpaint-masks/<maskId>.png`，随包含资源库的备份保存和恢复；恢复时不作为图库原图的哈希匹配候选。版本软删除和撤销保留遮罩，永久删除图片导致最后一个引用该遮罩的版本被清理时删除遮罩。正在排队的任务保留遮罩数据，接收结果时再次确保持久副本存在。旧快照无需迁移。

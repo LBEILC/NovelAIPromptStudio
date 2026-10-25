@@ -163,6 +163,30 @@ export const commandRegistry = {
     mutation: true,
   },
   'vibe.library': { fields: {} },
+  'generate.estimate-inpaint': {
+    fields: {
+      ...tab,
+      imageId: 'string',
+      rect: 'inpaintRect',
+      strength: 'number',
+      fullSize: 'boolean',
+    },
+    required: ['tabId', 'imageId', 'rect'],
+    uiOnly: true,
+  },
+  'generate.inpaint': {
+    fields: {
+      ...tab,
+      imageId: 'string',
+      rect: 'inpaintRect',
+      mask: 'inpaintMask',
+      strength: 'number',
+      fullSize: 'boolean',
+    },
+    required: ['tabId', 'imageId', 'rect', 'mask'],
+    uiOnly: true,
+    mutation: true,
+  },
   'generate.estimate-op': {
     fields: {
       ...tab,
@@ -593,6 +617,16 @@ export function record(value) {
 }
 /** @param {unknown} value @param {string} type @returns {boolean} */
 function valid(value, type) {
+  if (type === 'inpaintMask') return typeof value === 'string' && value.length <= 140 * 1024 * 1024;
+  if (type === 'inpaintRect')
+    return (
+      record(value) &&
+      ['x', 'y', 'width', 'height'].every((k) => Number.isSafeInteger(value[k])) &&
+      Number(value.x) >= 0 &&
+      Number(value.y) >= 0 &&
+      Number(value.width) >= 64 &&
+      Number(value.height) >= 64
+    );
   if (type === 'imageGroups')
     return (
       Array.isArray(value) &&

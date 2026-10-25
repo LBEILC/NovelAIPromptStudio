@@ -1,3 +1,4 @@
+import { INPAINT_MODELS } from '../src/shared/inpaint.ts';
 import crypto from 'node:crypto';
 import { normalizeRelayUrl } from './relay.js';
 import { MODEL_ORDER } from '../src/shared/params.ts';
@@ -199,7 +200,7 @@ export function estimateGeneration(request, subscription, count = 1, pendingEnco
         p.width *
         p.height *
         p.steps *
-        (request.model.endsWith('-medium') ? 1 / 1.06521739 : 1),
+        (/-medium(?:-inpainting)?$/.test(request.model) ? 1 / 1.06521739 : 1),
   );
   const basePrice = free
     ? 0
@@ -209,7 +210,11 @@ export function estimateGeneration(request, subscription, count = 1, pendingEnco
           base *
             (p.sm_dyn && p.sm ? 1.4 : p.sm ? 1.2 : 1) *
             (v5 ? 1.5 : 1) *
-            (request.action === 'img2img' ? p.strength : 1),
+            (request.action === 'img2img'
+              ? p.strength
+              : request.action === 'infill'
+                ? (p.img2img?.strength ?? 1)
+                : 1),
         ),
       );
   // TODO: verify multi-image Vibe surcharge; conservatively charge per image.
@@ -284,9 +289,23 @@ export function validateGenerationRequest(request) {
       p.noise > 0.99)
   )
     throw new CommandError('invalid_input', '底图参数无效');
-  const medium = request?.model === 'nai-diffusion-5-full-medium';
+  const infill = request?.action === 'infill';
   if (
-    !Object.hasOwn(GENERATION_MODELS, request?.model) ||
+    infill &&
+    (!Object.values(INPAINT_MODELS).includes(request.model) ||
+      !p?.image ||
+      !p?.mask ||
+      p.add_original_image !== false ||
+      (p.img2img &&
+        (!Number.isFinite(p.img2img.strength) ||
+          p.img2img.strength < 0.01 ||
+          p.img2img.strength > 1 ||
+          p.img2img.color_correct !== true)))
+  )
+    throw new CommandError('invalid_input', '重绘参数无效');
+  const medium = /^nai-diffusion-5-full-medium(?:-inpainting)?$/.test(request?.model);
+  if (
+    (!infill && !Object.hasOwn(GENERATION_MODELS, request?.model)) ||
     !p ||
     !validParameterNumber('steps', p.steps) ||
     !validParameterNumber('scale', p.scale) ||
@@ -418,8 +437,12 @@ export function createNovelAIClient({
       if (!Array.isArray(body?.data)) return null;
       const ids = [...new Set(body.data.map((m) => m.id).filter((id) => typeof id === 'string'))];
       return {
-        models: ids.filter((id) => MODEL_ORDER.includes(id)),
-        other: ids.filter((id) => !MODEL_ORDER.includes(id)),
+        models: ids.filter(
+          (id) => MODEL_ORDER.includes(id) || Object.values(INPAINT_MODELS).includes(id),
+        ),
+        other: ids.filter(
+          (id) => !MODEL_ORDER.includes(id) && !Object.values(INPAINT_MODELS).includes(id),
+        ),
       };
     },
     encodeVibe: async (body) =>

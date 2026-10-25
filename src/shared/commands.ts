@@ -309,6 +309,31 @@ export interface CommandDefinitions {
     input: Record<string, never>;
     output: { items: import('./params').VibeLibraryItem[] };
   };
+  'generate.estimate-inpaint': {
+    input: TabInput & {
+      imageId: string;
+      rect: import('./inpaint').Rect;
+      strength?: number;
+      fullSize?: boolean;
+    };
+    output: GenerationEstimate & {
+      width: number;
+      height: number;
+      scale: number;
+      model: string;
+      ignored?: ('vibe' | 'precise' | 'base')[];
+    };
+  };
+  'generate.inpaint': {
+    input: TabInput & {
+      imageId: string;
+      rect: import('./inpaint').Rect;
+      mask: string;
+      strength: number;
+      fullSize?: boolean;
+    };
+    output: GenerationJob;
+  };
   'generate.estimate-op': {
     input: TabInput & {
       op: 'upscale' | 'enhance';
@@ -356,7 +381,7 @@ export interface CommandDefinitions {
   'account.relay.save': { input: { baseUrl: string; key?: string }; output: GenerationStatus };
   'account.relay.test': {
     input: { baseUrl?: string; key?: string };
-    output: IPC.Result<{ models: import('./params').ModelId[]; other: string[] }>;
+    output: IPC.Result<{ models: string[]; other: string[] }>;
   };
   'account.refresh': { input: Record<string, never>; output: GenerationStatus };
   'settings.generation.save': {

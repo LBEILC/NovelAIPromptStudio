@@ -27,8 +27,12 @@ describe('relay boundary', () => {
         token: () => 'acceptance-token',
       });
       expect(await client.models()).toEqual({
-        models: ['nai-diffusion-5-full', 'nai-diffusion-4-5-full'],
-        other: ['nai-diffusion-5-full-inpainting'],
+        models: [
+          'nai-diffusion-5-full',
+          'nai-diffusion-4-5-full',
+          'nai-diffusion-5-full-inpainting',
+        ],
+        other: [],
       });
     } finally {
       await server.close();

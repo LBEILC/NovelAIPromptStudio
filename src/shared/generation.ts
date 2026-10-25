@@ -3,7 +3,7 @@ export interface GenerationSettings {
   blankModel?: 'last' | import('./params').ModelId;
   connection: 'official' | 'relay';
   officialToken: boolean;
-  relay: { baseUrl: string; hasKey: boolean; models: import('./params').ModelId[] | null };
+  relay: { baseUrl: string; hasKey: boolean; models: string[] | null };
   dailyImageLimit: number;
   spentImagesToday?: number;
   hasToken: boolean;
@@ -42,7 +42,15 @@ export interface VersionImage {
 }
 export type EnhanceScale = 1 | 1.5 | 2 | 'max';
 export interface ImageOperation {
-  kind: 'upscale' | 'enhance' | 'img2img';
+  kind: 'upscale' | 'enhance' | 'img2img' | 'inpaint';
+  rect?: import('./inpaint').Rect;
+  maskId?: string;
+  generated?: { width: number; height: number; model: string };
+  fullSize?: boolean;
+  prompt?: Pick<
+    ImageProject,
+    'metadata' | 'tags' | 'prompt_structure' | 'params' | 'keptParameters'
+  >;
   sourceProjectId?: string;
   strength?: number;
   noise?: number;

@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import sharp from 'sharp';
+import { buildInpaint } from './inpaint.js';
 import { buildProjectRequest } from './parameterRequest.js';
 import { estimateGeneration } from './generation.js';
 import { MODEL_CAPS } from '../src/shared/params.ts';
@@ -75,6 +76,8 @@ export function estimateImageOperation(request, subscription, pending = 0) {
   return estimateGeneration(priced, subscription, 1, pending);
 }
 export async function buildImageOperation(project, sourcePath, operation, library, options = {}) {
+  if (operation.kind === 'inpaint')
+    return buildInpaint(project, sourcePath, operation, library, options);
   const bytes = await fs.readFile(sourcePath);
   const { width, height } = await sharp(bytes).metadata();
   if (operation.kind === 'upscale') {

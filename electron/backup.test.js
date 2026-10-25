@@ -15,6 +15,7 @@ import { createWorkbenchTab } from '../src/lib/workbenchSession.js';
 import { importImage } from './assets.js';
 import { createBackupManager } from './backup.js';
 import { storeBaseImage } from './baseImage.js';
+import { storeInpaintMask } from './inpaint.js';
 
 async function fixture(run) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-backup-test-'));
@@ -103,7 +104,18 @@ it('backs up managed base copies and operation snapshots with version restoratio
     const base = { ...(await storeBaseImage(project.image_path, assets)), strength: 0.7, noise: 0 };
     const snapshot = { ...project, references: { vibes: [], precise: [], base } };
     const root = database.versions.ensure('operation-backup', snapshot);
-    const operation = { kind: 'img2img', strength: 0.7, noise: 0, sourceProjectId: project.id };
+    const maskBytes = await fs.readFile(project.image_path);
+    const maskId = await storeInpaintMask(maskBytes.toString('base64'), assets);
+    const maskPath = path.join(assets, 'inpaint-masks', `${maskId}.png`);
+    const operation = {
+      kind: 'inpaint',
+      strength: 0.7,
+      sourceProjectId: project.id,
+      maskId,
+      rect: { x: 0, y: 0, width: 12, height: 12 },
+      generated: { width: 1024, height: 1024, model: 'nai-diffusion-5-full-inpainting' },
+      prompt: project,
+    };
     const version = database.versions.append({
       workId: root.workId,
       parentId: root.id,
@@ -116,9 +128,11 @@ it('backs up managed base copies and operation snapshots with version restoratio
     await manager.export(file, true);
     const original = await fs.readFile(base.path);
     await fs.unlink(base.path);
+    await fs.unlink(maskPath);
     await manager.restore(file);
     const restored = database.versions.get(version.id);
     expect(restored.operation).toEqual(operation);
+    expect(await fs.readFile(maskPath)).toEqual(maskBytes);
     expect(await fs.readFile(restored.project.references.base.path)).toEqual(original);
   }));
 

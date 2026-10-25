@@ -302,6 +302,15 @@ export function createVersionStore(connection) {
         .map((r) => r.version_id);
       return this.pruneImages([], ids);
     },
+    maskIds() {
+      return new Set(
+        connection
+          .prepare('SELECT snapshot_json FROM work_versions')
+          .all()
+          .map((row) => JSON.parse(row.snapshot_json).operation?.maskId)
+          .filter((id) => /^[a-f0-9]{64}$/.test(id)),
+      );
+    },
     referencedPaths() {
       return connection
         .prepare('SELECT snapshot_json FROM work_versions UNION ALL SELECT origin_json FROM works')

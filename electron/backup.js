@@ -330,7 +330,7 @@ export function createBackupManager({
       const base = file.name.split('/').at(-1);
       if (!byName.has(base)) byName.set(base, file.path);
       else byName.set(base, null);
-      if (/\.(png|jpe?g|webp)$/i.test(file.name)) {
+      if (!file.name.startsWith('inpaint-masks/') && /\.(png|jpe?g|webp)$/i.test(file.name)) {
         const hash = await hashFile(file.path);
         if (wanted.has(hash)) byHash.set(hash, file.path);
       }

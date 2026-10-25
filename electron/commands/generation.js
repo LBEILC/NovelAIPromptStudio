@@ -1,3 +1,4 @@
+import { compositeInpaint, storeInpaintMask } from '../inpaint.js';
 import {
   buildImageOperation,
   estimateImageOperation,
@@ -183,21 +184,30 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           thumbnail_path: saved.project.thumbnail_path,
         };
       });
-      if (job.operation === 'upscale' || job.operation === 'enhance') {
+      if (['upscale', 'enhance', 'inpaint'].includes(job.operation)) {
         const preview = await buildImageOperation(
-          job.project,
+          job.operationDetails.prompt || job.project,
           job.operationPath,
           job.operationDetails,
           services.database.vibeLibrary,
-          { seed: job.request.parameters.seed },
+          { seed: job.request.parameters.seed, mask: job.inpaintMask },
         );
         checkOperationRelay(preview.request, preview.pendingEncodes);
+        if (job.operation === 'inpaint') {
+          job.request = preview.request;
+          job.referencesPrepared = true;
+          return;
+        }
         const prepared = await buildImageOperation(
-          job.project,
+          job.operationDetails.prompt || job.project,
           job.operationPath,
           job.operationDetails,
           services.database.vibeLibrary,
-          { seed: job.request.parameters.seed, encode: (body) => client().encodeVibe(body) },
+          {
+            seed: job.request.parameters.seed,
+            mask: job.inpaintMask,
+            encode: (body) => client().encodeVibe(body),
+          },
         );
         job.request = prepared.request;
         job.referencesPrepared = true;
@@ -267,6 +277,16 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       queueMicrotask(publish);
     },
     accept: async (job, png, seed) => {
+      if (job.operation === 'inpaint') {
+        png = await compositeInpaint(job.operationPath, png, job.operationDetails, job.inpaintMask);
+        // A queued operation may share a mask with a version purged while waiting.
+        await storeInpaintMask(
+          job.inpaintMask,
+          services.assetsDirectory?.() ||
+            services.preferences?.librarySettings().assetsDirectory ||
+            services.directory,
+        );
+      }
       const directory = path.join(services.directory, 'generated');
       await fs.mkdir(directory, { recursive: true });
       const file = path.join(directory, `${crypto.randomUUID()}.png`);
@@ -320,7 +340,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
             thumbnail_path: image.thumbnail_path,
             metadata: {
               ...job.project.metadata,
-              seed: String(seed),
+              seed: job.operation === 'inpaint' ? job.project.metadata.seed : String(seed),
               extra_json: image.metadata.extra_json,
             },
           };
@@ -510,6 +530,13 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   }
   function checkOperationRelay(request, pending) {
     if (
+      request.action === 'infill' &&
+      settings().connection === 'relay' &&
+      settings().relay.models !== null &&
+      !settings().relay.models.includes(request.model)
+    )
+      throw new Error('中转站没有局部重绘用的模型');
+    if (
       request.action === 'upscale' &&
       settings().connection === 'relay' &&
       settings().relay.models !== null &&
@@ -537,6 +564,20 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     const operation = {
       kind: input.op,
       sourceProjectId: input.imageId,
+      ...(input.op === 'inpaint'
+        ? {
+            rect: input.rect,
+            strength: input.strength ?? 1,
+            fullSize: input.fullSize ?? false,
+            prompt: structuredClone(
+              Object.fromEntries(
+                ['metadata', 'tags', 'prompt_structure', 'params', 'keptParameters']
+                  .filter((key) => current.project[key] !== undefined)
+                  .map((key) => [key, current.project[key]]),
+              ),
+            ),
+          }
+        : {}),
       ...(input.op === 'enhance'
         ? {
             magnitude: input.magnitude ?? 2,
@@ -546,11 +587,18 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         : {}),
     };
     const prepared = await buildImageOperation(
-      parent.project,
+      input.op === 'inpaint' ? current.project : parent.project,
       image.image_path,
       operation,
       services.database.vibeLibrary,
+      { mask: input.mask },
     );
+    if (input.op === 'inpaint')
+      operation.generated = {
+        width: prepared.width,
+        height: prepared.height,
+        model: prepared.request.model,
+      };
     checkOperationRelay(prepared.request, prepared.pendingEncodes);
     const price =
       settings().connection === 'relay'
@@ -571,7 +619,15 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     if (s.connection === 'relay' && s.limitEnabled && s.spentImagesToday + 1 > s.dailyImageLimit)
       throw new Error('已达到每日张数上限');
     if (s.connection !== 'relay' && balance() < price.anlas) throw new Error('Anlas 不足');
+    if (kind === 'inpaint')
+      operation.maskId = await storeInpaintMask(
+        input.mask,
+        services.assetsDirectory?.() ||
+          services.preferences?.librarySettings().assetsDirectory ||
+          services.directory,
+      );
     return queue.start({
+      ...(kind === 'inpaint' ? { inpaintMask: input.mask } : {}),
       tabId: current.id,
       workId: parent.workId,
       parentId: parent.id,
@@ -590,6 +646,35 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     });
   }
   const handlers = {
+    'generate.estimate-inpaint': async (input) => {
+      try {
+        const { prepared, price } = await operationFor({ ...input, op: 'inpaint' });
+        return {
+          ...price,
+          width: prepared.width,
+          height: prepared.height,
+          scale: prepared.scale,
+          model: prepared.request.model,
+          ...(prepared.ignored.length ? { ignored: prepared.ignored } : {}),
+          balance: balance(),
+        };
+      } catch (error) {
+        if (error.code === 'invalid_input') throw error;
+        return {
+          anlas: 0,
+          perImage: 0,
+          free: false,
+          count: 1,
+          width: 0,
+          height: 0,
+          scale: 0,
+          model: '',
+          unavailable: error.message,
+          ...(settings().connection === 'relay' ? { relay: true } : {}),
+        };
+      }
+    },
+    'generate.inpaint': (input) => startOperation(input, 'inpaint'),
     'generate.estimate-op': async (input) => {
       try {
         const { prepared, price } = await operationFor(input);

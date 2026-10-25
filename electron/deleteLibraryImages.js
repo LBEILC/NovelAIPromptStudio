@@ -32,7 +32,15 @@ export function deleteLibraryImages(database, assetsDirectory, ids) {
           kept.delete(key);
         }
       }
+      const masks = database.versions.maskIds();
       database.deleteProject(id);
+      const retainedMasks = database.versions.maskIds();
+      for (const mask of masks)
+        if (!retainedMasks.has(mask))
+          removeManagedAsset(
+            assetsDirectory,
+            path.join(assetsDirectory, 'inpaint-masks', `${mask}.png`),
+          );
       results.success.push(id);
     } catch (error) {
       results.failed.push({

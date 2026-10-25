@@ -85,6 +85,7 @@
       "electron/**/*",
       "src/lib/**/*",
       "src/shared/params.ts",
+      "src/shared/inpaint.ts",
       "src/workbench/edits.ts",
       "src/workbench/model.ts",
       "agent/**/*",

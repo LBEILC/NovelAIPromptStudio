@@ -38,6 +38,7 @@ export interface ModelCaps {
   /** Vibe 和精确参考：产品只在 V4.5 上提供（2.26） */
   references: boolean;
   img2img: boolean;
+  inpaint: boolean;
   defaults: { steps: number; scale: number };
 }
 export const SAMPLERS: { id: Sampler; name: string }[] = [
@@ -61,6 +62,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_ALL,
     maxCharacters: 22,
     references: false,
+    inpaint: true,
     img2img: true,
     defaults: { steps: 23, scale: 7 },
   },
@@ -73,6 +75,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_ALL,
     maxCharacters: 22,
     references: false,
+    inpaint: true,
     img2img: true,
     defaults: { steps: 23, scale: 7 },
   },
@@ -85,6 +88,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_ALL,
     maxCharacters: 6,
     references: true,
+    inpaint: true,
     img2img: true,
     defaults: { steps: 23, scale: 5 },
   },
@@ -97,6 +101,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: ['Heavy', 'Light', 'Human Focus', 'None'],
     maxCharacters: 6,
     references: true,
+    inpaint: true,
     img2img: true,
     defaults: { steps: 23, scale: 5 },
   },
@@ -109,6 +114,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_V4,
     maxCharacters: 6,
     references: false,
+    inpaint: true,
     img2img: false,
     defaults: { steps: 23, scale: 5.5 },
   },
@@ -121,6 +127,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_V4,
     maxCharacters: 6,
     references: false,
+    inpaint: true,
     img2img: false,
     defaults: { steps: 23, scale: 5.5 },
   },
