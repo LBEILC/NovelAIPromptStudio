@@ -33,6 +33,34 @@ export function dur(k: 1 | 2 | 3) {
 export const easeMove = () => getComputedStyle(root()).getPropertyValue('--ease-move').trim();
 const EASE_OUT = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 
+/**
+ * 等下一帧画出来以后再开始倒计时，返回取消函数。退出动画要画出来才开始播，
+ * 如果倒计时从渲染那一刻就开始，前面主线程卡一下（例如一次重的重渲染），
+ * 计时到了动画还没播，元素刚画上淡出的样子就被拿掉（用户 10-25：点"恢复"后"已修改"直接没了）。
+ */
+export function afterPaint(ms: number, fn: () => void) {
+  let t = 0,
+    done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    clearTimeout(t);
+    clearTimeout(backup);
+    fn();
+  };
+  const f = requestAnimationFrame(() => {
+    t = window.setTimeout(run, ms);
+  });
+  // 窗口藏起来（托盘）时下一帧可能一直不来，最多再等一秒照样拿掉
+  const backup = window.setTimeout(run, ms + 1000);
+  return () => {
+    done = true;
+    cancelAnimationFrame(f);
+    clearTimeout(t);
+    clearTimeout(backup);
+  };
+}
+
 /** 单个元素的出现和消失：show 变 false 后保留 --dur-1，期间 leaving 为 true。 */
 export function usePresence(show: boolean) {
   const [mounted, setMounted] = useState(show);
@@ -50,11 +78,10 @@ export function usePresence(show: boolean) {
       return;
     }
     setLeaving(true);
-    const t = setTimeout(() => {
+    return afterPaint(d + 30, () => {
       setMounted(false);
       setLeaving(false);
-    }, d + 30);
-    return () => clearTimeout(t);
+    });
   }, [show]);
   return { mounted: show || mounted, leaving: !show && leaving };
 }
@@ -100,7 +127,7 @@ export interface Exiting<T> {
 export function useExitList<T>(items: T[], keyOf: (item: T) => string): Exiting<T>[] {
   const prev = useRef<Exiting<T>[]>([]);
   const expired = useRef(new Set<string>());
-  const timers = useRef(new Map<string, number>());
+  const timers = useRef(new Map<string, () => void>());
   const [revision, force] = useState(0);
   const fade = dur(1);
   const out = useMemo(() => {
@@ -120,23 +147,23 @@ export function useExitList<T>(items: T[], keyOf: (item: T) => string): Exiting<
   useLayoutEffect(() => {
     prev.current = out;
     const leaving = new Set(out.filter((o) => o.leaving).map((o) => o.key));
-    for (const [k, t] of timers.current)
+    for (const [k, cancel] of timers.current)
       if (!leaving.has(k)) {
-        clearTimeout(t);
+        cancel();
         timers.current.delete(k);
       }
     for (const k of leaving)
       if (!timers.current.has(k))
         timers.current.set(
           k,
-          window.setTimeout(() => {
+          afterPaint(fade + 30, () => {
             timers.current.delete(k);
             expired.current.add(k);
             force((n) => n + 1);
-          }, fade + 30),
+          }),
         );
   }, [out, fade]);
-  useEffect(() => () => timers.current.forEach((t) => clearTimeout(t)), []);
+  useEffect(() => () => timers.current.forEach((cancel) => cancel()), []);
   return out;
 }
 
@@ -326,7 +353,7 @@ export function useSwap<T>(value: T, keyOf: (v: T) => string) {
     last.current = { key, value };
     if (!prev || prev.key === key || !dur(1)) return;
     setGone((g) => [...g.filter((x) => x.key !== key && x.key !== prev.key), prev]);
-    setTimeout(() => setGone((g) => g.filter((x) => x !== prev)), dur(1) + 30);
+    afterPaint(dur(1) + 30, () => setGone((g) => g.filter((x) => x !== prev)));
   }, [key]);
   useLayoutEffect(() => {
     if (last.current?.key === key) last.current.value = value;

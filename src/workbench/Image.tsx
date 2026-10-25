@@ -2,7 +2,7 @@
 // 标题行：起了名的写"名称 · 第 3 版"，没起名的只写"第 3 版"（原图写"原图"）；提示词改过以后淡入"已修改"和"恢复"，
 // 标题行固定高度，出现消失都不挤动图片。下面一行是尺寸、模型和参数；没起名时再一行"文件"。V4.5 的图另有一行 Vibe。
 // 右键图片：作为新作品打开、移入回收站。焦点不在输入框时 ← → 在这一版的图之间切换，到头停住。
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { WorkbenchTab } from '../state/workbench';
 import type { ImageProject, ImageRecord, Vibe } from '../shared/types';
 import type { WorkVersion } from '../shared/generation';
@@ -16,7 +16,7 @@ import { Icon } from '../kit/controls';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
 import { Pop } from '../kit/layer';
 import { useNotifications } from '../kit/toast';
-import { useDecoded, useSwap } from '../kit/motion';
+import { useDecoded, usePresence, useSwap } from '../kit/motion';
 import { Viewer } from '../kit/Viewer';
 import { markLoaded } from '../kit/alpha';
 import { trashNotice } from '../lib/trashNotice';
@@ -187,6 +187,14 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
     (v) => v.key,
   );
   const enter = dir < 0 ? 'left' : dir > 0 ? 'right' : 'fade';
+  // "已修改""恢复"：同一版里改回原样（点了恢复）时淡出；换标签页、换版本时随标题一起直接换，
+  // 不让上一个的"已修改"挂在新标题旁边淡出（用户 10-25）
+  const dirtyAt = `${tab.id}:${image?.image_path}`;
+  const lastDirtyAt = useRef(dirtyAt);
+  if (dirty) lastDirtyAt.current = dirtyAt;
+  const dirtyPresence = usePresence(dirty);
+  const showDirty = dirty || (dirtyPresence.mounted && lastDirtyAt.current === dirtyAt);
+  const dirtyLeaving = !dirty && showDirty;
   const menuItems: MenuEntry[] =
     version && stageId && !gone
       ? [
@@ -288,15 +296,15 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
           <div className="caption">
             <div className="cap-title">
               <b data-tip-overflow={title}>{title}</b>
-              {dirty && (
-                <span className="dirty-tag" data-enter="fade">
+              {showDirty && (
+                <span className={`dirty-tag ${dirtyLeaving ? 'leaving' : ''}`} data-enter="fade">
                   已修改
                 </span>
               )}
               <span className="sp" />
-              {dirty && (
+              {showDirty && (
                 <button
-                  className="btn quiet sm"
+                  className={`btn quiet sm ${dirtyLeaving ? 'leaving' : ''}`}
                   data-enter="fade"
                   data-tip={`恢复成${vlabel}的提示词`}
                   onClick={p.onReset}
@@ -353,7 +361,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                 存为新作品
               </button>
             ) : tab.source.type === 'library' ? (
-              <span className="saved">
+              <span className="saved" data-enter="fade">
                 <Icon name="check-line" />
                 已存入图片库
               </span>
