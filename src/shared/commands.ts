@@ -279,6 +279,10 @@ export interface CommandDefinitions {
     output: TabDocument & { notes: string[] };
   };
   /** 加一个 Vibe：从 Vibe 库（libraryId），或者从一张图片（图片库里的 imageId，或者文件 path；没有就弹出选择框） */
+  'reference.set-base': {
+    input: TabInput & { imageId?: string; path?: string; strength?: number; noise?: number };
+    output: TabDocument;
+  };
   'reference.add-vibe': {
     input: TabInput & { libraryId?: string; imageId?: string; path?: string };
     output: TabDocument;

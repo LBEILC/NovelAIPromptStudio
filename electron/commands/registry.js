@@ -130,6 +130,11 @@ export const commandRegistry = {
     required: ['tabId', 'patch'],
     mutation: true,
   },
+  'reference.set-base': {
+    fields: { ...tab, imageId: 'string', path: 'string', strength: 'number', noise: 'number' },
+    required: ['tabId'],
+    mutation: true,
+  },
   'reference.add-vibe': {
     fields: { ...tab, libraryId: 'string', imageId: 'string', path: 'string' },
     required: ['tabId'],

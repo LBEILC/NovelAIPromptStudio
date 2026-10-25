@@ -124,3 +124,7 @@ materials（JSON 素材） ──按内容引用── reference_vibes（参考�
 恢复通过现有数据库连接中的事务替换已知表内容，保留当前 schema，不执行备份携带的 schema 或触发器。恢复前的一致数据库、会话和可移植偏好快照保存在当前 profile 数据目录的独立 `backup-stage-*` 目录，`backup-state.json` 指向最近一次快照；恢复失败时回滚，成功后替换上一次撤回记录。撤回仅替换数据，资源文件只补缺、不删除或覆盖。恢复与撤回后重新加载窗口。
 
 原图按 SHA-256 在当前资源库中重新定位。缺失标记使用现有 `app_meta` 的 `backup_missing:<projectId>` 键（值 `1`），不改变旧表结构；缺失记录的卡片和详情返回可选 `missing: true`，其余记录不添加该字段。路径重定位也同步工作台会话、作品与版本快照中的已知路径。归档读取校验路径、重复条目、CRC 与数据库完整性；更高格式版本拒绝恢复。
+
+### 图像操作快照
+
+`work_versions.snapshot_json` 可含 `operation`（kind、sourceProjectId、strength、noise、magnitude、scale）。旧快照省略该字段仍可读取。底图保存在 `references.base`，path 指向资源目录 references 下的软件副本，随备份资源树保存并重链接。移除草稿底图保留历史素材。

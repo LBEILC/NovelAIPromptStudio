@@ -1,0 +1,70 @@
+import { it, expect } from 'vitest';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import sharp from 'sharp';
+import { prepareBaseImage, storeBaseImage } from './baseImage.js';
+import { buildGenerationRequest, estimateGeneration } from './generation.js';
+
+it('copies base images, clears alpha carriers and preserves transparency only for V5', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'base-image-'));
+  try {
+    const source = path.join(dir, 'synthetic.png');
+    await sharp(Buffer.from([10, 20, 30, 0, 50, 60, 70, 254]), {
+      raw: { width: 2, height: 1, channels: 4 },
+    })
+      .png()
+      .toFile(source);
+    const stored = await storeBaseImage(source, dir);
+    await fs.unlink(source);
+    expect(stored.path).not.toBe(source);
+    const v5 = Buffer.from(
+      await prepareBaseImage(stored.path, 2, 1, 'nai-diffusion-5-full'),
+      'base64',
+    );
+    const pixels = await sharp(v5).ensureAlpha().raw().toBuffer();
+    expect(pixels[3]).toBe(0);
+    expect(pixels[7]).toBe(255);
+    const v45 = Buffer.from(
+      await prepareBaseImage(stored.path, 64, 128, 'nai-diffusion-4-5-full'),
+      'base64',
+    );
+    expect(await sharp(v45).metadata()).toMatchObject({ width: 64, height: 128, hasAlpha: false });
+    expect([...(await sharp(v45).raw().toBuffer())].slice(0, 3)).toEqual([255, 255, 255]);
+    expect(v5.includes(Buffer.from('tEXt'))).toBe(false);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+it('only accepts explicit image edits and uses paired seeds and strength pricing', () => {
+  const raw = {
+    width: 832,
+    height: 1216,
+    steps: 23,
+    scale: 7,
+    image: 'stale',
+    strength: 0.1,
+    noise: 0.9,
+    upscaled_enhance: true,
+  };
+  const normal = buildGenerationRequest(raw, 'nai-diffusion-5-full');
+  expect(normal.parameters).not.toHaveProperty('image');
+  expect(normal.parameters).not.toHaveProperty('strength');
+  const request = buildGenerationRequest(raw, 'nai-diffusion-5-full', {
+    action: 'img2img',
+    image: 'managed',
+    strength: 0.7,
+    noise: 0,
+    seed: 0,
+  });
+  expect(request.parameters).toMatchObject({
+    seed: 1,
+    extra_noise_seed: 0,
+    strength: 0.7,
+    noise: 0,
+    color_correct: false,
+  });
+  expect(request.parameters).not.toHaveProperty('upscaled_enhance');
+  expect(estimateGeneration(request, null).anlas).toBe(18);
+});

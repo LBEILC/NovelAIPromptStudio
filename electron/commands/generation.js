@@ -253,6 +253,14 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           image,
           seed,
           versionId: job.versionId,
+          operation: job.project.references?.base
+            ? {
+                kind: 'img2img',
+                strength: job.project.references.base.strength,
+                noise: job.project.references.base.noise,
+                sourceProjectId: job.project.references.base.projectId,
+              }
+            : undefined,
         });
         versions.touch(
           job.workId,
@@ -681,6 +689,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         parentId: parent.id,
         originalPending: !!versions.list(parent.workId)[0]?.project.autoSaveOriginal,
         project: current.project,
+        operation: current.project.references?.base ? 'img2img' : undefined,
         name: current.displayName,
         parentNumber: parent.number,
         summary: diffSummary(versionDiff(parent.project, current.project)),

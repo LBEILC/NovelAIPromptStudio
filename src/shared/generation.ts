@@ -40,7 +40,17 @@ export interface VersionImage {
   deleted: boolean;
   createdAt: string;
 }
+export type EnhanceScale = 1 | 1.5 | 2 | 'max';
+export interface ImageOperation {
+  kind: 'upscale' | 'enhance' | 'img2img';
+  sourceProjectId?: string;
+  strength?: number;
+  noise?: number;
+  magnitude?: number;
+  scale?: EnhanceScale;
+}
 export interface WorkVersion {
+  operation?: ImageOperation;
   isStart?: boolean;
   /**
    * 只在根版本上（1.5.1，doc/design.md 2.23"不满意原图"）：原图在图片库里 / 从文件打开的 /
@@ -69,6 +79,7 @@ export interface WorkOrigin {
   deleted?: true;
 }
 export interface GenerationJob {
+  operation?: ImageOperation['kind'];
   progress?: number | null;
   branchNotice?: string;
   limitReached?: boolean;

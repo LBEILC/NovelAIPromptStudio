@@ -58,6 +58,10 @@ export function createGenerationQueue({
                 await prepare(job);
                 const request = structuredClone(job.request);
                 if (!job.fixedSeed) request.parameters.seed = crypto.randomInt(0, 0x100000000);
+                if (request.action === 'img2img') {
+                  request.parameters.seed ||= 1;
+                  request.parameters.extra_noise_seed = request.parameters.seed - 1;
+                }
                 const png = await generate(request, (progress) => {
                   job.progress = progress;
                   publish();

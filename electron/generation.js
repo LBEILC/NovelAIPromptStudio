@@ -168,7 +168,16 @@ export function buildGenerationRequest(raw, model, edits = {}) {
   parameters.v4_negative_prompt.legacy_uc ??=
     model.startsWith('nai-diffusion-4-') && !model.startsWith('nai-diffusion-4-5-');
   for (const key of ['width', 'height']) if (edits[key] !== undefined) parameters[key] = edits[key];
-  return { action: 'generate', input: prompt, model, parameters };
+  const action = edits.action || 'generate';
+  if (!['generate', 'img2img'].includes(action)) throw new Error('生成操作无效');
+  if (action === 'img2img') {
+    for (const key of ['image', 'strength', 'noise', 'upscaled_enhance'])
+      if (edits[key] !== undefined) parameters[key] = edits[key];
+    parameters.seed ||= 1;
+    parameters.extra_noise_seed = parameters.seed - 1;
+    parameters.color_correct = false;
+  }
+  return { action, input: prompt, model, parameters };
 }
 
 export function estimateGeneration(request, subscription, count = 1, pendingEncodes = 0) {
@@ -194,7 +203,15 @@ export function estimateGeneration(request, subscription, count = 1, pendingEnco
   );
   const basePrice = free
     ? 0
-    : Math.max(2, Math.ceil(base * (p.sm_dyn && p.sm ? 1.4 : p.sm ? 1.2 : 1) * (v5 ? 1.5 : 1)));
+    : Math.max(
+        2,
+        Math.ceil(
+          base *
+            (p.sm_dyn && p.sm ? 1.4 : p.sm ? 1.2 : 1) *
+            (v5 ? 1.5 : 1) *
+            (request.action === 'img2img' ? p.strength : 1),
+        ),
+      );
   // TODO: verify multi-image Vibe surcharge; conservatively charge per image.
   const vibeExtra = 2 * Math.max(0, (p.reference_image_multiple?.length || 0) - 4);
   const precise = 5 * (p.director_reference_images?.length || 0);
@@ -255,6 +272,18 @@ function httpError(status, reason) {
 
 export function validateGenerationRequest(request) {
   const p = request?.parameters;
+  if (
+    request?.action === 'img2img' &&
+    (!/nai-diffusion-(5|4-5)-/.test(request.model) ||
+      !p?.image ||
+      !Number.isFinite(p.strength) ||
+      p.strength < 0.01 ||
+      p.strength > 0.99 ||
+      !Number.isFinite(p.noise) ||
+      p.noise < 0 ||
+      p.noise > 0.99)
+  )
+    throw new CommandError('invalid_input', '底图参数无效');
   const medium = request?.model === 'nai-diffusion-5-full-medium';
   if (
     !Object.hasOwn(GENERATION_MODELS, request?.model) ||

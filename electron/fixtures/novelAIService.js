@@ -119,7 +119,8 @@ export async function startFakeNovelAI() {
       .png()
       .toBuffer();
     const text = pngText({
-      ...body.parameters,
+      ...Object.fromEntries(Object.entries(body.parameters).filter(([key]) => key !== 'image')),
+      request_type: body.action === 'img2img' ? 'Img2ImgRequest' : 'PromptGenerateRequest',
       model: body.model,
       uc: body.parameters.negative_prompt,
     });

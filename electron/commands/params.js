@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { storeBaseImage } from '../baseImage.js';
 import path from 'node:path';
 import { MODEL_CAPS, MAX_VIBES, MAX_PRECISE } from '../../src/shared/params.ts';
 import { hydrateParameters, normalizeSettings } from '../params.js';
@@ -124,6 +125,54 @@ export function parameterCommands({ services, tab, edit, revision, unlocked }) {
       }));
       return { ...result, notes };
     },
+    'reference.set-base': async (input, caller) => {
+      const p = draft(input);
+      for (const [key, min] of [
+        ['strength', 0.01],
+        ['noise', 0],
+      ]) {
+        const value = input[key];
+        if (value !== undefined && (!Number.isFinite(value) || value < min || value > 0.99))
+          fail('底图参数无效');
+      }
+      if (input.path && input.imageId) fail('只能指定一个参考来源');
+      let base = p.references.base;
+      let source = input.path,
+        name;
+      if (input.imageId) {
+        const image =
+          services.database.loadProject(input.imageId) ||
+          services.database.versions
+            .list(tab(input.tabId).workId)
+            .find((v) => v.project.id === input.imageId)?.project;
+        if (!image || image.deleted_at) throw new CommandError('not_found', '图片不存在');
+        source = image.image_path;
+        name = image.name;
+      }
+      const parametersOnly = !source && (input.strength !== undefined || input.noise !== undefined);
+      if (!source && !parametersOnly && caller.source === 'ui')
+        source = (await services.selectSource?.(caller))?.path;
+      if (source)
+        base = {
+          ...(await storeBaseImage(
+            source,
+            services.assetsDirectory?.() ||
+              services.preferences?.librarySettings().assetsDirectory ||
+              services.directory,
+            name,
+          )),
+          strength: base?.strength ?? 0.7,
+          noise: base?.noise ?? 0,
+          ...(input.imageId ? { projectId: input.imageId } : {}),
+        };
+      else if (!parametersOnly || !base) fail('请指定参考图片路径或图片 ID');
+      base = {
+        ...base,
+        ...(input.strength !== undefined ? { strength: input.strength } : {}),
+        ...(input.noise !== undefined ? { noise: input.noise } : {}),
+      };
+      return update(input, (next) => ({ ...next, references: { ...next.references, base } }));
+    },
     'reference.add-vibe': (i, c) => add(i, c, 'vibes'),
     'reference.add-precise': (i, c) => add(i, c, 'precise'),
     'reference.set': (input) =>
@@ -155,6 +204,8 @@ export function parameterCommands({ services, tab, edit, revision, unlocked }) {
       update(input, (p) => ({
         ...p,
         references: {
+          ...p.references,
+          ...(input.id === 'base' ? { base: null } : {}),
           vibes: p.references.vibes.filter((v) => v.id !== input.id),
           precise: p.references.precise.filter((v) => v.id !== input.id),
         },

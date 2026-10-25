@@ -37,6 +37,7 @@ export interface ModelCaps {
   maxCharacters: number;
   /** Vibe 和精确参考：产品只在 V4.5 上提供（2.26） */
   references: boolean;
+  img2img: boolean;
   defaults: { steps: number; scale: number };
 }
 export const SAMPLERS: { id: Sampler; name: string }[] = [
@@ -60,6 +61,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_ALL,
     maxCharacters: 22,
     references: false,
+    img2img: true,
     defaults: { steps: 23, scale: 7 },
   },
   'nai-diffusion-5-curated': {
@@ -71,6 +73,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_ALL,
     maxCharacters: 22,
     references: false,
+    img2img: true,
     defaults: { steps: 23, scale: 7 },
   },
   'nai-diffusion-4-5-full': {
@@ -82,6 +85,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_ALL,
     maxCharacters: 6,
     references: true,
+    img2img: true,
     defaults: { steps: 23, scale: 5 },
   },
   'nai-diffusion-4-5-curated': {
@@ -93,6 +97,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: ['Heavy', 'Light', 'Human Focus', 'None'],
     maxCharacters: 6,
     references: true,
+    img2img: true,
     defaults: { steps: 23, scale: 5 },
   },
   'nai-diffusion-4-full': {
@@ -104,6 +109,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_V4,
     maxCharacters: 6,
     references: false,
+    img2img: false,
     defaults: { steps: 23, scale: 5.5 },
   },
   'nai-diffusion-4-curated-preview': {
@@ -115,6 +121,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_V4,
     maxCharacters: 6,
     references: false,
+    img2img: false,
     defaults: { steps: 23, scale: 5.5 },
   },
 };
@@ -213,7 +220,19 @@ export interface PreciseReference {
   /** 0–1；请求里发 1 - fidelity */
   fidelity: number;
 }
+export interface BaseImage {
+  id: string;
+  name: string;
+  path: string;
+  thumbnail: string;
+  width: number;
+  height: number;
+  strength: number;
+  noise: number;
+  projectId?: string;
+}
 export interface References {
+  base?: BaseImage | null;
   vibes: VibeReference[];
   precise: PreciseReference[];
 }

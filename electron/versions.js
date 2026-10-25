@@ -93,6 +93,7 @@ export function versionSignature(project) {
     project.metadata.width,
     project.metadata.height,
     project.params,
+    project.references?.base,
     project.references?.vibes.map((r) => [
       r.thumbnail || r.encoding || r.libraryId,
       r.strength,
@@ -160,6 +161,7 @@ export function createVersionStore(connection) {
         connection
           .prepare('SELECT name FROM work_branch_names WHERE branch_id=?')
           .get(row.branch_id)?.name || (row.branch_number ? `分支 ${row.branch_number}` : '主线'),
+      operation: JSON.parse(row.snapshot_json).operation,
       project: hydrateParameters(JSON.parse(row.snapshot_json)),
       source: row.source,
       createdAt: row.created_at,
@@ -647,13 +649,14 @@ export function createVersionStore(connection) {
         return get(id);
       });
     },
-    append({ workId, parentId, project, source, image, seed, versionId }) {
+    append({ workId, parentId, project, source, image, seed, versionId, operation }) {
       return atomic(() => {
         const parent = get(parentId);
         if (!parent || parent.workId !== workId) throw new Error('版本不存在');
         let target = versionId
           ? get(versionId)
-          : !parent.isStart &&
+          : !operation &&
+              !parent.isStart &&
               !['trashed', 'removed'].includes(parent.originState) &&
               source !== 'agent' &&
               versionSignature(project) === versionSignature(parent.project)
@@ -683,7 +686,7 @@ export function createVersionStore(connection) {
               number,
               branchId,
               branchNumber,
-              JSON.stringify({ ...project, blank: undefined }),
+              JSON.stringify({ ...project, blank: undefined, operation }),
               source,
               new Date().toISOString(),
             );

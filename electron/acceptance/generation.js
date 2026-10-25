@@ -469,6 +469,21 @@ export async function generationChecks({
     patch: { model: 'nai-diffusion-4-5-full', steps: 23 },
     dropReferences: true,
   });
+  await check(
+    '底图命令生成新版本并持久保留底图',
+    `(async () => {
+    const call = async (name, input = {}) => { const r = await window.studio.invoke(name,input); if(!r.ok) throw Error(r.error.message); return r.data; };
+    const opened = await call('workbench.new', {}), tabId = opened.tab.id;
+    await call('reference.set-base', {tabId, path:${JSON.stringify(files[0])}});
+    const job = await call('generate.start', {tabId, count:1});
+    let state;
+    do { await new Promise(r=>setTimeout(r,30)); state=(await call('generate.status',{id:job.id})).jobs[0]; } while(['queued','generating'].includes(state.state));
+    const version = (await call('version.list',{tabId})).versions.find(v=>v.id===state.versionId);
+    const draft = (await call('workbench.get',{tabId})).tab.project;
+    await call('reference.remove',{tabId,id:'base'});
+    return state.state==='completed' && version.operation.kind==='img2img' && !!version.project.references.base && !!draft.references.base && !(await call('workbench.get',{tabId})).tab.project.references.base;
+  })()`,
+  );
   const reference = await call('reference.add-vibe', { tabId: refTab, path: files[0] });
   const referenceId = reference.tab.project.references.vibes[0].id;
   await call('reference.set', { tabId: refTab, id: referenceId, strength: 0.4 });

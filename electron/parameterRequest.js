@@ -15,6 +15,7 @@ import {
   expandDraftAutomaticPrompt,
   stripAutomaticAtBoundary,
 } from '../src/lib/novelaiAutoPrompt.js';
+import { prepareBaseImage } from './baseImage.js';
 import { preciseImage } from './vibeLibrary.js';
 import { MODEL_CAPS } from '../src/shared/params.ts';
 
@@ -109,6 +110,13 @@ export async function buildProjectRequest(project, library, { seed, encode } = {
               !settings.model.startsWith('nai-diffusion-4-5-'),
           }),
     };
+  }
+  if (refs.base) {
+    if (!MODEL_CAPS[settings.model].img2img) throw new Error('这个模型不能用底图');
+    edits.action = 'img2img';
+    edits.image = await prepareBaseImage(refs.base.path, edits.width, edits.height, model);
+    edits.strength = refs.base.strength;
+    edits.noise = refs.base.noise;
   }
   const request = buildGenerationRequest(raw, model, edits),
     parameters = request.parameters;
