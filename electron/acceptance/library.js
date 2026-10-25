@@ -705,19 +705,23 @@ export async function libraryChecks(env) {
     const trashId = await e('document.querySelector(".col.detail").dataset.detailId');
     await trashDetailImage();
     await h.until(() => !!database.loadProject(trashId).deleted_at, '移入回收站');
-    await wait('!![...document.querySelectorAll(".toast button")].find(b=>b.textContent==="撤销")');
+    // Read the notice and invoke its real action in one renderer turn: the
+    // notification can expire between separate assertion/click round trips.
+    await wait(
+      `(() => {const notice=[...document.querySelectorAll('.toast:not(.leaving)')].find(n=>n.textContent.includes('已移入回收站'));const button=notice&&[...notice.querySelectorAll('button')].find(b=>b.textContent==='撤销');if(!button)return false;window.__acceptanceTrashNotice=notice.textContent;button.click();return true;})()`,
+      '移入回收站通知出现后读取并点击撤销',
+    );
     await check(
       '单图回收通知使用定稿文案',
-      'document.querySelector(".toast:not(.leaving)").textContent.includes("已移入回收站")',
+      'window.__acceptanceTrashNotice.includes("已移入回收站")',
       undefined,
       'once',
     );
-    await click('撤销', 'document.querySelector(".toast:not(.leaving)")');
     await h.until(() => !database.loadProject(trashId).deleted_at, '撤销移入回收站');
-    // Restore commits before the renderer clears selection and reloads the library.
-    // Its completion notification is emitted after that reload; select only then.
+    // Restore commits before the renderer reloads the library. Wait for the
+    // restored card, not another short-lived notification, before selecting.
     await wait(
-      '[...document.querySelectorAll(".toast:not(.leaving)")].some(n=>n.textContent.includes("已恢复"))',
+      `!!document.querySelector('.lgrid:not(.leaving) [data-image-id="${trashId}"]:not(.leaving)')`,
       '撤销恢复已完成界面刷新',
     );
     await check(
@@ -731,10 +735,9 @@ export async function libraryChecks(env) {
     const trashAgain = await e('document.querySelector(".col.detail").dataset.detailId');
     await trashDetailImage();
     await h.until(() => !!database.loadProject(trashAgain).deleted_at, '再次移入');
-    // The database write precedes the gallery reload and selection reset.
-    // Wait for the action's completion notice before selecting in the trash view.
+    // The database write precedes the gallery reload. Observe the final list.
     await wait(
-      '[...document.querySelectorAll(".toast:not(.leaving)")].some(n=>n.textContent.startsWith("已移入回收站"))',
+      `!document.querySelector('.lgrid:not(.leaving) [data-image-id="${trashAgain}"]:not(.leaving)')`,
       '再次移入回收站已完成列表刷新和选择清理',
     );
     await click('回收站', scope);
