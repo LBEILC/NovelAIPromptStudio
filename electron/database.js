@@ -1463,7 +1463,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       member_ids:
         collection.kind === 'manual'
           ? query(
-              'SELECT project_id FROM gallery_collection_projects WHERE collection_id = $id ORDER BY created_at ASC',
+              'SELECT project_id FROM gallery_collection_projects WHERE collection_id = $id ORDER BY created_at ASC, rowid ASC',
               { $id: collection.id },
             ).map((row) => row.project_id)
           : [],

@@ -407,6 +407,14 @@ export interface ImportSummary {
 }
 export type ImportProgress =
   | {
+      phase: 'scanning';
+      batchId: string;
+      sessionId: string;
+      processed: number;
+      total: number;
+      current: string;
+    }
+  | {
       phase: 'preparing';
       batchId?: string;
       current: string;
@@ -484,4 +492,38 @@ export interface NetworkTestResult {
   status: number | null;
   failure: 'proxy' | 'proxy_auth' | 'timeout' | 'dns' | 'tls' | 'network' | null;
   elapsedMs: number;
+}
+
+export interface FolderScan {
+  sessionId: string;
+  root: string;
+  folders: FolderScanItem[];
+  zipCount: number;
+  freeBytes: number;
+}
+export interface FolderScanItem {
+  id: string;
+  parentId: string | null;
+  name: string;
+  relativePath: string;
+  imageCount: number;
+  newCount: number;
+  existingCount: number;
+  trashedCount: number;
+  repeatCount: number;
+  noMetadataCount: number;
+  newBytes: number;
+  newNoMetadataCount: number;
+  newNoMetadataBytes: number;
+  collection: { name: string; existingId: string | null } | null;
+}
+export interface FolderImportResult {
+  imported: number;
+  existing: number;
+  restored: number;
+  skipped: number;
+  collectionsCreated: number;
+  collectionsMerged: number;
+  canceled: boolean;
+  errors: { path: string; error: string }[];
 }

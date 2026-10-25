@@ -1077,7 +1077,7 @@ it('retains generating and queued targets, then removes canceled and failed empt
       .poll(async () => (await call('generate.status', { id: pending.id })).jobs[0].state)
       .toBe('failed');
     await store.exclusive(async () => {});
-    expect(database.versions.get(failedTarget.id)).toBeUndefined();
+    await expect.poll(() => database.versions.get(failedTarget.id)).toBeUndefined();
   }));
 
 it('restores a version after either of two separately deleted images returns', () =>

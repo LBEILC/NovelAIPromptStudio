@@ -112,3 +112,7 @@ materials（JSON 素材） ──按内容引用── reference_vibes（参考�
 ## 生成连接
 
 偏好 `generationConnection` 默认为 `official`，`relayBaseUrl` 保存规范化站点地址，`relayModels` 为已知模型数组或 `null`。`relayKeyEncrypted` 与 `novelAITokenEncrypted` 分别使用 safeStorage 保存。`generation.dailyImageLimit` 默认为 200，`spentImagesToday` 与 `spentToday` 共用 `spentDate`，按本地日期清零。
+
+## 文件夹导入
+
+扫描会话只保存在主进程内存，持有源文件路径、SHA-256、字节数和生成信息判断。`FolderScan` 按自然排序的先序遍历返回目录树与收藏集计划；`import.folder.commit` 只接受该会话的目录 ID。每个图片目录对应一个手动收藏集，重复内容复用 `projects.content_hash`，回收站记录清除 `deleted_at`。收藏集成员同一毫秒内的顺序使用行插入顺序确定，不新增数据表。

@@ -428,6 +428,14 @@ export interface CommandDefinitions {
     input: { paths?: string[]; fromClipboard?: boolean };
     output: IPC.ImportResult;
   };
+  'import.folder.scan': {
+    input: { path?: string };
+    output: IPC.Result<Types.FolderScan> | { canceled: true };
+  };
+  'import.folder.commit': {
+    input: { sessionId: string; folderIds: string[]; skipNoMetadata: boolean };
+    output: IPC.Result<Types.FolderImportResult>;
+  };
   'import.cancel': { input: { id: string }; output: { ok: boolean } };
   'library.cards': {
     input: { view?: 'all' | 'favorites' | 'trash' };

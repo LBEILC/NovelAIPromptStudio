@@ -134,8 +134,7 @@ function first(source, keys, fallback = '') {
   return fallback;
 }
 
-export async function readNovelAIMetadata(filePath) {
-  const buffer = fs.readFileSync(filePath);
+export async function readNovelAIMetadata(filePath, buffer = fs.readFileSync(filePath)) {
   let text = parsePngText(buffer);
   const hasStandardGenerationMetadata = Object.values(text).some((value) => {
     const parsed = safeJson(value);

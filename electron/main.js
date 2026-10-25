@@ -1,3 +1,4 @@
+import { createFolderImporter } from './folderImport.js';
 import { deleteLibraryImages } from './deleteLibraryImages.js';
 import { createTray } from './tray.js';
 import { installWindowClose } from './windowClose.js';
@@ -1631,7 +1632,47 @@ app.whenReady().then(async () => {
     shell.showItemInFolder(input.path);
     return { ok: true, filePath: input.path };
   });
+  const folderImporter = createFolderImporter({
+    database,
+    assetsDirectory: () => assetsDirectory,
+    activeImports,
+  });
+  const folderProgress = (caller) => (data) => {
+    if (caller.sender && !caller.sender.isDestroyed())
+      caller.sender.send('studio:command-event', {
+        type: 'progress',
+        topic: 'library:import-progress',
+        data,
+      });
+  };
+  registerCommand('import.folder.scan', async (input, caller) => {
+    try {
+      if (storageMigrationActive || permanentDeletionActive)
+        throw new Error('请等待图片库操作完成');
+      await contentBackfill;
+      let selected = input.path;
+      if (!selected) {
+        const owner = caller.sender && BrowserWindow.fromWebContents(caller.sender);
+        const result = await dialog.showOpenDialog(owner, { properties: ['openDirectory'] });
+        if (result.canceled || !result.filePaths[0]) return { canceled: true };
+        selected = result.filePaths[0];
+      }
+      return { ok: true, ...(await folderImporter.scan(selected, folderProgress(caller))) };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+  registerCommand('import.folder.commit', async (input, caller) => {
+    try {
+      if (storageMigrationActive || permanentDeletionActive)
+        throw new Error('请等待图片库操作完成');
+      return { ok: true, ...(await folderImporter.commit(input, folderProgress(caller))) };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
   registerCommand('import.cancel', async (input) => {
+    if (folderImporter.cancel(input.id)) return { ok: true };
     const controller = activeImports.get(input.id);
     if (controller) {
       controller.abort();

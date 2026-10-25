@@ -259,6 +259,12 @@ export const commandRegistry = {
   'workbench.open-many': { fields: { paths: 'strings' }, required: ['paths'], uiOnly: true },
   'import.prepare': { fields: { paths: 'stringList' }, uiOnly: true },
   'import.files': { fields: { paths: 'stringList', fromClipboard: 'boolean' }, uiOnly: true },
+  'import.folder.scan': { fields: { path: 'string' }, uiOnly: true },
+  'import.folder.commit': {
+    fields: { sessionId: 'string', folderIds: 'stringList', skipNoMetadata: 'boolean' },
+    required: ['sessionId', 'folderIds', 'skipNoMetadata'],
+    uiOnly: true,
+  },
   'import.cancel': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
   'library.cards': { fields: { view: 'all|favorites|trash' }, required: [], uiOnly: true },
   'library.import-days': {
