@@ -311,6 +311,7 @@ export function WorkbenchTabs(p: TabsProps) {
       {overflow && (
         <button
           className="btn quiet sm icon tabs-page"
+          data-enter="fade"
           aria-label="向前翻"
           onClick={() => scrollBy(-1)}
         >
@@ -451,6 +452,7 @@ export function WorkbenchTabs(p: TabsProps) {
       {overflow && (
         <button
           className="btn quiet sm icon tabs-page"
+          data-enter="fade"
           aria-label="向后翻"
           onClick={() => scrollBy(1)}
         >
@@ -459,6 +461,7 @@ export function WorkbenchTabs(p: TabsProps) {
       )}
       <button
         className="tab add"
+        data-enter="fade"
         aria-label={generation.settings.hasToken ? '新建空白作品' : '打开图片'}
         data-tip={
           generation.settings.hasToken

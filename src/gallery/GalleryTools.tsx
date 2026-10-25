@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon, Kbd } from '../kit/controls';
 import { MenuPop } from '../kit/menu';
-import { FlipScope, useExitList, useSwap } from '../kit/motion';
+import { FlipScope, dur, useExitList, usePresence, useSwap } from '../kit/motion';
 import { DEFAULT_GALLERY_FILTERS } from '../lib/galleryFilters.js';
 import type { LibraryProps } from '../library/types';
 import type { GalleryFilters } from '../shared/types';
@@ -33,6 +33,22 @@ export function Tools({
     : p.filters;
   const n = filterCount(filters);
   const trash = p.view === 'trash';
+  // 进出回收站（用户 10-25：以前说明条和"导入"直接冒出来、直接没）：
+  // "导入"淡入淡出；说明条像条件行一样展开收起，收起完才拿掉（不留一个藏着的"清空回收站"）
+  const importBtn = usePresence(!trash);
+  const [trashOpen, setTrashOpen] = useState(trash);
+  const [trashKept, setTrashKept] = useState(trash);
+  useEffect(() => {
+    if (trash) {
+      setTrashKept(true);
+      // 先以收起的样子挂上，过两帧再展开，高度才有过渡
+      let f = requestAnimationFrame(() => (f = requestAnimationFrame(() => setTrashOpen(true))));
+      return () => cancelAnimationFrame(f);
+    }
+    setTrashOpen(false);
+    const t = setTimeout(() => setTrashKept(false), dur(3) + 30);
+    return () => clearTimeout(t);
+  }, [trash]);
   const filterOpen = pop === 'filter' || !!p.editingSmartCollection;
   const openFilter = () => {
     if (p.editingSmartCollection) {
@@ -115,8 +131,8 @@ export function Tools({
           <Icon name="layout-grid-line" />
           视图
         </button>
-        {!trash && (
-          <span className="lsplit">
+        {importBtn.mounted && (
+          <span className={`lsplit ${importBtn.leaving ? 'leaving' : ''}`} data-enter="fade">
             <button
               className="btn ink"
               disabled={p.importing}
@@ -138,20 +154,24 @@ export function Tools({
           </span>
         )}
       </div>
-      {trash && (
-        <div className="ltrash-h">
-          <span className="help">
-            回收站中的图片不会自动清理。永久删除只删除图片库中的副本，不影响原文件。
-          </span>
-          <span className="sp" />
-          <button
-            className="btn line-danger sm"
-            disabled={!(p.trashCount ?? 0)}
-            data-tip={(p.trashCount ?? 0) ? undefined : '回收站为空'}
-            onClick={p.onEmptyTrash}
-          >
-            清空回收站
-          </button>
+      {(trash || trashKept) && (
+        <div className={`expand ${trash && trashOpen ? 'open' : ''}`}>
+          <div>
+            <div className="ltrash-h">
+              <span className="help">
+                回收站中的图片不会自动清理。永久删除只删除图片库中的副本，不影响原文件。
+              </span>
+              <span className="sp" />
+              <button
+                className="btn line-danger sm"
+                disabled={!trash || !(p.trashCount ?? 0)}
+                data-tip={(p.trashCount ?? 0) ? undefined : '回收站为空'}
+                onClick={p.onEmptyTrash}
+              >
+                清空回收站
+              </button>
+            </div>
+          </div>
         </div>
       )}
       <div className={`expand lchips ${showChips ? 'open' : ''}`}>
