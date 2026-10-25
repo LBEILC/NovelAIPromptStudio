@@ -293,3 +293,10 @@ img.matte-black { background: var(--matte-black); }
 .gen-bar .row > .gen-acts { gap: var(--sp-2); }
 /* 切换标签页：旧的提示词栏叠在原处淡出，不占位置（src/workbench/WorkbenchPage.tsx） */
 .col.prompt > .prompt-in.leaving { position: absolute; inset: 0; z-index: 1; background: var(--surface); }
+
+/* 节标题上的"V5 控制词"按钮（用户 10-25：只有图标看不出是干嘛的）：左边一段"V5"和控制词 Tag 上的一样 */
+.btn.ctl-entry { gap: var(--ctl-gap); padding-left: 0; overflow: hidden; }
+.btn.ctl-entry > .v5 { align-self: stretch; display: flex; align-items: center; padding: 0 var(--v5-seg-pad); border-right: var(--bw) solid var(--border); background: var(--seg-track); font: var(--fs-caption)/var(--lh-caption) var(--font-mono); color: var(--text-2); transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
+.btn.ctl-entry.off > .v5 { background: var(--warn-wash); color: var(--warn); }
+.btn.ctl-entry .ctl-n { min-width: var(--icon-sm); padding: 0 var(--sp-1); border-radius: var(--r-check); background: var(--seg-track); color: var(--text-2); font-size: var(--fs-caption); line-height: var(--lh-caption); text-align: center; }
+.btn.ctl-entry.on { background: var(--selected); border-color: var(--text-3); }

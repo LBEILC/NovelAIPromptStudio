@@ -465,19 +465,19 @@ textarea.para-in { resize: none; overflow: hidden; }
 
 /* 导入文件夹（1.7.0，doc/design.md 2.29）：文件夹树，一行一个文件夹，下面一段写清楚会发生什么 */
 .fdlg .ftree { flex: 1 1 auto; display: flex; flex-direction: column; overflow: auto; padding: var(--sp-1) var(--sp-5); min-height: calc(var(--menu-row-h) * 4); }
-.frow { display: flex; align-items: center; gap: var(--sp-2); min-height: calc(var(--lh-body) + var(--lh-small) + var(--sp-2)); padding: var(--sp-1) var(--sp-2) var(--sp-1) calc(var(--sp-2) + var(--depth) * var(--sp-5)); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--text); text-align: left; transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
-.frow:hover { background: var(--hover); }
-.frow > i { flex: 0 0 auto; color: var(--text-3); font-size: var(--icon); }
-.frow .lchk { flex: 0 0 auto; }
-.frow .fname { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
-.frow .fname b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.frow .fname small { color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.frow .fcount { flex: 0 0 auto; color: var(--text-2); font-size: var(--fs-small); }
-.frow .fcol { flex: 0 1 auto; max-width: 40%; display: inline-flex; align-items: center; gap: var(--sp-1); height: calc(var(--ctl-sm) - var(--sp-1)); padding: 0 var(--sp-2); border-radius: var(--r-tag); background: var(--hover); color: var(--text-2); font-size: var(--fs-small); }
-.frow .fcol span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.frow .fcol.merge { color: var(--text); }
-.frow.off { color: var(--text-3); }
-.frow.off .fcol, .frow.off .fcount { opacity: var(--dim); }
+.ftree .frow { display: flex; align-items: center; gap: var(--sp-2); min-height: calc(var(--lh-body) + var(--lh-small) + var(--sp-2)); padding: var(--sp-1) var(--sp-2) var(--sp-1) calc(var(--sp-2) + var(--depth) * var(--sp-5)); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--text); text-align: left; transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
+.ftree .frow:hover { background: var(--hover); }
+.ftree .frow > i { flex: 0 0 auto; color: var(--text-3); font-size: var(--icon); }
+.ftree .frow .lchk { flex: 0 0 auto; }
+.ftree .frow .fname { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.ftree .frow .fname b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ftree .frow .fname small { color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ftree .frow .fcount { flex: 0 0 auto; color: var(--text-2); font-size: var(--fs-small); }
+.ftree .frow .fcol { flex: 0 1 auto; max-width: 40%; display: inline-flex; align-items: center; gap: var(--sp-1); height: calc(var(--ctl-sm) - var(--sp-1)); padding: 0 var(--sp-2); border-radius: var(--r-tag); background: var(--hover); color: var(--text-2); font-size: var(--fs-small); }
+.ftree .frow .fcol span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ftree .frow .fcol.merge { color: var(--text); }
+.ftree .frow.off { color: var(--text-3); }
+.ftree .frow.off .fcol, .ftree .frow.off .fcount { opacity: var(--dim); }
 .fsum { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--divider); }
 .fsum ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-1); }
 .fsum li { position: relative; padding-left: var(--sp-3); }
@@ -501,3 +501,15 @@ textarea.para-in { resize: none; overflow: hidden; }
 /* 恢复备份后找不到原图（1.7.0）：卡片左下角、详情栏大图下沿一枚小标记，样子同"已在图片库" */
 .lmissing { position: absolute; left: var(--sp-1); bottom: var(--sp-1); display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1); border-radius: var(--r-ctl); background: var(--surface); color: var(--warn); font-size: var(--fs-small); line-height: var(--lh-small); pointer-events: auto; }
 .libp .detail .pic .pmissing { position: static; align-self: end; justify-self: start; margin: 0 0 var(--sp-1) var(--sp-1); }
+
+/* 放大、增强（1.8，doc/design.md 2.34）：操作条上和前面几个按钮隔一道细线；浮层写结果尺寸和价格 */
+.stage-acts .stage-sep { flex: 0 0 auto; width: 1px; height: var(--icon); margin: 0 var(--sp-1); background: var(--divider); }
+.stage-acts .btn.open { background: var(--hover); color: var(--text); }
+.popover.op-pop .op-h { display: flex; flex-direction: column; gap: var(--sp-0); }
+.popover.op-pop .op-h .help { color: var(--text-3); }
+.popover.op-pop .frow { grid-template-columns: 44px auto; justify-content: start; }
+.popover.op-pop .op-size { display: flex; align-items: center; gap: var(--sp-2); }
+.popover.op-pop .op-size > i { color: var(--text-3); }
+.popover.op-pop .op-size .muted { color: var(--text-3); }
+.popover.op-pop .op-foot { align-items: center; padding-top: var(--sp-3); border-top: 1px solid var(--divider); }
+.popover.op-pop .op-price { display: flex; flex-direction: column; min-width: 0; }

@@ -572,19 +572,35 @@ export function usePromptRendering({
       </div>
     );
   };
-  /** 节标题上的"V5 控制词"按钮，点了打开点选面板 */
-  const ctlBtn = (si: number) => (
-    <button
-      className={`btn quiet sm icon ${ctlFor === si ? 'on' : ''}`}
-      aria-label="V5 控制词"
-      aria-expanded={ctlFor === si}
-      data-tip="V5 控制词"
-      data-trigger={`ctl-${si}`}
-      onClick={() => setCtlFor(ctlFor === si ? null : si)}
-    >
-      <Icon name="equalizer-line" />
-    </button>
-  );
+  /**
+   * 节标题上的"V5 控制词"按钮，点了打开点选面板。用户 10-25："只有图标太隐蔽，看不出干嘛的"：
+   * 改成带字的，左边一小段"V5"和控制词 Tag 上的那一段一样，用了几个写在后面。
+   * 不是 V5、这一节里也没有控制词时不显示（没用）
+   */
+  const ctlBtn = (si: number) => {
+    const n = entries.filter(
+      (e) => e.section === si && !e.automatic && matchControl(e.tag.tag),
+    ).length;
+    if (!v5 && !n && ctlFor !== si) return null;
+    return (
+      <button
+        className={`btn sm ctl-entry ${ctlFor === si ? 'on' : ''} ${v5 ? '' : 'off'}`}
+        aria-label="V5 控制词"
+        aria-expanded={ctlFor === si}
+        data-tip={
+          v5
+            ? '复杂度、透明背景、年代感这类 V5 专用的控制词，点选加上'
+            : '当前模型不是 V5，这些控制词不起作用'
+        }
+        data-trigger={`ctl-${si}`}
+        onClick={() => setCtlFor(ctlFor === si ? null : si)}
+      >
+        <span className="v5">V5</span>
+        控制词
+        {n > 0 && <span className="ctl-n mono">{n}</span>}
+      </button>
+    );
+  };
   const secCopy = (si: number, label: string) => (
     <button
       className="btn quiet sm icon"
