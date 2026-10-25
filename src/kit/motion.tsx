@@ -274,6 +274,43 @@ export function useIndicator(box: RefObject<HTMLElement | null>, deps: unknown[]
   }, []);
 }
 
+/**
+ * 换图片前先把新图解码好，再交给 useSwap。不等的话新图元素一挂上就开始淡入，可图还没画出来，
+ * 旧图又先淡出了：中间空一下，新图解码完一下子蹦出来，看着像闪了一下（用户 10-25，图片库详情栏）。
+ * 超过 wait 毫秒还没解码完就照换，不让界面干等；src 为空或解码失败也立刻换。key 没变时值照常立刻更新。
+ */
+export function useDecoded<T>(
+  value: T,
+  keyOf: (v: T) => string,
+  srcOf: (v: T) => string,
+  wait = 400,
+): T {
+  const key = keyOf(value);
+  const [ready, setReady] = useState(key);
+  const shown = useRef(value);
+  if (ready === key) shown.current = value;
+  useEffect(() => {
+    if (ready === key) return;
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      setReady(key);
+    };
+    const src = srcOf(value);
+    if (!src) return go();
+    const img = new Image();
+    img.src = src;
+    img.decode().then(go, go);
+    const timer = setTimeout(go, wait);
+    return () => {
+      done = true;
+      clearTimeout(timer);
+    };
+  }, [key]);
+  return shown.current;
+}
+
 /** 换内容（2.17）：key 变了时旧的淡出、新的淡入。返回当前和正在离开的两份。 */
 export function useSwap<T>(value: T, keyOf: (v: T) => string) {
   const key = keyOf(value);

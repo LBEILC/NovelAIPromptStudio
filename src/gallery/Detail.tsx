@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, Kbd } from '../kit/controls';
 import { useNotifications } from '../kit/toast';
-import { useSwap } from '../kit/motion';
+import { useDecoded, useSwap } from '../kit/motion';
 import { writeClipboardText } from '../lib/clipboard';
 import { mediaUrl } from '../lib/imageStage.js';
 import { hasImageName, imageFileName, imageAccessibleName } from '../lib/imageNaming.js';
@@ -119,7 +119,15 @@ function One({
   // 一组和单张之间切换时小图条展开或收起；收起时保留上一次的内容，下面不跳
   const lastStrip = useRef<LibraryGroup | null>(null);
   if (n > 1) lastStrip.current = group;
-  const pics = useSwap(detail, (d) => d.id);
+  // 新图解码好了再换，不然淡入时图还没画出来，看着像闪一下
+  const pics = useSwap(
+    useDecoded(
+      detail,
+      (d) => d.id,
+      (d) => mediaUrl(d.image_path),
+    ),
+    (d) => d.id,
+  );
   const ids = group.members.map((m) => m.id);
   const refs = group.members.find((m) => m.id === detail.id)?.work_refs || detail.work_refs || [];
   // 回收站里不列"也是…"：放回之前点过去也看不到（去掉的记录在下面单独写）
