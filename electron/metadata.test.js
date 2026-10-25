@@ -12,10 +12,12 @@ function chunk(type, content = Buffer.alloc(0)) {
   const typeBuffer = Buffer.from(type, 'ascii');
   const length = Buffer.alloc(4);
   length.writeUInt32BE(content.length);
-  return Buffer.concat([length, typeBuffer, content, Buffer.alloc(4)]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(zlib.crc32(Buffer.concat([typeBuffer, content])));
+  return Buffer.concat([length, typeBuffer, content, crc]);
 }
 
-async function writeStealthPng(filePath, metadata, { compressed = true } = {}) {
+async function writeStealthPng(filePath, metadata, { compressed = true, text = {} } = {}) {
   const width = 128;
   const height = 128;
   const raw = Buffer.alloc(width * height * 4, 255);
@@ -38,9 +40,17 @@ async function writeStealthPng(filePath, metadata, { compressed = true } = {}) {
     const alphaIndex = (y * width + x) * 4 + 3;
     raw[alphaIndex] = (raw[alphaIndex] & 0xfe) | bit;
   }
-  await sharp(raw, { raw: { width, height, channels: 4 } })
+  const png = await sharp(raw, { raw: { width, height, channels: 4 } })
     .png()
-    .toFile(filePath);
+    .toBuffer();
+  fs.writeFileSync(
+    filePath,
+    Buffer.concat([
+      png.subarray(0, -12),
+      ...Object.entries(text).map(([key, value]) => chunk('tEXt', Buffer.from(`${key}\0${value}`))),
+      png.subarray(-12),
+    ]),
+  );
 }
 
 afterEach(() => {
@@ -193,6 +203,58 @@ describe('NovelAI PNG metadata', () => {
         model: 'NovelAI Diffusion V4.5',
         width: 128,
         height: 128,
+      });
+    },
+  );
+
+  it.each([
+    ['object', '{"editor":"test editor"}'],
+    ['array', '["test editor"]'],
+    ['empty object', '{}'],
+  ])('recovers stealth metadata alongside an unrelated JSON %s', async (_label, editorData) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
+    temporaryDirectories.push(directory);
+    const filePath = path.join(directory, 'editor-metadata.png');
+    await writeStealthPng(
+      filePath,
+      {
+        Source: 'NovelAI Diffusion V4.5',
+        Comment: JSON.stringify({ prompt: '1girl, outdoors', uc: 'lowres', seed: 123, steps: 28 }),
+      },
+      { text: { EditorData: editorData } },
+    );
+
+    const metadata = await readNovelAIMetadata(filePath);
+    expect(metadata).toMatchObject({
+      prompt_raw: '1girl, outdoors',
+      negative_prompt: 'lowres',
+      seed: '123',
+      steps: 28,
+      model: 'NovelAI Diffusion V4.5',
+    });
+    expect(JSON.parse(metadata.extra_json).pngText.EditorData).toBe(editorData);
+  });
+
+  it.each([
+    ['empty legacy prompt', { prompt: '' }, ''],
+    ['empty V4 prompt', { v4_prompt: { caption: { base_caption: '' } } }, ''],
+    ['zero seed', { seed: 0 }, '0'],
+  ])(
+    'keeps a standard %s authoritative over stale stealth metadata',
+    async (_label, standard, seed) => {
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-metadata-'));
+      temporaryDirectories.push(directory);
+      const filePath = path.join(directory, 'standard-and-stealth.png');
+      await writeStealthPng(
+        filePath,
+        { Comment: JSON.stringify({ prompt: 'old prompt', uc: 'old negative', seed: 123 }) },
+        { text: { Parameters: JSON.stringify(standard) } },
+      );
+
+      expect(await readNovelAIMetadata(filePath)).toMatchObject({
+        prompt_raw: '',
+        negative_prompt: '',
+        seed,
       });
     },
   );

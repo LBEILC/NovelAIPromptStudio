@@ -138,7 +138,29 @@ export async function readNovelAIMetadata(filePath, buffer = fs.readFileSync(fil
   let text = parsePngText(buffer);
   const hasStandardGenerationMetadata = Object.values(text).some((value) => {
     const parsed = safeJson(value);
-    return parsed && typeof parsed === 'object';
+    // Editors can add unrelated JSON chunks; these must not suppress stealth recovery.
+    return (
+      parsed &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed) &&
+      [
+        'prompt',
+        'description',
+        'uc',
+        'negative_prompt',
+        'negativePrompt',
+        'v4_prompt',
+        'v4_negative_prompt',
+        'seed',
+        'steps',
+        'sampler',
+        'scale',
+        'cfg_scale',
+        'guidance',
+        'reference_image_multiple',
+        'request_type',
+      ].some((key) => Object.hasOwn(parsed, key))
+    );
   });
   if (!hasStandardGenerationMetadata) text = { ...(await parseStealthPngText(buffer)), ...text };
   const dimensions = parsePngDimensions(buffer);
