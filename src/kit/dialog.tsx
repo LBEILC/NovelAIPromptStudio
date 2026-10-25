@@ -42,11 +42,16 @@ export interface DialogProps {
   data?: Record<`data-${string}`, string>;
 }
 export function Dialog(p: DialogProps) {
+  // 和 Pop 一样：关的时候照最后打开时的内容淡出，不剩空壳
+  const kids = useRef(p.children);
+  if (p.open) kids.current = p.children;
   return (
     <Presence show={p.open}>
       {(leaving, ref) => (
         <ToWin>
-          <DialogBody {...p} leaving={leaving} nodeRef={ref} />
+          <DialogBody {...p} leaving={leaving} nodeRef={ref}>
+            {p.open ? p.children : kids.current}
+          </DialogBody>
         </ToWin>
       )}
     </Presence>

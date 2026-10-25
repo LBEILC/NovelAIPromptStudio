@@ -197,11 +197,17 @@ export interface PopProps {
 }
 /** 一个浮层：菜单、浮层、补全、预览。进入 --dur-2，退出淡出 --dur-1。 */
 export function Pop(p: PopProps) {
+  // 关的时候里面照最后打开时的样子淡出：调用方多半一关就清掉内容（编辑的 Tag、菜单项），
+  // 不留住的话只剩一个空壳在淡出，看着闪一下（用户 10-25）
+  const kids = useRef(p.children);
+  if (p.open) kids.current = p.children;
   return (
     <Presence show={p.open}>
       {(leaving, ref) => (
         <ToWin>
-          <PopBody {...p} leaving={leaving} nodeRef={ref} />
+          <PopBody {...p} leaving={leaving} nodeRef={ref}>
+            {p.open ? p.children : kids.current}
+          </PopBody>
         </ToWin>
       )}
     </Presence>
