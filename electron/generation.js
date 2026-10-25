@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import { normalizeRelayUrl } from './relay.js';
+import { MODEL_ORDER } from '../src/shared/params.ts';
 import yauzl from 'yauzl';
 import { validParameterNumber, MEDIUM_FIXED } from '../src/shared/params.ts';
 import { CommandError } from './commands/registry.js';
@@ -315,15 +317,29 @@ export function extractGeneratedPng(buffer) {
 
 export function createNovelAIClient({
   token,
+  connection = 'official',
   baseUrl = 'https://image.novelai.net',
   fetchImpl = fetch,
 }) {
-  const url = new URL(baseUrl);
+  const url = new URL(connection === 'relay' ? normalizeRelayUrl(baseUrl) : baseUrl);
   if (
+    connection !== 'relay' &&
     url.origin !== 'https://image.novelai.net' &&
     !['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname)
   )
     throw new Error('不支持的生成服务地址');
+  const errorFor = (status, reason) => {
+    const error = httpError(status, reason);
+    if (connection === 'relay') {
+      error.message =
+        status === 403 && /model.*(?:does not exist|maintenance)|模型不存在/i.test(reason)
+          ? '中转站没有这个模型'
+          : status === 401 || status === 403
+            ? `中转站拒绝了 Key${reason ? `：${reason}` : ''}`
+            : error.message.replaceAll('NovelAI', '中转站');
+    }
+    return error;
+  };
   async function send(endpoint, body) {
     let secret;
     try {
@@ -340,7 +356,7 @@ export function createNovelAIClient({
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        throw httpError(response.status, serverReason(body, secret));
+        throw errorFor(response.status, serverReason(body, secret));
       }
       return response;
     } catch (error) {
@@ -350,13 +366,29 @@ export function createNovelAIClient({
       throw new CommandError(
         'network',
         machineCode === 'proxy'
-          ? '无法通过代理连接到 NovelAI，请检查设置里的网络'
-          : '无法连接到 NovelAI，请检查网络',
+          ? `无法通过代理连接到 ${connection === 'relay' ? '中转站' : 'NovelAI'}，请检查设置里的网络`
+          : `无法连接到 ${connection === 'relay' ? '中转站' : 'NovelAI'}，请检查网络`,
         { status: error.status || 0, machineCode },
       );
     }
   }
   return {
+    models: async () => {
+      let response;
+      try {
+        response = await send('/v1/models');
+      } catch (error) {
+        if (error.status === 404) return null;
+        throw error;
+      }
+      const body = await response.json().catch(() => null);
+      if (!Array.isArray(body?.data)) return null;
+      const ids = [...new Set(body.data.map((m) => m.id).filter((id) => typeof id === 'string'))];
+      return {
+        models: ids.filter((id) => MODEL_ORDER.includes(id)),
+        other: ids.filter((id) => !MODEL_ORDER.includes(id)),
+      };
+    },
     encodeVibe: async (body) =>
       Buffer.from(await (await send('/ai/encode-vibe', body)).arrayBuffer()).toString('base64'),
     subscription: async () => (await send('/user/subscription')).json(),
@@ -394,7 +426,7 @@ export function createNovelAIClient({
             ?.slice(6)
             .trim();
         if (type === 'error')
-          throw httpError(
+          throw errorFor(
             Number(value.status || value.status_code) || 500,
             serverReason(value, secret),
           );

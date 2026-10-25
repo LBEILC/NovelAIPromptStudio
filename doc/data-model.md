@@ -108,3 +108,7 @@ materials（JSON 素材） ──按内容引用── reference_vibes（参考�
 | 素材 payload 内含 name/kind 等外层也有的信息 | 更新实现以外层字段为准，payload 可能存在历史副本 | 明确序列化边界后再清理冗余。 |
 | 永久删除先删文件再删行，不是跨文件系统事务 | 中途 I/O 失败可能只删除部分文件 | 保留现有逐图失败与剩余路径报告，后续评估可恢复的删除日志。 |
 | 累积备份和撤销 JSON 没有统一容量策略 | 长期使用可能增长 | 单独设计保留策略，不在性能整理任务自动删用户历史。 |
+
+## 生成连接
+
+偏好 `generationConnection` 默认为 `official`，`relayBaseUrl` 保存规范化站点地址，`relayModels` 为已知模型数组或 `null`。`relayKeyEncrypted` 与 `novelAITokenEncrypted` 分别使用 safeStorage 保存。`generation.dailyImageLimit` 默认为 200，`spentImagesToday` 与 `spentToday` 共用 `spentDate`，按本地日期清零。

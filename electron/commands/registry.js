@@ -182,6 +182,17 @@ export const commandRegistry = {
   'generate.retry': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
   'account.get': { fields: {}, uiOnly: true },
   'account.save': { fields: { token: 'string' }, required: ['token'], uiOnly: true },
+  'account.connection.save': {
+    fields: { connection: 'official|relay' },
+    required: ['connection'],
+    uiOnly: true,
+  },
+  'account.relay.save': {
+    fields: { baseUrl: 'string', key: 'string' },
+    required: ['baseUrl'],
+    uiOnly: true,
+  },
+  'account.relay.test': { fields: { baseUrl: 'string', key: 'string' }, uiOnly: true },
   'account.refresh': { fields: {}, uiOnly: true },
   'settings.generation.save': {
     fields: {
@@ -190,6 +201,7 @@ export const commandRegistry = {
       agentMode: 'confirm|direct',
       limitEnabled: 'boolean',
       dailyLimit: 'integer',
+      dailyImageLimit: 'integer',
     },
     uiOnly: true,
   },

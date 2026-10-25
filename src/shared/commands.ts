@@ -319,6 +319,15 @@ export interface CommandDefinitions {
   'generate.retry': { input: { id: string }; output: GenerationJob };
   'account.get': { input: Record<string, never>; output: GenerationStatus };
   'account.save': { input: { token: string }; output: GenerationStatus };
+  'account.connection.save': {
+    input: { connection: 'official' | 'relay' };
+    output: GenerationStatus;
+  };
+  'account.relay.save': { input: { baseUrl: string; key?: string }; output: GenerationStatus };
+  'account.relay.test': {
+    input: { baseUrl?: string; key?: string };
+    output: IPC.Result<{ models: import('./params').ModelId[]; other: string[] }>;
+  };
   'account.refresh': { input: Record<string, never>; output: GenerationStatus };
   'settings.generation.save': {
     input: Partial<Omit<GenerationSettings, 'hasToken' | 'spentDate' | 'spentToday'>>;

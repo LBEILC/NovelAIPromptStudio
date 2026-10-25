@@ -1,5 +1,6 @@
 import { MODEL_ORDER } from '../src/shared/params.ts';
 import fs from 'node:fs';
+import { normalizeRelayUrl } from './relay.js';
 import { normalizeNetworkSettings } from './network.js';
 import path from 'node:path';
 import { DEFAULT_BASE_URL, normalizeBaseUrl } from './translation.js';
@@ -343,9 +344,42 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       stored.novelAITokenEncrypted = safeStorage.encryptString(token).toString('base64');
       write(stored);
     },
+    relayKey: () => {
+      const value = read().relayKeyEncrypted;
+      if (!value) return '';
+      try {
+        return safeStorage.decryptString(Buffer.from(value, 'base64'));
+      } catch {
+        throw new Error('无法解密已保存的中转站 Key，请重新保存');
+      }
+    },
+    saveRelay: ({ baseUrl, key, models }) => {
+      const stored = read();
+      stored.relayBaseUrl = normalizeRelayUrl(baseUrl);
+      if (key !== undefined) {
+        if (!safeStorage.isEncryptionAvailable()) throw new Error('当前系统无法安全加密 Key');
+        stored.relayKeyEncrypted = safeStorage.encryptString(key.trim()).toString('base64');
+      }
+      stored.relayModels = models ?? null;
+      write(stored);
+    },
+    saveConnection: (connection) => {
+      if (!['official', 'relay'].includes(connection)) throw new Error('连接方式无效');
+      write({ ...read(), generationConnection: connection });
+    },
     generationSettings: () => ({
       blankModel: 'last',
-      hasToken: !!read().novelAITokenEncrypted,
+      connection: read().generationConnection || 'official',
+      officialToken: !!read().novelAITokenEncrypted,
+      relay: {
+        baseUrl: read().relayBaseUrl || '',
+        hasKey: !!read().relayKeyEncrypted,
+        models: read().relayModels ?? null,
+      },
+      dailyImageLimit: 200,
+      hasToken: !!(read().generationConnection === 'relay'
+        ? read().relayKeyEncrypted
+        : read().novelAITokenEncrypted),
       continuous: false,
       agentMode: 'confirm',
       limitEnabled: false,
@@ -353,6 +387,11 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       ...(read().generation || {}),
     }),
     saveGenerationSettings: (next) => {
+      if (
+        next.dailyImageLimit !== undefined &&
+        (!Number.isSafeInteger(next.dailyImageLimit) || next.dailyImageLimit < 0)
+      )
+        throw new Error('每日张数上限无效');
       if (next.blankModel !== undefined && !['last', ...MODEL_ORDER].includes(next.blankModel))
         throw new Error('模型无效');
       const stored = read();

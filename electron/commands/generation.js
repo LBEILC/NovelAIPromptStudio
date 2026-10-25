@@ -1,3 +1,4 @@
+import { checkRelayRequest, normalizeRelayUrl } from '../relay.js';
 import { saveWorkbenchImage } from './saveWorkbenchImage.js';
 import { createBlankProject } from '../workbench.js';
 import { buildProjectRequest } from '../parameterRequest.js';
@@ -28,13 +29,19 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     Number(subscription?.trainingStepsLeft?.purchasedTrainingSteps || 0);
   const client = () =>
     createNovelAIClient({
-      token: preferences.novelAIToken,
-      baseUrl: services.generationBaseUrl,
+      token: settings().connection === 'relay' ? preferences.relayKey : preferences.novelAIToken,
+      connection: settings().connection,
+      baseUrl:
+        settings().connection === 'relay' ? settings().relay.baseUrl : services.generationBaseUrl,
       fetchImpl: services.fetcher,
     });
   const settings = () => {
     const s = preferences.generationSettings();
-    return { ...s, spentToday: s.spentDate === today() ? s.spentToday || 0 : 0 };
+    return {
+      ...s,
+      spentImagesToday: s.spentDate === today() ? s.spentImagesToday || 0 : 0,
+      spentToday: s.spentDate === today() ? s.spentToday || 0 : 0,
+    };
   };
   const status = (id) => ({
     jobs: id ? [queue.status(id)] : queue.status(),
@@ -44,10 +51,33 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     accountError,
   });
   const publish = () => services.emit?.({ type: 'generation', data: status() });
+  const priceFor = (request, count = 1, pending = 0) =>
+    settings().connection === 'relay'
+      ? { anlas: 0, perImage: 0, free: false, count, relay: true }
+      : estimateGeneration(request, subscription, count, pending);
+  const idleConnection = () => {
+    if (queue.status().some((j) => ['queued', 'generating'].includes(j.state)))
+      throw new Error('等生成完成后再切换连接');
+  };
+  async function testRelay(input = {}) {
+    const baseUrl = normalizeRelayUrl(input.baseUrl ?? settings().relay.baseUrl);
+    const key = input.key?.trim() ?? preferences.relayKey();
+    const result = await createNovelAIClient({
+      connection: 'relay',
+      baseUrl,
+      token: () => key,
+      fetchImpl: services.fetcher,
+    }).models();
+    return { baseUrl, result };
+  }
   async function refresh() {
     if (!settings().hasToken) return 0;
     try {
-      subscription = await client().subscription();
+      if (settings().connection === 'relay') {
+        const { baseUrl, result } = await testRelay();
+        preferences.saveRelay({ baseUrl, models: result?.models ?? null });
+        subscription = null;
+      } else subscription = await client().subscription();
       accountError = '';
       publish();
       return balance();
@@ -91,7 +121,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff)
         throw new Error('Seed 无效');
     }
-    return buildProjectRequest(current.project, services.database.vibeLibrary, { seed });
+    const prepared = await buildProjectRequest(current.project, services.database.vibeLibrary, {
+      seed,
+    });
+    checkRelayRequest(settings(), prepared.request, prepared.pendingEncodes);
+    return prepared;
   }
   function protectJobs(jobs) {
     versions.setActiveVersions(
@@ -140,6 +174,10 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         };
       });
       // Rehydrate restored jobs too; previously prepared requests can contain legacy bad values.
+      const preview = await buildProjectRequest(job.project, services.database.vibeLibrary, {
+        seed: job.request.parameters.seed,
+      });
+      checkRelayRequest(settings(), preview.request, preview.pendingEncodes);
       const prepared = await buildProjectRequest(job.project, services.database.vibeLibrary, {
         seed: job.request.parameters.seed,
         encode: (body) => client().encodeVibe(body),
@@ -149,10 +187,15 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       job.referencesPrepared = true;
       emit({ tabId: job.tabId });
     },
-    balance: refresh,
+    balance: () => (settings().connection === 'relay' ? 0 : refresh()),
     beforeEach: async (job) => {
       const s = settings();
+      if (s.connection === 'relay' && s.limitEnabled && s.spentImagesToday >= s.dailyImageLimit) {
+        job.limitReached = true;
+        return false;
+      }
       if (
+        s.connection !== 'relay' &&
         job.source === 'agent' &&
         !job.confirmed &&
         s.limitEnabled &&
@@ -244,6 +287,14 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         }
         emit({ libraryChanged: true, tabId: job.tabId });
       });
+      if (settings().connection === 'relay') {
+        const s = settings();
+        preferences.saveGenerationSettings({
+          spentDate: today(),
+          spentToday: s.spentToday,
+          spentImagesToday: s.spentImagesToday + 1,
+        });
+      }
       await fs.unlink(file);
       return image.id;
     },
@@ -502,12 +553,42 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       publish();
       return { restored };
     },
+    'account.connection.save': async ({ connection }) => {
+      idleConnection();
+      preferences.saveConnection(connection);
+      subscription = null;
+      accountError = '';
+      publish();
+      return status();
+    },
+    'account.relay.save': async (input) => {
+      idleConnection();
+      const { baseUrl, result } = await testRelay(input);
+      preferences.saveRelay({ baseUrl, key: input.key, models: result?.models ?? null });
+      accountError = '';
+      publish();
+      return status();
+    },
+    'account.relay.test': async (input) => {
+      try {
+        const { baseUrl, result } = await testRelay(input);
+        if (
+          baseUrl === settings().relay.baseUrl &&
+          (input.key === undefined || input.key.trim() === preferences.relayKey())
+        )
+          preferences.saveRelay({ baseUrl, models: result?.models ?? null });
+        return { ok: true, ...(result || { models: [], other: [] }) };
+      } catch (error) {
+        return { ok: false, error: error.message };
+      }
+    },
     'account.get': () => status(),
     'account.refresh': async () => {
       await refresh();
       return status();
     },
     'account.save': async ({ token }) => {
+      idleConnection();
       let next;
       try {
         next = await createNovelAIClient({
@@ -554,7 +635,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         if (request.parameters.width * request.parameters.height > 1536 * 2048)
           throw new Error('面积最大 1536×2048');
         return {
-          ...estimateGeneration(request, subscription, input.count, pendingEncodes),
+          ...priceFor(request, input.count, pendingEncodes),
           balance: balance(),
           usage: subscription?.usage?.percent,
         };
@@ -577,9 +658,15 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       if (input.continuous && (caller.source === 'agent' || !settings().continuous))
         throw new CommandError('forbidden', '持续生成未开启');
       const { request, pendingEncodes } = await requestFor(current, input.fixedSeed, input.seed),
-        price = estimateGeneration(request, subscription, input.count, pendingEncodes),
+        price = priceFor(request, input.count, pendingEncodes),
         s = settings();
-      if (balance() < (input.continuous ? price.perImage : price.anlas))
+      if (
+        s.connection === 'relay' &&
+        s.limitEnabled &&
+        s.spentImagesToday + input.count > s.dailyImageLimit
+      )
+        throw new Error('已达到每日张数上限');
+      if (s.connection !== 'relay' && balance() < (input.continuous ? price.perImage : price.anlas))
         throw new Error('Anlas 不足');
       const parent = await ensure(current);
       return queue.start({

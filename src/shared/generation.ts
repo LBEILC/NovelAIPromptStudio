@@ -1,6 +1,11 @@
 import type { ImageProject } from './types';
 export interface GenerationSettings {
   blankModel?: 'last' | import('./params').ModelId;
+  connection: 'official' | 'relay';
+  officialToken: boolean;
+  relay: { baseUrl: string; hasKey: boolean; models: import('./params').ModelId[] | null };
+  dailyImageLimit: number;
+  spentImagesToday?: number;
   hasToken: boolean;
   continuous: boolean;
   agentMode: 'confirm' | 'direct';
@@ -16,6 +21,7 @@ export interface NovelAISubscription {
   usage?: { percent: number; isNegative?: boolean; timeUntilNextPercent?: number };
 }
 export interface GenerationEstimate {
+  relay?: boolean;
   anlas: number;
   perImage: number;
   free: boolean;

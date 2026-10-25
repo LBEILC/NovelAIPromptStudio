@@ -41,6 +41,19 @@ export async function startFakeNovelAI() {
       res.writeHead(401).end('{}');
       return;
     }
+    if (req.url === '/v1/models') {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({
+          data: [
+            { id: 'nai-diffusion-5-full' },
+            { id: 'nai-diffusion-4-5-full' },
+            { id: 'nai-diffusion-5-full-inpainting' },
+          ],
+        }),
+      );
+      return;
+    }
     if (req.url === '/user/subscription') {
       res.setHeader('Content-Type', 'application/json');
       res.end(

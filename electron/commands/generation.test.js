@@ -135,6 +135,31 @@ it('runs generation through the command boundary with agent confirmation and ver
     await call('account.refresh', {}, 'ui');
     const capped = await call('generate.start', { tabId, count: 1 });
     expect(capped.state).toBe('pending');
+    await call('generate.cancel', { ids: [capped.id] }, 'ui');
+    await call(
+      'account.relay.save',
+      { baseUrl: service.url + '/v1', key: 'acceptance-token' },
+      'ui',
+    );
+    await call('account.connection.save', { connection: 'relay' }, 'ui');
+    const relayTest = await call('account.relay.test', {}, 'ui');
+    expect(relayTest.ok).toBe(true);
+    expect(relayTest.models).toContain('nai-diffusion-5-full');
+    const estimate = await call('generate.estimate', { tabId, count: 1 });
+    expect(estimate).toMatchObject({ anlas: 0, perImage: 0, free: false, count: 1, relay: true });
+    await call('settings.generation.save', { dailyImageLimit: 1 }, 'ui');
+    const relayJob = await call('generate.start', { tabId, count: 1 });
+    await import('vitest').then(({ vi }) =>
+      vi.waitFor(async () => {
+        expect((await call('generate.status', { id: relayJob.id })).jobs[0].state).toBe(
+          'completed',
+        );
+      }),
+    );
+    expect((await call('account.get', {}, 'ui')).settings.spentImagesToday).toBe(1);
+    await expect(call('generate.start', { tabId, count: 1 })).rejects.toThrow('每日张数上限');
+    await call('account.connection.save', { connection: 'official' }, 'ui');
+    expect((await call('account.get', {}, 'ui')).settings.hasToken).toBe(true);
   } finally {
     commands.close();
     await service.close();

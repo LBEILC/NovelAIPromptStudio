@@ -18,6 +18,23 @@ export async function generationChecks({
   const { evaluate: e, click, input, wait, check } = h;
   h.category('生成');
   await check(
+    '中转站命令完成连接测试、生成和切回官方',
+    `(async () => {
+    const call = async (name, input = {}) => { const r = await window.studio.invoke(name,input); if(!r.ok) throw Error(r.error.message); return r.data; };
+    await call('account.relay.save', {baseUrl: ${JSON.stringify(generationService.url)}, key:'acceptance-token'});
+    await call('account.connection.save', {connection:'relay'});
+    const test = await call('account.relay.test');
+    const opened = await call('workbench.new', {});
+    const estimate = await call('generate.estimate', {tabId:opened.tab.id, count:1});
+    const job = await call('generate.start', {tabId:opened.tab.id, count:1});
+    let state;
+    do { await new Promise(r=>setTimeout(r,30)); state=(await call('generate.status',{id:job.id})).jobs[0]; } while(['queued','generating'].includes(state.state));
+    await call('account.connection.save', {connection:'official'});
+    return test.ok && estimate.relay && state.state==='completed' && (await call('account.get')).settings.connection==='official';
+  })()`,
+  );
+
+  await check(
     '网络接口返回默认系统模式',
     `
     (async () => {

@@ -4,6 +4,10 @@ import { invokeUI } from '../lib/commands';
 let state: GenerationStatus = {
   jobs: [],
   settings: {
+    connection: 'official',
+    officialToken: false,
+    relay: { baseUrl: '', hasKey: false, models: null },
+    dailyImageLimit: 200,
     hasToken: false,
     continuous: false,
     agentMode: 'confirm',
