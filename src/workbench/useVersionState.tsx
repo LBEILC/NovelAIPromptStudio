@@ -11,6 +11,7 @@ import type { WorkOrigin, WorkVersion } from '../shared/generation';
 import { useSharedTrash } from '../shell/SharedTrash';
 import { useGeneration } from '../state/generation';
 import { originGone, originMenu, trashImage } from './original';
+import { openCompare } from './Compare';
 export function useVersionState({
   tab,
   before,
@@ -261,7 +262,24 @@ export function useVersionState({
     setPeek(null);
     setMenu({ at: [e.clientX, e.clientY], items });
   };
+  // 舞台上现在这张：右键别的缩略图可以和它对比（1.8.1）
+  const stageImage = tab.versionImageId || current?.project.id;
   const thumbMenu = (v: WorkVersion, imageId: string, trash = true): MenuEntry[] => [
+    ...(current && stageImage && imageId !== stageImage
+      ? [
+          {
+            label: '和当前这张对比',
+            icon: 'contrast-2-line',
+            onSelect: () =>
+              openCompare(
+                tab.id,
+                { versionId: current.id, imageId: stageImage },
+                { versionId: v.id, imageId },
+              ),
+          },
+          'sep' as const,
+        ]
+      : []),
     {
       label: '作为新作品打开',
       onSelect: () =>

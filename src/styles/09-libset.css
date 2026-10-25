@@ -525,3 +525,50 @@ textarea.para-in { resize: none; overflow: hidden; }
 .rn-sk-lines .sk { display: block; height: var(--lh-small); border-radius: var(--r-tag); }
 .rn-sk-lines .sk:nth-child(2) { width: 80%; }
 .rn-sk-lines .sk:nth-child(3) { width: 60%; }
+
+/* 局部重绘（1.8.1，doc/design.md 2.35）：盖住窗口的编辑层，上面是工具、下面是尺寸价格和按钮。
+   涂抹直接画成 --info，半透明叠在图上；框外压暗；框线和角的粗细除以缩放倍数，放大后不变粗 */
+.inpaint-ov .ip-top { border-top: 0; border-bottom: var(--bw) solid var(--border); }
+.inpaint-ov .ip-top > b { margin-right: var(--sp-2); font-weight: var(--fw-strong); }
+.inpaint-ov .label { color: var(--text-2); }
+.ip-canvas { position: relative; flex: 1 1 auto; min-height: 0; padding: var(--sp-6); display: grid; place-items: center; overflow: hidden; touch-action: none; user-select: none; }
+.ip-stage { position: relative; transform-origin: center; border-radius: 4px; overflow: hidden; box-shadow: var(--shadow-pop); }
+.ip-stage > img { display: block; width: 100%; height: 100%; }
+.ip-stage .ip-mask { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.5; pointer-events: none; }
+.ip-rect { position: absolute; pointer-events: none; outline: calc(1.5px / var(--vz, 1)) dashed var(--ink); box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--bg) 55%, transparent); }
+.ip-rect.manual { outline-style: solid; }
+.ip-rect i { position: absolute; width: calc(10px / var(--vz, 1)); height: calc(10px / var(--vz, 1)); background: var(--surface); outline: calc(1.5px / var(--vz, 1)) solid var(--ink); }
+.ip-rect .tl { left: 0; top: 0; translate: -50% -50%; }
+.ip-rect .tr { right: 0; top: 0; translate: 50% -50%; }
+.ip-rect .bl { left: 0; bottom: 0; translate: -50% 50%; }
+.ip-rect .br { right: 0; bottom: 0; translate: 50% 50%; }
+.ip-ring { position: absolute; pointer-events: none; translate: -50% -50%; border-radius: 50%; border: 1px solid var(--surface); box-shadow: 0 0 0 1px var(--ink); }
+.ip-size { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.ip-size .lslider { width: 120px; }
+.ip-size .mono { min-width: 3ch; }
+.ip-info { display: flex; flex-direction: column; min-width: 0; }
+.viewer-bar .ip-info .help { margin-left: 0; }
+.ip-info .help.warn { color: var(--warn); }
+.ip-info .help.danger { color: var(--danger); }
+.ip-full { display: inline-flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
+
+/* 两张图对比（1.8.1）：并排各占一半；滑块是两层叠在一起，右边那层按分界线裁掉左边。缩放平移两边共用一份 */
+.cmp-panes { flex: 1 1 auto; min-height: 0; display: flex; gap: var(--sp-3); padding: var(--sp-6); }
+.cmp-pane, .cmp-layer { display: grid; place-items: center; min-width: 0; min-height: 0; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
+.cmp-pane { position: relative; flex: 1 1 0; overflow: hidden; }
+.cmp-layer { position: absolute; inset: 0; overflow: hidden; }
+.cmp-pane .vz { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; box-shadow: var(--shadow-pop); cursor: grab; touch-action: none; }
+.cmp-tag { position: absolute; left: var(--sp-2); top: var(--sp-2); z-index: 2; padding: 0 var(--sp-2); border-radius: var(--r-ctl); background: var(--surface); box-shadow: var(--shadow-pop); color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small); pointer-events: none; }
+.cmp-tag.right { left: auto; right: var(--sp-2); }
+.cmp-cut { position: absolute; top: 0; bottom: 0; z-index: 3; width: 2px; translate: -50% 0; background: var(--surface); box-shadow: 0 0 0 1px var(--border); cursor: ew-resize; touch-action: none; }
+.cmp-cut i { position: absolute; top: 50%; left: 50%; translate: -50% -50%; width: var(--ctl-sm); height: var(--ctl-sm); display: grid; place-items: center; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-pop); color: var(--text-2); }
+.cmp-cut:focus-visible i { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
+.cmp-diff { flex: 0 0 auto; max-height: 30vh; overflow: hidden auto; display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) var(--sp-6); background: var(--surface); border-top: var(--bw) solid var(--border); }
+.cmp-diff .help { margin: 0; color: var(--text-3); }
+/* Ctrl 点的第一张：等第二张，虚线框 */
+.ver .ths span.is-pick img { outline: 2px dashed var(--ink); outline-offset: 1px; }
+.inpaint-ov .ip-top > b, .inpaint-ov .label { white-space: nowrap; }
+.inpaint-ov .ip-top .help { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* 1.8.1 起操作条上按钮多了：不压扁，放不下就换到第二行 */
+.stage-acts { flex-wrap: wrap; row-gap: var(--sp-1); }
+.stage-acts > * { flex-shrink: 0; }

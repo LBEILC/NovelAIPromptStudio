@@ -23,6 +23,8 @@ import { trashNotice } from '../lib/trashNotice';
 import { originGone, originMenu, trashImage } from './original';
 import { useSharedTrash } from '../shell/SharedTrash';
 import { ImageOps } from './ImageOps';
+import { Inpaint, rerunInpaint } from './Inpaint';
+import { CompareHost, openCompare } from './Compare';
 
 export interface ImageProps {
   tab: WorkbenchTab;
@@ -65,6 +67,8 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const [menu, setMenu] = useState<[number, number] | null>(null);
   const [vibe, setVibe] = useState<number | null>(null);
   const [op, setOp] = useState<'' | 'upscale' | 'enhance'>('');
+  // 局部重绘（1.8.1）：编辑层开在哪张图上
+  const [inpaint, setInpaint] = useState<{ id: string; src: string } | null>(null);
   useEffect(() => setMissing(!!tab.error), [image?.image_path, tab.error]);
   useEffect(() => {
     if (!generation.settings.hasToken) {
@@ -199,6 +203,23 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const dirtyLeaving = !dirty && showDirty;
   // 放大、增强（1.8）：有令牌、这一张有版本时才有
   const canOp = !!version && !!stageId && !gone && !blank && !allTrashed;
+  const openInpaint = (id: string) =>
+    void invokeUI('library.get', { id })
+      .then((r) => r.project && setInpaint({ id, src: mediaUrl(r.project.image_path) }))
+      .catch((e) => notify({ text: (e as Error).message, tone: 'error' }));
+  // 局部重绘生成的那一版：舞台下面多"再来一次"和"和修之前对比"
+  const repaint =
+    version?.operation?.kind === 'inpaint' && version.parentId && version.operation.sourceProjectId
+      ? { parentId: version.parentId, sourceId: version.operation.sourceProjectId }
+      : null;
+  const again = async () => {
+    if (!repaint) return;
+    try {
+      if (!(await rerunInpaint(tab.id, repaint.sourceId))) openInpaint(repaint.sourceId);
+    } catch (e) {
+      notify({ text: (e as Error).message, tone: 'error' });
+    }
+  };
   const menuItems: MenuEntry[] =
     version && stageId && !gone
       ? [
@@ -206,6 +227,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
             ? ([
                 { label: '放大…', icon: 'expand-diagonal-line', onSelect: () => setOp('upscale') },
                 { label: '增强…', icon: 'magic-line', onSelect: () => setOp('enhance') },
+                { label: '局部重绘…', icon: 'brush-line', onSelect: () => openInpaint(stageId) },
                 {
                   label: '用这张做底图',
                   icon: 'image-edit-line',
@@ -428,6 +450,44 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                   open={op}
                   onOpen={setOp}
                 />
+                <button
+                  className={`btn quiet sm ${missing ? 'is-off' : ''}`}
+                  data-trigger="op-inpaint"
+                  aria-label="局部重绘"
+                  {...lost(() => openInpaint(stageId))}
+                >
+                  <Icon name="brush-line" />
+                  <span className="lbl">局部重绘</span>
+                </button>
+              </>
+            )}
+            {canOp && repaint && (
+              <>
+                <span className="stage-sep" />
+                <button
+                  className="btn quiet sm"
+                  aria-label="再来一次"
+                  data-tip="同样的框和涂抹，再重绘一次"
+                  onClick={() => void again()}
+                >
+                  <Icon name="repeat-line" />
+                  <span className="lbl">再来一次</span>
+                </button>
+                <button
+                  className="btn quiet sm"
+                  aria-label="和修之前对比"
+                  data-tip="和修之前对比"
+                  onClick={() =>
+                    openCompare(
+                      tab.id,
+                      { versionId: repaint.parentId, imageId: repaint.sourceId },
+                      { versionId: version!.id, imageId: stageId },
+                    )
+                  }
+                >
+                  <Icon name="contrast-2-line" />
+                  <span className="lbl">和修之前对比</span>
+                </button>
               </>
             )}
           </div>
@@ -486,6 +546,14 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
           </>
         )}
       </Pop>
+      <Inpaint
+        open={!!inpaint}
+        tabId={tab.id}
+        imageId={inpaint?.id || ''}
+        src={inpaint?.src || ''}
+        onClose={() => setInpaint(null)}
+      />
+      <CompareHost tabId={tab.id} />
       <Viewer
         open={viewer != null}
         items={viewerItems}

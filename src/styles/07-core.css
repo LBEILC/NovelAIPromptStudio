@@ -110,7 +110,7 @@
 .ver .what { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .ver .what .mono > span + span { margin-left: 2px; }
 /* 完整对比：一处改动整个换行；单独一处比一行还宽时才在里面折行，不横着滚 */
-.ver-peek .vp-tags > span { white-space: normal; min-width: 0; overflow-wrap: anywhere; }
+:is(.ver-peek, .cmp-diff) .vp-tags > span { white-space: normal; min-width: 0; overflow-wrap: anywhere; }
 /* 一处改动不在中间断行；单独一处比一行还长时省略 */
 .ver .what .mono > span { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .ver .what .mono.squeeze > span { max-width: calc(100% - 5em); }
@@ -136,13 +136,13 @@
 .wchg { color: var(--text); }
 /* 和上一版的完整对比 */
 .ver-peek { width: var(--popover-w-wide); max-height: calc(100% - 16px); overflow: hidden auto; gap: var(--sp-2); }
-.ver-peek .vp-h { display: flex; flex-direction: column; gap: var(--sp-0); }
-.ver-peek .vp-g { display: flex; flex-direction: column; gap: var(--sp-1); padding-top: var(--sp-2); border-top: var(--bw) solid var(--divider); }
-.ver-peek .vp-tags { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); font-size: var(--fs-caption); }
-.ver-peek .vp-p { margin: 0; overflow-wrap: anywhere; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--text); }
-.ver-peek .vp-p.old { color: var(--text-3); }
-.ver-peek del { color: var(--remove); text-decoration: line-through; }
-.ver-peek ins { color: var(--add); text-decoration: underline; text-underline-offset: 2px; }
+:is(.ver-peek, .cmp-diff) .vp-h { display: flex; flex-direction: column; gap: var(--sp-0); }
+:is(.ver-peek, .cmp-diff) .vp-g { display: flex; flex-direction: column; gap: var(--sp-1); padding-top: var(--sp-2); border-top: var(--bw) solid var(--divider); }
+:is(.ver-peek, .cmp-diff) .vp-tags { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); font-size: var(--fs-caption); }
+:is(.ver-peek, .cmp-diff) .vp-p { margin: 0; overflow-wrap: anywhere; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--text); }
+:is(.ver-peek, .cmp-diff) .vp-p.old { color: var(--text-3); }
+:is(.ver-peek, .cmp-diff) del { color: var(--remove); text-decoration: line-through; }
+:is(.ver-peek, .cmp-diff) ins { color: var(--add); text-decoration: underline; text-underline-offset: 2px; }
 .stage .canvas-empty { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); color: var(--text-3); font-size: var(--fs-small); }
 .stage .canvas-empty i { font-size: calc(var(--icon) * 1.5); }
 .stage .canvas-blank { display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); place-items: center; align-self: stretch; justify-self: stretch; }

@@ -1,5 +1,5 @@
-import { Fragment } from 'react';
-import { Icon, Kbd } from '../kit/controls';
+import { Fragment, useState } from 'react';
+import { Icon, Kbd, isMod, modKey } from '../kit/controls';
 import { Pop } from '../kit/layer';
 import { ContextMenu } from '../kit/menu';
 import { FlipScope, useExitList } from '../kit/motion';
@@ -10,6 +10,7 @@ import type { CommandTab } from '../shared/commands';
 import type { ImageOperation, WorkVersion } from '../shared/generation';
 import { originGone } from './original';
 import { useVersionState } from './useVersionState';
+import { openCompare, type CompareSide } from './Compare';
 import { VersionDifference, VersionSummary } from './VersionDifference';
 import { Row, TH_H, TH_MORE, Thumb, rowsOf } from './versionHelpers';
 // 放大、增强、图生图出来的那一版（1.8，doc/design.md 2.34）：标题旁边挂一个和 Agent 一样的小标签
@@ -17,6 +18,7 @@ const OP_NAME: Record<ImageOperation['kind'], string> = {
   upscale: '放大',
   enhance: '增强',
   img2img: '图生图',
+  inpaint: '局部重绘',
 };
 const n2 = (v?: number) => (v == null ? '' : v.toFixed(2));
 const opTip = (o: ImageOperation) =>
@@ -24,7 +26,9 @@ const opTip = (o: ImageOperation) =>
     ? '把上一版的图宽高各放大 2 倍'
     : o.kind === 'enhance'
       ? `把上一版的图重新细化 · 幅度 ${o.magnitude ?? ''} · 放大 ${o.scale === 'max' ? 'Max' : `${o.scale ?? 1}x`}`
-      : `按底图生成 · 强度 ${n2(o.strength)} · 噪声 ${n2(o.noise)}`;
+      : o.kind === 'inpaint'
+        ? `重绘了上一版图里的一块${o.rect ? ` · 框 ${o.rect.width} × ${o.rect.height}，在 ${o.rect.x}, ${o.rect.y}` : ''} · 重绘强度 ${n2(o.strength)}`
+        : `按底图生成 · 强度 ${n2(o.strength)} · 噪声 ${n2(o.noise)}`;
 
 export function Versions({ tab, before }: { tab: CommandTab; before?: () => Promise<void> }) {
   const {
@@ -66,6 +70,16 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     setRename,
     setRefresh,
   } = useVersionState({ tab, before });
+  // Ctrl（macOS 是 Command）点两张缩略图：两张对比（1.8.1）；先点的那张虚线框标着
+  const [pick, setPick] = useState<CompareSide | null>(null);
+  const pickOr = (e: React.MouseEvent, v: WorkVersion, imageId: string) => {
+    if (!isMod(e)) return false;
+    if (pick && pick.imageId !== imageId) {
+      openCompare(tab.id, pick, { versionId: v.id, imageId });
+      setPick(null);
+    } else setPick(pick?.imageId === imageId ? null : { versionId: v.id, imageId });
+    return true;
+  };
   const thumbs = (v: WorkVersion, on: boolean) => {
     const w = Math.round(TH_H * ratio(v));
     type Cell = { key: string; pin: boolean; node: React.ReactNode };
@@ -79,11 +93,12 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         node: (
           <span
             key="orig"
-            className={cur(v.project.id) ? 'is-cur' : ''}
+            className={`${cur(v.project.id) ? 'is-cur' : ''} ${pick?.imageId === v.project.id ? 'is-pick' : ''}`}
             style={{ '--w': `${w}px` } as React.CSSProperties}
             data-tip="原图"
             onClick={(e) => {
               e.stopPropagation();
+              if (pickOr(e, v, v.project.id)) return;
               void go(v, v.project.id);
             }}
             onContextMenu={ctx(thumbMenu(v, v.project.id, false))}
@@ -102,11 +117,17 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         node: (
           <span
             key={img.id}
-            className={cur(img.projectId) ? 'is-cur' : ''}
+            className={`${cur(img.projectId) ? 'is-cur' : ''} ${pick?.imageId === img.projectId ? 'is-pick' : ''}`}
             style={{ '--w': `${w}px` } as React.CSSProperties}
             data-enter="fade"
+            data-tip={
+              pick && pick.imageId !== img.projectId
+                ? `按住 ${modKey()} 点，和标着的那张对比`
+                : undefined
+            }
             onClick={(e) => {
               e.stopPropagation();
+              if (pickOr(e, v, img.projectId)) return;
               void go(v, img.projectId);
             }}
             onContextMenu={ctx(thumbMenu(v, img.projectId))}

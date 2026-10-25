@@ -191,8 +191,9 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
   );
 }
 
-const modelNames = (ids: ModelId[]) =>
-  ids.map((id) => MODEL_CAPS[id]?.name || id).join('、') || '没有本软件支持的模型';
+// 中转站列出的模型里也有局部重绘用的 -inpainting，不在 MODEL_CAPS 里的照原名写
+const modelNames = (ids: readonly string[]) =>
+  ids.map((id) => MODEL_CAPS[id as ModelId]?.name || id).join('、') || '没有本软件支持的模型';
 
 /** 中转站：地址和 Key，"测试连接"读它挂了哪些模型（doc/design.md 2.33） */
 function Relay({ onSaved }: { onSaved?: () => void }) {
@@ -204,7 +205,7 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
   const [editingKey, setEditingKey] = useState(false);
   const [busy, setBusy] = useState<'' | 'save' | 'test'>('');
   const [error, setError] = useState('');
-  const [tested, setTested] = useState<{ models: ModelId[]; other: string[] } | null>(null);
+  const [tested, setTested] = useState<{ models: string[]; other: string[] } | null>(null);
   useEffect(() => setUrl(saved?.baseUrl || ''), [saved?.baseUrl]);
   const hasKey = !!saved?.hasKey;
   const keyEdit = editingKey || !hasKey;
