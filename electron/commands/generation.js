@@ -1,3 +1,8 @@
+import {
+  buildImageOperation,
+  estimateImageOperation,
+  ENHANCE_MAGNITUDES,
+} from '../imageOperations.js';
 import { checkRelayRequest, normalizeRelayUrl } from '../relay.js';
 import { saveWorkbenchImage } from './saveWorkbenchImage.js';
 import { createBlankProject } from '../workbench.js';
@@ -149,7 +154,10 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       syncFs.writeFileSync(temporary, JSON.stringify(jobs));
       syncFs.renameSync(temporary, queueFile);
     },
-    generate: (request, progress) => client().generate(request, progress),
+    generate: (request, progress) =>
+      request.action === 'upscale'
+        ? client().upscale(request)
+        : client().generate(request, progress),
     prepare: async (job) => {
       // Persist before any paid reference encoding or image request. Pending jobs
       // reach this point only after confirmation; closed tabs are supported too.
@@ -175,6 +183,26 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           thumbnail_path: saved.project.thumbnail_path,
         };
       });
+      if (job.operation === 'upscale' || job.operation === 'enhance') {
+        const preview = await buildImageOperation(
+          job.project,
+          job.operationPath,
+          job.operationDetails,
+          services.database.vibeLibrary,
+          { seed: job.request.parameters.seed },
+        );
+        checkOperationRelay(preview.request, preview.pendingEncodes);
+        const prepared = await buildImageOperation(
+          job.project,
+          job.operationPath,
+          job.operationDetails,
+          services.database.vibeLibrary,
+          { seed: job.request.parameters.seed, encode: (body) => client().encodeVibe(body) },
+        );
+        job.request = prepared.request;
+        job.referencesPrepared = true;
+        return;
+      }
       // Rehydrate restored jobs too; previously prepared requests can contain legacy bad values.
       const preview = await buildProjectRequest(job.project, services.database.vibeLibrary, {
         seed: job.request.parameters.seed,
@@ -248,19 +276,24 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         const version = versions.append({
           workId: job.workId,
           parentId: job.parentId,
-          project: job.project,
+          project:
+            job.operation === 'enhance'
+              ? { ...job.project, metadata: { ...job.project.metadata, seed: String(seed) } }
+              : job.project,
           source: job.source,
           image,
           seed,
           versionId: job.versionId,
-          operation: job.project.references?.base
-            ? {
-                kind: 'img2img',
-                strength: job.project.references.base.strength,
-                noise: job.project.references.base.noise,
-                sourceProjectId: job.project.references.base.projectId,
-              }
-            : undefined,
+          operation:
+            job.operationDetails ||
+            (job.project.references?.base
+              ? {
+                  kind: 'img2img',
+                  strength: job.project.references.base.strength,
+                  noise: job.project.references.base.noise,
+                  sourceProjectId: job.project.references.base.projectId,
+                }
+              : undefined),
         });
         versions.touch(
           job.workId,
@@ -475,7 +508,113 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     publish();
     return { ...counts, cancelledJobs: pending.length, undo };
   }
+  function checkOperationRelay(request, pending) {
+    if (
+      request.action === 'upscale' &&
+      settings().connection === 'relay' &&
+      settings().relay.models !== null &&
+      !settings().relay.models.includes('nai-diffusion-5-curated')
+    )
+      throw new Error('中转站没有放大用的模型');
+    checkRelayRequest(settings(), request, pending);
+  }
+  async function operationFor(input) {
+    const current = tab(input.tabId);
+    await ensure(current);
+    const parent =
+      versions.forImage(input.imageId, current.workId) ||
+      versions
+        .list(current.workId)
+        .find(
+          (v) =>
+            !v.parentId &&
+            v.project.id === input.imageId &&
+            !['removed', 'trashed'].includes(v.originState),
+        );
+    if (!parent) throw new CommandError('not_found', '图片不在这个作品中');
+    const image = services.database.loadProject(input.imageId) || parent.project;
+    if (image.deleted_at) throw new CommandError('not_found', '图片不存在');
+    const operation = {
+      kind: input.op,
+      sourceProjectId: input.imageId,
+      ...(input.op === 'enhance'
+        ? {
+            magnitude: input.magnitude ?? 2,
+            scale: input.scale ?? 1,
+            ...ENHANCE_MAGNITUDES[(input.magnitude ?? 2) - 1],
+          }
+        : {}),
+    };
+    const prepared = await buildImageOperation(
+      parent.project,
+      image.image_path,
+      operation,
+      services.database.vibeLibrary,
+    );
+    checkOperationRelay(prepared.request, prepared.pendingEncodes);
+    const price =
+      settings().connection === 'relay'
+        ? { anlas: 0, perImage: 0, free: false, count: 1, relay: true }
+        : estimateImageOperation(prepared.request, subscription, prepared.pendingEncodes);
+    return { current, parent, image, operation, prepared, price };
+  }
+  async function startOperation(input, kind) {
+    const current = tab(input.tabId);
+    revision(input.expectedRevision, current.revision || 0);
+    unlocked(input);
+    if (!settings().hasToken) throw new Error('没有持久令牌');
+    const { parent, image, operation, prepared, price } = await operationFor({
+      ...input,
+      op: kind,
+    });
+    const s = settings();
+    if (s.connection === 'relay' && s.limitEnabled && s.spentImagesToday + 1 > s.dailyImageLimit)
+      throw new Error('已达到每日张数上限');
+    if (s.connection !== 'relay' && balance() < price.anlas) throw new Error('Anlas 不足');
+    return queue.start({
+      tabId: current.id,
+      workId: parent.workId,
+      parentId: parent.id,
+      project: parent.project,
+      request: prepared.request,
+      count: 1,
+      fixedSeed: kind === 'upscale',
+      source: 'user',
+      operation: kind,
+      operationDetails: operation,
+      operationPath: image.image_path,
+      originalPending: !!versions.list(parent.workId)[0]?.project.autoSaveOriginal,
+      parentNumber: parent.number,
+      name: current.displayName,
+      estimate: price.anlas,
+    });
+  }
   const handlers = {
+    'generate.estimate-op': async (input) => {
+      try {
+        const { prepared, price } = await operationFor(input);
+        return {
+          ...price,
+          width: prepared.width,
+          height: prepared.height,
+          ...(prepared.scales ? { scales: prepared.scales } : {}),
+          balance: balance(),
+        };
+      } catch (error) {
+        return {
+          anlas: 0,
+          perImage: 0,
+          free: false,
+          count: 1,
+          width: 0,
+          height: 0,
+          unavailable: error.message,
+          ...(settings().connection === 'relay' ? { relay: true } : {}),
+        };
+      }
+    },
+    'generate.upscale': (input) => startOperation(input, 'upscale'),
+    'generate.enhance': (input) => startOperation(input, 'enhance'),
     'trash.detached': async () => {
       const cards = new Map(
         (await services.database.loadLibraryCards()).map((card) => [card.id, card]),

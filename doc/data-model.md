@@ -128,3 +128,5 @@ materials（JSON 素材） ──按内容引用── reference_vibes（参考�
 ### 图像操作快照
 
 `work_versions.snapshot_json` 可含 `operation`（kind、sourceProjectId、strength、noise、magnitude、scale）。旧快照省略该字段仍可读取。底图保存在 `references.base`，path 指向资源目录 references 下的软件副本，随备份资源树保存并重链接。移除草稿底图保留历史素材。
+
+放大和增强始终新建一版，父版本为来源图片所在版本；快照沿用父版本，增强更新为实际随机 seed。`operation.sourceProjectId` 记录来源图片 ID（图生图仅在底图来自图库时有值）。放大和增强文件中的旧 width/height 不覆盖入库尺寸，图库尺寸以 PNG IHDR 的实际像素为准。删除、撤销和备份沿用整个版本快照，不另加表。

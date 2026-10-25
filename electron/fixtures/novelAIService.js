@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { maxEnhanceResultSize } from '../imageOperations.js';
 import sharp from 'sharp';
 import yazl from 'yazl';
 function pngText(value) {
@@ -76,7 +77,7 @@ export async function startFakeNovelAI() {
       res.end(Buffer.from(JSON.stringify(body)));
       return;
     }
-    if (!['/ai/generate-image', '/ai/generate-image-stream'].includes(req.url)) {
+    if (!['/ai/generate-image', '/ai/generate-image-stream', '/ai/upscale'].includes(req.url)) {
       res.writeHead(404).end();
       return;
     }
@@ -111,11 +112,38 @@ export async function startFakeNovelAI() {
       res.writeHead(code).end('{}');
       return;
     }
+    if (req.url === '/ai/upscale') {
+      const source = Buffer.from(body.image, 'base64');
+      const { width, height } = await sharp(source).metadata();
+      const pixels = await sharp(source)
+        .resize(width * 2, height * 2)
+        .png()
+        .toBuffer();
+      const texts = [];
+      for (let offset = 8; offset + 12 <= source.length; ) {
+        const length = source.readUInt32BE(offset),
+          type = source.toString('ascii', offset + 4, offset + 8);
+        if (['tEXt', 'iTXt', 'zTXt'].includes(type))
+          texts.push(source.subarray(offset, offset + length + 12));
+        offset += length + 12;
+      }
+      const image = Buffer.concat([pixels.subarray(0, -12), ...texts, pixels.subarray(-12)]);
+      state.balance -= 1;
+      const zip = new yazl.ZipFile();
+      zip.addBuffer(image, 'image_0.png');
+      zip.end();
+      res.setHeader('Content-Type', 'application/zip');
+      zip.outputStream.pipe(res);
+      return;
+    }
+    const size = body.parameters.upscaled_enhance
+      ? maxEnhanceResultSize(body.parameters.width, body.parameters.height)
+      : body.parameters;
     // Different seeds yield distinct bytes, preserving importer duplicate behavior.
     const pixels = await sharp(
       state.images[(state.requests.length - 1) % state.images.length] || png,
     )
-      .resize(body.parameters.width, body.parameters.height)
+      .resize(size.width, size.height)
       .png()
       .toBuffer();
     const text = pngText({

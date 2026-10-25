@@ -14,6 +14,7 @@ import { openCommandSession } from './commands/session.js';
 import { createWorkbenchTab } from '../src/lib/workbenchSession.js';
 import { importImage } from './assets.js';
 import { createBackupManager } from './backup.js';
+import { storeBaseImage } from './baseImage.js';
 
 async function fixture(run) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-backup-test-'));
@@ -96,6 +97,30 @@ async function entries(file) {
   });
   return result;
 }
+
+it('backs up managed base copies and operation snapshots with version restoration', () =>
+  fixture(async ({ database, assets, manager, file, project }) => {
+    const base = { ...(await storeBaseImage(project.image_path, assets)), strength: 0.7, noise: 0 };
+    const snapshot = { ...project, references: { vibes: [], precise: [], base } };
+    const root = database.versions.ensure('operation-backup', snapshot);
+    const operation = { kind: 'img2img', strength: 0.7, noise: 0, sourceProjectId: project.id };
+    const version = database.versions.append({
+      workId: root.workId,
+      parentId: root.id,
+      project: snapshot,
+      source: 'user',
+      image: project,
+      seed: 123,
+      operation,
+    });
+    await manager.export(file, true);
+    const original = await fs.readFile(base.path);
+    await fs.unlink(base.path);
+    await manager.restore(file);
+    const restored = database.versions.get(version.id);
+    expect(restored.operation).toEqual(operation);
+    expect(await fs.readFile(restored.project.references.base.path)).toEqual(original);
+  }));
 
 it('rolls back a failed replacement and cancels extraction before changing current data', () =>
   fixture(async ({ manager, options, preferences, database, file, project }) => {

@@ -5,6 +5,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { prepareBaseImage, storeBaseImage } from './baseImage.js';
 import { buildGenerationRequest, estimateGeneration } from './generation.js';
+import { readNovelAIMetadata } from './metadata.js';
 
 it('copies base images, clears alpha carriers and preserves transparency only for V5', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'base-image-'));
@@ -67,4 +68,33 @@ it('only accepts explicit image edits and uses paired seeds and strength pricing
   });
   expect(request.parameters).not.toHaveProperty('upscaled_enhance');
   expect(estimateGeneration(request, null).anlas).toBe(18);
+});
+
+it('removes a real stealth payload before resizing', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'base-stealth-'));
+  try {
+    const source = path.join(dir, 'synthetic.png');
+    const pixels = Buffer.alloc(128 * 128 * 4, 255);
+    const payload = Buffer.from(
+      JSON.stringify({ Comment: JSON.stringify({ prompt: 'synthetic hidden shape', seed: 123 }) }),
+    );
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(payload.length * 8);
+    const hidden = Buffer.concat([Buffer.from('stealth_pnginfo'), length, payload]);
+    for (let i = 0; i < hidden.length * 8; i++)
+      pixels[((i % 128) * 128 + Math.floor(i / 128)) * 4 + 3] =
+        254 | ((hidden[Math.floor(i / 8)] >> (7 - (i % 8))) & 1);
+    await sharp(pixels, { raw: { width: 128, height: 128, channels: 4 } })
+      .png()
+      .toFile(source);
+    expect((await readNovelAIMetadata(source)).prompt_raw).toBe('synthetic hidden shape');
+    const cleaned = path.join(dir, 'cleaned.png');
+    await fs.writeFile(
+      cleaned,
+      Buffer.from(await prepareBaseImage(source, 128, 128, 'nai-diffusion-5-full'), 'base64'),
+    );
+    expect((await readNovelAIMetadata(cleaned)).prompt_raw).toBe('');
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });

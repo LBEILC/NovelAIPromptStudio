@@ -163,6 +163,29 @@ export const commandRegistry = {
     mutation: true,
   },
   'vibe.library': { fields: {} },
+  'generate.estimate-op': {
+    fields: {
+      ...tab,
+      op: 'upscale|enhance',
+      imageId: 'string',
+      magnitude: 'integer',
+      scale: 'enhanceScale',
+    },
+    required: ['tabId', 'op', 'imageId'],
+    uiOnly: true,
+  },
+  'generate.upscale': {
+    fields: { ...tab, imageId: 'string' },
+    required: ['tabId', 'imageId'],
+    mutation: true,
+    uiOnly: true,
+  },
+  'generate.enhance': {
+    fields: { ...tab, imageId: 'string', magnitude: 'integer', scale: 'enhanceScale' },
+    required: ['tabId', 'imageId', 'magnitude', 'scale'],
+    mutation: true,
+    uiOnly: true,
+  },
   'generate.estimate': {
     fields: { ...tab, count: 'integer', width: 'number', height: 'number' },
     required: ['tabId', 'count'],
@@ -715,6 +738,7 @@ function valid(value, type) {
       typeof value === 'string' && value.length <= 2_000_000 && (type === 'text' || !!value.trim())
     );
   if (type === 'generationPatch') return validSettingsPatch(value);
+  if (type === 'enhanceScale') return [1, 1.5, 2, 'max'].some((scale) => scale === value);
   if (type === 'unit')
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
   if (type === 'integer') return Number.isSafeInteger(value) && Number(value) >= 0;

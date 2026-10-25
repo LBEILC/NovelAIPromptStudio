@@ -54,7 +54,9 @@ it('keeps base images and image operation versions durable through command flows
     readImage: async () => project,
     readSource: async () => project,
     importImage: async (source) => {
-      const image = await readWorkbenchImage(source);
+      const copy = path.join(directory, `saved-${imported}.png`);
+      await fs.copyFile(source, copy);
+      const image = await readWorkbenchImage(copy);
       image.id = `generated-${++imported}`;
       database.insertProject(image);
       return image;
@@ -77,7 +79,9 @@ it('keeps base images and image operation versions durable through command flows
   const waitJob = async (id) => {
     if (!finishes.has(id))
       await new Promise((resolve) => {
-        onFinished = resolve;
+        onFinished = () => {
+          if (finishes.has(id)) resolve();
+        };
       });
     return finishes.get(id);
   };
@@ -108,6 +112,89 @@ it('keeps base images and image operation versions durable through command flows
     expect((await call('workbench.get', { tabId })).tab.project.references.base).toBeTruthy();
     await call('reference.remove', { tabId, id: 'base' });
     expect((await call('workbench.get', { tabId })).tab.project.references.base).toBeNull();
+    await call('params.set', { tabId, patch: { steps: 31 } });
+    const sourceId = completed.images[0];
+    for (const name of ['generate.upscale', 'generate.enhance', 'generate.estimate-op']) {
+      const r = await commands.dispatch(
+        name,
+        {
+          tabId,
+          imageId: sourceId,
+          ...(name === 'generate.enhance'
+            ? { magnitude: 2, scale: 'max' }
+            : name === 'generate.estimate-op'
+              ? { op: 'upscale' }
+              : {}),
+        },
+        'agent',
+      );
+      expect(r.ok).toBe(false);
+      expect(r.error.code).toBe('forbidden');
+    }
+    const estimate = await call(
+      'generate.estimate-op',
+      { tabId, imageId: sourceId, op: 'upscale' },
+      'ui',
+    );
+    expect(estimate).toMatchObject({ width: 1664, height: 2432, anlas: 1 });
+    const up = await waitJob(
+      (await call('generate.upscale', { tabId, imageId: sourceId }, 'ui')).id,
+    );
+    expect(up.state).toBe('completed');
+    const upVersion = database.versions.get(up.versionId);
+    expect(upVersion.parentId).toBe(version.id);
+    expect(upVersion.operation).toEqual({ kind: 'upscale', sourceProjectId: sourceId });
+    const upImage = database.loadProject(up.images[0]);
+    expect(upImage.metadata).toMatchObject({ width: 1664, height: 2432 });
+    expect(
+      (await database.loadLibraryCards()).find((card) => card.id === upImage.id).metadata,
+    ).toMatchObject({ width: 1664, height: 2432 });
+    expect(upImage.metadata.extra_json).toBe(database.loadProject(sourceId).metadata.extra_json);
+    const maxPrice = await call(
+      'generate.estimate-op',
+      { tabId, imageId: sourceId, op: 'enhance', magnitude: 2, scale: 'max' },
+      'ui',
+    );
+    expect(maxPrice).toMatchObject({ width: 1467, height: 2144, scales: [1, 1.5, 'max'] });
+    const enhanced = await waitJob(
+      (
+        await call(
+          'generate.enhance',
+          { tabId, imageId: sourceId, magnitude: 2, scale: 'max' },
+          'ui',
+        )
+      ).id,
+    );
+    expect(enhanced.state).toBe('completed');
+    const enhancedVersion = database.versions.get(enhanced.versionId);
+    expect(enhancedVersion.parentId).toBe(version.id);
+    expect(enhancedVersion.operation).toEqual({
+      kind: 'enhance',
+      sourceProjectId: sourceId,
+      strength: 0.4,
+      noise: 0,
+      magnitude: 2,
+      scale: 'max',
+    });
+    expect(enhancedVersion.project.params.steps).toBe(version.project.params.steps);
+    expect(enhancedVersion.project.metadata.seed).toBe(
+      String(service.state.requests.at(-1).parameters.seed),
+    );
+    expect(database.loadProject(enhanced.images[0]).metadata).toMatchObject({
+      width: 1467,
+      height: 2144,
+    });
+    const deletion = await call('version.delete', { versionId: enhanced.versionId, only: true });
+    await call('branch.restore', { undo: deletion.undo });
+    expect(database.versions.get(enhanced.versionId).operation).toEqual(enhancedVersion.operation);
+    await call('account.relay.save', { baseUrl: service.url, key: 'acceptance-token' }, 'ui');
+    await call('account.connection.save', { connection: 'relay' }, 'ui');
+    const blocked = await call(
+      'generate.estimate-op',
+      { tabId, imageId: sourceId, op: 'upscale' },
+      'ui',
+    );
+    expect(blocked).toMatchObject({ relay: true, unavailable: '中转站没有放大用的模型' });
   } finally {
     await commands.close();
     database.close();

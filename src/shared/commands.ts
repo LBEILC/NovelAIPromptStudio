@@ -309,6 +309,31 @@ export interface CommandDefinitions {
     input: Record<string, never>;
     output: { items: import('./params').VibeLibraryItem[] };
   };
+  'generate.estimate-op': {
+    input: TabInput & {
+      op: 'upscale' | 'enhance';
+      imageId: string;
+      magnitude?: 1 | 2 | 3 | 4 | 5;
+      scale?: import('./generation').EnhanceScale;
+    };
+    output: import('./generation').GenerationEstimate & {
+      width: number;
+      height: number;
+      scales?: import('./generation').EnhanceScale[];
+    };
+  };
+  'generate.upscale': {
+    input: TabInput & { imageId: string };
+    output: import('./generation').GenerationJob;
+  };
+  'generate.enhance': {
+    input: TabInput & {
+      imageId: string;
+      magnitude: 1 | 2 | 3 | 4 | 5;
+      scale: import('./generation').EnhanceScale;
+    };
+    output: import('./generation').GenerationJob;
+  };
   'generate.estimate': {
     input: TabInput & { count: number; width?: number; height?: number };
     output: GenerationEstimate;

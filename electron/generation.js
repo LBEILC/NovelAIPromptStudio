@@ -424,6 +424,18 @@ export function createNovelAIClient({
     },
     encodeVibe: async (body) =>
       Buffer.from(await (await send('/ai/encode-vibe', body)).arrayBuffer()).toString('base64'),
+    upscale: async (request) =>
+      extractGeneratedPng(
+        Buffer.from(
+          await (
+            await send('/ai/upscale', {
+              image: request.image,
+              model: 'nai-diffusion-5-curated',
+              declared_blur_sigma: 0,
+            })
+          ).arrayBuffer(),
+        ),
+      ),
     subscription: async () => (await send('/user/subscription')).json(),
     generate: async (request, onProgress = () => {}) => {
       const normalized = normalizeVibeParameters(request.parameters);

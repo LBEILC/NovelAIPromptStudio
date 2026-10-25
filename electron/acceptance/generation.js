@@ -473,7 +473,7 @@ export async function generationChecks({
     '底图命令生成新版本并持久保留底图',
     `(async () => {
     const call = async (name, input = {}) => { const r = await window.studio.invoke(name,input); if(!r.ok) throw Error(r.error.message); return r.data; };
-    const opened = await call('workbench.new', {}), tabId = opened.tab.id;
+    const opened = await call('workbench.new', {width:832,height:1216,params:{model:'nai-diffusion-5-full',effort:'High',steps:23}}), tabId = opened.tab.id;
     await call('reference.set-base', {tabId, path:${JSON.stringify(files[0])}});
     const job = await call('generate.start', {tabId, count:1});
     let state;
@@ -481,7 +481,36 @@ export async function generationChecks({
     const version = (await call('version.list',{tabId})).versions.find(v=>v.id===state.versionId);
     const draft = (await call('workbench.get',{tabId})).tab.project;
     await call('reference.remove',{tabId,id:'base'});
-    return state.state==='completed' && version.operation.kind==='img2img' && !!version.project.references.base && !!draft.references.base && !(await call('workbench.get',{tabId})).tab.project.references.base;
+    const baseRemoved = !(await call('workbench.get',{tabId})).tab.project.references.base;
+    window.__operationSource = { tabId, imageId:state.images[0], versionId:version.id };
+    return state.state==='completed' && version.operation.kind==='img2img' && !!version.project.references.base && !!draft.references.base && baseRemoved;
+  })()`,
+  );
+  await check(
+    '放大命令创建来源版本的子版且图片尺寸翻倍',
+    `(async () => {
+    const call = async (name, input = {}) => { const r = await window.studio.invoke(name,input); if(!r.ok) throw Error(r.error.message); return r.data; };
+    const {tabId,imageId,versionId}=window.__operationSource;
+    const estimate=await call('generate.estimate-op',{tabId,imageId,op:'upscale'});
+    const job=await call('generate.upscale',{tabId,imageId}); let state;
+    do { await new Promise(r=>setTimeout(r,30)); state=(await call('generate.status',{id:job.id})).jobs[0]; } while(['queued','generating'].includes(state.state));
+    const version=(await call('version.list',{tabId})).versions.find(v=>v.id===state.versionId);
+    const image=(await call('library.get',{id:state.images[0]})).project;
+    return state.state==='completed' && version.parentId===versionId && version.operation.kind==='upscale' && image.metadata.width===estimate.width && image.metadata.height===estimate.height;
+  })()`,
+  );
+  await check(
+    '增强 Max 创建来源版本的子版且尺寸符合结果预测',
+    `(async () => {
+    const call = async (name, input = {}) => { const r = await window.studio.invoke(name,input); if(!r.ok) throw Error(r.error.message); return r.data; };
+    const {tabId,imageId,versionId}=window.__operationSource;
+    const estimate=await call('generate.estimate-op',{tabId,imageId,op:'enhance',magnitude:2,scale:'max'});
+    const job=await call('generate.enhance',{tabId,imageId,magnitude:2,scale:'max'}); let state;
+    do { await new Promise(r=>setTimeout(r,30)); state=(await call('generate.status',{id:job.id})).jobs[0]; } while(['queued','generating'].includes(state.state));
+    const version=(await call('version.list',{tabId})).versions.find(v=>v.id===state.versionId);
+    const image=(await call('library.get',{id:state.images[0]})).project;
+    await call('workbench.close',{tabId}); delete window.__operationSource;
+    return state.state==='completed' && version.parentId===versionId && version.operation.kind==='enhance' && version.operation.scale==='max' && image.metadata.width===estimate.width && image.metadata.height===estimate.height;
   })()`,
   );
   const reference = await call('reference.add-vibe', { tabId: refTab, path: files[0] });
