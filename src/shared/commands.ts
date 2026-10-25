@@ -522,6 +522,10 @@ export interface CommandDefinitions {
     output: Types.ProductivitySettings;
   };
   /** 关闭弹框的选择；remember 为真时先把这次的选择存成"关闭主窗口时" */
+  /** 首次引导（1.6.3）：show 为 true 时启动后显示欢迎卡片；升级上来的老用户为 false */
+  'onboarding.get': { input: Record<string, never>; output: { show: boolean } };
+  /** 看完或跳过引导，以后启动不再显示（"关于"页里仍可重新查看） */
+  'onboarding.done': { input: Record<string, never>; output: Record<string, never> };
   'window.close-choice': {
     input: { action: 'tray' | 'quit'; remember: boolean };
     output: Record<string, never>;

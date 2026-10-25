@@ -308,6 +308,8 @@ export const commandRegistry = {
     uiOnly: true,
   },
   'settings.productivity.get': { fields: {}, required: [], uiOnly: true },
+  'onboarding.get': { fields: {}, required: [], uiOnly: true },
+  'onboarding.done': { fields: {}, required: [], uiOnly: true },
   'window.close-choice': {
     fields: { action: 'tray|quit', remember: 'boolean' },
     required: ['action', 'remember'],
