@@ -32,6 +32,7 @@ const cardRatio = (c: LibraryCard) => {
   const { width, height } = c.metadata;
   return width && height ? width / height : fallbackRatio;
 };
+const groupKey = (group: LibraryGroup) => group.id;
 /** 卡片显示的样子（1.5.6）：主图按"封面"选；多张预览时右边多一列，卡片宽出行高的 GALLERY_MOSAIC_RATIO */
 export type GalleryDisplay = {
   cover: 'origin' | 'earliest' | 'latest';
@@ -142,10 +143,14 @@ export function Grid({
     { groups: p.groups, key: p.contentKey, p, generated: generatedFor.current.on },
     (v) => v.key,
   );
-  const count = libraryCountText(
-    p.groups.length,
-    p.groups.reduce((n, g) => n + g.members.length, 0),
-    hasActiveGalleryFilters(p.filters) ? p.filterProjects.length : undefined,
+  const count = useMemo(
+    () =>
+      libraryCountText(
+        p.groups.length,
+        p.groups.reduce((n, g) => n + g.members.length, 0),
+        hasActiveGalleryFilters(p.filters) ? p.filterProjects.length : undefined,
+      ),
+    [p.groups, p.filters, p.filterProjects.length],
   );
   return (
     <div
@@ -210,8 +215,9 @@ function Cards({
 }) {
   const grid = useRef<HTMLDivElement>(null);
   // 删掉的先淡出（留在原来的位置），--dur-1 之后才拿掉，其他再补位
-  const exit = useExitList(live, (g) => g.id);
-  const groups = exit.map((x) => x.item);
+  const exit = useExitList(live, groupKey);
+  const groups = useMemo(() => exit.map((x) => x.item), [exit]);
+  const layoutKey = useMemo(() => exit.map((x) => x.key).join('|'), [exit]);
   const gap = ms('--thumb-gap') || 14;
   const rows: LibraryRow[] = useMemo(
     () =>
@@ -227,16 +233,15 @@ function Cards({
         ms('--thumb-ratio-min') || 0.5,
         ms('--thumb-ratio-max') || 2.5,
       ),
-    [exit.map((x) => x.key).join('|'), vp.width, rowHeight, gap, display.cover],
+    [layoutKey, vp.width, rowHeight, gap, display.cover],
   );
   const height = rows.length ? rows[rows.length - 1].top + rows[rows.length - 1].height : 0;
   // 新出现的（导入、生成的图）淡入；第一次画出来的不淡入
   const seen = useRef<Set<string> | null>(null);
-  const fresh = new Set<string>();
-  if (seen.current) for (const g of groups) if (!seen.current.has(g.id)) fresh.add(g.id);
+  const previousKeys = seen.current;
   useEffect(() => {
     seen.current = new Set(groups.map((g) => g.id));
-  });
+  }, [groups]);
   const [scrub, setScrub] = useState<{ id: string; i: number } | null>(null);
   const preloaded = useRef(new Map<string, Promise<void>>());
   const preload = (url: string) => {
@@ -251,7 +256,10 @@ function Cards({
     return ready;
   };
   const anchor = useRef('');
-  const index = groups.findIndex((g) => g.id === p.previewGroup?.id);
+  const index = useMemo(
+    () => groups.findIndex((g) => g.id === p.previewGroup?.id),
+    [groups, p.previewGroup?.id],
+  );
   const picking = p.selectedGroupIds.length > 0;
   const reveal = (i: number, focus = false) => {
     const el = scroll.current,
@@ -488,7 +496,7 @@ function Cards({
             <div
               key={g.id}
               className={`card ${on ? 'on' : ''} ${picked ? 'picked' : ''} ${leaving ? 'leaving fading' : ''} ${mosaic ? 'mosaic' : ''}`}
-              data-enter={fresh.has(g.id) ? 'fade' : undefined}
+              data-enter={previousKeys && !previousKeys.has(g.id) ? 'fade' : undefined}
               data-index={i}
               data-group-id={g.id}
               role="option"

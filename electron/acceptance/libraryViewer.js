@@ -46,7 +46,7 @@ export async function libraryViewerChecks({ h, database, mode }) {
     await selectGalleryGrouping(h, '完全相同');
     await h.key('Escape');
     await h.wait(
-      '!document.querySelector("[data-library-updating=true]") && document.querySelectorAll(".card").length===3',
+      '!document.querySelector("[data-library-updating=true]") && !document.querySelector(".lgrid.leaving") && document.querySelectorAll(".card").length===3',
     );
     await h.evaluate('document.querySelector(".card").click()');
     await h.wait(`document.querySelector('.detail')?.dataset.detailId===${JSON.stringify(ids[0])}`);

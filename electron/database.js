@@ -387,8 +387,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
 
   // Writes commit before their public API returns. Kept for existing callers.
   const persist = () => {};
-  const query = (sql, params = {}) => {
-    const statement = database.prepare(sql);
+  const readQuery = (statement, params = {}) => {
     // Preserve the previous Number-valued API even for legacy 64-bit integers;
     // the native default would throw when an integer exceeds Number's safe range.
     statement.setReadBigInts(true);
@@ -399,6 +398,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       return result;
     });
   };
+  const query = (sql, params = {}) => readQuery(database.prepare(sql), params);
 
   const lookupTagDictionary = (tags = []) => {
     const found = new Map();
@@ -1932,17 +1932,28 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     AFTER UPDATE OF name, image_path, thumbnail_path, created_at, is_favorite, deleted_at ON projects BEGIN
       INSERT OR REPLACE INTO app_meta(key, value) VALUES ('${cardDirtyPrefix}' || NEW.id, '1');
     END`);
+  let legacyFingerprintTracking = false;
   for (const { name, sql } of trackingTriggers) {
     const previous = query(
       "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = $name",
       { $name: name },
     )[0]?.sql;
-    if (previous && !previous.includes(cardDirtyPrefix)) database.run(`DROP TRIGGER ${name}`);
+    if (previous && !previous.includes(cardDirtyPrefix)) {
+      legacyFingerprintTracking = true;
+      database.run(`DROP TRIGGER ${name}`);
+    }
     database.run(sql);
   }
 
   const backfillPromptFingerprints = (force = true) => {
     let changed = 0;
+    // Fingerprints need raw prompt fields, not ownership, naming, parameters or dictionary data.
+    const metadataQuery = database.prepare(
+      'SELECT prompt_raw, negative_prompt, prompt_structure_json, model, extra_json FROM generation_metadata WHERE project_id = $id',
+    );
+    const tagsQuery = database.prepare(
+      'SELECT tag, weight, raw_segment, brace_depth, brace_group, brace_trailing_comma FROM prompt_tags WHERE project_id = $id ORDER BY position',
+    );
     const full =
       force ||
       trackingMissing ||
@@ -1952,7 +1963,24 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       `SELECT id, prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint, exact_group_fingerprint FROM projects
        ${full ? '' : 'WHERE id IN (SELECT substr(key, ' + (fingerprintDirtyPrefix.length + 1) + ") FROM app_meta WHERE key GLOB '" + fingerprintDirtyPrefix + "*')"}`,
     )) {
-      const project = hydrateProject(row);
+      const params = { $id: row.id };
+      const metadata = readQuery(metadataQuery, params)[0] || {};
+      const structure = safeJson(metadata.prompt_structure_json);
+      const project = {
+        ...row,
+        metadata,
+        tags: readQuery(tagsQuery, params),
+        // Match enrichProjectTags defaults, including legacy missing arrays.
+        prompt_structure: {
+          ...structure,
+          base_undesired_tags: structure.base_undesired_tags || [],
+          characters: (structure.characters || []).map((character) => ({
+            ...character,
+            prompt_tags: character.prompt_tags || [],
+            undesired_tags: character.undesired_tags || [],
+          })),
+        },
+      };
       const raw = safeJson(project.metadata?.extra_json);
       const vibeFingerprint = fingerprintVibes(
         extractEmbeddedVibes(raw.parsed || raw, project.metadata?.model),
@@ -2010,9 +2038,9 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       $key: fingerprintVersionKey,
       $value: fingerprintVersion,
     });
-    // Consume the old fingerprint markers only after invalidating their cached
-    // derivations. This also handles writes made by the original 010 triggers.
-    invalidateCards(full || cardTrackingMissing, true);
+    // Modern writers track cards independently, so a rebuilt card remains valid.
+    // Original 010 triggers only marked fingerprints and still need both invalidations.
+    invalidateCards(full || cardTrackingMissing, legacyFingerprintTracking);
     database.run(`DELETE FROM app_meta WHERE key GLOB '${fingerprintDirtyPrefix}*'`);
     if (changed) persist();
     return changed;

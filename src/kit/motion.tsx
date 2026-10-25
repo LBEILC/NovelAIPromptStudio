@@ -8,6 +8,7 @@ import {
   Component,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -100,19 +101,22 @@ export function useExitList<T>(items: T[], keyOf: (item: T) => string): Exiting<
   const prev = useRef<Exiting<T>[]>([]);
   const expired = useRef(new Set<string>());
   const timers = useRef(new Map<string, number>());
-  const [, force] = useState(0);
-  const keys = items.map(keyOf);
-  const live = new Set(keys);
-  const out: Exiting<T>[] = items.map((item, i) => ({ item, key: keys[i], leaving: false }));
+  const [revision, force] = useState(0);
   const fade = dur(1);
-  prev.current.forEach((p, i) => {
-    if (live.has(p.key)) {
-      expired.current.delete(p.key);
-      return;
-    }
-    if (!fade || expired.current.has(p.key)) return;
-    out.splice(Math.min(i, out.length), 0, { item: p.item, key: p.key, leaving: true });
-  });
+  const out = useMemo(() => {
+    const keys = items.map(keyOf);
+    const live = new Set(keys);
+    const next: Exiting<T>[] = items.map((item, i) => ({ item, key: keys[i], leaving: false }));
+    prev.current.forEach((p, i) => {
+      if (live.has(p.key)) {
+        expired.current.delete(p.key);
+        return;
+      }
+      if (!fade || expired.current.has(p.key)) return;
+      next.splice(Math.min(i, next.length), 0, { item: p.item, key: p.key, leaving: true });
+    });
+    return next;
+  }, [items, keyOf, fade, revision]);
   useLayoutEffect(() => {
     prev.current = out;
     const leaving = new Set(out.filter((o) => o.leaving).map((o) => o.key));
@@ -131,7 +135,7 @@ export function useExitList<T>(items: T[], keyOf: (item: T) => string): Exiting<
             force((n) => n + 1);
           }, fade + 30),
         );
-  });
+  }, [out, fade]);
   useEffect(() => () => timers.current.forEach((t) => clearTimeout(t)), []);
   return out;
 }

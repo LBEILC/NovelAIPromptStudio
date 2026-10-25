@@ -11,7 +11,9 @@ import { galleryViewGroups } from '../src/lib/gallery.js';
 import {
   galleryBasePromptSimilarity,
   galleryBasePromptSimilarityPayload,
+  galleryProjectGroupingFingerprints,
 } from '../src/lib/galleryGrouping.js';
+import { extractEmbeddedVibes, fingerprintVibes } from './vibes.js';
 import { filterGalleryProjects, galleryFilterOptions } from '../src/lib/galleryFilters.js';
 import { galleryCollectionScope } from '../src/lib/galleryCollections.js';
 
@@ -194,7 +196,7 @@ function hydrationSpy() {
   const ids = [];
   vi.spyOn(DatabaseSync.prototype, 'prepare').mockImplementation(function (sql) {
     const statement = prepare.call(this, sql);
-    if (sql === 'SELECT * FROM generation_metadata WHERE project_id = $id') {
+    if (sql.endsWith(' FROM generation_metadata WHERE project_id = $id')) {
       const all = statement.all.bind(statement);
       statement.all = (params) => {
         ids.push(params.$id);
@@ -205,6 +207,103 @@ function hydrationSpy() {
   });
   return ids;
 }
+
+it('repairs fingerprints with the same semantics as full hydration for legacy and structured prompts', async () => {
+  const directory = temporary();
+  const api = await open(directory);
+  for (let i = 0; i < 3; i++) api.insertProject(sample(i));
+  edit(directory, (raw) => {
+    const update = raw.prepare(
+      'UPDATE generation_metadata SET prompt_structure_json = ?, extra_json = ? WHERE project_id = ?',
+    );
+    const extra = JSON.stringify({
+      parsed: {
+        reference_image_multiple: ['synthetic-vibe'],
+        reference_strength_multiple: [0.7],
+        reference_information_extracted_multiple: [0.6],
+      },
+    });
+    update.run('{}', extra, 'p0');
+    update.run(
+      JSON.stringify({
+        characters: [{ prompt_raw: 'legacy character prose', center: { x: 0.2, y: 0.7 } }],
+      }),
+      extra,
+      'p1',
+    );
+    update.run(
+      JSON.stringify({
+        use_coords: true,
+        use_order: true,
+        base_undesired_tags: [{ tag: 'blurry', weight: 0.7 }],
+        characters: [
+          {
+            center: { x: 0.1, y: 0.9 },
+            prompt_tags: [{ tag: 'coat', weight: 1.4, brace_depth: 2, brace_group: 'synthetic' }],
+            undesired_tags: [{ tag: 'hat' }],
+          },
+        ],
+      }),
+      extra,
+      'p2',
+    );
+    raw.exec(
+      "UPDATE prompt_tags SET raw_segment = '{landscape}', brace_depth = 2, brace_group = 'synthetic', brace_trailing_comma = 1 WHERE tag = 'landscape'",
+    );
+    raw.exec(
+      "UPDATE projects SET prompt_fingerprint = 'stale', base_prompt_fingerprint = 'stale', vibe_fingerprint = 'stale', exact_group_fingerprint = 'stale'",
+    );
+  });
+  api.updateTagDictionary('landscape', { category: 'ArtistEra', translation: '风景' });
+  const expected = [0, 1, 2].map((i) => {
+    const project = api.loadProject(`p${i}`);
+    const raw = JSON.parse(project.metadata.extra_json);
+    const vibe = fingerprintVibes(extractEmbeddedVibes(raw.parsed || raw, project.metadata.model));
+    return { ...galleryProjectGroupingFingerprints({ ...project, vibe_fingerprint: vibe }), vibe };
+  });
+  expect(api.backfillPromptFingerprints()).toBe(3);
+  for (let i = 0; i < 3; i++) {
+    const project = api.loadProject(`p${i}`);
+    expect([
+      project.prompt_fingerprint,
+      project.base_prompt_fingerprint,
+      project.exact_group_fingerprint,
+      project.vibe_fingerprint,
+    ]).toEqual([
+      expected[i].promptFingerprint,
+      expected[i].basePromptFingerprint,
+      expected[i].exactGroupFingerprint,
+      expected[i].vibe,
+    ]);
+  }
+  expect(api.backfillPromptFingerprints()).toBe(0);
+});
+
+it('retains rebuilt cards across startup when only modern fingerprint markers remain', async () => {
+  const directory = temporary();
+  let api = await open(directory);
+  api.insertProject(sample(0));
+  const before = await api.loadLibraryCards();
+  api.close();
+  edit(directory, (raw) => {
+    expect(
+      raw.prepare("SELECT value FROM app_meta WHERE key = 'prompt_fingerprints_dirty:p0'").get(),
+    ).toBeTruthy();
+    expect(
+      raw.prepare("SELECT value FROM app_meta WHERE key = 'library_cards_dirty:p0'").get(),
+    ).toBeUndefined();
+    raw.exec(
+      "CREATE TRIGGER reject_cache_delete BEFORE DELETE ON library_card_cache BEGIN SELECT RAISE(ABORT, 'valid cache deleted'); END",
+    );
+  });
+  api = await open(directory);
+  expect(await api.loadLibraryCards()).toEqual(before);
+  edit(directory, (raw) =>
+    expect(
+      raw.prepare("SELECT value FROM app_meta WHERE key = 'prompt_fingerprints_dirty:p0'").get(),
+    ).toBeUndefined(),
+  );
+});
 
 it('aliases only identical base fingerprints and preserves independent or malformed legacy values', async () => {
   const directory = temporary();
