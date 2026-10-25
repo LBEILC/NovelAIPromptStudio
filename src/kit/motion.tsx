@@ -290,8 +290,15 @@ export function useSwap<T>(value: T, keyOf: (v: T) => string) {
   useLayoutEffect(() => {
     if (last.current?.key === key) last.current.value = value;
   });
+  // key 刚变的这一次渲染里，上一份还没进 gone：当场把它当作离开的那一份放在原位。
+  // 不这样的话这一帧旧的会被拿掉、下一帧再重建，重建会重播进场动画，看起来闪两下（用户 10-25）
+  const prev = last.current;
+  const pending = prev && prev.key !== key && dur(1) ? prev : null;
   return [
-    ...gone.filter((g) => g.key !== key).map((g) => ({ ...g, leaving: true })),
+    ...gone
+      .filter((g) => g.key !== key && g.key !== pending?.key)
+      .map((g) => ({ ...g, leaving: true })),
+    ...(pending ? [{ ...pending, leaving: true }] : []),
     { key, value, leaving: false },
   ];
 }

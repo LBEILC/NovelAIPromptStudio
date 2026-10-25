@@ -89,8 +89,10 @@ function Toasts({
       let need = 0;
       w.querySelectorAll<HTMLElement>('[data-dock]').forEach((d) => {
         if (d.closest('.leaving')) return;
+        // 不在当前页的操作条（所在的页藏起来了）位置读出来是 0，算进去通知会跑到窗口顶上再滑下来
+        if (!d.getClientRects().length) return;
         const kids = [...d.children].filter(
-          (k) => !k.classList.contains('leaving'),
+          (k) => !k.classList.contains('leaving') && (k as HTMLElement).offsetHeight > 0,
         ) as HTMLElement[];
         if (!kids.length) return;
         const h = kids.reduce((s, k) => s + k.offsetHeight, 0) + (kids.length - 1) * gap;
