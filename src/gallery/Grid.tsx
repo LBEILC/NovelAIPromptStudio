@@ -132,7 +132,16 @@ export function Grid({
     if (scroll.current) scroll.current.scrollTop = 0;
     setVp((v) => ({ ...v, top: 0 }));
   }, [p.contentKey]);
-  const swaps = useSwap({ groups: p.groups, key: p.contentKey }, (v) => v.key);
+  // "第 N 版"跟着这份列表走，不跟侧栏选中项走：点"全部图片"时选中项立刻变了，列表要等数据算完才换，
+  // 中间这段旧卡片上的"第 N 版"会先没了（用户 10-25）。列表换的那一刻两者是对得上的，就在那时记下
+  const generatedFor = useRef({ key: p.contentKey, on: p.activeCollection?.id === GENERATED });
+  if (generatedFor.current.key !== p.contentKey)
+    generatedFor.current = { key: p.contentKey, on: p.activeCollection?.id === GENERATED };
+  // 连 p 一起记下：淡出的那份照切换前的样子画，选中框这些不会按新状态先变
+  const swaps = useSwap(
+    { groups: p.groups, key: p.contentKey, p, generated: generatedFor.current.on },
+    (v) => v.key,
+  );
   const count = libraryCountText(
     p.groups.length,
     p.groups.reduce((n, g) => n + g.members.length, 0),
@@ -153,8 +162,9 @@ export function Grid({
           ? swaps.map(({ key, value, leaving }) => (
               <Cards
                 key={key}
-                p={p}
+                p={leaving ? value.p : p}
                 groups={value.groups}
+                generated={value.generated}
                 leaving={leaving}
                 vp={vp}
                 rowHeight={rowHeight}
@@ -175,6 +185,7 @@ export function Grid({
 function Cards({
   p,
   groups: live,
+  generated,
   leaving: gridLeaving,
   vp,
   rowHeight,
@@ -186,6 +197,8 @@ function Cards({
 }: {
   p: LibraryProps;
   groups: LibraryGroup[];
+  /** 这份列表是不是生成记录：卡片右上角写"第 N 版" */
+  generated: boolean;
   leaving: boolean;
   vp: { width: number; height: number; top: number };
   rowHeight: number;
@@ -468,7 +481,7 @@ function Cards({
           const picked = p.selectedGroupIds.includes(g.id);
           const on = g.id === p.previewGroup?.id && !picking;
           const genNote =
-            p.activeCollection?.id === GENERATED && shown.version_number
+            generated && shown.version_number
               ? `第 ${shown.version_number} 版${shown.generation_source === 'agent' ? ' · Agent' : ''}`
               : '';
           return (
