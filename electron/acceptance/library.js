@@ -160,11 +160,18 @@ export async function libraryChecks(env) {
       '分组切换及视口调整完成后再拖动滚动条',
     );
     await scrollChecks(h, '.lib-grid-col > .scroll');
-    const lastIndex = database.loadLibrary('all').length - 1;
     await e(
       "document.querySelector('.lib-grid-col > .scroll').scrollTop=document.querySelector('.lib-grid-col > .scroll').scrollHeight",
     );
-    await wait(`!!document.querySelector('.lgrid:not(.leaving) [data-index="${lastIndex}"]')`);
+    await settled();
+    // Works may combine several database images into one card, even without grouping.
+    const lastIndex = await e(
+      `Math.max(...[...document.querySelectorAll('.lgrid:not(.leaving) .card[data-group-id^="project:"]')].map(node=>Number(node.dataset.index)))`,
+    );
+    await check(
+      '滚动到底后存在可检查相邻顺序的图片卡片',
+      () => Number.isInteger(lastIndex) && lastIndex > 0,
+    );
     await selectCard(lastIndex);
     await check(
       '虚拟滚动复用卡片后点击仍选中当前图片并显示对应详情',
