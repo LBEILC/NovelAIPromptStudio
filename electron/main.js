@@ -1171,11 +1171,29 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  const copyLibraryImage = (_event, projectId) => {
+  const clipboardAdapters = (event) => {
+    const handle = BrowserWindow.fromWebContents(event.sender)?.getNativeWindowHandle();
+    return {
+      nativeImage,
+      clipboard,
+      owner:
+        process.platform === 'win32' && handle
+          ? handle.length === 8
+            ? handle.readBigUInt64LE()
+            : BigInt(handle.readUInt32LE())
+          : undefined,
+      ...(acceptanceDoubles ? { systemClipboard: () => acceptanceDoubles.systemClipboard } : {}),
+    };
+  };
+  const copyLibraryImage = async (event, projectId) => {
     try {
       const project = database.loadProject(projectId);
       if (!project) throw new Error('图片不存在');
-      copyManagedImageToClipboard(assetsDirectory, project.image_path, { nativeImage, clipboard });
+      await copyManagedImageToClipboard(
+        assetsDirectory,
+        project.image_path,
+        clipboardAdapters(event),
+      );
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -1206,9 +1224,9 @@ app.whenReady().then(async () => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   };
-  const copyWorkbenchImage = (_event, filePath) => {
+  const copyWorkbenchImage = async (event, filePath) => {
     try {
-      copyImageToClipboard(filePath, { nativeImage, clipboard });
+      await copyImageToClipboard(filePath, clipboardAdapters(event));
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };

@@ -167,6 +167,12 @@ export function installAcceptanceDoubles(mode, { dialog, shell, clipboard, nativ
   }
   return {
     realClipboard,
+    systemClipboard: {
+      write: (formats) => {
+        const png = formats.find((entry) => entry.format === 'PNG');
+        clipboard.writeBuffer('PNG', png.bytes);
+      },
+    },
     calls,
     selections,
     saves,

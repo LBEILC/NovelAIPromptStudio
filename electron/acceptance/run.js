@@ -1,3 +1,4 @@
+import { loadWindowsClipboard } from '../windowsClipboard.js';
 import { workSharingChecks } from './workSharing.js';
 import { onboardingChecks } from './onboarding.js';
 import { trayChecks } from './tray.js';
@@ -229,6 +230,11 @@ export async function runAcceptance(context) {
       }
     }
     if (mode.packaged) {
+      if (process.platform === 'win32')
+        await check(
+          '安装包剪贴板接口能加载',
+          () => typeof loadWindowsClipboard().isFormatAvailable(17) === 'boolean',
+        );
       const real = context.doubles.realClipboard;
       let restore;
       try {

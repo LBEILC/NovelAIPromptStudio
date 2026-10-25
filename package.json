@@ -40,6 +40,7 @@
   "dependencies": {
     "electron-updater": "6.8.9",
     "font-list": "2.1.0",
+    "koffi": "3.3.3",
     "react-markdown": "10.1.0",
     "rehype-raw": "7.0.0",
     "rehype-sanitize": "6.0.0",
@@ -98,7 +99,10 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "agent", "to": "agent" },
+      {
+        "from": "agent",
+        "to": "agent"
+      },
       {
         "from": "LICENSE",
         "to": "LICENSE"
@@ -150,6 +154,8 @@
     },
     "beforePack": "scripts/font-before-pack.mjs",
     "asarUnpack": [
+      "node_modules/koffi/**/*",
+      "node_modules/@koromix/**/*",
       "node_modules/sharp/**/*",
       "node_modules/@img/**/*"
     ]

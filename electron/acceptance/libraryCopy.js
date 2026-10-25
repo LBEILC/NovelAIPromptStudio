@@ -1,3 +1,4 @@
+import { windowsClipboardChecks } from './windowsClipboard.js';
 import { selectGalleryGrouping } from './galleryView.js';
 import path from 'node:path';
 import { clipboard } from 'electron';
@@ -117,4 +118,5 @@ export async function libraryCopyChecks(env) {
     database.updateProjects(originalTrash, { deleted: true });
     await refresh();
   }
+  await windowsClipboardChecks(env);
 }

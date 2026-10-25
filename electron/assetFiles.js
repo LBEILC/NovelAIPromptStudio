@@ -1,5 +1,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { Worker } from 'node:worker_threads';
+import { loadWindowsClipboard } from './windowsClipboard.js';
+
+function prepareClipboardBitmap(bytes, format) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./clipboardBitmapWorker.js', import.meta.url), {
+      workerData: { bytes, format },
+    });
+    worker.once('message', (formats) =>
+      resolve(formats.map((entry) => ({ ...entry, bytes: Buffer.from(entry.bytes) }))),
+    );
+    worker.once('error', reject);
+    worker.once('exit', (code) => {
+      if (code !== 0) reject(Error(`Clipboard bitmap worker exited: ${code}`));
+    });
+  });
+}
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 const RAW_CLIPBOARD_FORMATS = {
@@ -64,14 +81,36 @@ export function copyOriginalAsset(assetsDirectory, sourcePath, destinationPath) 
   return copyOriginalImage(resolveManagedAsset(assetsDirectory, sourcePath), destinationPath);
 }
 
-export function copyImageToClipboard(
+export async function copyImageToClipboard(
   filePath,
-  { nativeImage, clipboard, platform = process.platform },
+  {
+    nativeImage,
+    clipboard,
+    platform = process.platform,
+    systemClipboard = loadWindowsClipboard,
+    owner,
+    logger = console,
+  },
 ) {
   const source = resolveImageFile(filePath);
+  const format = rawClipboardFormatForImage(source, platform);
+  if (platform === 'win32' && typeof clipboard.writeBuffer === 'function') {
+    const bytes = await fs.promises.readFile(source);
+    try {
+      const system = systemClipboard();
+      const formats = await prepareClipboardBitmap(bytes, format);
+      await system.write(formats, owner);
+    } catch (error) {
+      logger.warn(
+        'Windows clipboard bitmap unavailable; copying original image only:',
+        error.message,
+      );
+      clipboard.writeBuffer(format, bytes);
+    }
+    return;
+  }
   const image = nativeImage.createFromPath(source);
   if (image.isEmpty()) throw new Error('图片无法读取');
-  const format = rawClipboardFormatForImage(source, platform);
   if (format && typeof clipboard.writeBuffer === 'function') {
     clipboard.writeBuffer(format, fs.readFileSync(source));
   } else {
