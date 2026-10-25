@@ -1,371 +1,56 @@
-// 版本栏（doc/design.md 2.3、2.23）：标题"版本 · 分支名"和"几版 · 几张"。只显示当前这条线，不缩进：
-// 原图（空白作品是没有图的"起点"，2.26a）→ 中间各版 → 当前版 → 沿当前分支一直到它的最后一版；一条线从一支进入另一支的地方，上面一行小字写分支名。
-// 每一版写相对上一版改了什么（最多两行），下面是这一版的缩略图（按比例，最多两行，"+N"展开），当前这一张朱砂细框。
-// 改了还没生成时，当前版下面一行虚线的"未生成"。别的分支在分叉处各收成一行；一处超过 3 支时列 2 支加"另外 N 支"。
-// 停在一版上 400ms 右边弹出和上一版的完整对比。右键分叉行、版本行或标题里的分支名可以改名。
-import { useEffect, useRef, useState } from 'react';
-import { useGeneration } from '../state/generation';
-import { errorCode, errorDetails, invokeUI } from '../lib/commands';
+import { Icon, Kbd } from '../kit/controls';
+import { Pop } from '../kit/layer';
+import { ContextMenu } from '../kit/menu';
+import { FlipScope, useExitList } from '../kit/motion';
+import { invokeUI } from '../lib/commands';
 import { mediaUrl } from '../lib/imageStage.js';
 import { versionDiff } from '../lib/versionDiff';
-import { trashNotice } from '../lib/trashNotice';
-import { originGone, originMenu, trashImage } from './original';
-import { useSharedTrash } from '../shell/SharedTrash';
-import { VersionDifference, VersionSummary } from './VersionDifference';
-import { Icon, Kbd } from '../kit/controls';
-import { ContextMenu, type MenuEntry } from '../kit/menu';
-import { Pop } from '../kit/layer';
-import { useAsk } from '../kit/dialog';
-import { useNotifications } from '../kit/toast';
-import { FlipScope, ms, useExitList } from '../kit/motion';
-import { useResizable } from '../kit/resize';
 import type { CommandTab } from '../shared/commands';
-import type { WorkVersion, WorkOrigin } from '../shared/generation';
-
-const TH_H = 38,
-  TH_GAP = 4,
-  TH_MORE = 28;
-const thumbCache = new Map<string, Promise<string>>();
-function thumbOf(id: string) {
-  let p = thumbCache.get(id);
-  if (!p) {
-    p = invokeUI('library.get', { id }).then((r) =>
-      mediaUrl(r.project.thumbnail_path || r.project.image_path),
-    );
-    thumbCache.set(id, p);
-    p.catch(() => thumbCache.delete(id));
-  }
-  return p;
-}
-function Thumb({ id, src }: { id: string; src?: string }) {
-  const [url, setUrl] = useState(src || '');
-  // 文件找不到时画一个虚线框，不显示浏览器的破图标（用户 10-22：从剪贴板打开、存入图片库后原图丢了）
-  const [broken, setBroken] = useState(false);
-  useEffect(() => {
-    setBroken(false);
-    if (src) return setUrl(src);
-    let live = true;
-    void thumbOf(id)
-      .then((u) => live && setUrl(u))
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [id, src]);
-  if (broken) return <span className="th-miss" data-tip="图片文件找不到了" />;
-  return url ? <img src={url} alt="" draggable={false} onError={() => setBroken(true)} /> : null;
-}
-/** 按宽度一格一格往下排，返回占几行 */
-function rowsOf(widths: number[], rowW: number) {
-  let rows = widths.length ? 1 : 0,
-    x = 0;
-  for (const w of widths) {
-    if (x && x + TH_GAP + w > rowW) {
-      rows++;
-      x = w;
-    } else x += (x ? TH_GAP : 0) + w;
-  }
-  return rows;
-}
-type Row = { key: string; render: (leaving: boolean) => React.ReactNode };
-
+import type { WorkVersion } from '../shared/generation';
+import { originGone } from './original';
+import { useVersionState } from './useVersionState';
+import { VersionDifference, VersionSummary } from './VersionDifference';
+import { Row, TH_H, TH_MORE, Thumb, rowsOf } from './versionHelpers';
 export function Versions({ tab, before }: { tab: CommandTab; before?: () => Promise<void> }) {
-  const state = useGeneration();
-  const notify = useNotifications();
-  const [dialog, ask] = useAsk();
-  const [sharedDialog, askShared] = useSharedTrash();
-  const col = useRef<HTMLDivElement>(null);
-  const scroll = useRef<HTMLDivElement>(null);
-  const rz = useResizable(col, {
-    key: 'versions',
-    edge: 'right',
-    min: () => ms('--versions-w'),
-    max: () => ms('--popover-w'),
-    def: () => ms('--versions-w'),
-    storage: 'nps.versions-width',
-    label: '版本栏宽度',
-  });
-  const [loaded, setLoaded] = useState<{ tab: string; versions: WorkVersion[] }>({
-    tab: '',
-    versions: [],
-  });
-  // 切标签页时还没读到新的之前，先照旧显示，但不拿上一个标签页的版本算"未生成"
-  const versions = loaded.versions;
-  const stale = loaded.tab !== tab.id;
-  const [origin, setOrigin] = useState<WorkOrigin | null>(null);
-  const [derived, setDerived] = useState<{ workId: string; source: WorkOrigin }[]>([]);
-  const [open, setOpen] = useState<string[]>([]);
-  const [left, setLeft] = useState('');
-  const [refresh, setRefresh] = useState(0);
-  const [peek, setPeek] = useState<{
-    key: string;
-    v: WorkVersion;
-    title: string;
-    against: string;
-  } | null>(null);
-  const [menu, setMenu] = useState<{ at: [number, number]; items: MenuEntry[] } | null>(null);
-  const [rename, setRename] = useState<{ v: WorkVersion; anchor: string; text: string } | null>(
-    null,
-  );
-  const peekTimer = useRef(0);
-  useEffect(
-    () =>
-      window.studio?.onCommandEvent((e) => {
-        if (e.type === 'workbench' && e.libraryChanged) setRefresh((n) => n + 1);
-      }),
-    [],
-  );
-  useEffect(() => {
-    let live = true;
-    void Promise.resolve(before?.())
-      .then(() => invokeUI('version.list', { tabId: tab.id }))
-      .then((r) => {
-        if (!live) return;
-        setLoaded({ tab: tab.id, versions: r.versions });
-        setOrigin(r.origin);
-        setDerived(r.derived);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [tab.id, tab.versionId, tab.revision, state.jobs, refresh]);
-  useEffect(() => () => clearTimeout(peekTimer.current), []);
-  const current = versions.find((v) => v.id === tab.versionId) || versions[0];
-  const kids = (id: string) => versions.filter((v) => v.parentId === id);
-  const subtree = (v: WorkVersion): WorkVersion[] => [v, ...kids(v.id).flatMap(subtree)];
-  const byId = (id: string | null) => versions.find((v) => v.id === id);
-  // 原图移入回收站或从作品里去掉以后，第一行是"起点"（1.5.1）
-  const name = (v: WorkVersion) =>
-    v.isStart || originGone(v) ? '起点' : v.parentId ? `第 ${v.number} 版` : '原图';
-  const delta = (v: WorkVersion) => versionDiff(byId(v.parentId)?.project || v.project, v.project);
-  const go = async (v: WorkVersion, imageId?: string) => {
-    try {
-      await before?.();
-      if (current && v.branchId !== current.branchId) setLeft(current.branchId);
-      await invokeUI('version.open', { tabId: tab.id, versionId: v.id, imageId });
-    } catch (e) {
-      notify({ text: (e as Error).message, tone: 'error' });
-    }
-  };
-  const hover = (key: string, v: WorkVersion, title: string) => {
-    clearTimeout(peekTimer.current);
-    const against = byId(v.parentId) ? name(byId(v.parentId)!) : name(v);
-    if (peek) return setPeek({ key, v, title, against });
-    peekTimer.current = window.setTimeout(() => setPeek({ key, v, title, against }), 400);
-  };
-  const unhover = () => {
-    clearTimeout(peekTimer.current);
-    peekTimer.current = window.setTimeout(() => setPeek(null), 120);
-  };
-  const peekProps = (key: string, v: WorkVersion | null, title: string) =>
-    v?.parentId
-      ? {
-          'data-peek': key,
-          onPointerEnter: () => hover(key, v, title),
-          onPointerLeave: unhover,
-          onFocus: () => hover(key, v, title),
-          onBlur: unhover,
-        }
-      : {};
-  // 删除分支（2.23）：从这条分支分出来的那一版起整棵子树，图进回收站；下面还有分支时先确认，通知里可以撤销
-  const branchTree = (v: WorkVersion) => {
-    const first = versions.find(
-      (x) => x.branchId === v.branchId && byId(x.parentId)?.branchId !== v.branchId,
-    );
-    return new Set(first ? subtree(first).map((x) => x.id) : []);
-  };
-  const branchBusy = (v: WorkVersion) => {
-    const tree = branchTree(v);
-    return state.jobs.some(
-      (j) =>
-        j.tabId === tab.id &&
-        ['generating', 'queued'].includes(j.state) &&
-        (tree.has(j.versionId || '') || tree.has(j.parentId || '')),
-    );
-  };
-  // 删除分支 / 删除这一版（2.23）：都是删掉一棵子树，图进回收站；不止一版时先确认，通知里可以撤销。
-  // 只删这一版（1.5.2）：后面的版本接到它的上一版下面，只删一版所以不确认
-  const remove = async (kind: 'branch' | 'version' | 'only', v: WorkVersion) => {
-    const label = kind === 'branch' ? v.branchName || `分支 ${v.branchNumber}` : name(v);
-    // 名字以数字或英文结尾时和后面的汉字隔一个空格（"分支 2 下面"）
-    const sp = /[!-~]$/.test(label) ? ' ' : '';
-    const run = (confirmed?: boolean) =>
-      kind === 'branch'
-        ? invokeUI('branch.delete', { branchId: v.branchId, ...(confirmed ? { confirmed } : {}) })
-        : invokeUI('version.delete', {
-            versionId: v.id,
-            ...(kind === 'only' ? { only: true } : {}),
-            ...(confirmed ? { confirmed } : {}),
-          });
-    let r: Awaited<ReturnType<typeof run>>;
-    try {
-      await before?.();
-      try {
-        r = await run();
-      } catch (e) {
-        if (errorCode(e) !== 'needs_confirm') throw e;
-        const d = errorDetails<{ branches: number; versions: number; images: number }>(e);
-        const body = !d
-          ? `${label}${sp}后面还有别的版本，会一起删除。`
-          : kind === 'branch'
-            ? `${label}${sp}下面还有 ${Math.max(1, d.branches - 1)} 个分支，会一起删除。共 ${d.versions} 版，${d.images} 张图移入回收站。`
-            : `${label}${sp}后面还有 ${d.versions - 1} 版${d.branches ? `（其中有 ${d.branches} 个分支）` : ''}，会一起删除。共 ${d.versions} 版，${d.images} 张图移入回收站。`;
-        if (!(await ask({ title: `删除${label}？`, body, ok: '删除', danger: true }))) return;
-        r = await run(true);
-      }
-    } catch (e) {
-      notify({
-        text:
-          errorCode(e) === 'branch_generating'
-            ? kind === 'branch'
-              ? '这条分支正在生成'
-              : '这一版或之后的版本正在生成'
-            : `删除失败：${(e as Error).message}`,
-        tone: 'error',
-      });
-      return;
-    }
-    const { undo } = r;
-    const what =
-      kind === 'branch'
-        ? `${label}：${r.versions} 版`
-        : kind === 'only'
-          ? label
-          : `${label}${r.versions > 1 ? `和之后的 ${r.versions - 1} 版` : ''}`;
-    notify({
-      text: `已删除${what}${r.images ? `，${r.images} 张图已移入回收站` : ''}${kind === 'only' && byId(v.parentId) ? `，后面的版本接到${name(byId(v.parentId)!)}下面` : ''}${r.cancelledJobs ? `，取消了 ${r.cancelledJobs} 个待确认的 Agent 生成` : ''}`,
-      action: {
-        label: '撤销',
-        onClick: () =>
-          void invokeUI('branch.restore', { undo }).catch((e) =>
-            notify({ text: `撤销失败：${(e as Error).message}`, tone: 'error' }),
-          ),
-      },
-    });
-  };
-  const treeBusy = (v: WorkVersion) => {
-    const tree = new Set(subtree(v).map((x) => x.id));
-    return state.jobs.some(
-      (j) =>
-        j.tabId === tab.id &&
-        ['generating', 'queued'].includes(j.state) &&
-        (tree.has(j.versionId || '') || tree.has(j.parentId || '')),
-    );
-  };
-  const ownBusy = (v: WorkVersion) =>
-    state.jobs.some(
-      (j) =>
-        j.tabId === tab.id &&
-        ['generating', 'queued'].includes(j.state) &&
-        (j.versionId === v.id || j.parentId === v.id),
-    );
-  // row：版本行上的菜单多一项"删除这一版"（原图和起点没有）；分叉行和分支名只有"删除分支"（主线没有）
-  const renameMenu = (
-    v: WorkVersion,
-    anchor: string,
-    fork?: boolean,
-    row?: boolean,
-  ): MenuEntry[] => [
-    ...(fork ? [{ label: '切换到这一支', onSelect: () => void go(v) }, 'sep' as const] : []),
-    { label: '重命名分支…', onSelect: () => setRename({ v, anchor, text: v.branchName }) },
-    ...(row && v.parentId
-      ? [
-          'sep' as const,
-          // 后面还有版本时：只删这一版，后面的接到上一版下面
-          ...(subtree(v).length > 1
-            ? [
-                {
-                  label: '只删除这一版',
-                  danger: true,
-                  disabled: ownBusy(v) ? '这一版正在生成' : false,
-                  onSelect: () => void remove('only', v),
-                },
-              ]
-            : []),
-          {
-            label:
-              subtree(v).length > 1
-                ? `删除这一版和之后的 ${subtree(v).length - 1} 版`
-                : '删除这一版',
-            danger: true,
-            disabled: treeBusy(v) ? '这一版或之后的版本正在生成' : false,
-            onSelect: () => void remove('version', v),
-          },
-        ]
-      : []),
-    ...(v.branchNumber
-      ? [
-          ...(row && v.parentId ? [] : ['sep' as const]),
-          {
-            label: '删除分支',
-            danger: true,
-            disabled: branchBusy(v) ? '这条分支正在生成' : false,
-            onSelect: () => void remove('branch', v),
-          },
-        ]
-      : []),
-  ];
-  const ctx = (items: MenuEntry[]) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    clearTimeout(peekTimer.current);
-    setPeek(null);
-    setMenu({ at: [e.clientX, e.clientY], items });
-  };
-  const thumbMenu = (v: WorkVersion, imageId: string, trash = true): MenuEntry[] => [
-    {
-      label: '作为新作品打开',
-      onSelect: () =>
-        void invokeUI('work.open-from-image', { tabId: tab.id, versionId: v.id, imageId }).then(
-          () => notify({ text: '已作为新作品打开' }),
-        ),
-    },
-    ...(trash
-      ? [
-          'sep' as const,
-          {
-            label: '移入回收站',
-            danger: true,
-            onSelect: () =>
-              void trashImage(imageId, tab.workId, {
-                notify,
-                refresh: () => setRefresh((n) => n + 1),
-                ask: askShared,
-              }),
-          },
-        ]
-      : v.parentId
-        ? []
-        : [
-            'sep' as const,
-            originMenu(v, tab.id, {
-              before,
-              notify,
-              refresh: () => setRefresh((n) => n + 1),
-              ask: askShared,
-              workId: tab.workId,
-            }),
-          ]),
-  ];
-  // 生成中：一版一张张出来，正在生成的格子是实底加墨色细条，排队的是虚线框；失败的格子是绛红色的叉
-  const jobs = state.jobs.filter((j) => j.tabId === tab.id);
-  const job =
-    jobs.find((j) => ['queued', 'generating'].includes(j.state)) ||
-    (jobs.at(-1)?.state === 'failed' ? jobs.at(-1) : undefined);
-  const appending =
-    job && versionDiff(byId(job.parentId)?.project || job.project, job.project).empty;
-  const pending = jobs.filter((j) => j.state === 'pending');
-  const draft = !stale && current && tab.project ? versionDiff(current.project, tab.project) : null;
-  const rowW = (rz.width || ms('--versions-w')) - 32;
-  const ratio = (v: WorkVersion) =>
-    Math.max(
-      ms('--thumb-ratio-min') || 0.5,
-      Math.min(
-        ms('--thumb-ratio-max') || 2.5,
-        (v.project.metadata.width || 832) / (v.project.metadata.height || 1216),
-      ),
-    );
+  const {
+    ratio,
+    go,
+    ctx,
+    thumbMenu,
+    job,
+    appending,
+    rowW,
+    open,
+    setOpen,
+    current,
+    kids,
+    byId,
+    renameMenu,
+    derived,
+    peekProps,
+    name,
+    delta,
+    origin,
+    draft,
+    versions,
+    pending,
+    subtree,
+    left,
+    col,
+    rz,
+    scroll,
+    peekTimer,
+    setPeek,
+    peek,
+    menu,
+    unhover,
+    setMenu,
+    dialog,
+    sharedDialog,
+    rename,
+    setRename,
+    setRefresh,
+  } = useVersionState({ tab, before });
   const thumbs = (v: WorkVersion, on: boolean) => {
     const w = Math.round(TH_H * ratio(v));
     type Cell = { key: string; pin: boolean; node: React.ReactNode };

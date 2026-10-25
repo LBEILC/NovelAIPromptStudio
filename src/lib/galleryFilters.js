@@ -40,6 +40,7 @@ function uniqueStrings(values = []) {
   return output;
 }
 
+/** @returns {import('../shared/types').GalleryFilters} */
 export function normalizeGalleryFilters(value = {}) {
   return {
     query: String(value.query || ''),

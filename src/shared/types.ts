@@ -269,10 +269,10 @@ export interface Collection {
   id: string;
   name: string;
   kind: 'manual' | 'smart';
-  filter_json: string;
+  filter_json?: string;
   filters: Partial<GalleryFilters>;
   member_ids: string[];
-  active_member_count: number;
+  active_member_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -405,18 +405,21 @@ export interface ImportSummary {
   remaining: number;
   cancelled: boolean;
 }
-export type ImportProgress = { batchId: string } & (
+export type ImportProgress =
   | {
       phase: 'preparing';
+      batchId?: string;
       current: string;
       prepared?: number;
       sourceCount?: number;
       processed?: number;
       total?: number;
     }
-  | ({ phase: 'importing'; current?: string } & Omit<ImportSummary, 'remaining' | 'cancelled'>)
-  | ({ phase: 'complete' } & ImportSummary)
-);
+  | ({ phase: 'importing'; batchId: string; current?: string } & Omit<
+      ImportSummary,
+      'remaining' | 'cancelled'
+    >)
+  | ({ phase: 'complete'; batchId: string } & ImportSummary);
 export interface LibraryStorageProgress {
   phase: 'copying' | 'switching' | 'complete';
   completed: number;
@@ -445,6 +448,7 @@ export type PreparedImportPreview = {
       previewPath: string;
       previewHeight: number;
       previewWidth: number;
+      duplicate?: boolean;
       error: string;
     }
   | { phase: 'complete'; error?: string }
