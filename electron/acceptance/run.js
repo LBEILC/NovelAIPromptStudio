@@ -31,6 +31,10 @@ import { chatGPTChecks } from './chatgpt.js';
 import electronUpdater from 'electron-updater';
 
 export async function runAcceptance(context) {
+  if (context.mode.fullLibraryBenchmark) {
+    const { runFullLibraryBenchmark } = await import('./fullLibraryBenchmark.js');
+    return runFullLibraryBenchmark(context);
+  }
   if (context.mode.commandBenchmark) {
     const { runCommandBenchmark } = await import('./commandBenchmark.js');
     return runCommandBenchmark(context);
@@ -162,9 +166,14 @@ export async function runAcceptance(context) {
     );
     await check(
       'SQLite 已打开且演示图库可读',
-      () =>
+      async () =>
         database.loadLibrary('all').length >=
-        (mode.needsLibrary === false ? 0 : Math.min(files.length, 13)),
+        (mode.phase > 0
+          ? JSON.parse(await fs.readFile(path.join(mode.root, 'snapshot.json'), 'utf8')).library
+              .length
+          : mode.needsLibrary === false
+            ? 0
+            : Math.min(files.length, 13)),
       undefined,
       'once',
     );

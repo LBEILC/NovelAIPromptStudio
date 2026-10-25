@@ -85,6 +85,10 @@ const { autoUpdater } = electronUpdater;
 
 app.setName('NovelAI Prompt Studio');
 const acceptanceMode = configureAcceptanceMode(app);
+if (acceptanceMode?.fullLibraryBenchmark) {
+  const { startBenchmarkProfile } = await import('./tools/benchmarkProfile.js');
+  await startBenchmarkProfile(acceptanceMode);
+}
 const acceptanceCardCache = createAcceptanceCardCache(acceptanceMode);
 const acceptanceDoubles = installAcceptanceDoubles(acceptanceMode, {
   dialog,
@@ -324,7 +328,12 @@ function createWindow(captureState = null) {
   const developmentUrl =
     process.env.NOVELAI_DEV_URL || (process.argv.includes('--dev') ? 'http://127.0.0.1:5173' : '');
   if (developmentUrl && !captureState) window.loadURL(developmentUrl);
-  else window.loadFile(path.join(import.meta.dirname, '..', 'dist', 'index.html'));
+  else
+    window.loadFile(
+      acceptanceMode?.fullLibraryBenchmark
+        ? path.join(acceptanceMode.root, 'build', 'index.html')
+        : path.join(import.meta.dirname, '..', 'dist', 'index.html'),
+    );
   return window;
 }
 
