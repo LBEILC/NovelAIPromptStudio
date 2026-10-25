@@ -251,3 +251,16 @@ html.tray, html.tray body, html.tray #root { width: auto; height: auto; backgrou
 .popover.ctl-panel .frow > .segc { justify-self: start; }
 .ctl-opts { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); }
 .btn.ctl-opt[aria-pressed="true"] { background: var(--selected); border-color: var(--text-3); color: var(--text); font-weight: var(--fw-strong); }
+
+/* 首次引导（1.6.3，2.29）：欢迎卡片三页，每页图标、标题、一句话、一个按钮；底栏左边页码点，右边跳过 / 上一页 / 下一页 */
+.dialog.onboard { width: calc(var(--dialog-w) + var(--sp-8) * 2); }
+.ob-page { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
+.ob-page h3 { margin: var(--sp-2) 0 0; }
+.ob-page p { min-height: calc(var(--lh-body) * 2); }
+.ob-page .btn { margin-top: var(--sp-2); }
+.ob-ic { display: grid; place-items: center; width: calc(var(--ctl-sm) * 2); height: calc(var(--ctl-sm) * 2); border-radius: var(--r-panel); background: var(--hover); color: var(--text-2); }
+.ob-ic [class^="ri-"] { font-size: calc(var(--icon) * 1.6); }
+.dialog.onboard .acts { align-items: center; }
+.ob-dots { display: inline-flex; gap: var(--sp-1); margin-right: auto; }
+.ob-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: background-color var(--dur-2) var(--ease-out); }
+.ob-dots i.on { background: var(--text); }

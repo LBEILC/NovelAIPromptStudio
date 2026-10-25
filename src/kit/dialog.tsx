@@ -38,6 +38,8 @@ export interface DialogProps {
   /** 点遮罩不关（例如正在进行中的操作） */
   sticky?: boolean;
   backdropClass?: string;
+  /** 放到对话框元素上的 data-* 属性（例如自动验收要找的标记） */
+  data?: Record<`data-${string}`, string>;
 }
 export function Dialog(p: DialogProps) {
   return (
@@ -87,6 +89,7 @@ function DialogBody(
         role="dialog"
         aria-modal="true"
         aria-label={p.label}
+        {...p.data}
         onKeyDown={(e) => trapTab(e, box.current)}
       >
         {p.children}

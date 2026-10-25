@@ -103,6 +103,7 @@ import { useStudioReducedMotion } from './lib/motion.js';
 import { trashNotice } from './lib/trashNotice';
 import { workLabel } from './lib/workNames';
 import { CloseAsk } from './shell/CloseAsk';
+import { Onboarding, ONBOARDING_REPLAY } from './shell/Onboarding';
 import {
   moveOverviewTags,
   overviewMoveContext,
@@ -241,6 +242,19 @@ export default function App() {
     [],
   );
   const [page, setPage] = useState(window.studioScreenshot?.page || 'workbench');
+  // 首次引导（doc/design.md 2.29）：新安装第一次打开时显示；"关于与更新"里可以重新查看
+  const [onboarding, setOnboarding] = useState(false);
+  useEffect(() => {
+    if (window.studioScreenshot) return;
+    void invokeResult('onboarding.get', {}).then((r) => r.ok && r.show && setOnboarding(true));
+    const replay = () => setOnboarding(true);
+    addEventListener(ONBOARDING_REPLAY, replay);
+    return () => removeEventListener(ONBOARDING_REPLAY, replay);
+  }, []);
+  const finishOnboarding = useCallback(() => {
+    setOnboarding(false);
+    void invokeResult('onboarding.done', {});
+  }, []);
   const [materialTarget, setMaterialTarget] = useState({ kind: 'block', n: 0 });
   const notify = useNotifications();
   const notificationTarget = useRef({ page, notify });
@@ -2010,6 +2024,18 @@ export default function App() {
       />
 
       <CloseAsk />
+
+      <Onboarding
+        open={onboarding}
+        onClose={finishOnboarding}
+        onAction={(action) => {
+          if (action === 'recover') void openWorkbenchPath();
+          else {
+            setMenuDestination({ section: action === 'token' ? 'novelai' : 'agent' });
+            setPage('settings');
+          }
+        }}
+      />
 
       <Confirm
         options={

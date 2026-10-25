@@ -13,6 +13,7 @@ import { Dialog } from '../kit/dialog';
 import { useNotifications } from '../kit/toast';
 import { useUpdates } from '../state/updates';
 import { StructuredReleaseNotes } from './StructuredReleaseNotes';
+import { replayOnboarding } from '../shell/Onboarding';
 import { Expand, Row, SetPage, errorText } from './parts';
 import misansLicense from '../../LICENSES/MiSans/LICENSE?raw';
 import newsreaderLicense from '../../LICENSES/Newsreader/LICENSE?raw';
@@ -253,6 +254,11 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           </button>
         </Row>
       )}
+      <Row title="首次引导" help="第一次打开时的几页介绍">
+        <button className="btn sm" data-onboard="replay" onClick={replayOnboarding}>
+          重新查看
+        </button>
+      </Row>
       <h2>快捷键</h2>
       <div className="help">macOS 上 Ctrl 对应 Command。在输入框里，Ctrl V 仍然是普通的粘贴。</div>
       {KEYS.map(([group, rows]) => (
