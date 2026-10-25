@@ -116,3 +116,11 @@ materials（JSON 素材） ──按内容引用── reference_vibes（参考�
 ## 文件夹导入
 
 扫描会话只保存在主进程内存，持有源文件路径、SHA-256、字节数和生成信息判断。`FolderScan` 按自然排序的先序遍历返回目录树与收藏集计划；`import.folder.commit` 只接受该会话的目录 ID。每个图片目录对应一个手动收藏集，重复内容复用 `projects.content_hash`，回收站记录清除 `deleted_at`。收藏集成员同一毫秒内的顺序使用行插入顺序确定，不新增数据表。
+
+## 备份格式与图片缺失
+
+`.npsbackup` 是流式写出的 ZIP，格式版本为 1：`manifest.json` 保存 `format`、`appVersion`、`createdAt`、`includesLibrary` 和 images/works/collections/dictionary/materials 数量；`studio.sqlite` 使用 `VACUUM INTO` 一致快照；`workbench-session.json` 保存当前版本 3 的工作台会话；`preferences.json` 只保存可移植的外观、生成、效率与引导偏好。可选 `library/` 保存资源库相对目录结构中的文件。safeStorage 凭据、资源库位置、网络连接配置与渲染器 localStorage 不进入偏好备份。
+
+恢复通过现有数据库连接中的事务替换已知表内容，保留当前 schema，不执行备份携带的 schema 或触发器。恢复前的一致数据库、会话和可移植偏好快照保存在当前 profile 数据目录的独立 `backup-stage-*` 目录，`backup-state.json` 指向最近一次快照；恢复失败时回滚，成功后替换上一次撤回记录。撤回仅替换数据，资源文件只补缺、不删除或覆盖。恢复与撤回后重新加载窗口。
+
+原图按 SHA-256 在当前资源库中重新定位。缺失标记使用现有 `app_meta` 的 `backup_missing:<projectId>` 键（值 `1`），不改变旧表结构；缺失记录的卡片和详情返回可选 `missing: true`，其余记录不添加该字段。路径重定位也同步工作台会话、作品与版本快照中的已知路径。归档读取校验路径、重复条目、CRC 与数据库完整性；更高格式版本拒绝恢复。

@@ -72,6 +72,17 @@ export async function openCommandSession(directory, readSource) {
   }
   return {
     exclusive,
+    backup: () => structuredClone({ version: 3, ...state }),
+    /** @param {{version:number,session:Session,revision:number,migrated:boolean}} saved */
+    async restoreBackup(saved) {
+      if (saved.version !== 3 || !Array.isArray(saved.session?.tabs))
+        throw new Error('备份文件已损坏');
+      await publish({
+        session: structuredClone(saved.session),
+        revision: Number(saved.revision) || 0,
+        migrated: true,
+      });
+    },
     get: () => structuredClone(state.session),
     revision: () => state.revision,
     /** @param {Session} session */

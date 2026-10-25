@@ -1,3 +1,4 @@
+import { backupChecks } from './backup.js';
 import { loadWindowsClipboard } from '../windowsClipboard.js';
 import { workSharingChecks } from './workSharing.js';
 import { onboardingChecks } from './onboarding.js';
@@ -449,6 +450,7 @@ export async function runAcceptance(context) {
       else if (mode.category === 'Agent') await agentChecks(environment);
       else if (mode.category === '作品共用') await workSharingChecks(environment);
       else if (mode.category === '生成') await generationChecks(environment);
+      else if (mode.category === '备份') await backupChecks(environment);
       else if (mode.category === '内置AI与素材') await materialsChecks(environment);
       else if (mode.category === 'ChatGPT') await chatGPTChecks(environment);
       else if (mode.category === '工作台') await workbenchChecks(environment);
@@ -515,6 +517,7 @@ export async function runAcceptance(context) {
           () => agentChecks(environment),
           () => generationChecks(environment),
           () => workSharingChecks(environment),
+          () => backupChecks(environment),
         ],
       ];
       for (const run of mode.shard ? groups[mode.shard.index - 1] : groups.flat()) await run();

@@ -1,3 +1,4 @@
+import { createBackupManager } from './backup.js';
 import { createFolderImporter } from './folderImport.js';
 import { deleteLibraryImages } from './deleteLibraryImages.js';
 import { createTray } from './tray.js';
@@ -545,6 +546,8 @@ app.whenReady().then(async () => {
     return net.fetch(pathToFileURL(filePath).toString());
   });
 
+  let backupManager;
+  let generationActive = false;
   const commandHandlers = {};
   const registerCommand = (name, handler) => {
     commandHandlers[name] = handler;
@@ -1713,7 +1716,12 @@ app.whenReady().then(async () => {
     acceptanceGeneration = await startFakeNovelAI();
   }
   try {
-    const beforeCommand = installAcceptanceLatency(acceptanceMode);
+    const latency = installAcceptanceLatency(acceptanceMode);
+    const beforeCommand = async (name) => {
+      if (backupManager?.restoring && !['backup.cancel', 'backup.status'].includes(name))
+        throw new CommandError('app_busy', '正在恢复备份');
+      await latency?.(name);
+    };
     commandRuntime = await installCommandRuntime({
       preferences,
       generationBaseUrl: acceptanceGeneration?.url,
@@ -1721,7 +1729,12 @@ app.whenReady().then(async () => {
       fetcher: network.fetch,
       beforeCommand,
       onEvent: (event) => {
-        if (event.type === 'generation') trayController?.generation(event.data);
+        if (event.type === 'generation') {
+          generationActive = event.data.jobs.some((job) =>
+            ['queued', 'generating'].includes(job.state),
+          );
+          trayController?.generation(event.data);
+        }
       },
       handlers: commandHandlers,
       readyLibrary: () => contentBackfill,
@@ -1758,6 +1771,66 @@ app.whenReady().then(async () => {
     app.exit(1);
     return;
   }
+
+  backupManager = createBackupManager({
+    dataDirectory,
+    assetsDirectory: () => assetsDirectory,
+    database,
+    preferences,
+    session: commandRuntime.store,
+    version: app.getVersion(),
+    busy: () =>
+      generationActive ||
+      activeImports.size > 0 ||
+      storageMigrationActive ||
+      permanentDeletionActive,
+    progress: (data) => {
+      for (const window of BrowserWindow.getAllWindows())
+        sendWindowEvent(window, { type: 'progress', topic: 'backup.progress', data });
+    },
+    reload: () => {
+      for (const window of BrowserWindow.getAllWindows()) window.webContents.reload();
+    },
+  });
+  const backupResult = async (operation) => {
+    try {
+      await contentBackfill;
+      return { ok: true, ...(await operation()) };
+    } catch (error) {
+      return { ok: false, error: error.name === 'AbortError' ? '操作已取消' : error.message };
+    }
+  };
+  registerCommand('backup.estimate', () => backupResult(() => backupManager.estimate()));
+  registerCommand('backup.status', () => backupManager.status());
+  registerCommand('backup.cancel', () => backupManager.cancel());
+  registerCommand('backup.export', async (input, caller) => {
+    const owner = caller.sender && BrowserWindow.fromWebContents(caller.sender);
+    const date = new Date();
+    const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const result = await dialog.showSaveDialog(owner, {
+      defaultPath: `NovelAI Prompt Studio 备份 ${day}.npsbackup`,
+      filters: [{ name: 'NovelAI Prompt Studio', extensions: ['npsbackup'] }],
+    });
+    if (result.canceled || !result.filePath) return { canceled: true };
+    return backupResult(() => backupManager.export(result.filePath, input.includeLibrary));
+  });
+  registerCommand('backup.inspect', async (input, caller) => {
+    let file = input.path;
+    if (!file) {
+      const owner = caller.sender && BrowserWindow.fromWebContents(caller.sender);
+      const result = await dialog.showOpenDialog(owner, {
+        properties: ['openFile'],
+        filters: [{ name: 'NovelAI Prompt Studio', extensions: ['npsbackup'] }],
+      });
+      if (result.canceled || !result.filePaths[0]) return { canceled: true };
+      file = result.filePaths[0];
+    }
+    return backupResult(() => backupManager.inspect(file));
+  });
+  registerCommand('backup.restore', (input) =>
+    backupResult(() => backupManager.restore(input.path)),
+  );
+  registerCommand('backup.undo', () => backupResult(() => backupManager.undo()));
 
   if (process.platform === 'win32' && !screenshotMode) {
     trayController = createTray({

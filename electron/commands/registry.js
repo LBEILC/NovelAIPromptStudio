@@ -259,6 +259,17 @@ export const commandRegistry = {
   'workbench.open-many': { fields: { paths: 'strings' }, required: ['paths'], uiOnly: true },
   'import.prepare': { fields: { paths: 'stringList' }, uiOnly: true },
   'import.files': { fields: { paths: 'stringList', fromClipboard: 'boolean' }, uiOnly: true },
+  'backup.estimate': { fields: {}, uiOnly: true },
+  'backup.export': {
+    fields: { includeLibrary: 'boolean' },
+    required: ['includeLibrary'],
+    uiOnly: true,
+  },
+  'backup.inspect': { fields: { path: 'string' }, uiOnly: true },
+  'backup.restore': { fields: { path: 'string' }, required: ['path'], uiOnly: true },
+  'backup.undo': { fields: {}, uiOnly: true },
+  'backup.status': { fields: {}, uiOnly: true },
+  'backup.cancel': { fields: {}, uiOnly: true },
   'import.folder.scan': { fields: { path: 'string' }, uiOnly: true },
   'import.folder.commit': {
     fields: { sessionId: 'string', folderIds: 'stringList', skipNoMetadata: 'boolean' },

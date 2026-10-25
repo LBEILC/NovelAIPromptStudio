@@ -117,6 +117,7 @@ export interface WorkbenchCommandEvent {
   dictionaryChanged?: boolean;
 }
 export interface ProgressTopics {
+  'backup.progress': { op: 'export' | 'restore'; done: number; total: number };
   'library:cards-progress': IPC.LibraryCardCacheProgress;
   'library:storage-progress': Types.LibraryStorageProgress;
   'library:import-progress': Types.ImportProgress;
@@ -428,6 +429,32 @@ export interface CommandDefinitions {
     input: { paths?: string[]; fromClipboard?: boolean };
     output: IPC.ImportResult;
   };
+  'backup.estimate': {
+    input: Record<string, never>;
+    output: IPC.Result<{ dataBytes: number; libraryBytes: number; libraryFiles: number }>;
+  };
+  'backup.export': {
+    input: { includeLibrary: boolean };
+    output: IPC.Result<{ path: string; bytes: number }> | { canceled: true };
+  };
+  'backup.inspect': {
+    input: { path?: string };
+    output: IPC.Result<Types.BackupInfo> | { canceled: true };
+  };
+  'backup.restore': { input: { path: string }; output: IPC.Result<{ missingImages: number }> };
+  'backup.undo': { input: Record<string, never>; output: IPC.Result<Record<string, never>> };
+  'backup.status': {
+    input: Record<string, never>;
+    output: {
+      lastRestore: {
+        at: string;
+        fileName: string;
+        createdAt: string;
+        missingImages: number;
+      } | null;
+    };
+  };
+  'backup.cancel': { input: Record<string, never>; output: { ok: boolean } };
   'import.folder.scan': {
     input: { path?: string };
     output: IPC.Result<Types.FolderScan> | { canceled: true };

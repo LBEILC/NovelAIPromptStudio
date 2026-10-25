@@ -4,9 +4,24 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { openDatabase } from './database.js';
 import { createFolderImporter, nameFolderCollections, hiddenDirectory } from './folderImport.js';
 import { importImage } from './assets.js';
+
+it.runIf(process.platform === 'win32')(
+  'does not descend into Windows hidden-attribute directories',
+  () =>
+    fixture(async ({ source, image, importer }) => {
+      await image('attribute-hidden/a.png');
+      await promisify(execFile)('attrib', ['+H', path.join(source, 'attribute-hidden')], {
+        windowsHide: true,
+      });
+      expect(hiddenDirectory(path.join(source, 'attribute-hidden'))).toBe(true);
+      expect((await importer.scan(source)).folders).toEqual([]);
+    }),
+);
 
 async function fixture(run) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-folder-test-'));

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeRelayUrl, checkRelayRequest } from './relay.js';
-import { createNovelAIClient } from './generation.js';
+import { createNovelAIClient, buildGenerationRequest } from './generation.js';
 import { startFakeNovelAI } from './fixtures/novelAIService.js';
 
 describe('relay boundary', () => {
@@ -59,7 +59,12 @@ describe('relay boundary', () => {
       client(
         403,
         JSON.stringify({ error: { message: `The requested model does not exist ${secret}` } }),
-      ).models(),
+      ).generate(
+        buildGenerationRequest(
+          { width: 832, height: 1216, steps: 28, scale: 5, sampler: 'k_euler_ancestral' },
+          'nai-diffusion-5-full',
+        ),
+      ),
     ).rejects.toThrow('中转站没有这个模型');
     await expect(
       client(401, JSON.stringify({ error: { message: `wrong ${secret}` } })).models(),

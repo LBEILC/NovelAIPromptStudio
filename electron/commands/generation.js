@@ -51,12 +51,14 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     accountError,
   });
   const publish = () => services.emit?.({ type: 'generation', data: status() });
-  const priceFor = (request, count = 1, pending = 0) =>
-    settings().connection === 'relay'
+  const priceFor = (request, count = 1, pending = 0) => {
+    if (!Number.isSafeInteger(count) || count < 1) throw new Error('张数必须是正整数');
+    return settings().connection === 'relay'
       ? { anlas: 0, perImage: 0, free: false, count, relay: true }
       : estimateGeneration(request, subscription, count, pending);
+  };
   const idleConnection = () => {
-    if (queue.status().some((j) => ['queued', 'generating'].includes(j.state)))
+    if (queue.status().some((j) => ['pending', 'queued', 'generating'].includes(j.state)))
       throw new Error('等生成完成后再切换连接');
   };
   async function testRelay(input = {}) {
@@ -228,6 +230,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           const s = settings();
           preferences.saveGenerationSettings({
             spentDate: today(),
+            spentImagesToday: s.spentImagesToday,
             spentToday: (s.spentToday || 0) + job.spent - (spent.get(job.id) || 0),
           });
           spent.set(job.id, job.spent);
@@ -558,6 +561,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       preferences.saveConnection(connection);
       subscription = null;
       accountError = '';
+      if (settings().hasToken) await refresh().catch(() => {});
       publish();
       return status();
     },
@@ -602,7 +606,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         throw error;
       }
       preferences.saveNovelAIToken(token.trim());
-      subscription = next;
+      subscription = settings().connection === 'relay' ? null : next;
       accountError = '';
       publish();
       return status();

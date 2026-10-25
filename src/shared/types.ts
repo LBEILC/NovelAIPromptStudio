@@ -166,6 +166,7 @@ export interface DetachedRecord {
   image: LibraryCard;
 }
 export interface ImageProject {
+  missing?: boolean;
   blank?: true;
   work_refs?: WorkRef[];
   paramsSource?: 'last' | 'defaults';
@@ -214,6 +215,7 @@ export interface LibraryCard
   extends Pick<
     ImageRecord,
     | 'id'
+    | 'missing'
     | 'name'
     | 'original_filename'
     | 'has_custom_name'
@@ -526,4 +528,23 @@ export interface FolderImportResult {
   collectionsMerged: number;
   canceled: boolean;
   errors: { path: string; error: string }[];
+}
+
+export interface BackupInfo {
+  path: string;
+  fileName: string;
+  bytes: number;
+  createdAt: string;
+  appVersion: string;
+  format: number;
+  includesLibrary: boolean;
+  counts: {
+    images: number;
+    works: number;
+    collections: number;
+    dictionary: number;
+    materials: number;
+  };
+  compatible: boolean;
+  reason?: string;
 }

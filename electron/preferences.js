@@ -1,3 +1,4 @@
+import { portablePreferences, mergePortablePreferences } from './backup.js';
 import { MODEL_ORDER } from '../src/shared/params.ts';
 import fs from 'node:fs';
 import { normalizeRelayUrl } from './relay.js';
@@ -314,6 +315,8 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
   };
 
   return {
+    backup: () => portablePreferences(read()),
+    restoreBackup: (value) => write(mergePortablePreferences(read(), value)),
     onboardingSettings: (hasExistingData = () => false) => {
       const stored = read();
       if (typeof stored.onboardingDone !== 'boolean') {

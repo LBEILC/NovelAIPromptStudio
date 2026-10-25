@@ -378,7 +378,11 @@ export function createNovelAIClient({
       try {
         response = await send('/v1/models');
       } catch (error) {
-        if (error.status === 404) return null;
+        if (
+          error.status === 404 ||
+          (error.status === 403 && error.message === '中转站没有这个模型')
+        )
+          return null;
         throw error;
       }
       const body = await response.json().catch(() => null);

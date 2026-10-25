@@ -1,3 +1,4 @@
+import { createDatabaseBackup } from './backupDatabase.js';
 import { migrateWorkOriginals } from './workOriginals.js';
 import fs from 'node:fs';
 import { migrateMaterials, createMaterialStore } from './materials.js';
@@ -808,6 +809,10 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     });
     return hydrateParameters({
       ...hydrated,
+      ...(query('SELECT 1 FROM app_meta WHERE key = $key', { $key: 'backup_missing:' + project.id })
+        .length
+        ? { missing: true }
+        : {}),
       ...generatedFields(project.id),
       work_refs: versionStore.workRefs(project.id).get(project.id) || [],
       ...namingFields(project, metadata),
@@ -862,10 +867,16 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       tagsByProject.get(tag.project_id).push(tag);
     }
     const refs = versionStore.workRefs();
+    const missingIds = new Set(
+      query("SELECT substr(key, 16) AS id FROM app_meta WHERE key GLOB 'backup_missing:*'").map(
+        (row) => row.id,
+      ),
+    );
     const hydrated = projects.map((project) => {
       const metadata = metadataByProject.get(project.id) || {};
       return {
         ...project,
+        ...(missingIds.has(project.id) ? { missing: true } : {}),
         tags: tagsByProject.get(project.id) || [],
         metadata,
         prompt_structure: safeJson(metadata.prompt_structure_json),
@@ -1140,7 +1151,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       if (fixedRows === undefined && index > offset && performance.now() - start >= 12) break;
       const row = rebuild[index];
       const fingerprints = query(
-        `SELECT rowid AS project_order, id, name, image_path, thumbnail_path, created_at, is_favorite, deleted_at,
+        `SELECT rowid AS project_order, id, name, image_path, thumbnail_path, created_at, is_favorite, deleted_at, EXISTS(SELECT 1 FROM app_meta WHERE key = 'backup_missing:' || projects.id) AS missing,
         prompt_fingerprint, base_prompt_fingerprint, vibe_fingerprint, exact_group_fingerprint
         FROM projects WHERE id = $id`,
         { $id: row.id },
@@ -1166,6 +1177,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       const embeddedBase = JSON.stringify(safeJson(fingerprints.prompt_fingerprint).base);
       const {
         exact_group_fingerprint,
+        missing,
         project_order,
         prompt_fingerprint,
         base_prompt_fingerprint,
@@ -1178,6 +1190,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
           : base_prompt_fingerprint;
       const payload = {
         ...cardFields,
+        ...(missing ? { missing: true } : {}),
         ...namingFields(cardFields, metadata),
         metadata: {
           model: metadata.model || '',
@@ -2065,6 +2078,16 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     loadProject,
   );
   return {
+    backup: createDatabaseBackup(connection, {
+      ready: async () => {
+        await cardBuild;
+      },
+      invalidate: () => {
+        cardDictionarySignature = '';
+        cardDictionary = new Map();
+        invalidateCards(true);
+      },
+    }),
     workOriginalsMigration,
     hasOnboardingHistory: () =>
       Boolean(connection.prepare('SELECT 1 FROM projects LIMIT 1').get()) ||
