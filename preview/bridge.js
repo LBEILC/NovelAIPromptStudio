@@ -320,6 +320,7 @@ group(
 bar.lastElementChild.querySelectorAll('button').forEach((b, i) => (b.dataset.size = SIZES[i][0]));
 applySize();
 group('数据', [
+  ['首次启动', act('onboarding')],
   ['重来', act('reset')],
   ['空图片库', act('empty')],
   ['2000 张图片', act('many')],

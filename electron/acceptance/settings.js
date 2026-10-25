@@ -127,6 +127,10 @@ export async function settingsChecks(context, restart) {
     await fs.writeFile(backup, 'acceptance metadata only');
     const backupRow = `[...document.querySelectorAll('.setrow')].find(row=>row.textContent.includes('studio.pre-acceptance.sqlite'))`;
     await section('通用');
+    await wait(
+      'document.querySelector(\'[data-settings-section="storage"]\')?.getClientRects().length === 0',
+      '图片库设置已隐藏，可以加载新增备份',
+    );
     await section('图片库');
     await wait('document.body.innerText.includes("studio.pre-acceptance.sqlite")');
     await check(
@@ -155,6 +159,10 @@ export async function settingsChecks(context, restart) {
       'once',
     );
     await section('通用');
+    await wait(
+      'document.querySelector(\'[data-settings-section="storage"]\')?.getClientRects().length === 0',
+      '图片库设置已隐藏，可以重新加载备份列表',
+    );
     await section('图片库');
     await wait(
       '![...document.querySelectorAll(".setrow small")].some(e=>e.textContent.includes("studio.pre-acceptance.sqlite"))',

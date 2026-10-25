@@ -115,7 +115,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
     };
     document.addEventListener('pointerdown', down, true);
     return () => document.removeEventListener('pointerdown', down, true);
-  }, []);
+  }, [d.allItems]);
   // Ctrl K 聚焦搜索；Esc 取消选择
   useEffect(() => {
     const key = (e: KeyboardEvent) => {

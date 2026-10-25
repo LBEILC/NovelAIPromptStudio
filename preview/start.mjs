@@ -111,6 +111,10 @@ function previewZip() {
   return out;
 }
 async function scenario({ action, value }) {
+  if (action === 'onboarding') {
+    session.resetOnboarding();
+    return { reload: true };
+  }
   if (action === 'zip') {
     const file = previewZip();
     session.allowedPath(file);

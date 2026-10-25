@@ -165,12 +165,21 @@ try {
   for (const file of await fs.readdir(output)) {
     if (
       file.endsWith('.png') ||
-      /^(?:checks-(?:progress-)?[012]|timeout-\d+-\d+|manifest)\.json$/.test(file)
+      /^(?:checks-(?:progress-)?\d+|timeout-\d+-\d+|manifest)\.json$/.test(file)
     )
       await fs.unlink(path.join(output, file));
   }
   await fs.writeFile(path.join(root, 'owner'), 'verify:app');
   await fs.mkdir(path.join(root, 'fixtures'));
+  const onboarding = !packaged && options.category === '首次引导';
+  if (!onboarding) {
+    const data = path.join(root, 'userData', 'data');
+    await fs.mkdir(data, { recursive: true });
+    await fs.writeFile(
+      path.join(data, 'preferences.json'),
+      JSON.stringify({ onboardingDone: true }),
+    );
+  }
   if (options.category === '图片库·复制') {
     const source = path.resolve('demo/images/final');
     // Full-suite library order starts with the last imported fixture. Keep that
@@ -212,7 +221,11 @@ try {
     !packaged &&
     (options.category === '全部' || options.restart) &&
     (!options.shard || options.shard.restarts);
-  for (const phase of restarts ? [0, 1, 2] : [0]) {
+  for (const phase of onboarding ? [0, 1, 2, 3, 4, 5, 6] : restarts ? [0, 1, 2] : [0]) {
+    if (onboarding && [3, 5].includes(phase)) {
+      // Only the known disposable profile is reset; each next process is a fresh install.
+      await fs.rm(path.join(root, 'userData'), { recursive: true, force: true });
+    }
     await fs.writeFile(
       path.join(root, 'run.json'),
       JSON.stringify({

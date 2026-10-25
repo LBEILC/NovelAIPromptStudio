@@ -40,6 +40,7 @@ export async function createSession(services, images, emit, empty = false) {
       apiKey: enabled ? 'preview-key' : '',
       clearApiKey: !enabled,
     });
+  preferences.completeOnboarding();
   setAI(true);
   preferences.saveNovelAIToken('acceptance-token');
   preferences.saveAppearanceSettings({ themeMode: 'light', motion: 'full' });
@@ -348,6 +349,13 @@ export async function createSession(services, images, emit, empty = false) {
       call,
       allowedPath,
       setAI,
+      resetOnboarding() {
+        const stored = JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'));
+        fs.writeFileSync(
+          preferences.filePath,
+          JSON.stringify({ ...stored, onboardingDone: false }),
+        );
+      },
       async setChatGPT(scenario) {
         await chatGPT.signOut();
         services.chatgpt.state.plan =

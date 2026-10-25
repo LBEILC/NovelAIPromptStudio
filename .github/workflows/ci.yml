@@ -111,6 +111,9 @@ jobs:
           key: misans-v4.003-5daf8d5447bfd423cfdec94a0e07c53b205892223ccc6ea21b7b8a37248b44d9
       - run: npm run build
       - run: npm run verify:app -- --shard=${{ matrix.shard }}/3
+      - name: Verify first-run onboarding and process restarts
+        if: matrix.shard == 1
+        run: npm run verify:app -- --category=首次引导
       - name: Upload acceptance-checks
         if: always()
         uses: actions/upload-artifact@v7
@@ -118,6 +121,7 @@ jobs:
           name: acceptance-checks-${{ matrix.os }}-shard${{ matrix.shard }}
           path: |
             .codex-runs/acceptance-shard-${{ matrix.shard }}/
+            .codex-runs/acceptance-首次引导/
           if-no-files-found: ignore
 
   screenshots:

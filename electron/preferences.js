@@ -76,6 +76,7 @@ function normalizeRecentImageDirectory(value, strict = false) {
 
 export function openPreferences(dataDirectory, safeStorage, options = {}) {
   const filePath = path.join(dataDirectory, 'preferences.json');
+  const existedAtStartup = fs.existsSync(filePath);
   let sessionApiKey = '';
   let chatGPT;
   const defaultAssetsDirectory = path.resolve(
@@ -312,6 +313,21 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
   };
 
   return {
+    onboardingSettings: (hasExistingData = () => false) => {
+      const stored = read();
+      if (typeof stored.onboardingDone !== 'boolean') {
+        stored.onboardingDone = Boolean(
+          existedAtStartup || stored.novelAITokenEncrypted || hasExistingData(),
+        );
+        write(stored);
+      }
+      return { show: !stored.onboardingDone };
+    },
+    completeOnboarding: () => {
+      const stored = read();
+      if (stored.onboardingDone !== true) write({ ...stored, onboardingDone: true });
+      return {};
+    },
     novelAIToken: () => {
       const value = read().novelAITokenEncrypted;
       if (!value) return '';

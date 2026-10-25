@@ -2034,6 +2034,9 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   );
   return {
     workOriginalsMigration,
+    hasOnboardingHistory: () =>
+      Boolean(connection.prepare('SELECT 1 FROM projects LIMIT 1').get()) ||
+      Boolean(connection.prepare('SELECT 1 FROM works LIMIT 1').get()),
     versions: versionStore,
     vibeLibrary: createVibeLibrary(connection),
     materials: createMaterialStore(connection),

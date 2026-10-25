@@ -1,4 +1,5 @@
 import { workSharingChecks } from './workSharing.js';
+import { onboardingChecks } from './onboarding.js';
 import { trayChecks } from './tray.js';
 import { materialsChecks } from './materials.js';
 import { libraryRefinementChecks } from './libraryRefinement.js';
@@ -133,7 +134,7 @@ export async function runAcceptance(context) {
     });
     await wait('!!document.querySelector(".tb") && !!window.studio');
     h.dualThemes(true);
-    if (mode.phase === 0) {
+    if (mode.phase === 0 && mode.category !== '首次引导') {
       await defaultMotionChecks(h);
       await applyMotionBaseline(h, mode);
     }
@@ -395,7 +396,9 @@ export async function runAcceptance(context) {
         h.dualThemes(true);
       }
     };
-    if (mode.packaged) {
+    if (mode.category === '首次引导' && !mode.packaged) {
+      await onboardingChecks(environment);
+    } else if (mode.packaged) {
       await clientChecks(environment);
       await agentChecks(environment);
       h.category('安装包');

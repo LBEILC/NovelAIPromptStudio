@@ -13,6 +13,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
   if (
     ![
       '全部',
+      '首次引导',
       'Agent',
       '生成',
       '作品共用',

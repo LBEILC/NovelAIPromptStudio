@@ -191,6 +191,16 @@ export async function createCommands(services) {
   };
   /** @type {Partial<Handlers>} */
   const handlers = {
+    'onboarding.get': () => {
+      if (!services.preferences) throw new Error('Preferences unavailable');
+      return services.preferences.onboardingSettings(() =>
+        services.database.hasOnboardingHistory(),
+      );
+    },
+    'onboarding.done': () => {
+      if (!services.preferences) throw new Error('Preferences unavailable');
+      return services.preferences.completeOnboarding();
+    },
     'app.status': async () => ({
       version: services.version,
       libraryCount: (await services.database.loadLibraryCards()).length,

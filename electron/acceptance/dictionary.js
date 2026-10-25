@@ -36,6 +36,16 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       `[...document.querySelectorAll('[role=tab]')].find(t=>t.textContent.startsWith(${JSON.stringify(label)})).click()`,
     );
   };
+  const reopenDictionary = async () => {
+    await section('通用');
+    // Injected fixtures need a fresh load effect; a still-leaving Activity
+    // page retains its effects when navigation returns immediately.
+    await wait(
+      'document.querySelector(\'[data-settings-section="tags"]\')?.getClientRects().length === 0',
+      '词典页已隐藏，可以重新加载验收数据',
+    );
+    await section('翻译词典');
+  };
   if (mostUsed) {
     await wait(`!!document.querySelector('[data-dxrow] .num button')`);
     await check(
@@ -236,8 +246,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     translation: '合成未分类',
     category: 'Unsorted',
   });
-  await section('通用');
-  await section('翻译词典');
+  await reopenDictionary();
   await input(search, 'view_fixture_');
   await tab('暂无译文');
   await wait(`${count}===1`);
@@ -274,8 +283,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
       category_source: 'ai',
     },
   ]);
-  await section('通用');
-  await section('翻译词典');
+  await reopenDictionary();
   await input(search, 'view_fixture_ai');
   await tab('AI 翻译');
   await wait(`${count}===1`);
@@ -307,8 +315,7 @@ export async function dictionaryChecks({ h, database, preferences, mode }) {
     );
   const configure = async (model) => {
     preferences.saveAISettings({ baseUrl: mode.baseUrl, model });
-    await section('通用');
-    await section('翻译词典');
+    await reopenDictionary();
     await input(search, 'dictionary_fixture_');
     await wait(`${count}===55`);
     await click('全选当前分页签');

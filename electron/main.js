@@ -498,6 +498,7 @@ app.whenReady().then(async () => {
     defaultAssetsDirectory,
     systemFonts,
   });
+  preferences.onboardingSettings(() => database.hasOnboardingHistory());
   const network = createNetworkManager({
     session: session.fromPartition('studio-network', { cache: false }),
     updaterSession: autoUpdater.netSession,
