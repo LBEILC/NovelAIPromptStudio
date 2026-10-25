@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { invokeResult } from '../lib/commands';
 import { Icon } from '../kit/controls';
 import { Pop } from '../kit/layer';
+import { suggestControls } from '../lib/v5Controls';
 
 type Hit = { tag: string; translation?: string };
 export function AddTags({
@@ -30,15 +31,21 @@ export function AddTags({
       return;
     }
     let live = true;
+    // V5 控制词排在最前（中文名也能找到），后面是词典的结果
+    const controls = suggestControls(q, 4);
+    const merge = (items: Hit[]) => {
+      const seen = new Set(controls.map((c) => c.tag));
+      return [...controls, ...items.filter((x) => !seen.has(x.tag))].slice(0, 6);
+    };
     const t = setTimeout(() => {
       void invokeResult('dictionary.suggest', { query: q })
         .then((r) => {
           if (live && r.ok) {
-            setHits(r.items.slice(0, 6));
+            setHits(merge(r.items));
             setPick(0);
           }
         })
-        .catch(() => live && setHits([]));
+        .catch(() => live && setHits(controls));
     }, 120);
     return () => {
       live = false;

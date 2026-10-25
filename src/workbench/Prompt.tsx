@@ -43,6 +43,14 @@ import {
 import { deleteTags, insertTags, moveTags } from './edits';
 import { CAT_VAR } from '../kit/categories';
 import { AddTags } from './AddTags';
+import { ControlPanel } from './Controls';
+import {
+  controlConflicts,
+  isV5Model,
+  matchControl,
+  type ControlGroup,
+  type ControlTag,
+} from '../lib/v5Controls';
 import { ParagraphEditor } from './Paragraph';
 import { TextSection } from './TextSection';
 import { InsertPop, CharacterPick } from './Insert';
@@ -122,6 +130,17 @@ export function WorkbenchEditor(p: EditorProps) {
   const tidy = useTidy(p);
   const doc = useMemo(() => createPromptDocument(p.project), [p.project]);
   const entries = useMemo(() => documentTags(doc), [doc]);
+  // V5 控制词：同一节里同一个互斥组（复杂度、年代感）写了两档时画黄框
+  const ctlClash = useMemo(
+    () =>
+      new Map(
+        doc.scopes.flatMap((_, si) => [
+          ...controlConflicts(entries.filter((e) => e.section === si && !e.automatic)),
+        ]),
+      ),
+    [doc, entries],
+  );
+  const v5 = isV5Model(p.project.params?.model);
   const projectRef = useRef(p.project);
   projectRef.current = p.project;
   const update = (project: ImageProject) => {
@@ -470,6 +489,36 @@ export function WorkbenchEditor(p: EditorProps) {
     type: 'tags' | 'paragraph';
   } | null>(null);
   const [insert, setInsert] = useState<{ si: number; before: number; anchor: string } | null>(null);
+  // V5 控制词面板开在哪一节
+  const [ctlFor, setCtlFor] = useState<number | null>(null);
+  /** 面板里选了一项：多选组加上或去掉；互斥组原地换档（多写的几个删掉），选"无"全删；新加的放在这一节最后一个 Tag 块末尾 */
+  const pickControl = (si: number, group: ControlGroup, item: ControlTag | null) =>
+    guard(() => {
+      const inGroup = entries.filter(
+        (e) => e.section === si && !e.automatic && matchControl(e.tag.tag)?.group === group,
+      );
+      const append = (tag: string) => {
+        const blocks = doc.scopes[si].blocks;
+        const last = blocks.map((b) => b.type).lastIndexOf('tags');
+        return insertTags(doc, si, last, tag);
+      };
+      if (!group.exclusive) {
+        const same = inGroup.filter((e) => matchControl(e.tag.tag)?.item === item);
+        save(same.length ? deleteTags(doc, same) : append(item!.tag));
+        return;
+      }
+      if (!item) return void save(deleteTags(doc, inGroup));
+      if (!inGroup.length) return void save(append(item.tag));
+      const [first, ...rest] = inGroup;
+      const next = deleteTags(doc, rest);
+      save(
+        replaceSection(
+          next,
+          first.section,
+          editPromptTag(next.scopes[first.section], first.block, first.index, { tag: item.tag }),
+        ),
+      );
+    });
   const [saveBlock, setSaveBlock] = useState<{ si: number; bi: number; name: string } | null>(null);
   const [paraTranslate, setParaTranslate] = useState({ key: '', n: 0 });
   const [paraEditing, setParaEditing] = useState<string[]>([]);
@@ -1031,8 +1080,12 @@ export function WorkbenchEditor(p: EditorProps) {
   };
   const tagEl = (e: DocumentTag) => {
     const t = e.tag;
-    const syntax = syntaxNote(t);
-    const zh = syntax || t.translation;
+    const ctl = matchControl(t.tag);
+    const clash = ctlClash.get(e.key);
+    const syntax = syntaxNote(t) || (clash ? `${clash.label}写了不止一档，只留一个` : '');
+    // 控制词显示中文名；用户自己改过的译文优先
+    const zh =
+      syntax || (ctl && t.translation_source !== 'manual' ? ctl.name : t.translation) || ctl?.name;
     const cls = [
       'tag',
       query && !matches(e) ? 'dim' : '',
@@ -1052,7 +1105,7 @@ export function WorkbenchEditor(p: EditorProps) {
         data-tag-key={e.key}
         role="button"
         tabIndex={0}
-        data-tip={syntax ? undefined : categoryLabel(t.category)}
+        data-tip={syntax ? undefined : ctl ? `V5 控制词 · ${ctl.name}` : categoryLabel(t.category)}
         onClick={(ev) => clickTag(e, ev)}
         onKeyDown={(ev) => {
           if (ev.key === 'Enter' || ev.key === ' ') {
@@ -1087,7 +1140,11 @@ export function WorkbenchEditor(p: EditorProps) {
           setMenu({ at: [ev.clientX, ev.clientY], items: tagMenu(e) });
         }}
       >
-        <span className="dot" style={{ background: `var(--cat-${catVar(t.category)})` }} />
+        {ctl ? (
+          <span className="dot ctl" />
+        ) : (
+          <span className="dot" style={{ background: `var(--cat-${catVar(t.category)})` }} />
+        )}
         <span className="t">
           <span className="en">
             {/* 括号强调：{} 加强、[] 减弱，括号画淡一点 */}
@@ -1192,6 +1249,7 @@ export function WorkbenchEditor(p: EditorProps) {
         </>
       )}
       <span className="acts" style={{ marginLeft: 'auto' }}>
+        {ctlBtn(si)}
         {secCopy(si, c.label)}
         {acts(() => charMenu(si), '这个角色的操作', `char-${c.id}`)}
       </span>
@@ -1426,6 +1484,19 @@ export function WorkbenchEditor(p: EditorProps) {
       </div>
     );
   };
+  /** 节标题上的"V5 控制词"按钮，点了打开点选面板 */
+  const ctlBtn = (si: number) => (
+    <button
+      className={`btn quiet sm icon ${ctlFor === si ? 'on' : ''}`}
+      aria-label="V5 控制词"
+      aria-expanded={ctlFor === si}
+      data-tip="V5 控制词"
+      data-trigger={`ctl-${si}`}
+      onClick={() => setCtlFor(ctlFor === si ? null : si)}
+    >
+      <Icon name="equalizer-line" />
+    </button>
+  );
   const secCopy = (si: number, label: string) => (
     <button
       className="btn quiet sm icon"
@@ -1520,6 +1591,7 @@ export function WorkbenchEditor(p: EditorProps) {
                 : `${doc.scopes[baseIndex].blocks.length} 块`}
             </span>
             <span className="acts" style={{ marginLeft: 'auto' }}>
+              {ctlBtn(baseIndex)}
               {secCopy(baseIndex, chars.length ? '基础提示词' : '提示词')}
               {acts(
                 () => [
@@ -1984,6 +2056,41 @@ export function WorkbenchEditor(p: EditorProps) {
               data-command-scope={doc.scopes[editing.section]?.scope.key}
               data-command-block={editing.block}
             />
+            {(() => {
+              // V5 控制词：一句说明；互斥组可以直接换档位；写法不标准给"改成官方写法"；不是 V5 时提醒
+              const m = matchControl(draft.tag);
+              if (!m) return null;
+              return (
+                <div className="ctl-pop">
+                  <div className="ctl-pop-h">
+                    <span className="dot ctl" />
+                    <b>{m.name}</b>
+                    <span className="muted">V5 控制词</span>
+                  </div>
+                  <p className="help">{m.item.help}</p>
+                  {m.group.exclusive && (
+                    <Seg
+                      label={m.group.label}
+                      items={m.group.items.map((x) => [x.tag, x.short] as const)}
+                      value={m.item.tag}
+                      onChange={(tag) => setDraft({ ...draft, tag, translation: '' })}
+                    />
+                  )}
+                  {m.nonstandard && (
+                    <p className="help warn-note">
+                      官方写法是 <span className="mono">{m.item.tag}</span>
+                      <button
+                        className="btn quiet sm"
+                        onClick={() => setDraft({ ...draft, tag: m.item.tag })}
+                      >
+                        改成官方写法
+                      </button>
+                    </p>
+                  )}
+                  {!v5 && <p className="help warn-note">当前模型不是 V5，这个词不起控制作用</p>}
+                </div>
+              );
+            })()}
             <div className="frow">
               <span className="label">Tag</span>
               <label className="field sm">
@@ -2082,6 +2189,14 @@ export function WorkbenchEditor(p: EditorProps) {
         }))}
       />
       <ContextMenu at={menu?.at || null} onClose={() => setMenu(null)} items={menu?.items || []} />
+      <ControlPanel
+        open={ctlFor != null && !!doc.scopes[ctlFor]}
+        onClose={() => setCtlFor(null)}
+        anchor={`[data-trigger="ctl-${ctlFor ?? baseIndex}"]`}
+        tags={entries.filter((e) => e.section === ctlFor && !e.automatic).map((e) => e.tag.tag)}
+        v5={v5}
+        onPick={(g, x) => ctlFor != null && pickControl(ctlFor, g, x)}
+      />
       {insert && p.tabId && (
         <InsertPop
           open={!!insert}
