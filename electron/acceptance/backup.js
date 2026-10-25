@@ -2,8 +2,9 @@ import path from 'node:path';
 import { once } from 'node:events';
 import fs from 'node:fs/promises';
 import sharp from 'sharp';
+import { backupUIChecks } from './backupUI.js';
 
-export async function backupChecks({ h, mode, doubles, commandHandlers, database }) {
+export async function backupChecks({ h, mode, doubles, commandHandlers, database, app }) {
   h.category('备份');
   const folder = path.join(mode.root, 'folder-command-fixture');
   await fs.mkdir(folder, { recursive: true });
@@ -68,4 +69,5 @@ export async function backupChecks({ h, mode, doubles, commandHandlers, database
   });
   await h.wait('!!window.studio && !!document.querySelector(".tb")');
   database.deleteCollection(id);
+  await backupUIChecks({ h, mode, doubles, database, app });
 }

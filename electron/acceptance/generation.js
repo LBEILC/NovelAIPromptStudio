@@ -1,4 +1,5 @@
 import { selectGalleryGrouping } from './galleryView.js';
+import { relayChecks } from './relay.js';
 import fs from 'node:fs';
 import { clipboard } from 'electron';
 import path from 'node:path';
@@ -956,4 +957,5 @@ export async function generationChecks({
       fs.existsSync(savedOriginal.project.image_path),
   );
   await h.screenshot('057-clipboard-original-restored');
+  await relayChecks({ h, generationService });
 }

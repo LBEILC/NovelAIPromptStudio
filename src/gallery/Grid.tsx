@@ -522,6 +522,7 @@ function Cards({
               data-enter={previousKeys && !previousKeys.has(g.id) ? 'fade' : undefined}
               data-index={i}
               data-group-id={g.id}
+              data-image-id={shown.id}
               role="option"
               aria-selected={picked || on}
               aria-label={imageAccessibleName(g.cover)}
