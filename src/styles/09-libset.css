@@ -453,7 +453,8 @@ textarea.para-in { resize: none; overflow: hidden; }
 .viewer-bar .vz-sep { width: var(--bw); height: var(--ctl-sm); margin: 0 var(--sp-1); background: var(--divider); }
 /* Seed：一个框里放标签、数值和随机/固定的小图标；编辑时只有数值变成输入，字体和宽度不变，框的边框加深（和其他输入框一样） */
 /* Seed：左边的图标兼作标签（随机是交叉箭头，固定是锁），点它切换；数值宽度跟着内容，输入时才按 10 位留宽 */
-.seedf { gap: var(--sp-1); padding-left: var(--sp-0); cursor: default; transition: border-color var(--dur-1) var(--ease-out); }
+/* 写成 .field.seedf：只写 .seedf 会被 .field.sm 的 8px 盖掉，图标左边比数字右边多出 4px（用户 10-25） */
+.field.seedf { gap: var(--sp-1); padding-left: var(--sp-0); cursor: default; transition: border-color var(--dur-1) var(--ease-out); }
 .seedf:hover { border-color: var(--text-2); }
 .seedf .seed-val { width: auto; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-family: var(--font-mono); text-align: left; cursor: text; outline: none; }
 .seedf .seed-val.rand, .seedf .seed-val::placeholder { color: var(--text-2); font-family: var(--font-ui); }

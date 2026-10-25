@@ -259,8 +259,8 @@ textarea.raw { font: var(--fs-small)/var(--lh-small) var(--font-mono); }
 @container (max-width: 560px) { .gen-bar .seed-lbl, .gen-bar .size-btn > i { display: none; } }
 @container (max-width: 520px) { .gen-bar .cost > span { display: none; } }
 @container (max-width: 480px) { .gen-bar .cunit { display: none; } }
-@container (max-width: 480px) { .gen-bar .seedf .seed-t { display: none; } .gen-bar .seedf { padding-left: 8px; } .gen-bar .count-step .btn { width: calc(var(--ctl-sm) * 0.8); } }
-@container (max-width: 460px) { .gen-bar .row { gap: var(--sp-1); } .gen-bar .seedf .seed-val { display: none; } .gen-bar .seedf .seed-t { display: inline-grid; } .gen-bar .seedf { padding: 0 var(--sp-0); } }
+@container (max-width: 480px) { .gen-bar .seedf .seed-t { display: none; } .gen-bar .field.seedf { padding-left: 8px; } .gen-bar .count-step .btn { width: calc(var(--ctl-sm) * 0.8); } }
+@container (max-width: 460px) { .gen-bar .row { gap: var(--sp-1); } .gen-bar .seedf .seed-val { display: none; } .gen-bar .seedf .seed-t { display: inline-grid; } .gen-bar .field.seedf { padding: 0 var(--sp-0); } }
 /* 提示词栏顶部窄时，复制按钮只留图标 */
 .col.prompt .col-h { container-type: inline-size; }
 @container (max-width: 460px) { [data-act="copy"] .lbl { display: none; } [data-act="copy"] { width: var(--ctl-sm); padding: 0; } }
