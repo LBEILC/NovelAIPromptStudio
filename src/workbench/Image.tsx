@@ -22,6 +22,7 @@ import { markLoaded } from '../kit/alpha';
 import { trashNotice } from '../lib/trashNotice';
 import { originGone, originMenu, trashImage } from './original';
 import { useSharedTrash } from '../shell/SharedTrash';
+import { ImageOps } from './ImageOps';
 
 export interface ImageProps {
   tab: WorkbenchTab;
@@ -63,6 +64,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const [viewer, setViewer] = useState<number | null>(null);
   const [menu, setMenu] = useState<[number, number] | null>(null);
   const [vibe, setVibe] = useState<number | null>(null);
+  const [op, setOp] = useState<'' | 'upscale' | 'enhance'>('');
   useEffect(() => setMissing(!!tab.error), [image?.image_path, tab.error]);
   useEffect(() => {
     if (!generation.settings.hasToken) {
@@ -195,9 +197,26 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const dirtyPresence = usePresence(dirty);
   const showDirty = dirty || (dirtyPresence.mounted && lastDirtyAt.current === dirtyAt);
   const dirtyLeaving = !dirty && showDirty;
+  // 放大、增强（1.8）：有令牌、这一张有版本时才有
+  const canOp = !!version && !!stageId && !gone && !blank && !allTrashed;
   const menuItems: MenuEntry[] =
     version && stageId && !gone
       ? [
+          ...(canOp && !missing
+            ? ([
+                { label: '放大…', icon: 'expand-diagonal-line', onSelect: () => setOp('upscale') },
+                { label: '增强…', icon: 'magic-line', onSelect: () => setOp('enhance') },
+                {
+                  label: '用这张做底图',
+                  icon: 'image-edit-line',
+                  onSelect: () =>
+                    void invokeUI('reference.set-base', { tabId: tab.id, imageId: stageId })
+                      .then(() => notify({ text: '已设为底图，生成时按底图出图' }))
+                      .catch((e) => notify({ text: (e as Error).message, tone: 'error' })),
+                },
+                'sep',
+              ] as MenuEntry[])
+            : []),
           {
             label: '作为新作品打开',
             onSelect: () =>
@@ -370,24 +389,47 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                 存入图片库
               </button>
             )}
-            <button className={`btn quiet sm ${missing ? 'is-off' : ''}`} {...lost(p.onReveal)}>
+            <button
+              className={`btn quiet sm ${missing ? 'is-off' : ''}`}
+              aria-label="在文件夹中显示"
+              data-tip="在文件夹中显示"
+              {...lost(p.onReveal)}
+            >
               <Icon name="folder-open-line" />
-              在文件夹中显示
+              <span className="lbl">在文件夹中显示</span>
             </button>
             <button
               className={`btn quiet sm ${missing ? 'is-off' : ''}`}
+              aria-label="复制图片"
+              data-tip="复制图片"
               {...lost(() => p.onCopyImage(image))}
             >
               <Icon name="file-copy-line" />
-              复制图片
+              <span className="lbl">复制图片</span>
             </button>
             <button
               className={`btn quiet sm ${missing ? 'is-off' : ''}`}
+              aria-label="另存为"
+              data-tip="另存为"
               {...lost(() => p.onDownloadImage(image))}
             >
               <Icon name="download-2-line" />
-              另存为
+              <span className="lbl">另存为</span>
             </button>
+            {canOp && (
+              <>
+                <span className="stage-sep" />
+                <ImageOps
+                  tabId={tab.id}
+                  imageId={stageId}
+                  width={Number(members[index]?.metadata?.width) || undefined}
+                  height={Number(members[index]?.metadata?.height) || undefined}
+                  off={missing ? '图片文件找不到了' : undefined}
+                  open={op}
+                  onOpen={setOp}
+                />
+              </>
+            )}
           </div>
         </>
       )}

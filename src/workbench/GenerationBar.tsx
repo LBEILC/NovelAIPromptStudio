@@ -62,8 +62,12 @@ export function GenerationSetup({ onConfigure }: { onConfigure: () => void }) {
   );
 }
 
+/** 放大、增强（1.8）在队列里时写"放大中""增强中"，其余照旧"生成中" */
+const busyVerb = (op?: string) =>
+  op === 'upscale' ? '放大中' : op === 'enhance' ? '增强中' : '生成中';
+
 /** 底栏右边生成中的样子："停止"和"生成中" */
-function GenBusy({ job }: { job: { id: string; stop?: boolean } }) {
+function GenBusy({ job }: { job: { id: string; stop?: boolean; operation?: string } }) {
   return (
     <>
       <button
@@ -76,7 +80,7 @@ function GenBusy({ job }: { job: { id: string; stop?: boolean } }) {
       </button>
       <button className="btn seal is-off busy" aria-disabled="true">
         <span className="spin" />
-        生成中
+        {busyVerb(job.operation)}
       </button>
     </>
   );
@@ -314,12 +318,12 @@ export function GenerationBar({
               >
                 {job
                   ? job.stop
-                    ? `生成中 ${job.index} / ${job.count} · 完成当前这张后停止`
+                    ? `${busyVerb(job.operation)} ${job.index} / ${job.count} · 完成当前这张后停止`
                     : job.continuous
                       ? `生成中 第 ${job.index} 张 · 持续生成`
                       : relay
-                        ? `生成中 ${job.index} / ${job.count}`
-                        : `生成中 ${job.index} / ${job.count} · ${job.spentKnown ? `已消耗 ${job.spent} Anlas` : '消耗未知'}`
+                        ? `${busyVerb(job.operation)} ${job.index} / ${job.count}`
+                        : `${busyVerb(job.operation)} ${job.index} / ${job.count} · ${job.spentKnown ? `已消耗 ${job.spent} Anlas` : '消耗未知'}`
                   : '生成中'}
               </span>
             ) : (

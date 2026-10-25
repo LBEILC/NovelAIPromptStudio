@@ -9,6 +9,10 @@ import { useGeneration } from '../state/generation';
 import { invokeUI } from '../lib/commands';
 import { mediaUrl } from '../lib/imageStage.js';
 
+/** 放大、增强（1.8）时写"放大中""增强中"（和工作台底栏一致） */
+const busyVerb = (op?: string) =>
+  op === 'upscale' ? '放大中' : op === 'enhance' ? '增强中' : '生成中';
+
 export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }) {
   const state = useGeneration();
   const notify = useNotifications();
@@ -111,7 +115,7 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
               {running
                 ? running.continuous
                   ? `生成中 · 第 ${running.index} 张`
-                  : `生成中 · ${running.index} / ${running.count}`
+                  : `${busyVerb(running.operation)} · ${running.index} / ${running.count}`
                 : '生成中'}
             </button>
           ) : (

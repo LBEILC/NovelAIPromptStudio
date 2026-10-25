@@ -30,6 +30,8 @@ export function RefSlider({
   off,
   tip,
   onCommit,
+  min = 0,
+  max = 1,
 }: {
   label: string;
   value: number | null;
@@ -37,6 +39,8 @@ export function RefSlider({
   off?: boolean;
   tip?: string;
   onCommit: (v: number) => void;
+  min?: number;
+  max?: number;
 }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
@@ -47,8 +51,8 @@ export function RefSlider({
         className={`pslider ${v == null ? 'unknown' : ''}`}
         label={label}
         value={v ?? 0}
-        min={0}
-        max={1}
+        min={min}
+        max={max}
         step={0.01}
         page={10}
         disabled={off}
@@ -101,27 +105,176 @@ export function RefsPane({
         .then((r) => setLibrary(r.items))
         .catch(() => setLibrary([]));
   }, [addOpen]);
+  // ---------- 底图（图生图，1.8，doc/design.md 2.34）----------
+  const rev0 = { tabId: tab.id, expectedRevision: tab.revision };
+  const baseImg = tab.project?.references?.base || null;
+  const wasBase = base?.project.references?.base || null;
+  const canBase = !!caps?.img2img;
+  const tw = Number(tab.project?.metadata?.width) || 0,
+    th = Number(tab.project?.metadata?.height) || 0;
+  const stretched =
+    !!baseImg &&
+    tw > 0 &&
+    th > 0 &&
+    Math.abs(baseImg.width / baseImg.height - tw / th) / (tw / th) > 0.02;
+  /** 面积不变、比例换成底图的，宽高贴 64 */
+  const fitBase = () => {
+    if (!baseImg) return;
+    const area = tw * th,
+      r = baseImg.width / baseImg.height;
+    const snap = (n: number) => Math.max(64, Math.round(n / 64) * 64);
+    void run(() =>
+      invokeUI('prompt.set-size', {
+        tabId: tab.id,
+        width: snap(Math.sqrt(area * r)),
+        height: snap(Math.sqrt(area / r)),
+      }),
+    );
+  };
+  const setBase = (input: { imageId?: string; strength?: number; noise?: number }) =>
+    void run(() => invokeUI('reference.set-base', { ...rev0, ...input }));
+  const baseBlock = (
+    <>
+      <div className="sec-h">
+        底图<span className="muted">图生图</span>
+        <span className="acts" style={{ marginLeft: 'auto' }}>
+          {baseImg ? (
+            <button
+              className="btn quiet sm icon"
+              aria-label="移除底图"
+              data-tip="移除底图，回到只按提示词生成"
+              onClick={() => void run(() => invokeUI('reference.remove', { ...rev0, id: 'base' }))}
+            >
+              <Icon name="close-line" />
+            </button>
+          ) : (
+            <>
+              <button
+                className={`btn quiet sm ${!canBase || !tab.versionImageId ? 'is-off' : ''}`}
+                aria-disabled={!canBase || !tab.versionImageId || undefined}
+                data-tip={
+                  !canBase
+                    ? `${modelName(model)} 不能用底图`
+                    : !tab.versionImageId
+                      ? '先在舞台上选一张图'
+                      : '用舞台上正在看的这张'
+                }
+                onClick={() =>
+                  canBase && tab.versionImageId && setBase({ imageId: tab.versionImageId })
+                }
+              >
+                用当前这张
+              </button>
+              <button
+                className={`btn quiet sm ${!canBase ? 'is-off' : ''}`}
+                aria-disabled={!canBase || undefined}
+                data-tip={!canBase ? `${modelName(model)} 不能用底图` : undefined}
+                onClick={() => canBase && setBase({})}
+              >
+                <Icon name="add-line" />
+                从文件选…
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+      {baseImg ? (
+        <div className="vrow base-row" data-enter="fade">
+          <span className="vthumb">
+            <img
+              src={
+                baseImg.thumbnail.startsWith('data:')
+                  ? baseImg.thumbnail
+                  : mediaUrl(baseImg.thumbnail)
+              }
+              alt=""
+              draggable={false}
+            />
+          </span>
+          <div className="vmain">
+            <div className="vh">
+              {/* 没起名的图名字是一长串 ID / 哈希，不显示（和图片库一样） */}
+              <b>{/^[0-9a-f-]{16,}(\.\w+)?$/i.test(baseImg.name) ? '底图' : baseImg.name}</b>
+              {!wasBase && <span className="src">新加</span>}
+              <span className="mono muted vfile">
+                {baseImg.width} × {baseImg.height}
+              </span>
+            </div>
+            <RefSlider
+              label="强度"
+              value={baseImg.strength}
+              min={0.01}
+              max={0.99}
+              changed={!!wasBase && wasBase.strength !== baseImg.strength}
+              onCommit={(strength) => setBase({ strength })}
+            />
+            <RefSlider
+              label="噪声"
+              value={baseImg.noise}
+              max={0.99}
+              changed={!!wasBase && wasBase.noise !== baseImg.noise}
+              onCommit={(noise) => setBase({ noise })}
+            />
+            {!canBase ? (
+              <span className="help warn vnote" data-enter="fade">
+                {modelName(model)} 不能用底图，生成前换成 V5 或 V4.5，或者移除底图
+              </span>
+            ) : stretched ? (
+              <span className="help warn vnote base-fit" data-enter="fade">
+                底图比例和要生成的 {tw} × {th} 不一样，会被拉伸
+                <button className="btn quiet sm" onClick={fitBase}>
+                  改成底图的比例
+                </button>
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <p className="help pnote">
+          {canBase
+            ? '有底图时按底图出图：强度越大越不像底图，噪声越大细节越多。图片库里右键一张图也能放进来。'
+            : `${modelName(model)} 不能用底图，V5 和 V4.5 可以。`}
+        </p>
+      )}
+    </>
+  );
   if (!caps?.references)
     return (
       <div className="doc pdoc">
-        <div className="empty pane-empty">
-          <span className="pe-ic">
-            <Icon name="image-circle-line" />
-          </span>
-          <h3>{modelName(model)} 暂不支持 Vibe 和精确参考</h3>
-          <p>
-            NovelAI 目前只在 V4.5 上提供这两项。可以在“参数”里把模型换成
-            V4.5，生成出来的是新的一版。
-          </p>
-          <div className="acts">
-            <button
-              className="btn"
-              onClick={() => void setParams({ model: 'nai-diffusion-4-5-full' })}
-            >
-              换成 V4.5 Full
-            </button>
+        {canBase && baseBlock}
+        {canBase ? (
+          <>
+            <div className="sec-h">Vibe 和精确参考</div>
+            <p className="help pnote">
+              {modelName(model)} 没有这两项，NovelAI 只在 V4.5 上提供。
+              <button
+                className="btn quiet sm"
+                onClick={() => void setParams({ model: 'nai-diffusion-4-5-full' })}
+              >
+                换成 V4.5 Full
+              </button>
+            </p>
+          </>
+        ) : (
+          <div className="empty pane-empty">
+            <span className="pe-ic">
+              <Icon name="image-circle-line" />
+            </span>
+            <h3>{modelName(model)} 暂不支持 Vibe 和精确参考</h3>
+            <p>
+              NovelAI 目前只在 V4.5 上提供这两项。可以在“参数”里把模型换成
+              V4.5，生成出来的是新的一版。
+            </p>
+            <div className="acts">
+              <button
+                className="btn"
+                onClick={() => void setParams({ model: 'nai-diffusion-4-5-full' })}
+              >
+                换成 V4.5 Full
+              </button>
+            </div>
           </div>
-        </div>
+        )}
         {dialog}
       </div>
     );
@@ -274,6 +427,7 @@ export function RefsPane({
   const extra = Math.max(0, vibes.length - VIBE_EXTRA_FREE);
   return (
     <div className="doc pdoc" ref={box}>
+      {baseBlock}
       <p className="help pnote">
         参考图让生成的图接近另一张图的气氛（Vibe）或角色、画风（精确参考）。两种不能同时用。
       </p>

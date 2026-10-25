@@ -247,6 +247,16 @@ export default function GalleryPage(
       ...(!multi && menu.member.generated_work_id && p.onOpenAsNewWork
         ? [{ label: '作为新作品打开', onSelect: () => p.onOpenAsNewWork!(menu.member) }]
         : []),
+      // 图生图（1.8）：放进工作台当前标签页的底图
+      ...(!multi
+        ? [
+            {
+              label: '在工作台用作底图',
+              disabled: p.onUseAsBase ? false : '先在工作台打开一个作品',
+              onSelect: () => p.onUseAsBase?.(menu.member),
+            },
+          ]
+        : []),
       {
         label: '加入收藏集…',
         onSelect: () => {

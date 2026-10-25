@@ -513,3 +513,7 @@ textarea.para-in { resize: none; overflow: hidden; }
 .popover.op-pop .op-size .muted { color: var(--text-3); }
 .popover.op-pop .op-foot { align-items: center; padding-top: var(--sp-3); border-top: 1px solid var(--divider); }
 .popover.op-pop .op-price { display: flex; flex-direction: column; min-width: 0; }
+/* 舞台窄的时候（窗口小、提示词栏拖宽）操作条只留图标，悬停写名字，不挤成竖排 */
+.stage-acts { container-type: inline-size; }
+@container (max-width: 600px) { .stage-acts .btn.quiet .lbl { display: none; } .stage-acts .btn.quiet:has(> .lbl) { width: var(--ctl-sm); padding: 0; justify-content: center; } }
+.stage-acts .saved { white-space: nowrap; }

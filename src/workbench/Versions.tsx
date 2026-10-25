@@ -7,11 +7,25 @@ import { invokeUI } from '../lib/commands';
 import { mediaUrl } from '../lib/imageStage.js';
 import { versionDiff } from '../lib/versionDiff';
 import type { CommandTab } from '../shared/commands';
-import type { WorkVersion } from '../shared/generation';
+import type { ImageOperation, WorkVersion } from '../shared/generation';
 import { originGone } from './original';
 import { useVersionState } from './useVersionState';
 import { VersionDifference, VersionSummary } from './VersionDifference';
 import { Row, TH_H, TH_MORE, Thumb, rowsOf } from './versionHelpers';
+// 放大、增强、图生图出来的那一版（1.8，doc/design.md 2.34）：标题旁边挂一个和 Agent 一样的小标签
+const OP_NAME: Record<ImageOperation['kind'], string> = {
+  upscale: '放大',
+  enhance: '增强',
+  img2img: '图生图',
+};
+const n2 = (v?: number) => (v == null ? '' : v.toFixed(2));
+const opTip = (o: ImageOperation) =>
+  o.kind === 'upscale'
+    ? '把上一版的图宽高各放大 2 倍'
+    : o.kind === 'enhance'
+      ? `把上一版的图重新细化 · 幅度 ${o.magnitude ?? ''} · 放大 ${o.scale === 'max' ? 'Max' : `${o.scale ?? 1}x`}`
+      : `按底图生成 · 强度 ${n2(o.strength)} · 噪声 ${n2(o.noise)}`;
+
 export function Versions({ tab, before }: { tab: CommandTab; before?: () => Promise<void> }) {
   const {
     ratio,
@@ -225,6 +239,11 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             <span className="vh">
               <span className="vn">{name(v)}</span>
               {v.source === 'agent' && <span className="src">Agent</span>}
+              {v.operation && (
+                <span className="src" data-tip={opTip(v.operation)}>
+                  {OP_NAME[v.operation.kind]}
+                </span>
+              )}
               {spawned.length > 0 && (
                 <span
                   className="src link"
@@ -432,6 +451,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             <span className="vh">
               <span className="vn">第 {versions.length + 1} 版</span>
               {job.source === 'agent' && <span className="src">Agent</span>}
+              {job.operation && <span className="src">{OP_NAME[job.operation]}</span>}
             </span>
             {job.summary && <span className="what">{job.summary}</span>}
             <div className="ths">

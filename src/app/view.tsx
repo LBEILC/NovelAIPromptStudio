@@ -447,6 +447,17 @@ export function renderApp({
               onImport={() => importImages()}
               onImportClipboard={() => importImages(null, true)}
               onImportFolder={() => void folder.importFolder()}
+              onUseAsBase={
+                activeTab
+                  ? (project) =>
+                      void invokeUI('reference.set-base', {
+                        tabId: activeTab.id,
+                        imageId: project.id,
+                      })
+                        .then(() => showToast('已放进当前标签页的底图，生成时按它出图'))
+                        .catch((error) => showToast(error.message, 'error'))
+                  : undefined
+              }
               onOpenAsNewWork={(project) =>
                 void workbenchConnection
                   ?.prepare()

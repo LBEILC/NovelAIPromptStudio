@@ -71,6 +71,8 @@ export interface LibraryProps {
   onOpenWorkbench: (project: Pick<ImageRecord, 'id'>, group?: Pick<LibraryGroup, 'id'>) => void;
   /** 软件生成的图另起一个新作品（doc/design.md 2.23，1.5.5） */
   onOpenAsNewWork?: (project: Pick<ImageRecord, 'id'>) => void;
+  /** 放进工作台当前标签页的底图（图生图，1.8）；没有打开的标签页时不给 */
+  onUseAsBase?: (project: Pick<ImageRecord, 'id'>) => void;
   onCopyImage: (project: LibraryCard | ImageRecord | ImageProject) => Promise<unknown>;
   onDownloadImage: (project: LibraryCard | ImageRecord | ImageProject) => Promise<unknown>;
   onReveal: (project: LibraryCard | ImageRecord) => void;
