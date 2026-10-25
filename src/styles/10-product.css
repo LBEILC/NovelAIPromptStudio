@@ -284,3 +284,10 @@ img.matte-black { background: var(--matte-black); }
 .vbg-sw.black { background: var(--matte-black); }
 /* 鼠标关掉浮层后焦点回到触发它的元素，不画焦点框；一按键就恢复（src/kit/layer.tsx 的 focusQuietly） */
 [data-pointer-focus]:focus-visible { outline: none; }
+/* 图片库详情栏：栏不动，里面一张 / 多选 / 没选三种内容叠在同一格里换（src/gallery/Detail.tsx） */
+.col.detail > .dswap { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
+.dswap > .dframe { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+/* 生成栏右边：费用和"生成" ↔ "停止"和"生成中"叠在同一格里换（src/workbench/GenerationBar.tsx） */
+.gen-acts { justify-items: end; align-items: center; }
+.gen-acts > .gen-act { display: inline-flex; align-items: center; gap: inherit; }
+.gen-bar .row > .gen-acts { gap: var(--sp-2); }

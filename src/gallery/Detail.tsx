@@ -48,14 +48,45 @@ export function Detail({
   detail: ImageRecord | null;
   a: DetailActions;
 }) {
-  if (p.selectedGroupIds.length) return <Summary p={p} a={a} />;
-  if (!detail || !p.previewGroup)
-    return (
-      <div className="col detail" ref={a.colRef}>
-        {a.handle}
+  // 一张、多选、没选三种状态在同一个栏里换内容（2.17）：以前各画一整个栏，换收藏集、开始多选时
+  // 整栏直接没了再重建（用户 10-25）。换一组图也整块淡出淡入；同一组里换一张只换图（One 里的 pics）。
+  // 新的一组先把图解码好再换，不然淡入时图还没画出来
+  const mode = p.selectedGroupIds.length
+    ? 'sum'
+    : !detail || !p.previewGroup
+      ? 'none'
+      : `one:${p.view}:${p.previewGroup.id}`;
+  const frames = useSwap(
+    useDecoded(
+      { mode, p, detail, group: p.previewGroup },
+      (v) => v.mode,
+      (v) => (v.mode.startsWith('one:') && v.detail ? mediaUrl(v.detail.image_path) : ''),
+    ),
+    (v) => v.mode,
+  );
+  // 正在离开的排在后面：叠在上面淡出，querySelector 先找到当前这一份
+  const ordered = [...frames.filter((f) => !f.leaving), ...frames.filter((f) => f.leaving)];
+  const current = frames.find((f) => !f.leaving)?.value;
+  return (
+    <div
+      className="col detail"
+      data-detail-id={current?.mode.startsWith('one:') ? current.detail?.id : undefined}
+      ref={a.colRef}
+    >
+      {a.handle}
+      <div className="swap dswap">
+        {ordered.map(({ key, value, leaving }) => (
+          <div key={key} className={`dframe ${leaving ? 'leaving' : ''}`} data-enter="fade">
+            {value.mode === 'sum' ? (
+              <Summary p={value.p} />
+            ) : value.mode !== 'none' && value.detail && value.group ? (
+              <One p={value.p} detail={value.detail} group={value.group} a={a} />
+            ) : null}
+          </div>
+        ))}
       </div>
-    );
-  return <One p={p} detail={detail} group={p.previewGroup} a={a} />;
+    </div>
+  );
 }
 
 function One({
@@ -134,8 +165,7 @@ function One({
   const others = trash ? [] : refs.filter((r) => `work:${r.workId}` !== group.id);
   const gone = group.detached;
   return (
-    <div className="col detail" data-detail-id={detail.id} ref={a.colRef}>
-      {a.handle}
+    <>
       <div className="scroll">
         <div className="pic swap">
           {pics.map(({ key, value, leaving }) => (
@@ -378,7 +408,7 @@ function One({
           </button>
         )}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -447,11 +477,10 @@ function Strip({
   );
 }
 
-function Summary({ p, a }: { p: LibraryProps; a: DetailActions }) {
+function Summary({ p }: { p: LibraryProps }) {
   const groups = p.groups.filter((g) => p.selectedGroupIds.includes(g.id));
   return (
-    <div className="col detail" ref={a.colRef}>
-      {a.handle}
+    <>
       <div className="scroll">
         <div className="sum" data-enter="fade">
           <b>已选 {libraryCountText(groups.length, p.selectedImageCount)}</b>
@@ -490,7 +519,7 @@ function Summary({ p, a }: { p: LibraryProps; a: DetailActions }) {
           </button>
         )}
       </div>
-    </div>
+    </>
   );
 }
 
