@@ -1,4 +1,5 @@
 import { useAppActions } from './app/actions';
+import { useFolderImport } from './app/folderImport';
 import { useWorkbenchAnnotations } from './app/annotations';
 import { useGalleryActions } from './app/galleryActions';
 import { useLibraryLoading } from './app/library';
@@ -156,6 +157,20 @@ export default function App() {
     workbenchSession,
     requestConfirmation,
     activeTab,
+  });
+  const folder = useFolderImport({
+    setPage,
+    setGalleryView,
+    setActiveCollectionId,
+    setImportProgress,
+    importProgress,
+    archiveImport,
+    reloadLibrary,
+    reloadCollections,
+    notify,
+    showToast,
+    page,
+    dropHandlerRef,
   });
   const {
     selectedProjectIds,
@@ -351,5 +366,6 @@ export default function App() {
     resolveConfirmation,
     contextMenu,
     setContextMenu,
+    folder,
   });
 }

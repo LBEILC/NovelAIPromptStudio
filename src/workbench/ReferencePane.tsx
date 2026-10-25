@@ -18,6 +18,7 @@ import {
   type VibeReference,
 } from '../shared/params';
 import type { ImageProject } from '../shared/types';
+import { useGeneration } from '../state/generation';
 import { modelName, useEdit } from './parameterControls';
 
 // ---------- 参考 ----------
@@ -84,6 +85,8 @@ export function RefsPane({
   const addBtn = useRef<HTMLButtonElement>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [library, setLibrary] = useState<VibeLibraryItem[]>([]);
+  // 中转站编不了 Vibe 的码，也不按 Anlas 计费（doc/design.md 2.33）
+  const relay = useGeneration().settings.connection === 'relay';
   const model = tab.project?.params?.model;
   const caps = MODEL_CAPS[model as ModelId];
   useEffect(() => {
@@ -187,9 +190,11 @@ export function RefsPane({
           />
           {v.encode && (
             <span className="help warn vnote" data-enter="fade">
-              {v.encode === 'changed'
-                ? `改了信息提取，生成前会重新编码，${VIBE_ENCODE_COST} Anlas`
-                : `首次编码 ${VIBE_ENCODE_COST} Anlas。编码后存进 Vibe 库，以后再用不收费`}
+              {relay
+                ? '中转站不能给 Vibe 编码，这样生成会失败。换回官方连接，或者改用 Vibe 库里编过码的'
+                : v.encode === 'changed'
+                  ? `改了信息提取，生成前会重新编码，${VIBE_ENCODE_COST} Anlas`
+                  : `首次编码 ${VIBE_ENCODE_COST} Anlas。编码后存进 Vibe 库，以后再用不收费`}
             </span>
           )}
         </div>
@@ -246,7 +251,7 @@ export function RefsPane({
     {
       label: '从图片添加…',
       icon: 'image-add-line',
-      hint: `首次编码 ${VIBE_ENCODE_COST} Anlas`,
+      hint: relay ? '中转站不能编码' : `首次编码 ${VIBE_ENCODE_COST} Anlas`,
       onSelect: () => void run(() => invokeUI('reference.add-vibe', rev)),
     },
     'sep',
@@ -258,7 +263,9 @@ export function RefsPane({
           disabled: used.has(item.id) ? '已经在用' : undefined,
           hint: item.models.includes(model as ModelId)
             ? undefined
-            : `要编码 ${VIBE_ENCODE_COST} Anlas`,
+            : relay
+              ? '中转站不能编码'
+              : `要编码 ${VIBE_ENCODE_COST} Anlas`,
           onSelect: () =>
             void run(() => invokeUI('reference.add-vibe', { ...rev, libraryId: item.id })),
         }))
@@ -299,10 +306,12 @@ export function RefsPane({
         vibes.map(vrow)
       ) : (
         <p className="help pnote">
-          暂无 Vibe。可以从 Vibe 库里选，也可以用一张图片新建（首次编码 {VIBE_ENCODE_COST} Anlas）。
+          {relay
+            ? '暂无 Vibe。可以从 Vibe 库里选编过码的；中转站不能给新图编码。'
+            : `暂无 Vibe。可以从 Vibe 库里选，也可以用一张图片新建（首次编码 ${VIBE_ENCODE_COST} Anlas）。`}
         </p>
       )}
-      {vibes.length > 0 && (
+      {vibes.length > 0 && !relay && (
         <p className={`help pnote ${extra ? 'warn' : ''}`}>
           超过 {VIBE_EXTRA_FREE} 个以后，每多 1 个每张加 {VIBE_EXTRA_COST} Anlas
           {extra ? `；现在多 ${extra} 个，每张加 ${extra * VIBE_EXTRA_COST} Anlas` : ''}。
@@ -326,7 +335,9 @@ export function RefsPane({
         precise.map(prow)
       ) : (
         <p className="help pnote">
-          暂无精确参考。用一张图指定角色或画风，每个参考每张加 {PRECISE_COST} Anlas。
+          {relay
+            ? '暂无精确参考。用一张图指定角色或画风。'
+            : `暂无精确参考。用一张图指定角色或画风，每个参考每张加 ${PRECISE_COST} Anlas。`}
         </p>
       )}
       <MenuPop

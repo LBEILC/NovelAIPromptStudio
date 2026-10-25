@@ -15,6 +15,7 @@ import {
 import type { CommandInput } from '../shared/commands';
 import type { DroppedFiles, ImportResult } from '../shared/ipc';
 import type { ImageProject, WorkbenchSource } from '../shared/types';
+import { assessGalleryDrop } from './folderImport';
 import type { useLibraryLoading } from './library';
 import { studio } from './shared';
 import type { useAppState } from './state';
@@ -322,7 +323,7 @@ export function useWorkbenchActions({
   useEffect(() => {
     if (!appShellRef.current || !['workbench', 'gallery'].includes(page)) return undefined;
     return installFileDrop(appShellRef.current, {
-      assess: page === 'workbench' ? assessWorkbenchDroppedFiles : assessDroppedFiles,
+      assess: page === 'workbench' ? assessWorkbenchDroppedFiles : assessGalleryDrop,
       onChange: setDragState,
       onDrop: (files: DroppedFiles) => dropHandlerRef.current?.(files),
     });
@@ -366,7 +367,7 @@ export function useWorkbenchActions({
         event.preventDefault();
         setWorkbenchSession((current) => cycleWorkbenchTab(current, event.shiftKey ? -1 : 1));
       }
-      if (key === 'i') {
+      if (key === 'i' && !event.shiftKey) {
         event.preventDefault();
         if (page === 'workbench') openWorkbenchPath();
         if (page === 'gallery') importImages();

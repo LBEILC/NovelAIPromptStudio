@@ -28,6 +28,9 @@ import { CAT_VAR, CAT_NAME } from '../kit/categories';
 import { markLoaded } from '../kit/alpha';
 const thumb = (c: { thumbnail_path?: string; image_path: string }) =>
   mediaUrl(c.thumbnail_path || c.image_path);
+/** 详情栏的大图：恢复备份后原图找不到（1.7.0）时用缩略图顶上 */
+const picUrl = (c: { missing?: boolean; thumbnail_path?: string; image_path: string }) =>
+  mediaUrl(c.missing ? c.thumbnail_path || c.image_path : c.image_path);
 const STRIP_ROW = 6;
 
 export interface DetailActions {
@@ -60,7 +63,7 @@ export function Detail({
     useDecoded(
       { mode, p, detail, group: p.previewGroup },
       (v) => v.mode,
-      (v) => (v.mode.startsWith('one:') && v.detail ? mediaUrl(v.detail.image_path) : ''),
+      (v) => (v.mode.startsWith('one:') && v.detail ? picUrl(v.detail) : ''),
     ),
     (v) => v.mode,
   );
@@ -160,7 +163,7 @@ function One({
     useDecoded(
       detail,
       (d) => d.id,
-      (d) => mediaUrl(d.image_path),
+      (d) => picUrl(d),
     ),
     (d) => d.id,
   );
@@ -179,7 +182,7 @@ function One({
               className={`alpha-bg ${leaving ? 'leaving' : ''}`}
               data-enter="fade"
               onLoad={markLoaded}
-              src={mediaUrl(value.image_path)}
+              src={picUrl(value)}
               alt={imageAccessibleName(value)}
               draggable={false}
               data-tip="查看大图"
@@ -194,6 +197,15 @@ function One({
               }}
             />
           ))}
+          {detail.missing && (
+            <span
+              className="lmissing pmissing"
+              data-tip="恢复备份时没有在这台电脑上找到这张图的文件，这里显示的是缩略图"
+            >
+              <Icon name="file-damage-line" />
+              图片缺失
+            </span>
+          )}
         </div>
         <div className={`expand lstrip-x ${n > 1 ? 'open' : ''}`}>
           <div>

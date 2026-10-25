@@ -4,6 +4,7 @@ import { Activity, useEffect, useRef, useState } from 'react';
 import { Icon } from '../kit/controls';
 import { useIndicator, useSwap } from '../kit/motion';
 import { About } from './About';
+import { Backup } from './Backup';
 import { Dictionary } from './Dictionary';
 import { Network } from './Network';
 import { Account, Agent, AI, Appearance, Storage } from './sections';
@@ -13,6 +14,7 @@ export { About, feedbackDiagnostics } from './About';
 const SECS = [
   ['appearance', '通用', 'equalizer-line'],
   ['storage', '图片库', 'hard-drive-2-line'],
+  ['backup', '备份与恢复', 'archive-line'],
   ['novelai', 'NovelAI 账号', 'key-2-line'],
   ['ai', 'AI 服务', 'translate-2'],
   ['network', '网络', 'global-line'],
@@ -59,6 +61,8 @@ export default function SettingsPage(props: {
         return <Agent />;
       case 'network':
         return <Network />;
+      case 'backup':
+        return <Backup />;
       default:
         return <About onInstallUpdate={props.onInstallUpdate} />;
     }

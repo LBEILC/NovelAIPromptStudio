@@ -41,7 +41,9 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
         });
       if (job.state === 'failed')
         notify({
-          text: `生成失败：${job.error} · ${job.spentKnown ? (job.spent ? `本次已消耗 ${job.spent} Anlas` : '本次未消耗 Anlas') : '无法确认是否消耗了 Anlas'}`,
+          text: relay
+            ? `生成失败：${job.error}`
+            : `生成失败：${job.error} · ${job.spentKnown ? (job.spent ? `本次已消耗 ${job.spent} Anlas` : '本次未消耗 Anlas') : '无法确认是否消耗了 Anlas'}`,
           tone: 'error',
           action: { label: '重试', onClick: () => void invokeUI('generate.retry', { id: job.id }) },
         });
@@ -69,8 +71,10 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
   const pending = state.jobs.filter((j) => j.state === 'pending');
   const running = state.jobs.find((j) => j.state === 'generating');
   const pills = useExitList(pending.length ? [pending.length] : [], () => 'pill');
-  const chipKey = running ? 'gen' : 'anlas';
-  const chips = useSwap(chipKey, (k) => k);
+  // 中转站模式查不到余额（doc/design.md 2.33），不生成时这里什么都不放
+  const relay = state.settings.connection === 'relay';
+  const chipKey = running ? 'gen' : relay ? '' : 'anlas';
+  const chips = useSwap(chipKey, (k) => k).filter(({ key }) => key);
   if (!state.settings.hasToken && !running) return null;
   const total = pending.reduce((n, j) => n + j.count, 0);
   const cost = pending.reduce((n, j) => n + (j.estimate || 0), 0);
@@ -135,7 +139,9 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
       >
         <div className="q-h">
           Agent 添加了 {pending.length} 个生成任务，待确认
-          <small>确认后逐张发送。未确认的任务不会发送，也不消耗 Anlas。</small>
+          <small>
+            确认后逐张发送。未确认的任务不会发送，{relay ? '也不计费' : '也不消耗 Anlas'}。
+          </small>
         </div>
         {pending.map((job) => (
           <div className="q-item" key={job.id}>
@@ -165,9 +171,15 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
         <div className="q-foot">
           <span className="cost">
             <b>
-              共 {total} 张 · {cost} Anlas
+              共 {total} 张{relay ? '' : ` · ${cost} Anlas`}
             </b>
-            <span>{cost ? `余额 ${state.balance.toLocaleString('en-US')}` : `用量 ${usage}%`}</span>
+            <span>
+              {relay
+                ? '中转站按张计费'
+                : cost
+                  ? `余额 ${state.balance.toLocaleString('en-US')}`
+                  : `用量 ${usage}%`}
+            </span>
           </span>
           <button
             className="btn quiet sm"

@@ -3,7 +3,7 @@ import { Icon, Seg, Switch } from '../kit/controls';
 import { useAsk } from '../kit/dialog';
 import { useNotifications } from '../kit/toast';
 import { invokeUI } from '../lib/commands';
-import { MODEL_CAPS, MODEL_ORDER } from '../shared/params';
+import { MODEL_CAPS, MODEL_ORDER, type ModelId } from '../shared/params';
 import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, errorText } from './parts';
 import { Fail } from './sectionShared';
@@ -46,11 +46,20 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
       .finally(() => setRefreshing(false));
   };
   const sub = g.subscription;
-  return (
-    <SetPage
-      title="NovelAI 账号"
-      desc="用你自己的 NovelAI 账号在这里生成图片。本软件是非官方工具，与 NovelAI 没有隶属关系；这样使用是否符合 NovelAI 的服务条款，由你自己判断并承担。"
-    >
+  const relay = g.settings.connection === 'relay';
+  const [mode, setMode] = useState<'official' | 'relay'>(relay ? 'relay' : 'official');
+  useEffect(() => setMode(relay ? 'relay' : 'official'), [relay]);
+  const pick = (v: 'official' | 'relay') => {
+    if (v === mode) return;
+    setMode(v);
+    setError('');
+    void invokeUI('account.connection.save', { connection: v }).catch((e) => {
+      setMode(relay ? 'relay' : 'official');
+      setError(errorText(e));
+    });
+  };
+  const official = (
+    <>
       <Col
         title="持久令牌"
         help="在 NovelAI 网站的账号设置里创建持久令牌（Persistent API Token）。加密后保存在这台电脑上，软件不保存明文。"
@@ -151,8 +160,212 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
           </div>
         </Col>
       )}
-      {has && <GenerationPreferences />}
+    </>
+  );
+  return (
+    <SetPage
+      title="NovelAI 账号"
+      desc="用你自己的 NovelAI 账号，或者通过中转站在这里生成图片。本软件是非官方工具，与 NovelAI 没有隶属关系；这样使用是否符合 NovelAI 的服务条款，由你自己判断并承担。"
+    >
+      <Row
+        title="连接方式"
+        help={
+          mode === 'relay'
+            ? '中转站是第三方服务，能看到你的提示词和生成的图，按它自己的价格计费。'
+            : '直接连 NovelAI，用你自己账号的 Anlas 和订阅。'
+        }
+      >
+        <Seg
+          label="连接方式"
+          items={[
+            ['official', 'NovelAI 官方'],
+            ['relay', '中转站'],
+          ]}
+          value={mode}
+          onChange={pick}
+        />
+      </Row>
+      <Swap k={mode}>{mode === 'relay' ? <Relay onSaved={onSaved} /> : official}</Swap>
+      {has && mode === (relay ? 'relay' : 'official') && <GenerationPreferences />}
     </SetPage>
+  );
+}
+
+const modelNames = (ids: ModelId[]) =>
+  ids.map((id) => MODEL_CAPS[id]?.name || id).join('、') || '没有本软件支持的模型';
+
+/** 中转站：地址和 Key，"测试连接"读它挂了哪些模型（doc/design.md 2.33） */
+function Relay({ onSaved }: { onSaved?: () => void }) {
+  const g = useGeneration();
+  const notify = useNotifications();
+  const saved = g.settings.relay;
+  const [url, setUrl] = useState(saved?.baseUrl || '');
+  const [key, setKey] = useState('');
+  const [editingKey, setEditingKey] = useState(false);
+  const [busy, setBusy] = useState<'' | 'save' | 'test'>('');
+  const [error, setError] = useState('');
+  const [tested, setTested] = useState<{ models: ModelId[]; other: string[] } | null>(null);
+  useEffect(() => setUrl(saved?.baseUrl || ''), [saved?.baseUrl]);
+  const hasKey = !!saved?.hasKey;
+  const keyEdit = editingKey || !hasKey;
+  const dirty = url.trim() !== (saved?.baseUrl || '') || !!key.trim();
+  const ready = !!url.trim() && (hasKey || !!key.trim());
+  const input = () => ({
+    baseUrl: url.trim(),
+    ...(key.trim() ? { key: key.trim() } : {}),
+  });
+  const test = async () => {
+    if (busy || !ready) return;
+    setBusy('test');
+    setError('');
+    setTested(null);
+    try {
+      const r = await invokeUI('account.relay.test', input());
+      if (!r.ok) throw new Error(r.error);
+      setTested({ models: r.models, other: r.other });
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy('');
+    }
+  };
+  const save = async () => {
+    if (busy || !ready || !dirty) return;
+    const first = !g.settings.hasToken;
+    setBusy('save');
+    setError('');
+    try {
+      await invokeUI('account.relay.save', input());
+      setKey('');
+      setEditingKey(false);
+      setTested(null);
+      notify({ text: '已保存中转站', tone: 'success' });
+      if (first) onSaved?.();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy('');
+    }
+  };
+  const models = saved?.models ?? null;
+  const result = tested
+    ? `连接成功 · 可以用：${modelNames(tested.models)}`
+    : hasKey && saved?.baseUrl && !dirty
+      ? models
+        ? `可以用：${modelNames(models)}`
+        : '没读到这个中转站有哪些模型，所有模型都可以选；它没有的会在生成时报错'
+      : '';
+  const tip = !url.trim() ? '先填地址' : !ready ? '先填 Key' : undefined;
+  return (
+    <>
+      <Col
+        title="地址"
+        help="中转站给的接口地址，例如 https://api.example.com，末尾的 /v1 可以不写。"
+      >
+        <label className="field sm mono set-key">
+          <input
+            aria-label="中转站地址"
+            placeholder="https://"
+            autoComplete="off"
+            spellCheck={false}
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setTested(null);
+            }}
+            onKeyDown={(e) => !e.nativeEvent.isComposing && e.key === 'Enter' && void save()}
+          />
+        </label>
+      </Col>
+      <Col title="Key" help="中转站给的 Key。加密后保存在这台电脑上，软件不保存明文。">
+        <Swap k={`key-${keyEdit}`}>
+          <div className="row">
+            {keyEdit ? (
+              <>
+                <label className="field sm mono set-key">
+                  <input
+                    autoFocus={editingKey}
+                    type="password"
+                    aria-label="中转站 Key"
+                    placeholder="粘贴 Key"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={key}
+                    onChange={(e) => {
+                      setKey(e.target.value);
+                      setTested(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing) return;
+                      if (e.key === 'Enter') void save();
+                      if (e.key === 'Escape' && hasKey) {
+                        e.stopPropagation();
+                        setEditingKey(false);
+                        setKey('');
+                      }
+                    }}
+                  />
+                </label>
+                {hasKey && (
+                  <button
+                    className="btn quiet sm"
+                    onClick={() => {
+                      setEditingKey(false);
+                      setKey('');
+                    }}
+                  >
+                    取消
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <span className="field sm mono">已保存 ••••••••</span>
+                <button className="btn sm" onClick={() => setEditingKey(true)}>
+                  更换
+                </button>
+              </>
+            )}
+          </div>
+        </Swap>
+      </Col>
+      <Col
+        title="连接"
+        after={
+          <div className="row">
+            <button
+              className={`btn sm ${busy === 'test' ? 'loading' : ''}`}
+              disabled={!!busy || !ready}
+              data-tip={tip}
+              onClick={() => void test()}
+            >
+              {busy === 'test' && <Icon name="loader-4-line" />}
+              测试连接
+            </button>
+            <button
+              className={`btn ink sm ${busy === 'save' ? 'loading' : ''}`}
+              disabled={!!busy || !ready || !dirty}
+              data-tip={tip || (!dirty ? '没有改动' : undefined)}
+              onClick={() => void save()}
+            >
+              {busy === 'save' && <Icon name="loader-4-line" />}
+              保存
+            </button>
+          </div>
+        }
+      >
+        <Swap k={error ? '' : result}>
+          <small className="relay-result">{error ? '' : result || '还没有连接'}</small>
+        </Swap>
+      </Col>
+      <Fail>{error || g.accountError}</Fail>
+      {hasKey && (
+        <Row
+          title="余额"
+          help="中转站按它自己的价格计费，余额请到中转站的网站上查看。生成前不显示 Anlas 消耗。"
+        />
+      )}
+    </>
   );
 }
 
@@ -161,8 +374,12 @@ export function GenerationPreferences({ agent = false }: { agent?: boolean }) {
   const s = useGeneration().settings;
   const notify = useNotifications();
   const [dialog, ask] = useAsk();
-  const [limit, setLimit] = useState(String(s.dailyLimit));
-  useEffect(() => setLimit(String(s.dailyLimit)), [s.dailyLimit]);
+  // 中转站按张计费，上限按张数（doc/design.md 2.33）
+  const relay = s.connection === 'relay';
+  const cap = relay ? s.dailyImageLimit : s.dailyLimit;
+  const [limit, setLimit] = useState(String(cap));
+  useEffect(() => setLimit(String(cap)), [cap]);
+  const offered = relay ? s.relay?.models : null;
   const save = (input: Parameters<typeof invokeUI<'settings.generation.save'>>[1]) =>
     void invokeUI('settings.generation.save', input).catch((e) =>
       notify({ text: errorText(e), tone: 'error' }),
@@ -194,6 +411,7 @@ export function GenerationPreferences({ agent = false }: { agent?: boolean }) {
               ...MODEL_ORDER.map((id) => ({
                 label: MODEL_CAPS[id].name,
                 checked: s.blankModel === id,
+                disabled: offered && !offered.includes(id) ? '中转站没有这个模型' : false,
                 onSelect: () => save({ blankModel: id }),
               })),
             ]}
@@ -230,8 +448,8 @@ export function GenerationPreferences({ agent = false }: { agent?: boolean }) {
     );
   const commitLimit = () => {
     const n = Number(limit);
-    if (Number.isSafeInteger(n) && n >= 0) save({ dailyLimit: n });
-    else setLimit(String(s.dailyLimit));
+    if (Number.isSafeInteger(n) && n >= 0) save(relay ? { dailyImageLimit: n } : { dailyLimit: n });
+    else setLimit(String(cap));
   };
   return (
     <>
@@ -250,7 +468,7 @@ export function GenerationPreferences({ agent = false }: { agent?: boolean }) {
             if (
               await ask({
                 title: '允许 Agent 直接生成？',
-                body: '开启后，Agent 发起的生成无需确认，将直接发送并消耗 Anlas。NovelAI 的接口说明里写着：',
+                body: `开启后，Agent 发起的生成无需确认，将直接发送并${relay ? '按张计费' : '消耗 Anlas'}。NovelAI 的接口说明里写着：`,
                 quote,
                 tail: '建议同时开启下面的“花费上限”。',
                 ok: '直接生成',
@@ -262,7 +480,11 @@ export function GenerationPreferences({ agent = false }: { agent?: boolean }) {
       </Row>
       <Row
         title="花费上限"
-        help="默认关闭。开启后可设置每日 Anlas 上限，达到上限时暂停 Agent 的生成。"
+        help={
+          relay
+            ? '默认关闭。开启后可设置每天最多生成几张，达到上限时暂停 Agent 的生成。'
+            : '默认关闭。开启后可设置每日 Anlas 上限，达到上限时暂停 Agent 的生成。'
+        }
         style={{ borderBottom: 0 }}
       >
         <Switch label="花费上限" on={s.limitEnabled} onChange={(v) => save({ limitEnabled: v })} />
@@ -282,7 +504,11 @@ export function GenerationPreferences({ agent = false }: { agent?: boolean }) {
                 onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
               />
             </label>
-            <span className="label">Anlas · 今日已用 {s.spentToday || 0}</span>
+            <span className="label">
+              {relay
+                ? `张 · 今日已生成 ${s.spentImagesToday || 0} 张`
+                : `Anlas · 今日已用 ${s.spentToday || 0}`}
+            </span>
           </div>
         </Expand>
       </div>

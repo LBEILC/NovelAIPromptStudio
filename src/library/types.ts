@@ -101,4 +101,6 @@ export interface LibraryProps {
   onDiscardDetached?: (records: DetachedRecord[]) => Promise<unknown>;
   onImport: () => void;
   onImportClipboard: () => void;
+  /** 导入文件夹（1.7.0） */
+  onImportFolder: () => void;
 }

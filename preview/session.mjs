@@ -13,6 +13,7 @@ import {
   applyWorkbenchLibraryDetails,
 } from '../electron/workbench.js';
 import { createPreviewHandlers } from './handlers.mjs';
+import { createBackupManager } from '../electron/backup.js';
 import { pause } from './services.mjs';
 import { hydrateParameters, normalizeSettings } from '../electron/params.js';
 import { createChatGPT, chatGPTCommands } from '../electron/chatgpt.js';
@@ -116,6 +117,42 @@ export async function createSession(services, images, emit, empty = false) {
   sender.id = 1;
   sender.isDestroyed = () => false;
   sender.send = (_, event) => emit(event);
+  // 备份与恢复（1.7.0）：浏览器没有保存、打开文件的对话框，导出写进本次临时目录，选文件时用最近导出的那份
+  const backups = path.join(directory, 'backups');
+  const backup = createBackupManager({
+    dataDirectory: directory,
+    assetsDirectory,
+    database,
+    preferences,
+    session: commands.store,
+    version: 'preview',
+    progress: (data) => emit({ type: 'progress', topic: 'backup.progress', data }),
+  });
+  const result = async (operation) => {
+    try {
+      return { ok: true, ...(await operation()) };
+    } catch (error) {
+      return { ok: false, error: error.name === 'AbortError' ? '操作已取消' : error.message };
+    }
+  };
+  Object.assign(adapter.handlers, {
+    'backup.estimate': () => result(() => backup.estimate()),
+    'backup.status': () => backup.status(),
+    'backup.cancel': () => backup.cancel(),
+    'backup.export': (input) => {
+      fs.mkdirSync(backups, { recursive: true });
+      const day = new Date().toISOString().slice(0, 10);
+      const file = path.join(backups, `NovelAI Prompt Studio 备份 ${day} ${Date.now()}.npsbackup`);
+      return result(() => backup.export(file, input.includeLibrary));
+    },
+    'backup.inspect': (input) => {
+      const latest = fs.existsSync(backups) ? fs.readdirSync(backups).sort().reverse()[0] : '';
+      if (!input.path && !latest) return { ok: false, error: '预览里还没有导出过备份，先导出一份' };
+      return result(() => backup.inspect(input.path || path.join(backups, latest)));
+    },
+    'backup.restore': (input) => result(() => backup.restore(input.path)),
+    'backup.undo': () => result(() => backup.undo()),
+  });
   const dispatch = (name, input = {}, origin = 'ui') =>
     commands.dispatch(name, input, origin, sender);
   const call = async (name, input = {}, origin = 'ui') => {

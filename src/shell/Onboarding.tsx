@@ -1,13 +1,12 @@
-// 首次引导（doc/design.md 2.29，1.6.3）：第一次打开时一张欢迎卡片，三页，每页一句话加一个按钮。
+// 首次引导（doc/design.md 2.29，1.6.3）：第一次打开时一张欢迎卡片，四页，每页一句话加一个按钮。
 // 不做高亮按钮一步步点的教程。随时跳过（Esc、点外面、"跳过"都算）；"设置·关于与更新"里可以重新查看。
-// 1.7.0 做好导入文件夹后再加一页"导入你的文件夹"。
 // 自动验收按 data-onboard / data-onboard-page 找元素（任务 065），改名要同步。
 import { useState } from 'react';
 import { Icon } from '../kit/controls';
 import { Dialog } from '../kit/dialog';
 import { useSwap } from '../kit/motion';
 
-export type OnboardAction = 'recover' | 'token' | 'agent';
+export type OnboardAction = 'recover' | 'folder' | 'token' | 'agent';
 /** "重新查看引导"发这个窗口事件，App 收到后打开卡片 */
 export const ONBOARDING_REPLAY = 'studio:onboarding-replay';
 export const replayOnboarding = () => dispatchEvent(new Event(ONBOARDING_REPLAY));
@@ -26,10 +25,17 @@ const PAGES: {
     action: '打开图片',
   },
   {
+    id: 'folder',
+    icon: 'folder-add-line',
+    title: '导入你的文件夹',
+    text: '选一个存着图的文件夹，图片库按里面的文件夹建好收藏集；同一张图只存一份。',
+    action: '导入文件夹',
+  },
+  {
     id: 'token',
     icon: 'key-2-line',
     title: '填上令牌，直接生成',
-    text: '填好 NovelAI 的持久令牌，改完提示词就能生成新的一版，生成的图自动存进图片库。',
+    text: '填好 NovelAI 的持久令牌（也可以用中转站），改完提示词就能生成新的一版，生成的图自动存进图片库。',
     action: '去填令牌',
   },
   {

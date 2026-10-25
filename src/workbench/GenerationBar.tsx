@@ -221,8 +221,10 @@ export function GenerationBar({
     }
   };
   if (!state.settings.hasToken) return null;
+  // 中转站：不查余额、不显示 Anlas，按张计费（doc/design.md 2.33）
+  const relay = state.settings.connection === 'relay';
   const cost = estimate?.anlas ?? 0;
-  const short = cost > state.balance;
+  const short = !relay && cost > state.balance;
   const usage = state.subscription?.usage?.percent || 0;
   const sub = estimate?.free ? `用量 ${usage}%` : `余额 ${state.balance.toLocaleString('en-US')}`;
   // 不在免费范围（订阅了的账号才说；未订阅的每次都花，不出横幅）
@@ -244,6 +246,7 @@ export function GenerationBar({
   ].filter(Boolean);
   const fix = PRESETS.find(([, pw, ph]) => Math.sign(pw - ph) === Math.sign(w - h))!;
   const banner =
+    !relay &&
     !!estimate &&
     !estimate.free &&
     !estimate.unavailable &&
@@ -314,7 +317,9 @@ export function GenerationBar({
                     ? `生成中 ${job.index} / ${job.count} · 完成当前这张后停止`
                     : job.continuous
                       ? `生成中 第 ${job.index} 张 · 持续生成`
-                      : `生成中 ${job.index} / ${job.count} · ${job.spentKnown ? `已消耗 ${job.spent} Anlas` : '消耗未知'}`
+                      : relay
+                        ? `生成中 ${job.index} / ${job.count}`
+                        : `生成中 ${job.index} / ${job.count} · ${job.spentKnown ? `已消耗 ${job.spent} Anlas` : '消耗未知'}`
                   : '生成中'}
               </span>
             ) : (
@@ -551,15 +556,22 @@ export function GenerationBar({
                 <GenBusy job={value.job} />
               ) : (
                 <>
-                  <span
-                    className={`cost ${short ? 'short' : ''}`}
-                    data-tip={short ? '余额不够' : sub}
-                  >
-                    <b>
-                      {estimate ? cost : '…'} Anlas{continuous ? ' / 张' : ''}
-                    </b>
-                    <span>{sub}</span>
-                  </span>
+                  {relay ? (
+                    <span className="cost" data-tip="中转站按它自己的价格计费">
+                      <b>中转站</b>
+                      <span>按张计费</span>
+                    </span>
+                  ) : (
+                    <span
+                      className={`cost ${short ? 'short' : ''}`}
+                      data-tip={short ? '余额不够' : sub}
+                    >
+                      <b>
+                        {estimate ? cost : '…'} Anlas{continuous ? ' / 张' : ''}
+                      </b>
+                      <span>{sub}</span>
+                    </span>
+                  )}
                   <button
                     className={`btn seal ${starting || !estimate || unavailable || short ? 'is-off' : ''}`}
                     aria-disabled={starting || !estimate || !!unavailable || short || undefined}
@@ -670,6 +682,10 @@ export function GenerationBar({
                 <span className="help danger">
                   {cFixed ? `将使用 ${cw}×${ch} · ` : ''}超过 NovelAI 的上限：面积最大 1536×2048
                 </span>
+              ) : relay ? (
+                cFixed ? (
+                  <span className="help">将使用 {`${cw}×${ch}`}</span>
+                ) : null
               ) : free(cw, ch) ? (
                 <span className="help">{cFixed ? `将使用 ${cw}×${ch} · ` : ''}在免费范围内</span>
               ) : (

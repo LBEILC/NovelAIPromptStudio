@@ -336,10 +336,16 @@ export default function GalleryPage(
     <div className="empty" data-enter="fade">
       <EmptyMark />
       <h3>图片库里还没有图片</h3>
-      <p>把图片或 NovelAI 导出的 ZIP 拖到这里。软件会复制一份保存，并读出每张图的提示词和参数。</p>
+      <p>
+        把图片、文件夹或 NovelAI 导出的 ZIP
+        拖到这里。软件会复制一份保存，并读出每张图的提示词和参数。
+      </p>
       <div className="acts">
         <button className="btn ink" onClick={p.onImport}>
           导入图片
+        </button>
+        <button className="btn" onClick={p.onImportFolder}>
+          导入文件夹
         </button>
         <button className="btn" onClick={p.onImportClipboard}>
           从剪贴板导入
@@ -363,7 +369,7 @@ export default function GalleryPage(
 
   // 底部浮条：导入进度、整理图片库、多选操作条；出现从下方上来，消失淡出
   const busyImport =
-    p.importProgress && ['preparing', 'importing'].includes(p.importProgress.phase)
+    p.importProgress && ['scanning', 'preparing', 'importing'].includes(p.importProgress.phase)
       ? p.importProgress
       : null;
   const docks = useExitList(
@@ -386,6 +392,23 @@ export default function GalleryPage(
       const ip = lastImport.current!;
       const done = ip.processed || 0,
         total = ip.total || 0;
+      if (ip.phase === 'scanning')
+        return (
+          <div key={key} className={`job ljob ${leaving ? 'leaving' : ''}`} data-enter="up">
+            <div className="top">
+              <span className="spin" />
+              <b>正在查看文件夹 · 已看过 {done.toLocaleString('en-US')} 张</b>
+              <span className="sp" />
+              <button className="btn quiet sm" onClick={p.onCancelImport}>
+                取消
+              </button>
+            </div>
+            <div className="progress ink indet">
+              <i />
+            </div>
+            <small className="mono">{ip.current || '…'}</small>
+          </div>
+        );
       return (
         <div key={key} className={`job ljob ${leaving ? 'leaving' : ''}`} data-enter="up">
           <div className="top">

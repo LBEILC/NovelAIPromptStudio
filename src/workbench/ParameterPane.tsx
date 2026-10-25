@@ -15,6 +15,7 @@ import {
   type GridCell,
 } from '../shared/params';
 import type { ImageProject } from '../shared/types';
+import { useGeneration } from '../state/generation';
 import { Drop, Row, modelName, same, samplerName, useEdit } from './parameterControls';
 
 export const COLS = ['A', 'B', 'C', 'D', 'E'] as const;
@@ -30,6 +31,9 @@ export function ParamsPane({
 }) {
   const { setParams, dialog } = useEdit(tab, before);
   const [kept, setKept] = useState(false);
+  // 中转站只挂了部分模型（doc/design.md 2.33）；读不到列表时是 null，不限制
+  const gen = useGeneration().settings;
+  const offered = gen.connection === 'relay' ? gen.relay?.models : null;
   const p = tab.project?.params;
   const b = base?.project.params || p;
   if (!p || !b) return <p className="help pnote">正在读取参数…</p>;
@@ -84,7 +88,9 @@ export function ParamsPane({
               checked: m === p.model,
               disabled: over
                 ? `这一版有 ${chars.length} 个角色，${c.name} 最多 ${c.maxCharacters} 个`
-                : undefined,
+                : offered && !offered.includes(m)
+                  ? '中转站没有这个模型'
+                  : undefined,
               onSelect: () => m !== p.model && void setParams({ model: m }),
             };
           })}

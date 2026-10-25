@@ -223,6 +223,12 @@ export function Tools({
             onSelect: p.onImport,
           },
           {
+            label: '导入文件夹…',
+            icon: 'folder-add-line',
+            hint: 'Ctrl Shift I',
+            onSelect: p.onImportFolder,
+          },
+          {
             label: '从剪贴板导入',
             icon: 'clipboard-line',
             hint: 'Ctrl V',

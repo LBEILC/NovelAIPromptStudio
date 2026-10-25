@@ -1,5 +1,6 @@
 import { Activity } from 'react';
 import GalleryPage from '../gallery/GalleryPage';
+import { FolderImport } from '../gallery/FolderImport';
 import { ZipImport } from '../gallery/ZipImport';
 import { Confirm } from '../kit/dialog';
 import { ContextMenu } from '../kit/menu';
@@ -25,6 +26,7 @@ import { WorkbenchTabs } from '../workbench/Tabs';
 import WorkbenchPage from '../workbench/WorkbenchPage';
 import type { useAppActions } from './actions';
 import type { useWorkbenchAnnotations } from './annotations';
+import type { useFolderImport } from './folderImport';
 import type { useGalleryActions } from './galleryActions';
 import type { useLibraryLoading } from './library';
 import type { useGallerySelection } from './selection';
@@ -123,7 +125,8 @@ export function renderApp({
   resolveConfirmation,
   contextMenu,
   setContextMenu,
-}: Pick<
+  folder,
+}: { folder: ReturnType<typeof useFolderImport> } & Pick<
   ReturnType<typeof useAppState> &
     ReturnType<typeof useLibraryLoading> &
     ReturnType<typeof useWorkbenchActions> &
@@ -443,6 +446,7 @@ export function renderApp({
               onEmptyTrash={emptyTrash}
               onImport={() => importImages()}
               onImportClipboard={() => importImages(null, true)}
+              onImportFolder={() => void folder.importFolder()}
               onOpenAsNewWork={(project) =>
                 void workbenchConnection
                   ?.prepare()
@@ -574,6 +578,11 @@ export function renderApp({
         onCancel={cancelArchiveImport}
         onImport={commitArchiveImport}
       />
+      <FolderImport
+        scan={folder.folderScan}
+        onCancel={folder.cancelFolderImport}
+        onImport={(ids, skip) => void folder.commitFolderImport(ids, skip)}
+      />
 
       <CloseAsk />
 
@@ -582,6 +591,7 @@ export function renderApp({
         onClose={finishOnboarding}
         onAction={(action) => {
           if (action === 'recover') void openWorkbenchPath();
+          else if (action === 'folder') void folder.importFolder();
           else {
             setMenuDestination({ section: action === 'token' ? 'novelai' : 'agent' });
             setPage('settings');

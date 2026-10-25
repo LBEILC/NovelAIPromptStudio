@@ -13,6 +13,7 @@ import { normalizePromptStructure, syncProjectPromptMetadata } from '../lib/prom
 import { activeWorkbenchTab } from '../lib/workbenchSession.js';
 import type { DroppedFiles } from '../shared/ipc';
 import type { DetachedRecord, GalleryFilters, ImageProject } from '../shared/types';
+import { AFTER_RESTORE } from '../settings/Backup';
 import { ONBOARDING_REPLAY } from '../shell/Onboarding';
 import { useAppearance } from '../state/appearance';
 import { useLibraryState } from '../state/library';
@@ -35,6 +36,17 @@ export function useAppState() {
     [],
   );
   const [page, setPage] = useState(window.studioScreenshot?.page || 'workbench');
+  // 恢复备份或撤回以后窗口会重新载入：回到"备份与恢复"这一页（settings/Backup.tsx）
+  useEffect(() => {
+    try {
+      if (!sessionStorage.getItem(AFTER_RESTORE)) return;
+      sessionStorage.removeItem(AFTER_RESTORE);
+    } catch {
+      return;
+    }
+    setMenuDestination({ section: 'backup' });
+    setPage('settings');
+  }, []);
   // 首次引导（doc/design.md 2.29）：新安装第一次打开时显示；"关于与更新"里可以重新查看
   const [onboarding, setOnboarding] = useState(false);
   useEffect(() => {

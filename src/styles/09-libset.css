@@ -462,3 +462,42 @@ textarea.para-in { resize: none; overflow: hidden; }
 .seedf .seed-t { display: inline-grid; place-items: center; width: calc(var(--ctl-sm) - 2 * var(--sp-0)); height: calc(var(--ctl-sm) - 2 * var(--sp-0)); padding: 0; border: 0; border-radius: var(--r-ctl); background: none; color: var(--text-3); transition: color var(--dur-1) var(--ease-out); }
 .seedf .seed-t:hover, .seedf .seed-t.is-hover { color: var(--text); }
 .seedf .seed-t:active { color: var(--text-2); }
+
+/* 导入文件夹（1.7.0，doc/design.md 2.29）：文件夹树，一行一个文件夹，下面一段写清楚会发生什么 */
+.fdlg .ftree { flex: 1 1 auto; display: flex; flex-direction: column; overflow: auto; padding: var(--sp-1) var(--sp-5); min-height: calc(var(--menu-row-h) * 4); }
+.frow { display: flex; align-items: center; gap: var(--sp-2); min-height: calc(var(--lh-body) + var(--lh-small) + var(--sp-2)); padding: var(--sp-1) var(--sp-2) var(--sp-1) calc(var(--sp-2) + var(--depth) * var(--sp-5)); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--text); text-align: left; transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
+.frow:hover { background: var(--hover); }
+.frow > i { flex: 0 0 auto; color: var(--text-3); font-size: var(--icon); }
+.frow .lchk { flex: 0 0 auto; }
+.frow .fname { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.frow .fname b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.frow .fname small { color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.frow .fcount { flex: 0 0 auto; color: var(--text-2); font-size: var(--fs-small); }
+.frow .fcol { flex: 0 1 auto; max-width: 40%; display: inline-flex; align-items: center; gap: var(--sp-1); height: calc(var(--ctl-sm) - var(--sp-1)); padding: 0 var(--sp-2); border-radius: var(--r-tag); background: var(--hover); color: var(--text-2); font-size: var(--fs-small); }
+.frow .fcol span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.frow .fcol.merge { color: var(--text); }
+.frow.off { color: var(--text-3); }
+.frow.off .fcol, .frow.off .fcount { opacity: var(--dim); }
+.fsum { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--divider); }
+.fsum ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-1); }
+.fsum li { position: relative; padding-left: var(--sp-3); }
+.fsum li::before { content: ""; position: absolute; left: var(--sp-0); top: calc(var(--lh-body) / 2 - 2px); width: var(--sp-1); height: var(--sp-1); border-radius: 50%; background: var(--text-3); }
+.fsum .muted { color: var(--text-3); }
+.fsum .danger { color: var(--danger); }
+.fsum .lcheck { align-self: flex-start; }
+
+/* 备份与恢复（1.7.0）：选好的备份文件一张卡片，写清楚是什么时候、哪个版本、有多少东西 */
+.bk-card { gap: var(--sp-1); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-ctl); }
+.bk-card > small { color: var(--text-2); }
+.bk-card > .banner { margin-top: var(--sp-1); }
+.bk-card > .row { margin-top: var(--sp-2); }
+.bk-name { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.bk-name > i { color: var(--text-3); font-size: var(--icon); }
+.bk-name > b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bk-done .sp, .setcol .banner .sp { flex: 1 1 auto; }
+.bk-done .btn { flex: 0 0 auto; }
+/* 中转站（2.33）："测试连接"的结果写在按钮上面 */
+.relay-result { color: var(--text-2); }
+/* 恢复备份后找不到原图（1.7.0）：卡片左下角、详情栏大图下沿一枚小标记，样子同"已在图片库" */
+.lmissing { position: absolute; left: var(--sp-1); bottom: var(--sp-1); display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1); border-radius: var(--r-ctl); background: var(--surface); color: var(--warn); font-size: var(--fs-small); line-height: var(--lh-small); pointer-events: auto; }
+.libp .detail .pic .pmissing { position: static; align-self: end; justify-self: start; margin: 0 0 var(--sp-1) var(--sp-1); }

@@ -20,6 +20,7 @@ import {
 import { lookupDsoTags } from '../electron/dsoDictionary.js';
 import { annotateTags } from '../electron/tagAnnotations.js';
 import { exportEmbeddedVibeFile } from '../electron/vibes.js';
+import { createFolderImporter } from '../electron/folderImport.js';
 import {
   createDatabaseStorage,
   describeAssetDirectory,
@@ -1211,7 +1212,60 @@ export function createPreviewHandlers({
     shell.showItemInFolder(input.path);
     return { ok: true, filePath: input.path };
   });
+  // 导入文件夹（1.7.0）：浏览器没有选文件夹的对话框，不传路径时扫一个用演示图搭的文件夹
+  const folderImporter = createFolderImporter({
+    database,
+    assetsDirectory: () => assetsDirectory,
+    activeImports,
+  });
+  const demoFolder = () => {
+    const root = path.join(dataDirectory, '我的 NovelAI 图');
+    if (fs.existsSync(root)) return root;
+    const source = path.resolve(import.meta.dirname, '../demo/images/final');
+    const images = fs.readdirSync(source).filter((f) => /\.(png|jpe?g|webp)$/i.test(f));
+    const layout = [
+      ['角色/初音', images.slice(0, 4)],
+      ['角色/初音/草稿', images.slice(3, 6)],
+      ['场景/初音', images.slice(6, 9)],
+      ['场景/城市夜景', images.slice(9, 12)],
+      ['', images.slice(12, 14)],
+    ];
+    for (const [dir, files] of layout) {
+      fs.mkdirSync(path.join(root, dir), { recursive: true });
+      for (const f of files) fs.copyFileSync(path.join(source, f), path.join(root, dir, f));
+    }
+    fs.writeFileSync(path.join(root, '场景', '旧图.zip'), '');
+    fs.mkdirSync(path.join(root, '.缓存'), { recursive: true });
+    return root;
+  };
+  const folderProgress = (event) => (data) => {
+    if (!event.sender.isDestroyed())
+      event.sender.send('studio:command-event', {
+        type: 'progress',
+        topic: 'library:import-progress',
+        data,
+      });
+  };
+  registerCommand('import.folder.scan', async (input, event) => {
+    try {
+      return {
+        ok: true,
+        ...(await folderImporter.scan(input.path || demoFolder(), folderProgress(event))),
+      };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+  registerCommand('import.folder.commit', async (input, event) => {
+    try {
+      return { ok: true, ...(await folderImporter.commit(input, folderProgress(event))) };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+
   registerCommand('import.cancel', async (input) => {
+    if (folderImporter.cancel(input.id)) return { ok: true };
     const controller = activeImports.get(input.id);
     if (controller) {
       controller.abort();

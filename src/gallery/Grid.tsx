@@ -571,6 +571,13 @@ function Cards({
                 draggable={false}
                 onLoad={markLoaded}
               />
+              {/* 恢复备份后这台电脑上找不到原图（1.7.0） */}
+              {shown.missing && (
+                <span className="lmissing" data-tip="恢复备份时没有在这台电脑上找到这张图的文件">
+                  <Icon name="file-damage-line" />
+                  图片缺失
+                </span>
+              )}
               {mosaic && (
                 <span className="lmosaic" aria-hidden="true">
                   {mosaic.picks.map((m, k) => (
