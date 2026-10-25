@@ -5,6 +5,10 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { seedLibrary } from './library-benchmark/fixture.mjs';
 
+const runs = Number(process.argv.find((a) => a.startsWith('--runs='))?.split('=')[1] || 3);
+if (![1, 3].includes(runs)) throw Error('Use --runs=1 or --runs=3');
+const heapSnapshot = process.argv.includes('--heap-snapshot');
+const keepFixture = process.argv.includes('--keep-fixture');
 const smoke = process.argv.includes('--smoke');
 const buildDirectory = path.resolve(
   process.argv.find((a) => a.startsWith('--build-dir='))?.slice('--build-dir='.length) || 'dist',
@@ -15,23 +19,47 @@ const count = smoke
 if (!smoke && ![10000, 50000].includes(count)) throw Error('Use --size=10000 or --size=50000');
 const output = path.resolve('.codex-runs/library-benchmark', `${count}-${Date.now()}`);
 fs.mkdirSync(output, { recursive: true });
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-acceptance-'));
+const reuseRoot = process.argv
+  .find((a) => a.startsWith('--fixture-root='))
+  ?.slice('--fixture-root='.length);
+const root = reuseRoot
+  ? path.resolve(reuseRoot)
+  : fs.mkdtempSync(path.join(os.tmpdir(), 'nai-acceptance-'));
+if (
+  reuseRoot &&
+  (path.dirname(root) !== path.resolve(os.tmpdir()) ||
+    !path.basename(root).startsWith('nai-acceptance-') ||
+    fs.lstatSync(root).isSymbolicLink() ||
+    fs.readFileSync(path.join(root, 'owner'), 'utf8') !== 'verify:app')
+)
+  throw Error('Only an owned disposable benchmark fixture can be reused');
 const require = createRequire(import.meta.url);
 const samples = [];
 try {
   fs.writeFileSync(path.join(root, 'owner'), 'verify:app');
   fs.cpSync(buildDirectory, path.join(root, 'build'), { recursive: true });
-  const fixture = await seedLibrary(root, count, smoke ? 10 : 1000);
+  const fixture = reuseRoot
+    ? JSON.parse(fs.readFileSync(path.join(root, 'fixture.json'), 'utf8'))
+    : await seedLibrary(root, count, smoke ? 10 : 1000);
+  if (fixture.count !== count) throw Error('Fixture size mismatch');
+  fs.writeFileSync(path.join(root, 'fixture.json'), JSON.stringify(fixture));
   const data = path.join(root, 'userData', 'data');
   const snapshot = path.join(root, 'baseline.sqlite');
-  fs.copyFileSync(path.join(data, 'studio.sqlite'), snapshot);
+  if (!reuseRoot) fs.copyFileSync(path.join(data, 'studio.sqlite'), snapshot);
+  const assetManifest = path.join(root, 'fixture-assets.json');
+  const originalAssets = reuseRoot
+    ? JSON.parse(fs.readFileSync(assetManifest, 'utf8'))
+    : Object.fromEntries(
+        ['images', 'thumbnails'].map((name) => [
+          name,
+          fs.readdirSync(path.join(root, 'userData/assets', name)),
+        ]),
+      );
+  if (!reuseRoot) fs.writeFileSync(assetManifest, JSON.stringify(originalAssets));
   const assetNames = Object.fromEntries(
-    ['images', 'thumbnails'].map((name) => [
-      name,
-      new Set(fs.readdirSync(path.join(root, 'userData/assets', name))),
-    ]),
+    ['images', 'thumbnails'].map((name) => [name, new Set(originalAssets[name])]),
   );
-  for (let run = 0; run < 3; run++) {
+  for (let run = 0; run < runs; run++) {
     fs.copyFileSync(snapshot, path.join(data, 'studio.sqlite'));
     for (const suffix of ['-wal', '-shm'])
       fs.rmSync(path.join(data, `studio.sqlite${suffix}`), { force: true });
@@ -50,6 +78,7 @@ try {
       path.join(root, 'run.json'),
       JSON.stringify({
         fullLibraryBenchmark: true,
+        heapSnapshot,
         count,
         output,
         resultPath,
@@ -61,12 +90,16 @@ try {
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
     await new Promise((resolve, reject) => {
-      const child = spawn(require('electron'), ['.', `--verify-app=${root}`], {
-        env,
-        shell: false,
-        windowsHide: true,
-        stdio: 'inherit',
-      });
+      const child = spawn(
+        require('electron'),
+        ['.', `--verify-app=${root}`, ...(heapSnapshot ? ['--js-flags=--expose-gc'] : [])],
+        {
+          env,
+          shell: false,
+          windowsHide: true,
+          stdio: 'inherit',
+        },
+      );
       const timer = setTimeout(() => {
         child.kill();
         reject(Error('Benchmark exceeded 60 minutes'));
@@ -89,7 +122,7 @@ try {
     )
   )
     throw Error('Benchmark samples must be finite and use the same stable gallery geometry');
-  const median = (values) => [...values].sort((a, b) => a - b)[1];
+  const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
   const medians = Object.fromEntries(
     Object.keys(samples[0])
       .filter((k) => typeof samples[0][k] === 'number')
@@ -117,5 +150,6 @@ try {
     !path.basename(root).startsWith('nai-acceptance-')
   )
     throw Error('Invalid cleanup target');
-  fs.rmSync(root, { recursive: true, force: true });
+  if (keepFixture) console.log(JSON.stringify({ fixtureRoot: root }));
+  else fs.rmSync(root, { recursive: true, force: true });
 }

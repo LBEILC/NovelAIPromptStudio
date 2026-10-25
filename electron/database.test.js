@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import './fixtures/databaseTestBudget.js';
 import os from 'node:os';
 import path from 'node:path';
@@ -674,4 +675,52 @@ describe('phase 2 core database', () => {
     expect(first.exact_group_fingerprint).not.toBe(differentVibe.exact_group_fingerprint);
     expect(first.exact_group_fingerprint).not.toBe(differentModel.exact_group_fingerprint);
   });
+});
+
+it('adds the hash lookup index to an existing database without changing legacy lookup results', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-hash-index-'));
+  temporaryDirectories.push(directory);
+  const db = await openDatabase(directory);
+  for (const id of ['hash-active', 'hash-trash', 'hash-empty'])
+    db.insertProject({ ...project(id), content_hash: id === 'hash-empty' ? '' : id });
+  db.insertProject({ ...project('hash-duplicate'), content_hash: 'hash-active' });
+  db.updateProjects(['hash-trash'], { deleted: true });
+  db.close();
+  connections.splice(connections.indexOf(db), 1);
+  const file = path.join(directory, 'studio.sqlite');
+  const legacy = new DatabaseSync(file);
+  legacy.exec('DROP INDEX idx_projects_content_hash_lookup');
+  const sql =
+    'SELECT id, name, image_path, thumbnail_path, deleted_at FROM projects WHERE content_hash = $content_hash LIMIT 1';
+  const expected = ['hash-active', 'hash-trash', '', 'missing'].map(
+    (hash) => legacy.prepare(sql).get({ $content_hash: hash }) || null,
+  );
+  expect(
+    legacy.prepare('EXPLAIN QUERY PLAN ' + sql).all({ $content_hash: 'hash-active' })[0].detail,
+  ).toContain('SCAN projects');
+  const rows = legacy.prepare('SELECT * FROM projects ORDER BY id').all();
+  legacy.close();
+  const upgraded = await openDatabase(directory);
+  expect(
+    ['hash-active', 'hash-trash', '', 'missing'].map((hash) =>
+      upgraded.findProjectByContentHash(hash),
+    ),
+  ).toEqual(expected);
+  const reader = new DatabaseSync(file);
+  try {
+    expect(
+      reader
+        .prepare('EXPLAIN QUERY PLAN ' + sql)
+        .all({ $content_hash: 'hash-active' })
+        .map((row) => row.detail)
+        .join(' '),
+    ).toContain('USING INDEX idx_projects_content_hash_lookup');
+    expect(reader.prepare('SELECT * FROM projects ORDER BY id').all()).toEqual(rows);
+    // Run the unchanged legacy SQL against the upgraded file, including an old-style write.
+    expect(reader.prepare(sql).get({ $content_hash: 'hash-trash' })).toEqual(expected[1]);
+    reader.prepare('UPDATE projects SET name = ? WHERE id = ?').run('Legacy write', 'hash-active');
+    expect(upgraded.findProjectByContentHash('hash-active').name).toBe('Legacy write');
+  } finally {
+    reader.close();
+  }
 });

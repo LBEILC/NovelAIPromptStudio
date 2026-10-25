@@ -87,7 +87,7 @@ materials（JSON 素材） ──按内容引用── reference_vibes（参考�
 1. 旧文件首次打开前保留 `studio.pre-phase2.sqlite`；切换原生 SQLite 时另保留 `studio.pre-node-sqlite.sqlite`。后者先同步副本再独占发布，失败不继续打开原库。
 2. `generation_versions_v1`：在事务中建立作品/版本/关联/分支命名表，移除旧 series、experiments、prompt_versions、旧 collections 和旧 vibe 系列表。存在旧表时先备份为 `studio.pre-generation-versions*.sqlite`。旧图片主表仍可读取；被退役表保留在备份里，并非转换成新作品。
 3. `materials_v1`：先备份既有库，再新增 materials；不改原图片或作品快照。
-4. `phase2-core`：创建基础表，按缺列补加图片哈希/指纹/收藏/删除字段，Tag 原始语法字段，结构化提示词/尺寸/生成模式以及词典来源字段。原行通过默认值读取，随后建立查询索引；不是重建用户数据。
+4. `phase2-core`：创建基础表，按缺列补加图片哈希/指纹/收藏/删除字段，Tag 原始语法字段，结构化提示词/尺寸/生成模式以及词典来源字段。原行通过默认值读取，随后建立查询索引；不是重建用户数据。1.6.4 增加 `CREATE INDEX IF NOT EXISTS idx_projects_content_hash_lookup ON projects(content_hash)`，覆盖含空值的整列，供参数化查重查询使用；保留旧部分索引，不改表或行，旧版查询可继续使用。
 5. `reference_vibes`、撤销/清理/序列/活动/文件签名表以 `IF NOT EXISTS` 加入；版本序列取已有最大值且不降低。
 6. `saved_works_v1`：从已有版本图片、序列以及非空且非待保存的原图补已保存作品标记。快照与 ID 不重写。
 7. `gallery_favorites_collection_v1`：把旧 `is_favorite` 图片纳入收藏集，记录已迁移，避免重复处理。

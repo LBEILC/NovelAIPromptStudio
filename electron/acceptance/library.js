@@ -160,6 +160,21 @@ export async function libraryChecks(env) {
       '分组切换及视口调整完成后再拖动滚动条',
     );
     await scrollChecks(h, '.lib-grid-col > .scroll');
+    const lastIndex = database.loadLibrary('all').length - 1;
+    await e(
+      "document.querySelector('.lib-grid-col > .scroll').scrollTop=document.querySelector('.lib-grid-col > .scroll').scrollHeight",
+    );
+    await wait(`!!document.querySelector('.lgrid:not(.leaving) [data-index="${lastIndex}"]')`);
+    await selectCard(lastIndex);
+    await check(
+      '虚拟滚动复用卡片后点击仍选中当前图片并显示对应详情',
+      `(()=>{const c=document.querySelector('.lgrid:not(.leaving) .card.on');return c?.dataset.index==='${lastIndex}' && c.getAttribute('aria-selected')==='true' && document.querySelector('.detail')?.dataset.detailId===c.dataset.groupId.slice(8)})()`,
+    );
+    await key('ArrowLeft', {}, 'document.querySelector(".lgrid:not(.leaving) .card.on")');
+    await h.checkSoon(
+      '复用卡片后方向键仍按图片顺序选择',
+      `document.querySelector('.lgrid:not(.leaving) .card.on')?.dataset.index==='${lastIndex - 1}'`,
+    );
     await e("document.querySelector('.lib-grid-col > .scroll').style.maxHeight=''");
     await e("document.querySelector('.lib-grid-col > .scroll').scrollTop=0");
     await settled();

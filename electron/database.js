@@ -295,6 +295,10 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   database.run(
     "CREATE INDEX IF NOT EXISTS idx_projects_content_hash ON projects(content_hash) WHERE content_hash != ''",
   );
+  // Equality with a bound parameter cannot use the older nonempty partial index.
+  database.run(
+    'CREATE INDEX IF NOT EXISTS idx_projects_content_hash_lookup ON projects(content_hash)',
+  );
   database.run(
     "CREATE INDEX IF NOT EXISTS idx_projects_prompt_fingerprint ON projects(prompt_fingerprint) WHERE prompt_fingerprint != ''",
   );

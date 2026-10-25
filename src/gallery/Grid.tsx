@@ -27,6 +27,7 @@ import type { LibraryGroup, LibraryProps } from '../library/types';
 import type { DetachedRecord, LibraryCard } from '../shared/types';
 import { namedWork, workLabel } from '../lib/workNames';
 import { markLoaded } from '../kit/alpha';
+import { reconcileVisibleSlots, type VisibleSlots } from '../library/visibleSlots';
 
 const cardRatio = (c: LibraryCard) => {
   const { width, height } = c.metadata;
@@ -394,6 +395,25 @@ function Cards({
   const visible = rows.filter(
     (r) => r.top + r.height >= vp.top - rowHeight && r.top <= vp.top + vp.height + rowHeight,
   );
+  const slotState = useRef<VisibleSlots>({ next: 0, slots: [] });
+  const recycledNodes = useRef<HTMLElement[]>([]);
+  const visibleIds = visible.flatMap((row) => row.widths.map((_, o) => groups[row.start + o].id));
+  const slotKey = JSON.stringify(visibleIds);
+  const slots = useMemo(
+    () => reconcileVisibleSlots(slotState.current, visibleIds, (id) => !!previousKeys?.has(id)),
+    [slotKey],
+  );
+  useLayoutEffect(() => {
+    slotState.current = slots;
+    // All recycled children disable their transitions before this parent effect.
+    // Commit their new positions in one layout read, then restore the CSS rules.
+    if (recycledNodes.current.length) {
+      grid.current?.getBoundingClientRect();
+      for (const node of recycledNodes.current) node.style.transition = '';
+      recycledNodes.current = [];
+    }
+  }, [slots]);
+  const slotById = new Map(slots.slots.map((entry) => [entry.id, entry]));
   return (
     <div
       ref={grid}
@@ -493,8 +513,11 @@ function Cards({
               ? `第 ${shown.version_number} 版${shown.generation_source === 'agent' ? ' · Agent' : ''}`
               : '';
           return (
-            <div
-              key={g.id}
+            <RecycledCard
+              key={slotById.get(g.id)!.slot}
+              itemId={g.id}
+              recycled={slotById.get(g.id)!.recycled}
+              recycledNodes={recycledNodes}
               className={`card ${on ? 'on' : ''} ${picked ? 'picked' : ''} ${leaving ? 'leaving fading' : ''} ${mosaic ? 'mosaic' : ''}`}
               data-enter={previousKeys && !previousKeys.has(g.id) ? 'fade' : undefined}
               data-index={i}
@@ -634,7 +657,7 @@ function Cards({
               >
                 <Icon name="check-line" />
               </span>
-            </div>
+            </RecycledCard>
           );
         });
       })}
@@ -646,4 +669,30 @@ function Cards({
       )}
     </div>
   );
+}
+
+/** 新进入视口的旧图片复用离屏节点；位置直接到位，与原来的首次挂载相同。 */
+function RecycledCard({
+  itemId,
+  recycled,
+  recycledNodes,
+  ...props
+}: React.ComponentProps<'div'> & {
+  itemId: string;
+  recycled: boolean;
+  recycledNodes: React.RefObject<HTMLElement[]>;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !recycled) return;
+    if (el.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+    for (const img of el.querySelectorAll('img')) {
+      if (img.complete && img.naturalWidth > 0) img.dataset.loaded = '';
+      else delete img.dataset.loaded;
+    }
+    el.style.transition = 'none';
+    recycledNodes.current.push(el);
+  }, [itemId]);
+  return <div {...props} ref={ref} />;
 }
