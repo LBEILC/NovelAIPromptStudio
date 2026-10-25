@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Icon, Kbd } from '../kit/controls';
 import { Pop } from '../kit/layer';
 import { ContextMenu } from '../kit/menu';
@@ -486,7 +487,10 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             setPeek(null);
           }}
         >
-          {shown.map(({ item, leaving }) => item.render(leaving))}
+          {/* 外面再包一层带标签页的 key：行自己的 key（ver-版本号）在两个标签页里会重复 */}
+          {shown.map(({ key, item, leaving }) => (
+            <Fragment key={key}>{item.render(leaving)}</Fragment>
+          ))}
         </div>
       </FlipScope>
       <Pop
