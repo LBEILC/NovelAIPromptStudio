@@ -308,8 +308,10 @@ textarea.raw { font: var(--fs-small)/var(--lh-small) var(--font-mono); }
 .wb-body > .col.versions { width: var(--versions-w-live, var(--versions-w)); }
 .wb-body > .col.prompt { width: var(--prompt-w-live, var(--prompt-w)); }
 /* 拖宽的栏不被压回去，让中间的舞台让出地方 */
-.wb-body > .col.versions, .wb-body > .col.prompt { flex-shrink: 0; }
-.wb-body > .col.stage { min-width: 0; }
+.wb-body > .col.versions { flex-shrink: 0; }
+/* 放不下时先让提示词栏让出来（最窄 --prompt-min-w），舞台不窄于 --stage-min-w */
+.wb-body > .col.prompt { flex-shrink: 1; min-width: var(--prompt-min-w); }
+.wb-body > .col.stage { min-width: var(--stage-min-w); }
 .col.detail { width: var(--detail-w-live, var(--detail-w)); }
 /* 线一直在，平时透明；指针到了分隔线附近淡入 --dur-1，离开淡出 --dur-1（状态变化，2.17） */
 .wb-body > .col.versions, .wb-body > .col.prompt, .col.detail { position: relative; }

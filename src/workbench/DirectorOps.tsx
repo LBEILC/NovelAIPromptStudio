@@ -222,6 +222,7 @@ export function DirectorOps({
               <span className="label">强度</span>
               <Seg
                 label="强度"
+                className="dir-seg"
                 items={STRENGTH.map(([k, n, tip]) => [k, n, tip] as const)}
                 value={String(defry)}
                 onChange={(v) => setDefry(Number(v) as Defry)}
@@ -237,7 +238,7 @@ export function DirectorOps({
                 label="表情"
                 className="dir-dd"
                 value={EMOTIONS.find(([k]) => k === emotion)?.[1]}
-                menuClass="dir-emotions"
+                menuClass="dir-emotions scroll"
                 items={EMOTIONS.map(([k, n]) => ({
                   label: n,
                   hint: k,
@@ -250,6 +251,7 @@ export function DirectorOps({
               <span className="label">强度</span>
               <Seg
                 label="强度"
+                className="dir-seg"
                 items={STRENGTH.map(([k, n, tip]) => [k, n, tip] as const)}
                 value={String(defry)}
                 onChange={(v) => setDefry(Number(v) as Defry)}

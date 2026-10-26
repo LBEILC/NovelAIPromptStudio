@@ -62,7 +62,10 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
     max: () =>
       Math.max(
         ms('--prompt-w'),
-        innerWidth - (generation.settings.hasToken ? ms('--versions-w') : 0) - ms('--popover-w'),
+        // 按版本栏现在的宽度和舞台的最窄宽度算，拖宽提示词栏不会把舞台挤没
+        innerWidth -
+          (generation.settings.hasToken ? ms('--versions-w-live') || ms('--versions-w') : 0) -
+          ms('--stage-min-w'),
       ),
     def: () => ms('--prompt-w'),
     storage: WORKBENCH_SOURCE_PANEL_WIDTH_KEY,

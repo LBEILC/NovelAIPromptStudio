@@ -513,7 +513,7 @@ textarea.para-in { resize: none; overflow: hidden; }
 .popover.op-pop .op-size .muted { color: var(--text-3); }
 .popover.op-pop .op-foot { align-items: center; padding-top: var(--sp-3); border-top: 1px solid var(--divider); }
 .popover.op-pop .op-price { display: flex; flex-direction: column; min-width: 0; }
-/* 导演工具（2.49）：六种工具排成两行三格，选中的描边加底色；上色、换表情的参数行输入框占满 */
+/* 导演工具（2.49）：六种工具排成两行三格，选中的描边加底色；上色、换表情的参数行（下拉、强度、输入框）一样宽，占满一行 */
 /* 强度六档放不进普通宽度，用宽浮层（用户 10-26：最弱那一档撑出了浮层） */
 .popover.dir-pop { width: var(--popover-w-wide); }
 .popover.dir-pop .dir-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-1); }
@@ -525,6 +525,9 @@ textarea.para-in { resize: none; overflow: hidden; }
 .popover.dir-pop .dir-help { color: var(--text-3); }
 .popover.dir-pop .frow { grid-template-columns: 44px minmax(0, 1fr); }
 .popover.dir-pop .frow .field { width: 100%; min-width: 0; }
+.popover.dir-pop .dir-seg { display: flex; width: 100%; }
+.popover.dir-pop .dir-seg > span { flex: 1 1 0; justify-content: center; padding: 0; }
+/* 24 种表情的菜单限高，用全软件统一的自绘滚动条（.scroll），不露系统滚动条 */
 .menu.dir-emotions { max-height: 320px; overflow-y: auto; }
 /* 舞台窄的时候（窗口小、提示词栏拖宽）操作条只留图标，悬停写名字，不挤成竖排 */
 .stage-acts { container-type: inline-size; }
