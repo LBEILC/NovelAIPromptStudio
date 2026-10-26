@@ -2,6 +2,7 @@
 // 停 500ms 出现；刚关掉的 300ms 内移到另一个上立即出现；按下、滚动、Esc 收起；键盘焦点移上去立即出现。
 // 默认在下方居中，下面放不下就放上面。
 // 用法：元素上写 data-tip="…"；只有图标的按钮（.btn.icon）用 aria-label；
+// data-tip-side="right" 放在右边（菜单项，不盖住下面几项）；
 // data-tip-overflow="全文" 只在文字被省略时提示；放不下时字被收起来的按钮（.lbl 被藏起）也用 aria-label。
 import { useEffect, useRef } from 'react';
 
@@ -68,10 +69,19 @@ export function TipLayer() {
           gap = 6,
           w = tip.offsetWidth,
           th = tip.offsetHeight;
-        let top = r.bottom + gap;
-        if (top + th > innerHeight - 8 && r.top - gap - th >= 8) top = r.top - gap - th;
-        tip.style.left = `${clamp(r.left + r.width / 2 - w / 2, 8, innerWidth - w - 8)}px`;
-        tip.style.top = `${top}px`;
+        if ((el as HTMLElement).dataset.tipSide === 'right') {
+          // 菜单项这类一列排下来的：放在右边，不盖住下面几项；右边放不下放左边
+          const box =
+            (el.closest('.menu') || el.closest('[role="menu"]'))?.getBoundingClientRect() || r;
+          const left = box.right + gap + w <= innerWidth - 8 ? box.right + gap : box.left - gap - w;
+          tip.style.left = `${clamp(left, 8, innerWidth - w - 8)}px`;
+          tip.style.top = `${clamp(r.top, 8, innerHeight - th - 8)}px`;
+        } else {
+          let top = r.bottom + gap;
+          if (top + th > innerHeight - 8 && r.top - gap - th >= 8) top = r.top - gap - th;
+          tip.style.left = `${clamp(r.left + r.width / 2 - w / 2, 8, innerWidth - w - 8)}px`;
+          tip.style.top = `${top}px`;
+        }
         tip.classList.add('on');
       };
       if (now || warm) reveal();

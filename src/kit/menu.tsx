@@ -21,6 +21,8 @@ export type MenuEntry =
       dot?: string;
       sub?: MenuEntry[];
       className?: string;
+      /** 悬停说明（不可用时写的原因优先） */
+      tip?: string;
     }
   | 'sep'
   | { header: ReactNode };
@@ -142,7 +144,8 @@ export function MenuItems({
             className={`mi ${e.danger ? 'danger' : ''} ${e.disabled ? 'off' : ''} ${i === active ? 'on' : ''} ${e.sub ? 'sub' : ''} ${subOpen === i ? 'open' : ''} ${fit.i === i && fit.left ? 'left' : ''} ${e.className || ''}`}
             role="menuitem"
             aria-disabled={e.disabled ? true : undefined}
-            data-tip={typeof e.disabled === 'string' ? e.disabled : undefined}
+            data-tip={typeof e.disabled === 'string' ? e.disabled : e.tip}
+            data-tip-side={e.tip && typeof e.disabled !== 'string' ? 'right' : undefined}
             onPointerEnter={(ev) => {
               setActive(usable(e) ? i : -1);
               setSubOpen(-1);

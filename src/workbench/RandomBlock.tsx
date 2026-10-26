@@ -183,6 +183,7 @@ export function RandomPop({
     ...pools.map((p) => ({
       label: p.name,
       hint: `${p.entries?.length || 0} 条`,
+      tip: poolTip(p, p.name),
       checked: p.name === o.pool,
       onSelect: () => setO({ ...o, pool: p.name }),
     })),
