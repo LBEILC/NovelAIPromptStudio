@@ -219,6 +219,61 @@ function play(el: HTMLElement | null, before: Snapshot) {
  * 包住一块会让位的内容：每次重画前记下 [data-flip][data-key] 的位置和 [data-grow] 的高度，
  * 重画后从旧的位置移到新的位置。离开时 data-exit="lift" 的项先按原来的位置浮起来，留下的立刻补位。
  */
+/**
+ * 同一块区域换成另一份内容（切标签页时的版本栏）：整块交叉淡化，不逐行进出。
+ * DOM 换掉之前拍一份旧的，叠在原处淡出 --dur-1；新的一份整体淡入 --dur-2，里面各行自己的进场动画直接到结尾。
+ * 每一份各记各的滚动位置，切回来时回到原处。
+ */
+export class SnapshotSwap extends Component<{
+  swapKey: string;
+  root: RefObject<HTMLElement | null>;
+}> {
+  tops = new Map<string, number>();
+  getSnapshotBeforeUpdate(prev: { swapKey: string }) {
+    const el = this.props.root.current;
+    if (!el || prev.swapKey === this.props.swapKey) return null;
+    this.tops.set(prev.swapKey, el.scrollTop);
+    if (!dur(1)) return { copy: null };
+    const copy = el.cloneNode(true) as HTMLElement;
+    copy.className = 'swap-snapshot leaving';
+    copy.removeAttribute('data-scroll');
+    copy.setAttribute('aria-hidden', 'true');
+    copy.inert = true;
+    Object.assign(copy.style, {
+      position: 'absolute',
+      left: `${el.offsetLeft}px`,
+      top: `${el.offsetTop}px`,
+      width: `${el.offsetWidth}px`,
+      height: `${el.offsetHeight}px`,
+      padding: getComputedStyle(el).padding,
+      boxSizing: 'border-box',
+      overflow: 'hidden',
+    });
+    return { copy, top: el.scrollTop };
+  }
+  componentDidUpdate(
+    _p: unknown,
+    _s: unknown,
+    snap: { copy: HTMLElement | null; top?: number } | null,
+  ) {
+    const el = this.props.root.current;
+    if (!snap || !el) return;
+    el.scrollTop = this.tops.get(this.props.swapKey) || 0;
+    if (!snap.copy) return;
+    el.after(snap.copy);
+    snap.copy.scrollTop = snap.top || 0;
+    el.querySelectorAll('[data-enter]').forEach((n) =>
+      n.getAnimations().forEach((a) => a.finish()),
+    );
+    el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur(2), easing: EASE_OUT });
+    const copy = snap.copy;
+    afterPaint(dur(1) + 30, () => copy.remove());
+  }
+  render() {
+    return null;
+  }
+}
+
 export class FlipScope extends Component<{
   root: RefObject<HTMLElement | null>;
   children: ReactNode;

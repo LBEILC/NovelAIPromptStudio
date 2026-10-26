@@ -99,6 +99,11 @@ export function ScrollLayer() {
       sb.classList.add('show');
       clearTimeout(idle);
       idle = window.setTimeout(function hide() {
+        // 跟着的区域已经没了（例如悬停浮层关掉了）：指针停在滚动条上也要藏起来
+        if (!active?.isConnected) {
+          sb.classList.remove('show');
+          return;
+        }
         if (over || drag) {
           idle = window.setTimeout(hide, ms('--sb-idle'));
           return;
@@ -116,7 +121,10 @@ export function ScrollLayer() {
         active.scrollTop = drag.top + (e.clientY - drag.y) * drag.k;
         return;
       }
-      if (e.target === sb) return;
+      if (e.target === sb) {
+        if (!active?.isConnected) sb.classList.remove('show');
+        return;
+      }
       const el =
         e.target instanceof Element ? (e.target.closest(SCROLLER) as HTMLElement | null) : null;
       if (el && el.scrollHeight > el.clientHeight + 1) wake(el);

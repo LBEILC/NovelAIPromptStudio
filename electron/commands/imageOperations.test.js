@@ -195,7 +195,8 @@ it('keeps base images and image operation versions durable through command flows
     expect(afterEnhance.project.image_path).toBe(
       database.loadProject(enhanced.images[0]).image_path,
     );
-    expect(afterEnhance.project.metadata).toMatchObject({ width: 1467, height: 2144 });
+    // 增强出来的图更大，但草稿的生成尺寸不跟着变（只有扩图改草稿尺寸）
+    expect(afterEnhance.project.metadata).toMatchObject({ width: 832, height: 1216 });
     expect(afterEnhance.project.metadata.prompt_raw).toContain('edited');
     const deletion = await call('version.delete', { versionId: enhanced.versionId, only: true });
     await call('branch.restore', { undo: deletion.undo });

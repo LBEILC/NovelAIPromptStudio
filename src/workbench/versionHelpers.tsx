@@ -143,3 +143,24 @@ export async function applyRedrawPrompt({
     notify({ text: (e as Error).message, tone: 'error' });
   }
 }
+/** 放大、增强那一版：图片的像素变了，草稿的生成尺寸不变（2.34），版本行写出像素的变化 */
+export function OpSize({ from, to }: { from?: string; to?: string }) {
+  const [px, setPx] = useState<[string, string] | null>(null);
+  useEffect(() => {
+    if (!from || !to) return;
+    let live = true;
+    const size = (id: string) =>
+      thumbOf(id).then((d) => {
+        const m = (d.image as { metadata?: { width?: unknown; height?: unknown } }).metadata;
+        return m?.width && m?.height ? `${m.width} × ${m.height}` : '';
+      });
+    void Promise.all([size(from), size(to)])
+      .then((s) => live && setPx(s as [string, string]))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [from, to]);
+  if (!px || !px[0] || !px[1]) return <span className="what" />;
+  return <span className="what">{px[0] === px[1] ? '尺寸不变' : `尺寸 ${px[0]} → ${px[1]}`}</span>;
+}

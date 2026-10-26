@@ -415,7 +415,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
             // The draft differs from the job: edited while the request ran, or an
             // image operation (enhance and inpaint keep the source version's
             // prompt) started from a different draft. Keep its edits, but always
-            // display the saved result; operations also change the image size.
+            // display the saved result. Only outpaint changes the generation size; upscale
+            // and enhance keep the draft's size (the version row shows the pixel change).
             current.project = {
               ...current.project,
               id: image.id,
@@ -424,7 +425,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
               nsfw: image.nsfw,
               metadata: {
                 ...current.project.metadata,
-                ...(job.operation
+                ...(job.operation === 'outpaint'
                   ? { width: image.metadata.width, height: image.metadata.height }
                   : {}),
               },

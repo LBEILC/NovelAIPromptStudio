@@ -1,8 +1,8 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Icon, Kbd, isMod, modKey } from '../kit/controls';
 import { Pop } from '../kit/layer';
 import { ContextMenu } from '../kit/menu';
-import { FlipScope, useExitList } from '../kit/motion';
+import { FlipScope, SnapshotSwap, useExitList } from '../kit/motion';
 import { invokeUI } from '../lib/commands';
 import { versionDiff } from '../lib/versionDiff';
 import type { CommandTab } from '../shared/commands';
@@ -11,7 +11,7 @@ import { originGone } from './original';
 import { useVersionState } from './useVersionState';
 import { openCompare, type CompareSide } from './Compare';
 import { VersionDifference, VersionSummary } from './VersionDifference';
-import { Row, TH_H, TH_MORE, Thumb, isRedraw, rowsOf } from './versionHelpers';
+import { OpSize, Row, TH_H, TH_MORE, Thumb, isRedraw, rowsOf } from './versionHelpers';
 import { openPick } from './Pick';
 import { randomSummary } from './RandomBlock';
 /** 一版超过这么多张时，"+N"打开挑图而不是展开 */
@@ -322,6 +322,11 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                 ) : (
                   <VersionSummary diff={delta(v)} lead="重绘提示词 " />
                 )
+              ) : v.operation?.kind === 'upscale' || v.operation?.kind === 'enhance' ? (
+                <OpSize
+                  from={v.operation.sourceProjectId}
+                  to={v.images.find((i) => !i.deleted)?.projectId}
+                />
               ) : (
                 <VersionSummary diff={delta(v)} />
               )
@@ -548,8 +553,35 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         });
       });
   }
+  // 浮层的滚动条画在浮层外面（ScrollLayer）：指针移到它上面、拖动它都还算在浮层里，离开滚动条、松手时再看指针在哪
+  const inPeek = (t: EventTarget | null) =>
+    t instanceof Element && !!t.closest('.ver-peek, .sb-layer .sb');
+  const leavePeek = (e: ReactPointerEvent) => {
+    const bar =
+      e.relatedTarget instanceof Element ? e.relatedTarget.closest<HTMLElement>('.sb') : null;
+    if (!bar) return unhover();
+    const settle = (ev: PointerEvent) => {
+      if (document.documentElement.classList.contains('is-dragging')) {
+        bar.removeEventListener('pointerleave', settle);
+        window.addEventListener(
+          'pointerup',
+          (up) => {
+            if (!inPeek(document.elementFromPoint(up.clientX, up.clientY))) unhover();
+          },
+          { once: true },
+        );
+        return;
+      }
+      bar.removeEventListener('pointerleave', settle);
+      if (!inPeek(ev.relatedTarget)) unhover();
+    };
+    bar.addEventListener('pointerleave', settle);
+  };
   // key 带上标签页：两个标签页里同 key 的行（草稿、同一作品的版本）切换时会被当成同一行、原地直接换内容（用户 10-25）
-  const shown = useExitList(rows, (r) => `${tab.id}:${r.key}`);
+  // 切到别的标签页时上一个标签页的行不逐行淡出：整列由 SnapshotSwap 交叉淡化
+  const shown = useExitList(rows, (r) => `${tab.id}:${r.key}`).filter(
+    (r) => !r.leaving || r.key.startsWith(`${tab.id}:`),
+  );
   // 原图算一张；空白作品的起点没有图
   const images = versions.reduce(
     (n, v) => n + v.images.filter((i) => !i.deleted).length,
@@ -575,6 +607,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
           {versions.filter((v) => !v.isStart).length} 版 · {images} 张
         </span>
       </div>
+      <SnapshotSwap swapKey={tab.id} root={scroll} />
       <FlipScope root={scroll}>
         <div
           className="scroll"
@@ -603,7 +636,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
           <div
             className="vp-in"
             onPointerEnter={() => clearTimeout(peekTimer.current)}
-            onPointerLeave={unhover}
+            onPointerLeave={leavePeek}
           >
             <VersionDifference
               diff={delta(peek.v)}

@@ -8,6 +8,10 @@ html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="
 
 /* 退出（2.17）：被拿掉的东西加 .leaving，从现在的样子淡出 --dur-1，不位移；同时取代它的进入动画，不能再点 */
 .leaving { pointer-events: none !important; animation: pf-out var(--dur-1) var(--ease-out) forwards !important; }
+/* 整块交叉淡化时拍下的旧内容（SnapshotSwap）：里面各行的进场动画不重播；底色由所在的栏给，盖住下面淡入的新内容 */
+.swap-snapshot { z-index: 1; }
+.swap-snapshot [data-enter] { animation: none; }
+.versions .swap-snapshot { background: var(--pane); }
 
 /* 拖动 Tag、拖栏宽时：整个窗口的光标跟着变，不选中文字 */
 html.is-dragging, html.is-dragging * { user-select: none !important; -webkit-user-select: none !important; cursor: grabbing !important; }
