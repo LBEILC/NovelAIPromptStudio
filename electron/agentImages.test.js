@@ -2,12 +2,15 @@ import { afterAll, beforeAll, it, expect } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import sharp from 'sharp';
 import { createAgentImages, resolveAgentMask, currentMaskInput } from './agentImages.js';
 import { autoInpaintRect, defaultInpaintRect } from '../src/shared/inpaint.ts';
 
 let fontDirectory;
-const originalFontConfig = process.env.FONTCONFIG_FILE;
+const execute = promisify(execFile);
 beforeAll(async () => {
   // SVG coordinates need digits, not the runner's entire system font inventory.
   // Pin one existing bundled font and a private cache before the first text render.
@@ -28,11 +31,8 @@ beforeAll(async () => {
     config,
     `<fontconfig><dir>${directory}</dir><cachedir>${directory}/cache</cachedir></fontconfig>`,
   );
-  process.env.FONTCONFIG_FILE = config;
 });
 afterAll(async () => {
-  if (originalFontConfig === undefined) delete process.env.FONTCONFIG_FILE;
-  else process.env.FONTCONFIG_FILE = originalFontConfig;
   if (fontDirectory) await fs.rm(fontDirectory, { recursive: true, force: true });
 });
 
@@ -187,7 +187,25 @@ it('shares the previous UI auto-frame rule and preserves current mask pixels whe
 it('limits the coordinate grid and removes only expired temporary files', async () => {
   await fixture(
     async ({ source, images, directory }) => {
-      const grid = await images.grid(source);
+      // On Windows the native font library reads its environment at process
+      // startup; changing process.env after loading sharp does not isolate it.
+      const { stdout } = await execute(
+        process.execPath,
+        [
+          fileURLToPath(new URL('./fixtures/agentGridWorker.mjs', import.meta.url)),
+          directory,
+          source,
+        ],
+        {
+          windowsHide: true,
+          env: {
+            ...process.env,
+            FONTCONFIG_FILE: path.join(fontDirectory, 'fonts.conf'),
+            PANGOCAIRO_BACKEND: 'fontconfig',
+          },
+        },
+      );
+      const grid = JSON.parse(stdout);
       expect(grid).toMatchObject({ width: 1568, height: 1176, scale: 1568 / 2048 });
       expect(grid.step % 64).toBe(0);
       expect(2048 / grid.step).toBeGreaterThanOrEqual(8);
