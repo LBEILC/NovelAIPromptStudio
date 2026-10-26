@@ -395,9 +395,14 @@ export async function generationChecks({
   await h.screenshot('034-04-seed-edit');
   await h.key('Enter');
   const sent = generationService.state.requests.length;
+  const seedJobs = new Set((await invoke('generate.status')).jobs.map((job) => job.id));
   await click('生成', 'document.querySelector(".gen-bar")');
-  await wait(
-    `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.filter(j=>j.tabId===${JSON.stringify(tabId)}).every(j=>!['queued','generating'].includes(j.state)))`,
+  await h.until(
+    () =>
+      JSON.parse(fs.readFileSync(path.join(userData, 'generation-queue.json'), 'utf8')).some(
+        (job) => job.tabId === tabId && !seedJobs.has(job.id) && job.state === 'completed',
+      ),
+    '固定 Seed 的新增任务完成后检查请求',
   );
   await check(
     '手输 Seed 用于下一次生成',
@@ -422,9 +427,14 @@ export async function generationChecks({
   await e('document.querySelector(".gen-bar button.seed-val").click()');
   await input('[aria-label="Seed"]', '');
   await h.key('Enter');
+  const randomSeedJobs = new Set((await invoke('generate.status')).jobs.map((job) => job.id));
   await click('生成', 'document.querySelector(".gen-bar")');
-  await wait(
-    `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.filter(j=>j.tabId===${JSON.stringify(tabId)}).every(j=>!['queued','generating'].includes(j.state)))`,
+  await h.until(
+    () =>
+      JSON.parse(fs.readFileSync(path.join(userData, 'generation-queue.json'), 'utf8')).some(
+        (job) => job.tabId === tabId && !randomSeedJobs.has(job.id) && job.state === 'completed',
+      ),
+    '随机 Seed 的新增任务完成后检查请求',
   );
   await check('Seed 清空后恢复随机生成', async () => {
     const jobs = (await invoke('generate.status')).jobs;

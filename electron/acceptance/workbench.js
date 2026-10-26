@@ -754,6 +754,6 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     if (project.metadata.prompt_raw === workbenchRaw) database.deleteProject(project.id);
   }
   await automaticAndVibeChecks({ h, mode, doubles });
-  await pick186Checks({ h, preferences });
+  await pick186Checks({ h, preferences, mode, database });
   h.window.setContentSize(...previousSize);
 }

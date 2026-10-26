@@ -13,7 +13,7 @@ export async function libraryCopyChecks(env) {
     // full suite's existing Workbench tabs rather than only an empty first open.
     await click('工作台', 'document.querySelector(".tb")');
     doubles.selections.push({ canceled: false, filePaths: [files[0]] });
-    await click('打开图片', 'document.querySelector(".tb")');
+    await h.key('i', process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true });
     await wait('document.querySelectorAll(".tabs [data-tab]").length===1', '准备已有工作台标签页');
   }
   const refresh = async () => {

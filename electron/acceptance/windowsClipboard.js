@@ -38,7 +38,7 @@ export async function windowsClipboardChecks({ h, mode, doubles, database }) {
     doubles.systemClipboard = system;
     await h.click('工作台', 'document.querySelector(".tb")');
     doubles.selections.push({ canceled: false, filePaths: [file] });
-    await h.click('打开图片', 'document.querySelector(".tb")');
+    await h.key('i', process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true });
     await h.wait(
       `window.studio.invoke('workbench.list',{}).then(r=>r.data.tabs.find(t=>t.id===r.data.activeTabId)?.source.path===${JSON.stringify(file)})`,
       '透明合成图成为活动标签页',

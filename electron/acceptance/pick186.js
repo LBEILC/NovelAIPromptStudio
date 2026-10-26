@@ -1,8 +1,13 @@
 import { commandFor, contextMenu, menuRoot, toastRoot } from './release186.js';
 import { expectQueueCompletion } from './generationQueueWait.js';
-export async function pick186Checks({ h, preferences }) {
+import fs from 'node:fs';
+import path from 'node:path';
+import { libraryDetailsChecks } from './libraryDetails.js';
+export async function pick186Checks({ h, preferences, mode, database }) {
   const call = commandFor(h);
-  const token = preferences.novelAIToken();
+  if (!path.resolve(preferences.filePath).startsWith(path.resolve(mode.root) + path.sep))
+    throw Error('Pick account fixture must stay in the temporary profile');
+  const token = JSON.parse(fs.readFileSync(preferences.filePath, 'utf8')).novelAITokenEncrypted;
   await call('account.connection.save', { connection: 'official' });
   await call('account.save', { token: 'acceptance-token' });
   const { tab } = await call('workbench.new', { width: 64, height: 64 });
@@ -31,7 +36,12 @@ export async function pick186Checks({ h, preferences }) {
   );
   await h.key('Escape');
   await h.wait('!document.querySelector("[data-pick]:not(.leaving)")');
+  await libraryDetailsChecks({ h, database });
   await call('workbench.close', { tabId: tab.id });
-  preferences.saveNovelAIToken(token);
+  const settings = JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'));
+  if (token === undefined) delete settings.novelAITokenEncrypted;
+  else settings.novelAITokenEncrypted = token;
+  fs.writeFileSync(preferences.filePath, JSON.stringify(settings));
+  await call('settings.generation.save');
   await h.reload();
 }
