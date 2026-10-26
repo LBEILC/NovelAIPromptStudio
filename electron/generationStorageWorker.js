@@ -24,9 +24,13 @@ try {
     jobs = [];
   }
   // An interrupted paid request is not safe to replay automatically.
-  // TODO(design): Confirm whether interrupted requests need a distinct recovery message.
   jobs = recentJobs(
-    jobs.map((job) => ({ ...job, state: job.state === 'generating' ? 'pending' : job.state })),
+    jobs.map((job) => ({
+      ...job,
+      undoAvailable: false,
+      state: job.state === 'generating' ? 'queued' : job.state,
+      resumedAfterExit: job.state === 'generating' || !!job.resumedAfterExit,
+    })),
     100,
   );
   const compact = await createGenerationStorage(directory).write(jobs);

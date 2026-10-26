@@ -154,7 +154,10 @@ it('migrates legacy records on startup and preserves corrupt queues instead of s
     const restored = await createGenerationStorage(directory).load();
     expect(restored).toHaveLength(102);
     expect(restored.find((j) => j.id === '200').state).toBe('queued');
-    expect(restored.find((j) => j.id === '201').state).toBe('pending');
+    expect(restored.find((j) => j.id === '201')).toMatchObject({
+      state: 'queued',
+      resumedAfterExit: true,
+    });
     expect((await fs.stat(file)).size).toBeLessThan(100000);
     expect(await fs.readdir(path.join(directory, 'generation-assets'))).toHaveLength(1);
     await fs.writeFile(file, '{broken');
@@ -293,6 +296,8 @@ it(
         accept: async () => 'synthetic-result',
       });
       queue.restore(restored);
+      expect(queue.paused).toBe(true);
+      queue.resume();
       const states = await completed;
       expect(states.map((j) => j.error || j.state)).toEqual(jobs.map(() => 'completed'));
       expect(sent).toEqual(requests);

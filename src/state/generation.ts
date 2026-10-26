@@ -3,6 +3,7 @@ import type { GenerationStatus } from '../shared/generation';
 import { invokeUI } from '../lib/commands';
 let state: GenerationStatus = {
   jobs: [],
+  paused: false,
   settings: {
     connection: 'official',
     officialToken: false,

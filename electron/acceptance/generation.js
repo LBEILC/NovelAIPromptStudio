@@ -1,3 +1,4 @@
+import { generationQueueChecks } from './generationQueue.js';
 import { selectGalleryGrouping } from './galleryView.js';
 import { relayChecks } from './relay.js';
 import { inpaintChecks } from './inpaint.js';
@@ -20,6 +21,7 @@ export async function generationChecks({
 }) {
   const { evaluate: e, click, input, wait, check } = h;
   h.category('生成');
+  await generationQueueChecks({ h, generationService });
   const randomRequestStart = generationService.state.requests.length;
   await check(
     '随机块三张生成保留一版、逐图记录并应用选中结果',
@@ -624,10 +626,12 @@ export async function generationChecks({
   const recentStatus = await call('generate.status');
   const expandedStatus = await call('generate.status', { limit: 100 });
   await check(
-    'Agent 默认最近 20 条、limit 可读取更多已结束任务',
+    '移除任务不再出现在 Agent 队列中，历史查询遵守 limit',
     () =>
       recentStatus.jobs.filter((j) => ['completed', 'failed', 'canceled'].includes(j.state))
-        .length === 20 && expandedStatus.jobs.length > recentStatus.jobs.length,
+        .length <= 20 &&
+      expandedStatus.jobs.length >= recentStatus.jobs.length &&
+      bulkJobs.every((job) => !expandedStatus.jobs.some((j) => j.id === job.id)),
   );
   await check('精确参考费用包含基础价和附加费', async () => {
     const price = await call('generate.estimate', { tabId: refTab, count: 2 });

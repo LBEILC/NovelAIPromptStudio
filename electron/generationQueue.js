@@ -12,10 +12,13 @@ export function createGenerationQueue({
   balance,
   beforeEach = () => true,
   initial = [],
+  undoDuration = 10000,
   changed = () => {},
   persist = () => {},
 }) {
   const jobs = recentJobs(initial, 100);
+  let paused = false;
+  const removed = new Map();
   let running = false;
   let closed = false;
   let finished;
@@ -38,19 +41,24 @@ export function createGenerationQueue({
     changed(publicJobs(jobs));
   };
   async function drain() {
-    if (running || closed) return;
+    if (running || closed || paused) return;
     running = true;
     finished = new Promise((resolve) => {
       complete = resolve;
     });
     try {
       let job;
-      while (!closed && (job = jobs.find((item) => item.state === 'queued'))) {
+      while (
+        !closed &&
+        !paused &&
+        (job = jobs.find((item) => item.state === 'queued' && !item.deferred))
+      ) {
         job.state = 'generating';
         publish();
-        while (!job.stop && (job.continuous || job.completed < job.count)) {
+        while (!closed && !paused && !job.stop && (job.continuous || job.completed < job.count)) {
           if (!(await beforeEach(job))) {
-            job.state = 'pending';
+            job.state = 'failed';
+            job.error ||= '已达到每日上限';
             publish();
             break;
           }
@@ -59,11 +67,12 @@ export function createGenerationQueue({
           publish();
           try {
             await run(async () => {
-              if (closed || job.stop) return;
+              if (closed || paused || job.stop) return;
               let before;
               try {
                 before = await balance();
                 await prepare(job);
+                if (closed || paused || job.stop) return;
                 const request = structuredClone(job.request);
                 if (!job.fixedSeed) request.parameters.seed = crypto.randomInt(0, 0x100000000);
                 if (request.action === 'img2img') {
@@ -111,7 +120,13 @@ export function createGenerationQueue({
           if (job.state === 'failed') break;
         }
         if (!['failed', 'pending'].includes(job.state))
-          job.state = job.stop ? 'canceled' : 'completed';
+          job.state = job.skipped
+            ? 'skipped'
+            : job.stop
+              ? 'canceled'
+              : (closed || paused) && (job.continuous || job.completed < job.count)
+                ? 'queued'
+                : 'completed';
         publish();
       }
     } finally {
@@ -121,9 +136,18 @@ export function createGenerationQueue({
   }
   return {
     restore(restored) {
-      jobs.splice(0, jobs.length, ...recentJobs(restored, 100));
+      jobs.splice(
+        0,
+        jobs.length,
+        ...recentJobs(
+          restored.map((job) =>
+            job.state === 'generating' ? { ...job, state: 'queued', resumedAfterExit: true } : job,
+          ),
+          100,
+        ),
+      );
+      paused = jobs.some(activeJob);
       publish();
-      void drain();
     },
     start(input) {
       if (closed) throw new Error('生成队列已关闭');
@@ -139,6 +163,10 @@ export function createGenerationQueue({
         spent: 0,
         spentKnown: true,
         stop: false,
+        deferred: false,
+        skipped: false,
+        resumedAfterExit: false,
+        hasRandomBlocks: JSON.stringify(input.project?.prompt_structure || {}).includes('__'),
         error: '',
         createdAt: new Date().toISOString(),
       };
@@ -148,7 +176,14 @@ export function createGenerationQueue({
       return publicJob(job);
     },
     status(id, limit = 100) {
-      return id ? publicJob(find(id)) : publicJobs(recentJobs(jobs, limit));
+      return id
+        ? publicJob(find(id))
+        : publicJobs(
+            recentJobs(
+              jobs.filter((j) => !j.removed),
+              limit,
+            ),
+          );
     },
     confirm(ids) {
       for (const id of ids) {
@@ -156,18 +191,107 @@ export function createGenerationQueue({
         if (job.state === 'pending') {
           job.state = 'queued';
           job.confirmed = true;
+          jobs.splice(jobs.indexOf(job), 1);
+          jobs.push(job);
         }
       }
       publish();
       void drain();
     },
+    get paused() {
+      return paused;
+    },
+    pause() {
+      paused = true;
+      publish();
+    },
+    resume() {
+      paused = false;
+      publish();
+      void drain();
+    },
+    setCount(id, count) {
+      const job = find(id);
+      if (job.continuous || !['queued', 'generating'].includes(job.state))
+        throw new Error('这项任务不能修改张数');
+      if (
+        !Number.isSafeInteger(count) ||
+        count < job.completed ||
+        (job.state === 'queued' && count < 1)
+      )
+        throw new Error('张数无效');
+      const next = Math.max(count, job.completed + 1);
+      if (job.estimate != null) job.estimate = (job.estimate / job.count) * next;
+      job.count = next;
+      publish();
+    },
+    skip(id) {
+      const job = find(id);
+      if (job.state !== 'generating') throw new Error('这项任务没有正在生成');
+      job.skipped = true;
+      job.stop = true;
+      publish();
+    },
+    defer(id, deferred) {
+      const job = find(id);
+      if (job.state !== 'queued') throw new Error('只能暂缓排队中的任务');
+      job.deferred = deferred;
+      publish();
+      void drain();
+    },
+    move(id, before) {
+      const job = find(id),
+        target = before ? find(before) : null;
+      if (job.state !== 'queued' || target?.state === 'generating')
+        throw new Error('不能移动正在生成的任务');
+      if (job === target) return;
+      const active = jobs.findIndex((j) => j.state === 'generating');
+      if (target && jobs.indexOf(target) <= active) throw new Error('不能插到正在生成的任务前');
+      jobs.splice(jobs.indexOf(job), 1);
+      jobs.splice(target ? jobs.indexOf(target) : jobs.length, 0, job);
+      publish();
+    },
     cancel(ids) {
+      const undo = [];
       for (const id of ids) {
         const job = find(id);
-        if (['pending', 'queued'].includes(job.state)) job.state = 'canceled';
-        else if (job.state === 'generating' && job.operation === 'outpaint') job.stop = true;
+        if (['pending', 'queued', 'failed'].includes(job.state)) {
+          const entry = { id, index: jobs.indexOf(job), count: job.count, state: job.state };
+          removed.set(id, { ...entry, job, before: jobs[jobs.indexOf(job) + 1]?.id });
+          job.removed = true;
+          job.undoAvailable = true;
+          const timer = setTimeout(() => {
+            removed.delete(id);
+            job.undoAvailable = false;
+            publish();
+          }, undoDuration);
+          timer.unref?.();
+          removed.get(id).timer = timer;
+          job.state = 'canceled';
+          undo.push(entry);
+        } else if (job.state === 'generating' && job.operation === 'outpaint') job.stop = true;
       }
       publish();
+      return undo;
+    },
+    restoreRemoved(id) {
+      const entry = removed.get(id);
+      if (!entry) throw new Error('没有可恢复的任务');
+      jobs.splice(jobs.indexOf(entry.job), 1);
+      clearTimeout(entry.timer);
+      entry.job.undoAvailable = false;
+      entry.job.removed = false;
+      entry.job.state = entry.state;
+      const next = jobs.findIndex((j) => j.id === entry.before);
+      const active = jobs.findIndex((j) => j.state === 'generating');
+      jobs.splice(
+        Math.max(active + 1, next < 0 ? Math.min(entry.index, jobs.length) : next),
+        0,
+        entry.job,
+      );
+      removed.delete(id);
+      publish();
+      void drain();
     },
     stop(id) {
       const job = find(id);
@@ -178,8 +302,7 @@ export function createGenerationQueue({
     retry(id) {
       const job = find(id);
       if (job.state !== 'failed') throw new Error('这项任务没有失败');
-      // Retry exactly the failed slot, not the rest of the original batch.
-      job.count = job.completed + 1;
+      // Keep the original remaining slots when retrying.
       job.continuous = false;
       job.stop = false;
       job.error = '';
@@ -192,10 +315,12 @@ export function createGenerationQueue({
     },
     async close() {
       closed = true;
-      for (const job of jobs) {
-        job.stop = true;
-        if (['pending', 'queued'].includes(job.state)) job.state = 'canceled';
+      for (const entry of removed.values()) {
+        clearTimeout(entry.timer);
+        entry.job.undoAvailable = false;
       }
+      removed.clear();
+      paused = true;
       publish();
       await finished;
     },

@@ -111,6 +111,10 @@ export interface WorkOrigin {
   deleted?: true;
 }
 export interface GenerationJob {
+  deferred?: boolean;
+  skipped?: boolean;
+  resumedAfterExit?: boolean;
+  hasRandomBlocks?: boolean;
   blockIndex?: number;
   blockCount?: number;
   failedEdges?: Edge[];
@@ -133,7 +137,7 @@ export interface GenerationJob {
   continuous?: boolean;
   fixedSeed?: boolean;
   pending?: boolean;
-  state: 'pending' | 'queued' | 'generating' | 'completed' | 'failed' | 'canceled';
+  state: 'pending' | 'queued' | 'generating' | 'completed' | 'failed' | 'canceled' | 'skipped';
   images: string[];
   completed: number;
   index: number;
@@ -148,6 +152,8 @@ export interface GenerationJob {
   project: ImageProject;
 }
 export interface GenerationStatus {
+  paused: boolean;
+  undo?: { id: string; index: number; count: number; state: string }[];
   jobs: GenerationJob[];
   settings: GenerationSettings;
   subscription: NovelAISubscription | null;

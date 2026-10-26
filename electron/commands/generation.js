@@ -71,6 +71,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         ? { ...job.project, nsfw: services.database.nsfw.state(job.project) }
         : job.project,
     })),
+    paused: queue.paused,
     settings: settings(),
     subscription,
     balance: balance(),
@@ -160,7 +161,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   function protectJobs(jobs) {
     versions.setActiveVersions(
       jobs
-        .filter((j) => ['pending', 'queued', 'generating'].includes(j.state))
+        .filter((j) => j.undoAvailable || ['pending', 'queued', 'generating'].includes(j.state))
         .flatMap((j) => [j.parentId, j.versionId].filter(Boolean)),
     );
   }
@@ -1207,13 +1208,42 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       });
     },
     'generate.status': (input) => status(input.id, input.limit),
+    'generate.pause': () => {
+      queue.pause();
+      return status();
+    },
+    'generate.resume': () => {
+      queue.resume();
+      return status();
+    },
+    'generate.set-count': ({ id, count }) => {
+      queue.setCount(id, count);
+      return status();
+    },
+    'generate.skip': ({ id }) => {
+      queue.skip(id);
+      return status();
+    },
+    'generate.defer': ({ id, deferred }) => {
+      queue.defer(id, deferred);
+      return status();
+    },
+    'generate.move': ({ id, before }) => {
+      queue.move(id, before);
+      return status();
+    },
+    'generate.restore': ({ id }) => {
+      queue.restoreRemoved(id);
+      return status();
+    },
+
     'generate.confirm': (input) => {
       queue.confirm(input.ids);
       return status();
     },
     'generate.cancel': (input) => {
-      queue.cancel(input.ids);
-      return status();
+      const undo = queue.cancel(input.ids);
+      return { ...status(), undo };
     },
     'generate.stop': (input) => {
       queue.stop(input.id);

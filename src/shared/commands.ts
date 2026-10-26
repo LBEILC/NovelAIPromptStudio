@@ -456,6 +456,13 @@ export interface CommandDefinitions {
     output: GenerationJob;
   };
   'generate.status': { input: { id?: string; limit?: number }; output: GenerationStatus };
+  'generate.pause': { input: Record<string, never>; output: GenerationStatus };
+  'generate.resume': { input: Record<string, never>; output: GenerationStatus };
+  'generate.set-count': { input: { id: string; count: number }; output: GenerationStatus };
+  'generate.skip': { input: { id: string }; output: GenerationStatus };
+  'generate.defer': { input: { id: string; deferred: boolean }; output: GenerationStatus };
+  'generate.move': { input: { id: string; before?: string }; output: GenerationStatus };
+  'generate.restore': { input: { id: string }; output: GenerationStatus };
   'generate.confirm': { input: { ids: string[] }; output: GenerationStatus };
   'generate.cancel': { input: { ids: string[] }; output: GenerationStatus };
   'generate.stop': { input: { id: string }; output: GenerationStatus };

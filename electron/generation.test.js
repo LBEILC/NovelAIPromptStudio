@@ -234,11 +234,12 @@ describe('application-wide generation worker', () => {
       beforeEach: (job) => job.confirmed || calls < 1,
     });
     const j = q.start({ count: 3, request: buildGenerationRequest(raw, model) });
-    await until(() => q.status(j.id).state === 'pending');
+    await until(() => q.status(j.id).state === 'failed');
     expect(calls).toBe(1);
-    q.confirm([j.id]);
+    calls = -10;
+    q.retry(j.id);
     await until(() => q.status(j.id).state === 'completed');
-    expect(calls).toBe(3);
+    expect(calls).toBe(-8);
     const r = createGenerationQueue({
       generate: async () => Buffer.alloc(0),
       accept: async () => {
@@ -260,7 +261,7 @@ describe('application-wide generation worker', () => {
     release();
     await stopping;
     expect(r.status(k.id).images).toEqual(['saved']);
-    expect(r.status(k.id).state).toBe('canceled');
+    expect(r.status(k.id).state).toBe('queued');
   });
   it('reports streamed steps and preserves the final PNG without another request', async () => {
     const png = Buffer.from('89504e470d0a1a0a010203', 'hex');
@@ -311,9 +312,9 @@ describe('application-wide generation worker', () => {
     expect(q.status(a.id).images).toHaveLength(3);
     expect(q.status(pending.id).state).toBe('pending');
     q.close();
-    expect(q.status(pending.id).state).toBe('canceled');
+    expect(q.status(pending.id).state).toBe('pending');
   });
-  it('stop finishes only the current image; a failure waits for a one-image retry', async () => {
+  it('stop finishes only the current image; a failure waits for an explicit retry', async () => {
     let release,
       calls = 0;
     const q = createGenerationQueue({
@@ -351,8 +352,8 @@ describe('application-wide generation worker', () => {
     fail = false;
     r.retry(b.id);
     await until(() => r.status(b.id).state === 'completed');
-    expect(n).toBe(2);
-    expect(r.status(b.id).images).toEqual(['result']);
+    expect(n).toBe(21);
+    expect(r.status(b.id).images).toHaveLength(20);
   });
 });
 

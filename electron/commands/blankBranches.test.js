@@ -996,7 +996,7 @@ it('prunes an intermediate fork through library trash, keeps raw lineage, and re
     expect(database.versions.get(fork.id).parentId).toBe(middle.id);
   }));
 
-it('protects queued version targets and prunes the emptied version after cancellation', () =>
+it('protects queued version targets during cancellation undo', () =>
   fixture(async ({ call, database, append, events, store }) => {
     const { tab } = await call('workbench.new');
     const first = append(tab.workId, tab.versionId, 'pending-target');
@@ -1010,7 +1010,9 @@ it('protects queued version targets and prunes the emptied version after cancell
     expect(database.versions.get(first.id)).toBeDefined();
     await call('generate.cancel', { ids: [job.id] }, 'ui');
     await store.exclusive(async () => {});
-    expect(database.versions.get(first.id)).toBeUndefined();
+    expect(database.versions.get(first.id)).toBeDefined();
+    await call('generate.restore', { id: job.id }, 'ui');
+    expect((await call('generate.status', { id: job.id })).jobs[0].state).toBe('pending');
     expect(database.versions.get(tab.versionId)).toBeDefined();
   }));
 
@@ -1044,7 +1046,7 @@ it('persists a clipboard original across closing and rebinds the root when saved
     expect(database.versions.list(tab.workId)[0].project.metadata).toEqual(root.project.metadata);
   }));
 
-it('retains generating and queued targets, then removes canceled and failed empty targets', () =>
+it('retains generating, queued and undoable targets, then removes failed empty targets', () =>
   fixture(async ({ call, database, append, service, waitJob, store }) => {
     const { tab } = await call('workbench.new', { width: 64, height: 64 });
     const first = append(tab.workId, tab.versionId, 'active-prune');
@@ -1062,7 +1064,7 @@ it('retains generating and queued targets, then removes canceled and failed empt
     expect(database.versions.get(second.id)).toBeDefined();
     await call('generate.cancel', { ids: [queued.id] }, 'ui');
     await store.exclusive(async () => {});
-    expect(database.versions.get(second.id)).toBeUndefined();
+    expect(database.versions.get(second.id)).toBeDefined();
     service.state.resume();
     const done = await waitJob(active.id);
     await store.exclusive(async () => {});
@@ -1106,7 +1108,7 @@ it('restores a version after either of two separately deleted images returns', (
     expect(database.versions.get(first.id).images.filter((i) => !i.deleted)).toHaveLength(2);
   }));
 
-it('finishes deferred pruning after shutdown and image purging without migrating older empty versions', () =>
+it('preserves pending targets across shutdown and image purging without migrating older empty versions', () =>
   fixture(async ({ call, database, append, restart }) => {
     const { tab } = await call('workbench.new');
     const oldEmpty = append(tab.workId, tab.versionId, 'legacy-empty');
@@ -1119,7 +1121,8 @@ it('finishes deferred pruning after shutdown and image purging without migrating
     expect(database.versions.get(target.id)).toBeDefined();
     database.deleteProject(target.images[0].projectId);
     await restart();
-    expect(database.versions.get(target.id)).toBeUndefined();
+    expect(database.versions.get(target.id)).toBeDefined();
+    expect((await call('generate.status')).paused).toBe(true);
     expect(database.versions.get(oldEmpty.id)).toBeDefined();
   }));
 
@@ -1354,4 +1357,54 @@ it('discards unsaved image works but retains explicitly saved originals with no 
     expect(database.loadProject(document.tab.project.id).work_refs).toEqual([
       expect.objectContaining({ workId: saved.workId, role: 'origin' }),
     ]);
+  }));
+
+it('queues multiple snapshots from the selected version while generating without chaining future versions', () =>
+  fixture(async ({ call, service, waitJob }) => {
+    await call('account.save', { token: 'acceptance-token' }, 'ui');
+    const { tab } = await call('workbench.new', { width: 64, height: 64 });
+    service.state.holdAt = 1;
+    const first = await call('generate.start', { tabId: tab.id, count: 1 }, 'ui');
+    await service.waitForHold();
+    try {
+      await call('prompt.set', {
+        tabId: tab.id,
+        scope: 'base:prompt',
+        text: 'synthetic second snapshot',
+      });
+      const second = await call('generate.start', { tabId: tab.id, count: 1 }, 'ui');
+      await call('prompt.set', {
+        tabId: tab.id,
+        scope: 'base:prompt',
+        text: 'synthetic third snapshot',
+      });
+      const third = await call('generate.start', { tabId: tab.id, count: 1 }, 'ui');
+      expect([first.parentId, second.parentId, third.parentId]).toEqual([
+        tab.versionId,
+        tab.versionId,
+        tab.versionId,
+      ]);
+      await call('generate.pause', {}, 'ui');
+      service.state.resume();
+      await waitJob(first.id);
+      expect((await call('generate.status')).paused).toBe(true);
+      expect(service.state.requests).toHaveLength(1);
+      await call('generate.resume', {}, 'ui');
+      await waitJob(second.id);
+      await waitJob(third.id);
+      const versions = (await call('version.list', { tabId: tab.id })).versions;
+      const generated = versions.filter((v) => v.parentId);
+      expect(generated).toHaveLength(3);
+      expect(generated.every((v) => v.parentId === tab.versionId && v.images.length === 1)).toBe(
+        true,
+      );
+      expect(generated.map((v) => v.project.metadata.prompt_raw)).toEqual([
+        '',
+        'synthetic second snapshot',
+        'synthetic third snapshot',
+      ]);
+      expect(versions.filter((v) => v.isStart)).toHaveLength(1);
+    } finally {
+      service.state.resume?.();
+    }
   }));
