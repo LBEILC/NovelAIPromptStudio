@@ -8,11 +8,51 @@ import fs from 'node:fs';
 import { clipboard } from 'electron';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { Session } from 'node:inspector/promises';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { importLibraryFiles } from '../importer.js';
 import { commandFor } from './release186.js';
 
-export async function generationChecks({
+export async function generationChecks(context) {
+  const inspector = new Session();
+  const renderer = context.h.window.webContents.debugger;
+  const lag = monitorEventLoopDelay({ resolution: 20 });
+  inspector.connect();
+  await inspector.post('Profiler.enable');
+  await inspector.post('Profiler.start');
+  await renderer.sendCommand('Profiler.enable');
+  await renderer.sendCommand('Profiler.start');
+  lag.enable();
+  try {
+    await runGenerationChecks(context);
+  } finally {
+    lag.disable();
+    console.log(
+      `生成验收事件循环：p99=${(lag.percentile(99) / 1e6).toFixed(1)} ms，max=${(lag.max / 1e6).toFixed(1)} ms`,
+    );
+    try {
+      const main = await inspector.post('Profiler.stop');
+      const web = await renderer.sendCommand('Profiler.stop');
+      for (const [name, result] of [
+        ['main', main],
+        ['renderer', web],
+      ]) {
+        await fs.promises.writeFile(
+          path.join(context.mode.output, `generation-${name}.cpuprofile`),
+          JSON.stringify(result.profile),
+        );
+      }
+    } catch (error) {
+      console.warn('生成验收性能记录失败：', error.message);
+    } finally {
+      inspector.disconnect();
+      await renderer.sendCommand('Profiler.disable').catch(() => {});
+    }
+  }
+}
+
+async function runGenerationChecks({
   app,
   h,
   mode,
