@@ -226,11 +226,26 @@ it('notices classify success/failure, keep three, deduplicate, act, close and ex
   expect(
     [...document.querySelectorAll('.toast .selectable')].map((n) => n.textContent),
   ).not.toContain('已保存');
+  act(() => notify({ text: '后台完成', source: 'background' }));
+  expect(query('.toast .selectable').textContent).toBe('已删除');
   click(query('.toast button:not([data-toast-close])'));
   expect(undo).toHaveBeenCalledOnce();
   expect(document.querySelectorAll('.toast')).toHaveLength(2);
   click(query('[data-toast-close]'));
   click(query('[data-toast-close]'));
+  expect(query('.toast')).toBeNull();
+  act(() => {
+    notify({ text: '暂停通知一', duration: 100 });
+    notify({ text: '暂停通知二', duration: 100 });
+  });
+  act(() =>
+    query('.toast-stack').dispatchEvent(new PointerEvent('pointerover', { bubbles: true })),
+  );
+  expect(query('.toast-stack').classList.contains('open')).toBe(true);
+  act(() => vi.advanceTimersByTime(5000));
+  expect(document.querySelectorAll('.toast')).toHaveLength(2);
+  act(() => query('.toast-stack').dispatchEvent(new PointerEvent('pointerout', { bubbles: true })));
+  act(() => vi.runAllTimers());
   expect(query('.toast')).toBeNull();
   act(() => notify({ text: '已保存', duration: 100 }));
   act(() => vi.runAllTimers());

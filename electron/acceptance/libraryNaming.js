@@ -176,7 +176,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await e('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     await check(
       '后台更新通知不替换带撤销的起名通知',
-      'document.querySelector(".toast button")?.textContent === "撤销" && !document.querySelector(".toast:not(.leaving)").textContent.includes("发现新版本")',
+      '[...document.querySelectorAll(".toast:not(.leaving) button")].some(b=>b.textContent === "撤销") && !document.querySelector(".toast:not(.leaving)").textContent.includes("发现新版本")',
       undefined,
       'once',
     );
@@ -274,7 +274,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     );
     await check(
       '完成通知给出实际图片数和撤销',
-      'document.querySelector(".toast:not(.leaving)").textContent.includes("已给 6 张图片起名") && document.querySelector(".toast button").textContent === "撤销"',
+      'document.querySelector(".toast:not(.leaving)").textContent.includes("已给 6 张图片起名") && [...document.querySelector(".toast:not(.leaving)").querySelectorAll("button")].some(b=>b.textContent === "撤销")',
       undefined,
       'once',
     );

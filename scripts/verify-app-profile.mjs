@@ -222,7 +222,7 @@ try {
   const manifests = [];
   const restarts =
     !packaged &&
-    (options.category === '全部' || options.restart) &&
+    (options.category === '全部' || options.category === '图片模糊' || options.restart) &&
     (!options.shard || options.shard.restarts);
   for (const phase of onboarding
     ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]

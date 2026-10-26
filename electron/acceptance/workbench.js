@@ -551,7 +551,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     'document.querySelectorAll(".char-sec:not(.leaving)").length===0',
   );
   await wait(
-    '!document.querySelector(".tb") || !!document.querySelector(".toast:not(.leaving) button")',
+    '!document.querySelector(".tb") || [...document.querySelectorAll(".toast:not(.leaving) button")].some(b=>b.textContent === "撤销")',
   );
   const survivedCharacterDelete = await e('!!document.querySelector(".tb")');
   await check('删除角色不使渲染器崩溃', () => survivedCharacterDelete, undefined, 'once');

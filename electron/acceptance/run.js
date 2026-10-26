@@ -1,4 +1,5 @@
 import { backupChecks } from './backup.js';
+import { blurChecks } from './blur.js';
 import { folderImportChecks } from './folderImport.js';
 import { loadWindowsClipboard } from '../windowsClipboard.js';
 import { workSharingChecks } from './workSharing.js';
@@ -447,7 +448,10 @@ export async function runAcceptance(context) {
         await interactionCorrectionChecks(environment);
         await agentChecks(environment);
       } else if (mode.category === '客户端边界') await clientChecks(environment);
-      else if (mode.category === '客户端控件') await clientControlChecks(environment);
+      else if (mode.category === '图片模糊') {
+        await blurChecks(environment);
+        await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());
+      } else if (mode.category === '客户端控件') await clientControlChecks(environment);
       else if (mode.category === '外壳') await shellChecks();
       else if (mode.category === 'Agent') await agentChecks(environment);
       else if (mode.category === '作品共用') await workSharingChecks(environment);
@@ -482,15 +486,20 @@ export async function runAcceptance(context) {
       }
     } else if (mode.phase > 0) {
       h.dualThemes(true);
-      h.category('数据');
-      await check(
-        '跨进程重启保留图库、收藏集、回收站和词典全部内容',
-        async () =>
-          snapshot() === (await fs.readFile(path.join(mode.root, 'snapshot.json'), 'utf8')),
-        undefined,
-        'once',
-      );
-      await settingsChecks(environment, true);
+      if (mode.category === '图片模糊') {
+        await blurChecks(environment);
+      } else {
+        h.category('数据');
+        await check(
+          '跨进程重启保留图库、收藏集、回收站和词典全部内容',
+          async () =>
+            snapshot() === (await fs.readFile(path.join(mode.root, 'snapshot.json'), 'utf8')),
+          undefined,
+          'once',
+        );
+        await settingsChecks(environment, true);
+        if (mode.category === '全部') await blurChecks(environment);
+      }
     } else {
       // The original order, cut into three groups of similar length so CI can
       // run them side by side (--shard=k/3). Later groups start from a fresh
@@ -527,6 +536,7 @@ export async function runAcceptance(context) {
         ],
       ];
       for (const run of mode.shard ? groups[mode.shard.index - 1] : groups.flat()) await run();
+      if (!mode.shard || mode.shard.restarts) await blurChecks(environment);
       if (!mode.shard || mode.shard.restarts)
         await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());
     }

@@ -112,6 +112,16 @@ export async function generationChecks({
   };
 
   const files = await createWorkbenchFixtures(path.join(mode.root, 'generation-fixtures'));
+  // The full suite has already saved a fake account in settings; this scenario
+  // explicitly starts without a token before exercising the account setup flow.
+  if (!path.resolve(preferences.filePath).startsWith(path.resolve(mode.root) + path.sep))
+    throw Error('Account fixture must stay in the temporary profile');
+  const fixturePreferences = JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'));
+  delete fixturePreferences.novelAITokenEncrypted;
+  fs.writeFileSync(preferences.filePath, JSON.stringify(fixturePreferences));
+  await e(
+    `window.studio.invoke('settings.generation.save',{}).then(r=>{if(!r.ok)throw Error(r.error.message)})`,
+  );
   await click('工作台', 'document.querySelector(".tb")');
   doubles.selections.push({ canceled: false, filePaths: [files[0]] });
   await click('打开图片', 'document.querySelector(".tb")');
