@@ -227,10 +227,12 @@ export async function extraLibraryChecks({
   );
   await click('回收站', side);
   // Select only the two new trash records; leave pre-existing trash untouched.
-  for (const id of trashed)
+  for (const id of trashed) {
+    await wait(`!!document.querySelector('.card[data-group-id="project:${id}"]')`);
     await e(
-      `document.querySelector('.card[data-group-id="project:${id}"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}))`,
+      `document.querySelector('.card[data-group-id="project:${id}"]').dispatchEvent(new MouseEvent('click',{bubbles:true,...${JSON.stringify(mod)}}))`,
     );
+  }
   await click('恢复', bar);
   await h.until(() => trashed.every((id) => !database.loadProject(id).deleted_at), '多选恢复');
   await check(
