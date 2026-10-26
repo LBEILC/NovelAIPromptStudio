@@ -80,8 +80,17 @@ const stepOf = (job: { index: number; count: number; blockIndex?: number; blockC
     ? `${Math.max(1, job.blockIndex || 1)} / ${job.blockCount}`
     : `${job.index} / ${job.count}`;
 
-/** 底栏右边生成中的样子："停止"和"生成中" */
-function GenBusy({ job }: { job: { id: string; stop?: boolean; operation?: string } }) {
+/**
+ * 底栏右边生成中的样子："停止"和"加入队列"（1.8.6，2.46：生成中也能接着排，按当时的草稿再存一份）。
+ * 加入队列和"生成"一样的条件（余额、AI 提案），不能排时写原因。
+ */
+function GenBusy({
+  job,
+  queue,
+}: {
+  job: { id: string; stop?: boolean; operation?: string };
+  queue: { off: boolean; tip: string; onClick: () => void };
+}) {
   return (
     <>
       <button
@@ -92,9 +101,13 @@ function GenBusy({ job }: { job: { id: string; stop?: boolean; operation?: strin
         <Icon name="stop-line" />
         {job.stop ? '正在停止' : '停止'}
       </button>
-      <button className="btn seal is-off busy" aria-disabled="true">
-        <span className="spin" />
-        {busyVerb(job.operation)}
+      <button
+        className={`btn seal ${queue.off ? 'is-off' : ''}`}
+        aria-disabled={queue.off || undefined}
+        data-tip={queue.tip}
+        onClick={() => !queue.off && queue.onClick()}
+      >
+        加入队列
       </button>
     </>
   );
@@ -572,7 +585,20 @@ export function GenerationBar({
               data-enter="fade"
             >
               {value.job ? (
-                <GenBusy job={value.job} />
+                <GenBusy
+                  job={value.job}
+                  queue={{
+                    off: starting || !estimate || !!unavailable || short,
+                    tip:
+                      unavailable ||
+                      (short
+                        ? '余额不够'
+                        : relay
+                          ? '按现在的草稿再排一份，排在这一份后面'
+                          : `按现在的草稿再排一份，排在这一份后面 · ${estimate ? cost : '…'} Anlas${continuous ? ' / 张' : ''}`),
+                    onClick: () => void go(),
+                  }}
+                />
               ) : (
                 <>
                   {relay ? (

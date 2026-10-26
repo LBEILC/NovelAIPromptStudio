@@ -57,7 +57,8 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     ctx,
     thumbMenu,
     job,
-    appending,
+    active,
+    draftQueued,
     rowW,
     open,
     setOpen,
@@ -158,20 +159,21 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
           </span>
         ),
       });
-    const mine =
-      job && (job.versionId === v.id || (!job.versionId && appending && job.parentId === v.id));
-    if (mine && job) {
+    // 排在这一版下面的每一份（同一标签页可以排好几份，2.46）
+    active.forEach(({ job, appending }) => {
+      const mine = job.versionId === v.id || (!job.versionId && appending && job.parentId === v.id);
+      if (!mine) return;
       const n = job.continuous ? 1 : Math.max(1, job.count - job.completed);
       for (let i = 0; i < n; i++) {
         const run = i === 0 && job.state === 'generating',
           fail = i === 0 && job.state === 'failed';
         cells.push({
-          key: `slot-${i}`,
+          key: `slot-${job.id}-${i}`,
           pin: run || fail,
           node: (
             <span
-              key={`slot-${i}`}
-              className={`slot ${run ? 'run' : ''} ${fail ? 'fail' : ''}`}
+              key={`slot-${job.id}-${i}`}
+              className={`slot ${run ? 'run' : ''} ${fail ? 'fail' : ''} ${job.deferred ? 'deferred' : ''}`}
               data-enter="fade"
               style={
                 {
@@ -179,14 +181,14 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                   '--p': `${Math.round((job.progress ?? 0.5) * 100)}%`,
                 } as React.CSSProperties
               }
-              data-tip={fail ? '生成失败' : run ? '生成中' : '排队中'}
+              data-tip={fail ? '生成失败' : run ? '生成中' : job.deferred ? '已暂缓' : '排队中'}
             >
               {fail && <Icon name="close-line" />}
             </span>
           ),
         });
       }
-    }
+    });
     if (!cells.length) return v.parentId ? <span className="ths-empty">图片都在回收站</span> : null;
     const over =
       rowsOf(
@@ -338,7 +340,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
           </div>
         ),
       });
-      if (on && draft && !draft.empty && (!job || job.state === 'failed')) {
+      if (on && draft && !draft.empty && !draftQueued) {
         const fail = job?.state === 'failed' && !job.versionId;
         const fake = {
           ...current,
@@ -487,39 +489,50 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
           ),
         });
     }
-    if (job && !job.versionId && !appending && job.state !== 'failed')
-      rows.push({
-        key: `new-${job.id}`,
-        render: (gone) => (
-          <div
-            key={`new-${job.id}`}
-            data-key={`new-${job.id}`}
-            data-flip=""
-            data-exit="lift"
-            data-enter="fade"
-            className={`ver ${gone ? 'leaving' : ''}`}
-          >
-            <span className="vh">
-              <span className="vn">第 {versions.length + 1} 版</span>
-              {job.source === 'agent' && <span className="src">Agent</span>}
-              {job.operation && <span className="src">{OP_NAME[job.operation]}</span>}
-            </span>
-            {job.summary && <span className="what">{job.summary}</span>}
-            <div className="ths">
-              <span
-                className="slot run"
-                data-enter="fade"
-                style={
-                  {
-                    '--w': `${Math.round(TH_H * ratio(current))}px`,
-                    '--p': `${Math.round((job.progress ?? 0.5) * 100)}%`,
-                  } as React.CSSProperties
-                }
-                data-tip="生成中"
-              />
+    // 还没出图、要另起一版的每一份：正在生成的是实底加墨色细条，排队的是虚线格子
+    active
+      .filter(({ job, appending }) => !job.versionId && !appending && job.state !== 'failed')
+      .forEach(({ job }, k) => {
+        const run = job.state === 'generating';
+        const n = run || job.continuous ? 1 : Math.min(job.count, 8);
+        rows.push({
+          key: `new-${job.id}`,
+          render: (gone) => (
+            <div
+              key={`new-${job.id}`}
+              data-key={`new-${job.id}`}
+              data-flip=""
+              data-exit="lift"
+              data-enter="fade"
+              className={`ver ${run ? '' : 'queued'} ${job.deferred ? 'deferred' : ''} ${gone ? 'leaving' : ''}`}
+            >
+              <span className="vh">
+                <span className="vn">第 {versions.length + 1 + k} 版</span>
+                {job.source === 'agent' && <span className="src">Agent</span>}
+                {job.operation && <span className="src">{OP_NAME[job.operation]}</span>}
+                {!run && <span className="src">{job.deferred ? '已暂缓' : '排队中'}</span>}
+              </span>
+              {job.summary && <span className="what">{job.summary}</span>}
+              <div className="ths">
+                {Array.from({ length: n }, (_, i) => (
+                  <span
+                    key={i}
+                    className={`slot ${run ? 'run' : ''}`}
+                    data-enter="fade"
+                    style={
+                      {
+                        '--w': `${Math.round(TH_H * ratio(current))}px`,
+                        '--p': `${Math.round((job.progress ?? 0.5) * 100)}%`,
+                      } as React.CSSProperties
+                    }
+                    data-tip={run ? '生成中' : job.deferred ? '已暂缓' : '排队中'}
+                  />
+                ))}
+                {!run && job.count > n && <span className="more mono">+{job.count - n}</span>}
+              </div>
             </div>
-          </div>
-        ),
+          ),
+        });
       });
   }
   // key 带上标签页：两个标签页里同 key 的行（草稿、同一作品的版本）切换时会被当成同一行、原地直接换内容（用户 10-25）

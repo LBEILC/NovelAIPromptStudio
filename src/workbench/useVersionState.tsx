@@ -345,12 +345,20 @@ export function useVersionState({
           ]),
   ];
   // 生成中：一版一张张出来，正在生成的格子是实底加墨色细条，排队的是虚线框；失败的格子是绛红色的叉
+  // 1.8.6 起同一个标签页能排好几份（2.46）：每份各自显示，排在它基于的那一版下面或另起一行
   const jobs = state.jobs.filter((j) => j.tabId === tab.id);
-  const job =
-    jobs.find((j) => ['queued', 'generating'].includes(j.state)) ||
-    (jobs.at(-1)?.state === 'failed' ? jobs.at(-1) : undefined);
-  const appending =
-    job && versionDiff(byId(job.parentId)?.project || job.project, job.project).empty;
+  const live = jobs.filter((j) => ['queued', 'generating'].includes(j.state));
+  const active = (live.length ? live : jobs.at(-1)?.state === 'failed' ? [jobs.at(-1)!] : []).map(
+    (j) => ({
+      job: j,
+      appending: versionDiff(byId(j.parentId)?.project || j.project, j.project).empty,
+    }),
+  );
+  const job = active[0]?.job;
+  const appending = active[0]?.appending;
+  // 草稿已经排进队列（和某一份一样）时不再显示"未生成"那一行
+  const draftQueued =
+    !!tab.project && live.some((j) => !j.operation && versionDiff(j.project, tab.project!).empty);
   const pending = jobs.filter((j) => j.state === 'pending');
   const draft = !stale && current && tab.project ? versionDiff(current.project, tab.project) : null;
   const rowW = (rz.width || ms('--versions-w')) - 32;
@@ -369,6 +377,8 @@ export function useVersionState({
     thumbMenu,
     job,
     appending,
+    active,
+    draftQueued,
     rowW,
     open,
     setOpen,
