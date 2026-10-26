@@ -218,6 +218,8 @@ html.tray, html.tray body, html.tray #root { width: auto; height: auto; backgrou
 .lgrid .card.mosaic.picked { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: var(--r-thumb); }
 .lgrid .card.mosaic .stack { right: calc(var(--mw) + var(--sp-0) + 6px); }
 .lgrid .card.mosaic .scrub-bar { right: calc(var(--mw) + var(--sp-0) + 6px); }
+/* 图片模糊（2.37）：多张预览时眼睛放在左边大图的正中，不按整张卡片居中 */
+.lgrid .card.mosaic > .blur-eye.btn.icon { left: calc((100% - var(--mw) - var(--sp-0)) / 2); }
 /* 详情栏小图条：作品组里原图那一张左上角一个很小的作品图标；"也是「X」的原图"那一行像链接一样可以点 */
 .lstrip .lth { position: relative; display: inline-flex; }
 .lstrip .lth.origin > [class^="ri-"] { position: absolute; left: var(--sp-0); top: var(--sp-0); padding: 1px; border-radius: var(--r-tag); background: var(--surface); color: var(--text-2); font-size: var(--fs-caption); line-height: 1; pointer-events: none; }
