@@ -1,3 +1,17 @@
+import type { NsfwState } from './nsfw';
+export type { NsfwState } from './nsfw';
+export interface BlurSettings {
+  mode: 'off' | 'nsfw' | 'all';
+  quickAll: boolean;
+  words: string[];
+  defaultWords: string[];
+}
+export interface BlurSettingsInput {
+  mode: BlurSettings['mode'];
+  quickAll: boolean;
+  words: string[];
+}
+
 // Domain shapes follow the producers in electron/ and the normalization in src/lib/.
 export type TagCategory =
   | 'ArtistEra'
@@ -166,6 +180,7 @@ export interface DetachedRecord {
   image: LibraryCard;
 }
 export interface ImageProject {
+  nsfw: NsfwState;
   missing?: boolean;
   blank?: true;
   work_refs?: WorkRef[];
@@ -216,6 +231,7 @@ export interface LibraryCard
     ImageRecord,
     | 'id'
     | 'missing'
+    | 'nsfw'
     | 'name'
     | 'original_filename'
     | 'has_custom_name'
@@ -257,6 +273,7 @@ export interface WorkbenchSource {
   id?: string;
 }
 export interface GalleryFilters {
+  nsfw: 'any' | 'nsfw' | 'safe';
   query: string;
   includeTags: string[];
   excludeTags: string[];

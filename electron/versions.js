@@ -103,7 +103,7 @@ export function versionSignature(project) {
   ]);
 }
 
-export function createVersionStore(connection) {
+export function createVersionStore(connection, hydrate = hydrateParameters) {
   let activeVersions = new Set();
   // Additive tables keep every existing snapshot readable without rewriting it.
   connection.exec(`
@@ -162,7 +162,7 @@ export function createVersionStore(connection) {
           .prepare('SELECT name FROM work_branch_names WHERE branch_id=?')
           .get(row.branch_id)?.name || (row.branch_number ? `分支 ${row.branch_number}` : '主线'),
       operation: JSON.parse(row.snapshot_json).operation,
-      project: hydrateParameters(JSON.parse(row.snapshot_json)),
+      project: hydrate(JSON.parse(row.snapshot_json)),
       source: row.source,
       createdAt: row.created_at,
       images: connection
@@ -445,7 +445,7 @@ export function createVersionStore(connection) {
           'SELECT v.snapshot_json FROM version_images vi JOIN work_versions v ON v.id=vi.version_id ORDER BY vi.rowid DESC LIMIT 1',
         )
         .get();
-      return row ? hydrateParameters(JSON.parse(row.snapshot_json)) : null;
+      return row ? hydrate(JSON.parse(row.snapshot_json)) : null;
     },
     discardEmpty(workId) {
       const work = connection.prepare('SELECT origin_json FROM works WHERE id=?').get(workId);
@@ -626,7 +626,7 @@ export function createVersionStore(connection) {
       return (
         w && {
           id: w.id,
-          origin: hydrateParameters(JSON.parse(w.origin_json)),
+          origin: hydrate(JSON.parse(w.origin_json)),
           source,
         }
       );

@@ -16,6 +16,7 @@ export const GALLERY_NO_VIBE_VALUE = '__no_vibe__';
 export const GALLERY_UNKNOWN_MODEL_VALUE = '__unknown_model__';
 
 export const DEFAULT_GALLERY_FILTERS = Object.freeze({
+  nsfw: 'any',
   query: '',
   includeTags: [],
   excludeTags: [],
@@ -43,6 +44,7 @@ function uniqueStrings(values = []) {
 /** @returns {import('../shared/types').GalleryFilters} */
 export function normalizeGalleryFilters(value = {}) {
   return {
+    nsfw: value.nsfw === 'nsfw' || value.nsfw === 'safe' ? value.nsfw : 'any',
     query: String(value.query || ''),
     includeTags: uniqueStrings(value.includeTags),
     excludeTags: uniqueStrings(value.excludeTags),
@@ -149,7 +151,8 @@ function compileGalleryFilters(filtersValue, nowValue) {
     vibes: new Set(filters.vibes.map(normalizeSearch)),
   };
   compiled.active = Boolean(
-    compiled.needles.length ||
+    filters.nsfw !== 'any' ||
+      compiled.needles.length ||
       compiled.includeTags.length ||
       compiled.excludeTags.length ||
       compiled.models.size ||
@@ -162,6 +165,11 @@ function compileGalleryFilters(filtersValue, nowValue) {
 
 function projectMatchesCompiledFilters(project, compiled) {
   if (!compiled.active) return true;
+  if (
+    compiled.filters.nsfw !== 'any' &&
+    Boolean(project.nsfw?.value) !== (compiled.filters.nsfw === 'nsfw')
+  )
+    return false;
   const index = projectFilterIndex(project);
   if (compiled.needles.length) {
     if (
@@ -250,6 +258,7 @@ export function galleryFilterOptions(projects = []) {
 export function galleryActiveFilterCount(filtersValue) {
   const filters = normalizeGalleryFilters(filtersValue);
   return [
+    filters.nsfw !== 'any',
     filters.includeTags.length > 0,
     filters.excludeTags.length > 0,
     filters.models.length > 0,

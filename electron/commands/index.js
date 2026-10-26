@@ -1,4 +1,5 @@
 // @ts-check
+import { blurCommands } from './blur.js';
 import { countImportDays } from '../../src/lib/dateRange.js';
 import crypto from 'node:crypto';
 import { parameterCommands } from './params.js';
@@ -62,6 +63,8 @@ import { saveWorkbenchImage } from './saveWorkbenchImage.js';
 
 /** @param {Services} services */
 export async function createCommands(services) {
+  if (services.preferences)
+    services.database.nsfw.setWords(services.preferences.blurSettings().words);
   const store = await openCommandSession(services.directory, async (source) =>
     hydrateParameters(await services.readSource(source)),
   );
@@ -70,6 +73,10 @@ export async function createCommands(services) {
     ...session,
     tabs: session.tabs.map((t) => ({
       ...t,
+      project: t.project ? { ...t.project, nsfw: services.database.nsfw.state(t.project) } : null,
+      originalProject: t.originalProject
+        ? { ...t.originalProject, nsfw: services.database.nsfw.state(t.originalProject) }
+        : null,
       workSaved: services.database.versions?.isSaved(t.workId) || false,
     })),
   });
@@ -109,7 +116,10 @@ export async function createCommands(services) {
   /** @param {Tab} value */
   const full = (value) => {
     if (!value.project) throw new CommandError('not_found', '这个标签页没有可读取的提示词');
-    const refreshed = services.database.vibeLibrary.refresh(value.project);
+    const refreshed = services.database.vibeLibrary.refresh({
+      ...value.project,
+      nsfw: services.database.nsfw.state(value.project),
+    });
     return {
       tab: {
         ...value,
@@ -191,6 +201,7 @@ export async function createCommands(services) {
   };
   /** @type {Partial<Handlers>} */
   const handlers = {
+    ...blurCommands(services),
     'onboarding.get': () => {
       if (!services.preferences) throw new Error('Preferences unavailable');
       return {

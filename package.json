@@ -86,6 +86,7 @@
       "src/lib/**/*",
       "src/shared/params.ts",
       "src/shared/inpaint.ts",
+      "src/shared/nsfw.ts",
       "src/workbench/edits.ts",
       "src/workbench/model.ts",
       "agent/**/*",

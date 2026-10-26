@@ -8,6 +8,23 @@ export function useLibraryState(initialView = 'all') {
     all: [],
     trash: [],
   });
+  useEffect(
+    () =>
+      window.studio?.onCommandEvent((event) => {
+        if (event.type !== 'nsfw-changed') return;
+        setProjectsByView((current) =>
+          Object.fromEntries(
+            Object.entries(current).map(([view, cards]) => [
+              view,
+              cards.map((card) =>
+                event.states[card.id] ? { ...card, nsfw: event.states[card.id] } : card,
+              ),
+            ]),
+          ),
+        );
+      }),
+    [],
+  );
   const [galleryCollections, setGalleryCollections] = useState<Collection[]>([]);
   const [activeCollectionId, setActiveCollectionId] = useState('');
   const [editingSmartCollectionId, setEditingSmartCollectionId] = useState('');

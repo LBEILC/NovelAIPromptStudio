@@ -13,6 +13,7 @@ import { validateBackupDatabase } from './backupDatabase.js';
 const fsp = fs.promises;
 const required = ['manifest.json', 'studio.sqlite', 'workbench-session.json', 'preferences.json'];
 const portable = {
+  privacy: ['blurMode', 'blurQuickAll', 'nsfwWords'],
   appearance: ['themeMode', 'primaryColor', 'sansFont', 'monoFont', 'proseFont', 'motion'],
   productivity: ['autoCheckUpdates', 'closeAction'],
   generation: [
@@ -380,6 +381,7 @@ export function createBackupManager({
       ? await reconcile(savedSession)
       : { missingImages: 0, session: savedSession };
     preferences.restoreBackup(savedPreferences);
+    database.nsfw.setWords(preferences.blurSettings().words);
     await session.restoreBackup(result.session);
     return { missingImages: result.missingImages };
   }

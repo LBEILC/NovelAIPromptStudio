@@ -1,6 +1,7 @@
 import { createDatabaseBackup } from './backupDatabase.js';
 import { migrateWorkOriginals } from './workOriginals.js';
 import fs from 'node:fs';
+import { createNsfwStore } from './nsfw.js';
 import { migrateMaterials, createMaterialStore } from './materials.js';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -726,6 +727,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     return counts;
   };
 
+  const nsfwStore = createNsfwStore(connection);
   const enrichProjectTags = (project, cachedEntries = null) => {
     const cached = cachedEntries || lookupTagDictionary(projectTags(project).map((tag) => tag.tag));
     const enrich = (tag) => {
@@ -768,6 +770,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     const structure = project.prompt_structure || {};
     return {
       ...project,
+      nsfw: nsfwStore.state(project),
       tags: (project.tags || []).map(enrich),
       prompt_structure: {
         ...structure,
@@ -799,7 +802,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     const metadata =
       query('SELECT * FROM generation_metadata WHERE project_id = $id', { $id: project.id })[0] ||
       {};
-    const hydrated = enrichProjectTags({
+    const { nsfw, ...hydrated } = enrichProjectTags({
       ...project,
       tags: query('SELECT * FROM prompt_tags WHERE project_id = $id ORDER BY position', {
         $id: project.id,
@@ -817,6 +820,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       work_refs: versionStore.workRefs(project.id).get(project.id) || [],
       ...namingFields(project, metadata),
       group_cover_id: '',
+      nsfw,
     });
   };
 
@@ -1111,7 +1115,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   };
 
   const prepareCardCache = () => {
-    const version = '6:image-naming';
+    const version = '7:nsfw-tokens';
     const previousVersion = query('SELECT value FROM app_meta WHERE key = $key', {
       $key: cardCacheVersionKey,
     })[0]?.value;
@@ -1227,6 +1231,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
           metadata: JSON.stringify(payload.metadata),
           search_prompts: JSON.stringify(payload.search_prompts),
         },
+        nsfwInput: nsfwStore.input(project),
         coverKey: coverKey(exact_group_fingerprint),
         inputs: projectTags(project).map(encodeCardTag),
         promptCount: project.tags.length,
@@ -1395,10 +1400,12 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       ]),
     );
     const refs = versionStore.workRefs();
+    const nsfw = nsfwStore.cards();
     return rows.map((row) => {
       const entry = cardMemory.get(row.project_id);
       return {
         ...entry.card,
+        nsfw: nsfw(row.project_id, entry.nsfwInput),
         ...generated.get(row.project_id),
         work_refs: refs.get(row.project_id) || [],
         group_cover_id: '',
@@ -1816,7 +1823,9 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       throw error;
     }
   };
-  const versionStore = createVersionStore(connection);
+  const versionStore = createVersionStore(connection, (project) =>
+    hydrateParameters({ ...project, nsfw: nsfwStore.state(project) }),
+  );
   const deleteProject = (id) => {
     const projectId = String(id || '');
     versionStore.discardDetachedImage(projectId);
@@ -2095,6 +2104,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     versions: versionStore,
     vibeLibrary: createVibeLibrary(connection),
     materials: createMaterialStore(connection),
+    nsfw: { state: nsfwStore.state, setWords: nsfwStore.setWords, mark: atomic(nsfwStore.mark) },
     loadLibrary,
     loadLibraryCards,
     listImportDates: (view = 'all') =>

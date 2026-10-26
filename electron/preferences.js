@@ -1,6 +1,7 @@
 import { portablePreferences, mergePortablePreferences } from './backup.js';
 import { MODEL_ORDER } from '../src/shared/params.ts';
 import fs from 'node:fs';
+import { DEFAULT_NSFW_TAGS, normalizeNsfwWords } from '../src/shared/nsfw.ts';
 import { normalizeRelayUrl } from './relay.js';
 import { normalizeNetworkSettings } from './network.js';
 import path from 'node:path';
@@ -169,6 +170,38 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     )
       return fallback;
     return family;
+  };
+  /** @returns {import('../src/shared/types').BlurSettings} */
+  const blurSettings = () => {
+    const privacy = read().privacy || {};
+    return {
+      mode: ['off', 'nsfw', 'all'].includes(privacy.blurMode) ? privacy.blurMode : 'off',
+      quickAll: privacy.blurQuickAll === true,
+      words: Array.isArray(privacy.nsfwWords)
+        ? normalizeNsfwWords(privacy.nsfwWords.filter((w) => typeof w === 'string'))
+        : [...DEFAULT_NSFW_TAGS],
+      defaultWords: [...DEFAULT_NSFW_TAGS],
+    };
+  };
+  /** @param {Partial<import('../src/shared/types').BlurSettingsInput>} next */
+  const saveBlurSettings = (next) => {
+    const stored = read();
+    const privacy = { ...stored.privacy };
+    if (next.mode !== undefined) {
+      if (!['off', 'nsfw', 'all'].includes(next.mode)) throw Error('Invalid blur mode');
+      privacy.blurMode = next.mode;
+    }
+    if (next.quickAll !== undefined) {
+      if (typeof next.quickAll !== 'boolean') throw Error('Invalid quickAll');
+      privacy.blurQuickAll = next.quickAll;
+    }
+    if (next.words !== undefined) {
+      if (!Array.isArray(next.words) || next.words.some((w) => typeof w !== 'string'))
+        throw Error('Invalid words');
+      privacy.nsfwWords = normalizeNsfwWords(next.words);
+    }
+    write({ ...stored, privacy });
+    return blurSettings();
   };
   const appearanceSettings = () => {
     const stored = read().appearance || {};
@@ -434,6 +467,8 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     },
     credentials,
     saveAISettings,
+    blurSettings,
+    saveBlurSettings,
     appearanceSettings,
     saveAppearanceSettings,
     librarySettings,

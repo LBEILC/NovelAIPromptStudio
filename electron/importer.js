@@ -402,7 +402,7 @@ export async function importLibraryFiles({
       for (const [index, result] of results.entries()) {
         if ('error' in result)
           resultErrors.push({ file: batch[index].displayName, error: result.error });
-        else imported.push(batch[index].project);
+        else imported.push({ ...batch[index].project, nsfw: result.project.nsfw });
       }
     } catch (error) {
       // A failed commit rolls back this chunk, never an earlier committed chunk.

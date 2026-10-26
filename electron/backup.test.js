@@ -99,6 +99,37 @@ async function entries(file) {
   return result;
 }
 
+it('restores image marks and privacy preferences with the original files', () =>
+  fixture(async ({ database, preferences, manager, file, project }) => {
+    database.nsfw.mark([project.id], 'nsfw');
+    preferences.saveBlurSettings({ mode: 'nsfw', quickAll: true, words: ['custom'] });
+    database.insertProject({
+      ...project,
+      id: 'synthetic-custom',
+      content_hash: 'synthetic-custom-hash',
+      prompt_structure: { base_prompt_raw: 'custom', characters: [] },
+      metadata: { ...project.metadata, prompt_raw: 'custom' },
+    });
+    const original = await fs.readFile(project.image_path);
+    await manager.export(file, true);
+    database.nsfw.mark([project.id], 'safe');
+    preferences.saveBlurSettings({ mode: 'off', quickAll: false, words: [] });
+    database.nsfw.setWords([]);
+    await manager.restore(file);
+    expect(database.loadProject(project.id).nsfw).toEqual({ value: true, source: 'manual' });
+    expect(database.loadProject('synthetic-custom').nsfw).toEqual({
+      value: true,
+      source: 'auto',
+      tag: 'custom',
+    });
+    expect(preferences.blurSettings()).toMatchObject({
+      mode: 'nsfw',
+      quickAll: true,
+      words: ['custom'],
+    });
+    expect(await fs.readFile(database.loadProject(project.id).image_path)).toEqual(original);
+  }));
+
 it('backs up managed base copies and operation snapshots with version restoration', () =>
   fixture(async ({ database, assets, manager, file, project }) => {
     const base = { ...(await storeBaseImage(project.image_path, assets)), strength: 0.7, noise: 0 };

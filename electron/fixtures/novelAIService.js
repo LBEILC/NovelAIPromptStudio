@@ -192,6 +192,13 @@ export async function startFakeNovelAI() {
     waitForHold: () =>
       state.resume ? Promise.resolve() : new Promise((resolve) => heldWaiters.add(resolve)),
     url: `http://127.0.0.1:${server.address().port}`,
-    close: () => new Promise((resolve) => server.close(resolve)),
+    close: () =>
+      new Promise((resolve) => {
+        server.close(resolve);
+        // Chromium may retain a speculative connection with no request yet.
+        // It must not keep the isolated acceptance process alive after all checks.
+        server.closeAllConnections();
+        state.resume?.();
+      }),
   };
 }

@@ -128,6 +128,8 @@ export type ProgressCommandEvent = {
   [K in keyof ProgressTopics]: { type: 'progress'; topic: K; data: ProgressTopics[K] };
 }[keyof ProgressTopics];
 export type CommandEvent =
+  | { type: 'blur'; settings: Types.BlurSettings }
+  | { type: 'nsfw-changed'; states: Record<string, Types.NsfwState> }
   | WorkbenchCommandEvent
   | ProgressCommandEvent
   | { type: 'ai-settings' }
@@ -149,6 +151,16 @@ export interface AgentSkills {
   codex: { state: AgentSkillState; path: string };
 }
 export interface CommandDefinitions {
+  'library.nsfw.mark': {
+    input: { ids: string[]; value: 'nsfw' | 'safe' | 'auto' };
+    output: { states: Record<string, Types.NsfwState> };
+  };
+  'settings.blur.get': { input: Record<string, never>; output: Types.BlurSettings };
+  'settings.blur.save': {
+    input: { settings: Partial<Types.BlurSettingsInput> };
+    output: Types.BlurSettings;
+  };
+
   'settings.network.get': { input: Record<string, never>; output: Types.NetworkState };
   'settings.network.save': { input: Types.NetworkSettings; output: Types.NetworkState };
   'settings.network.test': { input: Types.NetworkSettings; output: Types.NetworkTestResult };

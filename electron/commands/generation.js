@@ -50,7 +50,12 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     };
   };
   const status = (id) => ({
-    jobs: id ? [queue.status(id)] : queue.status(),
+    jobs: (id ? [queue.status(id)] : queue.status()).map((job) => ({
+      ...job,
+      project: job.project
+        ? { ...job.project, nsfw: services.database.nsfw.state(job.project) }
+        : job.project,
+    })),
     settings: settings(),
     subscription,
     balance: balance(),
@@ -336,6 +341,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
             ...job.project,
             blank: undefined,
             id: image.id,
+            nsfw: image.nsfw,
             image_path: image.image_path,
             thumbnail_path: image.thumbnail_path,
             metadata: {
@@ -364,7 +370,19 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     },
   });
   const full = (current) => ({
-    tab: { ...current, workSaved: versions.isSaved(current.workId) },
+    tab: {
+      ...current,
+      project: current.project
+        ? { ...current.project, nsfw: services.database.nsfw.state(current.project) }
+        : null,
+      originalProject: current.originalProject
+        ? {
+            ...current.originalProject,
+            nsfw: services.database.nsfw.state(current.originalProject),
+          }
+        : null,
+      workSaved: versions.isSaved(current.workId),
+    },
     document: createPromptDocument(current.project),
     revision: current.revision || 0,
   });
@@ -388,6 +406,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       image_path: p.image_path,
       thumbnail_path: p.thumbnail_path,
       id: p.id,
+      nsfw: p.nsfw,
       metadata: {
         ...version.project.metadata,
         seed: p.metadata.seed,
@@ -912,7 +931,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         workId: parent.workId,
         parentId: parent.id,
         originalPending: !!versions.list(parent.workId)[0]?.project.autoSaveOriginal,
-        project: current.project,
+        project: { ...current.project, nsfw: services.database.nsfw.state(current.project) },
         operation: current.project.references?.base ? 'img2img' : undefined,
         name: current.displayName,
         parentNumber: parent.number,
@@ -942,7 +961,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       const job = queue.status(input.id);
       if (!versions.get(job.parentId) || (job.versionId && !versions.get(job.versionId)))
         throw new CommandError('not_found', '版本不存在');
-      return queue.retry(input.id);
+      const retried = queue.retry(input.id);
+      return {
+        ...retried,
+        project: { ...retried.project, nsfw: services.database.nsfw.state(retried.project) },
+      };
     },
     'version.list': async (input) => {
       const current = tab(input.tabId),
@@ -1031,6 +1054,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       const snapshot = {
         ...version.project,
         id: image.id,
+        nsfw: image.nsfw,
         image_path: image.image_path,
         thumbnail_path: image.thumbnail_path,
         metadata: {

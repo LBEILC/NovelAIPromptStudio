@@ -16,6 +16,18 @@ const category =
   'ArtistEra|Subject|Identity|Body|Clothing|Action|Environment|Composition|StyleQuality|Unsorted';
 /** @type {Record<CommandName, Definition>} */
 export const commandRegistry = {
+  'library.nsfw.mark': {
+    fields: { ids: 'strings', value: 'nsfw|safe|auto' },
+    required: ['ids', 'value'],
+    mutation: true,
+  },
+  'settings.blur.get': { fields: {}, uiOnly: true },
+  'settings.blur.save': {
+    fields: { settings: 'blurSettings' },
+    required: ['settings'],
+    uiOnly: true,
+    mutation: true,
+  },
   'settings.network.get': { fields: {}, uiOnly: true },
   'settings.network.save': {
     fields: {
@@ -706,9 +718,10 @@ function valid(value, type) {
       )
     );
   }
-  if (['aiSettings', 'appearanceSettings', 'productivitySettings'].includes(type)) {
+  if (['blurSettings', 'aiSettings', 'appearanceSettings', 'productivitySettings'].includes(type)) {
     /** @type {Record<string,Record<string,string>>} */
     const schemas = {
+      blurSettings: { mode: 'off|nsfw|all', quickAll: 'boolean', words: 'blurWords' },
       aiSettings: {
         baseUrl: 'text',
         model: 'text',
@@ -778,6 +791,10 @@ function valid(value, type) {
   if (type === 'integer') return Number.isSafeInteger(value) && Number(value) >= 0;
   if (type === 'number') return typeof value === 'number' && Number.isFinite(value);
   if (type === 'boolean') return typeof value === 'boolean';
+  if (type === 'blurWords')
+    return (
+      Array.isArray(value) && value.length <= 10000 && value.every((w) => typeof w === 'string')
+    );
   if (type === 'strings')
     return (
       Array.isArray(value) &&
@@ -816,6 +833,7 @@ function valid(value, type) {
     if (!record(value)) return false;
     const fields = {
       query: 'text',
+      nsfw: 'any|nsfw|safe',
       includeTags: 'strings',
       excludeTags: 'strings',
       tagMatch: 'all|any',

@@ -5,6 +5,8 @@ const trayCommands = new Set([
   'tray.action',
   'account.get',
   'settings.appearance.get',
+  'settings.blur.get',
+  'settings.blur.save',
 ]);
 export function registerTrayContents(contents) {
   trayContents.add(contents);
@@ -17,7 +19,10 @@ export function allowsWindowCommand(contents, name) {
 }
 export function sendWindowEvent(window, event) {
   if (window.isDestroyed() || window.webContents.isDestroyed()) return;
-  if (isTrayContents(window.webContents) && !['generation', 'tray-menu-open'].includes(event.type))
+  if (
+    isTrayContents(window.webContents) &&
+    !['generation', 'tray-menu-open', 'blur', 'nsfw-changed'].includes(event.type)
+  )
     return;
   window.webContents.send('studio:command-event', event);
 }

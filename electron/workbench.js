@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { DEFAULT_NSFW_TAGS, judgeNsfw } from '../src/shared/nsfw.ts';
 import { NEW_WORK_DEFAULTS } from '../src/shared/params.ts';
 import { normalizeSettings, hydrateParameters } from './params.js';
 import fs from 'node:fs';
@@ -47,6 +48,8 @@ export function applyWorkbenchLibraryDetails(project, libraryProject) {
     ...applyWorkbenchStructure(project, libraryProject.prompt_structure),
     name: String(libraryProject.name || '').trim() || project.name,
     created_at: libraryProject.created_at || project.created_at,
+    id: libraryProject.id,
+    nsfw: libraryProject.nsfw,
     has_custom_name: libraryProject.has_custom_name,
     thumbnail_path: String(libraryProject.thumbnail_path || '').trim(),
     tags: libraryProject.tags ?? project.tags,
@@ -108,7 +111,12 @@ export async function readWorkbenchImage(
       information_extracted: vibe.information_extracted,
     })),
   };
-  return hydrateParameters(enrichProjectTags(project));
+  return hydrateParameters(
+    enrichProjectTags({
+      ...project,
+      nsfw: { ...judgeNsfw(project.prompt_structure, DEFAULT_NSFW_TAGS), source: 'auto' },
+    }),
+  );
 }
 
 export function createBlankProject(input = {}, { model = 'last', latest = null } = {}) {
@@ -146,6 +154,7 @@ export function createBlankProject(input = {}, { model = 'last', latest = null }
     id: `blank-${crypto.randomUUID()}`,
     name: input.name || '空白作品',
     blank: true,
+    nsfw: { value: false, source: 'auto' },
     paramsSource: inherited ? 'last' : 'defaults',
     image_path: '',
     thumbnail_path: '',
