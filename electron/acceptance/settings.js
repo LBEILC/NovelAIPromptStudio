@@ -236,11 +236,20 @@ export async function settingsChecks(context, restart) {
       'once',
     );
     await click('图片库', 'document.querySelector(".tb")');
-    await h.checkSoon(
+    await h.check(
       '迁移后图库图片仍能解码',
-      '!!document.querySelector(".libp") && !document.querySelector("[data-library-updating=true]") && [...document.querySelectorAll(".card img")].some(i=>i.getClientRects().length && i.complete && i.naturalWidth>0)',
-      12000,
-      undefined,
+      async () => {
+        let decoded = false;
+        await h.until(async () => {
+          decoded = await e(
+            '!!document.querySelector(".libp") && !document.querySelector("[data-library-updating=true]") && [...document.querySelectorAll(".card img")].some(i=>i.getClientRects().length && i.complete && i.naturalWidth>0)',
+          );
+          return decoded;
+        }, '迁移后的图库图片解码完成');
+        // Use the successful observation; a virtualized grid may replace the
+        // observed image before a second renderer round trip.
+        return decoded;
+      },
       undefined,
       'once',
     );

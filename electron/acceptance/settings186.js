@@ -91,11 +91,13 @@ export async function queueRestart186({ h, mode }, prepare = false) {
   const saved = JSON.parse(await fs.readFile(file, 'utf8'));
   h.category('生成');
   const state = await call('generate.status');
+  // Startup notifications can expire during the preceding database checks.
+  // The persistent queue entry and saved jobs are the recovery outcome.
   await h.wait(
-    'document.querySelector(".toast:not(.leaving)")?.textContent.includes("上次退出时还有")',
+    'document.querySelector("[data-trigger=queue]:not(.leaving)")?.textContent.includes("队列已暂停")',
   );
   await h.check(
-    '091-18 进程重启保留两张排队任务，暂停并通知',
+    '091-18 进程重启保留两张排队任务并显示队列已暂停',
     () =>
       state.paused &&
       state.jobs.some((j) => j.id === saved.id && j.state === 'queued' && j.count === 2),
