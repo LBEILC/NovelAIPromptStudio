@@ -2,6 +2,7 @@ import http from 'node:http';
 import { maxEnhanceResultSize } from '../imageOperations.js';
 import sharp from 'sharp';
 import yazl from 'yazl';
+import { fixtureServerClose } from './httpLifecycle.js';
 function pngText(value) {
   const content = Buffer.from('Comment\0' + JSON.stringify(value)),
     bytes = Buffer.concat([Buffer.from('tEXt'), content]);
@@ -184,6 +185,7 @@ export async function startFakeNovelAI() {
     res.setHeader('Content-Type', 'application/zip');
     zip.outputStream.pipe(res);
   });
+  const closeServer = fixtureServerClose(server);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   return {
     state,
@@ -192,13 +194,9 @@ export async function startFakeNovelAI() {
     waitForHold: () =>
       state.resume ? Promise.resolve() : new Promise((resolve) => heldWaiters.add(resolve)),
     url: `http://127.0.0.1:${server.address().port}`,
-    close: () =>
-      new Promise((resolve) => {
-        server.close(resolve);
-        // Chromium may retain a speculative connection with no request yet.
-        // It must not keep the isolated acceptance process alive after all checks.
-        server.closeAllConnections();
-        state.resume?.();
-      }),
+    close: () => {
+      state.resume?.();
+      return closeServer();
+    },
   };
 }

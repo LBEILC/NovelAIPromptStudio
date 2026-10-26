@@ -53,10 +53,12 @@ it('runs generation through the command boundary with agent confirmation and ver
     updated_at: new Date().toISOString(),
   };
   let count = 0;
-  let finish;
-  const completed = new Promise((resolve) => {
-    finish = resolve;
-  });
+  const terminalJobs = new Map();
+  const waiters = new Map();
+  const completed = (id) =>
+    terminalJobs.has(id)
+      ? Promise.resolve(terminalJobs.get(id))
+      : new Promise((resolve) => waiters.set(id, resolve));
   const commands = await createCommands({
     directory: root,
     version: 'test',
@@ -66,8 +68,12 @@ it('runs generation through the command boundary with agent confirmation and ver
     busy: () => false,
     emit: (event) => {
       if (event.type === 'generation') {
-        const job = event.data.jobs.find((item) => ['completed', 'failed'].includes(item.state));
-        if (job) finish(job);
+        for (const job of event.data.jobs) {
+          if (!['completed', 'failed'].includes(job.state)) continue;
+          terminalJobs.set(job.id, job);
+          waiters.get(job.id)?.(job);
+          waiters.delete(job.id);
+        }
       }
     },
     readImage: async () => project,
@@ -116,7 +122,7 @@ it('runs generation through the command boundary with agent confirmation and ver
       expect((await commands.dispatch(name, {}, 'agent')).error.code).toBe('forbidden');
     await call('generate.confirm', { ids: [pending.id] }, 'ui');
     // Await the real queue completion event, not a one-second polling budget.
-    const finished = await completed;
+    const finished = await completed(pending.id);
     expect(finished.error || finished.state).toBe('completed');
     expect((await call('generate.status', { id: pending.id })).jobs[0].state).toBe('completed');
     expect(service.state.requests).toHaveLength(2);
@@ -149,19 +155,15 @@ it('runs generation through the command boundary with agent confirmation and ver
     expect(estimate).toMatchObject({ anlas: 0, perImage: 0, free: false, count: 1, relay: true });
     await call('settings.generation.save', { dailyImageLimit: 1 }, 'ui');
     const relayJob = await call('generate.start', { tabId, count: 1 });
-    await import('vitest').then(({ vi }) =>
-      vi.waitFor(async () => {
-        expect((await call('generate.status', { id: relayJob.id })).jobs[0].state).toBe(
-          'completed',
-        );
-      }),
-    );
+    const relayFinished = await completed(relayJob.id);
+    expect(relayFinished.error || relayFinished.state).toBe('completed');
+    expect((await call('generate.status', { id: relayJob.id })).jobs[0].state).toBe('completed');
     expect((await call('account.get', {}, 'ui')).settings.spentImagesToday).toBe(1);
     await expect(call('generate.start', { tabId, count: 1 })).rejects.toThrow('每日张数上限');
     await call('account.connection.save', { connection: 'official' }, 'ui');
     expect((await call('account.get', {}, 'ui')).settings.hasToken).toBe(true);
   } finally {
-    commands.close();
+    await commands.close();
     await service.close();
     database.close();
     await fs.rm(root, { recursive: true, force: true });

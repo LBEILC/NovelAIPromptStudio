@@ -1868,9 +1868,14 @@ app.whenReady().then(async () => {
         preferences,
         createWindow,
       });
+      console.log('验收清理：关闭命令队列');
+      await commandRuntime?.close();
+      console.log('验收清理：关闭生成测试服务');
       await acceptanceGeneration?.close();
       chatGPT.close();
+      console.log('验收清理：关闭 ChatGPT 测试服务');
       await chatGPTFixture?.close();
+      console.log('验收清理：退出应用');
       app.quit();
     } catch (error) {
       console.error(error);

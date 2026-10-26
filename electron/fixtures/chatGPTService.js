@@ -1,5 +1,6 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
+import { fixtureServerClose } from './httpLifecycle.js';
 
 export async function startFakeChatGPT() {
   const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -221,6 +222,7 @@ export async function startFakeChatGPT() {
       res.end();
     }
   });
+  const closeServer = fixtureServerClose(server);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   origin = `http://127.0.0.1:${server.address().port}`;
   const browserRequests = new Set();
@@ -253,8 +255,7 @@ export async function startFakeChatGPT() {
       browserRequests.add(request);
     },
     async close() {
-      server.closeAllConnections();
-      await new Promise((resolve) => server.close(resolve));
+      await closeServer();
       await Promise.allSettled(browserRequests);
     },
   };
