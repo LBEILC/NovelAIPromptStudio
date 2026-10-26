@@ -23,6 +23,7 @@ import { createChatGPT, chatGPTCommands } from '../electron/chatgpt.js';
 import { createWorkbenchFixtures } from '../electron/acceptance/workbenchFixtures.js';
 
 export async function createSession(services, images, emit, empty = false) {
+  const failedOutpaintJobs = new Set();
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-ui-preview-'));
   const assetsDirectory = path.join(directory, 'assets');
   fs.mkdirSync(assetsDirectory);
@@ -94,7 +95,20 @@ export async function createSession(services, images, emit, empty = false) {
     generationBaseUrl: services.novel.url,
     handlers: adapter.handlers,
     busy: () => false,
-    emit,
+    emit: (event) => {
+      if (event.type === 'generation' && services.state.outpaintFailSecond)
+        for (const job of event.data.jobs)
+          if (
+            job.operation === 'outpaint' &&
+            job.state === 'generating' &&
+            job.blockIndex === 2 &&
+            !failedOutpaintJobs.has(job.id)
+          ) {
+            failedOutpaintJobs.add(job.id);
+            services.novel.state.failNext = 500;
+          }
+      emit(event);
+    },
     readImage,
     readSource: async (source) => {
       const library = source.type === 'library' ? database.loadProject(source.projectId) : null;

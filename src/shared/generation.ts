@@ -1,4 +1,22 @@
 import type { ImageProject } from './types';
+import type { Edge, OutpaintEdges } from './outpaint';
+export type { Edge, OutpaintEdges } from './outpaint';
+export interface OutpaintBlock {
+  edge: Edge;
+  rect: import('./inpaint').Rect;
+  width: number;
+  height: number;
+}
+export interface OutpaintEstimate {
+  canvas: { width: number; height: number };
+  whole: GenerationEstimate & { width: number; height: number; scale: number; model: string };
+  edges: GenerationEstimate & {
+    model: string;
+    blocks: (OutpaintBlock & { anlas: number; free: boolean })[];
+  };
+  recommended: 'whole' | 'edges';
+  ignored?: ('vibe' | 'precise' | 'base')[];
+}
 export interface GenerationSettings {
   blankModel?: 'last' | import('./params').ModelId;
   connection: 'official' | 'relay';
@@ -42,7 +60,12 @@ export interface VersionImage {
 }
 export type EnhanceScale = 1 | 1.5 | 2 | 'max';
 export interface ImageOperation {
-  kind: 'upscale' | 'enhance' | 'img2img' | 'inpaint';
+  kind: 'upscale' | 'enhance' | 'img2img' | 'inpaint' | 'outpaint';
+  edges?: OutpaintEdges;
+  mode?: 'whole' | 'edges';
+  blocks?: OutpaintBlock[];
+  failedEdges?: Edge[];
+  failure?: string;
   rect?: import('./inpaint').Rect;
   maskId?: string;
   generated?: { width: number; height: number; model: string };
@@ -87,6 +110,10 @@ export interface WorkOrigin {
   deleted?: true;
 }
 export interface GenerationJob {
+  blockIndex?: number;
+  blockCount?: number;
+  failedEdges?: Edge[];
+  failure?: string;
   operation?: ImageOperation['kind'];
   progress?: number | null;
   branchNotice?: string;

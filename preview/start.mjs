@@ -132,9 +132,15 @@ async function scenario({ action, value }) {
         balance: 10000,
         usage: 12,
         failNext: 0,
+        failAt: 0,
         delay: 1500,
       });
-      Object.assign(services.state, { aiFail: false, disconnect: false, slowImport: false });
+      Object.assign(services.state, {
+        aiFail: false,
+        disconnect: false,
+        slowImport: false,
+        outpaintFailSecond: false,
+      });
       resetPreviewUpdate(false);
       session = await createSession(services, images, emit, action === 'empty');
     } finally {
@@ -149,7 +155,8 @@ async function scenario({ action, value }) {
   else if (action === 'generation-error') {
     if (value === 'offline') services.state.disconnect = true;
     else services.novel.state.failNext = Number(value);
-  } else if (action === 'slow-generation') services.novel.state.delay = value ? 6000 : 1500;
+  } else if (action === 'outpaint-failure') services.state.outpaintFailSecond = Boolean(value);
+  else if (action === 'slow-generation') services.novel.state.delay = value ? 6000 : 1500;
   else if (action === 'account') {
     Object.assign(services.novel.state, {
       tier: value === 'unsubscribed' ? 0 : 3,

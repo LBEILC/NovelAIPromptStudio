@@ -338,6 +338,8 @@ group('生成', [
   ['下次连不上', act('generation-error', 'offline')],
   ['变慢', act('slow-generation', true)],
   ['恢复速度', act('slow-generation', false)],
+  ['扩图第 2 块失败', act('outpaint-failure', true)],
+  ['恢复扩图', act('outpaint-failure', false)],
 ]);
 group('AI 服务', [
   ['ChatGPT 未登录', act('chatgpt', 'signed-out')],

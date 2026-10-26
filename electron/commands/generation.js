@@ -1,4 +1,8 @@
-import { compositeInpaint, storeInpaintMask } from '../inpaint.js';
+import { buildInpaint, compositeInpaint, storeInpaintMask } from '../inpaint.js';
+import sharp from 'sharp';
+import { outpaintSteps } from '../outpaint.js';
+import { runOutpaint } from '../outpaintQueue.js';
+import { outpaintCanvas, recommendOutpaint } from '../../src/shared/outpaint.ts';
 import {
   buildImageOperation,
   estimateImageOperation,
@@ -164,6 +168,29 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       request.action === 'upscale'
         ? client().upscale(request)
         : client().generate(request, progress),
+    execute: (job, request, generate, onProgress, publish) => {
+      if (job.operation !== 'outpaint') return generate(request, onProgress);
+      return runOutpaint(job, {
+        generate,
+        seed: request.parameters.seed,
+        library: services.database.vibeLibrary,
+        publish,
+        beforeBlock: () => {
+          const s = settings();
+          if (s.connection === 'relay' && s.limitEnabled && s.spentImagesToday >= s.dailyImageLimit)
+            throw new Error('已达到每日张数上限');
+        },
+        afterBlock: () => {
+          const s = settings();
+          if (s.connection === 'relay')
+            preferences.saveGenerationSettings({
+              spentDate: today(),
+              spentToday: s.spentToday,
+              spentImagesToday: s.spentImagesToday + 1,
+            });
+        },
+      });
+    },
     prepare: async (job) => {
       // Persist before any paid reference encoding or image request. Pending jobs
       // reach this point only after confirmation; closed tabs are supported too.
@@ -189,6 +216,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           thumbnail_path: saved.project.thumbnail_path,
         };
       });
+      if (job.operation === 'outpaint') return;
       if (['upscale', 'enhance', 'inpaint'].includes(job.operation)) {
         const preview = await buildImageOperation(
           job.operationDetails.prompt || job.project,
@@ -346,7 +374,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
             thumbnail_path: image.thumbnail_path,
             metadata: {
               ...job.project.metadata,
-              seed: job.operation === 'inpaint' ? job.project.metadata.seed : String(seed),
+              seed: ['inpaint', 'outpaint'].includes(job.operation)
+                ? job.project.metadata.seed
+                : String(seed),
               extra_json: image.metadata.extra_json,
             },
           };
@@ -357,7 +387,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         }
         emit({ libraryChanged: true, tabId: job.tabId });
       });
-      if (settings().connection === 'relay') {
+      if (settings().connection === 'relay' && job.operation !== 'outpaint') {
         const s = settings();
         preferences.saveGenerationSettings({
           spentDate: today(),
@@ -664,7 +694,184 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       estimate: price.anlas,
     });
   }
+  async function outpaintFor(input) {
+    const current = tab(input.tabId);
+    await ensure(current);
+    const parent =
+      versions.forImage(input.imageId, current.workId) ||
+      versions
+        .list(current.workId)
+        .find(
+          (v) =>
+            !v.parentId &&
+            v.project.id === input.imageId &&
+            !['removed', 'trashed'].includes(v.originState),
+        );
+    if (!parent) throw new Error('图片不在这个作品中');
+    const image = services.database.loadProject(input.imageId) || parent.project;
+    if (image.deleted_at) throw new Error('图片不存在');
+    const source = await sharp(image.image_path).metadata();
+    const canvas = outpaintCanvas(source, input.edges);
+    // Only the common request settings are needed for pricing. No image is sent here.
+    const prepared = await buildInpaint(
+      current.project,
+      image.image_path,
+      {
+        rect: {
+          x: 0,
+          y: 0,
+          width: Math.min(source.width, 512),
+          height: Math.min(source.height, 512),
+        },
+      },
+      services.database.vibeLibrary,
+    );
+    checkOperationRelay(prepared.request, prepared.pendingEncodes);
+    const priceStep = (step) => {
+      const request = structuredClone(prepared.request);
+      Object.assign(request.parameters, { width: step.width, height: step.height });
+      const price =
+        settings().connection === 'relay'
+          ? { anlas: 0, perImage: 0, free: false, count: 1, relay: true }
+          : estimateImageOperation(request, subscription);
+      if (step.width > 2048 || step.height > 2048 || step.width * step.height > 3145728)
+        price.unavailable = '扩图生成尺寸超过单边 2048 或面积 3,145,728 上限';
+      return price;
+    };
+    const wholeSteps = outpaintSteps(source, input.edges, 'whole', input.fullSize);
+    const edgeSteps = outpaintSteps(source, input.edges, 'edges');
+    const whole = {
+      ...priceStep(wholeSteps[0]),
+      width: wholeSteps[0].width,
+      height: wholeSteps[0].height,
+      scale: wholeSteps[0].width / canvas.width,
+      model: prepared.request.model,
+      balance: balance(),
+    };
+    const priced = edgeSteps.map((step) => ({ step, price: priceStep(step) }));
+    const anlas = priced.reduce((sum, { price }) => sum + price.anlas, 0);
+    const edges = {
+      anlas,
+      perImage: anlas / priced.length,
+      count: priced.length,
+      free: priced.every(({ price }) => price.free),
+      model: prepared.request.model,
+      balance: balance(),
+      ...(settings().connection === 'relay' ? { relay: true } : {}),
+      ...(priced.some(({ price }) => price.unavailable)
+        ? { unavailable: priced.find(({ price }) => price.unavailable).price.unavailable }
+        : {}),
+      blocks: priced.map(({ step, price }) => ({
+        edge: step.edge,
+        rect: step.rect,
+        width: step.width,
+        height: step.height,
+        anlas: price.anlas,
+        free: price.free,
+      })),
+    };
+    const estimate = {
+      canvas,
+      whole,
+      edges,
+      recommended: recommendOutpaint(input.edges, edges.free),
+      ...(prepared.ignored.length ? { ignored: prepared.ignored } : {}),
+    };
+    return { current, parent, image, prepared, estimate, wholeSteps, edgeSteps };
+  }
   const handlers = {
+    'generate.estimate-outpaint': async (input) => {
+      try {
+        return (await outpaintFor(input)).estimate;
+      } catch (error) {
+        if (error.code === 'invalid_input') throw new CommandError('invalid_input', error.message);
+        const price = {
+          anlas: 0,
+          perImage: 0,
+          free: false,
+          count: 1,
+          model: '',
+          unavailable: error.message,
+          ...(settings().connection === 'relay' ? { relay: true } : {}),
+        };
+        return {
+          canvas: { width: 0, height: 0 },
+          whole: { ...price, width: 0, height: 0, scale: 0 },
+          edges: { ...price, blocks: [] },
+          recommended: recommendOutpaint(input.edges, false),
+        };
+      }
+    },
+    'generate.outpaint': async (input) => {
+      const current = tab(input.tabId);
+      revision(input.expectedRevision, current.revision || 0);
+      unlocked(input);
+      if (!settings().hasToken) throw new Error('没有持久令牌');
+      let context;
+      try {
+        context = await outpaintFor(input);
+      } catch (error) {
+        throw new CommandError(
+          error.code === 'invalid_input' ? 'invalid_input' : 'unavailable',
+          error.message,
+        );
+      }
+      const { parent, image, prepared, estimate, wholeSteps, edgeSteps } = context;
+      const price = estimate[input.mode];
+      if (price.unavailable) throw new CommandError('unavailable', price.unavailable);
+      const steps = input.mode === 'whole' ? wholeSteps : edgeSteps;
+      const s = settings();
+      if (
+        s.connection === 'relay' &&
+        s.limitEnabled &&
+        s.spentImagesToday + steps.length > s.dailyImageLimit
+      )
+        throw new Error('已达到每日张数上限');
+      if (s.connection !== 'relay' && balance() < price.anlas) throw new Error('Anlas 不足');
+      const operation = {
+        kind: 'outpaint',
+        sourceProjectId: input.imageId,
+        edges: input.edges,
+        mode: input.mode,
+        fullSize: input.fullSize ?? false,
+        blocks:
+          input.mode === 'edges'
+            ? edgeSteps.map(({ edge, rect, width, height }) => ({ edge, rect, width, height }))
+            : [],
+        rect: steps[0].rect,
+        generated: {
+          width: steps[0].width,
+          height: steps[0].height,
+          model: prepared.request.model,
+        },
+        prompt: structuredClone(
+          Object.fromEntries(
+            ['metadata', 'tags', 'prompt_structure', 'params', 'keptParameters']
+              .filter((key) => current.project[key] !== undefined)
+              .map((key) => [key, current.project[key]]),
+          ),
+        ),
+      };
+      return queue.start({
+        tabId: current.id,
+        workId: parent.workId,
+        parentId: parent.id,
+        project: parent.project,
+        request: prepared.request,
+        count: 1,
+        fixedSeed: false,
+        source: 'user',
+        operation: 'outpaint',
+        operationDetails: operation,
+        operationPath: image.image_path,
+        blockCount: steps.length,
+        blockIndex: 0,
+        originalPending: !!versions.list(parent.workId)[0]?.project.autoSaveOriginal,
+        parentNumber: parent.number,
+        name: current.displayName,
+        estimate: price.anlas,
+      });
+    },
     'generate.estimate-inpaint': async (input) => {
       try {
         const { prepared, price } = await operationFor({ ...input, op: 'inpaint' });

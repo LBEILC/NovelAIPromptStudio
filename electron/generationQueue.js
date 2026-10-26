@@ -4,6 +4,7 @@ import { CommandError } from './commands/registry.js';
 // One worker for the entire application. The worker never retries a request itself.
 export function createGenerationQueue({
   generate,
+  execute,
   run = (operation) => operation(),
   accept,
   prepare = async () => {},
@@ -62,16 +63,19 @@ export function createGenerationQueue({
                   request.parameters.seed ||= 1;
                   request.parameters.extra_noise_seed = request.parameters.seed - 1;
                 }
-                const png = await generate(request, (progress) => {
+                const onProgress = (progress) => {
                   job.progress = progress;
                   publish();
-                });
+                };
+                const png = execute
+                  ? await execute(job, request, generate, onProgress, publish)
+                  : await generate(request, onProgress);
                 // Persist the file and version before reporting success to any caller.
                 const image = await accept(job, png, request.parameters.seed);
                 job.images.push(image);
                 job.completed++;
               } catch (error) {
-                job.state = 'failed';
+                job.state = job.stop && job.operation === 'outpaint' ? 'canceled' : 'failed';
                 job.error = error.message;
                 if (error instanceof CommandError) {
                   job.errorCode = error.code;
@@ -89,7 +93,7 @@ export function createGenerationQueue({
               }
             });
           } catch (error) {
-            job.state = 'failed';
+            job.state = job.stop && job.operation === 'outpaint' ? 'canceled' : 'failed';
             job.error = error.message;
             if (error instanceof CommandError) {
               job.errorCode = error.code;
@@ -149,6 +153,7 @@ export function createGenerationQueue({
       for (const id of ids) {
         const job = find(id);
         if (['pending', 'queued'].includes(job.state)) job.state = 'canceled';
+        else if (job.state === 'generating' && job.operation === 'outpaint') job.stop = true;
       }
       publish();
     },

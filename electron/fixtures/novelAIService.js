@@ -27,6 +27,7 @@ export async function startFakeNovelAI() {
     active: 0,
     maxActive: 0,
     failNext: 0,
+    failAt: 0,
     delay: 20,
     balance: 10000,
     tier: 3,
@@ -107,8 +108,8 @@ export async function startFakeNovelAI() {
     state.maxActive = Math.max(state.maxActive, state.active);
     await new Promise((r) => setTimeout(r, state.delay));
     state.active--;
-    if (state.failNext) {
-      const code = state.failNext;
+    if (state.failNext || state.requests.length === state.failAt) {
+      const code = state.failNext || 500;
       state.failNext = 0;
       res.writeHead(code).end('{}');
       return;

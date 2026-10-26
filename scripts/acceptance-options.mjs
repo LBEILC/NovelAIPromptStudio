@@ -19,6 +19,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
       '导出',
       'Agent',
       '生成',
+      '局部重绘与扩图',
       '放大与图生图',
       '备份',
       '图片库·文件夹',
@@ -75,6 +76,7 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
   if (motion && !['system', 'off'].includes(motion)) throw Error('--motion must be system or off');
   const suffix = `${slow > 1 ? `-slow-${slow}` : ''}${reducedMotion ? '-reduced' : ''}${motion ? `-${motion}` : ''}${category === '全部' ? '' : `-${category.replaceAll('·', '-')}`}${shard ? `-shard-${shard.index}` : ''}`;
   const needsLibrary = [
+    '局部重绘与扩图',
     '图片模糊',
     '图片库·文件夹',
     'ChatGPT',

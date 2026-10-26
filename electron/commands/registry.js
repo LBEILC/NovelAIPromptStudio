@@ -182,6 +182,23 @@ export const commandRegistry = {
     mutation: true,
   },
   'vibe.library': { fields: {} },
+  'generate.estimate-outpaint': {
+    fields: { ...tab, imageId: 'string', edges: 'outpaintEdges', fullSize: 'boolean' },
+    required: ['tabId', 'imageId', 'edges'],
+    uiOnly: true,
+  },
+  'generate.outpaint': {
+    fields: {
+      ...tab,
+      imageId: 'string',
+      edges: 'outpaintEdges',
+      mode: 'whole|edges',
+      fullSize: 'boolean',
+    },
+    required: ['tabId', 'imageId', 'edges', 'mode'],
+    uiOnly: true,
+    mutation: true,
+  },
   'generate.estimate-inpaint': {
     fields: {
       ...tab,
@@ -636,6 +653,18 @@ export function record(value) {
 }
 /** @param {unknown} value @param {string} type @returns {boolean} */
 function valid(value, type) {
+  if (type === 'outpaintEdges')
+    return (
+      record(value) &&
+      ['left', 'right', 'top', 'bottom'].every(
+        (key) =>
+          Number.isSafeInteger(value[key]) &&
+          Number(value[key]) >= 0 &&
+          Number(value[key]) % 64 === 0,
+      ) &&
+      Object.keys(value).every((key) => ['left', 'right', 'top', 'bottom'].includes(key)) &&
+      Object.values(value).some((n) => Number(n) > 0)
+    );
   if (type === 'inpaintMask') return typeof value === 'string' && value.length <= 140 * 1024 * 1024;
   if (type === 'inpaintRect')
     return (

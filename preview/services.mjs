@@ -10,7 +10,13 @@ export async function startServices(images) {
   const chatgpt = await startFakeChatGPT();
   novel.state.images = images.map((file) => fs.readFileSync(file));
   novel.state.delay = 1500;
-  const state = { aiFail: false, slowImport: false, disconnect: false, aiDelay: 1000 };
+  const state = {
+    aiFail: false,
+    slowImport: false,
+    disconnect: false,
+    aiDelay: 1000,
+    outpaintFailSecond: false,
+  };
   const ai = http.createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.url === '/v1/models')

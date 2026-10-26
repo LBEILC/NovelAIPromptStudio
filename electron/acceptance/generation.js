@@ -1,6 +1,7 @@
 import { selectGalleryGrouping } from './galleryView.js';
 import { relayChecks } from './relay.js';
 import { inpaintChecks } from './inpaint.js';
+import { outpaintChecks } from './outpaint.js';
 import fs from 'node:fs';
 import { clipboard } from 'electron';
 import path from 'node:path';
@@ -1014,4 +1015,5 @@ export async function generationChecks({
   await h.screenshot('057-clipboard-original-restored');
   await relayChecks({ h, generationService });
   await inpaintChecks({ h, database });
+  await outpaintChecks({ h, database, generationService });
 }

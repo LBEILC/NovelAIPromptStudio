@@ -323,6 +323,23 @@ export interface CommandDefinitions {
     input: Record<string, never>;
     output: { items: import('./params').VibeLibraryItem[] };
   };
+  'generate.estimate-outpaint': {
+    input: TabInput & {
+      imageId: string;
+      edges: import('./generation').OutpaintEdges;
+      fullSize?: boolean;
+    };
+    output: import('./generation').OutpaintEstimate;
+  };
+  'generate.outpaint': {
+    input: TabInput & {
+      imageId: string;
+      edges: import('./generation').OutpaintEdges;
+      mode: 'whole' | 'edges';
+      fullSize?: boolean;
+    };
+    output: GenerationJob;
+  };
   'generate.estimate-inpaint': {
     input: TabInput & {
       imageId: string;
