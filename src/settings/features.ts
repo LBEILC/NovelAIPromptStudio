@@ -226,6 +226,16 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         point: { id: 'card', tip: '选中一张按空格看大图' },
       },
       {
+        name: '导出分享',
+        text: '多选几张、一组或整个收藏集，导出成 ZIP 或文件夹；导出的是原图，提示词和参数都在里面',
+        go: 'gallery',
+        where: '图片库 · 多选后下面的「导出…」；收藏集上右键 · 导出收藏集…',
+        point: {
+          id: 'export',
+          need: { id: 'card', text: 'Ctrl 点几张图，下面的操作条里有「导出…」' },
+        },
+      },
+      {
         name: '回收站',
         text: '删掉的图先进回收站，可以恢复；永久删除只删不再被用到的文件',
         go: 'gallery',

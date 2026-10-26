@@ -30,6 +30,7 @@ import { Detail } from './Detail';
 import { CollectPop } from './Collect';
 import { BatchNamePop } from './BatchName';
 import { NameAI } from './NameAI';
+import { useExport, type ExportSource } from './Export';
 import type { LibraryGroup, LibraryProps } from '../library/types';
 import type { LibraryCardCacheProgress } from '../shared/ipc';
 import type { DetachedRecord, ImportProgress, LibraryCard } from '../shared/types';
@@ -201,6 +202,15 @@ export default function GalleryPage(
   const [collect, setCollect] = useState<'detail' | 'dock' | null>(null);
   const [batchName, setBatchName] = useState(false);
   const [nameAI, setNameAI] = useState<{ groups: LibraryGroup[]; seq: number } | null>(null);
+  // 导出（1.8.4，2.39）：一组起了名的写组名
+  const exp = useExport();
+  const groupLabel = (g: LibraryGroup) =>
+    hasImageName(g.cover) ? g.cover.name.replace(/-\d+$/, '') : undefined;
+  const exportPicked = () =>
+    exp.start({
+      ids: pickedIds,
+      label: picked.length === 1 ? groupLabel(picked[0]) : undefined,
+    } satisfies ExportSource);
   const collectIds =
     collect === 'dock' ? pickedIds : p.previewGroup?.members.map((m) => m.id) || [];
   const copyPrompt = async (id: string) => {
@@ -282,6 +292,16 @@ export default function GalleryPage(
           }
         },
       },
+      // 导出（2.39）：单张照旧用详情栏的"另存为"，一组和多选才在这里
+      ...(multi || ids.length > 1
+        ? [
+            {
+              label: multi ? `导出 ${ids.length} 张…` : '导出这一组…',
+              onSelect: () =>
+                multi ? exportPicked() : exp.start({ ids, label: groupLabel(menu.group) }),
+            },
+          ]
+        : []),
       ...(p.activeCollection?.kind === 'manual'
         ? [
             {
@@ -388,6 +408,7 @@ export default function GalleryPage(
       : null;
   const docks = useExitList(
     [
+      ...(exp.job ? [{ key: 'export' }] : []),
       ...(busyImport ? [{ key: 'import' }] : []),
       ...(p.cacheProgress ? [{ key: 'cache' }] : []),
       ...(picked.length ? [{ key: 'pick' }] : []),
@@ -401,7 +422,30 @@ export default function GalleryPage(
   const pickedImages = pickedIds.length + pickedDetached.length;
   const lastPick = useRef({ groups: picked.length, images: pickedImages });
   if (picked.length) lastPick.current = { groups: picked.length, images: pickedImages };
+  const lastExport = useRef(exp.job);
+  if (exp.job) lastExport.current = exp.job;
   const dock = (key: string, leaving: boolean) => {
+    if (key === 'export') {
+      const j = lastExport.current!;
+      return (
+        <div key={key} className={`job ljob ${leaving ? 'leaving' : ''}`} data-enter="up">
+          <div className="top">
+            <span className="spin" />
+            <b>
+              正在导出 {j.done.toLocaleString('en-US')} / {j.total.toLocaleString('en-US')}
+            </b>
+            <span className="sp" />
+            <button className="btn quiet sm" onClick={exp.cancel}>
+              取消
+            </button>
+          </div>
+          <div className="progress ink">
+            <i style={{ width: `${j.total ? (j.done / j.total) * 100 : 0}%` }} />
+          </div>
+          <small>导出的是原图，不会修改图片库</small>
+        </div>
+      );
+    }
     if (key === 'import') {
       const ip = lastImport.current!;
       const done = ip.processed || 0,
@@ -526,6 +570,9 @@ export default function GalleryPage(
               <Icon name="sparkling-2-line" />
               根据提示词起名
             </button>
+            <button className="btn quiet sm" data-feature="export" onClick={exportPicked}>
+              导出…
+            </button>
             {p.activeCollection?.kind === 'manual' && (
               <button
                 className="btn quiet sm"
@@ -562,7 +609,7 @@ export default function GalleryPage(
       }}
     >
       {sharedDialog}
-      <Side p={p} />
+      <Side p={p} onExport={(c) => exp.start({ collectionId: c.id, label: c.name })} />
       <div className="col lib-grid-col">
         {showTools && (
           <Tools
@@ -632,6 +679,7 @@ export default function GalleryPage(
         onSubmit={(name) => p.onRenameMany(pickedIds, name)}
       />
       <NameAI p={p} request={nameAI} onDone={() => setNameAI(null)} />
+      {exp.dialog}
       <Viewer
         open={!!viewer}
         items={viewer?.items || []}

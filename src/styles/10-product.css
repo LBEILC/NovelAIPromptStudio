@@ -410,3 +410,9 @@ html[data-motion="off"] .oba [style*="--i"], html[data-motion="off"] .oba .oba-m
 @keyframes spot-pulse { 50% { outline-offset: 7px; outline-color: transparent; } }
 html[data-motion="off"] .spot, html[data-motion="off"] .spot-tip { animation: none; }
 .feat-row .feat-where { color: var(--text-2); }
+
+/* 导出图片（2.39）：一行格式、一行说明和大小 */
+.export-dlg .export-row { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-4); }
+.export-dlg .export-row > span:first-child { color: var(--text-2); }
+.export-dlg > small.help { display: block; margin-top: var(--sp-2); color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); }
+.export-dlg .banner { margin-top: var(--sp-3); }

@@ -14,7 +14,14 @@ export const pressKeys = (fn: () => void) => (e: KeyboardEvent) => {
   fn();
 };
 
-export function Side({ p }: { p: LibraryProps }) {
+export function Side({
+  p,
+  onExport,
+}: {
+  p: LibraryProps;
+  /** 收藏集右键"导出收藏集…"（2.39） */
+  onExport?: (c: CountedCollection) => void;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const current =
     p.view === 'trash' ? 'trash' : p.editingSmartCollection?.id || p.activeCollection?.id || '';
@@ -142,6 +149,7 @@ export function Side({ p }: { p: LibraryProps }) {
             setNaming(menu.c);
           },
         },
+        ...(onExport ? [{ label: '导出收藏集…', onSelect: () => onExport(menu.c) }] : []),
         'sep',
         { label: '删除', danger: true, onSelect: () => void p.onCollectionDelete(menu.c) },
       ]
