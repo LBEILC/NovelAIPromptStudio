@@ -94,12 +94,13 @@ function GenBusy({
   return (
     <>
       <button
-        className="btn quiet sm"
+        className="btn quiet sm icon"
+        aria-label={job.stop ? '正在停止' : '停止'}
+        data-tip={job.stop ? '正在停止：做完这张就停' : '停止：做完这张就停，这一份剩下的不发'}
         disabled={job.stop}
         onClick={() => void invokeUI('generate.stop', { id: job.id })}
       >
         <Icon name="stop-line" />
-        {job.stop ? '正在停止' : '停止'}
       </button>
       <button
         className={`btn seal ${queue.off ? 'is-off' : ''}`}
@@ -180,7 +181,7 @@ export function GenerationBar({
     (j) => j.tabId === tab.id && ['generating', 'queued'].includes(j.state),
   );
   const busyElsewhere = state.jobs.some((j) => j.state === 'generating' && j.tabId !== tab.id);
-  const left = useSwap(job ? 'busy' : 'normal', (k) => k);
+  const left = useSwap('normal', (k) => k);
   // 右边（费用和"生成" ↔ "停止"和"生成中"）也原地换内容；以前直接换（用户 10-25）。
   // 当前这份排在前面，querySelector 先找到它
   const rightSwap = useSwap({ key: job ? 'busy' : 'normal', job }, (v) => v.key);
@@ -336,243 +337,225 @@ export function GenerationBar({
       )}
       <div className="bar gen-bar">
         <span className="swap">
-          {left.map(({ key, leaving }) =>
-            key === 'busy' ? (
-              <span
-                key={key}
-                className={`help gen-now ${leaving ? 'leaving' : ''}`}
-                data-enter="fade"
-              >
-                {job
-                  ? job.stop
-                    ? `${busyVerb(job.operation)} ${stepOf(job)} · 完成当前这张后停止`
-                    : job.continuous
-                      ? `生成中 第 ${job.index} 张 · 持续生成`
-                      : relay
-                        ? `${busyVerb(job.operation)} ${stepOf(job)}`
-                        : `${busyVerb(job.operation)} ${stepOf(job)} · ${job.spentKnown ? `已消耗 ${job.spent} Anlas` : '消耗未知'}`
-                  : '生成中'}
-              </span>
-            ) : (
-              <span
-                key={key}
-                className={`row ${leaving ? 'leaving' : ''}`}
-                data-enter="fade"
-                style={{ flexWrap: 'nowrap' }}
-              >
-                <span className={`field sm seedf ${seedText !== null ? 'editing' : ''}`}>
-                  <button
-                    ref={seedBtn}
-                    className={`seed-t ${seedPop ? 'is-hover' : ''}`}
-                    aria-label={seed === null ? '固定 Seed' : '改为随机'}
-                    data-tip={
-                      seedPop
-                        ? undefined
+          {left.map(({ key, leaving }) => (
+            <span
+              key={key}
+              className={`row ${leaving ? 'leaving' : ''}`}
+              data-enter="fade"
+              style={{ flexWrap: 'nowrap' }}
+            >
+              <span className={`field sm seedf ${seedText !== null ? 'editing' : ''}`}>
+                <button
+                  ref={seedBtn}
+                  className={`seed-t ${seedPop ? 'is-hover' : ''}`}
+                  aria-label={seed === null ? '固定 Seed' : '改为随机'}
+                  data-tip={
+                    seedPop
+                      ? undefined
+                      : seed === null
+                        ? 'Seed 随机 · 点击固定为上一张图的 Seed'
+                        : `Seed ${seed} · 点击改为随机`
+                  }
+                  onPointerEnter={(e) => {
+                    // 数值收起来了的时候，点它是打开浮层
+                    const val = e.currentTarget.parentElement?.querySelector('.seed-val');
+                    if (seedPop) return;
+                    e.currentTarget.dataset.tip =
+                      val && getComputedStyle(val).display === 'none'
+                        ? `Seed ${seed ?? '随机'} · 点击修改`
                         : seed === null
                           ? 'Seed 随机 · 点击固定为上一张图的 Seed'
-                          : `Seed ${seed} · 点击改为随机`
-                    }
-                    onPointerEnter={(e) => {
-                      // 数值收起来了的时候，点它是打开浮层
-                      const val = e.currentTarget.parentElement?.querySelector('.seed-val');
-                      if (seedPop) return;
-                      e.currentTarget.dataset.tip =
-                        val && getComputedStyle(val).display === 'none'
-                          ? `Seed ${seed ?? '随机'} · 点击修改`
-                          : seed === null
-                            ? 'Seed 随机 · 点击固定为上一张图的 Seed'
-                            : `Seed ${seed} · 点击改为随机`;
-                    }}
-                    onClick={(e) => {
-                      // 数值收起来了（最窄的时候）：打开浮层，不直接切换
-                      const val = e.currentTarget.parentElement?.querySelector('.seed-val');
-                      if (val && getComputedStyle(val).display === 'none') {
-                        setSeedDraft(seed === null ? '' : String(seed));
-                        setSeedPop(!seedPop);
-                        return;
-                      }
-                      setSeedText(null);
-                      setSeed(seed === null ? Number(m?.seed || 0) : null);
-                    }}
-                  >
-                    <Icon name={seed === null ? 'shuffle-line' : 'lock-line'} />
-                  </button>
-                  <span className="muted seed-lbl">Seed</span>
-                  {seedText !== null ? (
-                    <input
-                      className="seed-val mono"
-                      autoFocus
-                      inputMode="numeric"
-                      value={seedText}
-                      placeholder="随机"
-                      aria-label="Seed"
-                      autoComplete="off"
-                      spellCheck={false}
-                      onChange={(e) => setSeedText(e.target.value)}
-                      onBlur={() => commitSeed(true)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === 'Escape') {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          commitSeed(e.key === 'Enter');
-                        }
-                      }}
-                    />
-                  ) : (
-                    <button
-                      className={`seed-val mono ${seed === null ? 'rand' : ''}`}
-                      data-tip="点击输入 Seed，清空就是随机"
-                      onClick={() => setSeedText(seed === null ? '' : String(seed))}
-                    >
-                      {seed ?? '随机'}
-                    </button>
-                  )}
-                </span>
-                <Pop
-                  open={seedPop}
-                  onClose={() => {
-                    saveSeedDraft();
-                    setSeedPop(false);
+                          : `Seed ${seed} · 点击改为随机`;
                   }}
-                  anchor={seedBtn}
-                  trigger={seedBtn}
-                  place="above-left"
-                  enter="pop-up"
-                  className="popover seed-pop"
-                  label="Seed"
-                  restoreFocus
+                  onClick={(e) => {
+                    // 数值收起来了（最窄的时候）：打开浮层，不直接切换
+                    const val = e.currentTarget.parentElement?.querySelector('.seed-val');
+                    if (val && getComputedStyle(val).display === 'none') {
+                      setSeedDraft(seed === null ? '' : String(seed));
+                      setSeedPop(!seedPop);
+                      return;
+                    }
+                    setSeedText(null);
+                    setSeed(seed === null ? Number(m?.seed || 0) : null);
+                  }}
                 >
-                  <div className="frow">
-                    <span className="label">Seed</span>
-                    <Seg
-                      label="Seed"
-                      items={[
-                        ['rand', '随机'],
-                        ['fixed', '固定'],
-                      ]}
-                      value={seed === null ? 'rand' : 'fixed'}
-                      onChange={(k) => {
-                        const next = k === 'rand' ? null : Number(m?.seed || 0);
-                        setSeed(next);
-                        setSeedDraft(next === null ? '' : String(next));
-                      }}
-                    />
-                  </div>
-                  <label className="field sm mono">
+                  <Icon name={seed === null ? 'shuffle-line' : 'lock-line'} />
+                </button>
+                <span className="muted seed-lbl">Seed</span>
+                {seedText !== null ? (
+                  <input
+                    className="seed-val mono"
+                    autoFocus
+                    inputMode="numeric"
+                    value={seedText}
+                    placeholder="随机"
+                    aria-label="Seed"
+                    autoComplete="off"
+                    spellCheck={false}
+                    onChange={(e) => setSeedText(e.target.value)}
+                    onBlur={() => commitSeed(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === 'Escape') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        commitSeed(e.key === 'Enter');
+                      }
+                    }}
+                  />
+                ) : (
+                  <button
+                    className={`seed-val mono ${seed === null ? 'rand' : ''}`}
+                    data-tip="点击输入 Seed，清空就是随机"
+                    onClick={() => setSeedText(seed === null ? '' : String(seed))}
+                  >
+                    {seed ?? '随机'}
+                  </button>
+                )}
+              </span>
+              <Pop
+                open={seedPop}
+                onClose={() => {
+                  saveSeedDraft();
+                  setSeedPop(false);
+                }}
+                anchor={seedBtn}
+                trigger={seedBtn}
+                place="above-left"
+                enter="pop-up"
+                className="popover seed-pop"
+                label="Seed"
+                restoreFocus
+              >
+                <div className="frow">
+                  <span className="label">Seed</span>
+                  <Seg
+                    label="Seed"
+                    items={[
+                      ['rand', '随机'],
+                      ['fixed', '固定'],
+                    ]}
+                    value={seed === null ? 'rand' : 'fixed'}
+                    onChange={(k) => {
+                      const next = k === 'rand' ? null : Number(m?.seed || 0);
+                      setSeed(next);
+                      setSeedDraft(next === null ? '' : String(next));
+                    }}
+                  />
+                </div>
+                <label className="field sm mono">
+                  <input
+                    autoFocus
+                    inputMode="numeric"
+                    value={seedDraft}
+                    placeholder="随机"
+                    aria-label="Seed 数值"
+                    autoComplete="off"
+                    spellCheck={false}
+                    onChange={(e) => setSeedDraft(e.target.value)}
+                    onBlur={saveSeedDraft}
+                    onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing) return;
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveSeedDraft();
+                        setSeedPop(false);
+                      }
+                    }}
+                  />
+                </label>
+                <span className="help">
+                  固定时用这里的数值，清空就是随机。只收 0 到 4294967295 的整数。
+                </span>
+              </Pop>
+              <button
+                className="field sm size-btn"
+                data-trigger="size"
+                data-tip="尺寸"
+                onClick={() => setSizeMenu(!sizeMenu)}
+              >
+                <Icon name="aspect-ratio-line" />
+                <span className="mono">
+                  {w}×{h}
+                </span>
+              </button>
+              <span
+                className={`stepper count-step ${continuous ? 'cont' : ''}`}
+                data-tip={
+                  continuous
+                    ? '持续生成，直到点"停止"。请求仍逐张发送'
+                    : '张数：没有上限，点数字可以直接输入。请求逐张发送；张数多时相当于连续生成，NovelAI 要求生成由人的操作发起，风险由你自行判断'
+                }
+              >
+                <span
+                  role="button"
+                  aria-label="减少张数"
+                  onClick={() => {
+                    setContinuous(false);
+                    setCount(Math.max(1, count - 1));
+                  }}
+                >
+                  −
+                </span>
+                {countText !== null ? (
+                  <b className="count-in">
                     <input
+                      className="mono"
                       autoFocus
                       inputMode="numeric"
-                      value={seedDraft}
-                      placeholder="随机"
-                      aria-label="Seed 数值"
+                      value={countText}
+                      aria-label="张数"
                       autoComplete="off"
-                      spellCheck={false}
-                      onChange={(e) => setSeedDraft(e.target.value)}
-                      onBlur={saveSeedDraft}
+                      onChange={(e) => setCountText(e.target.value)}
+                      onBlur={() => commitCount(countText)}
                       onKeyDown={(e) => {
-                        if (e.nativeEvent.isComposing) return;
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          saveSeedDraft();
-                          setSeedPop(false);
+                        if (e.key === 'Enter') commitCount(countText);
+                        if (e.key === 'Escape') {
+                          e.stopPropagation();
+                          setCountText(null);
                         }
                       }}
                     />
-                  </label>
-                  <span className="help">
-                    固定时用这里的数值，清空就是随机。只收 0 到 4294967295 的整数。
-                  </span>
-                </Pop>
-                <button
-                  className="field sm size-btn"
-                  data-trigger="size"
-                  data-tip="尺寸"
-                  onClick={() => setSizeMenu(!sizeMenu)}
-                >
-                  <Icon name="aspect-ratio-line" />
-                  <span className="mono">
-                    {w}×{h}
-                  </span>
-                </button>
+                  </b>
+                ) : (
+                  <b
+                    className="count-n mono"
+                    role="button"
+                    onClick={() => setCountText(String(count))}
+                  >
+                    {continuous ? (
+                      '持续'
+                    ) : (
+                      <>
+                        {count}
+                        <span className="cunit"> 张</span>
+                      </>
+                    )}
+                  </b>
+                )}
                 <span
-                  className={`stepper count-step ${continuous ? 'cont' : ''}`}
-                  data-tip={
-                    continuous
-                      ? '持续生成，直到点"停止"。请求仍逐张发送'
-                      : '张数：没有上限，点数字可以直接输入。请求逐张发送；张数多时相当于连续生成，NovelAI 要求生成由人的操作发起，风险由你自行判断'
-                  }
+                  role="button"
+                  aria-label="增加张数"
+                  onClick={() => {
+                    setContinuous(false);
+                    setCount(count + 1);
+                  }}
                 >
-                  <span
-                    role="button"
-                    aria-label="减少张数"
-                    onClick={() => {
-                      setContinuous(false);
-                      setCount(Math.max(1, count - 1));
-                    }}
-                  >
-                    −
-                  </span>
-                  {countText !== null ? (
-                    <b className="count-in">
-                      <input
-                        className="mono"
-                        autoFocus
-                        inputMode="numeric"
-                        value={countText}
-                        aria-label="张数"
-                        autoComplete="off"
-                        onChange={(e) => setCountText(e.target.value)}
-                        onBlur={() => commitCount(countText)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitCount(countText);
-                          if (e.key === 'Escape') {
-                            e.stopPropagation();
-                            setCountText(null);
-                          }
-                        }}
-                      />
-                    </b>
-                  ) : (
-                    <b
-                      className="count-n mono"
-                      role="button"
-                      onClick={() => setCountText(String(count))}
-                    >
-                      {continuous ? (
-                        '持续'
-                      ) : (
-                        <>
-                          {count}
-                          <span className="cunit"> 张</span>
-                        </>
-                      )}
-                    </b>
-                  )}
-                  <span
-                    role="button"
-                    aria-label="增加张数"
-                    onClick={() => {
-                      setContinuous(false);
-                      setCount(count + 1);
-                    }}
-                  >
-                    +
-                  </span>
-                  {state.settings.continuous && (
-                    <span
-                      className={`cont-btn ${continuous ? 'on' : ''}`}
-                      role="button"
-                      aria-label="持续生成"
-                      aria-pressed={continuous}
-                      onClick={() => setContinuous(!continuous)}
-                    >
-                      ∞
-                    </span>
-                  )}
+                  +
                 </span>
+                {state.settings.continuous && (
+                  <span
+                    className={`cont-btn ${continuous ? 'on' : ''}`}
+                    role="button"
+                    aria-label="持续生成"
+                    aria-pressed={continuous}
+                    onClick={() => setContinuous(!continuous)}
+                  >
+                    ∞
+                  </span>
+                )}
               </span>
-            ),
-          )}
+            </span>
+          ))}
         </span>
         <span className="sp" />
         <span className="swap gen-acts">
@@ -584,52 +567,68 @@ export function GenerationBar({
               inert={leaving || undefined}
               data-enter="fade"
             >
-              {value.job ? (
-                <GenBusy
-                  job={value.job}
-                  queue={{
-                    off: starting || !estimate || !!unavailable || short,
-                    tip:
-                      unavailable ||
-                      (short
-                        ? '余额不够'
-                        : relay
-                          ? '按现在的草稿再排一份，排在这一份后面'
-                          : `按现在的草稿再排一份，排在这一份后面 · ${estimate ? cost : '…'} Anlas${continuous ? ' / 张' : ''}`),
-                    onClick: () => void go(),
-                  }}
-                />
-              ) : (
-                <>
-                  {relay ? (
-                    <span className="cost" data-tip="中转站按它自己的价格计费">
-                      <b>中转站</b>
-                      <span>按张计费</span>
-                    </span>
-                  ) : (
-                    <span
-                      className={`cost ${short ? 'short' : ''}`}
-                      data-tip={short ? '余额不够' : sub}
-                    >
-                      <b>
-                        {estimate ? cost : '…'} Anlas{continuous ? ' / 张' : ''}
-                      </b>
-                      <span>{sub}</span>
-                    </span>
-                  )}
-                  <button
-                    className={`btn seal ${starting || !estimate || unavailable || short ? 'is-off' : ''}`}
-                    aria-disabled={starting || !estimate || !!unavailable || short || undefined}
-                    data-tip={goTip || undefined}
-                    onClick={() => {
-                      if (starting || !estimate || unavailable || short) return;
-                      void go();
-                    }}
-                  >
-                    {busyElsewhere ? '排队生成' : '生成'}
-                  </button>
-                </>
-              )}
+              {(() => {
+                // 生成中：费用的第二行写进度（左边照常能改张数，加入队列的是几张一眼看得到，用户 10-26）
+                const j = value.job;
+                const progress = j
+                  ? j.stop
+                    ? `${busyVerb(j.operation)} ${stepOf(j)} · 做完这张停`
+                    : j.continuous
+                      ? `生成中 · 第 ${j.index} 张`
+                      : `${busyVerb(j.operation)} ${stepOf(j)}`
+                  : '';
+                const off = starting || !estimate || !!unavailable || short;
+                return (
+                  <>
+                    {relay ? (
+                      <span className="cost" data-tip="中转站按它自己的价格计费">
+                        <b>中转站</b>
+                        <span>{progress || '按张计费'}</span>
+                      </span>
+                    ) : (
+                      <span
+                        className={`cost ${short ? 'short' : ''}`}
+                        data-tip={
+                          short
+                            ? '余额不够'
+                            : j
+                              ? `${progress} · 这一份已消耗 ${j.spentKnown ? `${j.spent} Anlas` : '未知'} · ${sub}`
+                              : sub
+                        }
+                      >
+                        <b>
+                          {estimate ? cost : '…'} Anlas{continuous ? ' / 张' : ''}
+                        </b>
+                        <span>{progress || sub}</span>
+                      </span>
+                    )}
+                    {j ? (
+                      <GenBusy
+                        job={j}
+                        queue={{
+                          off,
+                          tip:
+                            unavailable ||
+                            (short ? '余额不够' : '按现在的草稿和张数再排一份，排在后面'),
+                          onClick: () => void go(),
+                        }}
+                      />
+                    ) : (
+                      <button
+                        className={`btn seal ${off ? 'is-off' : ''}`}
+                        aria-disabled={off || undefined}
+                        data-tip={goTip || undefined}
+                        onClick={() => {
+                          if (off) return;
+                          void go();
+                        }}
+                      >
+                        {busyElsewhere ? '排队生成' : '生成'}
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </span>
           ))}
         </span>

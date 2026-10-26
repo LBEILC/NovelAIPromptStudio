@@ -81,10 +81,26 @@
 .popover.queue .q-agent { border-top: var(--bw) solid var(--divider); margin-top: var(--sp-2); padding-top: var(--sp-2); }
 .popover.queue .q-agent-acts { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
 .popover.queue .q-agent-acts .sp { flex: 1; }
-.popover.queue .q-recent { border-top: var(--bw) solid var(--divider); padding: var(--sp-1) 0; }
-.popover.queue .q-recent-h { display: flex; align-items: center; gap: var(--sp-1); width: 100%; padding: var(--sp-1) var(--sp-3); border: 0; background: transparent; color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); text-align: left; cursor: pointer; }
-.popover.queue .q-recent-h:hover { color: var(--text); }
-.popover.queue .q-done { display: flex; align-items: baseline; gap: var(--sp-2); padding: var(--sp-1) var(--sp-3) var(--sp-1) calc(var(--sp-3) + var(--icon) + var(--sp-1)); font-size: var(--fs-small); line-height: var(--lh-small); cursor: pointer; }
-.popover.queue .q-done:hover { background: var(--hover); }
-.popover.queue .q-done .q-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.popover.queue .q-done .q-meta { flex: none; margin-left: auto; color: var(--text-3); }
+.popover.queue .q-top { display: flex; align-items: baseline; gap: var(--sp-2); padding: var(--sp-1) var(--sp-3) var(--sp-2); }
+.popover.queue .q-top b { font-weight: var(--fw-strong); }
+.popover.queue .q-today { margin-left: auto; color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); }
+.popover.queue .q-empty { padding: var(--sp-4) var(--sp-3); border-top: var(--bw) solid var(--divider); color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); text-align: center; }
+.popover.queue .q-foot .q-left { margin-right: auto; color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small); }
+.popover.queue .q-recent { border-top: var(--bw) solid var(--divider); }
+.popover.queue .q-recent-h { display: flex; align-items: center; gap: var(--sp-1); width: 100%; padding: var(--sp-2) var(--sp-3); border: 0; background: transparent; color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); text-align: left; }
+.popover.queue button.q-recent-h { cursor: pointer; }
+.popover.queue button.q-recent-h:hover { color: var(--text); }
+.popover.queue .q-recent-h.label { padding-bottom: var(--sp-1); }
+.popover.queue .q-done { border-top: 0; padding-top: var(--sp-1); padding-bottom: var(--sp-1); }
+.popover.queue .q-done .q-meta { color: var(--text-3); }
+.popover.queue .q-done .q-time { align-self: start; padding-top: var(--sp-0); color: var(--text-3); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.popover.queue .q-done .th-miss { display: block; width: 28px; height: 38px; }
+/* 张数：说明行里可以点的数字（不常驻步进器，用户 10-26 嫌挤） */
+.popover.queue .q-item { padding-top: var(--sp-2); padding-bottom: var(--sp-2); column-gap: var(--sp-3); }
+.popover.queue .q-main { gap: var(--sp-0); }
+.popover.queue .q-count { display: inline-block; min-width: 1.6em; padding: 0 var(--sp-1); border-radius: var(--r-tag); color: var(--text); font-family: var(--font-mono); text-align: center; text-decoration: underline dotted var(--text-3); text-underline-offset: 3px; cursor: text; transition: background-color var(--dur-1) var(--ease-out); }
+.popover.queue .q-count:hover, .popover.queue .q-count:focus-visible { background: var(--surface); text-decoration-color: var(--text-2); outline: 0; }
+.popover.queue .q-count-in { width: auto; min-width: 2.4em; padding: 0 var(--sp-1); border: var(--bw) solid var(--text-2); border-radius: var(--r-tag); background: var(--surface); color: var(--text); font-size: inherit; line-height: inherit; text-align: center; outline: 0; }
+.popover.queue .q-side .btn { color: var(--text-3); }
+.popover.queue .q-side .btn:hover { color: var(--text); }
+.ver .what .what-lead { color: var(--text-3); }

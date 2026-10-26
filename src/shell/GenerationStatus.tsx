@@ -3,7 +3,7 @@
 // 底部写剩余多少、今天花了多少、暂停 / 继续；最近完成的折叠成一行。没有配置账号时什么都没有。
 import { useEffect, useRef, useState } from 'react';
 import { Pop } from '../kit/layer';
-import { Icon, Stepper } from '../kit/controls';
+import { Icon } from '../kit/controls';
 import { ContextMenu, MenuButton, type MenuEntry } from '../kit/menu';
 import { useNotifications } from '../kit/toast';
 import { FlipScope, useExitList, useSwap } from '../kit/motion';
@@ -11,6 +11,7 @@ import { useGeneration } from '../state/generation';
 import { invokeUI } from '../lib/commands';
 import { BlurImg } from '../kit/blur';
 import { openPick } from '../workbench/Pick';
+import { Thumb } from '../workbench/versionHelpers';
 import type { GenerationJob } from '../shared/generation';
 
 /** 放大、增强、局部重绘、扩图时写"放大中""增强中""重绘中""扩图中"（和工作台底栏一致） */
@@ -41,6 +42,80 @@ const stepOf = (job: { index: number; count: number; blockIndex?: number; blockC
 
 /** 移除以后能撤销的时间；命令层留 10 秒，通知短一点 */
 const UNDO_MS = 8000;
+
+/**
+ * 队列里一项的张数：说明行里的一个数字，点了原地变成小输入框（回车或移开确定，↑↓ 加减，Esc 取消），
+ * 和底栏张数的改法一样。不常驻步进器，免得一行挤满（用户 10-26）。
+ */
+function CountEdit({
+  value,
+  min,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  onChange: (n: number) => void;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  const done = useRef(false);
+  const commit = () => {
+    if (done.current || text === null) return;
+    done.current = true;
+    const n = Math.round(Number(text));
+    setText(null);
+    if (Number.isFinite(n) && n !== value) onChange(Math.max(min, Math.min(9999, n)));
+  };
+  if (text === null)
+    return (
+      <span
+        className="q-count"
+        role="button"
+        tabIndex={0}
+        data-tip="点击修改张数"
+        onClick={(e) => {
+          e.stopPropagation();
+          done.current = false;
+          setText(String(value));
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          e.stopPropagation();
+          done.current = false;
+          setText(String(value));
+        }}
+      >
+        {value}
+      </span>
+    );
+  return (
+    <input
+      className="q-count-in mono"
+      autoFocus
+      aria-label="张数"
+      inputMode="numeric"
+      value={text}
+      size={Math.max(2, text.length)}
+      onFocus={(e) => e.currentTarget.select()}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => setText(e.target.value.replace(/[^\d]/g, ''))}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') {
+          done.current = true;
+          setText(null);
+        }
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          const n = (Number(text) || value) + (e.key === 'ArrowUp' ? 1 : -1);
+          setText(String(Math.max(min, Math.min(9999, n))));
+        }
+      }}
+    />
+  );
+}
 
 export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }) {
   const state = useGeneration();
@@ -322,25 +397,26 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
           {head(job)}
           {job.summary && <small>{job.summary}</small>}
           <small className="q-meta">
-            {job.continuous
-              ? `生成中 · 第 ${job.index} 张 · 持续生成`
-              : `${busyVerb(job.operation)} · ${stepOf(job)}`}
+            {job.continuous ? (
+              `生成中 · 第 ${job.index} 张 · 持续生成`
+            ) : job.operation || job.stop || (job.blockCount || 0) > 1 ? (
+              `${busyVerb(job.operation)} · ${stepOf(job)}`
+            ) : (
+              <>
+                {busyVerb(job.operation)} · {job.index} /{' '}
+                <CountEdit
+                  value={job.count}
+                  min={job.completed + 1}
+                  onChange={(count) => run(invokeUI('generate.set-count', { id: job.id, count }))}
+                />{' '}
+                张
+              </>
+            )}
             {job.hasRandomBlocks ? ' · 随机块' : ''}
             {job.stop ? ' · 完成当前这张后停止' : ''}
           </small>
         </div>
         <div className="q-side" onClick={(e) => e.stopPropagation()}>
-          {!job.continuous && !job.operation && !job.stop && (
-            <Stepper
-              label="张数"
-              value={job.count}
-              step={1}
-              min={job.completed + 1}
-              max={9999}
-              digits={0}
-              onChange={(count) => run(invokeUI('generate.set-count', { id: job.id, count }))}
-            />
-          )}
           {!job.continuous && !job.operation && left > 1 && !job.stop && (
             <button
               className="btn quiet sm icon"
@@ -414,11 +490,19 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
             <small className="q-meta">
               {job.deferred ? '已暂缓 · ' : ''}
               {job.hasRandomBlocks ? '随机块 · ' : ''}
-              {job.continuous
-                ? '持续生成'
-                : job.completed
-                  ? `已完成 ${job.completed} / ${job.count} 张`
-                  : `${job.count} 张`}
+              {job.continuous ? (
+                '持续生成'
+              ) : (
+                <>
+                  {job.completed ? `已完成 ${job.completed} / ` : ''}
+                  <CountEdit
+                    value={job.count}
+                    min={job.completed + 1}
+                    onChange={(count) => run(invokeUI('generate.set-count', { id: job.id, count }))}
+                  />{' '}
+                  张
+                </>
+              )}
               {anlas(job.estimate)}
               {job.resumedAfterExit ? ' · 上次没发完' : ''}
             </small>
@@ -453,19 +537,7 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
                 >
                   恢复
                 </button>
-              ) : (
-                !job.continuous && (
-                  <Stepper
-                    label="张数"
-                    value={job.count}
-                    step={1}
-                    min={job.completed + 1}
-                    max={9999}
-                    digits={0}
-                    onChange={(count) => run(invokeUI('generate.set-count', { id: job.id, count }))}
-                  />
-                )
-              )}
+              ) : null}
               <MenuButton label="这一项的操作" items={() => jobMenu(job)} menuKey={`q-${job.id}`} />
             </>
           )}
@@ -491,8 +563,8 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
   const endless = live.some((j) => j.continuous);
   const today = state.today;
   const todayText = relay
-    ? `今天已生成 ${today?.images ?? state.settings.spentImagesToday ?? 0} 张`
-    : `今天已花 ${(today?.anlas ?? state.spentToday ?? 0).toLocaleString('en-US')} Anlas${today?.estimated ? '（含估算）' : ''}`;
+    ? `今天生成了 ${today?.images ?? state.settings.spentImagesToday ?? 0} 张`
+    : `今天已花 ${(today?.anlas ?? state.spentToday ?? 0).toLocaleString('en-US')} Anlas${today?.estimated ? '*' : ''}${today ? ` · ${today.images} 张` : ''}`;
   const pendTotal = pending.reduce((n, j) => n + j.count, 0);
   const pendCost = pending.reduce((n, j) => n + (j.estimate || 0), 0);
   const usage = state.subscription?.usage?.percent || 0;
@@ -503,7 +575,15 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
         ? j.completed
           ? `已停止：完成 ${j.completed} 张`
           : '已取消'
-        : `完成 ${j.completed} 张`;
+        : `${j.completed} 张`;
+  const clock = (iso?: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+  const busy = !!running || line.length > 0;
+  // 队列和待确认都空的时候，最近完成直接展开；有任务时折叠成一行
+  const recentShown = recentOpen || (!busy && !pending.length);
 
   if (!state.settings.hasToken && !running) return null;
   return (
@@ -577,8 +657,15 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
         place="below-right"
         className="popover queue"
         label="生成队列"
-        deps={[line.length, pending.length, !!running, recentOpen]}
+        deps={[line.length, pending.length, !!running, recentShown]}
       >
+        <div className="q-top">
+          <b>生成队列</b>
+          <span className="q-today mono" data-tip={today?.estimated ? '带 * 的含估算' : undefined}>
+            {todayText}
+          </span>
+        </div>
+        {!busy && !pending.length && <div className="q-empty">没有在生成或排队的任务</div>}
         {state.paused && (running || queued.length > 0) && (
           <div className="q-paused">
             <Icon name="pause-circle-line" />
@@ -642,52 +729,59 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
             </div>
           </div>
         )}
-        <div className="q-foot">
-          <span className="cost">
-            <b>
+        {busy && (
+          <div className="q-foot">
+            <span className="q-left">
               {endless
                 ? '持续生成中'
                 : leftImages
                   ? `剩余 ${leftImages} 张${relay ? '' : leftCost ? ` · 约 ${Math.round(leftCost)} Anlas` : ' · 免费'}`
-                  : '队列是空的'}
-            </b>
-            <span>{todayText}</span>
-          </span>
-          {(running || queued.length > 0) &&
-            (state.paused ? (
-              <button className="btn ink sm" onClick={() => run(invokeUI('generate.resume', {}))}>
-                <Icon name="play-line" />
-                继续
+                  : '没有要发的了'}
+            </span>
+            {(running || queued.length > 0) &&
+              (state.paused ? (
+                <button className="btn ink sm" onClick={() => run(invokeUI('generate.resume', {}))}>
+                  <Icon name="play-line" />
+                  继续
+                </button>
+              ) : (
+                <button
+                  className="btn sm"
+                  data-tip="正在生成的这张做完就停，后面的先不发"
+                  onClick={() => run(invokeUI('generate.pause', {}))}
+                >
+                  <Icon name="pause-line" />
+                  暂停队列
+                </button>
+              ))}
+          </div>
+        )}
+        {recent.length > 0 && (
+          <div className={`q-recent ${recentShown ? 'open' : ''}`}>
+            {busy || pending.length ? (
+              <button className="q-recent-h" onClick={() => setRecentOpen(!recentOpen)}>
+                <Icon name={recentOpen ? 'arrow-down-s-line' : 'arrow-right-s-line'} />
+                最近完成 {recent.length} 个
               </button>
             ) : (
-              <button
-                className="btn sm"
-                data-tip="正在生成的这张做完就停，后面的先不发"
-                onClick={() => run(invokeUI('generate.pause', {}))}
-              >
-                <Icon name="pause-line" />
-                暂停队列
-              </button>
-            ))}
-        </div>
-        {recent.length > 0 && (
-          <div className={`q-recent ${recentOpen ? 'open' : ''}`}>
-            <button className="q-recent-h" onClick={() => setRecentOpen(!recentOpen)}>
-              <Icon name={recentOpen ? 'arrow-down-s-line' : 'arrow-right-s-line'} />
-              最近完成 {recent.length} 个
-            </button>
-            {recentOpen &&
+              <div className="q-recent-h label">最近完成</div>
+            )}
+            {recentShown &&
               recent.map((j) => (
                 <div
                   key={j.id}
-                  className="q-done"
+                  className="q-item q-done"
                   role="button"
                   tabIndex={0}
                   onClick={() => jump(j)}
                   onKeyDown={(e) => e.key === 'Enter' && jump(j)}
                 >
-                  <span className="q-name">{j.name}</span>
-                  <span className="q-meta">{doneText(j)}</span>
+                  {j.images.length ? <Thumb id={j.images.at(-1)!} tab={j.tabId} /> : thumb(j)}
+                  <div className="q-main">
+                    {head(j)}
+                    <small className="q-meta">{doneText(j)}</small>
+                  </div>
+                  <span className="q-time mono">{clock(j.finishedAt)}</span>
                 </div>
               ))}
           </div>
