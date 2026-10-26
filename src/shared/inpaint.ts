@@ -25,9 +25,13 @@ export function inpaintSize(width: number, height: number, fullSize = false) {
       height: Math.max(64, Math.round(height / 64) * 64),
     };
   const area = width * height;
-  // Official largestValidWithinPixelCount retains areas >= 80% of the limit.
+  // Freehand crops still need 64-pixel alignment within the retained 80% band.
   // Larger crops are reduced first to keep focused generation within one MP.
-  if (area >= 0.8 * 1048576 && area <= 1048576) return { width, height };
+  if (area >= 0.8 * 1048576 && area <= 1048576)
+    return {
+      width: Math.max(64, Math.floor(width / 64) * 64),
+      height: Math.max(64, Math.floor(height / 64) * 64),
+    };
   const scale = Math.sqrt(1048576 / area);
   return {
     width: Math.max(64, Math.floor(Math.floor(width * scale) / 64) * 64),

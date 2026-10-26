@@ -172,6 +172,118 @@ export async function imageOperationChecks({ h, mode, doubles, database, generat
       !generationService.state.requests.at(-1).parameters.image &&
       (await e(`!document.querySelector('[data-key="ver-${plain.versionId}"] .src')`)),
   );
+  await selectSource();
+  const redraw = `[...document.querySelectorAll('.ip-bar button')].find(n=>n.textContent.trim()==='重绘')`;
+  const openInpaint = async () => {
+    await e('document.querySelector("[data-trigger=op-inpaint]").click()');
+    await wait(
+      '!!document.querySelector(".inpaint-ov:not(.leaving) .ip-mask") && document.querySelector(".ip-stage")?.getBoundingClientRect().width>0',
+    );
+  };
+  const dragInpaint = async (from, to) => {
+    // Separate dispatches let React commit the dragged rectangle before pointerup.
+    for (const [type, point] of [
+      ['pointerdown', from],
+      ['pointermove', to],
+      ['pointerup', to],
+    ]) {
+      await e(`(() => {
+        const r=document.querySelector('.ip-stage').getBoundingClientRect();
+        document.querySelector('.ip-canvas').dispatchEvent(new PointerEvent(${JSON.stringify(type)}, {
+          bubbles:true, button:0, buttons:${type === 'pointerup' ? 0 : 1},
+          clientX:r.left+r.width*${point[0]}, clientY:r.top+r.height*${point[1]}
+        }));
+      })()`);
+    }
+  };
+  await openInpaint();
+  await check(
+    '局部重绘打开时无涂抹不能提交并显示提示',
+    `!!document.querySelector('.inpaint-ov') && (${redraw})?.getAttribute('aria-disabled')==='true' && document.querySelector('.ip-bar').textContent.includes('涂上要重画的地方')`,
+  );
+  await dragInpaint([0.45, 0.45], [0.55, 0.55]);
+  await wait(
+    `!!document.querySelector('.ip-rect:not(.manual)') && (${redraw})?.getAttribute('aria-disabled')!=='true'`,
+  );
+  await check(
+    '直接涂抹自动出框并显示原图区域生成尺寸和免费价格',
+    `!!document.querySelector('.ip-rect:not(.manual)') && ['原图区域','生成','免费'].every(t=>document.querySelector('.ip-bar').textContent.includes(t)) && (${redraw})?.getAttribute('aria-disabled')!=='true'`,
+  );
+  await h.screenshot('078-inpaint-auto');
+  const painted = await generated(() => click('重绘', 'document.querySelector(".ip-bar")'));
+  await wait('!document.querySelector(".inpaint-ov")');
+  await check('重绘关闭编辑层并新增局部重绘版本且保持源图实际尺寸', async () => {
+    const size = await sharp(database.loadProject(painted.images[0]).image_path).metadata();
+    return (
+      size.width === 832 &&
+      size.height === 1216 &&
+      (await e(
+        `!document.querySelector('.inpaint-ov') && document.querySelector('[data-key="ver-${painted.versionId}"] .src')?.textContent==='局部重绘' && document.querySelector('.stage .canvas img')?.naturalWidth===832 && document.querySelector('.stage .canvas img')?.naturalHeight===1216 && !!document.querySelector('[aria-label="再来一次"]') && !!document.querySelector('[aria-label="和修之前对比"]')`,
+      ))
+    );
+  });
+  const again = await generated(() => click('再来一次'));
+  await check('再来一次直接新增同一源版本下的局部重绘兄弟版本', async () => {
+    const versions = (await invoke('version.list', { tabId })).versions;
+    const a = versions.find((v) => v.id === painted.versionId);
+    const b = versions.find((v) => v.id === again.versionId);
+    return (
+      a.parentId === source.versionId &&
+      b.parentId === a.parentId &&
+      (await e(
+        `!document.querySelector('.inpaint-ov') && document.querySelector('[data-key="ver-${again.versionId}"] .src')?.textContent==='局部重绘'`,
+      ))
+    );
+  });
+  await click('和修之前对比');
+  await wait('!!document.querySelector(".cmp-ov:not(.leaving)")');
+  await check(
+    '修前对比显示两张图的标签和局部重绘范围',
+    `document.querySelectorAll('.cmp-ov .cmp-tag').length===2 && document.querySelector('.cmp-diff')?.textContent.includes('局部重绘：框在')`,
+  );
+  await click('滑块', 'document.querySelector(".cmp-ov")');
+  await wait('!!document.querySelector(".cmp-cut")');
+  await check('对比可切换到滑块模式', '!!document.querySelector(".cmp-cut")');
+  await h.screenshot('078-compare');
+  await h.key('Escape');
+  await wait('!document.querySelector(".cmp-ov")');
+  await check('Esc 关闭对比', '!document.querySelector(".cmp-ov")');
+  const sourceThumb = `[data-key="ths-${source.versionId}"] img`;
+  await wait(`!!document.querySelector(${JSON.stringify(sourceThumb)})`);
+  await e(
+    `document.querySelector(${JSON.stringify(sourceThumb)}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:300,clientY:250}))`,
+  );
+  await check(
+    '非当前版本缩略图右键提供和当前这张对比',
+    `[...document.querySelectorAll('[role=menuitem]')].some(n=>n.textContent.includes('和当前这张对比'))`,
+  );
+  await click('和当前这张对比');
+  await wait('!!document.querySelector(".cmp-ov:not(.leaving)")');
+  await check('版本缩略图菜单打开对比', '!!document.querySelector(".cmp-ov:not(.leaving)")');
+  await h.key('Escape');
+  await wait('!document.querySelector(".cmp-ov")');
+  await openInpaint();
+  await click('框：拖出送去重绘的范围');
+  await click('自由', 'document.querySelector(".inpaint-ov")');
+  await dragInpaint([0.2, 0.2], [0.7, 0.65]);
+  await wait(
+    `!!document.querySelector('.ip-rect.manual') && document.querySelector('[role=radio][aria-label="笔刷：涂上要重画的地方"]')?.getAttribute('aria-checked')==='true'`,
+  );
+  await check(
+    '自由拖框生成手动范围并自动切回笔刷',
+    `!!document.querySelector('.ip-rect.manual') && document.querySelector('[role=radio][aria-label="笔刷：涂上要重画的地方"]')?.getAttribute('aria-checked')==='true'`,
+  );
+  await h.screenshot('078-inpaint-manual');
+  await h.key('Escape');
+  await wait('!document.querySelector(".inpaint-ov")');
+  await e(
+    `document.querySelector('.stage .canvas img').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:400,clientY:300}))`,
+  );
+  await check(
+    '舞台图片右键提供局部重绘入口',
+    `[...document.querySelectorAll('[role=menuitem]')].some(n=>n.textContent.includes('局部重绘…'))`,
+  );
+  await h.key('Escape');
   await click('图片库', 'document.querySelector(".tb")');
   await click('全部图片', 'document.querySelector(".libp")');
   await wait('!!document.querySelector(".card")');

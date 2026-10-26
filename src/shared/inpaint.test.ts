@@ -20,10 +20,14 @@ it('selects maximum free context, expands large masks and clamps at image edges'
   ).toEqual({ x: 0, y: 0, width: 512, height: 384 });
 });
 
-it('enlarges, retains the official 80% band, reduces and rounds original dimensions', () => {
+it('enlarges, aligns the 80% band, reduces and rounds original dimensions', () => {
   expect(inpaintSize(256, 256)).toEqual({ width: 1024, height: 1024 });
   expect(inpaintSize(832, 1216)).toEqual({ width: 832, height: 1216 });
-  expect(inpaintSize(900, 1000)).toEqual({ width: 900, height: 1000 });
+  expect(inpaintSize(900, 1000)).toEqual({ width: 896, height: 960 });
+  expect(inpaintSize(1000, 1000)).toEqual({ width: 960, height: 960 });
+  expect(inpaintSize(1024, 1024)).toEqual({ width: 1024, height: 1024 });
+  expect(inpaintSize(32, 30000)).toEqual({ width: 64, height: 29952 });
+  expect(inpaintSize(1000, 1000, true)).toEqual({ width: 1024, height: 1024 });
   expect(inpaintSize(2048, 2048)).toEqual({ width: 1024, height: 1024 });
   expect(inpaintSize(830, 1200, true)).toEqual({ width: 832, height: 1216 });
   expect(inpaintSize(2100, 2048, true)).toEqual({ width: 2112, height: 2048 });
