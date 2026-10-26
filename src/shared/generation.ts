@@ -143,6 +143,7 @@ export interface GenerationJob {
   errorCode?: import('./commands').CommandErrorCode;
   errorDetails?: { status?: number; machineCode?: string };
   createdAt: string;
+  finishedAt?: string;
   project: ImageProject;
 }
 export interface GenerationStatus {

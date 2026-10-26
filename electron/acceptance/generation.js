@@ -565,6 +565,41 @@ export async function generationChecks({
   });
   await call('reference.remove', { tabId: refTab, id: referenceId });
   await call('reference.add-precise', { tabId: refTab, path: files[0] });
+  const bulkJobs = [];
+  for (let i = 0; i < 30; i++)
+    bulkJobs.push(await call('generate.start', { tabId: refTab, count: 1 }));
+  const statusStarted = performance.now();
+  const responsiveStatus = await call('app.status');
+  const statusElapsed = performance.now() - statusStarted;
+  await check(
+    'Agent 连续排 30 个精确参考任务后 app.status 在 2 秒内返回',
+    () => responsiveStatus.version === app.getVersion() && statusElapsed < 2000,
+  );
+  await h.checkSoon('30 个精确参考任务全部落盘且队列小于 5 MB', () => {
+    const file = path.join(userData, 'generation-queue.json');
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return (
+      bulkJobs.every((job) => saved.some((j) => j.id === job.id)) &&
+      fs.statSync(file).size < 5 * 1024 * 1024
+    );
+  });
+  const bulkStatus = await call('generate.status');
+  await check(
+    'Agent 状态保留所有待确认任务但不携带图片数据',
+    () =>
+      bulkJobs.every((job) =>
+        bulkStatus.jobs.some((j) => j.id === job.id && j.state === 'pending'),
+      ) && !JSON.stringify(bulkStatus.jobs).includes('data:image'),
+  );
+  await invoke('generate.cancel', { ids: bulkJobs.map((job) => job.id) });
+  const recentStatus = await call('generate.status');
+  const expandedStatus = await call('generate.status', { limit: 100 });
+  await check(
+    'Agent 默认最近 20 条、limit 可读取更多已结束任务',
+    () =>
+      recentStatus.jobs.filter((j) => ['completed', 'failed', 'canceled'].includes(j.state))
+        .length === 20 && expandedStatus.jobs.length > recentStatus.jobs.length,
+  );
   await check('精确参考费用包含基础价和附加费', async () => {
     const price = await call('generate.estimate', { tabId: refTab, count: 2 });
     return price.parts.precise === 10 && price.parts.base > 0 && price.parts.encode === 0;

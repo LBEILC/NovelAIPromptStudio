@@ -13,7 +13,7 @@ import { saveWorkbenchImage } from './saveWorkbenchImage.js';
 import { createBlankProject } from '../workbench.js';
 import { buildProjectRequest } from '../parameterRequest.js';
 import fs from 'node:fs/promises';
-import syncFs from 'node:fs';
+import { createGenerationStorage } from '../generationStorage.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { createNovelAIClient, estimateGeneration } from '../generation.js';
@@ -53,8 +53,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       spentToday: s.spentDate === today() ? s.spentToday || 0 : 0,
     };
   };
-  const status = (id) => ({
-    jobs: (id ? [queue.status(id)] : queue.status()).map((job) => ({
+  const status = (id, limit = 20) => ({
+    jobs: (id ? [queue.status(id)] : queue.status(undefined, limit)).map((job) => ({
       ...job,
       project: job.project
         ? { ...job.project, nsfw: services.database.nsfw.state(job.project) }
@@ -152,18 +152,10 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     );
   }
   const spent = new Map();
-  const queueFile = path.join(services.directory, 'generation-queue.json');
-  let initial = [];
-  if (syncFs.existsSync(queueFile)) initial = JSON.parse(syncFs.readFileSync(queueFile, 'utf8'));
-  for (const job of initial) spent.set(job.id, job.spent || 0);
+  const storage = createGenerationStorage(services.directory);
   const queue = createGenerationQueue({
-    initial,
     run: services.network?.run,
-    persist: (jobs) => {
-      const temporary = `${queueFile}.tmp`;
-      syncFs.writeFileSync(temporary, JSON.stringify(jobs));
-      syncFs.renameSync(temporary, queueFile);
-    },
+    persist: storage.schedule,
     generate: (request, progress) =>
       request.action === 'upscale'
         ? client().upscale(request)
@@ -192,6 +184,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       });
     },
     prepare: async (job) => {
+      Object.assign(job, await storage.hydrate(job));
       // Persist before any paid reference encoding or image request. Pending jobs
       // reach this point only after confirmation; closed tabs are supported too.
       await store.exclusive(async () => {
@@ -282,6 +275,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     },
     changed: (jobs) => {
       protectJobs(jobs);
+      const retained = new Set(jobs.map((job) => job.id));
+      for (const id of spent.keys()) if (!retained.has(id)) spent.delete(id);
       if (!shuttingDown)
         void settlePruned().catch((error) => {
           cleanupError = error;
@@ -1151,7 +1146,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
             (s.limitEnabled && (s.spentToday || 0) + price.anlas > s.dailyLimit)),
       });
     },
-    'generate.status': (input) => status(input.id),
+    'generate.status': (input) => status(input.id, input.limit),
     'generate.confirm': (input) => {
       queue.confirm(input.ids);
       return status();
@@ -1303,7 +1298,12 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   return {
     handlers,
     initialize: ensure,
-    ready: settlePruned,
+    ready: async () => {
+      const initial = await storage.load();
+      for (const job of initial) spent.set(job.id, job.spent || 0);
+      queue.restore(initial);
+      await settlePruned();
+    },
     async openSource(source, image, requestedWorkId) {
       if (requestedWorkId && source.type === 'library') {
         const ref = versions
@@ -1351,6 +1351,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       (closing ??= (async () => {
         shuttingDown = true;
         await queue.close();
+        await storage.flush();
         await store.exclusive(async () => {});
         if (cleanupError) throw cleanupError;
       })()),

@@ -398,7 +398,7 @@ export interface CommandDefinitions {
     input: TabInput & { count: number; continuous?: boolean; fixedSeed?: boolean; seed?: number };
     output: GenerationJob;
   };
-  'generate.status': { input: { id?: string }; output: GenerationStatus };
+  'generate.status': { input: { id?: string; limit?: number }; output: GenerationStatus };
   'generate.confirm': { input: { ids: string[] }; output: GenerationStatus };
   'generate.cancel': { input: { ids: string[] }; output: GenerationStatus };
   'generate.stop': { input: { id: string }; output: GenerationStatus };

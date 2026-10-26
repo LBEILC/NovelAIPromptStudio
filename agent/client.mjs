@@ -164,6 +164,12 @@ export async function main(argv = process.argv.slice(2), services = {}) {
             input: v.fields,
             required: v.required || [],
             ...(v.example ? { example: v.example } : {}),
+            ...(name === 'generate.status'
+              ? {
+                  description:
+                    '按 id 查询；省略 id 返回全部未结束任务及最近 20 条已结束任务。limit 为 1–100，仅限制已结束条数。返回值不含内嵌图片。',
+                }
+              : {}),
           })),
       },
     };

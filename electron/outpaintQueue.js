@@ -47,7 +47,7 @@ export async function runOutpaint(
       if (job.stop) throw new Error('已取消');
       const png = await generate(prepared.request, (progress) => {
         job.progress = progress;
-        publish();
+        publish(false);
       });
       await afterBlock();
       result = await compositeOutpaint(prepared.canvas, png, previousSize, step);

@@ -263,7 +263,7 @@ export const commandRegistry = {
     mutation: true,
     example: { tabId: 'tab-id', count: 1 },
   },
-  'generate.status': { fields: { id: 'string' }, example: {} },
+  'generate.status': { fields: { id: 'string', limit: 'integer' }, example: { limit: 20 } },
   'generate.confirm': { fields: { ids: 'strings' }, required: ['ids'], uiOnly: true },
   'generate.cancel': { fields: { ids: 'strings' }, required: ['ids'], uiOnly: true },
   'generate.stop': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
@@ -935,6 +935,9 @@ export function validateCommand(name, input, source) {
     (name === 'dictionary.set' &&
       input.translation === undefined &&
       input.category === undefined) ||
+    (name === 'generate.status' &&
+      input.limit !== undefined &&
+      (Number(input.limit) < 1 || Number(input.limit) > 100)) ||
     (name === 'library.search' &&
       input.limit !== undefined &&
       (Number(input.limit) < 1 || Number(input.limit) > 1000))

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { activeJob, recentJobs, publicGenerationJob } from './generationStorage.js';
 import { CommandError } from './commands/registry.js';
 
 // One worker for the entire application. The worker never retries a request itself.
@@ -14,21 +15,27 @@ export function createGenerationQueue({
   changed = () => {},
   persist = () => {},
 }) {
-  const jobs = initial.map((job) => ({
-    ...job,
-    state: ['pending', 'queued', 'generating'].includes(job.state) ? 'canceled' : job.state,
-  }));
+  const jobs = recentJobs(initial, 100);
   let running = false;
   let closed = false;
   let finished;
   let complete;
-  const publicJob = (job) => {
-    const { request, inpaintMask, ...view } = job;
-    return structuredClone(view);
+  const publicJob = publicGenerationJob;
+  const publicJobs = (items) => {
+    const memo = new Map();
+    return items.map((job) => publicJob(job, memo));
   };
-  const publish = () => {
-    persist(jobs);
-    changed(jobs.map(publicJob));
+  const publish = (durable = true) => {
+    if (durable) {
+      for (const job of jobs) {
+        if (!activeJob(job)) job.finishedAt ||= new Date().toISOString();
+        else delete job.finishedAt;
+      }
+      const kept = recentJobs(jobs, 100);
+      jobs.splice(0, jobs.length, ...kept);
+      persist(jobs);
+    }
+    changed(publicJobs(jobs));
   };
   async function drain() {
     if (running || closed) return;
@@ -65,7 +72,7 @@ export function createGenerationQueue({
                 }
                 const onProgress = (progress) => {
                   job.progress = progress;
-                  publish();
+                  publish(false);
                 };
                 const png = execute
                   ? await execute(job, request, generate, onProgress, publish)
@@ -113,6 +120,11 @@ export function createGenerationQueue({
     }
   }
   return {
+    restore(restored) {
+      jobs.splice(0, jobs.length, ...recentJobs(restored, 100));
+      publish();
+      void drain();
+    },
     start(input) {
       if (closed) throw new Error('生成队列已关闭');
       if (!Number.isSafeInteger(input.count) || input.count < 1)
@@ -135,8 +147,8 @@ export function createGenerationQueue({
       void drain();
       return publicJob(job);
     },
-    status(id) {
-      return id ? publicJob(find(id)) : jobs.map(publicJob);
+    status(id, limit = 100) {
+      return id ? publicJob(find(id)) : publicJobs(recentJobs(jobs, limit));
     },
     confirm(ids) {
       for (const id of ids) {
