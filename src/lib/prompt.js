@@ -214,6 +214,20 @@ export function findPromptTextBlockStart(source = '') {
   return textBlockStart(String(source || ''), 0);
 }
 
+// A numeric weight runs to the next "::". When another "number::" opener starts a tag
+// first (e.g. "0.8::a,b,0.8::c::"), that opener starts the next group and this one ends
+// just before it without a closer of its own. Inside an unclosed {} or [] the old reading stays.
+function weightGroupEnd(source, from) {
+  for (let at = source.indexOf('::', from); at !== -1; at = source.indexOf('::', at + 2)) {
+    const before = source.slice(from, at);
+    const opener = before.match(/(?:^|,)\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))$/);
+    const open = (before.match(/[{[]/g) || []).length - (before.match(/[}\]]/g) || []).length;
+    if (!opener || open > 0) return { end: at, closer: 2 };
+    return { end: at - opener[1].length, closer: 0 };
+  }
+  return null;
+}
+
 function scanPromptSegments(source, state, offset = 0, wrappers = []) {
   const segments = [];
   let cursor = 0;
@@ -224,13 +238,16 @@ function scanPromptSegments(source, state, offset = 0, wrappers = []) {
     const weighted = source.slice(cursor).match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+))::/);
     if (weighted) {
       const contentStart = cursor + weighted[0].length;
-      const contentEnd = source.indexOf('::', contentStart);
-      if (contentEnd !== -1) {
+      const group = weightGroupEnd(source, contentStart);
+      if (group) {
+        const contentEnd = group.end;
         const weight = Number(weighted[1]);
+        // close stays "::" even when the group ends at the next opener: inserting a tag
+        // in the middle of the group has to close it explicitly.
         const wrapper = {
           kind: 'weight',
           start: offset + cursor,
-          end: offset + contentEnd + 2,
+          end: offset + contentEnd + group.closer,
           open: weighted[0],
           close: '::',
         };
@@ -238,7 +255,7 @@ function scanPromptSegments(source, state, offset = 0, wrappers = []) {
           ...wrappers,
           wrapper,
         ]).forEach((segment) => segments.push({ ...segment, weight }));
-        cursor = contentEnd + 2;
+        cursor = contentEnd + group.closer;
         continue;
       }
     }

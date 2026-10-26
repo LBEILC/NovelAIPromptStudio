@@ -10,6 +10,7 @@ import {
   normalizeCategory,
   parsePrompt as legacyParsePrompt,
   parsePromptPreservingEdits as legacyParsePromptPreservingEdits,
+  promptTagRanges,
   repairLegacyPromptTags as legacyRepairLegacyPromptTags,
 } from './prompt.js';
 import { parsePromptSection, serializePromptSection } from './promptDocument';
@@ -58,6 +59,37 @@ describe('NovelAI prompt codec', () => {
     });
     expect(formatPrompt(tags)).toBe('1girl,\n1.3::silver hair ::,\nfuturistic city');
     expect(formatPromptInline(tags)).toBe('1girl, 1.3::silver hair ::, futuristic city');
+  });
+
+  it('ends a weighted group where the next numeric opener starts', () => {
+    let id = 0;
+    const source = '0.8::artist:yajuu,artist:ask (askzy),0.8::artists:ningen mame::, rain';
+    const tags = parsePrompt(source, () => `next-${id++}`);
+    expect(tags.map(({ tag, weight, syntax_issue }) => ({ tag, weight, syntax_issue }))).toEqual([
+      { tag: 'artist:yajuu', weight: 0.8, syntax_issue: '' },
+      { tag: 'artist:ask (askzy)', weight: 0.8, syntax_issue: '' },
+      { tag: 'artists:ningen mame', weight: 0.8, syntax_issue: '' },
+      { tag: 'rain', weight: 1, syntax_issue: '' },
+    ]);
+    const ranges = promptTagRanges(source);
+    expect(ranges.map((r) => source.slice(r.start, r.end))).toEqual([
+      'artist:yajuu',
+      'artist:ask (askzy)',
+      'artists:ningen mame',
+      'rain',
+    ]);
+    // The first group has no closer of its own; it still closes with "::" when split.
+    expect(ranges[0].wrappers[0]).toMatchObject({ open: '0.8::', close: '::' });
+    expect(source.slice(ranges[0].wrappers[0].start, ranges[0].wrappers[0].end)).toBe(
+      '0.8::artist:yajuu,artist:ask (askzy),',
+    );
+    expect(parsePrompt('1.2::a, 2::b ::', () => `w-${id++}`).map((t) => t.weight)).toEqual([
+      1.2, 2,
+    ]);
+    // Digits inside a tag are not an opener.
+    expect(parsePrompt('1.5::year 2025::', () => `y-${id++}`)).toMatchObject([
+      { tag: 'year 2025', weight: 1.5 },
+    ]);
   });
 
   it('expands comma-separated weighted groups and preserves negative weights', () => {
