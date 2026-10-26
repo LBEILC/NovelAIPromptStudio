@@ -65,18 +65,15 @@ git diff -- package.json package-lock.json
 至少运行：
 
 ```bash
-npm ci
 npm test
 npm run build
 ```
 
-Windows 上执行 `npm ci` 前先确认没有本地 `npm run dev` 开发服务器在运行：Vite 会锁定 `node_modules` 中的原生绑定文件，导致 `npm ci` 删除重装时报 `EPERM` 或 `ENOTEMPTY`。中断的 `npm ci` 可能留下半删除的 `node_modules`，停止占用进程后重试通常即可恢复。
+只有自上次发版以来改过依赖清单（`package.json` 的依赖、`package-lock.json`）时，才先运行 `npm ci`。Windows 上执行 `npm ci` 前先确认没有本地 `npm run dev` 或整体预览在运行：Vite 会锁定 `node_modules` 中的原生绑定文件，导致 `npm ci` 删除重装时报 `EPERM` 或 `ENOTEMPTY`。中断的 `npm ci` 可能留下半删除的 `node_modules`，停止占用进程后重试通常即可恢复。
 
-涉及桌面打包、主进程、原生依赖或自动更新时，还应在受影响的平台运行：
+本机不打包：标签触发的工作流会在三个平台打包，Windows 还会启动打包后的程序检查。只有改了打包配置（`package.json` 的 `build`、`electron-builder` 相关脚本）、新增或升级原生依赖、改了自动更新时，才在本机先运行 `npm run package`。
 
-```bash
-npm run package
-```
+本机不等 CI、不跑界面验收全套：改动涉及的验收分类在开发时已经跑过，全套由推送后的 CI 跑。
 
 窗口行为、快捷键、文件对话框、安全存储、安装和更新等平台相关功能，由 CI 在 Windows 和 macOS 上的自动化验收覆盖（见[自动化验收](./automated-acceptance.md)）；自动化覆盖不到的写进发布说明的已知问题。
 
