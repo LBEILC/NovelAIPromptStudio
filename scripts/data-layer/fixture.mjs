@@ -93,6 +93,8 @@ export async function seed(directory, count, progress = () => {}, { compact = fa
   try {
     raw.run('PRAGMA foreign_keys=OFF');
     // Recreate the pre-generation schema for migration and compatibility checks.
+    raw.run('DROP TRIGGER IF EXISTS image_nsfw_marks_delete');
+    raw.run('DROP TABLE IF EXISTS image_nsfw_marks');
     for (const table of [
       'branch_undo',
       'saved_works',

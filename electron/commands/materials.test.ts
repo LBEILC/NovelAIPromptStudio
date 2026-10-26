@@ -74,6 +74,7 @@ async function setup() {
     readSource: async () => project,
     importImage: async () => project,
     preferences: {
+      blurSettings: () => ({ mode: 'off', quickAll: false, words: [] }),
       generationSettings: () => ({ hasToken: false }),
       credentials: () => ({ baseUrl: `http://127.0.0.1:${address.port}`, model: 'synthetic' }),
     } as any,

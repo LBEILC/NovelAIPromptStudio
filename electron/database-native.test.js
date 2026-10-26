@@ -96,6 +96,7 @@ describe('native engine upgrade', () => {
           ...record,
           original_filename: record.name + (path.extname(record.image_path) || '.png'),
           has_custom_name: false,
+          nsfw: { value: false, source: 'auto' },
         }));
       const originalFields = (records) =>
         records.map(({ params, references, keptParameters, work_refs, ...record }) => record);
@@ -111,6 +112,7 @@ describe('native engine upgrade', () => {
           [
             ...Object.keys(expected.tables).filter((name) => !RETIRED_TABLES.includes(name)),
             'materials',
+            'image_nsfw_marks',
             'branch_undo',
             'original_undo',
             'removed_originals',
