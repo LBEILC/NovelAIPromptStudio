@@ -164,6 +164,24 @@ export async function main(argv = process.argv.slice(2), services = {}) {
             input: v.fields,
             required: v.required || [],
             ...(v.example ? { example: v.example } : {}),
+            ...(name.startsWith('material.pool.')
+              ? {
+                  description:
+                    '随机池素材命令。名称区分大小写且禁止 _ * ~；chance 为正数相对概率（默认 1）。replace 按行替换、忽略空行；rename 同步打开的草稿，不改历史版本；delete 保留草稿引用。',
+                }
+              : {}),
+            ...(name.startsWith('block.random.')
+              ? {
+                  description:
+                    '基础或角色正面提示词随机块：__池名*2r~0.8-1.2/0.1__。count 1～16，repeat 默认 false；min/max 成对提供（0.1～3），step 默认 0.05（0.01～1）。每张图发送前独立抽取，模板和 Seed 不变，生成仍遵守确认规则。',
+                }
+              : {}),
+            ...(name === 'version.apply-random'
+              ? {
+                  description:
+                    '把所选图的实际抽取内容写回草稿。imageId 接受版本图片 id 或图库 projectId；按 scope/start/source 匹配，返回 applied 数量和 skipped 记录。抽取记录在 version.list 的 versions[].images[].random.blocks。',
+                }
+              : {}),
             ...(name === 'generate.status'
               ? {
                   description:

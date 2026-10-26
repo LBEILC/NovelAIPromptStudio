@@ -144,6 +144,23 @@ nai-studio branch.restore --json '{"undo":"UNDO"}'
 
 打开图片（`workbench.open`）会回到所属作品和对应版本；打开原图会恢复最近使用的作品及上次查看的版本。需要另起新作品时传 `fresh: true`，例如 `nai-studio workbench.open --json '{"libraryId":"IMAGE","fresh":true}'`。
 
+### 随机池与随机块
+
+随机池是 `material.list` 返回的 `kind: "pool"` 素材，名称区分大小写，禁止 `_`、`*`、`~` 和换行。条目为 `{id,text,chance}`，`chance` 是正数相对概率，默认 1。
+
+- `material.pool.create {name}`、`material.pool.rename {id,name}`、`material.pool.delete {id}`。
+- `material.pool.entry.add {id,text,chance?}`、`material.pool.entry.update {id,entryId,text?,chance?}`、`material.pool.entry.delete {id,entryId}`。
+- `material.pool.replace {id,text}`：整池替换，一行一个条目，空行忽略，概率重置为 1。
+- `block.random.insert {tabId,scope,pool,count?,repeat?,min?,max?,step?,before?,expectedRevision?}`；`block.random.update` 使用相同选项和必填的 `block` 索引。`min/max` 成对提供，省略则关闭随机权重。
+
+记号写法：`__池名__` 抽一项；`__池名*2__` 抽两项且不重复；`__池名*2r__` 允许重复；`__池名*2~0.8-1.2/0.1__` 按 0.1 步长分别随机每个 Tag 的权重。省略步长时为 0.05。数量为 1～16，权重范围 0.1～3，步长 0.01～1。段落整体加权，已有权重部分保留。只能用于基础和角色的正面提示词；负面记号会阻止生成。条目不支持嵌套随机块。
+
+每张图发送前使用独立于 Seed 的随机数抽一次；版本和工作台保留模板，模板复制也保留记号。图片自身的提示词来自服务返回的实际结果。`version.list` 的 `versions[].images[].random.blocks` 返回记号原文 `source`、池名 `pool`、范围 `scope`、UTF-16 偏移 `start`、实际替换文字 `text` 及条目 `entries`（`id,text,rendered,weights?`）。
+
+`version.apply-random {tabId,versionId,imageId,expectedRevision?}` 将所选图片抽到的内容写入当前草稿，按范围、原位置和原记号匹配，返回更新后的工作台、`applied` 数量及未匹配的 `skipped` 记录。`imageId` 可用版本图片记录 id 或图库 projectId。池子改名同步所有打开的草稿，保留历史版本；删除池子保留草稿，后续生成会报错。
+
+这些命令不改变生成授权规则：Agent 仍须遵守用户授权和应用的待确认机制，不能代替用户确认生成或修改账号设置。
+
 ### 作品归属与共用图片
 
 图片库记录的 `work_refs` 列出已建立的作品及原图／版本图角色。同一张图片可以属于多个作品；用 `workbench.open {libraryId, workId}` 返回指定作品并定位图片，不匹配时按默认规则打开。

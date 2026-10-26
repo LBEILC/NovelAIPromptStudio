@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
+import { validatePoolName } from '../src/lib/randomPrompt.ts';
 
 const migration = 'materials_v1';
 export function migrateMaterials(connection, filePath, { copy = fs.copyFileSync } = {}) {
@@ -56,10 +57,32 @@ export function createMaterialStore(connection) {
     const { _order, ...value } = JSON.parse(payload);
     return value;
   };
+  const validatePool = (value, id) => {
+    if (value.kind !== 'pool') return;
+    validatePoolName(value.name);
+    if (rows().some((row) => row.kind === 'pool' && row.id !== id && row.name === value.name))
+      throw new Error('随机池名称已存在');
+    const ids = new Set();
+    if (!Array.isArray(value.entries)) throw new Error('随机池条目无效');
+    for (const entry of value.entries) {
+      if (
+        typeof entry.id !== 'string' ||
+        !entry.id ||
+        ids.has(entry.id) ||
+        typeof entry.text !== 'string' ||
+        !entry.text.trim() ||
+        !Number.isFinite(entry.chance) ||
+        entry.chance <= 0
+      )
+        throw new Error('随机池条目无效');
+      ids.add(entry.id);
+    }
+  };
   return {
     list: () => rows().map(decode),
     get: (id) => decode(connection.prepare('SELECT * FROM materials WHERE id=?').get(id)),
     save(value) {
+      validatePool(value);
       const id = crypto.randomUUID();
       connection
         .prepare('INSERT INTO materials(id,kind,name,payload,created_at) VALUES (?,?,?,?,?)')
@@ -76,6 +99,7 @@ export function createMaterialStore(connection) {
       return this.get(id);
     },
     update(id, value, asNew = false) {
+      validatePool(value, id);
       const existing = rows();
       const index = existing.findIndex((row) => row.id === id);
       if (index < 0) throw new Error('素材不存在');
@@ -117,6 +141,7 @@ export function createMaterialStore(connection) {
       }
     },
     rename(id, name) {
+      validatePool({ ...this.get(id), name }, id);
       connection.prepare('UPDATE materials SET name=? WHERE id=?').run(name, id);
       return this.get(id);
     },

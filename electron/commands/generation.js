@@ -27,10 +27,21 @@ const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 };
+const withPromptTemplate = (project, draft) => ({
+  ...project,
+  metadata: {
+    ...project.metadata,
+    prompt_raw: draft.metadata.prompt_raw,
+    negative_prompt: draft.metadata.negative_prompt,
+  },
+  prompt_structure: structuredClone(draft.prompt_structure),
+  tags: structuredClone(draft.tags),
+});
 export function generationCommands({ services, store, tab, revision, unlocked, emit }) {
   const preferences = services.preferences;
   if (!preferences) return { handlers: {}, close: () => {} };
   const versions = services.database.versions;
+  const pools = () => services.database.materials.list().filter((p) => p.kind === 'pool');
   let shuttingDown = false;
   let subscription = null,
     accountError = '';
@@ -140,6 +151,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     }
     const prepared = await buildProjectRequest(current.project, services.database.vibeLibrary, {
       seed,
+      pools: pools(),
+      sample: false,
     });
     checkRelayRequest(settings(), prepared.request, prepared.pendingEncodes);
     return prepared;
@@ -166,6 +179,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         generate,
         seed: request.parameters.seed,
         library: services.database.vibeLibrary,
+        pools: pools(),
         publish,
         beforeBlock: () => {
           const s = settings();
@@ -212,29 +226,37 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       if (job.operation === 'outpaint') return;
       if (['upscale', 'enhance', 'inpaint'].includes(job.operation)) {
         const preview = await buildImageOperation(
-          job.operationDetails.prompt || job.project,
-          job.operationPath,
-          job.operationDetails,
-          services.database.vibeLibrary,
-          { seed: job.request.parameters.seed, mask: job.inpaintMask },
-        );
-        checkOperationRelay(preview.request, preview.pendingEncodes);
-        if (job.operation === 'inpaint') {
-          job.request = preview.request;
-          job.referencesPrepared = true;
-          return;
-        }
-        const prepared = await buildImageOperation(
-          job.operationDetails.prompt || job.project,
+          { ...job.project, ...job.operationDetails.prompt },
           job.operationPath,
           job.operationDetails,
           services.database.vibeLibrary,
           {
             seed: job.request.parameters.seed,
+            pools: pools(),
+            mask: job.inpaintMask,
+            sample: job.operation === 'inpaint',
+          },
+        );
+        checkOperationRelay(preview.request, preview.pendingEncodes);
+        if (job.operation === 'inpaint') {
+          job.random = preview.random;
+          job.request = preview.request;
+          job.referencesPrepared = true;
+          return;
+        }
+        const prepared = await buildImageOperation(
+          { ...job.project, ...job.operationDetails.prompt },
+          job.operationPath,
+          job.operationDetails,
+          services.database.vibeLibrary,
+          {
+            seed: job.request.parameters.seed,
+            pools: pools(),
             mask: job.inpaintMask,
             encode: (body) => client().encodeVibe(body),
           },
         );
+        job.random = prepared.random;
         job.request = prepared.request;
         job.referencesPrepared = true;
         return;
@@ -242,12 +264,16 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       // Rehydrate restored jobs too; previously prepared requests can contain legacy bad values.
       const preview = await buildProjectRequest(job.project, services.database.vibeLibrary, {
         seed: job.request.parameters.seed,
+        pools: pools(),
+        sample: false,
       });
       checkRelayRequest(settings(), preview.request, preview.pendingEncodes);
       const prepared = await buildProjectRequest(job.project, services.database.vibeLibrary, {
         seed: job.request.parameters.seed,
+        pools: pools(),
         encode: (body) => client().encodeVibe(body),
       });
+      job.random = prepared.random;
       job.request = prepared.request;
       job.project = prepared.project;
       job.referencesPrepared = true;
@@ -306,7 +332,13 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     },
     accept: async (job, png, seed) => {
       if (job.operation === 'inpaint') {
-        png = await compositeInpaint(job.operationPath, png, job.operationDetails, job.inpaintMask);
+        png = await compositeInpaint(
+          job.operationPath,
+          png,
+          job.operationDetails,
+          job.inpaintMask,
+          !!job.random?.blocks.length,
+        );
         // A queued operation may share a mask with a version purged while waiting.
         await storeInpaintMask(
           job.inpaintMask,
@@ -331,6 +363,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           source: job.source,
           image,
           seed,
+          random: job.random,
           versionId: job.versionId,
           operation:
             job.operationDetails ||
@@ -427,7 +460,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         : null,
       workSaved: versions.isSaved(current.workId),
     },
-    document: createPromptDocument(current.project),
+    document: createPromptDocument(current.project, {}, pools()),
     revision: current.revision || 0,
   });
   async function openVersion(input) {
@@ -627,21 +660,25 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     if (!parent) throw new CommandError('not_found', '图片不在这个作品中');
     const image = services.database.loadProject(input.imageId) || parent.project;
     if (image.deleted_at) throw new CommandError('not_found', '图片不存在');
+    const promptProject =
+      input.op === 'inpaint'
+        ? current.project
+        : withPromptTemplate(parent.project, current.project);
     const operation = {
       kind: input.op,
       sourceProjectId: input.imageId,
+      prompt: structuredClone(
+        Object.fromEntries(
+          ['metadata', 'tags', 'prompt_structure', 'params', 'keptParameters']
+            .filter((key) => promptProject[key] !== undefined)
+            .map((key) => [key, promptProject[key]]),
+        ),
+      ),
       ...(input.op === 'inpaint'
         ? {
             rect: input.rect,
             strength: input.strength ?? 1,
             fullSize: input.fullSize ?? false,
-            prompt: structuredClone(
-              Object.fromEntries(
-                ['metadata', 'tags', 'prompt_structure', 'params', 'keptParameters']
-                  .filter((key) => current.project[key] !== undefined)
-                  .map((key) => [key, current.project[key]]),
-              ),
-            ),
           }
         : {}),
       ...(input.op === 'enhance'
@@ -653,11 +690,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         : {}),
     };
     const prepared = await buildImageOperation(
-      input.op === 'inpaint' ? current.project : parent.project,
+      promptProject,
       image.image_path,
       operation,
       services.database.vibeLibrary,
-      { mask: input.mask },
+      { mask: input.mask, pools: pools(), sample: false },
     );
     if (input.op === 'inpaint')
       operation.generated = {
@@ -670,14 +707,14 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       settings().connection === 'relay'
         ? { anlas: 0, perImage: 0, free: false, count: 1, relay: true }
         : estimateImageOperation(prepared.request, subscription, prepared.pendingEncodes);
-    return { current, parent, image, operation, prepared, price };
+    return { current, parent, image, operation, prepared, price, promptProject };
   }
   async function startOperation(input, kind) {
     const current = tab(input.tabId);
     revision(input.expectedRevision, current.revision || 0);
     unlocked(input);
     if (!settings().hasToken) throw new Error('没有持久令牌');
-    const { parent, image, operation, prepared, price } = await operationFor({
+    const { parent, image, operation, prepared, price, promptProject } = await operationFor({
       ...input,
       op: kind,
     });
@@ -697,7 +734,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       tabId: current.id,
       workId: parent.workId,
       parentId: parent.id,
-      project: parent.project,
+      project: withPromptTemplate(parent.project, promptProject),
       request: prepared.request,
       count: 1,
       fixedSeed: kind === 'upscale',
@@ -742,6 +779,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         },
       },
       services.database.vibeLibrary,
+      { pools: pools(), sample: false },
     );
     checkOperationRelay(prepared.request, prepared.pendingEncodes);
     const priceStep = (step) => {
@@ -873,7 +911,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         tabId: current.id,
         workId: parent.workId,
         parentId: parent.id,
-        project: parent.project,
+        project: withPromptTemplate(parent.project, current.project),
         request: prepared.request,
         count: 1,
         fixedSeed: false,

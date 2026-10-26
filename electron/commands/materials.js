@@ -67,7 +67,7 @@ export function safeTidyChange(before, after, known) {
   );
 }
 
-export function materialCommands({ services, tab, full, edit, locate, revision }) {
+export function materialCommands({ services, tab, full, edit, locate, revision, renamePool }) {
   const db = services.database.materials;
   const requests = new Map();
   const read = (id) => {
@@ -235,9 +235,13 @@ export function materialCommands({ services, tab, full, edit, locate, revision }
         }),
       };
     },
-    'material.rename': ({ id, name }) => ({ item: db.rename(read(id).id, name.trim()) }),
+    'material.rename': ({ id, name }) =>
+      read(id).kind === 'pool' && renamePool
+        ? renamePool({ id, name })
+        : { item: db.rename(read(id).id, name.trim()) },
     'material.update': ({ id, block, negative, text, asNew }) => {
       const material = read(id);
+      if (material.kind === 'pool') throw new CommandError('invalid_input', '请使用随机池条目命令');
       if (typeof text !== 'string' || !text.trim())
         throw new CommandError('invalid_input', '素材内容不能为空');
       if (material.kind === 'block' && negative !== undefined)
@@ -272,6 +276,8 @@ export function materialCommands({ services, tab, full, edit, locate, revision }
     },
     'material.insert': async (input) => {
       const material = read(input.id);
+      if (material.kind === 'pool')
+        throw new CommandError('invalid_input', '请使用 block.random.insert');
       const result = await edit(input, (doc) => {
         if (material.kind === 'character') {
           const before = promptDocumentProject(doc);

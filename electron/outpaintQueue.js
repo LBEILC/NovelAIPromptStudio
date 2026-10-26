@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import sharp from 'sharp';
 import { EDGE_ORDER } from '../src/shared/outpaint.ts';
+import { resolveRandomProject } from './randomPrompt.js';
 import {
   outpaintSteps,
   buildOutpaint,
@@ -14,6 +15,7 @@ export async function runOutpaint(
   {
     generate,
     library,
+    pools = [],
     publish,
     seed = job.request.parameters.seed,
     beforeBlock = () => {},
@@ -23,9 +25,12 @@ export async function runOutpaint(
   const source = await read(job.operationPath);
   const sourceSize = await sharp(source).metadata();
   const operation = job.operationDetails;
+  const resolved = resolveRandomProject(operation.prompt, pools);
+  job.random = resolved.record;
   const steps = outpaintSteps(sourceSize, operation.edges, operation.mode, operation.fullSize);
   let result = source,
     completed = 0;
+  let metadataSource = source;
   job.blockCount = steps.length;
   for (const step of steps) {
     try {
@@ -36,13 +41,13 @@ export async function runOutpaint(
       publish();
       const previousSize = await sharp(result).metadata();
       const prepared = await buildOutpaint(
-        operation.prompt,
+        resolved.project,
         result,
         sourceSize,
         step.applied,
         step,
         library,
-        { seed },
+        { seed, pools },
       );
       if (job.stop) throw new Error('已取消');
       const png = await generate(prepared.request, (progress) => {
@@ -51,6 +56,7 @@ export async function runOutpaint(
       });
       await afterBlock();
       result = await compositeOutpaint(prepared.canvas, png, previousSize, step);
+      if (job.random.blocks.length) metadataSource = png;
       completed++;
     } catch (error) {
       if (!completed) throw error;
@@ -65,5 +71,5 @@ export async function runOutpaint(
       break;
     }
   }
-  return restoreOutpaintMetadata(source, result);
+  return restoreOutpaintMetadata(metadataSource, result);
 }

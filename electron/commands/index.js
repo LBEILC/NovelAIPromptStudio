@@ -1,3 +1,4 @@
+import { randomCommands } from './random.js';
 // @ts-check
 import { blurCommands } from './blur.js';
 import { countImportDays } from '../../src/lib/dateRange.js';
@@ -126,7 +127,11 @@ export async function createCommands(services) {
         workSaved: services.database.versions?.isSaved(value.workId) || false,
         project: refreshed,
       },
-      document: createPromptDocument(refreshed),
+      document: createPromptDocument(
+        refreshed,
+        {},
+        services.database.materials.list().filter((p) => p.kind === 'pool'),
+      ),
       revision: value.revision || 0,
     };
   };
@@ -396,9 +401,10 @@ export async function createCommands(services) {
     'library.get': async (input) => {
       await services.readyLibrary?.();
       return {
-        project: /** @type {import('../../src/shared/types').ImageRecord} */ (
-          services.database.loadProject(input.id) || project(input.id)
-        ),
+        project: /** @type {import('../../src/shared/types').ImageRecord} */ ({
+          ...(services.database.loadProject(input.id) || project(input.id)),
+          random: services.database.versions.randomForImage(input.id),
+        }),
         revision: store.revision(),
       };
     },
@@ -583,11 +589,21 @@ export async function createCommands(services) {
     },
   };
   const generation = generationCommands({ services, store, tab, revision, unlocked, emit });
+  const random = randomCommands({ services, store, tab, edit, locate, unlocked, emit });
   await generation.ready?.();
   Object.assign(
     handlers,
     generation.handlers,
-    materialCommands({ services, tab, full, edit, locate, revision }),
+    materialCommands({
+      services,
+      tab,
+      full,
+      edit,
+      locate,
+      revision,
+      renamePool: random['material.pool.rename'],
+    }),
+    random,
     parameterCommands({ services, tab, edit, revision, unlocked }),
   );
   /** @param {import('../../src/shared/commands').CommandInput<'collection.add'>} input @param {'add'|'remove'} action */

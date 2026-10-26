@@ -235,7 +235,10 @@ it.each(['whole', 'edges', 'partial', 'failed', 'cancel', 'cancel-before'])(
       expect(versions).toHaveLength(2);
       const version = f.database.versions.get(final.versionId);
       expect(version.parentId).toBe(parent.id);
-      expect(version.project.metadata).toEqual(parent.project.metadata);
+      expect(version.project.metadata).toEqual({
+        ...parent.project.metadata,
+        prompt_raw: 'synthetic draft',
+      });
       expect(version.operation).toMatchObject({
         kind: 'outpaint',
         edges: f.input.edges,

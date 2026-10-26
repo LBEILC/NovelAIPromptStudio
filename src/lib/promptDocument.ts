@@ -1,3 +1,9 @@
+import {
+  randomMarkers,
+  parseRandomMarker,
+  randomSyntaxNote,
+  type RandomOptions,
+} from './randomPrompt.ts';
 import { parsePrompt, parsePromptPreservingEdits, promptTagRanges, formatTag } from './prompt.js';
 import {
   getPromptScopes,
@@ -21,7 +27,7 @@ import type {
   PromptAutomation,
 } from '../shared/types';
 
-export type BlockType = 'tags' | 'paragraph';
+export type BlockType = 'tags' | 'paragraph' | 'random';
 /** Half-open UTF-16 offsets, suitable for String.slice (not encoded byte offsets). */
 export interface TextRange {
   start: number;
@@ -35,9 +41,13 @@ export interface BlockTypeOverride {
 export interface ParseBlockOptions {
   overrides?: readonly BlockTypeOverride[];
   createId?: () => string;
+  pools?: readonly { name: string; entries?: import('./randomPrompt').PoolEntry[] }[];
+  negative?: boolean;
 }
 export type ParsedTag = ReturnType<typeof parsePrompt>[number];
 export interface PromptBlock {
+  random?: RandomOptions;
+  syntaxNote?: string;
   textLayout?: boolean;
   displayLabel?: string;
   userType?: boolean;
@@ -185,7 +195,15 @@ function makeBlock(raw: string, start: number, options: ParseBlockOptions): Prom
     options.overrides?.find(
       (item) => item.range?.start === range.start && item.range.end === range.end,
     ) ?? options.overrides?.find((item) => item.raw === raw);
-  const type = override?.type ?? classifyPromptBlock(content);
+  const marker = content.startsWith('__');
+  const type = marker
+    ? options.negative
+      ? 'paragraph'
+      : 'random'
+    : (override?.type ?? classifyPromptBlock(content));
+  const syntaxNote = marker
+    ? randomSyntaxNote(content, options.pools, options.negative)
+    : undefined;
   const contentStart = start + prefix.length + label.length + labelSpacing.length;
   return {
     type,
@@ -196,6 +214,9 @@ function makeBlock(raw: string, start: number, options: ParseBlockOptions): Prom
     label,
     labelSpacing,
     content,
+    ...(marker
+      ? { syntaxNote, ...(!syntaxNote ? { random: parseRandomMarker(content) } : {}) }
+      : {}),
     contentRange: { start: contentStart, end: contentStart + content.length },
     tags: type === 'tags' ? parsePrompt(content, options.createId) : [],
   };
@@ -229,7 +250,39 @@ export function parsePromptSection(source: string, options: ParseBlockOptions = 
   }
   finish();
   separators.push(source.slice(previousEnd));
-  return { blocks, separators };
+  const split: PromptBlock[] = [];
+  for (const block of blocks) {
+    const markers = randomMarkers(block.raw);
+    if (!markers.length) {
+      split.push(block);
+      continue;
+    }
+    let at = 0;
+    for (const marker of markers) {
+      if (marker.index! > at)
+        split.push(makeBlock(block.raw.slice(at, marker.index), block.range.start + at, options));
+      split.push(
+        makeBlock(marker[0], block.range.start + marker.index!, {
+          pools: options.pools,
+          negative: options.negative,
+        }),
+      );
+      at = marker.index! + marker[0].length;
+    }
+    if (at < block.raw.length)
+      split.push(makeBlock(block.raw.slice(at), block.range.start + at, options));
+  }
+  return {
+    blocks: split,
+    separators: split.length
+      ? [
+          source.slice(0, split[0].range.start),
+          ...split.map((b, i) =>
+            source.slice(b.range.end, split[i + 1]?.range.start ?? source.length),
+          ),
+        ]
+      : [source],
+  };
 }
 
 export function serializePromptSection(section: PromptSection): string {
@@ -274,6 +327,7 @@ export function setPromptBlockType(
   index: number,
   type: BlockType,
 ): PromptSection {
+  if (section.blocks[index]?.type === 'random') throw new TypeError('随机块不能改为普通块');
   const next = replaceBlockContent(section, index, section.blocks[index]?.content ?? '', type);
   return {
     ...next,
@@ -297,6 +351,19 @@ export function editPromptBlockText(
   index: number,
   content: string,
 ): PromptSection {
+  if (section.blocks[index]?.type === 'random' || randomMarkers(content).length) {
+    const block = section.blocks[index];
+    if (!block) throw new RangeError('Unknown prompt block');
+    const raw = serializePromptSection(section);
+    return parsePromptSection(
+      raw.slice(0, block.contentRange.start) + content + raw.slice(block.contentRange.end),
+      {
+        overrides: section.blocks
+          .filter((b) => b.userType && b.type !== 'random')
+          .map((b) => ({ raw: b.raw, type: b.type })),
+      },
+    );
+  }
   return replaceBlockContent(section, index, content);
 }
 
@@ -464,6 +531,7 @@ function uniqueTagIds<T extends { tags: { id?: string }[] }>(scope: T): T {
 export function createPromptDocument(
   source: PromptDocumentSource,
   overrides: Record<string, readonly BlockTypeOverride[]> = {},
+  pools?: ParseBlockOptions['pools'],
 ): PromptDocument {
   const structure = normalizePromptStructure(source.prompt_structure, source.metadata);
   const project = {
@@ -474,7 +542,11 @@ export function createPromptDocument(
   return {
     project,
     scopes: (getPromptScopes(project) as PromptScope[]).map(uniqueTagIds).map((scope) => {
-      const section = parsePromptSection(scope.raw_prompt, { overrides: overrides[scope.key] });
+      const section = parsePromptSection(scope.raw_prompt, {
+        overrides: overrides[scope.key],
+        pools,
+        negative: scope.polarity === 'undesired',
+      });
       const annotations = [...(structure.block_annotations?.[scope.key] || [])];
       section.blocks = section.blocks.map((block) => {
         let index = annotations.findIndex(
@@ -485,7 +557,7 @@ export function createPromptDocument(
         const [entry] = annotations.splice(index, 1);
         return {
           ...block,
-          ...(entry.type
+          ...(entry.type && block.type !== 'random' && !block.syntaxNote
             ? {
                 type: entry.type,
                 userType: true,
@@ -629,7 +701,7 @@ export function copyVisiblePromptDocument(
         return [];
       const ranges = promptTagRanges(serializePromptSection(section));
       return section.blocks.flatMap((block) => {
-        if (block.type === 'paragraph') {
+        if (block.type === 'paragraph' || block.type === 'random') {
           if (
             filters.category !== 'All' ||
             !`${block.content}\n${block.translation || ''}`

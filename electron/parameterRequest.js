@@ -1,3 +1,4 @@
+import { resolveRandomProject } from './randomPrompt.js';
 import {
   hydrateParameters,
   normalizeSettings,
@@ -19,8 +20,14 @@ import { prepareBaseImage } from './baseImage.js';
 import { preciseImage } from './vibeLibrary.js';
 import { MODEL_CAPS } from '../src/shared/params.ts';
 
-export async function buildProjectRequest(project, library, { seed, encode } = {}) {
-  const p = hydrateParameters(project),
+export async function buildProjectRequest(
+  project,
+  library,
+  { seed, encode, pools = [], sample = true } = {},
+) {
+  const template = hydrateParameters(project);
+  const resolved = resolveRandomProject(template, pools, sample ? undefined : () => 0);
+  const p = hydrateParameters(resolved.project),
     settings = normalizeSettings(p.params),
     refs = p.references;
   const medium = settings.effort === 'Medium',
@@ -162,5 +169,15 @@ export async function buildProjectRequest(project, library, { seed, encode } = {
     parameters.director_reference_information_extracted = refs.precise.map(() => 1);
   }
   // Local estimate information is deliberately outside the API payload.
-  return { request, pendingEncodes: pending.size, project: p };
+  return {
+    request,
+    pendingEncodes: pending.size,
+    project: {
+      ...p,
+      metadata: template.metadata,
+      prompt_structure: template.prompt_structure,
+      tags: template.tags,
+    },
+    random: resolved.record,
+  };
 }

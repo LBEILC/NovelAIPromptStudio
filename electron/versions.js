@@ -107,6 +107,7 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
   let activeVersions = new Set();
   // Additive tables keep every existing snapshot readable without rewriting it.
   connection.exec(`
+    CREATE TABLE IF NOT EXISTS version_image_random (image_id TEXT PRIMARY KEY, record_json TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS deferred_version_prunes (version_id TEXT PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS deleted_versions (version_id TEXT PRIMARY KEY, token TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS branch_undo (token TEXT PRIMARY KEY, payload TEXT NOT NULL);
@@ -175,6 +176,11 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
           id: image.id,
           projectId: image.project_id,
           seed: image.seed,
+          random: JSON.parse(
+            connection
+              .prepare('SELECT record_json FROM version_image_random WHERE image_id=?')
+              .get(image.id)?.record_json || 'null',
+          ),
           deleted: !!image.deleted_at,
           createdAt: image.created_at,
         })),
@@ -282,6 +288,14 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
   );
   return (api = {
     ...sharing,
+    randomForImage(projectId) {
+      const row = connection
+        .prepare(
+          'SELECT r.record_json FROM version_image_random r JOIN version_images i ON i.id=r.image_id WHERE i.project_id=? ORDER BY i.rowid DESC LIMIT 1',
+        )
+        .get(projectId);
+      return row ? JSON.parse(row.record_json) : null;
+    },
     setActiveVersions(ids) {
       activeVersions = new Set(ids);
     },
@@ -582,6 +596,11 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
     purgeImage(projectId) {
       for (const work of originsOf([projectId]))
         connection.prepare('INSERT OR IGNORE INTO removed_originals VALUES (?)').run(work.workId);
+      connection
+        .prepare(
+          'DELETE FROM version_image_random WHERE image_id IN (SELECT id FROM version_images WHERE project_id=?)',
+        )
+        .run(projectId);
       connection.prepare('DELETE FROM version_images WHERE project_id=?').run(projectId);
       // Retain detached image targets so deleting another image cannot invalidate
       // their undo records. Keeping each target also retains its ancestors.
@@ -658,7 +677,7 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
         return get(id);
       });
     },
-    append({ workId, parentId, project, source, image, seed, versionId, operation }) {
+    append({ workId, parentId, project, source, image, seed, versionId, operation, random }) {
       return atomic(() => {
         const parent = get(parentId);
         if (!parent || parent.workId !== workId) throw new Error('版本不存在');
@@ -701,9 +720,14 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
             );
           target = get(id);
         }
+        const imageId = crypto.randomUUID();
         connection
           .prepare('INSERT INTO version_images VALUES (?,?,?,?,?)')
-          .run(crypto.randomUUID(), target.id, image.id, String(seed), new Date().toISOString());
+          .run(imageId, target.id, image.id, String(seed), new Date().toISOString());
+        if (random?.blocks.length)
+          connection
+            .prepare('INSERT INTO version_image_random VALUES (?,?)')
+            .run(imageId, JSON.stringify(random));
         sharing.save(workId);
         return get(target.id);
       });

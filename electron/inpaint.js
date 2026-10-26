@@ -152,7 +152,13 @@ function blur(input, width, height, radius) {
   return data;
 }
 
-export async function compositeInpaint(sourcePath, generated, operation, mask) {
+export async function compositeInpaint(
+  sourcePath,
+  generated,
+  operation,
+  mask,
+  useGeneratedMetadata = false,
+) {
   if (!generated.subarray(0, 8).equals(PNG)) throw new Error('重绘结果不是 PNG');
   const size = operation.generated;
   const metadata = await sharp(generated).metadata();
@@ -219,14 +225,15 @@ export async function compositeInpaint(sourcePath, generated, operation, mask) {
     }
   const pixels = await sharp(original.data, { raw: original.info }).png().toBuffer();
   const texts = [];
-  if (originalBytes.subarray(0, 8).equals(PNG))
-    for (let offset = 8; offset + 12 <= originalBytes.length; ) {
-      const length = originalBytes.readUInt32BE(offset);
-      if (offset + length + 12 > originalBytes.length) throw new Error('源图 PNG 数据损坏');
+  const metadataBytes = useGeneratedMetadata ? generated : originalBytes;
+  if (metadataBytes.subarray(0, 8).equals(PNG))
+    for (let offset = 8; offset + 12 <= metadataBytes.length; ) {
+      const length = metadataBytes.readUInt32BE(offset);
+      if (offset + length + 12 > metadataBytes.length) throw new Error('源图 PNG 数据损坏');
       if (
-        ['tEXt', 'zTXt', 'iTXt'].includes(originalBytes.toString('ascii', offset + 4, offset + 8))
+        ['tEXt', 'zTXt', 'iTXt'].includes(metadataBytes.toString('ascii', offset + 4, offset + 8))
       )
-        texts.push(originalBytes.subarray(offset, offset + length + 12));
+        texts.push(metadataBytes.subarray(offset, offset + length + 12));
       offset += length + 12;
     }
   return Buffer.concat([pixels.subarray(0, -12), ...texts, pixels.subarray(-12)]);

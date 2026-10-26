@@ -73,6 +73,7 @@ export function reparseSection(
   const next = parsePromptSection(raw);
   if (textMode)
     next.blocks = next.blocks.map((block) => {
+      if (block.type === 'random') return block;
       const type =
         !block.content.includes(',') && block.content.trim().split(/\s+/).length > 8
           ? 'paragraph'

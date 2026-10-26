@@ -23,6 +23,11 @@ const project = (prompt: string, negative = 'lowres') => {
     prompt_structure: createPromptStructure(metadata),
   } as ImageProject;
 };
+it('describes random option changes while retaining template identity', () => {
+  const diff = versionDiff(project('__Action__'), project('__Action*2__'));
+  expect(diff.empty).toBe(false);
+  expect(diffSummary(diff)).toContain('随机块 Action ×1→×2');
+});
 it('puts dimensions first and keeps a bounded change summary', () => {
   const a = project('rain'),
     b = project('rain, blue sky, yellow clouds, bright sunshine, soft light, mountain, river');

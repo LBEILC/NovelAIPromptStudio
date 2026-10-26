@@ -130,6 +130,44 @@ it('restores image marks and privacy preferences with the original files', () =>
     expect(await fs.readFile(database.loadProject(project.id).image_path)).toEqual(original);
   }));
 
+it('backs up random pools and per-image draws and restores their original values', () =>
+  fixture(async ({ database, manager, file, project }) => {
+    const pool = database.materials.save({
+      kind: 'pool',
+      name: 'Synthetic Pool',
+      blocks: [],
+      examples: [],
+      entries: [{ id: 'entry', text: 'standing', chance: 2 }],
+    });
+    const root = database.versions.ensure('random-backup', project);
+    const random = {
+      blocks: [
+        {
+          source: '__Synthetic Pool__',
+          pool: pool.name,
+          scope: 'base:prompt',
+          start: 0,
+          text: 'standing',
+          entries: [{ id: 'entry', text: 'standing', rendered: 'standing' }],
+        },
+      ],
+    };
+    const version = database.versions.append({
+      workId: root.workId,
+      parentId: root.id,
+      project,
+      source: 'user',
+      image: project,
+      seed: 123,
+      random,
+    });
+    await manager.export(file, true);
+    database.materials.remove(pool.id);
+    await manager.restore(file);
+    expect(database.materials.get(pool.id)).toEqual(pool);
+    expect(database.versions.get(version.id).images[0].random).toEqual(random);
+  }));
+
 it('backs up managed base copies and operation snapshots with version restoration', () =>
   fixture(async ({ database, assets, manager, file, project }) => {
     const base = { ...(await storeBaseImage(project.image_path, assets)), strength: 0.7, noise: 0 };

@@ -20,6 +20,35 @@ export async function generationChecks({
 }) {
   const { evaluate: e, click, input, wait, check } = h;
   h.category('生成');
+  const randomRequestStart = generationService.state.requests.length;
+  await check(
+    '随机块三张生成保留一版、逐图记录并应用选中结果',
+    `(async () => {
+      const call = async (name, input = {}) => { const r = await window.studio.invoke(name,input); if(!r.ok) throw Error(r.error.message); return r.data; };
+      await call('account.save', {token:'acceptance-token'});
+      const {item} = await call('material.pool.create', {name:'动作池'});
+      await call('material.pool.replace', {id:item.id,text:'standing\\nsitting\\nwalking\\nwaving'});
+      const opened = await call('workbench.new', {width:64,height:64,params:{quality:'None',uc:'None'}});
+      const tabId = opened.tab.id;
+      await call('prompt.set', {tabId,scope:'base:prompt',text:'__动作池*2__'});
+      const job = await call('generate.start', {tabId,count:3});
+      let state;
+      do { await new Promise(r=>setTimeout(r,30)); state=(await call('generate.status',{id:job.id})).jobs[0]; } while(['queued','generating'].includes(state.state));
+      const versions = (await call('version.list', {tabId})).versions.filter(v=>!v.isStart);
+      if (state.state!=='completed' || versions.length!==1 || versions[0].images.length!==3) return false;
+      const version = versions[0], image = version.images[1];
+      const applied = await call('version.apply-random', {tabId,versionId:version.id,imageId:image.id});
+      await call('material.pool.delete', {id:item.id});
+      await call('workbench.close', {tabId});
+      return version.project.metadata.prompt_raw==='__动作池*2__' && version.images.every(i=>i.random?.blocks[0]?.entries.length===2) && applied.applied===1 && !applied.tab.project.metadata.prompt_raw.includes('__') && applied.tab.project.metadata.prompt_raw===image.random.blocks[0].text;
+    })()`,
+  );
+  await check('随机记号未进入真实发送链路的本地假服务请求', () => {
+    const requests = generationService.state.requests.slice(randomRequestStart);
+    return (
+      requests.length === 3 && requests.every((request) => !JSON.stringify(request).includes('__'))
+    );
+  });
   await check(
     '中转站命令完成连接测试、生成和切回官方',
     `(async () => {

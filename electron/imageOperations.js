@@ -4,6 +4,7 @@ import { buildInpaint } from './inpaint.js';
 import { buildProjectRequest } from './parameterRequest.js';
 import { estimateGeneration } from './generation.js';
 import { MODEL_CAPS } from '../src/shared/params.ts';
+import { resolveRandomProject } from './randomPrompt.js';
 
 const MAX_AREA = 3145728;
 export const ENHANCE_MAGNITUDES = [
@@ -81,8 +82,14 @@ export async function buildImageOperation(project, sourcePath, operation, librar
   const bytes = await fs.readFile(sourcePath);
   const { width, height } = await sharp(bytes).metadata();
   if (operation.kind === 'upscale') {
+    const { record } = resolveRandomProject(
+      project,
+      options.pools || [],
+      options.sample === false ? () => 0 : undefined,
+    );
     upscalePrice(width, height);
     return {
+      random: record,
       request: {
         action: 'upscale',
         model: 'nai-diffusion-5-curated',

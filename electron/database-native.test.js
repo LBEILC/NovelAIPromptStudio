@@ -125,6 +125,7 @@ describe('native engine upgrade', () => {
             'work_file_signatures',
             'reference_vibes',
             'version_images',
+            'version_image_random',
             'work_branch_names',
             'work_versions',
             'works',

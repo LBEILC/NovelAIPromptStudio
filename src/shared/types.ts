@@ -89,7 +89,7 @@ export interface PromptStructure extends PromptStructureRaw {
     {
       raw: string;
       textLayout?: boolean;
-      type?: 'tags' | 'paragraph';
+      type?: 'tags' | 'paragraph' | 'random';
       translation?: string;
       displayLabel?: string;
       start: number;
@@ -180,6 +180,7 @@ export interface DetachedRecord {
   image: LibraryCard;
 }
 export interface ImageProject {
+  random?: import('../lib/randomPrompt').RandomRecord | null;
   nsfw: NsfwState;
   missing?: boolean;
   blank?: true;

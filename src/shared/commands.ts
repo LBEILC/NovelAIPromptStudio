@@ -153,6 +153,63 @@ export interface AgentSkills {
   codex: { state: AgentSkillState; path: string };
 }
 export interface CommandDefinitions {
+  'material.pool.create': {
+    input: { name: string };
+    output: { item: import('./materials').Material };
+  };
+  'material.pool.rename': {
+    input: { id: string; name: string };
+    output: { item: import('./materials').Material };
+  };
+  'material.pool.delete': { input: { id: string }; output: Record<string, never> };
+  'material.pool.entry.add': {
+    input: { id: string; text: string; chance?: number };
+    output: { item: import('./materials').Material };
+  };
+  'material.pool.entry.update': {
+    input: { id: string; entryId: string; text?: string; chance?: number };
+    output: { item: import('./materials').Material };
+  };
+  'material.pool.entry.delete': {
+    input: { id: string; entryId: string };
+    output: { item: import('./materials').Material };
+  };
+  'material.pool.replace': {
+    input: { id: string; text: string };
+    output: { item: import('./materials').Material };
+  };
+  'block.random.insert': {
+    input: ScopeInput & {
+      pool: string;
+      count?: number;
+      repeat?: boolean;
+      min?: number;
+      max?: number;
+      step?: number;
+      before?: number;
+    };
+    output: TabDocument;
+  };
+  'block.random.update': {
+    input: BlockInput & {
+      pool: string;
+      count?: number;
+      repeat?: boolean;
+      min?: number;
+      max?: number;
+      step?: number;
+      before?: number;
+    };
+    output: TabDocument;
+  };
+  'version.apply-random': {
+    input: TabInput & { versionId: string; imageId: string };
+    output: TabDocument & {
+      applied: number;
+      skipped: import('../lib/randomPrompt').RandomRecord['blocks'];
+    };
+  };
+
   'library.nsfw.mark': {
     input: { ids: string[]; value: 'nsfw' | 'safe' | 'auto' };
     output: { states: Record<string, Types.NsfwState> };

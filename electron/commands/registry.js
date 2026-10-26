@@ -16,6 +16,67 @@ const category =
   'ArtistEra|Subject|Identity|Body|Clothing|Action|Environment|Composition|StyleQuality|Unsorted';
 /** @type {Record<CommandName, Definition>} */
 export const commandRegistry = {
+  'material.pool.create': { fields: { name: 'string' }, required: ['name'], mutation: true },
+  'material.pool.rename': {
+    fields: { id: 'string', name: 'string' },
+    required: ['id', 'name'],
+    mutation: true,
+  },
+  'material.pool.delete': { fields: { id: 'string' }, required: ['id'], mutation: true },
+  'material.pool.entry.add': {
+    fields: { id: 'string', text: 'text', chance: 'number' },
+    required: ['id', 'text'],
+    mutation: true,
+  },
+  'material.pool.entry.update': {
+    fields: { id: 'string', entryId: 'string', text: 'text', chance: 'number' },
+    required: ['id', 'entryId'],
+    mutation: true,
+  },
+  'material.pool.entry.delete': {
+    fields: { id: 'string', entryId: 'string' },
+    required: ['id', 'entryId'],
+    mutation: true,
+  },
+  'material.pool.replace': {
+    fields: { id: 'string', text: 'text' },
+    required: ['id', 'text'],
+    mutation: true,
+  },
+  'block.random.insert': {
+    fields: {
+      ...scope,
+      pool: 'string',
+      count: 'integer',
+      repeat: 'boolean',
+      min: 'number',
+      max: 'number',
+      step: 'number',
+      before: 'integer',
+    },
+    required: [...scoped, 'pool'],
+    mutation: true,
+  },
+  'block.random.update': {
+    fields: {
+      ...block,
+      pool: 'string',
+      count: 'integer',
+      repeat: 'boolean',
+      min: 'number',
+      max: 'number',
+      step: 'number',
+      before: 'integer',
+    },
+    required: [...blocked, 'pool'],
+    mutation: true,
+  },
+  'version.apply-random': {
+    fields: { ...tab, versionId: 'string', imageId: 'string' },
+    required: ['tabId', 'versionId', 'imageId'],
+    mutation: true,
+  },
+
   'library.export.estimate': { fields: { ids: 'strings', collectionId: 'string' }, uiOnly: true },
   'library.export': {
     fields: { ids: 'strings', collectionId: 'string', format: 'zip|folder' },
@@ -904,6 +965,8 @@ export function validateCommand(name, input, source) {
       'branch.restore',
       'work.restore-original',
       'work.restore-detached',
+      'material.pool.delete',
+      'material.pool.entry.delete',
     ].includes(name) &&
     (/^(settings?|preferences?|keys?|secrets?|account|generation)\./i.test(name) ||
       /(?:permanent|empty|delete|purge|restore)/i.test(name))

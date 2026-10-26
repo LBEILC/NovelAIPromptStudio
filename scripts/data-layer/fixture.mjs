@@ -107,6 +107,7 @@ export async function seed(directory, count, progress = () => {}, { compact = fa
       'work_activity',
       'work_file_signatures',
       'version_images',
+      'version_image_random',
       'work_versions',
       'work_branch_names',
       'works',

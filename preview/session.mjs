@@ -315,6 +315,17 @@ export async function createSession(services, images, emit, empty = false) {
         character = current.document.scopes.find((s) => s.scope.characterId);
       }
       await call('material.save', { tabId, scope: character.scope.key, name: '雨中旅人' });
+      for (const [name, text] of [
+        [
+          '画师池',
+          'artist:synthetic_amber\nartist:synthetic_cobalt\nartist:synthetic_jade\nartist:synthetic_silver\nartist:synthetic_violet',
+        ],
+        ['动作池', 'standing\nsitting\nwalking\nwaving'],
+        ['背景池', 'forest\nbeach\ncity street\nmountain'],
+      ]) {
+        const { item } = await call('material.pool.create', { name });
+        await call('material.pool.replace', { id: item.id, text });
+      }
       database.upsertTagDictionary(
         ['umbrella', 'film grain', 'standing'].map((tag, i) => ({
           tag,

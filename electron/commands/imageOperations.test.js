@@ -146,7 +146,7 @@ it('keeps base images and image operation versions durable through command flows
     expect(up.state).toBe('completed');
     const upVersion = database.versions.get(up.versionId);
     expect(upVersion.parentId).toBe(version.id);
-    expect(upVersion.operation).toEqual({ kind: 'upscale', sourceProjectId: sourceId });
+    expect(upVersion.operation).toMatchObject({ kind: 'upscale', sourceProjectId: sourceId });
     const upImage = database.loadProject(up.images[0]);
     expect(upImage.metadata).toMatchObject({ width: 1664, height: 2432 });
     expect(
@@ -168,10 +168,10 @@ it('keeps base images and image operation versions durable through command flows
         )
       ).id,
     );
-    expect(enhanced.state).toBe('completed');
+    expect(enhanced.error || enhanced.state).toBe('completed');
     const enhancedVersion = database.versions.get(enhanced.versionId);
     expect(enhancedVersion.parentId).toBe(version.id);
-    expect(enhancedVersion.operation).toEqual({
+    expect(enhancedVersion.operation).toMatchObject({
       kind: 'enhance',
       sourceProjectId: sourceId,
       strength: 0.4,

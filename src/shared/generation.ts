@@ -52,6 +52,7 @@ export interface GenerationEstimate {
   usage?: number;
 }
 export interface VersionImage {
+  random?: import('../lib/randomPrompt').RandomRecord | null;
   id: string;
   projectId: string;
   seed: string;

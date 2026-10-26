@@ -20,7 +20,12 @@ export const TABS: [Kind, string, string][] = [
   ['vibe', 'Vibe', 'palette-line'],
 ];
 
-export const NOUN: Record<Kind, string> = { block: '常用块', character: '角色', vibe: 'Vibe' };
+export const NOUN: Record<Kind | 'pool', string> = {
+  block: '常用块',
+  character: '角色',
+  vibe: 'Vibe',
+  pool: '随机池',
+};
 
 // 名词前后接中文时，英文名词两边留空格（"搜索 Vibe 的名称"）
 export const sp = (n: string) => (/^[A-Za-z]/.test(n) ? ` ${n} ` : n);

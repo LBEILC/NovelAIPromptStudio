@@ -3,7 +3,8 @@ import type { PromptCharacter } from './types';
 
 export interface Material {
   id: string;
-  kind: 'block' | 'character';
+  kind: 'block' | 'character' | 'pool';
+  entries?: import('../lib/randomPrompt').PoolEntry[];
   name: string;
   uses: number;
   blocks: PromptBlock[];
