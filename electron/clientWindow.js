@@ -104,9 +104,13 @@ export function clientMenu({ app, navigate, feedback, development }) {
     },
     {
       label: '帮助',
+      role: 'help',
       submenu: [
+        { label: '功能一览', click: () => navigate('help') },
+        { label: '查看引导', click: () => navigate('onboarding') },
+        { label: '更新日志', click: () => navigate('changelog') },
+        { type: 'separator' },
         { label: '报告问题', click: () => feedback('bug', '[问题] ') },
-        { label: '提出建议', click: () => feedback('enhancement', '[建议] ') },
       ],
     },
   ];

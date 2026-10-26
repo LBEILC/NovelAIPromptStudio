@@ -193,13 +193,14 @@ export async function createCommands(services) {
   const handlers = {
     'onboarding.get': () => {
       if (!services.preferences) throw new Error('Preferences unavailable');
-      return services.preferences.onboardingSettings(() =>
-        services.database.hasOnboardingHistory(),
-      );
+      return {
+        ...services.preferences.onboardingSettings(() => services.database.hasOnboardingHistory()),
+        current: services.version,
+      };
     },
     'onboarding.done': () => {
       if (!services.preferences) throw new Error('Preferences unavailable');
-      return services.preferences.completeOnboarding();
+      return services.preferences.completeOnboarding(services.version);
     },
     'app.status': async () => ({
       version: services.version,

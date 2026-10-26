@@ -41,7 +41,7 @@ export async function createSession(services, images, emit, empty = false) {
       apiKey: enabled ? 'preview-key' : '',
       clearApiKey: !enabled,
     });
-  preferences.completeOnboarding();
+  preferences.completeOnboarding('preview');
   setAI(true);
   preferences.saveNovelAIToken('acceptance-token');
   preferences.saveAppearanceSettings({ themeMode: 'light', motion: 'full' });

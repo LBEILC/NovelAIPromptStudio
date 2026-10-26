@@ -23,7 +23,22 @@ export const RELEASE_AREAS = {
   set: '设置',
   app: '通用',
 };
-/** @typedef {{ kind: 'new'|'improved'|'fixed', area: 'wb'|'lib'|'gen'|'agent'|'set'|'app', title: string, detail: string, highlight?: boolean, icon?: keyof typeof RELEASE_ICONS }} ReleaseItem */
+export const RELEASE_TARGETS = /** @type {const} */ ([
+  'workbench',
+  'gallery',
+  'materials',
+  'settings:appearance',
+  'settings:storage',
+  'settings:backup',
+  'settings:novelai',
+  'settings:ai',
+  'settings:network',
+  'settings:tags',
+  'settings:agent',
+  'settings:help',
+  'settings:updates',
+]);
+/** @typedef {{ kind: 'new'|'improved'|'fixed', area: 'wb'|'lib'|'gen'|'agent'|'set'|'app', title: string, detail: string, highlight?: boolean, icon?: keyof typeof RELEASE_ICONS, goto?: (typeof RELEASE_TARGETS)[number] }} ReleaseItem */
 /** @typedef {{ schema: 'nps-release-notes/1', version: string, date: string, items: ReleaseItem[] }} ReleaseNotes */
 /** @param {unknown} input @returns {ReleaseNotes} */
 export function validateReleaseNotes(input) {
@@ -59,6 +74,7 @@ export function validateReleaseNotes(input) {
     if (item.highlight !== undefined && typeof item.highlight !== 'boolean') fail('highlight');
     if (item.highlight) highlights++;
     if (item.icon !== undefined && !Object.hasOwn(RELEASE_ICONS, item.icon)) fail('icon');
+    if (item.goto !== undefined && !RELEASE_TARGETS.includes(item.goto)) fail('goto');
   }
   if (highlights > 2) fail('highlight');
   return r;

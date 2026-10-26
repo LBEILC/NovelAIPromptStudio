@@ -33,7 +33,7 @@ async function setup(stored) {
     directory,
     database,
     preferences,
-    version: 'test',
+    version: '1.8.2',
     busy: () => false,
   });
   runtimes.push(commands);
@@ -48,21 +48,27 @@ it('shows a fresh install, persists the initial decision and completes idempoten
   const { directory, preferences, call } = await setup();
   // A startup write must not masquerade as an older installation.
   preferences.saveAppearanceSettings({ themeMode: 'light' });
-  expect(await call('onboarding.get')).toEqual({ show: true });
-  expect(openPreferences(directory, safeStorage).onboardingSettings()).toEqual({ show: true });
+  expect(await call('onboarding.get')).toEqual({ show: true, seen: null, current: '1.8.2' });
+  expect(openPreferences(directory, safeStorage).onboardingSettings()).toEqual({
+    show: true,
+    seen: null,
+  });
   expect(await call('onboarding.done')).toEqual({});
   const before = fs.readFileSync(preferences.filePath, 'utf8');
   expect(await call('onboarding.done')).toEqual({});
   expect(fs.readFileSync(preferences.filePath, 'utf8')).toBe(before);
-  expect(await call('onboarding.get')).toEqual({ show: false });
-  expect(openPreferences(directory, safeStorage).onboardingSettings()).toEqual({ show: false });
+  expect(await call('onboarding.get')).toEqual({ show: false, seen: '1.8.2', current: '1.8.2' });
+  expect(openPreferences(directory, safeStorage).onboardingSettings()).toEqual({
+    show: false,
+    seen: '1.8.2',
+  });
   expect(preferences.appearanceSettings().themeMode).toBe('light');
 });
 it.each([{}, { appearance: { themeMode: 'dark' } }])(
   'skips an existing preference file without changing old settings: %j',
   async (stored) => {
     const { preferences, call } = await setup(stored);
-    expect(await call('onboarding.get')).toEqual({ show: false });
+    expect(await call('onboarding.get')).toEqual({ show: false, seen: null, current: '1.8.2' });
     expect(JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'))).toMatchObject(stored);
   },
 );
@@ -87,21 +93,22 @@ it.each(['image', 'trash', 'work'])(
     }
     expect(fs.existsSync(preferences.filePath)).toBe(false);
     expect(database.hasOnboardingHistory()).toBe(true);
-    expect(await call('onboarding.get')).toEqual({ show: false });
+    expect(await call('onboarding.get')).toEqual({ show: false, seen: null, current: '1.8.2' });
     if (kind !== 'work') {
       database.deleteProject(project.id);
       expect(database.hasOnboardingHistory()).toBe(false);
-      expect(await call('onboarding.get')).toEqual({ show: false });
+      expect(await call('onboarding.get')).toEqual({ show: false, seen: null, current: '1.8.2' });
     }
     expect(openPreferences(directory, safeStorage).onboardingSettings(() => false)).toEqual({
       show: false,
+      seen: null,
     });
   },
 );
 it('treats a saved token as prior use', async () => {
   const { preferences, call } = await setup();
   preferences.saveNovelAIToken('synthetic-token');
-  expect(await call('onboarding.get')).toEqual({ show: false });
+  expect(await call('onboarding.get')).toEqual({ show: false, seen: null, current: '1.8.2' });
 });
 it('skips an existing demo library in an isolated copy without reading the daily profile', async () => {
   const { directory, database, preferences, call } = await setup();
@@ -118,7 +125,7 @@ it('skips an existing demo library in an isolated copy without reading the daily
   expect(result.errors).toEqual([]);
   expect(result.imported).toHaveLength(14);
   expect(fs.existsSync(preferences.filePath)).toBe(false);
-  expect(await call('onboarding.get')).toEqual({ show: false });
+  expect(await call('onboarding.get')).toEqual({ show: false, seen: null, current: '1.8.2' });
 });
 it('rejects both onboarding commands from Agent and CLI origin', async () => {
   const { commands } = await setup();
@@ -127,4 +134,30 @@ it('rejects both onboarding commands from Agent and CLI origin', async () => {
       ok: false,
       error: { code: 'forbidden' },
     });
+});
+
+it('updates the seen version for existing users and includes it in portable backups', async () => {
+  const { preferences, call } = await setup({ onboardingDone: true, featuresSeen: '1.7.0' });
+  expect(await call('onboarding.get')).toEqual({ show: false, seen: '1.7.0', current: '1.8.2' });
+  await call('onboarding.done');
+  const backup = preferences.backup();
+  expect(backup).toMatchObject({ onboardingDone: true, featuresSeen: '1.8.2' });
+  const restored = await setup();
+  restored.preferences.restoreBackup(backup);
+  expect(await restored.call('onboarding.get')).toEqual({
+    show: false,
+    seen: '1.8.2',
+    current: '1.8.2',
+  });
+  restored.preferences.restoreBackup({ onboardingDone: true });
+  expect(await restored.call('onboarding.get')).toEqual({
+    show: false,
+    seen: null,
+    current: '1.8.2',
+  });
+});
+it('does not export or return an invalid stored seen version', async () => {
+  const { preferences, call } = await setup({ onboardingDone: true, featuresSeen: 182 });
+  expect(await call('onboarding.get')).toEqual({ show: false, seen: null, current: '1.8.2' });
+  expect(preferences.backup()).not.toHaveProperty('featuresSeen');
 });

@@ -36,11 +36,13 @@ export function portablePreferences(value) {
       );
   }
   if (typeof value.onboardingDone === 'boolean') result.onboardingDone = value.onboardingDone;
+  if (typeof value.featuresSeen === 'string') result.featuresSeen = value.featuresSeen;
   return result;
 }
 export function mergePortablePreferences(current, incoming) {
   const result = { ...current };
-  for (const key of [...Object.keys(portable), 'onboardingDone']) delete result[key];
+  for (const key of [...Object.keys(portable), 'onboardingDone', 'featuresSeen'])
+    delete result[key];
   Object.assign(result, portablePreferences(incoming));
   if (current.productivity?.recentImageDirectory)
     result.productivity = {

@@ -12,7 +12,7 @@ export async function runFullLibraryBenchmark({
   createWindow,
   assetsDirectory,
 }) {
-  preferences.completeOnboarding();
+  preferences.completeOnboarding(app.getVersion());
   const window = createWindow();
   const loaded = new Promise((resolve) => window.webContents.once('did-finish-load', resolve));
   mode.screenshots = [];

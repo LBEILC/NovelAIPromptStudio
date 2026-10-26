@@ -1,4 +1,5 @@
 import { createFolderFixture, folderDialog } from './folderImport.js';
+import { app } from 'electron';
 
 export async function onboardingChecks({ h, mode, preferences, doubles }) {
   h.category('首次引导');
@@ -17,6 +18,10 @@ export async function onboardingChecks({ h, mode, preferences, doubles }) {
   const closed = async (label) => {
     await h.wait(`!${dialog}`);
     await h.until(() => !preferences.onboardingSettings().show, '引导完成状态已保存');
+    await h.check(
+      '引导完成后记录当前功能版本',
+      () => preferences.onboardingSettings().seen === app.getVersion(),
+    );
     await h.check(label, `!${dialog}`);
   };
   const replay = async () => {
@@ -54,6 +59,10 @@ export async function onboardingChecks({ h, mode, preferences, doubles }) {
   }
   await h.evaluate('window.studio.invoke("onboarding.get", {})');
   await h.check('重启进程后引导仍为已完成', () => !preferences.onboardingSettings().show);
+  await h.check(
+    '重启进程后保留已看功能版本',
+    () => preferences.onboardingSettings().seen === app.getVersion(),
+  );
   await h.check('重启进程后没有欢迎卡片', `!${dialog}`);
   if (mode.phase !== 1) return;
   await replay();

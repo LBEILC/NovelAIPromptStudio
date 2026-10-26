@@ -325,11 +325,15 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
         );
         write(stored);
       }
-      return { show: !stored.onboardingDone };
+      return {
+        show: !stored.onboardingDone,
+        seen: typeof stored.featuresSeen === 'string' ? stored.featuresSeen : null,
+      };
     },
-    completeOnboarding: () => {
+    completeOnboarding: (version) => {
       const stored = read();
-      if (stored.onboardingDone !== true) write({ ...stored, onboardingDone: true });
+      if (stored.onboardingDone !== true || stored.featuresSeen !== version)
+        write({ ...stored, onboardingDone: true, featuresSeen: version });
       return {};
     },
     novelAIToken: () => {

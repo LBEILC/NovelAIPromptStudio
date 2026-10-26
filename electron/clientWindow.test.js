@@ -6,6 +6,24 @@ import {
   themeBackground,
 } from './clientWindow.js';
 describe('desktop window boundary', () => {
+  it('routes the help menu without assigning shortcuts', () => {
+    const navigate = vi.fn();
+    const feedback = vi.fn();
+    const menu = clientMenu({ app: { name: 'Studio' }, navigate, feedback, development: false });
+    const help = menu[3];
+    expect(help.role).toBe('help');
+    expect(help.submenu.map((item) => item.label || item.type)).toEqual([
+      '功能一览',
+      '查看引导',
+      '更新日志',
+      'separator',
+      '报告问题',
+    ]);
+    for (const item of help.submenu) expect(item).not.toHaveProperty('accelerator');
+    for (const item of help.submenu) item.click?.();
+    expect(navigate.mock.calls).toEqual([['help'], ['onboarding'], ['changelog']]);
+    expect(feedback).toHaveBeenCalledExactlyOnceWith('bug', '[问题] ');
+  });
   it('only hands HTTP URLs to the system browser', async () => {
     const shell = { openExternal: vi.fn() };
     for (const url of ['file:///tmp/a', 'javascript:alert(1)', 'mailto:a@b.test', 'invalid'])

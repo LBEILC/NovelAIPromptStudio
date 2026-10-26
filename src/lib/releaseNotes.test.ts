@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { validateReleaseNotes, releaseCounts, lastUpdateCheckLabel } from './releaseNotes.js';
+import {
+  validateReleaseNotes,
+  releaseCounts,
+  lastUpdateCheckLabel,
+  RELEASE_TARGETS,
+} from './releaseNotes.js';
+import fs from 'node:fs';
 const fixture = () => ({
   schema: 'nps-release-notes/1',
   version: '1.2.0',
@@ -17,6 +23,24 @@ const fixture = () => ({
   ],
 });
 describe('structured release notes contract', () => {
+  it.each(RELEASE_TARGETS)('accepts the release target %s', (goto) => {
+    const value = fixture();
+    const notes = { ...value, items: value.items.map((item) => ({ ...item, goto })) };
+    expect(validateReleaseNotes(notes)).toEqual(notes);
+  });
+  it.each(['unknown', '', null, 42, {}, ['workbench']])('rejects invalid goto %j', (goto) => {
+    const value = fixture();
+    expect(() => validateReleaseNotes({ ...value, items: [{ ...value.items[0], goto }] })).toThrow(
+      'goto',
+    );
+  });
+  it('accepts all bundled release notes and entries without a goto', () => {
+    expect(validateReleaseNotes(fixture()).items[0]).not.toHaveProperty('goto');
+    for (const file of fs.readdirSync('release-notes').filter((name) => name.endsWith('.json')))
+      expect(() =>
+        validateReleaseNotes(JSON.parse(fs.readFileSync(`release-notes/${file}`, 'utf8'))),
+      ).not.toThrow();
+  });
   it('accepts the documented schema and counts every item including highlights', () => {
     expect(validateReleaseNotes(fixture())).toEqual(fixture());
     expect(releaseCounts(validateReleaseNotes(fixture()))).toBe('新增 1 项 · 修复 1 项');
