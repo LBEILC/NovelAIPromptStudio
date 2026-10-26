@@ -67,6 +67,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     byId,
     renameMenu,
     derived,
+    shownTab,
     peekProps,
     name,
     delta,
@@ -579,8 +580,9 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
   };
   // key 带上标签页：两个标签页里同 key 的行（草稿、同一作品的版本）切换时会被当成同一行、原地直接换内容（用户 10-25）
   // 切到别的标签页时上一个标签页的行不逐行淡出：整列由 SnapshotSwap 交叉淡化
-  const shown = useExitList(rows, (r) => `${tab.id}:${r.key}`).filter(
-    (r) => !r.leaving || r.key.startsWith(`${tab.id}:`),
+  // 跟着"显示的是哪个标签页的版本"走，不跟着标签页切换走：新标签页的版本读到时才整列换过去
+  const shown = useExitList(rows, (r) => `${shownTab}:${r.key}`).filter(
+    (r) => !r.leaving || r.key.startsWith(`${shownTab}:`),
   );
   // 原图算一张；空白作品的起点没有图
   const images = versions.reduce(
@@ -607,7 +609,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
           {versions.filter((v) => !v.isStart).length} 版 · {images} 张
         </span>
       </div>
-      <SnapshotSwap swapKey={tab.id} root={scroll} />
+      <SnapshotSwap swapKey={shownTab} root={scroll} />
       <FlipScope root={scroll}>
         <div
           className="scroll"

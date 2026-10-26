@@ -16,6 +16,14 @@ import { openPick } from './Pick';
 import { applyRedrawPrompt, isRedraw, promptOf } from './versionHelpers';
 import { applyRandom } from './RandomBlock';
 import { nsfwMenu } from '../kit/blur';
+type Loaded = {
+  tab: string;
+  versions: WorkVersion[];
+  origin: WorkOrigin | null;
+  derived: { workId: string; source: WorkOrigin }[];
+};
+// 每个标签页最近一次读到的版本：切过去先显示它，不等重新读完（用户 10-26：换了图片，左边还是上一张的分支）
+const versionCache = new Map<string, Loaded>();
 export function useVersionState({
   tab,
   before,
@@ -38,15 +46,16 @@ export function useVersionState({
     storage: 'nps.versions-width',
     label: '版本栏宽度',
   });
-  const [loaded, setLoaded] = useState<{ tab: string; versions: WorkVersion[] }>({
+  const [fetched, setLoaded] = useState<Loaded>({
     tab: '',
     versions: [],
+    origin: null,
+    derived: [],
   });
-  // 切标签页时还没读到新的之前，先照旧显示，但不拿上一个标签页的版本算"未生成"
-  const versions = loaded.versions;
+  // 切到没看过的标签页、还没读到之前，先照旧显示，但不拿上一个标签页的版本算"未生成"
+  const loaded = fetched.tab === tab.id ? fetched : versionCache.get(tab.id) || fetched;
+  const { versions, origin, derived } = loaded;
   const stale = loaded.tab !== tab.id;
-  const [origin, setOrigin] = useState<WorkOrigin | null>(null);
-  const [derived, setDerived] = useState<{ workId: string; source: WorkOrigin }[]>([]);
   const [open, setOpen] = useState<string[]>([]);
   const [left, setLeft] = useState('');
   const [refresh, setRefresh] = useState(0);
@@ -74,9 +83,9 @@ export function useVersionState({
       .then(() => invokeUI('version.list', { tabId: tab.id }))
       .then((r) => {
         if (!live) return;
-        setLoaded({ tab: tab.id, versions: r.versions });
-        setOrigin(r.origin);
-        setDerived(r.derived);
+        const next = { tab: tab.id, versions: r.versions, origin: r.origin, derived: r.derived };
+        versionCache.set(tab.id, next);
+        setLoaded(next);
       })
       .catch(() => {});
     return () => {
@@ -400,6 +409,8 @@ export function useVersionState({
     byId,
     renameMenu,
     derived,
+    /** 现在显示的是哪个标签页的版本（还没读到新标签页时是上一个） */
+    shownTab: loaded.tab,
     peekProps,
     name,
     delta,

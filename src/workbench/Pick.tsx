@@ -8,7 +8,7 @@ import { Presence, ms } from '../kit/motion';
 import { Viewer } from '../kit/Viewer';
 import { adjacentRowIndex, layoutLibraryRows } from '../library/layout';
 import { ToWin, useDismiss } from '../kit/layer';
-import { Icon, Slider, Switch } from '../kit/controls';
+import { Icon, Kbd, Slider, Switch } from '../kit/controls';
 import { markLoaded } from '../kit/alpha';
 import { useNotifications } from '../kit/toast';
 import { invokeUI } from '../lib/commands';
@@ -350,8 +350,19 @@ function Body({
           <Slider value={size} min={96} max={360} step={4} onChange={setSize} label="图片大小" />
         </span>
         <span className="sp" />
-        <span className="help">
-          空格 保留 · X 不要 · 0 取消 · Enter 看大图 · Ctrl / Shift 点多选
+        <span className="help key-hint">
+          <Kbd keys="空格" />
+          <span>保留</span>
+          <Kbd keys="X" />
+          <span>不要</span>
+          <Kbd keys="0" />
+          <span>取消</span>
+          <Kbd keys="Enter" />
+          <span>看大图</span>
+          <Kbd keys="Mod" />
+          <span>多选</span>
+          <Kbd keys="Shift" />
+          <span>连选</span>
         </span>
         <button className="btn quiet sm" onClick={onClose}>
           <Icon name="close-line" />
@@ -426,7 +437,12 @@ function Body({
               <Icon name="close-line" />
               不要
             </button>
-            <span className="help">空格 保留 · X 不要</span>
+            <span className="help key-hint">
+              <Kbd keys="空格" />
+              <span>保留</span>
+              <Kbd keys="X" />
+              <span>不要</span>
+            </span>
           </>
         }
       />
