@@ -1,4 +1,6 @@
 import { notificationClearance } from './interactionCorrections.js';
+import { pick186Checks } from './pick186.js';
+import { randomBlockUI } from './release186.js';
 import { textEditingChecks, automaticAndVibeChecks } from './workbenchText.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -11,6 +13,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   h = withWorkbenchState(h);
   const { evaluate: e, wait, click, input, check, key } = h;
   h.category('工作台');
+  await randomBlockUI({ h });
   const files = await createWorkbenchFixtures(path.join(mode.root, 'workbench-fixtures'));
   const previousSize = h.window.getContentSize();
   h.window.setContentSize(1240, 760);
@@ -751,5 +754,6 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     if (project.metadata.prompt_raw === workbenchRaw) database.deleteProject(project.id);
   }
   await automaticAndVibeChecks({ h, mode, doubles });
+  await pick186Checks({ h, preferences });
   h.window.setContentSize(...previousSize);
 }

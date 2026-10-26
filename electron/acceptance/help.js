@@ -64,6 +64,19 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
   await h.nativeKey('Escape');
   await point('扩图', 'open-image', '先打开一张图');
   await h.nativeKey('Escape');
+  await point('生成队列', 'open-image', '先打开一张图');
+  await h.nativeKey('Escape');
+  await point('挑图', 'open-image', '先打开一张图');
+  await h.nativeKey('Escape');
+  await point('回收站自动清理', 'trash-clean');
+  await h.nativeKey('Escape');
+  await point('随机池', 'materials', '左边选「随机池」');
+  await h.nativeKey('Escape');
+  await h.evaluate(`window.studio.invoke('account.save',{token:'acceptance-token'})`);
+  await point('用量统计', 'usage');
+  await h.nativeKey('Escape');
+  await point('扩图', 'open-image', '先打开一张图');
+  await h.nativeKey('Escape');
   const spotlightFiles = await createWorkbenchFixtures(path.join(mode.root, 'spotlight-fixtures'));
   doubles.selections.push({ canceled: false, filePaths: [spotlightFiles[0]] });
   await h.evaluate('document.querySelector(\'[data-feature~="open-image"]\').click()');
@@ -85,6 +98,10 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
     `(async()=>{const r=await window.studio.invoke('workbench.list',{});await window.studio.invoke('work.save',{tabId:r.data.activeTabId})})()`,
   );
   await point('扩图', 'outpaint');
+  await h.nativeKey('Escape');
+  await point('生成队列', 'cost', '生成中这里变成「加入队列」');
+  await h.nativeKey('Escape');
+  await point('挑图', 'versions', '右键一版 → 挑图…');
   await h.nativeKey('Escape');
   navigate('help');
   await h.wait(section('help'));

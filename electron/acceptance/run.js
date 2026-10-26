@@ -1,4 +1,5 @@
 import { backupChecks } from './backup.js';
+import { queueRestart186 } from './settings186.js';
 import { blurChecks } from './blur.js';
 import { folderImportChecks } from './folderImport.js';
 import { loadWindowsClipboard } from '../windowsClipboard.js';
@@ -17,6 +18,7 @@ import { libraryPolishChecks, workbenchPolishChecks } from './polish.js';
 import { libraryInteractionChecks, workbenchInteractionChecks } from './interactions.js';
 import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryCopyChecks } from './libraryCopy.js';
+import { libraryDetailsChecks } from './libraryDetails.js';
 import { libraryChecks } from './library.js';
 import { applyMotionBaseline, defaultMotionChecks } from './motion.js';
 import { motionOffChecks } from './motionOff.js';
@@ -201,16 +203,7 @@ export async function runAcceptance(context) {
         undefined,
         'once',
       );
-      await check(
-        '详情 IPC 与旧列表逐项一致，缺失图片返回 null',
-        `(async () => {
-      const full = ${JSON.stringify([...database.loadLibrary('all'), ...database.loadLibrary('trash')])};
-      for (const p of full) if (JSON.stringify(await window.studio.invoke('library.get',{id:p.id}).then(result=>result.ok?result.data.project:result.error.code==='not_found'?null:Promise.reject(Error(result.error.message)))) !== JSON.stringify(p)) return false;
-      return await window.studio.invoke('library.get',{id:'missing-acceptance-image'}).then(result=>result.ok?result.data.project:result.error.code==='not_found'?null:Promise.reject(Error(result.error.message))) === null;
-    })()`,
-        undefined,
-        'once',
-      );
+      await libraryDetailsChecks({ h, database });
       await check(
         '持久缓存和热缓存经过真实 IPC 返回逐项一致的卡片',
         `(async () => {
@@ -498,6 +491,7 @@ export async function runAcceptance(context) {
       if (mode.category === '图片模糊') {
         await blurChecks(environment);
       } else {
+        await queueRestart186(environment);
         h.category('数据');
         await check(
           '跨进程重启保留图库、收藏集、回收站和词典全部内容',

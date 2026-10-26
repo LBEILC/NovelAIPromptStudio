@@ -1,4 +1,5 @@
 import { generationQueueChecks } from './generationQueue.js';
+import { generation186Checks } from './generation186.js';
 import { selectGalleryGrouping } from './galleryView.js';
 import { relayChecks } from './relay.js';
 import { inpaintChecks } from './inpaint.js';
@@ -21,6 +22,7 @@ export async function generationChecks({
 }) {
   const { evaluate: e, click, input, wait, check } = h;
   h.category('生成');
+  await generation186Checks({ h, generationService });
   await generationQueueChecks({ h, generationService });
   const randomRequestStart = generationService.state.requests.length;
   await check(
@@ -254,7 +256,7 @@ export async function generationChecks({
   generationService.state.holdAt = generationService.state.requests.length + 1;
   await click('生成', 'document.querySelector(".gen-bar")');
   await h.until(() => !!generationService.state.resume, '当前图片请求到达假服务后再停止');
-  await wait('document.body.innerText.includes("停止")');
+  await wait('!!document.querySelector(".gen-bar [aria-label=停止]")');
   await click('停止', 'document.querySelector(".gen-bar")');
   await wait(
     `window.studio.invoke('generate.status',{}).then(r=>r.data.jobs.some(j=>j.tabId===${JSON.stringify(tabId)}&&j.state==='generating'&&j.stop))`,

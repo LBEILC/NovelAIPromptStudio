@@ -1,4 +1,5 @@
 import { notificationClearance } from './interactionCorrections.js';
+import { settings186Checks, queueRestart186 } from './settings186.js';
 import { scrollChecks } from './scroll.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -20,6 +21,7 @@ export async function settingsChecks(context, restart) {
     ];
   const savedFile = path.join(mode.root, 'settings-expected.json');
   if (!restart) {
+    if (['设置', '全部'].includes(mode.category)) await settings186Checks(context);
     await appearanceLayerChecks(context);
     if (mode.category === '设置·通用') return;
     if (['设置', '全部'].includes(mode.category)) await settingsGenerationChecks(context);
@@ -616,6 +618,7 @@ export async function settingsChecks(context, restart) {
       ai: preferences.publicSettings(),
     }),
   );
+  if (mode.category === '全部' || mode.restart) await queueRestart186(context, true);
 }
 
 import { existsSync as requireExists } from 'node:fs';

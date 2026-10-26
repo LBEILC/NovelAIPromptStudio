@@ -1,4 +1,6 @@
+import { libraryDetailsChecks } from './libraryDetails.js';
 import { selectGalleryGrouping } from './galleryView.js';
+import { trash186Checks } from './settings186.js';
 import { libraryNamingChecks } from './libraryNaming.js';
 import { libraryGroupingChecks } from './libraryGrouping.js';
 import { libraryViewerChecks } from './libraryViewer.js';
@@ -20,6 +22,8 @@ const require = createRequire(import.meta.url);
 
 export async function libraryChecks(env) {
   const { h, database, files, mode, doubles, assetsDirectory } = env;
+  if (mode.category === '图片库') await libraryDetailsChecks(env);
+  if (['图片库', '全部'].includes(mode.category)) await trash186Checks(env);
   const { evaluate: e, wait, check, key } = h;
   const settled = async () => {
     await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');

@@ -1,4 +1,5 @@
 import { withWorkbenchState, draftExpression, sessionExpression } from './workbenchState.js';
+import { randomPoolUI } from './release186.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createPromptStructure } from '../../src/lib/promptStructure.js';
@@ -50,6 +51,7 @@ export async function materialsChecks({ h, mode, database, preferences }) {
   }
   try {
     await h.reload();
+    await randomPoolUI({ h });
     await click('工作台', 'document.querySelector(".tb")');
     const originalTabs = (await command('workbench.list', {})).tabs.map((t) => t.id);
     const opened = await command('workbench.open', { libraryId: source.id });
