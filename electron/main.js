@@ -15,6 +15,7 @@ import { hasImageName, imageFileName } from '../src/lib/imageNaming.js';
 import { normalizePromptStructure } from '../src/lib/promptStructure.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { blurredMedia } from './blurMedia.js';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -540,9 +541,12 @@ app.whenReady().then(async () => {
     ),
   ]);
 
-  protocol.handle('novelai-media', (request) => {
-    const filePath = new URL(request.url).searchParams.get('path');
+  protocol.handle('novelai-media', async (request) => {
+    const url = new URL(request.url);
+    let filePath = url.searchParams.get('path');
     if (!filePath) return new Response('Missing media path', { status: 400 });
+    if (url.searchParams.get('blur') === '1')
+      filePath = await blurredMedia(filePath, path.join(assetsDirectory, 'blurred'));
     return net.fetch(pathToFileURL(filePath).toString());
   });
 

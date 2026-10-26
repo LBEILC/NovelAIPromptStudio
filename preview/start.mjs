@@ -1,5 +1,6 @@
 import http from 'node:http';
 import fs from 'node:fs';
+import { blurredMedia } from '../electron/blurMedia.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
@@ -248,7 +249,9 @@ try {
         return;
       }
       if (url.pathname === '/media') {
-        const file = session.allowedPath(url.searchParams.get('path'));
+        let file = session.allowedPath(url.searchParams.get('path'));
+        if (url.searchParams.get('blur') === '1')
+          file = await blurredMedia(file, path.join(session.directory, 'assets', 'blurred'));
         res.setHeader(
           'Content-Type',
           { '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' }[

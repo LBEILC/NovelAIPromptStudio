@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { parsePrompt } from '../src/lib/prompt.js';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -183,6 +184,11 @@ export async function createSession(services, images, emit, empty = false) {
       const result = await imported(copies);
       if (result.imported.length !== 14)
         throw Error(`需要14张演示图，实际导入${result.imported.length}`);
+      const first = database.loadProject(result.imported[0].id);
+      first.prompt_structure.base_prompt_raw = `nsfw, ${first.prompt_structure.base_prompt_raw || ''}`;
+      first.metadata.prompt_raw = first.prompt_structure.base_prompt_raw;
+      first.tags = parsePrompt(first.metadata.prompt_raw);
+      database.saveProjectPrompt(first.id, first);
       const cards = await database.loadLibraryCards();
       // Isolated preview drafts exercise both parameter/reference capability groups.
       for (const [index, model] of [

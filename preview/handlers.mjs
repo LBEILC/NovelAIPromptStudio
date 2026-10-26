@@ -1,3 +1,4 @@
+import { blurCommands } from '../electron/commands/blur.js';
 import { CommandError } from '../electron/commands/registry.js';
 // Preview-only adapters copied from main.js. Keep database/import contracts identical.
 import fs from 'node:fs';
@@ -227,7 +228,7 @@ export function createPreviewHandlers({
     };
   }
 
-  const commandHandlers = {};
+  const commandHandlers = blurCommands({ database, preferences, emit });
   const registerCommand = (name, handler) => {
     commandHandlers[name] = handler;
   };
