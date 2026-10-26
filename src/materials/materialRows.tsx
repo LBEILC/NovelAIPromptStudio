@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon, Kbd, isMod } from '../kit/controls';
 import { invokeUI } from '../lib/commands';
-import { mediaUrl } from '../lib/imageStage.js';
+import { BlurImg, type BlurImage } from '../kit/blur';
 import { Swap } from '../settings/parts';
 import type { Material } from '../shared/materials';
 import { MaterialContent } from '../workbench/Insert';
@@ -32,7 +32,15 @@ export type Part = 'self' | 'negative' | number;
 export const UNDO_MS = 5000;
 
 // ---------- 示例图片：按图片 id 读缩略图和名称，读过的记下来 ----------
-export type Example = { id: string; thumb: string; image: string; name: string; file: string };
+/** thumb、image 是文件路径；rec 是图片记录，决定要不要模糊（2.37） */
+export type Example = {
+  id: string;
+  thumb: string;
+  image: string;
+  rec: BlurImage;
+  name: string;
+  file: string;
+};
 
 export const exampleCache = new Map<string, Promise<Example | null>>();
 
@@ -45,8 +53,9 @@ export function loadExample(id: string) {
           ? null
           : {
               id,
-              thumb: mediaUrl(project.thumbnail_path || project.image_path),
-              image: mediaUrl(project.image_path),
+              thumb: project.thumbnail_path || project.image_path,
+              image: project.image_path,
+              rec: project as BlurImage,
               name: project.name || '',
               file: project.image_path.split(/[\\/]/).pop() || '',
             },
@@ -105,7 +114,7 @@ export function PeekCard({ ids, i }: { ids: string[]; i: number }) {
   return (
     <>
       <Swap k={e.id} className="tp-img">
-        <img src={e.image} alt="" />
+        <BlurImg image={e.rec} path={e.image} eye={false} alt="" />
       </Swap>
       {e.name ? (
         <b className="tp-name">{e.name}</b>
@@ -115,7 +124,14 @@ export function PeekCard({ ids, i }: { ids: string[]; i: number }) {
       <div className="mex-peek-f">
         <span className="mex-peek-strip">
           {ex.map((y, n) => (
-            <img key={y.id} className={n === k ? 'cur' : ''} src={y.thumb} alt="" />
+            <BlurImg
+              key={y.id}
+              image={y.rec}
+              path={y.thumb}
+              eye={false}
+              className={n === k ? 'cur' : ''}
+              alt=""
+            />
           ))}
         </span>
         <span className="sp" />
@@ -271,10 +287,12 @@ export function Row({
             onPointerLeave={onPeekLeave}
           >
             {ex.slice(0, ROW).map((e, i) => (
-              <img
+              <BlurImg
                 key={e.id}
+                image={e.rec}
+                path={e.thumb}
+                eye={false}
                 className={i === peekIndex ? 'cur' : ''}
-                src={e.thumb}
                 alt=""
                 draggable={false}
               />
@@ -346,8 +364,10 @@ export function Row({
                         <div className="mat-ex-list">
                           {ex.map((e) => (
                             <span className="mat-ex-it" key={e.id}>
-                              <img
-                                src={e.thumb}
+                              <BlurImg
+                                image={e.rec}
+                                path={e.thumb}
+                                eye={false}
                                 alt=""
                                 draggable={false}
                                 data-tip="在图片库中查看"
@@ -414,7 +434,13 @@ export function VibeRow({
       >
         {first && (
           <span className="mrow-pic">
-            <img src={mediaUrl(first.thumbnail)} alt="" draggable={false} />
+            <BlurImg
+              image={{ id: first.id }}
+              path={first.thumbnail}
+              eye={false}
+              alt=""
+              draggable={false}
+            />
           </span>
         )}
         <div className="mrow-main">
@@ -436,8 +462,10 @@ export function VibeRow({
                 <div className="mat-ex-list">
                   {v.sources.map((s) => (
                     <span className="mat-ex-it" key={s.id}>
-                      <img
-                        src={mediaUrl(s.thumbnail)}
+                      <BlurImg
+                        image={{ id: s.id }}
+                        path={s.thumbnail}
+                        eye={false}
                         alt=""
                         draggable={false}
                         data-tip={`${s.name || '图片'} · 在图片库中查看`}

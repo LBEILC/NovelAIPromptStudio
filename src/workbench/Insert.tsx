@@ -3,7 +3,7 @@
 // 停在名称或内容上弹出完整内容，停在小图上弹出示例图片的预览，两个不同时出现，都贴在浮层左边。
 import { useEffect, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
-import { mediaUrl } from '../lib/imageStage.js';
+import { BlurImg, type BlurImage } from '../kit/blur';
 import { catKey } from '../kit/categories';
 import { Icon, Kbd } from '../kit/controls';
 import { Pop, type Place } from '../kit/layer';
@@ -11,28 +11,23 @@ import { useNotifications } from '../kit/toast';
 import type { Material } from '../shared/materials';
 
 const ROW = 3;
-const examplesCache = new Map<string, Promise<string>>();
+/** 示例图：缩略图路径和图片记录（决定要不要模糊，2.37） */
+type Ex = { path: string; rec: BlurImage };
+const examplesCache = new Map<string, Promise<Ex>>();
 function exampleSrc(id: string) {
   let p = examplesCache.get(id);
   if (!p) {
-    p = invokeUI('library.get', { id }).then((r) =>
-      mediaUrl(r.project.thumbnail_path || r.project.image_path),
-    );
+    p = invokeUI('library.get', { id }).then((r) => ({
+      path: r.project.thumbnail_path || r.project.image_path,
+      rec: r.project,
+    }));
     examplesCache.set(id, p);
     p.catch(() => examplesCache.delete(id));
   }
   return p;
 }
-function Example({
-  id,
-  onPeek,
-  cur,
-}: {
-  id: string;
-  onPeek?: (src: string) => void;
-  cur?: boolean;
-}) {
-  const [src, setSrc] = useState('');
+function Example({ id, onPeek, cur }: { id: string; onPeek?: (ex: Ex) => void; cur?: boolean }) {
+  const [src, setSrc] = useState<Ex | null>(null);
   useEffect(() => {
     let live = true;
     void exampleSrc(id)
@@ -43,9 +38,11 @@ function Example({
     };
   }, [id]);
   return src ? (
-    <img
+    <BlurImg
+      image={src.rec}
+      path={src.path}
+      eye={false}
       className={cur ? 'cur' : ''}
-      src={src}
       alt=""
       draggable={false}
       onPointerEnter={() => onPeek?.(src)}
@@ -121,7 +118,7 @@ export function InsertPop({
   const [items, setItems] = useState<Material[]>([]);
   const [q, setQ] = useState('');
   const [pick, setPick] = useState(-1);
-  const [peek, setPeek] = useState<{ id: string; kind: 'text' | 'img'; src?: string } | null>(null);
+  const [peek, setPeek] = useState<{ id: string; kind: 'text' | 'img'; src?: Ex } | null>(null);
   const timer = useRef(0);
   useEffect(() => {
     if (!open) return;
@@ -296,7 +293,7 @@ export function InsertPop({
         {peeked &&
           (peek?.kind === 'img' ? (
             <div className="tp-img">
-              <img src={peek.src} alt="" />
+              {peek.src && <BlurImg image={peek.src.rec} path={peek.src.path} eye={false} alt="" />}
             </div>
           ) : (
             <>

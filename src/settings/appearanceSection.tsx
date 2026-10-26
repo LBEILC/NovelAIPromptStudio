@@ -6,8 +6,9 @@ import { BUNDLED_FONTS, partitionFontFamilies, quoteFontFamily } from '../lib/fo
 import type { AppearanceSettings, ProductivitySettings } from '../shared/types';
 import { useAppearance } from '../state/appearance';
 import { Dropdown, Row, SetPage, errorText } from './parts';
+import { BlurRows } from './blurSection';
 
-// ---------- 通用（外观和关闭窗口） ----------
+// ---------- 通用（外观、图片模糊和关闭窗口） ----------
 export function Appearance() {
   const notify = useNotifications();
   const { appearance, changeAppearance } = useAppearance();
@@ -116,6 +117,7 @@ export function Appearance() {
           onChange={(motion) => save({ motion })}
         />
       </Row>
+      <BlurRows />
       {windows && (
         <Row title="关闭主窗口时" help="最小化到托盘后，生成和 Agent 接入在后台继续">
           <Seg

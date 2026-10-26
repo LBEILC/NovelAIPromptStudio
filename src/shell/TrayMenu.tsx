@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MenuItems, type MenuEntry } from '../kit/menu';
 import { useGeneration } from '../state/generation';
 import { invokeUI } from '../lib/commands';
+import { saveBlurSettings, useBlurSettings } from '../state/blur';
 
 export function TrayMenu() {
   const { jobs } = useGeneration();
@@ -33,6 +34,7 @@ export function TrayMenu() {
   const act = (action: 'show' | 'quit' | 'close') => () =>
     void invokeUI('tray.action', { action }).catch(() => {});
   const running = jobs.find((j) => j.state === 'generating');
+  const blur = useBlurSettings();
   const items: MenuEntry[] = [
     ...(running
       ? ([
@@ -45,6 +47,18 @@ export function TrayMenu() {
         ] as MenuEntry[])
       : []),
     { label: '打开主窗口', icon: 'window-line', onSelect: act('show') },
+    // 图片模糊（1.8.3，2.37）：和标题栏的按钮是同一个开关
+    ...(blur
+      ? ([
+          {
+            label: '模糊所有图片',
+            icon: 'eye-off-line',
+            checked: blur.mode === 'all' || blur.quickAll,
+            disabled: blur.mode === 'all' ? '设置里选了所有图片都模糊' : false,
+            onSelect: () => void saveBlurSettings({ quickAll: !blur.quickAll }).catch(() => {}),
+          },
+        ] as MenuEntry[])
+      : []),
     'sep',
     {
       label: '退出',

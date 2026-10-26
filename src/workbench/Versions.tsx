@@ -4,7 +4,6 @@ import { Pop } from '../kit/layer';
 import { ContextMenu } from '../kit/menu';
 import { FlipScope, useExitList } from '../kit/motion';
 import { invokeUI } from '../lib/commands';
-import { mediaUrl } from '../lib/imageStage.js';
 import { versionDiff } from '../lib/versionDiff';
 import type { CommandTab } from '../shared/commands';
 import type { ImageOperation, WorkVersion } from '../shared/generation';
@@ -105,7 +104,9 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
           >
             <Thumb
               id={v.project.id}
-              src={mediaUrl(v.project.thumbnail_path || v.project.image_path)}
+              path={v.project.thumbnail_path || v.project.image_path}
+              image={v.project}
+              tab={tab.id}
             />
           </span>
         ),
@@ -132,7 +133,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             }}
             onContextMenu={ctx(thumbMenu(v, img.projectId))}
           >
-            <Thumb id={img.projectId} />
+            <Thumb id={img.projectId} tab={tab.id} />
           </span>
         ),
       });

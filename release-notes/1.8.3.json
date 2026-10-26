@@ -1,0 +1,36 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "1.8.3",
+  "date": "2026-10-26",
+  "items": [
+    {
+      "kind": "new",
+      "area": "set",
+      "title": "图片模糊",
+      "detail": "设置 → 通用里的\"图片模糊\"可以选只模糊 NSFW 的图，或者所有图片都模糊；默认关闭。提示词里有 nsfw、nude 这类 Tag 的图自动算 NSFW（负面提示词里的不算），敏感词可以自己增删；判断错了在右键菜单里标\"不是 NSFW\"或\"标为 NSFW\"。模糊的图中间有个小眼睛，点一下才显示。只影响显示，复制、导出、备份的都是原图。",
+      "highlight": true,
+      "icon": "shield",
+      "goto": "settings:appearance"
+    },
+    {
+      "kind": "new",
+      "area": "app",
+      "title": "一键模糊所有图片",
+      "detail": "标题栏齿轮左边多了一个眼睛按钮，点一下所有图片都模糊，再点恢复；重启后照旧。Windows 的托盘菜单里也有同一项。图片库的筛选里可以按\"NSFW 是 / 不是\"挑出来检查标记，智能收藏集也能用。",
+      "highlight": true,
+      "goto": "gallery"
+    },
+    {
+      "kind": "improved",
+      "area": "wb",
+      "title": "权重块漏写结束的 :: 时提示",
+      "detail": "像 0.8::artist:a,0.8::artist:b:: 这样前一块没写结束的 ::，V5 和 V4.5 读出来不一样。现在新开头的那个 Tag 上会提示，点开或右键\"补上结束的 ::\"一下补好，补完两个模型读法一样。"
+    },
+    {
+      "kind": "improved",
+      "area": "wb",
+      "title": "局部重绘时还能改提示词",
+      "detail": "局部重绘时右边的提示词栏不再被盖住，可以临时加 close-up、hand 这类 Tag 再重绘，不用先退出。"
+    }
+  ]
+}

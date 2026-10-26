@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon, Seg, Slider } from '../kit/controls';
 import { MenuPop, type MenuEntry } from '../kit/menu';
 import { invokeUI } from '../lib/commands';
-import { mediaUrl } from '../lib/imageStage.js';
+import { BlurImg } from '../kit/blur';
 import type { CommandTab } from '../shared/commands';
 import {
   MAX_VIBES,
@@ -181,15 +181,18 @@ export function RefsPane({
       {baseImg ? (
         <div className="vrow base-row" data-enter="fade">
           <span className="vthumb">
-            <img
-              src={
-                baseImg.thumbnail.startsWith('data:')
-                  ? baseImg.thumbnail
-                  : mediaUrl(baseImg.thumbnail)
-              }
-              alt=""
-              draggable={false}
-            />
+            {baseImg.thumbnail.startsWith('data:') ? (
+              <img src={baseImg.thumbnail} alt="" draggable={false} />
+            ) : (
+              <BlurImg
+                image={baseImg.projectId ? { id: baseImg.projectId } : null}
+                path={baseImg.thumbnail}
+                tab={tab.id}
+                eye={false}
+                alt=""
+                draggable={false}
+              />
+            )}
           </span>
           <div className="vmain">
             <div className="vh">
@@ -305,7 +308,14 @@ export function RefsPane({
       >
         <span className="vthumb">
           {v.thumbnail ? (
-            <img src={mediaUrl(v.thumbnail)} alt="" draggable={false} />
+            <BlurImg
+              image={null}
+              path={v.thumbnail}
+              tab={tab.id}
+              eye={false}
+              alt=""
+              draggable={false}
+            />
           ) : (
             <span className="vph">
               <Icon name="image-line" />
@@ -359,7 +369,14 @@ export function RefsPane({
     return (
       <div key={r.id} className="vrow" data-enter="fade">
         <span className="vthumb">
-          <img src={mediaUrl(r.thumbnail)} alt="" draggable={false} />
+          <BlurImg
+            image={null}
+            path={r.thumbnail}
+            tab={tab.id}
+            eye={false}
+            alt=""
+            draggable={false}
+          />
         </span>
         <div className="vmain">
           <div className="vh">

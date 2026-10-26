@@ -26,8 +26,8 @@ import { workLabel } from '../lib/workNames';
 export { CAT_VAR, CAT_NAME } from '../kit/categories';
 import { CAT_VAR, CAT_NAME } from '../kit/categories';
 import { markLoaded } from '../kit/alpha';
-const thumb = (c: { thumbnail_path?: string; image_path: string }) =>
-  mediaUrl(c.thumbnail_path || c.image_path);
+import { BlurImg, nsfwLabel } from '../kit/blur';
+import { useNsfwState } from '../state/blur';
 /** 详情栏的大图：恢复备份后原图找不到（1.7.0）时用缩略图顶上 */
 const picUrl = (c: { missing?: boolean; thumbnail_path?: string; image_path: string }) =>
   mediaUrl(c.missing ? c.thumbnail_path || c.image_path : c.image_path);
@@ -155,6 +155,7 @@ function One({
     }
   };
   const file = imageFileName(detail);
+  const nsfw = useNsfwState(detail);
   // 一组和单张之间切换时小图条展开或收起；收起时保留上一次的内容，下面不跳
   const lastStrip = useRef<LibraryGroup | null>(null);
   if (n > 1) lastStrip.current = group;
@@ -177,12 +178,14 @@ function One({
       <div className="scroll">
         <div className="pic swap">
           {pics.map(({ key, value, leaving }) => (
-            <img
+            <BlurImg
               key={key}
+              image={value}
+              path={value.missing ? value.thumbnail_path || value.image_path : value.image_path}
+              eye={leaving ? false : 'md'}
               className={`alpha-bg ${leaving ? 'leaving' : ''}`}
               data-enter="fade"
               onLoad={markLoaded}
-              src={picUrl(value)}
               alt={imageAccessibleName(value)}
               draggable={false}
               data-tip="查看大图"
@@ -287,6 +290,7 @@ function One({
             )}
             {detail.vibe_fingerprint && ` · Vibe ${detail.vibe_fingerprint.slice(0, 8)}`}
           </span>
+          {nsfwLabel(nsfw) && <span className="meta">{nsfwLabel(nsfw)}</span>}
           {gone ? (
             <span className="meta">
               {gone.detachedAt ? `${gone.detachedAt.slice(0, 10)} ` : ''}已从
@@ -449,10 +453,12 @@ function Strip({
     const origin = isGroupOrigin(group, m);
     return (
       <span key={m.id} className={`lth ${origin ? 'origin' : ''}`}>
-        <img
+        <BlurImg
+          image={m}
+          path={m.thumbnail_path || m.image_path}
+          eye={false}
           className={`alpha-bg ${i === si ? 'is-cur' : ''}`}
           onLoad={markLoaded}
-          src={thumb(m)}
           alt=""
           draggable={false}
           style={{ width: `calc(var(--strip-h) * ${ratioOf(m)})` }}
@@ -503,11 +509,13 @@ function Summary({ p }: { p: LibraryProps }) {
           <b>已选 {libraryCountText(groups.length, p.selectedImageCount)}</b>
           <div className="fan">
             {groups.slice(0, 5).map((g) => (
-              <img
+              <BlurImg
                 key={g.id}
+                image={g.cover}
+                path={g.cover.thumbnail_path || g.cover.image_path}
+                eye={false}
                 className="alpha-bg"
                 onLoad={markLoaded}
-                src={thumb(g.cover)}
                 alt=""
                 draggable={false}
                 style={{ width: `calc(var(--fan-h) * ${ratioOf(g.cover)})` }}

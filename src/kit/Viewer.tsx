@@ -8,10 +8,19 @@ import { Presence, dur, useSwap } from './motion';
 import { ToWin, useDismiss } from './layer';
 import { Icon, Seg } from './controls';
 import { markLoaded, readMatte, writeMatte, type Matte } from './alpha';
+import { BlurImg, nsfwMenu, type BlurImage } from './blur';
+import { ContextMenu } from './menu';
+import { useNotifications } from './toast';
+import { useNsfwState } from '../state/blur';
 
 export interface ViewerItem {
   id: string;
-  src: string;
+  /** 图片的文件路径 */
+  path: string;
+  /** 图片记录：决定要不要模糊（2.37）；没有记录的（ZIP 预览）只在"所有图片都模糊"时模糊 */
+  image?: BlurImage;
+  /** 工作台里打开的大图：临时显示按标签页算 */
+  tab?: string;
   /** 这一张属于第几组：↑ ↓ 在组之间跳 */
   group?: string;
 }
@@ -60,6 +69,10 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
   const pan = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
   const i = clamp(p.index, 0, p.items.length - 1);
   const item = p.items[i];
+  // 右键：标为 NSFW / 不是 NSFW（1.8.3，2.37）；只有图片库里的图（有记录）才有
+  const [menu, setMenu] = useState<[number, number] | null>(null);
+  const nsfw = useNsfwState(item?.image ?? null);
+  const notify = useNotifications();
   useLayoutEffect(() => {
     p.nodeRef.current = ov.current;
   });
@@ -192,10 +205,13 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
       <div className="viewer-img swap">
         {frames.map(({ key, value, leaving }) => (
           <div key={key} className={`vframe ${leaving ? 'leaving' : ''}`} data-enter={value.dir}>
-            <img
+            <BlurImg
               ref={leaving ? undefined : img}
+              image={value.item.image}
+              path={value.item.path}
+              tab={value.item.tab}
+              eye={leaving ? false : 'md'}
               className={`vz ${matte === 'checker' ? 'alpha-bg' : `matte-${matte}`}`}
-              src={value.item.src}
               alt=""
               draggable={false}
               onLoad={(e) => {
@@ -211,6 +227,11 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
                       '--vz': z.z,
                     } as React.CSSProperties)
               }
+              onContextMenu={(e) => {
+                if (leaving || !value.item.image) return;
+                e.preventDefault();
+                setMenu([e.clientX, e.clientY]);
+              }}
               onPointerDown={(e) => {
                 if (leaving || e.button !== 0) return;
                 e.preventDefault();
@@ -221,6 +242,13 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
           </div>
         ))}
       </div>
+      {item.image && (
+        <ContextMenu
+          at={menu}
+          onClose={() => setMenu(null)}
+          items={nsfwMenu([item.image.id], nsfw, (text) => notify({ text, tone: 'error' }))}
+        />
+      )}
       <div className="viewer-bar">
         <button
           className="btn quiet sm icon"

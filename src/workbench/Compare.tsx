@@ -8,7 +8,7 @@ import { ToWin, useDismiss } from '../kit/layer';
 import { Icon, Seg } from '../kit/controls';
 import { markLoaded, readMatte, type Matte } from '../kit/alpha';
 import { invokeUI } from '../lib/commands';
-import { mediaUrl } from '../lib/imageStage.js';
+import { BlurImg, type BlurImage } from '../kit/blur';
 import { versionDiff } from '../lib/versionDiff';
 import type { WorkVersion } from '../shared/generation';
 import type { ImageRecord } from '../shared/types';
@@ -57,7 +57,7 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 interface Loaded {
   version: WorkVersion;
   /** 这一版里能看的图（根版本带原图） */
-  items: { id: string; src: string; seed?: string }[];
+  items: { id: string; path: string; image: BlurImage; seed?: string }[];
 }
 const versionLabel = (v: WorkVersion) =>
   v.isStart || originGone(v) ? '起点' : v.parentId ? `第 ${v.number} 版` : '原图';
@@ -90,9 +90,9 @@ export function CompareHost({ tabId }: { tabId: string }) {
           version,
           items: ids.map((id, i) => ({
             id,
-            src: mediaUrl(
+            path:
               recs[i]?.image_path || (id === version.project.id ? version.project.image_path : ''),
-            ),
+            image: recs[i] || (id === version.project.id ? version.project : { id }),
             seed: recs[i]?.metadata?.seed,
           })),
         };
@@ -127,6 +127,7 @@ export function CompareHost({ tabId }: { tabId: string }) {
         last.current && (
           <ToWin>
             <Body
+              tabId={tabId}
               data={open ? data! : last.current}
               leaving={leaving}
               nodeRef={ref}
@@ -142,6 +143,7 @@ export function CompareHost({ tabId }: { tabId: string }) {
 }
 
 function Body({
+  tabId,
   data,
   leaving,
   nodeRef,
@@ -149,6 +151,7 @@ function Body({
   onIndex,
   onSwap,
 }: {
+  tabId: string;
   data: { a: Loaded; b: Loaded; ai: number; bi: number };
   leaving: boolean;
   nodeRef: React.RefObject<HTMLElement | null>;
@@ -230,10 +233,14 @@ function Body({
     transition: animate ? 'transform var(--dur-3) var(--ease-move)' : 'none',
   };
   const bg = matte === 'checker' ? 'alpha-bg' : `matte-${matte}`;
-  const img = (src: string, label: string) => (
-    <img
+  // 模糊（2.37）：滑块模式两张叠在一起，只在下面那张放眼睛；点了整个标签页一起显示
+  const img = (it: Loaded['items'][number], label: string, eye = true) => (
+    <BlurImg
+      image={it.image}
+      path={it.path}
+      tab={tabId}
+      eye={eye && !leaving ? 'md' : false}
       className={`vz ${bg}`}
-      src={src}
       alt={label}
       draggable={false}
       onLoad={markLoaded}
@@ -272,19 +279,19 @@ function Body({
         <div className="cmp-panes">
           <div className="cmp-pane">
             <span className="cmp-tag">{ln}</span>
-            {img(left.src, ln)}
+            {img(left, ln)}
           </div>
           <div className="cmp-pane">
             <span className="cmp-tag">{rn}</span>
-            {img(right.src, rn)}
+            {img(right, rn)}
           </div>
         </div>
       ) : (
         <div className="cmp-panes">
           <div className="cmp-pane cmp-slide">
-            <div className="cmp-layer">{img(left.src, ln)}</div>
+            <div className="cmp-layer">{img(left, ln)}</div>
             <div className="cmp-layer" style={{ clipPath: `inset(0 0 0 ${cut}%)` }}>
-              {img(right.src, rn)}
+              {img(right, rn, false)}
             </div>
             <span className="cmp-tag">{ln}</span>
             <span className="cmp-tag right">{rn}</span>

@@ -8,6 +8,7 @@ import { useSessionEffects } from './app/session';
 import { useAppState } from './app/state';
 import { renderApp } from './app/view';
 import { useWorkbenchActions } from './app/workbench';
+import { useBlurReset } from './kit/blur';
 
 export default function App() {
   const {
@@ -275,6 +276,7 @@ export default function App() {
     showToast,
     workbenchConnection,
   });
+  useBlurReset(page, workbenchSession.tabs);
   return renderApp({
     setPage,
     page,

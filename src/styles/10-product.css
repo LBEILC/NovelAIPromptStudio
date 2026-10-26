@@ -53,6 +53,8 @@ button.tag.ghost { font: inherit; font-size: var(--fs-small); }
 html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px))); }
 .tb .wc { align-self: stretch; flex: 0 0 auto; } /* 系统窗口按钮的位置不能被标签页挤窄，否则右边的额度和设置会钻到按钮底下（用户 10-21） */
 .tb-set.on { background: var(--selected); color: var(--text); }
+.tb-blur.on { background: var(--selected); color: var(--text); }
+.tb-blur[aria-disabled] { cursor: default; }
 
 /* 自绘滚动条：带 data-scroll 的区域也不显示系统滚动条（.scroll 已经在 01-base.css 里藏了） */
 [data-scroll] { scrollbar-width: none; }
@@ -355,3 +357,45 @@ html[data-motion="off"] .oba [style*="--i"], html[data-motion="off"] .oba .oba-m
 .feat-group > .label { margin: var(--sp-3) 0 var(--sp-1); color: var(--text-3); }
 .feat-row .btn [class^="ri-"] { margin-right: calc(var(--sp-1) * -1); }
 .feat-none { margin: var(--sp-3) 0; }
+/* 图片模糊（1.8.3，doc/design.md 2.37）：模糊的图是主进程给的一张极小的图拉伸出来的，认不出内容；
+   中间一个小眼睛，点一下才显示，悬停不显示。眼睛贴在图片所在格子的正中（父元素要能定位） */
+.blur-eye.btn.icon {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 1;
+  width: var(--ctl); height: var(--ctl); border-radius: var(--r-pill);
+  background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-pop);
+}
+.blur-eye.btn.icon:hover { background: var(--surface); color: var(--text); }
+.blur-eye.sm.btn.icon { width: var(--ctl-sm); height: var(--ctl-sm); }
+.blur-eye.sm [class^="ri-"] { font-size: var(--icon-sm); }
+.libp .detail .pic { position: relative; }
+.vframe { position: relative; }
+.stage .canvas { position: relative; }
+/* 敏感词表（设置·通用 · 图片模糊） */
+.nsfw-words { display: flex; flex-wrap: wrap; align-content: flex-start; gap: var(--sp-1); max-height: 220px; margin-top: var(--sp-3); padding: var(--sp-2); border: var(--bw) solid var(--border); border-radius: var(--r-ctl); }
+.nsfw-word { display: inline-flex; align-items: center; gap: var(--sp-0); padding-left: var(--sp-2); border-radius: var(--r-tag); background: var(--hover); font-size: var(--fs-small); }
+.nsfw-word .btn.icon { width: var(--ctl-sm); height: calc(var(--ctl-sm) - var(--sp-1)); }
+.nsfw-add { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); }
+.nsfw-add .field { flex: 1 1 auto; }
+.nsfw-reset { margin-right: auto; }
+/* 通知叠放（2.11）：最新的在最前，后面的缩小一点、往上露出一条 --sp-2 的边（内容藏起来）；
+   指针移上去整叠展开成一列，最新的在最下。用 translate / scale 单独的属性，不和进入动画的 transform 打架 */
+.toasts > .toast-stack {
+  pointer-events: auto; display: grid; justify-items: stretch; align-items: end;
+  min-height: calc(var(--toast-h) + (var(--toast-n) - 1) * var(--sp-2));
+  transition: min-height var(--dur-3) var(--ease-move);
+}
+.toast-stack.open { min-height: calc(var(--toast-n) * var(--toast-h) + (var(--toast-n) - 1) * var(--sp-2)); }
+.toast-stack > .toast {
+  grid-area: 1 / 1; z-index: calc(10 - var(--k)); transform-origin: center top; padding-right: var(--sp-1);
+  translate: 0 calc(var(--k) * var(--sp-2) * -1); scale: calc(1 - var(--k) * 0.04);
+  transition: translate var(--dur-3) var(--ease-move), scale var(--dur-3) var(--ease-move);
+}
+.toast-stack.open > .toast { translate: 0 calc(var(--k) * (var(--toast-h) + var(--sp-2)) * -1); scale: 1; }
+.toast-stack > .toast > * { transition: opacity var(--dur-2) var(--ease-out); }
+/* 一叠里宽度一样（以最宽的那条为准），文字靠左、关闭按钮靠右；收起时后面的不会从两边露出一大块 */
+.toast-stack > .toast > .selectable { flex: 1 1 auto; }
+.toast-stack > .toast.behind > * { opacity: 0; }
+.toast-stack.open > .toast.behind > * { opacity: 1; }
+.toast .toast-x { display: inline-grid; place-items: center; width: var(--ctl-sm); height: var(--ctl-sm); margin-left: 0; padding: 0; color: var(--text-3); font-weight: normal; }
+.toast .toast-x:hover { color: var(--text); }
+.toast .toast-x [class^="ri-"] { font-size: var(--icon-sm); }

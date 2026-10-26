@@ -11,6 +11,7 @@ import { markLoaded } from '../kit/alpha';
 import { invokeUI } from '../lib/commands';
 import { useGeneration } from '../state/generation';
 import { INPAINT_PRESETS, autoInpaintRect, inpaintSize, type Rect } from '../shared/inpaint';
+import { BlurImg, type BlurImage } from '../kit/blur';
 
 type Preset = (typeof INPAINT_PRESETS)[number]['id'] | 'free';
 type Tool = 'box' | 'brush' | 'erase';
@@ -157,12 +158,15 @@ export interface InpaintProps {
   tabId: string;
   /** 源图：这个作品里的一张 */
   imageId: string;
-  src: string;
+  /** 源图的文件路径 */
+  path: string;
+  /** 源图的记录：决定要不要模糊（2.37） */
+  image?: BlurImage;
   onClose: () => void;
 }
 export function Inpaint(p: InpaintProps) {
   // 关的时候调用方已经把图清掉了，照最后打开时的那张淡出
-  const show = p.open && !!p.src;
+  const show = p.open && !!p.path;
   const last = useRef(p);
   if (show) last.current = p;
   const q = show ? p : last.current;
@@ -685,9 +689,11 @@ function Editor(
             } as React.CSSProperties
           }
         >
-          <img
+          <BlurImg
+            image={p.image}
+            path={p.path}
+            tab={p.tabId}
             className="alpha-bg"
-            src={p.src}
             alt=""
             draggable={false}
             onLoad={(e) => {

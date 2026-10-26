@@ -276,6 +276,20 @@ export function FilterPop({
             <Icon name="arrow-down-s-line" />
           </button>
         </div>
+        {/* 图片模糊（1.8.3，2.37）：按 NSFW 标记筛，智能收藏集也能用 */}
+        <div className="frow">
+          <span className="label">NSFW</span>
+          <Seg
+            label="NSFW"
+            items={[
+              ['any', '不限'],
+              ['nsfw', '是'],
+              ['safe', '不是'],
+            ]}
+            value={filters.nsfw}
+            onChange={(nsfw) => p.onFiltersChange({ nsfw })}
+          />
+        </div>
         <div className="foot">
           <button
             className="btn quiet sm"

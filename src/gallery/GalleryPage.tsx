@@ -6,10 +6,10 @@ import { ContextMenu, type MenuEntry } from '../kit/menu';
 import { useExitList, ms } from '../kit/motion';
 import { useResizable } from '../kit/resize';
 import { useNotifications } from '../kit/toast';
+import { nsfwMenu } from '../kit/blur';
 import { Viewer, type ViewerItem } from '../kit/Viewer';
 import { invokeUI } from '../lib/commands';
 import { writeClipboardText } from '../lib/clipboard';
-import { mediaUrl } from '../lib/imageStage.js';
 import { hasImageName } from '../lib/imageNaming.js';
 import { GALLERY_CARD_SIZE_KEY } from '../lib/galleryLayout.js';
 import { GALLERY_PREVIEW_PANEL_WIDTH_KEY } from '../lib/panelLayout.js';
@@ -178,7 +178,7 @@ export default function GalleryPage(
   const openViewer = (group: LibraryGroup, member?: { id: string }) => {
     if (p.selectedGroupIds.length) return;
     const items: ViewerItem[] = p.groups.flatMap((g) =>
-      g.members.map((m) => ({ id: m.id, src: mediaUrl(m.image_path), group: g.id })),
+      g.members.map((m) => ({ id: m.id, path: m.image_path, image: m, group: g.id })),
     );
     const start = member?.id || group.cover.id;
     setViewer({
@@ -268,6 +268,10 @@ export default function GalleryPage(
         },
       },
       ...(multi ? [] : [{ label: '复制提示词', onSelect: () => void copyPrompt(menu.member.id) }]),
+      // 图片模糊（1.8.3，2.37）：一张只标指针停着的这一张，多选标选中的全部
+      ...nsfwMenu(multi ? ids : [menu.member.id], multi ? null : menu.member.nsfw, (text) =>
+        notify({ text, tone: 'error' }),
+      ),
       {
         label: multi || !hasImageName(menu.member) ? '起名' : '重命名',
         onSelect: () => {

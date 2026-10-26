@@ -12,6 +12,7 @@ import { useSharedTrash } from '../shell/SharedTrash';
 import { useGeneration } from '../state/generation';
 import { originGone, originMenu, trashImage } from './original';
 import { openCompare } from './Compare';
+import { nsfwMenu } from '../kit/blur';
 export function useVersionState({
   tab,
   before,
@@ -280,6 +281,11 @@ export function useVersionState({
           'sep' as const,
         ]
       : []),
+    // 图片模糊（1.8.3，2.37）：版本里的图只有 ID，不知道现在的状态时三项都给
+    ...nsfwMenu([imageId], imageId === v.project.id ? v.project.nsfw : undefined, (text) =>
+      notify({ text, tone: 'error' }),
+    ),
+    'sep' as const,
     {
       label: '作为新作品打开',
       onSelect: () =>

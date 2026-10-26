@@ -25,6 +25,8 @@ import { useSharedTrash } from '../shell/SharedTrash';
 import { ImageOps } from './ImageOps';
 import { Inpaint, rerunInpaint } from './Inpaint';
 import { CompareHost, openCompare } from './Compare';
+import { BlurImg, nsfwMenu, type BlurImage } from '../kit/blur';
+import { useNsfwState } from '../state/blur';
 
 export interface ImageProps {
   tab: WorkbenchTab;
@@ -68,7 +70,9 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const [vibe, setVibe] = useState<number | null>(null);
   const [op, setOp] = useState<'' | 'upscale' | 'enhance'>('');
   // 局部重绘（1.8.1）：编辑层开在哪张图上
-  const [inpaint, setInpaint] = useState<{ id: string; src: string } | null>(null);
+  const [inpaint, setInpaint] = useState<{ id: string; path: string; image: BlurImage } | null>(
+    null,
+  );
   useEffect(() => setMissing(!!tab.error), [image?.image_path, tab.error]);
   useEffect(() => {
     if (!generation.settings.hasToken) {
@@ -184,6 +188,8 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
     useDecoded(
       {
         src: image && !missing ? mediaUrl(image.image_path) : '',
+        path: image && !missing ? image.image_path : '',
+        image,
         key: `${tab.id}:${image?.image_path}:${allTrashed}:${blank}`,
         blank,
       },
@@ -203,9 +209,10 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const dirtyLeaving = !dirty && showDirty;
   // 放大、增强（1.8）：有令牌、这一张有版本时才有
   const canOp = !!version && !!stageId && !gone && !blank && !allTrashed;
+  const stageNsfw = useNsfwState(image);
   const openInpaint = (id: string) =>
     void invokeUI('library.get', { id })
-      .then((r) => r.project && setInpaint({ id, src: mediaUrl(r.project.image_path) }))
+      .then((r) => r.project && setInpaint({ id, path: r.project.image_path, image: r.project }))
       .catch((e) => notify({ text: (e as Error).message, tone: 'error' }));
   // 局部重绘生成的那一版：舞台下面多"再来一次"和"和修之前对比"
   const repaint =
@@ -239,6 +246,9 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                 'sep',
               ] as MenuEntry[])
             : []),
+          // 图片模糊（1.8.3，2.37）
+          ...nsfwMenu([stageId], stageNsfw, (text) => notify({ text, tone: 'error' })),
+          'sep',
           {
             label: '作为新作品打开',
             onSelect: () =>
@@ -273,9 +283,11 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
     () =>
       (members.length ? members : image ? [image as unknown as ImageRecord] : []).map((x) => ({
         id: x.id,
-        src: mediaUrl(x.image_path),
+        path: x.image_path,
+        image: x,
+        tab: tab.id,
       })),
-    [members, image?.image_path],
+    [members, image?.image_path, tab.id],
   );
   return (
     <div className="col stage">
@@ -302,12 +314,15 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
               这一版的图片都在回收站
             </div>
           ) : value.src ? (
-            <img
+            <BlurImg
               key={key}
+              image={value.image}
+              path={value.path}
+              tab={tab.id}
+              eye={leaving ? false : 'md'}
               className={`alpha-bg ${leaving ? 'leaving' : ''}`}
               data-enter={enter}
               data-stage=""
-              src={value.src}
               alt="当前图片"
               draggable={false}
               role="button"
@@ -550,7 +565,8 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
         open={!!inpaint}
         tabId={tab.id}
         imageId={inpaint?.id || ''}
-        src={inpaint?.src || ''}
+        path={inpaint?.path || ''}
+        image={inpaint?.image}
         onClose={() => setInpaint(null)}
       />
       <CompareHost tabId={tab.id} />

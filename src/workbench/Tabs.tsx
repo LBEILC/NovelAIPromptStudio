@@ -6,7 +6,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { hasImageName, imageFileName } from '../lib/imageNaming.js';
-import { mediaUrl } from '../lib/imageStage.js';
+import { BlurImg } from '../kit/blur';
 import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
 import { nearestTabSlot } from '../lib/tabSlots.js';
 import { useGeneration } from '../state/generation';
@@ -426,9 +426,12 @@ export function WorkbenchTabs(p: TabsProps) {
                     className={`tab-blank ${shapeOf(img.metadata.width, img.metadata.height)}`}
                   />
                 ) : (
-                  <img
+                  <BlurImg
+                    image={img}
+                    path={img?.thumbnail_path || img?.image_path || ''}
+                    tab={t.id}
+                    eye={false}
                     className={shapeOf(img?.metadata.width, img?.metadata.height)}
-                    src={mediaUrl(img?.thumbnail_path || img?.image_path || '')}
                     alt=""
                     draggable={false}
                   />
@@ -506,8 +509,11 @@ export function WorkbenchTabs(p: TabsProps) {
         {peekTab?.project?.image_path && (
           <>
             <div className="tp-img">
-              <img
-                src={mediaUrl(peekTab.project.thumbnail_path || peekTab.project.image_path)}
+              <BlurImg
+                image={peekTab.project}
+                path={peekTab.project.thumbnail_path || peekTab.project.image_path}
+                tab={peekTab.id}
+                eye={false}
                 alt=""
               />
             </div>

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Dialog } from '../kit/dialog';
 import { CheckMark, isMod } from '../kit/controls';
 import { Viewer } from '../kit/Viewer';
-import { mediaUrl } from '../lib/imageStage.js';
+import { BlurImg } from '../kit/blur';
 import { fallbackRatio } from '../library/layout';
 import type { PreparedImportEntry } from '../shared/types';
 
@@ -192,7 +192,7 @@ export function ZipImport({
                 e.previewWidth && e.previewHeight
                   ? e.previewWidth / e.previewHeight
                   : fallbackRatio;
-              const src = e.previewPath ? mediaUrl(e.previewPath) : undefined;
+              const src = e.previewPath || undefined;
               if (e.duplicate || e.previewError)
                 return (
                   <span
@@ -239,7 +239,7 @@ export function ZipImport({
       {box && <div className="marquee-box" style={{ display: 'block', ...box }} />}
       <Viewer
         open={viewer != null}
-        items={viewable.map((e) => ({ id: e.id, src: mediaUrl(e.previewPath) }))}
+        items={viewable.map((e) => ({ id: e.id, path: e.previewPath }))}
         index={viewer || 0}
         onIndex={setViewer}
         onClose={() => setViewer(null)}
@@ -249,13 +249,16 @@ export function ZipImport({
 }
 
 /** 一张小图：预览还没读出来时是浅灰底加一道扫过的微光，读出来以后淡入 */
+/** src 是文件路径；ZIP 里的图还没有记录，只在"所有图片都模糊"时模糊（2.37） */
 function Thumb({ src }: { src?: string }) {
   const [ready, setReady] = useState(false);
   return (
     <span className={`zthumb ${ready ? 'ready' : 'wait'}`}>
       {src && (
-        <img
-          src={src}
+        <BlurImg
+          image={null}
+          path={src}
+          eye={false}
           alt=""
           draggable={false}
           onLoad={() => setReady(true)}

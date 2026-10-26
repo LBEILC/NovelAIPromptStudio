@@ -1,8 +1,9 @@
 // 标题栏（doc/design.md 2.9、2.20）：左边标志和导航（当前页文字是 --text、稍粗，不做滑块和下划线），
-// 工作台时后面是标签页；右边是生成状态和设置齿轮。Windows 用自绘标题栏，系统的窗口按钮画在最右边。
+// 工作台时后面是标签页；右边是生成状态、模糊所有图片（1.8.3）和设置齿轮。Windows 用自绘标题栏，系统的窗口按钮画在最右边。
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Icon, Logo } from '../kit/controls';
 import { fadeOut, usePresence } from '../kit/motion';
+import { BlurToggle } from '../kit/blur';
 import 'remixicon/fonts/remixicon.css';
 
 export type Page = 'workbench' | 'gallery' | 'materials' | 'settings';
@@ -71,6 +72,7 @@ export function Titlebar({
       <span className="sp" />
       <div className="tb-end">
         {status}
+        <BlurToggle />
         <button
           className={`btn quiet sm icon tb-set ${page === 'settings' ? 'on' : ''}`}
           aria-label="设置"

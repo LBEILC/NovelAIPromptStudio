@@ -27,6 +27,7 @@ import type { LibraryGroup, LibraryProps } from '../library/types';
 import type { DetachedRecord, LibraryCard } from '../shared/types';
 import { namedWork, workLabel } from '../lib/workNames';
 import { markLoaded } from '../kit/alpha';
+import { BlurImg } from '../kit/blur';
 import { reconcileVisibleSlots, type VisibleSlots } from '../library/visibleSlots';
 
 const cardRatio = (c: LibraryCard) => {
@@ -565,9 +566,10 @@ function Cards({
               }}
               onPointerLeave={() => setScrub((s) => (s?.id === g.id ? null : s))}
             >
-              <img
+              <BlurImg
+                image={shown}
+                path={shown.thumbnail_path || shown.image_path}
                 className={`lmain alpha-bg ${fit ? 'fit' : ''}`}
-                src={thumb(shown)}
                 alt=""
                 draggable={false}
                 onLoad={markLoaded}
@@ -583,9 +585,11 @@ function Cards({
                 <span className="lmosaic" aria-hidden="true">
                   {mosaic.picks.map((m, k) => (
                     <span key={m.id}>
-                      <img
+                      <BlurImg
+                        image={m}
+                        path={m.thumbnail_path || m.image_path}
+                        eye={false}
                         className="alpha-bg"
-                        src={thumb(m)}
                         alt=""
                         draggable={false}
                         onLoad={markLoaded}

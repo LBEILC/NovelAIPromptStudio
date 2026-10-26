@@ -54,7 +54,8 @@ export function filterCount(f: GalleryFilters) {
     f.excludeTags.length +
     groupModelOptions(f.models.map((value) => ({ label: value, value }))).length +
     f.vibes.length +
-    Number(f.datePreset !== 'all')
+    Number(f.datePreset !== 'all') +
+    Number(f.nsfw !== 'any')
   );
 }
 
@@ -109,6 +110,15 @@ export function chipList(
       value: dateRangeLabel(f),
       mono: f.datePreset === 'custom',
       clear: () => onChange({ datePreset: 'all', dateFrom: '', dateTo: '' }),
+    });
+  // 图片模糊（1.8.3，2.37）：一次挑出来检查和修正标记
+  if (f.nsfw !== 'any')
+    out.push({
+      key: 'nsfw',
+      label: 'NSFW',
+      value: f.nsfw === 'nsfw' ? '是' : '不是',
+      mono: false,
+      clear: () => onChange({ nsfw: 'any' }),
     });
   return out;
 }

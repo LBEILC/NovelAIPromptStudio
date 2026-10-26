@@ -7,13 +7,14 @@ import { Icon } from '../kit/controls';
 import { useNotifications } from '../kit/toast';
 import { FlipScope, useExitList } from '../kit/motion';
 import { invokeUI } from '../lib/commands';
-import { mediaUrl } from '../lib/imageStage.js';
+import { BlurImg, type BlurImage } from '../kit/blur';
 import type { LibraryGroup, LibraryProps } from '../library/types';
 
 type Row = {
   key: string;
   ids: string[];
-  imgs: string[];
+  /** 前三张：路径和记录（决定要不要模糊，2.37） */
+  imgs: { path: string; rec: BlurImage }[];
   name: string;
   original: string;
   state: 'open' | 'done' | 'gone';
@@ -79,7 +80,9 @@ export function NameAI({
           return {
             key: `${id}-${i}`,
             ids,
-            imgs: g.members.slice(0, 3).map((m) => m.thumbnail_path || m.image_path),
+            imgs: g.members
+              .slice(0, 3)
+              .map((m) => ({ path: m.thumbnail_path || m.image_path, rec: m })),
             name: ids.length > 1 ? first.name.replace(/-01$/, '') : first.name,
             original: first.original,
             state: 'open',
@@ -208,8 +211,8 @@ export function NameAI({
                     className={`lnm-row ${r.state} ${leaving ? 'leaving' : ''}`}
                   >
                     <span className="lnm-pic">
-                      {r.imgs.map((src) => (
-                        <img key={src} src={mediaUrl(src)} alt="" />
+                      {r.imgs.map((x) => (
+                        <BlurImg key={x.path} image={x.rec} path={x.path} eye={false} alt="" />
                       ))}
                     </span>
                     <div className="lnm-main">

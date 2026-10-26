@@ -163,6 +163,11 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         go: 'gallery',
       },
       {
+        name: '图片模糊',
+        text: '只模糊 NSFW 的图或所有图片，标题栏一键切换；右键标"标为 NSFW""不是 NSFW"',
+        go: 'settings:appearance',
+      },
+      {
         name: '素材',
         text: '常用块、角色和 Vibe 库，在提示词里随手插入',
         go: 'materials',

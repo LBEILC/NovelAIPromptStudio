@@ -7,7 +7,7 @@ import { useNotifications } from '../kit/toast';
 import { useExitList, useSwap } from '../kit/motion';
 import { useGeneration } from '../state/generation';
 import { invokeUI } from '../lib/commands';
-import { mediaUrl } from '../lib/imageStage.js';
+import { BlurImg } from '../kit/blur';
 
 /** 放大、增强（1.8）时写"放大中""增强中"（和工作台底栏一致） */
 const busyVerb = (op?: string) =>
@@ -149,7 +149,12 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
         </div>
         {pending.map((job) => (
           <div className="q-item" key={job.id}>
-            <img src={mediaUrl(job.project.thumbnail_path || job.project.image_path)} alt="" />
+            <BlurImg
+              image={job.project}
+              path={job.project.thumbnail_path || job.project.image_path}
+              eye={false}
+              alt=""
+            />
             <div>
               <b>
                 <span className="q-name" data-tip={job.name}>
