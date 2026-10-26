@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import sharp from 'sharp';
 
 export async function cleanBaseImage(source) {
-  const input = await fs.readFile(source);
+  const input = Buffer.isBuffer(source) ? source : await fs.readFile(source);
   if (input.length > 100 * 1024 * 1024) throw new Error('参考图过大');
   const { data, info } = await sharp(input)
     .rotate()

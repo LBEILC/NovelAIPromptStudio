@@ -62,7 +62,8 @@ export async function buildInpaint(project, sourcePath, operation, library, opti
   validateRect(operation.rect, source);
   const strength = operation.strength ?? 1;
   if (!Number.isFinite(strength) || strength < 0.01 || strength > 1) invalid('重绘强度无效');
-  const size = inpaintSize(operation.rect.width, operation.rect.height, operation.fullSize);
+  const size =
+    options.size ?? inpaintSize(operation.rect.width, operation.rect.height, operation.fullSize);
   if (size.width > 2048 || size.height > 2048 || size.width * size.height > 1536 * 2048)
     throw new Error('重绘尺寸超过上限');
   const draft = structuredClone(project);
@@ -87,13 +88,20 @@ export async function buildInpaint(project, sourcePath, operation, library, opti
   if (strength !== 1) p.img2img = { strength, color_correct: true };
   for (const key of ['v4_prompt', 'v4_negative_prompt'])
     for (const character of p[key]?.caption?.char_captions || [])
-      character.centers = character.centers.map((c) => ({
-        x: Math.max(0, Math.min(1, (c.x * source.width - operation.rect.x) / operation.rect.width)),
-        y: Math.max(
-          0,
-          Math.min(1, (c.y * source.height - operation.rect.y) / operation.rect.height),
-        ),
-      }));
+      character.centers = character.centers.map((c) =>
+        options.transformCenter
+          ? options.transformCenter(c)
+          : {
+              x: Math.max(
+                0,
+                Math.min(1, (c.x * source.width - operation.rect.x) / operation.rect.width),
+              ),
+              y: Math.max(
+                0,
+                Math.min(1, (c.y * source.height - operation.rect.y) / operation.rect.height),
+              ),
+            },
+      );
   let crop = sharp(await cleanBaseImage(sourcePath)).extract({
     left: operation.rect.x,
     top: operation.rect.y,
