@@ -26,6 +26,7 @@ import { ImageOps } from './ImageOps';
 import { Inpaint, rerunInpaint } from './Inpaint';
 import { Outpaint } from './Outpaint';
 import { CompareHost, openCompare } from './Compare';
+import { PickHost } from './Pick';
 import { BlurImg, nsfwMenu, type BlurImage } from '../kit/blur';
 import { useNsfwState } from '../state/blur';
 
@@ -601,6 +602,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
         onClose={() => setOutpaint(null)}
       />
       <CompareHost tabId={tab.id} />
+      <PickHost tabId={tab.id} />
       <Viewer
         open={viewer != null}
         items={viewerItems}

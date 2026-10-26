@@ -12,6 +12,7 @@ import { useSharedTrash } from '../shell/SharedTrash';
 import { useGeneration } from '../state/generation';
 import { originGone, originMenu, trashImage } from './original';
 import { openCompare } from './Compare';
+import { openPick } from './Pick';
 import { nsfwMenu } from '../kit/blur';
 export function useVersionState({
   tab,
@@ -218,6 +219,17 @@ export function useVersionState({
     row?: boolean,
   ): MenuEntry[] => [
     ...(fork ? [{ label: '切换到这一支', onSelect: () => void go(v) }, 'sep' as const] : []),
+    // 挑图（1.8.6，2.47）：一版有 2 张以上时
+    ...(row && v.parentId && v.images.filter((i) => !i.deleted).length > 1
+      ? [
+          {
+            label: '挑图…',
+            icon: 'checkbox-multiple-line',
+            onSelect: () => openPick(tab.id, v.id),
+          },
+          'sep' as const,
+        ]
+      : []),
     { label: '重命名分支…', onSelect: () => setRename({ v, anchor, text: v.branchName }) },
     ...(row && v.parentId
       ? [

@@ -8,6 +8,7 @@ import { useExitList, useSwap } from '../kit/motion';
 import { useGeneration } from '../state/generation';
 import { invokeUI } from '../lib/commands';
 import { BlurImg } from '../kit/blur';
+import { openPick } from '../workbench/Pick';
 
 /** 放大、增强、局部重绘、扩图时写"放大中""增强中""重绘中""扩图中"（和工作台底栏一致） */
 const SIDE: Record<string, string> = { left: '左', right: '右', top: '上', bottom: '下' };
@@ -71,6 +72,25 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
           text: job.continuous
             ? `已停止：共完成 ${job.completed} 张`
             : `已停止：完成 ${job.completed} 张，其余已取消`,
+        });
+      // 一次生成 10 张以上（批量、随机块）：完成的通知带"挑图"（1.8.6，2.47）
+      if (
+        job.state === 'completed' &&
+        job.source === 'user' &&
+        job.completed >= 10 &&
+        job.versionId &&
+        !job.failedEdges?.length
+      )
+        notify({
+          text: `已生成 ${job.completed} 张`,
+          tone: 'success',
+          action: {
+            label: '挑图',
+            onClick: () => {
+              onOpen(job.tabId);
+              openPick(job.tabId, job.versionId!);
+            },
+          },
         });
       // 扩图按边分块中途失败（1.8.5，2.41）：已画好的边存成了新的一版
       if (job.state === 'completed' && job.failedEdges?.length)

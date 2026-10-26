@@ -12,6 +12,9 @@ import { useVersionState } from './useVersionState';
 import { openCompare, type CompareSide } from './Compare';
 import { VersionDifference, VersionSummary } from './VersionDifference';
 import { Row, TH_H, TH_MORE, Thumb, rowsOf } from './versionHelpers';
+import { openPick } from './Pick';
+/** 一版超过这么多张时，"+N"打开挑图而不是展开 */
+const PICK_AT = 24;
 // 放大、增强、图生图出来的那一版（1.8，doc/design.md 2.34）：标题旁边挂一个和 Agent 一样的小标签
 const OP_NAME: Record<ImageOperation['kind'], string> = {
   upscale: '放大',
@@ -221,8 +224,16 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
       <span
         key="more"
         className="more mono"
-        data-tip={`显示这一版的全部 ${cells.length} 张`}
-        onClick={(e) => (e.stopPropagation(), setOpen([...open, v.id]))}
+        data-tip={
+          cells.length > PICK_AT
+            ? `挑图：这一版 ${cells.length} 张铺开来挑`
+            : `显示这一版的全部 ${cells.length} 张`
+        }
+        // 图很多时（批量生成、随机块）展开会把版本栏撑得很长，直接打开挑图（2.47）
+        onClick={(e) => (
+          e.stopPropagation(),
+          cells.length > PICK_AT ? openPick(tab.id, v.id) : setOpen([...open, v.id])
+        )}
       >
         +{cells.length - shown.length}
       </span>,
