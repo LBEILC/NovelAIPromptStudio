@@ -355,7 +355,7 @@ function Editor(
             {(['top', 'right', 'bottom', 'left'] as const).map((k) => (
               <i
                 key={k}
-                className={`op-h ${k}`}
+                className={`op-grip ${k}`}
                 role="slider"
                 aria-label={`${SIDE_NAME[k]}边扩多少`}
                 aria-valuenow={edges[k]}

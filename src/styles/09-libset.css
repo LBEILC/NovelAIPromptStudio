@@ -583,15 +583,16 @@ textarea.para-in { resize: none; overflow: hidden; }
 .op-canvas { position: absolute; outline: 1.5px dashed var(--ink); background-color: var(--checker-a); background-image: repeating-conic-gradient(var(--checker-b) 0 25%, var(--checker-a) 0 50%); background-size: calc(var(--checker) * 2) calc(var(--checker) * 2); }
 .op-orig { position: absolute; display: block; box-shadow: var(--shadow-pop); pointer-events: none; }
 .op-plus { position: absolute; translate: -50% -50%; padding: 0 var(--sp-1); border-radius: var(--r-tag); background: var(--surface); color: var(--text-2); font: var(--fs-small)/var(--lh-small) var(--font-mono); white-space: nowrap; pointer-events: none; }
-.op-h { position: absolute; z-index: 1; border: 1px solid var(--ink); border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--shadow-pop); touch-action: none; }
-.op-h::before { content: ""; position: absolute; inset: -8px; }
-.op-h.top, .op-h.bottom { left: 50%; width: 32px; height: 8px; translate: -50% -50%; cursor: ns-resize; }
-.op-h.bottom { top: 100%; }
-.op-h.top { top: 0; }
-.op-h.left, .op-h.right { top: 50%; width: 8px; height: 32px; translate: -50% -50%; cursor: ew-resize; }
-.op-h.right { left: 100%; }
-.op-h.left { left: 0; }
-.op-h:hover, .op-canvas.dragging .op-h { background: var(--ink); }
+/* 把手只在扩图画布里（以前叫 .op-h，和放大、增强浮层的标题栏撞名，把浮层标题画成了一个白色胶囊） */
+.op-canvas .op-grip { position: absolute; z-index: 1; border: 1px solid var(--ink); border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--shadow-pop); touch-action: none; }
+.op-canvas .op-grip::before { content: ""; position: absolute; inset: -8px; }
+.op-canvas .op-grip.top, .op-canvas .op-grip.bottom { left: 50%; width: 32px; height: 8px; translate: -50% -50%; cursor: ns-resize; }
+.op-canvas .op-grip.bottom { top: 100%; }
+.op-canvas .op-grip.top { top: 0; }
+.op-canvas .op-grip.left, .op-canvas .op-grip.right { top: 50%; width: 8px; height: 32px; translate: -50% -50%; cursor: ew-resize; }
+.op-canvas .op-grip.right { left: 100%; }
+.op-canvas .op-grip.left { left: 0; }
+.op-canvas .op-grip:hover, .op-canvas.dragging .op-grip { background: var(--ink); }
 .op-ratios { display: inline-flex; gap: var(--sp-0); }
 .op-cards { display: inline-flex; gap: var(--sp-2); }
 .op-card { display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding: var(--sp-1) var(--sp-3); border: var(--bw) solid var(--border); border-radius: var(--r-ctl); background: transparent; color: var(--text); text-align: left; cursor: pointer; transition: border-color var(--dur-1) var(--ease-out), background var(--dur-1) var(--ease-out); }
