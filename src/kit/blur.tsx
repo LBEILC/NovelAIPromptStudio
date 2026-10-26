@@ -41,11 +41,31 @@ function useRevealed() {
   return useSyncExternalStore(subscribe, () => revealed);
 }
 
+// 启动时设置还没读到：按这台电脑上次的模式显示，免得开着"模糊所有图片"时一启动先露出原图；
+// 从来没读到过（新装、清了本地数据）就先全部模糊，读到以后马上换成真的
+const MODE_KEY = 'novelai-prompt-studio.blur-mode.v1';
+const lastMode = (): BlurMode => {
+  try {
+    const v = localStorage.getItem(MODE_KEY);
+    return v === 'off' || v === 'nsfw' || v === 'all' ? v : 'all';
+  } catch {
+    return 'all';
+  }
+};
+
 /** 现在生效的模式：标题栏的"模糊所有图片"开着时一律是 all */
 export function useBlurMode(): BlurMode {
   const s = useBlurSettings();
-  if (!s) return 'off';
-  return s.quickAll ? 'all' : s.mode;
+  const mode = s ? (s.quickAll ? 'all' : s.mode) : null;
+  useEffect(() => {
+    if (!mode) return;
+    try {
+      localStorage.setItem(MODE_KEY, mode);
+    } catch {
+      /* 存不了就每次启动先按全部模糊 */
+    }
+  }, [mode]);
+  return mode ?? lastMode();
 }
 
 /**
