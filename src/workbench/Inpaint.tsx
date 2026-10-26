@@ -238,6 +238,21 @@ function Editor(
     p.onClose();
   };
   useDismiss(!p.leaving, close, [ov], { modal: true });
+  // 提示词栏留在外面照常能改（doc/design.md 2.35，10-26）：编辑层的右边停在提示词栏左边，
+  // 重绘用的就是这份草稿。找不到提示词栏时照旧盖满
+  const [right, setRight] = useState(0);
+  useLayoutEffect(() => {
+    const col = document.querySelector<HTMLElement>('.col.prompt');
+    const host = ov.current?.offsetParent as HTMLElement | null;
+    if (!col || !host) return;
+    const measure = () =>
+      setRight(Math.max(0, host.getBoundingClientRect().right - col.getBoundingClientRect().left));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(col);
+    ro.observe(host);
+    return () => ro.disconnect();
+  }, []);
   // 恢复上次留下的涂抹
   useLayoutEffect(() => {
     if (dims && before && mask.current) mask.current.getContext('2d')!.drawImage(before.mask, 0, 0);
@@ -359,7 +374,8 @@ function Editor(
   useEffect(() => {
     if (p.leaving) return;
     const down = (e: KeyboardEvent) => {
-      if ((e.target as Element)?.closest?.('input, textarea')) return;
+      // 提示词栏里打字、按空格不算
+      if ((e.target as Element)?.closest?.('input, textarea, .col.prompt')) return;
       if (e.key === ' ') {
         e.preventDefault();
         setSpace(true);
@@ -578,9 +594,10 @@ function Editor(
     <div
       ref={ov}
       className={`viewer-ov inpaint-ov ${p.leaving ? 'leaving' : ''}`}
+      style={{ right: right || undefined }}
       data-enter="fade3"
       role="dialog"
-      aria-modal="true"
+      aria-modal={right ? undefined : 'true'}
       aria-label="局部重绘"
     >
       <div className="viewer-bar ip-top">
@@ -639,7 +656,7 @@ function Editor(
           清除涂抹
         </button>
         <span className="sp" />
-        <span className="help">滚轮缩放 · 按住空格拖动 · [ ] 调笔刷大小</span>
+        <span className="help">用右边的提示词重绘 · 滚轮缩放 · 按住空格拖动 · [ ] 调笔刷大小</span>
       </div>
       <div
         ref={box}

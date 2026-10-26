@@ -49,7 +49,9 @@ export const syntaxNote = (t: DocumentTag['tag']) =>
     ? '单独的 :: 是结束控制符，不是 Tag，建议删除'
     : t.syntax_issue === 'emphasis_closer'
       ? '多余的 :: 结束符；前面没有强调时相当于权重 1'
-      : '';
+      : t.syntax_issue === 'unclosed_weight'
+        ? '前一段权重没写结束的 ::，V4.5 会读成别的样子'
+        : '';
 export const blockKey = (si: number, bi: number) => `${si}:${bi}`;
 export const findTag = (root: ParentNode | null | undefined, key: string) =>
   [...(root?.querySelectorAll<HTMLElement>('[data-tag-key]') || [])].find(

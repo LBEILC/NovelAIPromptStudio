@@ -572,3 +572,7 @@ textarea.para-in { resize: none; overflow: hidden; }
 /* 1.8.1 起操作条上按钮多了：不压扁，放不下就换到第二行 */
 .stage-acts { flex-wrap: wrap; row-gap: var(--sp-1); }
 .stage-acts > * { flex-shrink: 0; }
+/* 局部重绘让出提示词栏（10-26）：层级放到浮层（.float）下面，从提示词栏打开的浮层不被挡住；左边沿着提示词栏画一道分隔线 */
+.viewer-ov.inpaint-ov { z-index: 19; }
+.inpaint-ov[style*="right"] { border-right: var(--bw) solid var(--border); }
+.inpaint-ov .ip-top { flex-wrap: wrap; row-gap: var(--sp-1); }

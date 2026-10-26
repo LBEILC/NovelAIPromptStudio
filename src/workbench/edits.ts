@@ -50,6 +50,26 @@ export function insertTags(
   content = tidyTagSeparators(content, block.content);
   return replaceSection(document, sectionIndex, editPromptBlockText(section, blockIndex, content));
 }
+/**
+ * 这个 Tag 前面的权重块没写结束的 ::（doc/design.md 2.38）：在上一块的最后一个 Tag 后面补上，
+ * "a,0.8::b::" → "a::,0.8::b::"。V5 和 V4.5 读法不同，补上以后两边一样。
+ */
+export function closeWeightBefore(document: PromptDocument, entry: DocumentTag): PromptDocument {
+  const section = document.scopes[entry.section];
+  const block = section.blocks[entry.block];
+  const wrapper = [...(promptTagRanges(block.content)[entry.index]?.wrappers || [])]
+    .reverse()
+    .find((w) => w.kind === 'weight');
+  if (!wrapper) return document;
+  let at = wrapper.start;
+  while (at > 0 && /[\s,]/.test(block.content[at - 1])) at -= 1;
+  const content = block.content.slice(0, at) + '::' + block.content.slice(at);
+  return replaceSection(
+    document,
+    entry.section,
+    editPromptBlockText(section, entry.block, content),
+  );
+}
 export function deleteTags(document: PromptDocument, entries: DocumentTag[]): PromptDocument {
   return [...entries]
     .sort((a, b) => b.section - a.section || b.block - a.block || b.index - a.index)

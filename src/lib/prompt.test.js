@@ -68,7 +68,7 @@ describe('NovelAI prompt codec', () => {
     expect(tags.map(({ tag, weight, syntax_issue }) => ({ tag, weight, syntax_issue }))).toEqual([
       { tag: 'artist:yajuu', weight: 0.8, syntax_issue: '' },
       { tag: 'artist:ask (askzy)', weight: 0.8, syntax_issue: '' },
-      { tag: 'artists:ningen mame', weight: 0.8, syntax_issue: '' },
+      { tag: 'artists:ningen mame', weight: 0.8, syntax_issue: 'unclosed_weight' },
       { tag: 'rain', weight: 1, syntax_issue: '' },
     ]);
     const ranges = promptTagRanges(source);

@@ -8,7 +8,7 @@ import {
 import { createPromptStructure } from '../lib/promptStructure.js';
 import { parsePrompt } from '../lib/prompt.js';
 import { documentTags } from './model';
-import { deleteTags, insertTags, moveTags } from './edits';
+import { closeWeightBefore, deleteTags, insertTags, moveTags } from './edits';
 function fixture(raw: string) {
   const metadata = { prompt_raw: raw, negative_prompt: 'noise' };
   return createPromptDocument({
@@ -18,6 +18,20 @@ function fixture(raw: string) {
   });
 }
 describe('minimal workbench tag edits', () => {
+  it('closes a weight group that ran into the next numeric opener', () => {
+    const doc = fixture('0.8::artist:yajuu,artist:ask (askzy),0.8::artists:ningen mame::, rain');
+    const tags = documentTags(doc).filter((t) => t.section === 0);
+    expect(tags.map((t) => t.tag.syntax_issue || '')).toEqual(['', '', 'unclosed_weight', '']);
+    const next = closeWeightBefore(doc, tags[2]);
+    const raw = serializePromptSection(next.scopes[0]);
+    expect(raw).toBe('0.8::artist:yajuu,artist:ask (askzy)::,0.8::artists:ningen mame::, rain');
+    expect(parsePrompt(raw).map((t) => [t.tag, t.weight, t.syntax_issue])).toEqual([
+      ['artist:yajuu', 0.8, ''],
+      ['artist:ask (askzy)', 0.8, ''],
+      ['artists:ningen mame', 0.8, ''],
+      ['rain', 1, ''],
+    ]);
+  });
   it('changes one leaf without rewriting unrelated spacing or weight syntax', () => {
     const doc = fixture('  1.5::sky,  river::, {clouds}\r\n\r\nsoft light');
     const next = editPromptTag(doc.scopes[0], 0, 1, { tag: 'lake' });

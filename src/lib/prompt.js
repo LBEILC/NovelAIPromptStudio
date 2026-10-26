@@ -231,6 +231,8 @@ function weightGroupEnd(source, from) {
 function scanPromptSegments(source, state, offset = 0, wrappers = []) {
   const segments = [];
   let cursor = 0;
+  // Where the previous weight group ended at a new opener instead of its own "::"
+  let unclosedAt = -1;
   while (cursor < source.length) {
     while (cursor < source.length && /[\s,]/.test(source[cursor])) cursor += 1;
     if (cursor >= source.length) break;
@@ -251,10 +253,22 @@ function scanPromptSegments(source, state, offset = 0, wrappers = []) {
           open: weighted[0],
           close: '::',
         };
+        // V5 starts a new group here; V4.5 reads it differently (doc/design.md 2.38), so the
+        // first tag after a missing closer carries a diagnostic and can be fixed in one click.
+        const afterUnclosed = unclosedAt === cursor;
         scanPromptSegments(source.slice(contentStart, contentEnd), state, offset + contentStart, [
           ...wrappers,
           wrapper,
-        ]).forEach((segment) => segments.push({ ...segment, weight }));
+        ]).forEach((segment, i) =>
+          segments.push({
+            ...segment,
+            weight,
+            ...(afterUnclosed && i === 0 && !segment.syntax_issue
+              ? { syntax_issue: 'unclosed_weight' }
+              : {}),
+          }),
+        );
+        unclosedAt = group.closer ? -1 : contentEnd;
         cursor = contentEnd + group.closer;
         continue;
       }

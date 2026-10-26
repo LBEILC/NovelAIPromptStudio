@@ -47,6 +47,7 @@ export function renderPromptView({
   chosen,
   setSelected,
   removeWithUndo,
+  closeWeight,
   doc,
   copyItems,
   moveTargets,
@@ -114,6 +115,7 @@ export function renderPromptView({
   | 'chosen'
   | 'setSelected'
   | 'removeWithUndo'
+  | 'closeWeight'
   | 'doc'
   | 'copyItems'
   | 'moveTargets'
@@ -383,6 +385,21 @@ export function renderPromptView({
               data-command-scope={doc.scopes[editing.section]?.scope.key}
               data-command-block={editing.block}
             />
+            {editing.tag.syntax_issue === 'unclosed_weight' && (
+              <p className="help warn-note">
+                前一段权重没写结束的 ::。V5 从这里开始新的权重，V4.5 会把前面的数字当成文字
+                <button
+                  className="btn quiet sm"
+                  onClick={() => {
+                    const e = editing;
+                    setEditing(null);
+                    closeWeight(e);
+                  }}
+                >
+                  补上 ::
+                </button>
+              </p>
+            )}
             {(() => {
               // V5 控制词：一句说明；互斥组可以直接换档位；写法不标准给"改成官方写法"；不是 V5 时提醒
               const m = matchControl(draft.tag);

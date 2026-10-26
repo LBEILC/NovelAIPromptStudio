@@ -29,7 +29,7 @@ import {
   type ControlTag,
 } from '../../lib/v5Controls';
 import type { ImageProject, TagCategory } from '../../shared/types';
-import { deleteTags, insertTags } from '../edits';
+import { closeWeightBefore, deleteTags, insertTags } from '../edits';
 import {
   categoryLabel,
   documentTags,
@@ -333,6 +333,8 @@ export function usePromptState(p: EditorProps) {
 
   // ---------- 右键菜单 ----------
   const [menu, setMenu] = useState<{ at: [number, number]; items: MenuEntry[] } | null>(null);
+  // 前一个权重块没写结束的 ::（doc/design.md 2.38）：补上以后 V5 和 V4.5 读法一样
+  const closeWeight = (e: DocumentTag) => guard(() => save(closeWeightBefore(doc, e)));
   const tagMenu = (e: DocumentTag): MenuEntry[] => {
     const targets = selected.includes(e.key) && chosen.length > 1 ? chosen : [e];
     const n = targets.length > 1 ? `${targets.length} 个` : undefined;
@@ -381,6 +383,9 @@ export function usePromptState(p: EditorProps) {
           onSelect: () => setCategory(targets, c),
         })),
       },
+      ...(e.tag.syntax_issue === 'unclosed_weight' && targets.length === 1
+        ? [{ label: '补上结束的 ::', onSelect: () => closeWeight(e) }]
+        : []),
       'sep',
       {
         label: '删除',
@@ -677,6 +682,7 @@ export function usePromptState(p: EditorProps) {
     copyLabel,
     copyMain,
     removeWithUndo,
+    closeWeight,
     copyItems,
     setPolarity,
     commitEditor,
