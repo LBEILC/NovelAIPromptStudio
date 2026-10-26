@@ -10,6 +10,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 import { importLibraryFiles } from '../importer.js';
+import { commandFor } from './release186.js';
 
 export async function generationChecks({
   app,
@@ -22,6 +23,15 @@ export async function generationChecks({
 }) {
   const { evaluate: e, click, input, wait, check } = h;
   h.category('生成');
+  const fixtureCommand = commandFor(h);
+  const closeFixtureTabs = async () => {
+    const { tabs } = await fixtureCommand('workbench.list');
+    // Session writes clone and persist every open draft. Finished scenarios must
+    // not make a later independent generation also persist their reference data.
+    for (const tab of tabs) await fixtureCommand('workbench.close', { tabId: tab.id });
+    console.log(`生成夹具清理：关闭 ${tabs.length} 个已结束场景的标签页`);
+  };
+  await closeFixtureTabs();
   await generation186Checks({ h, generationService });
   await generationQueueChecks({ h, generationService });
   const randomRequestStart = generationService.state.requests.length;
@@ -1022,6 +1032,7 @@ export async function generationChecks({
     await h.screenshot('057-library-trash-restored');
   }
 
+  await closeFixtureTabs();
   const [clipboardFile] = await createWorkbenchFixtures(
     path.join(mode.root, 'clipboard-original'),
     {
