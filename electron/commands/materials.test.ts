@@ -197,6 +197,21 @@ it('filters unsafe AI changes at the command boundary and leaves drafts and name
       )
     ).changes[0].name,
   ).toBe('合成场景');
+  const namingRequest = s.requests.at(-1) as { messages: { role: string; content: string }[] };
+  const instruction = namingRequest.messages[0].content;
+  for (const constraint of [
+    'JSON {names:',
+    '2 to 8',
+    'no punctuation',
+    'distinct',
+    'generic subject word',
+    'actual differences',
+  ])
+    expect(instruction).toContain(constraint);
+  expect(JSON.parse(namingRequest.messages[1].content)[0]).toMatchObject({
+    index: 0,
+    prompts: expect.any(Array),
+  });
   expect(s.database.loadProject('synthetic-material').name).toBe('Untitled');
   expect(JSON.stringify(s.requests)).not.toContain('/synthetic.png');
 });

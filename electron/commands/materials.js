@@ -160,7 +160,7 @@ export function materialCommands({ services, tab, full, edit, locate, revision }
       );
       const result = await ai(
         input,
-        'Return JSON {names:["简短中文名"]}, one concise Chinese name for each numbered image group, based only on the supplied prompts. No explanations.',
+        'Return JSON {names:["简短中文名"]}, one concise Chinese name for each numbered image group, in the same order and based only on its supplied prompts. Each name must contain 2 to 8 Chinese characters, with no punctuation, spaces or numbering. All names in this batch must be distinct. Do not use a generic subject word such as 少女, 女孩, 男孩, 人物 or 风景 as the entire name. Choose concrete distinguishing scene, action, clothing or composition details. When groups have nearly identical prompts, identify their actual differences and reflect those differences in their names, for example 雪地远景 and 雪地特写. Do not invent details absent from the prompts. Return only the JSON object; no explanations.',
         groups.map((items, index) => ({
           index,
           prompts: items.map((p) =>

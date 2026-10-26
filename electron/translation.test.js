@@ -101,7 +101,52 @@ describe('OpenAI-compatible AI translation', () => {
     expect(systemPrompt).not.toContain('Use the studio translation glossary.');
     expect(systemPrompt).not.toContain('Use the studio classification rules.');
     expect(systemPrompt).toContain('Return only valid JSON');
+    for (const constraint of [
+      'Danbooru',
+      'artist:',
+      'official Chinese name',
+      'without refusal',
+      'ArtistEra',
+      'Subject',
+      'Identity',
+      'Body',
+      'Clothing',
+      'Action',
+      'Environment',
+      'Composition',
+      'StyleQuality',
+      'Unsorted',
+      'nudity',
+      'rating:',
+      'depth of field',
+    ])
+      expect(systemPrompt).toContain(constraint);
+    expect(systemPrompt).toContain('"items":[{"translation":');
   });
+
+  it.each(['translate', 'rewrite'])(
+    'sends protected prompt syntax intact for paragraph %s',
+    async (direction) => {
+      const text = 'Panel 2: 合成场景 1.3::braid::, {kimono}, [[snow]], artist:sample_artist.';
+      const fetcher = vi.fn(async () =>
+        jsonResponse({ choices: [{ message: { content: 'synthetic response' } }] }),
+      );
+      expect(await transformParagraph(text, direction, { model: 'synthetic-model' }, fetcher)).toBe(
+        'synthetic response',
+      );
+      const { messages } = JSON.parse(fetcher.mock.calls[0][1].body);
+      expect(messages[1].content).toBe(text);
+      for (const constraint of [
+        'NovelAI/Danbooru',
+        'weighted spans',
+        'bracketed spans',
+        'Panel 1:',
+        'artist:',
+        'spacing',
+      ])
+        expect(messages[0].content).toContain(constraint);
+    },
+  );
 
   it('automatically translates more than 50 tags in ordered batches', async () => {
     const fetcher = vi.fn(async (_url, options) => {
