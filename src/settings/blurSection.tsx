@@ -14,6 +14,8 @@ export function BlurRows() {
   const notify = useNotifications();
   const s = useBlurSettings();
   const [editing, setEditing] = useState(false);
+  // 点了马上换过去（滑块和别处一样跟手），保存回来再以真值为准；保存失败退回原来的
+  const [picked, setPicked] = useState<BlurSettings['mode'] | null>(null);
   const save = (patch: Parameters<typeof saveBlurSettings>[0]) =>
     saveBlurSettings(patch).catch((e) => {
       notify({ text: errorText(e), tone: 'error' });
@@ -29,8 +31,13 @@ export function BlurRows() {
             ['nsfw', '只模糊 NSFW'],
             ['all', '所有图片都模糊'],
           ]}
-          value={s?.mode ?? 'off'}
-          onChange={(mode) => void save({ mode }).catch(() => {})}
+          value={picked ?? s?.mode ?? 'off'}
+          onChange={(mode) => {
+            setPicked(mode);
+            void save({ mode })
+              .catch(() => {})
+              .finally(() => setPicked(null));
+          }}
         />
       </Row>
       <Row

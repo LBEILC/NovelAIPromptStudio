@@ -293,10 +293,21 @@ export function useIndicator(box: RefObject<HTMLElement | null>, deps: unknown[]
       const ind = el.querySelector<HTMLElement>(':scope > .ind');
       const on = el.querySelector<HTMLElement>(':scope > .on, :scope > [aria-current="page"]');
       if (!ind || !on) return;
+      const width = `${on.offsetWidth}px`,
+        height = `${on.offsetHeight}px`,
+        transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
+      // 换选中项本身也会让整条宽一两像素（选中的字变粗，英文和数字尤其明显）：这时滑块已经在往对的位置滑，
+      // 不打断它。以前一律直接到位，"使用方式""图片模糊"这类带英文的切换就成了跳过去（用户 10-26）
+      if (
+        ind.style.width === width &&
+        ind.style.height === height &&
+        ind.style.transform === transform
+      )
+        return;
       ind.classList.add('jump');
-      ind.style.width = `${on.offsetWidth}px`;
-      ind.style.height = `${on.offsetHeight}px`;
-      ind.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
+      ind.style.width = width;
+      ind.style.height = height;
+      ind.style.transform = transform;
       ind.getBoundingClientRect();
       ind.classList.remove('jump');
     });
