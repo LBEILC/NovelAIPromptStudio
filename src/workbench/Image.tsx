@@ -24,6 +24,7 @@ import { originGone, originMenu, trashImage } from './original';
 import { useSharedTrash } from '../shell/SharedTrash';
 import { ImageOps } from './ImageOps';
 import { Inpaint, rerunInpaint } from './Inpaint';
+import { Outpaint } from './Outpaint';
 import { CompareHost, openCompare } from './Compare';
 import { BlurImg, nsfwMenu, type BlurImage } from '../kit/blur';
 import { useNsfwState } from '../state/blur';
@@ -71,6 +72,10 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const [op, setOp] = useState<'' | 'upscale' | 'enhance'>('');
   // 局部重绘（1.8.1）：编辑层开在哪张图上
   const [inpaint, setInpaint] = useState<{ id: string; path: string; image: BlurImage } | null>(
+    null,
+  );
+  // 扩图（1.8.5，2.41）：同样的编辑层
+  const [outpaint, setOutpaint] = useState<{ id: string; path: string; image: BlurImage } | null>(
     null,
   );
   useEffect(() => setMissing(!!tab.error), [image?.image_path, tab.error]);
@@ -210,10 +215,12 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   // 放大、增强（1.8）：有令牌、这一张有版本时才有
   const canOp = !!version && !!stageId && !gone && !blank && !allTrashed;
   const stageNsfw = useNsfwState(image);
-  const openInpaint = (id: string) =>
+  const openEditor = (id: string, set: typeof setInpaint) =>
     void invokeUI('library.get', { id })
-      .then((r) => r.project && setInpaint({ id, path: r.project.image_path, image: r.project }))
+      .then((r) => r.project && set({ id, path: r.project.image_path, image: r.project }))
       .catch((e) => notify({ text: (e as Error).message, tone: 'error' }));
+  const openInpaint = (id: string) => openEditor(id, setInpaint);
+  const openOutpaint = (id: string) => openEditor(id, setOutpaint);
   // 局部重绘生成的那一版：舞台下面多"再来一次"和"和修之前对比"
   const repaint =
     version?.operation?.kind === 'inpaint' && version.parentId && version.operation.sourceProjectId
@@ -235,6 +242,11 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                 { label: '放大…', icon: 'expand-diagonal-line', onSelect: () => setOp('upscale') },
                 { label: '增强…', icon: 'magic-line', onSelect: () => setOp('enhance') },
                 { label: '局部重绘…', icon: 'brush-line', onSelect: () => openInpaint(stageId) },
+                {
+                  label: '扩图…',
+                  icon: 'aspect-ratio-line',
+                  onSelect: () => openOutpaint(stageId),
+                },
                 {
                   label: '用这张做底图',
                   icon: 'image-edit-line',
@@ -475,6 +487,16 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                   <Icon name="brush-line" />
                   <span className="lbl">局部重绘</span>
                 </button>
+                <button
+                  className={`btn quiet sm ${missing ? 'is-off' : ''}`}
+                  data-trigger="op-outpaint"
+                  data-feature="outpaint"
+                  aria-label="扩图"
+                  {...lost(() => openOutpaint(stageId))}
+                >
+                  <Icon name="aspect-ratio-line" />
+                  <span className="lbl">扩图</span>
+                </button>
               </>
             )}
             {canOp && repaint && (
@@ -569,6 +591,14 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
         path={inpaint?.path || ''}
         image={inpaint?.image}
         onClose={() => setInpaint(null)}
+      />
+      <Outpaint
+        open={!!outpaint}
+        tabId={tab.id}
+        imageId={outpaint?.id || ''}
+        path={outpaint?.path || ''}
+        image={outpaint?.image}
+        onClose={() => setOutpaint(null)}
       />
       <CompareHost tabId={tab.id} />
       <Viewer

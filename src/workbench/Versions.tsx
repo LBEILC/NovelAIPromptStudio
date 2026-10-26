@@ -18,6 +18,21 @@ const OP_NAME: Record<ImageOperation['kind'], string> = {
   enhance: '增强',
   img2img: '图生图',
   inpaint: '局部重绘',
+  outpaint: '扩图',
+};
+const SIDE: Record<string, string> = { left: '左', right: '右', top: '上', bottom: '下' };
+/** 扩图那一版的悬停：右 +256、下 +128 · 一次画完；分块失败时写只扩了哪几边 */
+const outpaintTip = (o: ImageOperation) => {
+  const e = o.edges || { top: 0, right: 0, bottom: 0, left: 0 };
+  const failed = o.failedEdges || [];
+  const done = (['left', 'right', 'top', 'bottom'] as const).filter(
+    (k) => e[k] && !failed.includes(k),
+  );
+  const head = done.map((k) => `${SIDE[k]} +${e[k]}`).join('、');
+  const how = o.mode === 'edges' ? `按边分块 ${o.blocks?.length ?? done.length} 次` : '一次画完';
+  return failed.length
+    ? `只扩了${done.map((k) => SIDE[k]).join('、')}边（${head}），${failed.map((k) => SIDE[k]).join('、')}边生成失败${o.failure ? `：${o.failure}` : ''}`
+    : `往外扩图 · ${head} · ${how}`;
 };
 const n2 = (v?: number) => (v == null ? '' : v.toFixed(2));
 const opTip = (o: ImageOperation) =>
@@ -27,7 +42,9 @@ const opTip = (o: ImageOperation) =>
       ? `把上一版的图重新细化 · 幅度 ${o.magnitude ?? ''} · 放大 ${o.scale === 'max' ? 'Max' : `${o.scale ?? 1}x`}`
       : o.kind === 'inpaint'
         ? `重绘了上一版图里的一块${o.rect ? ` · 框 ${o.rect.width} × ${o.rect.height}，在 ${o.rect.x}, ${o.rect.y}` : ''} · 重绘强度 ${n2(o.strength)}`
-        : `按底图生成 · 强度 ${n2(o.strength)} · 噪声 ${n2(o.noise)}`;
+        : o.kind === 'outpaint'
+          ? outpaintTip(o)
+          : `按底图生成 · 强度 ${n2(o.strength)} · 噪声 ${n2(o.noise)}`;
 
 export function Versions({ tab, before }: { tab: CommandTab; before?: () => Promise<void> }) {
   const {

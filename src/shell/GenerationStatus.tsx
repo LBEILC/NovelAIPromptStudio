@@ -9,9 +9,24 @@ import { useGeneration } from '../state/generation';
 import { invokeUI } from '../lib/commands';
 import { BlurImg } from '../kit/blur';
 
-/** 放大、增强（1.8）时写"放大中""增强中"（和工作台底栏一致） */
+/** 放大、增强、局部重绘、扩图时写"放大中""增强中""重绘中""扩图中"（和工作台底栏一致） */
+const SIDE: Record<string, string> = { left: '左', right: '右', top: '上', bottom: '下' };
 const busyVerb = (op?: string) =>
-  op === 'upscale' ? '放大中' : op === 'enhance' ? '增强中' : '生成中';
+  op === 'upscale'
+    ? '放大中'
+    : op === 'enhance'
+      ? '增强中'
+      : op === 'inpaint'
+        ? '重绘中'
+        : op === 'outpaint'
+          ? '扩图中'
+          : '生成中';
+
+/** 第几张；扩图按边分块时是第几块（"扩图中 1 / 2"） */
+const stepOf = (job: { index: number; count: number; blockIndex?: number; blockCount?: number }) =>
+  job.blockCount && job.blockCount > 1
+    ? `${Math.max(1, job.blockIndex || 1)} / ${job.blockCount}`
+    : `${job.index} / ${job.count}`;
 
 export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }) {
   const state = useGeneration();
@@ -56,6 +71,13 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
           text: job.continuous
             ? `已停止：共完成 ${job.completed} 张`
             : `已停止：完成 ${job.completed} 张，其余已取消`,
+        });
+      // 扩图按边分块中途失败（1.8.5，2.41）：已画好的边存成了新的一版
+      if (job.state === 'completed' && job.failedEdges?.length)
+        notify({
+          text: `扩图没画完：${job.failedEdges.map((k) => SIDE[k]).join('、')}边生成失败${job.failure ? `：${job.failure}` : ''}，已画好的存成了新的一版`,
+          tone: 'error',
+          action: { label: '查看', onClick: () => onOpen(job.tabId) },
         });
       if (job.state === 'completed' && job.source === 'agent')
         notify({
@@ -115,7 +137,7 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
               {running
                 ? running.continuous
                   ? `生成中 · 第 ${running.index} 张`
-                  : `${busyVerb(running.operation)} · ${running.index} / ${running.count}`
+                  : `${busyVerb(running.operation)} · ${stepOf(running)}`
                 : '生成中'}
             </button>
           ) : (

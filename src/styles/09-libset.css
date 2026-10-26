@@ -576,3 +576,27 @@ textarea.para-in { resize: none; overflow: hidden; }
 .viewer-ov.inpaint-ov { z-index: 19; }
 .inpaint-ov[style*="right"] { border-right: var(--bw) solid var(--border); }
 .inpaint-ov .ip-top { flex-wrap: wrap; row-gap: var(--sp-1); }
+
+/* 扩图（2.41）：和局部重绘同一个编辑层。画布 = 扩大后的整张，扩出来的部分是棋盘格加虚线框；四条边中间各一个把手 */
+.op-area { display: block; }
+.op-probe { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.op-canvas { position: absolute; outline: 1.5px dashed var(--ink); background-color: var(--checker-a); background-image: repeating-conic-gradient(var(--checker-b) 0 25%, var(--checker-a) 0 50%); background-size: calc(var(--checker) * 2) calc(var(--checker) * 2); }
+.op-orig { position: absolute; display: block; box-shadow: var(--shadow-pop); pointer-events: none; }
+.op-plus { position: absolute; translate: -50% -50%; padding: 0 var(--sp-1); border-radius: var(--r-tag); background: var(--surface); color: var(--text-2); font: var(--fs-small)/var(--lh-small) var(--font-mono); white-space: nowrap; pointer-events: none; }
+.op-h { position: absolute; z-index: 1; border: 1px solid var(--ink); border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--shadow-pop); touch-action: none; }
+.op-h::before { content: ""; position: absolute; inset: -8px; }
+.op-h.top, .op-h.bottom { left: 50%; width: 32px; height: 8px; translate: -50% -50%; cursor: ns-resize; }
+.op-h.bottom { top: 100%; }
+.op-h.top { top: 0; }
+.op-h.left, .op-h.right { top: 50%; width: 8px; height: 32px; translate: -50% -50%; cursor: ew-resize; }
+.op-h.right { left: 100%; }
+.op-h.left { left: 0; }
+.op-h:hover, .op-canvas.dragging .op-h { background: var(--ink); }
+.op-ratios { display: inline-flex; gap: var(--sp-0); }
+.op-cards { display: inline-flex; gap: var(--sp-2); }
+.op-card { display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding: var(--sp-1) var(--sp-3); border: var(--bw) solid var(--border); border-radius: var(--r-ctl); background: transparent; color: var(--text); text-align: left; cursor: pointer; transition: border-color var(--dur-1) var(--ease-out), background var(--dur-1) var(--ease-out); }
+.op-card:hover:not(:disabled) { background: var(--hover); }
+.op-card.on { border-color: var(--text); background: var(--selected); }
+.op-card:disabled { cursor: default; opacity: var(--dim); }
+.op-card b { font-weight: var(--fw-strong); font-size: var(--fs-small); line-height: var(--lh-small); }
+.op-card span { color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small); white-space: nowrap; }

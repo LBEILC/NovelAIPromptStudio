@@ -64,7 +64,21 @@ export function GenerationSetup({ onConfigure }: { onConfigure: () => void }) {
 
 /** 放大、增强（1.8）在队列里时写"放大中""增强中"，其余照旧"生成中" */
 const busyVerb = (op?: string) =>
-  op === 'upscale' ? '放大中' : op === 'enhance' ? '增强中' : '生成中';
+  op === 'upscale'
+    ? '放大中'
+    : op === 'enhance'
+      ? '增强中'
+      : op === 'inpaint'
+        ? '重绘中'
+        : op === 'outpaint'
+          ? '扩图中'
+          : '生成中';
+
+/** 第几张；扩图按边分块时是第几块（"扩图中 1 / 2"） */
+const stepOf = (job: { index: number; count: number; blockIndex?: number; blockCount?: number }) =>
+  job.blockCount && job.blockCount > 1
+    ? `${Math.max(1, job.blockIndex || 1)} / ${job.blockCount}`
+    : `${job.index} / ${job.count}`;
 
 /** 底栏右边生成中的样子："停止"和"生成中" */
 function GenBusy({ job }: { job: { id: string; stop?: boolean; operation?: string } }) {
@@ -318,12 +332,12 @@ export function GenerationBar({
               >
                 {job
                   ? job.stop
-                    ? `${busyVerb(job.operation)} ${job.index} / ${job.count} · 完成当前这张后停止`
+                    ? `${busyVerb(job.operation)} ${stepOf(job)} · 完成当前这张后停止`
                     : job.continuous
                       ? `生成中 第 ${job.index} 张 · 持续生成`
                       : relay
-                        ? `${busyVerb(job.operation)} ${job.index} / ${job.count}`
-                        : `${busyVerb(job.operation)} ${job.index} / ${job.count} · ${job.spentKnown ? `已消耗 ${job.spent} Anlas` : '消耗未知'}`
+                        ? `${busyVerb(job.operation)} ${stepOf(job)}`
+                        : `${busyVerb(job.operation)} ${stepOf(job)} · ${job.spentKnown ? `已消耗 ${job.spent} Anlas` : '消耗未知'}`
                   : '生成中'}
               </span>
             ) : (

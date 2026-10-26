@@ -172,6 +172,13 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         point: { id: 'inpaint', need: IMG },
       },
       {
+        name: '扩图',
+        text: '往四边拉大画布，重画多出来的部分；可以一次画完，也可以按边分块，先写好尺寸和价格',
+        go: 'workbench',
+        where: '工作台 · 图片下面的操作条 · 扩图',
+        point: { id: 'outpaint', need: IMG },
+      },
+      {
         name: '两张图对比',
         text: '并排或叠在一起拖分界线看，下面写着两版提示词和参数的差异',
         go: 'workbench',
