@@ -543,7 +543,9 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
                 ? `${running.continuous ? `生成中 · 第 ${running.index} 张` : `${busyVerb(running.operation)} · ${stepOf(running)}`}${queued.length ? ` · 还有 ${queued.length} 个` : ''}`
                 : state.paused
                   ? `队列已暂停 · ${queued.length} 个`
-                  : `排队中 · ${queued.length} 个`}
+                  : queued.every((j) => j.deferred)
+                    ? `已暂缓 · ${queued.length} 个`
+                    : `排队中 · ${queued.length} 个`}
               {state.paused && running && ' · 将暂停'}
             </button>
           ) : (

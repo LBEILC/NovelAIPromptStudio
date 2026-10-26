@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Icon } from '../kit/controls';
+import { Icon, Switch } from '../kit/controls';
+import { useAsk } from '../kit/dialog';
 import { invokeUI } from '../lib/commands';
 import { useStorage } from '../state/storage';
 import { Col, Expand, Row, SetPage, Swap, bytes, errorText } from './parts';
@@ -15,15 +16,43 @@ export function Storage({
 }) {
   const s = useStorage(onLibraryChange);
   const [trash, setTrash] = useState(0);
+  const [trashBytes, setTrashBytes] = useState<number | null>(null);
+  // 回收站自动清理（2.47，1.8.6）：默认关
+  const [autoClean, setAutoClean] = useState(false);
+  const [dialog, ask] = useAsk();
   const [trashBusy, setTrashBusy] = useState(false);
   const [trashError, setTrashError] = useState('');
   const refresh = async () => {
     const r = await invokeUI('trash.summary', {});
     if (r?.ok) setTrash(r.count);
     else if (r) throw new Error(r.error);
+    const size = await invokeUI('trash.size', {}).catch(() => null);
+    setTrashBytes(size?.sizeKnown ? size.bytes : null);
+  };
+  const setClean = async (on: boolean) => {
+    if (
+      on &&
+      !(await ask({
+        title: '自动清理回收站？',
+        body: '打开后，移入回收站超过 30 天的图会自动永久删除，删除后无法恢复。现在就会检查一次，之后每天检查一次。',
+        tail: '只删不再被别处用到的文件；还在作品或收藏集里用到的不删。',
+        ok: '打开',
+      }))
+    )
+      return;
+    try {
+      const r = await invokeUI('settings.library.save', { trashAutoCleanup: on });
+      setAutoClean(!!r.trashAutoCleanup);
+      await refresh();
+    } catch (e) {
+      setTrashError(errorText(e));
+    }
   };
   useEffect(() => {
     void refresh().catch((e) => setTrashError(errorText(e)));
+    void invokeUI('settings.library.get', {})
+      .then((r) => setAutoClean(!!r.trashAutoCleanup))
+      .catch(() => {});
     // 图片库里删除或还原后回到这一页，数字要跟着变
     const onFocus = () => void refresh().catch(() => {});
     window.addEventListener('focus', onFocus);
@@ -137,7 +166,10 @@ export function Storage({
         </Row>
       ))}
       <Fail>{s.databaseError}</Fail>
-      <Row title="回收站" help={`${trash} 张图片 · 永久删除后无法恢复`}>
+      <Row
+        title="回收站"
+        help={`${trash} 张图片${trashBytes ? ` · 占用 ${bytes(trashBytes)}` : ''} · 永久删除后无法恢复`}
+      >
         <button
           className={`btn line-danger sm ${trashBusy ? 'loading' : ''}`}
           disabled={!trash || trashBusy}
@@ -148,7 +180,15 @@ export function Storage({
           清空回收站
         </button>
       </Row>
+      <Row
+        title="自动清理回收站"
+        help="移入回收站超过 30 天的图自动永久删除；只删不再被别处用到的文件"
+        feature="trash-clean"
+      >
+        <Switch on={autoClean} onChange={(v) => void setClean(v)} label="自动清理回收站" />
+      </Row>
       <Fail>{trashError}</Fail>
+      {dialog}
     </SetPage>
   );
 }

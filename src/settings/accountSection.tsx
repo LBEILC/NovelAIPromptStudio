@@ -7,6 +7,7 @@ import { MODEL_CAPS, MODEL_ORDER, type ModelId } from '../shared/params';
 import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, errorText } from './parts';
 import { Fail } from './sectionShared';
+import { Usage } from './usageSection';
 
 // ---------- NovelAI 账号 ----------
 export const TIERS = ['未订阅', 'Tablet', 'Scroll', 'Opus'];
@@ -188,7 +189,12 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
         />
       </Row>
       <Swap k={mode}>{mode === 'relay' ? <Relay onSaved={onSaved} /> : official}</Swap>
-      {has && mode === (relay ? 'relay' : 'official') && <GenerationPreferences />}
+      {has && mode === (relay ? 'relay' : 'official') && (
+        <>
+          <GenerationPreferences />
+          <Usage />
+        </>
+      )}
     </SetPage>
   );
 }

@@ -637,3 +637,24 @@ textarea.para-in { resize: none; overflow: hidden; }
 .mrow-body .pool-it:hover > .btn, .mrow-body .pool-it > .btn:focus-visible { opacity: 1; }
 .mrow-body .pool-add { margin-top: var(--sp-1); }
 .mrow-body .pool-list + .mat-acts .help code { font-size: var(--fs-caption); }
+
+/* 设置 · NovelAI 账号 · 用量（2.42）：范围切换、合计、按操作和按模型两列、最近 30 天的小柱子 */
+.set .usage { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3) 0; }
+.set .usage .usage-top { display: flex; align-items: center; gap: var(--sp-3); }
+.set .usage .usage-top .help { color: var(--text-3); }
+.set .usage .usage-total { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
+.set .usage .usage-total b { font-size: var(--fs-title); line-height: var(--lh-title); font-weight: var(--fw-strong); }
+.set .usage .usage-total .mono { color: var(--text-2); }
+.set .usage .usage-agent { color: var(--text-3); font-size: var(--fs-small); }
+.set .usage .usage-split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); }
+.set .usage .usage-split > div { display: flex; flex-direction: column; gap: var(--sp-0); min-width: 0; }
+.set .usage .usage-split .label { margin-bottom: var(--sp-1); }
+.set .usage .usage-row { display: flex; align-items: baseline; gap: var(--sp-2); padding: var(--sp-0) 0; font-size: var(--fs-small); line-height: var(--lh-small); border-bottom: var(--bw) solid var(--divider); }
+.set .usage .usage-row > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set .usage .usage-row .mono { margin-left: auto; flex: none; color: var(--text-2); }
+.set .usage .usage-days { display: flex; flex-direction: column; gap: var(--sp-1); }
+.set .usage .usage-bars { display: flex; align-items: flex-end; gap: var(--sp-0); height: 56px; }
+.set .usage .usage-bars > span { flex: 1; height: max(2px, var(--h)); border-radius: 2px 2px 0 0; background: var(--text-2); transition: background-color var(--dur-1) var(--ease-out); }
+.set .usage .usage-bars > span.zero { background: var(--divider); }
+.set .usage .usage-bars > span:hover { background: var(--ink); }
+.set .usage > .help { color: var(--text-3); }

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon, Kbd } from '../kit/controls';
 import { MenuPop } from '../kit/menu';
 import { FlipScope, dur, useExitList, usePresence, useSwap } from '../kit/motion';
+import { invokeUI } from '../lib/commands';
 import { DEFAULT_GALLERY_FILTERS } from '../lib/galleryFilters.js';
+import { bytes } from '../settings/parts';
 import type { LibraryProps } from '../library/types';
 import type { GalleryFilters } from '../shared/types';
 import { FilterPop } from './GalleryFilters';
@@ -49,6 +51,26 @@ export function Tools({
     const t = setTimeout(() => setTrashKept(false), dur(3) + 30);
     return () => clearTimeout(t);
   }, [trash]);
+  // 说明条写回收站占了多少空间、开没开自动清理（2.47，1.8.6）
+  const [trashInfo, setTrashInfo] = useState<{ bytes: number | null; auto: boolean } | null>(null);
+  useEffect(() => {
+    if (!trash) return;
+    let live = true;
+    void Promise.all([
+      invokeUI('trash.size', {}).catch(() => null),
+      invokeUI('settings.library.get', {}).catch(() => null),
+    ]).then(
+      ([size, set]) =>
+        live &&
+        setTrashInfo({
+          bytes: size?.sizeKnown ? size.bytes : null,
+          auto: !!set?.trashAutoCleanup,
+        }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [trash, p.trashCount]);
   const filterOpen = pop === 'filter' || !!p.editingSmartCollection;
   const openFilter = () => {
     if (p.editingSmartCollection) {
@@ -162,7 +184,11 @@ export function Tools({
           <div>
             <div className="ltrash-h">
               <span className="help">
-                回收站中的图片不会自动清理。永久删除只删除图片库中的副本，不影响原文件。
+                {trashInfo?.bytes ? `占用 ${bytes(trashInfo.bytes)}。` : ''}
+                {trashInfo?.auto
+                  ? '超过 30 天的会自动永久删除（设置 · 图片库）。'
+                  : '回收站中的图片不会自动清理。'}
+                永久删除只删除图片库中的副本，不影响原文件。
               </span>
               <span className="sp" />
               <button

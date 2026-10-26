@@ -144,6 +144,27 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         point: { id: 'cost', need: IMG },
       },
       {
+        name: '生成队列',
+        text: '生成中也能接着排，改了提示词再点「加入队列」又是一份；标题栏点开队列，拖动排顺序、改张数、暂缓、暂停',
+        go: 'workbench',
+        where: '工作台 · 生成中点右下角「加入队列」；标题栏右边的生成状态点开',
+        point: { id: 'cost', tip: '生成中这里变成「加入队列」', need: IMG },
+      },
+      {
+        name: '挑图',
+        text: '一版里图多时铺成网格，空格保留、X 不要，挑完一键把不要的移入回收站',
+        go: 'workbench',
+        where: '工作台 · 版本栏右键一版「挑图…」，或生成 10 张以上后通知里的「挑图」',
+        point: { id: 'versions', tip: '右键一版 → 挑图…', need: IMG },
+      },
+      {
+        name: '用量统计',
+        text: '今天、本周、本月花了多少 Anlas、生成了多少张，按操作和模型分，最近 30 天每天一根柱子',
+        go: 'settings:novelai',
+        where: '设置 · NovelAI 账号 · 用量',
+        point: { id: 'usage' },
+      },
+      {
         name: '中转站',
         text: '生成可以走中转站，填地址和 Key，测试连接会列出它有哪些模型',
         go: 'settings:novelai',
@@ -248,6 +269,13 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         go: 'gallery',
         where: '图片库 · 左边栏最下面',
         point: { id: 'trash' },
+      },
+      {
+        name: '回收站自动清理',
+        text: '打开后，移入回收站超过 30 天的图自动永久删除；默认关',
+        go: 'settings:storage',
+        where: '设置 · 图片库 · 自动清理回收站',
+        point: { id: 'trash-clean' },
       },
       {
         name: '图片模糊',
