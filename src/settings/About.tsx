@@ -1,19 +1,19 @@
-// 关于与更新（doc/design.md 2.11）：版本、更新（发现新版本时展开横幅和更新说明）、更新日志、快捷键、数据与隐私、反馈、字体与开源组件。
+// 关于与更新（doc/design.md 2.11）：版本、更新（发现新版本时展开横幅和更新说明）、更新日志、数据与隐私、字体与开源组件。
+// 快捷键、重新查看引导、报告问题和诊断信息 1.8.2 起在"帮助"页（2.36）。
 // 更新日志只读：构建时把仓库里的 release-notes/*.json（1.2.0 起才有）打包进来，离线也能看，不联网。
-import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
-import { writeClipboardText } from '../lib/clipboard';
 import {
   lastUpdateCheckLabel,
   releaseCounts,
   type ReleaseNotes as Notes,
 } from '../lib/releaseNotes.js';
-import { Icon, Kbd, Logo, Seg, Switch } from '../kit/controls';
+import { Icon, Logo, Seg, Switch } from '../kit/controls';
 import { Dialog } from '../kit/dialog';
 import { useNotifications } from '../kit/toast';
 import { useUpdates } from '../state/updates';
 import { StructuredReleaseNotes } from './StructuredReleaseNotes';
-import { replayOnboarding } from '../shell/Onboarding';
+import { CHANGELOG } from '../app/changelog';
 import { Expand, Row, SetPage, Swap, errorText } from './parts';
 import misansLicense from '../../LICENSES/MiSans/LICENSE?raw';
 import newsreaderLicense from '../../LICENSES/Newsreader/LICENSE?raw';
@@ -28,39 +28,6 @@ export function feedbackDiagnostics(version = '—', platform = '') {
   return `NovelAI Prompt Studio v${version}\n平台：${({ darwin: 'macOS', win32: 'Windows', linux: 'Linux' } as Record<string, string>)[platform] || platform || '未知平台'}`;
 }
 
-// 快捷键按在哪里用分成三组；以产品实际绑定的为准
-const KEYS: [string, [string, ...string[][]][]][] = [
-  [
-    '通用',
-    [
-      ['打开图片；在图片库里是导入', ['Mod', 'I']],
-      ['从剪贴板打开或导入图片', ['Mod', 'V']],
-      ['聚焦搜索框', ['Mod', 'K']],
-      ['下一个 / 上一个标签页', ['Mod', 'Tab'], ['Mod', 'Shift', 'Tab']],
-      ['关闭当前标签页', ['Mod', 'W']],
-    ],
-  ],
-  [
-    '工作台',
-    [
-      ['切换按块 / 按文本编辑', ['Mod', 'E']],
-      ['移动当前 Tag 或块', ['Alt', '方向键']],
-      ['在这一版的图之间切换', ['←'], ['→']],
-      ['取消选择', ['Esc']],
-    ],
-  ],
-  [
-    '图片库',
-    [
-      ['在图片之间移动', ['方向键']],
-      ['在工作台打开', ['Enter']],
-      ['看大图', ['Space']],
-      ['大图里换一张 / 换一组', ['← →'], ['↑ ↓']],
-      ['全选图片', ['Mod', 'A']],
-      ['取消选择；关闭大图', ['Esc']],
-    ],
-  ],
-];
 const NET = [
   '生成图片：用你的持久令牌把提示词和参数发给 NovelAI；带 Vibe 的图会带上图里的 Vibe 编码',
   '查询余额：打开软件、每次生成结束和点“刷新”时，向 NovelAI 查询 Anlas 余额和用量',
@@ -74,18 +41,6 @@ const NET = [
   '读取模型列表、测试连接：只和你配置的 AI 服务通信，不带你的提示词',
   '报告问题、提出建议：在浏览器里打开 GitHub，不自动附带任何数据',
 ];
-const cmpVersion = (a: string, b: string) => {
-  const x = a.split('.').map(Number),
-    y = b.split('.').map(Number);
-  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0);
-  return 0;
-};
-/** 新的在前 */
-const CHANGELOG = (
-  Object.values(
-    import.meta.glob('../../release-notes/*.json', { eager: true, import: 'default' }),
-  ) as Notes[]
-).sort((a, b) => cmpVersion(b.version, a.version));
 const LICENSES = [
   ['MiSans VF 4.003', misansLicense],
   ['Newsreader', newsreaderLicense],
@@ -94,7 +49,15 @@ const LICENSES = [
   ['Remix Icon', remixLicense],
   ['DanbooruSearchOnline', dictionaryLicense],
 ];
-const ISSUES = 'https://github.com/LBEILC/NovelAIPromptStudio/issues/new';
+export const ISSUES = 'https://github.com/LBEILC/NovelAIPromptStudio/issues/new';
+// 打开更新日志（macOS"帮助"菜单、新功能卡片最后一页）：发出时关于页可能还没显示（藏着的页面收不到事件），
+// 先记下来，关于页显示时再打开
+const OPEN_CHANGELOG = 'studio:open-changelog';
+let wantChangelog = false;
+export const openChangelog = () => {
+  wantChangelog = true;
+  dispatchEvent(new Event(OPEN_CHANGELOG));
+};
 
 /** 更新说明还没读到时的占位：和说明一样的轮廓（标题、两张卡片、几行），一道微光扫过 */
 function NotesLoading({ version }: { version?: string }) {
@@ -127,6 +90,16 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
   const [notesOpen, setNotesOpen] = useState(true);
   const [licenses, setLicenses] = useState(false);
   const [log, setLog] = useState<string | null>(null);
+  useEffect(() => {
+    const take = () => {
+      if (!wantChangelog || !CHANGELOG.length) return;
+      wantChangelog = false;
+      setLog(CHANGELOG[0].version);
+    };
+    take();
+    addEventListener(OPEN_CHANGELOG, take);
+    return () => removeEventListener(OPEN_CHANGELOG, take);
+  }, []);
   const logBody = useRef<HTMLDivElement>(null);
   const st = u.state;
   const open = (url?: string) =>
@@ -134,14 +107,6 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       () => notify({ text: '已在浏览器中打开', tone: 'success' }),
       (e) => notify({ text: errorText(e), tone: 'error' }),
     );
-  const copy = async () => {
-    try {
-      await writeClipboardText(feedbackDiagnostics(st?.currentVersion, st?.platform));
-      notify({ text: '已复制诊断信息', tone: 'success' });
-    } catch {
-      notify({ text: '复制诊断信息失败', tone: 'error' });
-    }
-  };
   const checking = st?.phase === 'checking';
   const found =
     !!st && (st.hasUpdate || ['available', 'downloading', 'downloaded'].includes(st.phase));
@@ -307,33 +272,6 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
           </button>
         </Row>
       )}
-      <Row title="首次引导" help="第一次打开时的几页介绍">
-        <button className="btn sm" data-onboard="replay" onClick={replayOnboarding}>
-          重新查看
-        </button>
-      </Row>
-      <h2>快捷键</h2>
-      <div className="help">macOS 上 Ctrl 对应 Command。在输入框里，Ctrl V 仍然是普通的粘贴。</div>
-      {KEYS.map(([group, rows]) => (
-        <div className="key-group" key={group}>
-          <span className="label">{group}</span>
-          {rows.map(([title, ...binds]) => (
-            <div className="setrow keyrow" key={title}>
-              <div>{title}</div>
-              <span className="keys">
-                {binds.map((keys, i) => (
-                  <Fragment key={i}>
-                    {i > 0 && <span className="key-sep">/</span>}
-                    {keys.map((k) => (
-                      <Kbd key={k} keys={k} />
-                    ))}
-                  </Fragment>
-                ))}
-              </span>
-            </div>
-          ))}
-        </div>
-      ))}
       <h2>数据与隐私</h2>
       <Row
         title="图片和图片库的数据只存在这台电脑上"
@@ -348,28 +286,6 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         title="API Key、ChatGPT 登录信息和 NovelAI 持久令牌加密后保存在这台电脑上"
         help="用系统自带的加密能力加密，软件不保存明文；诊断信息和报告问题都不会带上它们"
       />
-      <h2>反馈与支持</h2>
-      <Row title="报告问题或提出建议" help="会在浏览器里打开 GitHub，不会自动附带任何数据">
-        <span className="row">
-          <button
-            className="btn sm"
-            onClick={() => open(`${ISSUES}?labels=bug&title=%5B%E9%97%AE%E9%A2%98%5D%20`)}
-          >
-            报告问题
-          </button>
-          <button
-            className="btn sm"
-            onClick={() => open(`${ISSUES}?labels=enhancement&title=%5B%E5%BB%BA%E8%AE%AE%5D%20`)}
-          >
-            提出建议
-          </button>
-        </span>
-      </Row>
-      <Row title="诊断信息" help="只包含软件版本和操作系统，不包含图片、提示词和路径">
-        <button className="btn quiet sm" onClick={() => void copy()}>
-          复制
-        </button>
-      </Row>
       <h2>字体与开源组件</h2>
       <Row
         title="界面字体 MiSans · 段落字体 Newsreader · 等宽字体 IBM Plex Mono"

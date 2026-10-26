@@ -2,6 +2,7 @@
 // 拖动跟手；双击恢复默认宽度；键盘焦点在分隔线上时方向键每次 --split-step，按住 Shift 乘以 4。宽度记住。
 // 宽度写在根元素的 --<key>-w-live 上（src/styles/07-core.css 里各栏的 width 读它）。
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { layerOpen } from './layer';
 import { ms } from './motion';
 import { panelStorage, readPanelWidth, writePanelWidth } from '../lib/panelLayout.js';
 
@@ -46,6 +47,14 @@ export function useResizable(panel: RefObject<HTMLElement | null>, spec: PanelSp
     let hot = false,
       drag: { x: number; w: number } | null = null;
     const near = (e: PointerEvent) => {
+      // 上面盖着弹框、大图、菜单这类浮层时不算：指针在浮层上，分隔线不亮也拖不动（用户 10-26）
+      if (
+        layerOpen() ||
+        (e.target as Element | null)?.closest?.(
+          '[role="dialog"], [role="menu"], .backdrop, .popover, .viewer-ov',
+        )
+      )
+        return false;
       const r = el.getBoundingClientRect(),
         x = spec.edge === 'right' ? r.right : r.left;
       return (

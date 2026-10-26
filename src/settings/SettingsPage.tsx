@@ -4,6 +4,8 @@ import { Activity, useEffect, useRef, useState } from 'react';
 import { Icon } from '../kit/controls';
 import { useIndicator, useSwap } from '../kit/motion';
 import { About } from './About';
+import { Help } from './Help';
+import type { FeatureTarget } from './features';
 import { Backup } from './Backup';
 import { Dictionary } from './Dictionary';
 import { Network } from './Network';
@@ -20,6 +22,7 @@ const SECS = [
   ['network', '网络', 'global-line'],
   ['tags', '翻译词典', 'book-2-line'],
   ['agent', 'Agent', 'terminal-box-line'],
+  ['help', '帮助', 'question-line'],
   ['updates', '关于与更新', 'information-line'],
 ] as const;
 type Sec = (typeof SECS)[number][0];
@@ -31,6 +34,8 @@ export default function SettingsPage(props: {
   onInstallUpdate: () => Promise<unknown>;
   onLibraryChange: () => Promise<unknown>;
   onEmptyTrash: () => Promise<unknown>;
+  /** 帮助页功能一览的"去看看" */
+  onGo: (target: FeatureTarget) => void;
 }) {
   const [sec, setSec] = useState<Sec>(
     ((window as Window & { studioScreenshot?: { section?: string } }).studioScreenshot
@@ -63,6 +68,8 @@ export default function SettingsPage(props: {
         return <Network />;
       case 'backup':
         return <Backup />;
+      case 'help':
+        return <Help onGo={props.onGo} />;
       default:
         return <About onInstallUpdate={props.onInstallUpdate} />;
     }

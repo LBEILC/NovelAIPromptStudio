@@ -14,7 +14,9 @@ import { activeWorkbenchTab } from '../lib/workbenchSession.js';
 import type { DroppedFiles } from '../shared/ipc';
 import type { DetachedRecord, GalleryFilters, ImageProject } from '../shared/types';
 import { AFTER_RESTORE } from '../settings/Backup';
-import { ONBOARDING_REPLAY } from '../shell/Onboarding';
+import { ONBOARDING_REPLAY, replayOnboarding } from '../shell/Onboarding';
+import { newsSince } from './changelog';
+import { openChangelog } from '../settings/About';
 import { useAppearance } from '../state/appearance';
 import { useLibraryState } from '../state/library';
 import { useLibraryCacheProgress } from '../state/libraryCacheProgress';
@@ -30,7 +32,17 @@ export function useAppState() {
       studio.onCommandEvent?.((event) => {
         if (event.type !== 'navigate') return;
         const destination = event.destination;
-        setMenuDestination({ section: destination === 'about' ? 'updates' : 'appearance' });
+        // macOS 的"帮助"菜单（1.8.2）：功能一览、查看引导、更新日志
+        if (destination === 'onboarding') return replayOnboarding();
+        if (destination === 'changelog') openChangelog();
+        setMenuDestination({
+          section:
+            destination === 'help'
+              ? 'help'
+              : destination === 'about' || destination === 'changelog'
+                ? 'updates'
+                : 'appearance',
+        });
         setPage('settings');
       }),
     [],
@@ -47,17 +59,26 @@ export function useAppState() {
     setMenuDestination({ section: 'backup' });
     setPage('settings');
   }, []);
-  // 首次引导（doc/design.md 2.29）：新安装第一次打开时显示；"关于与更新"里可以重新查看
+  // 完整引导（doc/design.md 2.36）：新安装第一次打开时显示；"帮助"页里可以重新查看。
+  // 老用户更新以后弹新功能：上次看过之后每一版的重点，没有重点的版本不弹
   const [onboarding, setOnboarding] = useState(false);
+  const [news, setNews] = useState<ReturnType<typeof newsSince> | null>(null);
   useEffect(() => {
     if (window.studioScreenshot) return;
-    void invokeResult('onboarding.get', {}).then((r) => r.ok && r.show && setOnboarding(true));
+    void invokeResult('onboarding.get', {}).then((r) => {
+      if (!r.ok) return;
+      if (r.show) return setOnboarding(true);
+      if (!r.current) return;
+      const n = newsSince(r.seen ?? null, r.current);
+      if (n.pages.length) setNews(n);
+    });
     const replay = () => setOnboarding(true);
     addEventListener(ONBOARDING_REPLAY, replay);
     return () => removeEventListener(ONBOARDING_REPLAY, replay);
   }, []);
   const finishOnboarding = useCallback(() => {
     setOnboarding(false);
+    setNews(null);
     void invokeResult('onboarding.done', {});
   }, []);
   const [materialTarget, setMaterialTarget] = useState<{ kind: string; id?: string; n: number }>({
@@ -316,6 +337,7 @@ export function useAppState() {
     materialTarget,
     menuDestination,
     onboarding,
+    news,
     finishOnboarding,
     confirmation,
     resolveConfirmation,

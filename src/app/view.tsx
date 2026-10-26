@@ -21,6 +21,8 @@ import type { ImageProject, LibraryCard } from '../shared/types';
 import { CloseAsk } from '../shell/CloseAsk';
 import { GenerationStatus } from '../shell/GenerationStatus';
 import { Onboarding } from '../shell/Onboarding';
+import { NewsCard } from '../shell/News';
+import { openChangelog } from '../settings/About';
 import { Titlebar } from '../shell/Titlebar';
 import { WorkbenchTabs } from '../workbench/Tabs';
 import WorkbenchPage from '../workbench/WorkbenchPage';
@@ -120,6 +122,7 @@ export function renderApp({
   cancelArchiveImport,
   commitArchiveImport,
   onboarding,
+  news,
   finishOnboarding,
   confirmation,
   resolveConfirmation,
@@ -220,12 +223,20 @@ export function renderApp({
   | 'cancelArchiveImport'
   | 'commitArchiveImport'
   | 'onboarding'
+  | 'news'
   | 'finishOnboarding'
   | 'confirmation'
   | 'resolveConfirmation'
   | 'contextMenu'
   | 'setContextMenu'
 >) {
+  // 功能一览的"去看看"、新功能卡片的"去试试"、引导各页的按钮（doc/design.md 2.36）
+  const goTo = (target: string) => {
+    if (target.startsWith('settings:')) {
+      setMenuDestination({ section: target.slice(9) });
+      setPage('settings');
+    } else setPage(target as 'workbench' | 'gallery' | 'materials');
+  };
   return (
     <>
       <Titlebar
@@ -542,6 +553,7 @@ export function renderApp({
                 setPage('gallery');
               }}
               onEmptyTrash={emptyTrash}
+              onGo={goTo}
               onInstallUpdate={installDownloadedUpdate}
               onLibraryChange={async () => {
                 const [images, trash] = await Promise.all([
@@ -603,10 +615,25 @@ export function renderApp({
         onAction={(action) => {
           if (action === 'recover') void openWorkbenchPath();
           else if (action === 'folder') void folder.importFolder();
-          else {
-            setMenuDestination({ section: action === 'token' ? 'novelai' : 'agent' });
-            setPage('settings');
-          }
+          else
+            goTo(
+              {
+                tidy: 'settings:tags',
+                token: 'settings:novelai',
+                fix: 'workbench',
+                agent: 'settings:agent',
+                help: 'settings:help',
+              }[action],
+            );
+        }}
+      />
+      <NewsCard
+        news={news}
+        onClose={finishOnboarding}
+        onGo={goTo}
+        onChangelog={() => {
+          openChangelog();
+          goTo('settings:updates');
         }}
       />
 

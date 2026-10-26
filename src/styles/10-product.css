@@ -300,3 +300,58 @@ img.matte-black { background: var(--matte-black); }
 .btn.ctl-entry.off > .v5 { background: var(--warn-wash); color: var(--warn); }
 .btn.ctl-entry .ctl-n { min-width: var(--icon-sm); padding: 0 var(--sp-1); border-radius: var(--r-check); background: var(--seg-track); color: var(--text-2); font-size: var(--fs-caption); line-height: var(--lh-caption); text-align: center; }
 .btn.ctl-entry.on { background: var(--selected); border-color: var(--text-3); }
+
+/* 引导的示意（1.8.2，doc/design.md 2.36）：固定高度，换页时卡片不跳；用产品自己的 Tag、按钮、Seg 的样子拼，整块 inert。
+   带 --i 的元素按顺序一个个出现（说明"什么变了"），减少动态效果时直接显示 */
+.ob-page h3 { margin-top: var(--sp-1); }
+.ob-points { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: var(--sp-0); color: var(--text-2); }
+/* 说明最多折成四行：留够四行的高度，换页时卡片不跳 */
+.ob-page .ob-points { min-height: calc(var(--lh-body) * 4 + var(--sp-0) * 2); }
+.oba { align-self: stretch; height: 140px; display: flex; align-items: center; justify-content: center; gap: var(--sp-3); padding: var(--sp-3); border: var(--bw) solid var(--divider); border-radius: var(--r-panel); background: var(--bg); overflow: hidden; }
+.oba [style*="--i"] { animation: pf-up var(--dur-3) var(--ease-out) both; animation-delay: calc(var(--i) * 80ms + 120ms); }
+html[data-motion="off"] .oba [style*="--i"], html[data-motion="off"] .oba .oba-mask { animation: none; }
+.oba .sp { flex: 1 1 auto; }
+.oba-pic { position: relative; flex: 0 0 auto; display: grid; place-items: center; width: 64px; height: 88px; border-radius: var(--r-thumb); background: var(--surface); box-shadow: var(--shadow-print); color: var(--text-3); }
+.oba-pic [class^="ri-"] { font-size: calc(var(--icon) * 1.6); }
+.oba-pic.big { width: 92px; height: 112px; background: linear-gradient(160deg, var(--hover), var(--selected)); }
+.oba-box { position: absolute; left: 18px; top: 30px; width: 54px; height: 54px; outline: 1.5px dashed var(--ink); }
+.oba-mask { position: absolute; left: 32px; top: 44px; width: 28px; height: 22px; border-radius: 50%; background: var(--info); opacity: 0.5; animation: pf-zoom var(--dur-3) var(--ease-out) 300ms both; }
+.oba-arrow { color: var(--text-3); }
+.oba-card { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; max-width: 320px; padding: var(--sp-2) var(--sp-3); border: var(--bw) solid var(--border); border-radius: var(--r-panel); background: var(--surface); }
+.oba-cap { display: flex; align-items: center; gap: var(--sp-1); color: var(--text-3); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.oba-copy { align-self: flex-start; }
+.oba-seg { display: inline-flex; padding: var(--sp-0); border-radius: var(--r-ctl); background: var(--hover); }
+.oba-seg i { padding: 0 var(--sp-2); border-radius: calc(var(--r-ctl) - 2px); font-style: normal; }
+.oba-seg i.on { background: var(--surface); color: var(--text); }
+.oba-note { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--text-3); font-size: var(--fs-caption); }
+.oba-side { display: flex; flex-direction: column; gap: var(--sp-0); min-width: 104px; }
+.oba-side span { display: flex; align-items: center; gap: var(--sp-1); padding: var(--sp-0) var(--sp-2); border-radius: var(--r-ctl); color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small); }
+.oba-side span.on { background: var(--selected); color: var(--text); }
+.oba-grid { display: grid; grid-template-columns: repeat(3, 44px); gap: var(--sp-1); }
+.oba-grid i { height: 52px; border-radius: var(--r-thumb); background: linear-gradient(160deg, var(--hover), var(--selected)); }
+.oba-vers { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 220px; }
+.oba-vers span { padding: var(--sp-1) var(--sp-2); border: var(--bw) solid var(--border); border-radius: var(--r-ctl); background: var(--surface); font-size: var(--fs-small); line-height: var(--lh-small); }
+.oba-vers span.on { border-color: var(--cinnabar); }
+.oba-vers em { margin-left: var(--sp-1); font: var(--fs-caption)/var(--lh-caption) var(--font-mono); font-style: normal; }
+.oba-bar { display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-2); font-size: var(--fs-small); }
+.oba-term { display: flex; flex-direction: column; gap: var(--sp-0); width: 100%; min-width: 0; padding: var(--sp-2) var(--sp-3); border: var(--bw) solid var(--border); border-radius: var(--r-panel); background: var(--surface); font-size: var(--fs-caption); line-height: var(--lh-small); }
+.oba-term span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.oba-term b { font-weight: normal; color: var(--text-3); }
+.oba-term .muted { color: var(--text-3); }
+.oba-more { flex-wrap: wrap; align-content: center; gap: var(--sp-2); }
+.oba-more span { display: inline-flex; align-items: center; gap: var(--sp-0); padding: var(--sp-0) var(--sp-1) var(--sp-0) var(--sp-2); border: var(--bw) solid var(--border); border-radius: var(--r-pill); background: var(--surface); color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small); }
+.oba-more span i { color: var(--text-3); }
+/* 更新后的新功能：同一张卡片，上面一行版本号和图标 */
+.news-ver { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--text-3); font-size: var(--fs-small); line-height: var(--lh-small); }
+.news-ver [class^="ri-"] { color: var(--text-2); font-size: var(--icon); }
+.news-detail { color: var(--text-2); }
+.news-more { align-self: stretch; display: flex; flex-direction: column; gap: var(--sp-2); max-height: 200px; overflow: hidden auto; }
+.news-more .label { color: var(--text-3); }
+.ob-page .news-more .ob-points { min-height: 0; }
+.dialog.news .acts { justify-content: flex-end; }
+/* 帮助页的功能一览 */
+.help-search { width: 280px; max-width: 100%; margin-bottom: var(--sp-1); }
+.feat-group { display: flex; flex-direction: column; }
+.feat-group > .label { margin: var(--sp-3) 0 var(--sp-1); color: var(--text-3); }
+.feat-row .btn [class^="ri-"] { margin-right: calc(var(--sp-1) * -1); }
+.feat-none { margin: var(--sp-3) 0; }

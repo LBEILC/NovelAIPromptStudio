@@ -316,7 +316,7 @@ function Body({
           </div>
         </div>
       )}
-      <div className="cmp-diff">
+      <div className="cmp-diff" data-scroll="">
         {seedOnly ? (
           <p className="help">
             提示词和参数一样，只有 Seed 不同：
