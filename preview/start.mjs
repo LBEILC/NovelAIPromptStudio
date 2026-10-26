@@ -199,6 +199,42 @@ async function scenario({ action, value }) {
       source: 'ui',
       libraryChanged: true,
     });
+  } else if (action === 'agent-ops') {
+    // Agent 排三个图片操作（局部重绘、扩图、增强），都进待确认，用来看待确认卡片
+    const current = session.commands.store.get();
+    const tab = current.tabs.find((t) => t.id === current.activeTabId);
+    if (!tab?.project) throw Error('请先打开一张图片');
+    await session.call('settings.generation.save', { agentMode: 'confirm' });
+    const imageId = tab.versionImageId || tab.project.id;
+    const w = Number(tab.project.metadata?.width) || 832,
+      h = Number(tab.project.metadata?.height) || 1216;
+    await session.call(
+      'generate.inpaint',
+      {
+        tabId: tab.id,
+        imageId,
+        shapes: [
+          {
+            type: 'ellipse',
+            cx: Math.round(w * 0.5),
+            cy: Math.round(h * 0.3),
+            rx: Math.round(w * 0.14),
+            ry: Math.round(h * 0.08),
+          },
+        ],
+      },
+      'agent',
+    );
+    await session.call(
+      'generate.outpaint',
+      { tabId: tab.id, imageId, edges: { top: 0, right: 256, bottom: 0, left: 0 } },
+      'agent',
+    );
+    await session.call(
+      'generate.enhance',
+      { tabId: tab.id, imageId, magnitude: 2, scale: 1.5 },
+      'agent',
+    );
   } else if (action === 'agent-edit' || action === 'agent-generate') {
     const current = session.commands.store.get();
     const tabId = current.activeTabId;

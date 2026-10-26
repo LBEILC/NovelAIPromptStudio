@@ -11,7 +11,8 @@ import { useGeneration } from '../state/generation';
 import { invokeUI } from '../lib/commands';
 import { BlurImg } from '../kit/blur';
 import { openPick } from '../workbench/Pick';
-import { Thumb } from '../workbench/versionHelpers';
+import { Thumb, opPlan } from '../workbench/versionHelpers';
+import { Viewer } from '../kit/Viewer';
 import type { GenerationJob } from '../shared/generation';
 
 /** 放大、增强、局部重绘、扩图时写"放大中""增强中""重绘中""扩图中"（和工作台底栏一致） */
@@ -120,6 +121,8 @@ function CountEdit({
 export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }) {
   const state = useGeneration();
   const notify = useNotifications();
+  // 待确认卡片上的预览小图点开看大图
+  const [big, setBig] = useState<{ path: string; image: GenerationJob['project'] } | null>(null);
   const [open, setOpen] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
   const [dismissed, setDismissed] = useState<string[]>([]);
@@ -157,7 +160,10 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
         notify({ text: 'Agent 今天的花费已到上限，之后的生成需要你确认' });
       if (job.state === 'pending')
         notify({
-          text: 'Agent 添加了 1 个生成任务，待确认',
+          // 图片操作写清楚对哪张图做什么（"Agent 想重绘第 3 版的图里的一块，待确认"）
+          text: job.operation
+            ? `Agent 想${opPlan(job).text.split(' · ')[0]}，待确认`
+            : 'Agent 添加了 1 个生成任务，待确认',
           action: { label: '查看', onClick: () => setOpen(true) },
           source: 'background',
         });
@@ -376,6 +382,70 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
   );
   const anlas = (n?: number) =>
     relay || n == null ? '' : n ? ` · ${Math.round(n)} Anlas` : ' · 免费';
+  const confirmOne = (job: GenerationJob) => (
+    <button
+      className="btn quiet sm icon"
+      aria-label="确认"
+      data-tip="确认这一个"
+      onClick={() => run(invokeUI('generate.confirm', { ids: [job.id] }))}
+    >
+      <Icon name="check-line" />
+    </button>
+  );
+  const cancelOne = (job: GenerationJob) => (
+    <button
+      className="btn quiet sm icon"
+      aria-label="移除"
+      onClick={() => run(invokeUI('generate.cancel', { ids: [job.id] }))}
+    >
+      <Icon name="close-line" />
+    </button>
+  );
+  // Agent 发起的图片操作（2.48）：大一点的预览小图（重绘画出遮罩和框，扩图画出新区域），点开看大图；
+  // 写清楚对哪张图做什么；重绘、扩图用的是草稿提示词，确认前也写出来
+  const opItem = (job: GenerationJob) => {
+    const plan = opPlan(job),
+      src = job.operationDetails?.sourceProjectId;
+    return (
+      <div className="q-item q-op" key={job.id} data-pending-op={job.operation}>
+        {job.previewPath ? (
+          <button
+            className="q-prev"
+            aria-label="看大图"
+            data-tip="看大图"
+            onClick={() => setBig({ path: job.previewPath!, image: job.project })}
+          >
+            <BlurImg
+              image={job.project}
+              path={job.previewPath}
+              eye={false}
+              className="alpha-bg"
+              alt=""
+              draggable={false}
+            />
+          </button>
+        ) : (
+          <span className="q-prev">{src ? <Thumb id={src} /> : thumb(job)}</span>
+        )}
+        <div className="q-main">
+          {head(job)}
+          <small className="q-plan">{plan.text}</small>
+          {plan.prompt && (
+            <small className="q-prompt" data-tip={plan.prompt}>
+              提示词：{plan.prompt}
+            </small>
+          )}
+          <small className="q-meta mono">
+            {relay ? '按 1 张计' : job.estimate ? `${Math.round(job.estimate)} Anlas` : '免费'}
+          </small>
+        </div>
+        <div className="q-side">
+          {confirmOne(job)}
+          {cancelOne(job)}
+        </div>
+      </div>
+    );
+  };
 
   const runRow = (job: GenerationJob) => {
     const left = Math.max(0, job.count - job.completed);
@@ -567,6 +637,7 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
     : `今天已花 ${(today?.anlas ?? state.spentToday ?? 0).toLocaleString('en-US')} Anlas${today?.estimated ? '*' : ''}${today ? ` · ${today.images} 张` : ''}`;
   const pendTotal = pending.reduce((n, j) => n + j.count, 0);
   const pendCost = pending.reduce((n, j) => n + (j.estimate || 0), 0);
+  const pendOps = pending.some((j) => j.operation);
   const usage = state.subscription?.usage?.percent || 0;
   const doneText = (j: GenerationJob) =>
     j.state === 'skipped'
@@ -685,33 +756,34 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
         {pending.length > 0 && (
           <div className="q-sec q-agent">
             <div className="q-h">
-              Agent 添加了 {pending.length} 个生成任务，待确认
+              Agent 添加了 {pending.length} 个{pendOps ? '任务' : '生成任务'}，待确认
               <small>
                 确认后排进队列，逐张发送。未确认的不会发送，{relay ? '也不计费' : '也不消耗 Anlas'}
                 。
               </small>
             </div>
-            {pending.map((job) => (
-              <div className="q-item" key={job.id}>
-                {thumb(job)}
-                <div className="q-main">
-                  {head(job)}
-                  {job.summary && <small>{job.summary}</small>}
-                  <small className="q-meta">
-                    {job.count} 张 · {job.project.metadata.width} × {job.project.metadata.height} ·
-                    Seed {job.fixedSeed ? '固定' : '随机'}
-                    {anlas(job.estimate)}
-                  </small>
+            {pending.map((job) =>
+              job.operation ? (
+                opItem(job)
+              ) : (
+                <div className="q-item" key={job.id}>
+                  {thumb(job)}
+                  <div className="q-main">
+                    {head(job)}
+                    {job.summary && <small>{job.summary}</small>}
+                    <small className="q-meta">
+                      {job.count} 张 · {job.project.metadata.width} × {job.project.metadata.height}{' '}
+                      · Seed {job.fixedSeed ? '固定' : '随机'}
+                      {anlas(job.estimate)}
+                    </small>
+                  </div>
+                  <div className="q-side">
+                    {pending.length > 1 && confirmOne(job)}
+                    {cancelOne(job)}
+                  </div>
                 </div>
-                <button
-                  className="btn quiet sm icon"
-                  aria-label="移除"
-                  onClick={() => run(invokeUI('generate.cancel', { ids: [job.id] }))}
-                >
-                  <Icon name="close-line" />
-                </button>
-              </div>
-            ))}
+              ),
+            )}
             <div className="q-agent-acts">
               <span className="sp" />
               <button
@@ -724,7 +796,8 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
                 className="btn seal sm"
                 onClick={() => run(invokeUI('generate.confirm', { ids: pending.map((j) => j.id) }))}
               >
-                生成 {pendTotal} 张{relay || !pendCost ? '' : ` · ${pendCost} Anlas`}
+                {pendOps ? '全部确认' : `生成 ${pendTotal} 张`}
+                {relay || !pendCost ? '' : ` · ${Math.round(pendCost)} Anlas`}
               </button>
             </div>
           </div>
@@ -787,6 +860,13 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
           </div>
         )}
       </Pop>
+      <Viewer
+        open={!!big}
+        items={big ? [{ id: 'agent-preview', path: big.path, image: big.image }] : []}
+        index={0}
+        onIndex={() => {}}
+        onClose={() => setBig(null)}
+      />
       <ContextMenu at={menu?.at || null} onClose={() => setMenu(null)} items={menu?.items || []} />
     </>
   );

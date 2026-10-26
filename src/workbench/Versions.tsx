@@ -11,7 +11,8 @@ import { originGone } from './original';
 import { useVersionState } from './useVersionState';
 import { openCompare, type CompareSide } from './Compare';
 import { VersionDifference, VersionSummary } from './VersionDifference';
-import { OpSize, Row, TH_H, TH_MORE, Thumb, isRedraw, rowsOf } from './versionHelpers';
+import { OpSize, Row, TH_H, TH_MORE, Thumb, isRedraw, opPlan, rowsOf } from './versionHelpers';
+import { BlurImg } from '../kit/blur';
 import { openPick } from './Pick';
 import { randomSummary } from './RandomBlock';
 /** 一版超过这么多张时，"+N"打开挑图而不是展开 */
@@ -423,17 +424,36 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
               <span className="vh">
                 <span className="vn">待确认</span>
                 <span className="src">Agent</span>
+                {j.operation && <span className="src">{opPlan(j).name}</span>}
               </span>
-              <VersionSummary diff={versionDiff(v.project, j.project)} />
+              {/* Agent 的图片操作（2.48）：写对哪张图做什么，缩略图位置放预览小图（遮罩和框、扩出来的区域） */}
+              {j.operation ? (
+                <span className="what">{opPlan(j).text}</span>
+              ) : (
+                <VersionSummary diff={versionDiff(v.project, j.project)} />
+              )}
               <div className="ths">
-                {Array.from({ length: Math.min(6, j.count) }, (_, i) => (
-                  <span
-                    key={i}
-                    className="slot"
-                    style={{ '--w': `${Math.round(TH_H * ratio(v))}px` } as React.CSSProperties}
-                  />
-                ))}
-                {j.count > 6 && <span className="more mono">+{j.count - 6}</span>}
+                {j.operation && j.previewPath ? (
+                  <span className="op-prev">
+                    <BlurImg
+                      image={j.project}
+                      path={j.previewPath}
+                      eye={false}
+                      className="alpha-bg"
+                      alt=""
+                      draggable={false}
+                    />
+                  </span>
+                ) : (
+                  Array.from({ length: j.operation ? 1 : Math.min(6, j.count) }, (_, i) => (
+                    <span
+                      key={i}
+                      className="slot"
+                      style={{ '--w': `${Math.round(TH_H * ratio(v))}px` } as React.CSSProperties}
+                    />
+                  ))
+                )}
+                {!j.operation && j.count > 6 && <span className="more mono">+{j.count - 6}</span>}
               </div>
             </div>
           ),

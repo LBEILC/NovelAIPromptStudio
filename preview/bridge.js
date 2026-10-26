@@ -377,6 +377,7 @@ if (chatGPTScene) {
 group('Agent', [
   ['改提示词', act('agent-edit')],
   ['排两次生成', act('agent-generate')],
+  ['排图片操作', act('agent-ops')],
 ]);
 // 托盘菜单：贴着外框右下角弹出（像任务栏在下面时从托盘图标往上弹）；点外面、Esc、点了一项就关
 let trayFrame = null;

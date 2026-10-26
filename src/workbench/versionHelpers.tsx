@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { BlurImg, type BlurImage } from '../kit/blur';
+import type { ImageOperation } from '../shared/generation';
 export const TH_H = 38,
   TH_GAP = 4,
   TH_MORE = 28;
@@ -163,4 +164,52 @@ export function OpSize({ from, to }: { from?: string; to?: string }) {
   }, [from, to]);
   if (!px || !px[0] || !px[1]) return <span className="what" />;
   return <span className="what">{px[0] === px[1] ? '尺寸不变' : `尺寸 ${px[0]} → ${px[1]}`}</span>;
+}
+const OP_VERB: Record<string, string> = {
+  upscale: '放大',
+  enhance: '增强',
+  inpaint: '局部重绘',
+  outpaint: '扩图',
+};
+const SIDES: [keyof NonNullable<ImageOperation['edges']>, string][] = [
+  ['left', '左'],
+  ['right', '右'],
+  ['top', '上'],
+  ['bottom', '下'],
+];
+/**
+ * Agent 发起的图片操作在待确认时写清楚"对哪张图做什么"（2.48）：队列面板和版本栏共用。
+ * prompt 是局部重绘、扩图用的草稿提示词，确认前要看得到；放大、增强不用草稿，没有。
+ */
+export function opPlan(job: {
+  operation?: string;
+  operationDetails?: ImageOperation;
+  parentNumber?: number;
+}) {
+  const o = job.operationDetails,
+    kind = job.operation || o?.kind || '';
+  const src =
+    !job.parentNumber || job.parentNumber === 1 ? '原图' : `第 ${job.parentNumber} 版的图`;
+  const scale =
+    o?.scale === 'max'
+      ? '放大到最大'
+      : !o?.scale || o.scale === 1
+        ? '原尺寸'
+        : `放大 ${o.scale} 倍`;
+  const edges = SIDES.filter(([k]) => o?.edges?.[k])
+    .map(([k, n]) => `${n} +${o!.edges![k]}`)
+    .join('、');
+  const text =
+    kind === 'upscale'
+      ? `放大${src} · 宽高各 2 倍`
+      : kind === 'enhance'
+        ? `增强${src} · 幅度 ${o?.magnitude ?? 2} · ${scale}`
+        : kind === 'inpaint'
+          ? `重绘${src}里的一块${o?.rect ? ` · 框 ${o.rect.width} × ${o.rect.height}` : ''} · 强度 ${(o?.strength ?? 1).toFixed(2)}`
+          : kind === 'outpaint'
+            ? `给${src}扩图${edges ? ` · ${edges}` : ''} · ${o?.mode === 'edges' ? `按边分块 ${o.blocks?.length || 1} 次` : '一次画完'}`
+            : '';
+  const prompt =
+    kind === 'inpaint' || kind === 'outpaint' ? o?.prompt?.metadata?.prompt_raw?.trim() || '' : '';
+  return { name: OP_VERB[kind] || '', text, prompt };
 }
