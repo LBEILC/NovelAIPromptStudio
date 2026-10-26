@@ -161,20 +161,24 @@ async function newsChecks({ h, mode, preferences }) {
     `${news}.querySelectorAll('.ob-dots i').length === ${count > 1 ? count : 0}`,
   );
   await h.screenshot(`news-${mode.phase}`);
-  const target =
-    mode.phase === 9 ? highlights.slice(0, 6).findIndex((i) => i.goto === 'workbench') : count - 1;
-  if (target < 0) throw Error('更新说明缺少工作台跳转夹具');
+  const destinationIndex = highlights.slice(0, 6).findIndex((item) => item.goto);
+  const followsLink = mode.phase === 9 && destinationIndex >= 0;
+  const target = followsLink ? destinationIndex : count - 1;
   for (let i = 0; i < target; i++) {
     await press('next');
     await h.wait(`${news}?.dataset.newsPage === '${i + 2}'`);
   }
-  await press(mode.phase === 9 ? 'go' : 'done');
+  await press(followsLink ? 'go' : 'done');
   await h.wait(`!${news}`);
   await h.until(() => preferences.onboardingSettings().seen === current, '新功能版本持久化');
   await h.check('关闭新功能记录当前版本', () => preferences.onboardingSettings().seen === current);
-  if (mode.phase === 9)
-    await h.check(
-      '去试试打开工作台',
-      'document.querySelector(\'.tb nav [aria-current="page"]\')?.textContent.includes("工作台")',
-    );
+  if (followsLink) {
+    const destination = highlights[target].goto;
+    const page = { workbench: '工作台', gallery: '图片库', materials: '素材' }[destination];
+    const condition = page
+      ? `document.querySelector('.tb nav [aria-current="page"]')?.textContent.includes(${JSON.stringify(page)})`
+      : `!!document.querySelector('[data-settings-section="${destination.split(':')[1]}"]:not(.leaving)')`;
+    await h.wait(condition);
+    await h.check('去试试打开更新说明指定的页面', condition);
+  }
 }
