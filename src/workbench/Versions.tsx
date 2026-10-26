@@ -11,7 +11,7 @@ import { originGone } from './original';
 import { useVersionState } from './useVersionState';
 import { openCompare, type CompareSide } from './Compare';
 import { VersionDifference, VersionSummary } from './VersionDifference';
-import { Row, TH_H, TH_MORE, Thumb, rowsOf } from './versionHelpers';
+import { Row, TH_H, TH_MORE, Thumb, isRedraw, rowsOf } from './versionHelpers';
 import { openPick } from './Pick';
 import { randomSummary } from './RandomBlock';
 /** 一版超过这么多张时，"+N"打开挑图而不是展开 */
@@ -311,7 +311,20 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
               )}
             </span>
             {v.parentId ? (
-              <VersionSummary diff={delta(v)} />
+              isRedraw(v) ? (
+                delta(v).empty ? (
+                  <span className="what">
+                    提示词没改
+                    {v.operation?.rect
+                      ? ` · 区域 ${v.operation.rect.width} × ${v.operation.rect.height}`
+                      : ''}
+                  </span>
+                ) : (
+                  <VersionSummary diff={delta(v)} lead="重绘提示词 " />
+                )
+              ) : (
+                <VersionSummary diff={delta(v)} />
+              )
             ) : originGone(v) ? (
               <span className="what">
                 {v.originState === 'trashed' ? '原图在回收站' : '已去掉原图'}
@@ -592,7 +605,12 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             onPointerEnter={() => clearTimeout(peekTimer.current)}
             onPointerLeave={unhover}
           >
-            <VersionDifference diff={delta(peek.v)} title={peek.title} against={peek.against} />
+            <VersionDifference
+              diff={delta(peek.v)}
+              title={peek.title}
+              against={peek.against}
+              redraw={isRedraw(peek.v)}
+            />
           </div>
         )}
       </Pop>

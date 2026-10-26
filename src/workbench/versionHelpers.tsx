@@ -69,3 +69,77 @@ export function rowsOf(widths: number[], rowW: number) {
   return rows;
 }
 export type Row = { key: string; render: (leaving: boolean) => React.ReactNode };
+
+/**
+ * 局部重绘那一版实际用的提示词（doc/design.md 2.35 补充，1.8.6）：快照照旧是源图那一版的
+ * （和图片文件里的元数据一致），这次重绘用的草稿记在操作记录里。版本栏、悬停对比、两张图对比
+ * 都拿它来比，写成"重绘提示词"；没有记录的（旧版本）退回快照。
+ */
+export function promptOf(v: {
+  project: import('../shared/types').ImageProject;
+  operation?: import('../shared/generation').ImageOperation;
+}) {
+  const p = v.operation?.kind === 'inpaint' ? v.operation.prompt : undefined;
+  return p ? ({ ...v.project, ...p } as import('../shared/types').ImageProject) : v.project;
+}
+export const isRedraw = (v: { operation?: import('../shared/generation').ImageOperation }) =>
+  v.operation?.kind === 'inpaint' && !!v.operation.prompt;
+
+/**
+ * 右键"用这次重绘的提示词"：把那份提示词放回草稿（各节照原样写回），通知里可以撤销。
+ * 角色对不上（草稿里删掉或换了角色）的那几节跳过。
+ */
+export async function applyRedrawPrompt({
+  tabId,
+  version,
+  before,
+  notify,
+}: {
+  tabId: string;
+  version: {
+    project: import('../shared/types').ImageProject;
+    operation?: import('../shared/generation').ImageOperation;
+  };
+  before?: () => Promise<void>;
+  notify: ReturnType<typeof import('../kit/toast').useNotifications>;
+}) {
+  const { createPromptDocument, serializePromptSection } = await import('../lib/promptDocument');
+  try {
+    await before?.();
+    const old = await invokeUI('workbench.get', { tabId });
+    const want = createPromptDocument(promptOf(version));
+    const changed: { scope: string; text: string; was: string }[] = [];
+    let skipped = 0;
+    for (const s of want.scopes) {
+      const cur = old.document.scopes.find((x) => x.scope.key === s.scope.key);
+      if (!cur) {
+        if (serializePromptSection(s).trim()) skipped++;
+        continue;
+      }
+      const text = serializePromptSection(s),
+        was = serializePromptSection(cur);
+      if (text !== was) changed.push({ scope: s.scope.key, text, was });
+    }
+    if (!changed.length) {
+      notify({ text: '草稿和这次重绘的提示词一样' });
+      return;
+    }
+    for (const c of changed) await invokeUI('prompt.set', { tabId, scope: c.scope, text: c.text });
+    notify({
+      text: skipped
+        ? `已换成这次重绘的提示词；${skipped} 个角色草稿里没有，没有换`
+        : '已换成这次重绘的提示词',
+      tone: 'success',
+      action: {
+        label: '撤销',
+        onClick: () =>
+          void (async () => {
+            for (const c of changed)
+              await invokeUI('prompt.set', { tabId, scope: c.scope, text: c.was });
+          })().catch((e) => notify({ text: (e as Error).message, tone: 'error' })),
+      },
+    });
+  } catch (e) {
+    notify({ text: (e as Error).message, tone: 'error' });
+  }
+}

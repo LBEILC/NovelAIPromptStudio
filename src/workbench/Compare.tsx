@@ -14,6 +14,7 @@ import type { WorkVersion } from '../shared/generation';
 import type { ImageRecord } from '../shared/types';
 import { VersionDifference } from './VersionDifference';
 import { originGone } from './original';
+import { isRedraw, promptOf } from './versionHelpers';
 
 export interface CompareSide {
   versionId: string;
@@ -256,7 +257,9 @@ function Body({
     l.items.length > 1 ? `${versionLabel(l.version)} · 第 ${i + 1} 张` : versionLabel(l.version);
   const ln = name(data.a, data.ai),
     rn = name(data.b, data.bi);
-  const diff = versionDiff(data.a.version.project, data.b.version.project);
+  // 局部重绘那一版比的是这次重绘用的提示词（1.8.6）
+  const diff = versionDiff(promptOf(data.a.version), promptOf(data.b.version));
+  const redraw = isRedraw(data.a.version) || isRedraw(data.b.version);
   const op = data.b.version.operation as
     | { kind: string; rect?: { x: number; y: number; width: number; height: number } }
     | undefined;
@@ -334,7 +337,7 @@ function Body({
         ) : diff.empty ? (
           <p className="help">两张图的提示词和参数一样</p>
         ) : (
-          <VersionDifference diff={diff} title={rn} against={ln} />
+          <VersionDifference diff={diff} title={rn} against={ln} redraw={redraw} />
         )}
         {op?.kind === 'inpaint' && op.rect && (
           <p className="help">

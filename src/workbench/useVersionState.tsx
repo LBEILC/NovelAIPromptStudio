@@ -13,6 +13,7 @@ import { useGeneration } from '../state/generation';
 import { originGone, originMenu, trashImage } from './original';
 import { openCompare } from './Compare';
 import { openPick } from './Pick';
+import { applyRedrawPrompt, isRedraw, promptOf } from './versionHelpers';
 import { applyRandom } from './RandomBlock';
 import { nsfwMenu } from '../kit/blur';
 export function useVersionState({
@@ -90,7 +91,9 @@ export function useVersionState({
   // 原图移入回收站或从作品里去掉以后，第一行是"起点"（1.5.1）
   const name = (v: WorkVersion) =>
     v.isStart || originGone(v) ? '起点' : v.parentId ? `第 ${v.number} 版` : '原图';
-  const delta = (v: WorkVersion) => versionDiff(byId(v.parentId)?.project || v.project, v.project);
+  // 局部重绘那一版和上一版比的是这次重绘用的提示词（promptOf）
+  const delta = (v: WorkVersion) =>
+    versionDiff(byId(v.parentId)?.project || v.project, promptOf(v));
   const go = async (v: WorkVersion, imageId?: string) => {
     try {
       await before?.();
@@ -227,6 +230,16 @@ export function useVersionState({
             label: '挑图…',
             icon: 'checkbox-multiple-line',
             onSelect: () => openPick(tab.id, v.id),
+          },
+          'sep' as const,
+        ]
+      : []),
+    // 局部重绘那一版：把这次重绘用的提示词放回草稿，在它的基础上再重绘
+    ...(row && isRedraw(v)
+      ? [
+          {
+            label: '用这次重绘的提示词',
+            onSelect: () => void applyRedrawPrompt({ tabId: tab.id, version: v, before, notify }),
           },
           'sep' as const,
         ]

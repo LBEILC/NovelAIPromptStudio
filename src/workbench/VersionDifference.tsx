@@ -9,9 +9,12 @@ const KIND = { add: 'plus', rem: 'minus', w: 'wchg' } as const;
 export function VersionSummary({
   diff,
   compact = false,
+  lead,
 }: {
   diff: VersionDiff;
   compact?: boolean;
+  /** 写在最前面的说明（局部重绘那一版写"重绘提示词"） */
+  lead?: ReactNode;
 }) {
   const text = compact ? oneLine(diff) : diffSummary(diff);
   const pieces: ReactNode[] = [];
@@ -34,7 +37,12 @@ export function VersionSummary({
     );
     cursor = next.at + value.length;
   }
-  return <span className="what">{pieces}</span>;
+  return (
+    <span className="what">
+      {lead && <span className="what-lead">{lead}</span>}
+      {pieces}
+    </span>
+  );
 }
 
 // 段落按词对比：旧文里删掉的词加删除线，新文里加上的词加下划线
@@ -69,10 +77,13 @@ export function VersionDifference({
   diff,
   title,
   against,
+  redraw = false,
 }: {
   diff: VersionDiff;
   title: string;
   against: string;
+  /** 局部重绘：比的是这次重绘用的提示词，只作用于涂抹的区域 */
+  redraw?: boolean;
 }) {
   const groups = [...new Set(diff.items.map((x) => x.label))];
   const count =
@@ -82,7 +93,9 @@ export function VersionDifference({
       <div className="vp-h">
         <b>{title}</b>
         <span className="help">
-          与{against}相比{count ? ` · ${count} 处改动` : ''}
+          {redraw ? '重绘用的提示词与' : '与'}
+          {against}相比{count ? ` · ${count} 处改动` : ''}
+          {redraw ? ' · 只作用于涂抹的区域' : ''}
         </span>
       </div>
       {(diff.size || !!diff.params?.length) && (
@@ -126,7 +139,11 @@ export function VersionDifference({
           </div>
         );
       })}
-      {!count && <p className="help">{diff.order ? '只调整了顺序' : '没有改动'}</p>}
+      {!count && (
+        <p className="help">
+          {diff.order ? '只调整了顺序' : redraw ? '重绘时没改提示词' : '没有改动'}
+        </p>
+      )}
     </>
   );
 }
