@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { invokeUI } from '../lib/commands';
+import { libraryNsfwState, subscribeLibraryCards } from './library';
 import type { BlurSettings, BlurSettingsInput, NsfwState } from '../shared/types';
 
 let settings: BlurSettings | null = null;
@@ -33,7 +34,7 @@ function subscribe(listener: () => void) {
     listeners.delete(listener);
   };
 }
-function load() {
+export function loadBlurSettings() {
   connect();
   if (settings || loading) return;
   const started = revision;
@@ -55,7 +56,7 @@ export function useBlurSettings(): BlurSettings | null {
   return useSyncExternalStore(
     (listener) => {
       const off = subscribe(listener);
-      load();
+      loadBlurSettings();
       return off;
     },
     () => settings,
@@ -64,9 +65,17 @@ export function useBlurSettings(): BlurSettings | null {
 export function useNsfwState(
   image: { id: string; nsfw?: NsfwState } | null | undefined,
 ): NsfwState | null {
-  return useSyncExternalStore(subscribe, () =>
-    image ? states.get(image.id) || image.nsfw || null : null,
+  return useSyncExternalStore(subscribeNsfw, () =>
+    image ? states.get(image.id) || image.nsfw || libraryNsfwState(image.id) || null : null,
   );
+}
+function subscribeNsfw(listener: () => void) {
+  const offState = subscribe(listener);
+  const offLibrary = subscribeLibraryCards(listener);
+  return () => {
+    offState();
+    offLibrary();
+  };
 }
 export async function saveBlurSettings(patch: Partial<BlurSettingsInput>): Promise<BlurSettings> {
   connect();

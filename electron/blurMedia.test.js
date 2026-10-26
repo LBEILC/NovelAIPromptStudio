@@ -14,12 +14,19 @@ it('preserves original media URLs and adds blur only when requested', () => {
   expect(mediaUrl(file, { blur: true })).toBe(`${original}&blur=1`);
   expect(mediaUrl('', { blur: true })).toBe('');
 });
-it('creates a tiny transparent PNG asynchronously, reuses it and invalidates changed or missing sources', async () => {
+it('preserves dimensions and transparency in blurred WebP, reuses it and invalidates changed or missing sources', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nai-blur-'));
   try {
     const source = path.join(root, 'source.png'),
       cache = path.join(root, 'blurred');
-    await sharp({ create: { width: 832, height: 1216, channels: 4, background: '#597c9a80' } })
+    const width = 1664,
+      height = 2432;
+    const pixels = Buffer.alloc(width * height * 4);
+    for (let i = 0; i < width * height; i++) {
+      const value = ((i % width) + Math.floor(i / width)) % 2 ? 255 : 0;
+      pixels.set([value, value, value, 128], i * 4);
+    }
+    await sharp(pixels, { raw: { width, height, channels: 4 } })
       .png()
       .toFile(source);
     const original = await fs.readFile(source);
@@ -28,12 +35,20 @@ it('creates a tiny transparent PNG asynchronously, reuses it and invalidates cha
       blurredMedia(source, cache),
       blurredMedia(source, cache),
     ]);
-    console.log(`First blurred image: ${(performance.now() - start).toFixed(2)} ms`);
+    console.log(
+      `First blurred image 1664x2432: ${(performance.now() - start).toFixed(2)} ms, ${(await fs.stat(first)).size} bytes`,
+    );
     expect(first).toBe(parallel);
-    const metadata = await sharp(first).metadata();
-    expect(Math.max(metadata.width, metadata.height)).toBe(24);
-    expect(metadata.format).toBe('png');
+    const output = await fs.readFile(first);
+    const metadata = await sharp(output).metadata();
+    expect([metadata.width, metadata.height]).toEqual([width, height]);
+    expect(metadata.format).toBe('webp');
     expect(metadata.hasAlpha).toBe(true);
+    const blurred = await sharp(output).ensureAlpha().raw().toBuffer();
+    let difference = 0;
+    for (let i = 0; i < pixels.length; i += 4) difference += Math.abs(pixels[i] - blurred[i]);
+    expect(difference / (width * height)).toBeGreaterThan(100);
+    expect(Math.abs(blurred[3] - 128)).toBeLessThanOrEqual(3);
     expect(await fs.readFile(first)).not.toEqual(original);
     expect(await fs.readFile(source)).toEqual(original);
     expect(await blurredMedia(source, cache)).toBe(first);

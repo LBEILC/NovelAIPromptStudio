@@ -12,7 +12,10 @@ export function gallerySmartCollectionDefaultName(filtersValue = {}) {
     ...filters.vibes,
   ];
   if (filters.datePreset !== 'all') parts.push(dateRangeLabel(filters));
-  return parts.slice(0, 3).join(' · ') || '\u65b0\u7684\u667a\u80fd\u6536\u85cf\u96c6';
+  const nameParts = parts.slice(0, 3);
+  if (filters.nsfw === 'nsfw') nameParts.push('NSFW');
+  if (filters.nsfw === 'safe') nameParts.push('不是 NSFW');
+  return nameParts.join(' · ') || '\u65b0\u7684\u667a\u80fd\u6536\u85cf\u96c6';
 }
 
 export function normalizeGalleryCollection(value = {}) {

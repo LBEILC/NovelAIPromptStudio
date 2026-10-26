@@ -3,11 +3,25 @@ import type { LibraryCard, Collection, GalleryFilters } from '../shared/types';
 import { DEFAULT_GALLERY_FILTERS } from '../lib/galleryFilters.js';
 import { readGalleryGrouping } from '../lib/galleryGrouping.js';
 
+let libraryCards: LibraryCard[] = [];
+const cardListeners = new Set<() => void>();
+export const libraryNsfwState = (id: string) => libraryCards.find((card) => card.id === id)?.nsfw;
+export function subscribeLibraryCards(listener: () => void) {
+  cardListeners.add(listener);
+  return () => {
+    cardListeners.delete(listener);
+  };
+}
+
 export function useLibraryState(initialView = 'all') {
   const [projectsByView, setProjectsByView] = useState<Record<string, LibraryCard[]>>({
     all: [],
     trash: [],
   });
+  useEffect(() => {
+    libraryCards = projectsByView.all;
+    for (const listener of cardListeners) listener();
+  }, [projectsByView.all]);
   useEffect(
     () =>
       window.studio?.onCommandEvent((event) => {

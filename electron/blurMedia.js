@@ -26,9 +26,9 @@ export async function blurredMedia(filePath, cacheDirectory) {
   if (!stat.isFile()) throw Object.assign(Error('Media is not a file'), { code: 'ENOENT' });
   const key = crypto
     .createHash('sha256')
-    .update(`blur-v1:${resolved}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`)
+    .update(`blur-v2:${resolved}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`)
     .digest('hex');
-  const target = path.join(cacheDirectory, `${key}.png`);
+  const target = path.join(cacheDirectory, `${key}.webp`);
   try {
     await fs.access(target);
     return target;
@@ -40,11 +40,17 @@ export async function blurredMedia(filePath, cacheDirectory) {
       await fs.mkdir(cacheDirectory, { recursive: true });
       const temporary = `${target}.${crypto.randomUUID()}.tmp`;
       try {
-        await sharp(resolved)
+        const source = await fs.readFile(resolved);
+        const metadata = await sharp(source).metadata();
+        const small = await sharp(source)
           .rotate()
           .resize({ width: 24, height: 24, fit: 'inside', withoutEnlargement: true })
           .blur(3)
           .png()
+          .toBuffer();
+        await sharp(small)
+          .resize(metadata.width, metadata.height, { fit: 'fill', kernel: 'linear' })
+          .webp({ quality: 60 })
           .toFile(temporary);
         await fs.rename(temporary, target);
         return target;

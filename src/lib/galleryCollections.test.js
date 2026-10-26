@@ -63,6 +63,14 @@ describe('gallery collections', () => {
       'nai-v4.5 · vibe-a',
     );
     expect(gallerySmartCollectionDefaultName()).toBe('新的智能收藏集');
+    expect(gallerySmartCollectionDefaultName({ nsfw: 'nsfw' })).toBe('NSFW');
+    expect(gallerySmartCollectionDefaultName({ nsfw: 'safe' })).toBe('不是 NSFW');
+    expect(
+      gallerySmartCollectionDefaultName({
+        includeTags: ['one', 'two', 'three', 'four'],
+        nsfw: 'nsfw',
+      }),
+    ).toBe('one · two · three · NSFW');
   });
 
   it('persists only a collection id that still exists', () => {
