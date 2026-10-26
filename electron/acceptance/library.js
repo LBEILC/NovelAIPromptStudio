@@ -33,10 +33,11 @@ export async function libraryChecks(env) {
     await h.click(...args);
     await settled();
   };
-  const trashDetailImage = async () => {
+  const trashDetailImage = async (waitForLibrary = true) => {
     const actions = 'document.querySelector(".detail .dacts")';
     const grouped = await e(`!!${actions}?.querySelector('[aria-label="把这一张移入回收站"]')`);
-    await click(grouped ? '把这一张移入回收站' : '移入回收站', actions);
+    await h.click(grouped ? '把这一张移入回收站' : '移入回收站', actions);
+    if (waitForLibrary) await settled();
   };
   const input = async (...args) => {
     await h.input(...args);
@@ -707,8 +708,8 @@ export async function libraryChecks(env) {
     await selectCard(0);
     await waitDetail();
     const trashId = await e('document.querySelector(".col.detail").dataset.detailId');
-    await trashDetailImage();
-    await h.until(() => !!database.loadProject(trashId).deleted_at, '移入回收站');
+    // Observe the short-lived undo action before waiting for the library refresh.
+    await trashDetailImage(false);
     // Read the notice and invoke its real action in one renderer turn: the
     // notification can expire between separate assertion/click round trips.
     await wait(

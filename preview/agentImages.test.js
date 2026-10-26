@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { realpath } from 'node:fs/promises';
 import { startServices } from './services.mjs';
 import { createSession } from './session.mjs';
 import { createWorkbenchFixtures } from '../electron/acceptance/workbenchFixtures.js';
@@ -19,11 +20,11 @@ it('serves Agent image previews through the shared commands in an isolated previ
       shapes: [{ type: 'rect', x: 128, y: 128, width: 128, height: 128 }],
     };
     const preview = await session.call('generate.estimate-inpaint', input, 'agent');
-    expect(session.allowedPath(preview.previewPath)).toBe(preview.previewPath);
+    expect(session.allowedPath(preview.previewPath)).toBe(await realpath(preview.previewPath));
     expect(preview.maskRatio).toBe(1 / 16);
     const pending = await session.call('generate.inpaint', input, 'agent');
     expect(pending.state).toBe('pending');
-    expect(session.allowedPath(pending.previewPath)).toBe(pending.previewPath);
+    expect(session.allowedPath(pending.previewPath)).toBe(await realpath(pending.previewPath));
     expect(await session.call('inpaint.get', { tabId: input.tabId }, 'agent')).toEqual({
       active: false,
     });

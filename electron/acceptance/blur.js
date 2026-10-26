@@ -93,9 +93,17 @@ export async function blurChecks({ h, database, mode, trayController }) {
   const { mode: previousMode, quickAll, words } = previous;
   await fs.writeFile(stateFile, JSON.stringify({ mode: previousMode, quickAll, words }));
   const source = database.loadLibrary('all')[0];
-  // Enable the version strip through the same isolated fake account as generation checks.
+  // Reuse the isolated account when settings already prepared the paused restart
+  // queue. Saving it again would correctly be rejected while those jobs exist.
   await e(
-    `window.studio.invoke('account.save',{token:'acceptance-token'}).then(r=>{if(!r.ok)throw Error(r.error.message)})`,
+    `(async () => {
+      const account = await window.studio.invoke('account.get',{});
+      if (!account.ok) throw Error(account.error.message);
+      if (!account.data.settings.hasToken) {
+        const saved = await window.studio.invoke('account.save',{token:'acceptance-token'});
+        if (!saved.ok) throw Error(saved.error.message);
+      }
+    })()`,
   );
   ids.forEach((id, index) => {
     const metadata = {

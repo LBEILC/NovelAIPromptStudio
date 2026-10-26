@@ -150,3 +150,19 @@ it('waits for final state without timing records and never repeats an action', a
   await h.check('数据', () => true, undefined, 'once');
   expect(checks).toHaveLength(1);
 });
+
+it('reports the whole condition deadline when the final renderer read stalls', async () => {
+  vi.useFakeTimers();
+  const { h, evaluate } = setup();
+  const started = Date.now();
+  evaluate.mockImplementation(async () => {
+    if (Date.now() - started >= 11960) return new Promise(() => {});
+    return false;
+  });
+  const rejected = expect(h.wait('condition', '等待最终状态')).rejects.toThrow(
+    /等待超时.*等待最终状态.*12000 ms（上限 12000 ms）/,
+  );
+  await vi.advanceTimersByTimeAsync(12000);
+  await rejected;
+  expect(vi.getTimerCount()).toBe(0);
+});

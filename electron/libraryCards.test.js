@@ -896,8 +896,8 @@ it('returns complete empty and hot lists without any progress events', async () 
 
 it('rejects pending readers on close and resumes committed batches on reopen', async () => {
   const directory = temporary();
-  let api = await open(directory);
-  api.insertProjects(Array.from({ length: 51 }, (_, i) => sample(i)));
+  let api = await open(directory, { cardBuildSchedule: { rowsPerBatch: 1 } });
+  api.insertProjects(Array.from({ length: 3 }, (_, i) => sample(i)));
   let interrupted = false;
   await expect(
     api.loadLibraryCards('all', ({ completed, total }) => {
@@ -913,10 +913,10 @@ it('rejects pending readers on close and resumes committed batches on reopen', a
     (raw) => raw.prepare('SELECT count(*) AS n FROM library_card_cache').get().n,
   );
   expect(saved).toBeGreaterThan(0);
-  expect(saved).toBeLessThan(51);
-  api = await open(directory);
+  expect(saved).toBeLessThan(3);
+  api = await open(directory, { cardBuildSchedule: { rowsPerBatch: 1 } });
   const cards = await api.loadLibraryCards();
-  expect(cards).toHaveLength(51);
+  expect(cards).toHaveLength(3);
   edit(directory, (raw) => raw.exec('DROP TABLE library_card_cache'));
   expect(await api.loadLibraryCards()).toEqual(cards);
 }, 30_000);

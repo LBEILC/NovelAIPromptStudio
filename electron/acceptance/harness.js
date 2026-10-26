@@ -85,7 +85,21 @@ export function harness(window, mode, checks) {
     const started = Date.now();
     const budget = Math.min(timeoutMs, waitBudget);
     while (Date.now() - started < budget) {
-      const passed = await evaluate(expression, label, budget - (Date.now() - started));
+      // This is one condition deadline, including the final renderer round trip.
+      // Do not report its last few milliseconds as a fresh evaluation budget.
+      const remaining = budget - (Date.now() - started);
+      if (remaining <= 0) break;
+      let passed;
+      try {
+        passed = await bounded(
+          window.webContents.executeJavaScript(expression, true),
+          remaining,
+          'condition deadline',
+        );
+      } catch (error) {
+        if (error.message === 'condition deadline') break;
+        throw Error(error.message + '\n执行内容：' + expression.slice(0, 1200));
+      }
       if (passed && Date.now() - started <= budget) return;
       await new Promise((resolve) =>
         setTimeout(resolve, Math.min(40, Math.max(0, budget - (Date.now() - started)))),

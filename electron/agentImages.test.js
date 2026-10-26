@@ -154,7 +154,7 @@ it('shares the previous UI auto-frame rule and preserves current mask pixels whe
   });
 });
 
-it('limits grid and previews, produces highlighted crop and clears expired or canceled files', async () => {
+it('limits the coordinate grid and removes only expired temporary files', async () => {
   await fixture(
     async ({ source, images, directory }) => {
       const grid = await images.grid(source);
@@ -162,37 +162,50 @@ it('limits grid and previews, produces highlighted crop and clears expired or ca
       expect(grid.step % 64).toBe(0);
       expect(2048 / grid.step).toBeGreaterThanOrEqual(8);
       expect(2048 / grid.step).toBeLessThanOrEqual(12);
-      const resolved = await resolveAgentMask({ shapes: [rect] }, source);
-      for (const options of [{}, { limit: 1024, crop: true }, { limit: 512, job: true }]) {
+      const retained = path.join(directory, 'agent-image-previews', 'retained.png');
+      await fs.copyFile(grid.path, retained);
+      const old = new Date(Date.now() - 25 * 3600000);
+      await fs.utimes(grid.path, old, old);
+      await images.cleanupTemporary();
+      await expect(fs.access(grid.path)).rejects.toMatchObject({ code: 'ENOENT' });
+      await fs.access(retained);
+    },
+    2048,
+    1536,
+  );
+});
+
+it.each([{}, { limit: 1024, crop: true }, { limit: 512, job: true }])(
+  'produces a bounded highlighted preview with options %j',
+  async (options) => {
+    await fixture(
+      async ({ source, images }) => {
+        const resolved = await resolveAgentMask({ shapes: [rect] }, source);
         const file = await images.preview(source, resolved, options);
         const meta = await sharp(file).metadata();
         expect(Math.max(meta.width, meta.height)).toBeLessThanOrEqual(options.limit || 1568);
+        if (options.crop) expect(meta.width).toBe(meta.height);
         if (options.job) {
           await images.cleanupJobs([{ state: 'pending', previewPath: file }]);
           await fs.access(file);
           await images.cleanupJobs([{ state: 'canceled', previewPath: file }]);
           await expect(fs.access(file)).rejects.toMatchObject({ code: 'ENOENT' });
         }
-      }
-      const outpaint = await images.outpaint(
-        source,
-        { left: 64, top: 64 },
-        { width: 2112, height: 1600 },
-      );
-      const meta = await sharp(outpaint).metadata();
-      expect(Math.max(meta.width, meta.height)).toBeLessThanOrEqual(512);
-      await images.cleanupJobs([{ state: 'pending', previewPath: outpaint }]);
-      await images.cleanupJobs([]);
-      await expect(fs.access(outpaint)).rejects.toMatchObject({ code: 'ENOENT' });
-      const old = new Date(Date.now() - 25 * 3600000);
-      await fs.utimes(grid.path, old, old);
-      await images.cleanupTemporary();
-      await expect(fs.access(grid.path)).rejects.toMatchObject({ code: 'ENOENT' });
-      expect(
-        (await fs.readdir(path.join(directory, 'agent-image-previews'))).length,
-      ).toBeGreaterThan(0);
-    },
-    2048,
-    1536,
-  );
+      },
+      1600,
+      1024,
+    );
+  },
+);
+
+it('bounds outpaint previews and cleans up unretained jobs', async () => {
+  await fixture(async ({ source, images }) => {
+    const file = await images.outpaint(source, { left: 64, top: 64 }, { width: 576, height: 576 });
+    const meta = await sharp(file).metadata();
+    expect(Math.max(meta.width, meta.height)).toBe(512);
+    await images.cleanupJobs([{ state: 'pending', previewPath: file }]);
+    await fs.access(file);
+    await images.cleanupJobs([]);
+    await expect(fs.access(file)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
 });
