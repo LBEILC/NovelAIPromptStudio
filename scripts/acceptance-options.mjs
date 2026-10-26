@@ -15,6 +15,8 @@ export function acceptanceOptions(argv = process.argv.slice(2), env = process.en
       '全部',
       '图片模糊',
       '首次引导',
+      '帮助',
+      '导出',
       'Agent',
       '生成',
       '放大与图生图',

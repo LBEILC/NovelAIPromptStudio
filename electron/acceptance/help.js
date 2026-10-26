@@ -2,6 +2,7 @@ import path from 'node:path';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 
 export async function helpChecks({ h, preferences, mode, doubles }) {
+  h.category('帮助');
   const section = (name) =>
     `!!document.querySelector('[data-settings-section="${name}"]:not(.leaving)')`;
   const navigate = (destination) =>
@@ -18,6 +19,15 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
     '[...document.querySelectorAll(\'[data-settings-section="help"] h2\')].some(e=>e.textContent==="快捷键")',
   );
   await h.screenshot('help-features');
+  await h.check(
+    '每项功能都有位置说明',
+    '[...document.querySelectorAll(".feat-row")].every(row=>!!row.querySelector(".feat-where")?.textContent.trim())',
+  );
+  await h.input('[aria-label="搜索功能"]', '操作条');
+  await h.check(
+    '位置搜索能找到局部重绘',
+    '[...document.querySelectorAll(".feat-row")].some(row=>row.textContent.includes("局部重绘"))',
+  );
   await h.input('[aria-label="搜索功能"]', '局部重绘');
   await h.check(
     '功能搜索只保留局部重绘',
@@ -29,6 +39,47 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
     '!!document.querySelector(".feat-none") && !document.querySelector(".feat-row")',
   );
   await h.input('[aria-label="搜索功能"]', '');
+  const point = async (name, id, tip = '在这里') => {
+    navigate('help');
+    await h.wait(section('help'));
+    await h.input('[aria-label="搜索功能"]', '');
+    await h.click(
+      '去看看',
+      `[...document.querySelectorAll('.feat-row')].find(row=>row.querySelector('h3,strong,.feat-name')?.textContent===${JSON.stringify(name)} || row.textContent.startsWith(${JSON.stringify(name)}))`,
+    );
+    const condition = `!!document.querySelector('[data-spotlight]') && document.querySelector('.spot-tip')?.textContent===${JSON.stringify(tip)} && !!document.querySelector('[data-feature~="${id}"]')`;
+    await h.wait(condition);
+    await h.check(`${name}定位目标或前提控件`, condition);
+    await h.screenshot(`help-point-${id}`);
+  };
+  await point('回收站', 'trash');
+  await h.check('回收站定位后进入图片库', '!!document.querySelector(".libp")');
+  await h.nativeKey('Escape');
+  await h.check('Esc 关闭功能定位', '!document.querySelector("[data-spotlight]")');
+  // Start with no open workbench tabs, even when invoked after other categories.
+  await h.evaluate(
+    `(async()=>{const r=await window.studio.invoke('workbench.list',{});for(const tab of r.data.tabs) await window.studio.invoke('workbench.close',{tabId:tab.id});})()`,
+  );
+  await point('复制提示词', 'open-image', '先打开一张图');
+  await h.nativeKey('Escape');
+  const spotlightFiles = await createWorkbenchFixtures(path.join(mode.root, 'spotlight-fixtures'));
+  doubles.selections.push({ canceled: false, filePaths: [spotlightFiles[0]] });
+  await h.evaluate('document.querySelector(\'[data-feature~="open-image"]\').click()');
+  await h.wait('!!document.querySelector(".wb-body")');
+  await h.evaluate('document.querySelector(\'[data-feature="tab-refs"]\').click()');
+  await point('复制提示词', 'copy');
+  await h.check(
+    '复制定位切回提示词页签',
+    '!!document.querySelector(\'[data-feature="tab-prompt"][aria-selected="true"]\')',
+  );
+  await point('图生图', 'img2img');
+  await h.check(
+    '图生图定位切换参考页签',
+    '!!document.querySelector(\'[data-feature="tab-refs"][aria-selected="true"]\')',
+  );
+  await h.nativeKey('Escape');
+  navigate('help');
+  await h.wait(section('help'));
   await h.click(
     '去看看',
     '[...document.querySelectorAll(".feat-row")].find(e=>e.textContent.includes("翻译词典"))',

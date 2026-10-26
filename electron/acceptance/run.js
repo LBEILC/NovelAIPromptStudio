@@ -4,6 +4,8 @@ import { folderImportChecks } from './folderImport.js';
 import { loadWindowsClipboard } from '../windowsClipboard.js';
 import { workSharingChecks } from './workSharing.js';
 import { onboardingChecks } from './onboarding.js';
+import { helpChecks } from './help.js';
+import { exportChecks } from './export.js';
 import { trayChecks } from './tray.js';
 import { materialsChecks } from './materials.js';
 import { libraryRefinementChecks } from './libraryRefinement.js';
@@ -453,6 +455,8 @@ export async function runAcceptance(context) {
         await fs.writeFile(path.join(mode.root, 'snapshot.json'), snapshot());
       } else if (mode.category === '客户端控件') await clientControlChecks(environment);
       else if (mode.category === '外壳') await shellChecks();
+      else if (mode.category === '帮助') await helpChecks(environment);
+      else if (mode.category === '导出') await exportChecks(environment);
       else if (mode.category === 'Agent') await agentChecks(environment);
       else if (mode.category === '作品共用') await workSharingChecks(environment);
       else if (mode.category === '生成') await generationChecks(environment);
@@ -510,6 +514,8 @@ export async function runAcceptance(context) {
           () => clientChecks(environment),
           () => clientControlChecks(environment),
           () => shellChecks(),
+          () => helpChecks(environment),
+          () => exportChecks(environment),
         ],
         [
           () => workbenchChecks(environment),

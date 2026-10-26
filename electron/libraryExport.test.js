@@ -10,6 +10,27 @@ import { readNovelAIMetadata } from './metadata.js';
 import { validateCommand } from './commands/registry.js';
 
 const roots = [];
+it('uses work version names before filenames, sanitizes and deduplicates, but preserves explicit names', async () => {
+  const f = await fixture();
+  for (const image of f.images.slice(0, 2))
+    Object.assign(image, {
+      name: 'synthetic s-123',
+      has_custom_name: false,
+      work_refs: [
+        { role: 'origin', number: 1, workName: 'Ignored' },
+        { role: 'version', number: 2, workName: 'Synthetic/work' },
+      ],
+    });
+  const names = async () =>
+    (await resolveExport(f.database, { ids: ['image-01', 'image-02'] })).items.map(
+      (p) => p.fileName,
+    );
+  expect(await names()).toEqual(['Syntheticwork · 第 2 版.png', 'Syntheticwork · 第 2 版-2.png']);
+  Object.assign(f.images[0], { name: 'Explicit', has_custom_name: true });
+  f.images[1].work_refs[1].workName = 'synthetic s-456';
+  expect(await names()).toEqual(['Explicit.png', 'meadow-01.png']);
+  expect(f.images[1].name).toBe('synthetic s-123');
+});
 afterEach(async () => {
   for (const root of roots.splice(0)) await fs.rm(root, { recursive: true, force: true });
 });

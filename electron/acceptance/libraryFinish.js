@@ -11,7 +11,7 @@ export async function checkCollectionContext(h, id) {
   await collectionContext(h, id);
   await h.check(
     '收藏集右键菜单包含重命名和删除；智能收藏集提供编辑规则',
-    `(async()=>{const menu=document.querySelector('.menu:not(.leaving)'),items=[...menu.querySelectorAll('[role=menuitem]')];return (items.length===2||items.length===3&&items[0].textContent.trim()==='编辑规则…')&&items.at(-2).textContent.trim()==='重命名'&&items.at(-1).textContent.trim()==='删除'})()`,
+    `(()=>{const items=[...document.querySelector('.menu:not(.leaving)').querySelectorAll('[role=menuitem]')].map(e=>e.textContent.trim());return (items.length===3||items.length===4&&items[0]==='编辑规则…')&&items.slice(-3).join('|')==='重命名|导出收藏集…|删除'})()`,
     undefined,
     'both',
   );

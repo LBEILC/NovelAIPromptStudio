@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
 import yazl from 'yazl';
 import { galleryCollectionScope } from '../src/lib/galleryCollections.js';
-import { hasImageName, numberedImageNames } from '../src/lib/imageNaming.js';
+import { hasImageName, numberedImageNames, versionName } from '../src/lib/imageNaming.js';
 import { freeDiskBytes } from './folderImport.js';
 import { readableBytes } from './importer.js';
 import { CommandError } from './commands/registry.js';
@@ -73,7 +73,9 @@ export async function resolveExport(database, input) {
     const custom = customName(image);
     let stem = custom
       ? numbered.get(item)
-      : path.parse(image.original_filename || '').name || image.id.slice(0, 8);
+      : versionName(image) ||
+        path.parse(image.original_filename || '').name ||
+        image.id.slice(0, 8);
     stem = exportSafeName(stem, image.id.slice(0, 8));
     let fileName = stem + extension,
       n = 2;

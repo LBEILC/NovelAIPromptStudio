@@ -154,6 +154,7 @@ export async function libraryInteractionChecks(env) {
       '标为不是 NSFW（2 张）',
       '恢复自动判定',
       '起名',
+      '导出 2 张…',
       '移入回收站',
     ]);
     await check(
