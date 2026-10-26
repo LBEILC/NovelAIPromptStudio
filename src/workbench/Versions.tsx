@@ -11,7 +11,17 @@ import { originGone } from './original';
 import { useVersionState } from './useVersionState';
 import { openCompare, type CompareSide } from './Compare';
 import { VersionDifference, VersionSummary } from './VersionDifference';
-import { OpSize, Row, TH_H, TH_MORE, Thumb, isRedraw, opPlan, rowsOf } from './versionHelpers';
+import {
+  DIRECTOR_TOOL,
+  OpSize,
+  Row,
+  TH_H,
+  TH_MORE,
+  Thumb,
+  isRedraw,
+  opPlan,
+  rowsOf,
+} from './versionHelpers';
 import { BlurImg } from '../kit/blur';
 import { openPick } from './Pick';
 import { randomSummary } from './RandomBlock';
@@ -24,6 +34,7 @@ const OP_NAME: Record<ImageOperation['kind'], string> = {
   img2img: '图生图',
   inpaint: '局部重绘',
   outpaint: '扩图',
+  director: '导演工具',
 };
 const SIDE: Record<string, string> = { left: '左', right: '右', top: '上', bottom: '下' };
 /** 扩图那一版的悬停：右 +256、下 +128 · 一次画完；分块失败时写只扩了哪几边 */
@@ -49,7 +60,9 @@ const opTip = (o: ImageOperation) =>
         ? `重绘了上一版图里的一块${o.rect ? ` · 框 ${o.rect.width} × ${o.rect.height}，在 ${o.rect.x}, ${o.rect.y}` : ''} · 重绘强度 ${n2(o.strength)}`
         : o.kind === 'outpaint'
           ? outpaintTip(o)
-          : `按底图生成 · 强度 ${n2(o.strength)} · 噪声 ${n2(o.noise)}`;
+          : o.kind === 'director'
+            ? `导演工具 · ${DIRECTOR_TOOL[o.tool || ''] || ''}${o.sent ? ` · 送去 ${o.sent.width} × ${o.sent.height}` : ''}`
+            : `按底图生成 · 强度 ${n2(o.strength)} · 噪声 ${n2(o.noise)}`;
 
 export function Versions({ tab, before }: { tab: CommandTab; before?: () => Promise<void> }) {
   const {
@@ -296,7 +309,9 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
               {v.source === 'agent' && <span className="src">Agent</span>}
               {v.operation && (
                 <span className="src" data-tip={opTip(v.operation)}>
-                  {OP_NAME[v.operation.kind]}
+                  {v.operation.kind === 'director'
+                    ? DIRECTOR_TOOL[v.operation.tool || ''] || OP_NAME.director
+                    : OP_NAME[v.operation.kind]}
                 </span>
               )}
               {spawned.length > 0 && (
@@ -324,7 +339,9 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                 ) : (
                   <VersionSummary diff={delta(v)} lead="重绘提示词 " />
                 )
-              ) : v.operation?.kind === 'upscale' || v.operation?.kind === 'enhance' ? (
+              ) : v.operation?.kind === 'upscale' ||
+                v.operation?.kind === 'enhance' ||
+                v.operation?.kind === 'director' ? (
                 <OpSize
                   from={v.operation.sourceProjectId}
                   to={v.images.find((i) => !i.deleted)?.projectId}

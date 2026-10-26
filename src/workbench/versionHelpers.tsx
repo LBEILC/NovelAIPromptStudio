@@ -165,6 +165,15 @@ export function OpSize({ from, to }: { from?: string; to?: string }) {
   if (!px || !px[0] || !px[1]) return <span className="what" />;
   return <span className="what">{px[0] === px[1] ? '尺寸不变' : `尺寸 ${px[0]} → ${px[1]}`}</span>;
 }
+/** 导演工具（2.49）的中文名 */
+export const DIRECTOR_TOOL: Record<string, string> = {
+  'bg-removal': '去背景',
+  lineart: '线稿',
+  sketch: '草图',
+  colorize: '上色',
+  emotion: '换表情',
+  declutter: '去杂物',
+};
 const OP_VERB: Record<string, string> = {
   upscale: '放大',
   enhance: '增强',
@@ -206,10 +215,16 @@ export function opPlan(job: {
         ? `增强${src} · 幅度 ${o?.magnitude ?? 2} · ${scale}`
         : kind === 'inpaint'
           ? `重绘${src}里的一块${o?.rect ? ` · 框 ${o.rect.width} × ${o.rect.height}` : ''} · 强度 ${(o?.strength ?? 1).toFixed(2)}`
-          : kind === 'outpaint'
-            ? `给${src}扩图${edges ? ` · ${edges}` : ''} · ${o?.mode === 'edges' ? `按边分块 ${o.blocks?.length || 1} 次` : '一次画完'}`
-            : '';
+          : kind === 'director'
+            ? `${DIRECTOR_TOOL[o?.tool || ''] || '导演工具'}：${src}${o?.sent ? ` · 送去 ${o.sent.width} × ${o.sent.height}` : ''}`
+            : kind === 'outpaint'
+              ? `给${src}扩图${edges ? ` · ${edges}` : ''} · ${o?.mode === 'edges' ? `按边分块 ${o.blocks?.length || 1} 次` : '一次画完'}`
+              : '';
   const prompt =
     kind === 'inpaint' || kind === 'outpaint' ? o?.prompt?.metadata?.prompt_raw?.trim() || '' : '';
-  return { name: OP_VERB[kind] || '', text, prompt };
+  return {
+    name: kind === 'director' ? DIRECTOR_TOOL[o?.tool || ''] || '导演工具' : OP_VERB[kind] || '',
+    text,
+    prompt,
+  };
 }
