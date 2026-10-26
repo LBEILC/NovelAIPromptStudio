@@ -514,6 +514,8 @@ textarea.para-in { resize: none; overflow: hidden; }
 .popover.op-pop .op-foot { align-items: center; padding-top: var(--sp-3); border-top: 1px solid var(--divider); }
 .popover.op-pop .op-price { display: flex; flex-direction: column; min-width: 0; }
 /* 导演工具（2.49）：六种工具排成两行三格，选中的描边加底色；上色、换表情的参数行输入框占满 */
+/* 强度六档放不进普通宽度，用宽浮层（用户 10-26：最弱那一档撑出了浮层） */
+.popover.dir-pop { width: var(--popover-w-wide); }
 .popover.dir-pop .dir-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-1); }
 .popover.dir-pop .dir-tool { position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--sp-0); padding: var(--sp-2) var(--sp-1); border: var(--bw) solid var(--border); border-radius: var(--r-ctl); background: transparent; color: var(--text-2); font: inherit; font-size: var(--fs-small); cursor: pointer; transition: background-color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
 .popover.dir-pop .dir-tool > i { font-size: var(--icon); }
