@@ -62,6 +62,8 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
   );
   await point('复制提示词', 'open-image', '先打开一张图');
   await h.nativeKey('Escape');
+  await point('扩图', 'open-image', '先打开一张图');
+  await h.nativeKey('Escape');
   const spotlightFiles = await createWorkbenchFixtures(path.join(mode.root, 'spotlight-fixtures'));
   doubles.selections.push({ canceled: false, filePaths: [spotlightFiles[0]] });
   await h.evaluate('document.querySelector(\'[data-feature~="open-image"]\').click()');
@@ -77,6 +79,12 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
     '图生图定位切换参考页签',
     '!!document.querySelector(\'[data-feature="tab-refs"][aria-selected="true"]\')',
   );
+  await h.nativeKey('Escape');
+  await h.evaluate(`window.studio.invoke('account.save',{token:'acceptance-token'})`);
+  await h.evaluate(
+    `(async()=>{const r=await window.studio.invoke('workbench.list',{});await window.studio.invoke('work.save',{tabId:r.data.activeTabId})})()`,
+  );
+  await point('扩图', 'outpaint');
   await h.nativeKey('Escape');
   navigate('help');
   await h.wait(section('help'));

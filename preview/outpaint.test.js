@@ -52,6 +52,12 @@ it('previews both estimates, block progress and the second-block failure switch 
       width: 576,
       height: 512,
     });
+    const current = (await session.call('workbench.get', { tabId: input.tabId })).tab;
+    expect(current.versionImageId).toBe(partial.images[0]);
+    expect(current.project.image_path).toBe(
+      session.database.loadProject(partial.images[0]).image_path,
+    );
+    expect(current.project.metadata).toMatchObject({ width: 576, height: 512 });
     expect(
       events.some(
         (event) =>

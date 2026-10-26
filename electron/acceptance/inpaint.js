@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { isDeepStrictEqual } from 'node:util';
 
 export async function inpaintChecks({ h, database }) {
   const call = (name, input = {}) =>
@@ -94,10 +95,25 @@ export async function inpaintChecks({ h, database }) {
       }
     return true;
   });
-  await h.check(
-    '重绘版本保留父版本提示词和参数快照',
-    () =>
-      JSON.stringify(database.versions.get(finished.versionId).project.metadata) ===
-      JSON.stringify(parent.project.metadata),
-  );
+  await h.check('重绘版本保留父版本提示词和参数快照', () => {
+    const actual = database.versions.get(finished.versionId).project.metadata;
+    const expected = parent.project.metadata;
+    // Queue storage may normalize JSON whitespace while resolving image payloads.
+    const normalized = (value) => {
+      if (typeof value === 'string' && /^[\[{]/.test(value)) {
+        try {
+          return normalized(JSON.parse(value));
+        } catch {
+          return value;
+        }
+      }
+      if (Array.isArray(value)) return value.map(normalized);
+      if (value && typeof value === 'object')
+        return Object.fromEntries(
+          Object.entries(value).map(([key, item]) => [key, normalized(item)]),
+        );
+      return value;
+    };
+    return isDeepStrictEqual(normalized(actual), normalized(expected));
+  });
 }

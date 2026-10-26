@@ -245,6 +245,29 @@ it.each(['whole', 'edges', 'partial', 'failed', 'cancel', 'cancel-before'])(
       expect(f.service.state.requests[0].input).toContain('synthetic draft');
       const output = f.database.loadProject(final.images[0]);
       expect(output.metadata.prompt_raw).toBe('synthetic original');
+      const dimensions = {
+        width: 576,
+        height: ['partial', 'cancel'].includes(scenario) ? 512 : 576,
+      };
+      expect(output.metadata).toMatchObject(dimensions);
+      const current = (await f.call('workbench.get', { tabId: f.input.tabId })).tab;
+      expect(current.versionImageId).toBe(output.id);
+      expect(current.project.image_path).toBe(output.image_path);
+      expect(current.project.metadata).toMatchObject({
+        ...dimensions,
+        prompt_raw: 'synthetic draft',
+      });
+      expect(current.originalProject.metadata).toMatchObject(dimensions);
+      const reopened = await f.call('version.open', {
+        tabId: f.input.tabId,
+        versionId: final.versionId,
+      });
+      expect(reopened.tab.project.metadata).toMatchObject(dimensions);
+      // The embedded source settings remain intact despite the larger bitmap.
+      expect(JSON.parse(output.metadata.extra_json).parsed).toMatchObject({
+        width: 512,
+        height: 512,
+      });
       expect(await sharp(output.image_path).metadata()).toMatchObject({
         width: 576,
         height: ['partial', 'cancel'].includes(scenario) ? 512 : 576,

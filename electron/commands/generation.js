@@ -369,6 +369,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
             thumbnail_path: image.thumbnail_path,
             metadata: {
               ...job.project.metadata,
+              ...(job.operation === 'outpaint'
+                ? { width: image.metadata.width, height: image.metadata.height }
+                : {}),
               seed: ['inpaint', 'outpaint'].includes(job.operation)
                 ? job.project.metadata.seed
                 : String(seed),
@@ -377,6 +380,22 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           };
           current.originalProject = snapshot;
           if (!changed) current.project = structuredClone(snapshot);
+          else if (job.operation === 'outpaint') {
+            // The prompt draft may differ from the source version even before
+            // outpainting starts. Keep its edits, but display the saved result.
+            current.project = {
+              ...current.project,
+              id: image.id,
+              image_path: image.image_path,
+              thumbnail_path: image.thumbnail_path,
+              nsfw: image.nsfw,
+              metadata: {
+                ...current.project.metadata,
+                width: image.metadata.width,
+                height: image.metadata.height,
+              },
+            };
+          }
           current.revision = (current.revision || 0) + 1;
           await store.save(session);
         }
@@ -434,6 +453,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       nsfw: p.nsfw,
       metadata: {
         ...version.project.metadata,
+        ...(version.operation?.kind === 'outpaint'
+          ? { width: p.metadata.width, height: p.metadata.height }
+          : {}),
         seed: p.metadata.seed,
         extra_json: p.metadata.extra_json,
       },
