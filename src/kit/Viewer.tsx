@@ -33,6 +33,10 @@ export interface ViewerProps {
   onCopy?: (item: ViewerItem) => void;
   onSaveAs?: (item: ViewerItem) => void;
   onOpenWorkbench?: (item: ViewerItem) => void;
+  /** 盖在图片上方正中的标记（挑图：保留 / 不要 / 未定） */
+  badge?: React.ReactNode;
+  /** 工具条上额外的按钮，放在操作提示后面（挑图：保留、不要） */
+  actions?: React.ReactNode;
 }
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
@@ -78,13 +82,17 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
   });
   // Esc 只关最上面一层（大图可能盖在 ZIP 挑选这类对话框上）
   useDismiss(!p.leaving, p.onClose, [ov], { modal: true });
-  const go = (next: number) => {
-    next = clamp(next, 0, p.items.length - 1);
-    if (next === i) return;
-    setDir(next > i ? 'right' : 'left');
+  // 换到第几张可能来自外面（挑图标完自动跳下一张）：在渲染时比对，换图的方向动画照样有
+  const [shown, setShown] = useState(i);
+  if (shown !== i) {
+    setShown(i);
+    setDir(i > shown ? 'right' : 'left');
     setSeq((n) => n + 1);
     setZ({ z: 1, x: 0, y: 0 });
-    p.onIndex(next);
+  }
+  const go = (next: number) => {
+    next = clamp(next, 0, p.items.length - 1);
+    if (next !== i) p.onIndex(next);
   };
   const jumpGroup = (d: 1 | -1) => {
     const g = item?.group;
@@ -242,6 +250,7 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
           </div>
         ))}
       </div>
+      {p.badge && <div className="viewer-badge">{p.badge}</div>}
       {item.image && (
         <ContextMenu
           at={menu}
@@ -270,6 +279,7 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
           <Icon name="arrow-right-s-line" />
         </button>
         <span className="help">滚轮缩放 · 拖动平移 · 双击适应窗口</span>
+        {p.actions}
         <span className="sp" />
         <Seg
           className="vbg"

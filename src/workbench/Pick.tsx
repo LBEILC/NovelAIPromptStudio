@@ -1,9 +1,12 @@
 // 挑图（doc/design.md 2.47，1.8.6）：批量生成以后挑出要的、清掉不要的。做在大图里，不另开页面。
-// 这一版的图铺成网格（格子大小可调）；每张三种标记：保留、不要、未定。空格或 1 保留，X 或 Delete 不要，0 取消标记，
-// 标完自动跳到下一张；Ctrl / Shift 点多选后一起标。Enter 或双击看单张大图，← → 一张张过，Esc 回到网格。
-// 底部"把不要的 N 张移入回收站"（可勾"未定的也一起"），移完通知带撤销。标记只在挑图时用，不存进图片。
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Presence } from '../kit/motion';
+// 这一版的图和图片库一样按比例排成行（行高可调）；每张三种标记：保留、不要、未定。空格或 1 保留，X 或 Delete 不要，0 取消标记，
+// 标完自动跳到下一张；Ctrl / Shift 点多选后一起标。Enter 或双击用普通大图看单张（盖在挑图上面，关掉回到网格），
+// 大图里照样能标。底部"把不要的 N 张移入回收站"（可勾"未定的也一起"），移完通知带撤销。
+// 标记不存进图片，按版本记在内存里：退出挑图再打开还在（用户 10-26：点错关闭，挑了一半的都没了）。
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Presence, ms } from '../kit/motion';
+import { Viewer } from '../kit/Viewer';
+import { adjacentRowIndex, layoutLibraryRows } from '../library/layout';
 import { ToWin, useDismiss } from '../kit/layer';
 import { Icon, Slider, Switch } from '../kit/controls';
 import { markLoaded } from '../kit/alpha';
@@ -32,6 +35,8 @@ const useRequest = () =>
   );
 
 type Mark = 'keep' | 'drop';
+/** 每一版挑到哪了：退出挑图不丢，软件重启才清 */
+const savedMarks = new Map<string, Map<string, Mark>>();
 interface Item {
   id: string;
   path: string;
@@ -40,6 +45,8 @@ interface Item {
   seed?: string;
   /** 随机块抽到了什么（2.44），悬停显示 */
   random?: string;
+  /** 宽高比，按比例排行用 */
+  ratio: number;
 }
 const SIZE_KEY = 'nps.pick.size';
 const readSize = () => {
@@ -86,6 +93,9 @@ export function PickHost({ tabId, onChanged }: { tabId: string; onChanged?: () =
                   image: recs[i]!,
                   seed: recs[i]!.metadata?.seed,
                   random: randomSummary(shown[i].random),
+                  ratio:
+                    Number(recs[i]!.metadata?.width) / Number(recs[i]!.metadata?.height) ||
+                    832 / 1216,
                 },
               ]
             : [],
@@ -141,7 +151,13 @@ function Body({
   const ov = useRef<HTMLDivElement>(null);
   const grid = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState(readSize);
-  const [marks, setMarks] = useState<Map<string, Mark>>(new Map());
+  const [marks, setMarks] = useState<Map<string, Mark>>(
+    () => new Map(savedMarks.get(data.version.id)),
+  );
+  useEffect(() => {
+    if (marks.size) savedMarks.set(data.version.id, marks);
+    else savedMarks.delete(data.version.id);
+  }, [marks, data.version.id]);
   const [focus, setFocus] = useState(0);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [anchor, setAnchor] = useState<number | null>(null);
@@ -154,8 +170,35 @@ function Body({
   const items = data.items;
   const n = items.length;
   const cur = items[clamp(focus, 0, Math.max(0, n - 1))];
-  // 单张大图里 Esc 先回网格
-  useDismiss(!leaving, () => (single ? setSingle(false) : onClose()), [ov], { modal: true });
+  // 单张大图是盖在上面的另一层：Esc 先关它（回到网格），再按一次才退出挑图
+  useDismiss(!leaving, onClose, [ov], { modal: true });
+  // 按比例排成行（同图片库，2.13）：宽度跟着窗口变
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const g = grid.current;
+    if (!g) return;
+    const fit = () => {
+      const cs = getComputedStyle(g);
+      setWidth(g.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(g);
+    return () => ro.disconnect();
+  }, []);
+  const gap = ms('--thumb-gap') || 14;
+  const rows = useMemo(
+    () =>
+      layoutLibraryRows(
+        items.map((x) => x.ratio),
+        width,
+        size,
+        gap,
+        ms('--thumb-ratio-min') || 0.5,
+        ms('--thumb-ratio-max') || 2.5,
+      ),
+    [items, width, size, gap],
+  );
   useEffect(() => {
     try {
       localStorage.setItem(SIZE_KEY, String(size));
@@ -169,11 +212,6 @@ function Body({
       ?.querySelector<HTMLElement>(`[data-pick-index="${focus}"]`)
       ?.scrollIntoView({ block: 'nearest' });
   }, [focus, single]);
-  const cols = () => {
-    const g = grid.current;
-    if (!g) return 1;
-    return Math.max(1, getComputedStyle(g).gridTemplateColumns.split(' ').length);
-  };
   const mark = (m: Mark | null, ids: string[]) =>
     setMarks((cur) => {
       const next = new Map(cur);
@@ -203,10 +241,18 @@ function Body({
         e.stopPropagation();
         setFocus((f) => clamp(f + d, 0, n - 1));
       };
-      if (e.key === 'ArrowRight') return step(1);
-      if (e.key === 'ArrowLeft') return step(-1);
-      if (e.key === 'ArrowDown' && !single) return step(cols());
-      if (e.key === 'ArrowUp' && !single) return step(-cols());
+      const row = (d: 1 | -1) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setFocus((f) => adjacentRowIndex(rows, f, d, gap));
+      };
+      // 大图开着时 ← → 由大图自己换（换完告诉这里）
+      if (!single) {
+        if (e.key === 'ArrowRight') return step(1);
+        if (e.key === 'ArrowLeft') return step(-1);
+        if (e.key === 'ArrowDown') return row(1);
+        if (e.key === 'ArrowUp') return row(-1);
+      }
       if (e.key === ' ' || e.key === '1') {
         e.preventDefault();
         return apply('keep');
@@ -220,7 +266,7 @@ function Body({
         e.preventDefault();
         return setSingle((s) => !s);
       }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+      if (!single && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
         e.preventDefault();
         setSel(new Set(items.map((x) => x.id)));
       }
@@ -299,84 +345,91 @@ function Body({
         <span className="muted">
           {v.parentId ? `第 ${v.number} 版` : '原图'} · {n} 张
         </span>
-        {single ? (
-          <button className="btn quiet sm" onClick={() => setSingle(false)}>
-            <Icon name="layout-grid-line" />
-            回到网格
-          </button>
-        ) : (
-          <span className="pick-size" data-tip="格子大小">
-            <Icon name="image-line" />
-            <Slider value={size} min={96} max={360} step={4} onChange={setSize} label="格子大小" />
-          </span>
-        )}
+        <span className="pick-size" data-tip="图片大小">
+          <Icon name="image-line" />
+          <Slider value={size} min={96} max={360} step={4} onChange={setSize} label="图片大小" />
+        </span>
         <span className="sp" />
         <span className="help">
           空格 保留 · X 不要 · 0 取消 · Enter 看大图 · Ctrl / Shift 点多选
         </span>
-        <button className="btn quiet sm icon" aria-label="关闭" onClick={onClose}>
+        <button className="btn quiet sm" onClick={onClose}>
           <Icon name="close-line" />
+          退出挑图
         </button>
       </div>
-      {single && cur ? (
-        <div className="pick-single" onDoubleClick={() => setSingle(false)}>
-          <BlurImg
-            image={cur.image}
-            path={cur.path}
-            tab={tabId}
-            className="alpha-bg"
-            alt=""
-            draggable={false}
-            onLoad={markLoaded}
-          />
-          <span className={`pick-badge big ${marks.get(cur.id) || ''}`}>
-            {badge(marks.get(cur.id))}
-          </span>
-          <span className="pick-pos mono">
-            {focus + 1} / {n}
-            {cur.seed ? ` · Seed ${cur.seed}` : ''}
-          </span>
-        </div>
-      ) : (
-        <div
-          ref={grid}
-          className="pick-grid scroll"
-          style={{ '--pick-size': `${size}px` } as React.CSSProperties}
-          role="listbox"
-          aria-multiselectable="true"
-          aria-label="这一版的图"
-        >
-          {items.map((x, i) => {
-            const m = marks.get(x.id);
-            return (
-              <div
-                key={x.id}
-                className={`pick-cell ${m || ''} ${i === focus ? 'focus' : ''} ${sel.has(x.id) ? 'sel' : ''}`}
-                role="option"
-                aria-selected={sel.has(x.id)}
-                data-pick-index={i}
-                data-pick-mark={m || 'none'}
-                data-tip={x.random || undefined}
-                onClick={(e) => click(i, e)}
-                onDoubleClick={() => (setFocus(i), setSingle(true))}
-              >
-                <BlurImg
-                  image={x.image}
-                  path={x.thumb}
-                  tab={tabId}
-                  eye="sm"
-                  className="alpha-bg"
-                  alt=""
-                  draggable={false}
-                  loading="lazy"
-                  onLoad={markLoaded}
-                />
-                {m && <span className={`pick-badge ${m}`}>{badge(m)}</span>}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <div
+        ref={grid}
+        className="pick-grid scroll"
+        role="listbox"
+        aria-multiselectable="true"
+        aria-label="这一版的图"
+      >
+        {rows.map((r) => (
+          <div key={r.start} className="pick-row" style={{ height: r.height }}>
+            {r.widths.map((w, k) => {
+              const i = r.start + k,
+                x = items[i],
+                m = marks.get(x.id);
+              return (
+                <div
+                  key={x.id}
+                  className={`pick-cell ${m || ''} ${i === focus ? 'focus' : ''} ${sel.has(x.id) ? 'sel' : ''}`}
+                  style={{ width: w }}
+                  role="option"
+                  aria-selected={sel.has(x.id)}
+                  data-pick-index={i}
+                  data-pick-mark={m || 'none'}
+                  data-tip={x.random || undefined}
+                  onClick={(e) => click(i, e)}
+                  onDoubleClick={() => (setFocus(i), setSingle(true))}
+                >
+                  <BlurImg
+                    image={x.image}
+                    path={x.thumb}
+                    tab={tabId}
+                    eye="sm"
+                    className="alpha-bg"
+                    alt=""
+                    draggable={false}
+                    loading="lazy"
+                    onLoad={markLoaded}
+                  />
+                  {m && <span className={`pick-badge ${m}`}>{badge(m)}</span>}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <Viewer
+        open={single && !leaving}
+        items={items.map((x) => ({ id: x.id, path: x.path, image: x.image, tab: tabId }))}
+        index={focus}
+        onIndex={setFocus}
+        onClose={() => setSingle(false)}
+        badge={
+          cur && (
+            <span className={`pick-badge big ${marks.get(cur.id) || ''}`}>
+              {badge(marks.get(cur.id))}
+            </span>
+          )
+        }
+        actions={
+          <>
+            <span className="vz-sep" />
+            <button className="btn quiet sm" onClick={() => apply('keep')}>
+              <Icon name="check-line" />
+              保留
+            </button>
+            <button className="btn quiet sm" onClick={() => apply('drop')}>
+              <Icon name="close-line" />
+              不要
+            </button>
+            <span className="help">空格 保留 · X 不要</span>
+          </>
+        }
+      />
       <div className="viewer-bar pick-bar">
         <span className="pick-count mono">
           保留 <b>{keep}</b> · 不要 <b>{drop}</b> · 未定 <b>{unsure}</b>
