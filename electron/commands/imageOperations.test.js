@@ -159,6 +159,8 @@ it('keeps base images and image operation versions durable through command flows
       'ui',
     );
     expect(maxPrice).toMatchObject({ width: 1467, height: 2144, scales: [1, 1.5, 'max'] });
+    // 草稿和源版本不一样时（增强用源版本的提示词）：完成后舞台照样换成新图，草稿的改动保留
+    await call('prompt.set', { tabId, scope: 'base:prompt', text: 'synthetic shape, edited' });
     const enhanced = await waitJob(
       (
         await call(
@@ -187,6 +189,14 @@ it('keeps base images and image operation versions durable through command flows
       width: 1467,
       height: 2144,
     });
+    const afterEnhance = (await call('workbench.get', { tabId })).tab;
+    expect(afterEnhance.versionId).toBe(enhanced.versionId);
+    expect(afterEnhance.versionImageId).toBe(enhanced.images[0]);
+    expect(afterEnhance.project.image_path).toBe(
+      database.loadProject(enhanced.images[0]).image_path,
+    );
+    expect(afterEnhance.project.metadata).toMatchObject({ width: 1467, height: 2144 });
+    expect(afterEnhance.project.metadata.prompt_raw).toContain('edited');
     const deletion = await call('version.delete', { versionId: enhanced.versionId, only: true });
     await call('branch.restore', { undo: deletion.undo });
     expect(database.versions.get(enhanced.versionId).operation).toEqual(enhancedVersion.operation);
@@ -258,6 +268,12 @@ it('keeps base images and image operation versions durable through command flows
       (await call('generate.inpaint', { ...inpaintInput, mask }, 'ui')).id,
     );
     expect(inpainted.state).toBe('completed');
+    const afterInpaint = (await call('workbench.get', { tabId })).tab;
+    expect(afterInpaint.versionImageId).toBe(inpainted.images[0]);
+    expect(afterInpaint.project.image_path).toBe(
+      database.loadProject(inpainted.images[0]).image_path,
+    );
+    expect(afterInpaint.project.metadata.prompt_raw).toBe(draftBefore.metadata.prompt_raw);
     const usage = database.usage.list();
     expect(usage.map((record) => record.operation)).toEqual([
       'img2img',

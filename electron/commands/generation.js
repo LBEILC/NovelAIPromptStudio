@@ -411,9 +411,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           };
           current.originalProject = snapshot;
           if (!changed) current.project = structuredClone(snapshot);
-          else if (job.operation === 'outpaint') {
-            // The prompt draft may differ from the source version even before
-            // outpainting starts. Keep its edits, but display the saved result.
+          else {
+            // The draft differs from the job: edited while the request ran, or an
+            // image operation (enhance and inpaint keep the source version's
+            // prompt) started from a different draft. Keep its edits, but always
+            // display the saved result; operations also change the image size.
             current.project = {
               ...current.project,
               id: image.id,
@@ -422,8 +424,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
               nsfw: image.nsfw,
               metadata: {
                 ...current.project.metadata,
-                width: image.metadata.width,
-                height: image.metadata.height,
+                ...(job.operation
+                  ? { width: image.metadata.width, height: image.metadata.height }
+                  : {}),
               },
             };
           }
@@ -650,10 +653,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     if (!parent) throw new CommandError('not_found', '图片不在这个作品中');
     const image = services.database.loadProject(input.imageId) || parent.project;
     if (image.deleted_at) throw new CommandError('not_found', '图片不存在');
-    const promptProject =
-      input.op === 'inpaint'
-        ? current.project
-        : withPromptTemplate(parent.project, current.project);
+    // 局部重绘用编辑器里的草稿（2.35）；放大、增强用这张图自己那一版的提示词和参数（2.34）
+    const promptProject = input.op === 'inpaint' ? current.project : parent.project;
     const operation = {
       kind: input.op,
       sourceProjectId: input.imageId,
@@ -724,7 +725,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       tabId: current.id,
       workId: parent.workId,
       parentId: parent.id,
-      project: withPromptTemplate(parent.project, promptProject),
+      // 快照是源图那一版的，和图片文件里的元数据一致；局部重绘用的草稿记在 operation.prompt
+      project: parent.project,
       request: prepared.request,
       count: 1,
       fixedSeed: kind === 'upscale',

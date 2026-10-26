@@ -1,4 +1,4 @@
-import '../fixtures/databaseTestBudget.js';
+﻿import '../fixtures/databaseTestBudget.js';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -220,11 +220,16 @@ it.each(['img2img', 'enhance', 'upscale', 'inpaint', 'outpaint'])(
   'resolves the current draft and records %s draws',
   async (kind) => {
     await makePool();
+    // 源版本带随机块；生成后草稿再改一处。增强、放大用源版本自己的提示词（2.34），
+    // 局部重绘用草稿发、快照仍是源版本的（2.35），图生图、扩图用草稿
+    await call('prompt.set', { tabId, scope: 'base:prompt', text: '__Action*2__' });
     const first = await call('generate.start', { tabId, count: 1 });
     const generated = await wait(first.id);
     expect(generated.error || generated.state).toBe('completed');
     const imageId = generated.images[0];
-    await call('prompt.set', { tabId, scope: 'base:prompt', text: '__Action*2__' });
+    const draft = '__Action*2__, synthetic draft edit';
+    await call('prompt.set', { tabId, scope: 'base:prompt', text: draft });
+    const own = ['enhance', 'upscale'].includes(kind);
     let input = { tabId, imageId };
     if (kind === 'img2img') {
       await call('reference.set-base', { tabId, imageId });
@@ -245,14 +250,21 @@ it.each(['img2img', 'enhance', 'upscale', 'inpaint', 'outpaint'])(
     const finished = await wait(job.id);
     expect(finished.error || finished.state).toBe('completed');
     const version = database.versions.get(finished.versionId);
-    expect(version.project.metadata.prompt_raw).toBe('__Action*2__');
+    expect(version.project.metadata.prompt_raw).toBe(
+      own || kind === 'inpaint' ? '__Action*2__' : draft,
+    );
+    if (kind === 'inpaint') expect(version.operation.prompt.metadata.prompt_raw).toBe(draft);
     const record = version.images[0].random;
     expect(record.blocks[0].entries).toHaveLength(2);
     if (kind !== 'upscale') {
-      expect(service.state.requests.at(-1).input).toContain(record.blocks[0].text);
-      expect(database.loadProject(finished.images[0]).metadata.prompt_raw).toContain(
-        record.blocks[0].text,
-      );
+      const sent = service.state.requests.at(-1).input;
+      expect(sent).toContain(record.blocks[0].text);
+      if (own) expect(sent).not.toContain('synthetic draft edit');
+      else expect(sent).toContain('synthetic draft edit');
+      if (kind !== 'inpaint')
+        expect(database.loadProject(finished.images[0]).metadata.prompt_raw).toContain(
+          record.blocks[0].text,
+        );
     }
   },
 );
