@@ -1,5 +1,6 @@
 import { generationQueueChecks } from './generationQueue.js';
 import { generation186Checks } from './generation186.js';
+import { director187Checks } from './release187.js';
 import { selectGalleryGrouping } from './galleryView.js';
 import { relayChecks } from './relay.js';
 import { inpaintChecks } from './inpaint.js';
@@ -73,6 +74,7 @@ async function runGenerationChecks({
   };
   await closeFixtureTabs();
   await generation186Checks({ h, generationService });
+  await director187Checks({ h, generationService });
   await generationQueueChecks({ h, generationService });
   const randomRequestStart = generationService.state.requests.length;
   await check(

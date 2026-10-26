@@ -68,6 +68,12 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
   await h.nativeKey('Escape');
   await point('挑图', 'open-image', '先打开一张图');
   await h.nativeKey('Escape');
+  await point('导演工具', 'open-image', '先打开一张图');
+  await h.check(
+    '096-20a 无图片时导演帮助指向打开图片',
+    '!!document.querySelector("[data-feature~=open-image]")',
+  );
+  await h.nativeKey('Escape');
   await point('回收站自动清理', 'trash-clean');
   await h.nativeKey('Escape');
   await point('随机池', 'materials', '左边选「随机池」');
@@ -98,6 +104,12 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
     `(async()=>{const r=await window.studio.invoke('workbench.list',{});await window.studio.invoke('work.save',{tabId:r.data.activeTabId})})()`,
   );
   await point('扩图', 'outpaint');
+  await h.nativeKey('Escape');
+  await point('导演工具', 'director');
+  await h.check(
+    '096-20b 有图片时导演帮助指向导演工具',
+    '!!document.querySelector("[data-feature=director]")',
+  );
   await h.nativeKey('Escape');
   await point('生成队列', 'cost', '生成中这里变成「加入队列」');
   await h.nativeKey('Escape');

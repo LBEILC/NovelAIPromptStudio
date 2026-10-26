@@ -83,6 +83,63 @@ export async function agentImageChecks({ h, call, directory, database }) {
   const current = (await call('workbench.get', { tabId })).tab;
   let count = (await call('version.list', { tabId })).versions.length;
   const shapes = [{ type: 'ellipse', cx: 256, cy: 256, rx: 70, ry: 90 }];
+  const pendingPaint = await call('generate.inpaint', { tabId, imageId, shapes });
+  await h.wait(
+    '[...document.querySelectorAll(".toast")].some(e=>e.textContent.startsWith("Agent 想重绘"))',
+  );
+  const notified = await h.evaluate(
+    '[...document.querySelectorAll(".toast")].some(e=>e.textContent.startsWith("Agent 想重绘"))',
+  );
+  await h.evaluate("document.querySelector('[data-trigger=queue]').click()");
+  const paintRow = 'document.querySelector(\'.q-op[data-pending-op="inpaint"]\')';
+  await h.wait(`!!${paintRow}?.querySelector('.q-prev img')`);
+  await h.check(
+    '096-09 Agent 重绘待确认卡片显示预览、计划、草稿和通知',
+    `${notified} && !!${paintRow}.querySelector('.q-prev img') && ${paintRow}.querySelector('.q-plan').textContent.includes('重绘') && ${paintRow}.querySelector('.q-prompt').textContent.includes('synthetic agent redraw draft')`,
+  );
+  const pendingEnhance = await call('generate.enhance', { tabId, imageId, magnitude: 2, scale: 1 });
+  await h.click('确认', 'document.querySelector(\'.q-op[data-pending-op="enhance"]\')');
+  await h.until(
+    async () =>
+      (await call('generate.status', { id: pendingEnhance.id })).jobs[0].state === 'completed',
+    '仅确认增强',
+  );
+  await h.check(
+    '096-10 确认增强不确认另一项重绘',
+    async () =>
+      (await call('generate.status', { id: pendingPaint.id })).jobs[0].state === 'pending' &&
+      (await call('generate.status', { id: pendingEnhance.id })).jobs[0].state === 'completed',
+  );
+  count++;
+  await h.evaluate(
+    `document.querySelector('.q-op[data-pending-op="inpaint"] button.q-prev').click()`,
+  );
+  await h.wait('!!document.querySelector(".viewer-ov:not(.leaving)")');
+  await h.key('Escape');
+  await h.wait('!document.querySelector(".viewer-ov")');
+  await h.check(
+    '096-11 重绘预览大图关闭后仍保留队列',
+    '!!document.querySelector("[aria-label=生成队列]")',
+  );
+  await h.check(
+    '096-12 版本栏待确认重绘行显示标签和预览',
+    `(()=>{const e=document.querySelector('[data-key="q-${pendingPaint.id}"]');return !!e?.querySelector('.op-prev img')&&e.textContent.includes('局部重绘')})()`,
+  );
+  const pendingDirector = await call('generate.director', { tabId, imageId, tool: 'bg-removal' });
+  await h.wait(
+    'document.querySelector(\'.q-op[data-pending-op="director"] .q-plan\')?.textContent.includes("去背景")',
+  );
+  await h.check(
+    '096-13 Agent 去背景进入待确认并显示计划',
+    async () =>
+      (await call('generate.status', { id: pendingDirector.id })).jobs[0].state === 'pending' &&
+      (await h.evaluate(
+        'document.querySelector(\'.q-op[data-pending-op="director"] .q-plan\').textContent.includes("去背景")',
+      )),
+  );
+  await ui('generate.cancel', { ids: [pendingPaint.id, pendingDirector.id] });
+  await h.key('Escape');
+  await h.wait('!document.querySelector("[aria-label=生成队列]")');
   const grid = await call('image.grid', { tabId, imageId });
   const estimate = await call('generate.estimate-inpaint', { tabId, imageId, shapes });
   await h.check('093 Agent 网格与重绘预览可读取且尺寸受限', async () => {
