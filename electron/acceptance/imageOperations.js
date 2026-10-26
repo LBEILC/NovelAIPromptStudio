@@ -60,12 +60,17 @@ export async function imageOperationChecks({ h, mode, doubles, database, generat
       });
     return job;
   };
-  await wait('!!document.querySelector("[data-trigger=ctl-0]")');
-  await click('V5 控制词', 'document.querySelector(".doc")');
-  await check(
-    'V5 作品节入口打开控制词面板',
-    'document.querySelector("[data-trigger=ctl-0]")?.getAttribute("aria-expanded")==="true" && !!document.querySelector(".popover:not(.leaving)")',
+  // Tab/document transitions can retain the previous trigger in an inert tree.
+  const controlEntry = `Array.from(document.querySelectorAll('[data-trigger="ctl-0"]')).find(n=>n.getClientRects().length&&!n.closest('[inert], [aria-hidden="true"], .leaving'))`;
+  await wait(
+    `!!(${controlEntry}) && document.querySelector('.doc')?.textContent.includes('synthetic geometric shape')`,
   );
+  await h.key('Escape');
+  await wait(`(${controlEntry})?.getAttribute('aria-expanded')==='false'`);
+  await click('V5 控制词', 'document.querySelector(".doc")');
+  const controlsOpen = `(${controlEntry})?.getAttribute('aria-expanded')==='true' && !!document.querySelector('[data-pop][aria-label="V5 控制词"]:not(.leaving)')`;
+  await wait(controlsOpen, '当前作品的控制词面板打开');
+  await check('V5 作品节入口打开控制词面板', controlsOpen);
   await h.key('Escape');
   await invoke('params.set', { tabId, patch: { model: 'nai-diffusion-4-5-full' } });
   await wait('!document.querySelector("[data-trigger=ctl-0]")');
