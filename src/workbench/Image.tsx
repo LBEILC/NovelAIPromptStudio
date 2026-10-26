@@ -185,6 +185,10 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
         ? `空白作品 · ${vlabel}`
         : vlabel;
   const m = image?.metadata;
+  // 舞台下面的尺寸写这张图的实际像素：放大、增强、扩图以后，这一版快照里的宽高还是原图那一版的
+  const [natural, setNatural] = useState<{ path: string; w: number; h: number } | null>(null);
+  const size =
+    natural && natural.path === image?.image_path ? { width: natural.w, height: natural.h } : m;
   // 占位图：和作品一样大的透明图，缩放和真图一样
   const blankSrc = `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${m?.width || 832}" height="${m?.height || 1216}"/>`,
@@ -340,7 +344,12 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
               draggable={false}
               role="button"
               tabIndex={leaving ? -1 : 0}
-              onLoad={markLoaded}
+              onLoad={(e) => {
+                markLoaded(e);
+                const im = e.currentTarget;
+                if (!leaving && im.naturalWidth)
+                  setNatural({ path: value.path, w: im.naturalWidth, h: im.naturalHeight });
+              }}
               onError={() => setMissing(true)}
               onClick={() => setViewer(index)}
               onKeyDown={(e) => {
@@ -385,7 +394,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
             </div>
             <span className="meta mono selectable">
               {[
-                m?.width && m?.height ? `${m.width} × ${m.height}` : '',
+                size?.width && size?.height ? `${size.width} × ${size.height}` : '',
                 modelDisplayName(m?.model),
                 generationParameters(m || {}),
               ]
