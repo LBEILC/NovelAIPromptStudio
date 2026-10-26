@@ -20,11 +20,15 @@ it('serves Agent image previews through the shared commands in an isolated previ
       shapes: [{ type: 'rect', x: 128, y: 128, width: 128, height: 128 }],
     };
     const preview = await session.call('generate.estimate-inpaint', input, 'agent');
-    expect(session.allowedPath(preview.previewPath)).toBe(await realpath(preview.previewPath));
+    expect(await realpath(session.allowedPath(preview.previewPath))).toBe(
+      await realpath(preview.previewPath),
+    );
     expect(preview.maskRatio).toBe(1 / 16);
     const pending = await session.call('generate.inpaint', input, 'agent');
     expect(pending.state).toBe('pending');
-    expect(session.allowedPath(pending.previewPath)).toBe(await realpath(pending.previewPath));
+    expect(await realpath(session.allowedPath(pending.previewPath))).toBe(
+      await realpath(pending.previewPath),
+    );
     expect(await session.call('inpaint.get', { tabId: input.tabId }, 'agent')).toEqual({
       active: false,
     });

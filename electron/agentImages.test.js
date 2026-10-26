@@ -1,10 +1,40 @@
-import { it, expect } from 'vitest';
+import { afterAll, beforeAll, it, expect } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { createAgentImages, resolveAgentMask, currentMaskInput } from './agentImages.js';
 import { autoInpaintRect, defaultInpaintRect } from '../src/shared/inpaint.ts';
+
+let fontDirectory;
+const originalFontConfig = process.env.FONTCONFIG_FILE;
+beforeAll(async () => {
+  // SVG coordinates need digits, not the runner's entire system font inventory.
+  // Pin one existing bundled font and a private cache before the first text render.
+  fontDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-grid-fonts-'));
+  await fs.copyFile(
+    new URL(
+      '../node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2',
+      import.meta.url,
+    ),
+    path.join(fontDirectory, 'digits.woff2'),
+  );
+  const directory = fontDirectory
+    .replaceAll('\\', '/')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;');
+  const config = path.join(fontDirectory, 'fonts.conf');
+  await fs.writeFile(
+    config,
+    `<fontconfig><dir>${directory}</dir><cachedir>${directory}/cache</cachedir></fontconfig>`,
+  );
+  process.env.FONTCONFIG_FILE = config;
+});
+afterAll(async () => {
+  if (originalFontConfig === undefined) delete process.env.FONTCONFIG_FILE;
+  else process.env.FONTCONFIG_FILE = originalFontConfig;
+  if (fontDirectory) await fs.rm(fontDirectory, { recursive: true, force: true });
+});
 
 async function fixture(run, width = 512, height = 512) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-agent-images-'));
