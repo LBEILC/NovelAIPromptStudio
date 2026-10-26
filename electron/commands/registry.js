@@ -16,6 +16,13 @@ const category =
   'ArtistEra|Subject|Identity|Body|Clothing|Action|Environment|Composition|StyleQuality|Unsorted';
 /** @type {Record<CommandName, Definition>} */
 export const commandRegistry = {
+  'library.export.estimate': { fields: { ids: 'strings', collectionId: 'string' }, uiOnly: true },
+  'library.export': {
+    fields: { ids: 'strings', collectionId: 'string', format: 'zip|folder' },
+    required: ['format'],
+    uiOnly: true,
+  },
+  'library.export.cancel': { fields: {}, uiOnly: true },
   'library.nsfw.mark': {
     fields: { ids: 'strings', value: 'nsfw|safe|auto' },
     required: ['ids', 'value'],
@@ -887,6 +894,8 @@ export function validateCommand(name, input, source) {
   )
     throw new CommandError('invalid_input', '输入格式不正确，请按 help 中的格式填写');
   if (
+    (['library.export', 'library.export.estimate'].includes(name) &&
+      Number(input.ids !== undefined) + Number(input.collectionId !== undefined) !== 1) ||
     (['image.copy', 'image.save-as'].includes(name) &&
       Number(!!input.id) + Number(!!input.path) !== 1) ||
     (name === 'file.reveal' && Number(!!input.path) + Number(!!input.vibe) !== 1) ||

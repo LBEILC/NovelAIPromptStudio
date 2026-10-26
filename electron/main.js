@@ -1,4 +1,5 @@
 import { createBackupManager } from './backup.js';
+import { createLibraryExport } from './libraryExport.js';
 import { createFolderImporter } from './folderImport.js';
 import { deleteLibraryImages } from './deleteLibraryImages.js';
 import { createTray } from './tray.js';
@@ -1805,6 +1806,16 @@ app.whenReady().then(async () => {
     }
   };
   registerCommand('backup.estimate', () => backupResult(() => backupManager.estimate()));
+  const libraryExport = createLibraryExport({
+    database,
+    dialog,
+    owner: (caller) => caller.sender && BrowserWindow.fromWebContents(caller.sender),
+    progress: (data) => {
+      for (const window of BrowserWindow.getAllWindows())
+        sendWindowEvent(window, { type: 'progress', topic: 'library.export-progress', data });
+    },
+  });
+  for (const [name, handler] of Object.entries(libraryExport)) registerCommand(name, handler);
   registerCommand('backup.status', () => backupManager.status());
   registerCommand('backup.cancel', () => backupManager.cancel());
   registerCommand('backup.export', async (input, caller) => {

@@ -15,6 +15,8 @@ import {
 } from '../electron/workbench.js';
 import { createPreviewHandlers } from './handlers.mjs';
 import { createBackupManager } from '../electron/backup.js';
+import { resolveExport } from '../electron/libraryExport.js';
+import { CommandError } from '../electron/commands/registry.js';
 import { pause } from './services.mjs';
 import { hydrateParameters, normalizeSettings } from '../electron/params.js';
 import { createChatGPT, chatGPTCommands } from '../electron/chatgpt.js';
@@ -136,7 +138,44 @@ export async function createSession(services, images, emit, empty = false) {
       return { ok: false, error: error.name === 'AbortError' ? '操作已取消' : error.message };
     }
   };
+  let exportController;
   Object.assign(adapter.handlers, {
+    'library.export.estimate': (input) =>
+      result(async () => {
+        const { count, bytes, name } = await resolveExport(database, input);
+        return { count, bytes, name };
+      }),
+    'library.export.cancel': () => {
+      exportController?.abort();
+      return { ok: true };
+    },
+    'library.export': async (input) => {
+      if (exportController) throw new CommandError('busy', '正在导出图片');
+      exportController = new AbortController();
+      const signal = exportController.signal;
+      try {
+        const plan = await resolveExport(database, input);
+        for (let done = 1; done <= plan.count; done++) {
+          await pause(Math.max(1, Math.ceil(400 / plan.count)));
+          if (signal.aborted) return { canceled: true };
+          emit({
+            type: 'progress',
+            topic: 'library.export-progress',
+            data: { done, total: plan.count },
+          });
+        }
+        if (signal.aborted) return { canceled: true };
+        return {
+          ok: true,
+          path: path.join(directory, plan.name + (input.format === 'zip' ? '.zip' : '')),
+          count: plan.count,
+          bytes: plan.bytes,
+          skipped: plan.skipped,
+        };
+      } finally {
+        exportController = undefined;
+      }
+    },
     'backup.estimate': () => result(() => backup.estimate()),
     'backup.status': () => backup.status(),
     'backup.cancel': () => backup.cancel(),

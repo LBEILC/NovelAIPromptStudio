@@ -21,6 +21,7 @@ import type {
 } from './generation';
 
 export type CommandErrorCode =
+  | 'busy'
   | 'canceled'
   | 'denied'
   | 'not_eligible'
@@ -117,6 +118,7 @@ export interface WorkbenchCommandEvent {
   dictionaryChanged?: boolean;
 }
 export interface ProgressTopics {
+  'library.export-progress': { done: number; total: number };
   'backup.progress': { op: 'export' | 'restore'; done: number; total: number };
   'library:cards-progress': IPC.LibraryCardCacheProgress;
   'library:storage-progress': Types.LibraryStorageProgress;
@@ -495,6 +497,17 @@ export interface CommandDefinitions {
     input: { paths?: string[]; fromClipboard?: boolean };
     output: IPC.ImportResult;
   };
+  'library.export.estimate': {
+    input: { ids?: string[]; collectionId?: string };
+    output: IPC.Result<{ count: number; bytes: number; name: string }>;
+  };
+  'library.export': {
+    input: { ids?: string[]; collectionId?: string; format: 'zip' | 'folder' };
+    output:
+      | IPC.Result<{ path: string; count: number; bytes: number; skipped: number }>
+      | { canceled: true };
+  };
+  'library.export.cancel': { input: Record<string, never>; output: { ok: boolean } };
   'backup.estimate': {
     input: Record<string, never>;
     output: IPC.Result<{ dataBytes: number; libraryBytes: number; libraryFiles: number }>;

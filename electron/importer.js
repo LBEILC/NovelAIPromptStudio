@@ -30,7 +30,7 @@ async function closeZipFile(zipfile) {
   });
 }
 
-function readableBytes(value) {
+export function readableBytes(value) {
   if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
   if (value >= 1024 ** 2) return `${Math.ceil(value / 1024 ** 2)} MB`;
   return `${Math.ceil(value / 1024)} KB`;
