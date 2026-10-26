@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { maxEnhanceResultSize } from '../imageOperations.js';
+import { estimateDirector } from '../director.js';
 import sharp from 'sharp';
 import yazl from 'yazl';
 import { fixtureServerClose } from './httpLifecycle.js';
@@ -79,7 +80,14 @@ export async function startFakeNovelAI() {
       res.end(Buffer.from(JSON.stringify(body)));
       return;
     }
-    if (!['/ai/generate-image', '/ai/generate-image-stream', '/ai/upscale'].includes(req.url)) {
+    if (
+      ![
+        '/ai/generate-image',
+        '/ai/generate-image-stream',
+        '/ai/upscale',
+        '/ai/augment-image',
+      ].includes(req.url)
+    ) {
       res.writeHead(404).end();
       return;
     }
@@ -112,6 +120,40 @@ export async function startFakeNovelAI() {
       const code = state.failNext || 500;
       state.failNext = 0;
       res.writeHead(code).end('{}');
+      return;
+    }
+    if (req.url === '/ai/augment-image') {
+      const zip = new yazl.ZipFile();
+      const count = body.req_type === 'bg-removal' ? 3 : 1;
+      for (let index = 0; index < (state.directorImages ?? count); index++) {
+        const pixels = await sharp({
+          create: {
+            width: body.width,
+            height: body.height,
+            channels: 4,
+            background: {
+              r: 80 + index * 40,
+              g: 100,
+              b: state.requests.length % 255,
+              alpha: count === 3 ? 0.5 : 1,
+            },
+          },
+        })
+          .png()
+          .toBuffer();
+        const text = pngText({
+          req_type: body.req_type,
+          ...(body.prompt !== undefined ? { prompt: body.prompt, defry: body.defry } : {}),
+        });
+        zip.addBuffer(
+          Buffer.concat([pixels.subarray(0, -12), text, pixels.subarray(-12)]),
+          `image_${index}.png`,
+        );
+      }
+      state.balance -= estimateDirector(body, { active: state.tier > 0, tier: state.tier }).anlas;
+      zip.end();
+      res.setHeader('Content-Type', 'binary/octet-stream');
+      zip.outputStream.pipe(res);
       return;
     }
     if (req.url === '/ai/upscale') {

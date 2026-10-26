@@ -12,6 +12,15 @@ const tag = { ...block, index: 'integer' };
 const scoped = ['tabId', 'scope'];
 const blocked = [...scoped, 'block'];
 const tagged = [...blocked, 'index'];
+const director = {
+  ...tab,
+  imageId: 'string',
+  tool: 'bg-removal|lineart|sketch|colorize|emotion|declutter',
+  prompt: 'text',
+  defry: 'integer',
+  emotion:
+    'neutral|happy|sad|angry|scared|surprised|tired|excited|nervous|thinking|confused|shy|disgusted|smug|bored|laughing|irritated|aroused|embarrassed|worried|love|determined|hurt|playful',
+};
 const category =
   'ArtistEra|Subject|Identity|Body|Clothing|Action|Environment|Composition|StyleQuality|Unsorted';
 /** @type {Record<CommandName, Definition>} */
@@ -306,6 +315,17 @@ export const commandRegistry = {
     },
     required: ['tabId'],
     mutation: true,
+  },
+  'generate.estimate-director': {
+    fields: director,
+    required: ['tabId', 'imageId', 'tool'],
+    example: { tabId: 'TAB', imageId: 'IMAGE', tool: 'bg-removal' },
+  },
+  'generate.director': {
+    fields: director,
+    required: ['tabId', 'imageId', 'tool'],
+    mutation: true,
+    example: { tabId: 'TAB', imageId: 'IMAGE', tool: 'emotion', emotion: 'happy', defry: 0 },
   },
   'generate.estimate-op': {
     fields: {

@@ -172,6 +172,18 @@ nai-studio branch.restore --json '{"undo":"UNDO"}'
 
 ### 图片操作
 
+导演工具支持 `bg-removal`（去背景）、`lineart`（线稿）、`sketch`（草图）、`colorize`（上色）、`emotion`（换表情）、`declutter`（去杂物）。先估价再发起，Agent 默认待确认，直接模式仍受每日上限约束；完成后不切换用户舞台。中转站不支持。
+
+```sh
+nai-studio generate.estimate-director --json '{"tabId":"TAB","imageId":"IMAGE","tool":"bg-removal"}'
+nai-studio generate.director --json '{"tabId":"TAB","imageId":"IMAGE","tool":"colorize","prompt":"blue fabric","defry":0}'
+nai-studio generate.director --json '{"tabId":"TAB","imageId":"IMAGE","tool":"emotion","emotion":"happy","prompt":"","defry":0}'
+```
+
+约 1MP 时线稿、草图、上色、换表情各 20 Anlas；有效 Opus 且发送面积不超过 1MP 时预计免费（未实测）。去背景、去杂物较贵，约 1MP 时各 65 Anlas，Opus 也收费。小图会放大到约 1MP，大于约 3MP 的会缩小，按发送尺寸估价。`outputImages` 表示预计结果张数；去背景一次请求返回三张，存入同一版本，`images[].variant` 分别为 `masked`、`generated`、`blend`。
+
+只有上色、换表情能给 `prompt`（可空）和 `defry`（整数 0–5，0 最强，默认 0）。换表情必须给 `emotion`，适合正面清楚的单人脸；允许值见 `help`。其他工具不能带这些参数。工具提示词保存在 `operationDetails.toolPrompt`，源版本提示词和参数保存在版本快照。请求失败或中断可能已扣费，先检查状态和结果，再决定是否明确重试。
+
 能发起放大、增强、扩图、局部重绘（花钱的照样待确认）。先用 `version.list {tabId}` 找到图片：版本图片取 `images[].projectId`，原图取根版本的 `project.id`。先估价、看结果再发起，默认进入 `pending`；Agent 不能自己确认，也不能改变账号或确认设置。用户设为直接生成时照设置排队，超过每日花费上限仍待确认；中转站按每日张数限制。完成后另起一版，不切换用户正在看的图。
 
 将下面的 `TAB`、`IMAGE` 换成实际 ID。发起时可附 `expectedRevision`，按前面的修订号规则处理冲突。

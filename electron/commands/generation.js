@@ -30,6 +30,7 @@ import { createPromptDocument } from '../../src/lib/promptDocument.ts';
 import { CommandError } from './registry.js';
 import { versionDiff, diffSummary } from '../../src/lib/versionDiff.ts';
 import { recordUsageRequest, localDay } from '../usage.js';
+import { buildDirector, estimateDirector, validateDirector } from '../director.js';
 
 const withPromptTemplate = (project, draft) => ({
   ...project,
@@ -184,9 +185,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     run: services.network?.run,
     persist: storage.schedule,
     generate: (request, progress) =>
-      request.action === 'upscale'
-        ? client().upscale(request)
-        : client().generate(request, progress),
+      request.req_type
+        ? client().director(request)
+        : request.action === 'upscale'
+          ? client().upscale(request)
+          : client().generate(request, progress),
     execute: (job, request, generate, onProgress, publish) => {
       const tracked = (request, progress) =>
         recordUsageRequest({
@@ -197,7 +200,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           price:
             settings().connection === 'relay'
               ? { anlas: 0, free: false }
-              : estimateImageOperation(request, subscription),
+              : request.req_type
+                ? estimateDirector(request, subscription)
+                : estimateImageOperation(request, subscription),
           balance: async () => {
             await refresh();
             return subscription?.trainingStepsLeft ? balance() : NaN;
@@ -245,6 +250,19 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         };
       });
       if (job.operation === 'outpaint') return;
+      if (job.operation === 'director') {
+        checkDirectorConnection();
+        const detail = job.operationDetails;
+        job.request = (
+          await buildDirector(job.operationPath, {
+            tool: detail.tool,
+            prompt: detail.toolPrompt,
+            defry: detail.defry,
+            emotion: detail.emotion,
+          })
+        ).request;
+        return;
+      }
       if (['upscale', 'enhance', 'inpaint'].includes(job.operation)) {
         const preview = await buildImageOperation(
           { ...job.project, ...job.operationDetails.prompt },
@@ -302,7 +320,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     },
     beforeEach: async (job) => {
       const s = settings();
-      const imageOperation = ['upscale', 'enhance', 'inpaint', 'outpaint'].includes(job.operation);
+      const imageOperation = ['upscale', 'enhance', 'inpaint', 'outpaint', 'director'].includes(
+        job.operation,
+      );
       if (s.connection === 'relay' && s.limitEnabled && s.spentImagesToday >= s.dailyImageLimit) {
         job.limitReached = true;
         return false;
@@ -356,7 +376,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       // Deferred so queue construction is complete before status reads it.
       queueMicrotask(publish);
     },
-    accept: async (job, png, seed) => {
+    accept: async (job, png, seed, variant, imageIndex = 0) => {
       if (job.operation === 'inpaint') {
         png = await compositeInpaint(
           job.operationPath,
@@ -388,6 +408,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
               : job.project,
           source: job.source,
           image,
+          variant,
           seed,
           random: job.random,
           versionId: job.versionId,
@@ -404,7 +425,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         });
         versions.touch(
           job.workId,
-          job.source === 'user' && job.completed === 0 ? version.id : undefined,
+          job.source === 'user' && job.completed === 0 && imageIndex === 0 ? version.id : undefined,
         );
         job.versionId = version.id;
         usage.attachVersion(job.id, version.id);
@@ -414,7 +435,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           job.branchNotice = `已从第 ${versions.get(job.parentId).number} 版分出分支 ${version.branchNumber}`;
         const session = store.get(),
           current = session.tabs.find((t) => t.id === job.tabId);
-        if (current && job.source === 'user' && job.completed === 0) {
+        if (current && job.source === 'user' && job.completed === 0 && imageIndex === 0) {
           current.versionId = version.id;
           current.versionImageId = image.id;
           current.source = { type: 'library', projectId: image.id, path: image.image_path };
@@ -432,7 +453,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
               ...(job.operation === 'outpaint'
                 ? { width: image.metadata.width, height: image.metadata.height }
                 : {}),
-              seed: ['inpaint', 'outpaint'].includes(job.operation)
+              seed: ['inpaint', 'outpaint', 'director'].includes(job.operation)
                 ? job.project.metadata.seed
                 : String(seed),
               extra_json: image.metadata.extra_json,
@@ -512,7 +533,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         ...(version.operation?.kind === 'outpaint'
           ? { width: p.metadata.width, height: p.metadata.height }
           : {}),
-        seed: p.metadata.seed,
+        seed:
+          version.operation?.kind === 'director' ? version.project.metadata.seed : p.metadata.seed,
         extra_json: p.metadata.extra_json,
       },
     };
@@ -650,6 +672,12 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     publish();
     return { ...counts, cancelledJobs: pending.length, undo };
   }
+  function checkDirectorConnection() {
+    if (settings().connection === 'relay')
+      throw new CommandError('unsupported', '中转站不支持导演工具', {
+        unavailable: '中转站不支持导演工具',
+      });
+  }
   function checkOperationRelay(request, pending) {
     if (
       request.action === 'infill' &&
@@ -714,6 +742,27 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   }
   async function operationFor(input) {
     const { current, parent, image } = await sourceFor(input);
+    if (input.op === 'director') {
+      checkDirectorConnection();
+      const options = validateDirector(input);
+      const prepared = await buildDirector(image.image_path, options);
+      const { prompt, ...parameters } = options;
+      return {
+        current,
+        parent,
+        image,
+        prepared,
+        operation: {
+          kind: 'director',
+          ...parameters,
+          sourceProjectId: input.imageId,
+          ...(prompt !== undefined ? { toolPrompt: prompt } : {}),
+          sent: { width: prepared.width, height: prepared.height },
+        },
+        price: estimateDirector(prepared.request, subscription),
+        promptProject: parent.project,
+      };
+    }
     // 局部重绘用编辑器里的草稿（2.35）；放大、增强用这张图自己那一版的提示词和参数（2.34）
     const promptProject = input.op === 'inpaint' ? current.project : parent.project;
     const operation = {
@@ -765,6 +814,10 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     const current = tab(input.tabId);
     revision(input.expectedRevision, current.revision || 0);
     unlocked(input);
+    if (kind === 'director') {
+      validateDirector(input);
+      checkDirectorConnection();
+    }
     if (!settings().hasToken) throw new Error('没有持久令牌');
     if (kind === 'inpaint') input = await agentInpaint(input, caller);
     const { parent, image, operation, prepared, price } = await operationFor({
@@ -791,7 +844,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       project: parent.project,
       request: prepared.request,
       count: 1,
-      fixedSeed: kind === 'upscale',
+      fixedSeed: kind === 'upscale' || kind === 'director',
       ...agentPolicy(caller, price),
       ...(kind === 'inpaint'
         ? {
@@ -1064,6 +1117,13 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       }
     },
     'generate.inpaint': (input, caller) => startOperation(input, 'inpaint', caller),
+    'generate.director': (input, caller) => startOperation(input, 'director', caller),
+    'generate.estimate-director': async (input) => {
+      validateDirector(input);
+      checkDirectorConnection();
+      const { prepared, price } = await operationFor({ ...input, op: 'director' });
+      return { ...price, width: prepared.width, height: prepared.height, balance: balance() };
+    },
     'generate.estimate-op': async (input) => {
       try {
         const { prepared, price } = await operationFor(input);
@@ -1459,7 +1519,10 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         thumbnail_path: image.thumbnail_path,
         metadata: {
           ...version.project.metadata,
-          seed: image.metadata.seed,
+          seed:
+            version.operation?.kind === 'director'
+              ? version.project.metadata.seed
+              : image.metadata.seed,
           extra_json: image.metadata.extra_json,
         },
       };

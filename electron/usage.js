@@ -137,10 +137,11 @@ export async function recordUsageRequest({
     workId: job.workId,
     versionId: job.versionId || null,
     operation: job.operation || 'generate',
-    model: request.model,
-    width: request.parameters.width,
-    height: request.parameters.height,
-    requestedImages: 1,
+    model: request.model || 'director',
+    ...(request.req_type ? { tool: request.req_type } : {}),
+    width: request.width ?? request.parameters.width,
+    height: request.height ?? request.parameters.height,
+    requestedImages: request.req_type === 'bg-removal' ? 3 : 1,
     images: 0,
     source: job.source,
     connection,
@@ -149,9 +150,11 @@ export async function recordUsageRequest({
     estimated: connection === 'official',
     status: 'sending',
   });
-  let succeeded = false;
+  let succeeded = false,
+    images = 0;
   try {
     const result = await send();
+    images = Array.isArray(result) ? result.length : 1;
     succeeded = true;
     return result;
   } finally {
@@ -161,7 +164,7 @@ export async function recordUsageRequest({
     job.spent += anlas || 0;
     if (connection === 'official' && !known) job.spentKnown = false;
     usage.settle(id, {
-      images: succeeded ? 1 : 0,
+      images: succeeded ? images : 0,
       status: succeeded ? 'completed' : 'failed',
       anlas,
       estimated: connection === 'official' && !known,

@@ -110,7 +110,7 @@ export async function agentImageChecks({ h, call, directory, database }) {
     await h.wait('!!document.querySelector("[aria-label=生成队列]")');
     await h.screenshot(`093-agent-${operation}-pending`);
     await h.wait(
-      `(() => { const button=[...document.querySelectorAll('[aria-label=生成队列] button')].find(b=>b.textContent.trim().startsWith('生成 ')); if(!button)return false; button.click(); return true; })()`,
+      `(() => { const button=document.querySelector('[aria-label=生成队列] [data-pending-op="${operation}"] button[aria-label="确认"]'); if(!button || button.disabled)return false; button.click(); return true; })()`,
     );
     await h.until(
       async () =>

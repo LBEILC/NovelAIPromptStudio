@@ -11,6 +11,21 @@ import { buildImageOperation } from './imageOperations.js';
 import { buildOutpaint, outpaintSteps } from './outpaint.js';
 import { validateCommand } from './commands/registry.js';
 
+it('does not replay interrupted director requests after disk recovery', async () =>
+  temporary(async (directory) => {
+    const storage = createGenerationStorage(directory);
+    await storage.write([{ ...job(1, 'generating'), operation: 'director' }]);
+    const [restored] = await storage.load();
+    expect(restored.state).toBe('failed');
+    expect(restored.error).toContain('可能已扣费');
+    const generate = vi.fn();
+    const queue = createGenerationQueue({ generate, accept: vi.fn() });
+    queue.restore([restored]);
+    queue.resume();
+    await queue.close();
+    expect(generate).not.toHaveBeenCalled();
+  }));
+
 async function temporary(run) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'generation-storage-'));
   try {

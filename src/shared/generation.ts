@@ -52,6 +52,7 @@ export interface GenerationEstimate {
   usage?: number;
 }
 export interface VersionImage {
+  variant?: 'masked' | 'generated' | 'blend';
   random?: import('../lib/randomPrompt').RandomRecord | null;
   id: string;
   projectId: string;
@@ -60,8 +61,52 @@ export interface VersionImage {
   createdAt: string;
 }
 export type EnhanceScale = 1 | 1.5 | 2 | 'max';
+export type DirectorTool =
+  | 'bg-removal'
+  | 'lineart'
+  | 'sketch'
+  | 'colorize'
+  | 'emotion'
+  | 'declutter';
+export type DirectorEmotion =
+  | 'neutral'
+  | 'happy'
+  | 'sad'
+  | 'angry'
+  | 'scared'
+  | 'surprised'
+  | 'tired'
+  | 'excited'
+  | 'nervous'
+  | 'thinking'
+  | 'confused'
+  | 'shy'
+  | 'disgusted'
+  | 'smug'
+  | 'bored'
+  | 'laughing'
+  | 'irritated'
+  | 'aroused'
+  | 'embarrassed'
+  | 'worried'
+  | 'love'
+  | 'determined'
+  | 'hurt'
+  | 'playful';
+export interface DirectorInput {
+  imageId: string;
+  tool: DirectorTool;
+  prompt?: string;
+  defry?: 0 | 1 | 2 | 3 | 4 | 5;
+  emotion?: DirectorEmotion;
+}
 export interface ImageOperation {
-  kind: 'upscale' | 'enhance' | 'img2img' | 'inpaint' | 'outpaint';
+  kind: 'upscale' | 'enhance' | 'img2img' | 'inpaint' | 'outpaint' | 'director';
+  tool?: DirectorTool;
+  toolPrompt?: string;
+  defry?: number;
+  emotion?: DirectorEmotion;
+  sent?: { width: number; height: number };
   edges?: OutpaintEdges;
   mode?: 'whole' | 'edges';
   blocks?: OutpaintBlock[];

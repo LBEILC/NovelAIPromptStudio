@@ -90,8 +90,27 @@ export function createGenerationQueue({
                   ? await execute(job, request, generate, onProgress, publish)
                   : await generate(request, onProgress);
                 // Persist the file and version before reporting success to any caller.
-                const image = await accept(job, png, request.parameters.seed);
-                job.images.push(image);
+                if (job.operation === 'director') {
+                  for (const [index, result] of png.entries()) {
+                    const match = /(?:^|\/)image_([012])\.png$/i.exec(result.name);
+                    const variant =
+                      job.operationDetails.tool === 'bg-removal'
+                        ? ['masked', 'generated', 'blend'][match ? Number(match[1]) : index]
+                        : undefined;
+                    const image = await accept(
+                      job,
+                      result.png,
+                      job.project.metadata.seed,
+                      variant,
+                      index,
+                    );
+                    job.images.push(image);
+                    publish();
+                  }
+                } else {
+                  const image = await accept(job, png, request.parameters.seed);
+                  job.images.push(image);
+                }
                 job.completed++;
               } catch (error) {
                 job.state = job.stop && job.operation === 'outpaint' ? 'canceled' : 'failed';
@@ -146,7 +165,16 @@ export function createGenerationQueue({
         jobs.length,
         ...recentJobs(
           restored.map((job) =>
-            job.state === 'generating' ? { ...job, state: 'queued', resumedAfterExit: true } : job,
+            job.state === 'generating'
+              ? {
+                  ...job,
+                  state: job.operation === 'director' ? 'failed' : 'queued',
+                  ...(job.operation === 'director'
+                    ? { error: '导演工具请求中断，可能已扣费，请检查结果后再决定是否重试' }
+                    : {}),
+                  resumedAfterExit: true,
+                }
+              : job,
           ),
           100,
         ),
@@ -220,6 +248,7 @@ export function createGenerationQueue({
     },
     setCount(id, count) {
       const job = find(id);
+      if (job.operation === 'director') throw new Error('导演工具每个任务只发送一次请求');
       if (job.continuous || !['queued', 'generating'].includes(job.state))
         throw new Error('这项任务不能修改张数');
       if (

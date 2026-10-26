@@ -28,7 +28,15 @@ try {
     jobs.map((job) => ({
       ...job,
       undoAvailable: false,
-      state: job.state === 'generating' ? 'queued' : job.state,
+      state:
+        job.state === 'generating'
+          ? job.operation === 'director'
+            ? 'failed'
+            : 'queued'
+          : job.state,
+      ...(job.state === 'generating' && job.operation === 'director'
+        ? { error: '导演工具请求中断，可能已扣费，请检查结果后再决定是否重试' }
+        : {}),
       resumedAfterExit: job.state === 'generating' || !!job.resumedAfterExit,
     })),
     100,

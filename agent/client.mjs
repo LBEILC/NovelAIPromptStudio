@@ -173,6 +173,7 @@ export async function main(argv = process.argv.slice(2), services = {}) {
           ],
           shapeLimits: 'polygon 3–64 个点。所有坐标和 grow 都是原图像素。',
           workflow: [
+            '导演工具先用 generate.estimate-director 估价，再用 generate.director 发起。约 1MP 时线稿、草图、上色、换表情各 20 Anlas，符合条件的 Opus 免费；去背景、去杂物较贵，各 65 Anlas，Opus 也收费。去背景一次返回三张，属于同一版。换表情适合正面清楚的单人脸。中转站不支持。',
             '先 version.list 找到图片的 projectId（原图用根版本 project.id）。',
             '先估价再发起，默认进入 pending；Agent 不能调用 generate.confirm，也不能修改确认或费用设置。',
             '放大、增强用源图那一版的提示词，不看草稿；局部重绘、扩图用当前草稿，提示词写新区域里要有什么。',
@@ -182,6 +183,21 @@ export async function main(argv = process.argv.slice(2), services = {}) {
             'maskPath 只读本地 PNG（不超过 50 MB），尺寸与原图一致，亮度过半为重画；Agent 结果新增版本，不切换用户舞台。',
           ],
           examples: [
+            {
+              name: 'generate.estimate-director',
+              input: { tabId: 'TAB', imageId: 'IMAGE', tool: 'bg-removal' },
+            },
+            {
+              name: 'generate.director',
+              input: {
+                tabId: 'TAB',
+                imageId: 'IMAGE',
+                tool: 'emotion',
+                emotion: 'happy',
+                prompt: '',
+                defry: 0,
+              },
+            },
             {
               name: 'generate.estimate-op',
               input: { tabId: 'TAB', imageId: 'IMAGE', op: 'upscale' },

@@ -3,6 +3,40 @@ import { createGenerationQueue } from './generationQueue.js';
 import { validateCommand } from './commands/registry.js';
 
 const input = (count = 1) => ({ count, request: { parameters: { seed: 1 } }, fixedSeed: true });
+
+it('preserves received director images when stopped and does not resend on restore', async () => {
+  let resolve;
+  const sent = new Promise((r) => {
+    resolve = r;
+  });
+  const generate = vi.fn(() => sent),
+    accept = vi.fn(async (_job, _png, _seed, variant) => variant);
+  const queue = createGenerationQueue({ generate, accept });
+  const first = queue.start({
+    ...input(),
+    operation: 'director',
+    operationDetails: { tool: 'bg-removal' },
+    project: { metadata: { seed: '123' } },
+  });
+  await vi.waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+  queue.stop(first.id);
+  resolve([
+    { name: 'image_0.png', png: 'first' },
+    { name: 'image_2.png', png: 'third' },
+  ]);
+  await queue.close();
+  expect(queue.status(first.id)).toMatchObject({
+    state: 'canceled',
+    completed: 1,
+    images: ['masked', 'blend'],
+  });
+  const restored = createGenerationQueue({ generate, accept });
+  restored.restore([{ ...input(), id: 'interrupted', state: 'generating', operation: 'director' }]);
+  restored.resume();
+  await restored.close();
+  expect(restored.status('interrupted').state).toBe('failed');
+  expect(generate).toHaveBeenCalledTimes(1);
+});
 function fixture() {
   const sends = [];
   const queue = createGenerationQueue({

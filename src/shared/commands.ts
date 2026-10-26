@@ -21,6 +21,7 @@ import type {
 } from './generation';
 
 export type CommandErrorCode =
+  | 'unsupported'
   | 'busy'
   | 'canceled'
   | 'denied'
@@ -49,6 +50,7 @@ export type CommandResult<T> =
         code: CommandErrorCode;
         message: string;
         details?: {
+          unavailable?: string;
           branches?: number;
           versions?: number;
           images?: number;
@@ -467,6 +469,14 @@ export interface CommandDefinitions {
       strength?: number;
       fullSize?: boolean;
     };
+    output: GenerationJob;
+  };
+  'generate.estimate-director': {
+    input: TabInput & import('./generation').DirectorInput;
+    output: GenerationEstimate & { width: number; height: number; outputImages: number };
+  };
+  'generate.director': {
+    input: TabInput & import('./generation').DirectorInput;
     output: GenerationJob;
   };
   'generate.estimate-op': {

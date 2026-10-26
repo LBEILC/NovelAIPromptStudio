@@ -108,6 +108,7 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
   // Additive tables keep every existing snapshot readable without rewriting it.
   connection.exec(`
     CREATE TABLE IF NOT EXISTS version_image_random (image_id TEXT PRIMARY KEY, record_json TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS version_image_variants (image_id TEXT PRIMARY KEY, variant TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS deferred_version_prunes (version_id TEXT PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS deleted_versions (version_id TEXT PRIMARY KEY, token TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS branch_undo (token TEXT PRIMARY KEY, payload TEXT NOT NULL);
@@ -176,6 +177,9 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
           id: image.id,
           projectId: image.project_id,
           seed: image.seed,
+          ...(connection
+            .prepare('SELECT variant FROM version_image_variants WHERE image_id=?')
+            .get(image.id) || {}),
           random: JSON.parse(
             connection
               .prepare('SELECT record_json FROM version_image_random WHERE image_id=?')
@@ -602,6 +606,11 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
         )
         .run(projectId);
       connection.prepare('DELETE FROM version_images WHERE project_id=?').run(projectId);
+      connection
+        .prepare(
+          'DELETE FROM version_image_variants WHERE image_id NOT IN (SELECT id FROM version_images)',
+        )
+        .run();
       // Retain detached image targets so deleting another image cannot invalidate
       // their undo records. Keeping each target also retains its ancestors.
       // Remove empty deleted leaves, then their empty ancestors. Active versions are retained.
@@ -677,7 +686,18 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
         return get(id);
       });
     },
-    append({ workId, parentId, project, source, image, seed, versionId, operation, random }) {
+    append({
+      workId,
+      parentId,
+      project,
+      source,
+      image,
+      seed,
+      versionId,
+      operation,
+      random,
+      variant,
+    }) {
       if (operation?.kind === 'outpaint')
         project = {
           ...project,
@@ -733,6 +753,10 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
         connection
           .prepare('INSERT INTO version_images VALUES (?,?,?,?,?)')
           .run(imageId, target.id, image.id, String(seed), new Date().toISOString());
+        if (variant)
+          connection
+            .prepare('INSERT INTO version_image_variants VALUES (?,?)')
+            .run(imageId, variant);
         if (random?.blocks.length)
           connection
             .prepare('INSERT INTO version_image_random VALUES (?,?)')

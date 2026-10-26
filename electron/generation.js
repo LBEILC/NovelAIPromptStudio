@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { normalizeRelayUrl } from './relay.js';
 import { MODEL_ORDER } from '../src/shared/params.ts';
 import yauzl from 'yauzl';
+import { extractDirectorPngs, DIRECTOR_ZIP_LIMITS } from './directorZip.js';
 import { validParameterNumber, MEDIUM_FIXED } from '../src/shared/params.ts';
 import { CommandError } from './commands/registry.js';
 import { expandV5AutomaticPrompt } from '../src/lib/novelaiAutoPrompt.js';
@@ -421,6 +422,25 @@ export function createNovelAIClient({
     }
   }
   return {
+    director: async (request) => {
+      if (connection === 'relay') throw new CommandError('unsupported', '中转站不支持导演工具');
+      const response = await send('/ai/augment-image', request);
+      const chunks = [];
+      let bytes = 0;
+      try {
+        for await (const chunk of response.body) {
+          bytes += chunk.length;
+          if (bytes > DIRECTOR_ZIP_LIMITS.bytes) throw Error();
+          chunks.push(chunk);
+        }
+      } catch {
+        throw new CommandError(
+          'response_failed',
+          '无法读取导演工具结果，请检查结果后再决定是否重试',
+        );
+      }
+      return extractDirectorPngs(Buffer.concat(chunks));
+    },
     models: async () => {
       let response;
       try {
