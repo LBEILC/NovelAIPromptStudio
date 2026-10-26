@@ -21,6 +21,7 @@ import {
   contentText,
   sp,
 } from './materialRows';
+import { poolChanged } from './PoolBody';
 
 export function MaterialsPage({
   target,
@@ -78,7 +79,7 @@ export function MaterialsPage({
   }, []);
   useEffect(() => {
     if (!target) return;
-    const k = (['block', 'character', 'vibe'] as Kind[]).includes(target.kind as Kind)
+    const k = (['block', 'character', 'pool', 'vibe'] as Kind[]).includes(target.kind as Kind)
       ? (target.kind as Kind)
       : 'block';
     setKind(k);
@@ -160,6 +161,7 @@ export function MaterialsPage({
     setItems((all) => all.map((x) => (x.id === r.id ? { ...x, name } : x)));
     try {
       await invokeUI('material.rename', { id: r.id, name });
+      if (m.kind === 'pool') poolChanged();
     } catch (e) {
       notify({ text: `重命名失败：${(e as Error).message}`, tone: 'error' });
       void reload();
@@ -215,6 +217,7 @@ export function MaterialsPage({
           .then(() => {
             setItems((all) => all.filter((x) => x.id !== m.id));
             setHidden((h) => h.filter((x) => x !== m.id));
+            if (m.kind === 'pool') poolChanged();
           })
           .catch((e) => {
             setHidden((h) => h.filter((x) => x !== m.id));
@@ -250,6 +253,24 @@ export function MaterialsPage({
     return () => window.removeEventListener('beforeunload', flush);
   }, []);
 
+  // 新建随机池：起个不重名的名字，展开并进入改名
+  const createPool = async () => {
+    const names = new Set(items.filter((m) => m.kind === 'pool').map((m) => m.name));
+    let name = '新的随机池',
+      n = 2;
+    while (names.has(name)) name = `新的随机池 ${n++}`;
+    try {
+      const { item } = await invokeUI('material.pool.create', { name });
+      setItems((all) => [item, ...all]);
+      setQ('');
+      setOpen(item.id);
+      setRename({ id: item.id, text: item.name });
+      scrollTo.current = item.id;
+      poolChanged();
+    } catch (e) {
+      notify({ text: (e as Error).message, tone: 'error' });
+    }
+  };
   const menuItem = menu && items.find((m) => m.id === menu.id);
   const lastMenu = useRef<Material | null>(null);
   if (menuItem) lastMenu.current = menuItem;
@@ -328,10 +349,18 @@ export function MaterialsPage({
             {
               block: '在工作台中打开块的菜单，选择“存为常用块”，就可以在这里反复使用。',
               character: '在工作台中打开角色的“更多”菜单，选择“存为角色”，就可以在这里反复使用。',
+              pool: '随机池里放一组可以互换的内容，一行一条：画师串、动作、背景……提示词里的随机块在每张图生成前从中抽取。',
               vibe: '导入带 Vibe 的图片后，用到的 Vibe 会列在这里。',
             }[kind]
           }
         </p>
+        {kind === 'pool' && (
+          <div className="acts">
+            <button className="btn ink" onClick={() => void createPool()}>
+              新建随机池
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -388,6 +417,12 @@ export function MaterialsPage({
               </button>
             )}
           </label>
+          {kind === 'pool' && (
+            <button className="btn sm" onClick={() => void createPool()}>
+              <Icon name="add-line" />
+              新建随机池
+            </button>
+          )}
         </div>
         <div className="scroll" ref={list}>
           <Swap k={String(gen.current.n)}>
@@ -423,6 +458,9 @@ export function MaterialsPage({
                             onMenu={(at) => setMenu(menu?.id === m.id ? null : { at, id: m.id })}
                             onCopy={() => copy(m)}
                             onSave={(part, text, asNew) => saveEdit(m, part, text, asNew)}
+                            onPoolChange={(item) =>
+                              setItems((all) => all.map((x) => (x.id === item.id ? item : x)))
+                            }
                             onShowImage={onShowImage}
                             onPeekMove={peekMove}
                             onPeekLeave={peekLeave}

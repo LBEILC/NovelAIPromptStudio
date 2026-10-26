@@ -623,3 +623,17 @@ textarea.para-in { resize: none; overflow: hidden; }
 .pick-pos { position: absolute; bottom: var(--sp-2); left: 50%; translate: -50% 0; color: var(--text-3); font-size: var(--fs-small); }
 .pick-count b { font-weight: var(--fw-strong); color: var(--text); }
 .pick-unsure { display: inline-flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
+
+/* 素材 · 随机池（2.44）：一行一条，右边是抽中概率（相对的数和折算的百分比）、删除 */
+.mtools { display: flex; align-items: center; gap: var(--sp-2); }
+.mrow-body .pool-list .sp { flex: 1; }
+.mrow-body .pool-list .pool-chance-h { margin-right: calc(var(--ctl-sm) + 40px + var(--sp-2) * 2); cursor: help; }
+.mrow-body .pool-it { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--ctl-sm); padding: 0 0 0 var(--sp-2); border-radius: var(--r-ctl); }
+.mrow-body .pool-it:hover { background: var(--hover); }
+.mrow-body .pool-it .pool-text { flex: 1; min-width: 0; padding: var(--sp-1) 0; font-size: var(--fs-small); line-height: var(--lh-small); overflow-wrap: anywhere; cursor: text; }
+.mrow-body .pool-it .pool-edit { flex: 1; min-width: 0; margin-left: calc(-1 * var(--sp-2)); }
+.mrow-body .pool-it .pool-pct { width: 40px; color: var(--text-3); font-size: var(--fs-caption); text-align: right; }
+.mrow-body .pool-it > .btn { opacity: 0; transition: opacity var(--dur-1) var(--ease-out); }
+.mrow-body .pool-it:hover > .btn, .mrow-body .pool-it > .btn:focus-visible { opacity: 1; }
+.mrow-body .pool-add { margin-top: var(--sp-1); }
+.mrow-body .pool-list + .mat-acts .help code { font-size: var(--fs-caption); }

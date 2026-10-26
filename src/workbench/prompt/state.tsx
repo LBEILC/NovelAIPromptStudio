@@ -10,6 +10,7 @@ import {
   copyPromptDocumentScope,
   copyVisiblePromptDocument,
   createPromptDocument,
+  editPromptBlockText,
   editPromptTag,
   promptDocumentProject,
   serializePromptSection,
@@ -37,13 +38,24 @@ import {
   replaceSection,
   type DocumentTag,
 } from '../model';
+import { isRandomBlock, usePools } from '../RandomBlock';
 import { useTidy } from '../Tidy';
 import { LANG_VIEW, blockKey, catVar, type EditorProps } from './shared';
 
 export function usePromptState(p: EditorProps) {
   const notify = useNotifications();
   const tidy = useTidy(p);
-  const doc = useMemo(() => createPromptDocument(p.project), [p.project]);
+  // 随机池传进去：随机块写的池子不存在、条目不够时标黄（2.44）
+  const pools = usePools();
+  const doc = useMemo(
+    () =>
+      createPromptDocument(
+        p.project,
+        {},
+        pools.map((x) => ({ name: x.name, entries: x.entries })),
+      ),
+    [p.project, pools],
+  );
   const entries = useMemo(() => documentTags(doc), [doc]);
   // V5 控制词：同一节里同一个互斥组（复杂度、年代感）写了两档时画黄框
   const ctlClash = useMemo(
@@ -457,6 +469,53 @@ export function usePromptState(p: EditorProps) {
         section.separators[0] + blocks.map((x, i) => x.raw + section.separators[i + 1]).join(''),
       );
     };
+    const order: MenuEntry[] = [
+      { label: '上移', hint: 'Alt ↑', disabled: bi === 0, onSelect: () => move(-1) },
+      {
+        label: '下移',
+        hint: 'Alt ↓',
+        disabled: bi === section.blocks.length - 1,
+        onSelect: () => move(1),
+      },
+    ];
+    const remove: MenuEntry = {
+      label: '删除',
+      danger: true,
+      onSelect: () => {
+        const before = projectRef.current;
+        setFadingBlock(blockKey(si, bi));
+        setTimeout(() => {
+          setFadingBlock('');
+          const raw = serializePromptSection(section);
+          if (
+            save(
+              replaceSection(
+                doc,
+                si,
+                reparseSection(section, raw.slice(0, b.range.start) + raw.slice(b.range.end)),
+              ),
+            )
+          )
+            notify({
+              text: '已删除',
+              action: { label: '撤销', onClick: () => p.onUpdateProject(before) },
+            });
+        }, dur(1));
+      },
+    };
+    if (isRandomBlock(b))
+      return [
+        {
+          label: '修改…',
+          onSelect: () =>
+            setRandomEdit({ si, bi, anchor: `[data-trigger="rnd-${blockKey(si, bi)}"]` }),
+        },
+        { label: '复制', onSelect: () => copy(b.content) },
+        'sep',
+        ...order,
+        'sep',
+        remove,
+      ];
     return [
       {
         label: b.type === 'tags' ? '转为段落' : '转为 Tag 块',
@@ -501,41 +560,41 @@ export function usePromptState(p: EditorProps) {
           }),
       },
       'sep',
-      { label: '上移', hint: 'Alt ↑', disabled: bi === 0, onSelect: () => move(-1) },
-      {
-        label: '下移',
-        hint: 'Alt ↓',
-        disabled: bi === section.blocks.length - 1,
-        onSelect: () => move(1),
-      },
+      ...order,
       'sep',
-      {
-        label: '删除',
-        danger: true,
-        onSelect: () => {
-          const before = projectRef.current;
-          setFadingBlock(blockKey(si, bi));
-          setTimeout(() => {
-            setFadingBlock('');
-            const raw = serializePromptSection(section);
-            if (
-              save(
-                replaceSection(
-                  doc,
-                  si,
-                  reparseSection(section, raw.slice(0, b.range.start) + raw.slice(b.range.end)),
-                ),
-              )
-            )
-              notify({
-                text: '已删除',
-                action: { label: '撤销', onClick: () => p.onUpdateProject(before) },
-              });
-          }, dur(1));
-        },
-      },
+      remove,
     ];
   };
+  // 随机块的浮层：bi 是要改的那一块；after 是加在哪一块后面（-1 是这一节最后）
+  const [randomEdit, setRandomEdit] = useState<{
+    si: number;
+    bi?: number;
+    after?: number;
+    anchor: string;
+  } | null>(null);
+  const commitRandom = (marker: string) => {
+    const r = randomEdit;
+    setRandomEdit(null);
+    if (!r || !doc.scopes[r.si]) return;
+    guard(() => {
+      const section = doc.scopes[r.si];
+      if (r.bi !== undefined) {
+        save(replaceSection(doc, r.si, editPromptBlockText(section, r.bi, marker)));
+        return;
+      }
+      const raw = serializePromptSection(section);
+      const after = r.after ?? section.blocks.length - 1;
+      const at = after < 0 || !section.blocks[after] ? raw.length : section.blocks[after].range.end;
+      save(
+        replaceSection(
+          doc,
+          r.si,
+          reparseSection(section, raw.slice(0, at) + (at ? '\n\n' : '') + marker + raw.slice(at)),
+        ),
+      );
+    });
+  };
+  const random = { pools, edit: randomEdit, setEdit: setRandomEdit, commit: commitRandom };
   const commitNewBlock = (text: string, translation = '') => {
     const nb = newBlock;
     setNewBlock(null);
@@ -696,5 +755,6 @@ export function usePromptState(p: EditorProps) {
     saveBlock,
     setSaveBlock,
     saveMaterial,
+    random,
   };
 }

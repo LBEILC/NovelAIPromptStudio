@@ -9,6 +9,7 @@ import { ControlPanel } from '../Controls';
 import { deleteTags } from '../edits';
 import { CharacterPick, InsertPop } from '../Insert';
 import { categoryLabel } from '../model';
+import { RandomPop, readRandom } from '../RandomBlock';
 import type { usePromptDocumentView } from './document';
 import type { usePromptDrag } from './drag';
 import type { usePromptRendering } from './rendering';
@@ -78,6 +79,7 @@ export function renderPromptView({
   lang,
   float,
   marq,
+  random,
 }: Pick<
   ReturnType<typeof usePromptState> &
     ReturnType<typeof usePromptDrag> &
@@ -146,6 +148,7 @@ export function renderPromptView({
   | 'lang'
   | 'float'
   | 'marq'
+  | 'random'
 >) {
   return (
     <>
@@ -553,6 +556,20 @@ export function renderPromptView({
           onManage={() => p.onShowMaterials?.()}
         />
       )}
+      <RandomPop
+        open={!!random.edit && !!doc.scopes[random.edit.si]}
+        anchor={random.edit?.anchor}
+        editing={random.edit?.bi !== undefined}
+        initial={
+          random.edit?.bi !== undefined
+            ? readRandom(doc.scopes[random.edit.si]?.blocks[random.edit.bi])
+            : null
+        }
+        pools={random.pools}
+        onClose={() => random.setEdit(null)}
+        onSave={random.commit}
+        onManage={() => p.onShowMaterials?.('pool')}
+      />
       {p.tabId && (
         <CharacterPick
           open={charPick}

@@ -78,6 +78,7 @@ export function WorkbenchEditor(p: EditorProps) {
     saveBlock,
     setSaveBlock,
     saveMaterial,
+    random,
   } = usePromptState(p);
   const { scroll, drag, docRoot, float, marq } = usePromptDrag({
     textMode,
@@ -148,6 +149,7 @@ export function WorkbenchEditor(p: EditorProps) {
     ctlFor,
     setCtlFor,
     copy,
+    random,
   });
   const {
     promptShown,
@@ -262,5 +264,6 @@ export function WorkbenchEditor(p: EditorProps) {
     lang,
     float,
     marq,
+    random,
   });
 }

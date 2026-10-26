@@ -5,8 +5,9 @@ import { BlurImg, type BlurImage } from '../kit/blur';
 import { Swap } from '../settings/parts';
 import type { Material } from '../shared/materials';
 import { MaterialContent } from '../workbench/Insert';
+import { PoolBody } from './PoolBody';
 
-export type Kind = 'block' | 'character' | 'vibe';
+export type Kind = 'block' | 'character' | 'pool' | 'vibe';
 
 export type Vibe = {
   id: string;
@@ -17,10 +18,11 @@ export type Vibe = {
 export const TABS: [Kind, string, string][] = [
   ['block', '常用块', 'stack-line'],
   ['character', '角色', 'user-3-line'],
+  ['pool', '随机池', 'dice-line'],
   ['vibe', 'Vibe', 'palette-line'],
 ];
 
-export const NOUN: Record<Kind | 'pool', string> = {
+export const NOUN: Record<Kind, string> = {
   block: '常用块',
   character: '角色',
   vibe: 'Vibe',
@@ -87,9 +89,17 @@ export function useExamples(ids: string[]) {
 }
 
 export const contentText = (m: Material) =>
-  [...m.blocks, ...(m.negativeBlocks || [])].map((b) => b.content).join('\n\n');
+  m.kind === 'pool'
+    ? (m.entries || []).map((e) => e.text).join('\n')
+    : [...m.blocks, ...(m.negativeBlocks || [])].map((b) => b.content).join('\n\n');
 
 export const preview = (m: Material) => {
+  if (m.kind === 'pool')
+    return m.entries?.length ? (
+      <span className="mono">{m.entries.map((e) => e.text).join(' · ')}</span>
+    ) : (
+      <span className="muted">还没有条目</span>
+    );
   const b = m.blocks[0];
   if (!b) return <span className="muted">没有块</span>;
   return b.type === 'tags' ? (
@@ -100,6 +110,7 @@ export const preview = (m: Material) => {
 };
 
 export const typeText = (m: Material) => {
+  if (m.kind === 'pool') return `${m.entries?.length || 0} 条`;
   if (m.kind === 'character') {
     const neg = (m.negativeBlocks || []).reduce(
       (n, b) => n + (b.type === 'tags' ? b.tags.length : 0),
@@ -161,6 +172,7 @@ export function Row({
   onMenu,
   onCopy,
   onSave,
+  onPoolChange,
   onShowImage,
   onPeekMove,
   onPeekLeave,
@@ -178,6 +190,8 @@ export function Row({
   onCopy: () => void;
   /** 保存编辑：part 是 'self'（常用块本身）、角色的第几块或 'negative'；成功时返回 true */
   onSave: (part: Part, text: string, asNew: boolean) => Promise<boolean>;
+  /** 随机池的条目改了 */
+  onPoolChange: (item: Material) => void;
   onShowImage?: (id: string) => void;
   onPeekMove: (id: string, n: number) => (e: React.PointerEvent<HTMLElement>) => void;
   onPeekLeave: () => void;
@@ -309,7 +323,7 @@ export function Row({
             )}
           </span>
         )}
-        <span className="mrow-n">用过 {m.uses} 次</span>
+        {m.kind !== 'pool' && <span className="mrow-n">用过 {m.uses} 次</span>}
         <button
           className={`btn quiet sm icon mmore ${menuOpen ? 'is-hover' : ''}`}
           aria-label="更多"
@@ -326,7 +340,8 @@ export function Row({
       <div className={`expand ${open ? 'open' : ''}`}>
         <div>
           <div className="mrow-body">
-            {open && (
+            {open && m.kind === 'pool' && <PoolBody m={m} onChange={onPoolChange} />}
+            {open && m.kind !== 'pool' && (
               <>
                 {m.kind === 'character' ? (
                   <>

@@ -13,6 +13,7 @@ import { openCompare, type CompareSide } from './Compare';
 import { VersionDifference, VersionSummary } from './VersionDifference';
 import { Row, TH_H, TH_MORE, Thumb, rowsOf } from './versionHelpers';
 import { openPick } from './Pick';
+import { randomSummary } from './RandomBlock';
 /** 一版超过这么多张时，"+N"打开挑图而不是展开 */
 const PICK_AT = 24;
 // 放大、增强、图生图出来的那一版（1.8，doc/design.md 2.34）：标题旁边挂一个和 Agent 一样的小标签
@@ -144,7 +145,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             data-tip={
               pick && pick.imageId !== img.projectId
                 ? `按住 ${modKey()} 点，和标着的那张对比`
-                : undefined
+                : randomSummary(img.random) || undefined
             }
             onClick={(e) => {
               e.stopPropagation();

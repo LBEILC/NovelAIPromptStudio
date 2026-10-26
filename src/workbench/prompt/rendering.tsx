@@ -14,6 +14,7 @@ import { AddTags } from '../AddTags';
 import { insertTags, moveTags } from '../edits';
 import { categoryLabel, reparseSection, replaceSection, type DocumentTag } from '../model';
 import { ParagraphEditor } from '../Paragraph';
+import { RandomBox, isRandomBlock } from '../RandomBlock';
 import type { usePromptDrag } from './drag';
 import { blockKey, catVar, findTag, syntaxNote, type EditorProps } from './shared';
 import type { usePromptState } from './state';
@@ -59,6 +60,7 @@ export function usePromptRendering({
   ctlFor,
   setCtlFor,
   copy,
+  random,
 }: Pick<
   ReturnType<typeof usePromptState> & ReturnType<typeof usePromptDrag> & { p: EditorProps },
   | 'setSelected'
@@ -102,6 +104,7 @@ export function usePromptRendering({
   | 'ctlFor'
   | 'setCtlFor'
   | 'copy'
+  | 'random'
 >) {
   // ---------- 画 Tag ----------
   const braces = (depth = 0) =>
@@ -341,6 +344,38 @@ export function usePromptRendering({
     const list = entries.filter((e) => e.section === si && e.block === bi && !e.automatic);
     const label = b.displayLabel || b.label;
     const fadingCls = fadingBlock === key ? 'fading' : '';
+    if (isRandomBlock(b)) {
+      const trigger = `rnd-${key}`;
+      return (
+        <div
+          key={`b-${key}`}
+          className={`blk rnd-blk ${fadingCls}`}
+          data-key={`b-${key}`}
+          data-flip=""
+          data-block={key}
+          data-wb-scope={doc.scopes[si].scope.key}
+        >
+          <div className="blk-h">
+            <span className="label">随机块</span>
+            {!proposal && acts(() => blockMenu(si, bi), '这一块的操作', `blk-${key}`)}
+          </div>
+          {proposal || (
+            <RandomBox
+              block={b}
+              pools={random.pools}
+              trigger={trigger}
+              onOpen={() =>
+                random.setEdit(
+                  random.edit?.bi === bi && random.edit.si === si
+                    ? null
+                    : { si, bi, anchor: `[data-trigger="${trigger}"]` },
+                )
+              }
+            />
+          )}
+        </div>
+      );
+    }
     if (b.type !== 'tags') {
       const on = paraEditing.includes(key);
       return (
@@ -430,6 +465,20 @@ export function usePromptRendering({
               常用块
             </button>
           )}
+          <button
+            className={`btn quiet sm ${random.edit?.anchor === `[data-trigger="r${k}"]` ? 'is-hover' : ''}`}
+            data-trigger={`r${k}`}
+            data-feature="random-block"
+            onClick={() =>
+              random.setEdit(
+                random.edit?.anchor === `[data-trigger="r${k}"]`
+                  ? null
+                  : { si, after, anchor: `[data-trigger="r${k}"]` },
+              )
+            }
+          >
+            随机块
+          </button>
         </span>
       </div>
     );

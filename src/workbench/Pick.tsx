@@ -12,6 +12,7 @@ import { invokeUI } from '../lib/commands';
 import { BlurImg, type BlurImage } from '../kit/blur';
 import type { WorkVersion } from '../shared/generation';
 import type { ImageRecord } from '../shared/types';
+import { randomSummary } from './RandomBlock';
 
 type Request = { tabId: string; versionId: string } | null;
 let request: Request = null;
@@ -37,6 +38,8 @@ interface Item {
   thumb: string;
   image: BlurImage;
   seed?: string;
+  /** 随机块抽到了什么（2.44），悬停显示 */
+  random?: string;
 }
 const SIZE_KEY = 'nps.pick.size';
 const readSize = () => {
@@ -61,7 +64,8 @@ export function PickHost({ tabId, onChanged }: { tabId: string; onChanged?: () =
     void invokeUI('version.list', { tabId }).then(async (list) => {
       const version = list.versions.find((v) => v.id === mine.versionId);
       if (!version) return set(null);
-      const ids = version.images.filter((i) => !i.deleted).map((i) => i.projectId);
+      const shown = version.images.filter((i) => !i.deleted);
+      const ids = shown.map((i) => i.projectId);
       const recs = await Promise.all(
         ids.map((id) =>
           invokeUI('library.get', { id })
@@ -81,6 +85,7 @@ export function PickHost({ tabId, onChanged }: { tabId: string; onChanged?: () =
                   thumb: recs[i]!.thumbnail_path || recs[i]!.image_path,
                   image: recs[i]!,
                   seed: recs[i]!.metadata?.seed,
+                  random: randomSummary(shown[i].random),
                 },
               ]
             : [],
@@ -351,6 +356,7 @@ function Body({
                 aria-selected={sel.has(x.id)}
                 data-pick-index={i}
                 data-pick-mark={m || 'none'}
+                data-tip={x.random || undefined}
                 onClick={(e) => click(i, e)}
                 onDoubleClick={() => (setFocus(i), setSingle(true))}
               >

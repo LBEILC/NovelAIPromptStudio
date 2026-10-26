@@ -263,6 +263,13 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         where: '素材 · 左边选常用块、角色或 Vibe',
         point: { id: 'materials' },
       },
+      {
+        name: '随机池',
+        text: '一行一条放画师串、动作或背景；提示词里放随机块，每张图生成前各抽一次，抽到什么记在图上',
+        go: 'materials',
+        where: '素材 · 随机池；工作台提示词的块之间点「随机块」',
+        point: { id: 'materials', tip: '左边选「随机池」' },
+      },
     ],
   },
   {

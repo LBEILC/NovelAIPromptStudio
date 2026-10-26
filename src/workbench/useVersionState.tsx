@@ -13,6 +13,7 @@ import { useGeneration } from '../state/generation';
 import { originGone, originMenu, trashImage } from './original';
 import { openCompare } from './Compare';
 import { openPick } from './Pick';
+import { applyRandom } from './RandomBlock';
 import { nsfwMenu } from '../kit/blur';
 export function useVersionState({
   tab,
@@ -298,6 +299,17 @@ export function useVersionState({
       notify({ text, tone: 'error' }),
     ),
     'sep' as const,
+    // 随机块（2.44）：草稿里的随机块换成这张图实际抽到的文字和权重，接着细调
+    ...(v.images.find((i) => i.projectId === imageId)?.random?.blocks.length
+      ? [
+          {
+            label: '用这张抽到的内容',
+            icon: 'dice-line',
+            onSelect: () =>
+              void applyRandom({ tabId: tab.id, versionId: v.id, imageId, before, notify }),
+          },
+        ]
+      : []),
     {
       label: '作为新作品打开',
       onSelect: () =>

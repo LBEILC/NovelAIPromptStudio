@@ -106,3 +106,29 @@
 .tag .v5 { align-self: stretch; display: flex; align-items: center; margin: calc(var(--tag-pad-y) * -1) calc(var(--tag-pad-x) - var(--ctl-gap)) calc((var(--tag-pad-y) + 1px) * -1) 0; padding: 0 var(--v5-seg-pad); border-right: var(--bw) solid var(--border); background: var(--seg-track); font: var(--fs-caption)/var(--lh-caption) var(--font-mono); color: var(--text-2); transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
 .v5-badge { display: inline-flex; align-items: center; padding: 0 var(--v5-seg-pad); border-radius: var(--r-check); background: var(--seg-track); font: var(--fs-caption)/var(--lh-caption) var(--font-mono); color: var(--text-2); }
 .tag.ctl.off .v5, .v5-badge.off { background: var(--warn-wash); color: var(--warn); }
+
+/* 随机块（2.44）：虚线框写"画师池 · 抽 2 个"，悬停列出池里的条目，点开浮层修改；写错的标黄 */
+.blk.rnd-blk .rnd-box { display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-width: 0; padding: var(--sp-1) var(--sp-3); border: var(--bw) dashed var(--text-3); border-radius: var(--r-ctl); background: transparent; color: var(--text); font-size: var(--fs-small); line-height: var(--lh-small); text-align: left; cursor: pointer; transition: background var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out); }
+.blk.rnd-blk .rnd-box:hover { background: var(--hover); border-color: var(--text-2); }
+.blk.rnd-blk .rnd-box > i { color: var(--text-2); font-size: var(--icon); }
+.blk.rnd-blk .rnd-box b { font-weight: var(--fw-strong); }
+.blk.rnd-blk .rnd-box .rnd-opt { padding: 0 var(--sp-1); border-radius: var(--r-tag); background: var(--hover); color: var(--text-2); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.blk.rnd-blk .rnd-box:hover .rnd-opt { background: var(--surface); }
+.blk.rnd-blk .rnd-box .sp { flex: 1; }
+.blk.rnd-blk .rnd-box .rnd-n { color: var(--text-3); font-size: var(--fs-caption); }
+.blk.rnd-blk .rnd-box.warn { border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); }
+.blk.rnd-blk .rnd-box.warn > i, .blk.rnd-blk .rnd-box.warn .rnd-note { color: var(--warn); }
+.blk.rnd-blk .rnd-box.warn .rnd-src { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.blk.rnd-blk .rnd-box.warn .rnd-note { flex: none; margin-left: auto; font-size: var(--fs-caption); }
+
+.popover.rnd-pop .rnd-pop-h { display: flex; flex-direction: column; gap: var(--sp-0); }
+.popover.rnd-pop .rnd-pop-h .help { color: var(--text-3); }
+.popover.rnd-pop .frow > .sdd { justify-self: stretch; }
+.popover.rnd-pop .frow > .stepper { justify-self: start; }
+.popover.rnd-pop .rnd-sw-r { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.popover.rnd-pop .rnd-sw-r .help { color: var(--text-3); }
+.popover.rnd-pop .rnd-range { display: flex; align-items: center; gap: var(--sp-1); }
+.popover.rnd-pop .rnd-pop-src { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; padding: var(--sp-2) var(--sp-2); border-radius: var(--r-ctl); background: var(--bg); }
+.popover.rnd-pop .rnd-pop-src .help { flex: none; color: var(--text-3); }
+.popover.rnd-pop .rnd-pop-src code { min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-small); line-height: var(--lh-small); }
+.popover.rnd-pop .rnd-pop-src .rnd-err { color: var(--warn); font-size: var(--fs-caption); line-height: var(--lh-caption); }
