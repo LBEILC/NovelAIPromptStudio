@@ -150,6 +150,9 @@ export async function libraryInteractionChecks(env) {
     await expectMenu(h, '多选右键仅提供全部选中图片的操作', [
       '在工作台打开 2 张',
       '加入收藏集…',
+      '标为 NSFW（2 张）',
+      '标为不是 NSFW（2 张）',
+      '恢复自动判定',
       '起名',
       '移入回收站',
     ]);
@@ -175,6 +178,7 @@ export async function libraryInteractionChecks(env) {
       '在工作台用作底图',
       '加入收藏集…',
       '复制提示词',
+      '标为 NSFW',
       '起名',
       '移入回收站',
     ]);

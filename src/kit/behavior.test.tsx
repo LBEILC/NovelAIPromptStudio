@@ -200,7 +200,7 @@ it('segments change with arrow keys and switches accept Space/Enter but respect 
   click(query('[aria-label=Disabled]'));
   expect(query('[aria-label=Enabled]').getAttribute('aria-checked')).toBe('false');
 });
-it('notices classify success/failure, replace, act and expire', () => {
+it('notices classify success/failure, keep three, deduplicate, act, close and expire', () => {
   vi.useFakeTimers();
   let notify!: (n: Notice) => void;
   function Fixture() {
@@ -215,15 +215,25 @@ it('notices classify success/failure, replace, act and expire', () => {
   act(() => notify({ text: '已保存' }));
   expect(query('.toast .mark').classList.contains('ok')).toBe(true);
   act(() => notify({ text: '保存失败' }));
-  expect(document.querySelectorAll('.toast')).toHaveLength(1);
-  expect(query('.toast .mark').classList.contains('danger')).toBe(true);
+  expect(document.querySelectorAll('.toast')).toHaveLength(2);
+  expect(query('.toast .mark.danger')).not.toBeNull();
+  act(() => notify({ text: '另一个通知' }));
+  act(() => notify({ text: '另一个通知' }));
+  expect(document.querySelectorAll('.toast')).toHaveLength(3);
   const undo = vi.fn();
   act(() => notify({ text: '已删除', action: { label: 'Undo', onClick: undo } }));
-  click(query('.toast button'));
+  expect(document.querySelectorAll('.toast')).toHaveLength(3);
+  expect(
+    [...document.querySelectorAll('.toast .selectable')].map((n) => n.textContent),
+  ).not.toContain('已保存');
+  click(query('.toast button:not([data-toast-close])'));
   expect(undo).toHaveBeenCalledOnce();
+  expect(document.querySelectorAll('.toast')).toHaveLength(2);
+  click(query('[data-toast-close]'));
+  click(query('[data-toast-close]'));
   expect(query('.toast')).toBeNull();
   act(() => notify({ text: '已保存', duration: 100 }));
-  act(() => vi.advanceTimersByTime(100));
+  act(() => vi.runAllTimers());
   expect(query('.toast')).toBeNull();
 });
 it('AddTags does not submit Enter during IME composition', () => {
