@@ -153,6 +153,8 @@ export interface GenerationJob {
 }
 export interface GenerationStatus {
   paused: boolean;
+  spentToday?: number;
+  today?: import('./usage').UsageSummary;
   undo?: { id: string; index: number; count: number; state: string }[];
   jobs: GenerationJob[];
   settings: GenerationSettings;

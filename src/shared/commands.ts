@@ -456,6 +456,17 @@ export interface CommandDefinitions {
     output: GenerationJob;
   };
   'generate.status': { input: { id?: string; limit?: number }; output: GenerationStatus };
+  'usage.summary': {
+    input: { range?: 'today' | 'week' | 'month' };
+    output: import('./usage').UsageSummary;
+  };
+  'usage.daily': { input: { days?: number }; output: import('./usage').UsageDaily };
+  'trash.size': {
+    input: Record<string, never>;
+    output: { bytes: number; count: number; sizeKnown: boolean };
+  };
+  'settings.library.get': { input: Record<string, never>; output: Types.LibrarySettings };
+  'settings.library.save': { input: { trashAutoCleanup: boolean }; output: Types.LibrarySettings };
   'generate.pause': { input: Record<string, never>; output: GenerationStatus };
   'generate.resume': { input: Record<string, never>; output: GenerationStatus };
   'generate.set-count': { input: { id: string; count: number }; output: GenerationStatus };

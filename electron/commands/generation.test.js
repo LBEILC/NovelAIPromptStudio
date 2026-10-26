@@ -126,6 +126,15 @@ it('runs generation through the command boundary with agent confirmation and ver
     expect(finished.error || finished.state).toBe('completed');
     expect((await call('generate.status', { id: pending.id })).jobs[0].state).toBe('completed');
     expect(service.state.requests).toHaveLength(2);
+    const usage = await call('usage.summary', { range: 'today' });
+    expect(usage).toMatchObject({
+      images: 2,
+      requests: 2,
+      agent: { images: 2 },
+      byOperation: { generate: { images: 2 } },
+    });
+    expect((await call('generate.status')).settings.spentToday).toBe(usage.anlas);
+    expect((await call('usage.daily', { days: 1 })).items[0].images).toBe(2);
     expect(service.state.maxActive).toBe(1);
     const tree = await call('version.list', { tabId });
     expect(tree.versions).toHaveLength(2);
@@ -159,6 +168,11 @@ it('runs generation through the command boundary with agent confirmation and ver
     expect(relayFinished.error || relayFinished.state).toBe('completed');
     expect((await call('generate.status', { id: relayJob.id })).jobs[0].state).toBe('completed');
     expect((await call('account.get', {}, 'ui')).settings.spentImagesToday).toBe(1);
+    expect(await call('usage.summary')).toMatchObject({
+      images: 1,
+      anlas: null,
+      connection: 'relay',
+    });
     await expect(call('generate.start', { tabId, count: 1 })).rejects.toThrow('每日张数上限');
     await call('account.connection.save', { connection: 'official' }, 'ui');
     expect((await call('account.get', {}, 'ui')).settings.hasToken).toBe(true);

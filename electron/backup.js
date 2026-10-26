@@ -13,6 +13,7 @@ import { validateBackupDatabase } from './backupDatabase.js';
 const fsp = fs.promises;
 const required = ['manifest.json', 'studio.sqlite', 'workbench-session.json', 'preferences.json'];
 const portable = {
+  library: ['trashAutoCleanup'],
   privacy: ['blurMode', 'blurQuickAll', 'nsfwWords'],
   appearance: ['themeMode', 'primaryColor', 'sansFont', 'monoFont', 'proseFont', 'motion'],
   productivity: ['autoCheckUpdates', 'closeAction'],
@@ -38,6 +39,7 @@ export function portablePreferences(value) {
   }
   if (typeof value.onboardingDone === 'boolean') result.onboardingDone = value.onboardingDone;
   if (typeof value.featuresSeen === 'string') result.featuresSeen = value.featuresSeen;
+  if (result.library && !Object.keys(result.library).length) delete result.library;
   return result;
 }
 export function mergePortablePreferences(current, incoming) {
@@ -45,6 +47,8 @@ export function mergePortablePreferences(current, incoming) {
   for (const key of [...Object.keys(portable), 'onboardingDone', 'featuresSeen'])
     delete result[key];
   Object.assign(result, portablePreferences(incoming));
+  if (current.library?.assetsDirectory)
+    result.library = { ...result.library, assetsDirectory: current.library.assetsDirectory };
   if (current.productivity?.recentImageDirectory)
     result.productivity = {
       ...result.productivity,

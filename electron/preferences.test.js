@@ -197,11 +197,13 @@ describe('AI preferences', () => {
       assetsDirectory: defaultAssetsDirectory,
       defaultAssetsDirectory,
       isDefault: true,
+      trashAutoCleanup: false,
     });
     expect(preferences.saveLibrarySettings({ assetsDirectory: customAssetsDirectory })).toEqual({
       assetsDirectory: customAssetsDirectory,
       defaultAssetsDirectory,
       isDefault: false,
+      trashAutoCleanup: false,
     });
     expect(JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'))).toMatchObject({
       library: { assetsDirectory: customAssetsDirectory },

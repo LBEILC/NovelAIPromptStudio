@@ -1,4 +1,5 @@
 import { randomCommands } from './random.js';
+import { createTrashMaintenance } from '../trashMaintenance.js';
 // @ts-check
 import { blurCommands } from './blur.js';
 import { countImportDays } from '../../src/lib/dateRange.js';
@@ -589,11 +590,14 @@ export async function createCommands(services) {
     },
   };
   const generation = generationCommands({ services, store, tab, revision, unlocked, emit });
+  const trashMaintenance = createTrashMaintenance({ services, emit });
   const random = randomCommands({ services, store, tab, edit, locate, unlocked, emit });
   await generation.ready?.();
+  await trashMaintenance.start();
   Object.assign(
     handlers,
     generation.handlers,
+    trashMaintenance.handlers,
     materialCommands({
       services,
       tab,
@@ -674,7 +678,10 @@ export async function createCommands(services) {
   }
   return {
     dispatch,
-    close: generation.close,
+    close: async () => {
+      await trashMaintenance.close();
+      await generation.close();
+    },
     store,
     clearEditing: () => {
       editing = [];

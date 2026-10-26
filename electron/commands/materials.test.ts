@@ -76,6 +76,7 @@ async function setup() {
     preferences: {
       blurSettings: () => ({ mode: 'off', quickAll: false, words: [] }),
       generationSettings: () => ({ hasToken: false }),
+      librarySettings: () => ({ trashAutoCleanup: false }),
       credentials: () => ({ baseUrl: `http://127.0.0.1:${address.port}`, model: 'synthetic' }),
     } as any,
   });

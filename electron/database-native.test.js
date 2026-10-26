@@ -112,6 +112,7 @@ describe('native engine upgrade', () => {
           [
             ...Object.keys(expected.tables).filter((name) => !RETIRED_TABLES.includes(name)),
             'materials',
+            'generation_usage',
             'image_nsfw_marks',
             'branch_undo',
             'original_undo',

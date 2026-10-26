@@ -108,6 +108,14 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     'settings.ai.get',
     'trash.delete-permanently',
     'trash.detached',
+    'generate.pause',
+    'generate.resume',
+    'generate.set-count',
+    'generate.skip',
+    'generate.defer',
+    'generate.move',
+    'generate.restore',
+    'settings.library.save',
     'work.discard-detached',
     'agent.install',
     'agent.uninstall',
@@ -121,6 +129,13 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
       undefined,
       'once',
     );
+  }
+  for (const [name, input] of [
+    ['usage.summary', { range: 'today' }],
+    ['usage.daily', { days: 30 }],
+  ]) {
+    const result = await cli(name, input);
+    await h.check(`CLI 可读取 ${name}`, () => result.code === 0 && result.result.ok);
   }
   const setupRoot = path.join(mode.root, 'agent-install');
   const claudeRoot = path.join(setupRoot, 'home', '.claude');

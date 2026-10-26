@@ -1,4 +1,5 @@
 import { createDatabaseBackup } from './backupDatabase.js';
+import { createUsageStore } from './usage.js';
 import { migrateWorkOriginals } from './workOriginals.js';
 import fs from 'node:fs';
 import { createNsfwStore } from './nsfw.js';
@@ -2097,6 +2098,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
         invalidateCards(true);
       },
     }),
+    usage: createUsageStore(connection),
     workOriginalsMigration,
     hasOnboardingHistory: () =>
       Boolean(connection.prepare('SELECT 1 FROM projects LIMIT 1').get()) ||

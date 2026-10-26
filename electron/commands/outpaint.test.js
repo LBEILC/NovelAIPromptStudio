@@ -224,6 +224,18 @@ it.each(['whole', 'edges', 'partial', 'failed', 'cancel', 'cancel-before'])(
       }
       if (scenario === 'cancel-before') await f.call('generate.cancel', { ids: [job.id] });
       const final = await f.wait(job.id);
+      const usage = f.database.usage.list();
+      expect(usage).toHaveLength(f.service.state.requests.length);
+      expect(
+        usage.every(
+          (row) => row.operation === 'outpaint' && row.model === 'nai-diffusion-5-full-inpainting',
+        ),
+      ).toBe(true);
+      expect(usage.filter((row) => row.status === 'completed')).toHaveLength(
+        scenario === 'failed' || scenario === 'cancel-before' ? 0 : scenario === 'edges' ? 2 : 1,
+      );
+      if (final.versionId)
+        expect(usage.every((row) => row.versionId === final.versionId)).toBe(true);
       expect(final.state).toBe(
         scenario === 'failed' ? 'failed' : scenario.startsWith('cancel') ? 'canceled' : 'completed',
       );

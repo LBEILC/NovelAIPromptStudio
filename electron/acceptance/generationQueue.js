@@ -9,6 +9,7 @@ export async function generationQueueChecks({ h, generationService }) {
   })()`);
   await invoke('account.save', { token: 'acceptance-token' });
   const { tab } = await invoke('workbench.new', { width: 64, height: 64 });
+  const usageBefore = await invoke('usage.summary', { range: 'today' });
   const start = generationService.state.requests.length;
   generationService.state.holdAt = start + 1;
   const first = await invoke('generate.start', { tabId: tab.id, count: 1 });
@@ -35,6 +36,15 @@ export async function generationQueueChecks({ h, generationService }) {
       () =>
         generated.length === 2 &&
         generated.every((v) => v.parentId === first.parentId && v.images.length === 1),
+    );
+    const usageAfter = await invoke('usage.summary', { range: 'today' });
+    const status = await invoke('generate.status');
+    await h.check(
+      '今天用量新增张数等于本次生成张数，统计与每日花费一致',
+      () =>
+        usageAfter.images - usageBefore.images === 2 &&
+        status.settings.spentToday === usageAfter.anlas &&
+        status.today.images === usageAfter.images,
     );
   } finally {
     generationService.state.resume?.();

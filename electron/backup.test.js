@@ -168,6 +168,37 @@ it('backs up random pools and per-image draws and restores their original values
     expect(database.versions.get(version.id).images[0].random).toEqual(random);
   }));
 
+it('restores usage records and cleanup preference while keeping this machine asset path', () =>
+  fixture(async ({ database, preferences, manager, file, assets }) => {
+    const id = database.usage.add({
+      jobId: 'synthetic-job',
+      workId: 'synthetic-work',
+      versionId: 'synthetic-version',
+      operation: 'generate',
+      model: 'synthetic-model',
+      images: 2,
+      anlas: 6,
+      source: 'agent',
+      connection: 'official',
+      estimated: false,
+    });
+    preferences.saveLibrarySettings({ trashAutoCleanup: true });
+    await manager.export(file, true);
+    database.usage.settle(id, { anlas: 99 });
+    preferences.saveLibrarySettings({ trashAutoCleanup: false });
+    await manager.restore(file);
+    expect(database.usage.list()).toHaveLength(1);
+    expect(database.usage.list()[0]).toMatchObject({
+      id,
+      anlas: 6,
+      versionId: 'synthetic-version',
+    });
+    expect(preferences.librarySettings()).toMatchObject({
+      trashAutoCleanup: true,
+      assetsDirectory: assets,
+    });
+  }));
+
 it('backs up managed base copies and operation snapshots with version restoration', () =>
   fixture(async ({ database, assets, manager, file, project }) => {
     const base = { ...(await storeBaseImage(project.image_path, assets)), strength: 0.7, noise: 0 };

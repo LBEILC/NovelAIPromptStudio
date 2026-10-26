@@ -17,6 +17,21 @@ export async function settingsGenerationChecks({
     evaluate(
       `window.studio.invoke(${JSON.stringify(name)},${JSON.stringify(input)}).then(r=>{if(!r.ok)throw Error(r.error.message);return r.data})`,
     );
+  h.category('设置·图片库');
+  const library = await invoke('settings.library.get');
+  const cleanupOn = await invoke('settings.library.save', { trashAutoCleanup: true });
+  const trashSize = await invoke('trash.size');
+  const cleanupOff = await invoke('settings.library.save', { trashAutoCleanup: false });
+  await check(
+    '回收站自动清理默认关闭、可保存开关且不改变资源路径',
+    () =>
+      !library.trashAutoCleanup &&
+      cleanupOn.trashAutoCleanup &&
+      !cleanupOff.trashAutoCleanup &&
+      cleanupOn.assetsDirectory === library.assetsDirectory &&
+      trashSize.bytes >= 0 &&
+      trashSize.count >= 0,
+  );
   h.category('设置·NovelAI 账号');
   await section('NovelAI 账号');
   const firstToken = !preferences.novelAIToken();

@@ -115,7 +115,7 @@ export async function libraryNamingChecks({ h, database, doubles }) {
     await refresh();
     await check(
       '详情 IPC 与列表逐字一致，缺失图片返回 null',
-      `(async()=>{const images=${JSON.stringify([...database.loadLibrary('all'), ...database.loadLibrary('trash')])};for(const image of images) if(JSON.stringify(await window.studio.invoke('library.get',{id:image.id}).then(result=>result.ok?result.data.project:result.error.code==='not_found'?null:Promise.reject(Error(result.error.message))))!==JSON.stringify(image)) return false;return await window.studio.invoke('library.get',{id:'missing-naming-fixture'}).then(result=>result.ok?result.data.project:result.error.code==='not_found'?null:Promise.reject(Error(result.error.message)))===null;})()`,
+      `(async()=>{const images=${JSON.stringify([...database.loadLibrary('all'), ...database.loadLibrary('trash')].map((image) => ({ ...image, random: database.versions.randomForImage(image.id) })))};for(const image of images) if(JSON.stringify(await window.studio.invoke('library.get',{id:image.id}).then(result=>result.ok?result.data.project:result.error.code==='not_found'?null:Promise.reject(Error(result.error.message))))!==JSON.stringify(image)) return false;return await window.studio.invoke('library.get',{id:'missing-naming-fixture'}).then(result=>result.ok?result.data.project:result.error.code==='not_found'?null:Promise.reject(Error(result.error.message)))===null;})()`,
       undefined,
       'once',
     );

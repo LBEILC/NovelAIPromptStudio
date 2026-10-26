@@ -325,6 +325,15 @@ export const commandRegistry = {
     example: { tabId: 'tab-id', count: 1 },
   },
   'generate.status': { fields: { id: 'string', limit: 'integer' }, example: { limit: 20 } },
+  'usage.summary': { fields: { range: 'today|week|month' }, example: { range: 'today' } },
+  'usage.daily': { fields: { days: 'integer' }, example: { days: 30 } },
+  'trash.size': { fields: {}, uiOnly: true },
+  'settings.library.get': { fields: {}, uiOnly: true },
+  'settings.library.save': {
+    fields: { trashAutoCleanup: 'boolean' },
+    required: ['trashAutoCleanup'],
+    uiOnly: true,
+  },
   'generate.pause': { fields: {}, uiOnly: true },
   'generate.resume': { fields: {}, uiOnly: true },
   'generate.set-count': {

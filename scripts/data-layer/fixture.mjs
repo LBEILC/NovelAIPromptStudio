@@ -95,6 +95,7 @@ export async function seed(directory, count, progress = () => {}, { compact = fa
     // Recreate the pre-generation schema for migration and compatibility checks.
     raw.run('DROP TRIGGER IF EXISTS image_nsfw_marks_delete');
     raw.run('DROP TABLE IF EXISTS image_nsfw_marks');
+    raw.run('DROP TABLE IF EXISTS generation_usage');
     for (const table of [
       'branch_undo',
       'saved_works',

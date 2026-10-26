@@ -377,6 +377,7 @@ export interface ProductivitySettings {
   closeAction: 'ask' | 'tray' | 'quit';
 }
 export interface LibrarySettings {
+  trashAutoCleanup: boolean;
   assetsDirectory: string;
   defaultAssetsDirectory: string;
   isDefault: boolean;

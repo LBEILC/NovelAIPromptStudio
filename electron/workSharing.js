@@ -352,15 +352,15 @@ export function createWorkSharing(connection, versions, atomic) {
         return true;
       });
     },
-    retainedPaths(excludingProjectId) {
+    retainedPaths(excludingProjectId, previouslyDeleted = []) {
       const paths = new Set();
       const add = (p) => {
         for (const file of [p.image_path, p.thumbnail_path]) if (file) paths.add(file);
       };
       for (const p of connection
-        .prepare('SELECT image_path,thumbnail_path FROM projects WHERE id != ?')
+        .prepare('SELECT id,image_path,thumbnail_path FROM projects WHERE id != ?')
         .all(excludingProjectId))
-        add(p);
+        if (!previouslyDeleted.includes(p.id)) add(p);
       for (const r of connection
         .prepare(
           `SELECT v.snapshot_json FROM work_versions v JOIN works w ON w.id=v.work_id
@@ -370,12 +370,12 @@ export function createWorkSharing(connection, versions, atomic) {
         add(JSON.parse(r.snapshot_json));
       for (const r of connection
         .prepare(
-          `SELECT p.image_path,p.thumbnail_path FROM version_images i JOIN projects p ON p.id=i.project_id
+          `SELECT p.id,p.image_path,p.thumbnail_path FROM version_images i JOIN projects p ON p.id=i.project_id
         JOIN work_versions v ON v.id=i.version_id JOIN works w ON w.id=v.work_id
         WHERE v.id NOT IN (SELECT version_id FROM deleted_versions)`,
         )
         .all())
-        add(r);
+        if (!previouslyDeleted.includes(r.id)) add(r);
       return paths;
     },
   };

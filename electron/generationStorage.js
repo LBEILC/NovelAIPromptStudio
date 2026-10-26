@@ -8,7 +8,7 @@ export const activeJob = (job) => ['pending', 'queued', 'generating'].includes(j
 export function recentJobs(jobs, limit) {
   const keep = new Set(
     jobs
-      .filter((j) => !activeJob(j))
+      .filter((j) => !activeJob(j) && !j.undoAvailable)
       .reverse()
       .sort((a, b) =>
         String(b.finishedAt || b.createdAt || '').localeCompare(
@@ -17,7 +17,7 @@ export function recentJobs(jobs, limit) {
       )
       .slice(0, limit),
   );
-  return jobs.filter((j) => activeJob(j) || keep.has(j));
+  return jobs.filter((j) => activeJob(j) || j.undoAvailable || keep.has(j));
 }
 const assetPattern = /^nps-asset:([a-f0-9]{64})$/;
 const binary = (s) =>
@@ -55,7 +55,11 @@ export function mapPayload(value, mapString, memo = new Map()) {
 }
 export function publicGenerationJob(job, memo = new Map()) {
   const { request, inpaintMask, ...view } = job;
-  return mapPayload(view, (s) => (binary(s) ? undefined : s), memo);
+  return mapPayload(
+    { deferred: false, skipped: false, resumedAfterExit: false, hasRandomBlocks: false, ...view },
+    (s) => (binary(s) ? undefined : s),
+    memo,
+  );
 }
 
 export function createGenerationStorage(directory, { delay = 250, log = console.warn } = {}) {

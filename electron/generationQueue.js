@@ -12,6 +12,7 @@ export function createGenerationQueue({
   balance,
   beforeEach = () => true,
   initial = [],
+  // TODO(design): Keep the UI undo notice within this 10-second recovery window.
   undoDuration = 10000,
   changed = () => {},
   persist = () => {},
@@ -70,7 +71,7 @@ export function createGenerationQueue({
               if (closed || paused || job.stop) return;
               let before;
               try {
-                before = await balance();
+                before = balance ? await balance().catch(() => NaN) : undefined;
                 await prepare(job);
                 if (closed || paused || job.stop) return;
                 const request = structuredClone(job.request);
@@ -98,14 +99,15 @@ export function createGenerationQueue({
                   job.errorDetails = error.details;
                 }
               } finally {
-                try {
-                  const after = await balance();
-                  if (Number.isFinite(before) && Number.isFinite(after))
-                    job.spent += Math.max(0, before - after);
-                  else job.spentKnown = false;
-                } catch {
-                  job.spentKnown = false;
-                }
+                if (balance)
+                  try {
+                    const after = await balance();
+                    if (Number.isFinite(before) && Number.isFinite(after))
+                      job.spent += Math.max(0, before - after);
+                    else job.spentKnown = false;
+                  } catch {
+                    job.spentKnown = false;
+                  }
               }
             });
           } catch (error) {
@@ -127,6 +129,7 @@ export function createGenerationQueue({
               : (closed || paused) && (job.continuous || job.completed < job.count)
                 ? 'queued'
                 : 'completed';
+        if (closed && job.state === 'queued') job.resumedAfterExit = true;
         publish();
       }
     } finally {
@@ -185,6 +188,9 @@ export function createGenerationQueue({
             ),
           );
     },
+    retainedJobs() {
+      return publicJobs(jobs);
+    },
     confirm(ids) {
       for (const id of ids) {
         const job = find(id);
@@ -221,7 +227,10 @@ export function createGenerationQueue({
       )
         throw new Error('张数无效');
       const next = Math.max(count, job.completed + 1);
-      if (job.estimate != null) job.estimate = (job.estimate / job.count) * next;
+      if (job.estimate != null) {
+        const fixed = job.estimateFixed || 0;
+        job.estimate = ((job.estimate - fixed) / job.count) * next + fixed;
+      }
       job.count = next;
       publish();
     },

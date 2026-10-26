@@ -22,11 +22,8 @@ import { createWorkbenchTab } from '../../src/lib/workbenchSession.js';
 import { createPromptDocument } from '../../src/lib/promptDocument.ts';
 import { CommandError } from './registry.js';
 import { versionDiff, diffSummary } from '../../src/lib/versionDiff.ts';
+import { recordUsageRequest, localDay } from '../usage.js';
 
-const today = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-};
 const withPromptTemplate = (project, draft) => ({
   ...project,
   metadata: {
@@ -41,6 +38,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   const preferences = services.preferences;
   if (!preferences) return { handlers: {}, close: () => {} };
   const versions = services.database.versions;
+  const usage = services.database.usage;
   const pools = () => services.database.materials.list().filter((p) => p.kind === 'pool');
   let shuttingDown = false;
   let subscription = null,
@@ -60,8 +58,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     const s = preferences.generationSettings();
     return {
       ...s,
-      spentImagesToday: s.spentDate === today() ? s.spentImagesToday || 0 : 0,
-      spentToday: s.spentDate === today() ? s.spentToday || 0 : 0,
+      spentDate: localDay(),
+      spentImagesToday: usage.summary('today', 'relay').images,
+      spentToday: usage.summary('today', 'official').anlas,
     };
   };
   const status = (id, limit = 20) => ({
@@ -72,12 +71,16 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         : job.project,
     })),
     paused: queue.paused,
+    spentToday: settings().spentToday,
+    today: usage.summary('today', settings().connection),
     settings: settings(),
     subscription,
     balance: balance(),
     accountError,
   });
-  const publish = () => services.emit?.({ type: 'generation', data: status() });
+  const publish = () => {
+    if (!shuttingDown) services.emit?.({ type: 'generation', data: status() });
+  };
   const priceFor = (request, count = 1, pending = 0) => {
     if (!Number.isSafeInteger(count) || count < 1) throw new Error('张数必须是正整数');
     return settings().connection === 'relay'
@@ -165,7 +168,6 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         .flatMap((j) => [j.parentId, j.versionId].filter(Boolean)),
     );
   }
-  const spent = new Map();
   const storage = createGenerationStorage(services.directory);
   const queue = createGenerationQueue({
     run: services.network?.run,
@@ -175,9 +177,25 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         ? client().upscale(request)
         : client().generate(request, progress),
     execute: (job, request, generate, onProgress, publish) => {
-      if (job.operation !== 'outpaint') return generate(request, onProgress);
+      const tracked = (request, progress) =>
+        recordUsageRequest({
+          usage,
+          job,
+          request,
+          connection: settings().connection,
+          price:
+            settings().connection === 'relay'
+              ? { anlas: 0, free: false }
+              : estimateImageOperation(request, subscription),
+          balance: async () => {
+            await refresh();
+            return subscription?.trainingStepsLeft ? balance() : NaN;
+          },
+          send: () => generate(request, progress),
+        });
+      if (job.operation !== 'outpaint') return tracked(request, onProgress);
       return runOutpaint(job, {
-        generate,
+        generate: tracked,
         seed: request.parameters.seed,
         library: services.database.vibeLibrary,
         pools: pools(),
@@ -186,15 +204,6 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           const s = settings();
           if (s.connection === 'relay' && s.limitEnabled && s.spentImagesToday >= s.dailyImageLimit)
             throw new Error('已达到每日张数上限');
-        },
-        afterBlock: () => {
-          const s = settings();
-          if (s.connection === 'relay')
-            preferences.saveGenerationSettings({
-              spentDate: today(),
-              spentToday: s.spentToday,
-              spentImagesToday: s.spentImagesToday + 1,
-            });
         },
       });
     },
@@ -280,7 +289,6 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       job.referencesPrepared = true;
       emit({ tabId: job.tabId });
     },
-    balance: () => (settings().connection === 'relay' ? 0 : refresh()),
     beforeEach: async (job) => {
       const s = settings();
       if (s.connection === 'relay' && s.limitEnabled && s.spentImagesToday >= s.dailyImageLimit) {
@@ -302,8 +310,6 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     },
     changed: (jobs) => {
       protectJobs(jobs);
-      const retained = new Set(jobs.map((job) => job.id));
-      for (const id of spent.keys()) if (!retained.has(id)) spent.delete(id);
       if (!shuttingDown)
         void settlePruned().catch((error) => {
           cleanupError = error;
@@ -318,16 +324,6 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         )
           versions.discardEmpty(job.workId);
       }
-      for (const job of jobs)
-        if (job.source === 'agent' && job.spent > (spent.get(job.id) || 0)) {
-          const s = settings();
-          preferences.saveGenerationSettings({
-            spentDate: today(),
-            spentImagesToday: s.spentImagesToday,
-            spentToday: (s.spentToday || 0) + job.spent - (spent.get(job.id) || 0),
-          });
-          spent.set(job.id, job.spent);
-        }
       // Deferred so queue construction is complete before status reads it.
       queueMicrotask(publish);
     },
@@ -382,7 +378,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           job.source === 'user' && job.completed === 0 ? version.id : undefined,
         );
         job.versionId = version.id;
-        protectJobs(queue.status());
+        usage.attachVersion(job.id, version.id);
+        protectJobs(queue.retainedJobs());
         services.database.refreshGeneratedCards();
         if (version.branchId === version.id && version.branchNumber && job.completed === 0)
           job.branchNotice = `已从第 ${versions.get(job.parentId).number} 版分出分支 ${version.branchNumber}`;
@@ -435,14 +432,6 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         }
         emit({ libraryChanged: true, tabId: job.tabId });
       });
-      if (settings().connection === 'relay' && job.operation !== 'outpaint') {
-        const s = settings();
-        preferences.saveGenerationSettings({
-          spentDate: today(),
-          spentToday: s.spentToday,
-          spentImagesToday: s.spentImagesToday + 1,
-        });
-      }
       await fs.unlink(file);
       return image.id;
     },
@@ -747,6 +736,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       parentNumber: parent.number,
       name: current.displayName,
       estimate: price.anlas,
+      estimateFixed: price.parts?.encode || 0,
     });
   }
   async function outpaintFor(input) {
@@ -836,6 +826,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     return { current, parent, image, prepared, estimate, wholeSteps, edgeSteps };
   }
   const handlers = {
+    'usage.summary': ({ range = 'today' }) => usage.summary(range, settings().connection),
+    'usage.daily': ({ days = 30 }) => usage.daily(days, settings().connection),
     'generate.estimate-outpaint': async (input) => {
       try {
         return (await outpaintFor(input)).estimate;
@@ -926,6 +918,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         parentNumber: parent.number,
         name: current.displayName,
         estimate: price.anlas,
+        estimateFixed: price.parts?.encode || 0,
       });
     },
     'generate.estimate-inpaint': async (input) => {
@@ -1200,6 +1193,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         parentNumber: parent.number,
         summary: diffSummary(versionDiff(parent.project, current.project)),
         estimate: price.anlas,
+        estimateFixed: price.parts?.encode || 0,
         source: caller.source === 'agent' ? 'agent' : 'user',
         pending:
           caller.source === 'agent' &&
@@ -1390,7 +1384,6 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     initialize: ensure,
     ready: async () => {
       const initial = await storage.load();
-      for (const job of initial) spent.set(job.id, job.spent || 0);
       queue.restore(initial);
       await settlePruned();
     },

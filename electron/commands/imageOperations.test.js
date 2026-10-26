@@ -258,6 +258,24 @@ it('keeps base images and image operation versions durable through command flows
       (await call('generate.inpaint', { ...inpaintInput, mask }, 'ui')).id,
     );
     expect(inpainted.state).toBe('completed');
+    const usage = database.usage.list();
+    expect(usage.map((record) => record.operation)).toEqual([
+      'img2img',
+      'upscale',
+      'enhance',
+      'inpaint',
+    ]);
+    expect(
+      usage.every((record) => record.images === 1 && !record.estimated && record.versionId),
+    ).toBe(true);
+    expect(usage.at(-1)).toMatchObject({
+      width: 1024,
+      height: 1024,
+      model: 'nai-diffusion-5-full-inpainting',
+    });
+    const summary = await call('usage.summary', { range: 'today' });
+    expect(summary.images).toBe(4);
+    expect((await call('generate.status')).settings.spentToday).toBe(summary.anlas);
     const paintedVersion = database.versions.get(inpainted.versionId);
     expect(paintedVersion.parentId).toBe(version.id);
     expect(paintedVersion.project.params).toEqual(version.project.params);

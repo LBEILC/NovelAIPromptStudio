@@ -303,14 +303,21 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       assetsDirectory,
       defaultAssetsDirectory,
       isDefault: assetsDirectory === defaultAssetsDirectory,
+      trashAutoCleanup: stored.trashAutoCleanup === true,
     };
   };
 
-  const saveLibrarySettings = ({ assetsDirectory } = {}) => {
-    const nextDirectory = normalizeAssetsDirectory(assetsDirectory, defaultAssetsDirectory, true);
+  const saveLibrarySettings = ({ assetsDirectory, trashAutoCleanup } = {}) => {
+    const nextDirectory =
+      assetsDirectory === undefined
+        ? librarySettings().assetsDirectory
+        : normalizeAssetsDirectory(assetsDirectory, defaultAssetsDirectory, true);
     const stored = read();
-    if (nextDirectory === defaultAssetsDirectory) delete stored.library;
-    else stored.library = { assetsDirectory: nextDirectory };
+    stored.library = { ...stored.library, assetsDirectory: nextDirectory };
+    if (trashAutoCleanup !== undefined) {
+      if (typeof trashAutoCleanup !== 'boolean') throw new Error('自动清理设置无效');
+      stored.library.trashAutoCleanup = trashAutoCleanup;
+    }
     write(stored);
     return librarySettings();
   };
