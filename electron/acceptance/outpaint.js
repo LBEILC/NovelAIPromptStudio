@@ -192,6 +192,15 @@ async function outpaintUIChecks({ h, database, generationService, call, waitJob 
         record.metadata.width === expectedW &&
         record.metadata.height === H,
     );
+    await h.check(`扩图界面 ${scenario} 版本快照保存实际扩图尺寸`, () => {
+      const snapshot = versions.find((v) => v.id === result.versionId)?.project.metadata;
+      return snapshot?.width === expectedW && snapshot?.height === H;
+    });
+    await h.wait('!document.querySelector(\'[data-key="draft"]\')', '扩图完成后没有未生成行');
+    await h.check(
+      `扩图界面 ${scenario} 草稿与快照一致且没有未生成行`,
+      '!document.querySelector(\'[data-key="draft"]\')',
+    );
     await h.check(
       `扩图界面 ${scenario} 版本栏显示扩图标签`,
       `!![...document.querySelectorAll('[data-tip]')].find(e=>e.textContent==='扩图' && e.getAttribute('data-tip').includes('${scenario === 'partial' ? '只扩了' : '往外扩图'}'))`,

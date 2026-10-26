@@ -678,6 +678,15 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
       });
     },
     append({ workId, parentId, project, source, image, seed, versionId, operation, random }) {
+      if (operation?.kind === 'outpaint')
+        project = {
+          ...project,
+          metadata: {
+            ...project.metadata,
+            width: image.metadata.width,
+            height: image.metadata.height,
+          },
+        };
       return atomic(() => {
         const parent = get(parentId);
         if (!parent || parent.workId !== workId) throw new Error('版本不存在');

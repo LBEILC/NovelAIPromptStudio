@@ -268,7 +268,18 @@ it(
         expect(request, cases[i]).toEqual(requests[i]);
       }
       const sent = [];
+      let finish;
+      const completed = new Promise((resolve) => {
+        finish = resolve;
+      });
       const queue = createGenerationQueue({
+        changed: (states) => {
+          if (
+            states.length === jobs.length &&
+            states.every((j) => ['completed', 'failed', 'canceled'].includes(j.state))
+          )
+            finish(states);
+        },
         prepare: async (j) => {
           Object.assign(j, await storage.hydrate(j));
           j.request = await build(j);
@@ -282,9 +293,8 @@ it(
         accept: async () => 'synthetic-result',
       });
       queue.restore(restored);
-      await vi.waitFor(() =>
-        expect(queue.status().every((j) => j.state === 'completed')).toBe(true),
-      );
+      const states = await completed;
+      expect(states.map((j) => j.error || j.state)).toEqual(jobs.map(() => 'completed'));
       expect(sent).toEqual(requests);
       await queue.close();
     }),

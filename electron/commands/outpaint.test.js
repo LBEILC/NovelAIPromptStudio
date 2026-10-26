@@ -11,6 +11,7 @@ import { readWorkbenchImage } from '../workbench.js';
 import { startFakeNovelAI } from '../fixtures/novelAIService.js';
 import { createWorkbenchFixtures } from '../acceptance/workbenchFixtures.js';
 import { estimateImageOperation } from '../imageOperations.js';
+import { buildProjectRequest } from '../parameterRequest.js';
 
 async function setup(size = [512, 512]) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-outpaint-'));
@@ -238,6 +239,8 @@ it.each(['whole', 'edges', 'partial', 'failed', 'cancel', 'cancel-before'])(
       expect(version.project.metadata).toEqual({
         ...parent.project.metadata,
         prompt_raw: 'synthetic draft',
+        width: 576,
+        height: ['partial', 'cancel'].includes(scenario) ? 512 : 576,
       });
       expect(version.operation).toMatchObject({
         kind: 'outpaint',
@@ -266,6 +269,8 @@ it.each(['whole', 'edges', 'partial', 'failed', 'cancel', 'cancel-before'])(
         versionId: final.versionId,
       });
       expect(reopened.tab.project.metadata).toMatchObject(dimensions);
+      const request = await buildProjectRequest(version.project, f.database.vibeLibrary);
+      expect(request.request.parameters).toMatchObject(dimensions);
       // The embedded source settings remain intact despite the larger bitmap.
       expect(JSON.parse(output.metadata.extra_json).parsed).toMatchObject({
         width: 512,
