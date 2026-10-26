@@ -1,3 +1,10 @@
+import {
+  createAgentImages,
+  resolveAgentMask,
+  croppedMaskInfo,
+  currentMaskInput,
+} from '../agentImages.js';
+import { validateRect } from '../inpaint.js';
 import { buildInpaint, compositeInpaint, storeInpaintMask } from '../inpaint.js';
 import sharp from 'sharp';
 import { outpaintSteps } from '../outpaint.js';
@@ -35,6 +42,10 @@ const withPromptTemplate = (project, draft) => ({
   tags: structuredClone(draft.tags),
 });
 export function generationCommands({ services, store, tab, revision, unlocked, emit }) {
+  const previews = createAgentImages(services.directory);
+  const inpaintStates = new Map();
+  let previewCleanup = Promise.resolve();
+  let previewState;
   const preferences = services.preferences;
   if (!preferences) return { handlers: {}, close: () => {} };
   const versions = services.database.versions;
@@ -291,6 +302,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     },
     beforeEach: async (job) => {
       const s = settings();
+      const imageOperation = ['upscale', 'enhance', 'inpaint', 'outpaint'].includes(job.operation);
       if (s.connection === 'relay' && s.limitEnabled && s.spentImagesToday >= s.dailyImageLimit) {
         job.limitReached = true;
         return false;
@@ -300,16 +312,33 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         job.source === 'agent' &&
         !job.confirmed &&
         s.limitEnabled &&
-        (s.spentToday || 0) + estimateGeneration(job.request, subscription, 1).perImage >
+        (s.spentToday || 0) +
+          (imageOperation
+            ? job.estimate
+            : estimateGeneration(job.request, subscription, 1).perImage) >
           s.dailyLimit
       ) {
         job.limitReached = true;
+        if (imageOperation) job.state = 'pending';
         return false;
       }
       return true;
     },
     changed: (jobs) => {
       protectJobs(jobs);
+      const nextPreviewState = JSON.stringify(
+        jobs
+          .filter((job) => job.previewPath)
+          .map((job) => [job.previewPath, job.state, job.removed]),
+      );
+      if (nextPreviewState !== previewState) {
+        previewState = nextPreviewState;
+        previewCleanup = previewCleanup
+          .then(() => previews.cleanupJobs(jobs))
+          .catch((error) => {
+            cleanupError = error;
+          });
+      }
       if (!shuttingDown)
         void settlePruned().catch((error) => {
           cleanupError = error;
@@ -638,7 +667,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       throw new Error('中转站没有放大用的模型');
     checkRelayRequest(settings(), request, pending);
   }
-  async function operationFor(input) {
+  async function sourceFor(input) {
     const current = tab(input.tabId);
     await ensure(current);
     const parent =
@@ -654,6 +683,37 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     if (!parent) throw new CommandError('not_found', '图片不在这个作品中');
     const image = services.database.loadProject(input.imageId) || parent.project;
     if (image.deleted_at) throw new CommandError('not_found', '图片不存在');
+    return { current, parent, image };
+  }
+  async function agentInpaint(input, caller) {
+    if (caller?.source !== 'agent') return input;
+    if (input.useCurrent) {
+      const current = tab(input.tabId),
+        state = inpaintStates.get(current.id);
+      if (!state) throw new CommandError('not_found', '没有正在进行的局部重绘');
+      if (input.imageId && input.imageId !== state.imageId)
+        throw new CommandError('invalid_input', 'imageId 与正在重绘的图片不一致');
+      if (!state.mask) throw new CommandError('invalid_input', '先涂上要重画的地方');
+      const { image } = await sourceFor(state);
+      return currentMaskInput(input, state, image.image_path);
+    }
+    const { image } = await sourceFor(input);
+    return resolveAgentMask(input, image.image_path);
+  }
+  function agentPolicy(caller, price) {
+    const s = settings();
+    return {
+      source: caller?.source === 'agent' ? 'agent' : 'user',
+      pending:
+        caller?.source === 'agent' &&
+        (s.agentMode !== 'direct' ||
+          (s.connection !== 'relay' &&
+            s.limitEnabled &&
+            (s.spentToday || 0) + price.anlas > s.dailyLimit)),
+    };
+  }
+  async function operationFor(input) {
+    const { current, parent, image } = await sourceFor(input);
     // 局部重绘用编辑器里的草稿（2.35）；放大、增强用这张图自己那一版的提示词和参数（2.34）
     const promptProject = input.op === 'inpaint' ? current.project : parent.project;
     const operation = {
@@ -701,12 +761,13 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         : estimateImageOperation(prepared.request, subscription, prepared.pendingEncodes);
     return { current, parent, image, operation, prepared, price, promptProject };
   }
-  async function startOperation(input, kind) {
+  async function startOperation(input, kind, caller) {
     const current = tab(input.tabId);
     revision(input.expectedRevision, current.revision || 0);
     unlocked(input);
     if (!settings().hasToken) throw new Error('没有持久令牌');
-    const { parent, image, operation, prepared, price, promptProject } = await operationFor({
+    if (kind === 'inpaint') input = await agentInpaint(input, caller);
+    const { parent, image, operation, prepared, price } = await operationFor({
       ...input,
       op: kind,
     });
@@ -731,7 +792,12 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       request: prepared.request,
       count: 1,
       fixedSeed: kind === 'upscale',
-      source: 'user',
+      ...agentPolicy(caller, price),
+      ...(kind === 'inpaint'
+        ? {
+            previewPath: await previews.preview(image.image_path, input, { limit: 512, job: true }),
+          }
+        : {}),
       operation: kind,
       operationDetails: operation,
       operationPath: image.image_path,
@@ -743,21 +809,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     });
   }
   async function outpaintFor(input) {
-    const current = tab(input.tabId);
-    await ensure(current);
-    const parent =
-      versions.forImage(input.imageId, current.workId) ||
-      versions
-        .list(current.workId)
-        .find(
-          (v) =>
-            !v.parentId &&
-            v.project.id === input.imageId &&
-            !['removed', 'trashed'].includes(v.originState),
-        );
-    if (!parent) throw new Error('图片不在这个作品中');
-    const image = services.database.loadProject(input.imageId) || parent.project;
-    if (image.deleted_at) throw new Error('图片不存在');
+    const { current, parent, image } = await sourceFor(input);
     const source = await sharp(image.image_path).metadata();
     const canvas = outpaintCanvas(source, input.edges);
     // Only the common request settings are needed for pricing. No image is sent here.
@@ -829,6 +881,56 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     return { current, parent, image, prepared, estimate, wholeSteps, edgeSteps };
   }
   const handlers = {
+    'image.grid': async (input) => {
+      const { image } = await sourceFor(input);
+      return previews.grid(image.image_path, input.step);
+    },
+    'inpaint.sync': async (input) => {
+      if (input.closed) {
+        inpaintStates.delete(input.tabId);
+        return { active: false };
+      }
+      const current = tab(input.tabId);
+      const { image } = await sourceFor(input);
+      if (input.rect) validateRect(input.rect, await sharp(image.image_path).metadata());
+      if (input.mask && !input.rect) throw new CommandError('invalid_input', '遮罩需要重绘框');
+      if (input.mask) await croppedMaskInfo(input.mask, input.rect);
+      if (
+        input.strength !== undefined &&
+        (!Number.isFinite(input.strength) || input.strength < 0.01 || input.strength > 1)
+      )
+        throw new CommandError('invalid_input', '重绘强度无效');
+      inpaintStates.set(current.id, {
+        ...input,
+        strength: input.strength ?? 1,
+        fullSize: input.fullSize ?? false,
+        updatedAt: new Date().toISOString(),
+      });
+      return { active: true };
+    },
+    'inpaint.get': async (input) => {
+      const id = input.tabId ?? store.get().activeTabId;
+      if (!id) return { active: false };
+      const current = tab(id);
+      const state = inpaintStates.get(current.id);
+      if (!state) return { active: false };
+      const { image, parent } = await sourceFor(state);
+      return {
+        active: true,
+        tabId: current.id,
+        imageId: state.imageId,
+        versionId: parent.id,
+        versionNumber: parent.number,
+        rect: state.rect ?? null,
+        strength: state.strength,
+        fullSize: state.fullSize,
+        ...(await croppedMaskInfo(state.mask, state.rect)),
+        previewPath: await previews.preview(image.image_path, state),
+        cropPath: await previews.preview(image.image_path, state, { limit: 1024, crop: true }),
+        updatedAt: state.updatedAt,
+      };
+    },
+
     'usage.summary': ({ range = 'today' }) => usage.summary(range, settings().connection),
     'usage.daily': ({ days = 30 }) => usage.daily(days, settings().connection),
     'generate.estimate-outpaint': async (input) => {
@@ -853,7 +955,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         };
       }
     },
-    'generate.outpaint': async (input) => {
+    'generate.outpaint': async (input, caller) => {
       const current = tab(input.tabId);
       revision(input.expectedRevision, current.revision || 0);
       unlocked(input);
@@ -868,6 +970,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         );
       }
       const { parent, image, prepared, estimate, wholeSteps, edgeSteps } = context;
+      input = { ...input, mode: input.mode ?? estimate.recommended };
       const price = estimate[input.mode];
       if (price.unavailable) throw new CommandError('unavailable', price.unavailable);
       const steps = input.mode === 'whole' ? wholeSteps : edgeSteps;
@@ -911,7 +1014,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         request: prepared.request,
         count: 1,
         fixedSeed: false,
-        source: 'user',
+        ...agentPolicy(caller, price),
+        previewPath: await previews.outpaint(image.image_path, input.edges, estimate.canvas),
         operation: 'outpaint',
         operationDetails: operation,
         operationPath: image.image_path,
@@ -924,20 +1028,27 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         estimateFixed: price.parts?.encode || 0,
       });
     },
-    'generate.estimate-inpaint': async (input) => {
+    'generate.estimate-inpaint': async (input, caller) => {
       try {
-        const { prepared, price } = await operationFor({ ...input, op: 'inpaint' });
+        input = await agentInpaint(input, caller);
+        const { prepared, price, image } = await operationFor({ ...input, op: 'inpaint' });
+        const details = {
+          rect: input.rect,
+          ...(await croppedMaskInfo(input.mask, input.rect)),
+          previewPath: await previews.preview(image.image_path, input),
+        };
         return {
           ...price,
           width: prepared.width,
           height: prepared.height,
+          ...details,
           scale: prepared.scale,
           model: prepared.request.model,
           ...(prepared.ignored.length ? { ignored: prepared.ignored } : {}),
           balance: balance(),
         };
       } catch (error) {
-        if (error.code === 'invalid_input') throw error;
+        if (['invalid_input', 'not_found'].includes(error.code)) throw error;
         return {
           anlas: 0,
           perImage: 0,
@@ -952,7 +1063,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         };
       }
     },
-    'generate.inpaint': (input) => startOperation(input, 'inpaint'),
+    'generate.inpaint': (input, caller) => startOperation(input, 'inpaint', caller),
     'generate.estimate-op': async (input) => {
       try {
         const { prepared, price } = await operationFor(input);
@@ -976,8 +1087,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         };
       }
     },
-    'generate.upscale': (input) => startOperation(input, 'upscale'),
-    'generate.enhance': (input) => startOperation(input, 'enhance'),
+    'generate.upscale': (input, caller) => startOperation(input, 'upscale', caller),
+    'generate.enhance': (input, caller) => startOperation(input, 'enhance', caller),
     'trash.detached': async () => {
       const cards = new Map(
         (await services.database.loadLibraryCards()).map((card) => [card.id, card]),
@@ -1386,6 +1497,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     handlers,
     initialize: ensure,
     ready: async () => {
+      await previews.cleanupTemporary();
       const initial = await storage.load();
       queue.restore(initial);
       await settlePruned();
@@ -1438,6 +1550,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         shuttingDown = true;
         await queue.close();
         await storage.flush();
+        await previewCleanup;
         await store.exclusive(async () => {});
         if (cleanupError) throw cleanupError;
       })()),

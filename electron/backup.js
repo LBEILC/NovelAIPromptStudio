@@ -72,7 +72,11 @@ function entryPath(name) {
 async function listFiles(root, relative = '') {
   const result = [];
   for (const entry of await fsp.readdir(path.join(root, relative), { withFileTypes: true })) {
-    if (entry.isSymbolicLink()) continue;
+    if (
+      entry.isSymbolicLink() ||
+      (!relative && ['agent-image-previews', 'generation-assets'].includes(entry.name))
+    )
+      continue;
     const name = path.join(relative, entry.name);
     if (entry.isDirectory()) result.push(...(await listFiles(root, name)));
     else if (entry.isFile())

@@ -1,3 +1,4 @@
+import { agentImageChecks } from './agentImages.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn, execFile } from 'node:child_process';
@@ -105,6 +106,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     'once',
   );
   for (const name of [
+    'inpaint.sync',
     'settings.ai.get',
     'trash.delete-permanently',
     'trash.detached',
@@ -472,4 +474,5 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   database.deleteProject(imported.project.id);
   // Only the synthetic record created by this check is removed from the isolated database.
   database.deleteProject(saved.project.id);
+  await agentImageChecks({ h, call, directory: path.join(mode.root, 'agent-images'), database });
 }

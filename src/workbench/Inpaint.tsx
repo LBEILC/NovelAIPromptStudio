@@ -10,7 +10,7 @@ import { useNotifications } from '../kit/toast';
 import { markLoaded } from '../kit/alpha';
 import { invokeUI } from '../lib/commands';
 import { useGeneration } from '../state/generation';
-import { INPAINT_PRESETS, autoInpaintRect, inpaintSize, type Rect } from '../shared/inpaint';
+import { INPAINT_PRESETS, defaultInpaintRect, inpaintSize, type Rect } from '../shared/inpaint';
 import { BlurImg, type BlurImage } from '../kit/blur';
 
 type Preset = (typeof INPAINT_PRESETS)[number]['id'] | 'free';
@@ -214,6 +214,28 @@ function Editor(
   const [painted, setPainted] = useState(0);
   const [info, setInfo] = useState({ any: false, edge: false, outside: false });
   const [est, setEst] = useState<Estimate | null>(null);
+  useEffect(() => {
+    if (p.leaving) return;
+    const timer = setTimeout(() => {
+      const canvas = mask.current;
+      void invokeUI('inpaint.sync', {
+        tabId: p.tabId,
+        imageId: p.imageId,
+        ...(rect ? { rect } : {}),
+        strength,
+        fullSize,
+        ...(rect && canvas && scan(canvas, rect).any ? { mask: exportMask(canvas, rect) } : {}),
+      }).catch(console.error);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [p.tabId, p.imageId, p.leaving, rect, strength, fullSize, painted]);
+  useEffect(() => {
+    if (p.leaving)
+      void invokeUI('inpaint.sync', { tabId: p.tabId, closed: true }).catch(console.error);
+    return () => {
+      void invokeUI('inpaint.sync', { tabId: p.tabId, closed: true }).catch(console.error);
+    };
+  }, [p.tabId, p.leaving]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [space, setSpace] = useState(false);
@@ -294,10 +316,7 @@ function Editor(
     };
   };
   // 自动出框：整张图都不超过免费尺寸时就框整张，上下文最多
-  const autoRect = (b: Rect) =>
-    W * H <= FREE_PX
-      ? { x: 0, y: 0, width: W, height: H }
-      : autoInpaintRect(b, { width: W, height: H });
+  const autoRect = (b: Rect) => defaultInpaintRect(b, { width: W, height: H });
   /** 屏幕上 1px 是原图的多少像素 */
   const perPx = () => W / (stage.current?.getBoundingClientRect().width || W);
   const zoomTo = (r: Rect) => {

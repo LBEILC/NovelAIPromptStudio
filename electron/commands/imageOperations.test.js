@@ -117,23 +117,6 @@ it('keeps base images and image operation versions durable through command flows
     expect((await call('workbench.get', { tabId })).tab.project.references.base).toBeNull();
     await call('params.set', { tabId, patch: { steps: 31 } });
     const sourceId = completed.images[0];
-    for (const name of ['generate.upscale', 'generate.enhance', 'generate.estimate-op']) {
-      const r = await commands.dispatch(
-        name,
-        {
-          tabId,
-          imageId: sourceId,
-          ...(name === 'generate.enhance'
-            ? { magnitude: 2, scale: 'max' }
-            : name === 'generate.estimate-op'
-              ? { op: 'upscale' }
-              : {}),
-        },
-        'agent',
-      );
-      expect(r.ok).toBe(false);
-      expect(r.error.code).toBe('forbidden');
-    }
     const estimate = await call(
       'generate.estimate-op',
       { tabId, imageId: sourceId, op: 'upscale' },
@@ -212,14 +195,6 @@ it('keeps base images and image operation versions durable through command flows
         .toBuffer()
     ).toString('base64');
     const inpaintInput = { tabId, imageId: sourceId, rect, strength: 0.4 };
-    for (const name of ['generate.inpaint', 'generate.estimate-inpaint']) {
-      const denied = await commands.dispatch(
-        name,
-        { ...inpaintInput, ...(name === 'generate.inpaint' ? { mask } : {}) },
-        'agent',
-      );
-      expect(denied.error.code).toBe('forbidden');
-    }
     await call('params.set', { tabId, patch: { steps: 31 } });
     await call('reference.set-base', { tabId, path: file });
     const estimateInpaint = await call('generate.estimate-inpaint', inpaintInput, 'ui');

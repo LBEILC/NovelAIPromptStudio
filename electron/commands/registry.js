@@ -243,10 +243,28 @@ export const commandRegistry = {
     mutation: true,
   },
   'vibe.library': { fields: {} },
+  'image.grid': {
+    fields: { ...tab, imageId: 'string', step: 'integer' },
+    required: ['tabId', 'imageId'],
+  },
+  'inpaint.sync': {
+    fields: {
+      ...tab,
+      imageId: 'string',
+      rect: 'inpaintRect',
+      mask: 'inpaintMask',
+      strength: 'number',
+      fullSize: 'boolean',
+      closed: 'boolean',
+    },
+    required: ['tabId'],
+    uiOnly: true,
+    mutation: true,
+  },
+  'inpaint.get': { fields: { tabId: 'string' } },
   'generate.estimate-outpaint': {
     fields: { ...tab, imageId: 'string', edges: 'outpaintEdges', fullSize: 'boolean' },
     required: ['tabId', 'imageId', 'edges'],
-    uiOnly: true,
   },
   'generate.outpaint': {
     fields: {
@@ -256,8 +274,7 @@ export const commandRegistry = {
       mode: 'whole|edges',
       fullSize: 'boolean',
     },
-    required: ['tabId', 'imageId', 'edges', 'mode'],
-    uiOnly: true,
+    required: ['tabId', 'imageId', 'edges'],
     mutation: true,
   },
   'generate.estimate-inpaint': {
@@ -265,23 +282,29 @@ export const commandRegistry = {
       ...tab,
       imageId: 'string',
       rect: 'inpaintRect',
+      shapes: 'array',
+      grow: 'number',
+      maskPath: 'string',
+      useCurrent: 'boolean',
       strength: 'number',
       fullSize: 'boolean',
     },
-    required: ['tabId', 'imageId', 'rect'],
-    uiOnly: true,
+    required: ['tabId'],
   },
   'generate.inpaint': {
     fields: {
       ...tab,
       imageId: 'string',
       rect: 'inpaintRect',
+      shapes: 'array',
+      grow: 'number',
+      maskPath: 'string',
+      useCurrent: 'boolean',
       mask: 'inpaintMask',
       strength: 'number',
       fullSize: 'boolean',
     },
-    required: ['tabId', 'imageId', 'rect', 'mask'],
-    uiOnly: true,
+    required: ['tabId'],
     mutation: true,
   },
   'generate.estimate-op': {
@@ -293,19 +316,16 @@ export const commandRegistry = {
       scale: 'enhanceScale',
     },
     required: ['tabId', 'op', 'imageId'],
-    uiOnly: true,
   },
   'generate.upscale': {
     fields: { ...tab, imageId: 'string' },
     required: ['tabId', 'imageId'],
     mutation: true,
-    uiOnly: true,
   },
   'generate.enhance': {
     fields: { ...tab, imageId: 'string', magnitude: 'integer', scale: 'enhanceScale' },
     required: ['tabId', 'imageId', 'magnitude', 'scale'],
     mutation: true,
-    uiOnly: true,
   },
   'generate.estimate': {
     fields: { ...tab, count: 'integer', width: 'number', height: 'number' },
@@ -750,6 +770,7 @@ function valid(value, type) {
       Object.keys(value).every((key) => ['left', 'right', 'top', 'bottom'].includes(key)) &&
       Object.values(value).some((n) => Number(n) > 0)
     );
+  if (type === 'array') return Array.isArray(value);
   if (type === 'inpaintMask') return typeof value === 'string' && value.length <= 140 * 1024 * 1024;
   if (type === 'inpaintRect')
     return (
@@ -1030,5 +1051,32 @@ export function validateCommand(name, input, source) {
       (Number(input.limit) < 1 || Number(input.limit) > 1000))
   )
     throw new CommandError('invalid_input', '输入缺少要修改的内容，或超出允许范围');
+  if (['generate.inpaint', 'generate.estimate-inpaint'].includes(name)) {
+    if (source === 'agent') {
+      if (
+        Number(input.shapes !== undefined) +
+          Number(input.maskPath !== undefined) +
+          Number(input.useCurrent === true) !==
+          1 ||
+        input.mask !== undefined ||
+        (!input.useCurrent && !input.imageId) ||
+        (input.grow !== undefined && input.shapes === undefined)
+      )
+        throw new CommandError(
+          'invalid_input',
+          '恰好指定 shapes、maskPath 或 useCurrent: true 中的一种',
+        );
+    } else if (
+      !input.imageId ||
+      !input.rect ||
+      (name === 'generate.inpaint' && !input.mask) ||
+      input.shapes !== undefined ||
+      input.maskPath !== undefined ||
+      input.useCurrent !== undefined
+    )
+      throw new CommandError('invalid_input', '界面重绘需要 imageId、rect 和 mask');
+  }
+  if (name === 'generate.outpaint' && source === 'ui' && !input.mode)
+    throw new CommandError('invalid_input', '请选择扩图模式');
   return key;
 }

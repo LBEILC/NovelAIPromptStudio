@@ -380,6 +380,41 @@ export interface CommandDefinitions {
     input: Record<string, never>;
     output: { items: import('./params').VibeLibraryItem[] };
   };
+  'image.grid': {
+    input: TabInput & { imageId: string; step?: number };
+    output: { path: string; width: number; height: number; step: number; scale: number };
+  };
+  'inpaint.sync': {
+    input: TabInput & {
+      imageId?: string;
+      rect?: import('./inpaint').Rect;
+      mask?: string;
+      strength?: number;
+      fullSize?: boolean;
+      closed?: boolean;
+    };
+    output: { active: boolean };
+  };
+  'inpaint.get': {
+    input: { tabId?: string };
+    output:
+      | { active: false }
+      | {
+          active: true;
+          tabId: string;
+          imageId: string;
+          versionId: string;
+          versionNumber: number;
+          rect: import('./inpaint').Rect | null;
+          strength: number;
+          fullSize: boolean;
+          maskBounds: import('./inpaint').Rect | null;
+          maskRatio: number;
+          previewPath: string;
+          cropPath: string;
+          updatedAt: string;
+        };
+  };
   'generate.estimate-outpaint': {
     input: TabInput & {
       imageId: string;
@@ -392,15 +427,19 @@ export interface CommandDefinitions {
     input: TabInput & {
       imageId: string;
       edges: import('./generation').OutpaintEdges;
-      mode: 'whole' | 'edges';
+      mode?: 'whole' | 'edges';
       fullSize?: boolean;
     };
     output: GenerationJob;
   };
   'generate.estimate-inpaint': {
     input: TabInput & {
-      imageId: string;
-      rect: import('./inpaint').Rect;
+      imageId?: string;
+      rect?: import('./inpaint').Rect;
+      shapes?: import('./inpaint').InpaintShape[];
+      grow?: number;
+      maskPath?: string;
+      useCurrent?: boolean;
       strength?: number;
       fullSize?: boolean;
     };
@@ -409,15 +448,23 @@ export interface CommandDefinitions {
       height: number;
       scale: number;
       model: string;
+      rect?: import('./inpaint').Rect;
+      maskBounds?: import('./inpaint').Rect | null;
+      maskRatio?: number;
+      previewPath?: string;
       ignored?: ('vibe' | 'precise' | 'base')[];
     };
   };
   'generate.inpaint': {
     input: TabInput & {
-      imageId: string;
-      rect: import('./inpaint').Rect;
-      mask: string;
-      strength: number;
+      imageId?: string;
+      rect?: import('./inpaint').Rect;
+      shapes?: import('./inpaint').InpaintShape[];
+      grow?: number;
+      maskPath?: string;
+      useCurrent?: boolean;
+      mask?: string;
+      strength?: number;
       fullSize?: boolean;
     };
     output: GenerationJob;

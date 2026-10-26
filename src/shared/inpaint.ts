@@ -60,6 +60,17 @@ export function autoInpaintRect(mask: Rect, image: { width: number; height: numb
   };
 }
 
+export function defaultInpaintRect(mask: Rect, image: { width: number; height: number }): Rect {
+  return image.width * image.height <= 1048576
+    ? { x: 0, y: 0, width: image.width, height: image.height }
+    : autoInpaintRect(mask, image);
+}
+
+export type InpaintShape =
+  | { type: 'rect'; x: number; y: number; width: number; height: number }
+  | { type: 'ellipse'; cx: number; cy: number; rx: number; ry: number }
+  | { type: 'polygon'; points: [number, number][] };
+
 export const INPAINT_MODELS = Object.freeze({
   'nai-diffusion-5-full': 'nai-diffusion-5-full-inpainting',
   'nai-diffusion-5-full-medium': 'nai-diffusion-5-full-medium-inpainting',

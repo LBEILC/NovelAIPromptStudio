@@ -58,8 +58,10 @@ export function createGenerationQueue({
         publish();
         while (!closed && !paused && !job.stop && (job.continuous || job.completed < job.count)) {
           if (!(await beforeEach(job))) {
-            job.state = 'failed';
-            job.error ||= '已达到每日上限';
+            if (job.state !== 'pending') {
+              job.state = 'failed';
+              job.error ||= '已达到每日上限';
+            }
             publish();
             break;
           }

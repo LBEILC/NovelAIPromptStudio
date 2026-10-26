@@ -157,6 +157,81 @@ export async function main(argv = process.argv.slice(2), services = {}) {
       ok: true,
       data: {
         usage: 'nai-studio <命令> [--json <JSON对象>] [--profile=demo]',
+        imageOperations: {
+          title: '图片操作',
+          shapes: [
+            { type: 'rect', x: 0, y: 0, width: 100, height: 80 },
+            { type: 'ellipse', cx: 300, cy: 200, rx: 60, ry: 90 },
+            {
+              type: 'polygon',
+              points: [
+                [10, 10],
+                [200, 40],
+                [120, 180],
+              ],
+            },
+          ],
+          shapeLimits: 'polygon 3–64 个点。所有坐标和 grow 都是原图像素。',
+          workflow: [
+            '先 version.list 找到图片的 projectId（原图用根版本 project.id）。',
+            '先估价再发起，默认进入 pending；Agent 不能调用 generate.confirm，也不能修改确认或费用设置。',
+            '放大、增强用源图那一版的提示词，不看草稿；局部重绘、扩图用当前草稿，提示词写新区域里要有什么。',
+            '局部重绘：image.grid 看原图坐标 → 写 shapes → generate.estimate-inpaint 看 previewPath → 调整形状再估价 → generate.inpaint。',
+            '用户已涂好时先 inpaint.get 看 previewPath/cropPath，再改草稿；useCurrent:true 可使用同步的遮罩发起重绘。',
+            'shapes、maskPath、useCurrent:true 恰好给一种。rect 可省略；给了就必须包含全部遮罩。grow 为 0–128 原图像素，只用于 shapes。',
+            'maskPath 只读本地 PNG（不超过 50 MB），尺寸与原图一致，亮度过半为重画；Agent 结果新增版本，不切换用户舞台。',
+          ],
+          examples: [
+            {
+              name: 'generate.estimate-op',
+              input: { tabId: 'TAB', imageId: 'IMAGE', op: 'upscale' },
+            },
+            { name: 'generate.upscale', input: { tabId: 'TAB', imageId: 'IMAGE' } },
+            {
+              name: 'generate.estimate-op',
+              input: { tabId: 'TAB', imageId: 'IMAGE', op: 'enhance', magnitude: 2, scale: 1 },
+            },
+            {
+              name: 'generate.enhance',
+              input: { tabId: 'TAB', imageId: 'IMAGE', magnitude: 2, scale: 1 },
+            },
+            {
+              name: 'generate.estimate-outpaint',
+              input: {
+                tabId: 'TAB',
+                imageId: 'IMAGE',
+                edges: { left: 64, right: 0, top: 0, bottom: 0 },
+              },
+            },
+            {
+              name: 'generate.outpaint',
+              input: {
+                tabId: 'TAB',
+                imageId: 'IMAGE',
+                edges: { left: 64, right: 0, top: 0, bottom: 0 },
+              },
+            },
+            { name: 'image.grid', input: { tabId: 'TAB', imageId: 'IMAGE' } },
+            {
+              name: 'generate.estimate-inpaint',
+              input: {
+                tabId: 'TAB',
+                imageId: 'IMAGE',
+                shapes: [{ type: 'rect', x: 100, y: 100, width: 128, height: 128 }],
+              },
+            },
+            {
+              name: 'generate.inpaint',
+              input: {
+                tabId: 'TAB',
+                imageId: 'IMAGE',
+                shapes: [{ type: 'rect', x: 100, y: 100, width: 128, height: 128 }],
+              },
+            },
+            { name: 'inpaint.get', input: {} },
+            { name: 'generate.inpaint', input: { tabId: 'TAB', useCurrent: true } },
+          ],
+        },
         commands: Object.entries(commandRegistry)
           .filter(([, v]) => !v.uiOnly)
           .map(([name, v]) => ({
@@ -193,6 +268,7 @@ export async function main(argv = process.argv.slice(2), services = {}) {
     };
   validateCommand(request.name, request.input, 'agent');
   if (request.input.path) request.input.path = path.resolve(request.input.path);
+  if (request.input.maskPath) request.input.maskPath = path.resolve(request.input.maskPath);
   const config = await (services.configuration || configuration)(request.profile);
   const requestConnection = services.connect || connect;
   try {

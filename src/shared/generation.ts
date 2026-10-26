@@ -111,6 +111,8 @@ export interface WorkOrigin {
   deleted?: true;
 }
 export interface GenerationJob {
+  previewPath?: string;
+  operationDetails?: ImageOperation;
   deferred?: boolean;
   skipped?: boolean;
   resumedAfterExit?: boolean;

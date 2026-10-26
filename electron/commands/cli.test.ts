@@ -3,6 +3,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { afterEach, expect, it, vi } from 'vitest';
 import { configuration, main } from '../../agent/client.mjs';
+import { validateCommand } from './registry.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -62,4 +63,28 @@ it('keeps the default connection directory and omits a profile launch flag', asy
     userData: base,
     args: ['test-app-root'],
   });
+});
+
+it('documents valid image operation examples and keeps UI synchronization private', async () => {
+  const help = await main(['help']);
+  expect(help.data.imageOperations.title).toBe('图片操作');
+  for (const example of help.data.imageOperations.examples)
+    expect(validateCommand(example.name, example.input, 'agent')).toBe(example.name);
+  expect(
+    help.data.commands.some((command: { name: string }) => command.name === 'inpaint.sync'),
+  ).toBe(false);
+});
+
+it('resolves mask paths relative to the CLI caller before sending them to the application', async () => {
+  launchConfiguration();
+  const connect = vi.fn(async (_config: object, _request: object) => ({ ok: true, data: {} }));
+  await main(
+    [
+      'generate.estimate-inpaint',
+      '--json',
+      JSON.stringify({ tabId: 'synthetic', imageId: 'image', maskPath: 'mask.png' }),
+    ],
+    { connect },
+  );
+  expect(connect.mock.calls[0][1]).toMatchObject({ input: { maskPath: path.resolve('mask.png') } });
 });

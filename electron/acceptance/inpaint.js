@@ -1,3 +1,4 @@
+import { inpaintSyncChecks } from './agentImages.js';
 import sharp from 'sharp';
 import { contextMenu, menuRoot, toastRoot } from './release186.js';
 import { isDeepStrictEqual } from 'node:util';
@@ -21,6 +22,7 @@ export async function inpaintChecks({ h, database }) {
     patch: { model: 'nai-diffusion-5-full' },
     dropReferences: true,
   });
+  await inpaintSyncChecks(h, tabId);
   const versionsBefore = (await call('version.list', { tabId })).versions;
   const parent =
     database.versions.forImage(source.id, opened.tab.workId) ||

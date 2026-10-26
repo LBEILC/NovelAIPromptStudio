@@ -78,6 +78,7 @@ async function setup(size = [512, 512]) {
   return {
     directory,
     database,
+    preferences,
     service,
     commands,
     source,
@@ -145,7 +146,7 @@ it('prices both modes with actual models, validates inputs and matches inpaint p
     ])
       expect(await f.commands.dispatch(name, {}, 'agent')).toMatchObject({
         ok: false,
-        error: { code: 'forbidden' },
+        error: { code: 'invalid_input' },
       });
     for (const edges of [
       { ...f.input.edges, left: -64 },
@@ -325,3 +326,255 @@ it.each(['whole', 'edges', 'partial', 'failed', 'cancel', 'cancel-before'])(
     }
   },
 );
+
+const operationInput = (f, kind) => ({
+  tabId: f.input.tabId,
+  imageId: f.input.imageId,
+  ...(kind === 'enhance' ? { magnitude: 2, scale: 1 } : {}),
+  ...(kind === 'outpaint' ? { edges: f.input.edges } : {}),
+  ...(kind === 'inpaint'
+    ? { shapes: [{ type: 'rect', x: 160, y: 160, width: 128, height: 128 }] }
+    : {}),
+});
+
+for (const kind of ['upscale', 'enhance', 'outpaint', 'inpaint']) {
+  it(`Agent ${kind} confirms, keeps the stage and selects the correct prompt source`, async () => {
+    const f = await setup();
+    try {
+      await f.call('prompt.set', {
+        tabId: f.input.tabId,
+        scope: 'base:prompt',
+        text: 'synthetic distinct draft',
+      });
+      const before = (await f.call('workbench.get', { tabId: f.input.tabId })).tab;
+      const versions = (await f.call('version.list', { tabId: f.input.tabId })).versions;
+      const input = operationInput(f, kind);
+      const job = await f.call(`generate.${kind}`, input, 'agent');
+      expect(job).toMatchObject({
+        state: 'pending',
+        source: 'agent',
+        operation: kind,
+        parentNumber: expect.any(Number),
+        name: expect.any(String),
+        estimate: expect.any(Number),
+      });
+      expect(job.operationDetails.prompt.metadata.prompt_raw).toBe(
+        ['inpaint', 'outpaint'].includes(kind)
+          ? 'synthetic distinct draft'
+          : versions[0].project.metadata.prompt_raw,
+      );
+      expect(f.service.state.requests).toHaveLength(0);
+      if (['inpaint', 'outpaint'].includes(kind)) {
+        const meta = await sharp(job.previewPath).metadata();
+        expect(Math.max(meta.width, meta.height)).toBeLessThanOrEqual(512);
+      }
+      expect(
+        await f.commands.dispatch('generate.confirm', { ids: [job.id] }, 'agent'),
+      ).toMatchObject({ ok: false, error: { code: 'forbidden' } });
+      await f.call('generate.confirm', { ids: [job.id] });
+      const done = await f.wait(job.id);
+      expect(done.state, done.error).toBe('completed');
+      const after = (await f.call('workbench.get', { tabId: f.input.tabId })).tab;
+      expect(after.versionImageId).toBe(before.versionImageId);
+      expect(after.versionId).toBe(before.versionId);
+      expect((await f.call('version.list', { tabId: f.input.tabId })).versions).toHaveLength(
+        versions.length + 1,
+      );
+      expect(f.database.versions.get(done.versionId).source).toBe('agent');
+      if (job.previewPath)
+        await expect
+          .poll(async () =>
+            fs.access(job.previewPath).then(
+              () => false,
+              () => true,
+            ),
+          )
+          .toBe(true);
+    } finally {
+      await f.close();
+    }
+  });
+
+  it(`Agent ${kind} honors direct mode, spend limits, revisions and relay image limits`, async () => {
+    const f = await setup();
+    try {
+      f.service.state.tier = 0;
+      await f.call('account.refresh');
+      await f.call('generate.pause');
+      const input = operationInput(f, kind);
+      await expect(
+        f.call(`generate.${kind}`, { ...input, expectedRevision: 99999 }, 'agent'),
+      ).rejects.toMatchObject({ code: 'conflict' });
+      await f.call('settings.generation.save', { agentMode: 'direct', limitEnabled: false });
+      const direct = await f.call(`generate.${kind}`, input, 'agent');
+      expect(direct).toMatchObject({ state: 'queued', source: 'agent' });
+      await f.call('generate.cancel', { ids: [direct.id] });
+      if (direct.previewPath)
+        await expect
+          .poll(async () =>
+            fs.access(direct.previewPath).then(
+              () => false,
+              () => true,
+            ),
+          )
+          .toBe(true);
+      await f.call('settings.generation.save', { limitEnabled: true, dailyLimit: 0 });
+      const limited = await f.call(`generate.${kind}`, input, 'agent');
+      expect(limited.state).toBe('pending');
+      await f.call('generate.cancel', { ids: [limited.id] });
+      const uiInput =
+        kind === 'inpaint'
+          ? {
+              tabId: input.tabId,
+              imageId: input.imageId,
+              rect: { x: 0, y: 0, width: 512, height: 512 },
+              mask: (
+                await sharp({
+                  create: { width: 512, height: 512, channels: 4, background: '#fff' },
+                })
+                  .png()
+                  .toBuffer()
+              ).toString('base64'),
+            }
+          : { ...input, ...(kind === 'outpaint' ? { mode: 'whole' } : {}) };
+      const ui = await f.call(`generate.${kind}`, uiInput);
+      expect(ui).toMatchObject({ state: 'queued', source: 'user' });
+      await f.call('generate.cancel', { ids: [ui.id] });
+      await f.call('account.relay.save', { baseUrl: f.service.url, key: 'acceptance-token' });
+      await f.call('account.connection.save', { connection: 'relay' });
+      f.preferences.saveRelay({ baseUrl: f.service.url, models: null });
+      await f.call('settings.generation.save', { dailyImageLimit: 0 });
+      await expect(f.call(`generate.${kind}`, input, 'agent')).rejects.toThrow('每日张数');
+      await f.call('settings.generation.save', { dailyImageLimit: 10 });
+      const relay = await f.call(`generate.${kind}`, input, 'agent');
+      expect(relay).toMatchObject({ state: 'queued', source: 'agent' });
+      await f.call('generate.cancel', { ids: [relay.id] });
+      expect(f.service.state.requests).toHaveLength(0);
+    } finally {
+      await f.close();
+    }
+  });
+}
+
+it('syncs current inpaint state in memory, previews it and enforces Agent mask choices', async () => {
+  const f = await setup();
+  try {
+    const tabId = f.input.tabId,
+      imageId = f.input.imageId;
+    expect(await f.call('inpaint.get', {}, 'agent')).toEqual({ active: false });
+    await expect(
+      f.call('generate.estimate-inpaint', { tabId, useCurrent: true }, 'agent'),
+    ).rejects.toMatchObject({ code: 'not_found' });
+    expect(
+      await f.commands.dispatch('inpaint.sync', { tabId, closed: true }, 'agent'),
+    ).toMatchObject({ ok: false, error: { code: 'forbidden' } });
+    const rect = { x: 0, y: 0, width: 512, height: 512 };
+    const mask = (
+      await sharp(
+        Buffer.from(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect x="100" y="120" width="128" height="128" fill="white"/></svg>',
+        ),
+      )
+        .png()
+        .toBuffer()
+    ).toString('base64');
+    await f.call('inpaint.sync', { tabId, imageId, rect, strength: 0.4, fullSize: true });
+    expect(await f.call('inpaint.get', {}, 'agent')).toMatchObject({
+      active: true,
+      maskBounds: null,
+      maskRatio: 0,
+    });
+    await f.call('inpaint.sync', { tabId, imageId, rect, mask, strength: 0.4, fullSize: true });
+    const state = await f.call('inpaint.get', {}, 'agent');
+    expect(state).toMatchObject({
+      active: true,
+      tabId,
+      imageId,
+      rect,
+      strength: 0.4,
+      fullSize: true,
+      maskBounds: { x: 100, y: 120, width: 128, height: 128 },
+      maskRatio: 1 / 16,
+      versionId: expect.any(String),
+      versionNumber: expect.any(Number),
+      updatedAt: expect.any(String),
+    });
+    for (const file of [state.previewPath, state.cropPath]) await fs.access(file);
+    const estimate = await f.call(
+      'generate.estimate-inpaint',
+      { tabId, useCurrent: true },
+      'agent',
+    );
+    expect(estimate).toMatchObject({
+      rect,
+      maskBounds: state.maskBounds,
+      maskRatio: state.maskRatio,
+    });
+    const job = await f.call('generate.inpaint', { tabId, useCurrent: true }, 'agent');
+    expect(job.operationDetails).toMatchObject({ rect, strength: 0.4, fullSize: true });
+    expect(
+      await fs.readFile(
+        path.join(f.directory, 'inpaint-masks', job.operationDetails.maskId + '.png'),
+      ),
+    ).toEqual(Buffer.from(mask, 'base64'));
+    await expect(
+      f.call('generate.inpaint', { tabId, useCurrent: true, imageId: 'another' }, 'agent'),
+    ).rejects.toMatchObject({ code: 'invalid_input' });
+    for (const extra of [
+      { shapes: [{ type: 'rect', x: 0, y: 0, width: 64, height: 64 }] },
+      { maskPath: f.source.image_path },
+    ])
+      await expect(
+        f.call('generate.estimate-inpaint', { tabId, useCurrent: true, ...extra }, 'agent'),
+      ).rejects.toMatchObject({ code: 'invalid_input' });
+    await f.call('inpaint.sync', { tabId, closed: true });
+    expect(await f.call('inpaint.get', {}, 'agent')).toEqual({ active: false });
+    await f.call('generate.cancel', { ids: [job.id] });
+    await expect
+      .poll(async () =>
+        fs.access(job.previewPath).then(
+          () => false,
+          () => true,
+        ),
+      )
+      .toBe(true);
+  } finally {
+    await f.close();
+  }
+});
+
+for (const kind of ['upscale', 'enhance', 'inpaint', 'outpaint'])
+  it(`rechecks ${kind} operation cost when another request consumes the daily budget`, async () => {
+    const f = await setup();
+    try {
+      f.service.state.tier = 0;
+      await f.call('account.refresh');
+      await f.call('generate.pause');
+      await f.call('settings.generation.save', {
+        agentMode: 'direct',
+        limitEnabled: true,
+        dailyLimit: 100,
+      });
+      const job = await f.call(`generate.${kind}`, operationInput(f, kind), 'agent');
+      expect(job.state).toBe('queued');
+      f.database.usage.add({
+        jobId: 'synthetic-other-request',
+        connection: 'official',
+        source: 'user',
+        operation: 'generate',
+        model: 'synthetic',
+        images: 1,
+        anlas: 100,
+        estimated: false,
+      });
+      await f.call('generate.resume');
+      await expect
+        .poll(async () => (await f.call('generate.status', { id: job.id })).jobs[0].state)
+        .toBe('pending');
+      expect(f.service.state.requests).toHaveLength(0);
+      await f.call('generate.confirm', { ids: [job.id] });
+      expect((await f.wait(job.id)).state).toBe('completed');
+    } finally {
+      await f.close();
+    }
+  });

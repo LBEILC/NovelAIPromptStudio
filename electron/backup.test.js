@@ -130,6 +130,18 @@ it('restores image marks and privacy preferences with the original files', () =>
     expect(await fs.readFile(database.loadProject(project.id).image_path)).toEqual(original);
   }));
 
+it('excludes transient Agent previews even when the asset root contains application caches', () =>
+  fixture(async ({ assets, manager, file }) => {
+    for (const folder of ['agent-image-previews', 'generation-assets']) {
+      await fs.mkdir(path.join(assets, folder));
+      await fs.writeFile(path.join(assets, folder, 'synthetic.png'), 'temporary preview');
+    }
+    await manager.export(file, true);
+    const names = Object.keys(await entries(file));
+    expect(names.some((name) => /agent-image-previews|generation-assets/.test(name))).toBe(false);
+    expect(names.some((name) => name.endsWith('.png'))).toBe(true);
+  }));
+
 it('backs up random pools and per-image draws and restores their original values', () =>
   fixture(async ({ database, manager, file, project }) => {
     const pool = database.materials.save({

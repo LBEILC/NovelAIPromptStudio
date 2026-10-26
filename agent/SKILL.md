@@ -78,7 +78,7 @@ nai-studio dictionary.set-many --json '{"entries":[{"tag":"blue hair","translati
 
 ## 能力边界
 
-可以读取图片里的提示词和参数、工作台草稿、图片库与词典；可以编辑草稿、导入图片、存入图片库、起名、修改普通收藏集和词典。删除只会移入回收站。可以估算费用、排队生成、查询生成结果、切换版本、改分支名及从图片打开新作品。
+可以读取图片里的提示词和参数、工作台草稿、图片库与词典；可以编辑草稿、导入图片、存入图片库、起名、修改普通收藏集和词典。删除只会移入回收站。可以估算费用、排队生成、查询生成结果、切换版本、改分支名及从图片打开新作品。能发起放大、增强、扩图、局部重绘（花钱的照样待确认）。
 
 不能永久删除、清空回收站、修改设置、读取或修改密钥、确认或取消待确认任务、停止生成。不要通过其他文件、旧接口或数据库绕过这些边界。安装命令行工具由用户在软件的“设置 → Agent”中完成；技能不自动更改系统或账号设置。
 
@@ -168,3 +168,48 @@ nai-studio branch.restore --json '{"undo":"UNDO"}'
 `work.save {tabId, expectedRevision}` 将原图保存到图片库并建立作品，返回的 `tab.workSaved` 为真；`workbench.save-to-library` 同样建立作品。仅打开的新作品未保存、未生成时，关闭会丢弃它。
 
 `work.detach-images {workId, imageIds}` 只从指定作品移除图片，不移入回收站，也不影响其他作品。返回一个 `undo` 令牌，可用 `work.restore-detached {undo}` 撤销。需要在所有作品中移入回收站时仍用 `library.trash`，永久删除仍不向 Agent 开放。
+
+
+### 图片操作
+
+能发起放大、增强、扩图、局部重绘（花钱的照样待确认）。先用 `version.list {tabId}` 找到图片：版本图片取 `images[].projectId`，原图取根版本的 `project.id`。先估价、看结果再发起，默认进入 `pending`；Agent 不能自己确认，也不能改变账号或确认设置。用户设为直接生成时照设置排队，超过每日花费上限仍待确认；中转站按每日张数限制。完成后另起一版，不切换用户正在看的图。
+
+将下面的 `TAB`、`IMAGE` 换成实际 ID。发起时可附 `expectedRevision`，按前面的修订号规则处理冲突。
+
+```sh
+nai-studio version.list --json '{"tabId":"TAB"}'
+nai-studio generate.estimate-op --json '{"tabId":"TAB","imageId":"IMAGE","op":"upscale"}'
+nai-studio generate.upscale --json '{"tabId":"TAB","imageId":"IMAGE"}'
+nai-studio generate.estimate-op --json '{"tabId":"TAB","imageId":"IMAGE","op":"enhance","magnitude":2,"scale":1}'
+nai-studio generate.enhance --json '{"tabId":"TAB","imageId":"IMAGE","magnitude":2,"scale":1}'
+nai-studio generate.estimate-outpaint --json '{"tabId":"TAB","imageId":"IMAGE","edges":{"left":64,"right":0,"top":0,"bottom":0}}'
+nai-studio generate.outpaint --json '{"tabId":"TAB","imageId":"IMAGE","edges":{"left":64,"right":0,"top":0,"bottom":0}}'
+```
+
+扩图不传 `mode` 时采用估价返回的 `recommended`。**放大、增强用源图那一版的提示词，不看草稿；局部重绘、扩图用编辑器草稿。**修改提示词时写清新区域里要有什么。
+
+局部重绘推荐流程：`image.grid` 看坐标 → 写 `shapes` → `generate.estimate-inpaint` 打开 `previewPath` 检查 → 不对就改形状、重新估价 → 发起。
+
+```sh
+nai-studio image.grid --json '{"tabId":"TAB","imageId":"IMAGE"}'
+nai-studio generate.estimate-inpaint --json '{"tabId":"TAB","imageId":"IMAGE","shapes":[{"type":"rect","x":100,"y":100,"width":128,"height":128}]}'
+nai-studio generate.inpaint --json '{"tabId":"TAB","imageId":"IMAGE","shapes":[{"type":"rect","x":100,"y":100,"width":128,"height":128}]}'
+```
+
+坐标始终是原图像素，网格输出会缩小到长边不超过 1568，返回 `scale`。遮罩来源恰好给一种：
+
+- `shapes`：矩形 `{type:"rect",x,y,width,height}`、椭圆 `{type:"ellipse",cx,cy,rx,ry}`、多边形 `{type:"polygon",points:[[x,y],...]}`（3–64 个点）。多个形状取并集；可附 `grow`（0–128，默认 0）向外扩，超出原图裁掉。
+- `maskPath`：本地黑白 PNG，尺寸与原图一致，不超过 50 MB；亮度过半为重画，只读原文件。
+- `useCurrent:true`：用户正在软件里涂的遮罩，此时 `imageId` 可省略，给了必须一致。
+
+`rect` 可省略以自动出框；给了就必须包含全部遮罩。`strength` 默认 1，`fullSize` 默认 false。估价额外返回 `rect`、`maskBounds`、`maskRatio`、`previewPath`，用于检查真实送去重画的范围。
+
+用户已涂好时先 `inpaint.get`（可省略 `tabId` 取当前标签页），看 `previewPath` 和框内的 `cropPath`，再按用户要求修改草稿。`active:false` 表示没有正在进行的重绘；没有涂抹时 `maskBounds:null`、`maskRatio:0`。可让用户点重绘，也可使用当前遮罩发起，仍走待确认：
+
+```sh
+nai-studio inpaint.get --json '{"tabId":"TAB"}'
+nai-studio generate.estimate-inpaint --json '{"tabId":"TAB","useCurrent":true}'
+nai-studio generate.inpaint --json '{"tabId":"TAB","useCurrent":true}'
+```
+
+`generate.status` 的操作任务提供 `operation`、`operationDetails`、`estimate`、`parentNumber`、`name`；局部重绘和扩图还有小图 `previewPath`，取消或完成后会删除。网格和检查预览是临时文件，启动时清理超过 24 小时的文件。
