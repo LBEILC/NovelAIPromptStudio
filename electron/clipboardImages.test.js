@@ -12,10 +12,29 @@ const clipboardMock = vi.hoisted(() => ({
 }));
 vi.mock('electron', () => ({ clipboard: clipboardMock }));
 
-const { cleanupWorkbenchTemporaryImages, readClipboardImageSource } = await import(
-  './clipboardImages.js'
-);
+const {
+  cleanupWorkbenchTemporaryImages,
+  createWorkbenchTemporaryCleanup,
+  readClipboardImageSource,
+} = await import('./clipboardImages.js');
 const temporaryDirectories = [];
+
+it('retains clipboard handoffs across stale cleanup until the session acknowledges them', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-clipboard-handoff-'));
+  temporaryDirectories.push(directory);
+  const file = path.join(directory, 'synthetic.png');
+  fs.writeFileSync(file, 'synthetic image');
+  const cleanup = createWorkbenchTemporaryCleanup(directory);
+  cleanup.reserve(file);
+  expect(cleanup.sync([])).toEqual([]);
+  expect(fs.existsSync(file)).toBe(true);
+  expect(cleanup.sync([file])).toEqual([]);
+  expect(cleanup.sync([])).toEqual([file]);
+  fs.writeFileSync(file, 'failed handoff');
+  cleanup.reserve(file);
+  cleanup.release(file);
+  expect(cleanup.sync([])).toEqual([file]);
+});
 
 afterEach(() => {
   clipboardMock.availableFormats.mockReset().mockReturnValue([]);

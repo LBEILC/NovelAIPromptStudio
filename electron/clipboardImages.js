@@ -125,3 +125,21 @@ export function cleanupWorkbenchTemporaryImages(temporaryDirectory, referencedPa
   }
   return removed;
 }
+
+// A renderer can send an older session's cleanup request between reading the
+// clipboard and opening its tab. Keep handed-off files until the session owns them.
+export function createWorkbenchTemporaryCleanup(temporaryDirectory) {
+  const pending = new Set();
+  return {
+    reserve(file) {
+      pending.add(path.resolve(file));
+    },
+    release(file) {
+      pending.delete(path.resolve(file));
+    },
+    sync(referencedPaths) {
+      for (const file of referencedPaths) pending.delete(path.resolve(file));
+      return cleanupWorkbenchTemporaryImages(temporaryDirectory, [...referencedPaths, ...pending]);
+    },
+  };
+}

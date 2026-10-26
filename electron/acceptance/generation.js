@@ -1050,6 +1050,12 @@ export async function generationChecks({
         : 'image/png',
     fs.readFileSync(clipboardFile),
   );
+  const handoff = await invoke('workbench.open-clipboard');
+  await invoke('workbench.temp-sync', { paths: [] });
+  await check(
+    '旧会话清理不删除正在交给工作台的剪贴板图片',
+    () => handoff.ok && fs.existsSync(handoff.source.path),
+  );
   await h.key('v', process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true });
   await wait(
     `window.studio.invoke('workbench.list',{}).then(r=>r.data.tabs.find(t=>t.id===r.data.activeTabId)?.source.type==='clipboard')`,
@@ -1074,8 +1080,14 @@ export async function generationChecks({
     (j) => j.tabId === clipboardTab.id,
   );
   await wait(
-    `window.studio.invoke('generate.status',{id:${JSON.stringify(clipboardJob.id)}}).then(r=>r.data.jobs[0].state==='completed')`,
-    '剪贴板作品生成完成',
+    `window.studio.invoke('generate.status',{id:${JSON.stringify(clipboardJob.id)}}).then(r=>!['pending','queued','generating'].includes(r.data.jobs[0].state))`,
+    '剪贴板作品生成结束',
+  );
+  const clipboardResult = (await invoke('generate.status', { id: clipboardJob.id })).jobs[0];
+  await check(
+    '剪贴板作品生成成功',
+    () => clipboardResult.state === 'completed',
+    () => clipboardResult.error,
   );
   await invoke('version.open', { tabId: clipboardTab.id, versionId: clipboardRoot.id });
   const savedOriginal = { project: database.versions.list(clipboardTab.workId)[0].project };

@@ -61,7 +61,7 @@ import {
   describeAssetDirectory,
   migrateAssetDirectory,
 } from './libraryStorage.js';
-import { cleanupWorkbenchTemporaryImages, readClipboardImageSource } from './clipboardImages.js';
+import { createWorkbenchTemporaryCleanup, readClipboardImageSource } from './clipboardImages.js';
 import {
   checkForUpdates as checkReleaseUpdates,
   getUpdateCapabilities,
@@ -134,6 +134,7 @@ let contentBackfill = Promise.resolve();
 let storageMigrationActive = false;
 let permanentDeletionActive = false;
 let workbenchTemporaryDirectory;
+let workbenchTemporaryCleanup;
 let commandRuntime;
 let quitPrepared = false;
 let quitPreparing;
@@ -524,6 +525,7 @@ app.whenReady().then(async () => {
   await network.initialize();
   configureAutoUpdater();
   workbenchTemporaryDirectory = path.join(app.getPath('userData'), 'workbench-temp');
+  workbenchTemporaryCleanup = createWorkbenchTemporaryCleanup(workbenchTemporaryDirectory);
   assetsDirectory = preferences.librarySettings().assetsDirectory;
   try {
     fs.mkdirSync(assetsDirectory, { recursive: true });
@@ -756,8 +758,10 @@ app.whenReady().then(async () => {
     };
   });
   registerCommand('workbench.open-clipboard', async (input, _caller) => {
+    let source;
     try {
-      const source = readClipboardImageSource(workbenchTemporaryDirectory);
+      source = readClipboardImageSource(workbenchTemporaryDirectory);
+      workbenchTemporaryCleanup.reserve(source.filePath);
       const project = await readCommandImage(source.filePath);
       return {
         ok: true,
@@ -772,6 +776,7 @@ app.whenReady().then(async () => {
         },
       };
     } catch (error) {
+      if (source) workbenchTemporaryCleanup.release(source.filePath);
       return {
         ok: false,
         project: null,
@@ -780,11 +785,21 @@ app.whenReady().then(async () => {
     }
   });
   registerCommand('workbench.temp-sync', (input, _event) => {
-    const referencedPaths = [...input.paths, ...database.versions.referencedPaths()];
+    const referencedPaths = [
+      ...input.paths,
+      ...database.versions.referencedPaths(),
+      ...commandRuntime.store
+        .get()
+        .tabs.flatMap((tab) =>
+          [tab.source?.path, tab.project?.image_path, tab.originalProject?.image_path].filter(
+            Boolean,
+          ),
+        ),
+    ];
     try {
       return {
         ok: true,
-        removed: cleanupWorkbenchTemporaryImages(workbenchTemporaryDirectory, referencedPaths),
+        removed: workbenchTemporaryCleanup.sync(referencedPaths),
       };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
