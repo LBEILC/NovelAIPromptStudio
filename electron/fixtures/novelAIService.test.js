@@ -11,10 +11,13 @@ it('closes a speculative client connection that has not sent an HTTP request', a
   });
   try {
     await once(socket, 'connect');
-    const closed = once(socket, 'close');
+    const errors = [];
+    socket.on('error', (error) => errors.push(error.code));
+    const closed = new Promise((resolve) => socket.once('close', resolve));
     await service.close();
     await closed;
     expect(socket.destroyed).toBe(true);
+    expect(errors.every((code) => code === 'ECONNRESET')).toBe(true);
   } finally {
     socket.destroy();
     await service.close();
