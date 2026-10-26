@@ -500,6 +500,7 @@ export async function settingsChecks(context, restart) {
   delete doubles.structuredNotes;
   await e("window.studio.invoke('updates.check',{})");
   await wait('!!document.querySelector(".rn-md")');
+  await h.section('帮助');
   for (const [label, expected] of [
     ['报告问题', 'bug'],
     ['提出建议', 'enhancement'],
@@ -532,6 +533,7 @@ export async function settingsChecks(context, restart) {
     undefined,
     'once',
   );
+  await h.section('关于与更新');
   await click('查看声明');
   await e(`(() => {
     const names = ['MiSans VF 4.003','Newsreader','IBM Plex Mono','Remix Icon'];

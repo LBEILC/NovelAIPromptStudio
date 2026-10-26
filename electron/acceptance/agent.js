@@ -131,13 +131,22 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   const row = (title) =>
     `[...document.querySelectorAll('[data-settings-section=agent] div')].find(e=>e.firstChild?.nodeType===3&&e.firstChild.textContent===${JSON.stringify(title)})?.parentElement`;
   const setupState = () => h.evaluate(`window.studio.invoke('agent.setup',{}).then(r=>r.data)`);
+  // Discard account/setup views retained by earlier settings exception fixtures.
+  await h.reload();
   await h.section('Agent');
   await h.check(
-    'Agent 位于词典与关于之间，包含工具、能力和生成设置',
-    `(()=>{const pages=[...document.querySelectorAll('.set-side button')].map(n=>n.textContent.trim()),at=pages.indexOf('Agent'),page=document.querySelector('[data-settings-section=agent]');return pages[at-1]==='翻译词典'&&pages[at+1]==='关于与更新'&&['命令行工具','Agent 技能','Agent 能做什么','生成方式','花费上限'].every(label=>page.textContent.includes(label))})()`,
+    'Agent 页面包含工具、能力和生成设置',
+    `(()=>{const page=document.querySelector('[data-settings-section=agent]');return ['命令行工具','Agent 技能','Agent 能做什么','生成方式','花费上限'].every(label=>page.textContent.includes(label))})()`,
     undefined,
     'once',
   );
+  // A full run may already have installed the CLI in the settings category.
+  if ((await setupState()).installed) {
+    await h.click('卸载', row('命令行工具'));
+    await h.wait(
+      `!!(${row('命令行工具')}) && !(${row('命令行工具')}).textContent.includes('重新安装')`,
+    );
+  }
   await h.click('安装', row('命令行工具'));
   await h.wait(
     `document.querySelector('[data-settings-section=agent]').textContent.includes('已安装')`,

@@ -244,9 +244,10 @@ export async function materialsChecks({ h, mode, database, preferences }) {
     );
     await h.section('NovelAI 账号');
     await h.screenshot('033-fix-no-token-settings');
+    const hasToken = Boolean(preferences.novelAIToken());
     await check(
-      '没有令牌时账号页隐藏余额与用量',
-      '(()=>{const text=document.querySelector("[data-settings-section=novelai]").innerText;return !text.includes("余额")&&!text.includes("用量")})()',
+      hasToken ? '已保存令牌时账号页显示余额与用量' : '没有令牌时账号页隐藏余额与用量',
+      `(()=>{const text=document.querySelector("[data-settings-section=novelai]").innerText;return text.includes("余额")===${hasToken}&&text.includes("用量")===${hasToken}})()`,
     );
   } finally {
     await release();

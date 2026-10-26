@@ -8,7 +8,14 @@ import { createWorkbenchFixtures } from './workbenchFixtures.js';
 export async function windowsClipboardChecks({ h, mode, doubles, database }) {
   if (process.platform !== 'win32') return;
   const real = doubles.realClipboard;
-  const restore = preserveClipboard(real);
+  let restore;
+  try {
+    restore = preserveClipboard(real);
+  } catch (error) {
+    if (!String(error.message).startsWith('剪贴板包含 Electron 无法完整恢复的格式')) throw error;
+    h.uncovered('Windows 透明图片系统剪贴板', error.message);
+    return;
+  }
   const previous = { ...clipboard };
   const previousSystem = doubles.systemClipboard;
   const system = loadWindowsClipboard();

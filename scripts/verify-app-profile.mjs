@@ -177,7 +177,10 @@ try {
     await fs.mkdir(data, { recursive: true });
     await fs.writeFile(
       path.join(data, 'preferences.json'),
-      JSON.stringify({ onboardingDone: true }),
+      JSON.stringify({
+        onboardingDone: true,
+        featuresSeen: JSON.parse(await fs.readFile('package.json', 'utf8')).version,
+      }),
     );
   }
   if (options.category === '图片库·复制') {
@@ -221,10 +224,23 @@ try {
     !packaged &&
     (options.category === '全部' || options.restart) &&
     (!options.shard || options.shard.restarts);
-  for (const phase of onboarding ? [0, 1, 2, 3, 4, 5, 6] : restarts ? [0, 1, 2] : [0]) {
+  for (const phase of onboarding
+    ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    : restarts
+      ? [0, 1, 2]
+      : [0]) {
     if (onboarding && [3, 5].includes(phase)) {
       // Only the known disposable profile is reset; each next process is a fresh install.
       await fs.rm(path.join(root, 'userData'), { recursive: true, force: true });
+    }
+    if (onboarding && [7, 9, 10].includes(phase)) {
+      await fs.writeFile(
+        path.join(root, 'userData', 'data', 'preferences.json'),
+        JSON.stringify({
+          onboardingDone: true,
+          ...(phase === 10 ? {} : { featuresSeen: '1.7.0' }),
+        }),
+      );
     }
     await fs.writeFile(
       path.join(root, 'run.json'),
