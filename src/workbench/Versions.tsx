@@ -36,6 +36,12 @@ const OP_NAME: Record<ImageOperation['kind'], string> = {
   outpaint: '扩图',
   director: '导演工具',
 };
+/** 去背景一版三张（2.49）：按返回顺序是抠图、补全、混合 */
+const VARIANT: Record<string, string> = {
+  masked: '抠图：原图去掉背景',
+  generated: '补全：把被挡住的部分也画出来',
+  blend: '混合：抠图和补全混在一起',
+};
 const SIDE: Record<string, string> = { left: '左', right: '右', top: '上', bottom: '下' };
 /** 扩图那一版的悬停：右 +256、下 +128 · 一次画完；分块失败时写只扩了哪几边 */
 const outpaintTip = (o: ImageOperation) => {
@@ -161,7 +167,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             data-tip={
               pick && pick.imageId !== img.projectId
                 ? `按住 ${modKey()} 点，和标着的那张对比`
-                : randomSummary(img.random) || undefined
+                : (img.variant && VARIANT[img.variant]) || randomSummary(img.random) || undefined
             }
             onClick={(e) => {
               e.stopPropagation();

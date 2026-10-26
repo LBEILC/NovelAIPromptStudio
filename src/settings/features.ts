@@ -200,6 +200,13 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         point: { id: 'outpaint', need: IMG },
       },
       {
+        name: '导演工具',
+        text: '去背景、线稿、草图、上色、换表情、去杂物，结果是新的一版；去背景一次得到三张，先写好尺寸和价格',
+        go: 'workbench',
+        where: '工作台 · 图片下面的操作条 · 导演工具，或右键图片',
+        point: { id: 'director', need: IMG },
+      },
+      {
         name: '两张图对比',
         text: '并排或叠在一起拖分界线看，下面写着两版提示词和参数的差异',
         go: 'workbench',

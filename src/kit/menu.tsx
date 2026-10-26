@@ -153,7 +153,10 @@ export function MenuItems({
             }}
             onPointerLeave={() => setActive(-1)}
             onClick={(ev) => {
-              if (ev.target instanceof Element && ev.target.closest('.submenu')) return;
+              // 点在这一项自己的子菜单里：交给子菜单那一项处理。只看这一项下面的子菜单，
+              // 不然子菜单里的项（本身就在 .submenu 里）点了也会被这里吞掉
+              const sub = ev.target instanceof Element ? ev.target.closest('.submenu') : null;
+              if (sub && ev.currentTarget.contains(sub)) return;
               run(i);
             }}
           >

@@ -20,6 +20,7 @@ const OP: Record<string, string> = {
   img2img: '图生图',
   inpaint: '局部重绘',
   outpaint: '扩图',
+  director: '导演工具',
 };
 const modelName = (id: string) => {
   const base = id.replace(/-inpainting$/, '');

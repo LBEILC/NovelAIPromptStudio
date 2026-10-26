@@ -11,7 +11,7 @@ import { useGeneration } from '../state/generation';
 import { invokeUI } from '../lib/commands';
 import { BlurImg } from '../kit/blur';
 import { openPick } from '../workbench/Pick';
-import { Thumb, opPlan } from '../workbench/versionHelpers';
+import { DIRECTOR_TOOL, Thumb, opPlan } from '../workbench/versionHelpers';
 import { Viewer } from '../kit/Viewer';
 import type { GenerationJob } from '../shared/generation';
 
@@ -26,13 +26,16 @@ const busyVerb = (op?: string) =>
         ? '重绘中'
         : op === 'outpaint'
           ? '扩图中'
-          : '生成中';
+          : op === 'director'
+            ? '处理中'
+            : '生成中';
 const OP: Record<string, string> = {
   upscale: '放大',
   enhance: '增强',
   inpaint: '局部重绘',
   outpaint: '扩图',
   img2img: '图生图',
+  director: '导演工具',
 };
 
 /** 第几张；扩图按边分块时是第几块（"扩图中 1 / 2"） */
@@ -355,13 +358,15 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
       void invokeUI('version.open', { tabId: job.tabId, versionId: job.versionId });
   };
   const based = (job: GenerationJob) =>
-    job.operation
-      ? OP[job.operation] || ''
-      : job.parentNumber === 1
-        ? '基于原图'
-        : job.parentNumber
-          ? `基于第 ${job.parentNumber} 版`
-          : '';
+    job.operation === 'director'
+      ? DIRECTOR_TOOL[job.operationDetails?.tool || ''] || OP.director
+      : job.operation
+        ? OP[job.operation] || ''
+        : job.parentNumber === 1
+          ? '基于原图'
+          : job.parentNumber
+            ? `基于第 ${job.parentNumber} 版`
+            : '';
   const thumb = (job: GenerationJob) => (
     <BlurImg
       image={job.project}

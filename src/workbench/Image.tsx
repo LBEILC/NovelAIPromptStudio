@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { WorkbenchTab } from '../state/workbench';
 import type { ImageProject, ImageRecord, Vibe } from '../shared/types';
-import type { WorkVersion } from '../shared/generation';
+import type { DirectorTool, WorkVersion } from '../shared/generation';
 import { hasImageName, imageFileName } from '../lib/imageNaming.js';
 import { mediaUrl } from '../lib/imageStage.js';
 import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
@@ -23,6 +23,7 @@ import { trashNotice } from '../lib/trashNotice';
 import { originGone, originMenu, trashImage } from './original';
 import { useSharedTrash } from '../shell/SharedTrash';
 import { ImageOps } from './ImageOps';
+import { DIRECTOR_TOOLS, DirectorOps } from './DirectorOps';
 import { Inpaint, rerunInpaint } from './Inpaint';
 import { Outpaint } from './Outpaint';
 import { CompareHost, openCompare } from './Compare';
@@ -51,6 +52,7 @@ const midEll = (s: string, max: number) =>
 export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const notify = useNotifications();
   const generation = useGeneration();
+  const relay = generation.settings.connection === 'relay';
   const image = tab.project as (ImageProject & { vibes?: Vibe[] }) | null;
   const [missing, setMissing] = useState(!!tab.error);
   const [sharedDialog, askShared] = useSharedTrash();
@@ -70,7 +72,9 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const [viewer, setViewer] = useState<number | null>(null);
   const [menu, setMenu] = useState<[number, number] | null>(null);
   const [vibe, setVibe] = useState<number | null>(null);
-  const [op, setOp] = useState<'' | 'upscale' | 'enhance'>('');
+  const [op, setOp] = useState<'' | 'upscale' | 'enhance' | 'director'>('');
+  // 导演工具浮层里选中的工具；右键子菜单带着选好的工具打开（2.49）
+  const [dirTool, setDirTool] = useState<DirectorTool>('lineart');
   // 局部重绘（1.8.1）：编辑层开在哪张图上
   const [inpaint, setInpaint] = useState<{ id: string; path: string; image: BlurImage } | null>(
     null,
@@ -251,6 +255,19 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                   label: '扩图…',
                   icon: 'aspect-ratio-line',
                   onSelect: () => openOutpaint(stageId),
+                },
+                {
+                  label: '导演工具',
+                  icon: 'clapperboard-line',
+                  ...(relay
+                    ? { disabled: '中转站不支持导演工具' }
+                    : {
+                        sub: DIRECTOR_TOOLS.map((t) => ({
+                          label: `${t.name}…`,
+                          icon: t.icon,
+                          onSelect: () => (setDirTool(t.id), setOp('director')),
+                        })),
+                      }),
                 },
                 {
                   label: '用这张做底图',
@@ -484,7 +501,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                   width={Number(members[index]?.metadata?.width) || undefined}
                   height={Number(members[index]?.metadata?.height) || undefined}
                   off={missing ? '图片文件找不到了' : undefined}
-                  open={op}
+                  open={op === 'director' ? '' : op}
                   onOpen={setOp}
                 />
                 <button
@@ -507,6 +524,17 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                   <Icon name="aspect-ratio-line" />
                   <span className="lbl">扩图</span>
                 </button>
+                <DirectorOps
+                  tabId={tab.id}
+                  imageId={stageId}
+                  width={Number(members[index]?.metadata?.width) || undefined}
+                  height={Number(members[index]?.metadata?.height) || undefined}
+                  off={missing ? '图片文件找不到了' : undefined}
+                  open={op === 'director'}
+                  onOpen={(o) => setOp(o ? 'director' : '')}
+                  tool={dirTool}
+                  onTool={setDirTool}
+                />
               </>
             )}
             {canOp && repaint && (
