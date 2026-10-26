@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { hasImageName, imageFileName, isUnnamedImage, numberedImageNames } from './imageNaming.js';
+import {
+  hasImageName,
+  imageDisplayName,
+  imageFileName,
+  isUnnamedImage,
+  numberedImageNames,
+} from './imageNaming.js';
 
 describe('image naming', () => {
   it.each([
@@ -50,5 +56,18 @@ describe('image naming', () => {
       'fixture (1).PNG',
     );
     expect(imageFileName({ name: 's-3.png', image_path: '/assets/id.png' })).toBe('s-3.png');
+  });
+
+  it('shows a generated image under its named work until it gets its own name', () => {
+    const ref = (workName) => [{ workId: 'w', role: 'version', number: 2, workName }];
+    const hash = 'd70a240a-89a2-42b4-b7a0-f387e6813051';
+    expect(imageDisplayName({ name: hash, work_refs: ref('风笛 · 特写') })).toBe(
+      '风笛 · 特写 · 第 2 版',
+    );
+    expect(imageDisplayName({ name: hash, work_refs: ref(hash) })).toBe('');
+    expect(imageDisplayName({ name: hash })).toBe('');
+    expect(
+      imageDisplayName({ name: '雨夜', has_custom_name: true, work_refs: ref('风笛 · 特写') }),
+    ).toBe('雨夜');
   });
 });

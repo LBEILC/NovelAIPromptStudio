@@ -7,7 +7,7 @@ import { useNotifications } from '../kit/toast';
 import { useDecoded, useSwap } from '../kit/motion';
 import { writeClipboardText } from '../lib/clipboard';
 import { mediaUrl } from '../lib/imageStage.js';
-import { hasImageName, imageFileName, imageAccessibleName } from '../lib/imageNaming.js';
+import { imageDisplayName, imageFileName, imageAccessibleName } from '../lib/imageNaming.js';
 import { createPromptDocument, type PromptBlock } from '../lib/promptDocument';
 import { dimensions, libraryCountText, modelDisplayName } from '../library/presentation';
 import { libraryPositivePrompt } from '../library/Prompt';
@@ -115,7 +115,9 @@ function One({
     0,
     group.members.findIndex((m) => m.id === detail.id),
   );
-  const named = hasImageName(detail);
+  // 生成的图自己没起名时跟着作品名（1.8.4）
+  const shownName = imageDisplayName(detail);
+  const named = !!shownName;
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
   const [stripOpen, setStripOpen] = useState(false);
@@ -124,7 +126,7 @@ function One({
   useEffect(() => setStripOpen(false), [group.id]);
   const startRename = () => {
     if (trash) return;
-    setText(named ? detail.name : '');
+    setText(shownName);
     setEditing(true);
   };
   useEffect(() => {
@@ -137,7 +139,7 @@ function One({
   const commit = async (save: boolean) => {
     if (saving.current) return;
     const name = text.trim();
-    if (!save || !name || name === (named ? detail.name : '')) {
+    if (!save || !name || name === shownName) {
       setEditing(false);
       return;
     }
@@ -273,7 +275,7 @@ function One({
                 data-tip={trash ? undefined : '重命名'}
                 onClick={startRename}
               >
-                {detail.name}
+                {shownName}
               </b>
             )
           )}

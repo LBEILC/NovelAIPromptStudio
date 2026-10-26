@@ -12,6 +12,20 @@ export function hasImageName(image) {
   return image.has_custom_name === true || !isUnnamedImage(image.name);
 }
 
+/** 起过名的作品里生成的图：自己没起名时跟着作品名，显示成"作品名 · 第 N 版"（和工作台标题一样；1.8.4，用户 10-26）。
+ * 只是显示，不存进图片；作品改名时跟着变，自己改过名的用自己的。都没有时是空字符串。 */
+export function versionName(image) {
+  const ref = (image.work_refs || []).find(
+    (r) => r.role === 'version' && r.number && r.workName && !isUnnamedImage(r.workName),
+  );
+  return ref ? `${ref.workName} · 第 ${ref.number} 版` : '';
+}
+
+/** 界面上显示的名字：自己的名字，没有就跟着作品名，再没有是空字符串 */
+export function imageDisplayName(image) {
+  return hasImageName(image) ? image.name : versionName(image);
+}
+
 export function imageFileName(image) {
   if (image.original_filename) return image.original_filename;
   const extension = String(image.image_path || '').match(/\.[^.\\/]+$/)?.[0] || '.png';
@@ -28,7 +42,8 @@ export function numberedImageNames(name, count) {
 }
 
 export function imageAccessibleName(image) {
-  if (hasImageName(image)) return image.name;
+  const shown = imageDisplayName(image);
+  if (shown) return shown;
   const date = new Date(image.created_at);
   return `图片，导入于 ${date.getMonth() + 1} 月 ${date.getDate()} 日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }

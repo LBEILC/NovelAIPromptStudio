@@ -10,7 +10,7 @@ import { nsfwMenu } from '../kit/blur';
 import { Viewer, type ViewerItem } from '../kit/Viewer';
 import { invokeUI } from '../lib/commands';
 import { writeClipboardText } from '../lib/clipboard';
-import { hasImageName } from '../lib/imageNaming.js';
+import { hasImageName, imageDisplayName, versionName } from '../lib/imageNaming.js';
 import { GALLERY_CARD_SIZE_KEY } from '../lib/galleryLayout.js';
 import { GALLERY_PREVIEW_PANEL_WIDTH_KEY } from '../lib/panelLayout.js';
 import { DEFAULT_GALLERY_FILTERS, hasActiveGalleryFilters } from '../lib/galleryFilters.js';
@@ -205,7 +205,9 @@ export default function GalleryPage(
   // 导出（1.8.4，2.39）：一组起了名的写组名
   const exp = useExport();
   const groupLabel = (g: LibraryGroup) =>
-    hasImageName(g.cover) ? g.cover.name.replace(/-\d+$/, '') : undefined;
+    hasImageName(g.cover)
+      ? g.cover.name.replace(/-\d+$/, '')
+      : versionName(g.cover).replace(/ · 第 \d+ 版$/, '') || undefined;
   const exportPicked = () =>
     exp.start({
       ids: pickedIds,
@@ -283,7 +285,7 @@ export default function GalleryPage(
         notify({ text, tone: 'error' }),
       ),
       {
-        label: multi || !hasImageName(menu.member) ? '起名' : '重命名',
+        label: multi || !imageDisplayName(menu.member) ? '起名' : '重命名',
         onSelect: () => {
           if (multi) setBatchName(true);
           else {
