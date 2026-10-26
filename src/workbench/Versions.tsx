@@ -501,7 +501,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     versions.length && !versions[0].isStart && !originGone(versions[0]) ? 1 : 0,
   );
   return (
-    <div className="col versions" ref={col}>
+    <div className="col versions" ref={col} data-feature="versions">
       {rz.handle}
       <div className="col-h">
         <span className="label">版本</span>

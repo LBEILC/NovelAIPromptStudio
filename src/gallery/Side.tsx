@@ -71,6 +71,7 @@ export function Side({ p }: { p: LibraryProps }) {
       data-key={`sv-${id}`}
       data-flip=""
       className={`it ${current === id ? 'on' : ''} ${leaving ? 'leaving' : ''}`}
+      data-feature={id === 'trash' ? 'trash' : undefined}
       role="button"
       tabIndex={0}
       aria-current={current === id ? 'true' : undefined}
@@ -151,7 +152,7 @@ export function Side({ p }: { p: LibraryProps }) {
         <i className="ind" />
         {item('', 'image-2-line', '全部图片')}
         {item(GENERATED, 'history-line', '生成记录')}
-        <div className="lb label" data-key="lb-col" data-flip="">
+        <div className="lb label" data-key="lb-col" data-flip="" data-feature="collections">
           收藏集
           <button
             className="btn quiet sm icon"

@@ -79,7 +79,7 @@ export function Tools({
   return (
     <>
       <div className="col-h ltools">
-        <label className="field grow lsearch gallery-search">
+        <label className="field grow lsearch gallery-search" data-feature="search">
           <Icon name="search-line" />
           <input
             ref={searchRef}
@@ -125,6 +125,7 @@ export function Tools({
         <button
           className={`btn quiet ${pop === 'view' ? 'on' : ''}`}
           data-trigger="lview"
+          data-feature="view"
           aria-expanded={pop === 'view'}
           onClick={() => setPop(pop === 'view' ? '' : 'view')}
         >
@@ -137,6 +138,7 @@ export function Tools({
               className="btn ink"
               disabled={p.importing}
               data-tip={p.importing ? '正在导入' : '选择图片或 ZIP（Ctrl I）'}
+              data-feature="import"
               onClick={p.onImport}
             >
               <Icon name="add-line" />
@@ -145,6 +147,7 @@ export function Tools({
             <button
               className={`btn ink lsplit-more ${pop === 'import' ? 'open' : ''}`}
               data-trigger="limport"
+              data-feature="import-folder"
               aria-label="更多导入方式"
               disabled={p.importing}
               onClick={() => setPop(pop === 'import' ? '' : 'import')}

@@ -148,7 +148,11 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
           <h3>将 NovelAI 图片拖到此处</h3>
           <p>读取提示词和全部参数，整理修改后可直接生成新版本。</p>
           <div className="acts">
-            <button className={`btn ink ${p.loading ? 'loading' : ''}`} onClick={p.onChooseImage}>
+            <button
+              className={`btn ink ${p.loading ? 'loading' : ''}`}
+              data-feature="open-image"
+              onClick={p.onChooseImage}
+            >
               <Icon name={p.loading ? 'loader-4-line' : 'folder-open-line'} />
               打开图片
             </button>
@@ -199,7 +203,7 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
             : undefined
         }
       />
-      <div className="col prompt" ref={prompt}>
+      <div className="col prompt" ref={prompt} data-feature="prompt">
         {rz.handle}
         {p.error && (
           <div className="stage-banner">

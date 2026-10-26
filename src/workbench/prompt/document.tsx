@@ -118,6 +118,7 @@ export function usePromptDocumentView({
             className={`btn quiet sm ${full ? 'is-off' : ''}`}
             aria-disabled={!!full || undefined}
             data-tip={full || undefined}
+            data-feature="characters"
             onClick={addCharacter}
           >
             <Icon name="add-line" />
@@ -141,7 +142,7 @@ export function usePromptDocumentView({
     <div className="doc selectable" ref={docRoot} key="blocks">
       {polarity !== 'undesired' && baseIndex >= 0 && (
         <>
-          <div className="sec-h" data-key="base-h">
+          <div className="sec-h" data-key="base-h" data-feature="blocks">
             {chars.length ? '基础提示词' : '提示词'}
             <span className="muted">
               {query
@@ -161,6 +162,7 @@ export function usePromptDocumentView({
                 ],
                 '更多',
                 'sec-base',
+                'text-mode',
               )}
             </span>
           </div>

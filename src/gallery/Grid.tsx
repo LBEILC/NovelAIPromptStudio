@@ -524,6 +524,7 @@ function Cards({
               data-index={i}
               data-group-id={g.id}
               data-image-id={shown.id}
+              data-feature="card"
               role="option"
               aria-selected={picked || on}
               aria-label={imageAccessibleName(g.cover)}

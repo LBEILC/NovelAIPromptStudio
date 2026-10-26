@@ -553,6 +553,7 @@ export function GenerationBar({
             <span
               key={key}
               className={`gen-act ${leaving ? 'leaving' : ''}`}
+              data-feature={leaving ? undefined : 'cost'}
               inert={leaving || undefined}
               data-enter="fade"
             >

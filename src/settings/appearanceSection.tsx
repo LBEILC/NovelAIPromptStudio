@@ -90,7 +90,7 @@ export function Appearance() {
   };
   return (
     <SetPage title="通用" desc="更改会立即生效。">
-      <Row title="主题">
+      <Row feature="appearance" title="主题">
         <Seg
           label="主题"
           items={[

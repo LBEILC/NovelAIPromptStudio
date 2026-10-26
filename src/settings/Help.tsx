@@ -1,14 +1,16 @@
 // 帮助（doc/design.md 2.36，1.8.2）：最上面是功能一览（搜索、按工作台 / 生成和修图 / 图片库 / Agent 与设置分组，"去看看"直接跳过去），
 // 下面是从"关于与更新"搬过来的快捷键、重新查看引导、报告问题和诊断信息。没有快捷键打开这一页（用户 10-25）。
+// 1.8.4（2.40）：每行说明下面写"在哪"（搜索也搜它）；"去看看"跳过去后指出控件，找不到时通知里写在哪。
 import { Fragment, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { writeClipboardText } from '../lib/clipboard';
 import { Icon, Kbd } from '../kit/controls';
 import { useNotifications } from '../kit/toast';
 import { useUpdates } from '../state/updates';
+import { pointAt } from '../kit/spotlight';
 import { replayOnboarding } from '../shell/Onboarding';
 import { ISSUES, feedbackDiagnostics } from './About';
-import { FEATURES, type FeatureTarget } from './features';
+import { FEATURES, type Feature, type FeatureTarget } from './features';
 import { Row, SetPage, errorText } from './parts';
 
 // 快捷键按在哪里用分成三组；以产品实际绑定的为准
@@ -59,9 +61,15 @@ export function Help({ onGo }: { onGo: (target: FeatureTarget) => void }) {
   const groups = FEATURES.map((g) => ({
     ...g,
     items: query
-      ? g.items.filter((f) => `${f.name}${f.text}`.toLowerCase().includes(query))
+      ? g.items.filter((f) => `${f.name}${f.text}${f.where}`.toLowerCase().includes(query))
       : g.items,
   })).filter((g) => g.items.length);
+  const go = (f: Feature) => {
+    onGo(f.go);
+    void pointAt(f.point).then((found) => {
+      if (!found) notify({ text: `${f.name}在：${f.where}`, tone: 'info', duration: 6000 });
+    });
+  };
   const open = (url: string) =>
     void invokeUI('updates.open-release', { url }).then(
       () => notify({ text: '已在浏览器中打开', tone: 'success' }),
@@ -113,11 +121,16 @@ export function Help({ onGo }: { onGo: (target: FeatureTarget) => void }) {
           <div className="feat-group" key={g.group} data-feature-group={g.group}>
             <span className="label">{g.group}</span>
             {g.items.map((f) => (
-              <Row key={f.name} title={f.name} help={f.text} className="feat-row">
+              <Row
+                key={f.name}
+                title={f.name}
+                help={[f.text, <span className="feat-where">{f.where}</span>]}
+                className="feat-row"
+              >
                 <button
                   className="btn quiet sm"
                   data-tip={`去${GO_NAME[f.go] || '设置里的这一页'}`}
-                  onClick={() => onGo(f.go)}
+                  onClick={() => go(f)}
                 >
                   去看看
                   <Icon name="arrow-right-s-line" />

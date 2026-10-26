@@ -187,6 +187,7 @@ export function ParagraphEditor({
         <button
           className={`btn quiet sm ${busy === 'translate' ? 'loading' : ''} ${off ? 'is-off' : ''}`}
           data-tip={off || undefined}
+          data-feature="translate"
           onClick={() => !off && !busy && void transform('translate')}
         >
           <Icon name={busy === 'translate' ? 'loader-4-line' : 'arrow-down-line'} />

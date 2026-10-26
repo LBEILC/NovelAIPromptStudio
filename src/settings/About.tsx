@@ -233,6 +233,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         <Switch label="自动检查更新" on={u.autoCheck} onChange={(v) => void u.changeAutoCheck(v)} />
       </Row>
       <Row
+        feature="updates"
         title={
           checking
             ? '正在检查更新…'

@@ -100,7 +100,11 @@ export function AI() {
       desc="用来根据提示词起名、补全内置词典没有的 Tag 翻译和分类、翻译段落、整理提示词。不配置也能使用软件的其他功能。"
       foot={foot}
     >
-      <Row title="使用方式" help="ChatGPT 账号用你的 Plus 或 Pro 套餐额度；API Key 按用量另外付费">
+      <Row
+        feature="ai"
+        title="使用方式"
+        help="ChatGPT 账号用你的 Plus 或 Pro 套餐额度；API Key 按用量另外付费"
+      >
         <Seg
           label="使用方式"
           items={[

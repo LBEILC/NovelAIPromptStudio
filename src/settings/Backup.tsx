@@ -155,6 +155,7 @@ export function Backup() {
         <Switch label="包含图库" on={withLibrary} onChange={setWithLibrary} />
       </Row>
       <Col
+        feature="backup"
         title="导出"
         help="持久令牌、中转站 Key、AI 服务的 API Key 和 ChatGPT 登录不会放进备份（它们用这台电脑的系统加密保存，换电脑也解不开），恢复后要重新填。"
         after={

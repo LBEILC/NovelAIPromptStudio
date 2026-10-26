@@ -154,6 +154,7 @@ export function usePromptRendering({
         data-key={`t-${e.key}`}
         data-flip=""
         data-tag-key={e.key}
+        data-feature="tag"
         data-tc={ctl ? 'ctl' : catVar(t.category)}
         role="button"
         tabIndex={0}
@@ -250,9 +251,9 @@ export function usePromptRendering({
       </div>
     );
   };
-  const acts = (items: () => MenuEntry[], label: string, k: string) => (
+  const acts = (items: () => MenuEntry[], label: string, k: string, feature?: string) => (
     <span className="acts">
-      <MenuButton label={label} items={items} menuKey={k} />
+      <MenuButton label={label} items={items} menuKey={k} feature={feature} />
     </span>
   );
 
@@ -593,6 +594,7 @@ export function usePromptRendering({
             : '当前模型不是 V5，这些控制词不起作用'
         }
         data-trigger={`ctl-${si}`}
+        data-feature="controls"
         onClick={() => setCtlFor(ctlFor === si ? null : si)}
       >
         <span className="v5">V5</span>

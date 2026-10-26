@@ -267,8 +267,11 @@ export function MenuButton({
   place = 'below-right',
   className = 'btn quiet sm icon',
   menuKey,
+  feature,
 }: {
   label: string;
+  /** 功能一览指出控件用的 data-feature（2.40） */
+  feature?: string;
   /** 验收用的钩子（data-menu-key） */
   menuKey?: string;
   /** 打开时才算菜单项 */
@@ -290,6 +293,7 @@ export function MenuButton({
         aria-haspopup="menu"
         aria-expanded={!!shown}
         data-menu-key={menuKey}
+        data-feature={feature}
         onClick={() => setShown(shown ? null : items())}
       >
         <Icon name={icon} />

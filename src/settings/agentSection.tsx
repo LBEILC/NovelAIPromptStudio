@@ -161,6 +161,7 @@ export function Agent() {
         </span>
       </Row>
       <Row
+        feature="agent"
         title="Agent 技能"
         help="说明这些命令用法的技能文件。装进 Agent 的全局技能目录后，新开的会话就能用；也可以自己复制。"
       >

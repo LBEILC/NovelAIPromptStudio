@@ -209,7 +209,11 @@ export function Network() {
           </span>
         </div>
       )}
-      <Row title="连接方式" help={<Swap k={draft.mode}>{MODE_HELP[draft.mode]}</Swap>}>
+      <Row
+        feature="network"
+        title="连接方式"
+        help={<Swap k={draft.mode}>{MODE_HELP[draft.mode]}</Swap>}
+      >
         <Seg
           label="连接方式"
           items={[

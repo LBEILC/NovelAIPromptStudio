@@ -207,7 +207,7 @@ export function renderPromptView({
                 <span className="lbl">{translating ? '翻译中' : '翻译'}</span>
               </button>
               {tidy.button}
-              <span className="split" data-trigger="copy">
+              <span className="split" data-trigger="copy" data-feature="copy">
                 <button
                   className="btn sm"
                   data-act="copy"

@@ -401,3 +401,12 @@ html[data-motion="off"] .oba [style*="--i"], html[data-motion="off"] .oba .oba-m
 .toast .toast-x { display: inline-grid; place-items: center; width: var(--ctl-sm); height: var(--ctl-sm); margin-left: 0; padding: 0; color: var(--text-3); font-weight: normal; }
 .toast .toast-x:hover { color: var(--text); }
 .toast .toast-x [class^="ri-"] { font-size: var(--icon-sm); }
+
+/* 指出控件（2.40）：墨色描边闪两下，气泡写"在这里"；不压暗页面、不挡点击 */
+.spot { position: absolute; z-index: 50; pointer-events: none; border-radius: var(--r-ctl); outline: var(--focus-w) solid var(--focus); outline-offset: 3px; animation: spot-in var(--dur-2) var(--ease-out), spot-pulse 640ms var(--ease-out) var(--dur-2) 2; }
+.spot-tip { position: absolute; z-index: 50; pointer-events: none; white-space: nowrap; animation: spot-in var(--dur-2) var(--ease-out); }
+.spot-tip.above { translate: 0 -100%; }
+@keyframes spot-in { from { opacity: 0; } }
+@keyframes spot-pulse { 50% { outline-offset: 7px; outline-color: transparent; } }
+html[data-motion="off"] .spot, html[data-motion="off"] .spot-tip { animation: none; }
+.feat-row .feat-where { color: var(--text-2); }

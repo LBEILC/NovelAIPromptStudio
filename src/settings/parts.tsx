@@ -56,15 +56,18 @@ export function Row({
   children,
   className = '',
   style,
+  feature,
 }: {
   title: ReactNode;
   help?: ReactNode | ReactNode[];
   children?: ReactNode;
   className?: string;
   style?: CSSProperties;
+  /** 功能一览指出控件用的 data-feature（2.40） */
+  feature?: string;
 }) {
   return (
-    <div className={`setrow ${className}`} style={style}>
+    <div className={`setrow ${className}`} style={style} data-feature={feature}>
       <div>
         {title}
         {lines(help)}
@@ -80,6 +83,7 @@ export function Col({
   children,
   after,
   className = '',
+  feature,
 }: {
   title: ReactNode;
   help?: ReactNode | ReactNode[];
@@ -87,9 +91,10 @@ export function Col({
   /** 放在说明下面的按钮 */
   after?: ReactNode;
   className?: string;
+  feature?: string;
 }) {
   return (
-    <div className={`setcol ${className}`}>
+    <div className={`setcol ${className}`} data-feature={feature}>
       <div>{title}</div>
       {children}
       {lines(help)}

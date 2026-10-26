@@ -338,7 +338,7 @@ export function MaterialsPage({
 
   return (
     <div className="body matp" ref={root}>
-      <div className="side has-ind" ref={side} aria-label="素材分类">
+      <div className="side has-ind" ref={side} aria-label="素材分类" data-feature="materials">
         <i className="ind" />
         {TABS.map(([k, name, icon]) => (
           <div

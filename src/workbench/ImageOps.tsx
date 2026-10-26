@@ -107,6 +107,7 @@ export function ImageOps({
     <button
       className={`btn quiet sm ${off ? 'is-off' : ''} ${open === op ? 'open' : ''}`}
       data-trigger={`op-${op}`}
+      data-feature={`op-${op}`}
       aria-expanded={open === op}
       aria-label={label}
       {...(off

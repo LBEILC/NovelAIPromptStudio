@@ -385,7 +385,7 @@ export function Dictionary({ onFindTag }: { onFindTag?: (tag: string) => void })
       </div>
       <div className="dict-bar">
         <div>
-          <label className="field sm dict-search">
+          <label className="field sm dict-search" data-feature="dictionary">
             <Icon name="search-line" />
             <input
               ref={search}

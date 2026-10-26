@@ -135,7 +135,7 @@ export function RefsPane({
     void run(() => invokeUI('reference.set-base', { ...rev0, ...input }));
   const baseBlock = (
     <>
-      <div className="sec-h">
+      <div className="sec-h" data-feature="img2img">
         底图<span className="muted">图生图</span>
         <span className="acts" style={{ marginLeft: 'auto' }}>
           {baseImg ? (

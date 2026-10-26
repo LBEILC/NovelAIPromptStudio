@@ -23,7 +23,7 @@ export function BlurRows() {
     });
   return (
     <>
-      <Row title="图片模糊" help="只影响显示：复制、导出、备份拿到的都是原图">
+      <Row feature="blur" title="图片模糊" help="只影响显示：复制、导出、备份拿到的都是原图">
         <Seg
           label="图片模糊"
           items={[

@@ -46,7 +46,7 @@ export function Storage({
   const progress = s.progress;
   return (
     <SetPage title="图片库" desc="导入的图片、缩略图和生成的图片都保存在这里。">
-      <div className="setcol">
+      <div className="setcol" data-feature="storage">
         <div>图片存放位置</div>
         <Swap k={s.details?.assetsDirectory || ''} className="path">
           <span className="selectable">{s.details?.assetsDirectory || '正在读取…'}</span>

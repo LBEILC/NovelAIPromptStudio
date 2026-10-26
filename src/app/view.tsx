@@ -21,6 +21,7 @@ import type { ImageProject, LibraryCard } from '../shared/types';
 import { CloseAsk } from '../shell/CloseAsk';
 import { GenerationStatus } from '../shell/GenerationStatus';
 import { Onboarding } from '../shell/Onboarding';
+import { Spotlight } from '../kit/spotlight';
 import { NewsCard } from '../shell/News';
 import { openChangelog } from '../settings/About';
 import { Titlebar } from '../shell/Titlebar';
@@ -627,6 +628,7 @@ export function renderApp({
             );
         }}
       />
+      <Spotlight />
       <NewsCard
         news={news}
         onClose={finishOnboarding}

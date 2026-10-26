@@ -301,7 +301,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
           </div>
         </div>
       )}
-      <div className="canvas swap">
+      <div className="canvas swap" data-feature="stage">
         {pics.map(({ key, value, leaving }) =>
           value.blank ? (
             <div key={key} className={`canvas-blank ${leaving ? 'leaving' : ''}`} data-enter="fade">
@@ -468,6 +468,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                 <button
                   className={`btn quiet sm ${missing ? 'is-off' : ''}`}
                   data-trigger="op-inpaint"
+                  data-feature="inpaint"
                   aria-label="局部重绘"
                   {...lost(() => openInpaint(stageId))}
                 >

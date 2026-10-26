@@ -471,6 +471,7 @@ export function WorkbenchTabs(p: TabsProps) {
             ? '新建空白作品 · 右键可以打开图片'
             : '打开图片 · 右键选择打开方式'
         }
+        data-feature="new-blank"
         onClick={generation.settings.hasToken ? p.onNewBlank : p.onChooseImage}
         onContextMenu={(e) => {
           e.preventDefault();

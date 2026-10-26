@@ -52,6 +52,7 @@ export function PromptTabs({
     <button
       className={value === k ? 'on' : ''}
       role="tab"
+      data-feature={`tab-${k}`}
       aria-selected={value === k}
       onClick={() => onChange(k)}
     >

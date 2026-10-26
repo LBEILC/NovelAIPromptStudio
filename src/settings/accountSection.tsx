@@ -61,6 +61,7 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
   const official = (
     <>
       <Col
+        feature="token"
         title="持久令牌"
         help="在 NovelAI 网站的账号设置里创建持久令牌（Persistent API Token）。加密后保存在这台电脑上，软件不保存明文。"
       >
@@ -168,6 +169,7 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
       desc="用你自己的 NovelAI 账号，或者通过中转站在这里生成图片。本软件是非官方工具，与 NovelAI 没有隶属关系；这样使用是否符合 NovelAI 的服务条款，由你自己判断并承担。"
     >
       <Row
+        feature="relay"
         title="连接方式"
         help={
           mode === 'relay'
