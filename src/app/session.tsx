@@ -1,5 +1,6 @@
 import { ClipboardPaste, Copy, Redo2, Scissors, Undo2 } from 'lucide-react';
 import { useEffect } from 'react';
+import { workbenchErrorMessage } from '../lib/workbenchConnection';
 import { invokeResult, invokeUI, onProgress } from '../lib/commands';
 import { isTextEditingTarget } from '../lib/contextMenu.js';
 import { isImportActive } from '../lib/importProgress.js';
@@ -49,6 +50,8 @@ export function useSessionEffects({
 >) {
   useEffect(() => {
     if (!workbenchConnection) return;
+    workbenchConnection.notify = (text) =>
+      notificationTarget.current.notify({ text, tone: 'info' });
     const prepare = studio.onCommandPrepare(() => workbenchConnection.prepare());
     const events = studio.onCommandEvent((event) => {
       if (event.type !== 'workbench') return;
@@ -70,7 +73,13 @@ export function useSessionEffects({
                 .flush()
                 .then(async () => {
                   const result = await studio.invoke('workbench.undo', { undoId: event.undoId! });
-                  if (!result.ok) showToast(result.error.message, 'error');
+                  if (!result.ok)
+                    showToast(
+                      result.error.code === 'conflict' || result.error.code === 'not_found'
+                        ? '提示词已经又改过，不能撤销 Agent 的这次修改'
+                        : workbenchErrorMessage(result.error.message),
+                      'error',
+                    );
                 })
                 .catch((error) => showToast(error.message, 'error'));
             },
@@ -79,6 +88,7 @@ export function useSessionEffects({
       }
     });
     return () => {
+      workbenchConnection.notify = () => {};
       prepare();
       events();
     };

@@ -561,7 +561,14 @@ export async function createCommands(services) {
     'workbench.session': async (input) => savedSession(await store.migrate(input)),
     'workbench.commit': async (input) => {
       const previous = store.get();
-      const next = mergeSession(previous, input.base, input.next);
+      let next;
+      try {
+        next = mergeSession(previous, input.base, input.next);
+      } catch (error) {
+        if (error instanceof CommandError && error.code === 'conflict')
+          error.details = { ...error.details, session: savedSession(previous) };
+        throw error;
+      }
       await store.save(next);
       for (const old of previous.tabs)
         if (!next.tabs.some((t) => t.id === old.id)) generation.discardEmpty?.(old.workId);

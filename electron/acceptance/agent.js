@@ -1,4 +1,5 @@
 import { agentImageChecks } from './agentImages.js';
+import { agentConflictChecks } from './agentConflict.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn, execFile } from 'node:child_process';
@@ -405,6 +406,14 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
     undefined,
     'once',
   );
+  await h.click('撤销', 'document.querySelector(".toast:not(.leaving)")');
+  await h.wait(
+    `document.querySelector('.toast:not(.leaving)')?.textContent.includes('提示词已经又改过，不能撤销 Agent 的这次修改')`,
+  );
+  await h.check(
+    '用户编辑后撤销 Agent 修改使用界面文案',
+    `![...document.querySelectorAll('.toast')].some(n => n.textContent.includes('重新读取'))`,
+  );
   const saved = await call('workbench.save-to-library', {
     tabId,
     expectedRevision: merged.revision,
@@ -475,4 +484,5 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   // Only the synthetic record created by this check is removed from the isolated database.
   database.deleteProject(saved.project.id);
   await agentImageChecks({ h, call, directory: path.join(mode.root, 'agent-images'), database });
+  await agentConflictChecks({ h, call, files });
 }

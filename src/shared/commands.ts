@@ -50,6 +50,8 @@ export type CommandResult<T> =
         code: CommandErrorCode;
         message: string;
         details?: {
+          /** Latest UI session on a rejected workbench.commit. */
+          session?: CommandSession;
           unavailable?: string;
           branches?: number;
           versions?: number;

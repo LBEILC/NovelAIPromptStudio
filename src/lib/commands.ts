@@ -1,4 +1,5 @@
 import type { CommandName, CommandInput, CommandOutput, ProgressTopics } from '../shared/commands';
+import { workbenchErrorMessage } from './workbenchConnection';
 import { previewInvoke } from './previewCommands.js';
 
 export function onProgress<K extends keyof ProgressTopics>(
@@ -26,7 +27,7 @@ export async function invokeUI<N extends CommandName>(
   const result = await window.studio.invoke(name, input);
   // 错误码挂在抛出的错误上（例如 needs_confirm：界面先确认再重试）
   if (!result.ok)
-    throw Object.assign(new Error(result.error.message), {
+    throw Object.assign(new Error(workbenchErrorMessage(result.error.message)), {
       code: result.error.code,
       details: (result.error as { details?: unknown }).details,
     });

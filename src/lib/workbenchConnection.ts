@@ -6,12 +6,64 @@ import type {
 } from '../shared/commands';
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+// Reapply only the user's delta. Revision increments belong to the main process.
+function rebase(remote: CommandSession, base: CommandSession, local: CommandSession) {
+  const tabs = remote.tabs
+    .filter((t) => !base.tabs.some((b) => b.id === t.id) || local.tabs.some((l) => l.id === t.id))
+    .map((t) => ({ ...t }));
+  for (const tab of local.tabs) {
+    const old = base.tabs.find((t) => t.id === tab.id);
+    const target = tabs.find((t) => t.id === tab.id);
+    if (!target) {
+      if (!old || !same(old.project, tab.project)) tabs.push({ ...tab });
+      continue;
+    }
+    if (!old) continue;
+    for (const field of [
+      'project',
+      'displayName',
+      'source',
+      'originalProject',
+      'savedDraft',
+      'error',
+      'viewState',
+      'identity',
+    ] as const)
+      if (!same(old[field], tab[field])) Object.assign(target, { [field]: tab[field] });
+    if (!same(old.project, tab.project)) target.updatedAt = tab.updatedAt;
+  }
+  if (
+    !same(
+      base.tabs.map((t) => t.id),
+      local.tabs.map((t) => t.id),
+    )
+  ) {
+    const order = local.tabs.map((t) => t.id);
+    tabs.sort(
+      (a, b) =>
+        (order.includes(a.id) ? order.indexOf(a.id) : Infinity) -
+        (order.includes(b.id) ? order.indexOf(b.id) : Infinity),
+    );
+  }
+  const selected = local.activeTabId !== base.activeTabId ? local.activeTabId : remote.activeTabId;
+  return {
+    ...remote,
+    tabs,
+    activeTabId: tabs.some((t) => t.id === selected) ? selected : tabs[0]?.id || '',
+  };
+}
+
+export function workbenchErrorMessage(message: string) {
+  return message.includes('重新读取') ? '工作台保存失败，输入仍保留在界面，请稍后再试' : message;
+}
+
 export class WorkbenchConnection {
   private confirmed: CommandSession = { version: 2, tabs: [], activeTabId: '' };
   current: CommandSession = this.confirmed;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private running: Promise<void> | undefined;
   ready = false;
+  notify: (message: string) => void = () => {};
   private initialized: Promise<void>;
   private resolveInitialized!: () => void;
   constructor(
@@ -69,21 +121,48 @@ export class WorkbenchConnection {
       return this.flush();
     }
     if (!this.ready || this.current === this.confirmed) return;
-    const base = this.confirmed,
+    let base = this.confirmed,
       next = this.current;
     this.running = (async () => {
-      const result = await this.invoke('workbench.commit', { base, next });
-      if (!result.ok) throw Error(result.error.message);
+      let result = await this.invoke('workbench.commit', { base, next });
+      let overwritten = false;
+      if (!result.ok && result.error.code === 'conflict' && result.error.details?.session) {
+        const remote = result.error.details.session;
+        // Include edits made while the rejected request was in flight.
+        const local = this.current;
+        overwritten = local.tabs.some((tab) => {
+          const old = base.tabs.find((t) => t.id === tab.id);
+          const latest = remote.tabs.find((t) => t.id === tab.id);
+          return (
+            old &&
+            latest &&
+            !same(old.project, tab.project) &&
+            !same(old.project, latest.project) &&
+            !same(tab.project, latest.project)
+          );
+        });
+        next = rebase(remote, base, local);
+        base = remote;
+        this.confirmed = remote;
+        this.current = next;
+        this.publish(next);
+        result = await this.invoke('workbench.commit', { base, next });
+      }
+      if (!result.ok) {
+        // Refresh the baseline even when the bounded retry loses another race.
+        // Keep the delta pending for the next user edit, without an automatic loop.
+        if (result.error.details?.session) {
+          const remote = result.error.details.session;
+          this.current = rebase(remote, base, this.current);
+          this.confirmed = remote;
+          this.publish(this.current);
+        }
+        throw Error(workbenchErrorMessage(result.error.message));
+      }
       this.confirmed = result.data;
       if (this.current === next) this.current = this.confirmed;
-      else
-        this.current = {
-          ...this.current,
-          tabs: this.current.tabs.map((t) => ({
-            ...t,
-            revision: result.data.tabs.find((r) => r.id === t.id)?.revision ?? t.revision,
-          })),
-        };
+      else this.current = rebase(this.confirmed, next, this.current);
+      if (overwritten) this.notify('Agent 同时改了这个标签页，已保留你的修改');
       // No React state update on acknowledgement: only revision bookkeeping.
     })();
     try {
@@ -103,39 +182,57 @@ export class WorkbenchConnection {
       this.publish(remote);
       return;
     }
-    // Preserve an edit made after the prepare handshake. A conflicting later
-    // commit is rejected by the main process; it must not erase local input.
     const local = this.current,
       before = this.confirmed;
-    const tabs = remote.tabs.map((t) => {
-      const old = before.tabs.find((b) => b.id === t.id),
-        changed = local.tabs.find((b) => b.id === t.id);
-      return changed && old && !same(changed.project, old.project) ? changed : t;
-    });
-    for (const t of local.tabs)
-      if (!before.tabs.some((b) => b.id === t.id) && !tabs.some((b) => b.id === t.id)) tabs.push(t);
+    this.current = rebase(remote, before, local);
+    // Retain the true base only for pending fields, including deleted tabs.
+    // A simultaneous project edit must still be rejected on the first commit.
     this.confirmed = {
       ...remote,
-      tabs: remote.tabs.map((tab) => {
-        const old = before.tabs.find((t) => t.id === tab.id);
-        const edited = local.tabs.find((t) => t.id === tab.id);
-        // Retain the actual edit base when both sides changed after prepare.
-        // The main process must reject that race, never accept the local draft
-        // as if it had been edited against the newer Agent version.
-        return old &&
-          edited &&
-          !same(edited.project, old.project) &&
-          !same(tab.project, old.project)
-          ? old
-          : tab;
-      }),
-    };
-    this.current = {
-      ...remote,
-      tabs,
       activeTabId:
-        local.activeTabId !== before.activeTabId ? local.activeTabId : remote.activeTabId,
+        local.activeTabId !== before.activeTabId ? before.activeTabId : remote.activeTabId,
+      tabs: remote.tabs
+        .filter(
+          (t) => before.tabs.some((b) => b.id === t.id) || !local.tabs.some((l) => l.id === t.id),
+        )
+        .map((tab) => {
+          const old = before.tabs.find((t) => t.id === tab.id);
+          const edited = local.tabs.find((t) => t.id === tab.id);
+          if (!old) return tab;
+          if (!edited) return old;
+          const baseline = { ...tab };
+          for (const field of [
+            'project',
+            'displayName',
+            'source',
+            'originalProject',
+            'savedDraft',
+            'error',
+            'viewState',
+            'identity',
+          ] as const)
+            if (!same(old[field], edited[field])) Object.assign(baseline, { [field]: old[field] });
+          return baseline;
+        }),
     };
+    for (const old of before.tabs) {
+      const edited = local.tabs.find((t) => t.id === old.id);
+      if (!remote.tabs.some((t) => t.id === old.id) && edited && !same(old.project, edited.project))
+        this.confirmed.tabs.push(old);
+    }
+    if (
+      !same(
+        before.tabs.map((t) => t.id),
+        local.tabs.map((t) => t.id),
+      )
+    ) {
+      const order = before.tabs.map((t) => t.id);
+      this.confirmed.tabs.sort(
+        (a, b) =>
+          (order.includes(a.id) ? order.indexOf(a.id) : Infinity) -
+          (order.includes(b.id) ? order.indexOf(b.id) : Infinity),
+      );
+    }
     this.publish(this.current);
   }
   async prepare() {

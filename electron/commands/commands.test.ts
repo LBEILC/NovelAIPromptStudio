@@ -403,9 +403,21 @@ describe('command contract', () => {
       text: 'changed',
     });
     expect(() => mergeSession(app.store.get(), base, next)).toThrow(/新的修改/);
+    const conflict = await app.dispatch('workbench.commit', { base, next }, 'ui');
+    expect(conflict).toMatchObject({
+      ok: false,
+      error: { code: 'conflict', details: { session: app.store.get() } },
+    });
+    const undoId = app.events.at(-1)!.undoId;
+    await app.call('workbench.commit', { base: app.store.get(), next }, 'ui');
+    const undo = await app.dispatch('workbench.undo', { undoId }, 'ui');
+    expect(undo).toMatchObject({
+      ok: false,
+      error: { code: 'conflict', message: '内容已有新的修改，请重新读取后再改' },
+    });
     const reopened = await openCommandSession(app.directory, async () => fixture());
-    expect(reopened.get().tabs[0].project?.metadata.prompt_raw).toContain('changed');
-    expect(reopened.get().tabs[0].revision).toBe(1);
+    expect(reopened.get().tabs[0].project?.name).toBe('local');
+    expect(reopened.get().tabs[0].revision).toBe(2);
   });
 });
 
