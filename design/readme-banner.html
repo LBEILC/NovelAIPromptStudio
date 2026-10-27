@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<script>document.documentElement.dataset.theme = new URLSearchParams(location.search).get('theme') || 'light';</script>
+<head>
+<meta charset="utf-8">
+<title>README banner</title>
+<!-- README 顶部的 banner：1280 × 400，按 2 倍截图成 doc/screenshots/readme-banner.webp。
+     左边是名字和一句话，右边是案例图墙，一张提示词卡片压在图上：从图里读出提示词。 -->
+<link rel="stylesheet" href="./tokens.css">
+<style>
+@font-face { font-family: "NPS MiSans"; src: url("../.local/fonts/MiSansVF.ttf"); font-weight: 100 900; }
+html, body { margin: 0; background: var(--bg); }
+.banner { position: relative; width: 1280px; height: 400px; overflow: hidden; background: var(--bg); font-family: var(--font-ui); color: var(--text); }
+.banner .copy { position: absolute; left: 64px; top: 0; bottom: 0; width: 420px; display: flex; flex-direction: column; justify-content: center; z-index: 2; }
+.banner .icon { width: 64px; height: 64px; margin-bottom: 24px; }
+.banner h1 { margin: 0; font-size: 44px; font-weight: 640; letter-spacing: -0.01em; line-height: 1.1; }
+.banner .lead { margin: 16px 0 0; font-size: 19px; line-height: 1.6; color: var(--text-2); }
+.banner .meta { margin-top: 22px; display: flex; gap: 8px; }
+.banner .meta span { font-size: 13px; line-height: 1; padding: 7px 10px; border-radius: var(--r-pill); background: var(--pane); border: 1px solid var(--divider); color: var(--text-2); }
+.banner .meta span.hot { background: var(--cinnabar-wash); border-color: transparent; color: var(--cinnabar-text); }
+
+.banner .wall { position: absolute; left: 500px; top: 0; bottom: 0; display: flex; gap: 14px; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 140px); mask-image: linear-gradient(to right, transparent 0, #000 140px); }
+.banner .col { display: flex; flex-direction: column; gap: 14px; width: 150px; flex: none; }
+.banner .col img { display: block; width: 100%; aspect-ratio: 832 / 1216; object-fit: cover; border-radius: var(--r-panel); box-shadow: var(--shadow-print); }
+.banner .col img.sq { aspect-ratio: 1; }
+.banner .col:nth-child(1) { margin-top: -96px; }
+.banner .col:nth-child(2) { margin-top: -10px; }
+.banner .col:nth-child(3) { margin-top: -150px; }
+.banner .col:nth-child(4) { margin-top: -60px; }
+.banner .col:nth-child(5) { margin-top: -130px; }
+
+.banner .card { position: absolute; left: 520px; top: 132px; width: 300px; z-index: 3; background: var(--surface); border-radius: var(--r-panel); box-shadow: var(--shadow-pop); padding: 14px 14px 12px; }
+.banner .card .h { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-3); margin-bottom: 10px; }
+.banner .card .h b { font-weight: 560; color: var(--text-2); }
+.banner .card .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.banner .card .tag { display: inline-flex; flex-direction: column; gap: 1px; padding: var(--tag-pad-y) var(--tag-pad-x) calc(var(--tag-pad-y) + 1px); border-radius: var(--r-tag); background: var(--pane); border: 1px solid var(--divider); }
+.banner .card .tag i { font-style: normal; font-size: 12.5px; line-height: 1.35; }
+.banner .card .tag small { font-size: 10.5px; line-height: 1.3; color: var(--text-3); }
+.banner .card .tag.w i::before { content: "1.2::"; color: var(--text-3); }
+.banner .card .tag.w i::after { content: "::"; color: var(--text-3); }
+.banner .card .foot { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; }
+.banner .card .foot span { font-size: 12px; color: var(--text-3); }
+.banner .card .gen { font-size: 12.5px; font-weight: 560; padding: 6px 14px; border-radius: var(--r-ctl); background: var(--cinnabar); color: var(--on-cinnabar); }
+</style>
+</head>
+<body>
+<div class="banner">
+  <div class="copy">
+    <img class="icon" src="../public/app-icon.svg" alt="">
+    <h1>NovelAI Prompt Studio</h1>
+    <p class="lead">从一张图读出提示词，在本地整理、修改，<br>直接生成新的一版，结果自动进图片库。</p>
+    <div class="meta"><span class="hot">人和 Agent 两个入口</span><span>本地优先</span><span>Windows · macOS</span></div>
+  </div>
+
+  <div class="wall">
+    <div class="col">
+      <img src="../demo/images/showcase/晨间面包店-01.png" alt="">
+      <img src="../demo/images/showcase/霓虹屋顶-04.png" class="sq" alt="">
+      <img src="../demo/images/showcase/雨季的花伞街-03.png" alt="">
+    </div>
+    <div class="col">
+      <img src="../demo/images/showcase/夏日水族馆-01.png" alt="">
+      <img src="../demo/images/showcase/雪地小站-02.png" alt="">
+    </div>
+    <div class="col">
+      <img src="../demo/images/showcase/天文台的夜-04.png" class="sq" alt="">
+      <img src="../demo/images/showcase/霓虹屋顶-03.png" alt="">
+      <img src="../demo/images/showcase/晨间面包店-04.png" class="sq" alt="">
+    </div>
+    <div class="col">
+      <img src="../demo/images/showcase/雨季的花伞街-01.png" alt="">
+      <img src="../demo/images/showcase/天文台的夜-01.png" alt="">
+      <img src="../demo/images/showcase/夏日水族馆-03.png" alt="">
+    </div>
+    <div class="col">
+      <img src="../demo/images/showcase/雪地小站-04.png" class="sq" alt="">
+      <img src="../demo/images/showcase/霓虹屋顶-01.png" alt="">
+      <img src="../demo/images/showcase/夏日水族馆-04.png" class="sq" alt="">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="h"><b>角色 1 · 外观</b><span>V5 · 832 × 1216</span></div>
+    <div class="tags">
+      <span class="tag"><i style="color: var(--cat-subject)">1girl</i><small>1个女孩</small></span>
+      <span class="tag"><i style="color: var(--cat-body)">short white hair</i><small>白色短发</small></span>
+      <span class="tag"><i style="color: var(--cat-body)">cyan eyes</i><small>青色眼睛</small></span>
+      <span class="tag"><i style="color: var(--cat-clothing)">headphones</i><small>耳机</small></span>
+      <span class="tag"><i style="color: var(--cat-clothing)">oversized jacket</i><small>宽大夹克</small></span>
+      <span class="tag"><i style="color: var(--cat-environment)">city rooftop at night</i><small>夜晚的城市屋顶</small></span>
+    </div>
+    <div class="foot"><span>0 Anlas · 免费</span><span class="gen">生成</span></div>
+  </div>
+</div>
+</body>
+</html>

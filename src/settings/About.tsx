@@ -30,6 +30,7 @@ export function feedbackDiagnostics(version = '—', platform = '') {
 
 const NET = [
   '生成图片：用你的持久令牌把提示词和参数发给 NovelAI；带 Vibe 的图会带上图里的 Vibe 编码',
+  '图生图、修图和编码 Vibe：放大、增强、局部重绘、扩图、导演工具和图生图会把要处理的那张图发给 NovelAI，编码新的 Vibe 会发参考图；只发这一张，不发别的图',
   '查询余额：打开软件、每次生成结束和点“刷新”时，向 NovelAI 查询 Anlas 余额和用量',
   '用中转站时：上面两项改发到你填的中转站地址，用中转站的 Key；中转站能看到提示词、参数、参考图和生成的图。查询余额改成读取它有哪些模型',
   '检查和下载更新：访问 GitHub。自动检查可以在上面关掉；更新说明里带图片时，会从图片所在的网站加载',
@@ -278,7 +279,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         title="图片和图片库的数据只存在这台电脑上"
         help="位置见“图片库”那一页。软件不会上传图片"
       />
-      <Row title="这些时候会联网，都不会发送你的图片" help={NET} />
+      <Row title="这些时候会联网，只在修图、图生图和编码 Vibe 时发送用到的那张图" help={NET} />
       <Row
         title="命令行工具只在这台电脑上和软件通信"
         help="不开网络端口；Agent 能做什么见“Agent”那一页"
