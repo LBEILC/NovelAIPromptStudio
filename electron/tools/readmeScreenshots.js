@@ -5,128 +5,25 @@ import { importLibraryFiles } from '../importer.js';
 import { harness } from '../acceptance/harness.js';
 import { spawn } from 'node:child_process';
 
-const paragraph =
-  'A vertical full illustration of a girl waiting at a bus shelter just after the rain. She stands slightly right of centre, the transparent umbrella tilted toward the viewer, while the wet pavement mirrors the pale sky.';
-const translation =
-  '竖幅全身插画：雨刚停，女孩在候车亭下等车。她站在画面中间偏右，透明的伞朝观者倾斜，湿漉漉的路面映着淡色的天空。';
-
-// Curated edits belong only to the disposable screenshot profile.
+// Curated translations belong only to the disposable screenshot profile.
 const dictionaryEdits = `
-actively painting the coastline on canvas|正在画布上描绘海岸线|Action
-adult woman|成年女性|Subject
-afternoon sunlight|午后阳光|Environment
-artist collaboration|画师合作|ArtistEra
-artists:ningen mame|画师:ningen mame|ArtistEra
-back three-quarter view|背面四分之三视角|Composition
-bad quality|低画质|StyleQuality
-best quality|最佳画质|StyleQuality
-black leather shoulder bag|黑色皮革单肩包|Clothing
-books with unmarked spines|书脊无字的书本|Environment
-botanical garden|植物园|Environment
-calm atmosphere|平静氛围|Environment
-carrying a stack of books|抱着一摞书|Action
-charcoal gray plaid pleated skirt|炭灰色格纹百褶裙|Clothing
-cinematic composition|电影感构图|Composition
-clear morning light|明净的晨光|Environment
-close-up at a seaside promenade|海滨步道上的特写|Composition
-close-up portrait|肖像特写|Composition
-cozy independent bookstore at night|夜晚温馨的独立书店|Environment
-cropped face|面部被裁切|Composition
-dark shelves behind|身后的暗色书架|Environment
-detailed background|细致的背景|Environment
-detailed glass greenhouse|细致的玻璃温室|Environment
-detailed ocean horizon and seaside promenade|细致的海平线与海滨步道|Environment
-detailed seaside promenade and ocean horizon background|细致的海滨步道与海平线背景|Environment
-drawing in sketchbook|在速写本上绘画|Action
-duplicate|重复内容|StyleQuality
-duplicate person|重复人物|Subject
-extra characters|多余角色|Subject
-extra fingers|多余手指|Body
-extra limbs|多余肢体|Body
-floating dust|漂浮的尘埃|Environment
-frame|画框|Composition
-full body side view|全身侧视图|Composition
-full-bleed composition|满版构图|Composition
-gentle confident smile|温柔自信的微笑|Action
-girl|女孩|Subject
-hanging leaves|垂落的叶片|Environment
-holding a paintbrush|手持画笔|Action
-holding an open sketchbook|拿着展开的速写本|Action
-holding two books|拿着两本书|Action
-jpeg artifacts|JPEG 压缩伪影|StyleQuality
-konya karasue|画师:konya karasue|ArtistEra
-leaves in foreground|前景中的叶片|Environment
-letterbox|上下黑边|Composition
-light beige oversized knit cardigan|浅米色宽松针织开衫|Clothing
-long copper hair|铜色长发|Body
-lowres|低分辨率|StyleQuality
-lush plants|茂盛的植物|Environment
-malformed limbs|畸形肢体|Body
-masterpiece|杰作|StyleQuality
-medium shot|中景|Composition
-missing fingers|缺失手指|Body
-morning light|晨光|Environment
-muted blue and warm cream palette|柔和蓝色与暖奶油色配色|StyleQuality
-narrow navy necktie|藏青色窄领带|Clothing
-natural shadows|自然阴影|Environment
-natural smile|自然的微笑|Action
-navy and amber palette|藏青色与琥珀色配色|StyleQuality
-navy ribbon hair ornament|藏青色缎带发饰|Clothing
-no text|无文字|StyleQuality
-nsfw|成人内容|StyleQuality
-ocean and railing softly blurred behind|身后柔和虚化的海洋与栏杆|Environment
-only one girl seated on a folding stool at a wooden easel on the left|仅一名女孩坐在左侧木画架前的折叠凳上|Subject
-only one girl standing directly behind a wooden easel|仅一名女孩站在木画架正后方|Subject
-open sketchbook|展开的速写本|Environment
-original character|原创角色|Identity
-overcast sky|阴天的天空|Environment
-pale blue sky|淡蓝色天空|Environment
-pale color|淡色|StyleQuality
-peaceful creative workspace|安静的创作空间|Environment
-quiet atmosphere|安静氛围|Environment
-quiet city bus stop|安静的城市公交站|Environment
-quiet creative mood|宁静的创作氛围|Environment
-rain on window|窗上的雨滴|Environment
-rainy day|雨天|Environment
-reading an open book|阅读摊开的书|Action
-reflections on glass|玻璃上的倒影|Environment
-relaxed pose|放松的姿势|Action
-rella|画师:rella|ArtistEra
-scan artifacts|扫描伪影|StyleQuality
-screentone|网点纸效果|StyleQuality
-sea breeze|海风|Environment
-second person|第二个人|Subject
-self portrait|自画像|Composition
-shallow depth of field|浅景深|Composition
-side view|侧视图|Composition
-signature|签名|StyleQuality
-sitting on a cushioned window seat beside the rainy window|坐在雨窗旁带软垫的窗边座位上|Action
-sitting on a wooden bench|坐在木长椅上|Action
-soft diffused light|柔和的漫射光|Environment
-soft green and amber palette|柔和绿色与琥珀色配色|StyleQuality
-soft morning light|柔和晨光|Environment
-soft reflections|柔和的倒影|Environment
-soft rim light|柔和轮廓光|Composition
-standing beside the potting table|站在园艺工作台旁|Action
-standing in a narrow aisle|站在狭窄过道中|Action
-sunbeams through glass|穿过玻璃的阳光|Environment
-tall bookshelves|高大的书架|Environment
-teal eyes|蓝绿色眼睛|Body
-text|文字|StyleQuality
-three-quarter view|四分之三视角|Composition
-transparent umbrella|透明雨伞|Environment
-very aesthetic|极具美感|StyleQuality
-very displeasing|非常不美观|StyleQuality
-warm light on face|照在脸上的暖光|Environment
-warm tungsten lamps|暖色钨丝灯|Environment
-watering small flowers|给小花浇水|Action
-wet pavement|湿漉漉的路面|Environment
-white pointed-collar shirt|白色尖领衬衫|Clothing
-wide coastal landscape|开阔的海岸风景|Composition
-windblown hair|被风吹起的头发|Body
-wooden potting table|木制园艺工作台|Environment
-worst quality|最差画质|StyleQuality
-year2025|2025 年|ArtistEra
+snowy small train station|雪中的小火车站|Environment
+winter|冬天|Environment
+quiet shelter|安静的候车亭|Environment
+warm lamp light|温暖的灯光|Environment
+soft white snow and muted red accents|柔白的雪与柔和红色点缀|Environment
+long silver hair|银色长发|Body
+star hair ornament|星星发饰|Clothing
+violet eyes|紫色眼睛|Body
+navy winter coat|藏青色冬季外套|Clothing
+white high-collar dress|白色高领连衣裙|Clothing
+long chestnut hair|栗色长发|Body
+amber eyes|琥珀色眼睛|Body
+red knitted scarf|红色针织围巾|Clothing
+beige duffle coat|米色牛角扣大衣|Clothing
+white mittens|白色连指手套|Clothing
+soft snowfall|轻柔的飘雪|Environment
+blue hour|蓝调时刻|Environment
 `
   .trim()
   .split('\n')
@@ -284,20 +181,24 @@ export async function runReadmeScreenshots({
       '演示生成完成',
     );
   try {
-    const source = path.resolve('demo/images/final');
+    const source = path.resolve('demo/images/showcase');
     const files = (await fs.readdir(source))
       .filter((f) => f.endsWith('.png'))
       .sort()
       .map((f) => path.join(source, f));
-    if (files.length !== 14) throw Error('Expected 14 demo images');
+    if (files.length !== 24) throw Error('Expected 24 showcase images');
     const imported = await importLibraryFiles({ filePaths: files, database, assetsDirectory });
-    if (imported.errors.length || imported.imported.length !== 14)
+    if (imported.errors.length || imported.imported.length !== 24)
       throw Error('Demo import failed');
     const projects = database.loadLibrary('all'),
-      current = projects.find((p) => p.name === '雨后候车亭-01');
+      current = projects.find((p) => p.name === '雪地小站-02');
     if (!current) throw Error('Missing portrait demo');
     generationService.state.images = await Promise.all(
-      files.filter((f) => path.basename(f).startsWith('雨后候车亭')).map((f) => fs.readFile(f)),
+      files
+        .filter(
+          (f) => path.basename(f).startsWith('雪地小站') && path.basename(f) !== '雪地小站-02.png',
+        )
+        .map((f) => fs.readFile(f)),
     );
     for (const [id, name] of [
       ['weekly', '本周精选'],
@@ -310,8 +211,8 @@ export async function runReadmeScreenshots({
       );
     }
     database.createCollection({
-      id: 'v45',
-      name: 'V4.5',
+      id: 'v5',
+      name: 'V5',
       kind: 'smart',
       filters: { models: [current.metadata.model] },
     });
@@ -322,8 +223,9 @@ export async function runReadmeScreenshots({
       theme: 'light',
       animationsDisabled: true,
       workbenchPaths: [
-        path.join(source, '雨后候车亭-01.png'),
-        path.join(source, '海边写生-01.png'),
+        path.join(source, '雪地小站-02.png'),
+        path.join(source, '霓虹屋顶-04.png'),
+        path.join(source, '晨间面包店-01.png'),
       ],
     });
     window.setContentSize(1240, 760);
@@ -379,33 +281,45 @@ export async function runReadmeScreenshots({
     await h.wait(
       'document.body.innerText.includes("已保存 ••••••••")&&document.body.innerText.includes("10,000")',
     );
-    await capture('account');
+    await capture('guide-account');
     await h.click('工作台', 'document.querySelector(".tb")');
     await h.evaluate('document.querySelector(".tab").click()');
     const tabId = (await invoke('workbench.list')).activeTabId;
-    const parts = current.prompt_structure.base_prompt_raw.split(', ');
-    const tagText = parts.slice(0, 6).join(', ');
-    const raw = `${tagText}\n\n${paragraph}`;
-    await invoke('prompt.set', { tabId, scope: 'base:prompt', text: raw });
-    await invoke('prompt.set-size', { tabId, width: 832, height: 1216 });
+    const raw = current.prompt_structure.base_prompt_raw;
+    const characters = (await invoke('workbench.get', { tabId })).document.scopes.filter(
+      (s) => s.scope.kind === 'character' && s.scope.polarity === 'prompt',
+    );
+    const characterScope = characters[1].scope.key;
+    const characterRaw = current.prompt_structure.characters[1].prompt_raw;
     for (let i = 0; i < 4; i++) {
-      const text =
-        i === 0
-          ? raw
-          : `${tagText}, ${['', 'soft light', 'rain reflections', 'gentle breeze'][i]}\n\n${i >= 2 ? paragraph.replace('pale sky', 'warm evening sky') : paragraph}`;
-      await invoke('prompt.set', { tabId, scope: 'base:prompt', text });
+      await invoke('prompt.set', {
+        tabId,
+        scope: 'base:prompt',
+        text: raw.replace(
+          'warm lamp light',
+          ['warm lamp light', 'soft snowfall', 'blue hour', 'warm lamp light'][i],
+        ),
+      });
+      await invoke('prompt.set', {
+        tabId,
+        scope: characterScope,
+        text: characterRaw.replace(
+          'red knitted scarf',
+          i >= 2 ? '1.2::red knitted scarf::' : 'red knitted scarf',
+        ),
+      });
       const job = await invoke('generate.start', { tabId, count: 1 });
       await finished(job.id);
     }
     let tree = await invoke('version.list', { tabId });
     const mainTip = tree.versions.at(-1),
       fork = tree.versions[1],
-      rewritten = tree.versions[3];
+      rewritten = tree.versions[2];
     await invoke('version.open', { tabId, versionId: fork.id });
     await invoke('prompt.set', {
       tabId,
       scope: 'base:prompt',
-      text: `${tagText}, blue hour\n\n${paragraph.replace('pale sky', 'blue evening sky')}`,
+      text: raw.replace('warm lamp light', 'blue hour'),
     });
     const branch = await invoke('generate.start', { tabId, count: 1 });
     await finished(branch.id);
@@ -434,6 +348,9 @@ export async function runReadmeScreenshots({
       'once',
     );
     await h.wait(`!!document.querySelector('[data-key="ver-${rewritten.id}"]')`);
+    await h.evaluate(
+      `document.querySelector('[data-key="ver-${rewritten.id}"]').scrollIntoView({block:'nearest'}); new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`,
+    );
     const point = await h.evaluate(
       `(()=>{const n=document.querySelector('[data-key="ver-${rewritten.id}"]');n.scrollIntoView({block:'nearest'});const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+10}})()`,
     );
@@ -443,20 +360,23 @@ export async function runReadmeScreenshots({
       button: 'none',
     });
     await h.wait(
-      '!!document.querySelector(".ver-peek del")&&!!document.querySelector(".ver-peek ins")',
+      '!!document.querySelector(".ver-peek .minus")&&!!document.querySelector(".ver-peek .plus")',
     );
-    await capture('versions');
+    await h.wait(
+      `document.querySelector('.ver-peek .vp-h b')?.textContent==='第 ${rewritten.number} 版'`,
+    );
+    await capture('readme-versions');
     await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
       type: 'mouseMoved',
       x: 600,
       y: 50,
       button: 'none',
     });
-    await h.wait('!document.querySelector(".ver-peek del")');
+    await h.wait('!document.querySelector(".ver-peek .minus")');
     await invoke('prompt.set', {
       tabId,
       scope: 'base:prompt',
-      text: `${tagText}, falling rain\n\n${paragraph}`,
+      text: raw.replace('quiet shelter', 'quiet shelter, soft snowfall'),
     });
     generationService.state.holdAt = generationService.state.requests.length + 2;
     const generating = await invoke('generate.start', { tabId, count: 3 });
@@ -479,9 +399,74 @@ export async function runReadmeScreenshots({
     await h.wait(
       '(()=>{const r=document.querySelector(".slot.run").getBoundingClientRect();return r.bottom<=innerHeight&&r.top>0})()',
     );
-    await capture('generate');
+    await h.click('翻译');
+    await h.evaluate(`document.querySelector('.char-sec')?.scrollIntoView({block:'start'})`);
+    await capture('readme-workbench');
     generationService.state.resume();
     await finished(generating.id);
+    await invoke('version.open', { tabId, versionId: mainTip.id });
+    await h.wait('!!document.querySelector("[data-trigger=op-inpaint]")');
+    await h.evaluate('document.querySelector("[data-trigger=op-inpaint]").click()');
+    await h.wait('!!document.querySelector(".ip-mask")');
+    const paintRect = await h.evaluate(
+      `(()=>{const r=document.querySelector('.ip-stage').getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})()`,
+    );
+    for (const [type, dx, dy] of [
+      ['mousePressed', 0.71, 0.64],
+      ['mouseMoved', 0.74, 0.66],
+      ['mouseReleased', 0.74, 0.66],
+    ])
+      await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+        type,
+        x: paintRect.x + paintRect.width * dx,
+        y: paintRect.y + paintRect.height * dy,
+        button: 'left',
+        buttons: type === 'mouseReleased' ? 0 : 1,
+        clickCount: 1,
+      });
+    await h.until(
+      async () => (await invoke('inpaint.get', { tabId })).maskRatio > 0,
+      '截图遮罩已同步',
+    );
+    await h.click('框：拖出送去重绘的范围');
+    await h.click('自由', 'document.querySelector(".inpaint-ov")');
+    for (const [type, dx, dy] of [
+      ['mousePressed', 0.56, 0.48],
+      ['mouseMoved', 0.91, 0.82],
+      ['mouseReleased', 0.91, 0.82],
+    ]) {
+      await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+        type,
+        x: paintRect.x + paintRect.width * dx,
+        y: paintRect.y + paintRect.height * dy,
+        button: 'left',
+        buttons: type === 'mouseReleased' ? 0 : 1,
+        clickCount: 1,
+      });
+      await h.evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+    }
+    await h.wait('!!document.querySelector(".ip-rect.manual")');
+    await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: 1100,
+      y: 50,
+      button: 'none',
+    });
+    await h.wait('document.querySelector(".ip-info")?.textContent.includes("免费")');
+    await capture('readme-inpaint');
+    await h.click('取消', 'document.querySelector(".inpaint-ov")');
+    await h.wait('!document.querySelector(".inpaint-ov")');
+    await h.wait(`!!document.querySelector('[data-key="ths-${rewritten.id}"] img')`);
+    await h.evaluate(
+      `document.querySelector('[data-key="ths-${rewritten.id}"] img').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:300,clientY:250}))`,
+    );
+    await h.click('和当前这张对比');
+    await h.wait('!!document.querySelector(".cmp-ov:not(.leaving)")');
+    await h.click('滑块', 'document.querySelector(".cmp-ov")');
+    await h.wait('!!document.querySelector(".cmp-cut") && !!document.querySelector(".cmp-diff")');
+    await capture('guide-compare');
+    await h.key('Escape');
+    await h.wait('!document.querySelector(".cmp-ov")');
     const tabs = (await invoke('workbench.list')).tabs;
     const pending = [];
     for (const tab of tabs.slice(0, 2))
@@ -497,39 +482,38 @@ export async function runReadmeScreenshots({
       undefined,
       'once',
     );
-    await capture('agent');
+    await capture('readme-agent');
     await h.key('Escape');
     await invoke('generate.cancel', { ids: pending.map((j) => j.id) });
     await invoke('prompt.set', {
       tabId,
-      scope: 'base:prompt',
-      text: `1.3::rain::, {transparent umbrella}, girl, teal eyes, quiet city bus stop, pale blue sky, -1.2::wind::\n\n${paragraph}`,
+      scope: characterScope,
+      text: characterRaw.replace('red knitted scarf', '1.2::red knitted scarf::'),
     });
     await h.key('e', process.platform === 'darwin' ? { metaKey: true } : { ctrlKey: true });
     await h.wait('!!document.querySelector(".tx-wrap textarea")');
-    await capture('text');
+    await h.evaluate(`document.querySelectorAll('.tx-wrap')[3]?.scrollIntoView({block:'center'})`);
+    await capture('guide-text');
     await h.click('图片库', 'document.querySelector(".tb")');
     await h.click('全部图片', 'document.querySelector(".libp .side")');
-    await h.click('筛选');
-    await h.evaluate('document.querySelector("[data-trigger=lcal]").click()');
-    const now = new Date(),
-      day = String(now.getDate()).padStart(2, '0'),
-      month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    await h.evaluate(
-      `[...document.querySelectorAll('.lcal-d')].find(n=>n.querySelector('span').textContent==='1').click()`,
-    );
-    await h.evaluate(
-      `[...document.querySelectorAll('.lcal-d')].find(n=>n.querySelector('span').textContent==='${Number(day)}').click()`,
-    );
+    const selected = projects.find((p) => p.name === '霓虹屋顶-04');
+    await h.input('[aria-label="搜索图片库"]', '霓虹屋顶-04');
+    await h.wait(`!!document.querySelector('[data-image-id="${selected.id}"]')`);
+    await h.evaluate(`document.querySelector('[data-image-id="${selected.id}"]').click()`);
+    await h.click('清除搜索');
     await h.wait(
-      '!!document.querySelector(".lcal")&&document.querySelector(".chip")?.textContent.includes("至")',
+      `document.querySelector('.detail')?.textContent.includes('霓虹屋顶') || !!document.querySelector('[data-image-id="${selected.id}"].on')`,
     );
-    await capture('library');
-    await h.key('Escape');
-    await h.key('Escape');
+    await capture('readme-library');
     await h.section('翻译词典');
     await h.wait('document.querySelectorAll(".drow .num").length>0');
-    await capture('dictionary');
+    await h.evaluate(
+      `[...document.querySelectorAll('.dtabs button')].find(b=>b.textContent.startsWith('已修改')).click()`,
+    );
+    await h.wait(
+      'document.querySelector(".drow")?.textContent.includes("雪") || document.querySelector(".dict")?.textContent.includes("米色牛角扣大衣")',
+    );
+    await capture('guide-dictionary');
     await h.check(
       '全部请求仅使用本地假服务和离线词典替身',
       () => network.blockedRequests === 0 && network.localRequests > 0,
@@ -538,6 +522,18 @@ export async function runReadmeScreenshots({
     );
     if (checks.some((c) => c.status !== 'passed'))
       throw Error('README screenshot assertions failed');
+  } catch (error) {
+    if (window && h) {
+      await fs.writeFile(
+        path.join(output, 'failure.html'),
+        await h.evaluate('document.documentElement.outerHTML'),
+      );
+      await fs.writeFile(
+        path.join(output, 'failure.png'),
+        (await window.webContents.capturePage()).toPNG(),
+      );
+    }
+    throw error;
   } finally {
     generationService.state.resume?.();
     await fs.writeFile(

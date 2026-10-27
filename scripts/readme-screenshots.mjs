@@ -36,21 +36,25 @@ try {
   }
   const evidence = path.resolve('.codex-runs/readme');
   const manifest = JSON.parse(await fs.readFile(path.join(evidence, 'manifest.json'), 'utf8'));
-  if (manifest.screenshots.length !== 7 || manifest.checks.some((c) => c.status !== 'passed'))
+  if (manifest.screenshots.length !== 9 || manifest.checks.some((c) => c.status !== 'passed'))
     throw Error('Incomplete README screenshots');
-  for (const name of [
-    'generate',
-    'versions',
-    'agent',
-    'text',
-    'library',
-    'account',
-    'dictionary',
-  ]) {
+  const names = [
+    'readme-workbench',
+    'readme-versions',
+    'readme-inpaint',
+    'readme-library',
+    'readme-agent',
+    'guide-text',
+    'guide-account',
+    'guide-compare',
+    'guide-dictionary',
+  ];
+  for (const name of names) {
+    if (!manifest.screenshots.includes(name)) throw Error(`Missing screenshot: ${name}`);
     const source = path.join(evidence, `${name}.png`);
     const metadata = await sharp(source).metadata();
     if (metadata.width !== 2480 || metadata.height !== 1520) throw Error('Invalid screenshot size');
-    const output = path.join(evidence, `readme-${name}-v120.webp`);
+    const output = path.resolve('doc/screenshots', `${name}.webp`);
     let buffer;
     for (const quality of [90, 85, 80, 75, 70, 65, 60, 55, 50]) {
       buffer = await sharp(source).webp({ quality, effort: 6 }).toBuffer();

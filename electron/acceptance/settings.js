@@ -200,6 +200,8 @@ export async function settingsChecks(context, restart) {
     doubles.selections.push({ canceled: false, filePaths: [target] });
     doubles.messages.push({ response: 0 });
     const progress = [];
+    // Read once: rebuilding the entire library on every copied file stalls migration in CI.
+    const originalImages = database.loadLibrary('all').map((project) => project.image_path);
     const send = h.window.webContents.send.bind(h.window.webContents);
     h.window.webContents.send = (channel, ...args) => {
       if (
@@ -209,9 +211,7 @@ export async function settingsChecks(context, restart) {
       )
         progress.push({
           ...args[0].data,
-          oldPresent: database
-            .loadLibrary('all')
-            .every((project) => requireExists(project.image_path)),
+          oldPresent: originalImages.every(requireExists),
         });
       return send(channel, ...args);
     };
@@ -222,7 +222,9 @@ export async function settingsChecks(context, restart) {
     h.window.webContents.send = send;
     await check(
       '迁移产生进度且校验结束前旧文件存在',
-      () => progress.length > 0 && progress.every((p) => p.oldPresent),
+      () =>
+        progress.some((p) => p.phase === 'switching') &&
+        progress.filter((p) => p.phase !== 'complete').every((p) => p.oldPresent),
       undefined,
       'once',
     );
