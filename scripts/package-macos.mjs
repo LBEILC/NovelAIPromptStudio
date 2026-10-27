@@ -11,6 +11,8 @@ const signed = Boolean(env.CSC_LINK);
 let temporary;
 try {
   if (signed) {
+    // The legacy unsigned workflow disables discovery, even for an imported p12.
+    env.CSC_IDENTITY_AUTO_DISCOVERY = 'true';
     for (const key of [
       'CSC_KEY_PASSWORD',
       'APPLE_API_KEY_P8',
@@ -47,6 +49,7 @@ try {
       '--mac',
       arch,
       `-c.forceCodeSigning=${signed}`,
+      `-c.mac.hardenedRuntime=${signed}`,
       `-c.extraMetadata.macSignedAndNotarized=${signed}`,
     ],
     { env, stdio: 'inherit' },

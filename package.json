@@ -146,7 +146,7 @@
       ],
       "artifactName": "NovelAI-Prompt-Studio-${version}-${arch}.${ext}",
       "category": "public.app-category.graphics-design",
-      "hardenedRuntime": true,
+      "hardenedRuntime": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist"
     },
