@@ -564,6 +564,8 @@ textarea.para-in { resize: none; overflow: hidden; }
 .ip-size .mono { min-width: 3ch; }
 .ip-info { display: flex; flex-direction: column; min-width: 0; }
 .viewer-bar .ip-info .help { margin-left: 0; }
+/* 窄窗口换行时，价格整段换到下一行，不把"免费"拆成两行 */
+.ip-info > .mono b { white-space: nowrap; }
 .ip-info .help.warn { color: var(--warn); }
 .ip-info .help.danger { color: var(--danger); }
 .ip-full { display: inline-flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
