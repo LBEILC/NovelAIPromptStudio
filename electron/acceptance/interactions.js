@@ -175,6 +175,9 @@ export async function libraryInteractionChecks(env) {
     await library(h, 'interaction-fixture-');
     await context(h, card(records[1].id));
     await expectMenu(h, '单张右键菜单项目及顺序正确', [
+      '复制图片',
+      '另存为…',
+      '在文件夹中显示',
       '在工作台打开',
       '在工作台用作底图',
       '加入收藏集…',
@@ -215,6 +218,18 @@ export async function libraryInteractionChecks(env) {
       undefined,
       'once',
     );
+    await context(h, 'document.querySelector(".viewer-ov .vframe:not(.leaving) img")');
+    await check(
+      '097-3 图片库大图菜单前三项正确且保留 NSFW 标记',
+      `(()=>{const labels=[...${menu}.querySelectorAll('[role=menuitem]')].map(n=>n.textContent.trim());return JSON.stringify(labels.slice(0,3))===JSON.stringify(['复制图片','另存为…','在文件夹中显示']) && labels.slice(3).some(t=>t==='标为 NSFW'||t==='不是 NSFW')})()`,
+      undefined,
+      'once',
+    );
+    await key('Escape');
+    await click('复制图片', 'document.querySelector(".viewer-bar")');
+    const visibleToast = `(()=>{const n=[...document.querySelectorAll('.toasts .toast:not(.leaving)')].find(n=>n.textContent.includes('已复制图片'));if(!n)return false;const r=n.getBoundingClientRect();return !!document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('.toasts')})()`;
+    await wait(visibleToast);
+    await check('097-4 大图复制通知出现且中心点未被大图遮挡', visibleToast, undefined, 'once');
     await key('Escape', {}, 'document.querySelector(".viewer-ov")');
     await context(h, card(records[1].id));
     await click('加入收藏集…', menu);

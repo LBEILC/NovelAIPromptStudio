@@ -137,6 +137,26 @@ async function outpaintUIChecks({ h, database, generationService, call, waitJob 
       cards[0].textContent.includes('生成') && cards[1].textContent.includes('2 次');
   })()`,
   );
+  const checkCard = async (label, mixed) => {
+    const edges = await h.evaluate(
+      `Object.fromEntries([...${overlay}.querySelectorAll('[data-outpaint-handle]')].map(n=>[n.dataset.outpaintHandle,Number(n.getAttribute('aria-valuenow'))]))`,
+    );
+    const estimate = await call('generate.estimate-outpaint', {
+      tabId,
+      imageId: parent.project.id,
+      edges,
+    });
+    const card = `${overlay}.querySelectorAll('.op-card')[1]`;
+    await h.wait(`${card}?.textContent.includes(${JSON.stringify(mixed ? '等' : '每次')})`);
+    const blocks = estimate.edges.blocks;
+    const expected = `每次 ${blocks[0].width} × ${blocks[0].height}`;
+    const state = mixed
+      ? `(()=>{const n=${card},tip=n.getAttribute('data-tip')||'';return n.textContent.includes('等') && tip.includes('左') && tip.includes('上') && ${JSON.stringify(blocks.map((b) => `${b.width} × ${b.height}`))}.every(size=>tip.includes(size))})()`
+      : `${card}.textContent.includes(${JSON.stringify(expected)}) && /每次 \\d+ × \\d+/.test(${card}.textContent)`;
+    await h.wait(state);
+    await h.check(label, state, undefined, 'once');
+  };
+  await checkCard('097-12 左右等量扩图显示估价返回的每块尺寸', false);
   const drag = async (distance) => {
     await h.evaluate(`(() => {
       const handle=${overlay}.querySelector('[data-outpaint-handle="bottom"]');
@@ -162,6 +182,13 @@ async function outpaintUIChecks({ h, database, generationService, call, waitJob 
     '重置清空四条扩边',
     `[...${overlay}.querySelectorAll('[data-outpaint-handle]')].every(e=>e.getAttribute('aria-valuenow')==='0')`,
   );
+  for (const side of ['left', 'top']) {
+    await h.evaluate(
+      `(()=>{const n=${overlay}.querySelector('[data-outpaint-handle="${side}"]'),r=n.getBoundingClientRect(),area=${overlay}.querySelector('.op-area'),dx=${side === 'left' ? -40 : 0},dy=${side === 'top' ? -40 : 0};n.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:1,clientX:r.x,clientY:r.y}));area.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,pointerId:1,clientX:r.x+dx,clientY:r.y+dy}));area.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:1,clientX:r.x+dx,clientY:r.y+dy}))})()`,
+    );
+  }
+  await checkCard('097-13 左上扩图标明尺寸不同并列出各块尺寸', true);
+  await h.click('重置', overlay);
   for (const scenario of ['edges', 'partial', 'whole']) {
     if (scenario !== 'edges') {
       await start();

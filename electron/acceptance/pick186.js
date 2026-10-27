@@ -1,3 +1,4 @@
+import { imageMenuCopy190 } from './release190.js';
 import { commandFor, contextMenu, menuRoot, toastRoot } from './release186.js';
 import { expectQueueCompletion } from './generationQueueWait.js';
 import fs from 'node:fs';
@@ -16,6 +17,13 @@ export async function pick186Checks({ h, preferences, mode, database }) {
   const version = (await call('version.list', { tabId: tab.id })).versions.at(-1);
   await h.click('工作台', 'document.querySelector(".tb")');
   h.category('工作台');
+  const secondImage = database.loadProject(version.images[1].projectId);
+  await imageMenuCopy190(
+    h,
+    '097-2 版本第二张小图右键前三项及复制尺寸正确',
+    `document.querySelector('[data-key="ths-${version.id}"]')?.querySelectorAll('img')[1]`,
+    secondImage.metadata,
+  );
   await contextMenu(h, `[data-key="ver-${version.id}"]`);
   await h.click('挑图…', menuRoot);
   await h.wait('document.querySelectorAll("[data-pick-index]").length===3');

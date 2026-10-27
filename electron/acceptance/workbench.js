@@ -1,3 +1,4 @@
+import { imageMenuCopy190 } from './release190.js';
 import { notificationClearance } from './interactionCorrections.js';
 import { pick186Checks } from './pick186.js';
 import { randomBlockUI } from './release186.js';
@@ -56,7 +57,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   };
   const reset = async () => {
     const hadCharacter = await e('!!document.querySelector(".char-sec")');
-    if (await e('!!document.querySelector(".dirty-tag")')) {
+    if (await e('!!document.querySelector(".dirty-tag:not(.leaving)")')) {
       await click('恢复', 'document.querySelector(".cap-title")');
       if (hadCharacter) {
         await wait('!document.querySelector(".tb") || !document.querySelector(".char-sec")');
@@ -315,7 +316,24 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     `document.querySelector('.blk[data-block] .blk-h').textContent.includes('段落')`,
   );
   await menu('这一块的操作', '转为 Tag 块', 'document.querySelector(".blk[data-block]")');
-  // TODO(design): the rewritten editor currently lacks Alt-arrow reordering.
+  const blockButton = (index) =>
+    `document.querySelector('.blk[data-block="0:${index}"] .blk-h [aria-label="这一块的操作"]')`;
+  const swapped = [
+    workbenchRaw.split('\n\n')[1],
+    workbenchRaw.split('\n\n')[0],
+    workbenchRaw.split('\n\n')[2],
+  ].join('\n\n');
+  await e(`${blockButton(0)}.focus()`);
+  for (const [direction, index, expected, label] of [
+    ['ArrowDown', 1, swapped, '097-5 块 Alt 下移交换原文并跟随焦点'],
+    ['ArrowUp', 0, workbenchRaw, '097-6 块 Alt 上移恢复原文与焦点'],
+    ['ArrowUp', 0, workbenchRaw, '097-7 首块 Alt 上移保持原文'],
+  ]) {
+    await key(direction, { altKey: true });
+    const state = `${raw}===${JSON.stringify(expected)} && document.activeElement===${blockButton(index)}`;
+    await wait(state);
+    await check(label, state, undefined, 'once');
+  }
   for (const [direction, index] of [
     ['ArrowRight', 0],
     ['ArrowLeft', 1],
@@ -593,6 +611,12 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     clipboard.readImage().toPNG().equals(nativeImage.createFromPath(files[0]).toPNG());
   await h.until(copiedImageMatches, '工作台图片复制完成');
   await check('工作台复制图片得到原图像素', copiedImageMatches);
+  await imageMenuCopy190(
+    h,
+    '097-1 舞台右键前三项及复制图片尺寸正确',
+    'document.querySelector("img[data-stage]")',
+    nativeImage.createFromPath(files[0]).getSize(),
+  );
   await notificationClearance(h, '工作台', '.stage-acts');
   doubles.selections.push({ canceled: false, filePaths: [files[1]] });
   await click('打开图片', 'document.querySelector(".tb")');
@@ -613,6 +637,25 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await wait(
     'document.querySelector(".tabs").scrollWidth>document.querySelector(".tabs").clientWidth',
   );
+  for (const [position, left, right, label] of [
+    [0, false, true, '097-9 标签栏左端禁用向前翻且点击不滚动'],
+    [1, true, false, '097-10 标签栏右端禁用向后翻'],
+    [0.5, true, true, '097-11 标签栏中间允许双向翻页'],
+  ]) {
+    await e(
+      `(()=>{const n=document.querySelector('.tabs');n.scrollLeft=(n.scrollWidth-n.clientWidth)*${position};n.dispatchEvent(new Event('scroll'))})()`,
+    );
+    const state = `(()=>{const n=document.querySelector('.tabs'),l=document.querySelector('[aria-label="向前翻"]'),r=document.querySelector('[aria-label="向后翻"]');return !!l && !!r && n.classList.contains('more-l')===${left} && n.classList.contains('more-r')===${right} && ${left ? "!l.hasAttribute('aria-disabled')" : "l.getAttribute('aria-disabled')==='true'"} && ${right ? "!r.hasAttribute('aria-disabled')" : "r.getAttribute('aria-disabled')==='true'"}})()`;
+    await wait(state);
+    if (position === 0) await e("document.querySelector('[aria-label=向前翻]').click()");
+    await check(
+      label,
+      `${state} && ${position === 0 ? "document.querySelector('.tabs').scrollLeft===0" : 'true'}`,
+      undefined,
+      'once',
+    );
+  }
+  await e("document.querySelector('.tabs').scrollLeft=0");
   await e(
     `document.querySelector('.tabs').dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:100}))`,
   );

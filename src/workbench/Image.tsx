@@ -321,7 +321,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
                   }),
               },
         ]
-      : [];
+      : fileItems;
   const vibes = image?.vibes || [];
   const viewerItems = useMemo(
     () =>

@@ -77,7 +77,21 @@ export async function onboardingChecks({ h, mode, preferences, doubles }) {
   await h.check('新装完成后重启没有新功能卡片', '!document.querySelector(".dialog.news")');
   if (mode.phase !== 1) return;
   await helpChecks({ h, preferences, mode, doubles });
+  h.category('首次引导');
   await replay();
+  await press('next');
+  await press('next');
+  await h.wait(`${dialog}?.dataset.onboardPage === 'folder'`);
+  // Keep the rapid close/reopen in one renderer task, without IPC/paint waits.
+  const rapid = await h.evaluate(
+    `(async()=>{const frame=()=>new Promise(r=>requestAnimationFrame(r));const start=performance.now();document.querySelector('[data-onboard="skip"]').click();await new Promise(r=>setTimeout(r,0));document.querySelector('[data-onboard="replay"]').click();await frame();await frame();document.querySelector('.dialog.onboard:not(.leaving) [data-onboard="next"]').click();const elapsed=performance.now()-start;await new Promise(r=>setTimeout(r,600));return {elapsed,page:document.querySelector('.dialog.onboard:not(.leaving)')?.dataset.onboardPage}})()`,
+  );
+  await h.check(
+    '097-14 引导快速重开翻至第二页后不被旧定时器重置',
+    () => rapid.elapsed < 100 && rapid.page === 'tidy',
+    undefined,
+    'once',
+  );
   await h.check('重新查看不改变已完成状态', () => !preferences.onboardingSettings().show);
   await press('skip');
   await closed('关闭重新查看的引导');
