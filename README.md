@@ -97,9 +97,9 @@ nai-studio library.search --json '{"query":"rain","limit":20}'
 | macOS Intel | `NovelAI-Prompt-Studio-*-x64.dmg` |
 
 > [!NOTE]
-> 安装包没有做代码签名，系统可能会弹出安全提示。请只从本仓库的 Releases 页面下载。
+> macOS 安装包已签名并经过 Apple 公证，下载后拖进"应用程序"就能打开。Windows 安装包还没有签名，系统可能会弹出安全提示。请只从本仓库的 Releases 页面下载。
 >
-> macOS 提示"已损坏，无法打开"时，把应用拖进"应用程序"后，在终端运行一次下面这行再打开：
+> 1.9.3 及更早的 macOS 版本如果提示"已损坏，无法打开"，在终端运行一次下面这行再打开，或者直接换成最新版：
 >
 > ```sh
 > xattr -dr com.apple.quarantine "/Applications/NovelAI Prompt Studio.app"
