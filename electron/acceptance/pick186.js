@@ -64,6 +64,11 @@ export async function pick186Checks({ h, preferences, mode, database }) {
   await h.until(async () => !!(await image()).project.deleted_at, '挑图移入回收站');
   await h.click('撤销', toastRoot);
   await h.until(async () => !(await image()).project.deleted_at, '挑图撤销恢复');
+  // The undo callback reloads the picker after the database restore finishes.
+  // Send Escape to the restored grid, not to the old grid while it is leaving.
+  await h.wait(
+    'document.querySelectorAll("[data-pick]:not(.leaving) [data-pick-index]").length===3',
+  );
   await h.check(
     '091-19 挑图空格保留、X 丢弃，回收站撤销恢复图片',
     async () => !(await image()).project.deleted_at,

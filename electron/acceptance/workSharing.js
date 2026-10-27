@@ -45,8 +45,8 @@ export async function workSharingChecks({ h, mode, database, preferences }) {
   await invoke('workbench.open', { libraryId: imageId, workId: b.workId });
   await h.click('工作台', 'document.querySelector(".tb")');
   await h.wait(
-    `document.querySelector('.wb-body')?.dataset.projectId===${JSON.stringify(imageId)} && !!document.querySelector('.stage [data-stage]')`,
-    'B 第三版图片已显示',
+    `document.querySelector('.wb-body')?.dataset.projectId===${JSON.stringify(imageId)} && !!document.querySelector('.stage [data-stage]') && !!document.querySelector('[data-key="ver-${versionId}"][aria-current="true"]')`,
+    'B 第三版图片和当前版本已同步显示',
   );
   await h.evaluate(
     `document.querySelector('.stage [data-stage]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:400,clientY:200}))`,

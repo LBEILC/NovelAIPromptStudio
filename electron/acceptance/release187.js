@@ -71,6 +71,8 @@ export async function director187Checks({ h, generationService }) {
   await h.wait(
     `document.querySelector('img[data-stage]:not(.leaving)')?.getAttribute('src')==='novelai-media://file?path='+encodeURIComponent(${JSON.stringify(bgImage.image_path)})`,
   );
+  const bgThumbnails = `(()=>{const tips=[...document.querySelectorAll('[data-key="ths-${bg.id}"] [data-tip]')].map(e=>e.dataset.tip);return ['抠图','补全','混合'].every((t,i)=>tips[i]?.startsWith(t))})()`;
+  await h.wait(bgThumbnails, '去背景的三个结果已同步到版本栏');
   await h.check(
     '096-02 去背景生成三种结果、缩略图说明并切到首张',
     async () =>
@@ -78,9 +80,7 @@ export async function director187Checks({ h, generationService }) {
       bg.operation.kind === 'director' &&
       bg.operation.tool === 'bg-removal' &&
       bg.images.map((i) => i.variant).join(',') === 'masked,generated,blend' &&
-      (await h.evaluate(
-        `(()=>{const tips=[...document.querySelectorAll('[data-key="ths-${bg.id}"] [data-tip]')].map(e=>e.dataset.tip);return ['抠图','补全','混合'].every((t,i)=>tips[i]?.startsWith(t))})()`,
-      )),
+      (await h.evaluate(bgThumbnails)),
   );
   await open();
   await tool('emotion');
