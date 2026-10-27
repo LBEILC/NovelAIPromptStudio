@@ -1,16 +1,19 @@
-// 帮助（doc/design.md 2.36，1.8.2）：最上面是功能一览（搜索、按工作台 / 生成和修图 / 图片库 / Agent 与设置分组，"去看看"直接跳过去），
-// 下面是从"关于与更新"搬过来的快捷键、重新查看引导、报告问题和诊断信息。没有快捷键打开这一页（用户 10-25）。
-// 1.8.4（2.40）：每行说明下面写"在哪"（搜索也搜它）；"去看看"跳过去后指出控件，找不到时通知里写在哪。
+// 帮助（doc/design.md 2.36）：三个页签——功能、快捷键、反馈（用户 10-27：原来一页铺开 44 个功能，太长）。
+// 功能：搜索加分组切换，一个功能一行（名称和一句说明），整行点下去跳过去并指出控件（2.40）；
+// "在哪"平时放进悬停提示，搜索时直接显示。几个常用、难懂或不好找的功能带"演示"（helpDemos.tsx）。
+// 没有快捷键打开这一页（用户 10-25）。记住上次的页签和分组。
 import { Fragment, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { writeClipboardText } from '../lib/clipboard';
-import { Icon, Kbd } from '../kit/controls';
+import { Icon, Kbd, Seg } from '../kit/controls';
+import { useIndicator } from '../kit/motion';
 import { useNotifications } from '../kit/toast';
 import { useUpdates } from '../state/updates';
 import { pointAt } from '../kit/spotlight';
 import { replayOnboarding } from '../shell/Onboarding';
 import { ISSUES, feedbackDiagnostics } from './About';
 import { FEATURES, type Feature, type FeatureTarget } from './features';
+import { HelpDemo } from './helpDemos';
 import { Row, SetPage, errorText } from './parts';
 
 // 快捷键按在哪里用分成三组；以产品实际绑定的为准
@@ -46,6 +49,29 @@ const KEYS: [string, [string, ...string[][]][]][] = [
     ],
   ],
 ];
+const TABS = [
+  ['features', '功能'],
+  ['keys', '快捷键'],
+  ['feedback', '反馈'],
+] as const;
+type Tab = (typeof TABS)[number][0];
+const GROUPS = ['全部', ...FEATURES.map((g) => g.group)];
+// 记住上次的页签和分组；读不到（隐私模式、清过数据）就用默认的
+const recall = <T extends string>(key: string, ok: readonly string[], fallback: T): T => {
+  try {
+    const v = localStorage.getItem(key);
+    return v && ok.includes(v) ? (v as T) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+const remember = (key: string, v: string) => {
+  try {
+    localStorage.setItem(key, v);
+  } catch {
+    // 存不下就算了，下次用默认的
+  }
+};
 const GO_NAME: Record<string, string> = {
   workbench: '工作台',
   gallery: '图片库',
@@ -56,14 +82,33 @@ export function Help({ onGo }: { onGo: (target: FeatureTarget) => void }) {
   const notify = useNotifications();
   const st = useUpdates().state;
   const [q, setQ] = useState('');
+  const [tab, setTab] = useState<Tab>(() =>
+    recall(
+      'nps.help-tab',
+      TABS.map((t) => t[0]),
+      'features',
+    ),
+  );
+  const [group, setGroup] = useState<string>(() => recall('nps.help-group', GROUPS, '工作台'));
+  const [demo, setDemo] = useState('');
+  const tabs = useRef<HTMLSpanElement>(null);
+  useIndicator(tabs, [tab]);
   const search = useRef<HTMLInputElement>(null);
   const query = q.trim().toLowerCase();
-  const groups = FEATURES.map((g) => ({
-    ...g,
-    items: query
-      ? g.items.filter((f) => `${f.name}${f.text}${f.where}`.toLowerCase().includes(query))
-      : g.items,
-  })).filter((g) => g.items.length);
+  // 有搜索词时跨组搜，分组切换显示"全部"；清掉搜索回到原来的分组
+  const shown = query ? '全部' : group;
+  const groups = FEATURES.filter((g) => shown === '全部' || g.group === shown)
+    .map((g) => ({
+      ...g,
+      items: query
+        ? g.items.filter((f) => `${f.name}${f.text}${f.where}`.toLowerCase().includes(query))
+        : g.items,
+    }))
+    .filter((g) => g.items.length);
+  const pickTab = (t: Tab) => {
+    setTab(t);
+    remember('nps.help-tab', t);
+  };
   const go = (f: Feature) => {
     onGo(f.go);
     void pointAt(f.point).then((found) => {
@@ -85,113 +130,173 @@ export function Help({ onGo }: { onGo: (target: FeatureTarget) => void }) {
   };
   return (
     <SetPage title="帮助">
-      <h2>功能一览</h2>
-      <label className="field sm help-search">
-        <Icon name="search-line" />
-        <input
-          ref={search}
-          placeholder="搜索功能"
-          aria-label="搜索功能"
-          autoComplete="off"
-          spellCheck={false}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape' && q) {
-              e.stopPropagation();
-              setQ('');
-            }
-          }}
-        />
-        {q && (
+      <span className="help-tabs has-ind" ref={tabs} role="tablist" aria-label="帮助">
+        <i className="ind" />
+        {TABS.map(([k, name]) => (
           <button
-            className="btn quiet sm icon lq-x"
-            aria-label="清除搜索"
-            onClick={() => {
-              setQ('');
-              search.current?.focus();
-            }}
+            key={k}
+            role="tab"
+            aria-selected={tab === k}
+            className={tab === k ? 'on' : ''}
+            data-help-tab={k}
+            onClick={() => pickTab(k)}
           >
-            <Icon name="close-line" />
+            {name}
           </button>
-        )}
-      </label>
-      {groups.length ? (
-        groups.map((g) => (
-          <div className="feat-group" key={g.group} data-feature-group={g.group}>
-            <span className="label">{g.group}</span>
-            {g.items.map((f) => (
-              <Row
-                key={f.name}
-                title={f.name}
-                help={[f.text, <span className="feat-where">{f.where}</span>]}
-                className="feat-row"
-              >
+        ))}
+      </span>
+      {tab === 'features' && (
+        <div className="help-pane" data-enter="fade">
+          <div className="help-bar">
+            <label className="field sm help-search">
+              <Icon name="search-line" />
+              <input
+                ref={search}
+                placeholder="搜索功能"
+                aria-label="搜索功能"
+                autoComplete="off"
+                spellCheck={false}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && q) {
+                    e.stopPropagation();
+                    setQ('');
+                  }
+                }}
+              />
+              {q && (
                 <button
-                  className="btn quiet sm"
-                  data-tip={`去${GO_NAME[f.go] || '设置里的这一页'}`}
-                  onClick={() => go(f)}
+                  className="btn quiet sm icon lq-x"
+                  aria-label="清除搜索"
+                  onClick={() => {
+                    setQ('');
+                    search.current?.focus();
+                  }}
                 >
-                  去看看
-                  <Icon name="arrow-right-s-line" />
+                  <Icon name="close-line" />
                 </button>
-              </Row>
+              )}
+            </label>
+            <span className="sp" />
+            <button className="btn quiet sm" data-onboard="replay" onClick={replayOnboarding}>
+              <Icon name="play-circle-line" />
+              重新看引导
+            </button>
+          </div>
+          <Seg
+            items={GROUPS.map((g) => [g, g] as const)}
+            value={shown}
+            label="功能分组"
+            className="help-groups"
+            onChange={(g) => {
+              setQ('');
+              setGroup(g);
+              remember('nps.help-group', g);
+            }}
+          />
+          <div className={`help-feats ${query ? 'searching' : ''}`}>
+            {groups.length ? (
+              groups.map((g) => (
+                <div className="feat-group" key={g.group} data-feature-group={g.group}>
+                  {shown === '全部' && <span className="label">{g.group}</span>}
+                  {g.items.map((f) => (
+                    <Fragment key={f.name}>
+                      <div className="feat-row">
+                        <button
+                          className="feat-go"
+                          data-tip={query ? undefined : f.where}
+                          onClick={() => go(f)}
+                        >
+                          <span className="feat-name">{f.name}</span>
+                          <span className="feat-text">{f.text}</span>
+                          <span className="feat-where">{f.where}</span>
+                          <Icon name="arrow-right-s-line" className="feat-arrow" />
+                        </button>
+                        {f.demo && (
+                          <button
+                            className={`btn quiet sm feat-demo ${demo === f.name ? 'on' : ''}`}
+                            aria-expanded={demo === f.name}
+                            onClick={() => setDemo(demo === f.name ? '' : f.name)}
+                          >
+                            <Icon
+                              name={demo === f.name ? 'stop-circle-line' : 'play-circle-line'}
+                            />
+                            演示
+                          </button>
+                        )}
+                      </div>
+                      {f.demo && demo === f.name && (
+                        <div className="feat-demo-box" data-enter="fade">
+                          <HelpDemo id={f.demo} />
+                        </div>
+                      )}
+                    </Fragment>
+                  ))}
+                </div>
+              ))
+            ) : (
+              <p className="help feat-none">没有找到"{q.trim()}"相关的功能</p>
+            )}
+          </div>
+        </div>
+      )}
+      {tab === 'keys' && (
+        <div className="help-pane" data-enter="fade">
+          <div className="help">
+            macOS 上 Ctrl 对应 Command。在输入框里，Ctrl V 仍然是普通的粘贴。
+          </div>
+          <div className="help-keys">
+            {KEYS.map(([group, rows]) => (
+              <div className="key-group" key={group}>
+                <span className="label">{group}</span>
+                {rows.map(([title, ...binds]) => (
+                  <div className="setrow keyrow" key={title}>
+                    <div>{title}</div>
+                    <span className="keys">
+                      {binds.map((keys, i) => (
+                        <Fragment key={i}>
+                          {i > 0 && <span className="key-sep">/</span>}
+                          {keys.map((k) => (
+                            <Kbd key={k} keys={k} />
+                          ))}
+                        </Fragment>
+                      ))}
+                    </span>
+                  </div>
+                ))}
+              </div>
             ))}
           </div>
-        ))
-      ) : (
-        <p className="help feat-none">没有找到"{q.trim()}"相关的功能</p>
-      )}
-      <h2>快捷键</h2>
-      <div className="help">macOS 上 Ctrl 对应 Command。在输入框里，Ctrl V 仍然是普通的粘贴。</div>
-      {KEYS.map(([group, rows]) => (
-        <div className="key-group" key={group}>
-          <span className="label">{group}</span>
-          {rows.map(([title, ...binds]) => (
-            <div className="setrow keyrow" key={title}>
-              <div>{title}</div>
-              <span className="keys">
-                {binds.map((keys, i) => (
-                  <Fragment key={i}>
-                    {i > 0 && <span className="key-sep">/</span>}
-                    {keys.map((k) => (
-                      <Kbd key={k} keys={k} />
-                    ))}
-                  </Fragment>
-                ))}
-              </span>
-            </div>
-          ))}
         </div>
-      ))}
-      <h2>引导</h2>
-      <Row title="完整引导" help="新装第一次打开时的几页介绍">
-        <button className="btn sm" data-onboard="replay" onClick={replayOnboarding}>
-          重新查看
-        </button>
-      </Row>
-      <h2>反馈与支持</h2>
-      <Row title="报告问题或提出建议" help="会在浏览器里打开 GitHub，不会自动附带任何数据">
-        <span className="row">
-          <button
-            className="btn sm"
-            onClick={() => open(`${ISSUES}?labels=bug&title=%5B%E9%97%AE%E9%A2%98%5D%20`)}
-          >
-            报告问题
-          </button>
-          <button
-            className="btn sm"
-            onClick={() => open(`${ISSUES}?labels=enhancement&title=%5B%E5%BB%BA%E8%AE%AE%5D%20`)}
-          >
-            提出建议
-          </button>
-        </span>
-      </Row>
-      <Row title="诊断信息" help="只包含软件版本和操作系统，不包含图片、提示词和路径">
-        <button className="btn quiet sm" onClick={() => void copy()}>
-          复制
-        </button>
-      </Row>
+      )}
+      {tab === 'feedback' && (
+        <div className="help-pane" data-enter="fade">
+          <Row title="报告问题或提出建议" help="会在浏览器里打开 GitHub，不会自动附带任何数据">
+            <span className="row">
+              <button
+                className="btn sm"
+                onClick={() => open(`${ISSUES}?labels=bug&title=%5B%E9%97%AE%E9%A2%98%5D%20`)}
+              >
+                报告问题
+              </button>
+              <button
+                className="btn sm"
+                onClick={() =>
+                  open(`${ISSUES}?labels=enhancement&title=%5B%E5%BB%BA%E8%AE%AE%5D%20`)
+                }
+              >
+                提出建议
+              </button>
+            </span>
+          </Row>
+          <Row title="诊断信息" help="只包含软件版本和操作系统，不包含图片、提示词和路径">
+            <button className="btn quiet sm" onClick={() => void copy()}>
+              复制
+            </button>
+          </Row>
+        </div>
+      )}
     </SetPage>
   );
 }

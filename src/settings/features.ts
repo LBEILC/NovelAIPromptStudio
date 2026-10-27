@@ -17,6 +17,8 @@ export type FeatureTarget =
   | 'settings:tags'
   | 'settings:agent'
   | 'settings:updates';
+/** 帮助页里有演示动画的几个（用户 10-27：只挑常用、文字难懂、不好找的；src/settings/helpDemos.tsx） */
+export type DemoId = 'drag' | 'compare' | 'inpaint' | 'pick' | 'random';
 export interface Feature {
   name: string;
   text: string;
@@ -24,6 +26,7 @@ export interface Feature {
   where: string;
   go: FeatureTarget;
   point: PointSpec;
+  demo?: DemoId;
 }
 // 工作台里要先有一张图的
 const IMG = { id: 'open-image', text: '先打开一张图' };
@@ -48,6 +51,7 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         go: 'workbench',
         where: '工作台 · 提示词栏',
         point: { id: 'blocks', before: 'tab-prompt', tip: '按块显示，拖动 Tag 换位置', need: IMG },
+        demo: 'drag',
       },
       {
         name: '复制提示词',
@@ -156,6 +160,7 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         go: 'workbench',
         where: '工作台 · 版本栏右键一版「挑图…」，或生成 10 张以上后通知里的「挑图」',
         point: { id: 'versions', tip: '右键一版 → 挑图…', need: IMG },
+        demo: 'pick',
       },
       {
         name: '用量统计',
@@ -191,6 +196,7 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         go: 'workbench',
         where: '工作台 · 图片下面的操作条 · 局部重绘',
         point: { id: 'inpaint', need: IMG },
+        demo: 'inpaint',
       },
       {
         name: '扩图',
@@ -212,6 +218,7 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         go: 'workbench',
         where: '工作台 · 版本栏 · 右键缩略图「和当前这张对比」，或 Ctrl 点两张',
         point: { id: 'versions', tip: '右键缩略图 → 和当前这张对比', need: IMG },
+        demo: 'compare',
       },
     ],
   },
@@ -304,6 +311,7 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         go: 'materials',
         where: '素材 · 随机池；工作台提示词的块之间点「随机块」',
         point: { id: 'materials', tip: '左边选「随机池」' },
+        demo: 'random',
       },
     ],
   },
