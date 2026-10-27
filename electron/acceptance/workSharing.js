@@ -44,12 +44,16 @@ export async function workSharingChecks({ h, mode, database, preferences }) {
   const imageId = imported.imported[2].id;
   await invoke('workbench.open', { libraryId: imageId, workId: b.workId });
   await h.click('工作台', 'document.querySelector(".tb")');
+  // The stage loads its version separately from the sidebar. Wait for its
+  // caption and image too, so the menu cannot pair the old version with B's image.
+  const stage = '.wb-body:not(.leaving) .stage';
+  const imageSource = `novelai-media://file?path=${encodeURIComponent(imported.imported[2].image_path)}`;
   await h.wait(
-    `document.querySelector('.wb-body')?.dataset.projectId===${JSON.stringify(imageId)} && !!document.querySelector('.stage [data-stage]') && !!document.querySelector('[data-key="ver-${versionId}"][aria-current="true"]')`,
+    `document.querySelector('.wb-body:not(.leaving)')?.dataset.projectId===${JSON.stringify(imageId)} && document.querySelector('${stage} .cap-title b')?.textContent==='第 3 版' && document.querySelector('${stage} img[data-stage]:not(.leaving)')?.getAttribute('src')===${JSON.stringify(imageSource)} && !!document.querySelector('[data-key="ver-${versionId}"][aria-current="true"]')`,
     'B 第三版图片和当前版本已同步显示',
   );
   await h.evaluate(
-    `document.querySelector('.stage [data-stage]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:400,clientY:200}))`,
+    `document.querySelector('${stage} img[data-stage]:not(.leaving)').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:400,clientY:200}))`,
   );
   await h.click('作为新作品打开', 'document.querySelector("[role=menu]:not(.leaving *)")');
   await h.wait(
