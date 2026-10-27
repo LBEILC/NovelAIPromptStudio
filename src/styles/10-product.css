@@ -444,7 +444,7 @@ html[data-motion="off"] .spot, html[data-motion="off"] .spot-tip { animation: no
 .oba.hd { position: relative; height: var(--demo-h); }
 .hd > * { transition: opacity var(--dur-2) var(--ease-out); }
 .hd.out > * { opacity: 0; }
-.hd .hd-cur { position: absolute; left: 0; top: 0; z-index: 2; font-size: calc(var(--icon) * 1.25); color: var(--text); opacity: 0; pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3)); transition: transform var(--dur-3) var(--ease-move), opacity var(--dur-2) var(--ease-out); }
+.hd .hd-cur { position: absolute; left: 0; top: 0; z-index: 2; font-size: calc(var(--icon) * 1.25); color: var(--text); opacity: 0; pointer-events: none; filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--matte-black) 30%, transparent)); transition: transform var(--dur-3) var(--ease-move), opacity var(--dur-2) var(--ease-out); }
 .hd .hd-th { display: block; width: 20px; height: 28px; border-radius: var(--r-tag); background: linear-gradient(160deg, color-mix(in srgb, var(--cat-environment) 32%, var(--surface)), color-mix(in srgb, var(--cat-subject) 28%, var(--surface))); outline: 1.5px dashed transparent; outline-offset: 1px; transition: outline-color var(--dur-2) var(--ease-out); }
 .hd .hd-side { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
 
@@ -477,7 +477,7 @@ html[data-motion="off"] .spot, html[data-motion="off"] .spot-tip { animation: no
 .hd-compare .hd-cmp-l, .hd-compare .hd-cmp-r { position: absolute; top: 0; bottom: 0; left: 0; }
 .hd-compare .hd-cmp-r { right: 0; background: linear-gradient(160deg, color-mix(in srgb, var(--cat-identity) 34%, var(--surface)), color-mix(in srgb, var(--cat-environment) 30%, var(--surface))); }
 .hd-compare .hd-cmp-l { z-index: 1; width: 50%; background: linear-gradient(160deg, color-mix(in srgb, var(--cat-action) 34%, var(--surface)), color-mix(in srgb, var(--cat-style) 30%, var(--surface))); transition: width var(--dur-3) var(--ease-move); }
-.hd-compare .hd-cmp-line { position: absolute; top: 0; bottom: 0; left: 50%; z-index: 2; width: var(--rule-w); margin-left: calc(var(--rule-w) / -2); background: var(--on-ink); box-shadow: 0 0 0 var(--bw) rgba(0, 0, 0, 0.2); transition: left var(--dur-3) var(--ease-move); }
+.hd-compare .hd-cmp-line { position: absolute; top: 0; bottom: 0; left: 50%; z-index: 2; width: var(--rule-w); margin-left: calc(var(--rule-w) / -2); background: var(--on-ink); box-shadow: 0 0 0 var(--bw) color-mix(in srgb, var(--matte-black) 20%, transparent); transition: left var(--dur-3) var(--ease-move); }
 .hd-compare.s1 .hd-key { opacity: 1; }
 .hd-compare.s1 .hd-cur-cmp { opacity: 1; transform: translate(110px, 18px); }
 .hd-compare.s2 .hd-a { outline-color: var(--text); }
