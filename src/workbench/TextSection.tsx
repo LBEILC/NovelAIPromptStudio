@@ -72,8 +72,14 @@ export function TextSection({
     const node = area.current;
     if (!node) return;
     const resize = () => {
+      // 量高度时先把框缩回 auto，外面的滚动区域会因为内容变短被浏览器夹回去（长文本在底部编辑时跳回顶部，#8），量完把它的位置放回去
+      let scroller = node.parentElement;
+      while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY))
+        scroller = scroller.parentElement;
+      const top = scroller?.scrollTop ?? 0;
       node.style.height = 'auto';
       node.style.height = `${node.scrollHeight + 2 * parseFloat(getComputedStyle(node).borderTopWidth)}px`;
+      if (scroller && scroller.scrollTop !== top) scroller.scrollTop = top;
     };
     resize();
     let width = node.clientWidth;
