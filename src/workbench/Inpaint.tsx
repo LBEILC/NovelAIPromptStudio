@@ -748,8 +748,13 @@ function Editor(
         <span className="ip-info">
           {rect && gen ? (
             <span className="mono">
-              原图区域 {rect.width} × {rect.height} → 生成 {gen.width} × {gen.height}
-              {scaleText}
+              <span>
+                原图区域 {rect.width} × {rect.height}
+              </span>{' '}
+              <span>
+                → 生成 {gen.width} × {gen.height}
+              </span>
+              {scaleText && <span>{scaleText}</span>}
               {price && <b> · {price}</b>}
             </span>
           ) : null}
