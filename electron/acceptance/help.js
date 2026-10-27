@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { help192Checks } from './help192.js';
 import { createWorkbenchFixtures } from './workbenchFixtures.js';
 
 export async function helpChecks({ h, preferences, mode, doubles }) {
@@ -10,19 +11,7 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
   navigate('help');
   await h.wait(section('help'));
   await h.check('帮助菜单打开帮助页', section('help'));
-  await h.check(
-    '帮助导航存在且功能分为四组',
-    '!!document.querySelector(\'[data-settings-target="help"]\') && document.querySelectorAll(\'[data-settings-section="help"] .feat-group\').length === 4',
-  );
-  await h.check(
-    '帮助页包含快捷键',
-    '[...document.querySelectorAll(\'[data-settings-section="help"] h2\')].some(e=>e.textContent==="快捷键")',
-  );
-  await h.screenshot('help-features');
-  await h.check(
-    '每项功能都有位置说明',
-    '[...document.querySelectorAll(".feat-row")].every(row=>!!row.querySelector(".feat-where")?.textContent.trim())',
-  );
+  await help192Checks(h);
   await h.input('[aria-label="搜索功能"]', '操作条');
   await h.check(
     '位置搜索能找到局部重绘',
@@ -42,10 +31,10 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
   const point = async (name, id, tip = '在这里') => {
     navigate('help');
     await h.wait(section('help'));
-    await h.input('[aria-label="搜索功能"]', '');
-    await h.click(
-      '去看看',
-      `[...document.querySelectorAll('.feat-row')].find(row=>row.querySelector('h3,strong,.feat-name')?.textContent===${JSON.stringify(name)} || row.textContent.startsWith(${JSON.stringify(name)}))`,
+    await h.evaluate("document.querySelector('[data-help-tab=features]').click()");
+    await h.input('[aria-label="搜索功能"]', name);
+    await h.evaluate(
+      `[...document.querySelectorAll('.feat-row')].find(row=>row.querySelector('.feat-name')?.textContent===${JSON.stringify(name)}).querySelector('.feat-go').click()`,
     );
     const condition = `!!document.querySelector('[data-spotlight]') && document.querySelector('.spot-tip')?.textContent===${JSON.stringify(tip)} && !!document.querySelector('[data-feature~="${id}"]')`;
     await h.wait(condition);
@@ -117,9 +106,9 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
   await h.nativeKey('Escape');
   navigate('help');
   await h.wait(section('help'));
-  await h.click(
-    '去看看',
-    '[...document.querySelectorAll(".feat-row")].find(e=>e.textContent.includes("翻译词典"))',
+  await h.input('[aria-label="搜索功能"]', '翻译词典');
+  await h.evaluate(
+    `[...document.querySelectorAll('.feat-row')].find(e=>e.querySelector('.feat-name')?.textContent==='翻译词典').querySelector('.feat-go').click()`,
   );
   await h.wait(section('tags'));
   await h.check('功能一览跳转翻译词典', section('tags'));
@@ -150,6 +139,7 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
   );
   await h.reload();
   await h.section('帮助');
+  await h.evaluate("document.querySelector('[data-help-tab=features]').click()");
   await h.evaluate('document.querySelector(\'[data-onboard="replay"]\').click()');
   await h.wait('!!document.querySelector("[data-onboard-page]")');
   for (let i = 0; i < 4; i++) {
@@ -176,6 +166,7 @@ export async function helpChecks({ h, preferences, mode, doubles }) {
   await h.check('恢复提示词引导打开图片到工作台', '!!document.querySelector(".wb-body")');
   await h.reload();
   await h.section('帮助');
+  await h.evaluate("document.querySelector('[data-help-tab=features]').click()");
   await h.evaluate('document.querySelector(\'[data-onboard="replay"]\').click()');
   await h.wait('!!document.querySelector("[data-onboard-page]")');
   await h.evaluate(

@@ -1,4 +1,5 @@
 import { generationQueueChecks } from './generationQueue.js';
+import { generation192Checks } from './generation192.js';
 import { generation186Checks } from './generation186.js';
 import { director187Checks } from './release187.js';
 import { selectGalleryGrouping } from './galleryView.js';
@@ -73,6 +74,7 @@ async function runGenerationChecks({
     console.log(`生成夹具清理：关闭 ${tabs.length} 个已结束场景的标签页`);
   };
   await closeFixtureTabs();
+  await generation192Checks({ h, generationService });
   await generation186Checks({ h, generationService });
   await director187Checks({ h, generationService });
   await generationQueueChecks({ h, generationService });
