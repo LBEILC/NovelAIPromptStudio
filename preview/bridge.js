@@ -276,10 +276,10 @@ group('平台', [
   ['Windows', setPlatform('windows'), () => platform === 'windows'],
   ['macOS', setPlatform('macos'), () => platform === 'macos'],
 ]);
-// 窗口的常用尺寸：最小 960×600（软件允许的最小窗口）、默认 1240×760，以及几种常见的屏幕
+// 窗口的常用尺寸：最小 1080×700（软件允许的最小窗口，electron/main.js）、默认 1240×760，以及几种常见的屏幕
 const SIZE_KEY = 'nps-preview-size';
 const SIZES = [
-  ['960×600', '最小'],
+  ['1080×700', '最小'],
   ['1240×760', '默认'],
   ['1366×768', ''],
   ['1440×900', ''],

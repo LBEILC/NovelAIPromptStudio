@@ -3,7 +3,7 @@
 // 每页上面一块用产品组件拼的示意（onboardArt.tsx），下面标题、两三条短说明和一个按钮。
 // 不做高亮按钮一步步点的教程。随时跳过（Esc、点外面、"跳过"都算）；"设置·帮助"里可以重新查看。
 // 自动验收按 data-onboard / data-onboard-page 找元素（任务 065），改名要同步。
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog } from '../kit/dialog';
 import { useSwap } from '../kit/motion';
 import { OnboardArt } from './onboardArt';
@@ -111,14 +111,25 @@ export function Onboarding({
     setDir(n > at ? 1 : -1);
     setAt(n);
   };
+  const reset = useRef(0);
   const close = () => {
     onClose();
     // 卡片淡出以后再回到第一页，下次重新查看从头开始
-    setTimeout(() => {
+    reset.current = window.setTimeout(() => {
+      reset.current = 0;
       setAt(0);
       setDir(0);
     }, 300);
   };
+  // 淡出还没完就又打开：直接回到第一页，不留着等会儿把翻到的页拨回去（080 汇报）
+  useEffect(() => {
+    if (!open || !reset.current) return;
+    clearTimeout(reset.current);
+    reset.current = 0;
+    setAt(0);
+    setDir(0);
+  }, [open]);
+  useEffect(() => () => clearTimeout(reset.current), []);
   const page = PAGES[at];
   const pages = useSwap(page, (p) => p.id);
   const last = at === PAGES.length - 1;

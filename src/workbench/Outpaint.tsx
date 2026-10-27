@@ -217,6 +217,13 @@ function Editor(
     !e ? '…' : relay || e.relay ? '中转站按张计费' : e.free ? '免费' : `${e.anlas} Anlas`;
   const big = CW * CH > FREE_PX;
   const blocks = est?.edges.blocks.length || 0;
+  // 按边分块也写生成尺寸：各块一样大写"每次 W × H"；左右和上下不一样大时写第一块加"等"，每块的尺寸放进悬停说明
+  const blockSizes = [...new Set(est?.edges.blocks.map((b) => `${b.width} × ${b.height}`) || [])];
+  const blockSize = blockSizes.length > 1 ? `${blockSizes[0]} 等` : `每次 ${blockSizes[0] || ''}`;
+  const blockTip =
+    blockSizes.length > 1
+      ? `（${est!.edges.blocks.map((b) => `${SIDE_NAME[b.edge]} ${b.width} × ${b.height}`).join('，')}）`
+      : '';
   const unavailable = est ? (mode === 'whole' ? est.whole : est.edges).unavailable : '';
   const note = unavailable || error || (!any ? '拖四条边往外扩，或者点上面的比例' : '');
   const warn = [
@@ -407,8 +414,8 @@ function Editor(
           {card(
             'edges',
             '按边分块',
-            est ? `${blocks} 次 · ${priceOf(est.edges)}` : '…',
-            '每条边连着一块原图单独画，新区域更清楚；几条边就画几次',
+            est ? `${blocks} 次 · ${blockSize} · ${priceOf(est.edges)}` : '…',
+            `每条边连着一块原图单独画，新区域更清楚；几条边就画几次${blockTip}`,
           )}
         </span>
         {mode === 'whole' && big && (

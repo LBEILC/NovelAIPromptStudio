@@ -46,8 +46,15 @@
 .caption .dirty-line { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-2); font-size: var(--fs-small); }
 .caption .dirty-line .btn { margin-left: calc(-1 * var(--sp-1)); }
 
-/* 标签很多时两头的翻页按钮 */
-.tabs.clip { overflow: hidden; flex: 0 1 auto; mask-image: linear-gradient(to right, transparent 0, black var(--sp-5), black calc(100% - var(--sp-5)), transparent 100%); }
+/* 标签很多时两头的翻页按钮。只有那一头还藏着标签页才渐隐（.more-l / .more-r），滑到头那一头不渐隐，
+   第一个、最后一个标签页不被盖住；切到的标签页离边留出渐隐的宽度（scroll-padding）（用户 10-27） */
+@property --tabs-fade-l { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --tabs-fade-r { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.tabs.clip { overflow: hidden; flex: 0 1 auto; scroll-padding-inline: var(--sp-5); mask-image: linear-gradient(to right, transparent 0, black var(--tabs-fade-l), black calc(100% - var(--tabs-fade-r)), transparent 100%); transition: --tabs-fade-l var(--dur-2) var(--ease-out), --tabs-fade-r var(--dur-2) var(--ease-out); }
+.tabs.clip.more-l { --tabs-fade-l: var(--sp-5); }
+.tabs.clip.more-r { --tabs-fade-r: var(--sp-5); }
+/* 到头那一侧的翻页按钮变灰、点了没反应；不藏起来，免得标签页跟着挪 */
+.tb .tabs-page.is-off, .tb .tabs-page.is-off:hover { background: transparent; color: var(--text-off); }
 .tab.lift { background: var(--surface); box-shadow: var(--shadow-pop); transform: translateY(var(--sp-0)); }
 
 /* 底栏里合在一起的两个按钮 */

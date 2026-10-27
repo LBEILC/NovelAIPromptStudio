@@ -9,7 +9,8 @@ import { ToWin, useDismiss } from './layer';
 import { Icon, Seg } from './controls';
 import { markLoaded, readMatte, writeMatte, type Matte } from './alpha';
 import { BlurImg, nsfwMenu, type BlurImage } from './blur';
-import { ContextMenu } from './menu';
+import { ContextMenu, type MenuEntry } from './menu';
+import { invokeUI } from '../lib/commands';
 import { useNotifications } from './toast';
 import { useNsfwState } from '../state/blur';
 
@@ -255,7 +256,27 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
         <ContextMenu
           at={menu}
           onClose={() => setMenu(null)}
-          items={nsfwMenu([item.image.id], nsfw, (text) => notify({ text, tone: 'error' }))}
+          items={
+            [
+              // 最上面是复制图片、另存为、在文件夹中显示，和工具条上的按钮做同一件事（用户 10-27）
+              ...(p.onCopy
+                ? [{ label: '复制图片', icon: 'file-copy-line', onSelect: () => p.onCopy!(item) }]
+                : []),
+              ...(p.onSaveAs
+                ? [{ label: '另存为…', icon: 'download-2-line', onSelect: () => p.onSaveAs!(item) }]
+                : []),
+              {
+                label: '在文件夹中显示',
+                icon: 'folder-open-line',
+                onSelect: () =>
+                  void invokeUI('file.reveal', { path: item.path }).catch((e) =>
+                    notify({ text: (e as Error).message, tone: 'error' }),
+                  ),
+              },
+              'sep',
+              ...nsfwMenu([item.image.id], nsfw, (text) => notify({ text, tone: 'error' })),
+            ] as MenuEntry[]
+          }
         />
       )}
       <div className="viewer-bar">

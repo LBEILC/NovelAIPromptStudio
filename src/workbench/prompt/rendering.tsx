@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Icon, Kbd, isMod } from '../../kit/controls';
 import { MenuButton, type MenuEntry } from '../../kit/menu';
 import { useExitList } from '../../kit/motion';
@@ -49,6 +49,7 @@ export function usePromptRendering({
   fadingBlock,
   paraEditing,
   blockMenu,
+  moveBlock,
   view,
   paraTranslate,
   setParaEditing,
@@ -93,6 +94,7 @@ export function usePromptRendering({
   | 'fadingBlock'
   | 'paraEditing'
   | 'blockMenu'
+  | 'moveBlock'
   | 'view'
   | 'paraTranslate'
   | 'setParaEditing'
@@ -337,6 +339,18 @@ export function usePromptRendering({
       </span>
     ) : null;
   };
+  // Alt ↑ ↓：焦点在块标题的"更多"上时上移、下移这一块，焦点跟着它到新位置（Tag 上的 Alt + 方向键是挪 Tag）
+  const blockKeys = (si: number, bi: number) => (ev: KeyboardEvent<HTMLDivElement>) => {
+    const d = { ArrowUp: -1, ArrowDown: 1 }[ev.key];
+    if (!ev.altKey || !d) return;
+    ev.preventDefault();
+    if (!moveBlock(si, bi, d)) return;
+    requestAnimationFrame(() =>
+      scroll.current
+        ?.querySelector<HTMLElement>(`[data-block="${blockKey(si, bi + d)}"] .blk-h .acts button`)
+        ?.focus(),
+    );
+  };
   // ---------- 一块 ----------
   const blockEl = (si: number, bi: number, b: PromptBlock, negative: boolean) => {
     const key = blockKey(si, bi);
@@ -355,7 +369,7 @@ export function usePromptRendering({
           data-block={key}
           data-wb-scope={doc.scopes[si].scope.key}
         >
-          <div className="blk-h">
+          <div className="blk-h" onKeyDown={blockKeys(si, bi)}>
             <span className="label">随机块</span>
             {!proposal && acts(() => blockMenu(si, bi), '这一块的操作', `blk-${key}`)}
           </div>
@@ -387,7 +401,7 @@ export function usePromptRendering({
           data-block={key}
           data-wb-scope={doc.scopes[si].scope.key}
         >
-          <div className="blk-h">
+          <div className="blk-h" onKeyDown={blockKeys(si, bi)}>
             <span className="label">
               段落{label ? ` · ${label}` : ''}
               {on ? ' · 编辑中' : ''}
@@ -424,7 +438,7 @@ export function usePromptRendering({
         data-wb-scope={doc.scopes[si].scope.key}
       >
         {!negative && (
-          <div className="blk-h">
+          <div className="blk-h" onKeyDown={blockKeys(si, bi)}>
             <span className="label">
               TAG 块{label ? ` · ${label}` : ''} · {list.length} 个
             </span>

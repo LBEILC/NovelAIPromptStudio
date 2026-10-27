@@ -50,6 +50,15 @@ export function WorkbenchTabs(p: TabsProps) {
   const [peek, setPeek] = useState('');
   const [lifted, setLifted] = useState('');
   const [overflow, setOverflow] = useState(false);
+  // 放不下时两头各还藏没藏着标签页：决定那一头渐隐、那一头的翻页按钮能不能点
+  const [more, setMore] = useState({ l: false, r: false });
+  const measureMore = () => {
+    const el = list.current;
+    if (!el) return;
+    const l = el.scrollLeft > 1,
+      r = el.scrollLeft < el.scrollWidth - el.clientWidth - 1;
+    setMore((m) => (m.l === l && m.r === r ? m : { l, r }));
+  };
   const peekTimer = useRef(0);
   const tabs = useExitList(p.session.tabs, (t) => t.id);
   // 关掉的那一个淡出、真正拿掉以后其他的补位，当前标记跟着重新对位
@@ -110,6 +119,7 @@ export function WorkbenchTabs(p: TabsProps) {
       ];
       const room = el.clientWidth + pages.reduce((w, b) => w + b.offsetWidth + 2, 0);
       setOverflow(content > room + 2);
+      measureMore();
     };
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -134,8 +144,14 @@ export function WorkbenchTabs(p: TabsProps) {
       el.scrollLeft += d;
     };
     el.addEventListener('wheel', wheel, { passive: false });
-    return () => el.removeEventListener('wheel', wheel);
+    el.addEventListener('scroll', measureMore, { passive: true });
+    return () => {
+      el.removeEventListener('wheel', wheel);
+      el.removeEventListener('scroll', measureMore);
+    };
   }, []);
+  // 翻页按钮出现、消失会改变标签栏的宽度，换了以后再量一次
+  useLayoutEffect(measureMore, [overflow]);
   // 拖动换位置：被拖的那一个跟着指针（只横着走），放大到 --drag-scale；其他的排到放下之后会在的位置
   const latest = useRef(p);
   latest.current = p;
@@ -310,16 +326,17 @@ export function WorkbenchTabs(p: TabsProps) {
     <>
       {overflow && (
         <button
-          className="btn quiet sm icon tabs-page"
+          className={`btn quiet sm icon tabs-page ${more.l ? '' : 'is-off'}`}
           data-enter="fade"
           aria-label="向前翻"
-          onClick={() => scrollBy(-1)}
+          aria-disabled={!more.l || undefined}
+          onClick={() => more.l && scrollBy(-1)}
         >
           <Icon name="arrow-left-s-line" />
         </button>
       )}
       <div
-        className={`tabs has-ind ${overflow ? 'clip' : ''}`}
+        className={`tabs has-ind ${overflow ? 'clip' : ''} ${more.l ? 'more-l' : ''} ${more.r ? 'more-r' : ''}`}
         ref={list}
         role="tablist"
         aria-label="作品"
@@ -454,10 +471,11 @@ export function WorkbenchTabs(p: TabsProps) {
       </div>
       {overflow && (
         <button
-          className="btn quiet sm icon tabs-page"
+          className={`btn quiet sm icon tabs-page ${more.r ? '' : 'is-off'}`}
           data-enter="fade"
           aria-label="向后翻"
-          onClick={() => scrollBy(1)}
+          aria-disabled={!more.r || undefined}
+          onClick={() => more.r && scrollBy(1)}
         >
           <Icon name="arrow-right-s-line" />
         </button>

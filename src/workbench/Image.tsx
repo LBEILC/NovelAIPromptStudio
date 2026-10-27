@@ -243,9 +243,19 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
       notify({ text: (e as Error).message, tone: 'error' });
     }
   };
+  // 各处图片的右键菜单最上面都是这一组（用户 10-27）：和下面操作条的三个按钮做同一件事
+  const fileItems: MenuEntry[] = image
+    ? [
+        { label: '复制图片', icon: 'file-copy-line', onSelect: () => p.onCopyImage(image) },
+        { label: '另存为…', icon: 'download-2-line', onSelect: () => p.onDownloadImage(image) },
+        { label: '在文件夹中显示', icon: 'folder-open-line', onSelect: p.onReveal },
+      ].map((x) => (missing ? { ...x, disabled: '图片文件找不到了' } : x))
+    : [];
   const menuItems: MenuEntry[] =
     version && stageId && !gone
       ? [
+          ...fileItems,
+          'sep',
           ...(canOp && !missing
             ? ([
                 { label: '放大…', icon: 'expand-diagonal-line', onSelect: () => setOp('upscale') },

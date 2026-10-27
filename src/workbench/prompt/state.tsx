@@ -456,26 +456,34 @@ export function usePromptState(p: EditorProps) {
   const [paraEditing, setParaEditing] = useState<string[]>([]);
   const replaceRaw = (si: number, raw: string) =>
     save(replaceSection(doc, si, reparseSection(doc.scopes[si], raw)));
+  // 上移、下移一块："更多"菜单和块标题上的 Alt ↑ ↓ 共用；到头了不动，返回挪没挪
+  const moveBlock = (si: number, bi: number, d: number) => {
+    const section = doc.scopes[si];
+    const t = bi + d;
+    if (t < 0 || t >= section.blocks.length) return false;
+    const blocks = [...section.blocks];
+    [blocks[bi], blocks[t]] = [blocks[t], blocks[bi]];
+    replaceRaw(
+      si,
+      section.separators[0] + blocks.map((x, i) => x.raw + section.separators[i + 1]).join(''),
+    );
+    return true;
+  };
   const blockMenu = (si: number, bi: number): MenuEntry[] => {
     const section = doc.scopes[si],
       b = section.blocks[bi];
-    const move = (d: number) => {
-      const t = bi + d;
-      if (t < 0 || t >= section.blocks.length) return;
-      const blocks = [...section.blocks];
-      [blocks[bi], blocks[t]] = [blocks[t], blocks[bi]];
-      replaceRaw(
-        si,
-        section.separators[0] + blocks.map((x, i) => x.raw + section.separators[i + 1]).join(''),
-      );
-    };
     const order: MenuEntry[] = [
-      { label: '上移', hint: 'Alt ↑', disabled: bi === 0, onSelect: () => move(-1) },
+      {
+        label: '上移',
+        hint: 'Alt ↑',
+        disabled: bi === 0,
+        onSelect: () => void moveBlock(si, bi, -1),
+      },
       {
         label: '下移',
         hint: 'Alt ↓',
         disabled: bi === section.blocks.length - 1,
-        onSelect: () => move(1),
+        onSelect: () => void moveBlock(si, bi, 1),
       },
     ];
     const remove: MenuEntry = {
@@ -715,6 +723,7 @@ export function usePromptState(p: EditorProps) {
     fadingBlock,
     paraEditing,
     blockMenu,
+    moveBlock,
     paraTranslate,
     setParaEditing,
     setNewBlock,

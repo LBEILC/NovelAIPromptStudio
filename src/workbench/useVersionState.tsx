@@ -16,6 +16,7 @@ import { openPick } from './Pick';
 import { applyRedrawPrompt, isRedraw, promptOf } from './versionHelpers';
 import { applyRandom } from './RandomBlock';
 import { nsfwMenu } from '../kit/blur';
+import { imageFileMenu } from '../kit/imageFiles';
 type Loaded = {
   tab: string;
   versions: WorkVersion[];
@@ -301,6 +302,14 @@ export function useVersionState({
   // 舞台上现在这张：右键别的缩略图可以和它对比（1.8.1）
   const stageImage = tab.versionImageId || current?.project.id;
   const thumbMenu = (v: WorkVersion, imageId: string, trash = true): MenuEntry[] => [
+    // 最上面是和舞台、图片库一样的复制图片、另存为、在文件夹中显示；这一版自己的图（原图可能不在图片库里）按路径
+    ...imageFileMenu(
+      imageId === v.project.id
+        ? { path: v.project.image_path, name: v.project.name }
+        : { id: imageId },
+      notify,
+    ),
+    'sep' as const,
     ...(current && stageImage && imageId !== stageImage
       ? [
           {

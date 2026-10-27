@@ -76,6 +76,9 @@
 /* 通知不盖住能点的东西：浮在底栏和图片下方按钮的上面 */
 .toasts { position: absolute; left: 0; right: 0; bottom: calc(var(--bar-h) + var(--sp-3)); z-index: 25; display: flex; justify-content: center; pointer-events: none; }
 .toasts > .swap > * { pointer-events: auto; justify-self: center; }
+/* 大图（35）盖住标题栏以下的整个窗口：开着的时候通知浮到它上面，不然在大图里复制图片看不到"已复制"（用户 10-27）。
+   平时仍低于对话框的遮罩（30） */
+.win:has(.viewer-ov) .toasts { z-index: 36; }
 
 /* ---------- Tag ---------- */
 .tag.dim { opacity: var(--dim, 0.35); }
@@ -135,7 +138,10 @@
 .ver.fork:hover .what, .ver.fork:hover > i { color: var(--text); }
 .wchg { color: var(--text); }
 /* 和上一版的完整对比 */
-.ver-peek { width: var(--popover-w-wide); max-height: calc(100% - 16px); overflow: hidden auto; gap: var(--sp-2); }
+/* 内边距放在里层：进出判断挂在 .vp-in 上，滚动条画在卡片右边内边距的位置，
+   内边距在外框上时，指针移向滚动条要先出 .vp-in，卡片就关了（用户 10-27） */
+.ver-peek { width: var(--popover-w-wide); max-height: calc(100% - 16px); overflow: hidden auto; gap: var(--sp-2); padding: 0; }
+.ver-peek > .vp-in { padding: var(--sp-3); }
 :is(.ver-peek, .cmp-diff) .vp-h { display: flex; flex-direction: column; gap: var(--sp-0); }
 :is(.ver-peek, .cmp-diff) .vp-g { display: flex; flex-direction: column; gap: var(--sp-1); padding-top: var(--sp-2); border-top: var(--bw) solid var(--divider); }
 :is(.ver-peek, .cmp-diff) .vp-tags { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); font-size: var(--fs-caption); }

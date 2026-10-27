@@ -6,6 +6,7 @@ import { ContextMenu, type MenuEntry } from '../kit/menu';
 import { useExitList, ms } from '../kit/motion';
 import { useResizable } from '../kit/resize';
 import { useNotifications } from '../kit/toast';
+import { imageFileMenu } from '../kit/imageFiles';
 import { nsfwMenu } from '../kit/blur';
 import { Viewer, type ViewerItem } from '../kit/Viewer';
 import { invokeUI } from '../lib/commands';
@@ -248,6 +249,8 @@ export default function GalleryPage(
             { label: '永久删除…', danger: true, onSelect: () => deletePicked(ids, records) },
           ];
     return [
+      // 一张时最上面是复制图片、另存为、在文件夹中显示，和工作台、大图一样（用户 10-27）
+      ...(multi ? [] : [...imageFileMenu({ id: menu.member.id }, notify), 'sep' as const]),
       {
         label: multi ? `在工作台打开 ${ids.length} 张` : '在工作台打开',
         onSelect: () => {
