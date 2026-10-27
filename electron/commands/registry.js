@@ -395,6 +395,11 @@ export const commandRegistry = {
   'generate.retry': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
   'account.get': { fields: {}, uiOnly: true },
   'account.save': { fields: { token: 'string' }, required: ['token'], uiOnly: true },
+  'secret.copy': {
+    fields: { kind: 'novelai-token|relay-key|ai-api-key' },
+    required: ['kind'],
+    uiOnly: true,
+  },
   'account.connection.save': {
     fields: { connection: 'official|relay' },
     required: ['connection'],

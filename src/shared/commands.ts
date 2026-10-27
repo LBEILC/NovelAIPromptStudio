@@ -150,6 +150,8 @@ export type CommandEvent =
  * missing 这个 Agent 装了但还没有技能；unavailable 这台电脑上没找到这个 Agent（没有 ~/.claude 或 ~/.codex）。
  */
 export type AgentSkillState = 'installed' | 'outdated' | 'missing' | 'unavailable';
+/** 设置里可以复制的已保存密钥（secret.copy，只限界面） */
+export type SecretKind = 'novelai-token' | 'relay-key' | 'ai-api-key';
 export interface AgentSkills {
   claude: { state: AgentSkillState; path: string };
   codex: { state: AgentSkillState; path: string };
@@ -537,6 +539,8 @@ export interface CommandDefinitions {
   'generate.retry': { input: { id: string }; output: GenerationJob };
   'account.get': { input: Record<string, never>; output: GenerationStatus };
   'account.save': { input: { token: string }; output: GenerationStatus };
+  /** 后台解密后直接写进剪贴板，不把明文返回给界面；只限界面（1.9.1） */
+  'secret.copy': { input: { kind: SecretKind }; output: IPC.Result };
   'account.connection.save': {
     input: { connection: 'official' | 'relay' };
     output: GenerationStatus;

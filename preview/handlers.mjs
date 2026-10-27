@@ -236,6 +236,11 @@ export function createPreviewHandlers({
   registerCommand('clipboard.read-text', (input, _caller) => {
     return clipboard.readText();
   });
+  // 设置里"复制"已保存的密钥（1.9.1）：预览里没有真的密钥，写一段说明文字代替
+  registerCommand('secret.copy', (input) => {
+    clipboard.writeText(`preview-${input.kind}`);
+    return { ok: true };
+  });
   registerCommand('clipboard.write-text', (input, _event) => {
     const text = input.text;
     return clipboard.writeText(String(text));

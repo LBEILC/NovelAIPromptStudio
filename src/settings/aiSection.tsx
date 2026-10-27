@@ -5,6 +5,7 @@ import { invokeUI } from '../lib/commands';
 import type { AISettings } from '../shared/types';
 import { useAISettings } from '../state/ai';
 import { ChatGPTAccount } from './ChatGPT';
+import { copySecret } from './copySecret';
 import { Col, Dropdown, Row, SetPage, Swap, errorText } from './parts';
 
 // ---------- AI 服务 ----------
@@ -185,6 +186,12 @@ export function AI() {
                   ) : (
                     <>
                       <span className="field sm mono">已保存 ••••••••</span>
+                      <button
+                        className="btn sm"
+                        onClick={() => void copySecret('ai-api-key', notify)}
+                      >
+                        复制
+                      </button>
                       <button className="btn sm" onClick={() => setReplacing(true)}>
                         更换
                       </button>

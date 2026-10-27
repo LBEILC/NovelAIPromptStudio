@@ -285,7 +285,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       />
       <Row
         title="API Key、ChatGPT 登录信息和 NovelAI 持久令牌加密后保存在这台电脑上"
-        help="用系统自带的加密能力加密，软件不保存明文；诊断信息和报告问题都不会带上它们"
+        help="用系统自带的加密能力加密，软件不保存明文；需要时可以在设置里复制，Agent 不能复制；诊断信息和报告问题都不会带上它们"
       />
       <h2>字体与开源组件</h2>
       <Row

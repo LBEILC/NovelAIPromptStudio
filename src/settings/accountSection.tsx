@@ -7,6 +7,7 @@ import { MODEL_CAPS, MODEL_ORDER, type ModelId } from '../shared/params';
 import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, errorText } from './parts';
 import { Fail } from './sectionShared';
+import { copySecret } from './copySecret';
 import { Usage } from './usageSection';
 
 // ---------- NovelAI 账号 ----------
@@ -116,6 +117,9 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
             ) : (
               <>
                 <span className="field sm mono">已保存 ••••••••</span>
+                <button className="btn sm" onClick={() => void copySecret('novelai-token', notify)}>
+                  复制
+                </button>
                 <button className="btn sm" onClick={() => setEditing(true)}>
                   更换
                 </button>
@@ -330,6 +334,9 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
             ) : (
               <>
                 <span className="field sm mono">已保存 ••••••••</span>
+                <button className="btn sm" onClick={() => void copySecret('relay-key', notify)}>
+                  复制
+                </button>
                 <button className="btn sm" onClick={() => setEditingKey(true)}>
                   更换
                 </button>
