@@ -13,12 +13,17 @@ try {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NOVELAI_DEV_URL;
-  const child = spawn(electron, ['.', `--app-screenshots=${root}`, '--app-screenshot-readme'], {
-    env,
-    stdio: 'inherit',
-    windowsHide: true,
-    shell: false,
-  });
+  const only = process.argv.find((arg) => arg.startsWith('--only='));
+  const child = spawn(
+    electron,
+    ['.', `--app-screenshots=${root}`, '--app-screenshot-readme', ...(only ? [only] : [])],
+    {
+      env,
+      stdio: 'inherit',
+      windowsHide: true,
+      shell: false,
+    },
+  );
   const stop = () => child.kill();
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
@@ -36,8 +41,6 @@ try {
   }
   const evidence = path.resolve('.codex-runs/readme');
   const manifest = JSON.parse(await fs.readFile(path.join(evidence, 'manifest.json'), 'utf8'));
-  if (manifest.screenshots.length !== 9 || manifest.checks.some((c) => c.status !== 'passed'))
-    throw Error('Incomplete README screenshots');
   const names = [
     'readme-workbench',
     'readme-versions',
@@ -49,7 +52,18 @@ try {
     'guide-compare',
     'guide-dictionary',
   ];
-  for (const name of names) {
+  const selected =
+    process.argv
+      .find((arg) => arg.startsWith('--only='))
+      ?.slice(7)
+      .split(',') || names;
+  if (selected.some((name) => !names.includes(name))) throw Error('Unknown screenshot selection');
+  if (
+    manifest.screenshots.length !== selected.length ||
+    manifest.checks.some((c) => c.status !== 'passed')
+  )
+    throw Error('Incomplete README screenshots');
+  for (const name of selected) {
     if (!manifest.screenshots.includes(name)) throw Error(`Missing screenshot: ${name}`);
     const source = path.join(evidence, `${name}.png`);
     const metadata = await sharp(source).metadata();

@@ -117,7 +117,7 @@ git commit -m "[工程] 准备 v0.3.0 发版" -- package.json package-lock.json
 
 ## 下载提示
 
-- 当前安装包尚未签名，系统可能显示安全警告。
+- macOS 安装包已签名并经 Apple 公证；Windows 安装包尚未签名，系统可能显示安全警告。
 - 请只从本仓库 Releases 页面下载。
 
 完整提交记录：https://github.com/LBEILC/NovelAIPromptStudio/compare/v<上一版本>...v<本版本>
@@ -173,7 +173,7 @@ git push origin main refs/tags/v0.3.0
 2. 每个打包作业保留原生模块检查、启动真实打包程序的轻量验收、包内字体检查和更新元数据检查，不重复执行类型和单元测试。
 3. `release` 只等待 Windows x64 和 macOS Apple Silicon 两个打包作业成功，校验这两个平台的产物和更新元数据，加入可用的 `release-notes.json` 并生成 `SHA256SUMS.txt`。
 4. checkout 完整标签历史，读取 annotated tag 中的更新说明；只有标签推送事件才创建 GitHub Release，先上传 Windows 和 Apple 芯片的附件，不再额外上传一份合并产物到 Actions。
-5. macOS Intel 作业独立完成打包和检查，等待同一 Release 存在且主发布附件就绪后，追加 DMG、ZIP 和 blockmap，合并 x64 更新条目到 `latest-mac.yml` 并更新完整的 `SHA256SUMS.txt`。通常比主发布晚几分钟，最多轮询约 20 分钟。Intel 失败会在作业日志中明确提示，不影响已经发布的 Release，可重跑 Intel 作业补齐附件。未签名 macOS 当前未启用自动更新，允许其元数据稍后补齐。
+5. macOS Intel 作业独立完成打包和检查，等待同一 Release 存在且主发布附件就绪后，追加 DMG、ZIP 和 blockmap，合并 x64 更新条目到 `latest-mac.yml` 并更新完整的 `SHA256SUMS.txt`。通常比主发布晚几分钟，最多轮询约 20 分钟。Intel 失败会在作业日志中明确提示，不影响已经发布的 Release，可重跑 Intel 作业补齐附件。签名且公证的 macOS 包启用自动更新；Intel 附件尚未补齐时，electron-updater 会排除 arm64 文件，下载返回可重试的 ERR_UPDATER_NO_FILES_PROVIDED，不会安装错误架构。未签名包继续引导手动更新。
 
 当前发布产物包括：
 
@@ -197,15 +197,24 @@ CI 和发版使用完全相同的缓存键（版本与 SHA-256）、`.local/font
 
 ## macOS 签名与公证
 
-工作流会读取以下 GitHub Actions Secrets：
+工作流读取 6 个 GitHub Actions Secrets：
 
-- `MAC_CSC_LINK`
-- `MAC_CSC_KEY_PASSWORD`
-- `APPLE_ID`
-- `APPLE_APP_SPECIFIC_PASSWORD`
-- `APPLE_TEAM_ID`
+- `MAC_CSC_LINK`：Developer ID Application 证书的 p12 base64。
+- `MAC_CSC_KEY_PASSWORD`：p12 密码。
+- `APPLE_API_KEY_P8`：App Store Connect API 私钥内容。
+- `APPLE_API_KEY_ID`：API Key ID。
+- `APPLE_API_ISSUER`：API Issuer ID。
+- `APPLE_TEAM_ID`：开发者 Team ID，用于核对签名。
 
-未配置这些凭据时可以生成未签名安装包，但 macOS 会显示安全警告，并只在应用内检查新版本、引导用户前往官方 Release 手动更新。配置凭据后，需要启用 macOS 自动更新能力，并在真实 macOS 环境验证签名、公证、Gatekeeper 和更新安装。
+`scripts/package-macos.mjs` 将 API 私钥写入 `$RUNNER_TEMP` 的独立目录（文件权限 0600），通过 `APPLE_API_KEY` 路径交给 electron-builder，完成或失败后删除临时文件。不使用 Apple ID 或应用专用密码。证书与私钥原件由用户保管；续期由用户在 Apple Developer 的 Certificates, Identifiers & Profiles 中处理，API 密钥在 App Store Connect 的 Users and Access → Integrations 中管理，并更新上述 Secrets。
+
+未配置 `MAC_CSC_LINK` 时清除空凭据、生成未签名包，继续手动更新。已配置时缺少凭据直接失败，开启 `forceCodeSigning`；签名或公证失败不上传附件。打包前将 `macSignedAndNotarized: true` 写入包内 package.json，由签名保护；构建工作流只在签名、公证和下面检查全部成功后交付该包。本机普通打包不含此标记，运行时不调用 codesign。
+
+签名发布时开启 hardened runtime（普通未签名打包关闭），并使用 `build/entitlements.mac.plist`：只授予 `com.apple.security.cs.allow-jit`，供 Electron V8 执行 JIT。主进程与子进程共用此最小权限，原生模块随包签名。参见 [electron-builder v26 公证说明](https://www.electron.build/v26/docs/notarization/)。
+
+打包后 `scripts/verify-macos-signing.mjs` 对输出 app 和 ZIP 解压的 app 都执行 `codesign --verify --deep --strict`、验证 Developer ID 和 Team ID、检查 `spctl -a -vvv -t exec` 包含 `source=Notarized Developer ID`，并执行 `xcrun stapler validate`、核对包内更新标记。随后启动同一签名包检查原生模块和字体。任何检查失败均阻止该作业上传。
+
+先用 `workflow_dispatch` 验证两个 macOS 作业，再从隔离目录验证带 quarantine 的 DMG 和 app。签名版首次升级仍需由旧的未签名版本引导手动下载；签名版本之间的真实下载安装需在下一版发布时验证。
 
 ## 失败处理
 

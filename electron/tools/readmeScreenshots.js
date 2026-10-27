@@ -42,6 +42,10 @@ export async function runReadmeScreenshots({
   createWindow,
   generationService,
 }) {
+  const selectedScreens = process.argv
+    .find((arg) => arg.startsWith('--only='))
+    ?.slice(7)
+    .split(',');
   const output = path.resolve('.codex-runs/readme');
   await fs.mkdir(output, { recursive: true });
   await fs.rm(path.join(output, 'manifest.json'), { force: true });
@@ -150,6 +154,7 @@ export async function runReadmeScreenshots({
       });
     });
   const capture = async (name) => {
+    if (selectedScreens && !selectedScreens.includes(name)) return;
     await h.evaluate('document.activeElement?.blur()');
     await h.wait('!document.querySelector(".toast") && !window.studioScreenshot.pending()');
     await h.evaluate(
@@ -347,32 +352,34 @@ export async function runReadmeScreenshots({
       undefined,
       'once',
     );
-    await h.wait(`!!document.querySelector('[data-key="ver-${rewritten.id}"]')`);
-    await h.evaluate(
-      `document.querySelector('[data-key="ver-${rewritten.id}"]').scrollIntoView({block:'nearest'}); new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`,
-    );
-    const point = await h.evaluate(
-      `(()=>{const n=document.querySelector('[data-key="ver-${rewritten.id}"]');n.scrollIntoView({block:'nearest'});const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+10}})()`,
-    );
-    await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
-      type: 'mouseMoved',
-      ...point,
-      button: 'none',
-    });
-    await h.wait(
-      '!!document.querySelector(".ver-peek .minus")&&!!document.querySelector(".ver-peek .plus")',
-    );
-    await h.wait(
-      `document.querySelector('.ver-peek .vp-h b')?.textContent==='第 ${rewritten.number} 版'`,
-    );
-    await capture('readme-versions');
-    await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
-      type: 'mouseMoved',
-      x: 600,
-      y: 50,
-      button: 'none',
-    });
-    await h.wait('!document.querySelector(".ver-peek .minus")');
+    if (!selectedScreens || selectedScreens.includes('readme-versions')) {
+      await h.wait(`!!document.querySelector('[data-key="ver-${rewritten.id}"]')`);
+      await h.evaluate(
+        `document.querySelector('[data-key="ver-${rewritten.id}"]').scrollIntoView({block:'nearest'}); new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`,
+      );
+      const point = await h.evaluate(
+        `(()=>{const n=document.querySelector('[data-key="ver-${rewritten.id}"]');n.scrollIntoView({block:'nearest'});const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+10}})()`,
+      );
+      await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+        type: 'mouseMoved',
+        ...point,
+        button: 'none',
+      });
+      await h.wait(
+        '!!document.querySelector(".ver-peek .minus")&&!!document.querySelector(".ver-peek .plus")',
+      );
+      await h.wait(
+        `document.querySelector('.ver-peek .vp-h b')?.textContent==='第 ${rewritten.number} 版'`,
+      );
+      await capture('readme-versions');
+      await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+        type: 'mouseMoved',
+        x: 600,
+        y: 50,
+        button: 'none',
+      });
+      await h.wait('!document.querySelector(".ver-peek .minus")');
+    }
     await invoke('prompt.set', {
       tabId,
       scope: 'base:prompt',
@@ -404,7 +411,15 @@ export async function runReadmeScreenshots({
     await capture('readme-workbench');
     generationService.state.resume();
     await finished(generating.id);
-    await invoke('version.open', { tabId, versionId: mainTip.id });
+    await invoke('version.open', {
+      tabId,
+      versionId: tree.versions[0].id,
+      imageId: tree.versions[0].project.id,
+    });
+    const sourcePath = (await invoke('workbench.get', { tabId })).tab.project.image_path;
+    await h.wait(
+      `document.querySelector('[data-stage]:not(.leaving)')?.getAttribute('src')==='novelai-media://file?path='+encodeURIComponent(${JSON.stringify(sourcePath)})`,
+    );
     await h.wait('!!document.querySelector("[data-trigger=op-inpaint]")');
     await h.evaluate('document.querySelector("[data-trigger=op-inpaint]").click()');
     await h.wait('!!document.querySelector(".ip-mask")');
@@ -453,12 +468,17 @@ export async function runReadmeScreenshots({
       button: 'none',
     });
     await h.wait('document.querySelector(".ip-info")?.textContent.includes("免费")');
+    await h.evaluate(
+      `document.querySelector('.ip-canvas').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`,
+    );
     await capture('readme-inpaint');
     await h.click('取消', 'document.querySelector(".inpaint-ov")');
     await h.wait('!document.querySelector(".inpaint-ov")');
-    await h.wait(`!!document.querySelector('[data-key="ths-${rewritten.id}"] img')`);
+    await invoke('version.open', { tabId, versionId: tree.versions[1].id });
+    const compareVersion = tree.versions[0];
+    await h.wait(`!!document.querySelector('[data-key="ths-${compareVersion.id}"] img')`);
     await h.evaluate(
-      `document.querySelector('[data-key="ths-${rewritten.id}"] img').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:300,clientY:250}))`,
+      `document.querySelector('[data-key="ths-${compareVersion.id}"] img').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:300,clientY:250}))`,
     );
     await h.click('和当前这张对比');
     await h.wait('!!document.querySelector(".cmp-ov:not(.leaving)")');
