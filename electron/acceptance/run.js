@@ -42,6 +42,10 @@ import { chatGPTChecks } from './chatgpt.js';
 import electronUpdater from 'electron-updater';
 
 export async function runAcceptance(context) {
+  if (context.mode.generationBenchmark) {
+    const { runGenerationBenchmark } = await import('./generationBenchmark.js');
+    return runGenerationBenchmark(context);
+  }
   if (context.mode.fullLibraryBenchmark) {
     const { runFullLibraryBenchmark } = await import('./fullLibraryBenchmark.js');
     return runFullLibraryBenchmark(context);

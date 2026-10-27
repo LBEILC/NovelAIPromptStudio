@@ -17,6 +17,8 @@ import { importLibraryFiles } from '../importer.js';
 /** @param {{network?:import('./index.js').Services['network'], fetcher?:typeof fetch, preferences?:ReturnType<import('../preferences.js').openPreferences>, generationBaseUrl?:string, database:Awaited<ReturnType<import('../database.js').openDatabase>>,assetsDirectory:()=>string,busy:()=>boolean,createWindow:()=>Electron.BrowserWindow,testRoot?:string,handlers?:import('./index.js').Services['handlers'],selectSource?:import('./index.js').Services['selectSource'],readyLibrary?:()=>Promise<void>,onEvent?:(event:import('../../src/shared/commands').CommandEvent)=>void,beforeCommand?:import('./index.js').Services['beforeCommand']}} options */
 export async function installCommandRuntime(options) {
   const handlers = options.handlers || {};
+  /** @type {null | ((name:string,input:any,ms:number)=>void)} */
+  let observer = null;
   const { database } = options;
   const directory = app.getPath('userData');
   /** @type {Set<number>} */
@@ -127,7 +129,9 @@ export async function installCommandRuntime(options) {
       event.senderFrame !== event.sender.mainFrame
     )
       return { ok: false, error: { code: 'forbidden', message: '此窗口不允许调用该命令' } };
+    const started = observer ? performance.now() : 0;
     const result = await commands.dispatch(String(name), input, 'ui', event.sender);
+    observer?.(String(name), input, performance.now() - started);
     if (name === 'workbench.session' && result.ok) ready.add(event.sender.id);
     return result;
   });
@@ -171,6 +175,11 @@ export async function installCommandRuntime(options) {
   });
   return {
     ...commands,
+    /** Measurement is available only to an owned disposable test profile. */
+    observeUI(/** @type {typeof observer} */ fn) {
+      if (!options.testRoot) throw Error('Measurement requires a test profile');
+      observer = fn;
+    },
     async flush() {
       await commands.close();
       for (const window of BrowserWindow.getAllWindows())

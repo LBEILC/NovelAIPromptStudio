@@ -1879,6 +1879,7 @@ app.whenReady().then(async () => {
     try {
       const { runAcceptance } = await import('./acceptance/run.js');
       await runAcceptance({
+        commandRuntime,
         appIconPath,
         windowIcons,
         chatGPTFixture,
