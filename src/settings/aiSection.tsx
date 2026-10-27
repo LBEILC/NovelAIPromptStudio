@@ -7,6 +7,7 @@ import { useAISettings } from '../state/ai';
 import { ChatGPTAccount } from './ChatGPT';
 import { copySecret } from './copySecret';
 import { Col, Dropdown, Row, SetPage, Swap, errorText } from './parts';
+import { Fail, KeychainBanner } from './sectionShared';
 
 // ---------- AI 服务 ----------
 export function AI() {
@@ -18,6 +19,10 @@ export function AI() {
     if (!a.busy && a.settings.hasApiKey && !a.settings.apiKey) setReplacing(false);
   }, [a.busy]);
   const safe = a.settings.encryptionAvailable;
+  // 1.9.5：钥匙串被拒绝时页面顶上统一说明；某一项解不开时那一行显示"无法读取"
+  const store = a.settings.secretStore;
+  const denied = store === 'denied';
+  const keyBad = a.settings.hasApiKey && a.settings.apiKeyReadable === false;
   const keyEdit = !safe || !a.settings.hasApiKey || replacing;
   const pick = !a.modelsError && (a.models.length > 0 || (!!a.settings.model && !manual));
   const models = [...new Set([a.settings.model, ...a.models].filter(Boolean))];
@@ -101,6 +106,7 @@ export function AI() {
       desc="用来根据提示词起名、补全内置词典没有的 Tag 翻译和分类、翻译段落、整理提示词。不配置也能使用软件的其他功能。"
       foot={foot}
     >
+      <KeychainBanner store={store} />
       <Row
         feature="ai"
         title="使用方式"
@@ -125,7 +131,7 @@ export function AI() {
           />
         ) : (
           <div className="ai-key">
-            {!safe && (
+            {!safe && !denied && (
               <div className="banner warn set-banner">
                 <Icon name="alert-line" />
                 <span>
@@ -150,7 +156,9 @@ export function AI() {
               help={
                 safe
                   ? '加密后保存在这台电脑上，软件不保存明文'
-                  : '系统加密不可用，填写后只在这次使用中有效，关闭软件后需要重新填写'
+                  : denied
+                    ? '钥匙串没有授权，现在填写只在这次使用中有效；重新打开软件并允许后，原来保存的 Key 还在'
+                    : '系统加密不可用，填写后只在这次使用中有效，关闭软件后需要重新填写'
               }
             >
               <Swap k={`aikey-${keyEdit}`}>
@@ -185,13 +193,19 @@ export function AI() {
                     </>
                   ) : (
                     <>
-                      <span className="field sm mono">已保存 ••••••••</span>
-                      <button
-                        className="btn sm"
-                        onClick={() => void copySecret('ai-api-key', notify)}
-                      >
-                        复制
-                      </button>
+                      {keyBad ? (
+                        <span className="field sm mono set-key-bad">无法读取</span>
+                      ) : (
+                        <>
+                          <span className="field sm mono">已保存 ••••••••</span>
+                          <button
+                            className="btn sm"
+                            onClick={() => void copySecret('ai-api-key', notify)}
+                          >
+                            复制
+                          </button>
+                        </>
+                      )}
                       <button className="btn sm" onClick={() => setReplacing(true)}>
                         更换
                       </button>
@@ -200,6 +214,11 @@ export function AI() {
                 </div>
               </Swap>
             </Col>
+            <Fail>
+              {keyBad && store === 'unreadable' && !replacing
+                ? '已保存的 API Key 无法读取，请点"更换"重新填写。'
+                : ''}
+            </Fail>
             <Col
               title="模型"
               help={

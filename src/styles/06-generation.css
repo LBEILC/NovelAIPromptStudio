@@ -71,6 +71,8 @@
 .popover.queue .q-tag { margin-left: var(--sp-1); padding: 0 var(--sp-1); border: var(--bw) solid var(--border); border-radius: var(--r-pill); color: var(--text-3); font-size: var(--fs-caption); line-height: var(--lh-caption); }
 .popover.queue .q-meta { color: var(--text-2); }
 .popover.queue .q-err { color: var(--danger); white-space: normal; }
+/* 令牌读不出来的失败（1.9.5）：文字下面一行给去设置的按钮 */
+.popover.queue .q-err .q-err-go { display: flex; margin-top: var(--sp-1); }
 .popover.queue .q-side { display: flex; align-items: center; gap: var(--sp-0); }
 .popover.queue .q-side .stepper { margin-right: var(--sp-1); }
 .popover.queue .q-run { position: relative; }

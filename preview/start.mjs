@@ -151,6 +151,7 @@ async function scenario({ action, value }) {
   }
   if (action === 'token') session.preferences.saveNovelAIToken(value ? 'acceptance-token' : '');
   else if (action === 'ai') session.setAI(Boolean(value));
+  else if (action === 'keychain') session.setKeychain(String(value));
   else if (action === 'chatgpt') await session.setChatGPT(String(value));
   else if (action === 'generation-error') {
     if (value === 'offline') services.state.disconnect = true;
@@ -250,8 +251,8 @@ async function scenario({ action, value }) {
       for (let i = 0; i < 2; i++)
         await session.call('generate.start', { tabId, count: 1 }, 'agent');
     }
-  } else if (!['token', 'ai'].includes(action)) throw Error('未知场景');
-  return { reload: ['token', 'ai', 'chatgpt', 'many'].includes(action) };
+  } else if (!['token', 'ai', 'keychain'].includes(action)) throw Error('未知场景');
+  return { reload: ['token', 'ai', 'keychain', 'chatgpt', 'many'].includes(action) };
 }
 async function shutdown() {
   if (shuttingDown) return;

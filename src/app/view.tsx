@@ -249,6 +249,7 @@ export function renderApp({
               setWorkbenchSession((current) => ({ ...current, activeTabId: id }));
               setPage('workbench');
             }}
+            onConfigure={() => goTo('settings:novelai')}
           />
         }
       >

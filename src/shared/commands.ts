@@ -41,7 +41,10 @@ export type CommandErrorCode =
   | 'not_found'
   | 'conflict'
   | 'forbidden'
-  | 'app_busy';
+  | 'app_busy'
+  /** 1.9.5：密钥读不出来。denied 是 macOS 钥匙串没有授权，unreadable 是某一项解不开 */
+  | 'secret_denied'
+  | 'secret_unreadable';
 export type CommandResult<T> =
   | { ok: true; data: T }
   | {

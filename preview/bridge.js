@@ -332,6 +332,9 @@ group('账号', [
   ['V5 用量用尽', act('account', 'usage')],
   ['余额不足', act('account', 'balance')],
   ['恢复账号', act('account', 'normal')],
+  ['钥匙串被拒绝', act('keychain', 'denied')],
+  ['密钥解不开', act('keychain', 'unreadable')],
+  ['钥匙串正常', act('keychain', 'ok')],
 ]);
 group('生成', [
   ...[401, 402, 422, 429, 500].map((code) => ['下次失败 ' + code, act('generation-error', code)]),

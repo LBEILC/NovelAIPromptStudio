@@ -95,6 +95,12 @@ html[data-platform="windows"] .tb .wc { width: calc(100vw - env(titlebar-area-x,
 .field.set-key { min-width: 260px; }
 .menu.font-menu { max-height: min(360px, 60vh); }
 .set-banner { margin: var(--sp-3) 0 0; }
+/* 钥匙串横幅（1.9.5）：两行，图标对齐第一行；第二行说明只用自己那一项 */
+.set-banner.kc-banner { align-items: flex-start; }
+.set-banner.kc-banner > i { margin-top: 2px; }
+.set-banner.kc-banner small { display: block; margin-top: var(--sp-1); color: var(--text-2); }
+/* 密钥保存了但读不出来（1.9.5） */
+.set-key-bad { color: var(--danger); }
 .set .row.set-nowrap { flex-wrap: nowrap; }
 .set-limit { border-bottom: var(--bw) solid var(--divider); }
 .set-limit-row { padding: 0 0 13px; }

@@ -25,6 +25,10 @@ export interface GenerationSettings {
   dailyImageLimit: number;
   spentImagesToday?: number;
   hasToken: boolean;
+  /** 1.9.5（106）：密钥能不能读；保存了但解不开的那一项为 false */
+  secretStore?: import('./types').SecretStore;
+  officialTokenReadable?: boolean;
+  relayKeyReadable?: boolean;
   continuous: boolean;
   agentMode: 'confirm' | 'direct';
   limitEnabled: boolean;

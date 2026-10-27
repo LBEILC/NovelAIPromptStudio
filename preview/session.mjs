@@ -37,6 +37,49 @@ export async function createSession(services, images, emit, empty = false) {
     },
     { defaultAssetsDirectory: assetsDirectory },
   );
+  // 106 的界面先接假数据：钥匙串被拒绝 / 某项解不开。工程接上真实的 secretStore 后，
+  // 改成让上面的假 safeStorage 直接模拟这两种情况，删掉这一段包装
+  const keychain = { state: 'ok' };
+  const secretError = () =>
+    keychain.state === 'denied'
+      ? new CommandError(
+          'secret_denied',
+          '钥匙串没有允许本软件读取已保存的密钥。退出并重新打开软件，系统询问时选"始终允许"。',
+        )
+      : new CommandError(
+          'secret_unreadable',
+          '已保存的持久令牌无法读取，请在"设置 → NovelAI 账号"里更换。',
+        );
+  for (const name of ['novelAIToken', 'relayKey']) {
+    const read = preferences[name];
+    preferences[name] = () => {
+      if (keychain.state !== 'ok') throw secretError();
+      return read();
+    };
+  }
+  const generationSettings = preferences.generationSettings;
+  preferences.generationSettings = () => {
+    const settings = generationSettings();
+    if (keychain.state === 'ok') return settings;
+    return {
+      ...settings,
+      secretStore: keychain.state,
+      officialTokenReadable: !settings.officialToken,
+      relayKeyReadable: !settings.relay.hasKey,
+    };
+  };
+  const publicSettings = preferences.publicSettings;
+  preferences.publicSettings = () => {
+    const settings = publicSettings();
+    if (keychain.state === 'ok') return settings;
+    return {
+      ...settings,
+      encryptionAvailable: keychain.state !== 'denied',
+      secretStore: keychain.state,
+      apiKeyReadable: !settings.hasApiKey,
+      chatgpt: { ...settings.chatgpt, readable: !settings.chatgpt.signedIn },
+    };
+  };
   const setAI = (enabled) =>
     preferences.saveAISettings({
       provider: 'apiKey',
@@ -456,6 +499,9 @@ export async function createSession(services, images, emit, empty = false) {
       call,
       allowedPath,
       setAI,
+      setKeychain(state) {
+        keychain.state = state;
+      },
       resetOnboarding() {
         const stored = JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'));
         fs.writeFileSync(

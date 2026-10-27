@@ -306,11 +306,16 @@ export interface TagDictionaryEntry extends TagAnnotation {
   category_source: AnnotationSource;
   updated_at: string;
 }
+/** 1.9.5：加密保存的密钥能不能读（106）。denied 只在 macOS 上：钥匙串没有允许本软件读取；unreadable：某一项解不开 */
+export type SecretStore = 'ok' | 'denied' | 'unreadable';
 export interface AISettings {
   baseUrl: string;
   model: string;
   hasApiKey: boolean;
   encryptionAvailable: boolean;
+  secretStore?: SecretStore;
+  /** 保存了 API Key 但解不开时为 false */
+  apiKeyReadable?: boolean;
   /** 1.5：内置 AI 用哪一种（doc/design.md 2.27）。没登录 ChatGPT、也没填 API Key 时是 'chatgpt' */
   provider: 'chatgpt' | 'apiKey';
   chatgpt: ChatGPTAccount;
@@ -326,6 +331,8 @@ export interface ChatGPTAccount {
   model: string;
   /** 第一次登录成功后的说明弹过了 */
   introShown: boolean;
+  /** 保存过登录信息但解不开时为 false（1.9.5） */
+  readable?: boolean;
   /** 剩余额度：Codex 方式才有（官方方式响应里有额度信息时也填）；取不到是 null */
   quota: ChatGPTQuota | null;
   /** 最近一次 AI 请求因为额度用完被拒：界面出"已达到用量上限"横幅 */

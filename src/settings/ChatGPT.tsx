@@ -193,10 +193,17 @@ export function ChatGPTAccount({
   const model = models.find((m) => m.slug === a.model);
   return (
     <>
-      {!settings.encryptionAvailable && (
+      {/* 钥匙串被拒绝（1.9.5）由 AI 服务页顶上的横幅说明，这里不再重复 */}
+      {!settings.encryptionAvailable && settings.secretStore !== 'denied' && (
         <div className="banner warn set-banner">
           <Icon name="alert-line" />
           <span>这台电脑的系统加密不可用，无法保存登录信息。系统加密恢复后再登录。</span>
+        </div>
+      )}
+      {settings.secretStore === 'unreadable' && a.readable === false && (
+        <div className="banner danger set-banner" data-enter="fade">
+          <Icon name="error-warning-line" />
+          <span>已保存的 ChatGPT 登录信息无法读取，请重新登录。</span>
         </div>
       )}
       {a.signedIn && a.limited && (

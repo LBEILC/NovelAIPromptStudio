@@ -4,9 +4,10 @@ import { useAsk } from '../kit/dialog';
 import { useNotifications } from '../kit/toast';
 import { invokeUI } from '../lib/commands';
 import { MODEL_CAPS, MODEL_ORDER, type ModelId } from '../shared/params';
+import type { SecretStore } from '../shared/types';
 import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, errorText } from './parts';
-import { Fail } from './sectionShared';
+import { Fail, KeychainBanner } from './sectionShared';
 import { copySecret } from './copySecret';
 import { Usage } from './usageSection';
 
@@ -23,6 +24,9 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
   const [error, setError] = useState('');
   const input = useRef<HTMLInputElement>(null);
   const has = g.settings.hasToken;
+  const store = g.settings.secretStore;
+  // 保存了但读不出来（1.9.5）：钥匙串被拒绝时这次也存不进新的，更换要等重新打开软件
+  const tokenBad = has && g.settings.officialTokenReadable === false;
   const edit = editing || !has;
   const save = async () => {
     if (!token.trim() || busy) return;
@@ -116,19 +120,34 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
               </>
             ) : (
               <>
-                <span className="field sm mono">已保存 ••••••••</span>
-                <button className="btn sm" onClick={() => void copySecret('novelai-token', notify)}>
-                  复制
-                </button>
-                <button className="btn sm" onClick={() => setEditing(true)}>
-                  更换
-                </button>
+                {tokenBad ? (
+                  <span className="field sm mono set-key-bad">无法读取</span>
+                ) : (
+                  <>
+                    <span className="field sm mono">已保存 ••••••••</span>
+                    <button
+                      className="btn sm"
+                      onClick={() => void copySecret('novelai-token', notify)}
+                    >
+                      复制
+                    </button>
+                  </>
+                )}
+                <ReplaceButton store={store} onClick={() => setEditing(true)} />
               </>
             )}
           </div>
         </Swap>
       </Col>
-      <Fail>{error || g.accountError}</Fail>
+      <Fail>
+        {error ||
+          (tokenBad && store === 'unreadable'
+            ? '已保存的持久令牌无法读取，请点"更换"重新填写。'
+            : // 钥匙串被拒绝时查余额必然失败，原因已经在页面顶上说了
+              store === 'denied'
+              ? ''
+              : g.accountError)}
+      </Fail>
       {has && (
         <Row
           title="余额"
@@ -173,6 +192,7 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
       title="NovelAI 账号"
       desc="用你自己的 NovelAI 账号，或者通过中转站在这里生成图片。本软件是非官方工具，与 NovelAI 没有隶属关系；这样使用是否符合 NovelAI 的服务条款，由你自己判断并承担。"
     >
+      <KeychainBanner store={g.settings.secretStore} />
       <Row
         feature="relay"
         title="连接方式"
@@ -220,6 +240,8 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
   const [tested, setTested] = useState<{ models: string[]; other: string[] } | null>(null);
   useEffect(() => setUrl(saved?.baseUrl || ''), [saved?.baseUrl]);
   const hasKey = !!saved?.hasKey;
+  const store = g.settings.secretStore;
+  const keyBad = hasKey && g.settings.relayKeyReadable === false;
   const keyEdit = editingKey || !hasKey;
   const dirty = url.trim() !== (saved?.baseUrl || '') || !!key.trim();
   const ready = !!url.trim() && (hasKey || !!key.trim());
@@ -333,13 +355,17 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
               </>
             ) : (
               <>
-                <span className="field sm mono">已保存 ••••••••</span>
-                <button className="btn sm" onClick={() => void copySecret('relay-key', notify)}>
-                  复制
-                </button>
-                <button className="btn sm" onClick={() => setEditingKey(true)}>
-                  更换
-                </button>
+                {keyBad ? (
+                  <span className="field sm mono set-key-bad">无法读取</span>
+                ) : (
+                  <>
+                    <span className="field sm mono">已保存 ••••••••</span>
+                    <button className="btn sm" onClick={() => void copySecret('relay-key', notify)}>
+                      复制
+                    </button>
+                  </>
+                )}
+                <ReplaceButton store={store} onClick={() => setEditingKey(true)} />
               </>
             )}
           </div>
@@ -374,7 +400,14 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
           <small className="relay-result">{error ? '' : result || '还没有连接'}</small>
         </Swap>
       </Col>
-      <Fail>{error || g.accountError}</Fail>
+      <Fail>
+        {error ||
+          (keyBad && store === 'unreadable'
+            ? '已保存的中转站 Key 无法读取，请点"更换"重新填写。'
+            : store === 'denied'
+              ? ''
+              : g.accountError)}
+      </Fail>
       {hasKey && (
         <Row
           title="余额"
@@ -382,6 +415,24 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
         />
       )}
     </>
+  );
+}
+
+/** 已保存密钥的"更换"。钥匙串被拒绝时这次存不进新的，按钮停用并说明（1.9.5） */
+function ReplaceButton({ store, onClick }: { store?: SecretStore; onClick: () => void }) {
+  return store === 'denied' ? (
+    <button
+      className="btn sm is-off"
+      aria-disabled
+      data-tip="钥匙串没有授权，这次存不进新的。重新打开软件并允许后再更换"
+      onClick={() => {}}
+    >
+      更换
+    </button>
+  ) : (
+    <button className="btn sm" onClick={onClick}>
+      更换
+    </button>
   );
 }
 

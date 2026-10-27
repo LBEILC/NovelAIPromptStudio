@@ -121,7 +121,17 @@ function CountEdit({
   );
 }
 
-export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }) {
+// 1.9.5：令牌或 Key 读不出来导致的失败，重试没有用，改成带用户去 NovelAI 账号设置（106）
+const secretFailure = (job: GenerationJob) =>
+  job.errorCode === 'secret_denied' || job.errorCode === 'secret_unreadable';
+
+export function GenerationStatus({
+  onOpen,
+  onConfigure,
+}: {
+  onOpen: (tabId: string) => void;
+  onConfigure?: () => void;
+}) {
   const state = useGeneration();
   const notify = useNotifications();
   // 待确认卡片上的预览小图点开看大图
@@ -172,11 +182,16 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
         });
       if (job.state === 'failed')
         notify({
-          text: relay
-            ? `生成失败：${job.error}`
-            : `生成失败：${job.error} · ${job.spentKnown ? (job.spent ? `本次已消耗 ${job.spent} Anlas` : '本次未消耗 Anlas') : '无法确认是否消耗了 Anlas'}`,
+          // 读不出令牌时请求根本没发出去，不提消耗
+          text:
+            relay || secretFailure(job)
+              ? `生成失败：${job.error}`
+              : `生成失败：${job.error} · ${job.spentKnown ? (job.spent ? `本次已消耗 ${job.spent} Anlas` : '本次未消耗 Anlas') : '无法确认是否消耗了 Anlas'}`,
           tone: 'error',
-          action: { label: '重试', onClick: () => void invokeUI('generate.retry', { id: job.id }) },
+          action:
+            secretFailure(job) && onConfigure
+              ? { label: '去设置', onClick: onConfigure }
+              : { label: '重试', onClick: () => void invokeUI('generate.retry', { id: job.id }) },
         });
       if (job.state === 'canceled' && previous === 'generating')
         notify({
@@ -560,7 +575,21 @@ export function GenerationStatus({ onOpen }: { onOpen: (tabId: string) => void }
           {head(job)}
           {job.summary && <small>{job.summary}</small>}
           {failed ? (
-            <small className="q-meta q-err">生成失败：{job.error || '未知原因'}</small>
+            <small className="q-meta q-err">
+              生成失败：{job.error || '未知原因'}
+              {secretFailure(job) && onConfigure && (
+                <button
+                  className="btn quiet sm q-err-go"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    onConfigure();
+                  }}
+                >
+                  打开 NovelAI 账号设置
+                </button>
+              )}
+            </small>
           ) : (
             <small className="q-meta">
               {job.deferred ? '已暂缓 · ' : ''}
