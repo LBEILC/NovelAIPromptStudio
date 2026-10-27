@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 import {
   checkForUpdates,
@@ -48,6 +49,49 @@ describe('database lifecycle during installation', () => {
 });
 
 describe('release update checks', () => {
+  it.each(
+    ['win32', 'darwin', 'linux'].flatMap((platform) =>
+      [false, true].flatMap((packaged) =>
+        [false, true].map((signed) => [platform, packaged, signed]),
+      ),
+    ),
+  )('capabilities for %s packaged=%s signed=%s', (platform, packaged, signed) => {
+    const automatic = packaged && (platform === 'win32' || (platform === 'darwin' && signed));
+    expect(getUpdateCapabilities(platform, packaged, signed)).toEqual({
+      platform,
+      updateMode: automatic ? 'automatic' : 'manual',
+      canDownloadUpdate: automatic,
+      canInstallUpdate: automatic,
+      manualUpdateReason: !packaged
+        ? 'development'
+        : automatic
+          ? ''
+          : platform === 'darwin'
+            ? 'unsigned-macos'
+            : 'unsupported-platform',
+    });
+  });
+
+  it('the installed updater refuses ARM-only metadata on Intel until x64 assets arrive', () => {
+    const require = createRequire(import.meta.url);
+    const { MacUpdater } = require('electron-updater/out/MacUpdater.js');
+    const { findFile } = require('electron-updater/out/providers/Provider.js');
+    const file = (arch) => ({
+      url: new URL(`https://example.com/app-${arch}.zip`),
+      info: { url: `app-${arch}.zip` },
+    });
+    const arm = file('arm64'),
+      intel = file('x64');
+    const pending = MacUpdater.filterFilesForArch([arm], false);
+    expect(() => findFile(pending, 'zip', ['pkg', 'dmg'])).toThrow('No files provided');
+    expect(
+      findFile(MacUpdater.filterFilesForArch([arm, intel], false), 'zip', ['pkg', 'dmg']),
+    ).toBe(intel);
+    expect(findFile(MacUpdater.filterFilesForArch([arm, intel], true), 'zip', ['pkg', 'dmg'])).toBe(
+      arm,
+    );
+  });
+
   it('uses automatic updates only where the packaged build can install them', () => {
     expect(getUpdateCapabilities('win32', true)).toMatchObject({
       updateMode: 'automatic',

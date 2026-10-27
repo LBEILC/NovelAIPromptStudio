@@ -23,7 +23,7 @@ export function getUpdateCapabilities(platform, packaged, macAutomaticUpdates = 
     Boolean(packaged) && (platform === 'win32' || (platform === 'darwin' && macAutomaticUpdates));
   let manualUpdateReason = '';
   if (!packaged) manualUpdateReason = 'development';
-  else if (platform === 'darwin') manualUpdateReason = 'unsigned-macos';
+  else if (platform === 'darwin' && !automaticUpdates) manualUpdateReason = 'unsigned-macos';
   else if (!automaticUpdates) manualUpdateReason = 'unsupported-platform';
 
   return {

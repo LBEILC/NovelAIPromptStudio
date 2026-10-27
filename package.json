@@ -145,7 +145,10 @@
         "zip"
       ],
       "artifactName": "NovelAI-Prompt-Studio-${version}-${arch}.${ext}",
-      "category": "public.app-category.graphics-design"
+      "category": "public.app-category.graphics-design",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "nsis": {
       "installerIcon": "build/icons/icon.ico",

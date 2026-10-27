@@ -87,6 +87,10 @@ import {
 } from './assetFiles.js';
 
 const { autoUpdater } = electronUpdater;
+// Embedded only by the release packaging path, before signing seals app.asar.
+const macAutomaticUpdates =
+  JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'))
+    .macSignedAndNotarized === true;
 
 app.setName('NovelAI Prompt Studio');
 const acceptanceMode = configureAcceptanceMode(app);
@@ -349,7 +353,7 @@ function notifyUpdateState(patch = {}) {
     ...patch,
     currentVersion: app.getVersion(),
     packaged: app.isPackaged,
-    ...getUpdateCapabilities(process.platform, app.isPackaged),
+    ...getUpdateCapabilities(process.platform, app.isPackaged, macAutomaticUpdates),
   };
   for (const window of BrowserWindow.getAllWindows()) {
     sendWindowEvent(window, { type: 'updates', data: updateState });
@@ -375,7 +379,10 @@ function releaseNotesText(notes) {
 
 function configureAutoUpdater() {
   if (acceptanceMode) return;
-  if (!getUpdateCapabilities(process.platform, app.isPackaged).canDownloadUpdate) return;
+  if (
+    !getUpdateCapabilities(process.platform, app.isPackaged, macAutomaticUpdates).canDownloadUpdate
+  )
+    return;
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
@@ -1400,7 +1407,7 @@ app.whenReady().then(async () => {
       ...updateState,
       currentVersion: app.getVersion(),
       packaged: app.isPackaged,
-      ...getUpdateCapabilities(process.platform, app.isPackaged),
+      ...getUpdateCapabilities(process.platform, app.isPackaged, macAutomaticUpdates),
     };
   });
   registerCommand('updates.check', async (input, _caller) => {
@@ -1417,7 +1424,11 @@ app.whenReady().then(async () => {
       });
       return { ok: true, ...updateState };
     }
-    const capabilities = getUpdateCapabilities(process.platform, app.isPackaged);
+    const capabilities = getUpdateCapabilities(
+      process.platform,
+      app.isPackaged,
+      macAutomaticUpdates,
+    );
     try {
       if (!capabilities.canDownloadUpdate) {
         notifyUpdateState({ phase: 'checking', error: '', progress: 0 });
@@ -1458,7 +1469,11 @@ app.whenReady().then(async () => {
     }
   });
   registerCommand('updates.download', async (input, _caller) => {
-    const capabilities = getUpdateCapabilities(process.platform, app.isPackaged);
+    const capabilities = getUpdateCapabilities(
+      process.platform,
+      app.isPackaged,
+      macAutomaticUpdates,
+    );
     if (!capabilities.canDownloadUpdate) {
       const error =
         capabilities.manualUpdateReason === 'unsigned-macos'
@@ -1483,7 +1498,11 @@ app.whenReady().then(async () => {
     }
   });
   registerCommand('updates.install', (input, _caller) => {
-    const capabilities = getUpdateCapabilities(process.platform, app.isPackaged);
+    const capabilities = getUpdateCapabilities(
+      process.platform,
+      app.isPackaged,
+      macAutomaticUpdates,
+    );
     if (!capabilities.canInstallUpdate) {
       const error =
         capabilities.manualUpdateReason === 'unsigned-macos'
