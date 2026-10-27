@@ -9,6 +9,7 @@ export function createNsfwStore(connection) {
   CREATE TRIGGER IF NOT EXISTS image_nsfw_marks_delete AFTER DELETE ON projects
   BEGIN DELETE FROM image_nsfw_marks WHERE project_id = OLD.id; END;`);
   let words = [...DEFAULT_NSFW_TAGS];
+  let revision = 0;
   let automatic = new Map();
   const observed = new Map();
   const compiled = new Map();
@@ -36,14 +37,9 @@ export function createNsfwStore(connection) {
     }
     return automatic.get(key);
   };
+  const markFor = connection.prepare('SELECT value FROM image_nsfw_marks WHERE project_id = ?');
   const resolve = (id, key, marks) => {
-    const mark = !id
-      ? undefined
-      : marks
-        ? marks.get(id)
-        : connection
-            .prepare('SELECT value FROM image_nsfw_marks WHERE project_id = ?')
-            .get(id || '')?.value;
+    const mark = !id ? undefined : marks ? marks.get(id) : markFor.get(id || '')?.value;
     const state = mark === undefined ? auto(key) : { value: Boolean(mark), source: 'manual' };
     if (id) observed.set(id, { key, state });
     return state;
@@ -71,6 +67,7 @@ export function createNsfwStore(connection) {
     return new Map([...observed].map(([id, entry]) => [id, entry.state]));
   };
   return {
+    revision: () => revision,
     input,
     state: (project) => resolve(project.id, input(project)),
     cards: () => {
@@ -84,6 +81,7 @@ export function createNsfwStore(connection) {
     },
     setWords(next) {
       if (JSON.stringify(words) === JSON.stringify(next)) return {};
+      revision++;
       const before = snapshot();
       words = [...next];
       wordKeys = new Map(words.map((word) => [normalizeNsfwWord(word), word]));
@@ -103,6 +101,7 @@ export function createNsfwStore(connection) {
       const before = snapshot();
       const states = {},
         changed = {};
+      revision++;
       for (const id of unique) {
         if (value === 'auto')
           connection.prepare('DELETE FROM image_nsfw_marks WHERE project_id = ?').run(id);

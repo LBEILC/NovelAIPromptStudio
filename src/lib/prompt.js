@@ -188,10 +188,10 @@ function scanPromptBoundary(source, cursor) {
   return source.length;
 }
 
-function textBlockStart(source, cursor) {
+function textBlockStart(source, cursor, end = source.length) {
   let closingQuote = '';
   let braceDepth = 0;
-  for (let index = cursor; index < source.length; index += 1) {
+  for (let index = cursor; index < end; index += 1) {
     const character = source[index];
     if (closingQuote) {
       if (character === closingQuote && !isEscaped(source, index)) closingQuote = '';
@@ -300,7 +300,10 @@ function scanPromptSegments(source, state, offset = 0, wrappers = []) {
       continue;
     }
 
-    const textStart = textBlockStart(source, cursor);
+    // Only this segment can precede the next delimiter. Scanning the whole
+    // remaining prompt for every tag made a cold version list quadratic.
+    const regularBoundary = scanPromptBoundary(source, cursor);
+    const textStart = textBlockStart(source, cursor, regularBoundary);
     if (textStart === cursor) {
       const rawSegment = source.slice(cursor).trim();
       if (rawSegment)
@@ -314,7 +317,6 @@ function scanPromptSegments(source, state, offset = 0, wrappers = []) {
       break;
     }
 
-    const regularBoundary = scanPromptBoundary(source, cursor);
     const end = textStart > cursor ? Math.min(regularBoundary, textStart) : regularBoundary;
     const rawSegment = source.slice(cursor, end).trim();
     const source_range = {

@@ -96,6 +96,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     versions,
     pending,
     subtree,
+    lastInSubtree,
     left,
     col,
     rz,
@@ -143,7 +144,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
               if (pickOr(e, v, v.project.id)) return;
               void go(v, v.project.id);
             }}
-            onContextMenu={ctx(thumbMenu(v, v.project.id, false))}
+            onContextMenu={ctx(() => thumbMenu(v, v.project.id, false))}
           >
             <Thumb
               id={v.project.id}
@@ -174,7 +175,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
               if (pickOr(e, v, img.projectId)) return;
               void go(v, img.projectId);
             }}
-            onContextMenu={ctx(thumbMenu(v, img.projectId))}
+            onContextMenu={ctx(() => thumbMenu(v, img.projectId))}
           >
             <Thumb id={img.projectId} tab={tab.id} />
           </span>
@@ -284,7 +285,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
               data-exit="lift"
               data-enter="fade"
               className={`ver br-mark ${gone ? 'leaving' : ''}`}
-              onContextMenu={ctx(renameMenu(v, `[data-key="brm-${v.id}"]`))}
+              onContextMenu={ctx(() => renameMenu(v, `[data-key="brm-${v.id}"]`))}
             >
               <Icon name="git-branch-line" />
               <span className="t">{v.branchName}</span>
@@ -307,7 +308,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             aria-current={on || undefined}
             onClick={() => void go(v)}
             onKeyDown={(e) => e.key === 'Enter' && void go(v)}
-            onContextMenu={ctx(renameMenu(v, `[data-key="ver-${v.id}"]`, false, true))}
+            onContextMenu={ctx(() => renameMenu(v, `[data-key="ver-${v.id}"]`, false, true))}
             {...peekProps(`ver-${v.id}`, v, name(v))}
           >
             <span className="vh">
@@ -484,7 +485,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
       // 分叉：刚离开的那条线排在最前，其余按最新的在上面
       const forks = kids(v.id)
         .filter((k) => !line.includes(k))
-        .map((k) => ({ k, last: Math.max(...subtree(k).map((x) => versions.indexOf(x))) }))
+        .map((k) => ({ k, last: lastInSubtree(k) }))
         .sort(
           (a, b) =>
             Number(b.k.branchId === left) - Number(a.k.branchId === left) || b.last - a.last,
@@ -509,7 +510,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
               role="button"
               onClick={() => void go(f)}
               onKeyDown={(e) => e.key === 'Enter' && void go(f)}
-              onContextMenu={ctx(renameMenu(f, `[data-key="fork-${f.id}"]`, true))}
+              onContextMenu={ctx(() => renameMenu(f, `[data-key="fork-${f.id}"]`, true))}
               {...peekProps(`fork-${f.id}`, f, title)}
             >
               <Icon name="git-branch-line" />
@@ -642,7 +643,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             className="br-head"
             data-key="br-head"
             data-tip="当前这条线所在的分支，右键可以改名"
-            onContextMenu={ctx(renameMenu(current, '[data-key="br-head"]'))}
+            onContextMenu={ctx(() => renameMenu(current, '[data-key="br-head"]'))}
           >
             · {current.branchName}
           </span>

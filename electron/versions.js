@@ -1,4 +1,5 @@
 import { createWorkSharing } from './workSharing.js';
+import { createVersionCache } from './versionCache.js';
 import fs from 'node:fs';
 import { hydrateParameters } from './params.js';
 import path from 'node:path';
@@ -103,7 +104,7 @@ export function versionSignature(project) {
   ]);
 }
 
-export function createVersionStore(connection, hydrate = hydrateParameters) {
+export function createVersionStore(connection, hydrate = hydrateParameters, externalRevision) {
   let activeVersions = new Set();
   // Additive tables keep every existing snapshot readable without rewriting it.
   connection.exec(`
@@ -120,6 +121,7 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
     INSERT INTO work_sequences SELECT work_id, MAX(number), MAX(branch_number) FROM work_versions GROUP BY work_id
       ON CONFLICT(work_id) DO UPDATE SET version=MAX(version,excluded.version), branch=MAX(branch,excluded.branch);
   `);
+  const cache = createVersionCache(connection, externalRevision);
   const originalImage = (project) =>
     connection.prepare('SELECT id,deleted_at FROM projects WHERE id=?').get(project.id || '') ||
     (project.image_path
@@ -147,11 +149,28 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
         );
       })
       .map((w) => ({ workId: w.id, name: JSON.parse(w.origin_json).name }));
-  const decode = (row) =>
-    row && {
-      ...(!row.parent_id
-        ? { originState: originState(row.work_id, JSON.parse(row.snapshot_json)) }
-        : {}),
+  const branchName = connection.prepare('SELECT name FROM work_branch_names WHERE branch_id=?');
+  const imageQuery = `SELECT vi.*, p.deleted_at, vr.variant, rr.record_json
+    FROM version_images vi LEFT JOIN projects p ON p.id=vi.project_id
+    LEFT JOIN version_image_variants vr ON vr.image_id=vi.id
+    LEFT JOIN version_image_random rr ON rr.image_id=vi.id`;
+  const imageRows = connection.prepare(`${imageQuery} WHERE vi.version_id=? ORDER BY vi.rowid`);
+  const workImages = connection.prepare(`${imageQuery}
+    JOIN work_versions v ON v.id=vi.version_id WHERE v.work_id=? ORDER BY vi.rowid`);
+  const decodeImage = (image) => ({
+    id: image.id,
+    projectId: image.project_id,
+    seed: image.seed,
+    ...(image.variant !== null ? { variant: image.variant } : {}),
+    random: JSON.parse(image.record_json || 'null'),
+    deleted: !!image.deleted_at,
+    createdAt: image.created_at,
+  });
+  const decode = (row, context) => {
+    if (!row) return undefined;
+    const snapshot = JSON.parse(row.snapshot_json);
+    return {
+      ...(!row.parent_id ? { originState: originState(row.work_id, snapshot) } : {}),
       isStart: row.number === 0,
       id: row.id,
       workId: row.work_id,
@@ -160,35 +179,15 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
       branchId: row.branch_id,
       branchNumber: row.branch_number,
       branchName:
-        connection
-          .prepare('SELECT name FROM work_branch_names WHERE branch_id=?')
-          .get(row.branch_id)?.name || (row.branch_number ? `分支 ${row.branch_number}` : '主线'),
-      operation: JSON.parse(row.snapshot_json).operation,
-      project: hydrate(JSON.parse(row.snapshot_json)),
+        (context ? context.names.get(row.branch_id) : branchName.get(row.branch_id)?.name) ||
+        (row.branch_number ? `分支 ${row.branch_number}` : '主线'),
+      operation: snapshot.operation,
+      project: hydrate(snapshot),
       source: row.source,
       createdAt: row.created_at,
-      images: connection
-        .prepare(
-          `SELECT vi.*, p.deleted_at FROM version_images vi LEFT JOIN projects p ON p.id=vi.project_id
-      WHERE version_id=? ORDER BY vi.rowid`,
-        )
-        .all(row.id)
-        .map((image) => ({
-          id: image.id,
-          projectId: image.project_id,
-          seed: image.seed,
-          ...(connection
-            .prepare('SELECT variant FROM version_image_variants WHERE image_id=?')
-            .get(image.id) || {}),
-          random: JSON.parse(
-            connection
-              .prepare('SELECT record_json FROM version_image_random WHERE image_id=?')
-              .get(image.id)?.record_json || 'null',
-          ),
-          deleted: !!image.deleted_at,
-          createdAt: image.created_at,
-        })),
+      images: context ? context.images.get(row.id) || [] : imageRows.all(row.id).map(decodeImage),
     };
+  };
   const getAny = (id) =>
     decode(connection.prepare('SELECT * FROM work_versions WHERE id=?').get(id));
   const isDeleted = (id) =>
@@ -202,21 +201,48 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
     const v = getAny(id);
     return v && { ...v, parentId: visibleParent(v.parentId) };
   };
-  const list = (workId) => {
-    const rows = connection
-      .prepare(
-        'SELECT * FROM work_versions WHERE work_id=? AND id NOT IN (SELECT version_id FROM deleted_versions) ORDER BY number',
-      )
-      .all(workId)
-      .map(decode);
-    const branches = new Map();
-    for (const v of rows) if (!branches.has(v.branchId)) branches.set(v.branchId, v.id);
-    return rows.map((v) => ({
-      ...v,
-      parentId: visibleParent(v.parentId),
-      branchId: branches.get(v.branchId),
-    }));
-  };
+  const list = (workId) =>
+    cache.read(workId, () => {
+      const names = new Map(
+        connection
+          .prepare(
+            'SELECT DISTINCT b.branch_id,b.name FROM work_branch_names b JOIN work_versions v ON v.branch_id=b.branch_id WHERE v.work_id=?',
+          )
+          .all(workId)
+          .map((r) => [r.branch_id, r.name]),
+      );
+      const images = new Map();
+      for (const image of workImages.all(workId)) {
+        const group = images.get(image.version_id) || [];
+        group.push(decodeImage(image));
+        images.set(image.version_id, group);
+      }
+      const deleted = new Map(
+        connection
+          .prepare(
+            'SELECT v.id,v.parent_id FROM work_versions v JOIN deleted_versions d ON d.version_id=v.id WHERE v.work_id=?',
+          )
+          .all(workId)
+          .map((r) => [r.id, r.parent_id]),
+      );
+      const parentOf = (id) => {
+        while (id && deleted.has(id)) id = deleted.get(id);
+        return id || null;
+      };
+      const rows = connection
+        .prepare(
+          'SELECT * FROM work_versions WHERE work_id=? AND id NOT IN (SELECT version_id FROM deleted_versions) ORDER BY number',
+        )
+        .all(workId)
+        .map((row) => decode(row, { names, images }));
+      const branches = new Map();
+      for (const v of rows) if (!branches.has(v.branchId)) branches.set(v.branchId, v.id);
+      return rows.map((v) => ({
+        ...v,
+        parentId: parentOf(v.parentId),
+        branchId: branches.get(v.branchId),
+      }));
+    });
   const touch = (workId, versionId) => {
     const previous = connection.prepare('SELECT MAX(used_at) AS time FROM work_activity').get();
     connection
@@ -510,7 +536,7 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
       ) SELECT v.* FROM work_versions v JOIN tree t ON v.id=t.id WHERE v.id NOT IN (SELECT version_id FROM deleted_versions)`,
             )
             .all(first.id)
-            .map(decode);
+            .map((row) => decode(row));
       return { rows, parent: get(visibleParent(first.parent_id)), images: trashImages(rows) };
     },
     pruneImages(projectIds, deferredIds = []) {
@@ -660,7 +686,14 @@ export function createVersionStore(connection, hydrate = hydrateParameters) {
       );
     },
     ensure(workId, original, source = null) {
-      if (connection.prepare('SELECT 1 FROM works WHERE id=?').get(workId)) return list(workId)[0];
+      if (connection.prepare('SELECT 1 FROM works WHERE id=?').get(workId)) {
+        const first = connection
+          .prepare(
+            'SELECT id FROM work_versions WHERE work_id=? AND id NOT IN (SELECT version_id FROM deleted_versions) ORDER BY number LIMIT 1',
+          )
+          .get(workId);
+        return first && get(first.id);
+      }
       return atomic(() => {
         const id = crypto.randomUUID(),
           time = new Date().toISOString();

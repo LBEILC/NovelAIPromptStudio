@@ -19,6 +19,7 @@ import { applyRedrawPrompt, isRedraw, promptOf } from './versionHelpers';
 import { applyRandom } from './RandomBlock';
 import { nsfwMenu } from '../kit/blur';
 import { imageFileMenu } from '../kit/imageFiles';
+import { createVersionTree } from '../lib/versionTree';
 type Loaded = {
   tab: string;
   versions: WorkVersion[];
@@ -94,10 +95,25 @@ export function useVersionState({
   }, [tab.id, refresh]);
   useEffect(() => () => clearTimeout(peekTimer.current), []);
   const current = versions.find((v) => v.id === tab.versionId) || versions[0];
-  const kids = (id: string) => versions.filter((v) => v.parentId === id);
-  const subtree = (v: WorkVersion): WorkVersion[] => [v, ...kids(v.id).flatMap(subtree)];
-  const indexed = useMemo(() => new Map(versions.map((v) => [v.id, v])), [versions]);
-  const byId = (id: string | null) => indexed.get(id || '');
+  const tree = useMemo(() => createVersionTree(versions), [versions]);
+  const kids = (id: string) => tree.children.get(id) || [];
+  const subtree = (v: WorkVersion) => tree.descendants.get(v.id) || [v];
+  const lastInSubtree = (v: WorkVersion) => tree.last.get(v.id) ?? -1;
+  const byId = (id: string | null) => tree.byId.get(id || '');
+  const busyTree = useMemo(() => {
+    const busy = new Set<string>();
+    for (const job of state.jobs) {
+      if (job.tabId !== tab.id || !['generating', 'queued'].includes(job.state)) continue;
+      for (const start of [job.versionId, job.parentId]) {
+        let id: string | null | undefined = start;
+        while (id && !busy.has(id)) {
+          busy.add(id);
+          id = tree.byId.get(id)?.parentId;
+        }
+      }
+    }
+    return busy;
+  }, [tree, state.jobs, tab.id]);
   // 原图移入回收站或从作品里去掉以后，第一行是"起点"（1.5.1）
   const name = (v: WorkVersion) =>
     v.isStart || originGone(v) ? '起点' : v.parentId ? `第 ${v.number} 版` : '原图';
@@ -217,15 +233,7 @@ export function useVersionState({
       },
     });
   };
-  const treeBusy = (v: WorkVersion) => {
-    const tree = new Set(subtree(v).map((x) => x.id));
-    return state.jobs.some(
-      (j) =>
-        j.tabId === tab.id &&
-        ['generating', 'queued'].includes(j.state) &&
-        (tree.has(j.versionId || '') || tree.has(j.parentId || '')),
-    );
-  };
+  const treeBusy = (v: WorkVersion) => busyTree.has(v.id);
   const ownBusy = (v: WorkVersion) =>
     state.jobs.some(
       (j) =>
@@ -300,12 +308,12 @@ export function useVersionState({
         ]
       : []),
   ];
-  const ctx = (items: MenuEntry[]) => (e: React.MouseEvent) => {
+  const ctx = (items: () => MenuEntry[]) => (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     clearTimeout(peekTimer.current);
     setPeek(null);
-    setMenu({ at: [e.clientX, e.clientY], items });
+    setMenu({ at: [e.clientX, e.clientY], items: items() });
   };
   // 舞台上现在这张：右键别的缩略图可以和它对比（1.8.1）
   const stageImage = tab.versionImageId || current?.project.id;
@@ -436,6 +444,7 @@ export function useVersionState({
     versions,
     pending,
     subtree,
+    lastInSubtree,
     left,
     col,
     rz,

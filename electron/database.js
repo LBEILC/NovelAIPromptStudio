@@ -1824,8 +1824,10 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
       throw error;
     }
   };
-  const versionStore = createVersionStore(connection, (project) =>
-    hydrateParameters({ ...project, nsfw: nsfwStore.state(project) }),
+  const versionStore = createVersionStore(
+    connection,
+    (project) => hydrateParameters({ ...project, nsfw: nsfwStore.state(project) }),
+    nsfwStore.revision,
   );
   const deleteProject = (id) => {
     const projectId = String(id || '');
