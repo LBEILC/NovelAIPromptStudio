@@ -64,7 +64,10 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       # Includes database-native.test.js: fixed legacy fixture, atomic writes and crash recovery.
-      - run: npm test
+      # Preview tests start complete SQLite/image/service stacks. Run them
+      # separately so unrelated suites cannot consume their execution budget.
+      - run: npm test -- --exclude "preview/**"
+      - run: npm test -- preview
       - run: npm run build
       - if: matrix.node == 24
         run: npm run audit:ui
