@@ -512,6 +512,7 @@ export async function settingsChecks(context, restart) {
   await e("window.studio.invoke('updates.check',{})");
   await wait('!!document.querySelector(".rn-md")');
   await h.section('帮助');
+  await e("document.querySelector('[data-help-tab=feedback]').click()");
   for (const [label, expected] of [
     ['报告问题', 'bug'],
     ['提出建议', 'enhancement'],
