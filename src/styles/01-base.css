@@ -101,6 +101,8 @@ button { font: inherit; color: inherit; cursor: default; }
 /* 藏起来的滚动条不接鼠标：它停在上一块区域的位置上，那块区域没了（例如浮层关掉）以后，悬停不能让它在原处冒出来 */
 .sb { position: absolute; top: 0; left: 0; width: var(--sb-w); border-radius: 999px; background: var(--border); opacity: 0; pointer-events: none; transition: opacity var(--dur-2) var(--ease-out), width var(--dur-1), margin var(--dur-1), background-color var(--dur-1); }
 .sb.show, .sb.drag { opacity: 1; pointer-events: auto; }
+/* 跟着的区域淡出或被拿掉时一起走，和浮层的退出一样快 */
+.sb.quick { transition-duration: var(--dur-1); }
 .sb.show:hover, .sb.drag { width: var(--sb-w-hover); margin-left: calc(var(--sb-w) - var(--sb-w-hover)); background: var(--text-3); opacity: 1; }
 .sb[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .sb, .set-head { transition: none; } }

@@ -6,6 +6,8 @@ import { useEffect, useRef } from 'react';
 import { ms } from './motion';
 
 const SCROLLER = '.scroll, [data-scroll]';
+// 跟着的区域没了或正在淡出（浮层关掉时先加 .leaving 再拿掉）：滚动条要和它一起走，不能多停一会儿（用户 10-27）
+const gone = (el: HTMLElement | null) => !el || !el.isConnected || !!el.closest('.leaving');
 export function thumbGeometry(
   viewport: number,
   content: number,
@@ -41,10 +43,35 @@ export function ScrollLayer() {
       idle = 0,
       over = false,
       drag: { y: number; top: number; k: number } | null = null;
+    // 显示期间盯着整页的增删和类名：跟着的区域一开始淡出或被拿掉，滚动条立刻跟着淡出（用 --dur-1，和浮层的退出一样快）。
+    // 只在显示时盯，藏起来就停
+    const watcher = new MutationObserver(() => {
+      if (gone(active)) hideNow();
+    });
+    const show = () => {
+      sb.classList.remove('quick');
+      if (!sb.classList.contains('show'))
+        watcher.observe(document.body, {
+          subtree: true,
+          childList: true,
+          attributes: true,
+          attributeFilter: ['class'],
+        });
+      sb.classList.add('show');
+    };
+    const hide = () => {
+      sb.classList.remove('show');
+      watcher.disconnect();
+    };
+    const hideNow = () => {
+      clearTimeout(idle);
+      sb.classList.add('quick');
+      hide();
+    };
     const place = () => {
       const el = active;
-      if (!el || !el.isConnected) {
-        sb.classList.remove('show');
+      if (!el || gone(el)) {
+        hide();
         return false;
       }
       const top = edge(el, 'sbTop'),
@@ -59,7 +86,7 @@ export function ScrollLayer() {
         bottom,
       );
       if (!g.visible) {
-        sb.classList.remove('show');
+        hide();
         return false;
       }
       const r = el.getBoundingClientRect();
@@ -93,22 +120,21 @@ export function ScrollLayer() {
       watchKids(el);
     };
     const wake = (el: HTMLElement) => {
+      // 正在淡出的浮层里滚动、指针划过：不再把滚动条叫出来
+      if (gone(el)) return;
       active = el;
       watch(el);
       if (!place()) return;
-      sb.classList.add('show');
+      show();
       clearTimeout(idle);
-      idle = window.setTimeout(function hide() {
+      idle = window.setTimeout(function idleHide() {
         // 跟着的区域已经没了（例如悬停浮层关掉了）：指针停在滚动条上也要藏起来
-        if (!active?.isConnected) {
-          sb.classList.remove('show');
-          return;
-        }
+        if (gone(active)) return hideNow();
         if (over || drag) {
-          idle = window.setTimeout(hide, ms('--sb-idle'));
+          idle = window.setTimeout(idleHide, ms('--sb-idle'));
           return;
         }
-        sb.classList.remove('show');
+        hide();
       }, ms('--sb-idle'));
     };
     const onScroll = (e: Event) => {
@@ -122,7 +148,7 @@ export function ScrollLayer() {
         return;
       }
       if (e.target === sb) {
-        if (!active?.isConnected) sb.classList.remove('show');
+        if (gone(active)) hideNow();
         return;
       }
       const el =
@@ -156,6 +182,7 @@ export function ScrollLayer() {
     sb.addEventListener('pointerenter', enter);
     sb.addEventListener('pointerleave', leave);
     return () => {
+      watcher.disconnect();
       sizes.disconnect();
       kids.disconnect();
       removeEventListener('scroll', onScroll, true);
