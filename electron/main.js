@@ -62,6 +62,7 @@ import {
   migrateAssetDirectory,
 } from './libraryStorage.js';
 import { createWorkbenchTemporaryCleanup, readClipboardImageSource } from './clipboardImages.js';
+import { copySecret } from './copySecret.js';
 import {
   checkForUpdates as checkReleaseUpdates,
   getUpdateCapabilities,
@@ -1346,6 +1347,7 @@ app.whenReady().then(async () => {
     }
   };
 
+  registerCommand('secret.copy', ({ kind }) => copySecret(kind, preferences, clipboard));
   registerCommand('settings.ai.get', (input, _caller) => {
     return preferences.publicSettings();
   });

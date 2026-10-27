@@ -473,6 +473,7 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       chatGPT = service;
     },
     credentials,
+    aiApiKey: () => decryptKey(read()),
     saveAISettings,
     blurSettings,
     saveBlurSettings,

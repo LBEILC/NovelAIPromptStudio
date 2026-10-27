@@ -92,6 +92,16 @@ async function setup() {
 }
 
 describe('command contract', () => {
+  it('returns forbidden for secret.copy from CLI without invoking the clipboard handler', async () => {
+    const commands = await setup();
+    try {
+      expect(
+        await commands.dispatch('secret.copy', { kind: 'novelai-token' }, 'agent'),
+      ).toMatchObject({ ok: false, error: { code: 'forbidden' } });
+    } finally {
+      await commands.close();
+    }
+  });
   it('keeps sensitive command families UI-only', () => {
     for (const [name, definition] of Object.entries(commandRegistry)) {
       if (

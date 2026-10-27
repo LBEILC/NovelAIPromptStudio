@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { clipboard } from 'electron';
 
 export async function settingsGenerationChecks({
   h,
@@ -46,6 +47,33 @@ export async function settingsGenerationChecks({
     '保存令牌后输入框清空并退出编辑',
     '!document.querySelector(\'[aria-label="持久令牌"]\') && document.body.innerText.includes("已保存 ••••••••")',
   );
+  await click('复制', 'document.querySelector("[data-settings-section=novelai]:not(.leaving)")');
+  await wait('document.body.innerText.includes("已复制持久令牌")');
+  await check(
+    '持久令牌复制到剪贴板并显示成功通知',
+    async () =>
+      clipboard.readText() === 'acceptance-token' &&
+      (await evaluate('document.body.innerText.includes("已复制持久令牌")')),
+  );
+  const previousConnection = preferences.generationSettings();
+  await invoke('account.relay.save', {
+    baseUrl: generationService.url + '/v1',
+    key: 'acceptance-token',
+  });
+  await h.select('连接方式', '中转站');
+  await wait(
+    'document.querySelector("[data-settings-section=novelai]:not(.leaving)")?.textContent.includes("已保存 ••••••••")',
+  );
+  await click('复制', 'document.querySelector("[data-settings-section=novelai]:not(.leaving)")');
+  await wait('document.body.innerText.includes("已复制中转站 Key")');
+  await check(
+    '中转站 Key 复制到剪贴板并显示成功通知',
+    async () =>
+      clipboard.readText() === 'acceptance-token' &&
+      (await evaluate('document.body.innerText.includes("已复制中转站 Key")')),
+  );
+  await h.select('连接方式', previousConnection.connection === 'relay' ? '中转站' : 'NovelAI 官方');
+  await wait('!document.querySelector(\'[aria-label="中转站地址"]\')');
   await click('更换');
   await input('[aria-label="持久令牌"]', 'discarded-token');
   await click('取消', 'document.querySelector("[data-settings-section=novelai]")');
