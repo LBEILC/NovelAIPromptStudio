@@ -925,7 +925,10 @@ async function runGenerationChecks({
     previous = chain[1];
   await invoke('version.open', { tabId: only.tab.id, versionId: middle.id });
   const selector = `[data-key="ver-${middle.id}"]`;
-  await wait(`!!document.querySelector(${JSON.stringify(selector)})`);
+  await wait(
+    `!!document.querySelector(${JSON.stringify(selector)}) && !!document.querySelector('[data-key="ver-${last.id}"]')`,
+    '第三版及其第四版子节点已进入版本列表',
+  );
   await e(
     `document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:200}))`,
   );

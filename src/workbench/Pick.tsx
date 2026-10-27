@@ -12,6 +12,7 @@ import { Icon, Kbd, Slider, Switch } from '../kit/controls';
 import { markLoaded } from '../kit/alpha';
 import { useNotifications } from '../kit/toast';
 import { invokeUI } from '../lib/commands';
+import { readVersions } from '../state/versions';
 import { BlurImg, type BlurImage } from '../kit/blur';
 import type { WorkVersion } from '../shared/generation';
 import type { ImageRecord } from '../shared/types';
@@ -68,40 +69,42 @@ export function PickHost({ tabId, onChanged }: { tabId: string; onChanged?: () =
     if (!mine) return;
     setData(null);
     let live = true;
-    void invokeUI('version.list', { tabId }).then(async (list) => {
-      const version = list.versions.find((v) => v.id === mine.versionId);
-      if (!version) return set(null);
-      const shown = version.images.filter((i) => !i.deleted);
-      const ids = shown.map((i) => i.projectId);
-      const recs = await Promise.all(
-        ids.map((id) =>
-          invokeUI('library.get', { id })
-            .then((x) => x.project as ImageRecord | null)
-            .catch(() => null),
-        ),
-      );
-      if (!live) return;
-      setData({
-        version,
-        items: ids.flatMap((id, i) =>
-          recs[i]
-            ? [
-                {
-                  id,
-                  path: recs[i]!.image_path,
-                  thumb: recs[i]!.thumbnail_path || recs[i]!.image_path,
-                  image: recs[i]!,
-                  seed: recs[i]!.metadata?.seed,
-                  random: randomSummary(shown[i].random),
-                  ratio:
-                    Number(recs[i]!.metadata?.width) / Number(recs[i]!.metadata?.height) ||
-                    832 / 1216,
-                },
-              ]
-            : [],
-        ),
-      });
-    });
+    void readVersions(tabId)
+      .then(async (list) => {
+        const version = list.versions.find((v) => v.id === mine.versionId);
+        if (!version) return set(null);
+        const shown = version.images.filter((i) => !i.deleted);
+        const ids = shown.map((i) => i.projectId);
+        const recs = await Promise.all(
+          ids.map((id) =>
+            invokeUI('library.get', { id })
+              .then((x) => x.project as ImageRecord | null)
+              .catch(() => null),
+          ),
+        );
+        if (!live) return;
+        setData({
+          version,
+          items: ids.flatMap((id, i) =>
+            recs[i]
+              ? [
+                  {
+                    id,
+                    path: recs[i]!.image_path,
+                    thumb: recs[i]!.thumbnail_path || recs[i]!.image_path,
+                    image: recs[i]!,
+                    seed: recs[i]!.metadata?.seed,
+                    random: randomSummary(shown[i].random),
+                    ratio:
+                      Number(recs[i]!.metadata?.width) / Number(recs[i]!.metadata?.height) ||
+                      832 / 1216,
+                  },
+                ]
+              : [],
+          ),
+        });
+      })
+      .catch(() => {});
     return () => {
       live = false;
     };

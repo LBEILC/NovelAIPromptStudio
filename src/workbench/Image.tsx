@@ -12,6 +12,7 @@ import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
 import { invokeUI } from '../lib/commands';
 import { generationParameters, modelDisplayName } from '../library/presentation';
 import { useGeneration } from '../state/generation';
+import { useVersionList, readVersions, readVersionImage, versionLists } from '../state/versions';
 import { Icon } from '../kit/controls';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
 import { Pop } from '../kit/layer';
@@ -69,6 +70,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const [version, setVersion] = useState<WorkVersion | null>(null);
   const [members, setMembers] = useState<ImageRecord[]>([]);
   const [refresh, setRefresh] = useState(0);
+  const versionList = useVersionList(tab, generation.settings.hasToken);
   const [viewer, setViewer] = useState<number | null>(null);
   const [menu, setMenu] = useState<[number, number] | null>(null);
   const [vibe, setVibe] = useState<number | null>(null);
@@ -91,39 +93,37 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
       return;
     }
     let live = true;
-    void invokeUI('version.list', { tabId: tab.id }).then(async (r) => {
-      const v = r.versions.find((x) => x.id === tab.versionId) || r.versions[0];
-      if (!v) return;
-      const list = await Promise.all(
-        v.images
-          .filter((i) => !i.deleted)
-          .map((i) => invokeUI('library.get', { id: i.projectId }).then((x) => x.project)),
-      );
-      if (!live) return;
-      setVersion(v);
-      setMembers(
-        (v.parentId ? list : [v.project as unknown as ImageRecord, ...list]).filter(Boolean),
-      );
-    });
+    void readVersions(tab.id)
+      .then(async (r) => {
+        const v = r.versions.find((x) => x.id === tab.versionId) || r.versions[0];
+        if (!v) return;
+        const list = await Promise.all(
+          v.images.filter((i) => !i.deleted).map((i) => readVersionImage(i.projectId)),
+        );
+        if (!live) return;
+        setVersion(v);
+        setMembers(
+          (v.parentId ? list : [v.project as unknown as ImageRecord, ...list]).filter(Boolean),
+        );
+      })
+      .catch(() => {});
     return () => {
       live = false;
     };
-  }, [
-    tab.id,
-    tab.versionId,
-    tab.versionImageId,
-    tab.revision,
-    generation.jobs,
-    refresh,
-    generation.settings.hasToken,
-  ]);
+  }, [tab.id, tab.versionId, versionList, refresh, generation.settings.hasToken]);
   useEffect(
     () =>
       window.studio?.onCommandEvent((e) => {
-        if (e.type === 'workbench' && e.libraryChanged) setRefresh((n) => n + 1);
+        if (e.type === 'workbench' && e.libraryChanged && !e.tabId) setRefresh((n) => n + 1);
       }),
     [],
   );
+  const refreshed = useRef(refresh);
+  useEffect(() => {
+    if (refreshed.current === refresh) return;
+    refreshed.current = refresh;
+    versionLists.invalidate(tab.id);
+  }, [tab.id, refresh]);
   const allTrashed =
     !!version?.parentId && version.images.length > 0 && !version.images.some((i) => !i.deleted);
   const stageId = tab.versionImageId || (!version?.parentId ? version?.project.id : '') || '';

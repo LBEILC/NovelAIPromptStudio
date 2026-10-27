@@ -66,11 +66,17 @@ export async function runGenerationBenchmark({
     console.log(`Fixture ${index + 1}/${sizes.length}: ${size} versions`);
   }
   const timings = {};
+  let warm300Ms;
   for (const [i, t] of tabs.entries()) {
     if (mode.scenario !== 'A') break;
     const start = performance.now();
     await call('version.list', { tabId: t.id });
     timings[sizes[i]] = performance.now() - start;
+    if (sizes[i] === 300) {
+      const warmStart = performance.now();
+      await call('version.list', { tabId: t.id });
+      warm300Ms = performance.now() - warmStart;
+    }
   }
   if (mode.scenario === 'A') await call('workbench.close', { tabId: tabs[1].id });
   await call('version.open', { tabId: tabs[0].id, versionId: tabs[0].versionId });
@@ -150,6 +156,8 @@ export async function runGenerationBenchmark({
       });
     const perImage = [],
       navigation = [];
+    const jobIds = new Set();
+    const requestStart = generationService.state.requests.length;
     let failure = null;
     try {
       for (let n = 0; n < 20; n++) {
@@ -157,6 +165,8 @@ export async function runGenerationBenchmark({
         const response = await cli('generate.start', { tabId: tabs[0].id, count: 1 });
         const job = response.data;
         if (!job?.id) throw Error('CLI did not return a job id');
+        if (jobIds.has(job.id)) throw Error('CLI returned a duplicate job');
+        jobIds.add(job.id);
         if (job.state === 'pending') await call('generate.confirm', { ids: [job.id] });
         if (n % 2 === 0) {
           navigation.push(
@@ -174,7 +184,7 @@ export async function runGenerationBenchmark({
           '生成完成',
         );
         const done = (await call('generate.status', { id: job.id })).jobs[0];
-        if (done.state !== 'completed') throw Error(JSON.stringify(done));
+        if (done.state !== 'completed' || done.completed !== 1) throw Error(JSON.stringify(done));
         await new Promise((resolve) => setTimeout(resolve, 350));
         const rows = samples.slice(begin);
         perImage.push({
@@ -189,21 +199,32 @@ export async function runGenerationBenchmark({
       failure = String(error);
       console.error(failure);
     }
+    const generatedRequests = generationService.state.requests.length - requestStart;
+    if (!failure && generatedRequests !== 20)
+      failure = `Expected 20 fake requests, got ${generatedRequests}`;
     const longTasks = await e('window.benchObserver.disconnect();window.benchLong');
     const main = await inspector.post('Profiler.stop');
     const web = await renderer.sendCommand('Profiler.stop');
     await fs.writeFile(path.join(mode.output, 'main.cpuprofile'), JSON.stringify(main.profile));
     await fs.writeFile(path.join(mode.output, 'renderer.cpuprofile'), JSON.stringify(web.profile));
+    const orderedNavigation = [...navigation].sort((a, b) => a - b);
+    const middleNavigation = Math.floor(orderedNavigation.length / 2);
+    const navigationMedian =
+      orderedNavigation.length % 2
+        ? orderedNavigation[middleNavigation]
+        : (orderedNavigation[middleNavigation - 1] + orderedNavigation[middleNavigation]) / 2;
     const result = {
       scenario: mode.scenario,
       failure,
       completed: perImage.length,
+      generatedRequests,
       cpu: os.cpus()[0].model,
       timings,
+      warm300Ms,
       rerenderScriptMs,
       perImage,
       navigation,
-      navigationMedian: [...navigation].sort((a, b) => a - b)[Math.floor(navigation.length / 2)],
+      navigationMedian,
       navigationMax: Math.max(...navigation),
       longTaskTotal: longTasks.reduce((a, b) => a + b, 0),
       longTaskMax: Math.max(0, ...longTasks),

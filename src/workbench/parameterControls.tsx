@@ -5,6 +5,7 @@ import { MenuPop, type MenuEntry } from '../kit/menu';
 import { useIndicator } from '../kit/motion';
 import { useNotifications } from '../kit/toast';
 import { errorCode, invokeUI } from '../lib/commands';
+import { useVersionList, readVersions } from '../state/versions';
 import type { CommandTab } from '../shared/commands';
 import { MODEL_CAPS, SAMPLERS, type GenerationSettings, type ModelId } from '../shared/params';
 import type { ImageProject } from '../shared/types';
@@ -79,6 +80,7 @@ export function PromptTabs({
 /** 当前这一版（参数和参考都和它比）；没有账号、没有版本时是原图 */
 export function useBaseProject(tab: CommandTab | null, hasVersions: boolean) {
   const [base, setBase] = useState<{ project: ImageProject; name: string } | null>(null);
+  const versions = useVersionList(tab, hasVersions);
   useEffect(() => {
     if (!tab) return;
     let live = true;
@@ -88,7 +90,7 @@ export function useBaseProject(tab: CommandTab | null, hasVersions: boolean) {
       fallback();
       return;
     }
-    void invokeUI('version.list', { tabId: tab.id })
+    void readVersions(tab.id)
       .then((r) => {
         if (!live) return;
         const v = r.versions.find((x) => x.id === tab.versionId) || r.versions[0];
@@ -103,7 +105,7 @@ export function useBaseProject(tab: CommandTab | null, hasVersions: boolean) {
     return () => {
       live = false;
     };
-  }, [tab?.id, tab?.versionId, hasVersions]);
+  }, [tab?.id, tab?.versionId, hasVersions, versions]);
   return base;
 }
 

@@ -3,6 +3,7 @@
 // 不在免费范围时上面一条横幅说清原因和要花多少，右边一键改回免费尺寸。没有配置账号时只有"生成"，点了引导去设置。
 import { useEffect, useRef, useState } from 'react';
 import { useGeneration } from '../state/generation';
+import { useVersionList } from '../state/versions';
 import { invokeUI } from '../lib/commands';
 import { Icon, Kbd, Seg } from '../kit/controls';
 import { Pop } from '../kit/layer';
@@ -124,6 +125,7 @@ export function GenerationBar({
   proposal?: boolean;
 }) {
   const state = useGeneration();
+  const versionList = useVersionList(tab, state.settings.hasToken);
   const notify = useNotifications();
   const [count, setCount] = useState(1);
   const [countText, setCountText] = useState<string | null>(null);
@@ -144,12 +146,12 @@ export function GenerationBar({
   const w = m?.width || 832,
     h = m?.height || 1216;
   useEffect(() => {
-    if (state.settings.hasToken)
-      void invokeUI('version.list', { tabId: tab.id }).then((r) =>
-        // 空白作品的起点没有图，尺寸菜单里不列"原图"
-        setOriginal(r.versions[0]?.isStart ? null : r.versions[0]?.project.metadata || null),
+    if (versionList)
+      // 空白作品的起点没有图，尺寸菜单里不列"原图"
+      setOriginal(
+        versionList.versions[0]?.isStart ? null : versionList.versions[0]?.project.metadata || null,
       );
-  }, [tab.id, state.settings.hasToken]);
+  }, [versionList]);
   useEffect(() => {
     if (!state.settings.continuous) setContinuous(false);
   }, [state.settings.continuous]);

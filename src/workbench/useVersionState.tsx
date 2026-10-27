@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAsk } from '../kit/dialog';
 import { type MenuEntry } from '../kit/menu';
 import { ms } from '../kit/motion';
@@ -6,6 +6,8 @@ import { useResizable } from '../kit/resize';
 import { useNotifications } from '../kit/toast';
 import { errorCode, errorDetails, invokeUI } from '../lib/commands';
 import { versionDiff } from '../lib/versionDiff';
+import { createVersionDifferenceCache } from '../lib/versionDifferenceCache';
+import { useVersionList, versionLists } from '../state/versions';
 import type { CommandTab } from '../shared/commands';
 import type { WorkOrigin, WorkVersion } from '../shared/generation';
 import { useSharedTrash } from '../shell/SharedTrash';
@@ -23,8 +25,17 @@ type Loaded = {
   origin: WorkOrigin | null;
   derived: { workId: string; source: WorkOrigin }[];
 };
-// 每个标签页最近一次读到的版本：切过去先显示它，不等重新读完（用户 10-26：换了图片，左边还是上一张的分支）
-const versionCache = new Map<string, Loaded>();
+const differenceCaches = new Map<
+  string,
+  ReturnType<typeof createVersionDifferenceCache<ReturnType<typeof versionDiff>>>
+>();
+function differencesFor(tab: string, versions: WorkVersion[]) {
+  const cache = differenceCaches.get(tab) || createVersionDifferenceCache(versionDiff);
+  differenceCaches.delete(tab);
+  differenceCaches.set(tab, cache);
+  if (differenceCaches.size > 64) differenceCaches.delete(differenceCaches.keys().next().value!);
+  return cache.update(versions, promptOf);
+}
 export function useVersionState({
   tab,
   before,
@@ -47,14 +58,18 @@ export function useVersionState({
     storage: 'nps.versions-width',
     label: '版本栏宽度',
   });
-  const [fetched, setLoaded] = useState<Loaded>({
+  const fetched = useVersionList(tab, true, before);
+  const previous = useRef<Loaded>({
     tab: '',
     versions: [],
     origin: null,
     derived: [],
   });
   // 切到没看过的标签页、还没读到之前，先照旧显示，但不拿上一个标签页的版本算"未生成"
-  const loaded = fetched.tab === tab.id ? fetched : versionCache.get(tab.id) || fetched;
+  const loaded = fetched ? { ...fetched, tab: tab.id } : previous.current;
+  useEffect(() => {
+    if (fetched) previous.current = { ...fetched, tab: tab.id };
+  }, [fetched, tab.id]);
   const { versions, origin, derived } = loaded;
   const stale = loaded.tab !== tab.id;
   const [open, setOpen] = useState<string[]>([]);
@@ -71,39 +86,32 @@ export function useVersionState({
     null,
   );
   const peekTimer = useRef(0);
-  useEffect(
-    () =>
-      window.studio?.onCommandEvent((e) => {
-        if (e.type === 'workbench' && e.libraryChanged) setRefresh((n) => n + 1);
-      }),
-    [],
-  );
+  const refreshed = useRef(refresh);
   useEffect(() => {
-    let live = true;
-    void Promise.resolve(before?.())
-      .then(() => invokeUI('version.list', { tabId: tab.id }))
-      .then((r) => {
-        if (!live) return;
-        const next = { tab: tab.id, versions: r.versions, origin: r.origin, derived: r.derived };
-        versionCache.set(tab.id, next);
-        setLoaded(next);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [tab.id, tab.versionId, tab.revision, state.jobs, refresh]);
+    if (refreshed.current === refresh) return;
+    refreshed.current = refresh;
+    versionLists.invalidate(tab.id);
+  }, [tab.id, refresh]);
   useEffect(() => () => clearTimeout(peekTimer.current), []);
   const current = versions.find((v) => v.id === tab.versionId) || versions[0];
   const kids = (id: string) => versions.filter((v) => v.parentId === id);
   const subtree = (v: WorkVersion): WorkVersion[] => [v, ...kids(v.id).flatMap(subtree)];
-  const byId = (id: string | null) => versions.find((v) => v.id === id);
+  const indexed = useMemo(() => new Map(versions.map((v) => [v.id, v])), [versions]);
+  const byId = (id: string | null) => indexed.get(id || '');
   // 原图移入回收站或从作品里去掉以后，第一行是"起点"（1.5.1）
   const name = (v: WorkVersion) =>
     v.isStart || originGone(v) ? '起点' : v.parentId ? `第 ${v.number} 版` : '原图';
   // 局部重绘那一版和上一版比的是这次重绘用的提示词（promptOf）
-  const delta = (v: WorkVersion) =>
-    versionDiff(byId(v.parentId)?.project || v.project, promptOf(v));
+  const differences = useMemo(() => differencesFor(loaded.tab, versions), [loaded.tab, versions]);
+  const leaving = useRef(new WeakMap<WorkVersion, ReturnType<typeof versionDiff>>());
+  const delta = (v: WorkVersion) => {
+    const result =
+      differences.get(v.id) ||
+      leaving.current.get(v) ||
+      versionDiff(byId(v.parentId)?.project || v.project, promptOf(v));
+    leaving.current.set(v, result);
+    return result;
+  };
   const go = async (v: WorkVersion, imageId?: string) => {
     try {
       await before?.();

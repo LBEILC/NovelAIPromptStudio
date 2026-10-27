@@ -8,6 +8,7 @@ import { ToWin, useDismiss } from '../kit/layer';
 import { Icon, Seg } from '../kit/controls';
 import { markLoaded, readMatte, type Matte } from '../kit/alpha';
 import { invokeUI } from '../lib/commands';
+import { readVersions } from '../state/versions';
 import { BlurImg, type BlurImage } from '../kit/blur';
 import { versionDiff } from '../lib/versionDiff';
 import type { WorkVersion } from '../shared/generation';
@@ -72,48 +73,51 @@ export function CompareHost({ tabId }: { tabId: string }) {
     if (!mine) return;
     setData(null);
     let live = true;
-    void invokeUI('version.list', { tabId }).then(async (list) => {
-      const load = async (side: CompareSide): Promise<Loaded | null> => {
-        const version = list.versions.find((v) => v.id === side.versionId);
-        if (!version) return null;
-        const ids = [
-          ...(!version.parentId && !originGone(version) ? [version.project.id] : []),
-          ...version.images.filter((i) => !i.deleted).map((i) => i.projectId),
-        ];
-        const recs = await Promise.all(
-          ids.map((id) =>
-            invokeUI('library.get', { id })
-              .then((x) => x.project as ImageRecord | null)
-              .catch(() => null),
-          ),
-        );
-        return {
-          version,
-          items: ids.map((id, i) => ({
-            id,
-            path:
-              recs[i]?.image_path || (id === version.project.id ? version.project.image_path : ''),
-            image: recs[i] || (id === version.project.id ? version.project : { id }),
-            seed: recs[i]?.metadata?.seed,
-          })),
+    void readVersions(tabId)
+      .then(async (list) => {
+        const load = async (side: CompareSide): Promise<Loaded | null> => {
+          const version = list.versions.find((v) => v.id === side.versionId);
+          if (!version) return null;
+          const ids = [
+            ...(!version.parentId && !originGone(version) ? [version.project.id] : []),
+            ...version.images.filter((i) => !i.deleted).map((i) => i.projectId),
+          ];
+          const recs = await Promise.all(
+            ids.map((id) =>
+              invokeUI('library.get', { id })
+                .then((x) => x.project as ImageRecord | null)
+                .catch(() => null),
+            ),
+          );
+          return {
+            version,
+            items: ids.map((id, i) => ({
+              id,
+              path:
+                recs[i]?.image_path ||
+                (id === version.project.id ? version.project.image_path : ''),
+              image: recs[i] || (id === version.project.id ? version.project : { id }),
+              seed: recs[i]?.metadata?.seed,
+            })),
+          };
         };
-      };
-      const [a, b] = await Promise.all([load(mine.a), load(mine.b)]);
-      if (!live) return;
-      if (!a || !b) return set(null);
-      setData({
-        a,
-        b,
-        ai: Math.max(
-          0,
-          a.items.findIndex((x) => x.id === mine.a.imageId),
-        ),
-        bi: Math.max(
-          0,
-          b.items.findIndex((x) => x.id === mine.b.imageId),
-        ),
-      });
-    });
+        const [a, b] = await Promise.all([load(mine.a), load(mine.b)]);
+        if (!live) return;
+        if (!a || !b) return set(null);
+        setData({
+          a,
+          b,
+          ai: Math.max(
+            0,
+            a.items.findIndex((x) => x.id === mine.a.imageId),
+          ),
+          bi: Math.max(
+            0,
+            b.items.findIndex((x) => x.id === mine.b.imageId),
+          ),
+        });
+      })
+      .catch(() => {});
     return () => {
       live = false;
     };

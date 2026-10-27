@@ -10,6 +10,7 @@ import { BlurImg } from '../kit/blur';
 import { workbenchTabHasChanges } from '../lib/workbenchSession.js';
 import { nearestTabSlot } from '../lib/tabSlots.js';
 import { useGeneration } from '../state/generation';
+import { useVersionCounts } from '../state/versions';
 import { Icon } from '../kit/controls';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
 import { Pop } from '../kit/layer';
@@ -45,7 +46,7 @@ const midEll = (s: string, max: number) =>
 export function WorkbenchTabs(p: TabsProps) {
   const generation = useGeneration();
   const list = useRef<HTMLDivElement>(null);
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const counts = useVersionCounts(p.session.tabs, generation.settings.hasToken);
   const [menu, setMenu] = useState<{ at: [number, number]; tab: WorkbenchTab | null } | null>(null);
   const [peek, setPeek] = useState('');
   const [lifted, setLifted] = useState('');
@@ -76,31 +77,6 @@ export function WorkbenchTabs(p: TabsProps) {
     if (d && me)
       me.style.transform = `translateX(${d.want - me.offsetLeft}px) scale(var(--drag-scale))`;
   });
-  // 版数（有账号时才有版本）；删除版本、撤销、从回收站恢复不改标签页的 revision，跟着 libraryChanged 再数一遍
-  const revisions = p.session.tabs.map((t) => `${t.id}:${t.revision}`).join('|');
-  const [changed, setChanged] = useState(0);
-  useEffect(
-    () =>
-      window.studio?.onCommandEvent((e) => {
-        if (e.type === 'workbench' && e.libraryChanged) setChanged((n) => n + 1);
-      }),
-    [],
-  );
-  useEffect(() => {
-    if (!generation.settings.hasToken) return;
-    let live = true;
-    for (const t of p.session.tabs)
-      void invokeUI('version.list', { tabId: t.id })
-        .then((r) => {
-          // 空白作品的起点不算一版
-          const n = r.versions.filter((v) => !v.isStart).length;
-          if (live) setCounts((c) => (c[t.id] === n ? c : { ...c, [t.id]: n }));
-        })
-        .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [revisions, changed, generation.jobs.length, generation.settings.hasToken]);
   // 放不下时两头出现翻页按钮
   useLayoutEffect(() => {
     const el = list.current;

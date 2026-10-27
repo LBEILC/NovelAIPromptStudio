@@ -29,6 +29,7 @@ import { createWorkbenchTab } from '../../src/lib/workbenchSession.js';
 import { createPromptDocument } from '../../src/lib/promptDocument.ts';
 import { CommandError } from './registry.js';
 import { versionDiff, diffSummary } from '../../src/lib/versionDiff.ts';
+import { createVersionDifferenceCache } from '../../src/lib/versionDifferenceCache.ts';
 import { recordUsageRequest, localDay } from '../usage.js';
 import { buildDirector, estimateDirector, validateDirector } from '../director.js';
 
@@ -50,6 +51,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   const preferences = services.preferences;
   if (!preferences) return { handlers: {}, close: () => {} };
   const versions = services.database.versions;
+  // Bound retained works while keeping each work's immutable summaries across reads.
+  const summaryCaches = new Map();
   const usage = services.database.usage;
   const pools = () => services.database.materials.list().filter((p) => p.kind === 'pool');
   let shuttingDown = false;
@@ -1431,12 +1434,17 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       const current = tab(input.tabId),
         parent = await ensure(current),
         list = versions.list(parent.workId);
+      const cache =
+        summaryCaches.get(parent.workId) ||
+        createVersionDifferenceCache((before, after) => diffSummary(versionDiff(before, after)));
+      summaryCaches.delete(parent.workId);
+      summaryCaches.set(parent.workId, cache);
+      if (summaryCaches.size > 64) summaryCaches.delete(summaryCaches.keys().next().value);
+      const summaries = cache.update(list);
       return {
         versions: list.map((v) => ({
           ...v,
-          summary: diffSummary(
-            versionDiff(list.find((p) => p.id === v.parentId)?.project || v.project, v.project),
-          ),
+          summary: summaries.get(v.id),
         })),
         origin: versions.work(parent.workId).source,
         derived: versions.derived(parent.workId),
