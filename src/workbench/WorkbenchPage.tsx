@@ -58,7 +58,7 @@ export default function WorkbenchPage(p: WorkbenchPageProps) {
   const rz = useResizable(prompt, {
     key: 'prompt',
     edge: 'left',
-    min: () => ms('--prompt-min-w') || 440,
+    min: () => ms('--prompt-min-w') || 464,
     max: () =>
       Math.max(
         ms('--prompt-w'),
