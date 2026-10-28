@@ -4,6 +4,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { extractFile } from '@electron/asar';
 import { verifyHelperIcons } from './mac-helper-icons.mjs';
+import { runStapler } from './macos-stapler.mjs';
 
 const run = (command, args) => {
   const result = spawnSync(command, args, { encoding: 'utf8' });
@@ -30,7 +31,7 @@ async function verify(app) {
   const assessment = run('spctl', ['-a', '-vvv', '-t', 'exec', app]);
   if (!assessment.includes('source=Notarized Developer ID'))
     throw Error('Missing notarized Developer ID assessment');
-  run('xcrun', ['stapler', 'validate', app]);
+  await runStapler('validate', app);
   const metadata = JSON.parse(
     extractFile(path.join(app, 'Contents/Resources/app.asar'), 'package.json').toString(),
   );

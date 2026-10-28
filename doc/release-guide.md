@@ -189,6 +189,10 @@ git push origin main refs/tags/v0.3.0
 gh workflow run release.yml --ref <待验证分支>
 ```
 
+补齐已有 Release 的 Intel 附件时使用 `gh workflow run release.yml --ref main -f intel_tag=v1.9.8`（替换为目标标签）。此模式只运行 Intel 作业：产品源码和依赖来自原标签，公证、票据重试及上传脚本来自触发工作流的提交，不修改标签，也不重传 Windows 或 arm64 安装包。
+
+macOS 签名完成后由 `scripts/notarize-macos.mjs` 的 `afterSign` 钩子提交公证；electron-builder 内置公证关闭。获得 Accepted 后才执行 staple 和 validate，成功后再生成 DMG/ZIP。票据操作遇到网络错误最多尝试五次，间隔 15、30、60、120 秒；重试不会重新提交公证。签名校验、Gatekeeper 和最终 ZIP 内的票据校验仍必须通过。
+
 ### MiSans 缓存与标签
 
 CI 和发版使用完全相同的缓存键（版本与 SHA-256）、`.local/fonts/MiSansVF.ttf` 路径以及 `enableCrossOsArchive: true`。根据 [GitHub 缓存作用域规则](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching)，标签运行可以回退读取默认分支 `main` 的缓存，不能读取其他功能分支或其他标签的缓存；相同键还必须匹配缓存版本（路径和压缩方式）。

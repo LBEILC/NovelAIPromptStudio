@@ -3,14 +3,20 @@ name: Package and release
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      intel_tag:
+        description: 'Append only Intel assets to an existing release (for example v1.9.8)'
+        required: false
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   package:
+    if: ${{ !inputs.intel_tag }}
     name: Package ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -86,7 +92,7 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Verify macOS signatures, notarization tickets, and ZIP
         if: runner.os == 'macOS'
@@ -118,6 +124,19 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.intel_tag && format('refs/tags/{0}', inputs.intel_tag) || github.ref }}
+
+      - name: Check out release tooling from the workflow commit
+        if: inputs.intel_tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tooling
+
+      - name: Overlay only notarization and upload tooling
+        if: inputs.intel_tag
+        run: node .release-tooling/scripts/overlay-intel-tooling.mjs
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -129,8 +148,10 @@ jobs:
         run: npm ci
 
       - name: Verify release tag
-        if: github.ref_type == 'tag'
-        run: node scripts/verify-release-tag.mjs "${{ github.ref_name }}"
+        if: github.ref_type == 'tag' || inputs.intel_tag
+        env:
+          RELEASE_TAG: ${{ inputs.intel_tag || github.ref_name }}
+        run: node scripts/verify-release-tag.mjs "$RELEASE_TAG"
 
       - name: Restore pinned MiSans VF
         id: misans-cache
@@ -160,7 +181,7 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Verify macOS signatures, notarization tickets, and ZIP
         if: runner.os == 'macOS'
@@ -190,11 +211,11 @@ jobs:
           if-no-files-found: error
 
       - name: Append Intel assets to the published release
-        if: github.event_name == 'push' && github.ref_type == 'tag'
+        if: (github.event_name == 'push' && github.ref_type == 'tag') || inputs.intel_tag
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.intel_tag || github.ref_name }}
         run: node scripts/append-intel-release.mjs "$RELEASE_TAG" release
 
       - name: Report Intel failure without blocking the release

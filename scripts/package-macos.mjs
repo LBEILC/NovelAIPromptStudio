@@ -48,6 +48,8 @@ try {
       '--',
       '--mac',
       arch,
+      '-c.mac.notarize=false',
+      '-c.afterSign=scripts/notarize-macos.mjs',
       `-c.forceCodeSigning=${signed}`,
       `-c.mac.hardenedRuntime=${signed}`,
       `-c.extraMetadata.macSignedAndNotarized=${signed}`,
