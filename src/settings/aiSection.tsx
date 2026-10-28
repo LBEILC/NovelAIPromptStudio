@@ -7,7 +7,7 @@ import { useAISettings } from '../state/ai';
 import { ChatGPTAccount } from './ChatGPT';
 import { copySecret } from './copySecret';
 import { Col, Dropdown, Row, SetPage, Swap, errorText } from './parts';
-import { Fail, KeychainBanner } from './sectionShared';
+import { Fail, KeychainBanner, ReplaceButton } from './sectionShared';
 
 // ---------- AI 服务 ----------
 export function AI() {
@@ -23,7 +23,8 @@ export function AI() {
   const store = a.settings.secretStore;
   const denied = store === 'denied';
   const keyBad = a.settings.hasApiKey && a.settings.apiKeyReadable === false;
-  const keyEdit = !safe || !a.settings.hasApiKey || replacing;
+  // 钥匙串被拒绝时这次存不进新的（106：不再退回只在这次有效），已保存的那一行显示"无法读取"、更换停用
+  const keyEdit = (!safe && !denied) || !a.settings.hasApiKey || replacing;
   const pick = !a.modelsError && (a.models.length > 0 || (!!a.settings.model && !manual));
   const models = [...new Set([a.settings.model, ...a.models].filter(Boolean))];
   const t = a.testResult;
@@ -157,7 +158,7 @@ export function AI() {
                 safe
                   ? '加密后保存在这台电脑上，软件不保存明文'
                   : denied
-                    ? '钥匙串没有授权，现在填写只在这次使用中有效；重新打开软件并允许后，原来保存的 Key 还在'
+                    ? '钥匙串没有授权，这次存不进新的；重新打开软件并允许后，原来保存的 Key 还在'
                     : '系统加密不可用，填写后只在这次使用中有效，关闭软件后需要重新填写'
               }
             >
@@ -206,9 +207,7 @@ export function AI() {
                           </button>
                         </>
                       )}
-                      <button className="btn sm" onClick={() => setReplacing(true)}>
-                        更换
-                      </button>
+                      <ReplaceButton store={store} onClick={() => setReplacing(true)} />
                     </>
                   )}
                 </div>

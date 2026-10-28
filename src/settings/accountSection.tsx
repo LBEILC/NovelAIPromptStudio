@@ -4,10 +4,9 @@ import { useAsk } from '../kit/dialog';
 import { useNotifications } from '../kit/toast';
 import { invokeUI } from '../lib/commands';
 import { MODEL_CAPS, MODEL_ORDER, type ModelId } from '../shared/params';
-import type { SecretStore } from '../shared/types';
 import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, errorText } from './parts';
-import { Fail, KeychainBanner } from './sectionShared';
+import { Fail, KeychainBanner, ReplaceButton } from './sectionShared';
 import { copySecret } from './copySecret';
 import { Usage } from './usageSection';
 
@@ -415,24 +414,6 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
         />
       )}
     </>
-  );
-}
-
-/** 已保存密钥的"更换"。钥匙串被拒绝时这次存不进新的，按钮停用并说明（1.9.5） */
-function ReplaceButton({ store, onClick }: { store?: SecretStore; onClick: () => void }) {
-  return store === 'denied' ? (
-    <button
-      className="btn sm is-off"
-      aria-disabled
-      data-tip="钥匙串没有授权，这次存不进新的。重新打开软件并允许后再更换"
-      onClick={() => {}}
-    >
-      更换
-    </button>
-  ) : (
-    <button className="btn sm" onClick={onClick}>
-      更换
-    </button>
   );
 }
 

@@ -23,3 +23,21 @@ export const KeychainBanner = ({ store }: { store?: SecretStore }) =>
       </span>
     </div>
   ) : null;
+
+/** 已保存密钥的"更换"。钥匙串被拒绝时这次存不进新的，按钮停用并说明（1.9.5） */
+export function ReplaceButton({ store, onClick }: { store?: SecretStore; onClick: () => void }) {
+  return store === 'denied' ? (
+    <button
+      className="btn sm is-off"
+      aria-disabled
+      data-tip="钥匙串没有授权，这次存不进新的。重新打开软件并允许后再更换"
+      onClick={() => {}}
+    >
+      更换
+    </button>
+  ) : (
+    <button className="btn sm" onClick={onClick}>
+      更换
+    </button>
+  );
+}
