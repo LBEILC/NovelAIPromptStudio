@@ -498,6 +498,9 @@ textarea.para-in { resize: none; overflow: hidden; }
 .bk-done .btn { flex: 0 0 auto; }
 /* 中转站（2.33）："测试连接"的结果写在按钮上面 */
 .relay-result { color: var(--text-2); }
+/* 地址栏下面：生成请求最终发到的地址，长地址在任意处换行（1.9.7） */
+.setcol .relay-endpoint { overflow-wrap: anywhere; }
+.setcol .relay-endpoint .mono { color: var(--text-2); }
 /* 恢复备份后找不到原图（1.7.0）：卡片左下角、详情栏大图下沿一枚小标记，样子同"已在图片库" */
 .lmissing { position: absolute; left: var(--sp-1); bottom: var(--sp-1); display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1); border-radius: var(--r-ctl); background: var(--surface); color: var(--warn); font-size: var(--fs-small); line-height: var(--lh-small); pointer-events: auto; }
 .libp .detail .pic .pmissing { position: static; align-self: end; justify-self: start; margin: 0 0 var(--sp-1) var(--sp-1); }

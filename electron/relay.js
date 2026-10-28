@@ -1,25 +1,7 @@
+import { resolveRelayEndpoints } from '../src/shared/relay.ts';
+
 export function normalizeRelayUrl(value) {
-  const invalid = () => {
-    throw new Error('中转站地址无效，要以 https:// 开头，不能带 ? 或 #');
-  };
-  try {
-    const url = new URL(String(value).trim());
-    const pathname = url.pathname.replace(/\/+$/, '').replace(/\/v1$/, '').replace(/\/+$/, '');
-    if (
-      url.href.includes('?') ||
-      url.href.includes('#') ||
-      url.username ||
-      url.password ||
-      !(
-        url.protocol === 'https:' ||
-        (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
-      )
-    )
-      invalid();
-    return url.origin + pathname;
-  } catch {
-    return invalid();
-  }
+  return resolveRelayEndpoints(value).address;
 }
 
 export function checkRelayRequest(settings, request, pendingEncodes = 0) {

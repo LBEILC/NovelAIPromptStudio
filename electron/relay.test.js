@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { normalizeRelayUrl, checkRelayRequest } from './relay.js';
 import { createNovelAIClient, buildGenerationRequest } from './generation.js';
 import { startFakeNovelAI } from './fixtures/novelAIService.js';
+import { resolveRelayEndpoints } from '../src/shared/relay.ts';
+import yazl from 'yazl';
 
 describe('relay boundary', () => {
   const request = () =>
@@ -9,6 +11,93 @@ describe('relay boundary', () => {
       { width: 832, height: 1216, steps: 28, scale: 5, sampler: 'k_euler_ancestral' },
       'nai-diffusion-5-full',
     );
+  it.each([
+    ['', '', '', true],
+    ['/v1/', '', '', true],
+    ['/novelai', '/novelai', '/novelai', true],
+    ['/v1/ai/generate-image', '/v1/ai/generate-image', '/v1', false],
+    ['/v1/ai/generate-image-stream/', '/v1/ai/generate-image-stream', '/v1', true],
+  ])('resolves complete endpoints for %s', (input, address, prefix, stream) => {
+    const origin = 'https://example.com';
+    expect(resolveRelayEndpoints(origin + input)).toEqual({
+      address: origin + address,
+      generate:
+        origin + (address.includes('/ai/') ? address : address + '/ai/generate-image-stream'),
+      stream,
+      upscale: origin + prefix + '/ai/upscale',
+      encodeVibe: origin + prefix + '/ai/encode-vibe',
+      models:
+        prefix === '/v1'
+          ? [origin + '/v1/models', origin + '/v1/v1/models']
+          : [origin + prefix + '/v1/models'],
+    });
+  });
+  it.each([false, true])('sends complete generation endpoints (stream=%s)', async (stream) => {
+    const png = Buffer.from('89504e470d0a1a0a', 'hex');
+    const zip = new yazl.ZipFile();
+    zip.addBuffer(png, 'synthetic.png');
+    zip.end();
+    const chunks = [];
+    for await (const chunk of zip.outputStream) chunks.push(chunk);
+    const calls = [];
+    const baseUrl = 'https://example.com/v1/ai/generate-image' + (stream ? '-stream' : '');
+    const client = createNovelAIClient({
+      connection: 'relay',
+      baseUrl,
+      token: () => 'synthetic-key',
+      fetchImpl: async (url, options) => {
+        calls.push({ url: url.href, ...options });
+        return options.method === 'GET'
+          ? Response.json({ data: [] })
+          : new Response(Buffer.concat(chunks));
+      },
+    });
+    const input = request();
+    input.parameters.stream = 'sse';
+    expect(await client.generate(input)).toEqual(png);
+    expect(calls[0].url).toBe(baseUrl);
+    expect(calls[0].method).toBe('POST');
+    const parameters = JSON.parse(calls[0].body).parameters;
+    if (stream) expect(parameters.stream).toBe('sse');
+    else expect(parameters).not.toHaveProperty('stream');
+    await client.models();
+    expect(calls[1].url).toBe('https://example.com/v1/models');
+    await client.upscale({ image: 'synthetic-image' });
+    await client.encodeVibe({});
+    expect(calls.slice(2).map((call) => call.url)).toEqual([
+      'https://example.com/v1/ai/upscale',
+      'https://example.com/v1/ai/encode-vibe',
+    ]);
+  });
+  it.each([404, 403])('tries the next model endpoint after %s', async (status) => {
+    const urls = [];
+    let unavailable = false;
+    const client = createNovelAIClient({
+      connection: 'relay',
+      baseUrl: 'https://example.com/v1/ai/generate-image',
+      token: () => 'synthetic-key',
+      fetchImpl: async (url) => {
+        urls.push(url.href);
+        return unavailable || urls.length === 1
+          ? Response.json({ error: 'model does not exist' }, { status })
+          : Response.json({ data: [{ id: 'nai-diffusion-5-full' }] });
+      },
+    });
+    expect((await client.models()).models).toEqual(['nai-diffusion-5-full']);
+    expect(urls).toEqual(['https://example.com/v1/models', 'https://example.com/v1/v1/models']);
+    unavailable = true;
+    expect(await client.models()).toBeNull();
+    expect(urls.length).toBe(4);
+  });
+  it('removes the extra space from relay request errors', async () => {
+    const client = createNovelAIClient({
+      connection: 'relay',
+      baseUrl: 'https://example.com',
+      token: () => 'synthetic-key',
+      fetchImpl: async () => Response.json({ error: 'Invalid URL' }, { status: 400 }),
+    });
+    await expect(client.generate(request())).rejects.toThrow('中转站拒绝了这次请求：Invalid URL');
+  });
   it.each([
     ['/novelai', '/novelai'],
     ['/novelai/', '/novelai'],

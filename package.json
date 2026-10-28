@@ -1,6 +1,6 @@
 {
   "name": "novelai-prompt-studio",
-  "version": "1.9.6",
+  "version": "1.9.7",
   "private": true,
   "type": "module",
   "description": "A local-first asset and prompt manager for NovelAI Diffusion V4/V4.5.",
@@ -85,6 +85,7 @@
       "electron/**/*",
       "src/lib/**/*",
       "src/shared/params.ts",
+      "src/shared/relay.ts",
       "src/shared/inpaint.ts",
       "src/shared/outpaint.ts",
       "src/shared/nsfw.ts",

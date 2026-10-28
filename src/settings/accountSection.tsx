@@ -4,6 +4,7 @@ import { useAsk } from '../kit/dialog';
 import { useNotifications } from '../kit/toast';
 import { invokeUI } from '../lib/commands';
 import { MODEL_CAPS, MODEL_ORDER, type ModelId } from '../shared/params';
+import { resolveRelayEndpoints } from '../shared/relay';
 import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, errorText } from './parts';
 import { Fail, KeychainBanner, ReplaceButton } from './sectionShared';
@@ -290,11 +291,18 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
         : '没读到这个中转站有哪些模型，所有模型都可以选；它没有的会在生成时报错'
       : '';
   const tip = !url.trim() ? '先填地址' : !ready ? '先填 Key' : undefined;
+  // 地址栏下面写清生成请求最终发到哪里，和主进程用同一个解析（issue 9 之后，1.9.7）
+  let target: ReturnType<typeof resolveRelayEndpoints> | null = null;
+  try {
+    target = url.trim() ? resolveRelayEndpoints(url) : null;
+  } catch {
+    target = null;
+  }
   return (
     <>
       <Col
         title="地址"
-        help="中转站给的接口地址，例如 https://api.example.com，带路径的照原样填写，末尾的 /v1 可以不写。"
+        help="中转站给的地址，例如 https://api.example.com；给的是以 /ai/generate-image 结尾的完整地址就照原样粘贴。"
       >
         <label className="field sm mono set-key">
           <input
@@ -310,6 +318,18 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
             onKeyDown={(e) => !e.nativeEvent.isComposing && e.key === 'Enter' && void save()}
           />
         </label>
+        {url.trim() && (
+          <small className="relay-endpoint">
+            {target ? (
+              <>
+                生成请求会发到 <span className="mono">{target.generate}</span>
+                {!target.stream && '，生成时没有进度预览'}
+              </>
+            ) : (
+              '地址无效：要以 https:// 开头，不能带 ? 或 #'
+            )}
+          </small>
+        )}
       </Col>
       <Col title="Key" help="中转站给的 Key。加密后保存在这台电脑上，软件不保存明文。">
         <Swap k={`key-${keyEdit}`}>

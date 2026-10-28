@@ -1,6 +1,6 @@
 import { INPAINT_MODELS } from '../src/shared/inpaint.ts';
 import crypto from 'node:crypto';
-import { normalizeRelayUrl } from './relay.js';
+import { resolveRelayEndpoints } from '../src/shared/relay.ts';
 import { MODEL_ORDER } from '../src/shared/params.ts';
 import yauzl from 'yauzl';
 import { extractDirectorPngs, DIRECTOR_ZIP_LIMITS } from './directorZip.js';
@@ -370,7 +370,8 @@ export function createNovelAIClient({
   baseUrl = 'https://image.novelai.net',
   fetchImpl = fetch,
 }) {
-  const url = new URL(connection === 'relay' ? normalizeRelayUrl(baseUrl) : baseUrl);
+  const relay = connection === 'relay' ? resolveRelayEndpoints(baseUrl) : null;
+  const url = new URL(relay ? relay.address : baseUrl);
   if (
     connection !== 'relay' &&
     url.origin !== 'https://image.novelai.net' &&
@@ -385,7 +386,7 @@ export function createNovelAIClient({
           ? '中转站没有这个模型'
           : status === 401 || status === 403
             ? `中转站拒绝了 Key${reason ? `：${reason}` : ''}`
-            : error.message.replaceAll('NovelAI', '中转站');
+            : error.message.replace(/NovelAI\s*/g, '中转站');
     }
     return error;
   };
@@ -417,7 +418,6 @@ export function createNovelAIClient({
     try {
       secret = await token();
       const requestUrl = new URL(endpoint, url);
-      if (connection === 'relay') requestUrl.pathname = url.pathname.replace(/\/+$/, '') + endpoint;
       const response = await fetchImpl(requestUrl, {
         method: body ? 'POST' : 'GET',
         redirect: 'error',
@@ -469,16 +469,20 @@ export function createNovelAIClient({
     },
     models: async () => {
       let response;
-      try {
-        response = await send('/v1/models');
-      } catch (error) {
-        if (
-          error.status === 404 ||
-          (error.status === 403 && error.message === '中转站没有这个模型')
-        )
-          return null;
-        throw error;
+      for (const endpoint of relay?.models ?? ['/v1/models']) {
+        try {
+          response = await send(endpoint);
+          break;
+        } catch (error) {
+          if (
+            error.status === 404 ||
+            (error.status === 403 && error.message === '中转站没有这个模型')
+          )
+            continue;
+          throw error;
+        }
       }
+      if (!response) return null;
       const body = await response.json().catch(() => null);
       if (!Array.isArray(body?.data)) return null;
       const ids = [...new Set(body.data.map((m) => m.id).filter((id) => typeof id === 'string'))];
@@ -492,10 +496,12 @@ export function createNovelAIClient({
       };
     },
     encodeVibe: async (body) =>
-      Buffer.from(await (await send('/ai/encode-vibe', body)).arrayBuffer()).toString('base64'),
+      Buffer.from(
+        await (await send(relay?.encodeVibe ?? '/ai/encode-vibe', body)).arrayBuffer(),
+      ).toString('base64'),
     upscale: async (request) =>
       imageResponse(
-        await send('/ai/upscale', {
+        await send(relay?.upscale ?? '/ai/upscale', {
           image: request.image,
           model: 'nai-diffusion-5-curated',
           declared_blur_sigma: 0,
@@ -505,9 +511,12 @@ export function createNovelAIClient({
     generate: async (request, onProgress = () => {}) => {
       const normalized = normalizeVibeParameters(request.parameters);
       validateGenerationRequest(request);
-      const response = await send('/ai/generate-image-stream', {
+      const parameters = { ...normalized };
+      if (relay?.stream === false) delete parameters.stream;
+      else parameters.stream = 'sse';
+      const response = await send(relay?.generate ?? '/ai/generate-image-stream', {
         ...request,
-        parameters: { ...normalized, stream: 'sse' },
+        parameters,
       });
       if (!response.headers.get('content-type')?.includes('text/event-stream'))
         return imageResponse(response);
