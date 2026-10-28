@@ -389,11 +389,36 @@ export function createNovelAIClient({
     }
     return error;
   };
+  const responseSecrets = new WeakMap();
+  async function imageResponse(response) {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer[0] !== 0x50 || buffer[1] !== 0x4b) {
+      let body;
+      try {
+        body = JSON.parse(buffer.toString('utf8'));
+      } catch {
+        body = null;
+      }
+      const reason = serverReason(body, responseSecrets.get(response));
+      throw new Error(
+        connection === 'relay'
+          ? reason
+            ? `中转站没有返回图片：${reason}。请检查中转站地址是否完整`
+            : '中转站没有返回图片，请检查中转站地址是否完整'
+          : reason
+            ? `NovelAI 没有返回图片：${reason}`
+            : '生成结果不是有效的 ZIP',
+      );
+    }
+    return extractGeneratedPng(buffer);
+  }
   async function send(endpoint, body) {
     let secret;
     try {
       secret = await token();
-      const response = await fetchImpl(new URL(endpoint, url), {
+      const requestUrl = new URL(endpoint, url);
+      if (connection === 'relay') requestUrl.pathname = url.pathname.replace(/\/+$/, '') + endpoint;
+      const response = await fetchImpl(requestUrl, {
         method: body ? 'POST' : 'GET',
         redirect: 'error',
         headers: {
@@ -407,6 +432,7 @@ export function createNovelAIClient({
         const body = await response.json().catch(() => null);
         throw errorFor(response.status, serverReason(body, secret));
       }
+      responseSecrets.set(response, secret);
       return response;
     } catch (error) {
       // Only the bounded, redacted server reason may reach the UI.
@@ -468,16 +494,12 @@ export function createNovelAIClient({
     encodeVibe: async (body) =>
       Buffer.from(await (await send('/ai/encode-vibe', body)).arrayBuffer()).toString('base64'),
     upscale: async (request) =>
-      extractGeneratedPng(
-        Buffer.from(
-          await (
-            await send('/ai/upscale', {
-              image: request.image,
-              model: 'nai-diffusion-5-curated',
-              declared_blur_sigma: 0,
-            })
-          ).arrayBuffer(),
-        ),
+      imageResponse(
+        await send('/ai/upscale', {
+          image: request.image,
+          model: 'nai-diffusion-5-curated',
+          declared_blur_sigma: 0,
+        }),
       ),
     subscription: async () => (await send('/user/subscription')).json(),
     generate: async (request, onProgress = () => {}) => {
@@ -488,7 +510,7 @@ export function createNovelAIClient({
         parameters: { ...normalized, stream: 'sse' },
       });
       if (!response.headers.get('content-type')?.includes('text/event-stream'))
-        return extractGeneratedPng(Buffer.from(await response.arrayBuffer()));
+        return imageResponse(response);
       const secret = await token();
       let pending = '',
         final;

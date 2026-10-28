@@ -1,14 +1,13 @@
 export function normalizeRelayUrl(value) {
   const invalid = () => {
-    throw new Error('地址要写成 https://example.com 这样，不带路径');
+    throw new Error('中转站地址无效，要以 https:// 开头，不能带 ? 或 #');
   };
   try {
     const url = new URL(String(value).trim());
-    const pathname = url.pathname.replace(/\/+$/, '').replace(/\/v1$/, '');
+    const pathname = url.pathname.replace(/\/+$/, '').replace(/\/v1$/, '').replace(/\/+$/, '');
     if (
-      pathname ||
-      url.search ||
-      url.hash ||
+      url.href.includes('?') ||
+      url.href.includes('#') ||
       url.username ||
       url.password ||
       !(
@@ -17,7 +16,7 @@ export function normalizeRelayUrl(value) {
       )
     )
       invalid();
-    return url.origin;
+    return url.origin + pathname;
   } catch {
     return invalid();
   }

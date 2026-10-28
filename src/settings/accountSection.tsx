@@ -294,7 +294,7 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
     <>
       <Col
         title="地址"
-        help="中转站给的接口地址，例如 https://api.example.com，末尾的 /v1 可以不写。"
+        help="中转站给的接口地址，例如 https://api.example.com，带路径的照原样填写，末尾的 /v1 可以不写。"
       >
         <label className="field sm mono set-key">
           <input
