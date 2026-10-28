@@ -51,6 +51,7 @@ it.each(kinds)(
     storage.decryptString.mockImplementation(() => {
       throw Error('synthetic-secret');
     });
+    preferences.refreshSecretStore();
     expect(copySecret(kind, preferences, clipboard)).toEqual({
       ok: false,
       error: `读不出已保存的${name}，请重新填写`,

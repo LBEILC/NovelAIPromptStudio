@@ -900,6 +900,8 @@ function valid(value, type) {
         introShown: 'boolean',
         hasApiKey: 'boolean',
         encryptionAvailable: 'boolean',
+        secretStore: 'ok|denied|unreadable',
+        apiKeyReadable: 'boolean',
       },
       appearanceSettings: {
         themeMode: 'auto|dark|light',

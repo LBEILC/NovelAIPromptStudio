@@ -120,7 +120,9 @@ export function createGenerationQueue({
                   job.errorDetails = error.details;
                 }
               } finally {
-                if (balance)
+                // Secret failures happen before a request is sent. Keep any earlier
+                // completed images' spend, without making this attempt unknown.
+                if (balance && !['secret_denied', 'secret_unreadable'].includes(job.errorCode))
                   try {
                     const after = await balance();
                     if (Number.isFinite(before) && Number.isFinite(after))

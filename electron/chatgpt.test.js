@@ -59,6 +59,21 @@ const expire = () =>
   });
 
 describe('ChatGPT authorization and credentials', () => {
+  it('can sign in again after a saved login becomes unreadable', async () => {
+    await login();
+    const stored = JSON.parse(fs.readFileSync(preferences.filePath, 'utf8'));
+    stored.chatGPTEncrypted.official = safe.encryptString('invalid-json').toString('base64');
+    fs.writeFileSync(preferences.filePath, JSON.stringify(stored));
+    expect(preferences.publicSettings()).toMatchObject({
+      secretStore: 'unreadable',
+      chatgpt: { readable: false, signedIn: false },
+    });
+    await login();
+    expect(preferences.publicSettings()).toMatchObject({
+      secretStore: 'ok',
+      chatgpt: { readable: true, signedIn: true },
+    });
+  });
   it('uses fresh PKCE/state/nonce and registers once, preserving encrypted host/client across logout', async () => {
     const a = createPKCE(),
       b = createPKCE();

@@ -61,6 +61,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   const balance = () =>
     Number(subscription?.trainingStepsLeft?.fixedTrainingStepsLeft || 0) +
     Number(subscription?.trainingStepsLeft?.purchasedTrainingSteps || 0);
+  const secretReadable = (s) =>
+    s.secretStore !== 'denied' &&
+    (s.connection === 'relay' ? s.relayKeyReadable !== false : s.officialTokenReadable !== false);
   const client = () =>
     createNovelAIClient({
       token: settings().connection === 'relay' ? preferences.relayKey : preferences.novelAIToken,
@@ -227,6 +230,10 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       });
     },
     prepare: async (job) => {
+      // Fail before reference encoding or usage tracking, preserving the typed
+      // secret error in the queue even when the balance could not be fetched.
+      if (settings().connection === 'relay') preferences.relayKey();
+      else preferences.novelAIToken();
       Object.assign(job, await storage.hydrate(job));
       // Persist before any paid reference encoding or image request. Pending jobs
       // reach this point only after confirmation; closed tabs are supported too.
@@ -830,7 +837,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     const s = settings();
     if (s.connection === 'relay' && s.limitEnabled && s.spentImagesToday + 1 > s.dailyImageLimit)
       throw new Error('已达到每日张数上限');
-    if (s.connection !== 'relay' && balance() < price.anlas) throw new Error('Anlas 不足');
+    if (s.connection !== 'relay' && secretReadable(s) && balance() < price.anlas)
+      throw new Error('Anlas 不足');
     if (kind === 'inpaint')
       operation.maskId = await storeInpaintMask(
         input.mask,
@@ -1037,7 +1045,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         s.spentImagesToday + steps.length > s.dailyImageLimit
       )
         throw new Error('已达到每日张数上限');
-      if (s.connection !== 'relay' && balance() < price.anlas) throw new Error('Anlas 不足');
+      if (s.connection !== 'relay' && secretReadable(s) && balance() < price.anlas)
+        throw new Error('Anlas 不足');
       const operation = {
         kind: 'outpaint',
         sourceProjectId: input.imageId,
@@ -1354,7 +1363,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         s.spentImagesToday + input.count > s.dailyImageLimit
       )
         throw new Error('已达到每日张数上限');
-      if (s.connection !== 'relay' && balance() < (input.continuous ? price.perImage : price.anlas))
+      if (
+        s.connection !== 'relay' &&
+        secretReadable(s) &&
+        balance() < (input.continuous ? price.perImage : price.anlas)
+      )
         throw new Error('Anlas 不足');
       const parent = await ensure(current);
       return queue.start({

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openPreferences } from './preferences.js';
 
 const temporaryDirectories = [];
@@ -327,4 +327,142 @@ describe('tray preferences', () => {
     expect(reopened.productivitySettings()).not.toHaveProperty('trayNoticeShown');
     expect(() => p.saveProductivitySettings({ closeAction: 'invalid' })).toThrow();
   });
+});
+
+describe('secret store health', () => {
+  const secrets = [
+    [
+      'token',
+      (p) => p.novelAIToken(),
+      (p) => p.saveNovelAIToken('synthetic-token'),
+      (p) => p.generationSettings().officialTokenReadable,
+    ],
+    [
+      'relay',
+      (p) => p.relayKey(),
+      (p) => p.saveRelay({ baseUrl: 'https://example.com', key: 'synthetic-relay' }),
+      (p) => p.generationSettings().relayKeyReadable,
+    ],
+    [
+      'api',
+      (p) => p.aiApiKey(),
+      (p) => p.saveAISettings({ apiKey: 'synthetic-api' }),
+      (p) => p.publicSettings().apiKeyReadable,
+    ],
+    [
+      'chatgpt',
+      (p) => p.chatGPTRecord('official'),
+      (p) => p.saveChatGPTRecord('official', { accessToken: 'synthetic-login' }),
+      (p) => p.publicSettings().chatgpt.readable,
+    ],
+  ];
+  it.each(['ok', 'denied', 'unreadable'])(
+    '%s: all secrets, recovery and unchanged ciphertext',
+    (state) => {
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-secrets-'));
+      temporaryDirectories.push(directory);
+      const original = openPreferences(directory, safeStorage, { platform: 'darwin' });
+      secrets.forEach(([, , save]) => save(original));
+      const before = fs.readFileSync(original.filePath, 'utf8');
+      let broken = state !== 'ok';
+      const storage = {
+        ...safeStorage,
+        isEncryptionAvailable: () => state !== 'denied',
+        decryptString: vi.fn((bytes) => {
+          if (broken) throw Error('synthetic failure');
+          return safeStorage.decryptString(bytes);
+        }),
+      };
+      const p = openPreferences(directory, storage, { platform: 'darwin' });
+      expect(p.generationSettings().secretStore).toBe(state);
+      expect(p.publicSettings().secretStore).toBe(state);
+      const probes = storage.decryptString.mock.calls.length;
+      for (const [, read, save, readable] of secrets) {
+        expect(readable(p)).toBe(state === 'ok');
+        if (state === 'ok') expect(read(p)).toBeTruthy();
+        else {
+          try {
+            read(p);
+            throw Error('did not reject');
+          } catch (error) {
+            expect(error.code).toBe(`secret_${state}`);
+          }
+        }
+        if (state === 'denied') expect(() => save(p)).toThrow('钥匙串没有允许');
+      }
+      expect(storage.decryptString.mock.calls.length).toBe(probes);
+      expect(fs.readFileSync(original.filePath, 'utf8')).toBe(before);
+      if (state === 'unreadable') {
+        broken = false;
+        for (const [, read, save, readable] of secrets) {
+          save(p);
+          expect(readable(p)).toBe(true);
+          expect(read(p)).toBeTruthy();
+        }
+        expect(p.publicSettings().secretStore).toBe('ok');
+      }
+      const restarted = openPreferences(directory, safeStorage, { platform: 'darwin' });
+      expect(restarted.publicSettings().secretStore).toBe('ok');
+      secrets.forEach(([, read]) => expect(read(restarted)).toBeTruthy());
+    },
+  );
+  it('isolates an unreadable secret and probes only changed ciphertext', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-secrets-'));
+    temporaryDirectories.push(directory);
+    const original = openPreferences(directory, safeStorage);
+    secrets.forEach(([, , save]) => save(original));
+    const decryptString = vi.fn((bytes) => {
+      if (bytes.toString().includes('synthetic-relay')) throw Error('corrupt');
+      return safeStorage.decryptString(bytes);
+    });
+    const p = openPreferences(directory, { ...safeStorage, decryptString });
+    expect(p.generationSettings()).toMatchObject({
+      secretStore: 'unreadable',
+      officialTokenReadable: true,
+      relayKeyReadable: false,
+    });
+    expect(p.publicSettings()).toMatchObject({ apiKeyReadable: true, chatgpt: { readable: true } });
+    p.saveAppearanceSettings({ themeMode: 'dark' });
+    p.publicSettings();
+    p.generationSettings();
+    expect(decryptString).toHaveBeenCalledTimes(4);
+    p.saveNovelAIToken('replacement');
+    p.publicSettings();
+    p.generationSettings();
+    expect(decryptString).toHaveBeenCalledTimes(5);
+  });
+  it.each(['win32', 'linux'])('keeps the session API key fallback on %s', (platform) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-secrets-'));
+    temporaryDirectories.push(directory);
+    const p = openPreferences(
+      directory,
+      { ...safeStorage, isEncryptionAvailable: () => false },
+      { platform },
+    );
+    p.saveAISettings({ apiKey: 'session-only' });
+    expect(p.aiApiKey()).toBe('session-only');
+    expect(p.publicSettings()).toMatchObject({ secretStore: 'ok', encryptionAvailable: false });
+    expect(() => p.saveNovelAIToken('synthetic')).toThrow('当前系统无法安全加密');
+  });
+  it.each(['official', 'codex'])(
+    'checks the %s login even when the other mode is selected',
+    (mode) => {
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-secrets-'));
+      temporaryDirectories.push(directory);
+      const p = openPreferences(directory, safeStorage);
+      p.saveChatGPTRecord(mode, { accessToken: 'synthetic-login' });
+      const broken = openPreferences(directory, {
+        ...safeStorage,
+        decryptString: () => {
+          throw Error('corrupt');
+        },
+      });
+      expect(broken.publicSettings().secretStore).toBe('unreadable');
+      expect(() => broken.chatGPTRecord(mode)).toThrow(
+        expect.objectContaining({ code: 'secret_unreadable' }),
+      );
+      broken.clearChatGPTRecord(mode);
+      expect(broken.publicSettings().secretStore).toBe('ok');
+    },
+  );
 });

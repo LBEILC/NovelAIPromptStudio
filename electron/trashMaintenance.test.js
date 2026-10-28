@@ -13,7 +13,11 @@ import { deleteLibraryImages } from './deleteLibraryImages.js';
 async function fixture(run) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-trash-maintenance-'));
   const database = await openDatabase(directory);
-  const preferences = openPreferences(directory, {}, { defaultAssetsDirectory: directory });
+  const preferences = openPreferences(
+    directory,
+    { isEncryptionAvailable: () => false },
+    { defaultAssetsDirectory: directory },
+  );
   const sql = new DatabaseSync(database.filePath);
   const image = (id, age, file = id) => {
     const project = {

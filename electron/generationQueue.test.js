@@ -1,6 +1,6 @@
 ﻿import { it, expect, vi } from 'vitest';
 import { createGenerationQueue } from './generationQueue.js';
-import { validateCommand } from './commands/registry.js';
+import { CommandError, validateCommand } from './commands/registry.js';
 
 const input = (count = 1) => ({ count, request: { parameters: { seed: 1 } }, fixedSeed: true });
 
@@ -143,3 +143,23 @@ it('restricts every queue mutation to UI callers', () => {
   }
   expect(validateCommand('generate.status', {}, 'agent')).toBe('generate.status');
 });
+
+it.each(['secret_denied', 'secret_unreadable'])(
+  'records %s with zero known spend before sending',
+  async (code) => {
+    const balance = vi.fn(async () => {
+      throw new CommandError(code, 'synthetic secret failure');
+    });
+    const generate = vi.fn(async () => {
+      throw new CommandError(code, 'synthetic secret failure');
+    });
+    const accept = vi.fn();
+    const queue = createGenerationQueue({ balance, generate, accept });
+    const job = queue.start(input());
+    await vi.waitFor(() => expect(queue.status(job.id).state).toBe('failed'));
+    expect(queue.status(job.id)).toMatchObject({ errorCode: code, spentKnown: true, spent: 0 });
+    expect(balance).toHaveBeenCalledTimes(1);
+    expect(accept).not.toHaveBeenCalled();
+    await queue.close();
+  },
+);

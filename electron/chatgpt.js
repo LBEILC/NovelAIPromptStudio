@@ -1,5 +1,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
+import { CommandError } from './commands/registry.js';
+import { SECRET_DENIED_MESSAGE } from './preferences.js';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
   authError,
@@ -120,6 +122,8 @@ export function createChatGPT({
   }
   async function signIn() {
     if (pending) throw authError('conflict', '已有登录正在等待');
+    if (preferences.publicSettings().secretStore === 'denied')
+      throw new CommandError('secret_denied', SECRET_DENIED_MESSAGE);
     if (!preferences.publicSettings().encryptionAvailable)
       throw authError('unavailable', '当前系统无法安全加密登录令牌');
     const m = mode(),
@@ -130,7 +134,13 @@ export function createChatGPT({
     const timeout = setTimeout(() => controller.abort(), loginTimeout);
     let server;
     try {
-      let old = get(m);
+      let old;
+      try {
+        old = get(m);
+      } catch (error) {
+        if (error.code !== 'secret_unreadable') throw error;
+        old = {};
+      }
       if (!old.hostId) {
         old = { ...old, hostId: `urn:uuid:${crypto.randomUUID()}` };
         save(m, old);

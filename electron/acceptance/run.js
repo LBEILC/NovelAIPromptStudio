@@ -34,6 +34,7 @@ import { preserveClipboard } from './clipboard.js';
 import { cardCacheChecks } from './cardCache.js';
 import { agentChecks } from './agent.js';
 import { generationChecks } from './generation.js';
+import { secretStoreChecks } from './secretStore.js';
 import { inpaintChecks } from './inpaint.js';
 import { outpaintChecks } from './outpaint.js';
 import { imageOperationChecks } from './imageOperations.js';
@@ -459,6 +460,7 @@ export async function runAcceptance(context) {
       else if (mode.category === 'Agent') await agentChecks(environment);
       else if (mode.category === '作品共用') await workSharingChecks(environment);
       else if (mode.category === '生成') await generationChecks(environment);
+      else if (mode.category === '密钥存储') await secretStoreChecks(environment);
       else if (mode.category === '局部重绘与扩图') {
         await inpaintChecks(environment);
         await outpaintChecks(environment);
@@ -538,6 +540,7 @@ export async function runAcceptance(context) {
           () => interactionCorrectionChecks(environment),
           () => agentChecks(environment),
           () => generationChecks(environment),
+          () => secretStoreChecks(environment),
           () => imageOperationChecks(environment),
           () => workSharingChecks(environment),
           () => backupChecks(environment),

@@ -115,7 +115,7 @@ app.whenReady().then(async () => {
           new X509Certificate(request.certificate.data).fingerprint256 === fingerprint;
         callback(accepted ? 0 : -3);
       });
-    const preferences = openPreferences(root, {});
+    const preferences = openPreferences(root, { isEncryptionAvailable: () => false });
     const network = createNetworkManager({
       session: business,
       updaterSession,
@@ -145,7 +145,11 @@ app.whenReady().then(async () => {
         'synthetic-network-response',
     );
     check('两个会话都抵达假代理', connects >= beforeConnects + 2);
-    check('代理配置已独立持久化', openPreferences(root, {}).networkSettings().port === proxyPort);
+    check(
+      '代理配置已独立持久化',
+      openPreferences(root, { isEncryptionAvailable: () => false }).networkSettings().port ===
+        proxyPort,
+    );
     await network.save({ ...manual, protocol: 'socks5', port: socksPort });
     check(
       'SOCKS5 请求成功',

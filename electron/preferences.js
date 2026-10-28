@@ -6,6 +6,17 @@ import { normalizeRelayUrl } from './relay.js';
 import { normalizeNetworkSettings } from './network.js';
 import path from 'node:path';
 import { DEFAULT_BASE_URL, normalizeBaseUrl } from './translation.js';
+import { CommandError } from './commands/registry.js';
+
+export const SECRET_DENIED_MESSAGE =
+  '钥匙串没有允许本软件读取已保存的密钥。退出并重新打开软件，系统询问时选"始终允许"。';
+const SECRET_MESSAGES = {
+  novelAITokenEncrypted: '已保存的持久令牌无法读取，请在"设置 → NovelAI 账号"里更换。',
+  relayKeyEncrypted: '已保存的中转站 Key 无法读取，请在"设置 → NovelAI 账号"里更换。',
+  aiApiKeyEncrypted: '已保存的 API Key 无法读取，请在"设置 → AI 服务"里重新填写。',
+  // TODO(design): Confirm the command-side ChatGPT recovery copy.
+  chatGPT: '已保存的 ChatGPT 登录信息无法读取，请在"设置 → AI 服务"里重新登录。',
+};
 
 const APPEARANCE_DEFAULTS = Object.freeze({
   themeMode: 'auto',
@@ -82,6 +93,12 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
   const existedAtStartup = fs.existsSync(filePath);
   let sessionApiKey = '';
   let chatGPT;
+  const secretCache = new Map();
+  const platform = options.platform || process.platform;
+  const denied = () => platform === 'darwin' && !safeStorage.isEncryptionAvailable();
+  const assertSecretAccess = () => {
+    if (denied()) throw new CommandError('secret_denied', SECRET_DENIED_MESSAGE);
+  };
   const defaultAssetsDirectory = path.resolve(
     options.defaultAssetsDirectory || path.join(dataDirectory, '..', 'assets'),
   );
@@ -100,29 +117,82 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     fs.renameSync(temporaryPath, filePath);
   };
 
-  const decryptKey = (preferences) => {
-    if (sessionApiKey) return sessionApiKey;
-    if (!preferences.aiApiKeyEncrypted) return '';
-    try {
-      return safeStorage.decryptString(Buffer.from(preferences.aiApiKeyEncrypted, 'base64'));
-    } catch {
-      throw new Error('无法解密已保存的 API Key，请重新保存');
+  function secretEntry(key, encrypted, json = false) {
+    const cached = secretCache.get(key);
+    if (cached && cached.encrypted === encrypted) return cached;
+    const entry = { encrypted, value: json ? {} : '', readable: true };
+    if (encrypted) {
+      try {
+        assertSecretAccess();
+        const value = safeStorage.decryptString(Buffer.from(encrypted, 'base64'));
+        entry.value = json ? JSON.parse(value) : value;
+        if (json && (!entry.value || typeof entry.value !== 'object' || Array.isArray(entry.value)))
+          throw new Error('Invalid saved login');
+      } catch {
+        entry.readable = false;
+        entry.value = json ? {} : '';
+      }
     }
+    secretCache.set(key, entry);
+    return entry;
+  }
+  function readSecret(key, encrypted, json = false) {
+    assertSecretAccess();
+    const entry = secretEntry(key, encrypted, json);
+    if (!entry.readable) {
+      if (platform !== 'darwin' && !safeStorage.isEncryptionAvailable()) {
+        if (json) return {};
+        const name = {
+          novelAITokenEncrypted: '持久令牌',
+          relayKeyEncrypted: '中转站 Key',
+          aiApiKeyEncrypted: 'API Key',
+        }[key];
+        throw new Error(`无法解密已保存的${name === 'API Key' ? ' ' : ''}${name}，请重新保存`);
+      }
+      throw new CommandError('secret_unreadable', SECRET_MESSAGES[json ? 'chatGPT' : key]);
+    }
+    return json ? structuredClone(entry.value) : entry.value;
+  }
+  function secretStatus(preferences = read()) {
+    const entries = Object.keys(SECRET_MESSAGES)
+      .filter((key) => key !== 'chatGPT')
+      .map((key) => secretEntry(key, preferences[key]));
+    for (const mode of ['official', 'codex'])
+      entries.push(secretEntry(`chatGPT:${mode}`, preferences.chatGPTEncrypted?.[mode], true));
+    if (!safeStorage.isEncryptionAvailable()) return platform === 'darwin' ? 'denied' : 'ok';
+    return entries.some((entry) => !entry.readable) ? 'unreadable' : 'ok';
+  }
+  const refreshSecretStore = () => {
+    secretCache.clear();
+    return secretStatus();
+  };
+
+  const decryptKey = (preferences) => {
+    assertSecretAccess();
+    if (sessionApiKey) return sessionApiKey;
+    return readSecret('aiApiKeyEncrypted', preferences.aiApiKeyEncrypted);
   };
 
   const publicSettings = () => {
     const preferences = read();
     const mode = preferences.codexMode ? 'codex' : 'official';
-    const account = chatGPTRecord(mode);
+    const secretStore = secretStatus(preferences);
+    const login = secretEntry(`chatGPT:${mode}`, preferences.chatGPTEncrypted?.[mode], true);
+    const account = login.value;
     return {
       baseUrl: preferences.aiBaseUrl || DEFAULT_BASE_URL,
       model: preferences.aiModel || '',
       hasApiKey: Boolean(sessionApiKey || preferences.aiApiKeyEncrypted),
       encryptionAvailable: safeStorage.isEncryptionAvailable(),
+      secretStore,
+      apiKeyReadable:
+        Boolean(sessionApiKey) ||
+        secretEntry('aiApiKeyEncrypted', preferences.aiApiKeyEncrypted).readable,
       provider:
         preferences.aiProvider ||
         (sessionApiKey || preferences.aiApiKeyEncrypted ? 'apiKey' : 'chatgpt'),
       chatgpt: {
+        readable: login.readable,
         mode,
         signedIn: Boolean(account.accessToken),
         email: account.email || null,
@@ -143,20 +213,17 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
 
   function chatGPTRecord(mode) {
     const encrypted = read().chatGPTEncrypted?.[mode];
-    if (!encrypted) return {};
-    try {
-      return JSON.parse(safeStorage.decryptString(Buffer.from(encrypted, 'base64')));
-    } catch {
-      return {};
-    }
+    return readSecret(`chatGPT:${mode}`, encrypted, true);
   }
   function saveChatGPTRecord(mode, record) {
     if (!['official', 'codex'].includes(mode)) throw new Error('登录方式无效');
+    assertSecretAccess();
     if (!safeStorage.isEncryptionAvailable()) throw new Error('当前系统无法安全加密登录令牌');
     const encrypted = safeStorage.encryptString(JSON.stringify(record)).toString('base64');
     const stored = read();
     stored.chatGPTEncrypted = { ...stored.chatGPTEncrypted, [mode]: encrypted };
     write(stored);
+    secretCache.delete(`chatGPT:${mode}`);
   }
 
   const resolveFont = (value, fallback) => {
@@ -274,11 +341,13 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       delete preferences.aiApiKeyEncrypted;
     }
     if (typeof apiKey === 'string' && apiKey.trim()) {
+      assertSecretAccess();
       if (!safeStorage.isEncryptionAvailable()) {
         sessionApiKey = apiKey.trim();
         delete preferences.aiApiKeyEncrypted;
       } else {
         preferences.aiApiKeyEncrypted = safeStorage.encryptString(apiKey.trim()).toString('base64');
+        secretCache.delete('aiApiKeyEncrypted');
         sessionApiKey = '';
       }
     }
@@ -354,7 +423,9 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     return productivitySettings();
   };
 
+  refreshSecretStore();
   return {
+    refreshSecretStore,
     backup: () => portablePreferences(read()),
     restoreBackup: (value) => write(mergePortablePreferences(read(), value)),
     onboardingSettings: (hasExistingData = () => false) => {
@@ -377,35 +448,27 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       return {};
     },
     novelAIToken: () => {
-      const value = read().novelAITokenEncrypted;
-      if (!value) return '';
-      try {
-        return safeStorage.decryptString(Buffer.from(value, 'base64'));
-      } catch {
-        throw new Error('无法解密已保存的持久令牌，请重新保存');
-      }
+      return readSecret('novelAITokenEncrypted', read().novelAITokenEncrypted);
     },
     saveNovelAIToken: (token) => {
+      assertSecretAccess();
       if (!safeStorage.isEncryptionAvailable()) throw new Error('当前系统无法安全加密持久令牌');
       const stored = read();
       stored.novelAITokenEncrypted = safeStorage.encryptString(token).toString('base64');
       write(stored);
+      secretCache.delete('novelAITokenEncrypted');
     },
     relayKey: () => {
-      const value = read().relayKeyEncrypted;
-      if (!value) return '';
-      try {
-        return safeStorage.decryptString(Buffer.from(value, 'base64'));
-      } catch {
-        throw new Error('无法解密已保存的中转站 Key，请重新保存');
-      }
+      return readSecret('relayKeyEncrypted', read().relayKeyEncrypted);
     },
     saveRelay: ({ baseUrl, key, models }) => {
       const stored = read();
       stored.relayBaseUrl = normalizeRelayUrl(baseUrl);
       if (key !== undefined) {
+        assertSecretAccess();
         if (!safeStorage.isEncryptionAvailable()) throw new Error('当前系统无法安全加密 Key');
         stored.relayKeyEncrypted = safeStorage.encryptString(key.trim()).toString('base64');
+        secretCache.delete('relayKeyEncrypted');
       }
       stored.relayModels = models ?? null;
       write(stored);
@@ -432,6 +495,10 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       limitEnabled: false,
       dailyLimit: 100,
       ...(read().generation || {}),
+      secretStore: secretStatus(),
+      officialTokenReadable: secretEntry('novelAITokenEncrypted', read().novelAITokenEncrypted)
+        .readable,
+      relayKeyReadable: secretEntry('relayKeyEncrypted', read().relayKeyEncrypted).readable,
     }),
     saveGenerationSettings: (next) => {
       if (
@@ -455,7 +522,8 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     chatGPTRecord,
     saveChatGPTRecord,
     clearChatGPTRecord: (mode) => {
-      const old = chatGPTRecord(mode),
+      assertSecretAccess();
+      const old = secretEntry(`chatGPT:${mode}`, read().chatGPTEncrypted?.[mode], true).value,
         stored = read();
       if (old.clientId || old.hostId) {
         saveChatGPTRecord(mode, {
