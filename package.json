@@ -159,6 +159,7 @@
       "createStartMenuShortcut": true
     },
     "beforePack": "scripts/font-before-pack.mjs",
+    "afterPack": "scripts/mac-helper-icons.mjs",
     "asarUnpack": [
       "node_modules/koffi/**/*",
       "node_modules/@koromix/**/*",
