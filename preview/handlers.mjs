@@ -815,15 +815,6 @@ export function createPreviewHandlers({
     }
   });
 
-  registerCommand('library.restore', (input, _event) => {
-    const ids = input.ids;
-    try {
-      const results = database.updateProjects(ids, { deleted: false });
-      return { ok: true, results, summary: batchSummary(results) };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
   registerCommand('trash.delete-permanently', async (input, _event) => {
     const ids = input.ids || [];
     if (storageMigrationActive) return { ok: false, error: '资源库正在迁移，请稍候' };

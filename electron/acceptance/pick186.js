@@ -62,6 +62,10 @@ export async function pick186Checks({ h, preferences, mode, database }) {
   const imageId = version.images[1].projectId;
   const image = () => call('library.get', { id: imageId });
   await h.until(async () => !!(await image()).project.deleted_at, '挑图移入回收站');
+  // Wait for the deleted version to reach the shared cache before undoing it.
+  await h.wait(
+    `document.querySelector('[data-key="ths-${version.id}"]')?.querySelectorAll('img').length===2`,
+  );
   await h.click('撤销', toastRoot);
   await h.until(async () => !(await image()).project.deleted_at, '挑图撤销恢复');
   // The undo callback reloads the picker after the database restore finishes.

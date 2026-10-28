@@ -424,6 +424,16 @@ export async function createCommands(services) {
       emit({ libraryChanged: true });
       return { project: project(input.id), revision: store.revision() };
     },
+    'library.restore': async (input) => {
+      try {
+        const results = services.database.updateProjects(input.ids, { deleted: false });
+        await store.bump();
+        emit({ libraryChanged: true });
+        return { ok: true, results, summary: summary(results) };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
     'library.trash': async (input) => {
       revision(input.expectedRevision, store.revision());
       if (source() === 'agent') input.ids.forEach(project);

@@ -457,6 +457,22 @@ it('rolls image and version deletion back when pruning or session persistence fa
     }
   }));
 
+it('invalidates cached library data before returning a restore result', () =>
+  fixture(async ({ call, database, append, events }) => {
+    const { tab } = await call('workbench.new');
+    const leaf = append(tab.workId, tab.versionId, 'restore-cache');
+    const id = leaf.images[0].projectId;
+    database.updateProjects([id], { deleted: true });
+    events.length = 0;
+    const result = await call('library.restore', { ids: [id] }, 'ui');
+    expect(result.ok).toBe(true);
+    expect(result.results.success).toEqual([id]);
+    expect(database.loadProject(id).deleted_at).toBe('');
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: 'workbench', libraryChanged: true }),
+    );
+  }));
+
 it('can trash images while an unrelated tab has no version tree yet', () =>
   fixture(async ({ call, database, append, store }) => {
     const { tab } = await call('workbench.new');
