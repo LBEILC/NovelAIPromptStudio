@@ -553,7 +553,7 @@ export interface CommandDefinitions {
   'account.relay.save': { input: { baseUrl: string; key?: string }; output: GenerationStatus };
   'account.relay.test': {
     input: { baseUrl?: string; key?: string };
-    output: IPC.Result<{ models: string[]; other: string[] }>;
+    output: IPC.Result<{ models: string[] | null; other: string[] }>;
   };
   'account.refresh': { input: Record<string, never>; output: GenerationStatus };
   'settings.generation.save': {

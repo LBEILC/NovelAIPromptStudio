@@ -1,3 +1,4 @@
+import { decode } from '@msgpack/msgpack';
 import { INPAINT_MODELS } from '../src/shared/inpaint.ts';
 import crypto from 'node:crypto';
 import { resolveRelayEndpoints } from '../src/shared/relay.ts';
@@ -232,21 +233,21 @@ export function estimateGeneration(request, subscription, count = 1, pendingEnco
   return { anlas, perImage, free: anlas === 0, count, parts };
 }
 
-export function generationError(status, reason = '') {
+export function generationError(status, reason = '', source = 'NovelAI') {
   if (status === 401) return '持久令牌无效，请在设置里更换';
   if (status === 402) return 'Anlas 不足';
   if (status === 429) return '请求太频繁，请稍后再试';
   if (status >= 500) {
     const message =
       status === 502 || status === 504
-        ? 'NovelAI 暂时无法访问'
+        ? `${source} 暂时无法访问`
         : status === 503
-          ? 'NovelAI 服务繁忙'
-          : 'NovelAI 服务器出错';
+          ? `${source} 服务繁忙`
+          : `${source} 服务器出错`;
     return `${message}（HTTP ${status}）${reason ? `：${reason}` : status === 503 ? '，请稍后再试' : ''}`;
   }
-  if (status >= 400) return `NovelAI 拒绝了这次请求${reason ? `：${reason}` : ''}`;
-  return '无法连接到 NovelAI，请检查网络';
+  if (status >= 400) return `${source} 拒绝了这次请求${reason ? `：${reason}` : ''}`;
+  return `无法连接到 ${source}，请检查网络`;
 }
 
 function httpError(status, reason) {
@@ -386,32 +387,169 @@ export function createNovelAIClient({
           ? '中转站没有这个模型'
           : status === 401 || status === 403
             ? `中转站拒绝了 Key${reason ? `：${reason}` : ''}`
-            : error.message.replace(/NovelAI\s*/g, '中转站');
+            : generationError(status, reason, '中转站').replace(/^中转站 /, '中转站');
     }
     return error;
   };
   const responseSecrets = new WeakMap();
-  async function imageResponse(response) {
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer[0] !== 0x50 || buffer[1] !== 0x4b) {
-      let body;
-      try {
-        body = JSON.parse(buffer.toString('utf8'));
-      } catch {
-        body = null;
+  async function imageResponse(response, steps = 1, onProgress = () => {}) {
+    const secret = responseSecrets.get(response);
+    const reader = response.body?.[Symbol.asyncIterator]();
+    let current = Buffer.alloc(0);
+    const read = async (size) => {
+      const chunks = [];
+      let length = 0;
+      while (length < size) {
+        if (!current.length) {
+          const next = reader ? await reader.next() : { done: true };
+          if (next.done) break;
+          current = Buffer.from(next.value);
+          if (!current.length) continue;
+        }
+        const take = Math.min(size - length, current.length);
+        chunks.push(current.subarray(0, take));
+        current = current.subarray(take);
+        length += take;
       }
-      const reason = serverReason(body, responseSecrets.get(response));
-      throw new Error(
-        connection === 'relay'
-          ? reason
-            ? `中转站没有返回图片：${reason}。请检查中转站地址是否完整`
-            : '中转站没有返回图片，请检查中转站地址是否完整'
-          : reason
-            ? `NovelAI 没有返回图片：${reason}`
-            : '生成结果不是有效的 ZIP',
-      );
+      return Buffer.concat(chunks, length);
+    };
+    const rest = async function* () {
+      if (current.length) yield current;
+      current = Buffer.alloc(0);
+      if (reader) {
+        let next;
+        while (!(next = await reader.next()).done) yield Buffer.from(next.value);
+      }
+    };
+    const isPng = (value) => value.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
+    let final;
+    const consumeValue = (value, type = value?.event_type) => {
+      if (type === 'error')
+        throw errorFor(
+          Number(value.status || value.status_code) || 500,
+          serverReason(value, secret),
+        );
+      if (type === 'intermediate' && Number.isFinite(value.step_ix))
+        onProgress(Math.max(0, Math.min(1, value.step_ix / steps)));
+      if (type === 'final' && value.image) final = Buffer.from(value.image, 'base64');
+    };
+    try {
+      const prefix = await read(8);
+      const contentType = response.headers.get('content-type') || '';
+      if (
+        contentType.includes('text/event-stream') ||
+        /^(data:|event:|:)/.test(prefix.toString('utf8'))
+      ) {
+        let pending = '';
+        const decoder = new TextDecoder();
+        const consume = (frame) => {
+          const lines = frame.split('\n');
+          const data = lines
+            .filter((line) => line.startsWith('data:'))
+            .map((line) => line.slice(5).trimStart())
+            .join('\n');
+          if (!data || data === '[DONE]') return;
+          const value = JSON.parse(data);
+          consumeValue(
+            value,
+            value.event_type ||
+              lines
+                .find((line) => line.startsWith('event:'))
+                ?.slice(6)
+                .trim(),
+          );
+        };
+        const append = (text) => {
+          // Normalize after concatenation so CRLF split across chunks also works.
+          pending = (pending + text).replace(/\r\n/g, '\n');
+          let end;
+          while ((end = pending.indexOf('\n\n')) >= 0) {
+            consume(pending.slice(0, end));
+            pending = pending.slice(end + 2);
+          }
+        };
+        try {
+          append(decoder.decode(prefix, { stream: true }));
+          for await (const chunk of rest()) append(decoder.decode(chunk, { stream: true }));
+          append(decoder.decode());
+          if (pending.trim()) consume(pending);
+        } catch (error) {
+          if (error.safe) throw error;
+          throw new Error('无法读取生成结果');
+        }
+      } else if (
+        prefix.length >= 5 &&
+        prefix.readUInt32BE(0) > 0 &&
+        ((prefix[4] >= 0x80 && prefix[4] <= 0x8f) || prefix[4] === 0xde || prefix[4] === 0xdf)
+      ) {
+        // A map marker identifies a framed response; reject oversized first frames too.
+        if (prefix.readUInt32BE(0) > 100 * 1024 * 1024) throw new Error('无法读取生成结果');
+        current = Buffer.concat([prefix, current]);
+        try {
+          while (true) {
+            const header = await read(4);
+            if (!header.length) break;
+            if (header.length !== 4) throw Error();
+            const size = header.readUInt32BE(0);
+            if (!size || size > 100 * 1024 * 1024) throw Error();
+            const payload = await read(size);
+            if (payload.length !== size) throw Error();
+            const value = decode(payload);
+            if (
+              !value ||
+              typeof value !== 'object' ||
+              Array.isArray(value) ||
+              value instanceof Uint8Array
+            )
+              throw Error();
+            consumeValue(value);
+          }
+        } catch (error) {
+          if (error.safe) throw error;
+          throw new Error('无法读取生成结果');
+        }
+      } else {
+        const chunks = [prefix];
+        for await (const chunk of rest()) chunks.push(chunk);
+        const buffer = Buffer.concat(chunks);
+        if (prefix.subarray(0, 4).toString('hex') === '504b0304')
+          final = await extractGeneratedPng(buffer);
+        else if (isPng(prefix)) final = buffer;
+        else {
+          let body;
+          let json = false;
+          try {
+            body = JSON.parse(buffer.toString('utf8'));
+            json = true;
+          } catch {
+            /* Not JSON. */
+          }
+          const reason = serverReason(body, secret);
+          const source = connection === 'relay' ? '中转站' : 'NovelAI';
+          if (json)
+            throw new Error(
+              connection === 'relay'
+                ? reason
+                  ? `中转站没有返回图片：${reason}。请检查中转站地址是否完整`
+                  : '中转站没有返回图片，请检查中转站地址是否完整'
+                : reason
+                  ? `NovelAI 没有返回图片：${reason}`
+                  : '生成结果不是有效的 ZIP',
+            );
+          const safeType = serverReason({ message: contentType }, secret) || '没有 content-type';
+          const hex = buffer.subarray(0, 16).toString('hex').match(/../g)?.join(' ') || '';
+          throw new Error(
+            `${source}返回的内容无法识别（HTTP ${response.status}，${safeType}，开头 ${hex}）`,
+          );
+        }
+      }
+      if (!final) throw new Error('生成结果没有 PNG');
+      if (!isPng(final)) final = await extractGeneratedPng(final);
+      onProgress(1);
+      return final;
+    } finally {
+      await reader?.return?.();
     }
-    return extractGeneratedPng(buffer);
   }
   async function send(endpoint, body) {
     let secret;
@@ -468,11 +606,12 @@ export function createNovelAIClient({
       return extractDirectorPngs(Buffer.concat(chunks));
     },
     models: async () => {
-      let response;
+      let body;
       for (const endpoint of relay?.models ?? ['/v1/models']) {
         try {
-          response = await send(endpoint);
-          break;
+          const response = await send(endpoint);
+          body = await response.json().catch(() => null);
+          if (Array.isArray(body?.data)) break;
         } catch (error) {
           if (
             error.status === 404 ||
@@ -482,8 +621,6 @@ export function createNovelAIClient({
           throw error;
         }
       }
-      if (!response) return null;
-      const body = await response.json().catch(() => null);
       if (!Array.isArray(body?.data)) return null;
       const ids = [...new Set(body.data.map((m) => m.id).filter((id) => typeof id === 'string'))];
       return {
@@ -518,60 +655,7 @@ export function createNovelAIClient({
         ...request,
         parameters,
       });
-      if (!response.headers.get('content-type')?.includes('text/event-stream'))
-        return imageResponse(response);
-      const secret = await token();
-      let pending = '',
-        final;
-      const decoder = new TextDecoder();
-      const consume = (frame) => {
-        const data = frame
-          .split('\n')
-          .filter((line) => line.startsWith('data:'))
-          .map((line) => line.slice(5).trimStart())
-          .join('\n');
-        if (!data || data === '[DONE]') return;
-        let value;
-        try {
-          value = JSON.parse(data);
-        } catch {
-          throw new Error('无法读取生成结果');
-        }
-        const type =
-          value.event_type ||
-          frame
-            .split('\n')
-            .find((line) => line.startsWith('event:'))
-            ?.slice(6)
-            .trim();
-        if (type === 'error')
-          throw errorFor(
-            Number(value.status || value.status_code) || 500,
-            serverReason(value, secret),
-          );
-        if (type === 'intermediate' && Number.isFinite(value.step_ix))
-          onProgress(Math.max(0, Math.min(1, value.step_ix / request.parameters.steps)));
-        if (type === 'final' && value.image) final = Buffer.from(value.image, 'base64');
-      };
-      try {
-        for await (const chunk of response.body) {
-          pending += decoder.decode(chunk, { stream: true }).replace(/\r\n/g, '\n');
-          let end;
-          while ((end = pending.indexOf('\n\n')) >= 0) {
-            consume(pending.slice(0, end));
-            pending = pending.slice(end + 2);
-          }
-        }
-        if (pending.trim()) consume(pending);
-      } catch (error) {
-        if (error.safe) throw error;
-        throw new Error('无法读取生成结果');
-      }
-      if (!final) throw new Error('生成结果没有 PNG');
-      if (final.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a')
-        return extractGeneratedPng(final);
-      onProgress(1);
-      return final;
+      return imageResponse(response, request.parameters.steps, onProgress);
     },
   };
 }

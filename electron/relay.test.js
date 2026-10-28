@@ -26,10 +26,14 @@ describe('relay boundary', () => {
       stream,
       upscale: origin + prefix + '/ai/upscale',
       encodeVibe: origin + prefix + '/ai/encode-vibe',
-      models:
-        prefix === '/v1'
-          ? [origin + '/v1/models', origin + '/v1/v1/models']
-          : [origin + prefix + '/v1/models'],
+      models: [
+        ...new Set([
+          ...(prefix === '/v1'
+            ? [origin + '/v1/models', origin + '/v1/v1/models']
+            : [origin + prefix + '/v1/models']),
+          origin + '/v1/models',
+        ]),
+      ],
     });
   });
   it.each([false, true])('sends complete generation endpoints (stream=%s)', async (stream) => {
@@ -148,11 +152,13 @@ describe('relay boundary', () => {
     await expect(client.generate(request())).rejects.toThrow();
     await expect(client.upscale({ image: 'synthetic-image' })).rejects.toThrow();
     await client.encodeVibe({});
-    expect(urls).toEqual(
-      ['/v1/models', '/ai/generate-image-stream', '/ai/upscale', '/ai/encode-vibe'].map(
+    expect(urls).toEqual([
+      ...resolveRelayEndpoints(baseUrl).models.filter(() => connection === 'relay'),
+      ...(connection === 'official' ? [base + '/v1/models'] : []),
+      ...['/ai/generate-image-stream', '/ai/upscale', '/ai/encode-vibe'].map(
         (endpoint) => base + endpoint,
       ),
-    );
+    ]);
   });
   it.each(['generate', 'upscale'])(
     '%s explains non-image responses without changing error metadata',
@@ -177,13 +183,15 @@ describe('relay boundary', () => {
       expect(error.message).toBe('中转站没有返回图片：wrong [redacted]。请检查中转站地址是否完整');
       expect(Object.keys(error)).toEqual([]);
       await expect(run('relay', '<html>missing</html>')).rejects.toThrow(
-        '中转站没有返回图片，请检查中转站地址是否完整',
+        '中转站返回的内容无法识别（HTTP 200，application/json，开头 3c 68 74 6d 6c 3e 6d 69 73 73 69 6e 67 3c 2f 68）',
       );
       await expect(run('official', '{"error":"File not found"}')).rejects.toThrow(
         'NovelAI 没有返回图片：File not found',
       );
       await expect(run('official', '{}')).rejects.toThrow('生成结果不是有效的 ZIP');
-      await expect(run('relay', 'PKbroken')).rejects.toThrow('生成结果不是有效的 ZIP');
+      await expect(run('relay', 'PKbroken')).rejects.toThrow(
+        '中转站返回的内容无法识别（HTTP 200，application/json，开头 50 4b 62 72 6f 6b 65 6e）',
+      );
     },
   );
   it.each(['localhost', '127.0.0.1', '[::1]'])('allows local HTTP %s', (host) =>
@@ -247,4 +255,21 @@ describe('relay boundary', () => {
     expect(await client(404, '').models()).toBeNull();
     expect(await client(200, '<html>').models()).toBeNull();
   });
+});
+
+it('falls back from an unreadable model list to the origin', async () => {
+  const urls = [];
+  const client = createNovelAIClient({
+    connection: 'relay',
+    baseUrl: 'https://example.com/novelai',
+    token: () => 'synthetic-key',
+    fetchImpl: async (url) => {
+      urls.push(url.href);
+      return urls.length === 1
+        ? Response.json({ error: 'File not found' })
+        : Response.json({ data: [{ id: 'nai-diffusion-5-full' }] });
+    },
+  });
+  expect(await client.models()).toEqual({ models: ['nai-diffusion-5-full'], other: [] });
+  expect(urls).toEqual(['https://example.com/novelai/v1/models', 'https://example.com/v1/models']);
 });

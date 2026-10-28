@@ -41,9 +41,14 @@ export function resolveRelayEndpoints(value: string): RelayEndpoints {
       stream: endpoint !== '/ai/generate-image',
       upscale: base + '/ai/upscale',
       encodeVibe: base + '/ai/encode-vibe',
-      models: prefix.endsWith('/v1')
-        ? [base + '/models', base + '/v1/models']
-        : [base + '/v1/models'],
+      models: [
+        ...new Set([
+          ...(prefix.endsWith('/v1')
+            ? [base + '/models', base + '/v1/models']
+            : [base + '/v1/models']),
+          url.origin + '/v1/models',
+        ]),
+      ],
     };
   } catch {
     throw new Error(RELAY_URL_INVALID);

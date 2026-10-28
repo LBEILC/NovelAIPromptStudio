@@ -237,7 +237,8 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
   const [editingKey, setEditingKey] = useState(false);
   const [busy, setBusy] = useState<'' | 'save' | 'test'>('');
   const [error, setError] = useState('');
-  const [tested, setTested] = useState<{ models: string[]; other: string[] } | null>(null);
+  // models 为 null：中转站没有模型列表接口或读不懂（issue 10），和"列表里没有支持的模型"分开写
+  const [tested, setTested] = useState<{ models: string[] | null; other: string[] } | null>(null);
   useEffect(() => setUrl(saved?.baseUrl || ''), [saved?.baseUrl]);
   const hasKey = !!saved?.hasKey;
   const store = g.settings.secretStore;
@@ -284,7 +285,9 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
   };
   const models = saved?.models ?? null;
   const result = tested
-    ? `连接成功 · 可以用：${modelNames(tested.models)}`
+    ? tested.models
+      ? `连接成功 · 可以用：${modelNames(tested.models)}`
+      : '没读到这个中转站有哪些模型，所有模型都可以选；它没有的会在生成时报错'
     : hasKey && saved?.baseUrl && !dirty
       ? models
         ? `可以用：${modelNames(models)}`

@@ -1,6 +1,6 @@
 {
   "name": "novelai-prompt-studio",
-  "version": "1.9.7",
+  "version": "1.9.8",
   "private": true,
   "type": "module",
   "description": "A local-first asset and prompt manager for NovelAI Diffusion V4/V4.5.",
@@ -38,6 +38,7 @@
     "verify:packaged": "npm run fonts:check && npm run build && node scripts/verify-app.mjs --packaged"
   },
   "dependencies": {
+    "@msgpack/msgpack": "3.1.2",
     "electron-updater": "6.8.9",
     "font-list": "2.1.0",
     "koffi": "3.3.3",

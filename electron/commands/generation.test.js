@@ -183,3 +183,37 @@ it('runs generation through the command boundary with agent confirmation and ver
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+it('returns null models through the relay command when all model lists are unreadable', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-relay-models-'));
+  const database = await openDatabase(root);
+  const preferences = openPreferences(root, {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(value),
+    decryptString: (value) => value.toString(),
+  });
+  let commands;
+  try {
+    commands = await createCommands({
+      directory: root,
+      version: 'test',
+      database,
+      preferences,
+      fetcher: async () => Response.json({ error: 'File not found' }),
+      busy: () => false,
+      emit: () => {},
+    });
+    const input = { baseUrl: 'https://example.com/novelai', key: 'synthetic-key' };
+    expect((await commands.dispatch('account.relay.save', input, 'ui')).ok).toBe(true);
+    expect((await commands.dispatch('account.relay.test', {}, 'ui')).data).toEqual({
+      ok: true,
+      models: null,
+      other: [],
+    });
+    expect(preferences.generationSettings().relay.models).toBeNull();
+  } finally {
+    await commands?.close();
+    database.close();
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

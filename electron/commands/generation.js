@@ -1274,7 +1274,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           (input.key === undefined || input.key.trim() === preferences.relayKey())
         )
           preferences.saveRelay({ baseUrl, models: result?.models ?? null });
-        return { ok: true, ...(result || { models: [], other: [] }) };
+        return { ok: true, ...(result || { models: null, other: [] }) };
       } catch (error) {
         return { ok: false, error: error.message };
       }
