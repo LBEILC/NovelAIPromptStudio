@@ -181,6 +181,8 @@ export function buildGenerationRequest(raw, model, edits = {}) {
     parameters.extra_noise_seed = parameters.seed - 1;
     parameters.color_correct = false;
   }
+  // Omit absent top-level API options without changing stored metadata or nested captions.
+  for (const key of Object.keys(parameters)) if (parameters[key] === null) delete parameters[key];
   return { action, input: prompt, model, parameters };
 }
 

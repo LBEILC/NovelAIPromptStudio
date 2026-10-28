@@ -94,6 +94,10 @@ it('builds infill from the draft, maps models and transforms character centers w
         img2img: { strength: 0.1 },
         upscaled_enhance: true,
         add_original_image: true,
+        tag_hint_transparent_background: null,
+        straight_alpha: null,
+        skip_cfg_above_sigma: null,
+        cfg_rescale: null,
       },
     });
     const original = structuredClone(draft);
@@ -108,6 +112,9 @@ it('builds infill from the draft, maps models and transforms character centers w
         { mask, seed: 123 },
       );
     const high = await build(1);
+    for (const key of ['tag_hint_transparent_background', 'straight_alpha', 'skip_cfg_above_sigma'])
+      expect(high.request.parameters).not.toHaveProperty(key);
+    expect(Object.values(high.request.parameters)).not.toContain(null);
     expect(high.request).toMatchObject({
       action: 'infill',
       model: 'nai-diffusion-5-full-inpainting',

@@ -39,6 +39,22 @@ export function fixture(model = 'nai-diffusion-4-5-full', raw = {}) {
 }
 const blankLibrary = { resolve: async (r) => ({ encoding: r.encoding }) };
 describe('parameter metadata and request contracts', () => {
+  it('omits null original options from requests and kept labels while retaining metadata', async () => {
+    const p = fixture('nai-diffusion-5-full', {
+      tag_hint_transparent_background: null,
+      straight_alpha: null,
+      skip_cfg_above_sigma: null,
+      legacy_v3_extend: false,
+    });
+    const before = structuredClone(p);
+    expect(p.keptParameters).toEqual([['legacy_v3_extend', 'false']]);
+    const { request, project } = await buildProjectRequest(p, blankLibrary);
+    for (const key of ['tag_hint_transparent_background', 'straight_alpha', 'skip_cfg_above_sigma'])
+      expect(request.parameters).not.toHaveProperty(key);
+    expect(Object.values(request.parameters)).not.toContain(null);
+    expect(project.metadata).toEqual(before.metadata);
+    expect(p).toEqual(before);
+  });
   it('replaces automatic text only at complete boundaries and preserves unknown UC hints', async () => {
     const p = fixture('nai-diffusion-4-full', { qualityToggle: true, ucPreset: 0 });
     const baseline = (await buildProjectRequest(p, blankLibrary)).request;

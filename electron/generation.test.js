@@ -43,6 +43,42 @@ const raw = {
 const model = 'nai-diffusion-5-full';
 const subscription = { active: true, tier: 3, usage: { isNegative: false } };
 describe('generation request contract', () => {
+  it.each(['generate', 'img2img'])('omits only top-level null options for %s', (action) => {
+    const source = {
+      ...structuredClone(raw),
+      tag_hint_transparent_background: null,
+      straight_alpha: null,
+      skip_cfg_above_sigma: null,
+      cfg_rescale: null,
+    };
+    source.v4_prompt.caption.optional = null;
+    const before = structuredClone(source);
+    const request = buildGenerationRequest(source, model, { action, noise: 0 });
+    for (const key of [
+      'tag_hint_transparent_background',
+      'straight_alpha',
+      'skip_cfg_above_sigma',
+      'cfg_rescale',
+    ])
+      expect(request.parameters).not.toHaveProperty(key);
+    expect(Object.values(request.parameters)).not.toContain(null);
+    expect(request.parameters.v4_prompt.caption.optional).toBeNull();
+    expect(source).toEqual(before);
+    const valid = buildGenerationRequest(
+      { ...source, tag_hint_transparent_background: false, straight_alpha: true, cfg_rescale: 0 },
+      model,
+      { action, noise: 0 },
+    );
+    expect(valid.parameters).toMatchObject({
+      tag_hint_transparent_background: false,
+      straight_alpha: true,
+      cfg_rescale: 0,
+    });
+    expect(
+      buildGenerationRequest({ ...source, skip_cfg_above_sigma: 19 }, 'nai-diffusion-4-5-full')
+        .parameters.skip_cfg_above_sigma,
+    ).toBe(19);
+  });
   it('preserves every supported repository demo image request field without edits', async () => {
     const root = new URL('../demo/images/final/', import.meta.url);
     let count = 0;

@@ -166,7 +166,10 @@ export function hydrateParameters(project) {
     references: project.references || saved.references || { vibes, precise },
     keptParameters: project.keptParameters ||
       saved.keptParameters || [
-        ...KEPT.filter((k) => raw[k] !== undefined).map((k) => [k, String(raw[k])]),
+        ...KEPT.filter((k) => raw[k] !== undefined && raw[k] !== null).map((k) => [
+          k,
+          String(raw[k]),
+        ]),
         ...(!recognized && source ? [['model', String(source)]] : []),
         ...(raw.tag_hint_uc_preset === 1 ? [['tag_hint_uc_preset', '1']] : []),
       ],
