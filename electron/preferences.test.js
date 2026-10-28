@@ -123,7 +123,7 @@ describe('AI preferences', () => {
       }),
     );
     const unavailable = { ...safeStorage, isEncryptionAvailable: () => false };
-    const preferences = openPreferences(directory, unavailable);
+    const preferences = openPreferences(directory, unavailable, { platform: 'win32' });
     expect(preferences.publicSettings()).not.toHaveProperty('translationPrompt');
     preferences.saveAISettings({
       provider: 'apiKey',
@@ -135,7 +135,9 @@ describe('AI preferences', () => {
     const stored = fs.readFileSync(preferences.filePath, 'utf8');
     expect(stored).not.toContain('session-only-secret');
     expect(stored).not.toContain('legacy rule');
-    expect(openPreferences(directory, unavailable).credentials().apiKey).toBe('');
+    expect(
+      openPreferences(directory, unavailable, { platform: 'win32' }).credentials().apiKey,
+    ).toBe('');
   });
 
   it('persists validated cross-platform appearance preferences', () => {

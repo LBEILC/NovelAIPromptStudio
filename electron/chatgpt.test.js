@@ -121,14 +121,23 @@ describe('ChatGPT authorization and credentials', () => {
   it('requires plan scope and system encryption', async () => {
     fixture.state.plan = 'free';
     await expect(service.signIn()).rejects.toMatchObject({ code: 'not_eligible' });
-    const unavailable = openPreferences(directory, { ...safe, isEncryptionAvailable: () => false });
-    const blocked = createChatGPT({
-      preferences: unavailable,
-      openExternal: () => {
-        throw Error('must not open');
-      },
-    });
-    await expect(blocked.signIn()).rejects.toMatchObject({ code: 'unavailable' });
+    for (const platform of ['darwin', 'win32', 'linux']) {
+      const unavailable = openPreferences(
+        directory,
+        { ...safe, isEncryptionAvailable: () => false },
+        { platform },
+      );
+      const blocked = createChatGPT({
+        preferences: unavailable,
+        openExternal: () => {
+          throw Error('must not open');
+        },
+      });
+      await expect(blocked.signIn()).rejects.toMatchObject({
+        code: platform === 'darwin' ? 'secret_denied' : 'unavailable',
+      });
+      blocked.close();
+    }
   });
   it('ignores forged state, supports explicit cancel and prevents concurrent login', async () => {
     let opened;
