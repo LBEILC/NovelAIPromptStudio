@@ -1,0 +1,13 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "1.9.11",
+  "date": "2026-10-28",
+  "items": [
+    {
+      "kind": "fixed",
+      "area": "gen",
+      "title": "从图库打开再生成被中转站拒绝",
+      "detail": "从图库打开一张用中转站生成的图再生成时，请求里会带上原图里值为空的参数（例如 tag_hint_transparent_background: null），校验严格的中转站会直接拒绝。现在值为空的参数不再发送，由接口按默认处理。"
+    }
+  ]
+}
