@@ -1,5 +1,6 @@
 import { decode } from '@msgpack/msgpack';
 import { INPAINT_MODELS } from '../src/shared/inpaint.ts';
+import { relayRequestModel } from './relay.js';
 import crypto from 'node:crypto';
 import { resolveRelayEndpoints } from '../src/shared/relay.ts';
 import { MODEL_ORDER } from '../src/shared/params.ts';
@@ -653,6 +654,7 @@ export function createNovelAIClient({
       else parameters.stream = 'sse';
       const response = await send(relay?.generate ?? '/ai/generate-image-stream', {
         ...request,
+        model: relayRequestModel(connection, baseUrl, request),
         parameters,
       });
       return imageResponse(response, request.parameters.steps, onProgress);

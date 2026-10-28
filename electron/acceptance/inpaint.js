@@ -2,8 +2,9 @@ import { inpaintSyncChecks } from './agentImages.js';
 import sharp from 'sharp';
 import { contextMenu, menuRoot, toastRoot } from './release186.js';
 import { isDeepStrictEqual } from 'node:util';
+import { RELAY_PRESETS } from '../../src/shared/relayPresets.ts';
 
-export async function inpaintChecks({ h, database }) {
+export async function inpaintChecks({ h, database, preferences }) {
   h.category('局部重绘与扩图');
   const call = (name, input = {}) =>
     h.evaluate(
@@ -28,6 +29,34 @@ export async function inpaintChecks({ h, database }) {
     database.versions.forImage(source.id, opened.tab.workId) ||
     versionsBefore.find((v) => !v.parentId && v.project.id === source.id);
   const rect = { x: 0, y: 0, width: 512, height: 512 };
+  const saved = preferences.generationSettings();
+  try {
+    preferences.saveRelay({ baseUrl: RELAY_PRESETS[0].address, models: ['nai-diffusion-5-full'] });
+    preferences.saveConnection('relay');
+    const repaint = await call('generate.estimate-inpaint', { tabId, imageId: source.id, rect });
+    const expand = await call('generate.estimate-outpaint', {
+      tabId,
+      imageId: source.id,
+      edges: { left: 64, right: 0, top: 0, bottom: 0 },
+    });
+    await h.check(
+      'TaleAPI 仅列基础模型时局部重绘和两种扩图均可用',
+      () =>
+        !repaint.unavailable &&
+        !expand.whole.unavailable &&
+        !expand.edges.unavailable &&
+        repaint.model === 'nai-diffusion-5-full-inpainting',
+    );
+    preferences.saveRelay({ baseUrl: RELAY_PRESETS[0].address, models: [] });
+    const missing = await call('generate.estimate-inpaint', { tabId, imageId: source.id, rect });
+    await h.check(
+      'TaleAPI 缺少基础模型时仍阻止局部重绘',
+      () => missing.unavailable === '中转站没有局部重绘用的模型',
+    );
+  } finally {
+    preferences.saveRelay(saved.relay);
+    preferences.saveConnection(saved.connection);
+  }
   const mask = (
     await sharp(
       Buffer.from(

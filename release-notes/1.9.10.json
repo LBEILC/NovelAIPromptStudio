@@ -1,0 +1,13 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "1.9.10",
+  "date": "2026-10-28",
+  "items": [
+    {
+      "kind": "improved",
+      "area": "set",
+      "title": "TaleAPI 局部重绘和扩图",
+      "detail": "中转站选 TaleAPI 时，局部重绘和扩图以前不可用。现在按 TaleAPI 的约定发送请求，V4、V4.5 和 V5 Full 都可以局部重绘和扩图，按 TaleAPI 自己的价格计费。"
+    }
+  ]
+}

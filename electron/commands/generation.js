@@ -15,7 +15,7 @@ import {
   estimateImageOperation,
   ENHANCE_MAGNITUDES,
 } from '../imageOperations.js';
-import { checkRelayRequest, normalizeRelayUrl } from '../relay.js';
+import { checkRelayRequest, normalizeRelayUrl, relayRequestModel } from '../relay.js';
 import { saveWorkbenchImage } from './saveWorkbenchImage.js';
 import { createBlankProject } from '../workbench.js';
 import { buildProjectRequest } from '../parameterRequest.js';
@@ -693,7 +693,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       request.action === 'infill' &&
       settings().connection === 'relay' &&
       settings().relay.models !== null &&
-      !settings().relay.models.includes(request.model)
+      !settings().relay.models.includes(
+        relayRequestModel(settings().connection, settings().relay.baseUrl, request),
+      )
     )
       throw new Error('中转站没有局部重绘用的模型');
     if (

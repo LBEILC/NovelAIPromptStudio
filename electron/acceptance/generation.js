@@ -1164,6 +1164,6 @@ async function runGenerationChecks({
   );
   await h.screenshot('057-clipboard-original-restored');
   await relayChecks({ h, generationService });
-  await inpaintChecks({ h, database });
+  await inpaintChecks({ h, database, preferences });
   await outpaintChecks({ h, database, generationService });
 }

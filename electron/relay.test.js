@@ -4,6 +4,50 @@ import { createNovelAIClient, buildGenerationRequest } from './generation.js';
 import { startFakeNovelAI } from './fixtures/novelAIService.js';
 import { resolveRelayEndpoints } from '../src/shared/relay.ts';
 import yazl from 'yazl';
+import { RELAY_PRESETS } from '../src/shared/relayPresets.ts';
+
+it('keeps TaleAPI ordinary generation and official request objects unchanged', async () => {
+  const request = buildGenerationRequest(
+    { width: 832, height: 1216, steps: 28, scale: 5, sampler: 'k_euler_ancestral' },
+    'nai-diffusion-5-full',
+  );
+  const original = structuredClone(request);
+  let sent;
+  const client = createNovelAIClient({
+    connection: 'relay',
+    baseUrl: RELAY_PRESETS[0].address,
+    token: () => 'synthetic-key',
+    fetchImpl: async (_url, options) => {
+      sent = JSON.parse(options.body);
+      return new Response(Buffer.from('89504e470d0a1a0a', 'hex'));
+    },
+  });
+  await client.generate(request);
+  expect(sent.model).toBe(request.model);
+  expect(request).toEqual(original);
+});
+
+it('checks TaleAPI infill against base models without broadening other relay rules', () => {
+  const request = { action: 'infill', model: 'nai-diffusion-4-curated-inpainting' };
+  for (const baseUrl of [
+    RELAY_PRESETS[0].address,
+    RELAY_PRESETS[1].address,
+    'https://example.com',
+  ]) {
+    const settings = {
+      connection: 'relay',
+      relay: { baseUrl, models: ['nai-diffusion-4-curated-preview'] },
+    };
+    if (baseUrl === RELAY_PRESETS[0].address) {
+      expect(() => checkRelayRequest(settings, request)).not.toThrow();
+      expect(() => checkRelayRequest(settings, request, 1)).toThrow('新的 Vibe');
+    } else expect(() => checkRelayRequest(settings, request)).toThrow('中转站没有这个模型');
+    settings.relay.models = [];
+    expect(() => checkRelayRequest(settings, request)).toThrow('中转站没有这个模型');
+    settings.connection = 'official';
+    expect(() => checkRelayRequest(settings, request)).not.toThrow();
+  }
+});
 
 describe('relay boundary', () => {
   const request = () =>

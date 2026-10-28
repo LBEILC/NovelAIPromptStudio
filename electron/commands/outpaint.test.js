@@ -12,6 +12,8 @@ import { startFakeNovelAI } from '../fixtures/novelAIService.js';
 import { createWorkbenchFixtures } from '../acceptance/workbenchFixtures.js';
 import { estimateImageOperation } from '../imageOperations.js';
 import { buildProjectRequest } from '../parameterRequest.js';
+import { RELAY_PRESETS } from '../../src/shared/relayPresets.ts';
+import { INPAINT_MODELS } from '../../src/shared/inpaint.ts';
 
 async function setup(size = [512, 512]) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-outpaint-'));
@@ -31,6 +33,7 @@ async function setup(size = [512, 512]) {
   const finishes = new Map(),
     waiters = new Map(),
     events = [];
+  const sent = [];
   let imported = 0;
   const commands = await createCommands({
     directory,
@@ -38,6 +41,14 @@ async function setup(size = [512, 512]) {
     database,
     preferences,
     generationBaseUrl: service.url,
+    fetcher: (url, options) => {
+      if (options.body) sent.push(JSON.parse(options.body));
+      const endpoint = new URL(url);
+      return fetch(
+        new URL(endpoint.pathname.replace(/^\/v1(?:\/novelai)?(?=\/ai\/)/, ''), service.url),
+        options,
+      );
+    },
     version: 'test',
     busy: () => false,
     readImage: async () => source,
@@ -85,6 +96,7 @@ async function setup(size = [512, 512]) {
     call,
     input,
     events,
+    sent,
     wait: (id) =>
       finishes.has(id)
         ? Promise.resolve(finishes.get(id))
@@ -98,6 +110,83 @@ async function setup(size = [512, 512]) {
     },
   };
 }
+
+it.each([
+  ['nai-diffusion-5-full', 'nai-diffusion-5-full'],
+  ['nai-diffusion-5-curated', 'nai-diffusion-4-5-curated'],
+  ['nai-diffusion-4-5-curated', 'nai-diffusion-4-5-curated'],
+  ['nai-diffusion-4-curated-preview', 'nai-diffusion-4-curated-preview'],
+  ['nai-diffusion-4-5-full', 'nai-diffusion-4-5-full'],
+])('adapts TaleAPI inpaint and outpaint for %s only at transport', async (model, baseModel) => {
+  const f = await setup();
+  try {
+    await f.call('params.set', { tabId: f.input.tabId, patch: { model } });
+    const rect = { x: 0, y: 0, width: 512, height: 512 };
+    const mask = (
+      await sharp({ create: { width: 512, height: 512, channels: 4, background: '#ffffff' } })
+        .png()
+        .toBuffer()
+    ).toString('base64');
+    const input = { tabId: f.input.tabId, imageId: f.source.id, rect, mask };
+    for (const baseUrl of [
+      RELAY_PRESETS[0].address,
+      RELAY_PRESETS[1].address,
+      'https://example.com',
+    ]) {
+      f.preferences.saveRelay({ baseUrl, key: 'acceptance-token', models: [baseModel] });
+      f.preferences.saveConnection('relay');
+      const allowed = baseUrl === RELAY_PRESETS[0].address;
+      const estimate = await f.call('generate.estimate-inpaint', {
+        tabId: input.tabId,
+        imageId: input.imageId,
+        rect,
+      });
+      const expanded = await f.call('generate.estimate-outpaint', f.input);
+      if (!allowed) {
+        expect(estimate.unavailable).toBe('中转站没有局部重绘用的模型');
+        expect(expanded.whole.unavailable).toBe('中转站没有局部重绘用的模型');
+        f.preferences.saveRelay({ baseUrl, models: [INPAINT_MODELS[model]] });
+      } else {
+        expect(estimate.unavailable).toBeFalsy();
+        expect(expanded.whole.unavailable).toBeFalsy();
+        expect(expanded.edges.unavailable).toBeFalsy();
+        f.preferences.saveRelay({ baseUrl, models: [] });
+        expect(
+          (
+            await f.call('generate.estimate-inpaint', {
+              tabId: input.tabId,
+              imageId: input.imageId,
+              rect,
+            })
+          ).unavailable,
+        ).toBe('中转站没有局部重绘用的模型');
+        f.preferences.saveRelay({ baseUrl, models: [baseModel] });
+      }
+      for (const [name, args] of [
+        ['generate.inpaint', input],
+        ['generate.outpaint', { ...f.input, mode: 'whole' }],
+        ['generate.outpaint', { ...f.input, mode: 'edges' }],
+      ]) {
+        const start = f.sent.length;
+        const job = await f.wait((await f.call(name, args)).id);
+        expect(job.error || job.state).toBe('completed');
+        const requests = f.sent.slice(start).filter((r) => r.action === 'infill');
+        expect(requests.length).toBeGreaterThan(0);
+        expect(
+          requests.every((r) => r.model === (allowed ? baseModel : INPAINT_MODELS[model])),
+        ).toBe(true);
+        expect(f.database.versions.get(job.versionId).operation.generated.model).toBe(
+          INPAINT_MODELS[model],
+        );
+        const usage = f.database.usage.list().filter((record) => record.jobId === job.id);
+        expect(usage).toHaveLength(requests.length);
+        expect(usage.every((record) => record.model === INPAINT_MODELS[model])).toBe(true);
+      }
+    }
+  } finally {
+    await f.close();
+  }
+});
 
 it('prices both modes with actual models, validates inputs and matches inpaint permissions', async () => {
   const f = await setup([1536, 1536]);
