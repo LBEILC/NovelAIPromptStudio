@@ -49,6 +49,7 @@ import {
 } from './importer.js';
 import { openPreferences } from './preferences.js';
 import { createChatGPT, chatGPTCommands } from './chatgpt.js';
+import { relaySiteHandler } from './relaySite.js';
 import { listModels, testModel, translateTags, transformParagraph } from './translation.js';
 import { lookupDanbooruTags } from './danbooru.js';
 import { lookupDsoTags } from './dsoDictionary.js';
@@ -1537,6 +1538,10 @@ app.whenReady().then(async () => {
     });
     return { ok: true };
   });
+  registerCommand(
+    'account.relay.open-site',
+    relaySiteHandler((url) => shell.openExternal(url)),
+  );
   registerCommand('updates.open-release', async (input, _event) => {
     const releaseUrl = input.url;
     const fallback = 'https://github.com/LBEILC/NovelAIPromptStudio/releases/latest';

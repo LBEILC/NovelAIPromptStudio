@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { clipboard } from 'electron';
+import { RELAY_PRESETS } from '../../src/shared/relayPresets.ts';
 
 export async function settingsGenerationChecks({
   h,
@@ -8,6 +9,7 @@ export async function settingsGenerationChecks({
   preferences,
   encrypted,
   mode,
+  doubles,
 }) {
   if (!encrypted) {
     h.uncovered('设置账号与生成偏好', '系统安全存储不可用');
@@ -61,6 +63,31 @@ export async function settingsGenerationChecks({
     key: 'acceptance-token',
   });
   await h.select('连接方式', '中转站');
+  const pickPreset = async (name) => {
+    await wait('!!document.querySelector("button[aria-label=中转站]")');
+    await click('中转站', 'document.querySelector("button[aria-label=中转站]").parentElement');
+    await wait('!!document.querySelector(".menu:not(.leaving) [role=menuitem]")');
+    await click(name, 'document.querySelector(".menu:not(.leaving)")');
+  };
+  for (const preset of RELAY_PRESETS) {
+    await pickPreset(preset.name);
+    await wait(
+      `document.querySelector('.relay-endpoint')?.textContent.includes(${JSON.stringify(preset.address)})`,
+    );
+    await check(
+      `选择 ${preset.name} 自动填写预设地址`,
+      `document.querySelector('.relay-endpoint')?.textContent.includes(${JSON.stringify(preset.address)})`,
+    );
+    const before = doubles.calls.filter((call) => call.kind === 'openExternal').length;
+    await click('打开网站');
+    await wait('document.body.innerText.includes("已在浏览器中打开")');
+    await check(`打开 ${preset.name} 网站经过主进程`, () => {
+      const calls = doubles.calls.filter((call) => call.kind === 'openExternal');
+      return calls.length === before + 1 && calls.at(-1).value === preset.site;
+    });
+  }
+  await pickPreset('自定义');
+  await input('[aria-label="中转站地址"]', generationService.url + '/v1');
   await wait(
     'document.querySelector("[data-settings-section=novelai]:not(.leaving)")?.textContent.includes("已保存 ••••••••")',
   );

@@ -1060,6 +1060,7 @@ export function createPreviewHandlers({
   });
   registerCommand('updates.install', () => ({ ok: true }));
   registerCommand('updates.open-release', () => ({ ok: true }));
+  registerCommand('account.relay.open-site', () => ({ ok: true }));
   registerCommand('fonts.list', async (input, _caller) => {
     try {
       return { ok: true, fonts: await listSystemFonts() };

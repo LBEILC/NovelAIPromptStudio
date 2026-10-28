@@ -411,6 +411,7 @@ export const commandRegistry = {
     uiOnly: true,
   },
   'account.relay.test': { fields: { baseUrl: 'string', key: 'string' }, uiOnly: true },
+  'account.relay.open-site': { fields: { id: 'string' }, required: ['id'], uiOnly: true },
   'account.refresh': { fields: {}, uiOnly: true },
   'settings.generation.save': {
     fields: {

@@ -551,6 +551,7 @@ export interface CommandDefinitions {
     output: GenerationStatus;
   };
   'account.relay.save': { input: { baseUrl: string; key?: string }; output: GenerationStatus };
+  'account.relay.open-site': { input: { id: string }; output: { ok: true } };
   'account.relay.test': {
     input: { baseUrl?: string; key?: string };
     output: IPC.Result<{ models: string[] | null; other: string[] }>;

@@ -5,6 +5,7 @@ import { useNotifications } from '../kit/toast';
 import { invokeUI } from '../lib/commands';
 import { MODEL_CAPS, MODEL_ORDER, type ModelId } from '../shared/params';
 import { resolveRelayEndpoints } from '../shared/relay';
+import { RELAY_PRESETS, relayPresetFor } from '../shared/relayPresets';
 import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, errorText } from './parts';
 import { Fail, KeychainBanner, ReplaceButton } from './sectionShared';
@@ -240,6 +241,19 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
   // models 为 null：中转站没有模型列表接口或读不懂（issue 10），和"列表里没有支持的模型"分开写
   const [tested, setTested] = useState<{ models: string[] | null; other: string[] } | null>(null);
   useEffect(() => setUrl(saved?.baseUrl || ''), [saved?.baseUrl]);
+  // 选中哪个预设由地址推断，不另外存（doc/design.md 2.33）；选了"自定义"就一直显示地址栏
+  const [custom, setCustom] = useState(false);
+  const preset = custom ? null : relayPresetFor(url);
+  const pickPreset = (address: string | null) => {
+    setCustom(address === null);
+    if (address !== null) setUrl(address);
+    setTested(null);
+  };
+  const openSite = (id: string) =>
+    void invokeUI('account.relay.open-site', { id }).then(
+      () => notify({ text: '已在浏览器中打开', tone: 'success' }),
+      (e) => notify({ text: errorText(e), tone: 'error' }),
+    );
   const hasKey = !!saved?.hasKey;
   const store = g.settings.secretStore;
   const keyBad = hasKey && g.settings.relayKeyReadable === false;
@@ -304,36 +318,74 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
   return (
     <>
       <Col
-        title="地址"
-        help="中转站给的地址，例如 https://api.example.com；给的是以 /ai/generate-image 结尾的完整地址就照原样粘贴。"
+        title="中转站"
+        help={
+          preset
+            ? preset.note
+            : '选一个实测过的中转站，地址会自动填好，只要填 Key；也可以选"自定义"自己填地址。'
+        }
       >
-        <label className="field sm mono set-key">
-          <input
-            aria-label="中转站地址"
-            placeholder="https://"
-            autoComplete="off"
-            spellCheck={false}
-            value={url}
-            onChange={(e) => {
-              setUrl(e.target.value);
-              setTested(null);
-            }}
-            onKeyDown={(e) => !e.nativeEvent.isComposing && e.key === 'Enter' && void save()}
+        <div className="row">
+          <Dropdown
+            label="中转站"
+            className="set-dd"
+            value={preset ? preset.name : '自定义'}
+            items={[
+              ...RELAY_PRESETS.map((p) => ({
+                label: p.name,
+                checked: preset?.id === p.id,
+                onSelect: () => pickPreset(p.address),
+              })),
+              'sep' as const,
+              { label: '自定义', checked: !preset, onSelect: () => pickPreset(null) },
+            ]}
           />
-        </label>
-        {url.trim() && (
+          {preset && (
+            <button className="btn sm" onClick={() => openSite(preset.id)}>
+              <Icon name="external-link-line" />
+              打开网站
+            </button>
+          )}
+        </div>
+        {preset && target && (
           <small className="relay-endpoint">
-            {target ? (
-              <>
-                生成请求会发到 <span className="mono">{target.generate}</span>
-                {!target.stream && '，生成时没有进度预览'}
-              </>
-            ) : (
-              '地址无效：要以 https:// 开头，不能带 ? 或 #'
-            )}
+            生成请求会发到 <span className="mono">{target.generate}</span>
           </small>
         )}
       </Col>
+      {!preset && (
+        <Col
+          title="地址"
+          help="中转站给的地址，例如 https://api.example.com；给的是以 /ai/generate-image 结尾的完整地址就照原样粘贴。"
+        >
+          <label className="field sm mono set-key">
+            <input
+              aria-label="中转站地址"
+              placeholder="https://"
+              autoComplete="off"
+              spellCheck={false}
+              value={url}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                setTested(null);
+              }}
+              onKeyDown={(e) => !e.nativeEvent.isComposing && e.key === 'Enter' && void save()}
+            />
+          </label>
+          {url.trim() && (
+            <small className="relay-endpoint">
+              {target ? (
+                <>
+                  生成请求会发到 <span className="mono">{target.generate}</span>
+                  {!target.stream && '，生成时没有进度预览'}
+                </>
+              ) : (
+                '地址无效：要以 https:// 开头，不能带 ? 或 #'
+              )}
+            </small>
+          )}
+        </Col>
+      )}
       <Col title="Key" help="中转站给的 Key。加密后保存在这台电脑上，软件不保存明文。">
         <Swap k={`key-${keyEdit}`}>
           <div className="row">
