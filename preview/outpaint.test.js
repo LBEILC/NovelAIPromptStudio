@@ -1,16 +1,20 @@
-import { expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startServices } from './services.mjs';
 import { createSession } from './session.mjs';
 import { createWorkbenchFixtures } from '../electron/acceptance/workbenchFixtures.js';
 
-it('previews both estimates, block progress and the second-block failure switch without external requests', async () => {
-  const services = await startServices([]),
-    events = [],
+describe.sequential('preview outpaint through an isolated session', () => {
+  const events = [],
     terminal = new Map(),
     waiters = new Map();
-  services.novel.state.delay = 10;
-  let session;
-  try {
+  let services, session, input, opened;
+  const wait = (id) =>
+    terminal.has(id)
+      ? Promise.resolve(terminal.get(id))
+      : new Promise((resolve) => waiters.set(id, resolve));
+  beforeAll(async () => {
+    services = await startServices([]);
+    services.novel.state.delay = 10;
     session = await createSession(
       services,
       [],
@@ -25,20 +29,22 @@ it('previews both estimates, block progress and the second-block failure switch 
       },
       true,
     );
-    const wait = (id) =>
-      terminal.has(id)
-        ? Promise.resolve(terminal.get(id))
-        : new Promise((resolve) => waiters.set(id, resolve));
     const [file] = await createWorkbenchFixtures(session.directory, {
       sizes: [[512, 512]],
       prompts: ['synthetic preview'],
     });
-    const opened = await session.call('workbench.open', { path: file });
-    const input = {
+    opened = await session.call('workbench.open', { path: file });
+    input = {
       tabId: opened.tab.id,
       imageId: opened.tab.project.id,
       edges: { left: 64, right: 0, top: 64, bottom: 0 },
     };
+  });
+  afterAll(async () => {
+    await session?.close();
+    await services?.close();
+  });
+  it('estimates blocks and retains the first block when the second fails', async () => {
     const estimate = await session.call('generate.estimate-outpaint', input);
     expect(estimate.canvas).toEqual({ width: 576, height: 576 });
     expect(estimate.edges.blocks).toHaveLength(2);
@@ -65,6 +71,9 @@ it('previews both estimates, block progress and the second-block failure switch 
           event.data.jobs.some((job) => job.id === partial.id && job.blockIndex === 2),
       ),
     ).toBe(true);
+    expect(services.blocked).toEqual([]);
+  });
+  it('completes both blocks using the persisted original after disabling the failure switch', async () => {
     // Opening an external source saves the original; subsequent operations use its persisted ID.
     input.imageId = session.database.versions.list(
       opened.tab.workId || opened.tab.id,
@@ -79,8 +88,5 @@ it('previews both estimates, block progress and the second-block failure switch 
       height: 576,
     });
     expect(services.blocked).toEqual([]);
-  } finally {
-    await session?.close();
-    await services.close();
-  }
+  });
 });
