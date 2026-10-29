@@ -20,10 +20,6 @@
 .tags + .help { margin-top: var(--sp-2); }
 .tag.sel .w { color: var(--text); }
 
-/* NovelAI 自动添加的内容：一行说明，默认收起 */
-.auto { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0 0; padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3); border: var(--bw) dashed var(--border); border-radius: var(--r-ctl); color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small); }
-.auto .btn { margin-left: auto; }
-
 /* 段落的双语编辑：上面英文（衬线），下面中文，中间两个按钮互相转换 */
 .editor { display: flex; flex-direction: column; gap: var(--sp-2); }
 .editor .swap { display: flex; align-items: center; gap: var(--sp-2); }
