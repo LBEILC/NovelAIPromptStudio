@@ -3,6 +3,7 @@ export interface UsageTotals {
   requests: number;
   /** Relay usage has no Anlas price. */
   anlas: number | null;
+  quota: number | null;
   estimated: boolean;
 }
 export interface UsageBreakdown extends UsageTotals {

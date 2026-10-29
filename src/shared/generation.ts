@@ -21,7 +21,14 @@ export interface GenerationSettings {
   blankModel?: 'last' | import('./params').ModelId;
   connection: 'official' | 'relay';
   officialToken: boolean;
-  relay: { baseUrl: string; hasKey: boolean; models: string[] | null };
+  relay: {
+    baseUrl: string;
+    hasKey: boolean;
+    models: string[] | null;
+    slot: string;
+    slots: { id: string; baseUrl: string; hasKey: boolean; readable: boolean }[];
+    lastQuota: number | null;
+  };
   dailyImageLimit: number;
   spentImagesToday?: number;
   hasToken: boolean;

@@ -1721,6 +1721,7 @@ app.whenReady().then(async () => {
     return { ok: Boolean(await releasePreparedImport(input.id)) };
   });
   let acceptanceGeneration;
+  let acceptanceRelayFetch;
   let chatGPTFixture;
   if (acceptanceMode && !acceptanceMode.packaged) {
     const { startFakeChatGPT } = await import('./fixtures/chatGPTService.js');
@@ -1749,8 +1750,10 @@ app.whenReady().then(async () => {
     (acceptanceMode && !acceptanceMode.packaged) ||
     (screenshotMode && process.argv.includes('--app-screenshot-readme'))
   ) {
-    const { startFakeNovelAI } = await import('./fixtures/novelAIService.js');
+    const { startFakeNovelAI, relayFixtureUrl } = await import('./fixtures/novelAIService.js');
     acceptanceGeneration = await startFakeNovelAI();
+    acceptanceRelayFetch = (input, options) =>
+      network.fetch(relayFixtureUrl(input, acceptanceGeneration.url), options);
   }
   try {
     const latency = installAcceptanceLatency(acceptanceMode);
@@ -1763,7 +1766,7 @@ app.whenReady().then(async () => {
       preferences,
       generationBaseUrl: acceptanceGeneration?.url,
       network,
-      fetcher: network.fetch,
+      fetcher: acceptanceRelayFetch || network.fetch,
       beforeCommand,
       onEvent: (event) => {
         if (event.type === 'generation') {

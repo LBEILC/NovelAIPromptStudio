@@ -31,6 +31,8 @@ import { CommandError } from './registry.js';
 import { versionDiff, diffSummary } from '../../src/lib/versionDiff.ts';
 import { createVersionDifferenceCache } from '../../src/lib/versionDifferenceCache.ts';
 import { recordUsageRequest, localDay } from '../usage.js';
+import { relayPresetFor } from '../../src/shared/relayPresets.ts';
+import { createRelayUsage } from '../relayUsage.js';
 import { buildDirector, estimateDirector, validateDirector } from '../director.js';
 
 const withPromptTemplate = (project, draft) => ({
@@ -54,6 +56,9 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   // Bound retained works while keeping each work's immutable summaries across reads.
   const summaryCaches = new Map();
   const usage = services.database.usage;
+  const relayUsage = createRelayUsage({ fetchImpl: services.fetcher });
+  const relayRequests = new WeakMap();
+  const latestRelayRequests = new Map();
   const pools = () => services.database.materials.list().filter((p) => p.kind === 'pool');
   let shuttingDown = false;
   let subscription = null,
@@ -64,13 +69,14 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   const secretReadable = (s) =>
     s.secretStore !== 'denied' &&
     (s.connection === 'relay' ? s.relayKeyReadable !== false : s.officialTokenReadable !== false);
-  const client = () =>
+  const client = (onRequestId) =>
     createNovelAIClient({
       token: settings().connection === 'relay' ? preferences.relayKey : preferences.novelAIToken,
       connection: settings().connection,
       baseUrl:
         settings().connection === 'relay' ? settings().relay.baseUrl : services.generationBaseUrl,
       fetchImpl: services.fetcher,
+      onRequestId,
     });
   const settings = () => {
     const s = preferences.generationSettings();
@@ -90,7 +96,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     })),
     paused: queue.paused,
     spentToday: settings().spentToday,
-    today: usage.summary('today', settings().connection),
+    today: usage.summary('today', settings().connection, new Date(), settings().relay.baseUrl),
     settings: settings(),
     subscription,
     balance: balance(),
@@ -111,21 +117,27 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   };
   async function testRelay(input = {}) {
     const baseUrl = normalizeRelayUrl(input.baseUrl ?? settings().relay.baseUrl);
-    const key = input.key?.trim() ?? preferences.relayKey();
+    const key = input.key?.trim() ?? preferences.relayKey(relayPresetFor(baseUrl)?.id ?? 'custom');
+    if (!key) throw new Error('先填 Key');
     const result = await createNovelAIClient({
       connection: 'relay',
       baseUrl,
       token: () => key,
       fetchImpl: services.fetcher,
     }).models();
-    return { baseUrl, result };
+    return { baseUrl, key, result };
   }
   async function refresh() {
     if (!settings().hasToken) return 0;
     try {
       if (settings().connection === 'relay') {
-        const { baseUrl, result } = await testRelay();
-        preferences.saveRelay({ baseUrl, models: result?.models ?? null });
+        const { baseUrl, key, result } = await testRelay();
+        preferences.saveRelayModels(
+          relayPresetFor(baseUrl)?.id ?? 'custom',
+          baseUrl,
+          key,
+          result?.models ?? null,
+        );
         subscription = null;
       } else subscription = await client().subscription();
       accountError = '';
@@ -190,19 +202,48 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   const queue = createGenerationQueue({
     run: services.network?.run,
     persist: storage.schedule,
-    generate: (request, progress) =>
-      request.req_type
-        ? client().director(request)
+    generate: (request, progress) => {
+      const api = client((id) => {
+        const record = relayRequests.get(request);
+        if (record) record.requestId = id;
+      });
+      return request.req_type
+        ? api.director(request)
         : request.action === 'upscale'
-          ? client().upscale(request)
-          : client().generate(request, progress),
-    execute: (job, request, generate, onProgress, publish) => {
-      const tracked = (request, progress) =>
-        recordUsageRequest({
+          ? api.upscale(request)
+          : api.generate(request, progress);
+    },
+    execute: (job, request, generate, onProgress, publishQueue) => {
+      const tracked = (request, progress) => {
+        const s = settings();
+        const record =
+          s.connection === 'relay'
+            ? { ...s.relay, key: preferences.relayKey(), requestId: null }
+            : null;
+        if (record) {
+          relayRequests.set(request, record);
+          latestRelayRequests.set(record.slot, record);
+          preferences.setRelayQuota(record.slot, null);
+        }
+        return recordUsageRequest({
           usage,
           job,
           request,
           connection: settings().connection,
+          relayBaseUrl: record?.baseUrl,
+          settleQuota: record
+            ? async () => {
+                const quota = await relayUsage.requestQuota(
+                  record.baseUrl,
+                  record.key,
+                  record.requestId,
+                );
+                if (!shuttingDown && latestRelayRequests.get(record.slot) === record)
+                  preferences.setRelayQuota(record.slot, quota);
+                return quota;
+              }
+            : undefined,
+          onQuota: publish,
           price:
             settings().connection === 'relay'
               ? { anlas: 0, free: false }
@@ -215,13 +256,14 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           },
           send: () => generate(request, progress),
         });
+      };
       if (job.operation !== 'outpaint') return tracked(request, onProgress);
       return runOutpaint(job, {
         generate: tracked,
         seed: request.parameters.seed,
         library: services.database.vibeLibrary,
         pools: pools(),
-        publish,
+        publish: publishQueue,
         beforeBlock: () => {
           const s = settings();
           if (s.connection === 'relay' && s.limitEnabled && s.spentImagesToday >= s.dailyImageLimit)
@@ -997,8 +1039,10 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       };
     },
 
-    'usage.summary': ({ range = 'today' }) => usage.summary(range, settings().connection),
-    'usage.daily': ({ days = 30 }) => usage.daily(days, settings().connection),
+    'usage.summary': ({ range = 'today' }) =>
+      usage.summary(range, settings().connection, new Date(), settings().relay.baseUrl),
+    'usage.daily': ({ days = 30 }) =>
+      usage.daily(days, settings().connection, new Date(), settings().relay.baseUrl),
     'generate.estimate-outpaint': async (input) => {
       try {
         return (await outpaintFor(input)).estimate;
@@ -1263,19 +1307,49 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     'account.relay.save': async (input) => {
       idleConnection();
       const { baseUrl, result } = await testRelay(input);
+      idleConnection();
       preferences.saveRelay({ baseUrl, key: input.key, models: result?.models ?? null });
+      latestRelayRequests.delete(relayPresetFor(baseUrl)?.id ?? 'custom');
       accountError = '';
       publish();
       return status();
     },
+    'account.relay.switch': async ({ slot }) => {
+      idleConnection();
+      preferences.switchRelay(slot);
+      accountError = '';
+      publish();
+      const baseUrl = settings().relay.baseUrl;
+      try {
+        const { key, result } = await testRelay({ baseUrl });
+        if (result?.models) preferences.saveRelayModels(slot, baseUrl, key, result.models);
+      } catch {
+        /* Keep the saved model list when the relay is unavailable. */
+      }
+      accountError = '';
+      publish();
+      return status();
+    },
+    'account.relay.usage': async () => {
+      try {
+        return await relayUsage.usage(settings().relay.baseUrl, preferences.relayKey());
+      } catch {
+        return { ok: true, used: null, available: null };
+      }
+    },
     'account.relay.test': async (input) => {
       try {
-        const { baseUrl, result } = await testRelay(input);
+        const { baseUrl, key, result } = await testRelay(input);
         if (
           baseUrl === settings().relay.baseUrl &&
           (input.key === undefined || input.key.trim() === preferences.relayKey())
         )
-          preferences.saveRelay({ baseUrl, models: result?.models ?? null });
+          preferences.saveRelayModels(
+            relayPresetFor(baseUrl)?.id ?? 'custom',
+            baseUrl,
+            key,
+            result?.models ?? null,
+          );
         return { ok: true, ...(result || { models: null, other: [] }) };
       } catch (error) {
         return { ok: false, error: error.message };

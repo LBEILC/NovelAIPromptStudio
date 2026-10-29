@@ -3,6 +3,7 @@ import { MODEL_ORDER } from '../src/shared/params.ts';
 import fs from 'node:fs';
 import { DEFAULT_NSFW_TAGS, normalizeNsfwWords } from '../src/shared/nsfw.ts';
 import { normalizeRelayUrl } from './relay.js';
+import { relayPresetFor } from '../src/shared/relayPresets.ts';
 import { normalizeNetworkSettings } from './network.js';
 import path from 'node:path';
 import { DEFAULT_BASE_URL, normalizeBaseUrl } from './translation.js';
@@ -94,6 +95,7 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
   let sessionApiKey = '';
   let chatGPT;
   const secretCache = new Map();
+  const lastQuotas = new Map();
   const platform = options.platform || process.platform;
   const denied = () => platform === 'darwin' && !safeStorage.isEncryptionAvailable();
   const assertSecretAccess = () => {
@@ -104,11 +106,30 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
   );
 
   const read = () => {
+    let stored;
     try {
-      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      stored = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     } catch {
       return {};
     }
+    if (stored.relayBaseUrl || stored.relayKeyEncrypted || stored.relayModels) {
+      const id = relayPresetFor(stored.relayBaseUrl || '')?.id ?? 'custom';
+      if (!stored.relaySlots) {
+        stored.relaySlots = {
+          [id]: {
+            baseUrl: stored.relayBaseUrl || '',
+            keyEncrypted: stored.relayKeyEncrypted,
+            models: stored.relayModels ?? null,
+          },
+        };
+        stored.relaySlot = id;
+      }
+      delete stored.relayBaseUrl;
+      delete stored.relayKeyEncrypted;
+      delete stored.relayModels;
+      write(stored);
+    }
+    return stored;
   };
 
   const write = (preferences) => {
@@ -146,10 +167,13 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
           novelAITokenEncrypted: '持久令牌',
           relayKeyEncrypted: '中转站 Key',
           aiApiKeyEncrypted: 'API Key',
-        }[key];
+        }[key.startsWith('relay:') ? 'relayKeyEncrypted' : key];
         throw new Error(`无法解密已保存的${name === 'API Key' ? ' ' : ''}${name}，请重新保存`);
       }
-      throw new CommandError('secret_unreadable', SECRET_MESSAGES[json ? 'chatGPT' : key]);
+      throw new CommandError(
+        'secret_unreadable',
+        SECRET_MESSAGES[json ? 'chatGPT' : key.startsWith('relay:') ? 'relayKeyEncrypted' : key],
+      );
     }
     return json ? structuredClone(entry.value) : entry.value;
   }
@@ -159,6 +183,8 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       .map((key) => secretEntry(key, preferences[key]));
     for (const mode of ['official', 'codex'])
       entries.push(secretEntry(`chatGPT:${mode}`, preferences.chatGPTEncrypted?.[mode], true));
+    for (const [id, slot] of Object.entries(preferences.relaySlots || {}))
+      entries.push(secretEntry(`relay:${id}`, slot.keyEncrypted));
     if (!safeStorage.isEncryptionAvailable()) return platform === 'darwin' ? 'denied' : 'ok';
     return entries.some((entry) => !entry.readable) ? 'unreadable' : 'ok';
   }
@@ -423,6 +449,9 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     return productivitySettings();
   };
 
+  const relaySlot = () => read().relaySlot || 'custom';
+  const relayRecord = (id = relaySlot()) => read().relaySlots?.[id] || {};
+  const relayKey = (id = relaySlot()) => readSecret(`relay:${id}`, relayRecord(id).keyEncrypted);
   refreshSecretStore();
   return {
     refreshSecretStore,
@@ -458,19 +487,34 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       write(stored);
       secretCache.delete('novelAITokenEncrypted');
     },
-    relayKey: () => {
-      return readSecret('relayKeyEncrypted', read().relayKeyEncrypted);
+    relayKey,
+    switchRelay: (id) => {
+      if (!relayRecord(id).keyEncrypted) throw new Error('这个中转站还没有保存 Key');
+      relayKey(id);
+      write({ ...read(), relaySlot: id });
+    },
+    setRelayQuota: (id, quota) => lastQuotas.set(id, quota),
+    saveRelayModels: (id, baseUrl, key, models) => {
+      const stored = read();
+      const record = stored.relaySlots?.[id];
+      if (!record || record.baseUrl !== baseUrl || relayKey(id) !== key) return;
+      record.models = models;
+      write(stored);
     },
     saveRelay: ({ baseUrl, key, models }) => {
       const stored = read();
-      stored.relayBaseUrl = normalizeRelayUrl(baseUrl);
+      baseUrl = normalizeRelayUrl(baseUrl);
+      const id = relayPresetFor(baseUrl)?.id ?? 'custom';
+      const record = { ...stored.relaySlots?.[id], baseUrl, models: models ?? null };
+      if (key !== undefined || stored.relaySlots?.[id]?.baseUrl !== baseUrl) lastQuotas.delete(id);
       if (key !== undefined) {
         assertSecretAccess();
         if (!safeStorage.isEncryptionAvailable()) throw new Error('当前系统无法安全加密 Key');
-        stored.relayKeyEncrypted = safeStorage.encryptString(key.trim()).toString('base64');
-        secretCache.delete('relayKeyEncrypted');
+        record.keyEncrypted = safeStorage.encryptString(key.trim()).toString('base64');
+        secretCache.delete(`relay:${id}`);
       }
-      stored.relayModels = models ?? null;
+      stored.relaySlots = { ...stored.relaySlots, [id]: record };
+      stored.relaySlot = id;
       write(stored);
     },
     saveConnection: (connection) => {
@@ -482,13 +526,21 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       connection: read().generationConnection || 'official',
       officialToken: !!read().novelAITokenEncrypted,
       relay: {
-        baseUrl: read().relayBaseUrl || '',
-        hasKey: !!read().relayKeyEncrypted,
-        models: read().relayModels ?? null,
+        baseUrl: relayRecord().baseUrl || '',
+        hasKey: !!relayRecord().keyEncrypted,
+        models: relayRecord().models ?? null,
+        slot: relaySlot(),
+        slots: Object.entries(read().relaySlots || {}).map(([id, record]) => ({
+          id,
+          baseUrl: record.baseUrl,
+          hasKey: !!record.keyEncrypted,
+          readable: secretEntry(`relay:${id}`, record.keyEncrypted).readable,
+        })),
+        lastQuota: lastQuotas.get(relaySlot()) ?? null,
       },
       dailyImageLimit: 200,
       hasToken: !!(read().generationConnection === 'relay'
-        ? read().relayKeyEncrypted
+        ? relayRecord().keyEncrypted
         : read().novelAITokenEncrypted),
       continuous: false,
       agentMode: 'confirm',
@@ -498,7 +550,7 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       secretStore: secretStatus(),
       officialTokenReadable: secretEntry('novelAITokenEncrypted', read().novelAITokenEncrypted)
         .readable,
-      relayKeyReadable: secretEntry('relayKeyEncrypted', read().relayKeyEncrypted).readable,
+      relayKeyReadable: secretEntry(`relay:${relaySlot()}`, relayRecord().keyEncrypted).readable,
     }),
     saveGenerationSettings: (next) => {
       if (

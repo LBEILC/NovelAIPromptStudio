@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createCommands } from './index.js';
 import { openDatabase } from '../database.js';
 import { openPreferences } from '../preferences.js';
+import { readWorkbenchImage } from '../workbench.js';
 import { startFakeNovelAI } from '../fixtures/novelAIService.js';
 import { createPromptStructure } from '../../src/lib/promptStructure.js';
 import { parsePrompt } from '../../src/lib/prompt.js';
@@ -213,6 +214,87 @@ it('returns null models through the relay command when all model lists are unrea
     expect(preferences.generationSettings().relay.models).toBeNull();
   } finally {
     await commands?.close();
+    database.close();
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+it('switches independent relay keys through commands, preserves cached models on failure, and sends the selected key', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-relay-switch-'));
+  const database = await openDatabase(root),
+    service = await startFakeNovelAI();
+  const preferences = openPreferences(root, {
+    isEncryptionAvailable: () => true,
+    encryptString: (s) => Buffer.from(s),
+    decryptString: (b) => b.toString(),
+  });
+  const { relayFixtureUrl } = await import('../fixtures/novelAIService.js');
+  let offline = false;
+  const commands = await createCommands({
+    directory: root,
+    version: 'test',
+    database,
+    preferences,
+    busy: () => false,
+    emit: () => {},
+    importImage: async (file) => {
+      const image = await readWorkbenchImage(file);
+      database.insertProject(image);
+      return image;
+    },
+    fetcher: (url, options) => {
+      if (offline) throw Error('offline');
+      return fetch(relayFixtureUrl(url, service.url), options);
+    },
+  });
+  const call = async (name, input = {}) => {
+    const r = await commands.dispatch(name, input, 'ui');
+    if (!r.ok) throw Error(r.error.message);
+    return r.data;
+  };
+  try {
+    await expect(call('account.relay.save', { baseUrl: 'https://api.chr1.com' })).rejects.toThrow(
+      '先填 Key',
+    );
+    await expect(call('account.relay.switch', { slot: 'chr1' })).rejects.toThrow('还没有保存 Key');
+    for (const [baseUrl, key] of [
+      ['https://api.chr1.com', 'acceptance-token'],
+      ['https://api.hamubox.com/v1/novelai', 'acceptance-token-second'],
+    ])
+      await call('account.relay.save', { baseUrl, key });
+    await call('account.relay.save', { baseUrl: 'https://api.chr1.com' });
+    expect(preferences.relayKey()).toBe('acceptance-token');
+    await call('account.connection.save', { connection: 'relay' });
+    const opened = await call('workbench.new', { width: 64, height: 64 });
+    for (const [slot, key] of [
+      ['hamubox', 'acceptance-token-second'],
+      ['chr1', 'acceptance-token'],
+    ]) {
+      await call('account.relay.switch', { slot });
+      const job = await call('generate.start', { tabId: opened.tab.id, count: 1 });
+      await expect(call('account.relay.switch', { slot: 'custom' })).rejects.toThrow('等生成完成');
+      await expect
+        .poll(
+          async () =>
+            (await call('generate.status', { id: job.id })).jobs[0].error ||
+            (await call('generate.status', { id: job.id })).jobs[0].state,
+        )
+        .toBe('completed');
+      expect(service.state.requestKeys.at(-1)).toBe(`Bearer ${key}`);
+      await expect.poll(() => preferences.generationSettings().relay.lastQuota).toBe(0.8);
+      expect(await call('usage.summary')).toMatchObject({ images: 1, quota: 0.8 });
+      expect((await call('usage.daily', { days: 1 })).items[0].quota).toBe(0.8);
+    }
+    offline = true;
+    const switched = await call('account.relay.switch', { slot: 'hamubox' });
+    expect(switched.settings.relay).toMatchObject({
+      slot: 'hamubox',
+      models: ['nai-diffusion-5-full', 'nai-diffusion-4-5-full', 'nai-diffusion-5-full-inpainting'],
+    });
+    for (const name of ['account.relay.switch', 'account.relay.usage'])
+      expect((await commands.dispatch(name, {}, 'agent')).error.code).toBe('forbidden');
+  } finally {
+    await commands.close();
+    await service.close();
     database.close();
     await fs.rm(root, { recursive: true, force: true });
   }

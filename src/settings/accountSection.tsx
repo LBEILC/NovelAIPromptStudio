@@ -5,7 +5,7 @@ import { useNotifications } from '../kit/toast';
 import { invokeUI } from '../lib/commands';
 import { MODEL_CAPS, MODEL_ORDER, type ModelId } from '../shared/params';
 import { resolveRelayEndpoints } from '../shared/relay';
-import { RELAY_PRESETS, relayPresetFor } from '../shared/relayPresets';
+import { RELAY_PRESETS, quotaText, relayPresetFor } from '../shared/relayPresets';
 import { useGeneration } from '../state/generation';
 import { Col, Dropdown, Expand, Row, SetPage, Swap, errorText } from './parts';
 import { Fail, KeychainBanner, ReplaceButton } from './sectionShared';
@@ -228,42 +228,72 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
 const modelNames = (ids: readonly string[]) =>
   ids.map((id) => MODEL_CAPS[id as ModelId]?.name || id).join('、') || '没有本软件支持的模型';
 
-/** 中转站：地址和 Key，"测试连接"读它挂了哪些模型（doc/design.md 2.33） */
+/**
+ * 中转站：地址和 Key，"测试连接"读它挂了哪些模型（doc/design.md 2.33）。
+ * 每个预设和"自定义"各存一个 Key（1.9.12）：选一个存过 Key 的直接切过去，没存过的填 Key 再保存。
+ */
 function Relay({ onSaved }: { onSaved?: () => void }) {
   const g = useGeneration();
   const notify = useNotifications();
   const saved = g.settings.relay;
-  const [url, setUrl] = useState(saved?.baseUrl || '');
+  const slots = saved?.slots ?? [];
+  const slotOf = (id: string) => slots.find((s) => s.id === id);
+  const activeSlot = saved?.slot ?? relayPresetFor(saved?.baseUrl || '')?.id ?? 'custom';
+  const [sel, setSel] = useState(activeSlot);
+  useEffect(() => setSel(activeSlot), [activeSlot]);
+  const customSaved =
+    slotOf('custom')?.baseUrl ?? (activeSlot === 'custom' ? saved?.baseUrl || '' : '');
+  const [customUrl, setCustomUrl] = useState(customSaved);
+  useEffect(() => setCustomUrl(customSaved), [customSaved]);
+  const preset = RELAY_PRESETS.find((p) => p.id === sel) ?? null;
+  const url = preset ? preset.address : customUrl;
+  const selSlot = slotOf(sel);
   const [key, setKey] = useState('');
   const [editingKey, setEditingKey] = useState(false);
-  const [busy, setBusy] = useState<'' | 'save' | 'test'>('');
+  const [busy, setBusy] = useState<'' | 'save' | 'test' | 'switch'>('');
   const [error, setError] = useState('');
   // models 为 null：中转站没有模型列表接口或读不懂（issue 10），和"列表里没有支持的模型"分开写
   const [tested, setTested] = useState<{ models: string[] | null; other: string[] } | null>(null);
-  useEffect(() => setUrl(saved?.baseUrl || ''), [saved?.baseUrl]);
-  // 选中哪个预设由地址推断，不另外存（doc/design.md 2.33）；选了"自定义"就一直显示地址栏
-  const [custom, setCustom] = useState(false);
-  const preset = custom ? null : relayPresetFor(url);
-  const pickPreset = (address: string | null) => {
-    setCustom(address === null);
-    if (address !== null) setUrl(address);
+  const store = g.settings.secretStore;
+  const hasKey = !!selSlot?.hasKey;
+  const active = sel === activeSlot && !!saved?.hasKey;
+  const keyBad = hasKey && selSlot?.readable === false;
+  const keyEdit = editingKey || !hasKey;
+  const dirty = !active || url.trim() !== (saved?.baseUrl || '') || !!key.trim();
+  const ready = !!url.trim() && (hasKey || !!key.trim());
+  const input = () => ({
+    baseUrl: url.trim(),
+    ...(key.trim() ? { key: key.trim() } : {}),
+  });
+  const nameOf = (id: string) => RELAY_PRESETS.find((p) => p.id === id)?.name ?? '自定义中转站';
+  const reset = () => {
+    setKey('');
+    setEditingKey(false);
     setTested(null);
+    setError('');
+  };
+  // 存过 Key 的直接切过去；没存过的只在界面上选中，等填了 Key 再保存
+  const pick = async (id: string) => {
+    if (busy || id === sel) return;
+    setSel(id);
+    reset();
+    if (!slotOf(id)?.hasKey || id === activeSlot) return;
+    setBusy('switch');
+    try {
+      await invokeUI('account.relay.switch', { slot: id });
+      notify({ text: `已切换到${nameOf(id)}`, tone: 'success' });
+    } catch (e) {
+      setSel(activeSlot);
+      setError(errorText(e));
+    } finally {
+      setBusy('');
+    }
   };
   const openSite = (id: string) =>
     void invokeUI('account.relay.open-site', { id }).then(
       () => notify({ text: '已在浏览器中打开', tone: 'success' }),
       (e) => notify({ text: errorText(e), tone: 'error' }),
     );
-  const hasKey = !!saved?.hasKey;
-  const store = g.settings.secretStore;
-  const keyBad = hasKey && g.settings.relayKeyReadable === false;
-  const keyEdit = editingKey || !hasKey;
-  const dirty = url.trim() !== (saved?.baseUrl || '') || !!key.trim();
-  const ready = !!url.trim() && (hasKey || !!key.trim());
-  const input = () => ({
-    baseUrl: url.trim(),
-    ...(key.trim() ? { key: key.trim() } : {}),
-  });
   const test = async () => {
     if (busy || !ready) return;
     setBusy('test');
@@ -286,9 +316,7 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
     setError('');
     try {
       await invokeUI('account.relay.save', input());
-      setKey('');
-      setEditingKey(false);
-      setTested(null);
+      reset();
       notify({ text: '已保存中转站', tone: 'success' });
       if (first) onSaved?.();
     } catch (e) {
@@ -297,12 +325,30 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
       setBusy('');
     }
   };
+  // 这个 Key 已用多少额度（New API 系的中转站能查；查不到就不写数字）
+  const [usage, setUsage] = useState<{ used: number | null; available: number | null } | null>(
+    null,
+  );
+  const usageTick = `${active}:${saved?.baseUrl}:${saved?.lastQuota ?? ''}`;
+  useEffect(() => {
+    let live = true;
+    setUsage(null);
+    if (active)
+      void invokeUI('account.relay.usage', {})
+        .then((r) => {
+          if (live && r.ok) setUsage({ used: r.used, available: r.available });
+        })
+        .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [usageTick]);
   const models = saved?.models ?? null;
   const result = tested
     ? tested.models
       ? `连接成功 · 可以用：${modelNames(tested.models)}`
       : '没读到这个中转站有哪些模型，所有模型都可以选；它没有的会在生成时报错'
-    : hasKey && saved?.baseUrl && !dirty
+    : active && !dirty
       ? models
         ? `可以用：${modelNames(models)}`
         : '没读到这个中转站有哪些模型，所有模型都可以选；它没有的会在生成时报错'
@@ -315,6 +361,7 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
   } catch {
     target = null;
   }
+  const savedHint = (id: string) => (slotOf(id)?.hasKey ? '已存 Key' : undefined);
   return (
     <>
       <Col
@@ -322,22 +369,29 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
         help={
           preset
             ? preset.note
-            : '选一个实测过的中转站，地址会自动填好，只要填 Key；也可以选"自定义"自己填地址。'
+            : '选一个实测过的中转站，地址会自动填好，只要填 Key；也可以选"自定义"自己填地址。每个中转站的 Key 分开保存，切换不用重填。'
         }
       >
         <div className="row">
           <Dropdown
             label="中转站"
             className="set-dd"
+            disabled={busy === 'switch'}
             value={preset ? preset.name : '自定义'}
             items={[
               ...RELAY_PRESETS.map((p) => ({
                 label: p.name,
-                checked: preset?.id === p.id,
-                onSelect: () => pickPreset(p.address),
+                hint: savedHint(p.id),
+                checked: sel === p.id,
+                onSelect: () => void pick(p.id),
               })),
               'sep' as const,
-              { label: '自定义', checked: !preset, onSelect: () => pickPreset(null) },
+              {
+                label: '自定义',
+                hint: savedHint('custom'),
+                checked: sel === 'custom',
+                onSelect: () => void pick('custom'),
+              },
             ]}
           />
           {preset && (
@@ -364,9 +418,9 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
               placeholder="https://"
               autoComplete="off"
               spellCheck={false}
-              value={url}
+              value={customUrl}
               onChange={(e) => {
-                setUrl(e.target.value);
+                setCustomUrl(e.target.value);
                 setTested(null);
               }}
               onKeyDown={(e) => !e.nativeEvent.isComposing && e.key === 'Enter' && void save()}
@@ -386,8 +440,11 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
           )}
         </Col>
       )}
-      <Col title="Key" help="中转站给的 Key。加密后保存在这台电脑上，软件不保存明文。">
-        <Swap k={`key-${keyEdit}`}>
+      <Col
+        title="Key"
+        help="中转站给的 Key。每个中转站分开保存，加密存在这台电脑上，软件不保存明文。"
+      >
+        <Swap k={`key-${sel}-${keyEdit}`}>
           <div className="row">
             {keyEdit ? (
               <>
@@ -482,11 +539,22 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
               ? ''
               : g.accountError)}
       </Fail>
-      {hasKey && (
+      {active && (
         <Row
-          title="余额"
-          help="中转站按它自己的价格计费，余额请到中转站的网站上查看。生成前不显示 Anlas 消耗。"
-        />
+          title="用量"
+          help={
+            usage?.used != null
+              ? '额度的数字和中转站网站上显示的一样；余额请到它的网站上查看。'
+              : '中转站按它自己的价格计费，余额请到中转站的网站上查看。生成前不显示消耗。'
+          }
+        >
+          {usage?.used != null && (
+            <span className="mono relay-used">
+              这个 Key 已用 {quotaText(usage.used)} 额度
+              {usage.available != null && ` · 还剩 ${quotaText(usage.available)} 额度`}
+            </span>
+          )}
+        </Row>
       )}
     </>
   );

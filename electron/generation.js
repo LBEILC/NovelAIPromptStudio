@@ -238,7 +238,10 @@ export function estimateGeneration(request, subscription, count = 1, pendingEnco
 
 export function generationError(status, reason = '', source = 'NovelAI') {
   if (status === 401) return '持久令牌无效，请在设置里更换';
-  if (status === 402) return 'Anlas 不足';
+  if (status === 402)
+    return source === '中转站'
+      ? `中转站返回 402（通常是余额不足）${reason ? `：${reason}` : ''}`
+      : 'Anlas 不足';
   if (status === 429) return '请求太频繁，请稍后再试';
   if (status >= 500) {
     const message =
@@ -373,6 +376,7 @@ export function createNovelAIClient({
   connection = 'official',
   baseUrl = 'https://image.novelai.net',
   fetchImpl = fetch,
+  onRequestId = () => {},
 }) {
   const relay = connection === 'relay' ? resolveRelayEndpoints(baseUrl) : null;
   const url = new URL(relay ? relay.address : baseUrl);
@@ -574,6 +578,7 @@ export function createNovelAIClient({
         throw errorFor(response.status, serverReason(body, secret));
       }
       responseSecrets.set(response, secret);
+      if (relay && body) onRequestId(response.headers.get('X-Oneapi-Request-Id'));
       return response;
     } catch (error) {
       // Only the bounded, redacted server reason may reach the UI.

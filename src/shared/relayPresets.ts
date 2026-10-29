@@ -26,7 +26,7 @@ export const RELAY_PRESETS: readonly RelayPreset[] = [
     name: 'TaleAPI',
     address: 'https://api.taleapi.asia/v1/ai/generate-image',
     site: 'https://taleapi.asia/',
-    note: '可以文生图、图生图、增强、局部重绘和扩图；暂不支持放大和新 Vibe 编码，生成时没有进度预览',
+    note: '可以文生图、图生图、局部重绘和扩图，只能用免费档（不超过 1MP、28 步）；增强、放大和新 Vibe 编码暂不可用，生成时没有进度预览',
     inpaintBaseModel: true,
   },
   {
@@ -36,7 +36,20 @@ export const RELAY_PRESETS: readonly RelayPreset[] = [
     site: 'https://api.hamubox.com/',
     note: '文生图、图生图、增强、局部重绘和扩图都能用，生成时有进度预览',
   },
+  {
+    id: 'chr1',
+    name: '小忆API开放平台',
+    address: 'https://api.chr1.com',
+    site: 'https://api.chr1.com/',
+    note: '文生图、图生图、增强、局部重绘和扩图都能用，生成时有进度预览',
+  },
 ];
 
 export const relayPresetFor = (address: string) =>
   RELAY_PRESETS.find((p) => p.address === address.trim()) ?? null;
+
+/**
+ * 中转站的"额度"（1.9.12，用户 10-29 定）：各站网站上显示的那个数，统一写"额度"，不带 $ 或站点自己的符号，
+ * 也不换算成钱（各站一个额度值多少钱是它们自己定的）。最多三位小数，去掉末尾的 0。
+ */
+export const quotaText = (n: number) => String(Number(n.toFixed(3)));

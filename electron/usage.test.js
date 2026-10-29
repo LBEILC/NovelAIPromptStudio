@@ -131,3 +131,30 @@ it('durably records actual requests, measured costs, fallback estimates, failed 
     connection.close();
   }
 });
+it('keeps relay quota totals scoped to the current address and excludes legacy rows', () => {
+  const connection = new DatabaseSync(':memory:');
+  try {
+    const usage = createUsageStore(connection);
+    for (const changes of [
+      {},
+      { relayBaseUrl: 'https://one.example', quota: null },
+      { relayBaseUrl: 'https://one.example', quota: 0.8 },
+      { relayBaseUrl: 'https://two.example', quota: 4 },
+    ])
+      usage.add({ ...record, connection: 'relay', anlas: null, ...changes });
+    const summary = usage.summary('today', 'relay', new Date(), 'https://one.example');
+    expect(summary).toMatchObject({
+      images: 2,
+      quota: 0.8,
+      byModel: { 'synthetic-model': { quota: 0.8 } },
+      agent: { quota: null },
+    });
+    expect(usage.daily(1, 'relay', new Date(), 'https://two.example').items[0]).toMatchObject({
+      images: 1,
+      quota: 4,
+    });
+    expect(usage.summary('today', 'relay', new Date(), 'https://missing.example').quota).toBeNull();
+  } finally {
+    connection.close();
+  }
+});

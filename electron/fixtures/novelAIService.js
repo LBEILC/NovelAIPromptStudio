@@ -4,6 +4,18 @@ import { estimateDirector } from '../director.js';
 import sharp from 'sharp';
 import yazl from 'yazl';
 import { fixtureServerClose } from './httpLifecycle.js';
+import { RELAY_PRESETS } from '../../src/shared/relayPresets.ts';
+
+export function relayFixtureUrl(input, origin) {
+  const url = new URL(input);
+  if (!RELAY_PRESETS.some((preset) => new URL(preset.address).origin === url.origin)) return input;
+  const route = url.pathname.startsWith('/api/')
+    ? url.pathname
+    : url.pathname.endsWith('/models')
+      ? '/v1/models'
+      : `/ai/${url.pathname.split('/').at(-1)}`;
+  return `${origin}${route}`;
+}
 function pngText(value) {
   const content = Buffer.from('Comment\0' + JSON.stringify(value)),
     bytes = Buffer.concat([Buffer.from('tEXt'), content]);
@@ -24,6 +36,9 @@ export async function startFakeNovelAI() {
   const heldWaiters = new Set();
   const state = {
     requests: [],
+    requestKeys: [],
+    logs: [],
+    logKeys: [],
     encodes: [],
     active: 0,
     maxActive: 0,
@@ -41,8 +56,36 @@ export async function startFakeNovelAI() {
     .png()
     .toBuffer();
   const server = http.createServer(async (req, res) => {
-    if (req.headers.authorization !== 'Bearer acceptance-token') {
+    if (req.url === '/api/status') {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ data: { quota_per_unit: 500000 } }));
+      return;
+    }
+    if (
+      !['Bearer acceptance-token', 'Bearer acceptance-token-second'].includes(
+        req.headers.authorization,
+      )
+    ) {
       res.writeHead(401).end('{}');
+      return;
+    }
+    if (req.url === '/api/usage/token/' || req.url === '/api/log/token') {
+      const logs = state.logs.filter(
+        (_, index) => state.logKeys[index] === req.headers.authorization,
+      );
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({
+          data:
+            req.url === '/api/log/token'
+              ? logs
+              : {
+                  total_used: logs.reduce((n, r) => n + r.quota, 0),
+                  total_available: 50000000,
+                  unlimited_quota: false,
+                },
+        }),
+      );
       return;
     }
     if (req.url === '/v1/models') {
@@ -95,6 +138,7 @@ export async function startFakeNovelAI() {
     for await (const chunk of req) chunks.push(chunk);
     const body = JSON.parse(Buffer.concat(chunks).toString());
     state.requests.push(body);
+    state.requestKeys.push(req.headers.authorization);
     // 和真实服务一样校验 Vibe 的三个数组一样长（用户 10-21 实测被拒）
     const vibeLengths = [
       'reference_image_multiple',
@@ -122,6 +166,15 @@ export async function startFakeNovelAI() {
       res.writeHead(code).end('{}');
       return;
     }
+    const requestId = `fixture-${state.requests.length}`;
+    res.setHeader('X-Oneapi-Request-Id', requestId);
+    state.logs.push({
+      request_id: requestId,
+      quota: 400000,
+      model_name: body.model,
+      created_at: Math.floor(Date.now() / 1000),
+    });
+    state.logKeys.push(req.headers.authorization);
     if (req.url === '/ai/augment-image') {
       const zip = new yazl.ZipFile();
       const count = body.req_type === 'bg-removal' ? 3 : 1;

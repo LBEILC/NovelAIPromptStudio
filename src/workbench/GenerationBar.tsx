@@ -12,6 +12,7 @@ import { useNotifications } from '../kit/toast';
 import { useSwap } from '../kit/motion';
 import type { CommandTab } from '../shared/commands';
 import type { GenerationEstimate } from '../shared/generation';
+import { quotaText } from '../shared/relayPresets';
 
 const MAX_AREA = 1536 * 2048;
 const norm = (n: string) => Math.min(2048, Math.max(64, Math.round(Number(n) / 64) * 64));
@@ -257,6 +258,8 @@ export function GenerationBar({
   if (!state.settings.hasToken) return null;
   // 中转站：不查余额、不显示 Anlas，按张计费（doc/design.md 2.33）
   const relay = state.settings.connection === 'relay';
+  // 中转站上一张扣了多少额度（1.9.12，New API 系的中转站按请求编号查得到；查不到是 null）
+  const lastQuota = relay ? (state.settings.relay?.lastQuota ?? null) : null;
   const cost = estimate?.anlas ?? 0;
   const short = !relay && cost > state.balance;
   const usage = state.subscription?.usage?.percent || 0;
@@ -583,9 +586,21 @@ export function GenerationBar({
                 return (
                   <>
                     {relay ? (
-                      <span className="cost" data-tip="中转站按它自己的价格计费">
+                      <span
+                        className="cost"
+                        data-tip={
+                          lastQuota != null
+                            ? '上一张在中转站扣的额度，数字和它网站上显示的一样'
+                            : '中转站按它自己的价格计费'
+                        }
+                      >
                         <b>中转站</b>
-                        <span>{progress || '按张计费'}</span>
+                        <span>
+                          {progress ||
+                            (lastQuota != null
+                              ? `上一张 ${quotaText(lastQuota)} 额度`
+                              : '按张计费')}
+                        </span>
                       </span>
                     ) : (
                       <span

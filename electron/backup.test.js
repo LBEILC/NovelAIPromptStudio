@@ -348,7 +348,12 @@ it('excludes credentials, local library/network settings and layout; retains thi
       expect(bytes).not.toContain(secret);
     await manager.restore(file);
     const restored = JSON.parse(await fs.readFile(path.join(data, 'preferences.json'), 'utf8'));
-    expect(restored).toMatchObject(secrets);
+    const { relayKeyEncrypted, ...unchanged } = secrets;
+    expect(restored).toMatchObject({
+      ...unchanged,
+      relaySlots: { custom: { keyEncrypted: relayKeyEncrypted } },
+    });
+    expect(restored.relayKeyEncrypted).toBeUndefined();
     expect(preferences.networkSettings().mode).toBe('direct');
   }));
 

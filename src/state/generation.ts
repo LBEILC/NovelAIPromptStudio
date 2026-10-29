@@ -7,7 +7,7 @@ let state: GenerationStatus = {
   settings: {
     connection: 'official',
     officialToken: false,
-    relay: { baseUrl: '', hasKey: false, models: null },
+    relay: { baseUrl: '', hasKey: false, models: null, slot: 'custom', slots: [], lastQuota: null },
     dailyImageLimit: 200,
     hasToken: false,
     continuous: false,

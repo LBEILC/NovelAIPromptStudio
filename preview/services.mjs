@@ -1,7 +1,7 @@
 ﻿import http from 'node:http';
 import net from 'node:net';
 import fs from 'node:fs';
-import { startFakeNovelAI } from '../electron/fixtures/novelAIService.js';
+import { startFakeNovelAI, relayFixtureUrl } from '../electron/fixtures/novelAIService.js';
 import { startFakeChatGPT } from '../electron/fixtures/chatGPTService.js';
 
 export const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -86,6 +86,10 @@ export async function startServices(images) {
   const blocked = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, options) => {
+    input = relayFixtureUrl(
+      typeof input === 'string' || input instanceof URL ? input : input.url,
+      novel.url,
+    );
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
     if (!allowed.has(url.origin)) {
       blocked.push(url.origin);

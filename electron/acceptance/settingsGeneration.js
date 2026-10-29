@@ -99,6 +99,27 @@ export async function settingsGenerationChecks({
       clipboard.readText() === 'acceptance-token' &&
       (await evaluate('document.body.innerText.includes("已复制中转站 Key")')),
   );
+  for (const [name, key] of [
+    ['小忆API开放平台', 'acceptance-token'],
+    ['hamubox', 'acceptance-token-second'],
+  ]) {
+    await pickPreset(name);
+    await input('[aria-label="中转站 Key"]', key);
+    await click('保存', 'document.querySelector("[data-settings-section=novelai]:not(.leaving)")');
+    await wait('!document.querySelector(\'[aria-label="中转站 Key"]\')');
+  }
+  for (const [name, id, key] of [
+    ['小忆API开放平台', 'chr1', 'acceptance-token'],
+    ['hamubox', 'hamubox', 'acceptance-token-second'],
+    ['自定义', 'custom', 'acceptance-token'],
+  ]) {
+    await pickPreset(name);
+    await h.until(() => preferences.generationSettings().relay.slot === id, '下拉切换已保存槽位');
+    await wait('!document.querySelector(\'[aria-label="中转站 Key"]\')');
+    await check(`切到 ${name} 无需重填且使用独立 Key`, () => preferences.relayKey() === key);
+  }
+  await wait('document.body.innerText.includes("这个 Key 已用")');
+  await check('中转站用量查询显示额度', 'document.body.innerText.includes("额度")');
   await h.select('连接方式', previousConnection.connection === 'relay' ? '中转站' : 'NovelAI 官方');
   await wait('!document.querySelector(\'[aria-label="中转站地址"]\')');
   await click('更换');

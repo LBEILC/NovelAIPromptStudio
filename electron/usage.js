@@ -30,13 +30,20 @@ export function createUsageStore(connection) {
       )
       .all(start.toISOString(), end.toISOString())
       .map(decode);
-  const totals = (records, connectionMode) => {
+  const totals = (records, connectionMode, baseUrl) => {
     const selected = connectionMode
-      ? records.filter((r) => r.connection === connectionMode)
+      ? records.filter(
+          (r) =>
+            r.connection === connectionMode &&
+            (connectionMode !== 'relay' || baseUrl === undefined || r.relayBaseUrl === baseUrl),
+        )
       : records;
     const sum = (list) => ({
       images: list.reduce((n, r) => n + r.images, 0),
       requests: list.length,
+      quota: list.some((r) => Number.isFinite(r.quota))
+        ? list.reduce((n, r) => n + (r.quota ?? 0), 0)
+        : null,
       anlas:
         connectionMode === 'relay'
           ? null
@@ -84,17 +91,17 @@ export function createUsageStore(connection) {
         .run(versionId, jobId);
     },
     list: (start = new Date(0), end = new Date()) => rows(start, end),
-    summary(range = 'today', connectionMode, now = new Date()) {
+    summary(range = 'today', connectionMode, now = new Date(), baseUrl) {
       const start = usageRange(range, now);
       return {
         range,
         from: localDay(start),
         to: localDay(now),
         connection: connectionMode || 'all',
-        ...totals(rows(start, now), connectionMode),
+        ...totals(rows(start, now), connectionMode, baseUrl),
       };
     },
-    daily(days = 30, connectionMode, now = new Date()) {
+    daily(days = 30, connectionMode, now = new Date(), baseUrl) {
       if (!Number.isSafeInteger(days) || days < 1 || days > 366)
         throw new Error('天数必须在 1 到 366 之间');
       const start = usageRange('today', now);
@@ -112,6 +119,7 @@ export function createUsageStore(connection) {
             ...totals(
               records.filter((r) => localDay(new Date(r.createdAt)) === date),
               connectionMode,
+              baseUrl,
             ),
           };
         }),
@@ -130,6 +138,9 @@ export async function recordUsageRequest({
   price,
   balance,
   send,
+  relayBaseUrl,
+  settleQuota,
+  onQuota,
 }) {
   const before = connection === 'official' ? await balance().catch(() => NaN) : NaN;
   const id = usage.add({
@@ -145,6 +156,7 @@ export async function recordUsageRequest({
     images: 0,
     source: job.source,
     connection,
+    ...(connection === 'relay' ? { relayBaseUrl, quota: null } : {}),
     free: connection === 'official' && price.free,
     anlas: connection === 'official' ? price.anlas : null,
     estimated: connection === 'official',
@@ -169,5 +181,12 @@ export async function recordUsageRequest({
       anlas,
       estimated: connection === 'official' && !known,
     });
+    if (succeeded && connection === 'relay' && settleQuota)
+      void settleQuota()
+        .then((quota) => {
+          usage.settle(id, { quota });
+          onQuota?.();
+        })
+        .catch(() => {});
   }
 }
