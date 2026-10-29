@@ -259,7 +259,16 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
   const active = sel === activeSlot && !!saved?.hasKey;
   const keyBad = hasKey && selSlot?.readable === false;
   const keyEdit = editingKey || !hasKey;
-  const dirty = !active || url.trim() !== (saved?.baseUrl || '') || !!key.trim();
+  // 地址栏下面写清生成请求最终发到哪里，和主进程用同一个解析（issue 9 之后，1.9.7）
+  let target: ReturnType<typeof resolveRelayEndpoints> | null = null;
+  try {
+    target = url.trim() ? resolveRelayEndpoints(url) : null;
+  } catch {
+    target = null;
+  }
+  // 和已保存的地址比规范化以后的值：填 https://x.com/v1 保存后存的是 https://x.com，不算改动
+  const dirty =
+    !active || (target?.address ?? url.trim()) !== (saved?.baseUrl || '') || !!key.trim();
   const ready = !!url.trim() && (hasKey || !!key.trim());
   const input = () => ({
     baseUrl: url.trim(),
@@ -354,13 +363,6 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
         : '没读到这个中转站有哪些模型，所有模型都可以选；它没有的会在生成时报错'
       : '';
   const tip = !url.trim() ? '先填地址' : !ready ? '先填 Key' : undefined;
-  // 地址栏下面写清生成请求最终发到哪里，和主进程用同一个解析（issue 9 之后，1.9.7）
-  let target: ReturnType<typeof resolveRelayEndpoints> | null = null;
-  try {
-    target = url.trim() ? resolveRelayEndpoints(url) : null;
-  } catch {
-    target = null;
-  }
   const savedHint = (id: string) => (slotOf(id)?.hasKey ? '已存 Key' : undefined);
   return (
     <>
