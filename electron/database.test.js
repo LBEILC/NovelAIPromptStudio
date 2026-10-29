@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { parsePrompt } from '../src/lib/prompt.js';
 import { DatabaseSync } from 'node:sqlite';
 import './fixtures/databaseTestBudget.js';
 import os from 'node:os';
@@ -220,7 +221,7 @@ describe('phase 2 core database', () => {
       const database = await openDatabase(directory);
       database.upsertTagDictionary([
         {
-          tag: 'light gray ribbed knit sleeveless turtleneck top',
+          tag: 'light gray ribbed knit turtleneck top',
           translation: '浅灰色罗纹针织无袖高领上衣',
           category: 'Clothing',
           has_translation: true,
@@ -250,7 +251,7 @@ describe('phase 2 core database', () => {
 
       expect(database.listTagDictionary({ query: '浅灰色' })).toMatchObject({
         total: 1,
-        items: [{ tag: 'light gray ribbed knit sleeveless turtleneck top', category: 'Clothing' }],
+        items: [{ tag: 'light gray ribbed knit turtleneck top', category: 'Clothing' }],
       });
       expect(database.listTagDictionary({ category: 'Identity' })).toMatchObject({
         total: 1,
@@ -275,17 +276,13 @@ describe('phase 2 core database', () => {
       });
       expect(
         database.updateTagDictionaryCategory(
-          [
-            'light gray ribbed knit sleeveless turtleneck top',
-            'bagpipe (arknights)',
-            'missing tag',
-          ],
+          ['light gray ribbed knit turtleneck top', 'bagpipe (arknights)', 'missing tag'],
           'Body',
         ),
       ).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            tag: 'light gray ribbed knit sleeveless turtleneck top',
+            tag: 'light gray ribbed knit turtleneck top',
             category: 'Body',
             category_source: 'manual',
           }),
@@ -311,7 +308,7 @@ describe('phase 2 core database', () => {
       expect(database.deleteTagDictionary('bagpipe (arknights)')).toBe(false);
       expect(
         database.deleteTagDictionaries([
-          'light gray ribbed knit sleeveless turtleneck top',
+          'light gray ribbed knit turtleneck top',
           'yamamoto souichirou',
           'missing tag',
         ]),
@@ -398,7 +395,7 @@ describe('phase 2 core database', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-core-db-'));
     temporaryDirectories.push(directory);
     const database = await openDatabase(directory);
-    const tag = 'light gray ribbed knit sleeveless turtleneck top';
+    const tag = 'light gray ribbed knit turtleneck top';
     database.upsertTagDictionary([
       {
         tag,
@@ -723,4 +720,45 @@ it('adds the hash lookup index to an existing database without changing legacy l
   } finally {
     reader.close();
   }
+});
+
+it('keeps parsed text blocks in projects but out of every dictionary insertion path', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-single-tag-'));
+  temporaryDirectories.push(directory);
+  const database = await openDatabase(directory);
+  const prompt = 'text:"A paper boat, a quiet lake" landscape, 1.85::blue coat::, soft light';
+  const tags = parsePrompt(prompt).map((tag) => ({
+    ...tag,
+    translation: 'Synthetic translation',
+    category: 'Scene',
+    has_translation: true,
+  }));
+  expect(tags).toHaveLength(1);
+  expect(tags[0]).toMatchObject({ tag: prompt, segment_type: 'text_block' });
+  database.insertProject({
+    ...project('text-block'),
+    tags,
+    prompt_structure: {},
+    metadata: { prompt_raw: prompt, extra_json: '{}' },
+  });
+  expect(database.loadProject('text-block').tags[0].tag).toBe(prompt);
+  expect(database.listTagDictionary().total).toBe(0);
+  database.upsertTagDictionary([
+    ...tags,
+    { tag: '1.85::blue coat::', translation: 'Synthetic translation' },
+    { tag: '(green scarf:1.45)', translation: 'Synthetic translation' },
+  ]);
+  expect(database.updateTagDictionary(prompt, { translation: 'Synthetic translation' })).toBeNull();
+  const updated = database.updateTagDictionaries([
+    { tag: 'red scarf\nblue coat', translation: 'Synthetic translation' },
+    { tag: '{{silver hat}}', translation: 'Synthetic translation' },
+  ]);
+  expect(updated[0]).toBeNull();
+  expect(updated[1]).toMatchObject({ tag: 'silver hat' });
+  expect(
+    database
+      .listTagDictionary({ all: true })
+      .items.map((item) => item.tag)
+      .sort(),
+  ).toEqual(['blue coat', 'silver hat']);
 });

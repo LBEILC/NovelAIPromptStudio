@@ -507,6 +507,7 @@ export async function createCommands(services) {
         searchDsoTags(search).map((item) => [item.tag.toLowerCase().replaceAll(' ', '_'), item]),
       );
       for (const entry of services.database.listTagDictionary({ query: search, limit: 30 }).items) {
+        if (/[,，\r\n]/.test(entry.tag) || /[,，\r\n]/.test(entry.display_tag || '')) continue;
         items.set(entry.tag.toLowerCase().replaceAll(' ', '_'), {
           tag: entry.display_tag || entry.tag,
           translation: entry.translation,
@@ -527,7 +528,7 @@ export async function createCommands(services) {
     },
     'dictionary.set-many': async (input) => {
       revision(input.expectedRevision, store.revision());
-      services.database.updateTagDictionaries(
+      const updated = services.database.updateTagDictionaries(
         input.entries.map((entry) => ({
           tag: entry.tag,
           ...(entry.translation !== undefined ? { translation: entry.translation } : {}),
@@ -537,11 +538,7 @@ export async function createCommands(services) {
       await store.bump();
       emit({ dictionaryChanged: true });
       return {
-        items: [
-          ...services.database
-            .lookupTagDictionary(input.entries.map((entry) => entry.tag))
-            .values(),
-        ],
+        items: updated.filter(Boolean),
         revision: store.revision(),
       };
     },
@@ -557,14 +554,14 @@ export async function createCommands(services) {
     }),
     'dictionary.set': async (input) => {
       revision(input.expectedRevision, store.revision());
-      services.database.updateTagDictionary(input.tag, {
+      const updated = services.database.updateTagDictionary(input.tag, {
         ...(input.translation !== undefined ? { translation: input.translation } : {}),
         ...(input.category !== undefined ? { category: input.category } : {}),
       });
       await store.bump();
       emit({ dictionaryChanged: true });
       return {
-        items: [...services.database.lookupTagDictionary([input.tag]).values()],
+        items: updated ? [updated] : [],
         revision: store.revision(),
       };
     },

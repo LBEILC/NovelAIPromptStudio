@@ -8,6 +8,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash } from 'node:crypto';
 import { CATEGORY_OPTIONS, inferCategory, normalizeCategory } from '../src/lib/prompt.js';
+import { singleTagCore } from '../src/lib/singleTag.js';
 import {
   galleryProjectGroupingFingerprints,
   normalizedSimilarityTag,
@@ -472,12 +473,13 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     ] || 0;
   const upsertTagDictionary = (entries = [], updatedAt = new Date().toISOString()) => {
     for (const entry of entries) {
-      const key = dictionaryKey(entry.tag);
+      const tag = singleTagCore(entry.tag);
+      const key = dictionaryKey(tag);
       if (!key) continue;
       const current =
         query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0] || {};
       const incomingTranslation = String(entry.translation || '').trim();
-      const incomingCategory = normalizeCategory(entry.category, entry.tag);
+      const incomingCategory = normalizeCategory(entry.category, tag);
       const incomingTranslationSource = String(
         entry.translation_source || (entry.has_translation ? 'ai' : ''),
       );
@@ -500,7 +502,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
         : String(current.translation || '');
       const category = replaceClassification
         ? incomingCategory
-        : normalizeCategory(current.category, entry.tag);
+        : normalizeCategory(current.category, tag);
       const hasTranslation = Boolean(current.has_translation || hasIncomingTranslation);
       const hasClassification = Boolean(current.has_classification || hasIncomingClassification);
       if (!hasTranslation && !hasClassification) continue;
@@ -513,7 +515,7 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
           category_source = excluded.category_source, updated_at = excluded.updated_at`,
         {
           $tag: key,
-          $display_tag: String(current.display_tag || entry.tag || '').trim(),
+          $display_tag: String(current.display_tag || tag).trim(),
           $translation: translation,
           $category: category,
           $has_translation: hasTranslation ? 1 : 0,
@@ -531,6 +533,8 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   };
 
   const updateTagDictionary = (tag, patch = {}) => {
+    tag = singleTagCore(tag);
+    if (!tag) return null;
     const key = dictionaryKey(tag);
     if (!key) throw new Error('Tag 不能为空');
     const current = query('SELECT * FROM tag_dictionary WHERE tag = $tag', { $tag: key })[0] || {};

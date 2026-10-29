@@ -1,6 +1,7 @@
 import '../fixtures/databaseTestBudget.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs/promises';
+import { DatabaseSync } from 'node:sqlite';
 import os from 'node:os';
 import path from 'node:path';
 import { createCommands } from './index.js';
@@ -498,4 +499,62 @@ describe('calendar import-day scope', () => {
         .ok,
     ).toBe(false);
   });
+});
+
+it('filters legacy prompt blocks only in suggestions and returns normalized writes', async () => {
+  const app = await setup();
+  const legacy = new DatabaseSync(app.database.filePath);
+  const entries = [
+    ['synthetic, landscape', 'synthetic, landscape'],
+    ['synthetic\nlandscape', 'synthetic\nlandscape'],
+    ['synthetic\rlandscape', 'synthetic\rlandscape'],
+    ['synthetic\uFF0Clandscape', 'synthetic\uFF0Clandscape'],
+    ['synthetic display', 'synthetic, display'],
+    ['synthetic valid', 'synthetic valid'],
+  ];
+  try {
+    const insert = legacy.prepare(`INSERT INTO tag_dictionary
+      (tag, display_tag, translation, category, has_translation, updated_at)
+      VALUES (?, ?, 'legacy', 'Scene', 1, '2026-01-01')`);
+    for (const [tag, display] of entries) insert.run(tag, display);
+    const before = legacy.prepare('SELECT * FROM tag_dictionary ORDER BY tag').all();
+    expect(
+      (await app.call('dictionary.suggest', { query: 'synthetic' })).items.map(
+        (item: { tag: string }) => item.tag,
+      ),
+    ).toEqual(['synthetic valid']);
+    expect(
+      (await app.call('dictionary.list', { query: 'synthetic', all: true })).items,
+    ).toHaveLength(entries.length);
+    expect(legacy.prepare('SELECT * FROM tag_dictionary ORDER BY tag').all()).toEqual(before);
+    expect(
+      (
+        await app.call('dictionary.set', {
+          tag: '1.85::synthetic coat::',
+          translation: 'Synthetic translation',
+        })
+      ).items,
+    ).toMatchObject([{ tag: 'synthetic coat' }]);
+    expect(
+      (
+        await app.call('dictionary.set-many', {
+          entries: [
+            { tag: '{synthetic hat}', translation: 'Synthetic translation' },
+            { tag: 'synthetic, rejected', translation: 'Synthetic translation' },
+          ],
+        })
+      ).items,
+    ).toMatchObject([{ tag: 'synthetic hat' }]);
+    expect(
+      (
+        await app.call('dictionary.set', {
+          tag: 'synthetic, rejected',
+          translation: 'Synthetic translation',
+        })
+      ).items,
+    ).toEqual([]);
+  } finally {
+    legacy.close();
+    await app.close();
+  }
 });

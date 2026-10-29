@@ -6,6 +6,7 @@ import { Icon } from '../kit/controls';
 type Suggestion = { id: string; text: string; translation?: string; count?: string };
 import { invokeUI } from '../lib/commands';
 import { textErrors, textMarks } from '../lib/promptText.js';
+import { singleTagCore } from '../lib/singleTag.js';
 import { categoryLabel } from './model';
 import type { Tag } from '../shared/types';
 
@@ -155,18 +156,7 @@ export function TextSection({
   const parts = value.split(/([,\n])/).map((part, index) => {
     const begin = at;
     at += part.length;
-    const core = part
-      .trim()
-      .replace(/^-?[\d.]+::/, '')
-      .replace(/::$/, '')
-      .replace(/^[{[(]+|[}\])]+$/g, '')
-      .trim();
-    const isTag =
-      !!core &&
-      core.split(/\s+/).length <= 6 &&
-      !/[.!?]$/.test(core) &&
-      part !== ',' &&
-      part !== '\n';
+    const core = singleTagCore(part);
     const runs: ReactNode[] = [];
     let run = '',
       kind = marks[begin];
@@ -195,7 +185,7 @@ export function TextSection({
     return (
       <span
         key={index}
-        data-text-tag={isTag ? core : undefined}
+        data-text-tag={core || undefined}
         className={`${errors.some((e) => e.at >= begin && e.at < at) ? 'bad' : ''} ${query && part.toLowerCase().includes(query.toLowerCase()) ? 'hit' : ''}`}
       >
         {runs}
