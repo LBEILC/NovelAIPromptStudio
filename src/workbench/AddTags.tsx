@@ -135,7 +135,9 @@ export function AddTags({
             onPointerEnter={() => setPick(i)}
             onClick={() => add(h.tag)}
           >
-            <span className="en">{h.tag}</span>
+            <span className="en" data-tip-overflow={h.tag}>
+              {h.tag}
+            </span>
             <span className="zh">{h.translation}</span>
           </div>
         ))}

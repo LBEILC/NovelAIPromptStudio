@@ -99,7 +99,9 @@ export function TagField({
             onPointerEnter={() => setPick(i)}
             onClick={() => add(h.text)}
           >
-            <span className="en">{h.text}</span>
+            <span className="en" data-tip-overflow={h.text}>
+              {h.text}
+            </span>
             <span className="zh">{h.translation}</span>
           </div>
         ))}

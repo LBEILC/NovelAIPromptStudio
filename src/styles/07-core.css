@@ -92,6 +92,10 @@
 .tags-view-en .tag.ghost, .tags-view-zh .tag.ghost, .tags-view-en .tag.input, .tags-view-zh .tag.input { min-height: 0; }
 .complete { position: absolute; z-index: 21; }
 .complete .mi .en { font: var(--fs-small)/1 var(--font-mono); }
+/* 补全候选（#11）：菜单最宽 --popover-w-wide，每条一行，放不下省略、悬停看全文；以前长条目换行后叠在一起、横跨整个窗口 */
+.menu.complete { max-width: var(--popover-w-wide); }
+.menu.complete .mi .en, .menu.complete .mi .zh { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu.complete .mi .zh { flex: 0 1 auto; max-width: 45%; }
 
 /* 搜索框里可以打字 */
 .field input { flex: 1 1 0; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; padding: 0; }

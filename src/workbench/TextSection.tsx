@@ -102,10 +102,14 @@ export function TextSection({
   };
   const head = value.slice(0, cursor),
     start = Math.max(head.lastIndexOf(','), head.lastIndexOf('\n')) + 1,
-    search = head.slice(start).trim();
+    token = head.slice(start),
+    // 权重前缀（1.5::、-2::）和开头的括号不参与补全，选中候选时原样留着；
+    // 只有数字、权重、符号这类没有文字的不弹补全（#11：打 1.5 时弹出一串带 1.5 的条目）
+    lead = /^\s*(?:-?[\d.]+::)?[{[(]*/.exec(token)![0],
+    search = token.slice(lead.length).trim();
   useEffect(() => {
     let alive = true;
-    if (!suggest || !search || search.length > 80) {
+    if (!suggest || !/\p{L}/u.test(search) || search.length > 80) {
       setItems([]);
       return;
     }
@@ -113,12 +117,16 @@ export function TextSection({
       void invokeUI('dictionary.suggest', { query: search }).then((r) => {
         if (alive) {
           setItems(
-            r.items.slice(0, 6).map((item) => ({
-              id: item.tag,
-              text: item.tag,
-              translation: item.translation,
-              count: item.count ? String(item.count) : '',
-            })),
+            r.items
+              // 候选只放单个标签：带逗号、换行的（整段提示词被记成了一个条目）不放（#11）
+              .filter((item) => !/[,\n]/.test(item.tag))
+              .slice(0, 6)
+              .map((item) => ({
+                id: item.tag,
+                text: item.tag,
+                translation: item.translation,
+                count: item.count ? String(item.count) : '',
+              })),
           );
           setActive(0);
         }
@@ -130,9 +138,8 @@ export function TextSection({
     };
   }, [search, suggest]);
   const choose = (item: Suggestion) => {
-    const whitespace = /^\s*/.exec(value.slice(start, cursor))![0];
-    const next = value.slice(0, start) + whitespace + item.text + ', ' + value.slice(cursor);
-    const position = start + whitespace.length + item.text.length + 2;
+    const next = value.slice(0, start) + lead + item.text + ', ' + value.slice(cursor);
+    const position = start + lead.length + item.text.length + 2;
     change(next, position);
     setSuggest(false);
     setItems([]);
@@ -293,7 +300,9 @@ export function TextSection({
             onPointerEnter={() => setActive(i)}
             onClick={() => choose(item)}
           >
-            <span className="en">{item.text}</span>
+            <span className="en" data-tip-overflow={item.text}>
+              {item.text}
+            </span>
             <span className="zh">{item.translation}</span>
           </div>
         ))}
