@@ -109,6 +109,7 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       (e) => notify({ text: errorText(e), tone: 'error' }),
     );
   const checking = st?.phase === 'checking';
+  const downloading = st?.phase === 'downloading';
   const found =
     !!st && (st.hasUpdate || ['available', 'downloading', 'downloaded'].includes(st.phase));
   const failed = !found && !checking && !!(u.error || st?.error);
@@ -256,10 +257,11 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
             '当前 macOS 版本未签名，无法在应用内直接安装更新。发现新版本后，请从官方 Release 下载对应安装包并手动替换应用。',
         ]}
       >
+        {/* 发现新版本以后也能再检查：期间又发了更新的版本，要能换成最新的（用户 10-29）；只有正在下载时不行 */}
         <button
           className={`btn sm ${checking ? 'loading' : ''}`}
-          disabled={checking || found || !st}
-          data-tip={found ? '已发现新版本' : undefined}
+          disabled={checking || downloading || !st}
+          data-tip={downloading ? '下载完成后再检查' : undefined}
           onClick={() => void u.check()}
         >
           {checking && <Icon name="loader-4-line" />}
