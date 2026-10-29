@@ -1,4 +1,27 @@
 import { validateReleaseNotes } from '../src/lib/releaseNotes.js';
+// Use the state captured before checking so transient events cannot erase a download.
+export function transitionUpdateCheck(state, result) {
+  if (state.phase === 'downloading') return state;
+  if (result.error) {
+    return {
+      ...state,
+      phase: ['available', 'downloaded'].includes(state.phase) ? state.phase : 'error',
+      error: result.error,
+    };
+  }
+  const downloaded =
+    state.phase === 'downloaded' &&
+    result.hasUpdate &&
+    state.latestVersion === result.latestVersion;
+  return {
+    ...state,
+    ...result,
+    phase: downloaded ? 'downloaded' : result.hasUpdate ? 'available' : 'current',
+    progress: downloaded ? 100 : 0,
+    error: '',
+  };
+}
+
 // The installer may fail without quitting the app. Let the caller reopen its
 // database on failure, but never start the installer with an open connection.
 export function installUpdateAfterClosingDatabase(updater, database, onInstallError) {

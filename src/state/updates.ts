@@ -37,7 +37,12 @@ export function useUpdates() {
       setState(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      setState((current) => current && { ...current, phase: 'error', hasUpdate: false });
+      // The main process retains any available or downloaded update on check failure.
+      try {
+        setState(await invokeUI('updates.status', {}));
+      } catch {
+        setState(state);
+      }
     }
   };
   const changeAutoCheck = async (checked: boolean) => {

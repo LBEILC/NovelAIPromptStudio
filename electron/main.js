@@ -67,6 +67,7 @@ import { copySecret } from './copySecret.js';
 import {
   checkForUpdates as checkReleaseUpdates,
   getUpdateCapabilities,
+  transitionUpdateCheck,
   installUpdateAfterClosingDatabase,
 } from './updates.js';
 import { configureAppProfile } from './appProfile.js';
@@ -378,6 +379,8 @@ function releaseNotesText(notes) {
   return String(notes || '').trim();
 }
 
+let updateCheckState = null;
+
 function configureAutoUpdater() {
   if (acceptanceMode) return;
   if (
@@ -391,28 +394,26 @@ function configureAutoUpdater() {
     notifyUpdateState({ phase: 'checking', error: '', progress: 0 }),
   );
   autoUpdater.on('update-available', (info) =>
-    notifyUpdateState({
-      phase: 'available',
-      hasUpdate: true,
-      latestVersion: info.version,
-      checkedAt: new Date().toISOString(),
-      publishedAt: info.releaseDate || '',
-      notes: releaseNotesText(info.releaseNotes).slice(0, 4_000),
-      progress: 0,
-      error: '',
-    }),
+    notifyUpdateState(
+      transitionUpdateCheck(updateCheckState || updateState, {
+        hasUpdate: true,
+        latestVersion: info.version,
+        checkedAt: new Date().toISOString(),
+        publishedAt: info.releaseDate || '',
+        notes: releaseNotesText(info.releaseNotes).slice(0, 4_000),
+      }),
+    ),
   );
   autoUpdater.on('update-not-available', (info) =>
-    notifyUpdateState({
-      phase: 'current',
-      hasUpdate: false,
-      latestVersion: info.version || app.getVersion(),
-      checkedAt: new Date().toISOString(),
-      publishedAt: info.releaseDate || '',
-      notes: '',
-      progress: 0,
-      error: '',
-    }),
+    notifyUpdateState(
+      transitionUpdateCheck(updateCheckState || updateState, {
+        hasUpdate: false,
+        latestVersion: info.version || app.getVersion(),
+        checkedAt: new Date().toISOString(),
+        publishedAt: info.releaseDate || '',
+        notes: '',
+      }),
+    ),
   );
   autoUpdater.on('download-progress', (progress) =>
     notifyUpdateState({
@@ -434,10 +435,13 @@ function configureAutoUpdater() {
     }),
   );
   autoUpdater.on('error', (error) =>
-    notifyUpdateState({
-      phase: 'error',
-      error: error instanceof Error ? error.message : String(error),
-    }),
+    notifyUpdateState(
+      updateCheckState
+        ? transitionUpdateCheck(updateCheckState, {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        : { phase: 'error', error: error instanceof Error ? error.message : String(error) },
+    ),
   );
 }
 
@@ -1403,17 +1407,28 @@ app.whenReady().then(async () => {
     };
   });
   registerCommand('updates.check', async (input, _caller) => {
+    if (updateState.phase === 'downloading')
+      return { ok: false, error: '正在下载更新，下载完成后再检查' };
+    if (updateCheckState) return { ok: true, ...updateState };
     if (acceptanceMode) {
       await acceptanceDoubles.beforeUpdateCheck?.();
-      notifyUpdateState({
-        phase: 'available',
-        hasUpdate: true,
-        latestVersion: '99.0.0',
-        checkedAt: new Date().toISOString(),
-        structuredNotes: acceptanceDoubles.structuredNotes || null,
-        notes: '# 验收发布说明\n\n本地替身。[验收链接](https://example.com/acceptance)',
-        releaseUrl: 'https://github.com/LBEILC/NovelAIPromptStudio/releases/tag/v99.0.0',
-      });
+      if (acceptanceDoubles.updateError) {
+        notifyUpdateState(
+          transitionUpdateCheck(updateState, { error: acceptanceDoubles.updateError }),
+        );
+        return { ok: false, ...updateState };
+      }
+      const version = acceptanceDoubles.updateVersion || '99.0.0';
+      notifyUpdateState(
+        transitionUpdateCheck(updateState, {
+          hasUpdate: true,
+          latestVersion: version,
+          checkedAt: new Date().toISOString(),
+          structuredNotes: acceptanceDoubles.structuredNotes || null,
+          notes: '# 验收发布说明\n\n本地替身。[验收链接](https://example.com/acceptance)',
+          releaseUrl: `https://github.com/LBEILC/NovelAIPromptStudio/releases/tag/v${version}`,
+        }),
+      );
       return { ok: true, ...updateState };
     }
     const capabilities = getUpdateCapabilities(
@@ -1421,16 +1436,12 @@ app.whenReady().then(async () => {
       app.isPackaged,
       macAutomaticUpdates,
     );
+    updateCheckState = updateState;
     try {
       if (!capabilities.canDownloadUpdate) {
         notifyUpdateState({ phase: 'checking', error: '', progress: 0 });
         const release = await checkReleaseUpdates(app.getVersion(), network.fetch);
-        notifyUpdateState({
-          ...release,
-          phase: release.hasUpdate ? 'available' : 'current',
-          progress: 0,
-          error: '',
-        });
+        notifyUpdateState(transitionUpdateCheck(updateCheckState, release));
         return { ok: true, ...updateState };
       }
       const result = await network.run(() => autoUpdater.checkForUpdates());
@@ -1450,14 +1461,16 @@ app.whenReady().then(async () => {
         ...updateState,
         currentVersion: app.getVersion(),
         latestVersion: info?.version || updateState.latestVersion,
-        hasUpdate: updateState.phase === 'available',
+        hasUpdate: updateState.hasUpdate,
         packaged: true,
         ...capabilities,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      notifyUpdateState({ phase: 'error', error: message });
-      return { ok: false, currentVersion: app.getVersion(), ...capabilities, error: message };
+      notifyUpdateState(transitionUpdateCheck(updateCheckState, { error: message }));
+      return { ok: false, ...updateState, error: message };
+    } finally {
+      updateCheckState = null;
     }
   });
   registerCommand('updates.download', async (input, _caller) => {

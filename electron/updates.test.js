@@ -1,12 +1,122 @@
 import { EventEmitter } from 'node:events';
 import { createRequire } from 'node:module';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   checkForUpdates,
   compareVersions,
   getUpdateCapabilities,
   installUpdateAfterClosingDatabase,
+  transitionUpdateCheck,
 } from './updates.js';
+
+describe('rechecking updates', () => {
+  const state = (phase) => ({
+    phase,
+    latestVersion: '2.0.0',
+    hasUpdate: true,
+    progress: phase === 'downloaded' ? 100 : 0,
+    releaseUrl: 'https://example.com/v2',
+    notes: 'X',
+  });
+  it.each(['available', 'downloaded'])('preserves %s on a network error', (phase) => {
+    const before = state(phase);
+    expect(transitionUpdateCheck(before, { error: 'offline' })).toEqual({
+      ...before,
+      error: 'offline',
+    });
+  });
+  it.each(['available', 'downloaded'])('keeps %s when the same version is found', (phase) => {
+    expect(
+      transitionUpdateCheck(state(phase), { hasUpdate: true, latestVersion: '2.0.0' }),
+    ).toMatchObject({ phase, latestVersion: '2.0.0', error: '' });
+  });
+  it.each(['available', 'downloaded'])(
+    'replaces %s with the newer version and release page',
+    (phase) => {
+      expect(
+        transitionUpdateCheck(state(phase), {
+          hasUpdate: true,
+          latestVersion: '2.0.1',
+          releaseUrl: 'https://example.com/vY',
+        }),
+      ).toMatchObject({
+        phase: 'available',
+        latestVersion: '2.0.1',
+        progress: 0,
+        releaseUrl: 'https://example.com/vY',
+      });
+    },
+  );
+  it('never changes a download in progress', () => {
+    const before = state('downloading');
+    for (const result of [{ error: 'offline' }, { hasUpdate: true, latestVersion: '2.0.1' }])
+      expect(transitionUpdateCheck(before, result)).toBe(before);
+  });
+  it('supports initial checks, no update and initial errors', () => {
+    expect(transitionUpdateCheck({ phase: 'idle' }, { error: 'offline' }).phase).toBe('error');
+    expect(
+      transitionUpdateCheck({ phase: 'idle' }, { hasUpdate: true, latestVersion: '2.0.0' }).phase,
+    ).toBe('available');
+    expect(
+      transitionUpdateCheck({ phase: 'idle' }, { hasUpdate: false, latestVersion: '1.0.0' }).phase,
+    ).toBe('current');
+  });
+
+  it('the installed updater downloads Y after X and passes Y to installation', async () => {
+    const require = createRequire(import.meta.url);
+    const { BaseUpdater } = require('electron-updater/out/BaseUpdater.js');
+    const { DownloadedUpdateHelper } = require('electron-updater/out/DownloadedUpdateHelper.js');
+    const root = await mkdtemp(path.join(os.tmpdir(), 'update-recheck-'));
+    const updater = new BaseUpdater(null, { version: '1.0.0', isPackaged: true });
+    updater.logger = { info() {}, warn() {}, error() {} };
+    updater.autoDownload = false;
+    updater.autoInstallOnAppQuit = false;
+    updater.downloadedUpdateHelper = new DownloadedUpdateHelper(root);
+    let version = '2.0.0';
+    updater.getUpdateInfoAndProvider = async () => ({
+      info: { version, files: [{ url: `app-${version}.exe`, sha512: version }] },
+      provider: {
+        resolveFiles: (info) =>
+          info.files.map((file) => ({
+            url: new URL(`https://example.com/${file.url}`),
+            info: file,
+          })),
+      },
+    });
+    updater.doDownloadUpdate = (options) =>
+      updater.executeDownload({
+        fileExtension: 'exe',
+        downloadUpdateOptions: options,
+        fileInfo: options.updateInfoAndProvider.provider.resolveFiles(
+          options.updateInfoAndProvider.info,
+        )[0],
+        task: (file) => writeFile(file, options.updateInfoAndProvider.info.version),
+      });
+    const installed = [];
+    updater.doInstall = () => {
+      installed.push(updater.installerPath);
+      return true;
+    };
+    try {
+      await updater.checkForUpdates();
+      await updater.downloadUpdate();
+      const first = updater.installerPath;
+      await updater.checkForUpdates();
+      expect(updater.installerPath).toBe(first);
+      version = '2.0.1';
+      await updater.checkForUpdates();
+      expect(updater.updateInfoAndProvider.info.version).toBe(version);
+      await updater.downloadUpdate();
+      expect(updater.install()).toBe(true);
+      expect(installed).toEqual([path.join(root, 'pending', 'app-2.0.1.exe')]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('database lifecycle during installation', () => {
   it('closes before invoking the installer and forwards its arguments', () => {

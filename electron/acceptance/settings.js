@@ -463,9 +463,30 @@ export async function settingsChecks(context, restart) {
     'once',
   );
   await check(
-    '发现新版本后检查更新不可用且说明原因',
-    `(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='检查更新');return !!b&&(b.disabled||b.getAttribute('aria-disabled')==='true')&&b.dataset.tip==='已发现新版本'})()`,
+    '发现新版本后检查更新仍可点',
+    `(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='检查更新');return !!b&&!b.disabled&&b.getAttribute('aria-disabled')!=='true'})()`,
   );
+  doubles.updateVersion = '99.0.1';
+  await click('检查更新');
+  await wait('document.body.innerText.includes("发现新版本 99.0.1")');
+  await check('再次检查显示更新的版本', 'document.body.innerText.includes("发现新版本 99.0.1")');
+  doubles.updateError = '验收模拟网络失败';
+  try {
+    await click('检查更新');
+    await wait(
+      `(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='检查更新');return !!b&&!b.disabled&&b.getAttribute('aria-disabled')!=='true'})()`,
+    );
+    await check(
+      '再次检查失败仍保留已发现版本',
+      'document.body.innerText.includes("发现新版本 99.0.1")',
+    );
+    await check('主进程保留更新状态和网络错误', async () => {
+      const { data: status } = await e("window.studio.invoke('updates.status',{})");
+      return status.phase === 'available' && status.error === doubles.updateError;
+    });
+  } finally {
+    delete doubles.updateError;
+  }
   await wait('document.querySelector(".rn-md")?.textContent.includes("验收发布说明")');
   await check(
     '缺少 JSON 时在更新横幅下展开 Markdown 说明',
@@ -475,7 +496,7 @@ export async function settingsChecks(context, restart) {
   );
   doubles.structuredNotes = {
     schema: 'nps-release-notes/1',
-    version: '99.0.0',
+    version: '99.0.1',
     date: '2026-10-20',
     items: [
       {
@@ -501,7 +522,7 @@ export async function settingsChecks(context, restart) {
   await wait('document.querySelectorAll(".rn-card").length===2');
   await check(
     '027 结构化更新横幅显示分类计数、两张重点卡片和分组',
-    'document.querySelector(".upd").textContent.includes("发现新版本 99.0.0")&&document.querySelector(".upd").textContent.includes("新增 1 项 · 改进 1 项 · 修复 1 项")&&document.querySelectorAll(".rn-card").length===2&&[...document.querySelectorAll(".rn-g")].some(n=>n.textContent.includes("修复"))',
+    'document.querySelector(".upd").textContent.includes("发现新版本 99.0.1")&&document.querySelector(".upd").textContent.includes("新增 1 项 · 改进 1 项 · 修复 1 项")&&document.querySelectorAll(".rn-card").length===2&&[...document.querySelectorAll(".rn-g")].some(n=>n.textContent.includes("修复"))',
   );
   await h.screenshot('027-settings-update');
   await click('收起说明');

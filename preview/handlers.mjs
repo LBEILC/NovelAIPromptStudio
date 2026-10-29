@@ -1040,6 +1040,8 @@ export function createPreviewHandlers({
   };
   registerCommand('updates.status', update);
   registerCommand('updates.check', async () => {
+    if (previewUpdate.progress != null && !previewUpdate.downloaded)
+      return { ok: false, error: '正在下载更新，下载完成后再检查' };
     await new Promise((r) => setTimeout(r, 900));
     previewUpdate.checked = true;
     previewUpdate.checkedAt = new Date().toISOString();
