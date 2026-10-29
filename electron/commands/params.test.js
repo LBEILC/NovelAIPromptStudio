@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
+import { WorkbenchConnection } from '../../src/lib/workbenchConnection';
 import { createCommands } from './index.js';
 import { openDatabase } from '../database.js';
 import { openPreferences } from '../preferences.js';
@@ -42,6 +43,7 @@ it('edits parameters and references through Agent commands, with revision, undo,
   });
   const events = [],
     finishes = new Map();
+  project.nsfw = database.nsfw.state(project);
   let onFinished;
   let imported = 0;
   const commands = await createCommands({
@@ -85,6 +87,53 @@ it('edits parameters and references through Agent commands, with revision, undo,
     const opened = await call('workbench.open', { path: file }),
       tabId = opened.tab.id;
     expect(opened.tab.project.params.model).toBe('nai-diffusion-5-full');
+    // Acknowledgements update the connection without rerendering the editor.
+    // UI patches must work even when the rendered tab still has revision zero.
+    const connection = new WorkbenchConnection(
+      (name, input) => commands.dispatch(name, input, 'ui'),
+      () => {},
+      (message) => {
+        throw Error(message);
+      },
+    );
+    connection.hydrate(await call('workbench.session', {}, 'ui'));
+    try {
+      for (const [name, patch, verify] of [
+        ['params.set', { patch: { steps: 27 } }, (t) => t.project.params.steps === 27],
+        [
+          'reference.set-base',
+          { path: file, strength: 0.45 },
+          (t) => t.project.references.base.strength === 0.45,
+        ],
+      ]) {
+        const staleRevision = connection.current.tabs[0].revision;
+        connection.update((session) => ({
+          ...session,
+          tabs: session.tabs.map((tab) => ({
+            ...tab,
+            project: {
+              ...tab.project,
+              metadata: { ...tab.project.metadata, prompt_raw: `synthetic typing ${name}` },
+            },
+          })),
+        }));
+        await connection.flush();
+        expect(connection.current.tabs[0].revision).toBeGreaterThan(staleRevision);
+        const changed = await call(name, { tabId, ...patch }, 'ui');
+        expect(verify(changed.tab)).toBe(true);
+        const rejected = await commands.dispatch(
+          name,
+          { tabId, ...patch, expectedRevision: staleRevision },
+          'agent',
+        );
+        expect(rejected).toMatchObject({ ok: false, error: { code: 'conflict' } });
+        connection.hydrate(await call('workbench.session', {}, 'ui'));
+      }
+      await call('reference.remove', { tabId, id: 'base' }, 'ui');
+    } finally {
+      connection.dispose();
+    }
+
     const sizeBefore = (await call('workbench.get', { tabId })).tab.project.metadata;
     await expect(call('prompt.set-size', { tabId, width: 2048, height: 2048 })).rejects.toThrow(
       '面积最大 1536×2048',
@@ -104,7 +153,7 @@ it('edits parameters and references through Agent commands, with revision, undo,
     ).toBeUndefined();
     const changed = await call('params.set', {
       tabId,
-      expectedRevision: opened.revision,
+      expectedRevision: (await call('workbench.get', { tabId })).revision,
       patch: { effort: 'Medium', steps: 50, sampler: 'k_euler', uc: 'None' },
     });
     expect(changed.tab.project.params).toMatchObject({
@@ -193,7 +242,7 @@ it('edits parameters and references through Agent commands, with revision, undo,
       patch: { model: 'nai-diffusion-5-full' },
       dropReferences: true,
     });
-    expect(dropped.tab.project.references).toEqual({ vibes: [], precise: [] });
+    expect(dropped.tab.project.references).toEqual({ vibes: [], precise: [], base: null });
     database.insertProject({
       ...project,
       created_at: new Date().toISOString(),

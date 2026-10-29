@@ -106,7 +106,7 @@ export function RefsPane({
         .catch(() => setLibrary([]));
   }, [addOpen]);
   // ---------- 底图（图生图，1.8，doc/design.md 2.34）----------
-  const rev0 = { tabId: tab.id, expectedRevision: tab.revision };
+  const target = { tabId: tab.id };
   const baseImg = tab.project?.references?.base || null;
   const wasBase = base?.project.references?.base || null;
   const canBase = !!caps?.img2img;
@@ -132,7 +132,7 @@ export function RefsPane({
     );
   };
   const setBase = (input: { imageId?: string; strength?: number; noise?: number }) =>
-    void run(() => invokeUI('reference.set-base', { ...rev0, ...input }));
+    void run(() => invokeUI('reference.set-base', { ...target, ...input }));
   const baseBlock = (
     <>
       <div className="sec-h" data-feature="img2img">
@@ -143,7 +143,9 @@ export function RefsPane({
               className="btn quiet sm icon"
               aria-label="移除底图"
               data-tip="移除底图，回到只按提示词生成"
-              onClick={() => void run(() => invokeUI('reference.remove', { ...rev0, id: 'base' }))}
+              onClick={() =>
+                void run(() => invokeUI('reference.remove', { ...target, id: 'base' }))
+              }
             >
               <Icon name="close-line" />
             </button>
@@ -283,7 +285,6 @@ export function RefsPane({
     );
   const refs = tab.project?.references || { vibes: [], precise: [] };
   const was = base?.project.references || { vibes: [], precise: [] };
-  const rev = { tabId: tab.id, expectedRevision: tab.revision };
   const set = (
     id: string,
     patch: {
@@ -292,8 +293,8 @@ export function RefsPane({
       type?: PreciseReferenceType;
       fidelity?: number;
     },
-  ) => void run(() => invokeUI('reference.set', { ...rev, id, ...patch }));
-  const remove = (id: string) => void run(() => invokeUI('reference.remove', { ...rev, id }));
+  ) => void run(() => invokeUI('reference.set', { ...target, id, ...patch }));
+  const remove = (id: string) => void run(() => invokeUI('reference.remove', { ...target, id }));
   const vibes = refs.vibes,
     precise = refs.precise;
   const used = new Set(vibes.map((v) => v.libraryId).filter(Boolean));
@@ -422,7 +423,7 @@ export function RefsPane({
       label: '从图片添加…',
       icon: 'image-add-line',
       hint: relay ? '中转站不能编码' : `首次编码 ${VIBE_ENCODE_COST} Anlas`,
-      onSelect: () => void run(() => invokeUI('reference.add-vibe', rev)),
+      onSelect: () => void run(() => invokeUI('reference.add-vibe', target)),
     },
     'sep',
     { header: 'Vibe 库' },
@@ -437,7 +438,7 @@ export function RefsPane({
               ? '中转站不能编码'
               : `要编码 ${VIBE_ENCODE_COST} Anlas`,
           onSelect: () =>
-            void run(() => invokeUI('reference.add-vibe', { ...rev, libraryId: item.id })),
+            void run(() => invokeUI('reference.add-vibe', { ...target, libraryId: item.id })),
         }))
       : [{ label: 'Vibe 库里还没有。生成时编码过的 Vibe 会存进来', disabled: true }]),
   ];
@@ -495,7 +496,9 @@ export function RefsPane({
             className={`btn quiet sm ${vibes.length ? 'is-off' : ''}`}
             aria-disabled={vibes.length > 0 || undefined}
             data-tip={vibes.length ? '精确参考不能和 Vibe 一起用，先移除 Vibe' : undefined}
-            onClick={() => !vibes.length && void run(() => invokeUI('reference.add-precise', rev))}
+            onClick={() =>
+              !vibes.length && void run(() => invokeUI('reference.add-precise', target))
+            }
           >
             <Icon name="add-line" />
             添加精确参考

@@ -597,6 +597,41 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await click('打开图片', 'document.querySelector(".tb")');
   await wait('!!document.querySelector(".blk[data-block]")');
   await textEditingChecks({ h, raw, draft, reset, modifier });
+  await reset();
+  const stepsBeforeTyping = await e(`${draft}.params.steps`);
+  await click(
+    '按文本编辑（Ctrl E 切换）',
+    'document.querySelector("[role=radiogroup][aria-label=编辑方式]")',
+  );
+  await e(`(() => {
+    window.parameterErrors = [];
+    window.parameterErrorObserver = new MutationObserver(() => {
+      for (const node of document.querySelectorAll('.toast:has(.mark.danger)'))
+        window.parameterErrors.push(node.textContent);
+    });
+    window.parameterErrorObserver.observe(document.body, {childList:true, subtree:true, characterData:true});
+    const input = document.querySelector('.tx-wrap textarea');
+    input.focus();
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, 'synthetic immediate parameter edit');
+    input.dispatchEvent(new Event('input', {bubbles:true}));
+    document.querySelector('[data-feature="tab-params"]').click();
+  })()`);
+  // Only wait for the parameter control to mount, never for the typing save.
+  await click('增加步数');
+  await wait(`${draft}.params.steps===${stepsBeforeTyping + 1}`);
+  await check(
+    '输入提示词后立即改步数成功且没有错误通知',
+    `${draft}.params.steps===${stepsBeforeTyping + 1} && ${draft}.metadata.prompt_raw==='synthetic immediate parameter edit' && window.parameterErrors.length===0 && !document.querySelector('.toast .mark.danger')`,
+  );
+  await shot('typing-then-parameters');
+  await e('window.parameterErrorObserver.disconnect()');
+  await e('document.querySelector(\'[data-feature="tab-prompt"]\').click()');
+  await click(
+    '按块编辑（Ctrl E 切换）',
+    'document.querySelector("[role=radiogroup][aria-label=编辑方式]")',
+  );
+  await reset();
+
   await click('存入图片库');
   await wait('document.querySelector(".stage-acts").textContent.includes("已存入图片库")');
   await check(

@@ -109,7 +109,7 @@ export function useBaseProject(tab: CommandTab | null, hasVersions: boolean) {
   return base;
 }
 
-/** 改参数和参考：先把正在编辑的文字交出去，带上修订号；needs_confirm 时先确认 */
+/** 改参数和参考：先保存文字，再提交局部补丁；不使用渲染时的旧修订号。 */
 export function useEdit(tab: CommandTab, before?: () => Promise<void>) {
   const notify = useNotifications();
   const [dialog, ask] = useAsk();
@@ -127,7 +127,6 @@ export function useEdit(tab: CommandTab, before?: () => Promise<void>) {
     const call = (dropReferences?: boolean) =>
       invokeUI('params.set', {
         tabId: tab.id,
-        expectedRevision: tab.revision,
         patch,
         ...(dropReferences ? { dropReferences } : {}),
       });
