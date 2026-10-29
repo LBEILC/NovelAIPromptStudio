@@ -299,6 +299,11 @@ textarea.raw { font: var(--fs-small)/var(--lh-small) var(--font-mono); }
 .key-hint > span:not(.kbd) + .kbd { margin-left: var(--sp-2); }
 /* 分支名：标题里当前这条线的分支；线中途进入另一支的地方一行小字；分叉行第一行 */
 .versions .col-h .br-head { margin-left: var(--sp-1); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-small); color: var(--text-2); }
+/* 标题行（1.9.13）："版本"和"N 版 · N 张"不折行、不收缩，分支名在中间省略；栏太窄时不显示分支名（下面每条线都写着）。
+   以前 mac 字宽、张数三位数时，"版本"挤成两行、分支名只剩"分…"、张数折行 */
+.versions .col-h { container-type: inline-size; }
+.versions .col-h > .label, .versions .col-h .muted { flex: 0 0 auto; white-space: nowrap; }
+@container (max-width: 199px) { .versions .col-h .br-head { display: none; } }
 .ver.br-mark { flex-direction: row; align-items: center; gap: var(--sp-1); padding: var(--sp-2) var(--sp-2) 0; font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-3); }
 .ver.br-mark:hover { background: transparent; }
 .ver.br-mark > i { font-size: var(--icon-sm); }
