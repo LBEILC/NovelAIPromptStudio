@@ -12,7 +12,7 @@ import type { VersionDiff } from '../lib/versionDiff';
 import type { WorkVersion } from '../shared/generation';
 import type { PeekImage } from './useVersionState';
 import { VersionDifference, VersionSummary } from './VersionDifference';
-import { PeekPicture, Thumb, isRedraw } from './versionHelpers';
+import { PeekPicture, Thumb, isRedraw, warmImage, warmThumb } from './versionHelpers';
 
 type Tree = { byId: Map<string, WorkVersion>; children: Map<string, WorkVersion[]> };
 type Props = {
@@ -483,6 +483,17 @@ function Canvas({
     ...(firstImage(v) === v.project.id ? [v.project.id] : []),
     ...v.images.filter((i) => !i.deleted).map((i) => i.projectId),
   ];
+  // 快放大到详细卡片时，先把这一屏要用的图（每版最多 6 张）读好，展开那一下不空
+  useEffect(() => {
+    if (shape !== 'one' || view.z < 0.4) return;
+    for (const [li, lane] of lanes.entries())
+      for (const v of lane.versions) {
+        if (!seen(cardX(v), laneY(li))) continue;
+        for (const id of imagesOf(v).slice(0, CELLS))
+          if (id === v.project.id) warmImage(v.project.thumbnail_path || v.project.image_path);
+          else warmThumb(id);
+      }
+  }, [shape, Math.round(view.z * 10), Math.round(view.x / 200), Math.round(view.y / 200)]);
   const card = (v: WorkVersion, li: number) => {
     const x = cardX(v),
       y = laneY(li);

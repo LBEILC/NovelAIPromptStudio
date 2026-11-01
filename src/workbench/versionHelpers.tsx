@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { BlurImg, type BlurImage } from '../kit/blur';
+import { mediaUrl } from '../lib/imageStage.js';
 import type { ImageOperation } from '../shared/generation';
 import type { PeekImage } from './useVersionState';
 export const TH_H = 38,
@@ -8,17 +9,36 @@ export const TH_H = 38,
   TH_MORE = 28;
 type ThumbData = { path: string; image: BlurImage };
 export const thumbCache = new Map<string, Promise<ThumbData>>();
+// 已经查到的直接同步拿：卡片重新挂载（分支总览换档、滚进视野）时第一帧就有图，不空一下（用户 11-01 录屏里的闪）
+const thumbReady = new Map<string, ThumbData>();
 export function thumbOf(id: string) {
   let p = thumbCache.get(id);
   if (!p) {
-    p = invokeUI('library.get', { id }).then((r) => ({
-      path: r.project.thumbnail_path || r.project.image_path,
-      image: r.project,
-    }));
+    p = invokeUI('library.get', { id }).then((r) => {
+      const d = { path: r.project.thumbnail_path || r.project.image_path, image: r.project };
+      thumbReady.set(id, d);
+      return d;
+    });
     thumbCache.set(id, p);
     p.catch(() => thumbCache.delete(id));
   }
   return p;
+}
+// 预先读好并解码：留着引用，浏览器不会马上丢掉解码好的图；最多留一批最近的
+const warmed = new Map<string, HTMLImageElement>();
+export function warmImage(path: string) {
+  if (!path || warmed.has(path)) return;
+  const im = new Image();
+  im.decoding = 'async';
+  im.src = mediaUrl(path);
+  void im.decode?.().catch(() => {});
+  warmed.set(path, im);
+  if (warmed.size > 400) warmed.delete(warmed.keys().next().value || '');
+}
+export function warmThumb(id: string) {
+  void thumbOf(id)
+    .then((d) => warmImage(d.path))
+    .catch(() => {});
 }
 /** 悬停缩略图时的大图：要原图的路径，不是缩略图（11-01） */
 const fullCache = new Map<string, Promise<ThumbData>>();
@@ -46,12 +66,16 @@ export function Thumb({
   image?: BlurImage;
   tab?: string;
 }) {
-  const [data, setData] = useState<ThumbData | null>(path ? { path, image } : null);
+  const [data, setData] = useState<ThumbData | null>(
+    path ? { path, image: image! } : thumbReady.get(id) || null,
+  );
   // 文件找不到时画一个虚线框，不显示浏览器的破图标（用户 10-22：从剪贴板打开、存入图片库后原图丢了）
   const [broken, setBroken] = useState(false);
   useEffect(() => {
     setBroken(false);
-    if (path) return setData({ path, image });
+    if (path) return setData({ path, image: image! });
+    const ready = thumbReady.get(id);
+    if (ready) return setData(ready);
     let live = true;
     void thumbOf(id)
       .then((d) => live && setData(d))
