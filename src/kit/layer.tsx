@@ -216,10 +216,14 @@ export function Pop(p: PopProps) {
 function PopBody(p: PopProps & { leaving: boolean; nodeRef: RefObject<HTMLElement | null> }) {
   const win = useWin();
   const ref = useRef<HTMLDivElement | null>(null);
-  const anchorEl = () =>
-    typeof p.anchor === 'string'
-      ? (win.current || document).querySelector(p.anchor)
-      : p.anchor?.current || null;
+  // 尺寸变了重新定位时用最新的锚点和位置：以前 ResizeObserver 记着打开时的锚点，
+  // 版本栏的对比卡片换到另一版、内容一变高矮，又被拉回第一次悬停的那一版旁边（用户 11-01）
+  const latest = useRef(p);
+  latest.current = p;
+  const anchorEl = () => {
+    const a = latest.current.anchor;
+    return typeof a === 'string' ? (win.current || document).querySelector(a) : a?.current || null;
+  };
   useLayoutEffect(() => {
     p.nodeRef.current = ref.current;
   });
@@ -233,7 +237,7 @@ function PopBody(p: PopProps & { leaving: boolean; nodeRef: RefObject<HTMLElemen
     const el = ref.current,
       w = win.current || document.body;
     const ro = new ResizeObserver(() =>
-      placeAt(el, w, anchorEl(), p.place || 'below-left', p.point),
+      placeAt(el, w, anchorEl(), latest.current.place || 'below-left', latest.current.point),
     );
     ro.observe(el);
     return () => ro.disconnect();
