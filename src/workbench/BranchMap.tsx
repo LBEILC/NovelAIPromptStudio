@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Icon, Kbd, isMod, modKey } from '../kit/controls';
 import { Pop, ToWin, useDismiss } from '../kit/layer';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
-import { Presence, ms } from '../kit/motion';
+import { Presence, dur, ms } from '../kit/motion';
 import type { VersionDiff } from '../lib/versionDiff';
 import type { WorkVersion } from '../shared/generation';
 import type { PeekImage } from './useVersionState';
@@ -161,7 +161,54 @@ function Canvas({
   // 连线的高度：对着卡片里第一排图的中间
   const midY = (li: number) => laneY(li) + H * 0.4;
   // ---------- 视图：缩放和平移 ----------
-  const [view, setView] = useState({ z: 0.5, x: 0, y: 0 });
+  // view 是画面现在的样子，goal 是要去的地方：滚轮、按钮、跳转都朝 goal 缓过去（约 --dur-3，位置和大小的变化），
+  // 拖动直接跟手。按某一点缩放时（anchor）那一点一路钉在指针下面，不漂（用户 11-01：要连贯）
+  type View = { z: number; x: number; y: number };
+  const [view, setShown] = useState<View>({ z: 0.5, x: 0, y: 0 });
+  const shownRef = useRef(view);
+  const goal = useRef(view);
+  const anchor = useRef<[number, number] | null>(null);
+  const raf = useRef(0);
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  const setView = (
+    next: View | ((v: View) => View),
+    opts: { instant?: boolean; at?: [number, number] } = {},
+  ) => {
+    const g = typeof next === 'function' ? next(goal.current) : next;
+    goal.current = g;
+    anchor.current = opts.at || null;
+    if (opts.instant || !dur(3)) {
+      cancelAnimationFrame(raf.current);
+      raf.current = 0;
+      shownRef.current = g;
+      setShown(g);
+      return;
+    }
+    if (raf.current) return;
+    let last = performance.now();
+    const step = (now: number) => {
+      const k = 1 - Math.exp(-(now - last) / (dur(3) / 3));
+      last = now;
+      const v = shownRef.current,
+        t = goal.current,
+        a = anchor.current;
+      const z = Math.exp(Math.log(v.z) + (Math.log(t.z) - Math.log(v.z)) * k);
+      const n = a
+        ? {
+            z,
+            x: a[0] - ((a[0] - t.x) / t.z) * z,
+            y: a[1] - ((a[1] - t.y) / t.z) * z,
+          }
+        : { z, x: v.x + (t.x - v.x) * k, y: v.y + (t.y - v.y) * k };
+      const done =
+        Math.abs(t.x - n.x) < 0.5 && Math.abs(t.y - n.y) < 0.5 && Math.abs(t.z - n.z) < t.z * 0.002;
+      const out = done ? t : n;
+      shownRef.current = out;
+      setShown(out);
+      raf.current = done ? 0 : requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
+  };
   const [size, setSize] = useState({ w: 0, h: 0 });
   useLayoutEffect(() => {
     const el = stage.current;
@@ -174,45 +221,45 @@ function Canvas({
   }, []);
   const edge = () => ms('--sp-8') || 32;
   const fitZ = () => Math.min((size.w - 2 * edge()) / worldW, (size.h - 2 * edge()) / worldH, 1);
-  const fitView = () => {
+  const fitView = (instant = false) => {
     const z = clamp(fitZ(), MIN_Z, MAX_Z);
-    setView({ z, x: (size.w - worldW * z) / 2, y: (size.h - worldH * z) / 2 });
+    setView({ z, x: (size.w - worldW * z) / 2, y: (size.h - worldH * z) / 2 }, { instant });
   };
-  const centerOn = (v: WorkVersion, z = Math.max(view.z, 0.5)) => {
+  const centerOn = (v: WorkVersion, z = Math.max(goal.current.z, 0.5), instant = false) => {
     const li = laneOf.get(v.id) ?? 0;
-    setView({
-      z,
-      x: size.w / 2 - (cardX(v) + W / 2) * z,
-      y: size.h / 2 - (laneY(li) + H / 2) * z,
-    });
+    setView(
+      {
+        z,
+        x: size.w / 2 - (cardX(v) + W / 2) * z,
+        y: size.h / 2 - (laneY(li) + H / 2) * z,
+      },
+      { instant },
+    );
   };
   // 打开时：整个装得下、又不至于太小就全部显示；不然以当前这一版为中心
   const opened = useRef(false);
   useLayoutEffect(() => {
     if (opened.current || !size.w) return;
     opened.current = true;
-    if (fitZ() >= 0.4 || !current) fitView();
-    else centerOn(current, 0.5);
+    if (fitZ() >= 0.4 || !current) fitView(true);
+    else centerOn(current, 0.5, true);
   }, [size.w]);
-  const zoomAt = (z: number, px: number, py: number) =>
-    setView((v) => {
-      const nz = clamp(z, MIN_Z, MAX_Z),
-        k = nz / v.z;
-      return { z: nz, x: px - k * (px - v.x), y: py - k * (py - v.y) };
-    });
+  const zoomAt = (z: (v: View) => number, px: number, py: number) =>
+    setView(
+      (v) => {
+        const nz = clamp(z(v), MIN_Z, MAX_Z),
+          k = nz / v.z;
+        return { z: nz, x: px - k * (px - v.x), y: py - k * (py - v.y) };
+      },
+      { at: [px, py] },
+    );
   useEffect(() => {
     const el = stage.current;
     if (!el) return;
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
       const r = el.getBoundingClientRect();
-      setView((v) => {
-        const nz = clamp(v.z * Math.exp(-e.deltaY * 0.0015), MIN_Z, MAX_Z),
-          k = nz / v.z,
-          px = e.clientX - r.left,
-          py = e.clientY - r.top;
-        return { z: nz, x: px - k * (px - v.x), y: py - k * (py - v.y) };
-      });
+      zoomAt((v) => v.z * Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
     };
     el.addEventListener('wheel', wheel, { passive: false });
     return () => el.removeEventListener('wheel', wheel);
@@ -228,7 +275,15 @@ function Canvas({
   const moved = useRef(false);
   const down = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
-    drag.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
+    // 正在缓过去时按下：停在现在的样子，从这里开始拖
+    setView(shownRef.current, { instant: true });
+    drag.current = {
+      x: e.clientX,
+      y: e.clientY,
+      vx: shownRef.current.x,
+      vy: shownRef.current.y,
+      moved: false,
+    };
     moved.current = false;
   };
   useEffect(() => {
@@ -244,7 +299,7 @@ function Canvas({
         setPeek(null);
         stage.current?.classList.add('panning');
       }
-      setView((v) => ({ ...v, x: d.vx + dx, y: d.vy + dy }));
+      setView((v) => ({ ...v, x: d.vx + dx, y: d.vy + dy }), { instant: true });
     };
     const up = () => {
       drag.current = null;
@@ -405,21 +460,22 @@ function Canvas({
         250,
       );
     };
-    const enterCard = (e: React.PointerEvent<HTMLElement>) => {
+    // 对比只在写字的地方（版本名、改了什么）才出：图的边缘、卡片的空白不出，划过一排图时不会被对比挡住（用户 11-01）
+    const enterText = (e: React.PointerEvent<HTMLElement>) => {
       const el = e.currentTarget.closest('.map-card');
       if (v.parentId && el) showPeek({ kind: 'diff', v, at: rightOf(el) }, 400);
     };
     if (level === 'one')
       return (
-        <div key={v.id} {...common} onPointerEnter={enterCard} onPointerLeave={hidePeek}>
+        <div key={v.id} {...common} onPointerLeave={hidePeek}>
           <span
             className="map-pic"
             onPointerEnter={(e) => id && enterImg(e, id)}
-            onPointerLeave={enterCard}
+            onPointerLeave={hidePeek}
           >
             {id ? thumbOf(v, id) : <span className="map-none">{name(v)}</span>}
           </span>
-          <span className="map-cap">
+          <span className="map-cap" onPointerEnter={enterText} onPointerLeave={hidePeek}>
             <span>{name(v)}</span>
             {n > 1 && <span className="muted mono">×{n}</span>}
           </span>
@@ -429,8 +485,8 @@ function Canvas({
       shown = all.slice(0, CELLS),
       more = all.length - shown.length;
     return (
-      <div key={v.id} {...common} onPointerEnter={enterCard} onPointerLeave={hidePeek}>
-        <span className="map-h">
+      <div key={v.id} {...common} onPointerLeave={hidePeek}>
+        <span className="map-h" onPointerEnter={enterText} onPointerLeave={hidePeek}>
           <b>{name(v)}</b>
           {v.source === 'agent' && <span className="src">Agent</span>}
           <span className="sp" />
@@ -443,7 +499,7 @@ function Canvas({
             gridTemplateColumns: `repeat(${Math.max(1, Math.min(3, shown.length))}, 1fr)`,
             gridTemplateRows: `repeat(${Math.max(1, Math.ceil(shown.length / 3))}, 1fr)`,
           }}
-          onPointerLeave={enterCard}
+          onPointerLeave={hidePeek}
         >
           {shown.map((img, k) => {
             const last = more > 0 && k === shown.length - 1;
@@ -466,7 +522,7 @@ function Canvas({
           })}
           {!shown.length && <span className="map-none">{name(v)}</span>}
         </span>
-        <span className="map-what">
+        <span className="map-what" onPointerEnter={enterText} onPointerLeave={hidePeek}>
           {v.parentId ? (
             <VersionSummary diff={delta(v)} />
           ) : (
@@ -534,11 +590,11 @@ function Canvas({
   const MW = ms('--map-mini-w') || 200,
     MH = ms('--map-mini-h') || 128;
   const mk = Math.min(MW / worldW, MH / worldH);
-  const mini = (e: React.PointerEvent<HTMLDivElement>) => {
+  const mini = (e: React.PointerEvent<HTMLDivElement>, instant = false) => {
     const r = e.currentTarget.getBoundingClientRect();
     const wx = (e.clientX - r.left) / mk,
       wy = (e.clientY - r.top) / mk;
-    setView((v) => ({ ...v, x: size.w / 2 - wx * v.z, y: size.h / 2 - wy * v.z }));
+    setView((v) => ({ ...v, x: size.w / 2 - wx * v.z, y: size.h / 2 - wy * v.z }), { instant });
   };
   return (
     <div
@@ -619,7 +675,7 @@ function Canvas({
             <button
               className="btn quiet sm icon"
               aria-label="缩小"
-              onClick={() => zoomAt(view.z / 1.25, size.w / 2, size.h / 2)}
+              onClick={() => zoomAt((v) => v.z / 1.25, size.w / 2, size.h / 2)}
             >
               <Icon name="subtract-line" />
             </button>
@@ -627,11 +683,11 @@ function Canvas({
             <button
               className="btn quiet sm icon"
               aria-label="放大"
-              onClick={() => zoomAt(view.z * 1.25, size.w / 2, size.h / 2)}
+              onClick={() => zoomAt((v) => v.z * 1.25, size.w / 2, size.h / 2)}
             >
               <Icon name="add-line" />
             </button>
-            <button className="btn quiet sm" onClick={fitView}>
+            <button className="btn quiet sm" onClick={() => fitView()}>
               适应窗口
             </button>
             {current && (
@@ -647,7 +703,7 @@ function Canvas({
               mini(e);
               e.currentTarget.setPointerCapture(e.pointerId);
             }}
-            onPointerMove={(e) => e.buttons === 1 && mini(e)}
+            onPointerMove={(e) => e.buttons === 1 && mini(e, true)}
           >
             <svg width={worldW * mk} height={worldH * mk} aria-hidden="true">
               {lanes.map((lane, li) => {

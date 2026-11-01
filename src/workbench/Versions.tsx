@@ -942,8 +942,8 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
           setMap(false);
           void go(v, imageId);
         }}
+        // 对比开在总览上面，关掉对比回到总览接着看（用户 11-01）
         onCompare={(a, b) => {
-          setMap(false);
           openCompare(
             tab.id,
             { versionId: a.v.id, imageId: a.imageId },

@@ -147,7 +147,7 @@
 .ver-peek { width: var(--popover-w-wide); max-height: calc(100% - 16px); overflow: hidden auto; gap: var(--sp-2); padding: 0; }
 .ver-peek > .vp-in { padding: var(--sp-3); }
 /* 悬停缩略图时的大图（11-01）：宽度跟着图走，最大 --peek-img-w × --peek-img-h */
-.ver-peek.img { width: auto; }
+.ver-peek.img { width: auto; pointer-events: none; } /* 大图只是看的：不挡指针，往旁边移就看下一张 */
 .ver-peek .vp-pic { display: grid; place-items: center; min-width: calc(var(--peek-img-w) / 2); min-height: calc(var(--peek-img-w) / 2); margin-bottom: var(--sp-2); border-radius: var(--r-thumb); background: var(--hover); overflow: hidden; }
 .ver-peek .vp-pic img { display: block; max-width: var(--peek-img-w); max-height: var(--peek-img-h); object-fit: contain; }
 /* 版本行标题右边：收起、展开这一版的缩略图。平时藏着，指针移上来或已经收起时才显示 */
