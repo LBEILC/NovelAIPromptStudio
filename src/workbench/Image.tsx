@@ -212,7 +212,22 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
     ),
     (v) => v.key,
   );
-  const enter = dir < 0 ? 'left' : dir > 0 ? 'right' : 'fade';
+  // 换标签页的方向记下来，留给新标签页的图进场时用一次（新图要等解码好才换上，那时方向已经归零了）
+  const pending = useRef(0);
+  if (dir) pending.current = dir;
+  // 进场方式只在一张图第一次出现时定下来：点标签页的那一刻方向就变了，要是跟着改还在显示的那张图的 data-enter，
+  // 它的进场动画会从头再播一遍，先透明再淡回来（用户 11-01 录屏：空一帧、又变实、再淡出）
+  const enters = useRef(new Map<string, string>());
+  const enterOf = (key: string) => {
+    if (!enters.current.has(key)) {
+      const d = pending.current;
+      enters.current.set(key, d < 0 ? 'left' : d > 0 ? 'right' : 'fade');
+      pending.current = 0;
+    }
+    return enters.current.get(key);
+  };
+  for (const k of [...enters.current.keys()])
+    if (!pics.some((x) => x.key === k)) enters.current.delete(k);
   // "已修改""恢复"：同一版里改回原样（点了恢复）时淡出；换标签页、换版本时随标题一起直接换，
   // 不让上一个的"已修改"挂在新标题旁边淡出（用户 10-25）
   const dirtyAt = `${tab.id}:${image?.image_path}`;
@@ -365,7 +380,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
               tab={tab.id}
               eye={leaving ? false : 'md'}
               className={`alpha-bg ${leaving ? 'leaving' : ''}`}
-              data-enter={enter}
+              data-enter={enterOf(key)}
               data-stage=""
               alt="当前图片"
               draggable={false}

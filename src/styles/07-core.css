@@ -203,12 +203,13 @@
 .map-ov .map-none { font-size: var(--fs-caption); color: var(--text-3); }
 /* 一张图 ↔ 详细卡片（11-01）：同一张图变形过去。展开：那张图缩进第一格，其余的从它旁边依次摊开，白底长出来，
    标题从上落下、改了什么从下升起；收起反过来，图放回整张，最后"第几版"那行升上来 */
-.map-ov .map-ghost { position: absolute; z-index: 1; overflow: hidden; border-radius: var(--r-thumb); pointer-events: none; }
+/* 灰色的底框跟着图一起变（大小、位置、圆角），第一格自己的底在变形时不画：以前底框不动，变形时突然跳（用户 11-01 录屏） */
+.map-ov .map-ghost { position: absolute; z-index: 1; overflow: hidden; border-radius: var(--r-thumb); background: var(--hover); pointer-events: none; }
 .map-ov .map-card.morph .map-cell:first-child > :not(.map-more) { opacity: 0; }
 .map-ov .map-card.morph-in .map-ghost { animation: map-ghost-in var(--dur-3) var(--ease-move) both; }
 .map-ov .map-card.morph-out .map-ghost { animation: map-ghost-out var(--dur-3) var(--ease-move) both; }
-@keyframes map-ghost-in { from { left: var(--ax); top: var(--ay); width: var(--aw); height: var(--ah); } to { left: var(--bx); top: var(--by); width: var(--bw); height: var(--bh); } }
-@keyframes map-ghost-out { from { left: var(--bx); top: var(--by); width: var(--bw); height: var(--bh); } to { left: var(--ax); top: var(--ay); width: var(--aw); height: var(--ah); } }
+@keyframes map-ghost-in { from { left: var(--ax); top: var(--ay); width: var(--aw); height: var(--ah); border-radius: var(--r-panel); } to { left: var(--bx); top: var(--by); width: var(--bw); height: var(--bh); border-radius: var(--r-thumb); } }
+@keyframes map-ghost-out { from { left: var(--bx); top: var(--by); width: var(--bw); height: var(--bh); border-radius: var(--r-thumb); } to { left: var(--ax); top: var(--ay); width: var(--aw); height: var(--ah); border-radius: var(--r-panel); } }
 .map-ov .map-card.morph-in { animation: map-chrome-in var(--dur-3) var(--ease-out) both; }
 .map-ov .map-card.morph-out { animation: map-chrome-out var(--dur-3) var(--ease-out) both; }
 @keyframes map-chrome-in { from { background-color: transparent; box-shadow: none; } }
@@ -217,9 +218,7 @@
 .map-ov .map-card.morph-out .map-cell:not(:first-child) { animation: map-fan-out var(--dur-2) var(--ease-out) both; }
 @keyframes map-fan-in { from { opacity: 0; transform: translateX(calc(var(--sp-4) * -1)) scale(0.9); } }
 @keyframes map-fan-out { to { opacity: 0; transform: translateX(calc(var(--sp-4) * -1)) scale(0.9); } }
-.map-ov .map-card.morph .map-cell:first-child { animation: map-fade var(--dur-3) var(--ease-out) both; }
-.map-ov .map-card.morph-out .map-cell:first-child { animation-direction: reverse; }
-@keyframes map-fade { from { background-color: transparent; } }
+.map-ov .map-card.morph .map-cell:first-child { background: transparent; }
 .map-ov .map-card.morph-in .map-h { animation: map-drop-in var(--dur-3) var(--ease-out) both; }
 .map-ov .map-card.morph-in .map-what { animation: map-lift-in var(--dur-3) var(--ease-out) 60ms both; }
 .map-ov .map-card.morph-out .map-h { animation: map-drop-out var(--dur-2) var(--ease-out) both; }
