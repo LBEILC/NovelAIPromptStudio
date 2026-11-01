@@ -15,7 +15,7 @@ import { useGeneration } from '../state/generation';
 import { useVersionList, readVersions, readVersionImage, versionLists } from '../state/versions';
 import { Icon } from '../kit/controls';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
-import { Pop } from '../kit/layer';
+import { Pop, useLeave } from '../kit/layer';
 import { useNotifications } from '../kit/toast';
 import { useDecoded, usePresence, useSwap } from '../kit/motion';
 import { Viewer } from '../kit/Viewer';
@@ -25,10 +25,10 @@ import { originGone, originMenu, trashImage } from './original';
 import { useSharedTrash } from '../shell/SharedTrash';
 import { ImageOps } from './ImageOps';
 import { DIRECTOR_TOOLS, DirectorOps } from './DirectorOps';
-import { Inpaint, rerunInpaint } from './Inpaint';
-import { Outpaint } from './Outpaint';
-import { CompareHost, openCompare } from './Compare';
-import { PickHost } from './Pick';
+import { Inpaint, inpaintDrawn, rerunInpaint } from './Inpaint';
+import { Outpaint, outpaintDrawn } from './Outpaint';
+import { CompareHost, closeCompare, openCompare } from './Compare';
+import { PickHost, closePick } from './Pick';
 import { BlurImg, nsfwMenu, type BlurImage } from '../kit/blur';
 import { useNsfwState } from '../state/blur';
 
@@ -50,6 +50,7 @@ const midEll = (s: string, max: number) =>
     ? s
     : `${s.slice(0, Math.ceil((max - 1) * 0.6))}…${s.slice(-Math.floor((max - 1) * 0.4))}`;
 
+type EditorAt = { tabId: string; id: string; path: string; image: BlurImage };
 export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const notify = useNotifications();
   const generation = useGeneration();
@@ -77,14 +78,45 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const [op, setOp] = useState<'' | 'upscale' | 'enhance' | 'director'>('');
   // 导演工具浮层里选中的工具；右键子菜单带着选好的工具打开（2.49）
   const [dirTool, setDirTool] = useState<DirectorTool>('lineart');
-  // 局部重绘（1.8.1）：编辑层开在哪张图上
-  const [inpaint, setInpaint] = useState<{ id: string; path: string; image: BlurImage } | null>(
-    null,
-  );
+  // 局部重绘（1.8.1）：编辑层开在哪个标签页的哪张图上
+  const [inpaint, setInpaint] = useState<EditorAt | null>(null);
   // 扩图（1.8.5，2.41）：同样的编辑层
-  const [outpaint, setOutpaint] = useState<{ id: string; path: string; image: BlurImage } | null>(
-    null,
+  const [outpaint, setOutpaint] = useState<EditorAt | null>(null);
+  // 覆盖层属于这个标签页（doc/design.md 2.11）：换标签页、切到别的页面就关。
+  // 重绘和扩图先收起，回到这个标签页时涂过、拉过边的再打开；什么都没动的就不回来了
+  const parked = useRef(new Map<string, { kind: 'inpaint' | 'outpaint'; at: EditorAt }>());
+  useLeave(viewer != null, () => setViewer(null), tab.id);
+  useLeave(
+    !!inpaint,
+    () => {
+      parked.current.set(inpaint!.tabId, { kind: 'inpaint', at: inpaint! });
+      setInpaint(null);
+    },
+    tab.id,
   );
+  useLeave(
+    !!outpaint,
+    () => {
+      parked.current.set(outpaint!.tabId, { kind: 'outpaint', at: outpaint! });
+      setOutpaint(null);
+    },
+    tab.id,
+  );
+  useLeave(
+    true,
+    () => {
+      closeCompare();
+      closePick();
+    },
+    tab.id,
+  );
+  useEffect(() => {
+    const back = parked.current.get(tab.id);
+    if (!back) return;
+    parked.current.delete(tab.id);
+    if (back.kind === 'inpaint' && inpaintDrawn(tab.id, back.at.id)) setInpaint(back.at);
+    if (back.kind === 'outpaint' && outpaintDrawn(tab.id, back.at.id)) setOutpaint(back.at);
+  }, [tab.id]);
   useEffect(() => setMissing(!!tab.error), [image?.image_path, tab.error]);
   useEffect(() => {
     if (!generation.settings.hasToken) {
@@ -241,7 +273,10 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
   const stageNsfw = useNsfwState(image);
   const openEditor = (id: string, set: typeof setInpaint) =>
     void invokeUI('library.get', { id })
-      .then((r) => r.project && set({ id, path: r.project.image_path, image: r.project }))
+      .then(
+        (r) =>
+          r.project && set({ tabId: tab.id, id, path: r.project.image_path, image: r.project }),
+      )
       .catch((e) => notify({ text: (e as Error).message, tone: 'error' }));
   const openInpaint = (id: string) => openEditor(id, setInpaint);
   const openOutpaint = (id: string) => openEditor(id, setOutpaint);
@@ -670,7 +705,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
       </Pop>
       <Inpaint
         open={!!inpaint}
-        tabId={tab.id}
+        tabId={inpaint?.tabId || tab.id}
         imageId={inpaint?.id || ''}
         path={inpaint?.path || ''}
         image={inpaint?.image}
@@ -678,7 +713,7 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
       />
       <Outpaint
         open={!!outpaint}
-        tabId={tab.id}
+        tabId={outpaint?.tabId || tab.id}
         imageId={outpaint?.id || ''}
         path={outpaint?.path || ''}
         image={outpaint?.image}

@@ -29,6 +29,7 @@ const set = (r: Request) => {
   listeners.forEach((f) => f());
 };
 export const openCompare = (tabId: string, a: CompareSide, b: CompareSide) => set({ tabId, a, b });
+export const closeCompare = () => request && set(null);
 const useRequest = () =>
   useSyncExternalStore(
     (f) => {

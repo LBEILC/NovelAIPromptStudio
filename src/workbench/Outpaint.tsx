@@ -66,6 +66,11 @@ export interface OutpaintProps {
   image?: BlurImage;
   onClose: () => void;
 }
+/** 这张图在这个标签页里拉过边没有：切走再回来时，拉过的编辑层重新打开 */
+export function outpaintDrawn(tabId: string, imageId: string) {
+  const s = saved.get(keyOf(tabId, imageId));
+  return !!s && Object.values(s.edges).some((v) => v > 0);
+}
 export function Outpaint(p: OutpaintProps) {
   const show = p.open && !!p.path;
   const last = useRef(p);
@@ -115,6 +120,10 @@ function Editor(
     saved.set(key, { edges, mode: picked, fullSize });
     p.onClose();
   };
+  // 从外面关的（换标签页、切页面）也把拉好的边留下
+  useEffect(() => {
+    if (p.leaving) saved.set(key, { edges, mode: picked, fullSize });
+  }, [p.leaving]);
   useDismiss(!p.leaving, close, [ov], { modal: true });
   // 提示词栏留在外面（和局部重绘一样，2.35）
   const [right, setRight] = useState(0);

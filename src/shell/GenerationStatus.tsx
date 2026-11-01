@@ -2,7 +2,7 @@
 // 1.8.6 起点开是生成队列（2.46）：正在生成的、排队中的（拖动排序、改张数、暂缓、移除）、Agent 待确认的，
 // 底部写剩余多少、今天花了多少、暂停 / 继续；最近完成的折叠成一行。没有配置账号时什么都没有。
 import { useEffect, useRef, useState } from 'react';
-import { Pop } from '../kit/layer';
+import { Pop, useLeave } from '../kit/layer';
 import { Icon } from '../kit/controls';
 import { ContextMenu, MenuButton, type MenuEntry } from '../kit/menu';
 import { useNotifications } from '../kit/toast';
@@ -136,6 +136,7 @@ export function GenerationStatus({
   const notify = useNotifications();
   // 待确认卡片上的预览小图点开看大图
   const [big, setBig] = useState<{ path: string; image: GenerationJob['project'] } | null>(null);
+  useLeave(!!big, () => setBig(null));
   const [open, setOpen] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
   const [dismissed, setDismissed] = useState<string[]>([]);

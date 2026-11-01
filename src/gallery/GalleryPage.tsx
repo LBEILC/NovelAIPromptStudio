@@ -1,6 +1,7 @@
 // 图片库（doc/design.md 2.13）：左边常驻侧栏；工具栏是搜索、筛选、视图、导入；右边详情栏只读显示提示词。
 // 底部浮着导入进度、整理图片库的进度和多选操作条（[data-dock]，通知停在它们上方）。
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLeave } from '../kit/layer';
 import { Icon, EmptyMark } from '../kit/controls';
 import { ContextMenu, type MenuEntry } from '../kit/menu';
 import { useExitList, ms } from '../kit/motion';
@@ -177,6 +178,8 @@ export default function GalleryPage(
 
   // 大图：按图片库当前的顺序，遇到一组依次走完
   const [viewer, setViewer] = useState<{ items: ViewerItem[]; index: number } | null>(null);
+  // 切到别的页面就关（doc/design.md 2.11）
+  useLeave(!!viewer, () => setViewer(null));
   const openViewer = (group: LibraryGroup, member?: { id: string }) => {
     if (p.selectedGroupIds.length) return;
     const items: ViewerItem[] = p.groups.flatMap((g) =>

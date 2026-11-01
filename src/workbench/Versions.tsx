@@ -1,6 +1,6 @@
 import { Fragment, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Icon, Kbd, isMod, modKey } from '../kit/controls';
-import { Pop } from '../kit/layer';
+import { Pop, useLeave } from '../kit/layer';
 import { ContextMenu } from '../kit/menu';
 import { FlipScope, SnapshotSwap, useExitList } from '../kit/motion';
 import { invokeUI } from '../lib/commands';
@@ -124,6 +124,8 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
   // Ctrl（macOS 是 Command）点两张缩略图：两张对比（1.8.1）；先点的那张虚线框标着
   const [pick, setPick] = useState<CompareSide | null>(null);
   const [map, setMap] = useState(false);
+  // 换标签页、切到别的页面就关，不变成另一张图的总览（doc/design.md 2.11）
+  useLeave(map, () => setMap(false), tab.id);
   /** 停在缩略图上看大图：卡片贴在版本栏右边，顶边对齐这张图（11-01） */
   const imgPeek = (e: ReactPointerEvent<HTMLElement>, v: WorkVersion, img: Omit<PeekImage, 'at'>) =>
     hoverImg(`img-${img.id}`, v, {

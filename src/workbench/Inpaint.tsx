@@ -138,6 +138,11 @@ function place(c: { x: number; y: number }, w: number, h: number, W: number, H: 
   };
 }
 
+/** 这张图在这个标签页里涂过没有：切走再回来时，涂过的编辑层重新打开 */
+export function inpaintDrawn(tabId: string, imageId: string) {
+  const s = saved.get(keyOf(tabId, imageId));
+  return !!s?.rect && scan(s.mask, s.rect).any;
+}
 /** 重绘结果那一版上的"再来一次"：框和涂抹还在就直接重绘，返回 false 时由调用方打开编辑层 */
 export async function rerunInpaint(tabId: string, imageId: string) {
   const s = saved.get(keyOf(tabId, imageId));
@@ -259,6 +264,10 @@ function Editor(
     copy.getContext('2d')!.drawImage(m, 0, 0);
     saved.set(key, { rect, manual, mask: copy, strength, fullSize, preset });
   };
+  // 从外面关的（换标签页、切页面）也把框和涂抹留下
+  useEffect(() => {
+    if (p.leaving) keep();
+  }, [p.leaving]);
   const close = () => {
     keep();
     p.onClose();

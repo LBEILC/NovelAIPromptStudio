@@ -37,11 +37,15 @@ type Props = {
 };
 
 export function BranchMap(p: Props) {
+  // 关的时候照关之前那个作品淡出：换了标签页，传进来的已经是下一个作品了
+  const last = useRef(p);
+  if (p.open) last.current = p;
+  const q = p.open ? p : last.current;
   return (
     <Presence show={p.open}>
       {(leaving, ref) => (
         <ToWin>
-          <Canvas {...p} leaving={leaving} nodeRef={ref} />
+          <Canvas {...q} onClose={p.onClose} leaving={leaving} nodeRef={ref} />
         </ToWin>
       )}
     </Presence>

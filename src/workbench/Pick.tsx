@@ -26,6 +26,7 @@ const set = (r: Request) => {
   listeners.forEach((f) => f());
 };
 export const openPick = (tabId: string, versionId: string) => set({ tabId, versionId });
+export const closePick = () => request && set(null);
 const useRequest = () =>
   useSyncExternalStore(
     (f) => {

@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -17,6 +18,38 @@ import { Presence } from './motion';
 const WinContext = createContext<RefObject<HTMLElement | null>>({ current: null });
 export const WinProvider = WinContext.Provider;
 export const useWin = () => useContext(WinContext);
+
+// 盖住内容区的覆盖层（大图、分支总览、对比……）属于打开它的页面和标签页（doc/design.md 2.11）：
+// 顶栏照常能点，一离开就关——切到别的页面、换了标签页。以前切到图片库后总览还盖着，Esc 也关不掉（用户 11-01）
+const PageContext = createContext({ page: '', here: true });
+/** name 是这一页的名字；不写表示不属于哪一页（顶栏、全局），只看页面换没换 */
+export function PageScope({
+  page,
+  name,
+  children,
+}: {
+  page: string;
+  name?: string;
+  children: ReactNode;
+}) {
+  const here = !name || page === name;
+  const value = useMemo(() => ({ page, here }), [page, here]);
+  return <PageContext.Provider value={value}>{children}</PageContext.Provider>;
+}
+/** 开着的覆盖层在离开时调 close：所在页面不在前台了、页面换了，或 scope（如标签页 id）变了 */
+export function useLeave(open: boolean, close: () => void, scope?: unknown) {
+  const { page, here } = useContext(PageContext);
+  const last = useRef({ page, here, scope });
+  const latest = useRef({ open, close });
+  latest.current = { open, close };
+  useEffect(() => {
+    const was = last.current;
+    last.current = { page, here, scope };
+    // 藏起来的页面回到前台时效果会重跑，那时 here 是从 false 变回来，不算离开
+    if (latest.current.open && (was.page !== page || (was.here && !here) || was.scope !== scope))
+      latest.current.close();
+  }, [page, here, scope]);
+}
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 // 最近一次操作是鼠标还是键盘。浮层关掉后把焦点还给触发它的元素时，如果焦点原来在浮层的输入框里，
