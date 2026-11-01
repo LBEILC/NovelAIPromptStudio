@@ -200,6 +200,80 @@ async function scenario({ action, value }) {
       source: 'ui',
       libraryChanged: true,
     });
+  } else if (action === 'branches') {
+    // 一个几百版、近百条分支的作品，直接写版本库，不走生成队列（看分支总览在大作品里的样子）
+    const db = session.database;
+    const cards = await db.loadLibraryCards();
+    const templates = cards.filter((card) => !card.generated_work_id).slice(0, 14);
+    if (!templates.length) throw Error('请先重置数据');
+    const { tab } = await session.call('workbench.new', {
+      name: '多分支作品',
+      width: 832,
+      height: 1216,
+    });
+    const copyDirectory = path.join(session.directory, 'assets', 'branches');
+    fs.mkdirSync(copyDirectory, { recursive: true });
+    let n = 0;
+    const copy = () => {
+      const p = structuredClone(db.loadProject(templates[n++ % templates.length].id));
+      p.id = crypto.randomUUID();
+      p.tags.forEach((t) => (t.id = crypto.randomUUID()));
+      p.content_hash = crypto.randomUUID();
+      p.name = `分支演示 ${n}`;
+      for (const key of ['image_path', 'thumbnail_path']) {
+        const target = path.join(copyDirectory, `${p.id}-${key}${path.extname(p[key])}`);
+        fs.linkSync(p[key], target);
+        p[key] = target;
+      }
+      return p;
+    };
+    // 固定种子，每次造出来的树一样
+    let s = 20261101;
+    const rand = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const pick = (list) => list[Math.floor(rand() * list.length)];
+    const SLOTS = [
+      ['blue hair', 'silver hair', 'red hair', 'black hair', 'green hair', 'pink hair'],
+      ['standing', 'sitting', 'walking', 'looking back', 'arms up', 'kneeling'],
+      ['forest', 'beach', 'city street', 'rooftop', 'library', 'snowfield'],
+      ['soft lighting', 'backlighting', 'sunset', 'night', 'rim light', 'overcast'],
+      ['film grain', 'watercolor', 'flat color', 'oil painting', 'sketch', 'cel shading'],
+    ];
+    const total = Number(value) || 300;
+    const root = (await session.call('version.list', { tabId: tab.id })).versions[0];
+    const made = [{ id: root.id, slots: SLOTS.map((o) => o[0]) }];
+    let tip = made[0];
+    for (let i = 0; i < total; i++) {
+      // 七成接着当前这条往下走，三成从已有的某一版分出去
+      const parent = i && rand() < 0.3 ? pick(made.slice(1)) : tip;
+      const slots = [...parent.slots];
+      for (let c = 0, k = rand() < 0.3 ? 2 : 1; c < k; c++) {
+        const at = Math.floor(rand() * SLOTS.length);
+        slots[at] = pick(SLOTS[at].filter((o) => o !== parent.slots[at]));
+      }
+      await session.call('prompt.set', {
+        tabId: tab.id,
+        scope: 'base:prompt',
+        text: `1girl, ${slots[0]}, ${slots[1]}\n\n${slots[2]}, ${slots[3]}\n\n${slots[4]}`,
+      });
+      const project = session.commands.store.get().tabs.find((t) => t.id === tab.id).project;
+      const images = Array.from({ length: 1 + Math.floor(rand() * rand() * 6) }, copy);
+      db.insertProjects(images);
+      let version;
+      for (const image of images)
+        version = db.versions.append({
+          workId: tab.workId,
+          parentId: parent.id,
+          project,
+          source: 'user',
+          image,
+          seed: Math.floor(rand() * 4294967295),
+          versionId: version?.id,
+        });
+      tip = { id: version.id, slots };
+      made.push(tip);
+    }
+    db.refreshGeneratedCards();
+    await session.call('version.open', { tabId: tab.id, versionId: tip.id });
   } else if (action === 'agent-ops') {
     // Agent 排三个图片操作（局部重绘、扩图、增强），都进待确认，用来看待确认卡片
     const current = session.commands.store.get();
@@ -252,7 +326,7 @@ async function scenario({ action, value }) {
         await session.call('generate.start', { tabId, count: 1 }, 'agent');
     }
   } else if (!['token', 'ai', 'keychain'].includes(action)) throw Error('未知场景');
-  return { reload: ['token', 'ai', 'keychain', 'chatgpt', 'many'].includes(action) };
+  return { reload: ['token', 'ai', 'keychain', 'chatgpt', 'many', 'branches'].includes(action) };
 }
 async function shutdown() {
   if (shuttingDown) return;

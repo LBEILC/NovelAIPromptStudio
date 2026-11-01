@@ -324,6 +324,7 @@ group('数据', [
   ['重来', act('reset')],
   ['空图片库', act('empty')],
   ['2000 张图片', act('many')],
+  ['300 版的多分支作品', act('branches')],
 ]);
 group('账号', [
   ['没有令牌', act('token', false)],
