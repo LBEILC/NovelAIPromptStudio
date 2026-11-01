@@ -146,6 +146,43 @@
    内边距在外框上时，指针移向滚动条要先出 .vp-in，卡片就关了（用户 10-27） */
 .ver-peek { width: var(--popover-w-wide); max-height: calc(100% - 16px); overflow: hidden auto; gap: var(--sp-2); padding: 0; }
 .ver-peek > .vp-in { padding: var(--sp-3); }
+/* 悬停缩略图时的大图（11-01）：宽度跟着图走，最大 --peek-img-w × --peek-img-h */
+.ver-peek.img { width: auto; }
+.ver-peek .vp-pic { display: grid; place-items: center; min-width: calc(var(--peek-img-w) / 2); min-height: calc(var(--peek-img-w) / 2); margin-bottom: var(--sp-2); border-radius: var(--r-thumb); background: var(--hover); overflow: hidden; }
+.ver-peek .vp-pic img { display: block; max-width: var(--peek-img-w); max-height: var(--peek-img-h); object-fit: contain; }
+/* 版本行标题右边：收起、展开这一版的缩略图。平时藏着，指针移上来或已经收起时才显示 */
+.ver .vh .ver-n { margin-left: var(--sp-1); font-size: var(--fs-caption); color: var(--text-3); }
+.ver .vh .ver-fold { margin: calc(var(--sp-1) * -1) calc(var(--sp-1) * -1) calc(var(--sp-1) * -1) auto; opacity: 0; transition: opacity var(--dur-1) var(--ease-out); }
+.ver:hover .vh .ver-fold, .ver .vh .ver-fold.on, .ver .vh .ver-fold:focus-visible { opacity: 1; }
+/* 分叉行：下面常态一排小图，右边展开按钮；展开后这条分支的各版一行一个，缩进一格 */
+.ver.fork .fk-ths { margin-top: var(--sp-1); }
+.ver.fork .fk-open { flex: 0 0 auto; margin: calc(var(--sp-1) * -1) calc(var(--sp-1) * -1) 0 0; }
+.ver.fork-ver { flex-direction: row; align-items: flex-start; gap: var(--sp-2); margin-left: var(--sp-5); padding-top: var(--sp-1); padding-bottom: var(--sp-1); color: var(--text-3); }
+.ver.fork-ver::before { content: ""; position: absolute; left: calc(var(--sp-2) * -1); top: 0; bottom: 0; border-left: var(--bw) solid var(--border); }
+.ver.fork-ver .fk { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.ver.fork-ver .fk-name { display: flex; align-items: center; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--text-2); }
+.ver.fork-ver .what { font-size: var(--fs-caption); color: var(--text-3); -webkit-line-clamp: 1; }
+.ver.fork-ver:hover .fk-name { color: var(--text); }
+.ver.fork-ver .fx-th.empty { width: 28px; height: 38px; border: var(--bw) dashed var(--border); border-radius: 3px; box-sizing: border-box; }
+/* 分支总览（11-01）：每条分支一行，同一代对齐在同一列，连线走版本之间的缝 */
+.map-ov .map-top { border-top: 0; border-bottom: var(--bw) solid var(--border); }
+.map-ov .map-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--sp-5); }
+.map-ov .map-grid { position: relative; }
+.map-ov .map-labels { position: sticky; left: 0; z-index: 2; background: var(--bg); }
+.map-ov .map-label { position: absolute; left: 0; right: 0; display: flex; flex-direction: column; justify-content: center; gap: var(--sp-0); padding: 0 var(--sp-3); border-left: var(--thumb-ring) solid transparent; }
+.map-ov .map-label b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-ov .map-label.on { border-left-color: var(--ink); }
+.map-ov .map-lines { position: absolute; top: 0; overflow: visible; pointer-events: none; }
+.map-ov .map-lines path { fill: none; stroke: var(--border); stroke-width: var(--bw); }
+.map-ov .map-lines path.on { stroke: var(--text-2); stroke-width: 1.5px; }
+.map-ov .map-card { position: absolute; width: var(--map-card-w); display: flex; flex-direction: column; gap: var(--sp-1); padding: 0; border: 0; background: transparent; color: var(--text-2); text-align: left; }
+.map-ov .map-pic { display: grid; place-items: center; width: var(--map-card-w); height: var(--map-card-h); border-radius: var(--r-thumb); background: var(--hover); overflow: hidden; outline: var(--thumb-ring) solid transparent; outline-offset: var(--thumb-ring); transition: outline-color var(--dur-1) var(--ease-out); }
+.map-ov .map-pic img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.map-ov .map-card:hover .map-pic { outline-color: var(--border); }
+.map-ov .map-card.on .map-pic { outline-color: var(--cinnabar); }
+.map-ov .map-card:hover, .map-ov .map-card.on { color: var(--text); }
+.map-ov .map-cap { display: flex; justify-content: space-between; gap: var(--sp-1); font-size: var(--fs-caption); line-height: var(--lh-caption); white-space: nowrap; }
+.map-ov .map-none { font-size: var(--fs-caption); color: var(--text-3); }
 :is(.ver-peek, .cmp-diff) .vp-h { display: flex; flex-direction: column; gap: var(--sp-0); }
 :is(.ver-peek, .cmp-diff) .vp-g { display: flex; flex-direction: column; gap: var(--sp-1); padding-top: var(--sp-2); border-top: var(--bw) solid var(--divider); }
 :is(.ver-peek, .cmp-diff) .vp-tags { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); font-size: var(--fs-caption); }

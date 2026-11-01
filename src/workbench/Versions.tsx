@@ -1,4 +1,4 @@
-import { Fragment, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { Fragment, useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Icon, Kbd, isMod, modKey } from '../kit/controls';
 import { Pop } from '../kit/layer';
 import { ContextMenu } from '../kit/menu';
@@ -8,7 +8,8 @@ import { versionDiff } from '../lib/versionDiff';
 import type { CommandTab } from '../shared/commands';
 import type { ImageOperation, WorkVersion } from '../shared/generation';
 import { originGone } from './original';
-import { useVersionState } from './useVersionState';
+import { useVersionState, type PeekImage } from './useVersionState';
+import { BranchMap } from './BranchMap';
 import { openCompare, type CompareSide } from './Compare';
 import { VersionDifference, VersionSummary } from './VersionDifference';
 import {
@@ -18,6 +19,7 @@ import {
   TH_H,
   TH_MORE,
   Thumb,
+  fullOf,
   isRedraw,
   opPlan,
   rowsOf,
@@ -89,6 +91,12 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     derived,
     shownTab,
     peekProps,
+    hover,
+    hoverImg,
+    folded,
+    toggleFold,
+    saveFolded,
+    tree,
     name,
     delta,
     origin,
@@ -115,6 +123,43 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
   } = useVersionState({ tab, before });
   // Ctrl（macOS 是 Command）点两张缩略图：两张对比（1.8.1）；先点的那张虚线框标着
   const [pick, setPick] = useState<CompareSide | null>(null);
+  const [map, setMap] = useState(false);
+  /** 停在缩略图上看大图：卡片贴在版本栏右边，顶边对齐这张图（11-01） */
+  const imgPeek = (e: ReactPointerEvent<HTMLElement>, v: WorkVersion, img: Omit<PeekImage, 'at'>) =>
+    hoverImg(`img-${img.id}`, v, {
+      ...img,
+      at: [
+        (col.current?.getBoundingClientRect().right ?? 0) + 6,
+        e.currentTarget.getBoundingClientRect().top,
+      ],
+    });
+  /** 离开一排缩略图、还在这一行里：换回版本对比。缩略图之间的缝隙算在图上，扫过时不闪 */
+  const backToRow =
+    (key: string, v: WorkVersion, title: string) => (e: ReactPointerEvent<HTMLElement>) => {
+      const row = e.currentTarget.closest('[data-peek]');
+      if (v.parentId && row && e.relatedTarget instanceof Node && row.contains(e.relatedTarget))
+        hover(key, v, title);
+    };
+  /** 一版的第 k 张：大图卡片下面写的那行 */
+  const imgLabel = (v: WorkVersion, projectId: string, prefix = '') => {
+    const list = v.images.filter((i) => !i.deleted);
+    const k = list.findIndex((i) => i.projectId === projectId);
+    const img = list[k];
+    return {
+      label: `${prefix}${name(v)} · 第 ${k + 1} 张${img?.seed ? ` · Seed ${img.seed}` : ''}`,
+      tip: (img?.variant && VARIANT[img.variant]) || randomSummary(img?.random) || undefined,
+    };
+  };
+  /** 从 f 起沿第一个孩子一路往下：这条分支自己的那条线 */
+  const lineFrom = (f: WorkVersion) => {
+    const out = [f];
+    for (let x = kids(f.id)[0]; x; x = kids(x.id)[0]) out.push(x);
+    return out;
+  };
+  /** 一版拿哪张出来代表：第一张没进回收站的；原图那一版是原图 */
+  const firstImage = (x: WorkVersion) =>
+    x.images.find((i) => !i.deleted)?.projectId ||
+    (!x.parentId && !x.isStart && !originGone(x) ? x.project.id : '');
   const pickOr = (e: React.MouseEvent, v: WorkVersion, imageId: string) => {
     if (!isMod(e)) return false;
     if (pick && pick.imageId !== imageId) {
@@ -138,7 +183,14 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             key="orig"
             className={`${cur(v.project.id) ? 'is-cur' : ''} ${pick?.imageId === v.project.id ? 'is-pick' : ''}`}
             style={{ '--w': `${w}px` } as React.CSSProperties}
-            data-tip="原图"
+            onPointerEnter={(e) =>
+              imgPeek(e, v, {
+                id: v.project.id,
+                path: v.project.image_path,
+                image: v.project,
+                label: '原图',
+              })
+            }
             onClick={(e) => {
               e.stopPropagation();
               if (pickOr(e, v, v.project.id)) return;
@@ -168,7 +220,10 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             data-tip={
               pick && pick.imageId !== img.projectId
                 ? `按住 ${modKey()} 点，和标着的那张对比`
-                : (img.variant && VARIANT[img.variant]) || randomSummary(img.random) || undefined
+                : undefined
+            }
+            onPointerEnter={(e) =>
+              imgPeek(e, v, { id: img.projectId, ...imgLabel(v, img.projectId) })
             }
             onClick={(e) => {
               e.stopPropagation();
@@ -293,6 +348,14 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
           ),
         });
       const spawned = derived.filter((d) => d.source.versionId === v.id);
+      // 缩略图收起来了（正在往这一版里生成时照样显示，看得到进度）
+      const count =
+        v.images.filter((i) => !i.deleted).length + (firstImage(v) === v.project.id ? 1 : 0);
+      const busy = active.some(
+        ({ job, appending }) =>
+          job.versionId === v.id || (!job.versionId && appending && job.parentId === v.id),
+      );
+      const fold = folded.has(v.id) && !busy && count > 0;
       rows.push({
         key: `ver-${v.id}`,
         render: (gone) => (
@@ -332,6 +395,20 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                 >
                   新作品
                 </span>
+              )}
+              {fold && <span className="ver-n">{count} 张</span>}
+              {count > 0 && !busy && (
+                <button
+                  className={`btn quiet sm icon ver-fold ${fold ? 'on' : ''}`}
+                  aria-label={fold ? '展开缩略图' : '收起缩略图'}
+                  data-tip={fold ? '展开缩略图' : '收起缩略图，只留标题和改了什么'}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFold(v.id);
+                  }}
+                >
+                  <Icon name={fold ? 'arrow-down-s-line' : 'arrow-up-s-line'} />
+                </button>
               )}
             </span>
             {v.parentId ? (
@@ -378,9 +455,16 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                 来自 {origin.name || '原作品'} · 第 {origin.number} 版
               </span>
             ) : null}
-            <div className="ths" data-key={`ths-${v.id}`} data-grow="">
-              {thumbs(v, on)}
-            </div>
+            {!fold && (
+              <div
+                className="ths"
+                data-key={`ths-${v.id}`}
+                data-grow=""
+                onPointerLeave={backToRow(`ver-${v.id}`, v, name(v))}
+              >
+                {thumbs(v, on)}
+              </div>
+            )}
           </div>
         ),
       });
@@ -496,6 +580,10 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
       for (const f of list) {
         const all = subtree(f);
         const title = `${f.branchName} · ${all.length} 版 · ${all.reduce((n, x) => n + x.images.filter((i) => !i.deleted).length, 0)} 张`;
+        // 分叉行常态带一排小图：这条分支最近几版各一张，在主线上也看得到分支的图（11-01）
+        const fl = lineFrom(f);
+        const fx = open.includes(`forkx:${f.id}`);
+        const strip = fl.filter((x) => firstImage(x)).slice(-4);
         rows.push({
           key: `fork-${f.id}`,
           render: (gone) => (
@@ -521,10 +609,107 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
                   {f.source === 'agent' && <span className="src">Agent</span>}
                 </span>
                 <VersionSummary compact diff={delta(f)} />
+                {!fx && strip.length > 0 && (
+                  <span className="ths fk-ths" onPointerLeave={backToRow(`fork-${f.id}`, f, title)}>
+                    {strip.map((x) => {
+                      const id = firstImage(x);
+                      return (
+                        <span
+                          key={x.id}
+                          style={
+                            { '--w': `${Math.round(TH_H * ratio(x))}px` } as React.CSSProperties
+                          }
+                          onPointerEnter={(e) =>
+                            imgPeek(e, x, {
+                              id,
+                              ...(id === x.project.id
+                                ? { path: x.project.image_path, image: x.project, label: '原图' }
+                                : imgLabel(x, id, `${f.branchName} · `)),
+                            })
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void go(x, id);
+                          }}
+                        >
+                          {id === x.project.id ? (
+                            <Thumb
+                              id={id}
+                              path={x.project.thumbnail_path || x.project.image_path}
+                              image={x.project}
+                              tab={tab.id}
+                            />
+                          ) : (
+                            <Thumb id={id} tab={tab.id} />
+                          )}
+                        </span>
+                      );
+                    })}
+                  </span>
+                )}
               </span>
+              <button
+                className={`btn quiet sm icon fk-open ${fx ? 'on' : ''}`}
+                aria-label={fx ? '收起这条分支' : '展开这条分支'}
+                data-tip={fx ? '收起' : `展开这条分支的 ${fl.length} 版，不用切过去`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(
+                    fx ? open.filter((x) => x !== `forkx:${f.id}`) : [...open, `forkx:${f.id}`],
+                  );
+                }}
+              >
+                <Icon name={fx ? 'arrow-up-s-line' : 'arrow-down-s-line'} />
+              </button>
             </div>
           ),
         });
+        // 就地展开：这条分支的各版一行一个，左边一张小图；点了才切过去
+        if (fx)
+          for (const x of fl) {
+            const id = firstImage(x);
+            const t = `${f.branchName} · ${name(x)}`;
+            rows.push({
+              key: `fx-${x.id}`,
+              render: (gone) => (
+                <div
+                  key={`fx-${x.id}`}
+                  data-key={`fx-${x.id}`}
+                  data-flip=""
+                  data-exit="lift"
+                  data-enter="fade"
+                  className={`ver fork-ver ${gone ? 'leaving' : ''}`}
+                  tabIndex={0}
+                  role="button"
+                  onClick={() => void go(x)}
+                  onKeyDown={(e) => e.key === 'Enter' && void go(x)}
+                  {...peekProps(`fx-${x.id}`, x, t)}
+                >
+                  {id ? (
+                    <span className="ths fx-th" onPointerLeave={backToRow(`fx-${x.id}`, x, t)}>
+                      <span
+                        style={{ '--w': `${Math.round(TH_H * ratio(x))}px` } as React.CSSProperties}
+                        onPointerEnter={(e) =>
+                          imgPeek(e, x, { id, ...imgLabel(x, id, `${f.branchName} · `) })
+                        }
+                      >
+                        <Thumb id={id} tab={tab.id} />
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="fx-th empty" />
+                  )}
+                  <span className="fk">
+                    <span className="fk-name">
+                      <span className="t">{name(x)}</span>
+                      <span className="ver-n">{x.images.filter((i) => !i.deleted).length} 张</span>
+                    </span>
+                    <VersionSummary compact diff={delta(x)} />
+                  </span>
+                </div>
+              ),
+            });
+          }
       }
       if (list.length < forks.length || (fo && forks.length > 3))
         rows.push({
@@ -628,6 +813,7 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
   const shown = useExitList(rows, (r) => `${shownTab}:${r.key}`).filter(
     (r) => !r.leaving || r.key.startsWith(`${shownTab}:`),
   );
+  const allFolded = versions.length > 0 && versions.every((v) => folded.has(v.id));
   // 原图算一张；空白作品的起点没有图
   const images = versions.reduce(
     (n, v) => n + v.images.filter((i) => !i.deleted).length,
@@ -652,6 +838,33 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         <span className="muted">
           {versions.filter((v) => !v.isStart).length} 版 · {images} 张
         </span>
+        {versions.length > 1 && (
+          <>
+            <button
+              className="btn quiet sm icon"
+              aria-label={allFolded ? '展开全部缩略图' : '收起全部缩略图'}
+              data-tip={allFolded ? '展开全部缩略图' : '收起全部缩略图，只留标题和改了什么'}
+              onClick={() =>
+                saveFolded(
+                  allFolded
+                    ? new Set([...folded].filter((id) => !tree.byId.has(id)))
+                    : new Set([...folded, ...versions.map((v) => v.id)]),
+                )
+              }
+            >
+              <Icon name={allFolded ? 'expand-up-down-line' : 'contract-up-down-line'} />
+            </button>
+            <button
+              className={`btn quiet sm icon ${map ? 'is-hover' : ''}`}
+              aria-label="分支总览"
+              data-tip="分支总览：所有分支的图一次看全"
+              data-feature="branch-map"
+              onClick={() => setMap(true)}
+            >
+              <Icon name="node-tree" />
+            </button>
+          </>
+        )}
       </div>
       <SnapshotSwap swapKey={shownTab} root={scroll} />
       <FlipScope root={scroll}>
@@ -672,9 +885,10 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
       <Pop
         open={!!peek && !menu}
         onClose={() => setPeek(null)}
-        anchor={peek ? `[data-peek="${peek.key}"]` : undefined}
+        anchor={peek && !peek.img ? `[data-peek="${peek.key}"]` : undefined}
+        point={peek?.img?.at}
         place="right-top"
-        className="popover ver-peek scroll"
+        className={`popover ver-peek scroll ${peek?.img ? 'img' : ''}`}
         passive
         deps={[peek?.key]}
       >
@@ -684,15 +898,33 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
             onPointerEnter={() => clearTimeout(peekTimer.current)}
             onPointerLeave={leavePeek}
           >
-            <VersionDifference
-              diff={delta(peek.v)}
-              title={peek.title}
-              against={peek.against}
-              redraw={isRedraw(peek.v)}
-            />
+            {peek.img ? (
+              <PeekPicture img={peek.img} tab={tab.id} />
+            ) : (
+              <VersionDifference
+                diff={delta(peek.v)}
+                title={peek.title}
+                against={peek.against}
+                redraw={isRedraw(peek.v)}
+              />
+            )}
           </div>
         )}
       </Pop>
+      <BranchMap
+        open={map}
+        onClose={() => setMap(false)}
+        tab={tab.id}
+        versions={versions}
+        current={current}
+        tree={tree}
+        name={name}
+        firstImage={firstImage}
+        onGo={(v, imageId) => {
+          setMap(false);
+          void go(v, imageId);
+        }}
+      />
       <ContextMenu at={menu?.at || null} onClose={() => setMenu(null)} items={menu?.items || []} />
       {dialog}
       {sharedDialog}
@@ -760,5 +992,41 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         )}
       </Pop>
     </div>
+  );
+}
+
+/** 悬停缩略图时的大图卡片：原图按比例放在 --peek-img-w × --peek-img-h 里，下面写第几版第几张和 Seed */
+function PeekPicture({ img, tab }: { img: PeekImage; tab: string }) {
+  const [data, setData] = useState(img.path ? { path: img.path, image: img.image } : null);
+  useEffect(() => {
+    if (img.path) return setData({ path: img.path, image: img.image });
+    let live = true;
+    setData(null);
+    void fullOf(img.id)
+      .then((d) => live && setData(d))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [img.id, img.path]);
+  return (
+    <>
+      <div className="vp-pic">
+        {data && (
+          <BlurImg
+            image={data.image}
+            path={data.path}
+            tab={tab}
+            eye={false}
+            alt=""
+            draggable={false}
+          />
+        )}
+      </div>
+      <div className="vp-h">
+        <b>{img.label}</b>
+        {img.tip && <span className="help">{img.tip}</span>}
+      </div>
+    </>
   );
 }

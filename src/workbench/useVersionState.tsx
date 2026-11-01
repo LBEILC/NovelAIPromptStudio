@@ -20,6 +20,28 @@ import { applyRandom } from './RandomBlock';
 import { nsfwMenu } from '../kit/blur';
 import { imageFileMenu } from '../kit/imageFiles';
 import { createVersionTree } from '../lib/versionTree';
+import type { BlurImage } from '../kit/blur';
+
+/** 悬停在缩略图上：看大图（11-01）。path 不给时按 id 读原图 */
+export type PeekImage = {
+  id: string;
+  path?: string;
+  image?: BlurImage;
+  label: string;
+  /** 抽到了什么、是哪种变体 */
+  tip?: string;
+  /** 卡片贴在版本栏右边、顶边对齐这张缩略图 */
+  at: [number, number];
+};
+// 每一版的缩略图收没收起来，按版本记住（11-01）
+const FOLD_KEY = 'nps:version-folded';
+const readFolded = () => {
+  try {
+    return new Set<string>(JSON.parse(localStorage.getItem(FOLD_KEY) || '[]'));
+  } catch {
+    return new Set<string>();
+  }
+};
 type Loaded = {
   tab: string;
   versions: WorkVersion[];
@@ -81,7 +103,23 @@ export function useVersionState({
     v: WorkVersion;
     title: string;
     against: string;
+    img?: PeekImage;
   } | null>(null);
+  const [folded, setFolded] = useState(readFolded);
+  const saveFolded = (next: Set<string>) => {
+    setFolded(next);
+    try {
+      // 只留最近的一些，免得越存越多
+      localStorage.setItem(FOLD_KEY, JSON.stringify([...next].slice(-2000)));
+    } catch {
+      // 存不了就只在这次打开时有效
+    }
+  };
+  const toggleFold = (id: string) => {
+    const next = new Set(folded);
+    if (!next.delete(id)) next.add(id);
+    saveFolded(next);
+  };
   const [menu, setMenu] = useState<{ at: [number, number]; items: MenuEntry[] } | null>(null);
   const [rename, setRename] = useState<{ v: WorkVersion; anchor: string; text: string } | null>(
     null,
@@ -142,6 +180,14 @@ export function useVersionState({
     const against = byId(v.parentId) ? name(byId(v.parentId)!) : name(v);
     if (peek) return setPeek({ key, v, title, against });
     peekTimer.current = window.setTimeout(() => setPeek({ key, v, title, against }), 400);
+  };
+  /** 停在缩略图上：看大图。比版本对比快一点；已经有卡片开着时立刻换 */
+  const hoverImg = (key: string, v: WorkVersion, img: PeekImage) => {
+    clearTimeout(peekTimer.current);
+    const against = byId(v.parentId) ? name(byId(v.parentId)!) : name(v);
+    const next = { key, v, title: img.label, against, img };
+    if (peek) return setPeek(next);
+    peekTimer.current = window.setTimeout(() => setPeek(next), 250);
   };
   const unhover = () => {
     clearTimeout(peekTimer.current);
@@ -437,6 +483,12 @@ export function useVersionState({
     /** 现在显示的是哪个标签页的版本（还没读到新标签页时是上一个） */
     shownTab: loaded.tab,
     peekProps,
+    hover,
+    hoverImg,
+    folded,
+    toggleFold,
+    saveFolded,
+    tree,
     name,
     delta,
     origin,

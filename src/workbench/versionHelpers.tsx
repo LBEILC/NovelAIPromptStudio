@@ -19,6 +19,20 @@ export function thumbOf(id: string) {
   }
   return p;
 }
+/** 悬停缩略图时的大图：要原图的路径，不是缩略图（11-01） */
+const fullCache = new Map<string, Promise<ThumbData>>();
+export function fullOf(id: string) {
+  let p = fullCache.get(id);
+  if (!p) {
+    p = invokeUI('library.get', { id }).then((r) => ({
+      path: r.project.image_path,
+      image: r.project,
+    }));
+    fullCache.set(id, p);
+    p.catch(() => fullCache.delete(id));
+  }
+  return p;
+}
 /** 版本栏的小图：太小，不放眼睛；模糊时在舞台上点眼睛，整个标签页一起显示（2.37） */
 export function Thumb({
   id,

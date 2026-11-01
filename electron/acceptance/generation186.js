@@ -19,7 +19,8 @@ export async function generation186Checks({ h, generationService }) {
   const tree = (await call('version.list', { tabId: tab.id })).versions.filter((v) => !v.isStart);
   const version = tree.at(-1);
   const thumbs = `[data-key="ths-${version.id}"]`;
-  await h.wait(`document.querySelectorAll('${thumbs} [data-tip^="抽到的内容"]').length===3`);
+  // 抽到了什么写在悬停缩略图的大图卡片里（11-01），这里只等三张图都出来；记录本身由下面的 recorded 检查
+  await h.wait(`document.querySelectorAll('${thumbs} span:has(img)').length===3`);
   const recorded = tree.length === 1 && version.images.length === 3;
   await contextMenu(h, `${thumbs} span:has(img)`);
   await h.click('用这张抽到的内容', menuRoot);
