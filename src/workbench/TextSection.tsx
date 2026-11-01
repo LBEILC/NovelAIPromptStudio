@@ -17,6 +17,8 @@ export function TextSection({
   tags,
   onSave,
   scope,
+  onCaret,
+  onMenuInsert,
 }: {
   scope?: string;
   text: string;
@@ -24,6 +26,10 @@ export function TextSection({
   query: string;
   tags: Tag[];
   onSave: (value: string) => void;
+  /** 用户移动光标、打字时报告光标位置（插入常用块插在这里） */
+  onCaret?: (position: number) => void;
+  /** 右键菜单里的"插入常用块…"：插在右键点到的位置，浮层开在指针处 */
+  onMenuInsert?: (position: number, point: [number, number]) => void;
 }) {
   const [value, setValue] = useState(text),
     [cursor, setCursor] = useState(0),
@@ -42,6 +48,28 @@ export function TextSection({
     save = useRef(onSave),
     lastSaved = useRef(text);
   save.current = onSave;
+  const menuInsert = useRef(onMenuInsert);
+  menuInsert.current = onMenuInsert;
+  // 输入框通用的右键菜单（app/session.tsx）问一声，这里在后面加"插入常用块…"
+  useEffect(() => {
+    const node = area.current;
+    if (!node) return;
+    const add = (event: Event) => {
+      const { detail } = event as CustomEvent<{
+        add: (item: { key: string; label: string; onClick: () => void }) => void;
+        point: [number, number];
+      }>;
+      if (!menuInsert.current) return;
+      const at = node.selectionStart;
+      detail.add({
+        key: 'insert-material',
+        label: '插入常用块…',
+        onClick: () => menuInsert.current?.(at, detail.point),
+      });
+    };
+    node.addEventListener('nps:text-menu', add);
+    return () => node.removeEventListener('nps:text-menu', add);
+  }, []);
   const commit = () => {
     clearTimeout(timer.current);
     if (pending.current !== null) {
@@ -212,8 +240,14 @@ export function TextSection({
           value={value}
           spellCheck={false}
           data-tip={tip || undefined}
-          onChange={(e) => change(e.target.value, e.target.selectionStart)}
-          onSelect={(e) => setCursor(e.currentTarget.selectionStart)}
+          onChange={(e) => {
+            change(e.target.value, e.target.selectionStart);
+            onCaret?.(e.target.selectionStart);
+          }}
+          onSelect={(e) => {
+            setCursor(e.currentTarget.selectionStart);
+            onCaret?.(e.currentTarget.selectionStart);
+          }}
           onBlur={() => {
             commitRef.current();
             setSuggest(false);

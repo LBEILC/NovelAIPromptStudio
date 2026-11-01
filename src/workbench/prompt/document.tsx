@@ -37,6 +37,7 @@ export function usePromptDocumentView({
   charRows,
   charTitle,
   setNewBlock,
+  insert,
   setInsert,
   newBlockEl,
   countTags,
@@ -76,6 +77,7 @@ export function usePromptDocumentView({
   | 'charRows'
   | 'charTitle'
   | 'setNewBlock'
+  | 'insert'
   | 'setInsert'
   | 'newBlockEl'
   | 'countTags'
@@ -276,6 +278,42 @@ export function usePromptDocumentView({
   // ---------- 文本方式 ----------
   const latestDoc = useRef(doc);
   latestDoc.current = doc;
+  // 每一节最后一次的光标位置：插入常用块插在这里，没点过文字框时插在最前面（用户 11-01）
+  const caretAt = useRef(new Map<string, number>());
+  /** 在 key 这一节光标 at 的位置插常用块：按最新的分块算插在第几块前面 */
+  const openInsert = (key: string, at: number, anchor: string, point?: [number, number]) => {
+    // 先把还没存的文字交出去
+    window.dispatchEvent(new Event('nps:flush-text'));
+    const cur = latestDoc.current,
+      i = cur.scopes.findIndex((s) => s.scope.key === key);
+    if (i < 0) return;
+    setInsert({
+      si: i,
+      before: cur.scopes[i].blocks.filter((b) => b.range.start < at).length,
+      anchor,
+      point,
+    });
+  };
+  const textInsert = (si: number) => {
+    if (!p.tabId) return null;
+    const key = doc.scopes[si].scope.key,
+      trigger = `tins-${key}`;
+    return (
+      <button
+        className={`btn quiet sm ${insert?.anchor === `[data-trigger="${trigger}"]` ? 'is-hover' : ''}`}
+        data-trigger={trigger}
+        data-tip="插到光标所在的位置；没点过文字框时插在最前面"
+        onClick={() =>
+          insert
+            ? setInsert(null)
+            : openInsert(key, caretAt.current.get(key) ?? 0, `[data-trigger="${trigger}"]`)
+        }
+      >
+        <Icon name="bookmark-line" />
+        常用块
+      </button>
+    );
+  };
   const textBox = (si: number, label: string) => {
     const section = doc.scopes[si];
     const key = section.scope.key;
@@ -283,6 +321,13 @@ export function usePromptDocumentView({
       <TextSection
         key={`tx-${key}`}
         scope={key}
+        onCaret={(position) => caretAt.current.set(key, position)}
+        onMenuInsert={
+          p.tabId
+            ? (position, point) =>
+                openInsert(key, position, `.tx-wrap[data-wb-scope="${key}"] textarea`, point)
+            : undefined
+        }
         text={serializePromptSection(section)}
         label={label}
         query={query}
@@ -306,6 +351,7 @@ export function usePromptDocumentView({
             {chars.length ? '基础提示词' : '提示词'}
             <span className="muted">空一行是新的一块</span>
             <span className="acts" style={{ marginLeft: 'auto' }}>
+              {textInsert(baseIndex)}
               {secCopy(baseIndex, '基础提示词')}
             </span>
           </div>
@@ -329,7 +375,11 @@ export function usePromptDocumentView({
       </div>
       {charScopes.map(({ c, si, ni }) => (
         <div className="char-sec" key={`tch-${c.id}`}>
-          {si >= 0 ? charTitle(c, si) : <div className="sec-h char-h">{c.label}</div>}
+          {si >= 0 ? (
+            charTitle(c, si, textInsert(si))
+          ) : (
+            <div className="sec-h char-h">{c.label}</div>
+          )}
           {si >= 0 && textBox(si, c.label)}
           {ni >= 0 && (
             <>

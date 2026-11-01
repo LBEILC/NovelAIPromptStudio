@@ -100,6 +100,7 @@ export function InsertPop({
   onManage,
   kind = 'block',
   place,
+  point,
 }: {
   open: boolean;
   onClose: () => void;
@@ -112,6 +113,8 @@ export function InsertPop({
   /** 常用块，或者"添加角色"旁边的箭头：从素材里选一个角色 */
   kind?: 'block' | 'character';
   place?: Place;
+  /** 开在指针处（文本方式的右键"插入常用块…"） */
+  point?: [number, number];
 }) {
   const notify = useNotifications();
   const noun = kind === 'character' ? '角色' : '常用块';
@@ -163,6 +166,7 @@ export function InsertPop({
         trigger={anchor}
         className="popover ins-pop"
         place={place}
+        point={point}
         label={kind === 'character' ? '从素材添加角色' : '插入常用块'}
         deps={[list.length]}
       >

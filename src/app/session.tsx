@@ -10,7 +10,14 @@ import {
   WORKBENCH_SESSION_KEY,
 } from '../lib/workbenchSession.js';
 import type { useLibraryLoading } from './library';
-import { captureTextSelection, Editable, runTextEditAction, studio, TextAction } from './shared';
+import {
+  captureTextSelection,
+  Editable,
+  runTextEditAction,
+  studio,
+  TextAction,
+  type LegacyMenuItem,
+} from './shared';
 import type { useAppState } from './state';
 export function useSessionEffects({
   workbenchConnection,
@@ -246,6 +253,16 @@ export function useSessionEffects({
       const selection = captureTextSelection(editable);
       const invoke = (action: TextAction) =>
         runTextEditAction(selection, action).catch(() => showToast('文本操作失败', 'error'));
+      // 输入框自己可以往菜单后面加几项（文本方式的"插入常用块…"）
+      const extra: LegacyMenuItem[] = [];
+      editable.dispatchEvent(
+        new CustomEvent('nps:text-menu', {
+          detail: {
+            add: (item: LegacyMenuItem) => extra.push(item),
+            point: [event.clientX, event.clientY],
+          },
+        }),
+      );
       openContextMenu(event, [
         { key: 'undo', label: '撤销', icon: Undo2, onClick: () => invoke('undo') },
         { key: 'redo', label: '重做', icon: Redo2, onClick: () => invoke('redo') },
@@ -267,6 +284,7 @@ export function useSessionEffects({
         { key: 'paste', label: '粘贴', icon: ClipboardPaste, onClick: () => invoke('paste') },
         { key: 'selection-divider', type: 'divider' },
         { key: 'select-all', label: '全选', onClick: () => invoke('select-all') },
+        ...(extra.length ? [{ key: 'extra-divider', type: 'divider' as const }, ...extra] : []),
       ]);
     };
     document.addEventListener('contextmenu', handler);

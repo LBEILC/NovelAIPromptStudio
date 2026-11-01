@@ -263,7 +263,8 @@ export function usePromptRendering({
   );
 
   /** 角色的标题行：名字（点击重命名）、块数、复制和更多（按块、按文本两种方式共用） */
-  const charTitle = (c: (typeof chars)[number], si: number) => (
+  /** extra：文本方式在右边多放一个"常用块" */
+  const charTitle = (c: (typeof chars)[number], si: number, extra?: ReactNode) => (
     <div className="sec-h char-h">
       {renaming?.id === c.id ? (
         <>
@@ -310,6 +311,7 @@ export function usePromptRendering({
         </>
       )}
       <span className="acts" style={{ marginLeft: 'auto' }}>
+        {extra}
         {ctlBtn(si)}
         {secCopy(si, c.label)}
         {acts(() => charMenu(si), '这个角色的操作', `char-${c.id}`)}
@@ -450,7 +452,7 @@ export function usePromptRendering({
       </div>
     );
   };
-  /** 块和块之间（以及最后一块下面）：指针移过来淡入"＋ Tag 块 · 段落 · 常用块" */
+  /** 块和块之间（以及第一块上面、最后一块下面）：指针移过来淡入"＋ Tag 块 · 段落 · 常用块" */
   const gap = (si: number, after: number) => {
     const k = `ins-${si}-${after}`;
     return (
@@ -575,8 +577,10 @@ export function usePromptRendering({
         if (b.type !== 'tags') out.push(blockEl(si, bi, b, negative));
       return out;
     }
+    // 第一块上面也有一道空隙（after 是 -1）：常用块、新块能直接放到最前面（用户 11-01）
     section.blocks.forEach((b, bi) => {
-      if (bi && !negative) out.push(gap(si, bi - 1));
+      if (!negative) out.push(gap(si, bi - 1));
+      if (!bi) out.push(newBlockEl(si, -1));
       out.push(blockEl(si, bi, b, negative));
       out.push(newBlockEl(si, bi));
     });

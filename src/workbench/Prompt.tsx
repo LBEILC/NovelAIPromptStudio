@@ -191,6 +191,7 @@ export function WorkbenchEditor(p: EditorProps) {
     charRows,
     charTitle,
     setNewBlock,
+    insert,
     setInsert,
     newBlockEl,
     countTags,

@@ -420,7 +420,12 @@ export function usePromptState(p: EditorProps) {
     after: number;
     type: 'tags' | 'paragraph';
   } | null>(null);
-  const [insert, setInsert] = useState<{ si: number; before: number; anchor: string } | null>(null);
+  const [insert, setInsert] = useState<{
+    si: number;
+    before: number;
+    anchor: string;
+    point?: [number, number];
+  } | null>(null);
   // V5 控制词面板开在哪一节
   const [ctlFor, setCtlFor] = useState<number | null>(null);
   /** 面板里选了一项：多选组加上或去掉；互斥组原地换档（多写的几个删掉），选"无"全删；新加的放在这一节最后一个 Tag 块末尾 */
@@ -592,12 +597,19 @@ export function usePromptState(p: EditorProps) {
       }
       const raw = serializePromptSection(section);
       const after = r.after ?? section.blocks.length - 1;
-      const at = after < 0 || !section.blocks[after] ? raw.length : section.blocks[after].range.end;
+      // after 是 -1 且已经有块：放在最前面
+      const at =
+        after < 0 && section.blocks.length
+          ? 0
+          : after < 0 || !section.blocks[after]
+            ? raw.length
+            : section.blocks[after].range.end;
+      const inserted = at ? '\n\n' + marker : raw.trim() ? marker + '\n\n' : marker;
       save(
         replaceSection(
           doc,
           r.si,
-          reparseSection(section, raw.slice(0, at) + (at ? '\n\n' : '') + marker + raw.slice(at)),
+          reparseSection(section, raw.slice(0, at) + inserted + raw.slice(at)),
         ),
       );
     });
@@ -610,8 +622,9 @@ export function usePromptState(p: EditorProps) {
     guard(() => {
       const prev = doc.scopes[nb.si],
         raw = serializePromptSection(prev),
-        at = nb.after < 0 ? raw.length : prev.blocks[nb.after].range.end;
-      const inserted = (at ? '\n\n' : '') + text;
+        // after 是 -1：空节里接在末尾，已经有块时放在最前面
+        at = nb.after < 0 ? (prev.blocks.length ? 0 : raw.length) : prev.blocks[nb.after].range.end;
+      const inserted = at ? '\n\n' + text : raw.trim() ? text + '\n\n' : text;
       const next = reparseSection(prev, raw.slice(0, at) + inserted + raw.slice(at));
       const target = next.blocks.find((b) => b.range.start >= at);
       if (target) {

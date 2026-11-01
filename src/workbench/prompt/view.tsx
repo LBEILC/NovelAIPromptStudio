@@ -552,6 +552,7 @@ export function renderPromptView({
           tabId={p.tabId}
           scope={doc.scopes[insert.si].scope.key}
           before={insert.before}
+          point={insert.point}
           flush={p.before}
           onManage={() => p.onShowMaterials?.()}
         />
