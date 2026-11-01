@@ -206,7 +206,7 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
           p.onClose();
       }}
       onDoubleClick={(e) => {
-        if ((e.target as Element).closest('.viewer-bar')) return;
+        if ((e.target as Element).closest('.viewer-bar, .side-nav')) return;
         setAnimate(dur(3) > 0);
         setZ({ z: 1, x: 0, y: 0 });
       }}
@@ -251,6 +251,27 @@ function Body(p: ViewerProps & { leaving: boolean; nodeRef: React.RefObject<HTML
           </div>
         ))}
       </div>
+      {/* 两侧的翻页箭头，和底栏的 ‹ › 做同一件事；单手用鼠标时不用移到底栏（用户 11-01） */}
+      {p.items.length > 1 && (
+        <>
+          <button
+            className="side-nav prev"
+            aria-label="上一张"
+            disabled={i === 0}
+            onClick={() => go(i - 1)}
+          >
+            <Icon name="arrow-left-s-line" />
+          </button>
+          <button
+            className="side-nav next"
+            aria-label="下一张"
+            disabled={i === p.items.length - 1}
+            onClick={() => go(i + 1)}
+          >
+            <Icon name="arrow-right-s-line" />
+          </button>
+        </>
+      )}
       {p.badge && <div className="viewer-badge">{p.badge}</div>}
       {item.image && (
         <ContextMenu

@@ -395,6 +395,27 @@ export function WorkbenchImage({ tab, dir = 0, ...p }: ImageProps) {
             </div>
           ),
         )}
+        {/* 这一版不止一张时，两侧的翻页箭头：指针移到舞台上淡入，到头的那一侧变灰（用户 11-01：习惯单手用鼠标） */}
+        {members.length > 1 && !blank && (
+          <>
+            <button
+              className="side-nav prev"
+              aria-label="上一张"
+              disabled={index === 0}
+              onClick={() => show(index - 1)}
+            >
+              <Icon name="arrow-left-s-line" />
+            </button>
+            <button
+              className="side-nav next"
+              aria-label="下一张"
+              disabled={index === members.length - 1}
+              onClick={() => show(index + 1)}
+            >
+              <Icon name="arrow-right-s-line" />
+            </button>
+          </>
+        )}
       </div>
       {image && (
         <>

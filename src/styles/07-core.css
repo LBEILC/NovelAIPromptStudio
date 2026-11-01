@@ -217,6 +217,16 @@ textarea.raw { font: var(--fs-small)/var(--lh-small) var(--font-mono); }
 .viewer-img img { max-width: 100%; max-height: 100%; border-radius: 4px; box-shadow: var(--shadow-pop); }
 [data-enter="zoom3"] { animation: pf-zoom var(--dur-3) var(--ease-out) both; }
 .viewer-bar { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4); background: var(--surface); border-top: var(--bw) solid var(--border); }
+/* 舞台和大图两侧的翻页箭头（用户 11-01）：圆形浮起的按钮，到头的那一侧变灰。大图里一直显示，图两边让出位置；舞台上指针移进来才淡入，盖在图上 */
+.side-nav { position: absolute; top: 50%; z-index: 1; width: var(--viewer-nav); height: var(--viewer-nav); margin-top: calc(var(--viewer-nav) / -2); display: grid; place-items: center; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-pop); color: var(--text-2); font-size: var(--icon); transition: color var(--dur-1) var(--ease-out), opacity var(--dur-1) var(--ease-out); }
+.side-nav.prev { left: var(--sp-3); }
+.side-nav.next { right: var(--sp-3); }
+.side-nav:hover:not(:disabled) { color: var(--text); }
+.side-nav:disabled { color: var(--text-off); cursor: default; }
+.viewer-ov:has(> .side-nav) .viewer-img { padding-inline: calc(var(--viewer-nav) + var(--sp-3) * 2); }
+.stage .canvas { position: relative; }
+.stage .canvas .side-nav { opacity: 0; }
+.stage .canvas:hover .side-nav, .stage .canvas .side-nav:focus-visible { opacity: 1; }
 
 /* ---------- 翻译词典 ---------- */
 .dict-zh { display: inline-block; min-width: 120px; padding: 2px 6px; margin: -2px -6px; border-radius: var(--r-tag); cursor: text; transition: background-color var(--dur-1) var(--ease-out); }
