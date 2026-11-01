@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { BlurImg, type BlurImage } from '../kit/blur';
 import type { ImageOperation } from '../shared/generation';
+import type { PeekImage } from './useVersionState';
 export const TH_H = 38,
   TH_GAP = 4,
   TH_MORE = 28;
@@ -241,4 +242,40 @@ export function opPlan(job: {
     text,
     prompt,
   };
+}
+
+/** 悬停缩略图时的大图卡片：原图按比例放在 --peek-img-w × --peek-img-h 里，下面写第几版第几张和 Seed */
+export function PeekPicture({ img, tab }: { img: PeekImage; tab: string }) {
+  const [data, setData] = useState(img.path ? { path: img.path, image: img.image } : null);
+  useEffect(() => {
+    if (img.path) return setData({ path: img.path, image: img.image });
+    let live = true;
+    setData(null);
+    void fullOf(img.id)
+      .then((d) => live && setData(d))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [img.id, img.path]);
+  return (
+    <>
+      <div className="vp-pic">
+        {data && (
+          <BlurImg
+            image={data.image}
+            path={data.path}
+            tab={tab}
+            eye={false}
+            alt=""
+            draggable={false}
+          />
+        )}
+      </div>
+      <div className="vp-h">
+        <b>{img.label}</b>
+        {img.tip && <span className="help">{img.tip}</span>}
+      </div>
+    </>
+  );
 }

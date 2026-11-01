@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { Fragment, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Icon, Kbd, isMod, modKey } from '../kit/controls';
 import { Pop } from '../kit/layer';
 import { ContextMenu } from '../kit/menu';
@@ -18,8 +18,8 @@ import {
   Row,
   TH_H,
   TH_MORE,
+  PeekPicture,
   Thumb,
-  fullOf,
   isRedraw,
   opPlan,
   rowsOf,
@@ -920,9 +920,39 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         tree={tree}
         name={name}
         firstImage={firstImage}
+        delta={delta}
+        // 右键菜单和版本行一样；改名就地弹在卡片旁边，其余的（删除、挑图……）先关掉总览再做
+        menuFor={(v) =>
+          renameMenu(v, `[data-map="${v.id}"]`, false, true).map((e) =>
+            typeof e === 'object' &&
+            'onSelect' in e &&
+            e.onSelect &&
+            !String(e.label).startsWith('重命名')
+              ? {
+                  ...e,
+                  onSelect: () => {
+                    setMap(false);
+                    e.onSelect?.();
+                  },
+                }
+              : e,
+          )
+        }
         onGo={(v, imageId) => {
           setMap(false);
           void go(v, imageId);
+        }}
+        onCompare={(a, b) => {
+          setMap(false);
+          openCompare(
+            tab.id,
+            { versionId: a.v.id, imageId: a.imageId },
+            { versionId: b.v.id, imageId: b.imageId },
+          );
+        }}
+        onPick={(v) => {
+          setMap(false);
+          openPick(tab.id, v.id);
         }}
       />
       <ContextMenu at={menu?.at || null} onClose={() => setMenu(null)} items={menu?.items || []} />
@@ -992,41 +1022,5 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         )}
       </Pop>
     </div>
-  );
-}
-
-/** 悬停缩略图时的大图卡片：原图按比例放在 --peek-img-w × --peek-img-h 里，下面写第几版第几张和 Seed */
-function PeekPicture({ img, tab }: { img: PeekImage; tab: string }) {
-  const [data, setData] = useState(img.path ? { path: img.path, image: img.image } : null);
-  useEffect(() => {
-    if (img.path) return setData({ path: img.path, image: img.image });
-    let live = true;
-    setData(null);
-    void fullOf(img.id)
-      .then((d) => live && setData(d))
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [img.id, img.path]);
-  return (
-    <>
-      <div className="vp-pic">
-        {data && (
-          <BlurImg
-            image={data.image}
-            path={data.path}
-            tab={tab}
-            eye={false}
-            alt=""
-            draggable={false}
-          />
-        )}
-      </div>
-      <div className="vp-h">
-        <b>{img.label}</b>
-        {img.tip && <span className="help">{img.tip}</span>}
-      </div>
-    </>
   );
 }

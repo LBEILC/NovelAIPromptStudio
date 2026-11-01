@@ -164,25 +164,63 @@
 .ver.fork-ver .what { font-size: var(--fs-caption); color: var(--text-3); -webkit-line-clamp: 1; }
 .ver.fork-ver:hover .fk-name { color: var(--text); }
 .ver.fork-ver .fx-th.empty { width: 28px; height: 38px; border: var(--bw) dashed var(--border); border-radius: 3px; box-sizing: border-box; }
-/* 分支总览（11-01）：每条分支一行，同一代对齐在同一列，连线走版本之间的缝 */
+/* 分支总览（11-01）：能缩放、平移的画布。卡片按缩放程度换细节：dot 只剩方块，one 一张图，full 全部图和改了什么 */
+.win:has(.viewer-ov) > .float { z-index: 36; }
+.viewer-ov.map-ov { background: var(--bg); }
 .map-ov .map-top { border-top: 0; border-bottom: var(--bw) solid var(--border); }
-.map-ov .map-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--sp-5); }
-.map-ov .map-grid { position: relative; }
-.map-ov .map-labels { position: sticky; left: 0; z-index: 2; background: var(--bg); }
-.map-ov .map-label { position: absolute; left: 0; right: 0; display: flex; flex-direction: column; justify-content: center; gap: var(--sp-0); padding: 0 var(--sp-3); border-left: var(--thumb-ring) solid transparent; }
-.map-ov .map-label b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.map-ov .map-label.on { border-left-color: var(--ink); }
-.map-ov .map-lines { position: absolute; top: 0; overflow: visible; pointer-events: none; }
-.map-ov .map-lines path { fill: none; stroke: var(--border); stroke-width: var(--bw); }
-.map-ov .map-lines path.on { stroke: var(--text-2); stroke-width: 1.5px; }
-.map-ov .map-card { position: absolute; width: var(--map-card-w); display: flex; flex-direction: column; gap: var(--sp-1); padding: 0; border: 0; background: transparent; color: var(--text-2); text-align: left; }
-.map-ov .map-pic { display: grid; place-items: center; width: var(--map-card-w); height: var(--map-card-h); border-radius: var(--r-thumb); background: var(--hover); overflow: hidden; outline: var(--thumb-ring) solid transparent; outline-offset: var(--thumb-ring); transition: outline-color var(--dur-1) var(--ease-out); }
-.map-ov .map-pic img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
-.map-ov .map-card:hover .map-pic { outline-color: var(--border); }
-.map-ov .map-card.on .map-pic { outline-color: var(--cinnabar); }
-.map-ov .map-card:hover, .map-ov .map-card.on { color: var(--text); }
-.map-ov .map-cap { display: flex; justify-content: space-between; gap: var(--sp-1); font-size: var(--fs-caption); line-height: var(--lh-caption); white-space: nowrap; }
+.map-ov .map-search { width: var(--popover-w); margin-left: var(--sp-3); }
+.map-ov .map-search .mono { flex: 0 0 auto; font-size: var(--fs-caption); }
+.map-ov .map-stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; cursor: grab; touch-action: none; }
+.map-ov .map-stage.panning { cursor: grabbing; }
+.map-ov .map-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.map-ov .map-lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.map-ov .map-lines path { fill: none; stroke: var(--border); stroke-width: 1.5px; }
+.map-ov .map-lines path.on { stroke: var(--text-2); stroke-width: 2px; }
+.map-ov .map-card { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--sp-2); color: var(--text-2); border-radius: var(--r-panel); transition: opacity var(--dur-1) var(--ease-out); }
+.map-ov .map-card.dim { opacity: var(--dim); }
+/* 只剩方块：看结构 */
+.map-ov .map-card.dot { background: var(--hover); box-shadow: inset 0 0 0 var(--bw) var(--border); }
+.map-ov .map-card.dot.on { background: var(--cinnabar); }
+.map-ov .map-card.dot.marked { box-shadow: inset 0 0 0 calc(var(--bw) * 6) var(--ink); }
+/* 一张图 */
+.map-ov .map-card.one .map-pic { flex: 1 1 auto; min-height: 0; display: grid; place-items: center; border-radius: var(--r-panel); background: var(--hover); overflow: hidden; }
+.map-ov .map-card.one .map-pic img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.map-ov .map-card.one .map-cap { display: flex; justify-content: space-between; gap: var(--sp-1); font-size: calc(var(--fs-body) * 1.6); white-space: nowrap; }
+/* 全部图和改了什么：像一张小卡片 */
+.map-ov .map-card.full { padding: var(--sp-3); background: var(--surface); box-shadow: var(--shadow-print); }
+.map-ov .map-card.full .map-h { display: flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-small); color: var(--text); }
+.map-ov .map-card.full .map-pics { display: grid; gap: var(--sp-1); flex: 1 1 auto; min-height: 0; }
+.map-ov .map-card.full .map-cell { position: relative; display: grid; place-items: center; min-height: 0; border-radius: var(--r-thumb); background: var(--hover); overflow: hidden; }
+.map-ov .map-card.full .map-cell img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.map-ov .map-card.full .map-more { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--text); font-size: var(--fs-small); }
+.map-ov .map-card.full .map-what { flex: 0 0 auto; }
+.map-ov .map-card.full .map-what .what { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-2); }
+/* 当前这一版朱砂框；Ctrl 点了等着对比的那一版墨色虚线框 */
+.map-ov .map-card.one.on .map-pic, .map-ov .map-card.full.on { outline: calc(var(--thumb-ring) * 2) solid var(--cinnabar); outline-offset: calc(var(--thumb-ring) * 2); }
+.map-ov .map-card.one.marked .map-pic, .map-ov .map-card.full.marked { outline: calc(var(--thumb-ring) * 2) dashed var(--ink); outline-offset: calc(var(--thumb-ring) * 2); }
+.map-ov .map-card:hover { color: var(--text); }
+.map-ov .map-card.one:hover:not(.on):not(.marked) .map-pic, .map-ov .map-card.full:hover:not(.on):not(.marked) { outline: calc(var(--thumb-ring) * 2) solid var(--border); outline-offset: calc(var(--thumb-ring) * 2); }
 .map-ov .map-none { font-size: var(--fs-caption); color: var(--text-3); }
+/* 分支名：屏幕上的字，不跟着画布缩放；写在每一行上方的空隙里 */
+.map-ov .map-label { position: absolute; z-index: 1; display: flex; align-items: center; gap: var(--sp-2); min-width: 0; white-space: nowrap; pointer-events: none; }
+.map-ov .map-label > * { pointer-events: auto; }
+.map-ov .map-label b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-small); color: var(--text-2); }
+.map-ov .map-label .help { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.map-ov .map-label.on b { color: var(--text); }
+.map-ov .map-label.on b::before { content: ""; display: inline-block; width: var(--sp-1); height: var(--sp-1); margin-right: var(--sp-1); border-radius: 50%; background: var(--cinnabar); vertical-align: middle; }
+.map-ov .map-label.small b { font-size: var(--fs-caption); }
+.map-ov .map-label .map-fold { flex: 0 0 auto; }
+.map-ov .map-label.at-side { justify-content: flex-end; }
+.map-ov .map-card.tiny .map-cap { display: none; }
+/* 右下角：缩放和小地图 */
+.map-ov .map-tools { position: absolute; right: var(--sp-4); bottom: var(--sp-4); z-index: 2; display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-2); }
+.map-ov .map-zoom { display: flex; align-items: center; gap: var(--sp-0); padding: var(--sp-0); border-radius: var(--r-ctl); background: var(--surface); box-shadow: var(--shadow-pop); }
+.map-ov .map-zoom .mono { min-width: calc(var(--sp-8) + var(--sp-2)); text-align: center; font-size: var(--fs-caption); color: var(--text-2); }
+.map-ov .map-mini { box-sizing: content-box; padding: var(--sp-2); border-radius: var(--r-ctl); background: var(--surface); box-shadow: var(--shadow-pop); cursor: pointer; }
+.map-ov .map-mini svg { display: block; overflow: hidden; }
+.map-ov .map-mini rect { fill: var(--border); }
+.map-ov .map-mini rect.on { fill: var(--text-3); }
+.map-ov .map-mini rect.view { fill: none; stroke: var(--cinnabar); stroke-width: 1.5px; }
 :is(.ver-peek, .cmp-diff) .vp-h { display: flex; flex-direction: column; gap: var(--sp-0); }
 :is(.ver-peek, .cmp-diff) .vp-g { display: flex; flex-direction: column; gap: var(--sp-1); padding-top: var(--sp-2); border-top: var(--bw) solid var(--divider); }
 :is(.ver-peek, .cmp-diff) .vp-tags { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); font-size: var(--fs-caption); }
