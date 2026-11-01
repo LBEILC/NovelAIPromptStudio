@@ -127,6 +127,15 @@ export function RandomBox({
 }
 
 const DEFAULT_WEIGHT = { min: 0.8, max: 1.2, step: 0.05 };
+// 加新的随机块时默认选上一次用的池子：连着插的多半是同一个（用户 11-01）
+const LAST_POOL_KEY = 'nps:last-random-pool';
+const lastPool = () => {
+  try {
+    return localStorage.getItem(LAST_POOL_KEY) || '';
+  } catch {
+    return '';
+  }
+};
 
 /** 加一个或修改随机块的浮层 */
 export function RandomPop({
@@ -138,9 +147,12 @@ export function RandomPop({
   onClose,
   onSave,
   onManage,
+  point,
 }: {
   open: boolean;
   anchor?: string;
+  /** 开在指针处（文本方式右键"插入随机块…""修改随机块…"） */
+  point?: [number, number];
   /** 修改已有的一块（写错的也算）；否则是加一个 */
   editing: boolean;
   /** 修改时原来的设置；写错读不出来时没有 */
@@ -160,7 +172,13 @@ export function RandomPop({
     setO(
       initial
         ? { ...initial, pool: known ? initial.pool : '' }
-        : { pool: editing ? '' : pools[0]?.name || '', count: 1, repeat: false },
+        : {
+            pool: editing
+              ? ''
+              : pools.find((x) => x.name === lastPool())?.name || pools[0]?.name || '',
+            count: 1,
+            repeat: false,
+          },
     );
     setWeightOn(!!initial?.weight);
     setWeight(initial?.weight || DEFAULT_WEIGHT);
@@ -194,7 +212,9 @@ export function RandomPop({
       open={open}
       onClose={onClose}
       anchor={anchor}
-      trigger={anchor}
+      // 开在指针处时锚点是文字框，不能当触发按钮：点回文字框要能关掉浮层
+      trigger={point ? undefined : anchor}
+      point={point}
       place="below-left"
       className="popover rnd-pop"
       label="随机块"
@@ -328,7 +348,20 @@ export function RandomPop({
             <button className="btn quiet sm" onClick={onClose}>
               取消
             </button>
-            <button className="btn ink sm" disabled={!ok} onClick={() => onSave(marker)}>
+            {/* 焦点先放在这里：选好池子（默认是上次的）直接回车就加进去 */}
+            <button
+              className="btn ink sm"
+              disabled={!ok}
+              autoFocus
+              onClick={() => {
+                try {
+                  localStorage.setItem(LAST_POOL_KEY, o.pool);
+                } catch {
+                  // 存不了就下次默认第一个池子
+                }
+                onSave(marker);
+              }}
+            >
               {editing ? '保存' : '加入'}
             </button>
           </div>

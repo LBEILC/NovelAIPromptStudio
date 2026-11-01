@@ -584,6 +584,7 @@ export function usePromptState(p: EditorProps) {
     bi?: number;
     after?: number;
     anchor: string;
+    point?: [number, number];
   } | null>(null);
   const commitRandom = (marker: string) => {
     const r = randomEdit;

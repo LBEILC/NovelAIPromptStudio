@@ -386,6 +386,10 @@ textarea.raw { font: var(--fs-small)/var(--lh-small) var(--font-mono); }
 .tx-hl .num.down { color: var(--info); }
 .tx-hl .num.neg { color: var(--remove); }
 .tx-hl .bad { text-decoration: underline wavy var(--warn); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+/* 右键菜单开着时照着画的选区（文字框没有焦点，浏览器不画） */
+.tx-hl span.held { background: var(--select-bg); }
+/* 随机块（__画师池*2__）：和块方式一样的虚线框，用 outline 画，不挤动文字 */
+.tx-hl .rnd { outline: var(--bw) dashed var(--text-3); outline-offset: 1px; border-radius: 2px; }
 .tx-err { display: flex; align-items: center; gap: var(--sp-1); margin: calc(var(--sp-2) * -1) 0 var(--sp-3); font-size: var(--fs-caption); color: var(--warn); }
 /* ---------- 块方式：加一块 ---------- */
 .blk-gap { position: relative; height: var(--sp-3); margin: calc(var(--sp-1) * -1) 0; z-index: 2; }

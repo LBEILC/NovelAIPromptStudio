@@ -253,17 +253,19 @@ export function useSessionEffects({
       const selection = captureTextSelection(editable);
       const invoke = (action: TextAction) =>
         runTextEditAction(selection, action).catch(() => showToast('文本操作失败', 'error'));
-      // 输入框自己可以往菜单后面加几项（文本方式的"插入常用块…"）
-      const extra: LegacyMenuItem[] = [];
+      // 输入框自己可以往菜单里加几项：文本方式的"插入常用块…"放在后面，"修改随机块…"放在最上面
+      const extra: LegacyMenuItem[] = [],
+        top: LegacyMenuItem[] = [];
       editable.dispatchEvent(
         new CustomEvent('nps:text-menu', {
           detail: {
-            add: (item: LegacyMenuItem) => extra.push(item),
+            add: (item: LegacyMenuItem, first?: boolean) => (first ? top : extra).push(item),
             point: [event.clientX, event.clientY],
           },
         }),
       );
       openContextMenu(event, [
+        ...(top.length ? [...top, { key: 'top-divider', type: 'divider' as const }] : []),
         { key: 'undo', label: '撤销', icon: Undo2, onClick: () => invoke('undo') },
         { key: 'redo', label: '重做', icon: Redo2, onClick: () => invoke('redo') },
         { key: 'edit-divider', type: 'divider' },

@@ -193,6 +193,7 @@ export function WorkbenchEditor(p: EditorProps) {
     setNewBlock,
     insert,
     setInsert,
+    random,
     newBlockEl,
     countTags,
     negIndex,

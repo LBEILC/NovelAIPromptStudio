@@ -39,6 +39,7 @@ export function usePromptDocumentView({
   setNewBlock,
   insert,
   setInsert,
+  random,
   newBlockEl,
   countTags,
   negIndex,
@@ -79,6 +80,7 @@ export function usePromptDocumentView({
   | 'setNewBlock'
   | 'insert'
   | 'setInsert'
+  | 'random'
   | 'newBlockEl'
   | 'countTags'
   | 'negIndex'
@@ -294,6 +296,49 @@ export function usePromptDocumentView({
       point,
     });
   };
+  /** 在 key 这一节光标 at 的位置加随机块（单独成一块） */
+  const openRandom = (key: string, at: number, anchor: string, point?: [number, number]) => {
+    window.dispatchEvent(new Event('nps:flush-text'));
+    const cur = latestDoc.current,
+      i = cur.scopes.findIndex((s) => s.scope.key === key);
+    if (i < 0) return;
+    const before = cur.scopes[i].blocks.filter((b) => b.range.start < at).length;
+    random.setEdit({ si: i, after: before - 1, anchor, point });
+  };
+  /** 右键点在随机块上：修改从 at 开始的那一块 */
+  const editRandom = (key: string, at: number, point: [number, number]) => {
+    window.dispatchEvent(new Event('nps:flush-text'));
+    const cur = latestDoc.current,
+      i = cur.scopes.findIndex((s) => s.scope.key === key);
+    if (i < 0) return;
+    const bi = cur.scopes[i].blocks.findIndex((b) => b.range.start <= at && at < b.range.end);
+    if (bi < 0) return;
+    random.setEdit({ si: i, bi, anchor: `.tx-wrap[data-wb-scope="${key}"] textarea`, point });
+  };
+  /** 节标题上的"常用块""随机块"：插到光标所在的位置，没点过文字框时插在最前面 */
+  const textAdds = (si: number) => {
+    const key = doc.scopes[si].scope.key,
+      trigger = `trnd-${key}`;
+    return (
+      <>
+        {textInsert(si)}
+        <button
+          className={`btn quiet sm ${random.edit?.anchor === `[data-trigger="${trigger}"]` ? 'is-hover' : ''}`}
+          data-trigger={trigger}
+          data-feature="random-block"
+          data-tip="每张图生成前从随机池里抽；插到光标所在的位置，没点过文字框时插在最前面"
+          onClick={() =>
+            random.edit
+              ? random.setEdit(null)
+              : openRandom(key, caretAt.current.get(key) ?? 0, `[data-trigger="${trigger}"]`)
+          }
+        >
+          <Icon name="dice-line" />
+          随机块
+        </button>
+      </>
+    );
+  };
   const textInsert = (si: number) => {
     if (!p.tabId) return null;
     const key = doc.scopes[si].scope.key,
@@ -314,19 +359,23 @@ export function usePromptDocumentView({
       </button>
     );
   };
-  const textBox = (si: number, label: string) => {
+  const textBox = (si: number, label: string, negative = false) => {
     const section = doc.scopes[si];
-    const key = section.scope.key;
+    const key = section.scope.key,
+      box = `.tx-wrap[data-wb-scope="${key}"] textarea`;
     return (
       <TextSection
         key={`tx-${key}`}
         scope={key}
+        pools={random.pools}
+        negative={negative}
+        onMenuRandom={
+          negative ? undefined : (position, point) => openRandom(key, position, box, point)
+        }
+        onEditRandom={(at, point) => editRandom(key, at, point)}
         onCaret={(position) => caretAt.current.set(key, position)}
         onMenuInsert={
-          p.tabId
-            ? (position, point) =>
-                openInsert(key, position, `.tx-wrap[data-wb-scope="${key}"] textarea`, point)
-            : undefined
+          p.tabId ? (position, point) => openInsert(key, position, box, point) : undefined
         }
         text={serializePromptSection(section)}
         label={label}
@@ -351,7 +400,7 @@ export function usePromptDocumentView({
             {chars.length ? '基础提示词' : '提示词'}
             <span className="muted">空一行是新的一块</span>
             <span className="acts" style={{ marginLeft: 'auto' }}>
-              {textInsert(baseIndex)}
+              {textAdds(baseIndex)}
               {secCopy(baseIndex, '基础提示词')}
             </span>
           </div>
@@ -362,29 +411,38 @@ export function usePromptDocumentView({
       <div className="sec-h">
         角色<span className="muted">{chars.length ? `${chars.length} 个` : '暂无角色'}</span>
         <span className="acts" style={{ marginLeft: 'auto' }}>
-          <button
-            className={`btn quiet sm ${full ? 'is-off' : ''}`}
-            aria-disabled={!!full || undefined}
-            data-tip={full || undefined}
-            onClick={addCharacter}
-          >
-            <Icon name="add-line" />
-            添加角色
-          </button>
+          {/* 和块方式一样：旁边的箭头从素材里选角色（用户 11-01） */}
+          <span className="split">
+            <button
+              className={`btn quiet sm ${full ? 'is-off' : ''}`}
+              aria-disabled={!!full || undefined}
+              data-tip={full || undefined}
+              onClick={addCharacter}
+            >
+              <Icon name="add-line" />
+              添加角色
+            </button>
+            {p.tabId && (
+              <button
+                className={`btn quiet sm ${charPick ? 'is-hover' : ''}`}
+                aria-label="从素材添加角色"
+                data-trigger="charadd"
+                onClick={() => setCharPick(!charPick)}
+              >
+                <Icon name="arrow-down-s-line" />
+              </button>
+            )}
+          </span>
         </span>
       </div>
       {charScopes.map(({ c, si, ni }) => (
         <div className="char-sec" key={`tch-${c.id}`}>
-          {si >= 0 ? (
-            charTitle(c, si, textInsert(si))
-          ) : (
-            <div className="sec-h char-h">{c.label}</div>
-          )}
+          {si >= 0 ? charTitle(c, si, textAdds(si)) : <div className="sec-h char-h">{c.label}</div>}
           {si >= 0 && textBox(si, c.label)}
           {ni >= 0 && (
             <>
               <div className="sub-h">{c.label} 的负面提示词</div>
-              {textBox(ni, `${c.label} 的负面提示词`)}
+              {textBox(ni, `${c.label} 的负面提示词`, true)}
             </>
           )}
         </div>
@@ -393,7 +451,7 @@ export function usePromptDocumentView({
         <>
           <div className="sec-h">负面提示词</div>
           {autoRow(negIndex)}
-          {textBox(negIndex, '负面提示词')}
+          {textBox(negIndex, '负面提示词', true)}
         </>
       )}
     </div>

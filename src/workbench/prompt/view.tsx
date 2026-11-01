@@ -560,6 +560,7 @@ export function renderPromptView({
       <RandomPop
         open={!!random.edit && !!doc.scopes[random.edit.si]}
         anchor={random.edit?.anchor}
+        point={random.edit?.point}
         editing={random.edit?.bi !== undefined}
         initial={
           random.edit?.bi !== undefined

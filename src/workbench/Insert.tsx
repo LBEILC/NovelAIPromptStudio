@@ -163,7 +163,8 @@ export function InsertPop({
         open={open}
         onClose={onClose}
         anchor={anchor}
-        trigger={anchor}
+        // 开在指针处时锚点是文字框，不能当触发按钮：点回文字框要能关掉浮层
+        trigger={point ? undefined : anchor}
         className="popover ins-pop"
         place={place}
         point={point}

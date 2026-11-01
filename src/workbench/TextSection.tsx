@@ -5,6 +5,9 @@ import { Icon } from '../kit/controls';
 
 type Suggestion = { id: string; text: string; translation?: string; count?: string };
 import { invokeUI } from '../lib/commands';
+import { parseRandomMarker, randomMarkers, randomSyntaxNote } from '../lib/randomPrompt';
+import type { Material } from '../shared/materials';
+import { poolTip } from './RandomBlock';
 import { textErrors, textMarks } from '../lib/promptText.js';
 import { singleTagCore } from '../lib/singleTag.js';
 import { categoryLabel } from './model';
@@ -19,6 +22,10 @@ export function TextSection({
   scope,
   onCaret,
   onMenuInsert,
+  onMenuRandom,
+  onEditRandom,
+  pools,
+  negative = false,
 }: {
   scope?: string;
   text: string;
@@ -30,13 +37,23 @@ export function TextSection({
   onCaret?: (position: number) => void;
   /** 右键菜单里的"插入常用块…"：插在右键点到的位置，浮层开在指针处 */
   onMenuInsert?: (position: number, point: [number, number]) => void;
+  /** 右键菜单里的"插入随机块…" */
+  onMenuRandom?: (position: number, point: [number, number]) => void;
+  /** 右键点在随机块上："修改随机块…"，at 是这个随机块在文字里的起点 */
+  onEditRandom?: (at: number, point: [number, number]) => void;
+  /** 随机池：悬停随机块时列出条目、检查池子在不在 */
+  pools?: Material[];
+  /** 负面提示词里不能放随机块 */
+  negative?: boolean;
 }) {
   const [value, setValue] = useState(text),
     [cursor, setCursor] = useState(0),
     [items, setItems] = useState<Suggestion[]>([]),
     [active, setActive] = useState(0),
     [suggest, setSuggest] = useState(false),
-    [tip, setTip] = useState('');
+    [tip, setTip] = useState(''),
+    // 右键菜单开着时焦点在菜单上，浏览器不画文字框的选区：由后面那层照着画，点了菜单项或别处就收掉
+    [held, setHeld] = useState<[number, number] | null>(null);
   const [dictionary, setDictionary] = useState(
     new Map<string, { translation?: string; category?: string }>(),
   );
@@ -48,24 +65,56 @@ export function TextSection({
     save = useRef(onSave),
     lastSaved = useRef(text);
   save.current = onSave;
-  const menuInsert = useRef(onMenuInsert);
-  menuInsert.current = onMenuInsert;
+  const menu = useRef({ onMenuInsert, onMenuRandom, onEditRandom });
+  menu.current = { onMenuInsert, onMenuRandom, onEditRandom };
   // 输入框通用的右键菜单（app/session.tsx）问一声，这里在后面加"插入常用块…"
   useEffect(() => {
     const node = area.current;
     if (!node) return;
     const add = (event: Event) => {
       const { detail } = event as CustomEvent<{
-        add: (item: { key: string; label: string; onClick: () => void }) => void;
+        add: (item: { key: string; label: string; onClick: () => void }, first?: boolean) => void;
         point: [number, number];
       }>;
-      if (!menuInsert.current) return;
-      const at = node.selectionStart;
-      detail.add({
-        key: 'insert-material',
-        label: '插入常用块…',
-        onClick: () => menuInsert.current?.(at, detail.point),
-      });
+      const m = menu.current,
+        at = node.selectionStart,
+        [x, y] = detail.point;
+      if (node.selectionStart !== node.selectionEnd) {
+        setHeld([node.selectionStart, node.selectionEnd]);
+        const clear = () => setHeld(null);
+        document.addEventListener('pointerdown', clear, { capture: true, once: true });
+        node.addEventListener('focus', clear, { once: true });
+      }
+      // 右键点在随机块上：最上面一项是修改它
+      const hit = [...(mirror.current?.querySelectorAll<HTMLElement>('[data-rnd]') || [])].find(
+        (n) =>
+          [...n.getClientRects()].some(
+            (r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom,
+          ),
+      );
+      if (hit && m.onEditRandom) {
+        const start = Number(hit.dataset.at);
+        detail.add(
+          {
+            key: 'edit-random',
+            label: '修改随机块…',
+            onClick: () => menu.current.onEditRandom?.(start, detail.point),
+          },
+          true,
+        );
+      }
+      if (m.onMenuInsert)
+        detail.add({
+          key: 'insert-material',
+          label: '插入常用块…',
+          onClick: () => menu.current.onMenuInsert?.(at, detail.point),
+        });
+      if (m.onMenuRandom)
+        detail.add({
+          key: 'insert-random',
+          label: '插入随机块…',
+          onClick: () => menu.current.onMenuRandom?.(at, detail.point),
+        });
     };
     node.addEventListener('nps:text-menu', add);
     return () => node.removeEventListener('nps:text-menu', add);
@@ -178,16 +227,40 @@ export function TextSection({
       area.current?.setSelectionRange(position, position);
     });
   };
-  const errors = textErrors(value),
+  // 随机块（__画师池*2__）：池子不在、条目不够、写错时，和括号不配对一样写在下面
+  const lineOf = (i: number) => value.slice(0, i).split('\n').length;
+  const errors = [
+      ...textErrors(value),
+      ...randomMarkers(value).flatMap((m) => {
+        const note = randomSyntaxNote(m[0], pools, negative);
+        return note ? [{ at: m.index!, msg: `第 ${lineOf(m.index!)} 行：${note}` }] : [];
+      }),
+    ].sort((a, b) => a.at - b.at),
     marks = textMarks(value);
+  /** 悬停随机块：抽取设置一行，下面是池里的条目 */
+  const randomTip = (source: string) => {
+    const note = randomSyntaxNote(source, pools, negative);
+    if (note) return `${note} · 右键可以修改`;
+    const r = parseRandomMarker(source);
+    const pool = pools?.find((x) => x.name === r.pool);
+    const head = [
+      `${r.pool} · 抽 ${r.count} 个`,
+      ...(r.repeat ? ['可重复'] : []),
+      ...(r.weight ? [`权重 ${r.weight.min}～${r.weight.max}`] : []),
+    ].join(' · ');
+    return [head, ...poolTip(pool, r.pool).split('\n').slice(1), '右键可以修改'].join('\n');
+  };
   let at = 0;
   const parts = value.split(/([,\n])/).map((part, index) => {
     const begin = at;
     at += part.length;
-    const core = singleTagCore(part);
+    const rnd = part.trim().startsWith('__') ? part.trim() : '';
+    const core = rnd ? '' : singleTagCore(part);
     const runs: ReactNode[] = [];
+    const markAt = (k: number) =>
+      held && k >= held[0] && k < held[1] ? `${marks[k] || ''} held` : marks[k];
     let run = '',
-      kind = marks[begin];
+      kind = markAt(begin);
     const push = (key: number) => {
       if (run) {
         runs.push(
@@ -203,9 +276,9 @@ export function TextSection({
         push(k - 0.5);
         runs.push(<span key="caret" ref={caret} />);
       }
-      if (marks[k] !== kind) {
+      if (markAt(k) !== kind) {
         push(k);
-        kind = marks[k];
+        kind = markAt(k);
       }
       run += value[k];
     }
@@ -214,7 +287,9 @@ export function TextSection({
       <span
         key={index}
         data-text-tag={core || undefined}
-        className={`${errors.some((e) => e.at >= begin && e.at < at) ? 'bad' : ''} ${query && part.toLowerCase().includes(query.toLowerCase()) ? 'hit' : ''}`}
+        data-rnd={rnd || undefined}
+        data-at={rnd ? begin + part.indexOf(rnd) : undefined}
+        className={`${rnd ? 'rnd' : ''} ${errors.some((e) => e.at >= begin && e.at < at) ? 'bad' : ''} ${query && part.toLowerCase().includes(query.toLowerCase()) ? 'hit' : ''}`}
       >
         {runs}
       </span>
@@ -255,7 +330,8 @@ export function TextSection({
           onMouseLeave={() => setTip('')}
           onMouseMove={(event) => {
             const hit = [
-              ...(mirror.current?.querySelectorAll<HTMLElement>('[data-text-tag]') || []),
+              ...(mirror.current?.querySelectorAll<HTMLElement>('[data-text-tag], [data-rnd]') ||
+                []),
             ].find((node) =>
               [...node.getClientRects()].some(
                 (r) =>
@@ -265,6 +341,10 @@ export function TextSection({
                   event.clientY <= r.bottom,
               ),
             );
+            if (hit?.dataset.rnd) {
+              setTip(randomTip(hit.dataset.rnd));
+              return;
+            }
             const core = hit?.dataset.textTag;
             if (!core) {
               setTip('');
