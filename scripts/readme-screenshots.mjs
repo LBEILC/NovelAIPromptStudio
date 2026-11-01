@@ -44,6 +44,7 @@ try {
   const names = [
     'readme-workbench',
     'readme-versions',
+    'readme-branchmap',
     'readme-inpaint',
     'readme-library',
     'readme-agent',

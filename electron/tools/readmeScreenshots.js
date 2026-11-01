@@ -380,6 +380,89 @@ export async function runReadmeScreenshots({
       });
       await h.wait('!document.querySelector(".ver-peek .minus")');
     }
+    if (!selectedScreens || selectedScreens.includes('readme-branchmap')) {
+      // Expand only after the original version-strip screenshot has been captured.
+      const firstBranch = tree.versions.find((v) => v.branchId !== mainTip.branchId);
+      const addVersions = async (parent, variants) => {
+        await invoke('version.open', { tabId, versionId: parent.id });
+        const added = [];
+        for (const [light, weight, count] of variants) {
+          await invoke('prompt.set', {
+            tabId,
+            scope: 'base:prompt',
+            text: raw.replace('warm lamp light', light),
+          });
+          await invoke('prompt.set', {
+            tabId,
+            scope: characterScope,
+            text: characterRaw.replace('red knitted scarf', `${weight}::red knitted scarf::`),
+          });
+          const job = await invoke('generate.start', { tabId, count });
+          await finished(job.id);
+          added.push((await invoke('version.list', { tabId })).versions.at(-1));
+        }
+        return added;
+      };
+      const extended = await addVersions(firstBranch, [
+        ['soft snowfall', 1.1, 3],
+        ['warm lamp light', 1.2, 2],
+        ['blue hour', 1.3, 4],
+      ]);
+      await addVersions(firstBranch, [
+        ['warm lamp light', 1.3, 2],
+        ['soft snowfall', 1.2, 3],
+      ]);
+      await addVersions(rewritten, [
+        ['soft snowfall', 1.3, 4],
+        ['blue hour', 1.2, 2],
+        ['warm lamp light', 1.1, 3],
+        ['soft snowfall', 1.2, 2],
+      ]);
+      const mapTree = await invoke('version.list', { tabId });
+      await h.check(
+        '总览演示至少十二版、四条分支，并含分支上的分叉和多图版本',
+        () =>
+          mapTree.versions.filter((v) => !v.isStart).length >= 12 &&
+          new Set(mapTree.versions.map((v) => v.branchId)).size >= 4 &&
+          mapTree.versions.some(
+            (v) => v.parentId === firstBranch.id && v.branchId !== firstBranch.branchId,
+          ) &&
+          mapTree.versions.filter((v) => v.images.length >= 2 && v.images.length <= 4).length >= 3,
+        undefined,
+        'once',
+      );
+      await invoke('version.open', { tabId, versionId: extended[0].id });
+      await h.click('分支总览');
+      await h.wait('!!document.querySelector(".map-ov")');
+      while (
+        (await h.evaluate('parseInt(document.querySelector(".map-zoom .mono").textContent)')) < 90
+      )
+        await h.click('放大', 'document.querySelector(".map-ov")');
+      // Keep the detailed tier while fitting as much of the adjacent lanes as possible.
+      const scale = await h.evaluate(
+        'Number(document.querySelector(".map-world").style.transform.match(/scale\\(([^)]+)\\)/)[1])',
+      );
+      await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+        type: 'mouseWheel',
+        x: 620,
+        y: 400,
+        deltaX: 0,
+        deltaY: Math.log(scale / 0.9) / 0.0015,
+      });
+      await h.wait('document.querySelector(".map-zoom .mono")?.textContent === "90%"');
+      await h.click('回到当前版', 'document.querySelector(".map-ov")');
+      await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+        type: 'mouseMoved',
+        x: 600,
+        y: 50,
+        button: 'none',
+      });
+      await h.wait('!!document.querySelector(".map-card.full")');
+      await capture('readme-branchmap');
+      await h.click('关闭', 'document.querySelector(".map-ov")');
+      await h.wait('!document.querySelector(".map-ov")');
+      await invoke('version.open', { tabId, versionId: mainTip.id });
+    }
     await invoke('prompt.set', {
       tabId,
       scope: 'base:prompt',
