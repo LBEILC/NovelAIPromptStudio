@@ -312,7 +312,68 @@ function Canvas({
       removeEventListener('pointerup', up);
     };
   }, []);
-  const level = view.z < ONE_AT ? 'dot' : view.z < FULL_AT ? 'one' : 'full';
+  // 档位带一点回差：放大到 FULL_AT 才展开，缩回比它小一截才收起，在边界上不来回闪
+  type Level = 'dot' | 'one' | 'full';
+  const [level, setLevel] = useState<Level>('one');
+  const nextLevel: Level =
+    view.z < ONE_AT
+      ? 'dot'
+      : level === 'full'
+        ? view.z < FULL_AT - 0.05
+          ? 'one'
+          : 'full'
+        : view.z >= FULL_AT
+          ? 'full'
+          : 'one';
+  // 一张图 ↔ 详细卡片：不整张换，同一张图变形过去（用户 11-01）。
+  // morph 期间按详细卡片的结构画，in 是展开、out 是收起；收起后"第几版"那行再升上来（fromFull）
+  const [morph, setMorph] = useState<'in' | 'out' | null>(null);
+  const [fromFull, setFromFull] = useState(false);
+  const morphTimer = useRef(0);
+  useEffect(() => () => clearTimeout(morphTimer.current), []);
+  if (nextLevel !== level) {
+    setLevel(nextLevel);
+    const dir =
+      level === 'one' && nextLevel === 'full'
+        ? 'in'
+        : level === 'full' && nextLevel === 'one'
+          ? 'out'
+          : null;
+    setMorph(dur(3) ? dir : null);
+    setFromFull(false);
+    clearTimeout(morphTimer.current);
+    if (dir && dur(3))
+      morphTimer.current = window.setTimeout(
+        () => {
+          setMorph(null);
+          if (dir === 'out') {
+            setFromFull(true);
+            morphTimer.current = window.setTimeout(() => setFromFull(false), dur(3));
+          }
+        },
+        dur(3) + 150,
+      );
+  }
+  const shape: Level = morph ? 'full' : level;
+  // 变形的起点和终点：一张图时那张图的框（量一次记住），详细卡片里第一格的框（每张卡片各量各的）
+  const picBox = useRef<[number, number, number, number] | null>(null);
+  useLayoutEffect(() => {
+    if (shape === 'one') {
+      const pic = stage.current?.querySelector<HTMLElement>('.map-card.one .map-pic');
+      if (pic) picBox.current = [pic.offsetLeft, pic.offsetTop, pic.offsetWidth, pic.offsetHeight];
+    }
+    if (!morph) return;
+    const a = picBox.current || [0, 0, W, H * 0.84];
+    for (const card of stage.current?.querySelectorAll<HTMLElement>('.map-card.morph') || []) {
+      const cell = card.querySelector<HTMLElement>('.map-cell');
+      if (!cell) continue;
+      const b = [cell.offsetLeft, cell.offsetTop, cell.offsetWidth, cell.offsetHeight];
+      (['x', 'y', 'w', 'h'] as const).forEach((k, i) => {
+        card.style.setProperty(`--a${k}`, `${a[i]}px`);
+        card.style.setProperty(`--b${k}`, `${b[i]}px`);
+      });
+    }
+  });
   const showPeek = (next: Peek, delay: number) => {
     if (drag.current?.moved) return;
     clearTimeout(timer.current);
@@ -429,7 +490,7 @@ function Canvas({
     const n = count(v),
       id = firstImage(v),
       on = v.id === current?.id;
-    const cls = `map-card ${level} ${view.z < 0.28 ? 'tiny' : ''} ${on ? 'on' : ''} ${mark?.id === v.id ? 'marked' : ''} ${q && !hitSet.has(v.id) ? 'dim' : ''}`;
+    const cls = `map-card ${shape} ${morph ? `morph morph-${morph}` : ''} ${fromFull && shape === 'one' ? 'from-full' : ''} ${view.z < 0.28 ? 'tiny' : ''} ${on ? 'on' : ''} ${mark?.id === v.id ? 'marked' : ''} ${q && !hitSet.has(v.id) ? 'dim' : ''}`;
     const common = {
       className: cls,
       'data-map': v.id,
@@ -442,7 +503,7 @@ function Canvas({
         setMenu({ at: [e.clientX, e.clientY], items: menuFor(v) });
       },
     };
-    if (level === 'dot')
+    if (shape === 'dot')
       return <div key={v.id} {...common} data-tip={`${v.branchName} · ${name(v)} · ${n} 张`} />;
     const enterImg = (e: React.PointerEvent<HTMLElement>, img: string) => {
       e.stopPropagation();
@@ -465,7 +526,7 @@ function Canvas({
       const el = e.currentTarget.closest('.map-card');
       if (v.parentId && el) showPeek({ kind: 'diff', v, at: rightOf(el) }, 400);
     };
-    if (level === 'one')
+    if (shape === 'one')
       return (
         <div key={v.id} {...common} onPointerLeave={hidePeek}>
           <span
@@ -507,6 +568,7 @@ function Canvas({
               <span
                 key={img}
                 className="map-cell"
+                style={{ '--k': k } as React.CSSProperties}
                 onPointerEnter={(e) => enterImg(e, img)}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -522,6 +584,8 @@ function Canvas({
           })}
           {!shown.length && <span className="map-none">{name(v)}</span>}
         </span>
+        {/* 变形用的那张图：从一张图时的框移到第一格（收起时反过来），到了再换回真的那格 */}
+        {morph && shown[0] && <span className="map-ghost">{thumbOf(v, shown[0])}</span>}
         <span className="map-what" onPointerEnter={enterText} onPointerLeave={hidePeek}>
           {v.parentId ? (
             <VersionSummary diff={delta(v)} />
