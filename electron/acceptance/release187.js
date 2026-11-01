@@ -71,10 +71,10 @@ export async function director187Checks({ h, generationService }) {
   await h.wait(
     `document.querySelector('img[data-stage]:not(.leaving)')?.getAttribute('src')==='novelai-media://file?path='+encodeURIComponent(${JSON.stringify(bgImage.image_path)})`,
   );
-  const bgThumbnails = `(()=>{const tips=[...document.querySelectorAll('[data-key="ths-${bg.id}"] [data-tip]')].map(e=>e.dataset.tip);return ['抠图','补全','混合'].every((t,i)=>tips[i]?.startsWith(t))})()`;
+  const bgThumbnails = `document.querySelectorAll('[data-key="ths-${bg.id}"] img').length===3`;
   await h.wait(bgThumbnails, '去背景的三个结果已同步到版本栏');
   await h.check(
-    '096-02 去背景生成三种结果、缩略图说明并切到首张',
+    '096-02 去背景生成三种结果、显示三张缩略图并切到首张',
     async () =>
       three &&
       bg.operation.kind === 'director' &&

@@ -94,8 +94,8 @@ export async function randomBlockUI({ h }) {
   await h.until(async () => (await raw()).includes('*3__'), '随机块抽取数保存');
   await h.check('091-06 随机块浮层保存抽三个', async () => (await raw()) === '__合成块验收池*3__');
   await set('synthetic before\n\n__合成块验收池*2__\n\nsynthetic after');
-  await h.wait('!!document.querySelector("[data-trigger^=rins-]")');
-  await h.evaluate('document.querySelector("[data-trigger^=rins-]").click()');
+  await h.wait('!!document.querySelector("[data-trigger=rins-0-0]")');
+  await h.evaluate('document.querySelector("[data-trigger=rins-0-0]").click()');
   await h.wait('document.querySelector(".rnd-pop")?.textContent.includes("加一个随机块")');
   await h.click('加入', 'document.querySelector(".rnd-pop")');
   await h.until(async () => (await raw()).split('__').length === 5, '插入第二个随机块');

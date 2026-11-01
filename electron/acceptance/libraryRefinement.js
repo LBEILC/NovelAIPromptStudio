@@ -73,14 +73,13 @@ export async function libraryRefinementChecks({ h, database }) {
     await e(
       `[...document.querySelectorAll('.lcal-d')].find(n=>n.querySelector('span').textContent==='${Number(today.slice(8))}').click()`,
     );
+    const crossesMonth = earlier.slice(0, 7) !== today.slice(0, 7);
+    if (crossesMonth) await click('上一页', 'document.querySelector(".lcal")');
     await e(
       `[...document.querySelectorAll('.lcal-d')].find(n=>n.querySelector('span').textContent==='${Number(earlier.slice(8))}')?.click()`,
     );
-    // Cross-month ranges use the date field if the earlier day is outside this page.
-    if (earlier.slice(0, 7) !== today.slice(0, 7)) {
-      await input('[aria-label="开始日期"]', earlier);
-      await key('Enter', {}, 'document.activeElement');
-    }
+    // Return to today's month before checking its import count.
+    if (crossesMonth) await click('下一页', 'document.querySelector(".lcal")');
     await settle();
     const todayCount = database
       .loadLibrary('all')
