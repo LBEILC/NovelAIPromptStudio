@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -7,6 +6,7 @@ import electron from 'electron';
 import { verifyNativePackage } from './verify-native-package.mjs';
 
 import { acceptanceOptions } from './acceptance-options.mjs';
+import { createRunTempDir, removeRunTempDir } from './lib/runTempDirs.mjs';
 const options = acceptanceOptions();
 const packaged = process.argv.includes('--packaged');
 if (packaged) {
@@ -20,7 +20,31 @@ const output = path.resolve(
   packaged ? 'acceptance-packaged' : options.outputName,
   ...(packaged ? [] : [theme]),
 );
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nai-acceptance-'));
+const root = await createRunTempDir('nai-acceptance-', 'verify:app');
+// Small files from the disposable profile, copied out only when a run fails.
+const failedProfile = path.join(output, 'failed-profile');
+const EVIDENCE_MAX_BYTES = 2 * 1024 * 1024;
+const EVIDENCE_SKIP = new Set(['fixtures', 'sessionData', 'Code Cache', 'GPUCache', 'assets']);
+async function copyEvidence(from, to) {
+  for (const entry of await fs.readdir(from, { withFileTypes: true }).catch(() => [])) {
+    if (EVIDENCE_SKIP.has(entry.name)) continue;
+    const source = path.join(from, entry.name);
+    if (entry.isDirectory()) await copyEvidence(source, path.join(to, entry.name));
+    else if (entry.isFile() && (await fs.stat(source)).size <= EVIDENCE_MAX_BYTES) {
+      await fs.mkdir(to, { recursive: true });
+      await fs.copyFile(source, path.join(to, entry.name));
+    }
+  }
+}
+let passed = false;
+let interrupted = false;
+let current;
+const interrupt = () => {
+  interrupted = true;
+  current?.kill();
+};
+process.once('SIGINT', interrupt);
+process.once('SIGTERM', interrupt);
 let failure = false;
 let continueDictionary;
 let continueAI;
@@ -134,6 +158,7 @@ const server = createServer((request, response) => {
   );
 });
 async function run(executable, args, timeout = options.processTimeoutMs) {
+  if (interrupted) throw new Error('Acceptance interrupted');
   const env = { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false' };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NOVELAI_DEV_URL;
@@ -146,6 +171,7 @@ async function run(executable, args, timeout = options.processTimeoutMs) {
       windowsHide: !args.some((arg) => arg.startsWith('--verify-app=')),
       shell: false,
     });
+    current = child;
     const timer = setTimeout(() => {
       child.kill();
       reject(new Error(`Acceptance process timeout after ${timeout} ms (slow=${options.slow})`));
@@ -156,12 +182,16 @@ async function run(executable, args, timeout = options.processTimeoutMs) {
     });
     child.once('exit', (code) => {
       clearTimeout(timer);
-      code === 0 ? resolve() : reject(new Error(`Acceptance exited ${code}`));
+      current = undefined;
+      code === 0 && !interrupted
+        ? resolve()
+        : reject(new Error(interrupted ? 'Acceptance interrupted' : `Acceptance exited ${code}`));
     });
   });
 }
 try {
   await fs.mkdir(output, { recursive: true });
+  await fs.rm(failedProfile, { recursive: true, force: true });
   for (const file of await fs.readdir(output)) {
     if (
       file.endsWith('.png') ||
@@ -292,6 +322,7 @@ try {
         error: String(failure),
       });
     manifests.push(evidence);
+    if (interrupted) break;
     if (
       failure &&
       !(await fs.access(path.join(root, 'snapshot.json')).then(
@@ -332,13 +363,17 @@ try {
         .map((item) => item.label)
         .join('；')}`,
     );
+  passed = true;
 } finally {
+  process.off('SIGINT', interrupt);
+  process.off('SIGTERM', interrupt);
   server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
-  if (
-    path.dirname(root) !== path.resolve(os.tmpdir()) ||
-    !path.basename(root).startsWith('nai-acceptance-')
-  )
-    throw new Error('Unsafe cleanup path');
-  await fs.rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  if (!passed) {
+    await copyEvidence(root, failedProfile).catch((error) =>
+      console.error('Failed to keep acceptance evidence:', error),
+    );
+    console.error(`验收失败证据：${failedProfile}`);
+  }
+  await removeRunTempDir(root);
 }

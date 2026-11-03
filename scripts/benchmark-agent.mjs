@@ -1,12 +1,12 @@
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import electron from 'electron';
+import { createRunTempDir, removeRunTempDir } from './lib/runTempDirs.mjs';
 
 const label = process.argv[2] || 'after';
 if (!['before', 'after'].includes(label)) throw Error('Use before or after');
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nai-acceptance-'));
+const root = await createRunTempDir('nai-acceptance-', 'benchmark:agent');
 const output = path.resolve('.codex-runs', 'agent-performance', label);
 await fs.mkdir(output, { recursive: true });
 await fs.writeFile(path.join(root, 'owner'), 'verify:app');
@@ -28,6 +28,7 @@ const child = spawn(electron, ['.', `--verify-app=${root}`], {
   windowsHide: true,
 });
 const code = await new Promise((resolve) => child.on('exit', resolve));
+await removeRunTempDir(root);
 if (code !== 0) process.exitCode = 1;
 else if (label === 'after' && !process.env.CI) {
   const read = async (name) =>

@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import { parsePrompt } from '../src/lib/prompt.js';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
@@ -21,10 +20,11 @@ import { pause } from './services.mjs';
 import { hydrateParameters, normalizeSettings } from '../electron/params.js';
 import { createChatGPT, chatGPTCommands } from '../electron/chatgpt.js';
 import { createWorkbenchFixtures } from '../electron/acceptance/workbenchFixtures.js';
+import { createRunTempDir } from '../scripts/lib/runTempDirs.mjs';
 
 export async function createSession(services, images, emit, empty = false) {
   const failedOutpaintJobs = new Set();
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-ui-preview-'));
+  const directory = await createRunTempDir('nai-ui-preview-', 'preview');
   const assetsDirectory = path.join(directory, 'assets');
   fs.mkdirSync(assetsDirectory);
   const database = await openDatabase(directory);

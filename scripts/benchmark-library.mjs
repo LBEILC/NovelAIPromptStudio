@@ -4,6 +4,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { seedLibrary } from './library-benchmark/fixture.mjs';
+import { createRunTempDir } from './lib/runTempDirs.mjs';
 
 const runs = Number(process.argv.find((a) => a.startsWith('--runs='))?.split('=')[1] || 3);
 if (![1, 3].includes(runs)) throw Error('Use --runs=1 or --runs=3');
@@ -24,7 +25,7 @@ const reuseRoot = process.argv
   ?.slice('--fixture-root='.length);
 const root = reuseRoot
   ? path.resolve(reuseRoot)
-  : fs.mkdtempSync(path.join(os.tmpdir(), 'nai-acceptance-'));
+  : await createRunTempDir('nai-acceptance-', 'benchmark:library', { keep: keepFixture });
 if (
   reuseRoot &&
   (path.dirname(root) !== path.resolve(os.tmpdir()) ||

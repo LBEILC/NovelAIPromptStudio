@@ -23,6 +23,7 @@
     "screenshots:app": "npm run build && node scripts/app-screenshots.mjs",
     "screenshots:readme": "npm run build && node scripts/readme-screenshots.mjs",
     "audit:ui": "node scripts/audit-ui.mjs",
+    "clean:runs": "node scripts/clean-runs.mjs",
     "verify:update-artifacts": "node scripts/verify-update-artifacts.mjs release",
     "start": "electron .",
     "start:demo": "electron . --profile=demo",

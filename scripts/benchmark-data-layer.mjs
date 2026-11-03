@@ -6,8 +6,9 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { ensureCardBenchmarkTags } from './data-layer/fixture.mjs';
+import { createRunTempDir } from './lib/runTempDirs.mjs';
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-data-benchmark-'));
+const root = await createRunTempDir('nai-data-benchmark-', 'benchmark:data-layer');
 const args = process.argv.slice(2);
 const fixtureOption = args.find((arg) => arg.startsWith('--fixtures-root='));
 const fixtureRoot = fixtureOption

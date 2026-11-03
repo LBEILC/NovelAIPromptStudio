@@ -4,9 +4,10 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import electron from 'electron';
 import { requireFont } from './fonts.mjs';
+import { createRunTempDir } from './lib/runTempDirs.mjs';
 
 await requireFont();
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nai-app-screens-'));
+const root = await createRunTempDir('nai-app-screens-', 'screenshots:app');
 const started = Date.now();
 try {
   await fs.writeFile(path.join(root, 'owner'), 'screenshots:app');

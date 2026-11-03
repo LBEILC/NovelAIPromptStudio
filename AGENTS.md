@@ -15,6 +15,7 @@
 - 开发和测试不碰用户日常使用的图库数据。需要真实数据时用独立的演示环境（`--profile=demo`，见 `doc/demo-profile.md`）或临时目录。
 - 调用外部程序时，参数用数组传，不拼 shell 命令字符串。
 - `node_modules/`、构建产物、`.codex-runs/`、日志都不进 git。新增依赖优先选发布超过 7 天的版本。
+- `.codex-runs/` 只长期保留报告、日志、截图和小的清单文件。任务成功结束前，删掉自己下载或解包的安装包和程序、临时 Profile、依赖安装和超大原始数据（如堆快照）；失败时只留复现所需的最小证据。`npm run clean:runs` 列出可清理的内容，加 `--apply` 执行。临时 Profile 用 `scripts/lib/runTempDirs.mjs` 创建，被强制结束的运行会在下次启动时自动清理。
 - 不使用任何真实用户的 Prompt、图片或文件名作为测试数据（仓库是公开的）。
 
 ## Platform support

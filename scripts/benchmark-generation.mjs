@@ -3,13 +3,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import electron from 'electron';
+import { createRunTempDir } from './lib/runTempDirs.mjs';
 
 const label = process.argv[2] || 'before';
 if (!['before', 'after'].includes(label)) throw Error('Use before or after');
 const scenarios = process.argv[3] ? [process.argv[3]] : ['A', 'B'];
 if (scenarios.some((s) => !['A', 'B'].includes(s))) throw Error('Use scenario A or B');
 for (const scenario of scenarios) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nai-acceptance-'));
+  const root = await createRunTempDir('nai-acceptance-', 'benchmark:generation');
   const output = path.resolve('.codex-runs/generation-performance', label, scenario);
   await fs.mkdir(output, { recursive: true });
   await fs.writeFile(path.join(root, 'owner'), 'verify:app');
