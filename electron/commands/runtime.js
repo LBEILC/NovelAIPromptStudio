@@ -157,9 +157,9 @@ export async function installCommandRuntime(options) {
   handlers['agent.setup'] = () => setupResult(setup.status);
   handlers['agent.install'] = () => setupResult(setup.install);
   handlers['agent.uninstall'] = () => setupResult(setup.uninstall);
-  handlers['agent.skill-install'] = (/** @type {{target:'claude'|'codex'}} */ { target }) =>
+  handlers['agent.skill-install'] = (/** @type {{target:'claude'|'codex'|'dsh'}} */ { target }) =>
     setupResult(() => setup.installSkill(target));
-  handlers['agent.skill-uninstall'] = (/** @type {{target:'claude'|'codex'}} */ { target }) =>
+  handlers['agent.skill-uninstall'] = (/** @type {{target:'claude'|'codex'|'dsh'}} */ { target }) =>
     setupResult(() => setup.uninstallSkill(target));
   handlers['agent.skill'] = () => setupResult(async () => ({ text: await setup.skill() }));
   handlers['agent.reveal'] = () =>

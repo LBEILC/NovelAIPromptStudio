@@ -1255,6 +1255,10 @@ export function createPreviewHandlers({
       state: 'missing',
       path: path.join(dataDirectory, 'home', '.codex', 'skills', 'nai-studio', 'SKILL.md'),
     },
+    dsh: {
+      state: 'missing',
+      path: path.join(dataDirectory, 'home', '.dsh', 'skills', 'nai-studio', 'SKILL.md'),
+    },
   };
   const agentStatus = () => ({
     ok: true,
@@ -1276,7 +1280,7 @@ export function createPreviewHandlers({
   });
   for (const action of ['install', 'uninstall']) {
     registerCommand(`agent.skill-${action}`, ({ target }) => {
-      if (target !== 'claude' && target !== 'codex') throw Error('Invalid skill target');
+      if (!['claude', 'codex', 'dsh'].includes(target)) throw Error('Invalid skill target');
       agentSkills[target].state = action === 'install' ? 'installed' : 'missing';
       return { ok: true, skills: structuredClone(agentSkills) };
     });

@@ -110,7 +110,7 @@ it.each(['darwin', 'linux'] as const)('quotes the %s shell launcher', (platform)
       "#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec '/Applications/Studio \"app\".app/run' '/User'\\''s Space/agent.mjs' \"$@\"\n",
   });
 });
-it.each(['claude', 'codex'] as const)(
+it.each(['claude', 'codex', 'dsh'] as const)(
   'reports all four %s skill states and installs exact bundled bytes',
   async (target) => {
     const setup = agentSetup(options());
@@ -130,7 +130,7 @@ it.each(['claude', 'codex'] as const)(
     expect((await setup.installSkill(target)).skills[target].state).toBe('installed');
   },
 );
-it.each(['claude', 'codex'] as const)(
+it.each(['claude', 'codex', 'dsh'] as const)(
   'uninstalls only the %s skill, including repeated/absent uninstall',
   async (target) => {
     const setup = agentSetup(options());

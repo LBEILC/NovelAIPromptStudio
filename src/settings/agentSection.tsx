@@ -18,6 +18,13 @@ export type AgentSetup = {
   pathFailed?: boolean;
   skills?: AgentSkills;
 };
+type SkillTarget = keyof AgentSkills;
+/** 能一键装技能的 Agent，按这个顺序列出 */
+const SKILL_TARGETS: Record<SkillTarget, string> = {
+  claude: 'Claude Code',
+  codex: 'Codex',
+  dsh: 'DSH',
+};
 
 export function Agent() {
   const notify = useNotifications();
@@ -60,10 +67,10 @@ export function Agent() {
       setCliBusy('');
     }
   };
-  // 把技能装进 Claude Code 或 Codex 的全局技能目录
+  // 把技能装进 Claude Code、Codex 或 DSH（DeepSeek，用户 11-03）的全局技能目录
   const [skillBusy, setSkillBusy] = useState('');
-  const installSkill = async (target: 'claude' | 'codex', remove = false) => {
-    const name = target === 'claude' ? 'Claude Code' : 'Codex';
+  const installSkill = async (target: SkillTarget, remove = false) => {
+    const name = SKILL_TARGETS[target];
     setSkillBusy(`${target}:${remove ? 'remove' : 'add'}`);
     try {
       const r = await invokeUI(remove ? 'agent.skill-uninstall' : 'agent.skill-install', {
@@ -122,7 +129,7 @@ export function Agent() {
   return (
     <SetPage
       title="Agent"
-      desc="让你的 Agent（如 Claude Code、Codex）通过命令行使用本软件：读取提示词、修改工作台、搜索图片库、添加生成任务。"
+      desc="让你的 Agent（如 Claude Code、Codex、DSH）通过命令行使用本软件：读取提示词、修改工作台、搜索图片库、添加生成任务。"
     >
       <Fail>{error}</Fail>
       <Row title="命令行工具" help={help}>
@@ -181,9 +188,9 @@ export function Agent() {
           </button>
         </span>
       </Row>
-      {(['claude', 'codex'] as const).map((target) => {
+      {(Object.keys(SKILL_TARGETS) as SkillTarget[]).map((target) => {
         const info = setup?.skills?.[target];
-        const name = target === 'claude' ? 'Claude Code' : 'Codex';
+        const name = SKILL_TARGETS[target];
         const state = info?.state;
         return (
           <Row

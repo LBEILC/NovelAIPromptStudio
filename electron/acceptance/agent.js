@@ -144,6 +144,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   const claudeRoot = path.join(setupRoot, 'home', '.claude');
   const codexSkill = path.join(setupRoot, 'home', '.codex', 'skills', 'nai-studio', 'SKILL.md');
   await fs.mkdir(claudeRoot, { recursive: true });
+  await fs.mkdir(path.join(setupRoot, 'home', '.dsh'), { recursive: true });
   await fs.mkdir(path.dirname(codexSkill), { recursive: true });
   await fs.writeFile(codexSkill, 'synthetic old skill');
   const row = (title) =>
@@ -220,6 +221,7 @@ export async function agentChecks({ app, h, mode, doubles, database }) {
   for (const [target, title, action] of [
     ['claude', 'Claude Code', '安装'],
     ['codex', 'Codex', '更新'],
+    ['dsh', 'DSH', '安装'],
   ]) {
     await h.click(action, row(title));
     await h.wait(`(${row(title)}).textContent.includes('已安装，新开的会话就能用')`);

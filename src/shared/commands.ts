@@ -152,7 +152,7 @@ export type CommandEvent =
   | { type: 'tray-menu-open' };
 /**
  * 技能在某个 Agent 里的情况：installed 已装且和软件里的一样；outdated 已装但和软件里的不一样（软件升级后）；
- * missing 这个 Agent 装了但还没有技能；unavailable 这台电脑上没找到这个 Agent（没有 ~/.claude 或 ~/.codex）。
+ * missing 这个 Agent 装了但还没有技能；unavailable 这台电脑上没找到这个 Agent（没有 ~/.claude、~/.codex 或 ~/.dsh）。
  */
 export type AgentSkillState = 'installed' | 'outdated' | 'missing' | 'unavailable';
 /** 设置里可以复制的已保存密钥（secret.copy，只限界面） */
@@ -160,6 +160,7 @@ export type SecretKind = 'novelai-token' | 'relay-key' | 'ai-api-key';
 export interface AgentSkills {
   claude: { state: AgentSkillState; path: string };
   codex: { state: AgentSkillState; path: string };
+  dsh: { state: AgentSkillState; path: string };
 }
 export interface CommandDefinitions {
   'material.pool.create': {
@@ -618,12 +619,12 @@ export interface CommandDefinitions {
   };
   /** 从 Claude Code 或 Codex 里删掉这个技能（只删 skills/nai-studio 这一个文件夹） */
   'agent.skill-uninstall': {
-    input: { target: 'claude' | 'codex' };
+    input: { target: 'claude' | 'codex' | 'dsh' };
     output: IPC.Result<{ skills: AgentSkills }>;
   };
   /** 把技能装进 Claude Code（~/.claude/skills/nai-studio）或 Codex（~/.codex/skills/nai-studio），已有的直接覆盖 */
   'agent.skill-install': {
-    input: { target: 'claude' | 'codex' };
+    input: { target: 'claude' | 'codex' | 'dsh' };
     output: IPC.Result<{ skills: AgentSkills }>;
   };
   'agent.install': {

@@ -466,9 +466,13 @@ export const commandRegistry = {
   'agent.setup': { fields: {}, uiOnly: true },
   'agent.install': { fields: {}, uiOnly: true },
   'agent.skill': { fields: {}, uiOnly: true },
-  'agent.skill-install': { fields: { target: 'claude|codex' }, required: ['target'], uiOnly: true },
+  'agent.skill-install': {
+    fields: { target: 'claude|codex|dsh' },
+    required: ['target'],
+    uiOnly: true,
+  },
   'agent.skill-uninstall': {
-    fields: { target: 'claude|codex' },
+    fields: { target: 'claude|codex|dsh' },
     required: ['target'],
     uiOnly: true,
   },

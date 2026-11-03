@@ -89,8 +89,12 @@ export function agentSetup(options) {
     );
   /** @param {string} target */
   function skillLocation(target) {
-    if (target !== 'claude' && target !== 'codex') throw Error('Invalid skill target');
-    const root = path.join(home, `.${target}`);
+    if (!['claude', 'codex', 'dsh'].includes(target)) throw Error('Invalid skill target');
+    // DeepSeek Harness reads ~/.dsh/skills; $DSH_HOME moves its home.
+    const root =
+      target === 'dsh' && !options.testRoot && process.env.DSH_HOME
+        ? path.resolve(process.env.DSH_HOME)
+        : path.join(home, `.${target}`);
     return {
       root,
       directory: path.join(root, 'skills', 'nai-studio'),
@@ -121,6 +125,7 @@ export function agentSetup(options) {
     return {
       claude: await skillStatus('claude', bundled),
       codex: await skillStatus('codex', bundled),
+      dsh: await skillStatus('dsh', bundled),
     };
   }
   async function userPath() {
