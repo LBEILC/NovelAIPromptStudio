@@ -1,0 +1,13 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "2.0.3",
+  "date": "2026-11-03",
+  "items": [
+    {
+      "kind": "improved",
+      "area": "agent",
+      "title": "技能能一键装进 DSH",
+      "detail": "\"设置 → Agent\"的 Agent 技能下面多了 DSH（DeepSeek 的命令行 Agent），和 Claude Code、Codex 一样能一键安装、更新和卸载，装进 ~/.dsh/skills；设了 DSH_HOME 时装进它指的目录。这台电脑上没装 DSH 时这一行写\"没找到\"。"
+    }
+  ]
+}
