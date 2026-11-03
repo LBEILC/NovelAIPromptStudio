@@ -1,5 +1,8 @@
+import { openPreferences } from '../preferences.js';
+import { WorkbenchConnection } from '../../src/lib/workbenchConnection';
+import type { InvokeCommand } from '../../src/shared/commands';
 import '../fixtures/databaseTestBudget.js';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import os from 'node:os';
@@ -54,7 +57,7 @@ function fixture(): ImageProject {
     tags: parsePrompt(metadata.prompt_raw),
   }) as ImageProject;
 }
-async function setup() {
+async function setup(withPreferences = false) {
   const directory = await temporary(),
     database = await openDatabase(path.join(directory, 'data'));
   databases.push(database);
@@ -66,9 +69,16 @@ async function setup() {
     directory,
     version: 'test',
     database,
+    preferences: withPreferences
+      ? openPreferences(directory, {
+          isEncryptionAvailable: () => true,
+          encryptString: (value: string) => Buffer.from(value),
+          decryptString: (value: Buffer) => value.toString(),
+        })
+      : undefined,
     busy: () => busy,
-    readImage: async () => fixture(),
-    readSource: async () => fixture(),
+    readImage: async () => database.enrichProjectTags(fixture()),
+    readSource: async () => database.enrichProjectTags(fixture()),
     importImage: async (_path, draft) =>
       draft ? database.saveProjectPrompt('synthetic-image', draft) : fixture(),
     emit: (event) => {
@@ -407,7 +417,10 @@ describe('command contract', () => {
     const conflict = await app.dispatch('workbench.commit', { base, next }, 'ui');
     expect(conflict).toMatchObject({
       ok: false,
-      error: { code: 'conflict', details: { session: app.store.get() } },
+      error: {
+        code: 'conflict',
+        details: { session: app.store.get() },
+      },
     });
     const undoId = app.events.at(-1)!.undoId;
     await app.call('workbench.commit', { base: app.store.get(), next }, 'ui');
@@ -557,4 +570,138 @@ it('filters legacy prompt blocks only in suggestions and returns normalized writ
     legacy.close();
     await app.close();
   }
+});
+
+describe('derived workbench state', () => {
+  it.each(['nsfw', 'nude', 'remove', 'mark', 'words'])(
+    'keeps saving after %s changes',
+    async (kind) => {
+      const app = await setup(true);
+      await app.call('workbench.open', { path: '/synthetic.png' });
+      const errors = vi.fn();
+      const connection = new WorkbenchConnection(
+        ((name, input) => app.dispatch(name, input, 'ui')) as InvokeCommand,
+        () => {},
+        errors,
+      );
+      const edit = async (text: string) => {
+        connection.update((session) => ({
+          ...session,
+          tabs: session.tabs.map((tab) => ({
+            ...tab,
+            project: syncProjectPromptMetadata({
+              ...tab.project!,
+              prompt_structure: createPromptStructure({
+                ...tab.project!.metadata,
+                prompt_raw: text,
+              }),
+            }) as ImageProject,
+          })),
+        }));
+        await connection.flush();
+      };
+      try {
+        connection.hydrate(await app.call('workbench.session', {}, 'ui'));
+        if (kind === 'remove') await edit('synthetic, nsfw');
+        if (kind === 'mark' || kind === 'words') {
+          if (kind === 'mark')
+            await app.call('library.nsfw.mark', { ids: ['synthetic-image'], value: 'nsfw' }, 'ui');
+          else await app.call('settings.blur.save', { settings: { words: ['standing'] } }, 'ui');
+          // The renderer receives the recalculated state, while stored state is older.
+          connection.receive({
+            type: 'workbench',
+            session: await app.call('workbench.session', {}, 'ui'),
+            source: 'ui',
+          });
+        }
+        const text = kind === 'nsfw' || kind === 'nude' ? `synthetic, ${kind}` : 'synthetic';
+        await edit(text);
+        await edit(`${text}, smile`);
+        await edit(`${text}, smile, standing`);
+        expect(app.store.get().tabs[0].project!.metadata.prompt_raw).toBe(
+          `${text}, smile, standing`,
+        );
+        expect(app.store.get().tabs[0].project).not.toHaveProperty('nsfw');
+        expect(errors).not.toHaveBeenCalled();
+        const reopened = await openCommandSession(app.directory, async () => fixture());
+        expect(reopened.get().tabs[0].project).toEqual(app.store.get().tabs[0].project);
+      } finally {
+        connection.dispose();
+        await app.close();
+      }
+    },
+  );
+  it('ignores mismatched derived state when editing and closing but preserves real conflicts and rebase', async () => {
+    const app = await setup();
+    await app.call('workbench.open', { path: '/synthetic.png' });
+    const base = await app.call('workbench.session', {}, 'ui');
+    const current = structuredClone(base);
+    delete current.tabs[0].project.nsfw;
+    const next = structuredClone(base);
+    next.tabs[0].project.name = 'local';
+    expect(mergeSession(current, base, next).tabs[0].project?.name).toBe('local');
+    expect(mergeSession(current, base, { ...base, tabs: [] }).tabs).toEqual([]);
+    const results: boolean[] = [];
+    const connection = new WorkbenchConnection(
+      (async (name, input) => {
+        const result = await app.dispatch(name, input, 'ui');
+        if (name === 'workbench.commit') results.push(result.ok);
+        return result;
+      }) as InvokeCommand,
+      () => {},
+      vi.fn(),
+    );
+    connection.notify = vi.fn();
+    try {
+      connection.hydrate(base);
+      await app.call('tag.set', {
+        tabId: base.tabs[0].id,
+        scope: 'base:prompt',
+        block: 0,
+        index: 0,
+        text: 'agent',
+      });
+      connection.update(next);
+      await connection.flush();
+      expect(results).toEqual([false, true]);
+      expect(app.store.get().tabs[0].project?.name).toBe('local');
+      expect(connection.notify).toHaveBeenCalledOnce();
+    } finally {
+      connection.dispose();
+      await app.close();
+    }
+  });
+});
+
+it('normalizes refreshed Vibe encodings while preserving user reference changes', async () => {
+  const app = await setup();
+  await app.call('workbench.open', { path: '/synthetic.png' });
+  const current = app.store.get();
+  const project = current.tabs[0].project!;
+  project.params!.model = 'nai-diffusion-4-full';
+  project.references!.vibes = [
+    {
+      id: 'reference',
+      libraryId: 'cached',
+      file: 'old',
+      encoding: 'old',
+      model: 'nai-diffusion-4-full',
+      information: 1,
+      strength: 0.6,
+    },
+  ] as any;
+  app.database.vibeLibrary.save({
+    id: 'cached',
+    encodings: { v4full: { one: { encoding: 'fresh', params: { information_extracted: 1 } } } },
+  });
+  const base = structuredClone(current);
+  base.tabs[0].project = app.database.vibeLibrary.refresh(base.tabs[0].project);
+  const next = structuredClone(base);
+  next.tabs[0].project!.name = 'edited';
+  const merged = mergeSession(current, base, next, app.database.vibeLibrary.refresh);
+  expect(merged.tabs[0].project!.references!.vibes[0].encoding).toBe('fresh');
+  expect(merged.tabs[0].project!.name).toBe('edited');
+  current.tabs[0].project!.references!.vibes[0].strength = 0.8;
+  expect(() => mergeSession(current, base, next, app.database.vibeLibrary.refresh)).toThrow();
+  await app.close();
 });

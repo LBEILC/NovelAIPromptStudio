@@ -8,6 +8,25 @@ export async function textEditingChecks({ h, raw, draft, reset, modifier }) {
   await key('e', modifier);
   await wait('!!document.querySelector(".tx-wrap textarea")');
   await check('Ctrl E切换文本方式不改变草稿', `${raw}===${JSON.stringify(before)}`);
+  await e(`(() => {
+    window.sensitiveSaveErrors = [];
+    window.sensitiveSaveObserver = new MutationObserver(() => {
+      for (const node of document.querySelectorAll('.toast:has(.mark.danger)'))
+        window.sensitiveSaveErrors.push(node.textContent);
+    });
+    window.sensitiveSaveObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+  })()`);
+  await input('.tx-wrap textarea', `${before}, nsfw`);
+  await wait(`${raw}===${JSON.stringify(`${before}, nsfw`)}`, '敏感词已保存');
+  await input('.tx-wrap textarea', `${before}, nsfw, smile`);
+  await wait(`${raw}===${JSON.stringify(`${before}, nsfw, smile`)}`, '敏感词之后的修改已保存');
+  await check(
+    '敏感词和后续输入都保存且没有错误通知',
+    `${raw}===${JSON.stringify(`${before}, nsfw, smile`)} && window.sensitiveSaveErrors.length===0 && !document.querySelector('.toast .mark.danger')`,
+  );
+  await e('window.sensitiveSaveObserver.disconnect()');
+  await input('.tx-wrap textarea', before);
+  await wait(`${raw}===${JSON.stringify(before)}`);
   await h.reload();
   await check('重新启动渲染器后保留文本编辑方式', '!!document.querySelector(".tx-wrap textarea")');
   await key('e', modifier);

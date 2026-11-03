@@ -3,7 +3,7 @@ import { createLibraryExport } from './libraryExport.js';
 import { createFolderImporter } from './folderImport.js';
 import { deleteLibraryImages } from './deleteLibraryImages.js';
 import { createTray } from './tray.js';
-import { installWindowClose } from './windowClose.js';
+import { installWindowClose, confirmUnsavedClose, createQuitHandler } from './windowClose.js';
 import { isTrayContents, sendWindowEvent } from './windowAccess.js';
 import { CommandError } from './commands/registry.js';
 import {
@@ -146,6 +146,7 @@ let commandRuntime;
 let quitPrepared = false;
 let quitPreparing;
 let quitRequested = false;
+let sessionEnding = false;
 let trayController;
 const windowClosers = new WeakMap();
 function mainWindows() {
@@ -328,6 +329,12 @@ function createWindow(captureState = null) {
         isQuitting: () => quitRequested || quitPrepared,
         prepare: (window) => commandRuntime.prepareWindow(window),
         quit: requestQuit,
+        sessionEnd: () => {
+          sessionEnding = true;
+          requestQuit();
+        },
+        confirm: (error) =>
+          confirmUnsavedClose((options) => dialog.showMessageBox(window, options), error),
         request: (window) => sendWindowEvent(window, { type: 'close-request' }),
         error: (error) => console.error('Unable to save workbench before closing:', error),
       }),
@@ -1975,16 +1982,26 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   if (!screenshotMode && !acceptanceMode && process.platform !== 'darwin') app.quit();
 });
+const handleQuit = createQuitHandler({
+  prepare: prepareQuit,
+  sessionEnding: () => sessionEnding,
+  confirm: (error) => confirmUnsavedClose((options) => dialog.showMessageBox(options), error),
+  cancel: () => {
+    quitRequested = false;
+    quitPreparing = undefined;
+    if (!sessionEnding) showMainWindow();
+  },
+  quit: () => {
+    quitPrepared = true;
+    app.quit();
+  },
+  error: (error) => console.error('Unable to save workbench before quitting:', error),
+});
 app.on('before-quit', (event) => {
   quitRequested = true;
   if (!quitPrepared && commandRuntime && !acceptanceMode && !screenshotMode) {
     event.preventDefault();
-    void prepareQuit()
-      .then(() => {
-        quitPrepared = true;
-        app.quit();
-      })
-      .catch((error) => console.error('Unable to save workbench before quitting:', error));
+    void handleQuit().catch((error) => console.error('Unable to confirm quit:', error));
     return;
   }
   quitting = true;

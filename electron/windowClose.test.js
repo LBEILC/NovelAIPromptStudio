@@ -1,9 +1,11 @@
 import { EventEmitter } from 'node:events';
 import { describe, it, expect, vi } from 'vitest';
-import { installWindowClose } from './windowClose.js';
+import { installWindowClose, createQuitHandler, confirmUnsavedClose } from './windowClose.js';
 function setup(platform = 'win32', action = 'ask') {
   const window = Object.assign(new EventEmitter(), {
     hide: vi.fn(),
+    show: vi.fn(),
+    focus: vi.fn(),
     close: vi.fn(),
     isDestroyed: () => false,
   });
@@ -18,6 +20,7 @@ function setup(platform = 'win32', action = 'ask') {
     quit: vi.fn(),
     request: vi.fn(),
     error: vi.fn(),
+    confirm: vi.fn(async () => false),
   };
   const controller = installWindowClose(window, options);
   const event = { preventDefault: vi.fn() };
@@ -52,11 +55,12 @@ describe('window close lifecycle', () => {
     expect(options.prepare).toHaveBeenCalledOnce();
     expect(window.hide).toHaveBeenCalledOnce();
   });
-  it('does not hide when saving fails', async () => {
+  it('hides without a dialog when saving fails', async () => {
     const { window, options, controller } = setup();
     options.prepare.mockRejectedValue(Error('save failed'));
-    await expect(controller.choose('tray')).rejects.toThrow('save failed');
-    expect(window.hide).not.toHaveBeenCalled();
+    await controller.choose('tray');
+    expect(window.hide).toHaveBeenCalledOnce();
+    expect(options.confirm).not.toHaveBeenCalled();
   });
   it('quit choice and remembered quit enter application quit without asking', async () => {
     const { window, options, controller, event } = setup('win32', 'quit');
@@ -87,5 +91,62 @@ describe('window close lifecycle', () => {
     await vi.waitFor(() => expect(window.close).toHaveBeenCalledOnce());
     expect(options.prepare).toHaveBeenCalledOnce();
     expect(options.request).not.toHaveBeenCalled();
+  });
+});
+
+describe('save failure decisions', () => {
+  function quitSetup(response = 0) {
+    const dialog = vi.fn(async () => ({ response }));
+    const options = {
+      prepare: vi.fn().mockRejectedValueOnce(Error('disk full')).mockResolvedValue(undefined),
+      sessionEnding: () => false,
+      confirm: (error) => confirmUnsavedClose(dialog, error),
+      cancel: vi.fn(),
+      quit: vi.fn(),
+      error: vi.fn(),
+    };
+    return { options, dialog, run: createQuitHandler(options) };
+  }
+  it('exits after failure without flushing again, coalescing simultaneous requests', async () => {
+    const { options, dialog, run } = quitSetup();
+    await Promise.all([run(), run()]);
+    expect(options.prepare).toHaveBeenCalledOnce();
+    expect(options.quit).toHaveBeenCalledOnce();
+    expect(dialog).toHaveBeenCalledExactlyOnceWith({
+      type: 'warning',
+      title: '没能保存工作台',
+      message: '最后的修改没能保存：disk full',
+      buttons: ['仍然退出', '取消'],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true,
+    });
+  });
+  it('cancels and allows the next quit to save successfully', async () => {
+    const { options, run } = quitSetup(1);
+    await run();
+    expect(options.cancel).toHaveBeenCalledOnce();
+    expect(options.quit).not.toHaveBeenCalled();
+    await run();
+    expect(options.prepare).toHaveBeenCalledTimes(2);
+    expect(options.quit).toHaveBeenCalledOnce();
+  });
+  it('does not show a dialog on session termination', async () => {
+    const { options, dialog, run } = quitSetup();
+    options.sessionEnding = () => true;
+    await run();
+    expect(dialog).not.toHaveBeenCalled();
+  });
+  it.each([true, false])('macOS close failure respects the choice %s', async (accepted) => {
+    const { window, options, event } = setup('darwin');
+    options.prepare.mockRejectedValueOnce(Error('disk full'));
+    options.confirm.mockResolvedValue(accepted);
+    window.emit('close', event);
+    await vi.waitFor(() => expect(accepted ? window.close : window.focus).toHaveBeenCalledOnce());
+    expect(options.prepare).toHaveBeenCalledOnce();
+    if (!accepted) {
+      window.emit('close', event);
+      await vi.waitFor(() => expect(window.close).toHaveBeenCalledOnce());
+    }
   });
 });

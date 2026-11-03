@@ -570,7 +570,12 @@ export async function createCommands(services) {
       const previous = store.get();
       let next;
       try {
-        next = mergeSession(previous, input.base, input.next);
+        next = mergeSession(
+          previous,
+          input.base,
+          input.next,
+          services.database.vibeLibrary.refresh,
+        );
       } catch (error) {
         if (error instanceof CommandError && error.code === 'conflict')
           error.details = { ...error.details, session: savedSession(previous) };

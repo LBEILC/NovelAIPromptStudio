@@ -165,9 +165,33 @@ export async function openCommandSession(directory, readSource) {
   };
 }
 
+/** Strip view-only state; authoritative marks remain in the database.
+ * @param {Project|null} project @returns {Project|null} */
+export function editableProject(project) {
+  if (!project) return project;
+  const { nsfw: _derived, ...copy } = structuredClone(project);
+  return /** @type {Project} */ (copy);
+}
+
 /** Merge independent UI changes with newer main-process state. Conflicts never overwrite a draft.
- * @param {Session} current @param {Session} base @param {Session} next @returns {Session} */
-export function mergeSession(current, base, next) {
+ * @param {Session} current @param {Session} base @param {Session} next
+ * @param {(project:Project)=>Project} [refresh] @returns {Session} */
+export function mergeSession(current, base, next, refresh = (project) => project) {
+  // Refresh cache-backed references on every side using the same current library.
+  // Keep reference identity and user controls in the comparison.
+  const normalize = (/** @type {Session} */ session) => ({
+    ...session,
+    tabs: session.tabs.map((tab) => {
+      const copy = structuredClone(tab);
+      copy.project = editableProject(copy.project && refresh(copy.project));
+      copy.originalProject = editableProject(copy.originalProject && refresh(copy.originalProject));
+      delete copy.workSaved;
+      return copy;
+    }),
+  });
+  current = normalize(current);
+  base = normalize(base);
+  next = normalize(next);
   const same = (/** @type {unknown} */ a, /** @type {unknown} */ b) =>
     JSON.stringify(a) === JSON.stringify(b);
   const result = structuredClone(current);
