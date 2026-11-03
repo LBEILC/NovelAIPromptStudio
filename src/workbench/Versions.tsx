@@ -135,12 +135,14 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
         e.currentTarget.getBoundingClientRect().top,
       ],
     });
-  /** 离开一排缩略图、还在这一行里：换回版本对比。缩略图之间的缝隙算在图上，扫过时不闪 */
+  /** 离开一排缩略图、还在这一行里：换回版本对比。缩略图之间的缝隙算在图上，扫过时不闪。
+   * 离开这一行就关：原图那一行没有版本对比，行上不管关，以前大图一直留着关不掉（用户 11-03） */
   const backToRow =
     (key: string, v: WorkVersion, title: string) => (e: ReactPointerEvent<HTMLElement>) => {
       const row = e.currentTarget.closest('[data-peek]');
       if (v.parentId && row && e.relatedTarget instanceof Node && row.contains(e.relatedTarget))
         hover(key, v, title);
+      else unhover();
     };
   /** 一版的第 k 张：大图卡片下面写的那行 */
   const imgLabel = (v: WorkVersion, projectId: string, prefix = '') => {
@@ -822,7 +824,13 @@ export function Versions({ tab, before }: { tab: CommandTab; before?: () => Prom
     versions.length && !versions[0].isStart && !originGone(versions[0]) ? 1 : 0,
   );
   return (
-    <div className="col versions" ref={col} data-feature="versions">
+    <div
+      className="col versions"
+      ref={col}
+      data-feature="versions"
+      // 大图卡片不接指针：离开版本栏一定关掉，哪一行漏了也不会一直留着
+      onPointerLeave={() => peek?.img && unhover()}
+    >
       {rz.handle}
       <div className="col-h">
         <span className="label">版本</span>
