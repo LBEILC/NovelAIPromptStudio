@@ -13,8 +13,7 @@ import { useSwap } from '../kit/motion';
 import type { CommandTab } from '../shared/commands';
 import type { GenerationEstimate } from '../shared/generation';
 import { quotaText } from '../shared/relayPresets';
-
-const MAX_AREA = 1536 * 2048;
+import { MAX_GENERATION_AREA as MAX_AREA, fitGenerationSize } from '../shared/generationSize';
 const norm = (n: string) => Math.min(2048, Math.max(64, Math.round(Number(n) / 64) * 64));
 const PRESETS = [
   ['竖图', 832, 1216],
@@ -144,14 +143,15 @@ export function GenerationBar({
   const [original, setOriginal] = useState<{ width: number; height: number } | null>(null);
   const [starting, setStarting] = useState(false);
   const m = tab.project?.metadata;
-  const w = m?.width || 832,
-    h = m?.height || 1216;
+  // 显示的是实际发出去的尺寸：原图不是 64 的倍数时，请求会取整（src/shared/generationSize.ts）
+  const { width: w, height: h } = fitGenerationSize(m?.width || 832, m?.height || 1216);
   useEffect(() => {
-    if (versionList)
+    if (versionList) {
       // 空白作品的起点没有图，尺寸菜单里不列"原图"
-      setOriginal(
-        versionList.versions[0]?.isStart ? null : versionList.versions[0]?.project.metadata || null,
-      );
+      const first = versionList.versions[0];
+      const om = first?.isStart ? null : first?.project.metadata;
+      setOriginal(om?.width && om?.height ? fitGenerationSize(om.width, om.height) : null);
+    }
   }, [versionList]);
   useEffect(() => {
     if (!state.settings.continuous) setContinuous(false);

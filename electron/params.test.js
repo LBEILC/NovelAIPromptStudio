@@ -55,6 +55,14 @@ describe('parameter metadata and request contracts', () => {
     expect(project.metadata).toEqual(before.metadata);
     expect(p).toEqual(before);
   });
+  it('snaps an original size that is not a multiple of 64 before sending', async () => {
+    const p = fixture('nai-diffusion-5-full', { width: 1467, height: 2144 });
+    p.metadata.width = 1467;
+    p.metadata.height = 2144;
+    const { request, project } = await buildProjectRequest(p, blankLibrary);
+    expect([request.parameters.width, request.parameters.height]).toEqual([1408, 2048]);
+    expect([project.metadata.width, project.metadata.height]).toEqual([1467, 2144]);
+  });
   it('replaces automatic text only at complete boundaries and preserves unknown UC hints', async () => {
     const p = fixture('nai-diffusion-4-full', { qualityToggle: true, ucPreset: 0 });
     const baseline = (await buildProjectRequest(p, blankLibrary)).request;

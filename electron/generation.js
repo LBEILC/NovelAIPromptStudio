@@ -1,5 +1,6 @@
 import { decode } from '@msgpack/msgpack';
 import { INPAINT_MODELS } from '../src/shared/inpaint.ts';
+import { fitGenerationSize } from '../src/shared/generationSize.ts';
 import { relayRequestModel } from './relay.js';
 import crypto from 'node:crypto';
 import { resolveRelayEndpoints } from '../src/shared/relay.ts';
@@ -172,6 +173,8 @@ export function buildGenerationRequest(raw, model, edits = {}) {
   parameters.v4_negative_prompt.legacy_uc ??=
     model.startsWith('nai-diffusion-4-') && !model.startsWith('nai-diffusion-4-5-');
   for (const key of ['width', 'height']) if (edits[key] !== undefined) parameters[key] = edits[key];
+  if (parameters.width > 0 && parameters.height > 0)
+    Object.assign(parameters, fitGenerationSize(parameters.width, parameters.height));
   const action = edits.action || 'generate';
   if (!['generate', 'img2img'].includes(action)) throw new Error('生成操作无效');
   if (action === 'img2img') {

@@ -19,6 +19,7 @@ import {
 import { prepareBaseImage } from './baseImage.js';
 import { preciseImage } from './vibeLibrary.js';
 import { MODEL_CAPS } from '../src/shared/params.ts';
+import { fitGenerationSize } from '../src/shared/generationSize.ts';
 
 export async function buildProjectRequest(
   project,
@@ -86,8 +87,10 @@ export async function buildProjectRequest(
   const edits = {
     prompt,
     negative,
-    width: p.metadata.width,
-    height: p.metadata.height,
+    // 原图尺寸可能不是 64 的倍数（放大过的图），这里先取整，底图也按取整后的尺寸准备
+    ...(p.metadata.width && p.metadata.height
+      ? fitGenerationSize(p.metadata.width, p.metadata.height)
+      : {}),
     ...(seed !== undefined ? { seed } : {}),
   };
   for (const [key, field, base] of [
