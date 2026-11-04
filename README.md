@@ -18,6 +18,9 @@
   <a href="https://github.com/LBEILC/NovelAIPromptStudio/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/LBEILC/NovelAIPromptStudio/release.yml?style=flat-square&label=Build" alt="构建状态"></a>
   <img src="https://img.shields.io/badge/Windows%20%7C%20macOS-supported-d4351c?style=flat-square" alt="支持 Windows 和 macOS">
   <a href="./LICENSE"><img src="https://img.shields.io/github/license/LBEILC/NovelAIPromptStudio?style=flat-square" alt="许可证"></a>
+  <img src="https://img.shields.io/badge/QQ%E7%BE%A4-485594229-12b7f5?style=flat-square" alt="QQ 群 485594229">
+
+  <p>使用中遇到问题、有想法或想交流作品，欢迎加 QQ 群 <strong>485594229</strong>。</p>
 </div>
 
 ![工作台：提示词按块整理，改完直接生成，新的一版出现在左边的版本栏](./doc/screenshots/readme-workbench.webp)
