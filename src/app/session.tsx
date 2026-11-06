@@ -21,8 +21,7 @@ import {
 import type { useAppState } from './state';
 export function useSessionEffects({
   workbenchConnection,
-  reloadLibrary,
-  reloadCollections,
+  libraryChanged,
   notificationTarget,
   showToast,
   hydrateProject,
@@ -39,8 +38,7 @@ export function useSessionEffects({
 }: Pick<
   ReturnType<typeof useAppState> & ReturnType<typeof useLibraryLoading>,
   | 'workbenchConnection'
-  | 'reloadLibrary'
-  | 'reloadCollections'
+  | 'libraryChanged'
   | 'notificationTarget'
   | 'showToast'
   | 'hydrateProject'
@@ -65,9 +63,7 @@ export function useSessionEffects({
       const wasCurrent = event.tabId === workbenchConnection.current.activeTabId;
       workbenchConnection.receive(event);
       if (event.libraryChanged) {
-        void reloadLibrary('all', 'background');
-        void reloadLibrary('trash', 'background');
-        void reloadCollections('background');
+        libraryChanged();
       }
       if (event.source === 'agent' && event.undoId && wasCurrent) {
         notificationTarget.current.notify({
@@ -99,7 +95,7 @@ export function useSessionEffects({
       prepare();
       events();
     };
-  }, [workbenchConnection, reloadLibrary, reloadCollections, showToast]);
+  }, [workbenchConnection, libraryChanged, showToast]);
 
   useEffect(() => {
     let active = true;

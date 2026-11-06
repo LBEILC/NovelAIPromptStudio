@@ -1863,6 +1863,9 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
         has_custom_name: hasCustomName,
       }),
     });
+    database.run("INSERT OR REPLACE INTO app_meta(key, value) VALUES ($key, '1')", {
+      $key: cardDirtyPrefix + project.id,
+    });
     database.run('UPDATE projects SET name = $name, updated_at = $updated_at WHERE id = $id', {
       $id: project.id,
       $name: cleaned,
@@ -2237,6 +2240,6 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
     filePath,
     backupPath,
     engineBackupPath,
-    refreshGeneratedCards: () => invalidateCards(true),
+    refreshGeneratedCards: () => invalidateCards(false),
   };
 }

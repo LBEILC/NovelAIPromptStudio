@@ -49,14 +49,15 @@ export async function libraryChecks(env) {
   const grid = 'document.querySelector(".lgrid")';
   const selectCard = async (index = 0, options = {}) => {
     await settled();
-    await wait(
-      `document.querySelector('.card:not(.leaving)[data-index="${index}"]')?.checkVisibility()`,
-      '目标卡片已完成渲染并可见',
-    );
-    // Read identity and dispatch in one renderer turn: undo can replace/reorder cards.
-    const group = await e(
-      `(()=>{const node=document.querySelector('.card:not(.leaving)[data-index="${index}"]');const id=node.dataset.groupId;node.focus();node.dispatchEvent(new MouseEvent('click',${JSON.stringify({ bubbles: true, ...options })}));return id;})()`,
-    );
+    // Observe availability and select in the same renderer turn: a trailing
+    // refresh can replace the card between separate wait and click requests.
+    let group;
+    await h.until(async () => {
+      group = await e(
+        `(()=>{const node=document.querySelector('.card:not(.leaving)[data-index="${index}"]');if(!node?.checkVisibility())return null;const id=node.dataset.groupId;node.focus();node.dispatchEvent(new MouseEvent('click',${JSON.stringify({ bubbles: true, ...options })}));return id;})()`,
+      );
+      return Boolean(group);
+    }, '目标卡片已完成渲染并可选择');
     await e('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     if (
       !options.shiftKey &&

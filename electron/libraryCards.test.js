@@ -1014,3 +1014,128 @@ it('keeps generated image identities without projecting an original work cover',
   expect(cards[0].id).toBe('p0');
   expect(api.loadProject('p0')).not.toHaveProperty('work_cover');
 });
+
+async function countedCards() {
+  const directory = temporary();
+  const api = await open(directory, { cardBuildSchedule: { rowsPerBatch: 25 } });
+  await api.loadLibraryCards();
+  // Count actual cache writes, including replacements, without timing or production hooks.
+  edit(directory, (raw) =>
+    raw.exec(
+      'CREATE TABLE card_writes (id TEXT); CREATE TRIGGER count_card_writes AFTER INSERT ON library_card_cache BEGIN INSERT INTO card_writes VALUES (NEW.project_id); END;',
+    ),
+  );
+  return {
+    api,
+    count: () =>
+      edit(directory, (raw) => raw.prepare('SELECT count(*) AS n FROM card_writes').get().n),
+    rows: () =>
+      edit(directory, (raw) => raw.prepare('SELECT count(*) AS n FROM library_card_cache').get().n),
+  };
+}
+
+it('retains 129 cached cards and performs zero writes on generated refresh', async () => {
+  const { api, count, rows } = await countedCards();
+  api.insertProjects(Array.from({ length: 129 }, (_, i) => sample(i)));
+  const before = await api.loadLibraryCards();
+  expect(count()).toBe(129);
+  api.refreshGeneratedCards();
+  expect(rows()).toBe(129);
+  expect(await api.loadLibraryCards()).toEqual(before);
+  expect(count()).toBe(129);
+});
+
+it('builds only the new card after 128 cached cards', async () => {
+  const { api, count, rows } = await countedCards();
+  api.insertProjects(Array.from({ length: 128 }, (_, i) => sample(i)));
+  await api.loadLibraryCards();
+  api.insertProject(sample(128));
+  api.refreshGeneratedCards();
+  expect(rows()).toBe(128);
+  expect(await api.loadLibraryCards()).toHaveLength(129);
+  expect(count()).toBe(129);
+});
+
+it('does not discard completed batches when generated refresh arrives twice during a build', async () => {
+  const { api, count } = await countedCards();
+  api.insertProjects(Array.from({ length: 129 }, (_, i) => sample(i)));
+  let refreshed = false;
+  const cards = await api.loadLibraryCards('all', ({ completed, total }) => {
+    if (!refreshed && completed > 0 && completed < total) {
+      refreshed = true;
+      api.refreshGeneratedCards();
+      api.refreshGeneratedCards();
+    }
+  });
+  expect(refreshed).toBe(true);
+  expect(cards).toHaveLength(129);
+  expect(count()).toBe(129);
+});
+
+it('refreshes naming metadata without rebuilding unrelated cards', async () => {
+  const { api, count } = await countedCards();
+  api.insertProjects([sample(0), sample(1)]);
+  const before = await api.loadLibraryCards();
+  api.updateProjectName('p0', 'Synthetic renamed image');
+  api.refreshGeneratedCards();
+  const renamed = (await api.loadLibraryCards()).find((card) => card.id === 'p0');
+  expect(renamed.name).toBe('Synthetic renamed image');
+  expect(renamed.original_filename).toBe(before.find((card) => card.id === 'p0').original_filename);
+  expect(renamed.has_custom_name).toBe(true);
+  expect(count()).toBe(3);
+  api.updateProjectName('p0', 'Synthetic restored image', false);
+  api.refreshGeneratedCards();
+  expect((await api.loadLibraryCards()).find((card) => card.id === 'p0').has_custom_name).toBe(
+    false,
+  );
+  expect(count()).toBe(4);
+});
+
+it('keeps version ownership and trash membership current with incremental refresh', async () => {
+  const { api } = await countedCards();
+  api.insertProjects([sample(0), sample(1)]);
+  const versions = api.versions;
+  const root = versions.ensure('synthetic-work', api.loadProject('p0'));
+  const generated = versions.append({
+    workId: 'synthetic-work',
+    parentId: root.id,
+    project: {
+      ...api.loadProject('p1'),
+      metadata: { ...sample(1).metadata, prompt_raw: 'synthetic changed prompt' },
+    },
+    source: 'agent',
+    image: { id: 'p1' },
+    seed: 1,
+  });
+  const read = async (view = 'all') => {
+    api.refreshGeneratedCards();
+    return api.loadLibraryCards(view);
+  };
+  const card = (await read()).find((item) => item.id === 'p1');
+  expect(card.version_number).toBe(generated.number);
+  expect(card.work_refs).toHaveLength(1);
+  expect(card.deleted_at).toBe('');
+  const undo = versions.trash([versions.get(generated.id)], true);
+  expect((await read()).map((item) => item.id)).toEqual(['p0']);
+  const trashed = (await read('trash'))[0];
+  expect(trashed.id).toBe('p1');
+  expect(trashed.version_number).toBe(generated.number);
+  expect(trashed.work_refs).toEqual([]);
+  expect(trashed.deleted_at).not.toBe('');
+  versions.restore(undo);
+  expect((await read()).find((item) => item.id === 'p1')).toEqual(card);
+  expect(await read('trash')).toEqual([]);
+  const detached = versions.detachImages('synthetic-work', ['p1']);
+  const standalone = (await read()).find((item) => item.id === 'p1');
+  expect(standalone.work_refs).toEqual([]);
+  expect(standalone.version_number).toBeUndefined();
+  expect(standalone.deleted_at).toBe('');
+  versions.restoreDetached(detached.undo);
+  expect((await read()).find((item) => item.id === 'p1')).toEqual(card);
+  api.updateProjects(['p1'], { deleted: true });
+  expect((await read()).map((item) => item.id)).toEqual(['p0']);
+  expect((await read('trash'))[0].id).toBe('p1');
+  api.updateProjects(['p1'], { deleted: false });
+  expect((await read()).find((item) => item.id === 'p1')).toEqual(card);
+  expect(await read('trash')).toEqual([]);
+});

@@ -1,10 +1,11 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { invokeResult, invokeUI } from '../lib/commands';
 import {
   normalizeGalleryCollection,
   readActiveGalleryCollection,
   writeActiveGalleryCollection,
 } from '../lib/galleryCollections.js';
+import { createCoalescedRefresh, createDeferredLibraryRefresh } from '../lib/libraryRefresh';
 import type { Collection } from '../shared/types';
 import type { useAppState } from './state';
 export function useLibraryLoading({
@@ -17,7 +18,7 @@ export function useLibraryLoading({
   hydrateProject,
   setGalleryCollections,
   setActiveCollectionId,
-  galleryView,
+  page,
 }: Pick<
   ReturnType<typeof useAppState>,
   | 'libraryRequestsRef'
@@ -29,14 +30,19 @@ export function useLibraryLoading({
   | 'hydrateProject'
   | 'setGalleryCollections'
   | 'setActiveCollectionId'
-  | 'galleryView'
+  | 'page'
 >) {
-  const reloadLibrary = useCallback(
+  const refreshers = useRef<
+    Partial<Record<'all' | 'trash', ReturnType<typeof createCoalescedRefresh>>>
+  >({});
+  const deferredRefresh = useRef(createDeferredLibraryRefresh());
+  const loadLibrary = useCallback(
     async (view = 'all', source: 'user' | 'background' = 'user') => {
       const targetView = view === 'trash' ? 'trash' : 'all';
       const requestId = (libraryRequestsRef.current[targetView] || 0) + 1;
       libraryRequestsRef.current[targetView] = requestId;
-      setLibraryLoadingByView((current) => ({ ...current, [targetView]: true }));
+      if (source === 'user' || !loadedLibraryViewsRef.current.has(targetView))
+        setLibraryLoadingByView((current) => ({ ...current, [targetView]: true }));
       if (targetView === 'trash')
         void invokeUI('trash.detached', {}).then(
           (r) =>
@@ -64,6 +70,16 @@ export function useLibraryLoading({
     [hydrateProject, showToast],
   );
 
+  const loadLibraryRef = useRef(loadLibrary);
+  loadLibraryRef.current = loadLibrary;
+  const reloadLibrary = useCallback((view = 'all', source: 'user' | 'background' = 'user') => {
+    const targetView = view === 'trash' ? 'trash' : 'all';
+    const refresher = (refreshers.current[targetView] ??= createCoalescedRefresh((nextSource) =>
+      loadLibraryRef.current(targetView, nextSource),
+    ));
+    return refresher(source);
+  }, []);
+
   const reloadCollections = useCallback(
     async (source: 'user' | 'background' = 'user') => {
       const result = await invokeResult('collection.list', {});
@@ -87,13 +103,19 @@ export function useLibraryLoading({
     [showToast],
   );
 
+  const refreshVisibleLibrary = useCallback(() => {
+    deferredRefresh.current.flush(page === 'gallery', () => {
+      void reloadLibrary('all', 'background');
+      void reloadLibrary('trash', 'background');
+      void reloadCollections('background');
+    });
+  }, [page, reloadLibrary, reloadCollections]);
+  const libraryChanged = useCallback(() => {
+    deferredRefresh.current.invalidate();
+    refreshVisibleLibrary();
+  }, [refreshVisibleLibrary]);
   useEffect(() => {
-    if (!loadedLibraryViewsRef.current.has(galleryView)) reloadLibrary(galleryView, 'background');
-    if (!loadedLibraryViewsRef.current.has('trash')) reloadLibrary('trash', 'background');
-  }, [galleryView, reloadLibrary]);
-
-  useEffect(() => {
-    reloadCollections('background');
-  }, [reloadCollections]);
-  return { reloadLibrary, reloadCollections };
+    refreshVisibleLibrary();
+  }, [refreshVisibleLibrary]);
+  return { reloadLibrary, reloadCollections, libraryChanged };
 }

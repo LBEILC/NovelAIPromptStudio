@@ -96,11 +96,17 @@ export function createDatabaseBackup(connection, { invalidate, ready }) {
         const update = connection.prepare(
           'UPDATE projects SET image_path=?, thumbnail_path=? WHERE id=?',
         );
+        connection.exec(`INSERT OR REPLACE INTO app_meta(key,value)
+          SELECT 'library_cards_dirty:' || substr(key, 16), '1'
+          FROM app_meta WHERE key GLOB 'backup_missing:*'`);
         connection.exec("DELETE FROM app_meta WHERE key GLOB 'backup_missing:*'");
         const mark = connection.prepare('INSERT OR REPLACE INTO app_meta(key,value) VALUES (?,?)');
         for (const record of records) {
           update.run(record.image_path, record.thumbnail_path, record.id);
-          if (record.missing) mark.run('backup_missing:' + record.id, '1');
+          if (record.missing) {
+            mark.run('backup_missing:' + record.id, '1');
+            mark.run('library_cards_dirty:' + record.id, '1');
+          }
         }
         for (const [table, column] of [
           ['works', 'origin_json'],

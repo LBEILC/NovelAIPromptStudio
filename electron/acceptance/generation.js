@@ -543,6 +543,7 @@ async function runGenerationChecks({
     'Agent确认不被已失焦版本的延迟对比浮层关闭',
     `!!document.querySelector('.queue:not(.leaving)')`,
   );
+  const beforeBackgroundIds = (await database.loadLibraryCards()).map((card) => card.id);
   await click('生成 1 张');
   await wait('!document.body.innerText.includes("Agent 待确认 · 1")');
   await h.wait(
@@ -563,6 +564,19 @@ async function runGenerationChecks({
   await check(
     '生成记录逐张列出且最新卡片标注版本和Agent',
     `(()=>{const cards=[...document.querySelectorAll('.card')];return cards.length>0&&!document.querySelector('.stack .ri-stack-line')&&/第 [0-9]+ 版/.test(cards[0].querySelector('.stack')?.textContent)&&cards[0].textContent.includes('Agent')})()`,
+  );
+  const backgroundCards = await database.loadLibraryCards();
+  const backgroundJob = (await invoke('generate.status', { id: pending.id })).jobs[0];
+  await h.checkSoon(
+    '后台生成后进入图库：新图第一、旧图保留且总数正确',
+    async () =>
+      backgroundJob.images.includes(
+        await e('document.querySelector("[data-image-id]")?.dataset.imageId'),
+      ) &&
+      beforeBackgroundIds.every((id) => backgroundCards.some((card) => card.id === id)) &&
+      backgroundCards.length === new Set([...beforeBackgroundIds, ...backgroundJob.images]).size &&
+      Number(await e(`document.querySelector('[data-key="sv-"] .n')?.textContent`)) ===
+        backgroundCards.length,
   );
   await h.section('Agent');
   await click('直接生成');

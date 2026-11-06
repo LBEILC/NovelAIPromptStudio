@@ -92,7 +92,7 @@ export default function App() {
     contextMenu,
     setContextMenu,
   } = useAppState();
-  const { reloadLibrary, reloadCollections } = useLibraryLoading({
+  const { reloadLibrary, reloadCollections, libraryChanged } = useLibraryLoading({
     libraryRequestsRef,
     setLibraryLoadingByView,
     setDetachedRecords,
@@ -102,12 +102,11 @@ export default function App() {
     hydrateProject,
     setGalleryCollections,
     setActiveCollectionId,
-    galleryView,
+    page,
   });
   const {} = useSessionEffects({
     workbenchConnection,
-    reloadLibrary,
-    reloadCollections,
+    libraryChanged,
     notificationTarget,
     showToast,
     hydrateProject,
