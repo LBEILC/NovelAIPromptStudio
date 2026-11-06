@@ -87,6 +87,7 @@
       "electron/**/*",
       "src/lib/**/*",
       "src/shared/params.ts",
+      "src/shared/generationSize.ts",
       "src/shared/relay.ts",
       "src/shared/relayPresets.ts",
       "src/shared/inpaint.ts",
