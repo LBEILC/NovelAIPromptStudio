@@ -419,12 +419,15 @@ export async function workbenchInteractionChecks(env) {
     );
     await library(h, 'workbench-interaction-fixture');
     for (const [index, record] of records.slice(0, 2).entries()) {
-      await wait(`!!document.querySelector('[data-group-id="project:${record.id}"]')`);
-      await e(`document.querySelector('[data-group-id="project:${record.id}"]').click()`);
+      const card = `.lgrid:not(.leaving) [data-group-id="project:${record.id}"]`;
+      await wait(`!!document.querySelector(${JSON.stringify(card)})`);
+      await e(`document.querySelector(${JSON.stringify(card)}).click()`);
       await wait(
         `document.querySelector('.col.detail')?.dataset.detailId===${JSON.stringify(record.id)}`,
       );
-      await key('Enter', {}, 'document.querySelector(".lgrid")');
+      // A grouping transition retains the old grid with its old selection.
+      // Send Enter to the current grid, as a user focusing the card would.
+      await key('Enter', {}, 'document.querySelector(".lgrid:not(.leaving)")');
       await wait(`${tabs}.length===${previousTabs.length + index + 1}`);
       if (index === 0) await click('图片库', 'document.querySelector(".tb")');
     }

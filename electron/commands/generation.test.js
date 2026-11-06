@@ -229,13 +229,27 @@ it('switches independent relay keys through commands, preserves cached models on
   });
   const { relayFixtureUrl } = await import('../fixtures/novelAIService.js');
   let offline = false;
+  const terminalJobs = new Map();
+  const waiters = new Map();
+  const completed = (id) =>
+    terminalJobs.has(id)
+      ? Promise.resolve(terminalJobs.get(id))
+      : new Promise((resolve) => waiters.set(id, resolve));
   const commands = await createCommands({
     directory: root,
     version: 'test',
     database,
     preferences,
     busy: () => false,
-    emit: () => {},
+    emit: (event) => {
+      if (event.type !== 'generation') return;
+      for (const job of event.data.jobs) {
+        if (!['completed', 'failed'].includes(job.state)) continue;
+        terminalJobs.set(job.id, job);
+        waiters.get(job.id)?.(job);
+        waiters.delete(job.id);
+      }
+    },
     importImage: async (file) => {
       const image = await readWorkbenchImage(file);
       database.insertProject(image);
@@ -272,13 +286,10 @@ it('switches independent relay keys through commands, preserves cached models on
       await call('account.relay.switch', { slot });
       const job = await call('generate.start', { tabId: opened.tab.id, count: 1 });
       await expect(call('account.relay.switch', { slot: 'custom' })).rejects.toThrow('等生成完成');
-      await expect
-        .poll(
-          async () =>
-            (await call('generate.status', { id: job.id })).jobs[0].error ||
-            (await call('generate.status', { id: job.id })).jobs[0].state,
-        )
-        .toBe('completed');
+      // Generation includes disk writes; assert the terminal event, not elapsed time.
+      const finished = await completed(job.id);
+      expect(finished.error || finished.state).toBe('completed');
+      expect((await call('generate.status', { id: job.id })).jobs[0].state).toBe('completed');
       expect(service.state.requestKeys.at(-1)).toBe(`Bearer ${key}`);
       await expect.poll(() => preferences.generationSettings().relay.lastQuota).toBe(0.8);
       expect(await call('usage.summary')).toMatchObject({ images: 1, quota: 0.8 });
