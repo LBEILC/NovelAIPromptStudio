@@ -111,28 +111,34 @@ async function setup(size = [512, 512]) {
   };
 }
 
-it.each([
+const relayCases = [
   ['nai-diffusion-5-full', 'nai-diffusion-5-full'],
   ['nai-diffusion-5-curated', 'nai-diffusion-4-5-curated'],
   ['nai-diffusion-4-5-curated', 'nai-diffusion-4-5-curated'],
   ['nai-diffusion-4-curated-preview', 'nai-diffusion-4-curated-preview'],
   ['nai-diffusion-4-5-full', 'nai-diffusion-4-5-full'],
-])('adapts TaleAPI inpaint and outpaint for %s only at transport', async (model, baseModel) => {
-  const f = await setup();
-  try {
-    await f.call('params.set', { tabId: f.input.tabId, patch: { model } });
-    const rect = { x: 0, y: 0, width: 512, height: 512 };
-    const mask = (
-      await sharp({ create: { width: 512, height: 512, channels: 4, background: '#ffffff' } })
-        .png()
-        .toBuffer()
-    ).toString('base64');
-    const input = { tabId: f.input.tabId, imageId: f.source.id, rect, mask };
-    for (const baseUrl of [
-      RELAY_PRESETS[0].address,
-      RELAY_PRESETS[1].address,
-      'https://example.com',
-    ]) {
+].flatMap(([model, baseModel]) =>
+  [RELAY_PRESETS[0].address, RELAY_PRESETS[1].address, 'https://example.com'].map((baseUrl) => ({
+    model,
+    baseModel,
+    baseUrl,
+  })),
+);
+
+// Each relay gets its own fixture and budget; keep all transport and persisted-model assertions.
+it.each(relayCases)(
+  'adapts $model only at transport via $baseUrl',
+  async ({ model, baseModel, baseUrl }) => {
+    const f = await setup();
+    try {
+      await f.call('params.set', { tabId: f.input.tabId, patch: { model } });
+      const rect = { x: 0, y: 0, width: 512, height: 512 };
+      const mask = (
+        await sharp({ create: { width: 512, height: 512, channels: 4, background: '#ffffff' } })
+          .png()
+          .toBuffer()
+      ).toString('base64');
+      const input = { tabId: f.input.tabId, imageId: f.source.id, rect, mask };
       f.preferences.saveRelay({ baseUrl, key: 'acceptance-token', models: [baseModel] });
       f.preferences.saveConnection('relay');
       const allowed = baseUrl === RELAY_PRESETS[0].address;
@@ -182,11 +188,11 @@ it.each([
         expect(usage).toHaveLength(requests.length);
         expect(usage.every((record) => record.model === INPAINT_MODELS[model])).toBe(true);
       }
+    } finally {
+      await f.close();
     }
-  } finally {
-    await f.close();
-  }
-});
+  },
+);
 
 it('prices both modes with actual models, validates inputs and matches inpaint permissions', async () => {
   const f = await setup([1536, 1536]);
