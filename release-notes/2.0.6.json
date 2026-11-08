@@ -1,0 +1,13 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "2.0.6",
+  "date": "2026-11-08",
+  "items": [
+    {
+      "kind": "fixed",
+      "area": "wb",
+      "title": "ChatGPT 登录后无法翻译",
+      "detail": "AI 服务选了 ChatGPT 账号并已登录、但没配过 API Key 方式的模型时，段落的「翻译成中文」「根据中文改写英文」、段落菜单的「翻译并分类」、翻译词典的「用 AI 重新翻译」、图片库的 AI 起名和工作台的整理都不能用。现在按当前选的服务判断：ChatGPT 看是否已登录，API Key 看是否选了模型。发送前的确认框也写明发给 ChatGPT，不再显示 API 地址。"
+    }
+  ]
+}
