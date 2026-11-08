@@ -1,4 +1,5 @@
 import { invokeUI, onProgress, invokeResult } from '../lib/commands';
+import { aiConfigured, aiTarget } from '../lib/aiService';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TagCachePatch, DictionaryTranslationProgress } from '../shared/ipc';
 import type { TagDictionaryEntry, TagCategory } from '../shared/types';
@@ -60,8 +61,8 @@ export function useDictionary() {
     void invokeUI('settings.ai.get', {})
       .then((settings) => {
         if (active) {
-          setAiReady(!!settings.model.trim());
-          setServiceUrl(settings.baseUrl);
+          setAiReady(aiConfigured(settings));
+          setServiceUrl(aiTarget(settings));
         }
       })
       .catch((e: Error) => {

@@ -2,6 +2,7 @@
 // 中间两个按钮让 AI 把另一边跟上（"翻译成中文""根据中文改写英文"）。发给 NovelAI 的永远是英文；改了中文还没改写英文时有提示。
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
+import { aiConfigured } from '../lib/aiService';
 import { Icon } from '../kit/controls';
 import type { PromptBlock } from '../lib/promptDocument';
 
@@ -74,7 +75,7 @@ export function ParagraphEditor({
   useEffect(() => {
     let live = true;
     void invokeUI('settings.ai.get', {})
-      .then((s) => live && setConfigured(!!s.model))
+      .then((s) => live && setConfigured(aiConfigured(s)))
       .catch(() => {});
     return () => {
       live = false;
@@ -120,8 +121,9 @@ export function ParagraphEditor({
     }
     setEditing(true);
     void invokeUI('settings.ai.get', {}).then((s) => {
-      setConfigured(!!s.model);
-      if (s.model) void transform('translate', text);
+      const ready = aiConfigured(s);
+      setConfigured(ready);
+      if (ready) void transform('translate', text);
     });
   }, [translateRequest]);
   const open = () => {

@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { parsePrompt } from '../lib/prompt.js';
 import { invokeUI } from '../lib/commands';
+import { aiTarget } from '../lib/aiService';
 import {
   createPromptDocument,
   editPromptBlockText,
@@ -52,7 +53,7 @@ export function useTidy(p: {
     );
   useEffect(() => {
     let live = true;
-    void invokeUI('settings.ai.get', {}).then((s) => live && setTarget(s.model ? s.baseUrl : ''));
+    void invokeUI('settings.ai.get', {}).then((s) => live && setTarget(aiTarget(s)));
     return () => {
       live = false;
       if (request.current) void invokeUI('ai.cancel', { requestId: request.current });

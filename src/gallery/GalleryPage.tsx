@@ -11,6 +11,7 @@ import { imageFileMenu } from '../kit/imageFiles';
 import { nsfwMenu } from '../kit/blur';
 import { Viewer, type ViewerItem } from '../kit/Viewer';
 import { invokeUI } from '../lib/commands';
+import { aiConfigured as aiReady } from '../lib/aiService';
 import { writeClipboardText } from '../lib/clipboard';
 import { hasImageName, imageDisplayName, versionName } from '../lib/imageNaming.js';
 import { GALLERY_CARD_SIZE_KEY } from '../lib/galleryLayout.js';
@@ -64,7 +65,7 @@ export default function GalleryPage(
   const [aiConfigured, setAI] = useState(false);
   useEffect(() => {
     let live = true;
-    void invokeUI('settings.ai.get', {}).then((s) => live && setAI(!!s.model));
+    void invokeUI('settings.ai.get', {}).then((s) => live && setAI(aiReady(s)));
     return () => {
       live = false;
     };

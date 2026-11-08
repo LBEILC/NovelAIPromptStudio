@@ -7,6 +7,7 @@ import { Icon } from '../kit/controls';
 import { useNotifications } from '../kit/toast';
 import { FlipScope, useExitList } from '../kit/motion';
 import { invokeUI } from '../lib/commands';
+import { aiTarget } from '../lib/aiService';
 import { BlurImg, type BlurImage } from '../kit/blur';
 import type { LibraryGroup, LibraryProps } from '../library/types';
 
@@ -47,7 +48,7 @@ export function NameAI({
   const groups = useRef<LibraryGroup[]>([]);
   useEffect(() => {
     let live = true;
-    void invokeUI('settings.ai.get', {}).then((s) => live && setTarget(s.model ? s.baseUrl : ''));
+    void invokeUI('settings.ai.get', {}).then((s) => live && setTarget(aiTarget(s)));
     return () => {
       live = false;
       if (job.current) void invokeUI('ai.cancel', { requestId: job.current });
