@@ -19,6 +19,7 @@ async function fixture(run) {
     { defaultAssetsDirectory: directory },
   );
   const sql = new DatabaseSync(database.filePath);
+  if (process.platform === 'win32') sql.exec('PRAGMA journal_mode=PERSIST');
   const image = (id, age, file = id) => {
     const project = {
       ...createBlankProject(),

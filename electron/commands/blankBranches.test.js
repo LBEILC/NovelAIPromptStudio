@@ -668,6 +668,7 @@ it('tracks external original trash, recovery and purge, names affected works and
     await waitJob((await call('generate.start', { tabId: tab.id, count: 1 }, 'ui')).id);
     expect(database.versions.get(root.id).project).toEqual(root.project);
     const raw = new DatabaseSync(database.filePath);
+    if (process.platform === 'win32') raw.exec('PRAGMA journal_mode=PERSIST');
     try {
       raw.prepare('DELETE FROM works WHERE id=?').run(root.workId);
       expect((await call('version.list', { tabId: derived.id })).origin.deleted).toBe(true);
@@ -854,6 +855,7 @@ it('reopens generated images and original sources, remembers usage, and supports
     expect(derived.workOrigin).toMatchObject({ workId: first.workId, versionId: second.id });
     expect((await call('workbench.list')).tabs.at(-1).id).toBe(derived.id);
     const raw = new DatabaseSync(database.filePath);
+    if (process.platform === 'win32') raw.exec('PRAGMA journal_mode=PERSIST');
     try {
       raw.prepare('DELETE FROM works WHERE id=?').run(first.workId);
     } finally {
@@ -871,6 +873,7 @@ it('matches file signatures and upgrades only matching legacy metadata without r
     const latest = append(first.workId, first.versionId, 'file-latest');
     await call('workbench.close', { tabId: first.id });
     const raw = new DatabaseSync(database.filePath);
+    if (process.platform === 'win32') raw.exec('PRAGMA journal_mode=PERSIST');
     try {
       const origin = database.versions.work(first.workId).origin;
       delete origin.fileSignature;
@@ -902,6 +905,7 @@ it('rejects legacy mismatches and missing metadata, and selects the most recentl
     const a = (await call('workbench.open', { path: file })).tab;
     const b = (await call('workbench.open', { path: file, fresh: true })).tab;
     const raw = new DatabaseSync(database.filePath);
+    if (process.platform === 'win32') raw.exec('PRAGMA journal_mode=PERSIST');
     try {
       for (const tab of [a, b]) {
         const origin = database.versions.work(tab.workId).origin;
@@ -1259,6 +1263,7 @@ it.each(['blank', 'library', 'legacy'])('does not auto-save a %s work', (kind) =
       if (kind === 'legacy') {
         // Old snapshots have no opt-in marker. Preserve their on-disk format.
         const raw = new DatabaseSync(database.filePath);
+        if (process.platform === 'win32') raw.exec('PRAGMA journal_mode=PERSIST');
         const original = { ...database.versions.list(tab.workId)[0].project };
         delete original.autoSaveOriginal;
         raw

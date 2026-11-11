@@ -532,6 +532,7 @@ describe('calendar import-day scope', () => {
 it('filters legacy prompt blocks only in suggestions and returns normalized writes', async () => {
   const app = await setup();
   const legacy = new DatabaseSync(app.database.filePath);
+  if (process.platform === 'win32') legacy.exec('PRAGMA journal_mode=PERSIST');
   const entries = [
     ['synthetic, landscape', 'synthetic, landscape'],
     ['synthetic\nlandscape', 'synthetic\nlandscape'],

@@ -147,6 +147,7 @@ it('keeps legacy batch tokens readable and reports a deleted work clearly', () =
     db.versions.save('legacy-detach-work');
     const batch = db.versions.detachImages('legacy-detach-work', [a.id]);
     const raw = new DatabaseSync(path.join(directory, 'studio.sqlite'));
+    if (process.platform === 'win32') raw.exec('PRAGMA journal_mode=PERSIST');
     try {
       const payload = JSON.parse(
         raw.prepare('SELECT payload FROM detached_images_undo WHERE token=?').get(batch.undo)
@@ -305,6 +306,7 @@ it('migrates generated works without rewriting snapshots and runs only once', ()
       autoSaveOriginal: true,
     });
     const raw = new DatabaseSync(path.join(directory, 'studio.sqlite'));
+    if (process.platform === 'win32') raw.exec('PRAGMA journal_mode=PERSIST');
     const before = raw.prepare('SELECT * FROM work_versions ORDER BY id').all();
     raw.exec("DROP TABLE saved_works; DELETE FROM app_meta WHERE key='saved_works_v1'");
     raw.close();
@@ -358,6 +360,7 @@ it('invalidates cached references after external writes and never caches rolled-
     db.versions.save('cached');
     expect(db.versions.workRefs().get(p.id)).toHaveLength(1);
     const raw = new DatabaseSync(path.join(directory, 'studio.sqlite'));
+    if (process.platform === 'win32') raw.exec('PRAGMA journal_mode=PERSIST');
     try {
       const versions = createVersionStore(raw);
       raw.exec("BEGIN; DELETE FROM saved_works WHERE work_id='cached'");

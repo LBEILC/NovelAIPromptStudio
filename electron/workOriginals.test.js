@@ -14,6 +14,7 @@ async function fixture(run) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-originals-'));
   const db = await openDatabase(directory);
   const raw = new DatabaseSync(db.filePath);
+  if (process.platform === 'win32') raw.exec('PRAGMA journal_mode=PERSIST');
   try {
     await run({ directory, db, raw });
   } finally {

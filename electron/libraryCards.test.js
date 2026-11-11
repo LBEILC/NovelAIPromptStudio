@@ -31,6 +31,7 @@ function temporary() {
 }
 function edit(directory, operation) {
   const raw = new DatabaseSync(path.join(directory, 'studio.sqlite'));
+  if (process.platform === 'win32') raw.exec('PRAGMA journal_mode=PERSIST');
   try {
     return operation(raw);
   } finally {
