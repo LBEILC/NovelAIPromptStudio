@@ -175,6 +175,21 @@ describe('command contract', () => {
     });
     expect(calls).toEqual([{ source: 'ui', sender }]);
   });
+  it('ranks exact, prefix and whole-word suggestion matches first', async () => {
+    const app = await setup();
+    await app.call('dictionary.set-many', {
+      entries: ['aqua zqxv', 'zqxvlike', 'pants under zqxv', 'zqxv lift', 'zqxv'].map((tag) => ({
+        tag,
+        translation: '测试',
+      })),
+      expectedRevision: (await app.call('app.status')).revision,
+    });
+    expect(
+      (await app.call('dictionary.suggest', { query: 'zqxv' })).items.map(
+        (item: { tag: string }) => item.tag,
+      ),
+    ).toEqual(['zqxv', 'zqxvlike', 'zqxv lift', 'aqua zqxv', 'pants under zqxv']);
+  });
   it('validates nested batches before applying any changes and rejects stale revisions', async () => {
     const app = await setup();
     const initial = (await app.call('app.status')).revision;

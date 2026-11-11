@@ -72,11 +72,36 @@ export function searchDsoTags(query, limit = 30) {
       category: data.categories[Number(entry[1])] || 'Unsorted',
     });
   }
-  return results
+  return sortTagMatches(results, search).slice(0, Math.min(50, Math.max(1, limit)));
+}
+
+/**
+ * 补全候选的顺序：和输入完全一样的排最前（英文 Tag 或译文），然后是开头一样的、整词出现的，其余在后；同档短的在前。
+ * @template {{ tag: string, translation?: string }} T
+ * @param {T[]} items
+ * @param {string} query
+ * @returns {T[]}
+ */
+export function sortTagMatches(items, query) {
+  const search = String(query || '')
+    .trim()
+    .toLowerCase()
+    .replaceAll('_', ' ');
+  const rank = (/** @type {T} */ item) => {
+    const tag = item.tag.toLowerCase().replaceAll('_', ' ');
+    const zh = String(item.translation || '').toLowerCase();
+    if (tag === search || zh === search) return 0;
+    if (tag.startsWith(search) || zh.startsWith(search)) return 1;
+    if (tag.split(' ').includes(search)) return 2;
+    return 3;
+  };
+  return items
+    .map((item) => ({ item, rank: rank(item) }))
     .sort(
       (a, b) =>
-        Number(b.tag.startsWith(search)) - Number(a.tag.startsWith(search)) ||
-        a.tag.localeCompare(b.tag),
+        a.rank - b.rank ||
+        a.item.tag.length - b.item.tag.length ||
+        a.item.tag.localeCompare(b.item.tag),
     )
-    .slice(0, Math.min(50, Math.max(1, limit)));
+    .map(({ item }) => item);
 }

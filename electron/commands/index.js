@@ -35,7 +35,7 @@ import {
 import { filterGalleryProjects } from '../../src/lib/galleryFilters.js';
 import { galleryCollectionScope } from '../../src/lib/galleryCollections.js';
 import { insertTags } from '../../src/workbench/edits.ts';
-import { searchDsoTags } from '../dsoDictionary.js';
+import { searchDsoTags, sortTagMatches } from '../dsoDictionary.js';
 import { generationCommands } from './generation.js';
 import { saveWorkbenchImage } from './saveWorkbenchImage.js';
 
@@ -516,8 +516,7 @@ export async function createCommands(services) {
       }
       const counts = await services.database.tagImageCounts();
       return {
-        items: [...items.values()]
-          .reverse()
+        items: sortTagMatches([...items.values()], search)
           .slice(0, 30)
           .map((item) => ({
             ...item,

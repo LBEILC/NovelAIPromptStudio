@@ -1,4 +1,5 @@
 // 添加 Tag（doc/design.md 2.14）：块末尾的虚线框，点了变成输入框；中文会找对应的英文 Tag，逗号或换行一次加多个，回车添加。
+// 输英文时回车加的是输入的原文，↑ ↓ 选了候选才加候选，Tab 加选中的或第一条；鼠标悬停不改选中。
 // 虚线框和输入框跟 Tag 一样高。什么都没输就离开，输入框收回去（新建的空块这时会被拿掉）。
 import { useEffect, useRef, useState } from 'react';
 import { invokeResult } from '../lib/commands';
@@ -42,7 +43,8 @@ export function AddTags({
         .then((r) => {
           if (live && r.ok) {
             setHits(merge(r.items));
-            setPick(0);
+            // 输中文是为了找英文 Tag，默认选中第一条；输英文默认不选，回车就是输入的原文
+            setPick(/[^\x20-\x7e]/.test(q) ? 0 : -1);
           }
         })
         .catch(() => live && setHits(controls));
@@ -102,13 +104,19 @@ export function AddTags({
           }}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return;
+            const listed = hits.length > 0 && !!text.trim() && !/[,，\n]/.test(text);
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-              if (!hits.length) return;
+              if (!listed) return;
               e.preventDefault();
-              setPick((pick + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % hits.length);
+              if (pick < 0) setPick(e.key === 'ArrowDown' ? 0 : hits.length - 1);
+              else setPick((pick + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % hits.length);
             } else if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
               e.preventDefault();
-              add(hits.length && text.trim() && !/[,，\n]/.test(text) ? hits[pick].tag : text);
+              add(listed && hits[pick] ? hits[pick].tag : text);
+            } else if (e.key === 'Tab' && listed) {
+              // Tab 用选中的候选，没选就用第一条
+              e.preventDefault();
+              add((hits[pick] || hits[0]).tag);
             } else if (e.key === 'Escape') {
               e.stopPropagation();
               if (text) setText('');
@@ -132,7 +140,6 @@ export function AddTags({
             key={h.tag}
             className={`mi ${i === pick ? 'on' : ''}`}
             onPointerDown={(e) => e.preventDefault()}
-            onPointerEnter={() => setPick(i)}
             onClick={() => add(h.tag)}
           >
             <span className="en" data-tip-overflow={h.tag}>
