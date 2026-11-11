@@ -1,5 +1,5 @@
 import '../fixtures/databaseTestBudget.js';
-import { it, expect } from 'vitest';
+import { it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,6 +14,16 @@ import { estimateImageOperation } from '../imageOperations.js';
 import { buildProjectRequest } from '../parameterRequest.js';
 import { RELAY_PRESETS } from '../../src/shared/relayPresets.ts';
 import { INPAINT_MODELS } from '../../src/shared/inpaint.ts';
+
+const localFetch = globalThis.fetch;
+beforeEach(() => {
+  // Fail before DNS/network access if a code path bypasses the fixture transport.
+  vi.spyOn(globalThis, 'fetch').mockImplementation((url, options) => {
+    expect(new URL(url).hostname).toBe('127.0.0.1');
+    return localFetch(url, options);
+  });
+});
+afterEach(() => vi.restoreAllMocks());
 
 async function setup(size = [512, 512]) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-outpaint-'));
@@ -129,7 +139,10 @@ const relayCases = [
 it.each(relayCases)(
   'adapts $model only at transport via $baseUrl',
   async ({ model, baseModel, baseUrl }) => {
+    const started = performance.now();
+    const timings = {};
     const f = await setup();
+    timings.setup = Math.round(performance.now() - started);
     try {
       await f.call('params.set', { tabId: f.input.tabId, patch: { model } });
       const rect = { x: 0, y: 0, width: 512, height: 512 };
@@ -173,8 +186,12 @@ it.each(relayCases)(
         ['generate.outpaint', { ...f.input, mode: 'whole' }],
         ['generate.outpaint', { ...f.input, mode: 'edges' }],
       ]) {
+        const operationStarted = performance.now();
         const start = f.sent.length;
         const job = await f.wait((await f.call(name, args)).id);
+        timings[`${name}:${args.mode || 'inpaint'}`] = Math.round(
+          performance.now() - operationStarted,
+        );
         expect(job.error || job.state).toBe('completed');
         const requests = f.sent.slice(start).filter((r) => r.action === 'infill');
         expect(requests.length).toBeGreaterThan(0);
@@ -189,7 +206,10 @@ it.each(relayCases)(
         expect(usage.every((record) => record.model === INPAINT_MODELS[model])).toBe(true);
       }
     } finally {
+      const closeStarted = performance.now();
       await f.close();
+      timings.close = Math.round(performance.now() - closeStarted);
+      console.log('Transport timings (ms)', model, baseUrl, timings);
     }
   },
 );

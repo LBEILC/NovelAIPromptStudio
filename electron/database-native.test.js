@@ -59,10 +59,26 @@ describe('native engine upgrade', () => {
     });
     const close = vi.spyOn(DatabaseSync.prototype, 'close');
     const database = await open(directory);
-    expect(settings).toEqual({ journal: 'delete', synchronous: 3, fullfsync: 1 });
+    expect(settings).toEqual({
+      journal: process.platform === 'win32' ? 'persist' : 'delete',
+      synchronous: 3,
+      fullfsync: 1,
+    });
+    database.insertProject({ id: 'journal-reuse', name: 'Synthetic journal fixture', tags: [] });
+    if (process.platform === 'win32') {
+      const journal = fs.readFileSync(path.join(directory, 'studio.sqlite-journal'));
+      expect(journal.subarray(0, 28)).toEqual(Buffer.alloc(28));
+    }
     database.close();
     database.close();
     expect(close).toHaveBeenCalledTimes(1);
+    expect(fs.existsSync(path.join(directory, 'studio.sqlite-journal'))).toBe(false);
+    inspect(directory, (raw) => {
+      expect(raw.prepare("SELECT name FROM projects WHERE id='journal-reuse'").get().name).toBe(
+        'Synthetic journal fixture',
+      );
+      expect(raw.prepare('PRAGMA integrity_check').get().integrity_check).toBe('ok');
+    });
   });
 
   it('closes and rolls back when startup repair fails', { timeout: 20000 }, async () => {
@@ -303,7 +319,8 @@ describe('native engine upgrade', () => {
     database.updateCollectionProjects('collection', ['kept']);
     inspect(directory, (raw) =>
       raw.exec(
-        "CREATE TRIGGER fail_delete BEFORE DELETE ON gallery_collections BEGIN SELECT RAISE(ABORT, 'injected failure'); END",
+        `${process.platform === 'win32' ? 'PRAGMA journal_mode=PERSIST;' : ''}
+        CREATE TRIGGER fail_delete BEFORE DELETE ON gallery_collections BEGIN SELECT RAISE(ABORT, 'injected failure'); END`,
       ),
     );
     expect(() => database.deleteCollection('collection')).toThrow('injected failure');

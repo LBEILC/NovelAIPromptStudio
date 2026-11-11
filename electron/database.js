@@ -245,12 +245,16 @@ function initializeDatabase(connection, filePath, backupPath, engineBackupPath, 
   };
   const close = () => {
     if (closed) return;
+    // PERSIST is connection-local. Remove its inactive journal at orderly shutdown,
+    // leaving the same standalone database that older versions and backups read.
+    if (process.platform === 'win32') connection.exec('PRAGMA journal_mode=DELETE');
     connection.close();
     closed = true;
   };
-  // EXTRA also syncs the directory after deleting a rollback journal. No WAL sidecars.
+  // Reuse the rollback journal on Windows instead of deleting/recreating it for
+  // every commit. Keep durable syncs and rollback recovery; do not introduce WAL.
   connection.exec(
-    'PRAGMA journal_mode=DELETE; PRAGMA synchronous=EXTRA; PRAGMA fullfsync=ON; PRAGMA foreign_keys=OFF',
+    `PRAGMA journal_mode=${process.platform === 'win32' ? 'PERSIST' : 'DELETE'}; PRAGMA synchronous=EXTRA; PRAGMA fullfsync=ON; PRAGMA foreign_keys=OFF`,
   );
   migrateGenerationVersions(connection, filePath);
   migrateMaterials(connection, filePath);

@@ -705,6 +705,8 @@ it('adds the hash lookup index to an existing database without changing legacy l
   ).toEqual(expected);
   const reader = new DatabaseSync(file);
   try {
+    // Concurrent writers must use the same journal lifecycle on Windows.
+    if (process.platform === 'win32') reader.exec('PRAGMA journal_mode=PERSIST');
     expect(
       reader
         .prepare('EXPLAIN QUERY PLAN ' + sql)

@@ -7,6 +7,8 @@ export async function cardCacheChecks({ database, h, mode = {}, cardCacheControl
   const timing = process.env.NPS_ACCEPTANCE_CARD_TIMING || 'fast';
   if (!cardCacheControl) throw Error('Card cache checks require guarded acceptance mode');
   const raw = new DatabaseSync(database.filePath);
+  // This fixture writes alongside the product connection, using its journal mode.
+  if (process.platform === 'win32') raw.exec('PRAGMA journal_mode=PERSIST');
   const unrelated = new BrowserWindow({ show: false });
   let unrelatedProgress = 0;
   const originalSend = unrelated.webContents.send.bind(unrelated.webContents);
