@@ -12,6 +12,7 @@ on:
         type: string
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
@@ -217,6 +218,15 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.intel_tag || github.ref_name }}
         run: node scripts/append-intel-release.mjs "$RELEASE_TAG" release
+
+      - name: Trigger MirrorChyan workflows
+        if: (github.event_name == 'push' && github.ref_type == 'tag') || inputs.intel_tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIRRORCHYAN_TAG: ${{ inputs.intel_tag || github.ref_name }}
+        run: |
+          gh workflow run --repo "$GITHUB_REPOSITORY" mirrorchyan_release.yml -f tag="$MIRRORCHYAN_TAG"
+          gh workflow run --repo "$GITHUB_REPOSITORY" mirrorchyan_release_note.yml -f tag="$MIRRORCHYAN_TAG"
 
       - name: Report Intel failure without blocking the release
         if: failure()
