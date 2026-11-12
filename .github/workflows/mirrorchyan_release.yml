@@ -9,6 +9,7 @@ on:
 
 jobs:
   mirrorchyan:
+    if: ${{ github.repository_owner == 'LBEILC' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
