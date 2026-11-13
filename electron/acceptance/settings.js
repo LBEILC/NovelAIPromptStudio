@@ -434,6 +434,83 @@ export async function settingsChecks(context, restart) {
     undefined,
     'once',
   );
+  const previousSource = preferences.updateSourceSettings();
+  const previousMirrorUpdate = doubles.mirrorUpdate;
+  const cdkInput = 'input[aria-label="Mirror酱 CDK"]';
+  const cdkRow = `document.querySelector(${JSON.stringify(cdkInput)})?.closest('.setcol')`;
+  const validCdk = 'synthetic-acceptance-129-valid';
+  const invalidCdk = 'synthetic-acceptance-129-invalid';
+  const expires = new Date(1800000000 * 1000);
+  const expiresDay = `${expires.getFullYear()}-${String(expires.getMonth() + 1).padStart(2, '0')}-${String(expires.getDate()).padStart(2, '0')}`;
+  try {
+    doubles.mirrorUpdate = { code: 0, cdk_expired_time: 1800000000, url: true };
+    await click('Mirror酱', 'document.querySelector("[aria-label=更新源]")');
+    await h.until(
+      () => preferences.updateSourceSettings().source === 'mirrorchyan',
+      '保存 Mirror酱 更新源',
+    );
+    await wait(`document.querySelector(${JSON.stringify(cdkInput)})?.checkVisibility()`);
+    await check(
+      '选择 Mirror酱 保存更新源并显示 CDK 输入框',
+      async () =>
+        preferences.updateSourceSettings().source === 'mirrorchyan' &&
+        (await e(`document.querySelector(${JSON.stringify(cdkInput)})?.checkVisibility()`)),
+      undefined,
+      'once',
+    );
+    await input(cdkInput, validCdk);
+    await e(`document.querySelector(${JSON.stringify(cdkInput)}).blur()`);
+    await wait(
+      `${cdkRow}?.textContent.includes('有效期至') && ${cdkRow}?.textContent.includes(${JSON.stringify(expiresDay)})`,
+    );
+    await check(
+      'CDK 失焦保存并自动验证本地日期有效期',
+      async () =>
+        preferences.updateSourceSettings().cdk === validCdk &&
+        (await e(
+          `${cdkRow}?.textContent.includes('有效期至') && ${cdkRow}?.textContent.includes(${JSON.stringify(expiresDay)})`,
+        )),
+      undefined,
+      'once',
+    );
+    doubles.mirrorUpdate = { code: 7002 };
+    await input(cdkInput, invalidCdk);
+    await e(`document.querySelector(${JSON.stringify(cdkInput)}).blur()`);
+    const invalidState = `${cdkRow}?.textContent.includes('CDK 不正确，请检查后重新填写') && [...(${cdkRow}?.querySelectorAll('button') || [])].some(b=>b.textContent.trim()==='改用 GitHub 下载')`;
+    await wait(invalidState);
+    await check('错误 CDK 失焦后显示错误与 GitHub 回退入口', invalidState, undefined, 'once');
+    await click('改用 GitHub 下载', cdkRow);
+    await h.until(
+      () => preferences.updateSourceSettings().source === 'github',
+      '回退 GitHub 更新源',
+    );
+    const cdkCollapsed = `!!document.querySelector(${JSON.stringify(cdkInput)})?.closest('.expand') && !document.querySelector(${JSON.stringify(cdkInput)})?.closest('.expand').classList.contains('open')`;
+    await wait(cdkCollapsed);
+    await check(
+      '回退 GitHub 保留 CDK 并收起输入区',
+      async () => {
+        const saved = preferences.updateSourceSettings();
+        return saved.source === 'github' && saved.cdk === invalidCdk && (await e(cdkCollapsed));
+      },
+      undefined,
+      'once',
+    );
+  } finally {
+    // Restore both persistence and renderer state before the existing update checks.
+    doubles.mirrorUpdate = previousMirrorUpdate;
+    preferences.saveUpdateSource({ source: previousSource.source, cdk: previousSource.cdk });
+    await h.reload();
+    await section('关于与更新');
+  }
+  await check(
+    '更新源验收收尾恢复原更新源与 CDK',
+    () => {
+      const saved = preferences.updateSourceSettings();
+      return saved.source === previousSource.source && saved.cdk === previousSource.cdk;
+    },
+    undefined,
+    'once',
+  );
   const previousAutoCheck = preferences.productivitySettings().autoCheckUpdates;
   await click('自动检查更新');
   await h.until(
