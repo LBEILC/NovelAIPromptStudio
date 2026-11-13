@@ -1,0 +1,26 @@
+name: mirrorchyan_zip_release_note
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        default: ''
+        required: false
+  release:
+    types: [edited]
+
+jobs:
+  mirrorchyan:
+    if: ${{ github.repository_owner == 'LBEILC' }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: uploading
+        uses: MirrorChyan/release-note-action@v1
+        with:
+          mirrorchyan_rid: NovelAIPromptStudio_zip
+          version_name: ${{ inputs.tag || github.event.release.tag_name }}
+
+          owner: LBEILC
+          repo: NovelAIPromptStudio
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          upload_token: ${{ secrets.MirrorChyanUploadToken }}

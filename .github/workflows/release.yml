@@ -230,6 +230,8 @@ jobs:
         run: |
           gh workflow run --repo "$GITHUB_REPOSITORY" mirrorchyan_release.yml -f tag="$MIRRORCHYAN_TAG"
           gh workflow run --repo "$GITHUB_REPOSITORY" mirrorchyan_release_note.yml -f tag="$MIRRORCHYAN_TAG"
+          gh workflow run --repo "$GITHUB_REPOSITORY" mirrorchyan_zip_release.yml -f tag="$MIRRORCHYAN_TAG"
+          gh workflow run --repo "$GITHUB_REPOSITORY" mirrorchyan_zip_release_note.yml -f tag="$MIRRORCHYAN_TAG"
 
       - name: Report Intel failure without blocking the release
         if: failure()
