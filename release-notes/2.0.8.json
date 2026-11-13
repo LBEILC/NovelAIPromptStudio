@@ -1,0 +1,16 @@
+{
+  "schema": "nps-release-notes/1",
+  "version": "2.0.8",
+  "date": "2026-11-13",
+  "items": [
+    {
+      "kind": "new",
+      "area": "set",
+      "title": "可以从 Mirror酱 下载更新",
+      "detail": "GitHub 下载慢的话，在「设置 → 关于与更新」把更新源换成 Mirror酱，填上 CDK 就从 Mirror酱 下载，国内更快。没有 CDK 也能用 Mirror酱 检查新版本，下载照旧走 GitHub。CDK 填完会立刻验证并显示到期日，加密保存在这台电脑上，不进备份。",
+      "highlight": true,
+      "icon": "speed",
+      "goto": "settings:updates"
+    }
+  ]
+}
