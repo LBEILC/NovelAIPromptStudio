@@ -118,13 +118,16 @@ git commit -m "[工程] 准备 v0.3.0 发版" -- package.json package-lock.json
 ## 下载提示
 
 - macOS 安装包已签名并经 Apple 公证；Windows 安装包尚未签名，系统可能显示安全警告。
-- 请只从本仓库 Releases 页面下载。
+- 请只从本仓库 Releases 页面或 Mirror酱 下载。
 
 完整提交记录：https://github.com/LBEILC/NovelAIPromptStudio/compare/v<上一版本>...v<本版本>
+
+GitHub 下不动？已有 Mirror酱 CDK 可以 [前往 Mirror酱 高速下载](https://mirrorchyan.com/zh/projects?rid=NovelAIPromptStudio)
 ```
 
 模板说明：
 
+- 正文最后一行固定是 Mirror酱 下载入口。正文会由 `mirrorchyan_release_note` 工作流同步到 Mirror酱，应用选 Mirror酱 更新源又拿不到 `release-notes.json` 时也显示它，这一行在那边也无妨。
 - 把 `<版本>` 替换为实际版本号（如 `0.5.0`），`<上一版本>` 替换为上一个标签。
 - 文件名来自 `package.json` 的 `build.win.artifactName`（`NovelAI-Prompt-Studio-Setup-<版本>-x64.exe`）和 `build.mac.artifactName`（`NovelAI-Prompt-Studio-<版本>-x64.dmg` / `-arm64.dmg`），与 GitHub Release 资产名必须完全一致；若打包配置改了命名，同步更新本表。
 - 固定链接格式为 `https://github.com/LBEILC/NovelAIPromptStudio/releases/download/v<版本>/<资产名>`，Release 创建后即可点击跳转下载。
