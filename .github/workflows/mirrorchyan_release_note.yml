@@ -13,11 +13,15 @@ jobs:
   mirrorchyan:
     if: ${{ github.repository_owner == 'LBEILC' }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [NovelAIPromptStudio, NovelAIPromptStudio_zip]
     steps:
       - id: uploading
         uses: MirrorChyan/release-note-action@v1
         with:
-          mirrorchyan_rid: NovelAIPromptStudio
+          mirrorchyan_rid: ${{ matrix.rid }}
           version_name: ${{ inputs.tag || github.event.release.tag_name }}
 
           owner: LBEILC
