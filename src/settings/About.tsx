@@ -11,10 +11,10 @@ import {
 import { Icon, Logo, Seg, Switch } from '../kit/controls';
 import { Dialog } from '../kit/dialog';
 import { useNotifications } from '../kit/toast';
-import { useUpdates } from '../state/updates';
+import { CDK_PROBLEMS, useUpdates } from '../state/updates';
 import { StructuredReleaseNotes } from './StructuredReleaseNotes';
 import { CHANGELOG } from '../app/changelog';
-import { Expand, Row, SetPage, Swap, errorText } from './parts';
+import { Col, Expand, Row, SetPage, Swap, errorText } from './parts';
 import misansLicense from '../../LICENSES/MiSans/LICENSE?raw';
 import newsreaderLicense from '../../LICENSES/Newsreader/LICENSE?raw';
 import plexLicense from '../../LICENSES/IBMPlexMono/LICENSE?raw';
@@ -33,7 +33,7 @@ const NET = [
   '图生图、修图和编码 Vibe：放大、增强、局部重绘、扩图、导演工具和图生图会把要处理的那张图发给 NovelAI，编码新的 Vibe 会发参考图；只发这一张，不发别的图',
   '查询余额：打开软件、每次生成结束和点“刷新”时，向 NovelAI 查询 Anlas 余额和用量',
   '用中转站时：上面两项改发到你填的中转站地址，用中转站的 Key；中转站能看到提示词、参数、参考图和生成的图。查询余额改成读取它有哪些模型',
-  '检查和下载更新：访问 GitHub。自动检查可以在上面关掉；更新说明里带图片时，会从图片所在的网站加载',
+  '检查和下载更新：访问 GitHub；更新源选了 Mirror酱 时访问 mirrorchyan.com，带上你填的 CDK。自动检查可以在上面关掉；更新说明里带图片时，会从图片所在的网站加载',
   '翻译与分类：内置词典里没有的 Tag，会把 Tag 的名字发给 Danbooru，查它属于哪一类；配置了 AI 服务时，还没有译文的 Tag 会再发给你配置的服务',
   '起名：把这张图的提示词发给你配置的 AI 服务',
   '段落的“翻译成中文”“根据中文改写英文”：把这一段文字发给你配置的 AI 服务',
@@ -85,6 +85,122 @@ function NotesLoading({ version }: { version?: string }) {
   );
 }
 
+const SOURCES = [
+  ['github', 'GitHub'],
+  ['mirrorchyan', 'Mirror酱'],
+] as const;
+const day = (iso?: string) => {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** 更新源和 Mirror酱 CDK（doc/design.md 2.50） */
+function UpdateSourceRows({ u }: { u: ReturnType<typeof useUpdates> }) {
+  const notify = useNotifications();
+  const saved = u.source;
+  const st = u.state;
+  const [cdk, setCdk] = useState('');
+  const [show, setShow] = useState(false);
+  useEffect(() => setCdk(saved?.cdk || ''), [saved?.cdk]);
+  if (!saved) return null;
+  const mirror = saved.source === 'mirrorchyan';
+  const checking = st?.phase === 'checking';
+  // 状态里的 Mirror酱 结果只对已保存的 CDK 有意义；输入框里改了还没离开时先不显示旧结论
+  const editing = cdk.trim() !== saved.cdk;
+  const code = st?.mirrorCode ?? 0;
+  const problem = CDK_PROBLEMS.includes(code);
+  const failed = (e: unknown) => notify({ text: errorText(e), tone: 'error' });
+  const toGitHub = () =>
+    void u
+      .changeSource('github')
+      .then(() => notify({ text: '已改用 GitHub 更新', tone: 'success' }), failed);
+  const status = editing ? (
+    '离开输入框后保存并验证'
+  ) : !saved.cdk ? (
+    '没填 CDK 时从 GitHub 下载更新。一个 CDK 在所有接入 Mirror酱 的软件里通用'
+  ) : checking ? (
+    '正在验证 CDK…'
+  ) : problem ? (
+    <span className="upd-cdk-bad">
+      <span>{st?.error}</span>
+      <button className="btn quiet sm" onClick={toGitHub}>
+        改用 GitHub 下载
+      </button>
+    </span>
+  ) : st?.mirrorFallback ? (
+    code === 8001 ? (
+      'Mirror酱 暂时没有这个平台的更新，这次改用 GitHub 检查'
+    ) : (
+      'Mirror酱 暂时连不上，这次改用 GitHub 检查'
+    )
+  ) : st?.cdkExpiresAt ? (
+    <>
+      有效期至 <span className="mono">{day(st.cdkExpiresAt)}</span>
+    </>
+  ) : (
+    ''
+  );
+  return (
+    <>
+      <Row
+        title="更新源"
+        help={mirror ? '从 Mirror酱 检查和下载，国内下载更快，需要 CDK' : '从 GitHub 检查和下载'}
+      >
+        <Seg
+          label="更新源"
+          items={SOURCES}
+          value={saved.source}
+          onChange={(v) => void u.changeSource(v).catch(failed)}
+        />
+      </Row>
+      <Expand open={mirror}>
+        <Col title="Mirror酱 CDK" help={status} className="upd-cdk">
+          <div className="row">
+            <label className={`field sm mono set-key ${problem && !editing ? 'is-error' : ''}`}>
+              <input
+                type={show ? 'text' : 'password'}
+                aria-label="Mirror酱 CDK"
+                placeholder="粘贴 CDK"
+                autoComplete="off"
+                spellCheck={false}
+                value={cdk}
+                onChange={(e) => setCdk(e.target.value)}
+                onBlur={() => void u.changeCdk(cdk).catch(failed)}
+                onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) return;
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                  if (e.key === 'Escape' && editing) {
+                    e.stopPropagation();
+                    setCdk(saved.cdk);
+                  }
+                }}
+              />
+            </label>
+            <button
+              className="btn quiet icon sm"
+              aria-label={show ? '隐藏 CDK' : '显示 CDK'}
+              aria-pressed={show}
+              data-tip={show ? '隐藏' : '显示'}
+              disabled={!cdk}
+              onClick={() => setShow(!show)}
+            >
+              <Icon name={show ? 'eye-off-line' : 'eye-line'} />
+            </button>
+            <button
+              className="btn quiet sm"
+              onClick={() => void invokeUI('updates.open-mirrorchyan', {}).catch(failed)}
+            >
+              获取 CDK
+              <Icon name="external-link-line" />
+            </button>
+          </div>
+        </Col>
+      </Expand>
+    </>
+  );
+}
+
 export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unknown> }) {
   const notify = useNotifications();
   const u = useUpdates();
@@ -115,6 +231,19 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
   const failed = !found && !checking && !!(u.error || st?.error);
   const manual = st?.platform === 'darwin' && st.updateMode === 'manual';
   const p = Math.round(st?.progress || 0);
+  const mirror = u.source?.source === 'mirrorchyan';
+  const cdkProblem = mirror && CDK_PROBLEMS.includes(st?.mirrorCode ?? 0);
+  // 选了 Mirror酱 但这次要从 GitHub 下载时说一句为什么（2.50）
+  const downloadHint =
+    mirror && st?.canDownloadUpdate && st.downloadSource !== 'mirrorchyan' && !cdkProblem
+      ? !u.source?.cdk
+        ? '这次从 GitHub 下载。填写 Mirror酱 CDK 后可以从 Mirror酱 下载'
+        : st.platform === 'darwin'
+          ? 'Mirror酱 暂时还没有 macOS 的更新包，这次从 GitHub 下载'
+          : st.mirrorFallback
+            ? '这次从 GitHub 下载'
+            : ''
+      : '';
   // 自动更新先报出新版本号，结构化的更新说明要再去 GitHub 读一次；这期间手里还是上一次的说明。
   // 版本号对上了才用；对不上时先是加载态，8 秒还没读到就退回安装包自带的 Markdown 说明（用户 10-26）
   const fresh =
@@ -143,13 +272,15 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
               ? '重启后安装，工作台中的标签页和草稿会保留'
               : st.phase === 'downloading'
                 ? `正在下载 · ${p}%`
-                : manual
-                  ? 'macOS 上需要到下载页手动安装（安装包没有签名）'
-                  : fresh
-                    ? releaseCounts(fresh)
-                    : waited
-                      ? ''
-                      : '正在读取更新说明'}
+                : st.phase === 'error' && st.error && !cdkProblem
+                  ? `下载失败：${st.error}`
+                  : manual
+                    ? 'macOS 上需要到下载页手动安装（安装包没有签名）'
+                    : fresh
+                      ? releaseCounts(fresh)
+                      : waited
+                        ? ''
+                        : '正在读取更新说明'}
           </small>
           <div className="progress ink">
             <i
@@ -234,6 +365,8 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
       <Row title="自动检查更新" help="启动后检查一次，不会自动安装">
         <Switch label="自动检查更新" on={u.autoCheck} onChange={(v) => void u.changeAutoCheck(v)} />
       </Row>
+      <UpdateSourceRows u={u} />
+
       <Row
         feature="updates"
         title={
@@ -248,9 +381,11 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         help={[
           <>
             当前版本 <span className="mono selectable">{st?.currentVersion || '—'}</span> ·{' '}
-            {failed ? `${u.error || st?.error} · ` : ''}上次检查：
+            {failed ? `${cdkProblem ? 'Mirror酱 CDK 有问题' : u.error || st?.error} · ` : ''}
+            上次检查：
             {lastUpdateCheckLabel(st?.checkedAt)}
           </>,
+          found && st?.phase === 'available' && downloadHint,
           st && !st.packaged && '开发模式只检查官方稳定版本，不会下载或安装更新。',
           st?.packaged &&
             manual &&
@@ -287,8 +422,8 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
         help="不开网络端口；Agent 能做什么见“Agent”那一页"
       />
       <Row
-        title="API Key、ChatGPT 登录信息和 NovelAI 持久令牌加密后保存在这台电脑上"
-        help="用系统自带的加密能力加密，软件不保存明文；需要时可以在设置里复制，Agent 不能复制；诊断信息和报告问题都不会带上它们"
+        title="API Key、ChatGPT 登录信息、NovelAI 持久令牌和 Mirror酱 CDK 加密后保存在这台电脑上"
+        help="用系统自带的加密能力加密，软件不保存明文；需要时可以在设置里复制，Agent 不能复制；诊断信息、报告问题和备份都不会带上它们"
       />
       <h2>字体与开源组件</h2>
       <Row

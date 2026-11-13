@@ -209,6 +209,9 @@ html[data-motion="off"] .spin { animation: none; }
   transition: height var(--dur-3) var(--ease-move), margin-top var(--dur-3) var(--ease-move), opacity var(--dur-1) var(--ease-out); }
 .upd.down .progress { height: var(--progress-h); margin-top: var(--sp-1); opacity: 1; }
 .upd > .row { flex: 0 0 auto; flex-wrap: nowrap; }
+/* Mirror酱 CDK（2.50）：出错时说明变红，旁边紧跟"改用 GitHub 下载" */
+.setcol.upd-cdk .upd-cdk-bad { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); color: var(--danger); }
+.setcol.upd-cdk .upd-cdk-bad .btn { color: var(--text); }
 /* 更新说明（release-notes JSON）：重点条目两张卡片，其余按新增 / 改进 / 修复分组；颜色只用中性色，图标 --text-3 */
 .rn { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-1) 0 var(--sp-3); font-size: var(--fs-small); line-height: var(--lh-small); }
 .rn-head { display: flex; align-items: baseline; gap: var(--sp-2); }

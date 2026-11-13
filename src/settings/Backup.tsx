@@ -157,7 +157,7 @@ export function Backup() {
       <Col
         feature="backup"
         title="导出"
-        help="持久令牌、中转站 Key、AI 服务的 API Key 和 ChatGPT 登录不会放进备份（它们用这台电脑的系统加密保存，换电脑也解不开），恢复后要重新填。"
+        help="持久令牌、中转站 Key、AI 服务的 API Key、ChatGPT 登录和 Mirror酱 CDK 不会放进备份（它们用这台电脑的系统加密保存，换电脑也解不开），恢复后要重新填。"
         after={
           <div className="row">
             <button

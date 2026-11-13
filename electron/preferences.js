@@ -476,13 +476,11 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
         assertSecretAccess();
         const value = cdk.trim();
         if (value) {
-          // TODO(design): Confirm the command-side CDK encryption failure copy.
-          if (!safeStorage.isEncryptionAvailable())
-            throw new Error('【文案待定：当前系统无法安全保存 CDK】');
+          if (!safeStorage.isEncryptionAvailable()) throw new Error('当前系统无法安全加密 CDK');
           try {
             stored.mirrorChyanCdkEncrypted = safeStorage.encryptString(value).toString('base64');
           } catch {
-            throw new Error('【文案待定：CDK 加密保存失败】');
+            throw new Error('CDK 保存失败，请重试');
           }
         } else delete stored.mirrorChyanCdkEncrypted;
       }

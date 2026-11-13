@@ -15,11 +15,10 @@ const CDK_ERRORS = {
 };
 
 export function mirrorFailure(code = -1) {
-  // TODO(design): Confirm the generic request failure copy (download refresh only).
   return {
     mirrorCode: code,
     mirrorFallback: !Object.hasOwn(CDK_ERRORS, code),
-    error: CDK_ERRORS[code] || '【文案待定：Mirror酱 更新请求失败】',
+    error: CDK_ERRORS[code] || 'Mirror酱 暂时不可用，请稍后再试或改用 GitHub 下载',
   };
 }
 
@@ -145,8 +144,7 @@ export class MirrorChyanProvider extends providerModule.Provider {
     super(runtimeOptions);
     const { version, url, sha256, filesize } = options.mirrorDownload;
     if (!/^[a-f\d]{64}$/i.test(sha256 || '') || !Number.isSafeInteger(filesize) || filesize <= 0)
-      // TODO(design): Confirm the invalid download metadata copy.
-      throw new Error('【文案待定：Mirror酱 更新文件校验信息无效】');
+      throw new Error('Mirror酱 返回的更新包校验信息不完整，请改用 GitHub 下载');
     this.info = {
       version,
       files: [{ url, sha2: sha256, size: filesize }],

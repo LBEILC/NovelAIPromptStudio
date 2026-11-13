@@ -142,8 +142,7 @@ export function createUpdateService({
       updaterCheck = false;
     }
     const info = result?.updateInfo;
-    // TODO(design): Confirm copy for malformed/empty updater responses and busy operations.
-    if (!info) throw Error('【文案待定：没有收到有效的更新信息】');
+    if (!info) throw Error('没有收到有效的更新信息，请稍后再试');
     const notes = Array.isArray(info.releaseNotes)
       ? info.releaseNotes
           .map((item) => `${item.version || ''}\n${item.note || ''}`.trim())
@@ -217,7 +216,7 @@ export function createUpdateService({
     }
   }
   async function download() {
-    if (checking || downloading) return { ok: false, error: '【文案待定：更新操作正在进行】' };
+    if (checking || downloading) return { ok: false, error: '正在检查或下载更新，请稍候' };
     if (!['available', 'error'].includes(getState().phase))
       return { ok: false, error: '请先检查并确认有可用更新' };
     downloading = true;
@@ -241,8 +240,7 @@ export function createUpdateService({
           notify({ mirrorCode: result.failure.mirrorCode });
           throw Error(result.failure.error);
         }
-        // TODO(design): Confirm copy for incomplete Mirror metadata and no downloadable version.
-        if (!result.download) throw Error('【文案待定：Mirror酱 没有返回可用的更新文件】');
+        if (!result.download) throw Error('Mirror酱 没有返回更新包，请改用 GitHub 下载');
         updater.setFeedURL({
           provider: 'custom',
           updateProvider: MirrorChyanProvider,
@@ -264,7 +262,7 @@ export function createUpdateService({
           updaterCheck = false;
         }
         if (!result?.updateInfo || compareVersions(result.updateInfo.version, currentVersion) <= 0)
-          throw Error('【文案待定：没有可下载的新版本】');
+          throw Error('没有可下载的新版本');
         await updater.downloadUpdate();
       });
       return { ok: true };

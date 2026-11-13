@@ -1036,8 +1036,54 @@ export function createPreviewHandlers({
       canDownloadUpdate: found,
       canInstallUpdate: !!u.downloaded,
       structuredNotes: found ? PREVIEW_NOTES : undefined,
+      ...mirrorResult(),
     };
   };
+  // Mirror酱 更新源（2.50）：按填的 CDK 演示各种结果。CDK 里带 7001–7005、8009 就是那个错误，
+  // 带 8001 是"没有这个平台的包"、带 net 是连不上（这两种改用 GitHub 检查），其他算有效、60 天后到期
+  const previewSource = { source: 'github', cdk: '' };
+  const CDK_TEXT = {
+    7001: 'CDK 已过期，请续费或更换',
+    7002: 'CDK 不正确，请检查后重新填写',
+    7003: '今天的下载次数已用完，请明天再试',
+    7004: '这个 CDK 不适用于本软件',
+    7005: 'CDK 已被封禁，请联系 Mirror酱 客服',
+    8009: '这是测试用 CDK，不能下载',
+  };
+  const mirrorResult = () => {
+    if (previewSource.source !== 'mirrorchyan' || !previewUpdate.checked)
+      return { source: 'github', downloadSource: 'github' };
+    const cdk = previewSource.cdk;
+    const code = Number(Object.keys(CDK_TEXT).find((c) => cdk.includes(c)) || 0);
+    if (code)
+      return {
+        source: 'mirrorchyan',
+        downloadSource: 'github',
+        mirrorCode: code,
+        phase: 'error',
+        hasUpdate: false,
+        error: CDK_TEXT[code],
+      };
+    if (cdk.includes('8001') || cdk.includes('net'))
+      return {
+        source: 'github',
+        downloadSource: 'github',
+        mirrorCode: cdk.includes('8001') ? 8001 : -1,
+        mirrorFallback: true,
+      };
+    return {
+      source: 'mirrorchyan',
+      downloadSource: cdk ? 'mirrorchyan' : 'github',
+      cdkExpiresAt: cdk ? new Date(Date.now() + 60 * 86_400_000).toISOString() : undefined,
+    };
+  };
+  registerCommand('updates.source.get', () => ({ ...previewSource, secretStore: 'ok' }));
+  registerCommand('updates.source.save', (input) => {
+    if (input.source) previewSource.source = input.source;
+    if (typeof input.cdk === 'string') previewSource.cdk = input.cdk.trim();
+    return { ...previewSource, secretStore: 'ok' };
+  });
+  registerCommand('updates.open-mirrorchyan', () => ({ ok: true }));
   registerCommand('updates.status', update);
   registerCommand('updates.check', async () => {
     if (previewUpdate.progress != null && !previewUpdate.downloaded)
