@@ -18,19 +18,30 @@ jobs:
           - os: win
             arch: x64
             filename: 'NovelAI-Prompt-Studio-Setup-*-x64.exe'
+            rid: NovelAIPromptStudio
           - os: macos
             arch: arm64
             filename: 'NovelAI-Prompt-Studio-*-arm64.dmg'
+            rid: NovelAIPromptStudio
           - os: macos
             arch: x64
             filename: 'NovelAI-Prompt-Studio-*-x64.dmg'
+            rid: NovelAIPromptStudio
+          - os: macos
+            arch: arm64
+            filename: 'NovelAI-Prompt-Studio-*-arm64.zip'
+            rid: NovelAIPromptStudio_zip
+          - os: macos
+            arch: x64
+            filename: 'NovelAI-Prompt-Studio-*-x64.zip'
+            rid: NovelAIPromptStudio_zip
 
     steps:
       - uses: MirrorChyan/uploading-action@v1
         with:
           filetype: latest-release
           filename: ${{ matrix.filename }}
-          mirrorchyan_rid: NovelAIPromptStudio
+          mirrorchyan_rid: ${{ matrix.rid }}
           tag: ${{ inputs.tag }}
 
           os: ${{ matrix.os }}

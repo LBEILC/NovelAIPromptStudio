@@ -2,7 +2,7 @@ import providerModule from 'electron-updater/out/providers/Provider.js';
 import { compareVersions } from './updates.js';
 import { validateReleaseNotes } from '../src/lib/releaseNotes.js';
 
-export const MIRRORCHYAN_MAC_ZIP_RID = '';
+export const MIRRORCHYAN_MAC_ZIP_RID = 'NovelAIPromptStudio_zip';
 export const MIRRORCHYAN_SITE = 'https://mirrorchyan.com/zh/get-start?source=NovelAIPromptStudio';
 const RELEASES = 'https://github.com/LBEILC/NovelAIPromptStudio/releases';
 const CDK_ERRORS = {
