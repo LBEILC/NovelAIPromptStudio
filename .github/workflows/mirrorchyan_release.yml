@@ -1,0 +1,42 @@
+name: mirrorchyan_release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        default: ''
+        required: false
+
+jobs:
+  mirrorchyan:
+    if: ${{ github.repository_owner == 'LBEILC' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: win
+            arch: x64
+            filename: 'NovelAI-Prompt-Studio-Setup-*-x64.exe'
+          - os: macos
+            arch: arm64
+            filename: 'NovelAI-Prompt-Studio-*-arm64.dmg'
+          - os: macos
+            arch: x64
+            filename: 'NovelAI-Prompt-Studio-*-x64.dmg'
+
+    steps:
+      - uses: MirrorChyan/uploading-action@v1
+        with:
+          filetype: latest-release
+          filename: ${{ matrix.filename }}
+          mirrorchyan_rid: NovelAIPromptStudio
+          tag: ${{ inputs.tag }}
+
+          os: ${{ matrix.os }}
+          arch: ${{ matrix.arch }}
+
+          owner: LBEILC
+          repo: NovelAIPromptStudio
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          upload_token: ${{ secrets.MirrorChyanUploadToken }}
