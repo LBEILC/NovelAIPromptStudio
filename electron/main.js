@@ -64,12 +64,9 @@ import {
 } from './libraryStorage.js';
 import { createWorkbenchTemporaryCleanup, readClipboardImageSource } from './clipboardImages.js';
 import { copySecret } from './copySecret.js';
-import {
-  checkForUpdates as checkReleaseUpdates,
-  getUpdateCapabilities,
-  transitionUpdateCheck,
-  installUpdateAfterClosingDatabase,
-} from './updates.js';
+import { getUpdateCapabilities, installUpdateAfterClosingDatabase } from './updates.js';
+import { createUpdateService, updateSourceCommands, resolveGithubFeed } from './updateService.js';
+import { sanitizeUpdateText } from './mirrorchyan.js';
 import { configureAppProfile } from './appProfile.js';
 import { installCommandRuntime } from './commands/runtime.js';
 import { configureScreenshotMode } from './tools/screenshotMode.js';
@@ -179,6 +176,8 @@ async function prepareQuit() {
   }
 }
 let updateState = {
+  source: 'github',
+  downloadSource: 'github',
   phase: 'idle',
   progress: 0,
   currentVersion: '',
@@ -377,81 +376,6 @@ function reportDatabaseOpenError(dataDirectory, error) {
   app.quit();
 }
 
-function releaseNotesText(notes) {
-  if (Array.isArray(notes))
-    return notes
-      .map((item) => `${item.version || ''}\n${item.note || ''}`.trim())
-      .filter(Boolean)
-      .join('\n\n');
-  return String(notes || '').trim();
-}
-
-let updateCheckState = null;
-
-function configureAutoUpdater() {
-  if (acceptanceMode) return;
-  if (
-    !getUpdateCapabilities(process.platform, app.isPackaged, macAutomaticUpdates).canDownloadUpdate
-  )
-    return;
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.allowPrerelease = false;
-  autoUpdater.on('checking-for-update', () =>
-    notifyUpdateState({ phase: 'checking', error: '', progress: 0 }),
-  );
-  autoUpdater.on('update-available', (info) =>
-    notifyUpdateState(
-      transitionUpdateCheck(updateCheckState || updateState, {
-        hasUpdate: true,
-        latestVersion: info.version,
-        checkedAt: new Date().toISOString(),
-        publishedAt: info.releaseDate || '',
-        notes: releaseNotesText(info.releaseNotes).slice(0, 4_000),
-      }),
-    ),
-  );
-  autoUpdater.on('update-not-available', (info) =>
-    notifyUpdateState(
-      transitionUpdateCheck(updateCheckState || updateState, {
-        hasUpdate: false,
-        latestVersion: info.version || app.getVersion(),
-        checkedAt: new Date().toISOString(),
-        publishedAt: info.releaseDate || '',
-        notes: '',
-      }),
-    ),
-  );
-  autoUpdater.on('download-progress', (progress) =>
-    notifyUpdateState({
-      phase: 'downloading',
-      progress: Math.max(0, Math.min(100, Number(progress.percent) || 0)),
-      transferred: Number(progress.transferred) || 0,
-      total: Number(progress.total) || 0,
-      bytesPerSecond: Number(progress.bytesPerSecond) || 0,
-      error: '',
-    }),
-  );
-  autoUpdater.on('update-downloaded', (info) =>
-    notifyUpdateState({
-      phase: 'downloaded',
-      hasUpdate: true,
-      latestVersion: info.version,
-      progress: 100,
-      error: '',
-    }),
-  );
-  autoUpdater.on('error', (error) =>
-    notifyUpdateState(
-      updateCheckState
-        ? transitionUpdateCheck(updateCheckState, {
-            error: error instanceof Error ? error.message : String(error),
-          })
-        : { phase: 'error', error: error instanceof Error ? error.message : String(error) },
-    ),
-  );
-}
-
 function imageDialogDefaultPath() {
   const recent = preferences.productivitySettings().recentImageDirectory;
   return recent || undefined;
@@ -543,7 +467,21 @@ app.whenReady().then(async () => {
     },
   });
   await network.initialize();
-  configureAutoUpdater();
+  const updates = createUpdateService({
+    updater: autoUpdater,
+    preferences,
+    network,
+    githubFeed: () =>
+      resolveGithubFeed(
+        JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8')),
+        autoUpdater,
+      ),
+    currentVersion: app.getVersion(),
+    capabilities: getUpdateCapabilities(process.platform, app.isPackaged, macAutomaticUpdates),
+    getState: () => updateState,
+    notify: notifyUpdateState,
+    doubles: acceptanceMode ? acceptanceDoubles : null,
+  });
   workbenchTemporaryDirectory = path.join(app.getPath('userData'), 'workbench-temp');
   workbenchTemporaryCleanup = createWorkbenchTemporaryCleanup(workbenchTemporaryDirectory);
   assetsDirectory = preferences.librarySettings().assetsDirectory;
@@ -1413,73 +1351,11 @@ app.whenReady().then(async () => {
       ...getUpdateCapabilities(process.platform, app.isPackaged, macAutomaticUpdates),
     };
   });
-  registerCommand('updates.check', async (input, _caller) => {
-    if (updateState.phase === 'downloading')
-      return { ok: false, error: '正在下载更新，下载完成后再检查' };
-    if (updateCheckState) return { ok: true, ...updateState };
-    if (acceptanceMode) {
-      await acceptanceDoubles.beforeUpdateCheck?.();
-      if (acceptanceDoubles.updateError) {
-        notifyUpdateState(
-          transitionUpdateCheck(updateState, { error: acceptanceDoubles.updateError }),
-        );
-        return { ok: false, ...updateState };
-      }
-      const version = acceptanceDoubles.updateVersion || '99.0.0';
-      notifyUpdateState(
-        transitionUpdateCheck(updateState, {
-          hasUpdate: true,
-          latestVersion: version,
-          checkedAt: new Date().toISOString(),
-          structuredNotes: acceptanceDoubles.structuredNotes || null,
-          notes: '# 验收发布说明\n\n本地替身。[验收链接](https://example.com/acceptance)',
-          releaseUrl: `https://github.com/LBEILC/NovelAIPromptStudio/releases/tag/v${version}`,
-        }),
-      );
-      return { ok: true, ...updateState };
-    }
-    const capabilities = getUpdateCapabilities(
-      process.platform,
-      app.isPackaged,
-      macAutomaticUpdates,
-    );
-    updateCheckState = updateState;
-    try {
-      if (!capabilities.canDownloadUpdate) {
-        notifyUpdateState({ phase: 'checking', error: '', progress: 0 });
-        const release = await checkReleaseUpdates(app.getVersion(), network.fetch);
-        notifyUpdateState(transitionUpdateCheck(updateCheckState, release));
-        return { ok: true, ...updateState };
-      }
-      const result = await network.run(() => autoUpdater.checkForUpdates());
-      const info = result?.updateInfo;
-      try {
-        const release = await checkReleaseUpdates(app.getVersion(), network.fetch);
-        if (release.latestVersion === updateState.latestVersion)
-          notifyUpdateState({
-            structuredNotes: release.structuredNotes,
-            checkedAt: release.checkedAt,
-          });
-      } catch {
-        /* Keep the updater's Markdown when GitHub attachments are unavailable. */
-      }
-      return {
-        ok: true,
-        ...updateState,
-        currentVersion: app.getVersion(),
-        latestVersion: info?.version || updateState.latestVersion,
-        hasUpdate: updateState.hasUpdate,
-        packaged: true,
-        ...capabilities,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      notifyUpdateState(transitionUpdateCheck(updateCheckState, { error: message }));
-      return { ok: false, ...updateState, error: message };
-    } finally {
-      updateCheckState = null;
-    }
-  });
+  for (const [name, handler] of Object.entries(
+    updateSourceCommands(preferences, (url) => shell.openExternal(url)),
+  ))
+    registerCommand(name, handler);
+  registerCommand('updates.check', () => updates.check());
   registerCommand('updates.download', async (input, _caller) => {
     const capabilities = getUpdateCapabilities(
       process.platform,
@@ -1495,19 +1371,7 @@ app.whenReady().then(async () => {
     }
     if (storageMigrationActive || activeImports.size || permanentDeletionActive)
       return { ok: false, error: '请等待导入、迁移或删除操作完成后再下载更新' };
-    if (updateState.phase !== 'available' && updateState.phase !== 'error')
-      return { ok: false, error: '请先检查并确认有可用更新' };
-    try {
-      notifyUpdateState({ phase: 'downloading', progress: 0, error: '' });
-      await network.run(() => autoUpdater.downloadUpdate());
-      return { ok: true };
-    } catch (error) {
-      notifyUpdateState({
-        phase: 'error',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    return updates.download();
   });
   registerCommand('updates.install', (input, _caller) => {
     const capabilities = getUpdateCapabilities(
@@ -1543,7 +1407,7 @@ app.whenReady().then(async () => {
           }
           notifyUpdateState({
             phase: 'error',
-            error: error instanceof Error ? error.message : String(error),
+            error: sanitizeUpdateText(error, [preferences.updateSourceSettings().cdk]),
           });
         });
       } catch (error) {
@@ -1552,7 +1416,7 @@ app.whenReady().then(async () => {
         quitPreparing = undefined;
         notifyUpdateState({
           phase: 'error',
-          error: error instanceof Error ? error.message : String(error),
+          error: sanitizeUpdateText(error, [preferences.updateSourceSettings().cdk]),
         });
       }
     });

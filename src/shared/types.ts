@@ -406,7 +406,17 @@ export interface UpdateCapabilities {
   canInstallUpdate: boolean;
   manualUpdateReason: '' | 'development' | 'unsigned-macos' | 'unsupported-platform';
 }
+export interface UpdateSourceSettings {
+  source: 'github' | 'mirrorchyan';
+  cdk: string;
+  secretStore: 'ok' | 'denied' | 'unreadable';
+}
 export interface UpdateState extends UpdateCapabilities {
+  source: 'github' | 'mirrorchyan';
+  downloadSource: 'github' | 'mirrorchyan';
+  cdkExpiresAt?: string;
+  mirrorCode?: number;
+  mirrorFallback?: boolean;
   phase: 'idle' | 'checking' | 'available' | 'current' | 'downloading' | 'downloaded' | 'error';
   progress: number;
   currentVersion: string;

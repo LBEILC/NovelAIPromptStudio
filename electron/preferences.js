@@ -450,10 +450,46 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
   };
 
   const relaySlot = () => read().relaySlot || 'custom';
+  const updateSourceSettings = () => {
+    const stored = read();
+    const entry = secretEntry('mirrorChyanCdkEncrypted', stored.mirrorChyanCdkEncrypted);
+    const secretStore = denied() ? 'denied' : entry.readable ? 'ok' : 'unreadable';
+    return {
+      source: stored.updateSource === 'mirrorchyan' ? 'mirrorchyan' : 'github',
+      cdk: secretStore === 'ok' ? entry.value : '',
+      secretStore,
+    };
+  };
   const relayRecord = (id = relaySlot()) => read().relaySlots?.[id] || {};
   const relayKey = (id = relaySlot()) => readSecret(`relay:${id}`, relayRecord(id).keyEncrypted);
   refreshSecretStore();
   return {
+    updateSourceSettings,
+    saveUpdateSource: ({ source, cdk }) => {
+      if (source !== undefined && !['github', 'mirrorchyan'].includes(source))
+        throw new CommandError('invalid_input', '更新源无效');
+      if (cdk !== undefined && typeof cdk !== 'string')
+        throw new CommandError('invalid_input', 'CDK 格式无效');
+      const stored = read();
+      if (source !== undefined) stored.updateSource = source;
+      if (cdk !== undefined) {
+        assertSecretAccess();
+        const value = cdk.trim();
+        if (value) {
+          // TODO(design): Confirm the command-side CDK encryption failure copy.
+          if (!safeStorage.isEncryptionAvailable())
+            throw new Error('【文案待定：当前系统无法安全保存 CDK】');
+          try {
+            stored.mirrorChyanCdkEncrypted = safeStorage.encryptString(value).toString('base64');
+          } catch {
+            throw new Error('【文案待定：CDK 加密保存失败】');
+          }
+        } else delete stored.mirrorChyanCdkEncrypted;
+      }
+      write(stored);
+      secretCache.delete('mirrorChyanCdkEncrypted');
+      return updateSourceSettings();
+    },
     refreshSecretStore,
     backup: () => portablePreferences(read()),
     restoreBackup: (value) => write(mergePortablePreferences(read(), value)),

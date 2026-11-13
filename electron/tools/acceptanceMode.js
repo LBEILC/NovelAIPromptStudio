@@ -174,6 +174,9 @@ export function installAcceptanceDoubles(mode, { dialog, shell, clipboard, nativ
       },
     },
     calls,
+    // Used only after the temporary acceptance profile guard. No real Mirror requests.
+    mirrorUpdate: null,
+    mirrorError: false,
     selections,
     saves,
     messages,

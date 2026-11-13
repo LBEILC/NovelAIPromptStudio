@@ -835,6 +835,12 @@ export interface CommandDefinitions {
     input: Record<string, never>;
     output: { ok: true } & Types.UpdateState;
   };
+  'updates.source.get': { input: Record<string, never>; output: Types.UpdateSourceSettings };
+  'updates.source.save': {
+    input: { source?: 'github' | 'mirrorchyan'; cdk?: string };
+    output: Types.UpdateSourceSettings;
+  };
+  'updates.open-mirrorchyan': { input: Record<string, never>; output: { ok: true } };
   'updates.check': {
     input: Record<string, never>;
     output:

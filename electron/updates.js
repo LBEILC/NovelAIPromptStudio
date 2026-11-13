@@ -5,6 +5,11 @@ export function transitionUpdateCheck(state, result) {
   if (result.error) {
     return {
       ...state,
+      ...Object.fromEntries(
+        ['source', 'downloadSource', 'cdkExpiresAt', 'mirrorCode', 'mirrorFallback']
+          .filter((key) => Object.hasOwn(result, key))
+          .map((key) => [key, result[key]]),
+      ),
       phase: ['available', 'downloaded'].includes(state.phase) ? state.phase : 'error',
       error: result.error,
     };

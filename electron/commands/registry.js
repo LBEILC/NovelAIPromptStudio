@@ -581,6 +581,13 @@ export const commandRegistry = {
     uiOnly: true,
   },
   'updates.status': { fields: {}, required: [], uiOnly: true },
+  'updates.source.get': { fields: {}, required: [], uiOnly: true },
+  'updates.source.save': {
+    fields: { source: 'github|mirrorchyan', cdk: 'text' },
+    required: [],
+    uiOnly: true,
+  },
+  'updates.open-mirrorchyan': { fields: {}, required: [], uiOnly: true },
   'updates.check': { fields: {}, required: [], uiOnly: true },
   'updates.download': { fields: {}, required: [], uiOnly: true },
   'updates.install': { fields: {}, required: [], uiOnly: true },

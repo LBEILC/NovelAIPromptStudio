@@ -11,6 +11,80 @@ const safeStorage = {
   decryptString: (value) => value.toString().replace(/^encrypted:/, ''),
 };
 
+describe('private update preferences', () => {
+  function setup(storage = safeStorage, platform = 'win32', directory) {
+    if (!directory) {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-update-preferences-'));
+      temporaryDirectories.push(directory);
+    }
+    return { directory, preferences: openPreferences(directory, storage, { platform }) };
+  }
+  it('reads old preferences, encrypts trimmed CDKs, excludes them from backup and preserves local values on restore', () => {
+    const { directory, preferences: p } = setup();
+    expect(p.updateSourceSettings()).toEqual({ source: 'github', cdk: '', secretStore: 'ok' });
+    expect(p.saveUpdateSource({ source: 'mirrorchyan', cdk: '  synthetic-cdk  ' })).toEqual({
+      source: 'mirrorchyan',
+      cdk: 'synthetic-cdk',
+      secretStore: 'ok',
+    });
+    const stored = fs.readFileSync(path.join(directory, 'preferences.json'), 'utf8');
+    expect(stored).toContain('mirrorChyanCdkEncrypted');
+    expect(stored).not.toContain('synthetic-cdk');
+    const backup = JSON.stringify(p.backup());
+    expect(backup).not.toMatch(/synthetic-cdk|mirrorChyanCdkEncrypted|updateSource/);
+    p.restoreBackup({
+      updateSource: 'github',
+      mirrorChyanCdkEncrypted: 'foreign',
+      productivity: { autoCheckUpdates: false },
+    });
+    expect(p.updateSourceSettings()).toMatchObject({ source: 'mirrorchyan', cdk: 'synthetic-cdk' });
+    expect(p.productivitySettings().autoCheckUpdates).toBe(false);
+    expect(p.productivitySettings()).not.toHaveProperty('updateSource');
+    expect(setup(safeStorage, 'win32', directory).preferences.updateSourceSettings().cdk).toBe(
+      'synthetic-cdk',
+    );
+    expect(p.saveUpdateSource({ cdk: '  ' }).cdk).toBe('');
+    expect(fs.readFileSync(path.join(directory, 'preferences.json'), 'utf8')).not.toContain(
+      'mirrorChyanCdkEncrypted',
+    );
+  });
+  it.each(['darwin', 'win32'])(
+    'reports unreadable ciphertext and permits replacement on %s',
+    (platform) => {
+      const { directory, preferences: p } = setup();
+      p.saveUpdateSource({ source: 'mirrorchyan', cdk: 'synthetic-cdk' });
+      const storage = {
+        ...safeStorage,
+        decryptString: vi.fn(() => {
+          throw Error('bad ciphertext');
+        }),
+      };
+      const broken = setup(storage, platform, directory).preferences;
+      expect(broken.updateSourceSettings()).toEqual({
+        source: 'mirrorchyan',
+        cdk: '',
+        secretStore: 'unreadable',
+      });
+      expect(broken.saveUpdateSource({ cdk: '' }).secretStore).toBe('ok');
+    },
+  );
+  it('reports denied mac access without exposing a cached CDK and preserves preferences on save failure', () => {
+    const storage = { ...safeStorage, isEncryptionAvailable: vi.fn(() => true) };
+    const { directory, preferences: p } = setup(storage, 'darwin');
+    p.saveUpdateSource({ source: 'mirrorchyan', cdk: 'synthetic-cdk' });
+    storage.isEncryptionAvailable.mockReturnValue(false);
+    expect(p.updateSourceSettings()).toEqual({
+      source: 'mirrorchyan',
+      cdk: '',
+      secretStore: 'denied',
+    });
+    const before = fs.readFileSync(path.join(directory, 'preferences.json'), 'utf8');
+    expect(() => p.saveUpdateSource({ source: 'github', cdk: 'new' })).toThrow('钥匙串');
+    expect(fs.readFileSync(path.join(directory, 'preferences.json'), 'utf8')).toBe(before);
+    expect(p.saveUpdateSource({ source: 'github' }).source).toBe('github');
+  });
+});
+
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0))
     fs.rmSync(directory, { recursive: true, force: true });
