@@ -93,7 +93,7 @@ nai-studio library.search --json '{"query":"rain","limit":20}'
 
 ## 快速开始
 
-1. 在 [Releases](https://github.com/LBEILC/NovelAIPromptStudio/releases/latest) 下载安装包，把一张 NovelAI 生成的图拖进窗口。
+1. 在 [Releases](https://github.com/LBEILC/NovelAIPromptStudio/releases/latest) 下载安装包（国内也可以在 [Mirror酱](https://mirrorchyan.com/zh/projects?rid=NovelAIPromptStudio) 下载），把一张 NovelAI 生成的图拖进窗口。
 2. 想在软件里生成：到"设置 → NovelAI 账号"填入持久令牌，也可以用中转站。
 3. 想让 Agent 来用：到"设置 → Agent"安装命令行工具，把技能交给你的 Agent。
 
@@ -104,7 +104,7 @@ nai-studio library.search --json '{"query":"rain","limit":20}'
 | macOS Intel | `NovelAI-Prompt-Studio-*-x64.dmg` |
 
 > [!NOTE]
-> macOS 安装包已签名并经过 Apple 公证，下载后拖进"应用程序"就能打开。Windows 安装包还没有签名，系统可能会弹出安全提示。请只从本仓库的 Releases 页面下载。
+> macOS 安装包已签名并经过 Apple 公证，下载后拖进"应用程序"就能打开。Windows 安装包还没有签名，系统可能会弹出安全提示。请只从本仓库的 Releases 页面或 Mirror酱 下载。
 >
 > 1.9.3 及更早的 macOS 版本如果提示"已损坏，无法打开"，在终端运行一次下面这行再打开，或者直接换成最新版：
 >
