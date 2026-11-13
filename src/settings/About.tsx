@@ -238,11 +238,9 @@ export function About({ onInstallUpdate }: { onInstallUpdate: () => Promise<unkn
     mirror && st?.canDownloadUpdate && st.downloadSource !== 'mirrorchyan' && !cdkProblem
       ? !u.source?.cdk
         ? '这次从 GitHub 下载。填写 Mirror酱 CDK 后可以从 Mirror酱 下载'
-        : st.platform === 'darwin'
-          ? 'Mirror酱 暂时还没有 macOS 的更新包，这次从 GitHub 下载'
-          : st.mirrorFallback
-            ? '这次从 GitHub 下载'
-            : ''
+        : st.mirrorFallback
+          ? '这次从 GitHub 下载'
+          : ''
       : '';
   // 自动更新先报出新版本号，结构化的更新说明要再去 GitHub 读一次；这期间手里还是上一次的说明。
   // 版本号对上了才用；对不上时先是加载态，8 秒还没读到就退回安装包自带的 Markdown 说明（用户 10-26）
