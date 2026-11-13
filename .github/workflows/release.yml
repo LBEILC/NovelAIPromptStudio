@@ -12,7 +12,6 @@ on:
         type: string
 
 permissions:
-  actions: write
   contents: write
 
 jobs:
@@ -122,6 +121,10 @@ jobs:
     runs-on: macos-15-intel
     # Intel is supplemental and never gates the primary release.
     continue-on-error: true
+    # actions: write lets this job dispatch the MirrorChyan workflows after appending Intel assets.
+    permissions:
+      actions: write
+      contents: write
     steps:
       - name: Check out source
         uses: actions/checkout@v6

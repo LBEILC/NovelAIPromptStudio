@@ -18,7 +18,7 @@ jobs:
         uses: MirrorChyan/release-note-action@v1
         with:
           mirrorchyan_rid: NovelAIPromptStudio
-          version_name: ${{ inputs.tag }}
+          version_name: ${{ inputs.tag || github.event.release.tag_name }}
 
           owner: LBEILC
           repo: NovelAIPromptStudio
