@@ -8,7 +8,11 @@ import { RELAY_PRESETS } from '../../src/shared/relayPresets.ts';
 
 export function relayFixtureUrl(input, origin) {
   const url = new URL(input);
-  if (!RELAY_PRESETS.some((preset) => new URL(preset.address).origin === url.origin)) return input;
+  if (
+    url.hostname !== 'second.relay.test' &&
+    !RELAY_PRESETS.some((preset) => new URL(preset.address).origin === url.origin)
+  )
+    return input;
   const route = url.pathname.startsWith('/api/')
     ? url.pathname
     : url.pathname.endsWith('/models')

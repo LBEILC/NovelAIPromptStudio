@@ -8,6 +8,60 @@ export async function textEditingChecks({ h, raw, draft, reset, modifier }) {
   await key('e', modifier);
   await wait('!!document.querySelector(".tx-wrap textarea")');
   await check('Ctrl E切换文本方式不改变草稿', `${raw}===${JSON.stringify(before)}`);
+  const repeated = 'rain, street\n\nRain, {street}';
+  const cleaned = 'rain, street\n\n{street}';
+  const field = 'document.querySelector(".tx-wrap textarea")';
+  await input('.tx-wrap textarea', repeated);
+  await wait(`${raw}===${JSON.stringify(repeated)}`);
+  await key('e', modifier);
+  const marks = '[...document.querySelectorAll(".tag.dup")]';
+  const marked = `${marks}.length===2 && ${marks}.some(n=>n.textContent.includes("Rain") && n.dataset.tip?.includes("重复"))`;
+  await wait(marked);
+  await check('块方式标记两处重复并提示 Rain 重复', marked);
+  await click('更多', 'document.querySelector("[data-key=base-h]")');
+  const menu = 'document.querySelector(".menu:not(.leaving)")';
+  await check(
+    '基础提示词菜单显示可去掉的重复数为 1',
+    `[...${menu}.querySelectorAll("[role=menuitem]")].some(n=>n.textContent.trim()==="去掉重复的1")`,
+  );
+  await click('去掉重复的', menu);
+  const toast =
+    '[...document.querySelectorAll(".toast:not(.leaving)")].find(n=>n.textContent.includes("已去掉 1 个重复的 Tag"))';
+  const removed = `${raw}===${JSON.stringify(cleaned)} && !!(${toast})`;
+  await wait(removed);
+  await check('去重后保留不同权重的 street 并显示通知', removed);
+  await click('撤销', toast);
+  await wait(`${raw}===${JSON.stringify(repeated)}`);
+  await check('通知撤销恢复两块原文', `${raw}===${JSON.stringify(repeated)}`);
+  await key('e', modifier);
+  const warning = 'document.querySelector(".tx-dup")';
+  await check('文本方式在提示词下方显示重复提示', `${warning}?.textContent.includes("重复：")`);
+  await click('去掉重复的', warning);
+  // workbench.list flushes pending editor text. Observe the saved session directly
+  // so checking the debounce and IME cannot itself commit the text under test.
+  const persistedRaw = `window.studio.invoke('workbench.session',{}).then(({data})=>data.tabs.find(t=>t.id===data.activeTabId).project.prompt_structure.base_prompt_raw)`;
+  const saved = `${persistedRaw}.then(text=>text===${JSON.stringify(cleaned)} && ${field}.value===text)`;
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  await wait(saved);
+  await check('文本去重同时写入文字框和草稿', saved);
+  const debuggerClient = h.window.webContents.debugger;
+  await e(`${field}.focus(); ${field}.setSelectionRange(0,0)`);
+  await debuggerClient.sendCommand('Input.imeSetComposition', {
+    text: 'yu',
+    selectionStart: 2,
+    selectionEnd: 2,
+  });
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  await check(
+    '组字停顿后拼音仅存在于文字框',
+    `${persistedRaw}.then(text=>text===${JSON.stringify(cleaned)} && ${field}.value==="yu"+text)`,
+  );
+  await debuggerClient.sendCommand('Input.insertText', { text: '雨' });
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  await check(
+    '上屏后草稿保存汉字且光标留在插入处',
+    `${persistedRaw}.then(text=>text==="雨"+${JSON.stringify(cleaned)} && ${field}.selectionStart===1 && ${field}.selectionEnd===1)`,
+  );
   await e(`(() => {
     window.sensitiveSaveErrors = [];
     window.sensitiveSaveObserver = new MutationObserver(() => {

@@ -91,7 +91,8 @@ export async function settingsGenerationChecks({
       return calls.length === before + 1 && calls.at(-1).value === preset.site;
     });
   }
-  await pickPreset('自定义');
+  const firstHost = new URL(generationService.url).host;
+  await pickPreset(firstHost);
   await input('[aria-label="中转站地址"]', generationService.url + '/v1');
   await wait(
     'document.querySelector("[data-settings-section=novelai]:not(.leaving)")?.textContent.includes("已保存 ••••••••")',
@@ -103,6 +104,63 @@ export async function settingsGenerationChecks({
     async () =>
       clipboard.readText() === 'acceptance-token' &&
       (await evaluate('document.body.innerText.includes("已复制中转站 Key")')),
+  );
+  const relay = () => preferences.generationSettings().relay;
+  const account = 'document.querySelector("[data-settings-section=novelai]:not(.leaving)")';
+  const second = 'second.relay.test';
+  await pickPreset('添加自定义中转站…');
+  await input('[aria-label="中转站地址"]', 'https://' + second);
+  await input('[aria-label="中转站 Key"]', 'acceptance-token-second');
+  await click('保存', account);
+  await wait(
+    'document.querySelector("button[aria-label=中转站]")?.textContent.includes("second.relay.test")',
+  );
+  const secondId = relay().slot;
+  await check(
+    '保存第二个自定义站后两个槽位独立且新站生效',
+    () =>
+      relay().slots.filter((s) => s.custom).length === 2 &&
+      relay().slots.some((s) => s.id === secondId && s.baseUrl === 'https://' + second) &&
+      preferences.relayKey() === 'acceptance-token-second',
+  );
+  await pickPreset(firstHost);
+  await h.until(() => relay().slot === 'custom', '第一个自定义站已切回');
+  await check(
+    '切回第一个自定义站直接使用原 Key',
+    async () =>
+      preferences.relayKey() === 'acceptance-token' &&
+      (await evaluate(`!document.querySelector('[aria-label="中转站 Key"]')`)),
+  );
+  await pickPreset(second);
+  await h.until(() => relay().slot === secondId, '第二个自定义站已切回');
+  await input('[aria-label="中转站名称"]', '合成站点');
+  await evaluate('document.querySelector("[aria-label=中转站名称]").blur()');
+  const renamed =
+    'document.querySelector("button[aria-label=中转站]")?.textContent.includes("合成站点")';
+  await wait(renamed);
+  await check(
+    '失焦保存名称并更新中转站下拉按钮',
+    async () =>
+      relay().slots.find((s) => s.id === secondId)?.name === '合成站点' &&
+      (await evaluate(renamed)),
+  );
+  await click('删除', account);
+  await click('删除', 'document.querySelector("[role=dialog]:not(.leaving *)")');
+  const switched =
+    '[...document.querySelectorAll(".toast:not(.leaving)")].some(n=>n.textContent.includes("改用"))';
+  await wait(switched);
+  await check(
+    '删除当前站清除槽位和 Key 并通知改用已保存站',
+    async () =>
+      !relay().slots.some((s) => s.id === secondId) &&
+      !preferences.relayKey(secondId) &&
+      relay().slot === 'custom' &&
+      preferences.relayKey() === 'acceptance-token' &&
+      (await evaluate(switched)),
+  );
+  await check(
+    '唯一存有 Key 的自定义站禁止删除',
+    `[...${account}.querySelectorAll("button")].some(b=>b.textContent.trim()==="删除" && b.getAttribute("aria-disabled")==="true")`,
   );
   for (const [name, key] of [
     ['小忆API开放平台', 'acceptance-token'],
@@ -116,7 +174,7 @@ export async function settingsGenerationChecks({
   for (const [name, id, key] of [
     ['小忆API开放平台', 'chr1', 'acceptance-token'],
     ['hamubox', 'hamubox', 'acceptance-token-second'],
-    ['自定义', 'custom', 'acceptance-token'],
+    [firstHost, 'custom', 'acceptance-token'],
   ]) {
     await pickPreset(name);
     await h.until(() => preferences.generationSettings().relay.slot === id, '下拉切换已保存槽位');

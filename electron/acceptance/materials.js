@@ -117,6 +117,50 @@ export async function materialsChecks({ h, mode, database, preferences }) {
     const s = await e(sessionExpression);
     const active = s.tabs.find((t) => t.id === s.activeTabId);
     const character = active.project.prompt_structure.characters.at(-1);
+    await command('prompt.set', { tabId: active.id, scope: 'base:undesired', text: 'fog, grain' });
+    const listBlocks = async () =>
+      (await command('material.list', {})).items.filter((m) => m.kind === 'block');
+    const beforeBlocks = await listBlocks();
+    await click(
+      '更多',
+      'document.querySelector("[data-key=neg-h] [data-menu-key^=neg-]").parentElement',
+    );
+    await click('存为常用块…');
+    await wait('document.activeElement?.getAttribute("aria-label")==="常用块的名字"');
+    await key('Enter');
+    await wait('!document.querySelector(".saveblk-pop:not(.leaving)")');
+    const blocks = await listBlocks();
+    const negative = blocks.find((m) => !beforeBlocks.some((old) => old.id === m.id));
+    await check(
+      '基础负面节回车保存一个负面常用块',
+      () => blocks.length === beforeBlocks.length + 1 && negative?.negative === true,
+    );
+    await click(
+      '更多',
+      `document.querySelector('[data-key="ch-${character.id}"] [data-menu-key^=neg-]').parentElement`,
+    );
+    await click('插入常用块…');
+    const options =
+      '[...document.querySelectorAll(".ins-pop:not(.leaving) [data-insrow]")].map(n=>n.dataset.insrow)';
+    const negatives = blocks.filter((m) => m.negative).map((m) => m.id);
+    await wait(`${options}.includes(${JSON.stringify(negative.id)})`);
+    await check(
+      '角色负面浮层只列负面常用块',
+      `${options}.every(id=>${JSON.stringify(negatives)}.includes(id)) && ${options}.length>0`,
+    );
+    await e(`document.querySelector('[data-insrow="${negative.id}"]').click()`);
+    const inserted = `(${draftExpression}).prompt_structure.characters.find(c=>c.id===${JSON.stringify(character.id)}).undesired_raw==="fog, grain"`;
+    await wait(inserted);
+    await check('插入的两个 Tag 写入角色负面提示词', inserted);
+    await click('常用块', 'document.querySelector(".blk-gap")');
+    const positiveId = beforeBlocks.find((m) => m.name === '合成常用块').id;
+    await wait(`${options}.includes(${JSON.stringify(positiveId)})`);
+    await check(
+      '正面常用块浮层显示正面素材并排除负面素材',
+      `${options}.every(id=>!${JSON.stringify(negatives)}.includes(id)) && ${options}.includes(${JSON.stringify(positiveId)})`,
+    );
+    await key('Escape');
+    await command('material.delete', { id: negative.id });
     await command('prompt.set', {
       tabId: active.id,
       scope: `character:${character.id}:prompt`,
