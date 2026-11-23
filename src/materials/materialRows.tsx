@@ -119,7 +119,7 @@ export const typeText = (m: Material) => {
     return `${m.blocks.length} 块${neg ? ` · 负面 ${neg} 个 Tag` : ''}`;
   }
   const b = m.blocks[0];
-  return b?.type === 'tags' ? `Tag 块 · ${b.tags.length} 个` : '段落';
+  return b?.type === 'tags' ? `${m.negative ? '负面 · ' : ''}Tag 块 · ${b.tags.length} 个` : '段落';
 };
 
 export function PeekCard({ ids, i }: { ids: string[]; i: number }) {

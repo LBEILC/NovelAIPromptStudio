@@ -552,6 +552,7 @@ export function renderPromptView({
           tabId={p.tabId}
           scope={doc.scopes[insert.si].scope.key}
           before={insert.before}
+          negative={doc.scopes[insert.si].scope.polarity === 'undesired'}
           point={insert.point}
           flush={p.before}
           onManage={() => p.onShowMaterials?.()}
@@ -586,7 +587,9 @@ export function renderPromptView({
         open={!!saveBlock}
         onClose={() => setSaveBlock(null)}
         anchor={
-          saveBlock ? `[data-menu-key="blk-${blockKey(saveBlock.si, saveBlock.bi)}"]` : undefined
+          saveBlock
+            ? (saveBlock.anchor ?? `[data-menu-key="blk-${blockKey(saveBlock.si, saveBlock.bi)}"]`)
+            : undefined
         }
         place="below-right"
         className="popover saveblk-pop"
@@ -596,7 +599,11 @@ export function renderPromptView({
           <>
             <div className="vp-h">
               <b>存为常用块</b>
-              <span className="help">存进素材，以后可以插入任何一张图的提示词</span>
+              <span className="help">
+                {doc.scopes[saveBlock.si]?.scope.polarity === 'undesired'
+                  ? '存进素材，以后可以插入任何一张图的负面提示词'
+                  : '存进素材，以后可以插入任何一张图的提示词'}
+              </span>
             </div>
             <label className="field sm">
               <input

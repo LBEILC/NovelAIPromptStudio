@@ -25,6 +25,7 @@ export function usePromptRendering({
   lastClicked,
   openEditor,
   ctlClash,
+  dups,
   query,
   matches,
   editing,
@@ -70,6 +71,7 @@ export function usePromptRendering({
   | 'lastClicked'
   | 'openEditor'
   | 'ctlClash'
+  | 'dups'
   | 'query'
   | 'matches'
   | 'editing'
@@ -137,6 +139,7 @@ export function usePromptRendering({
     const ctl = matchControl(t.tag);
     const clash = ctlClash.get(e.key);
     const syntax = syntaxNote(t) || (clash ? `${clash.label}写了不止一档，只留一个` : '');
+    const dup = dups.get(e.key);
     // 控制词显示中文名；用户自己改过的译文优先
     const zh =
       syntax || (ctl && t.translation_source !== 'manual' ? ctl.name : t.translation) || ctl?.name;
@@ -147,6 +150,7 @@ export function usePromptRendering({
       fading.includes(e.key) ? 'fading' : '',
       selected.includes(e.key) ? 'sel' : '',
       syntax ? 'warn' : '',
+      dup ? 'dup' : '',
       ctl ? 'ctl' : '',
       ctl && !v5 ? 'off' : '',
     ]
@@ -166,9 +170,11 @@ export function usePromptRendering({
         data-tip={
           syntax
             ? undefined
-            : ctl
-              ? `V5 控制词 · ${ctl.name}${v5 ? '' : ' · 当前模型不是 V5，不起作用'}`
-              : categoryLabel(t.category)
+            : dup
+              ? `重复 · ${dup.note}`
+              : ctl
+                ? `V5 控制词 · ${ctl.name}${v5 ? '' : ' · 当前模型不是 V5，不起作用'}`
+                : categoryLabel(t.category)
         }
         onClick={(ev) => clickTag(e, ev)}
         onKeyDown={(ev) => {

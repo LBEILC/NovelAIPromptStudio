@@ -53,7 +53,7 @@ const typeOf = (m: Material) =>
   m.kind === 'character'
     ? `${m.blocks.length} 块`
     : m.blocks[0]?.type === 'tags'
-      ? `Tag 块 · ${m.blocks[0].tags.length} 个`
+      ? `${m.negative ? '负面 · ' : ''}Tag 块 · ${m.blocks[0].tags.length} 个`
       : '段落';
 const matText = (m: Material) =>
   m.blocks.map((b) => (b.type === 'tags' ? b.content : b.content)).join('\n\n');
@@ -99,9 +99,12 @@ export function InsertPop({
   flush,
   onManage,
   kind = 'block',
+  negative = false,
   place,
   point,
 }: {
+  /** 插到负面提示词里：只列负面的常用块；插到正面只列正面的（2.25，#21） */
+  negative?: boolean;
   open: boolean;
   onClose: () => void;
   anchor: string;
@@ -129,7 +132,11 @@ export function InsertPop({
     setPick(-1);
     setPeek(null);
     void invokeUI('material.list', {})
-      .then((r) => setItems(r.items.filter((x) => x.kind === kind)))
+      .then((r) =>
+        setItems(
+          r.items.filter((x) => x.kind === kind && (kind !== 'block' || !!x.negative === negative)),
+        ),
+      )
       .catch((e) => notify({ text: (e as Error).message, tone: 'error' }));
   }, [open]);
   const list = items.filter(
@@ -262,7 +269,9 @@ export function InsertPop({
                 ? `没有找到匹配的${noun}`
                 : kind === 'character'
                   ? '暂无保存的角色。在角色的“更多”菜单里选“存为角色”即可添加。'
-                  : '暂无常用块。在块的菜单里选"存为常用块"即可添加。'}
+                  : negative
+                    ? '暂无负面常用块。在负面提示词的“更多”菜单里选“存为常用块”即可添加。'
+                    : '暂无常用块。在块的菜单里选"存为常用块"即可添加。'}
             </p>
           )}
         </div>

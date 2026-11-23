@@ -31,6 +31,8 @@ export function usePromptDocumentView({
   acts,
   setMode,
   translate,
+  dupItems,
+  negMenu,
   blocksOf,
   tagsRow,
   autoRow,
@@ -72,6 +74,8 @@ export function usePromptDocumentView({
   | 'acts'
   | 'setMode'
   | 'translate'
+  | 'dupItems'
+  | 'negMenu'
   | 'blocksOf'
   | 'tagsRow'
   | 'autoRow'
@@ -163,6 +167,7 @@ export function usePromptDocumentView({
                     label: '全部翻译并分类',
                     onSelect: () => void translate(entries.filter((e) => e.section === baseIndex)),
                   },
+                  ...dupItems(baseIndex),
                 ],
                 '更多',
                 'sec-base',
@@ -247,6 +252,9 @@ export function usePromptDocumentView({
               <>
                 <div className="sub-h">
                   {c.label} 的负面提示词<span className="muted">{countTags(ni)} 个 Tag</span>
+                  <span className="acts" style={{ marginLeft: 'auto' }}>
+                    {acts(() => negMenu(ni), '更多', `neg-${ni}`)}
+                  </span>
                 </div>
                 {doc.scopes[ni].blocks.length ? (
                   blocksOf(ni, true)
@@ -264,6 +272,7 @@ export function usePromptDocumentView({
             负面提示词<span className="muted">{countTags(negIndex)} 个 Tag</span>
             <span className="acts" style={{ marginLeft: 'auto' }}>
               {secCopy(negIndex, '负面提示词')}
+              {acts(() => negMenu(negIndex), '更多', `neg-${negIndex}`)}
             </span>
           </div>
           {autoRow(negIndex)}

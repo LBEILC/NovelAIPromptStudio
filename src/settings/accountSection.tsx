@@ -228,24 +228,45 @@ export function Account({ onSaved }: { onSaved?: () => void }) {
 const modelNames = (ids: readonly string[]) =>
   ids.map((id) => MODEL_CAPS[id as ModelId]?.name || id).join('、') || '没有本软件支持的模型';
 
+/** 自定义中转站没改过名时用地址的域名当名字（2.33，#21） */
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+};
+
 /**
  * 中转站：地址和 Key，"测试连接"读它挂了哪些模型（doc/design.md 2.33）。
- * 每个预设和"自定义"各存一个 Key（1.9.12）：选一个存过 Key 的直接切过去，没存过的填 Key 再保存。
+ * 每个预设和每个自定义中转站各存一个 Key（1.9.12；自定义可以存多个，2.0.9）：选一个存过 Key 的直接切过去，
+ * 没存过的填 Key 再保存。下拉最后一项"添加自定义中转站…"是 sel === 'new'，保存后才有自己的 id。
  */
 function Relay({ onSaved }: { onSaved?: () => void }) {
   const g = useGeneration();
   const notify = useNotifications();
+  const [dialog, ask] = useAsk();
   const saved = g.settings.relay;
   const slots = saved?.slots ?? [];
   const slotOf = (id: string) => slots.find((s) => s.id === id);
-  const activeSlot = saved?.slot ?? relayPresetFor(saved?.baseUrl || '')?.id ?? 'custom';
-  const [sel, setSel] = useState(activeSlot);
-  useEffect(() => setSel(activeSlot), [activeSlot]);
-  const customSaved =
-    slotOf('custom')?.baseUrl ?? (activeSlot === 'custom' ? saved?.baseUrl || '' : '');
+  const customs = slots.filter((s) => s.custom);
+  const activeSlot =
+    saved?.slot ?? relayPresetFor(saved?.baseUrl || '')?.id ?? customs[0]?.id ?? 'new';
+  // 当前槽位不在列表里（例如自定义还没存过）当作"添加"
+  const known = (id: string) =>
+    id === 'new' || RELAY_PRESETS.some((p) => p.id === id) || !!slotOf(id);
+  const [sel, setSel] = useState(known(activeSlot) ? activeSlot : 'new');
+  useEffect(() => setSel(known(activeSlot) ? activeSlot : 'new'), [activeSlot]);
+  const customSaved = sel === 'new' ? '' : (slotOf(sel)?.baseUrl ?? '');
   const [customUrl, setCustomUrl] = useState(customSaved);
-  useEffect(() => setCustomUrl(customSaved), [customSaved]);
+  useEffect(() => setCustomUrl(customSaved), [customSaved, sel]);
   const preset = RELAY_PRESETS.find((p) => p.id === sel) ?? null;
+  const customName = (id: string) => {
+    const s = slotOf(id);
+    return s?.name || hostOf(s?.baseUrl || '') || '自定义中转站';
+  };
+  const [name, setName] = useState('');
+  useEffect(() => setName(slotOf(sel)?.custom ? slotOf(sel)?.name || '' : ''), [sel, slots]);
   const url = preset ? preset.address : customUrl;
   const selSlot = slotOf(sel);
   const [key, setKey] = useState('');
@@ -274,7 +295,52 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
     baseUrl: url.trim(),
     ...(key.trim() ? { key: key.trim() } : {}),
   });
-  const nameOf = (id: string) => RELAY_PRESETS.find((p) => p.id === id)?.name ?? '自定义中转站';
+  const nameOf = (id: string) =>
+    RELAY_PRESETS.find((p) => p.id === id)?.name ??
+    (id === 'new' ? '自定义中转站' : customName(id));
+  const rename = async () => {
+    const s = slotOf(sel);
+    if (!s?.custom || name.trim() === s.name) return;
+    try {
+      await invokeUI('account.relay.rename', { slot: sel, name: name.trim() });
+    } catch (e) {
+      setName(s.name);
+      notify({ text: errorText(e), tone: 'error' });
+    }
+  };
+  // 删的是正在用的：先切到另一个存过 Key 的；只有它存过 Key 时不能删（选中就会切过去，所以不能简单地"正在用的不能删"）
+  const fallback =
+    sel === activeSlot ? slots.find((s) => s.id !== sel && s.hasKey && known(s.id)) : undefined;
+  const removeBlocked =
+    sel === activeSlot && !fallback ? '这是唯一存了 Key 的中转站，不能删除' : '';
+  const remove = async () => {
+    const s = slotOf(sel);
+    if (!s?.custom || removeBlocked || busy) return;
+    const label = customName(sel);
+    if (
+      !(await ask({
+        title: `删除“${label}”？`,
+        body: `它的地址和 Key 会从这台电脑上删掉，以后要用得重新填写。${
+          fallback ? `删除后改用“${nameOf(fallback.id)}”。` : ''
+        }`,
+        ok: '删除',
+        danger: true,
+      }))
+    )
+      return;
+    try {
+      if (fallback) await invokeUI('account.relay.switch', { slot: fallback.id });
+      await invokeUI('account.relay.remove', { slot: s.id });
+      setSel(fallback?.id ?? activeSlot);
+      reset();
+      notify({
+        text: fallback ? `已删除“${label}”，改用“${nameOf(fallback.id)}”` : `已删除“${label}”`,
+        tone: 'success',
+      });
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
   const reset = () => {
     setKey('');
     setEditingKey(false);
@@ -324,7 +390,8 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
     setBusy('save');
     setError('');
     try {
-      await invokeUI('account.relay.save', input());
+      // 预设由主进程按地址认出来；自定义的带上是哪一个，"添加"的传 new
+      await invokeUI('account.relay.save', { ...input(), ...(preset ? {} : { slot: sel }) });
       reset();
       notify({ text: '已保存中转站', tone: 'success' });
       if (first) onSaved?.();
@@ -371,7 +438,7 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
         help={
           preset
             ? preset.note
-            : '选一个实测过的中转站，地址会自动填好，只要填 Key；也可以选"自定义"自己填地址。每个中转站的 Key 分开保存，切换不用重填。'
+            : '选一个实测过的中转站，地址会自动填好，只要填 Key；也可以添加自定义中转站，自己填地址。每个中转站的地址和 Key 分开保存，切换不用重填。'
         }
       >
         <div className="row">
@@ -379,7 +446,7 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
             label="中转站"
             className="set-dd"
             disabled={busy === 'switch'}
-            value={preset ? preset.name : '自定义'}
+            value={preset ? preset.name : sel === 'new' ? '添加自定义中转站' : customName(sel)}
             items={[
               ...RELAY_PRESETS.map((p) => ({
                 label: p.name,
@@ -388,11 +455,16 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
                 onSelect: () => void pick(p.id),
               })),
               'sep' as const,
+              ...customs.map((s) => ({
+                label: customName(s.id),
+                hint: savedHint(s.id),
+                checked: sel === s.id,
+                onSelect: () => void pick(s.id),
+              })),
               {
-                label: '自定义',
-                hint: savedHint('custom'),
-                checked: sel === 'custom',
-                onSelect: () => void pick('custom'),
+                label: '添加自定义中转站…',
+                checked: sel === 'new',
+                onSelect: () => void pick('new'),
               },
             ]}
           />
@@ -409,6 +481,35 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
           </small>
         )}
       </Col>
+      {!preset && slotOf(sel)?.custom && (
+        <Col title="名称" help="下拉里显示的名字；不填就用地址的域名。">
+          <div className="row">
+            <label className="field sm set-key">
+              <input
+                aria-label="中转站名称"
+                placeholder={hostOf(slotOf(sel)?.baseUrl || '')}
+                autoComplete="off"
+                spellCheck={false}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={() => void rename()}
+                onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) return;
+                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                }}
+              />
+            </label>
+            <button
+              className={`btn sm ${removeBlocked ? 'is-off' : ''}`}
+              aria-disabled={!!removeBlocked || undefined}
+              data-tip={removeBlocked || undefined}
+              onClick={() => void remove()}
+            >
+              删除
+            </button>
+          </div>
+        </Col>
+      )}
       {!preset && (
         <Col
           title="地址"
@@ -558,6 +659,7 @@ function Relay({ onSaved }: { onSaved?: () => void }) {
           )}
         </Row>
       )}
+      {dialog}
     </>
   );
 }

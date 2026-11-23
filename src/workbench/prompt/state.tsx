@@ -30,6 +30,7 @@ import {
   type ControlTag,
 } from '../../lib/v5Controls';
 import type { ImageProject, TagCategory } from '../../shared/types';
+import { blockDuplicates } from '../duplicates';
 import { closeWeightBefore, deleteTags, insertTags } from '../edits';
 import {
   categoryLabel,
@@ -456,7 +457,13 @@ export function usePromptState(p: EditorProps) {
         ),
       );
     });
-  const [saveBlock, setSaveBlock] = useState<{ si: number; bi: number; name: string } | null>(null);
+  // anchor：浮层贴在哪里，默认是那一块的菜单按钮；负面那一节贴在节标题的"更多"上
+  const [saveBlock, setSaveBlock] = useState<{
+    si: number;
+    bi: number;
+    name: string;
+    anchor?: string;
+  } | null>(null);
   const [paraTranslate, setParaTranslate] = useState({ key: '', n: 0 });
   const [paraEditing, setParaEditing] = useState<string[]>([]);
   const replaceRaw = (si: number, raw: string) =>
@@ -657,6 +664,57 @@ export function usePromptState(p: EditorProps) {
     }
   };
 
+  // ---------- 重复的 Tag（2.14，#21）----------
+  const dups = useMemo(() => blockDuplicates(doc, entries), [doc, entries]);
+  /** 节菜单里的"去掉重复的 · N"：保留第一次出现的，权重不同的不删；没有能去掉的就不出现 */
+  const dupItems = (si: number): MenuEntry[] => {
+    const targets = entries.filter((e) => e.section === si && dups.get(e.key)?.removable);
+    if (!targets.length) return [];
+    return [
+      {
+        label: '去掉重复的',
+        hint: String(targets.length),
+        onSelect: () =>
+          removeWithUndo(
+            targets.map((e) => e.key),
+            () => deleteTags(doc, targets),
+            `已去掉 ${targets.length} 个重复的 Tag`,
+          ),
+      },
+    ];
+  };
+
+  /** 负面提示词那一节（基础的和每个角色的）标题上的"更多"（2.25 负面常用块，#21） */
+  const negMenu = (si: number): MenuEntry[] => {
+    const anchor = `[data-menu-key="neg-${si}"]`;
+    const tags = entries.filter((e) => e.section === si && !e.automatic);
+    return [
+      ...(p.tabId
+        ? [
+            {
+              label: '插入常用块…',
+              onSelect: () => setInsert({ si, before: 0, anchor }),
+            },
+            {
+              label: '存为常用块…',
+              disabled: tags.length ? false : '还没有负面 Tag',
+              onSelect: () =>
+                setSaveBlock({
+                  si,
+                  bi: 0,
+                  anchor,
+                  name: `负面 · ${tags
+                    .slice(0, 2)
+                    .map((e) => e.tag.translation || e.tag.tag)
+                    .join('、')}`,
+                }),
+            },
+          ]
+        : []),
+      ...dupItems(si),
+    ];
+  };
+
   // ---------- 角色 ----------
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [charPick, setCharPick] = useState(false);
@@ -672,6 +730,7 @@ export function usePromptState(p: EditorProps) {
         label: '复制这个角色',
         onSelect: () => p.onCopyText(copyPromptDocumentScope(doc, scope.key), 0, false, 0, c.label),
       },
+      ...dupItems(si),
       {
         label: '存为角色…',
         onSelect: async () => {
@@ -721,6 +780,9 @@ export function usePromptState(p: EditorProps) {
     lastClicked,
     openEditor,
     ctlClash,
+    dups,
+    dupItems,
+    negMenu,
     query,
     matches,
     editing,

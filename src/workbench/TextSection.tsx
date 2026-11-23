@@ -11,6 +11,7 @@ import { poolTip } from './RandomBlock';
 import { textErrors, textMarks } from '../lib/promptText.js';
 import { singleTagCore } from '../lib/singleTag.js';
 import { categoryLabel } from './model';
+import { removeTextDuplicates, textDuplicates } from './duplicates';
 import type { Tag } from '../shared/types';
 
 export function TextSection({
@@ -63,7 +64,12 @@ export function TextSection({
     timer = useRef<ReturnType<typeof setTimeout>>(undefined),
     pending = useRef<string | null>(null),
     save = useRef(onSave),
-    lastSaved = useRef(text);
+    lastSaved = useRef(text),
+    // 输入法组字中（#19）：不写回草稿、不被外面传进来的文字覆盖，组完再说
+    composing = useRef(false),
+    deferred = useRef<string | null>(null),
+    // 外面的文字覆盖输入框时，正在输入的话光标留在原处，不跳到最后（#19）
+    keepSelection = useRef<[number, number] | null>(null);
   save.current = onSave;
   const menu = useRef({ onMenuInsert, onMenuRandom, onEditRandom });
   menu.current = { onMenuInsert, onMenuRandom, onEditRandom };
@@ -130,13 +136,32 @@ export function TextSection({
   };
   const commitRef = useRef(commit);
   commitRef.current = commit;
-  useEffect(() => {
-    if (text === lastSaved.current) return;
-    lastSaved.current = text;
+  const replace = (next: string) => {
+    deferred.current = null;
+    lastSaved.current = next;
     pending.current = null;
     clearTimeout(timer.current);
-    setValue(text);
+    const node = area.current;
+    keepSelection.current =
+      node && document.activeElement === node
+        ? [Math.min(node.selectionStart, next.length), Math.min(node.selectionEnd, next.length)]
+        : null;
+    setValue(next);
+  };
+  useEffect(() => {
+    if (text === lastSaved.current) return;
+    if (composing.current) {
+      deferred.current = text;
+      return;
+    }
+    replace(text);
   }, [text]);
+  useLayoutEffect(() => {
+    const keep = keepSelection.current;
+    keepSelection.current = null;
+    if (keep && area.current && document.activeElement === area.current)
+      area.current.setSelectionRange(keep[0], keep[1]);
+  }, [value]);
   useEffect(() => {
     // 只有真的有没存的文字时才同步提交（多数时候没有，免得在 React 的生命周期里调 flushSync）
     const flush = () => pending.current !== null && flushSync(() => commitRef.current());
@@ -175,7 +200,7 @@ export function TextSection({
     setCursor(position);
     pending.current = next;
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => commitRef.current(), 500);
+    if (!composing.current) timer.current = setTimeout(() => commitRef.current(), 500);
     setSuggest(true);
   };
   const head = value.slice(0, cursor),
@@ -236,7 +261,19 @@ export function TextSection({
         return note ? [{ at: m.index!, msg: `第 ${lineOf(m.index!)} 行：${note}` }] : [];
       }),
     ].sort((a, b) => a.at - b.at),
-    marks = textMarks(value);
+    marks = textMarks(value),
+    // 重复的 Tag（2.24，#21）：写在和语法检查同一个位置，有语法问题时先写语法问题
+    dupList = errors.length ? [] : textDuplicates(value),
+    removable = dupList.filter((d) => d.removable).length;
+  /** 去掉重复的：整段换成去掉以后的文字，走文字框自己的输入，Ctrl Z 能撤回 */
+  const dedupe = () => {
+    const node = area.current;
+    const next = removeTextDuplicates(value, dupList);
+    if (!node || next === value) return;
+    node.focus();
+    node.select();
+    if (!document.execCommand('insertText', false, next)) change(next, next.length);
+  };
   /** 悬停随机块：抽取设置一行，下面是池里的条目 */
   const randomTip = (source: string) => {
     const note = randomSyntaxNote(source, pools, negative);
@@ -323,7 +360,27 @@ export function TextSection({
             setCursor(e.currentTarget.selectionStart);
             onCaret?.(e.currentTarget.selectionStart);
           }}
+          onCompositionStart={() => {
+            composing.current = true;
+            clearTimeout(timer.current);
+          }}
+          onCompositionEnd={(e) => {
+            composing.current = false;
+            const outside = deferred.current;
+            if (outside !== null && outside !== lastSaved.current) {
+              replace(outside);
+              return;
+            }
+            deferred.current = null;
+            if (e.currentTarget.value !== value)
+              change(e.currentTarget.value, e.currentTarget.selectionStart);
+            else if (pending.current !== null) {
+              clearTimeout(timer.current);
+              timer.current = setTimeout(() => commitRef.current(), 500);
+            }
+          }}
           onBlur={() => {
+            composing.current = false;
             commitRef.current();
             setSuggest(false);
           }}
@@ -384,6 +441,24 @@ export function TextSection({
           <Icon name="alert-line" />
           {errors[0].msg}
           {errors.length > 1 ? `，另外还有 ${errors.length - 1} 处` : ''}
+        </div>
+      )}
+      {!!dupList.length && (
+        <div className="tx-err tx-dup" role="status" data-enter="fade">
+          <Icon name="alert-line" />
+          重复：{dupList[0].tag}（第 {dupList[0].line} 行）
+          {dupList.length > 1 ? `，另外还有 ${dupList.length - 1} 处` : ''}
+          {removable > 0 && (
+            <button
+              className="btn quiet sm"
+              data-tip={
+                removable < dupList.length ? '保留第一个；权重不同的不会被去掉' : '保留第一个'
+              }
+              onClick={dedupe}
+            >
+              去掉重复的
+            </button>
+          )}
         </div>
       )}
       <Pop

@@ -493,6 +493,7 @@ textarea.raw { font: var(--fs-small)/var(--lh-small) var(--font-mono); }
 /* 随机块（__画师池*2__）：和块方式一样的虚线框，用 outline 画，不挤动文字 */
 .tx-hl .rnd { outline: var(--bw) dashed var(--text-3); outline-offset: 1px; border-radius: 2px; }
 .tx-err { display: flex; align-items: center; gap: var(--sp-1); margin: calc(var(--sp-2) * -1) 0 var(--sp-3); font-size: var(--fs-caption); color: var(--warn); }
+.tx-err.tx-dup .btn { margin-left: var(--sp-1); }
 /* ---------- 块方式：加一块 ---------- */
 .blk-gap { position: relative; height: var(--sp-3); margin: calc(var(--sp-1) * -1) 0; z-index: 2; }
 .blk-gap .add-blks { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: var(--sp-0); padding: 0 var(--sp-1) 0 var(--sp-2); border-radius: var(--r-ctl); background: var(--surface); box-shadow: 0 0 0 var(--bw) var(--border); color: var(--text-3); opacity: 0; transition: opacity var(--dur-1) var(--ease-out); }

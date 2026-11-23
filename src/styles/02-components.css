@@ -66,6 +66,8 @@
 .tag.dim { opacity: 0.4; }
 .tag.warn { border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); }
 .tag.warn .zh { color: var(--warn); }
+/* 重复的 Tag（2.14，#21）：虚线框，和语法问题的实线黄框分开；两样都有时按语法问题画 */
+.tag.dup:not(.warn) { border-style: dashed; border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); }
 .tag.lift { box-shadow: var(--shadow-pop); transform: rotate(-1.5deg); }
 .tag .zh.wait { color: var(--text-off); }
 

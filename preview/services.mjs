@@ -90,6 +90,14 @@ export async function startServices(images) {
       typeof input === 'string' || input instanceof URL ? input : input.url,
       novel.url,
     );
+    // 预览里试自定义中转站（可以存多个，2.33）：https://<任意名>.relay.test 也走本机假服务
+    {
+      const raw = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+      if (raw.hostname.endsWith('.relay.test'))
+        input = `${novel.url}${
+          raw.pathname.endsWith('/models') ? '/v1/models' : `/ai/${raw.pathname.split('/').at(-1)}`
+        }`;
+    }
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
     if (!allowed.has(url.origin)) {
       blocked.push(url.origin);
