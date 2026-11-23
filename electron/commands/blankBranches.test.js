@@ -4,6 +4,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { WorkbenchConnection } from '../../src/lib/workbenchConnection.ts';
+import { syncProjectPromptMetadata } from '../../src/lib/promptStructure.js';
 import { createCommands } from './index.js';
 import { openDatabase } from '../database.js';
 import { openPreferences } from '../preferences.js';
@@ -1429,3 +1431,72 @@ it('queues multiple snapshots from the selected version while generating without
       service.state.resume?.();
     }
   }));
+
+it.each(['branch.delete', 'version.delete', 'single', 'library.trash'])(
+  'keeps an edited draft writable across %s and Agent reads',
+  (operation) =>
+    fixture(async ({ call, dispatch, services, append, database }) => {
+      const { tab } = await call('workbench.new');
+      append(tab.workId, tab.versionId, 'main');
+      const fork = append(tab.workId, tab.versionId, 'fork');
+      await call('version.open', { tabId: tab.id, versionId: fork.id });
+      await call('prompt.set', {
+        tabId: tab.id,
+        scope: 'base:prompt',
+        text: 'synthetic draft, nsfw',
+      });
+      const connection = new WorkbenchConnection(
+        (name, input) => dispatch(name, input, 'ui'),
+        () => {},
+        (message) => {
+          throw Error(message);
+        },
+      );
+      connection.hydrate(await call('workbench.session', {}, 'ui'));
+      const draft = structuredClone(connection.current.tabs[0].project);
+      const emit = services.emit;
+      services.emit = (event) => {
+        emit(event);
+        connection.receive(event);
+      };
+      services.prepareUI = () => connection.flush();
+      const edit = (tag) => {
+        const local = structuredClone(connection.current);
+        const project = local.tabs[0].project;
+        project.prompt_structure.base_prompt_raw += ', ' + tag;
+        local.tabs[0].project = syncProjectPromptMetadata(project);
+        connection.update(local);
+      };
+      try {
+        const removed =
+          operation === 'branch.delete'
+            ? await call(operation, { branchId: fork.branchId })
+            : operation === 'library.trash'
+              ? await call(operation, { ids: [fork.images[0].projectId] })
+              : await call('version.delete', { versionId: fork.id, only: operation === 'single' });
+        expect(connection.current.tabs[0]).toMatchObject({
+          versionId: tab.versionId,
+          project: draft,
+          originalProject: tab.project,
+        });
+        for (const tag of ['first', 'second']) {
+          edit(tag);
+          expect((await call('workbench.list')).tabs[0].id).toBe(tab.id);
+          expect(
+            (await call('workbench.get', { tabId: tab.id })).tab.project.metadata.prompt_raw,
+          ).toContain(tag);
+        }
+        if (removed.undo) {
+          await call('branch.restore', { undo: removed.undo });
+          expect(database.versions.get(fork.id)).toBeTruthy();
+          edit('restored');
+          await connection.flush();
+          expect(
+            (await call('workbench.get', { tabId: tab.id })).tab.project.metadata.prompt_raw,
+          ).toContain('restored');
+        }
+      } finally {
+        connection.dispose();
+      }
+    }),
+);

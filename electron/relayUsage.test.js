@@ -38,6 +38,9 @@ it.each([
     hasKey: true,
     models: ['model'],
   });
+  expect(p.generationSettings().relay.slots).toMatchObject([
+    { id: slot, custom: slot === 'custom', name: '', baseUrl },
+  ]);
   expect(p.relayKey()).toBe('synthetic');
   const before = fs.readFileSync(p.filePath, 'utf8');
   expect(JSON.parse(before).relayKeyEncrypted).toBeUndefined();

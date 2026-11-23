@@ -113,6 +113,12 @@ export class WorkbenchConnection {
       typing ? 180 : 0,
     );
   }
+  private async conflictBaseline(session?: CommandSession) {
+    if (session) return session;
+    const result = await this.invoke('workbench.session', {});
+    if (!result.ok) throw Error(workbenchErrorMessage(result.error.message));
+    return result.data;
+  }
   async flush(): Promise<void> {
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('nps:flush-text'));
     clearTimeout(this.timer);
@@ -126,8 +132,8 @@ export class WorkbenchConnection {
     this.running = (async () => {
       let result = await this.invoke('workbench.commit', { base, next });
       let overwritten = false;
-      if (!result.ok && result.error.code === 'conflict' && result.error.details?.session) {
-        const remote = result.error.details.session;
+      if (!result.ok && result.error.code === 'conflict') {
+        const remote = await this.conflictBaseline(result.error.details?.session);
         // Include edits made while the rejected request was in flight.
         const local = this.current;
         overwritten = local.tabs.some((tab) => {
@@ -151,8 +157,8 @@ export class WorkbenchConnection {
       if (!result.ok) {
         // Refresh the baseline even when the bounded retry loses another race.
         // Keep the delta pending for the next user edit, without an automatic loop.
-        if (result.error.details?.session) {
-          const remote = result.error.details.session;
+        if (result.error.code === 'conflict') {
+          const remote = await this.conflictBaseline(result.error.details?.session);
           this.current = rebase(remote, base, this.current);
           this.confirmed = remote;
           this.publish(this.current);

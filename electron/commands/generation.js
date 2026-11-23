@@ -31,7 +31,6 @@ import { CommandError } from './registry.js';
 import { versionDiff, diffSummary } from '../../src/lib/versionDiff.ts';
 import { createVersionDifferenceCache } from '../../src/lib/versionDifferenceCache.ts';
 import { recordUsageRequest, localDay } from '../usage.js';
-import { relayPresetFor } from '../../src/shared/relayPresets.ts';
 import { createRelayUsage } from '../relayUsage.js';
 import { buildDirector, estimateDirector, validateDirector } from '../director.js';
 
@@ -117,7 +116,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
   };
   async function testRelay(input = {}) {
     const baseUrl = normalizeRelayUrl(input.baseUrl ?? settings().relay.baseUrl);
-    const key = input.key?.trim() ?? preferences.relayKey(relayPresetFor(baseUrl)?.id ?? 'custom');
+    const slot = preferences.findRelaySlot(
+      baseUrl,
+      input.slot ?? (input.baseUrl === undefined ? settings().relay.slot : undefined),
+    );
+    const key = input.key?.trim() ?? (slot ? preferences.relayKey(slot) : '');
     if (!key) throw new Error('先填 Key');
     const result = await createNovelAIClient({
       connection: 'relay',
@@ -125,19 +128,14 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       token: () => key,
       fetchImpl: services.fetcher,
     }).models();
-    return { baseUrl, key, result };
+    return { baseUrl, key, result, slot };
   }
   async function refresh() {
     if (!settings().hasToken) return 0;
     try {
       if (settings().connection === 'relay') {
-        const { baseUrl, key, result } = await testRelay();
-        preferences.saveRelayModels(
-          relayPresetFor(baseUrl)?.id ?? 'custom',
-          baseUrl,
-          key,
-          result?.models ?? null,
-        );
+        const { baseUrl, key, result, slot } = await testRelay();
+        preferences.saveRelayModels(slot, baseUrl, key, result?.models ?? null);
         subscription = null;
       } else subscription = await client().subscription();
       accountError = '';
@@ -1306,11 +1304,34 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     },
     'account.relay.save': async (input) => {
       idleConnection();
-      const { baseUrl, result } = await testRelay(input);
+      const verified = await testRelay(input);
+      const { baseUrl, result } = verified;
       idleConnection();
-      preferences.saveRelay({ baseUrl, key: input.key, models: result?.models ?? null });
-      latestRelayRequests.delete(relayPresetFor(baseUrl)?.id ?? 'custom');
+      if (
+        input.key === undefined &&
+        (preferences.findRelaySlot(baseUrl, input.slot) !== verified.slot ||
+          preferences.relayKey(verified.slot) !== verified.key)
+      )
+        throw new CommandError('conflict', '中转站已有新的修改，请重新保存');
+      const slot = preferences.saveRelay({
+        baseUrl,
+        key: input.key,
+        models: result?.models ?? null,
+        slot: input.slot,
+      });
+      latestRelayRequests.delete(slot);
       accountError = '';
+      publish();
+      return status();
+    },
+    'account.relay.rename': ({ slot, name }) => {
+      preferences.renameRelay(slot, name);
+      publish();
+      return status();
+    },
+    'account.relay.remove': ({ slot }) => {
+      preferences.removeRelay(slot);
+      latestRelayRequests.delete(slot);
       publish();
       return status();
     },
@@ -1321,7 +1342,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       publish();
       const baseUrl = settings().relay.baseUrl;
       try {
-        const { key, result } = await testRelay({ baseUrl });
+        const { key, result } = await testRelay({ baseUrl, slot });
         if (result?.models) preferences.saveRelayModels(slot, baseUrl, key, result.models);
       } catch {
         /* Keep the saved model list when the relay is unavailable. */
@@ -1339,17 +1360,12 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
     },
     'account.relay.test': async (input) => {
       try {
-        const { baseUrl, key, result } = await testRelay(input);
+        const { baseUrl, key, result, slot } = await testRelay(input);
         if (
           baseUrl === settings().relay.baseUrl &&
           (input.key === undefined || input.key.trim() === preferences.relayKey())
         )
-          preferences.saveRelayModels(
-            relayPresetFor(baseUrl)?.id ?? 'custom',
-            baseUrl,
-            key,
-            result?.models ?? null,
-          );
+          preferences.saveRelayModels(slot, baseUrl, key, result?.models ?? null);
         return { ok: true, ...(result || { models: null, other: [] }) };
       } catch (error) {
         return { ok: false, error: error.message };

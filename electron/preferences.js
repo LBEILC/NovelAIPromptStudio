@@ -1,5 +1,6 @@
 import { portablePreferences, mergePortablePreferences } from './backup.js';
 import { MODEL_ORDER } from '../src/shared/params.ts';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { DEFAULT_NSFW_TAGS, normalizeNsfwWords } from '../src/shared/nsfw.ts';
 import { normalizeRelayUrl } from './relay.js';
@@ -461,6 +462,18 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
     };
   };
   const relayRecord = (id = relaySlot()) => read().relaySlots?.[id] || {};
+  const isCustom = (id) => id === 'custom' || id?.startsWith('custom:');
+  const findRelaySlot = (baseUrl, slot, slots = read().relaySlots || {}) => {
+    const preset = relayPresetFor(baseUrl);
+    if (preset) return preset.id;
+    if (isCustom(slot) && Object.hasOwn(slots, slot)) return slot;
+    return Object.keys(slots).find((id) => isCustom(id) && slots[id].baseUrl === baseUrl);
+  };
+  const requireCustom = (stored, id) => {
+    if (!isCustom(id) || !Object.hasOwn(stored.relaySlots || {}, id))
+      throw new CommandError('invalid_input', '请选择已保存的自定义中转站');
+    return stored.relaySlots[id];
+  };
   const relayKey = (id = relaySlot()) => readSecret(`relay:${id}`, relayRecord(id).keyEncrypted);
   refreshSecretStore();
   return {
@@ -522,6 +535,21 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       secretCache.delete('novelAITokenEncrypted');
     },
     relayKey,
+    findRelaySlot,
+    renameRelay: (id, name) => {
+      const stored = read();
+      requireCustom(stored, id).name = name.trim();
+      write(stored);
+    },
+    removeRelay: (id) => {
+      const stored = read();
+      requireCustom(stored, id);
+      if (id === relaySlot()) throw new CommandError('invalid_input', '先切到别的中转站再删除');
+      delete stored.relaySlots[id];
+      write(stored);
+      secretCache.delete(`relay:${id}`);
+      lastQuotas.delete(id);
+    },
     switchRelay: (id) => {
       if (!relayRecord(id).keyEncrypted) throw new Error('这个中转站还没有保存 Key');
       relayKey(id);
@@ -535,10 +563,10 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       record.models = models;
       write(stored);
     },
-    saveRelay: ({ baseUrl, key, models }) => {
+    saveRelay: ({ baseUrl, key, models, slot }) => {
       const stored = read();
       baseUrl = normalizeRelayUrl(baseUrl);
-      const id = relayPresetFor(baseUrl)?.id ?? 'custom';
+      const id = findRelaySlot(baseUrl, slot, stored.relaySlots || {}) ?? `custom:${randomUUID()}`;
       const record = { ...stored.relaySlots?.[id], baseUrl, models: models ?? null };
       if (key !== undefined || stored.relaySlots?.[id]?.baseUrl !== baseUrl) lastQuotas.delete(id);
       if (key !== undefined) {
@@ -550,6 +578,7 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
       stored.relaySlots = { ...stored.relaySlots, [id]: record };
       stored.relaySlot = id;
       write(stored);
+      return id;
     },
     saveConnection: (connection) => {
       if (!['official', 'relay'].includes(connection)) throw new Error('连接方式无效');
@@ -567,6 +596,8 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
         slots: Object.entries(read().relaySlots || {}).map(([id, record]) => ({
           id,
           baseUrl: record.baseUrl,
+          custom: isCustom(id),
+          name: isCustom(id) ? record.name || '' : '',
           hasKey: !!record.keyEncrypted,
           readable: secretEntry(`relay:${id}`, record.keyEncrypted).readable,
         })),

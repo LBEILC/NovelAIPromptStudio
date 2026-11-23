@@ -58,7 +58,12 @@ export async function settingsGenerationChecks({
       (await evaluate('document.body.innerText.includes("已复制持久令牌")')),
   );
   const previousConnection = preferences.generationSettings();
+  // Exercise an upgraded profile whose original custom relay keeps its stable id.
+  const stored = JSON.parse(await fs.readFile(preferences.filePath, 'utf8'));
+  stored.relaySlots = { ...stored.relaySlots, custom: { baseUrl: generationService.url } };
+  await fs.writeFile(preferences.filePath, JSON.stringify(stored));
   await invoke('account.relay.save', {
+    slot: 'custom',
     baseUrl: generationService.url + '/v1',
     key: 'acceptance-token',
   });

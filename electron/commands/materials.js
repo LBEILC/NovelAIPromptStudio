@@ -8,6 +8,7 @@ import {
   serializePromptSection,
   promptDocumentProject,
   editPromptBlockText,
+  createTagBlock,
 } from '../../src/lib/promptDocument.ts';
 import { reparseSection } from '../../src/workbench/model.ts';
 import { addPromptCharacter, updatePromptCharacter } from '../../src/lib/promptStructure.js';
@@ -65,6 +66,18 @@ export function safeTidyChange(before, after, known) {
     a.length === b.length &&
     a.every((t, i) => t.weight === b[i].weight && spelling(t.text, b[i].text, known))
   );
+}
+
+function joinNegative(parts) {
+  return parts
+    .map((part) =>
+      part
+        .trim()
+        .replace(/^,+|,+$/g, '')
+        .trim(),
+    )
+    .filter(Boolean)
+    .join(', ');
 }
 
 export function materialCommands({ services, tab, full, edit, locate, revision, renamePool }) {
@@ -210,11 +223,16 @@ export function materialCommands({ services, tab, full, edit, locate, revision, 
     'material.save': (input) => {
       const current = full(tab(input.tabId));
       revision(input.expectedRevision, current.revision);
-      const { section } = locate(current.document, input);
+      const { section } = locate(current.document, { ...input, block: undefined });
       let value;
-      if (input.block !== undefined)
+      if (input.block !== undefined && section.scope.polarity === 'undesired') {
+        const content = joinNegative(section.blocks.map((block) => block.content));
+        if (!content) throw new CommandError('invalid_input', '素材内容不能为空');
+        value = { kind: 'block', negative: true, blocks: [createTagBlock(content)] };
+      } else if (input.block !== undefined) {
+        locate(current.document, input);
         value = { kind: 'block', blocks: [structuredClone(section.blocks[input.block])] };
-      else {
+      } else {
         const character = current.tab.project.prompt_structure.characters.find(
           (c) => c.id === section.scope.characterId,
         );
@@ -260,12 +278,10 @@ export function materialCommands({ services, tab, full, edit, locate, revision, 
         const index = material.kind === 'block' && block === undefined ? 0 : block;
         if (!Number.isInteger(index) || index < 0 || index >= material.blocks.length)
           throw new CommandError('invalid_input', '素材块位置不存在');
-        const section = editPromptBlockText(
-          { blocks: [material.blocks[index]], separators: ['', ''] },
-          0,
-          text,
-        );
-        next.blocks[index] = section.blocks[0];
+        next.blocks[index] = material.negative
+          ? createTagBlock(text)
+          : editPromptBlockText({ blocks: [material.blocks[index]], separators: ['', ''] }, 0, text)
+              .blocks[0];
         if (next.blocks[index].type === 'paragraph') delete next.blocks[index].translation;
       }
       return { item: db.update(id, next, asNew) };
@@ -306,6 +322,25 @@ export function materialCommands({ services, tab, full, edit, locate, revision, 
           return fresh;
         }
         const { si, section } = locate(doc, { ...input, block: undefined });
+        const negative = section.scope.polarity === 'undesired';
+        if (!!material.negative !== negative)
+          throw new CommandError(
+            'invalid_input',
+            material.negative ? '负面常用块只能插入负面提示词' : '这个常用块只能插入正面提示词',
+          );
+        if (negative) {
+          const last = section.blocks.at(-1);
+          const text = material.blocks[0].content;
+          const updated = last
+            ? editPromptBlockText(
+                section,
+                section.blocks.length - 1,
+                joinNegative([last.content, text]),
+              )
+            : { blocks: structuredClone(material.blocks), separators: ['', ''] };
+          doc.scopes[si] = { ...section, ...updated };
+          return doc;
+        }
         const at = input.before ?? section.blocks.length;
         if (at > section.blocks.length) throw new CommandError('invalid_input', '插入位置不存在');
         const texts = section.blocks.map((b) => b.raw);

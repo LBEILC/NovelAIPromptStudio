@@ -26,7 +26,14 @@ export interface GenerationSettings {
     hasKey: boolean;
     models: string[] | null;
     slot: string;
-    slots: { id: string; baseUrl: string; hasKey: boolean; readable: boolean }[];
+    slots: {
+      id: string;
+      baseUrl: string;
+      hasKey: boolean;
+      readable: boolean;
+      custom: boolean;
+      name: string;
+    }[];
     lastQuota: number | null;
   };
   dailyImageLimit: number;

@@ -406,11 +406,17 @@ export const commandRegistry = {
     uiOnly: true,
   },
   'account.relay.save': {
-    fields: { baseUrl: 'string', key: 'string' },
+    fields: { baseUrl: 'string', key: 'string', slot: 'string' },
     required: ['baseUrl'],
     uiOnly: true,
   },
   'account.relay.test': { fields: { baseUrl: 'string', key: 'string' }, uiOnly: true },
+  'account.relay.rename': {
+    fields: { slot: 'string', name: 'text' },
+    required: ['slot', 'name'],
+    uiOnly: true,
+  },
+  'account.relay.remove': { fields: { slot: 'string' }, required: ['slot'], uiOnly: true },
   'account.relay.switch': { fields: { slot: 'string' }, required: ['slot'], uiOnly: true },
   'account.relay.usage': { fields: {}, uiOnly: true },
   'account.relay.open-site': { fields: { id: 'string' }, required: ['id'], uiOnly: true },

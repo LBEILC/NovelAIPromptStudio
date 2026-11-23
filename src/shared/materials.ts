@@ -9,6 +9,7 @@ export interface Material {
   uses: number;
   blocks: PromptBlock[];
   character?: PromptCharacter;
+  negative?: boolean;
   negativeBlocks?: PromptBlock[];
   examples: string[];
 }

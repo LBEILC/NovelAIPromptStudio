@@ -322,6 +322,11 @@ function replaceBlockContent(
   return { blocks, separators: [...section.separators] };
 }
 
+export function createTagBlock(content: string): PromptBlock {
+  const section = parsePromptSection('placeholder');
+  return { ...replaceBlockContent(section, 0, content, 'tags').blocks[0], userType: true };
+}
+
 export function setPromptBlockType(
   section: PromptSection,
   index: number,

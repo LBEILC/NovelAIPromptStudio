@@ -168,6 +168,24 @@ it('limits retry to one and can save after another conflict', async () => {
   expect(f.remote.tabs[1].displayName).toBe('later edit');
   f.connection.dispose();
 });
+it('reads a fresh baseline when a conflict response omits the session', async () => {
+  const f = setupRace();
+  f.edit();
+  f.remote.tabs[0].project!.metadata.prompt_raw = 'remote';
+  f.invoke.mockImplementationOnce(
+    async () => ({ ok: false, error: { code: 'conflict', message: 'conflict' } }) as any,
+  );
+  f.invoke.mockImplementationOnce(async () => ({ ok: true, data: structuredClone(f.remote) }));
+  await f.connection.flush();
+  expect(f.invoke.mock.calls.map(([name]) => name)).toEqual([
+    'workbench.commit',
+    'workbench.session',
+    'workbench.commit',
+  ]);
+  expect(f.remote.tabs[0].project!.metadata.prompt_raw).toBe('user');
+  f.connection.dispose();
+});
+
 it('includes typing and renaming made while the conflict response is pending', async () => {
   const f = setupRace();
   f.edit();

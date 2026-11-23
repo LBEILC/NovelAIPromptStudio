@@ -551,7 +551,12 @@ export interface CommandDefinitions {
     input: { connection: 'official' | 'relay' };
     output: GenerationStatus;
   };
-  'account.relay.save': { input: { baseUrl: string; key?: string }; output: GenerationStatus };
+  'account.relay.save': {
+    input: { baseUrl: string; key?: string; slot?: string };
+    output: GenerationStatus;
+  };
+  'account.relay.rename': { input: { slot: string; name: string }; output: GenerationStatus };
+  'account.relay.remove': { input: { slot: string }; output: GenerationStatus };
   'account.relay.switch': { input: { slot: string }; output: GenerationStatus };
   'account.relay.usage': {
     input: Record<string, never>;

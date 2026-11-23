@@ -212,6 +212,50 @@ it('returns null models through the relay command when all model lists are unrea
       other: [],
     });
     expect(preferences.generationSettings().relay.models).toBeNull();
+    const relay = async (operation, args) => {
+      const result = await commands.dispatch('account.relay.' + operation, args, 'ui');
+      if (!result.ok) throw Error(result.error.message);
+      return result.data.settings.relay;
+    };
+    const first = preferences.generationSettings().relay.slot;
+    const second = (await relay('save', { baseUrl: 'https://second.invalid', key: 'second-key' }))
+      .slot;
+    expect(first).toMatch(/^custom:/);
+    expect(second).not.toBe(first);
+    expect(preferences.relayKey()).toBe('second-key');
+    expect((await relay('switch', { slot: first })).baseUrl).toBe(input.baseUrl);
+    expect(preferences.relayKey()).toBe(input.key);
+    const changed = { baseUrl: 'https://changed.invalid' };
+    expect((await relay('save', { ...changed, slot: first })).slots).toHaveLength(2);
+    expect((await relay('save', changed)).slot).toBe(first);
+    const preset = await relay('save', {
+      baseUrl: 'https://api.chr1.com',
+      key: 'preset-key',
+      slot: first,
+    });
+    expect(preset.slot).toBe('chr1');
+    expect(preset.slots).toContainEqual(
+      expect.objectContaining({ id: first, ...changed, custom: true, name: '' }),
+    );
+    for (const name of ['  Station  ', '']) {
+      const renamed = await relay('rename', { slot: first, name });
+      expect(renamed.slots.find((s) => s.id === first).name).toBe(name.trim());
+    }
+    for (const operation of ['remove', 'rename']) {
+      const args = { slot: 'chr1', ...(operation === 'rename' ? { name: 'Preset' } : {}) };
+      expect(await commands.dispatch('account.relay.' + operation, args, 'ui')).toMatchObject({
+        ok: false,
+        error: { code: 'invalid_input' },
+      });
+      expect(await commands.dispatch('account.relay.' + operation, args, 'agent')).toMatchObject({
+        ok: false,
+        error: { code: 'forbidden' },
+      });
+    }
+    await relay('switch', { slot: second });
+    await expect(relay('remove', { slot: second })).rejects.toThrow('先切到别的中转站再删除');
+    expect((await relay('remove', { slot: first })).slots.map((s) => s.id)).not.toContain(first);
+    expect(preferences.relayKey(first)).toBe('');
   } finally {
     await commands?.close();
     database.close();

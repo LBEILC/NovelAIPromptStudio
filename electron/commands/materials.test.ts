@@ -216,3 +216,49 @@ it('filters unsafe AI changes at the command boundary and leaves drafts and name
   expect(s.database.loadProject('synthetic-material').name).toBe('Untitled');
   expect(JSON.stringify(s.requests)).not.toContain('/synthetic.png');
 });
+
+it('saves complete negative sections and restricts insertion to matching scopes', async () => {
+  const { call, commands, tabId } = await setup();
+  const added = await call('character.add', { tabId, name: 'Synthetic' });
+  const characterScope = `character:${added.tab.project.prompt_structure.characters[0].id}:undesired`;
+  const base = 'base:undesired';
+  const set = (scope: string, text: string) => call('prompt.set', { tabId, scope, text });
+  const save = async (scope: string) =>
+    (await call('material.save', { tabId, scope, block: 0, name: 'Synthetic' })).item;
+  const positive = await save('base:prompt');
+  expect(positive).not.toHaveProperty('negative');
+  for (const scope of [base, characterScope]) {
+    await set(scope, 'bad hands\n\ntext');
+    const negative = await save(scope);
+    expect(negative.negative).toBe(true);
+    expect(negative.blocks).toMatchObject([{ type: 'tags', content: 'bad hands, text' }]);
+    const insert = (id: string) => call('material.insert', { tabId, scope, id, before: 100 });
+    for (const existing of ['lowres', '']) {
+      await set(scope, existing);
+      const result = await insert(negative.id);
+      expect(result.document.scopes.find((s: any) => s.scope.key === scope).blocks).toMatchObject([
+        { content: existing ? 'lowres, bad hands, text' : 'bad hands, text' },
+      ]);
+    }
+    const before = await call('workbench.get', { tabId });
+    for (const [id, target, message] of [
+      [negative.id, 'base:prompt', '负面常用块只能插入负面提示词'],
+      [positive.id, scope, '这个常用块只能插入正面提示词'],
+    ]) {
+      expect(
+        await commands.dispatch('material.insert', { tabId, id, scope: target }, 'agent'),
+      ).toMatchObject({ ok: false, error: { code: 'invalid_input', message } });
+    }
+    expect((await call('workbench.get', { tabId })).tab.project).toEqual(before.tab.project);
+    for (const asNew of [false, true]) {
+      const { item } = await call(
+        'material.update',
+        { id: negative.id, text: 'blur', asNew },
+        'ui',
+      );
+      expect((await call('material.list')).items.find((m: any) => m.id === item.id)).toMatchObject({
+        negative: true,
+      });
+    }
+  }
+});
