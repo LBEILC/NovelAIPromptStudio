@@ -746,13 +746,12 @@ app.whenReady().then(async () => {
     const referencedPaths = [
       ...input.paths,
       ...database.versions.referencedPaths(),
-      ...commandRuntime.store
-        .get()
-        .tabs.flatMap((tab) =>
+      ...[...commandRuntime.store.snapshot().tabs, ...commandRuntime.retainedTabs()].flatMap(
+        (tab) =>
           [tab.source?.path, tab.project?.image_path, tab.originalProject?.image_path].filter(
             Boolean,
           ),
-        ),
+      ),
     ];
     try {
       return {

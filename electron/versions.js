@@ -118,6 +118,10 @@ export function createVersionStore(connection, hydrate = hydrateParameters, exte
     CREATE TABLE IF NOT EXISTS work_sequences (work_id TEXT PRIMARY KEY, version INTEGER NOT NULL, branch INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS work_activity (work_id TEXT PRIMARY KEY, used_at INTEGER NOT NULL, version_id TEXT);
     CREATE TABLE IF NOT EXISTS work_file_signatures (work_id TEXT PRIMARY KEY, signature_json TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS idx_works_origin_digest ON works(json_extract(origin_json,'$.fileSignature.sha256'));
+    CREATE INDEX IF NOT EXISTS idx_works_origin_image ON works(json_extract(origin_json,'$.id'));
+    CREATE INDEX IF NOT EXISTS idx_works_origin_path ON works(json_extract(origin_json,'$.image_path'));
+    CREATE INDEX IF NOT EXISTS idx_work_file_digest ON work_file_signatures(json_extract(signature_json,'$.sha256'));
     INSERT INTO work_sequences SELECT work_id, MAX(number), MAX(branch_number) FROM work_versions GROUP BY work_id
       ON CONFLICT(work_id) DO UPDATE SET version=MAX(version,excluded.version), branch=MAX(branch,excluded.branch);
   `);
@@ -318,6 +322,24 @@ export function createVersionStore(connection, hydrate = hydrateParameters, exte
   );
   return (api = {
     ...sharing,
+    counts(workIds) {
+      const rows = connection
+        .prepare(
+          `SELECT work_id, COUNT(*) AS total FROM work_versions
+        WHERE work_id IN (SELECT value FROM json_each(?)) AND number <> 0
+        AND id NOT IN (SELECT version_id FROM deleted_versions) GROUP BY work_id`,
+        )
+        .all(JSON.stringify(workIds));
+      return new Map(rows.map((row) => [row.work_id, row.total]));
+    },
+    count(workId) {
+      if (!workId) return 0;
+      return connection
+        .prepare(
+          'SELECT count(*) AS total FROM work_versions WHERE work_id=? AND number<>0 AND id NOT IN (SELECT version_id FROM deleted_versions)',
+        )
+        .get(workId).total;
+    },
     randomForImage(projectId) {
       const row = connection
         .prepare(
@@ -400,13 +422,21 @@ export function createVersionStore(connection, hydrate = hydrateParameters, exte
       return remembered?.workId === workId ? remembered : list(workId).at(-1);
     },
     findOrigin(source, image) {
+      // Limit expensive snapshot decoding to possible matches. Old unsigned
+      // origins still use the existing normalized-path and metadata checks.
+      const library = source.type === 'library';
+      const matches = library
+        ? "json_extract(w.origin_json,'$.id')=? OR json_extract(w.origin_json,'$.image_path')=?"
+        : "json_extract(w.origin_json,'$.fileSignature.sha256') IS NULL OR json_extract(w.origin_json,'$.fileSignature.sha256')=? OR w.id IN (SELECT work_id FROM work_file_signatures WHERE json_extract(signature_json,'$.sha256')=?)";
+      const digest = image.fileSignature?.sha256 || '';
       const candidates = connection
         .prepare(
           `SELECT w.*, s.signature_json FROM works w
         LEFT JOIN work_activity a ON a.work_id=w.id LEFT JOIN work_file_signatures s ON s.work_id=w.id
+        WHERE ${matches}
         ORDER BY COALESCE(a.used_at,0) DESC, w.created_at DESC, w.rowid DESC`,
         )
-        .all();
+        .all(...(library ? [source.projectId, image.image_path] : [digest, digest]));
       const normalize = (p) =>
         process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p);
       for (const row of candidates) {

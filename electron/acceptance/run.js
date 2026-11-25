@@ -43,6 +43,10 @@ import { chatGPTChecks } from './chatgpt.js';
 import electronUpdater from 'electron-updater';
 
 export async function runAcceptance(context) {
+  if (context.mode.tabsBenchmark) {
+    const { benchmarkWorkbenchTabs } = await import('./workbenchTabsBenchmark.js');
+    return benchmarkWorkbenchTabs(context);
+  }
   if (context.mode.generationBenchmark) {
     const { runGenerationBenchmark } = await import('./generationBenchmark.js');
     return runGenerationBenchmark(context);

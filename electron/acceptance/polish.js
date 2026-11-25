@@ -255,7 +255,7 @@ export async function workbenchPolishChecks(env) {
       );
       await click('关闭', 'document.querySelector(".menu:not(.leaving)")');
       if (await e('!!document.querySelector("[role=dialog]:not(.leaving *)")'))
-        await click('丢弃并关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
+        await click('关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
       await wait(`!document.querySelector('[data-tab="${tabId}"]')`);
     }
     for (const project of projects) {

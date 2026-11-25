@@ -2,8 +2,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
 import {
   createWorkbenchTab,
+  computeWorkbenchTabHasChanges,
   parseWorkbenchSession,
   normalizeWorkbenchViewState,
 } from '../../src/lib/workbenchSession.js';
@@ -37,23 +39,56 @@ export async function openCommandSession(directory, readSource) {
   const file = path.join(directory, 'workbench-session.json');
   /** @type {SavedState} */
   let state = { session: { version: 2, tabs: [], activeTabId: '' }, revision: 0, migrated: false };
+  await fs.mkdir(directory, { recursive: true });
+  const databaseFile = path.join(directory, 'workbench.sqlite');
+  /** @type {DatabaseSync|undefined} */
+  let writer;
+  const db = new DatabaseSync(databaseFile);
+  let hasIndex = false;
   try {
-    const saved = JSON.parse(await fs.readFile(file, 'utf8'));
-    if (saved.version !== 3 || !Array.isArray(saved.session?.tabs))
-      throw Error('保存的工作台格式无法读取');
-    state = saved;
-    // Keep drafts and original snapshots even if an external source moved.
-    for (const tab of state.session.tabs)
-      if (tab.source.path) {
-        try {
-          await fs.access(tab.source.path);
-          tab.error = '';
-        } catch {
-          tab.error = '图片源已不可用';
-        }
-      }
-  } catch (error) {
-    if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'ENOENT') throw error;
+    db.exec(
+      'CREATE TABLE IF NOT EXISTS tabs(id TEXT PRIMARY KEY, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS session(id INTEGER PRIMARY KEY, data TEXT NOT NULL)',
+    );
+    const row = db.prepare('SELECT data FROM session WHERE id=1').get();
+    if (row) {
+      hasIndex = true;
+      const index = JSON.parse(String(row.data));
+      const tabs = new Map(
+        db
+          .prepare('SELECT id,data FROM tabs')
+          .all()
+          .map((r) => [r.id, JSON.parse(String(r.data))]),
+      );
+      state = {
+        revision: index.revision,
+        migrated: index.migrated,
+        session: {
+          version: 2,
+          activeTabId: index.activeTabId,
+          tabs: index.order.map((/** @type {string} */ id) => {
+            if (!tabs.has(id)) throw Error('保存的工作台格式无法读取');
+            return tabs.get(id);
+          }),
+        },
+      };
+    }
+  } finally {
+    db.close();
+  }
+  if (!hasIndex) {
+    let raw;
+    try {
+      raw = await fs.readFile(file, 'utf8');
+    } catch (error) {
+      if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'ENOENT') throw error;
+    }
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (saved.version !== 3 || !Array.isArray(saved.session?.tabs))
+        throw Error('保存的工作台格式无法读取');
+      await atomicWrite(path.join(directory, 'workbench-v3-migration-backup.json'), saved);
+      await publish(saved);
+    }
   }
   let tail = Promise.resolve();
   /** @template T @param {() => Promise<T>} action @returns {Promise<T>} */
@@ -67,11 +102,67 @@ export async function openCommandSession(directory, readSource) {
   }
   /** @param {SavedState} next */
   async function publish(next) {
-    await atomicWrite(file, { version: 3, ...next });
-    state = next;
+    if (new Set(next.session.tabs.map((t) => t.id)).size !== next.session.tabs.length)
+      throw new Error('工作台包含重复的标签页 ID');
+    const previous = new Map(state.session.tabs.map((t) => [t.id, t]));
+    const db = writer || new DatabaseSync(databaseFile);
+    try {
+      db.exec('PRAGMA synchronous=FULL; BEGIN IMMEDIATE');
+      const write = db.prepare('INSERT OR REPLACE INTO tabs(id,data) VALUES(?,?)');
+      const tabs = next.session.tabs.map((t) => {
+        const old = previous.get(t.id);
+        previous.delete(t.id);
+        if (old === t) return old;
+        const copy = structuredClone(t);
+        copy.hasChanges = computeWorkbenchTabHasChanges(copy);
+        const json = JSON.stringify(copy);
+        if (old && JSON.stringify(old) === json) return old;
+        write.run(t.id, json);
+        return copy;
+      });
+      const remove = db.prepare('DELETE FROM tabs WHERE id=?');
+      for (const id of previous.keys()) remove.run(id);
+      const index = {
+        revision: next.revision,
+        migrated: next.migrated,
+        activeTabId: next.session.activeTabId,
+        order: tabs.map((t) => t.id),
+      };
+      db.prepare('INSERT OR REPLACE INTO session(id,data) VALUES(1,?)').run(JSON.stringify(index));
+      db.exec('COMMIT');
+      state = { ...next, session: { ...next.session, tabs } };
+    } catch (error) {
+      if (db.isTransaction) db.exec('ROLLBACK');
+      throw error;
+    } finally {
+      if (!writer) db.close();
+    }
   }
   return {
     exclusive,
+    connectWriter() {
+      if (writer) return;
+      const connection = new DatabaseSync(databaseFile);
+      try {
+        connection.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL');
+      } catch (error) {
+        connection.close();
+        throw error;
+      }
+      writer = connection;
+    },
+    closeWriter() {
+      writer?.close();
+      writer = undefined;
+    },
+
+    hasIndex,
+    snapshot: () => state.session,
+    /** Mutable session envelope; only the requested tab is writable. @param {string} [id] */
+    draft: (id) => ({
+      ...state.session,
+      tabs: state.session.tabs.map((t) => (id === t.id ? structuredClone(t) : t)),
+    }),
     backup: () => structuredClone({ version: 3, ...state }),
     /** @param {{version:number,session:Session,revision:number,migrated:boolean}} saved */
     async restoreBackup(saved) {
@@ -89,7 +180,7 @@ export async function openCommandSession(directory, readSource) {
     async save(session) {
       await publish({
         ...state,
-        session: structuredClone(session),
+        session,
         revision: state.revision + 1,
         migrated: true,
       });
@@ -98,18 +189,22 @@ export async function openCommandSession(directory, readSource) {
       await publish({ ...state, revision: state.revision + 1 });
     },
     /** @param {{legacyV1?:string,legacyV2?:string}} input */
-    async migrate(input) {
+    async migrate(input, snapshotOnly = false) {
       if (state.migrated || state.session.tabs.length) {
-        for (const tab of state.session.tabs)
-          if (tab.source.path) {
+        const tabs = await Promise.all(
+          state.session.tabs.map(async (tab) => {
+            if (!tab.source.path) return tab;
+            let error = '';
             try {
               await fs.access(tab.source.path);
-              tab.error = '';
             } catch {
-              tab.error = '图片源已不可用';
+              error = '图片源已不可用';
             }
-          }
-        return structuredClone(state.session);
+            return tab.error === error ? tab : { ...tab, error };
+          }),
+        );
+        state = { ...state, session: { ...state.session, tabs } };
+        return snapshotOnly ? state.session : structuredClone(state.session);
       }
       const parsed = parseWorkbenchSession(input.legacyV2) || parseWorkbenchSession(input.legacyV1);
       if (!parsed && (input.legacyV1 || input.legacyV2))
@@ -169,7 +264,7 @@ export async function openCommandSession(directory, readSource) {
  * @param {Project|null} project @returns {Project|null} */
 export function editableProject(project) {
   if (!project) return project;
-  const { nsfw: _derived, ...copy } = structuredClone(project);
+  const { nsfw: _derived, ...copy } = project;
   return /** @type {Project} */ (copy);
 }
 
@@ -177,12 +272,38 @@ export function editableProject(project) {
  * @param {Session} current @param {Session} base @param {Session} next
  * @param {(project:Project)=>Project} [refresh] @returns {Session} */
 export function mergeSession(current, base, next, refresh = (project) => project) {
+  if (next.order && base.order) {
+    const affected = new Set([...next.tabs, ...base.tabs].map((t) => t.id));
+    const merged = mergeSession(
+      { ...current, tabs: current.tabs.filter((t) => affected.has(t.id)) },
+      { ...base, order: undefined },
+      { ...next, order: undefined },
+      refresh,
+    );
+    const tabs = new Map(current.tabs.filter((t) => !affected.has(t.id)).map((t) => [t.id, t]));
+    for (const t of merged.tabs) tabs.set(t.id, t);
+    const previousOrder = current.tabs.map((t) => t.id);
+    const reorder =
+      base.order.length !== next.order.length || base.order.some((id, i) => id !== next.order?.[i]);
+    const order = new Set([
+      ...(reorder ? next.order : previousOrder),
+      ...previousOrder,
+      ...tabs.keys(),
+    ]);
+    const ordered = [...order].flatMap((id) => tabs.get(id) || []);
+    const selected = base.activeTabId !== next.activeTabId ? next.activeTabId : current.activeTabId;
+    return {
+      version: current.version,
+      tabs: ordered,
+      activeTabId: tabs.has(selected) ? selected : ordered[0]?.id || '',
+    };
+  }
   // Refresh cache-backed references on every side using the same current library.
   // Keep reference identity and user controls in the comparison.
   const normalize = (/** @type {Session} */ session) => ({
     ...session,
     tabs: session.tabs.map((tab) => {
-      const copy = structuredClone(tab);
+      const copy = { ...tab };
       copy.project = editableProject(copy.project && refresh(copy.project));
       copy.originalProject = editableProject(copy.originalProject && refresh(copy.originalProject));
       delete copy.workSaved;
@@ -194,7 +315,7 @@ export function mergeSession(current, base, next, refresh = (project) => project
   next = normalize(next);
   const same = (/** @type {unknown} */ a, /** @type {unknown} */ b) =>
     JSON.stringify(a) === JSON.stringify(b);
-  const result = structuredClone(current);
+  const result = { ...current, tabs: current.tabs.map((t) => ({ ...t })) };
   for (const old of base.tabs) {
     if (next.tabs.some((t) => t.id === old.id)) continue;
     const remote = result.tabs.find((t) => t.id === old.id);
@@ -206,7 +327,7 @@ export function mergeSession(current, base, next, refresh = (project) => project
     const old = base.tabs.find((t) => t.id === local.id);
     const remote = result.tabs.find((t) => t.id === local.id);
     if (!old) {
-      if (!remote) result.tabs.push({ ...structuredClone(local), revision: 0 });
+      if (!remote) result.tabs.push({ ...local, revision: 0 });
       continue;
     }
     if (!remote) {
@@ -218,7 +339,7 @@ export function mergeSession(current, base, next, refresh = (project) => project
     if (edited && !same(remote.project, old.project) && !same(remote.project, local.project))
       throw new CommandError('conflict', '提示词已有新的修改，输入仍保留在界面');
     if (edited) {
-      remote.project = structuredClone(local.project);
+      remote.project = local.project;
       remote.revision = (remote.revision || 0) + 1;
       remote.updatedAt = local.updatedAt;
     }
@@ -231,8 +352,7 @@ export function mergeSession(current, base, next, refresh = (project) => project
       'viewState',
       'identity',
     ])) {
-      if (!same(old[field], local[field]))
-        Object.assign(remote, { [field]: structuredClone(local[field]) });
+      if (!same(old[field], local[field])) Object.assign(remote, { [field]: local[field] });
     }
   }
   if (

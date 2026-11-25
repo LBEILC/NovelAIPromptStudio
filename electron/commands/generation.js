@@ -44,7 +44,15 @@ const withPromptTemplate = (project, draft) => ({
   prompt_structure: structuredClone(draft.prompt_structure),
   tags: structuredClone(draft.tags),
 });
-export function generationCommands({ services, store, tab, revision, unlocked, emit }) {
+export function generationCommands({
+  services,
+  store,
+  tab,
+  revision,
+  unlocked,
+  emit,
+  retained = () => false,
+}) {
   const previews = createAgentImages(services.directory);
   const inpaintStates = new Map();
   let previewCleanup = Promise.resolve();
@@ -147,7 +155,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       throw error;
     }
   }
-  async function ensure(current) {
+  async function ensure(current, opening = false) {
     if (!current.project) throw new CommandError('not_found', '图片不存在');
     const workId = current.workId || current.id;
     const root = versions.ensure(
@@ -164,12 +172,14 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       current.workOrigin || null,
     );
     if (!current.workId) {
-      const session = store.get(),
-        t = session.tabs.find((t) => t.id === current.id);
-      t.workId = workId;
-      t.versionId = root.id;
-      await store.save(session);
-      Object.assign(current, t);
+      Object.assign(current, { workId, versionId: root.id });
+      if (!opening) {
+        const session = store.snapshot();
+        await store.save({
+          ...session,
+          tabs: session.tabs.map((item) => (item.id === current.id ? current : item)),
+        });
+      }
       versions.touch(workId, root.id);
     }
     return versions.get(current.versionId) || root;
@@ -413,10 +423,11 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         void settlePruned().catch((error) => {
           cleanupError = error;
         });
-      const openWorks = new Set(store.get().tabs.map((t) => t.workId));
+      const openWorks = new Set(store.snapshot().tabs.map((t) => t.workId));
       for (const job of jobs) {
         if (
           !openWorks.has(job.workId) &&
+          !retained(job.workId) &&
           !jobs.some(
             (j) => j.workId === job.workId && ['pending', 'queued', 'generating'].includes(j.state),
           )
@@ -483,7 +494,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         services.database.refreshGeneratedCards();
         if (version.branchId === version.id && version.branchNumber && job.completed === 0)
           job.branchNotice = `已从第 ${versions.get(job.parentId).number} 版分出分支 ${version.branchNumber}`;
-        const session = store.get(),
+        const session = store.draft(job.tabId),
           current = session.tabs.find((t) => t.id === job.tabId);
         if (current && job.source === 'user' && job.completed === 0 && imageIndex === 0) {
           current.versionId = version.id;
@@ -552,6 +563,8 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
             nsfw: services.database.nsfw.state(current.originalProject),
           }
         : null,
+      hasChanges: store.snapshot().tabs.find((t) => t.id === current.id)?.hasChanges,
+      versionCount: versions.count(current.workId),
       workSaved: versions.isSaved(current.workId),
     },
     document: createPromptDocument(current.project, {}, pools()),
@@ -588,7 +601,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         extra_json: p.metadata.extra_json,
       },
     };
-    const session = store.get(),
+    const session = store.draft(current.id),
       next = session.tabs.find((t) => t.id === current.id);
     Object.assign(next, {
       source: services.database.loadProject(p.id)
@@ -1015,7 +1028,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       return { active: true };
     },
     'inpaint.get': async (input) => {
-      const id = input.tabId ?? store.get().activeTabId;
+      const id = input.tabId ?? store.snapshot().activeTabId;
       if (!id) return { active: false };
       const current = tab(id);
       const state = inpaintStates.get(current.id);
@@ -1277,7 +1290,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
       next.revision = 0;
       next.workId = next.id;
       next.versionId = versions.ensure(next.id, project).id;
-      const session = store.get();
+      const session = store.draft();
       session.tabs.push(next);
       if (caller.source !== 'agent') session.activeTabId = next.id;
       await store.save(session);
@@ -1566,7 +1579,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           : versions.lastVersion(input.workId);
       if (!target || target.workId !== input.workId)
         throw new CommandError('not_found', '版本不存在');
-      const session = store.get();
+      const session = store.draft();
       let next = session.tabs.find((t) => t.workId === input.workId);
       if (!next) {
         next = createWorkbenchTab(work.origin, {
@@ -1596,7 +1609,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         if (!Number.isFinite(n) || n <= 0) throw new Error('尺寸无效');
         return Math.min(2048, Math.max(64, Math.round(n / 64) * 64));
       };
-      const session = store.get(),
+      const session = store.draft(current.id),
         next = session.tabs.find((t) => t.id === current.id);
       if (input.width * input.height > 1536 * 2048) throw new Error('面积最大 1536×2048');
       if (norm(input.width) * norm(input.height) > 1536 * 2048)
@@ -1659,7 +1672,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         next.workOrigin,
       ).id;
       versions.touch(next.workId, next.versionId);
-      const session = store.get();
+      const session = store.draft();
       session.tabs.push(next);
       session.activeTabId = next.id;
       await store.save(session);
@@ -1700,7 +1713,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
         });
       const workId = versions.findOrigin(source, image);
       if (workId) {
-        const alreadyOpen = store.get().tabs.some((t) => t.workId === workId);
+        const alreadyOpen = store.snapshot().tabs.some((t) => t.workId === workId);
         const opened = await handlers['work.open']({ workId });
         // Reopening a saved original must retain its library draft without rewriting history.
         if (
@@ -1708,7 +1721,7 @@ export function generationCommands({ services, store, tab, revision, unlocked, e
           !alreadyOpen &&
           !versions.get(opened.tab.versionId).parentId
         ) {
-          const session = store.get(),
+          const session = store.draft(opened.tab.id),
             current = session.tabs.find((t) => t.id === opened.tab.id);
           current.project = structuredClone(image);
           current.revision = (current.revision || 0) + 1;

@@ -2,6 +2,7 @@
 // 打开时焦点给"取消"（危险的确认不让回车误触），但程序给的焦点不画焦点框（只有键盘操作时才画）。
 // Tab 在对话框里循环。
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { CheckRow, Icon } from './controls';
 import { Presence } from './motion';
 import { ToWin, useDismiss } from './layer';
 
@@ -114,6 +115,7 @@ export interface ConfirmOptions {
   danger?: boolean;
   /** 只有一个按钮 */
   single?: boolean;
+  checkbox?: (checked: boolean) => void;
 }
 /** 确认框：标题、说明、可选的引文，"取消"和确认按钮。 */
 export function Confirm({
@@ -123,18 +125,46 @@ export function Confirm({
   options: ConfirmOptions | null;
   onAnswer: (ok: boolean) => void;
 }) {
+  const [checked, setChecked] = useState(false);
+  useEffect(() => {
+    if (!options) setChecked(false);
+  }, [options]);
   const last = useRef(options);
   if (options) last.current = options;
   const o = options || last.current;
   return (
-    <Dialog open={!!options} onClose={() => onAnswer(false)} label={o?.title || ''}>
+    <Dialog
+      className={o?.checkbox ? 'close-ask' : undefined}
+      open={!!options}
+      onClose={() => onAnswer(false)}
+      label={o?.title || ''}
+    >
       {o && (
         <>
-          <h3>{o.title}</h3>
+          {o.checkbox ? (
+            <div className="bar">
+              <h3>{o.title}</h3>
+              <span className="sp" />
+              <button
+                className="btn quiet sm icon"
+                aria-label="取消关闭标签页"
+                onClick={() => onAnswer(false)}
+              >
+                <Icon name="close-line" />
+              </button>
+            </div>
+          ) : (
+            <h3>{o.title}</h3>
+          )}
           {o.body && <p>{o.body}</p>}
           {o.quote && <p className="dlg-quote">{o.quote}</p>}
           {o.tail && <p>{o.tail}</p>}
           <div className="acts">
+            {o.checkbox && (
+              <CheckRow className="lcheck ca-remember" on={checked} onChange={setChecked}>
+                不再询问
+              </CheckRow>
+            )}
             {!o.single && (
               <button className="btn quiet" onClick={() => onAnswer(false)}>
                 {o.cancel || '取消'}
@@ -142,7 +172,10 @@ export function Confirm({
             )}
             <button
               className={`btn ${o.danger ? 'line-danger' : 'ink'}`}
-              onClick={() => onAnswer(true)}
+              onClick={() => {
+                o.checkbox?.(checked);
+                onAnswer(true);
+              }}
             >
               {o.ok}
             </button>

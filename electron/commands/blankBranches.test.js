@@ -148,8 +148,9 @@ it('creates token-free blank defaults, validates overrides and settings, and cle
     expect((await dispatch('generate.queue', { tabId: first.tab.id, count: 1 })).ok).toBe(false);
     expect(preferences.generationSettings().blankModel).toBe('last');
     await call('workbench.close', { tabId: first.tab.id });
-    expect(database.versions.work(first.tab.workId)).toBeUndefined();
+    expect(database.versions.work(first.tab.workId)).toBeDefined();
     await restart();
+    expect(database.versions.work(first.tab.workId)).toBeUndefined();
     expect((await call('workbench.list')).tabs).toEqual([]);
     expect(await database.loadLibraryCards()).toEqual([]);
   }));
@@ -168,7 +169,7 @@ it('supports all fixed models, validates input, restores blank sessions and pres
       expect(next.tab.project.paramsSource).toBe('defaults');
       expect((await call('workbench.list')).activeTabId).toBe(active);
       await call('workbench.close', { tabId: next.tab.id });
-      expect(database.versions.work(next.tab.workId)).toBeUndefined();
+      expect(database.versions.work(next.tab.workId)).toBeDefined();
     }
     expect(preferences.generationSettings().blankModel).toBe(MODEL_ORDER.at(-1));
     expect(
@@ -1365,14 +1366,14 @@ it('saves shared origins, opens each work explicitly, detaches only one work and
     ]);
   }));
 
-it('discards unsaved image works but retains explicitly saved originals with no generated versions', () =>
+it('retains a closed image draft for reopening and preserves explicitly saved originals', () =>
   fixture(async ({ call, database, directory }) => {
     const [file] = await createWorkbenchFixtures(path.join(directory, 'synthetic-unsaved'), {
       sizes: [[64, 64]],
     });
     const temporary = (await call('workbench.open', { path: file })).tab;
     await call('workbench.close', { tabId: temporary.id });
-    expect(database.versions.work(temporary.workId)).toBeUndefined();
+    expect(database.versions.work(temporary.workId)).toBeDefined();
     const saved = (await call('workbench.open', { path: file })).tab;
     const document = await call('work.save', { tabId: saved.id });
     expect(document.tab.workSaved).toBe(true);

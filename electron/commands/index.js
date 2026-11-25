@@ -13,7 +13,6 @@ import { openCommandSession, mergeSession } from './session.js';
 import {
   addWorkbenchTab,
   createWorkbenchTab,
-  closeWorkbenchTab,
   workbenchTabHasChanges,
 } from '../../src/lib/workbenchSession.js';
 import {
@@ -55,7 +54,7 @@ import { saveWorkbenchImage } from './saveWorkbenchImage.js';
  * readImage:(path:string)=>Promise<Project>, readSource:(source:Source)=>Promise<Project>,
  * importImage:(path:string,draft?:Project)=>Promise<Project>,
  * database:Awaited<ReturnType<import('../database.js').openDatabase>>,
- * busy:()=>boolean, prepareUI?:()=>Promise<void>, emit?:(event:CommandEvent)=>void,
+ * busy:()=>boolean, prepareUI?:()=>Promise<void>, emit?:(event:CommandEvent, exclude?:Electron.WebContents)=>void,
  * remember?:(tab:Tab)=>void
  * handlers?:Partial<Handlers>
  * selectSource?:(caller:Caller)=>Promise<Source|null>, readyLibrary?:()=>Promise<void>
@@ -70,22 +69,41 @@ export async function createCommands(services) {
   const store = await openCommandSession(services.directory, async (source) =>
     hydrateParameters(await services.readSource(source)),
   );
+  /** @type {Map<string,{tab:Tab,key:string,view:Tab}>} */
+  const views = new Map();
+  /** @param {Tab} tab @param {number} [count] */
+  function savedTab(tab, count) {
+    const nsfw = tab.project && services.database.nsfw.state(tab.project);
+    const originalNsfw = tab.originalProject && services.database.nsfw.state(tab.originalProject);
+    const versionCount = count ?? services.database.versions?.count?.(tab.workId) ?? 0;
+    const workSaved = services.database.versions?.isSaved(tab.workId) || false;
+    const key = JSON.stringify([nsfw, originalNsfw, versionCount, workSaved]);
+    const cached = views.get(tab.id);
+    if (cached?.tab === tab && cached.key === key) return cached.view;
+    const view = {
+      ...tab,
+      project: tab.project && nsfw ? { ...tab.project, nsfw } : tab.project,
+      originalProject:
+        tab.originalProject && originalNsfw
+          ? { ...tab.originalProject, nsfw: originalNsfw }
+          : tab.originalProject,
+      versionCount,
+      workSaved,
+    };
+    views.set(tab.id, { tab, key, view });
+    return view;
+  }
   /** @param {Session} session */
-  const savedSession = (session) => ({
-    ...session,
-    tabs: session.tabs.map((t) => ({
-      ...t,
-      project: t.project ? { ...t.project, nsfw: services.database.nsfw.state(t.project) } : null,
-      originalProject: t.originalProject
-        ? { ...t.originalProject, nsfw: services.database.nsfw.state(t.originalProject) }
-        : null,
-      workSaved: services.database.versions?.isSaved(t.workId) || false,
-    })),
-  });
+  const savedSession = (session) => {
+    const counts = services.database.versions?.counts?.(
+      session.tabs.map((t) => t.workId).filter(Boolean),
+    );
+    return { ...session, tabs: session.tabs.map((t) => savedTab(t, counts?.get(t.workId) ?? 0)) };
+  };
   services.database.versions?.setWorkNameResolver(
-    () => new Map(store.get().tabs.map((t) => [t.workId, t.displayName])),
+    () => new Map(store.snapshot().tabs.map((t) => [t.workId, t.displayName])),
   );
-  const restored = savedSession(store.get());
+  const restored = store.hasIndex ? { version: 2, tabs: [], activeTabId: '' } : store.get();
   for (const t of restored.tabs) {
     if (t.project) t.project = hydrateParameters(t.project);
     if (t.originalProject) t.originalProject = hydrateParameters(t.originalProject);
@@ -100,9 +118,9 @@ export async function createCommands(services) {
   const undo = new Map();
   /** @param {string} id */
   const tab = (id) => {
-    const found = store.get().tabs.find((t) => t.id === id);
+    const found = store.snapshot().tabs.find((t) => t.id === id);
     if (!found) throw new CommandError('not_found', '标签页不存在，请重新读取工作台');
-    return found;
+    return structuredClone(found);
   };
   /** @param {string} id */
   const project = (id) => {
@@ -125,6 +143,8 @@ export async function createCommands(services) {
     return {
       tab: {
         ...value,
+        hasChanges: store.snapshot().tabs.find((t) => t.id === value.id)?.hasChanges,
+        versionCount: services.database.versions?.count?.(value.workId) || 0,
         workSaved: services.database.versions?.isSaved(value.workId) || false,
         project: refreshed,
       },
@@ -136,14 +156,65 @@ export async function createCommands(services) {
       revision: value.revision || 0,
     };
   };
-  /** @param {Partial<import('../../src/shared/commands').WorkbenchCommandEvent>} [extra] */
-  const emit = (extra = {}) =>
-    services.emit?.({
-      type: 'workbench',
-      session: savedSession(store.get()),
-      source: source(),
-      ...extra,
+  let lastPublished = store.snapshot();
+  /** @param {Session} before @param {string | undefined} [tabId] @param {boolean} [refreshLibrary] */
+  function patch(before, tabId, refreshLibrary = false) {
+    const current = store.snapshot();
+    const prior = new Map(before.tabs.map((t) => [t.id, t]));
+    const workId = current.tabs.find((t) => t.id === tabId)?.workId;
+    const tabs = current.tabs.flatMap((t) => {
+      const changed = prior.get(t.id) !== t;
+      if (!changed && t.id !== tabId && !(refreshLibrary && (!tabId || t.workId === workId)))
+        return [];
+      const old = views.get(t.id)?.view;
+      const view = savedTab(t);
+      return changed || view !== old ? [view] : [];
     });
+    const order = current.tabs.map((t) => t.id);
+    const live = new Set(order);
+    for (const id of views.keys()) if (!live.has(id)) views.delete(id);
+    return { version: current.version, activeTabId: current.activeTabId, tabs, order };
+  }
+  /** @param {Partial<import('../../src/shared/commands').WorkbenchCommandEvent>} [extra] */
+  const emit = (extra = {}) => {
+    const session = patch(lastPublished, extra.tabId, extra.libraryChanged);
+    lastPublished = store.snapshot();
+    services.emit?.({ type: 'workbench', source: source(), session, ...extra });
+  };
+  /** @type {{undoId:string,activeTabId:string,items:{tab:Tab,index:number}[]}[]} */
+  const closedBatches = [];
+  /** @param {string|undefined} workId */
+  const retained = (workId) =>
+    !!workId && closedBatches.some((b) => b.items.some((i) => i.tab.workId === workId));
+  /** @param {{tab:Tab}[]} items */
+  function discardReleased(items) {
+    const open = new Set(store.snapshot().tabs.map((t) => t.workId));
+    for (const id of new Set(items.map((i) => i.tab.workId)))
+      if (id && !open.has(id) && !retained(id)) generation.discardEmpty?.(id);
+  }
+  /** @param {string[]} tabIds */
+  async function closeTabs(tabIds) {
+    const current = store.snapshot();
+    const ids = new Set(tabIds);
+    const items = current.tabs.flatMap((tab, index) => (ids.has(tab.id) ? [{ tab, index }] : []));
+    if (!items.length) return { closed: 0, undoId: '' };
+    const tabs = current.tabs.filter((t) => !ids.has(t.id));
+    const activeIndex = current.tabs.findIndex((t) => t.id === current.activeTabId);
+    const activeTabId = ids.has(current.activeTabId)
+      ? current.tabs
+          .slice(0, activeIndex)
+          .reverse()
+          .find((t) => !ids.has(t.id))?.id ||
+        tabs[0]?.id ||
+        ''
+      : current.activeTabId;
+    await store.save({ ...current, tabs, activeTabId });
+    const undoId = crypto.randomUUID();
+    closedBatches.push({ undoId, items, activeTabId: current.activeTabId });
+    if (closedBatches.length > 20) discardReleased(closedBatches.shift().items);
+    emit();
+    return { closed: items.length, undoId };
+  }
   /** @param {EditingTarget} target */
   const unlocked = (target) => {
     if (
@@ -173,9 +244,8 @@ export async function createCommands(services) {
       revision: (current.revision || 0) + 1,
       updatedAt: new Date().toISOString(),
     };
-    const session = store.get();
-    session.tabs = session.tabs.map((t) => (t.id === next.id ? next : t));
-    await store.save(session);
+    const session = store.snapshot();
+    await store.save({ ...session, tabs: session.tabs.map((t) => (t.id === next.id ? next : t)) });
     services.remember?.(next);
     let undoId;
     if (source() === 'agent' && current.project) {
@@ -222,7 +292,7 @@ export async function createCommands(services) {
     'app.status': async () => ({
       version: services.version,
       libraryCount: (await services.database.loadLibraryCards()).length,
-      workbenchTabs: store.get().tabs.length,
+      workbenchTabs: store.snapshot().tabs.length,
       revision: store.revision(),
     }),
     'image.read': async (input) => {
@@ -230,14 +300,14 @@ export async function createCommands(services) {
       return { project: p, document: createPromptDocument(p) };
     },
     'workbench.list': () => ({
-      tabs: store.get().tabs.map((t) => ({
+      tabs: store.snapshot().tabs.map((t) => ({
         id: t.id,
         name: t.displayName,
         revision: t.revision || 0,
         dirty: workbenchTabHasChanges(t),
         source: t.source,
       })),
-      activeTabId: store.get().activeTabId,
+      activeTabId: store.snapshot().activeTabId,
     }),
     'workbench.get': (input) => full(tab(input.tabId)),
     'workbench.open': async (input, caller) => {
@@ -259,26 +329,64 @@ export async function createCommands(services) {
         const reopened = await generation.openSource?.(origin, image, input.workId);
         if (reopened) return reopened;
       }
-      const session = store.get();
+      const session = store.snapshot();
       let next = /** @type {Session} */ (addWorkbenchTab(session, image, { source: origin }));
       if (fresh || session.tabs.some((t) => t.id === next.activeTabId && t.workId)) {
         const created = createWorkbenchTab(image, { source: origin });
         created.identity = `work:${created.id}`;
         next = { ...session, tabs: [...session.tabs, created], activeTabId: created.id };
       }
-      for (const t of next.tabs) t.revision ??= 0;
-      await store.save(next);
-      await generation.initialize?.(tab(next.activeTabId));
+      const opened = { .../** @type {Tab} */ (next.tabs.find((t) => t.id === next.activeTabId)) };
+      opened.revision ??= 0;
+      await generation.initialize?.(opened, true);
+      try {
+        await store.save({
+          ...next,
+          tabs: next.tabs.map((t) => (t.id === opened.id ? opened : t)),
+        });
+      } catch (error) {
+        if (!session.tabs.some((t) => t.workId === opened.workId))
+          generation.discardEmpty?.(opened.workId);
+        throw error;
+      }
       emit({ tabId: next.activeTabId });
       return full(tab(next.activeTabId));
+    },
+    'workbench.close-tabs': ({ tabIds }) => closeTabs(tabIds),
+    'workbench.reopen': async ({ undoId }) => {
+      const index =
+        undoId === undefined
+          ? closedBatches.length - 1
+          : closedBatches.findIndex((b) => b.undoId === undoId);
+      if (index < 0) return { reopened: 0 };
+      const batch = closedBatches[index];
+      const current = store.snapshot();
+      const tabs = [...current.tabs];
+      let active = '',
+        duplicate = '';
+      for (const entry of batch.items) {
+        const existing = tabs.find(
+          (t) => t.id === entry.tab.id || t.identity === entry.tab.identity,
+        );
+        if (!existing) tabs.splice(Math.min(entry.index, tabs.length), 0, entry.tab);
+        else duplicate = existing.id;
+        if (entry.tab.id === batch.activeTabId) active = existing?.id || entry.tab.id;
+      }
+      await store.save({
+        ...current,
+        tabs,
+        activeTabId: active || duplicate || current.activeTabId || tabs[0].id,
+      });
+      closedBatches.splice(index, 1);
+      discardReleased(batch.items);
+      emit();
+      return { reopened: batch.items.length };
     },
     'workbench.close': async (input) => {
       const value = tab(input.tabId);
       revision(input.expectedRevision, value.revision || 0);
       unlocked(input);
-      await store.save(closeWorkbenchTab(store.get(), input.tabId));
-      generation.discardEmpty?.(value.workId);
-      emit();
+      await closeTabs([input.tabId]);
       return { closed: input.tabId };
     },
     'workbench.save-to-library': async (input) => {
@@ -564,9 +672,12 @@ export async function createCommands(services) {
         revision: store.revision(),
       };
     },
-    'workbench.session': async (input) => savedSession(await store.migrate(input)),
-    'workbench.commit': async (input) => {
-      const previous = store.get();
+    'workbench.session': async (input) => {
+      await store.migrate(input, true);
+      return savedSession(store.snapshot());
+    },
+    'workbench.commit': async (input, caller) => {
+      const previous = store.snapshot();
       let next;
       try {
         next = mergeSession(
@@ -581,12 +692,15 @@ export async function createCommands(services) {
         throw error;
       }
       await store.save(next);
-      for (const old of previous.tabs)
-        if (!next.tabs.some((t) => t.id === old.id)) generation.discardEmpty?.(old.workId);
+      const liveIds = new Set(next.tabs.map((t) => t.id));
+      discardReleased(previous.tabs.filter((t) => !liveIds.has(t.id)).map((tab) => ({ tab })));
       const active = next.tabs.find((t) => t.id === next.activeTabId);
       if (active?.workId && previous.activeTabId !== next.activeTabId)
         services.database.versions.touch(active.workId, active.versionId);
-      return savedSession(store.get());
+      const delta = patch(previous);
+      lastPublished = store.snapshot();
+      services.emit?.({ type: 'workbench', source: source(), session: delta }, caller.sender);
+      return input.next.order ? delta : savedSession(store.snapshot());
     },
     'workbench.editing': (input) => {
       editing = input.targets;
@@ -607,7 +721,15 @@ export async function createCommands(services) {
       return savedSession(store.get());
     },
   };
-  const generation = generationCommands({ services, store, tab, revision, unlocked, emit });
+  const generation = generationCommands({
+    services,
+    store,
+    tab,
+    revision,
+    unlocked,
+    emit,
+    retained,
+  });
   const trashMaintenance = createTrashMaintenance({ services, emit });
   const random = randomCommands({ services, store, tab, edit, locate, unlocked, emit });
   await generation.ready?.();
@@ -694,13 +816,22 @@ export async function createCommands(services) {
       };
     }
   }
+  const restoreBackup = store.restoreBackup;
+  store.restoreBackup = async (saved) => {
+    await restoreBackup(saved);
+    closedBatches.length = 0;
+    undo.clear();
+    views.clear();
+  };
   return {
     dispatch,
     close: async () => {
       await trashMaintenance.close();
       await generation.close();
+      discardReleased(closedBatches.splice(0).flatMap((b) => b.items));
     },
     store,
+    retainedTabs: () => closedBatches.flatMap((b) => b.items.map((i) => i.tab)),
     clearEditing: () => {
       editing = [];
     },

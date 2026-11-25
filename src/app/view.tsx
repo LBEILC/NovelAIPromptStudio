@@ -664,6 +664,7 @@ export function renderApp({
                 tail: confirmation.detail,
                 ok: confirmation.okText || '确定',
                 danger: Boolean(confirmation.danger),
+                checkbox: confirmation.checkbox,
               }
             : null
         }

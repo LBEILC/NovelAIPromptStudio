@@ -1,4 +1,5 @@
-import { useCallback, useEffect } from 'react';
+import { isMod } from '../kit/controls';
+import { useCallback, useEffect, useRef } from 'react';
 import { invokeResult, invokeUI } from '../lib/commands';
 import { isTextEditingTarget } from '../lib/contextMenu.js';
 import { installFileDrop } from '../lib/fileDrop.js';
@@ -8,7 +9,6 @@ import { assessDroppedFiles, assessWorkbenchDroppedFiles } from '../lib/importDr
 import { isImportActive } from '../lib/importProgress.js';
 import {
   addWorkbenchTab,
-  closeWorkbenchTab,
   cycleWorkbenchTab,
   workbenchTabHasChanges,
 } from '../lib/workbenchSession.js';
@@ -331,30 +331,90 @@ export function useWorkbenchActions({
 
   dropHandlerRef.current = page === 'workbench' ? openDroppedWorkbenchImages : importImages;
 
-  const closeTab = useCallback(
-    async (tabId: string) => {
-      const tab = workbenchSession.tabs.find((item) => item.id === tabId);
-      if (!tab) return;
-      if (
-        workbenchTabHasChanges(tab) &&
-        !(await requestConfirmation({
-          title: '关闭已修改的标签页？',
-          // 和标签页一样：起过名字才写名字，没起名的不拿文件名（图片库里是一串哈希）凑数
-          message:
-            tab.project && hasImageName(tab.project)
-              ? `「${tab.project.name}」的提示词改过了。`
-              : '这个标签页的提示词改过了。',
-          detail: '关闭后这些修改会丢失，其他标签页不受影响。',
-          okText: '丢弃并关闭',
-          danger: true,
-        }))
-      )
-        return;
-      setWorkbenchSession((current) => closeWorkbenchTab(current, tabId));
+  const reopen = useCallback(
+    async (undoId?: string) => {
+      try {
+        await workbenchConnection?.flush();
+        const result = await invokeUI('workbench.reopen', { undoId });
+        if (result.reopened) setPage('workbench');
+      } catch (error) {
+        showToast((error as Error).message, 'error');
+      }
     },
-    [requestConfirmation, workbenchSession.tabs],
+    [workbenchConnection, setPage, showToast],
   );
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!isMod(event) || !event.shiftKey || event.altKey || event.key.toLowerCase() !== 't')
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      void reopen();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [reopen]);
+
+  const closing = useRef(false);
+  const closeTab = useCallback(
+    async (ids: string | string[]) => {
+      if (closing.current) return;
+      closing.current = true;
+      try {
+        await workbenchConnection?.flush();
+        const selected = new Set(typeof ids === 'string' ? [ids] : ids);
+        const tabs = (workbenchConnection?.current || workbenchSession).tabs.filter((t) =>
+          selected.has(t.id),
+        );
+        if (!tabs.length) return;
+        const changed = tabs.filter(workbenchTabHasChanges).length;
+        const multiple = tabs.length > 1;
+        const project = tabs[0].project;
+        const name = project && hasImageName(project) ? project.name : '';
+        if (changed && (await invokeUI('settings.productivity.get', {})).confirmCloseChangedTabs) {
+          let remember = false;
+          if (
+            !(await requestConfirmation({
+              title: multiple ? `关闭 ${tabs.length} 个标签页？` : '关闭已修改的标签页？',
+              message: multiple
+                ? `其中 ${changed} 个有未生成的改动。`
+                : name
+                  ? `「${name}」的提示词改过了。`
+                  : '这个标签页的提示词改过了。',
+              detail: `关闭后可以在通知里撤销，或按 ${document.documentElement.dataset.platform === 'macos' ? 'Cmd' : 'Ctrl'} Shift T 重新打开。`,
+              okText: '关闭',
+              checkbox: (checked) => {
+                remember = checked;
+              },
+            }))
+          )
+            return;
+          if (remember)
+            await invokeUI('settings.productivity.save', {
+              settings: { confirmCloseChangedTabs: false },
+            });
+        }
+        const { closed, undoId } = await invokeUI('workbench.close-tabs', {
+          tabIds: tabs.map((t) => t.id),
+        });
+        if (closed && (multiple || changed))
+          notify({
+            text: multiple
+              ? `已关闭 ${closed} 个标签页`
+              : name
+                ? `已关闭「${name}」`
+                : '已关闭标签页',
+            action: { label: '撤销', onClick: () => void reopen(undoId) },
+          });
+      } catch (error) {
+        showToast((error as Error).message, 'error');
+      } finally {
+        closing.current = false;
+      }
+    },
+    [workbenchConnection, workbenchSession, requestConfirmation, notify, reopen, showToast],
+  );
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey)) return;

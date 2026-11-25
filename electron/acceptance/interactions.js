@@ -93,7 +93,7 @@ async function closeAddedTabs(h, previous) {
     await context(h, `document.querySelector('[data-tab="${id}"]')`);
     await h.click('关闭', menu);
     if (await h.evaluate('!!document.querySelector("[role=dialog]:not(.leaving *)")'))
-      await h.click('丢弃并关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
+      await h.click('关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
     await h.wait(`!document.querySelector('[data-tab="${id}"]')`);
   }
 }

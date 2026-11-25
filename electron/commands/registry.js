@@ -636,6 +636,13 @@ export const commandRegistry = {
     mutation: true,
   },
   'workbench.get': { uiOnly: false, fields: { tabId: 'string' }, required: ['tabId'] },
+  'workbench.close-tabs': {
+    uiOnly: true,
+    mutation: true,
+    fields: { tabIds: 'strings' },
+    required: ['tabIds'],
+  },
+  'workbench.reopen': { uiOnly: true, mutation: true, fields: { undoId: 'string' } },
   'workbench.close': { uiOnly: false, fields: tab, required: ['tabId'], mutation: true },
   'workbench.save-to-library': { uiOnly: false, fields: tab, required: ['tabId'], mutation: true },
   'prompt.set': {
@@ -939,6 +946,7 @@ function valid(value, type) {
       productivitySettings: {
         recentImageDirectory: 'text',
         autoCheckUpdates: 'boolean',
+        confirmCloseChangedTabs: 'boolean',
         closeAction: 'ask|tray|quit',
       },
     };
@@ -1000,6 +1008,11 @@ function valid(value, type) {
     return (
       record(value) &&
       value.version === 2 &&
+      (value.order === undefined ||
+        (Array.isArray(value.order) &&
+          value.order.length <= 1000 &&
+          value.order.every((id) => valid(id, 'string')) &&
+          new Set(value.order).size === value.order.length)) &&
       typeof value.activeTabId === 'string' &&
       Array.isArray(value.tabs) &&
       value.tabs.length <= 1000 &&

@@ -46,12 +46,15 @@ export async function agentConflictChecks({ h, call, files }) {
     const result = await window.studio.invoke('workbench.commit', {base:initial.data, next});
     if (!result.ok) throw Error(result.error.message);
   })()`);
-  await h.click('丢弃并关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
+  await h.click('关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
   await h.wait(`!document.querySelector('[data-tab="${id}"]')`);
-  await h.check(
-    '冲突标签页关闭后主进程中不再存在',
-    async () => !(await call('workbench.list')).tabs.some((t) => t.id === id),
-  );
+  await h.check('关闭后移出会话，找回时保留并发写入的草稿', async () => {
+    if ((await call('workbench.list')).tabs.some((t) => t.id === id)) return false;
+    const recovered = await h.evaluate("window.studio.invoke('workbench.reopen',{})");
+    const draft = await call('workbench.get', { tabId: id });
+    await call('workbench.close', { tabId: id });
+    return recovered.ok && draft.tab.project.metadata.prompt_raw === 'concurrent close draft';
+  });
   await h.evaluate(`document.querySelector('[data-tab="${other.tab.id}"]').click()`);
   await h.wait(`!!document.querySelector('[data-tab="${other.tab.id}"][aria-selected=true]')`);
   await h.evaluate(`document.querySelector('.tags .tag[data-tag-key]').click()`);

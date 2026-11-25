@@ -421,6 +421,7 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
   const productivitySettings = () => {
     const stored = read().productivity || {};
     return {
+      confirmCloseChangedTabs: stored.confirmCloseChangedTabs !== false,
       recentImageDirectory: normalizeRecentImageDirectory(stored.recentImageDirectory),
       autoCheckUpdates: stored.autoCheckUpdates !== false,
       closeAction: ['ask', 'tray', 'quit'].includes(stored.closeAction)
@@ -438,6 +439,8 @@ export function openPreferences(dataDirectory, safeStorage, options = {}) {
         Boolean(next.recentImageDirectory),
       );
     }
+    if (next.confirmCloseChangedTabs !== undefined)
+      productivity.confirmCloseChangedTabs = !!next.confirmCloseChangedTabs;
     if (next.autoCheckUpdates !== undefined)
       productivity.autoCheckUpdates = Boolean(next.autoCheckUpdates);
     if (next.closeAction !== undefined) {
