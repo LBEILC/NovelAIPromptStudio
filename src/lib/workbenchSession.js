@@ -225,6 +225,10 @@ export function parseWorkbenchSession(value) {
 }
 
 export function workbenchTabHasChanges(tab) {
+  return tab?.hasChanges ?? computeWorkbenchTabHasChanges(tab);
+}
+
+export function computeWorkbenchTabHasChanges(tab) {
   if (!tab?.project || (!tab?.originalProject && !tab?.savedDraft)) return false;
   const comparableSnapshot = (project) =>
     JSON.stringify(normalizePromptChangeValue(promptSnapshot(project)));

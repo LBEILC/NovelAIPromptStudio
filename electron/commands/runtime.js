@@ -111,9 +111,10 @@ export async function installCommandRuntime(options) {
       if (!windows.length) windows.push(options.createWindow());
       for (const window of windows) await prepareWindow(window);
     },
-    emit: (event) => {
+    emit: (event, exclude) => {
       options.onEvent?.(event);
-      for (const window of BrowserWindow.getAllWindows()) sendWindowEvent(window, event);
+      for (const window of BrowserWindow.getAllWindows())
+        if (window.webContents !== exclude) sendWindowEvent(window, event);
     },
   });
   ipcMain.on('studio:command-prepared', (event, id, error) => {
@@ -169,6 +170,7 @@ export async function installCommandRuntime(options) {
       return {};
     });
   await setup.refresh();
+  commands.store.connectWriter();
   const server = await startCommandServer({
     directory,
     dispatch: (name, input) => commands.dispatch(name, input, 'agent'),
@@ -190,6 +192,7 @@ export async function installCommandRuntime(options) {
     close: async () => {
       await commands.close();
       await server.close();
+      commands.store.closeWriter();
     },
     endpoint: server.endpoint,
   };

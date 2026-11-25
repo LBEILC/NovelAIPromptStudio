@@ -49,7 +49,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
       '!!document.querySelector("[role=dialog]:not(.leaving *)") || !document.querySelector(".tabs [data-tab]")',
     );
     if (await e('!!document.querySelector("[role=dialog]:not(.leaving *)")'))
-      await click('丢弃并关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
+      await click('关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
     await wait('!document.querySelector(".tabs [data-tab]")');
     doubles.selections.push({ canceled: false, filePaths: [files[0]] });
     await click('打开图片', 'document.querySelector(".tb")');
@@ -591,7 +591,7 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
     '!!document.querySelector("[role=dialog]:not(.leaving *)") || !document.querySelector(".tabs [data-tab]")',
   );
   if (await e('!!document.querySelector("[role=dialog]:not(.leaving *)")'))
-    await click('丢弃并关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
+    await click('关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
   await wait('!document.querySelector(".tabs [data-tab]")');
   doubles.selections.push({ canceled: false, filePaths: [files[0]] });
   await click('打开图片', 'document.querySelector(".tb")');
@@ -812,21 +812,63 @@ export async function workbenchChecks({ h, mode, doubles, database, preferences 
   await wait('!!document.querySelector("[role=dialog]:not(.leaving *)")');
   await check(
     '中键关闭修改过的标签页先确认且未丢失草稿',
-    'document.querySelectorAll(".tabs [data-tab]").length===3 && document.querySelector("[role=dialog]:not(.leaving *)").textContent.includes("丢弃并关闭")',
+    'document.querySelectorAll(".tabs [data-tab]").length===3 && document.querySelector("[role=dialog]:not(.leaving *)").textContent.includes("关闭已修改的标签页")',
     undefined,
     'once',
   );
   await click('取消', 'document.querySelector("[role=dialog]:not(.leaving *)")');
-  for (let i = 0; i < 3; i++) {
-    const count = await e('document.querySelectorAll(".tabs [data-tab]").length');
-    await key('w', modifier);
-    await wait(
-      `!!document.querySelector('[role=dialog]:not(.leaving *)') || document.querySelectorAll('.tabs [data-tab]').length < ${count}`,
+  const dialog = 'document.querySelector("[role=dialog]:not(.leaving *)")';
+  const tabMenu = async (label) => {
+    await e(
+      "document.querySelector('.tabs [data-tab]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:280,clientY:25}))",
     );
-    if (await e('!!document.querySelector("[role=dialog]:not(.leaving *)")'))
-      await click('丢弃并关闭', 'document.querySelector("[role=dialog]:not(.leaving *)")');
-    await wait(`document.querySelectorAll('.tabs [data-tab]').length < ${count}`);
-  }
+    await click(label, 'document.querySelector(".menu:not(.leaving)")');
+  };
+  const original = await e(session);
+  const dirty = original.tabs.slice(1).filter((t) => t.hasChanges).length;
+  await tabMenu('关闭其他标签页');
+  await wait(
+    `document.querySelectorAll('[role=dialog]:not(.leaving *)').length===1 && ${dialog}.textContent.includes("其中 ${dirty} 个有未生成的改动。")`,
+  );
+  await click('关闭', dialog);
+  await wait(`(${session}).tabs.length===1`);
+  await click(
+    '撤销',
+    '[...document.querySelectorAll(".toast")].find(t=>t.textContent.includes("已关闭 2 个标签页"))',
+  );
+  await wait(`(${session}).tabs.length===3`);
+  const restored = await e(session);
+  await check(
+    '关闭其他只确认一次，通知撤销恢复顺序、当前页和草稿',
+    () => JSON.stringify(restored) === JSON.stringify(original),
+  );
+  await tabMenu('关闭所有标签页');
+  await click('不再询问', dialog);
+  await click('关闭', dialog);
+  await wait('!!document.querySelector(".pages .empty")');
+  await h.section('通用');
+  await key('t', { ...modifier, shiftKey: true });
+  await wait(`document.querySelectorAll('.tabs [data-tab]').length===3`);
+  await check(
+    '从设置页用快捷键找回整批标签页',
+    async () => JSON.stringify(await e(session)) === JSON.stringify(original),
+  );
+  await key('w', modifier);
+  await wait(`(${session}).tabs.length===2`);
+  await check('记住选择后直接关闭已修改的标签页', `!${dialog}`);
+  await h.section('通用');
+  await click('关闭有改动的标签页前询问');
+  await key('t', { ...modifier, shiftKey: true });
+  await wait(`document.querySelectorAll('.tabs [data-tab]').length===3`);
+  await key('w', modifier);
+  await wait(`!!${dialog}`);
+  await check(
+    '设置重新开启询问后再关闭会弹框',
+    `${dialog}.textContent.includes("关闭已修改的标签页")`,
+  );
+  await click('取消', dialog);
+  await tabMenu('关闭所有标签页');
+  await click('关闭', dialog);
   await wait('!!document.querySelector(".pages .empty")');
   for (const project of database.loadLibrary('all')) {
     if (project.metadata.prompt_raw === workbenchRaw) database.deleteProject(project.id);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Seg } from '../kit/controls';
+import { Seg, Switch } from '../kit/controls';
 import { useNotifications } from '../kit/toast';
 import { invokeUI } from '../lib/commands';
 import { BUNDLED_FONTS, partitionFontFamilies, quoteFontFamily } from '../lib/fonts.js';
@@ -14,11 +14,14 @@ export function Appearance() {
   const { appearance, changeAppearance } = useAppearance();
   // 关闭主窗口时（2.28）：只在 Windows；macOS 照系统习惯，关窗口后程序留在 Dock
   const windows = document.documentElement.dataset.platform === 'windows';
+  const [confirmClose, setConfirmClose] = useState(true);
   const [closeAction, setCloseAction] = useState<ProductivitySettings['closeAction']>('ask');
   useEffect(() => {
-    if (!windows) return;
     invokeUI('settings.productivity.get', {})
-      .then((s) => setCloseAction(s.closeAction || 'ask'))
+      .then((s) => {
+        setConfirmClose(s.confirmCloseChangedTabs);
+        setCloseAction(s.closeAction || 'ask');
+      })
       .catch(() => {});
   }, [windows]);
   const saveClose = (value: ProductivitySettings['closeAction']) => {
@@ -132,6 +135,19 @@ export function Appearance() {
           />
         </Row>
       )}
+      <Row title="关闭有改动的标签页前询问">
+        <Switch
+          label="关闭有改动的标签页前询问"
+          on={confirmClose}
+          onChange={(value) => {
+            void invokeUI('settings.productivity.save', {
+              settings: { confirmCloseChangedTabs: value },
+            })
+              .then((s) => setConfirmClose(s.confirmCloseChangedTabs))
+              .catch((e) => notify({ text: errorText(e), tone: 'error' }));
+          }}
+        />
+      </Row>
     </SetPage>
   );
 }

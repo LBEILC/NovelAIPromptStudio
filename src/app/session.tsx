@@ -147,13 +147,15 @@ export function useSessionEffects({
     };
   }, [hydrateProject]);
 
-  useEffect(() => {
-    if (!workbenchSessionReady) return;
-    const temporaryPaths = workbenchSession.tabs
+  const clipboardPaths = JSON.stringify(
+    workbenchSession.tabs
       .filter((tab) => tab.source?.type === 'clipboard' && tab.source.path)
-      .map((tab) => tab.source.path!);
-    invokeUI('workbench.temp-sync', { paths: temporaryPaths });
-  }, [workbenchSession, workbenchSessionReady]);
+      .map((tab) => tab.source.path!),
+  );
+  useEffect(() => {
+    if (workbenchSessionReady)
+      void invokeUI('workbench.temp-sync', { paths: JSON.parse(clipboardPaths) });
+  }, [clipboardPaths, workbenchSessionReady]);
 
   useEffect(() => {
     const unsubscribe = onProgress('library:import-progress', (progress) =>

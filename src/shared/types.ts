@@ -378,6 +378,7 @@ export interface AppearanceSettings {
   motion: 'full' | 'reduced' | 'off';
 }
 export interface ProductivitySettings {
+  confirmCloseChangedTabs: boolean;
   recentImageDirectory: string;
   autoCheckUpdates: boolean;
   /** 关闭主窗口时（doc/design.md 2.28，只在 Windows）：每次询问 / 最小化到托盘 / 退出 */

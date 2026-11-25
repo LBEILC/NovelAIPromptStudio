@@ -1,4 +1,4 @@
-﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VersionListStore, type VersionList } from './versionListStore';
 import type { CommandEvent, CommandTab } from '../shared/commands';
 import type { GenerationJob, GenerationStatus, WorkVersion } from '../shared/generation';
@@ -85,9 +85,12 @@ describe('shared version lists', () => {
     store.receive(generation([{ state: 'completed', images: ['image'] }]));
     await vi.advanceTimersByTimeAsync(150);
     expect(load.mock.calls.map((c) => c[0])).toEqual(['a', 'b', 'a']);
+    store.subscribe('a', () => {});
     store.receive(workbench([tab('a', 2, 'next'), tab('b')], { libraryChanged: true }));
     await vi.advanceTimersByTimeAsync(150);
-    expect(load.mock.calls.map((c) => c[0])).toEqual(['a', 'b', 'a', 'a', 'b']);
+    expect(load.mock.calls.map((c) => c[0])).toEqual(['a', 'b', 'a', 'a']);
+    await store.read('b');
+    expect(load.mock.calls.at(-1)).toEqual(['b']);
   });
   it('also invalidates another tab displaying the same work', async () => {
     const load = vi.fn(async (_id: string) => result()),
@@ -99,19 +102,15 @@ describe('shared version lists', () => {
     await vi.advanceTimersByTimeAsync(150);
     expect(load.mock.calls.map((c) => c[0])).toEqual(['a', 'b', 'c', 'a', 'b']);
   });
-  it('keeps unchanged version references and publishes counts excluding the start', async () => {
+  it('keeps unchanged version references', async () => {
     const fixture = result();
     fixture.versions.unshift({ ...fixture.versions[0], id: 'start', isStart: true });
     const load = vi.fn(async () => structuredClone(fixture)),
-      store = new VersionListStore(load),
-      listener = vi.fn();
-    store.subscribeCounts(listener);
+      store = new VersionListStore(load);
     const first = await store.read('a');
     store.invalidate('a');
     await vi.advanceTimersByTimeAsync(150);
     expect(store.snapshot('a')!.versions[1]).toBe(first.versions[1]);
-    expect(store.countSnapshot()).toEqual({ a: 1 });
-    expect(listener).toHaveBeenCalledTimes(1);
   });
   it('discards a closed tab response and allows the tab to be read again', async () => {
     const pending = deferred<VersionList>(),

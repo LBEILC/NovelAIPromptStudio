@@ -26,6 +26,7 @@ const KEYS: [string, [string, ...string[][]][]][] = [
       ['聚焦搜索框', ['Mod', 'K']],
       ['下一个 / 上一个标签页', ['Mod', 'Tab'], ['Mod', 'Shift', 'Tab']],
       ['关闭当前标签页', ['Mod', 'W']],
+      ['重新打开关闭的标签页', ['Mod', 'Shift', 'T']],
     ],
   ],
   [

@@ -15,7 +15,7 @@ export async function saveWorkbenchImage({ services, store, emit }, value) {
     image_path: saved.image_path,
     thumbnail_path: saved.thumbnail_path,
   };
-  const next = store.get();
+  const next = store.draft(value.id);
   const item = next.tabs.find((t) => t.id === value.id);
   // A queued job may finish saving after its tab was closed or switched versions.
   if (item?.project?.image_path === original.image_path) {

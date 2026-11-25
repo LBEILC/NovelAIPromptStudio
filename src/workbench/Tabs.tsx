@@ -3,7 +3,7 @@
 // 拖动换位置（只能横着拖）：按被拖的标签页自己的位置判断，过了到相邻空位的一半就换；其他的让位。中键关闭。
 // 右键：关闭、关闭其他标签页、关闭右侧标签页、在图片库中显示。最右边的"+"点击新建空白作品（2.26a；没填令牌时是打开图片），
 // 右键是菜单：新建空白作品和几种打开方式。还没有图的空白作品按尺寸比例显示一个虚线框。
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { invokeUI } from '../lib/commands';
 import { hasImageName, imageFileName } from '../lib/imageNaming.js';
 import { BlurImg } from '../kit/blur';
@@ -21,7 +21,7 @@ import type { WorkbenchSession, WorkbenchTab } from '../state/workbench';
 export interface TabsProps {
   session: WorkbenchSession;
   onActivateTab: (id: string) => void;
-  onCloseTab: (id: string) => Promise<void> | void;
+  onCloseTab: (id: string | string[]) => Promise<void> | void;
   onReorderTab: (id: string, target: string) => void;
   onChooseImage: () => void;
   onNewBlank: () => void;
@@ -29,6 +29,14 @@ export interface TabsProps {
   onBrowseLibrary: () => void;
   onShowLibrary: (tab: WorkbenchTab) => void;
 }
+type TabMenu = { at: [number, number]; tab: WorkbenchTab | null };
+type TabActions = Pick<TabsProps, 'onActivateTab' | 'onCloseTab'> & {
+  setPeek: (id: string) => void;
+  setMenu: (menu: TabMenu) => void;
+  peek: string;
+  peekTimer: React.RefObject<number>;
+};
+const tabKey = (tab: WorkbenchTab) => tab.id;
 let dragging = false;
 blockTips(() => dragging);
 const shapeOf = (w = 1, h = 1) => (w > h ? 'wide' : w === h ? 'square' : '');
@@ -47,7 +55,7 @@ export function WorkbenchTabs(p: TabsProps) {
   const generation = useGeneration();
   const list = useRef<HTMLDivElement>(null);
   const counts = useVersionCounts(p.session.tabs, generation.settings.hasToken);
-  const [menu, setMenu] = useState<{ at: [number, number]; tab: WorkbenchTab | null } | null>(null);
+  const [menu, setMenu] = useState<TabMenu | null>(null);
   const [peek, setPeek] = useState('');
   const [lifted, setLifted] = useState('');
   const [overflow, setOverflow] = useState(false);
@@ -61,7 +69,17 @@ export function WorkbenchTabs(p: TabsProps) {
     setMore((m) => (m.l === l && m.r === r ? m : { l, r }));
   };
   const peekTimer = useRef(0);
-  const tabs = useExitList(p.session.tabs, (t) => t.id);
+  const actions = {
+    onActivateTab: p.onActivateTab,
+    onCloseTab: p.onCloseTab,
+    setPeek,
+    setMenu,
+    peek,
+    peekTimer,
+  };
+  const tabActions = useRef<TabActions>(actions);
+  tabActions.current = actions;
+  const tabs = useExitList(p.session.tabs, tabKey);
   // 关掉的那一个淡出、真正拿掉以后其他的补位，当前标记跟着重新对位
   useIndicator(list, [
     p.session.activeTabId,
@@ -237,7 +255,7 @@ export function WorkbenchTabs(p: TabsProps) {
     };
   }, []);
   const closeMany = async (ts: WorkbenchTab[]) => {
-    for (const t of ts) await p.onCloseTab(t.id);
+    await p.onCloseTab(ts.map((t) => t.id));
   };
   const menuItems: MenuEntry[] = !menu
     ? []
@@ -257,6 +275,7 @@ export function WorkbenchTabs(p: TabsProps) {
               disabled: i === p.session.tabs.length - 1,
               onSelect: () => void closeMany(p.session.tabs.slice(i + 1)),
             },
+            { label: '关闭所有标签页', onSelect: () => void closeMany(p.session.tabs) },
             ...(t.source.type === 'library'
               ? ['sep' as const, { label: '在图片库中显示', onSelect: () => p.onShowLibrary(t) }]
               : []),
@@ -367,82 +386,18 @@ export function WorkbenchTabs(p: TabsProps) {
       >
         <i className="ind" />
         <FlipScope root={list}>
-          {tabs.map(({ item: t, leaving }) => {
-            const img = t.project;
-            const name = img && hasImageName(img) ? img.name : '';
-            const on = t.id === p.session.activeTabId;
-            const busy = generation.jobs.some((j) => j.tabId === t.id && j.state === 'generating');
-            const dirty = workbenchTabHasChanges(t);
-            return (
-              <button
-                key={t.id}
-                data-tab={t.id}
-                data-key={`tab-${t.id}`}
-                data-flip={lifted === t.id ? undefined : ''}
-                className={`tab ${name ? '' : 'bare'} ${on ? 'on' : ''} ${lifted === t.id ? 'lifted' : ''} ${leaving ? 'leaving' : ''}`}
-                role="tab"
-                aria-selected={on}
-                aria-label={name || (img ? imageFileName(img) : '没有起名')}
-                tabIndex={on ? 0 : -1}
-                data-enter="fade"
-                data-no-tip=""
-                onClick={() => p.onActivateTab(t.id)}
-                onMouseDown={(e) => e.button === 1 && e.preventDefault()}
-                onAuxClick={(e) => {
-                  if (e.button !== 1) return;
-                  e.preventDefault();
-                  void p.onCloseTab(t.id);
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setPeek('');
-                  setMenu({ at: [e.clientX, e.clientY], tab: t });
-                }}
-                onPointerEnter={() => {
-                  clearTimeout(peekTimer.current);
-                  if (dragging) return;
-                  if (peek) setPeek(t.id);
-                  else peekTimer.current = window.setTimeout(() => setPeek(t.id), 400);
-                }}
-                onPointerLeave={() => {
-                  clearTimeout(peekTimer.current);
-                  peekTimer.current = window.setTimeout(() => setPeek(''), 80);
-                }}
-                onPointerDown={() => {
-                  clearTimeout(peekTimer.current);
-                  setPeek('');
-                }}
-              >
-                {on && <span className="cur" />}
-                {img && !img.image_path ? (
-                  <span
-                    className={`tab-blank ${shapeOf(img.metadata.width, img.metadata.height)}`}
-                  />
-                ) : (
-                  <BlurImg
-                    image={img}
-                    path={img?.thumbnail_path || img?.image_path || ''}
-                    tab={t.id}
-                    eye={false}
-                    className={shapeOf(img?.metadata.width, img?.metadata.height)}
-                    alt=""
-                    draggable={false}
-                  />
-                )}
-                {name && (
-                  <>
-                    <span className="nm">{name}</span>
-                    {!!counts[t.id] && <span className="n mono">{counts[t.id]} 版</span>}
-                  </>
-                )}
-                {busy ? (
-                  <span className="dirty busy" aria-label="生成中" />
-                ) : dirty ? (
-                  <span className="dirty" aria-label="有未生成的改动" />
-                ) : null}
-              </button>
-            );
-          })}
+          {tabs.map(({ item, leaving }) => (
+            <TabItem
+              key={item.id}
+              t={item}
+              leaving={leaving}
+              on={item.id === p.session.activeTabId}
+              lifted={item.id === lifted}
+              busy={generation.jobs.some((j) => j.tabId === item.id && j.state === 'generating')}
+              count={counts[item.id]}
+              actions={tabActions}
+            />
+          ))}
         </FlipScope>
       </div>
       {overflow && (
@@ -536,3 +491,98 @@ export function WorkbenchTabs(p: TabsProps) {
     </>
   );
 }
+
+const TabItem = memo(function TabItem({
+  t,
+  on,
+  busy,
+  lifted,
+  leaving,
+  count,
+  actions,
+}: {
+  t: WorkbenchTab;
+  on: boolean;
+  busy: boolean;
+  lifted: boolean;
+  leaving: boolean;
+  count: number;
+  actions: React.RefObject<TabActions>;
+}) {
+  const img = t.project;
+  const name = img && hasImageName(img) ? img.name : '';
+  const dirty = workbenchTabHasChanges(t);
+  return (
+    <button
+      data-tab={t.id}
+      data-key={`tab-${t.id}`}
+      data-flip={lifted ? undefined : ''}
+      className={`tab ${name ? '' : 'bare'} ${on ? 'on' : ''} ${lifted ? 'lifted' : ''} ${leaving ? 'leaving' : ''}`}
+      role="tab"
+      aria-selected={on}
+      aria-label={name || (img ? imageFileName(img) : '没有起名')}
+      tabIndex={on ? 0 : -1}
+      data-enter="fade"
+      data-no-tip=""
+      onClick={() => actions.current.onActivateTab(t.id)}
+      onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+      onAuxClick={(e) => {
+        if (e.button !== 1) return;
+        e.preventDefault();
+        void actions.current.onCloseTab(t.id);
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        actions.current.setPeek('');
+        actions.current.setMenu({ at: [e.clientX, e.clientY], tab: t });
+      }}
+      onPointerEnter={() => {
+        clearTimeout(actions.current.peekTimer.current);
+        if (dragging) return;
+        if (actions.current.peek) actions.current.setPeek(t.id);
+        else
+          actions.current.peekTimer.current = window.setTimeout(
+            () => actions.current.setPeek(t.id),
+            400,
+          );
+      }}
+      onPointerLeave={() => {
+        clearTimeout(actions.current.peekTimer.current);
+        actions.current.peekTimer.current = window.setTimeout(
+          () => actions.current.setPeek(''),
+          80,
+        );
+      }}
+      onPointerDown={() => {
+        clearTimeout(actions.current.peekTimer.current);
+        actions.current.setPeek('');
+      }}
+    >
+      {on && <span className="cur" />}
+      {img && !img.image_path ? (
+        <span className={`tab-blank ${shapeOf(img.metadata.width, img.metadata.height)}`} />
+      ) : (
+        <BlurImg
+          image={img}
+          path={img?.thumbnail_path || img?.image_path || ''}
+          tab={t.id}
+          eye={false}
+          className={shapeOf(img?.metadata.width, img?.metadata.height)}
+          alt=""
+          draggable={false}
+        />
+      )}
+      {name && (
+        <>
+          <span className="nm">{name}</span>
+          {!!count && <span className="n mono">{count} 版</span>}
+        </>
+      )}
+      {busy ? (
+        <span className="dirty busy" aria-label="生成中" />
+      ) : dirty ? (
+        <span className="dirty" aria-label="有未生成的改动" />
+      ) : null}
+    </button>
+  );
+});

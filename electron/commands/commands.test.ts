@@ -721,3 +721,152 @@ it('normalizes refreshed Vibe encodings while preserving user reference changes'
   expect(() => mergeSession(current, base, next, app.database.vibeLibrary.refresh)).toThrow();
   await app.close();
 });
+
+it('sends one changed tab and preserves closed draft positions and selection across batches', async () => {
+  const app = await setup();
+  const tabs = ['a', 'b', 'c'].map((id) => ({
+    ...createWorkbenchTab(fixture()),
+    id,
+    identity: id,
+  }));
+  await app.store.save({ version: 2, tabs, activeTabId: 'b' });
+  await app.call('tag.set', {
+    tabId: 'b',
+    scope: 'base:prompt',
+    block: 0,
+    index: 0,
+    text: 'draft',
+  });
+  await app.call('tag.set', {
+    tabId: 'c',
+    scope: 'base:prompt',
+    block: 0,
+    index: 0,
+    text: 'other',
+  });
+  expect(app.events.at(-1)!.session.tabs.map((t) => t.id)).toEqual(['c']);
+  const original = app.store.get();
+  const invoke = vi.fn(async (name, input) => app.dispatch(name, input, 'ui'));
+  const connection = new WorkbenchConnection(
+    invoke as InvokeCommand,
+    () => {},
+    () => {},
+  );
+  connection.hydrate(original);
+  connection.update((s) => ({
+    ...s,
+    tabs: s.tabs.map((t) => (t.id === 'b' ? { ...t, displayName: 'changed' } : t)),
+  }));
+  await connection.flush();
+  expect(invoke.mock.calls[0][1].next.tabs.map((t: { id: string }) => t.id)).toEqual(['b']);
+  const before = app.store.get();
+  const first = await app.call('workbench.close-tabs', { tabIds: ['a', 'b'] }, 'ui');
+  await app.call('workbench.close', { tabId: 'c' });
+  await app.call('workbench.reopen', {}, 'ui');
+  expect(app.store.get().tabs.map((t) => t.id)).toEqual(['c']);
+  await app.call('workbench.reopen', { undoId: first.undoId }, 'ui');
+  expect(app.store.get()).toEqual(before);
+  await app.call('workbench.close', { tabId: 'b' });
+  await app.store.save({
+    ...before,
+    tabs: [...before.tabs.filter((t) => t.id !== 'b'), { ...before.tabs[1], id: 'new-b' }],
+  });
+  await app.call('workbench.reopen', {}, 'ui');
+  expect(app.store.get().activeTabId).toBe('new-b');
+  expect(app.store.get().tabs).toHaveLength(3);
+  connection.dispose();
+  await app.close();
+});
+
+it('keeps empty works until eviction and clears retained works on exit', async () => {
+  const app = await setup(true);
+  let first, last;
+  for (let i = 0; i < 21; i++) {
+    const { tab } = await app.call('workbench.new', { width: 64, height: 64 }, 'ui');
+    const batch = await app.call('workbench.close-tabs', { tabIds: [tab.id] }, 'ui');
+    if (!i) first = { workId: tab.workId, undoId: batch.undoId };
+    if (i === 19) expect(app.database.versions.work(first!.workId)).toBeTruthy();
+    last = tab.workId;
+  }
+  expect(app.database.versions.work(first!.workId)).toBeFalsy();
+  expect(await app.call('workbench.reopen', { undoId: first!.undoId }, 'ui')).toEqual({
+    reopened: 0,
+  });
+  expect(app.database.versions.work(last)).toBeTruthy();
+  await app.close();
+  expect(app.database.versions.work(last)).toBeFalsy();
+});
+
+it('migrates v3, restores a portable v3 backup and writes only the edited tab row', async () => {
+  const directory = await temporary();
+  const tabs = ['a', 'b'].map((id) => ({ ...createWorkbenchTab(fixture()), id }));
+  const legacy = {
+    version: 3,
+    revision: 4,
+    migrated: true,
+    session: { version: 2, activeTabId: 'a', tabs },
+  };
+  await fs.writeFile(path.join(directory, 'workbench-session.json'), JSON.stringify(legacy));
+  const store = await openCommandSession(directory, async () => fixture());
+  expect(store.get()).toMatchObject(legacy.session);
+  expect(
+    JSON.parse(
+      await fs.readFile(path.join(directory, 'workbench-v3-migration-backup.json'), 'utf8'),
+    ),
+  ).toEqual(legacy);
+  store.connectWriter();
+  const db = new DatabaseSync(path.join(directory, 'workbench.sqlite'));
+  try {
+    db.exec(
+      'CREATE TABLE writes(id); CREATE TRIGGER trace AFTER INSERT ON tabs BEGIN INSERT INTO writes VALUES(new.id); END',
+    );
+    const session = store.get();
+    session.tabs[1].displayName = 'edited';
+    await store.save(session);
+    expect(db.prepare('SELECT id FROM writes').all()).toEqual([{ id: 'b' }]);
+    db.exec(
+      "CREATE TRIGGER fail_index BEFORE INSERT ON session BEGIN SELECT RAISE(ABORT,'synthetic write failure'); END",
+    );
+    const interrupted = store.get();
+    interrupted.tabs[0].displayName = 'unconfirmed';
+    await expect(store.save(interrupted)).rejects.toThrow('synthetic write failure');
+    expect(store.get()).toEqual(session);
+    expect((await openCommandSession(directory, async () => fixture())).get()).toEqual(session);
+    db.exec('DROP TRIGGER fail_index');
+    await store.restoreBackup(legacy);
+    expect((await openCommandSession(directory, async () => fixture())).get()).toMatchObject(
+      legacy.session,
+    );
+  } finally {
+    db.close();
+    store.closeWriter();
+  }
+});
+
+it('counts non-start versions with the same visibility as the version panel', async () => {
+  const app = await setup(true);
+  try {
+    const { tab } = await app.call('workbench.new', { width: 64, height: 64 }, 'ui');
+    const root = (await app.call('version.list', { tabId: tab.id })).versions[0];
+    app.database.versions.append({
+      workId: tab.workId,
+      parentId: root.id,
+      project: root.project,
+      source: 'agent',
+      image: fixture(),
+      seed: 1,
+      versionId: undefined,
+      operation: undefined,
+      random: undefined,
+      variant: undefined,
+    });
+    const list = (await app.call('version.list', { tabId: tab.id })).versions;
+    const session = await app.call('workbench.session', {}, 'ui');
+    expect(session.tabs[0].versionCount).toBe(1);
+    expect(session.tabs[0].versionCount).toBe(
+      list.filter((v: { isStart: boolean }) => !v.isStart).length,
+    );
+  } finally {
+    await app.close();
+  }
+});

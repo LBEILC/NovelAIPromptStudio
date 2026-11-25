@@ -134,6 +134,7 @@ export async function createSession(services, images, emit, empty = false) {
         database.rememberWorkbenchStructure(tab.source.path, tab.project.prompt_structure);
     },
   });
+  commands.store.connectWriter();
   const sender = new EventEmitter();
   sender.id = 1;
   sender.isDestroyed = () => false;
@@ -498,6 +499,7 @@ export async function createSession(services, images, emit, empty = false) {
       async close() {
         chatGPT.close();
         await commands.close();
+        commands.store.closeWriter();
         await adapter.close();
         database.close();
         fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
@@ -506,6 +508,7 @@ export async function createSession(services, images, emit, empty = false) {
   } catch (error) {
     chatGPT.close();
     await commands.close();
+    commands.store.closeWriter();
     await adapter.close();
     database.close();
     fs.rmSync(directory, { recursive: true, force: true });

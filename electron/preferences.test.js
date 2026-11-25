@@ -301,9 +301,15 @@ describe('AI preferences', () => {
         recentImageDirectory: recent,
         autoCheckUpdates: false,
       }),
-    ).toEqual({ recentImageDirectory: recent, autoCheckUpdates: false, closeAction: 'ask' });
+    ).toEqual({
+      confirmCloseChangedTabs: true,
+      recentImageDirectory: recent,
+      autoCheckUpdates: false,
+      closeAction: 'ask',
+    });
     fs.rmSync(recent, { recursive: true });
     expect(preferences.productivitySettings()).toEqual({
+      confirmCloseChangedTabs: true,
       recentImageDirectory: '',
       autoCheckUpdates: false,
       closeAction: 'ask',

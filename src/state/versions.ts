@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { CommandTab } from '../shared/commands';
 import type { ImageRecord } from '../shared/types';
 import { invokeUI } from '../lib/commands';
@@ -63,17 +63,8 @@ export function useVersionList(
   return data;
 }
 export function useVersionCounts(tabs: CommandTab[], enabled: boolean) {
-  const counts = useSyncExternalStore((listener) => {
-    connect();
-    return versionLists.subscribeCounts(listener);
-  }, versionLists.countSnapshot);
-  const key = tabs.map((t) => `${t.id}:${t.revision}:${t.versionId}`).join('|');
-  useEffect(() => {
-    if (!enabled) return;
-    for (const tab of tabs) {
-      versionLists.observe(tab);
-      void readVersions(tab.id).catch(() => {});
-    }
-  }, [key, enabled]);
-  return counts;
+  return useMemo(
+    () => Object.fromEntries(tabs.map((t) => [t.id, enabled ? (t.versionCount ?? 0) : 0])),
+    [tabs, enabled],
+  );
 }

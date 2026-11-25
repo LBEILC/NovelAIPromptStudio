@@ -1,5 +1,11 @@
 import { DEFAULT_MONO_FONT, DEFAULT_SANS_FONT } from './fonts.js';
 const unavailable = (error) => async () => ({ ok: false, error });
+let previewProductivity = {
+  recentImageDirectory: '',
+  autoCheckUpdates: true,
+  closeAction: 'ask',
+  confirmCloseChangedTabs: true,
+};
 let previewNetwork = { mode: 'system' };
 const networkState = () => ({
   settings: structuredClone(previewNetwork),
@@ -37,9 +43,9 @@ const handlers = {
       motion: 'reduced',
     }))(),
   'settings.appearance.save': (input) => (async (settings) => settings)(input.settings),
-  'settings.productivity.get': (input) =>
-    (async () => ({ recentImageDirectory: '', autoCheckUpdates: true, closeAction: 'ask' }))(),
-  'settings.productivity.save': (input) => (async (settings) => settings)(input.settings),
+  'settings.productivity.get': () => ({ ...previewProductivity }),
+  'settings.productivity.save': ({ settings }) =>
+    (previewProductivity = { ...previewProductivity, ...settings }),
   'updates.status': (input) =>
     (async () => ({
       ok: true,

@@ -30,8 +30,6 @@ export function generationVersionKeys(jobs: readonly GenerationJob[]) {
 export class VersionListStore {
   private entries = new Map<string, Entry>();
   private jobKeys = new Map<string, string>();
-  private listeners = new Set<() => void>();
-  private counts: Record<string, number> = {};
   constructor(
     private load: (tabId: string) => Promise<VersionList>,
     private delay = 150,
@@ -54,7 +52,6 @@ export class VersionListStore {
     return e;
   }
   snapshot = (id: string) => this.entries.get(id)?.data || null;
-  countSnapshot = () => this.counts;
   subscribe(id: string, listener: () => void) {
     const e = this.entry(id);
     e.listeners.add(listener);
@@ -62,12 +59,6 @@ export class VersionListStore {
       e.listeners.delete(listener);
     };
   }
-  subscribeCounts = (listener: () => void) => {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
-  };
   observe(tab: Tab) {
     const e = this.entry(tab.id),
       key = `${tab.revision || 0}:${tab.versionId || ''}`;
@@ -84,7 +75,7 @@ export class VersionListStore {
     this.schedule(id, e);
     return result;
   }
-  invalidate(id: string) {
+  invalidate(id: string, lazy = false) {
     const e = this.entries.get(id);
     if (!e) return;
     e.epoch++;
@@ -92,7 +83,7 @@ export class VersionListStore {
     e.due = Date.now() + this.delay;
     clearTimeout(e.timer);
     e.timer = undefined;
-    this.schedule(id, e);
+    if (!lazy || e.listeners.size || e.waiters.length) this.schedule(id, e);
   }
   private schedule(id: string, e: Entry) {
     if (e.running || e.timer) return;
@@ -119,11 +110,6 @@ export class VersionListStore {
       });
       e.data = { ...incoming, versions };
       e.dirty = false;
-      const count = versions.filter((v) => !v.isStart).length;
-      if (this.counts[id] !== count) {
-        this.counts = { ...this.counts, [id]: count };
-        for (const listener of this.listeners) listener();
-      }
       for (const listener of e.listeners) listener();
       for (const waiter of e.waiters.splice(0)) waiter.resolve(e.data);
     } catch (error) {
@@ -139,9 +125,6 @@ export class VersionListStore {
     clearTimeout(e.timer);
     this.entries.delete(id);
     for (const waiter of e.waiters) waiter.reject(Error('Tab closed'));
-    const { [id]: removed, ...counts } = this.counts;
-    this.counts = counts;
-    for (const listener of this.listeners) listener();
   }
   receive(event: CommandEvent) {
     if (event.type === 'generation') {
@@ -152,20 +135,23 @@ export class VersionListStore {
     }
     if (event.type === 'workbench') {
       const tabs = new Map(event.session.tabs.map((t) => [t.id, t]));
+      const live = new Set(event.session.order || tabs.keys());
       for (const [id, e] of this.entries) {
         const tab = tabs.get(id);
-        if (!tab) {
+        if (!live.has(id)) {
           this.remove(id);
           continue;
         }
-        this.observe(tab);
+        if (tab) this.observe(tab);
         if (
           event.libraryChanged &&
           (!event.tabId ||
             event.tabId === id ||
-            (e.tab?.workId && e.tab.workId === tabs.get(event.tabId)?.workId))
+            (e.tab?.workId &&
+              e.tab.workId ===
+                (tabs.get(event.tabId)?.workId || this.entries.get(event.tabId)?.tab?.workId)))
         )
-          this.invalidate(id);
+          this.invalidate(id, !event.tabId);
       }
     }
   }

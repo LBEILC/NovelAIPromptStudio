@@ -1,3 +1,4 @@
+import { computeWorkbenchTabHasChanges } from './workbenchSession.js';
 import type {
   CommandSession,
   CommandEvent,
@@ -5,20 +6,52 @@ import type {
   InvokeCommand,
 } from '../shared/commands';
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
+
+function changes(base: CommandSession, next: CommandSession) {
+  const before = new Map(base.tabs.map((t) => [t.id, t]));
+  const after = new Map(next.tabs.map((t) => [t.id, t]));
+  return {
+    base: {
+      ...base,
+      order: [...before.keys()],
+      tabs: base.tabs.filter((t) => after.get(t.id) !== t),
+    },
+    next: {
+      ...next,
+      order: [...after.keys()],
+      tabs: next.tabs.filter((t) => before.get(t.id) !== t),
+    },
+  };
+}
+function applyChanges(base: CommandSession, patch: CommandSession): CommandSession {
+  if (!patch.order) return patch;
+  const tabs = new Map(base.tabs.map((t) => [t.id, t]));
+  for (const t of patch.tabs) tabs.set(t.id, t);
+  return {
+    version: patch.version,
+    activeTabId: patch.activeTabId,
+    tabs: patch.order.flatMap((id) => tabs.get(id) || []),
+  };
+}
+
 // Reapply only the user's delta. Revision increments belong to the main process.
 function rebase(remote: CommandSession, base: CommandSession, local: CommandSession) {
-  const tabs = remote.tabs
-    .filter((t) => !base.tabs.some((b) => b.id === t.id) || local.tabs.some((l) => l.id === t.id))
-    .map((t) => ({ ...t }));
+  const before = new Map(base.tabs.map((t) => [t.id, t]));
+  const localIds = new Set(local.tabs.map((t) => t.id));
+  const byId = new Map(
+    remote.tabs.filter((t) => !before.has(t.id) || localIds.has(t.id)).map((t) => [t.id, t]),
+  );
   for (const tab of local.tabs) {
-    const old = base.tabs.find((t) => t.id === tab.id);
-    const target = tabs.find((t) => t.id === tab.id);
+    const old = before.get(tab.id);
+    if (old === tab) continue;
+    const target = byId.get(tab.id);
     if (!target) {
-      if (!old || !same(old.project, tab.project)) tabs.push({ ...tab });
+      if (!old || !same(old.project, tab.project)) byId.set(tab.id, tab);
       continue;
     }
     if (!old) continue;
+    let amended = target;
     for (const field of [
       'project',
       'displayName',
@@ -29,28 +62,35 @@ function rebase(remote: CommandSession, base: CommandSession, local: CommandSess
       'viewState',
       'identity',
     ] as const)
-      if (!same(old[field], tab[field])) Object.assign(target, { [field]: tab[field] });
-    if (!same(old.project, tab.project)) target.updatedAt = tab.updatedAt;
-  }
-  if (
-    !same(
-      base.tabs.map((t) => t.id),
-      local.tabs.map((t) => t.id),
+      if (!same(old[field], tab[field]) && !same(target[field], tab[field])) {
+        if (amended === target) amended = { ...target };
+        Object.assign(amended, { [field]: tab[field] });
+      }
+    if (amended === target) continue;
+    if (!same(old.project, tab.project)) amended.updatedAt = tab.updatedAt;
+    if (
+      amended.project !== target.project ||
+      amended.originalProject !== target.originalProject ||
+      amended.savedDraft !== target.savedDraft
     )
-  ) {
-    const order = local.tabs.map((t) => t.id);
-    tabs.sort(
-      (a, b) =>
-        (order.includes(a.id) ? order.indexOf(a.id) : Infinity) -
-        (order.includes(b.id) ? order.indexOf(b.id) : Infinity),
-    );
+      amended.hasChanges = computeWorkbenchTabHasChanges(amended);
+    byId.set(tab.id, amended);
   }
+  const order = [...localIds];
+  const reordered =
+    order.length !== base.tabs.length || base.tabs.some((t, i) => t.id !== order[i]);
+  const tabs = reordered
+    ? [...new Set([...order, ...byId.keys()])].flatMap((id) => byId.get(id) || [])
+    : [...byId.values()];
   const selected = local.activeTabId !== base.activeTabId ? local.activeTabId : remote.activeTabId;
-  return {
-    ...remote,
-    tabs,
-    activeTabId: tabs.some((t) => t.id === selected) ? selected : tabs[0]?.id || '',
-  };
+  const activeTabId = byId.has(selected) ? selected : tabs[0]?.id || '';
+  if (
+    activeTabId === remote.activeTabId &&
+    tabs.length === remote.tabs.length &&
+    tabs.every((t, i) => t === remote.tabs[i])
+  )
+    return remote;
+  return { ...remote, tabs, activeTabId };
 }
 
 export function workbenchErrorMessage(message: string) {
@@ -99,8 +139,27 @@ export class WorkbenchConnection {
   update(action: CommandSession | ((previous: CommandSession) => CommandSession)) {
     const next = typeof action === 'function' ? action(this.current) : action;
     if (next === this.current) return;
-    this.current = next;
-    this.publish(next);
+    if (next.tabs === this.current.tabs) {
+      this.current = next;
+    } else {
+      const previous = new Map(this.current.tabs.map((t) => [t.id, t]));
+      this.current = {
+        ...next,
+        tabs: next.tabs.map((t) => {
+          const old = previous.get(t.id);
+          if (
+            old === t ||
+            (old &&
+              old.project === t.project &&
+              old.originalProject === t.originalProject &&
+              old.savedDraft === t.savedDraft)
+          )
+            return t;
+          return { ...t, hasChanges: computeWorkbenchTabHasChanges(t) };
+        }),
+      };
+    }
+    this.publish(this.current);
     if (!this.ready) return;
     clearTimeout(this.timer);
     // Editors keep their unsaved text locally. Direct typing is batched; drag
@@ -130,7 +189,7 @@ export class WorkbenchConnection {
     let base = this.confirmed,
       next = this.current;
     this.running = (async () => {
-      let result = await this.invoke('workbench.commit', { base, next });
+      let result = await this.invoke('workbench.commit', changes(base, next));
       let overwritten = false;
       if (!result.ok && result.error.code === 'conflict') {
         const remote = await this.conflictBaseline(result.error.details?.session);
@@ -152,7 +211,7 @@ export class WorkbenchConnection {
         this.confirmed = remote;
         this.current = next;
         this.publish(next);
-        result = await this.invoke('workbench.commit', { base, next });
+        result = await this.invoke('workbench.commit', changes(base, next));
       }
       if (!result.ok) {
         // Refresh the baseline even when the bounded retry loses another race.
@@ -165,7 +224,7 @@ export class WorkbenchConnection {
         }
         throw Error(workbenchErrorMessage(result.error.message));
       }
-      this.confirmed = result.data;
+      this.confirmed = applyChanges(this.confirmed, result.data);
       if (this.current === next) this.current = this.confirmed;
       else this.current = rebase(this.confirmed, next, this.current);
       if (overwritten) this.notify('Agent 同时改了这个标签页，已保留你的修改');
@@ -180,7 +239,7 @@ export class WorkbenchConnection {
   }
   receive(event: CommandEvent) {
     if (event.type !== 'workbench') return;
-    const remote = event.session;
+    const remote = applyChanges(this.confirmed, event.session);
     const pending = this.current !== this.confirmed;
     if (!pending) {
       this.current = remote;
@@ -190,6 +249,9 @@ export class WorkbenchConnection {
     }
     const local = this.current,
       before = this.confirmed;
+    const beforeById = new Map(before.tabs.map((t) => [t.id, t]));
+    const editedById = new Map(local.tabs.map((t) => [t.id, t]));
+    const live = new Set(remote.tabs.map((t) => t.id));
     this.current = rebase(remote, before, local);
     // Retain the true base only for pending fields, including deleted tabs.
     // A simultaneous project edit must still be rejected on the first commit.
@@ -198,13 +260,11 @@ export class WorkbenchConnection {
       activeTabId:
         local.activeTabId !== before.activeTabId ? before.activeTabId : remote.activeTabId,
       tabs: remote.tabs
-        .filter(
-          (t) => before.tabs.some((b) => b.id === t.id) || !local.tabs.some((l) => l.id === t.id),
-        )
+        .filter((t) => beforeById.has(t.id) || !editedById.has(t.id))
         .map((tab) => {
-          const old = before.tabs.find((t) => t.id === tab.id);
-          const edited = local.tabs.find((t) => t.id === tab.id);
-          if (!old) return tab;
+          const old = beforeById.get(tab.id);
+          const edited = editedById.get(tab.id);
+          if (!old || old === edited) return tab;
           if (!edited) return old;
           const baseline = { ...tab };
           for (const field of [
@@ -222,8 +282,8 @@ export class WorkbenchConnection {
         }),
     };
     for (const old of before.tabs) {
-      const edited = local.tabs.find((t) => t.id === old.id);
-      if (!remote.tabs.some((t) => t.id === old.id) && edited && !same(old.project, edited.project))
+      const edited = editedById.get(old.id);
+      if (!live.has(old.id) && edited && !same(old.project, edited.project))
         this.confirmed.tabs.push(old);
     }
     if (

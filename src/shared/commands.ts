@@ -84,8 +84,12 @@ export interface CommandTab {
   workOrigin?: WorkOrigin;
   /** 作品已经存进图片库（生成过，或点过"存入图片库""存为新作品"；1.5.6） */
   workSaved?: boolean;
+  versionCount?: number;
+  hasChanges?: boolean;
 }
 export interface CommandSession {
+  /** Present on incremental messages. Lists every live id in display order. */
+  order?: string[];
   version: number;
   tabs: CommandTab[];
   activeTabId: string;
@@ -956,6 +960,11 @@ export interface CommandDefinitions {
     output: TabDocument | { canceled: true };
   };
   'workbench.get': { input: { tabId: string }; output: TabDocument };
+  'workbench.close-tabs': {
+    input: { tabIds: string[] };
+    output: { closed: number; undoId: string };
+  };
+  'workbench.reopen': { input: { undoId?: string }; output: { reopened: number } };
   'workbench.close': { input: TabInput; output: { closed: string } };
   'workbench.save-to-library': {
     input: TabInput;

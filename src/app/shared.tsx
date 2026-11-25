@@ -16,7 +16,10 @@ export type Editable = HTMLElement &
     >
   >;
 export type TextAction = 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'select-all';
-export type Confirmation = Parameters<EditorProps['onConfirm']>[0] & { primaryDanger?: boolean };
+export type Confirmation = Parameters<EditorProps['onConfirm']>[0] & {
+  primaryDanger?: boolean;
+  checkbox?: (checked: boolean) => void;
+};
 export type LegacyMenuItem = {
   key: string;
   type?: string;
