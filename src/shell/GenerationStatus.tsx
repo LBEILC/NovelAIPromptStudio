@@ -148,7 +148,10 @@ export function GenerationStatus({
   const relay = state.settings.connection === 'relay';
   useEffect(() => {
     // 重启后队列是暂停的（不会一启动就花钱）：说一声，点"查看"打开队列
-    const left = state.jobs.filter((j) => j.state === 'queued');
+    // 只算上次留下的：这次先暂停再排的（issue #20）不是"上次没生成"
+    const left = state.jobs.filter(
+      (j) => j.state === 'queued' && Date.parse(j.createdAt) < opened.current,
+    );
     if (!resumeTold.current && state.paused && left.length) {
       resumeTold.current = true;
       notify({
@@ -264,9 +267,10 @@ export function GenerationStatus({
     .reverse();
   const pills = useExitList(pending.length ? [pending.length] : [], () => 'pill');
   // 中转站模式查不到余额（doc/design.md 2.33），不生成、没有排队时这里什么都不放
-  const chipKey = running ? 'gen' : queued.length ? 'queue' : relay ? '' : 'anlas';
+  // 队列暂停了、还没排任务时也显示"队列已暂停"（issue #20：先暂停再排几份，不让人以为点生成没反应）
+  const chipKey = running ? 'gen' : queued.length || state.paused ? 'queue' : relay ? '' : 'anlas';
   const chips = useSwap(chipKey, (k) => k).filter(({ key }) => key);
-  const any = !!(running || line.length || pending.length || recent.length);
+  const any = !!(running || line.length || pending.length || recent.length || state.paused);
   useEffect(() => {
     if (open && !any) setOpen(false);
   }, [open, any]);
@@ -728,7 +732,9 @@ export function GenerationStatus({
               {running
                 ? `${running.continuous ? `生成中 · 第 ${running.index} 张` : `${busyVerb(running.operation)} · ${stepOf(running)}`}${queued.length ? ` · 还有 ${queued.length} 个` : ''}`
                 : state.paused
-                  ? `队列已暂停 · ${queued.length} 个`
+                  ? queued.length
+                    ? `队列已暂停 · ${queued.length} 个`
+                    : '队列已暂停'
                   : queued.every((j) => j.deferred)
                     ? `已暂缓 · ${queued.length} 个`
                     : `排队中 · ${queued.length} 个`}
@@ -771,13 +777,17 @@ export function GenerationStatus({
             {todayText}
           </span>
         </div>
-        {!busy && !pending.length && <div className="q-empty">没有在生成或排队的任务</div>}
-        {state.paused && (running || queued.length > 0) && (
+        {!busy && !pending.length && !state.paused && (
+          <div className="q-empty">没有在生成或排队的任务</div>
+        )}
+        {state.paused && (
           <div className="q-paused">
             <Icon name="pause-circle-line" />
             {running
               ? '队列已暂停：正在生成的这张做完就停，后面的先不发'
-              : `队列已暂停，${queued.length} 个任务在等，点“继续”接着生成`}
+              : queued.length
+                ? `队列已暂停，${queued.length} 个任务在等。可以接着在工作台点“加入队列”，排好后点“继续”`
+                : '队列已暂停：在工作台点“加入队列”只排不发，排好后点“继续”一起生成'}
           </div>
         )}
         {(running || line.length > 0) && (
@@ -837,16 +847,18 @@ export function GenerationStatus({
             </div>
           </div>
         )}
-        {busy && (
+        {(busy || state.paused) && (
           <div className="q-foot">
             <span className="q-left">
               {endless
                 ? '持续生成中'
                 : leftImages
                   ? `剩余 ${leftImages} 张${relay ? '' : leftCost ? ` · 约 ${Math.round(leftCost)} Anlas` : ' · 免费'}`
-                  : '没有要发的了'}
+                  : busy
+                    ? '没有要发的了'
+                    : '还没有排队的任务'}
             </span>
-            {(running || queued.length > 0) &&
+            {(running || queued.length > 0 || state.paused) &&
               (state.paused ? (
                 <button className="btn ink sm" onClick={() => run(invokeUI('generate.resume', {}))}>
                   <Icon name="play-line" />

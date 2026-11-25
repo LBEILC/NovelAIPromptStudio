@@ -7,7 +7,7 @@ import { useVersionList } from '../state/versions';
 import { invokeUI } from '../lib/commands';
 import { Icon, Kbd, Seg } from '../kit/controls';
 import { Pop } from '../kit/layer';
-import { MenuPop } from '../kit/menu';
+import { ContextMenu, MenuPop } from '../kit/menu';
 import { useNotifications } from '../kit/toast';
 import { useSwap } from '../kit/motion';
 import type { CommandTab } from '../shared/commands';
@@ -142,6 +142,8 @@ export function GenerationBar({
   const [customEstimate, setCustomEstimate] = useState<GenerationEstimate | null>(null);
   const [original, setOriginal] = useState<{ width: number; height: number } | null>(null);
   const [starting, setStarting] = useState(false);
+  // 右键"生成"：加入队列，先不开始（issue #20：先排好几份再一起生成）
+  const [goMenu, setGoMenu] = useState<[number, number] | null>(null);
   const m = tab.project?.metadata;
   // 显示的是实际发出去的尺寸：原图不是 64 的倍数时，请求会取整（src/shared/generationSize.ts）
   const { width: w, height: h } = fitGenerationSize(m?.width || 832, m?.height || 1216);
@@ -234,14 +236,17 @@ export function GenerationBar({
       setSeedDraft(seed === null ? '' : String(seed));
     }
   };
-  const go = async () => {
+  const go = async (hold = false) => {
     if (proposal) {
       notify({ text: '先接受或放弃 AI 提案，再生成' });
       return;
     }
     setStarting(true);
+    // 先暂停再排：暂停时新排的任务只排不发（2.46）；没排进去就恢复原样
+    const pausedHere = hold && !state.paused;
     try {
       await before?.();
+      if (pausedHere) await invokeUI('generate.pause', {});
       await invokeUI('generate.start', {
         tabId: tab.id,
         count,
@@ -249,7 +254,12 @@ export function GenerationBar({
         fixedSeed: seed !== null,
         ...(seed !== null ? { seed } : {}),
       });
+      if (pausedHere)
+        notify({
+          text: '已加入队列，先不生成。其余几份排好后，在标题栏点开队列，点“继续”',
+        });
     } catch (e) {
+      if (pausedHere) void invokeUI('generate.resume', {}).catch(() => {});
       notify({ text: (e as Error).message, tone: 'error' });
     } finally {
       setStarting(false);
@@ -291,8 +301,17 @@ export function GenerationBar({
     !!state.subscription?.active &&
     state.subscription.tier >= 3;
   const unavailable = estimate?.unavailable || '';
+  // 队列暂停时"生成"只排不发，按钮写"加入队列"（issue #20）
+  const held = state.paused;
   const goTip =
-    unavailable || (short ? '余额不够' : busyElsewhere ? '已有任务在生成，将排在其后' : '');
+    unavailable ||
+    (short
+      ? '余额不够'
+      : held
+        ? '队列已暂停：只排进队列，先不生成；在标题栏的队列里点“继续”开始'
+        : busyElsewhere
+          ? '已有任务在生成，将排在其后'
+          : '');
   const sizeItems = [
     ...(original && !PRESETS.some(([, pw, ph]) => pw === original.width && ph === original.height)
       ? [['原图', original.width, original.height] as const]
@@ -639,8 +658,13 @@ export function GenerationBar({
                           if (off) return;
                           void go();
                         }}
+                        onContextMenu={(e) => {
+                          if (off || held) return;
+                          e.preventDefault();
+                          setGoMenu([e.clientX, e.clientY]);
+                        }}
                       >
-                        {busyElsewhere ? '排队生成' : '生成'}
+                        {held ? '加入队列' : busyElsewhere ? '排队生成' : '生成'}
                       </button>
                     )}
                   </>
@@ -650,6 +674,18 @@ export function GenerationBar({
           ))}
         </span>
       </div>
+      <ContextMenu
+        at={goMenu}
+        onClose={() => setGoMenu(null)}
+        items={[
+          {
+            label: '加入队列，先不开始',
+            icon: 'pause-line',
+            tip: '先排好几份再一起生成：暂停队列，排好后在标题栏的队列里点“继续”',
+            onSelect: () => void go(true),
+          },
+        ]}
+      />
       <MenuPop
         open={sizeMenu && !custom}
         onClose={() => setSizeMenu(false)}
