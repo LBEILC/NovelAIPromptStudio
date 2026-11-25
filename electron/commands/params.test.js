@@ -54,7 +54,8 @@ it('edits parameters and references through Agent commands, with revision, undo,
     version: 'test',
     busy: () => false,
     readImage: async () => project,
-    readSource: async () => project,
+    readSource: async (source) =>
+      source.type === 'library' ? database.loadProject(source.projectId) : project,
     importImage: async (source) => {
       const image = await readWorkbenchImage(source);
       image.id = `generated-${++imported}`;
@@ -243,10 +244,87 @@ it('edits parameters and references through Agent commands, with revision, undo,
       dropReferences: true,
     });
     expect(dropped.tab.project.references).toEqual({ vibes: [], precise: [], base: null });
+    await call('params.set', { tabId, patch: { effort: 'Medium' } });
+    const precise = await call('reference.add-precise', { tabId, path: file });
+    const ref = precise.tab.project.references.precise[0];
+    expect(precise.notes).toEqual(['精确参考需要 High，Effort 已改成 High']);
+    expect(precise.tab.project.params.effort).toBe('High');
+    await expect(call('params.set', { tabId, patch: { effort: 'Medium' } })).rejects.toThrow(
+      '有精确参考时只能用 High',
+    );
+    expect(
+      (await call('reference.set', { tabId, id: ref.id, type: 'costume', strength: 4.2 })).tab
+        .project.references.precise[0],
+    ).toMatchObject({ type: 'costume', strength: 4.2 });
+    await call('reference.set', { tabId, id: ref.id, strength: 2.5 });
+    const clamped = await call('params.set', { tabId, patch: { model: 'nai-diffusion-4-5-full' } });
+    expect(clamped.notes).toContain('1 个精确参考的强度超过 1，已改成 1');
+    expect(clamped.tab.project.references.precise[0]).toMatchObject({
+      type: 'costume',
+      strength: 1,
+    });
+    for (const patch of [{ strength: 1.2 }, { type: 'costume' }])
+      await expect(call('reference.set', { tabId, id: ref.id, ...patch })).rejects.toThrow(
+        'invalid_input',
+      );
+    expect(
+      (await call('params.set', { tabId, patch: { model: 'nai-diffusion-5-full' } })).tab.project
+        .references.precise,
+    ).toEqual(clamped.tab.project.references.precise);
+    await expect(
+      call('params.set', { tabId, patch: { model: 'nai-diffusion-4-full' } }),
+    ).rejects.toThrow('needs_confirm');
+    expect(
+      (
+        await call('params.set', {
+          tabId,
+          patch: { model: 'nai-diffusion-4-full' },
+          dropReferences: true,
+        })
+      ).tab.project.references.precise,
+    ).toEqual([]);
+    await expect(call('reference.add-precise', { tabId, path: file })).rejects.toThrow(
+      '这个模型不支持添加参考图',
+    );
+    for (const model of ['nai-diffusion-4-5-full', 'nai-diffusion-5-curated']) {
+      await call('params.set', { tabId, patch: { model } });
+      const result = await call('reference.add-precise', { tabId, path: file });
+      expect(result.notes).toEqual([]);
+      await call('reference.remove', { tabId, id: result.tab.project.references.precise[0].id });
+    }
+
     database.insertProject({
       ...project,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+    });
+    const placeholderProject = {
+      ...project,
+      id: 'placeholder-fixture',
+      image_path: path.join(directory, 'placeholder.png'),
+      metadata: {
+        ...metadata,
+        extra_json: JSON.stringify({ parsed: { director_reference_strengths: [0.8] } }),
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    await fs.copyFile(file, placeholderProject.image_path);
+    database.insertProject(placeholderProject);
+    const restored = (await call('workbench.open', { libraryId: placeholderProject.id })).tab;
+    const placeholder = restored.project.references.precise[0];
+    expect(placeholder.thumbnail).toBeNull();
+    expect(
+      (await call('params.set', { tabId: restored.id, patch: { effort: 'Medium' } })).tab.project
+        .params.effort,
+    ).toBe('Medium');
+    const filled = (
+      await call('reference.set-image', { tabId: restored.id, id: placeholder.id, path: file })
+    ).tab.project;
+    expect(filled.params.effort).toBe('High');
+    expect(filled.references.precise[0]).toEqual({
+      ...placeholder,
+      thumbnail: expect.stringMatching(/^data:image/),
     });
     database.saveProjectPrompt(project.id, dropped.tab.project);
     expect(database.loadProject(project.id).params).toEqual(dropped.tab.project.params);

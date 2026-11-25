@@ -10,9 +10,42 @@ export async function referenceImage(source) {
   if (input.length > 100 * 1024 * 1024) throw new Error('参考图过大');
   return sharp(input).rotate().removeAlpha().png().toBuffer();
 }
-export async function preciseImage(source) {
+// Official V5 buckets in ascending aspect ratio, mirrored around the square.
+const portraitBucketWidths = [
+  256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 320, 320, 320, 320, 320, 320,
+  320, 320, 320, 384, 384, 384, 384, 384, 384, 448, 448, 448, 448, 512, 512, 512, 512, 576, 576,
+  576, 640, 640, 704, 704, 768, 768, 832, 896, 960,
+];
+const portraitBuckets = portraitBucketWidths.map((width, i) => [width, 4096 - i * 64]);
+const buckets = [
+  ...portraitBuckets,
+  [1024, 1024],
+  ...portraitBuckets.toReversed().map(([w, h]) => [h, w]),
+];
+export async function preciseImage(source, model) {
   const image = await referenceImage(source),
     { width, height } = await sharp(image).metadata();
+  if (model?.startsWith('nai-diffusion-5-')) {
+    const ratio = Math.log(width / height);
+    const distance = ([w, h]) => Math.abs(ratio - Math.log(w / h));
+    const [w, h] = buckets.reduce((best, b) => (distance(b) < distance(best) ? b : best));
+    if (width === w && height === h) return image.toString('base64');
+    const scale = Math.max(w / width, h / height);
+    const scaledW = Math.max(w, Math.round(width * scale)),
+      scaledH = Math.max(h, Math.round(height * scale));
+    return (
+      await sharp(image)
+        .resize(scaledW, scaledH, { fit: 'fill' })
+        .extract({
+          left: Math.floor((scaledW - w) / 2),
+          top: Math.floor((scaledH - h) / 2),
+          width: w,
+          height: h,
+        })
+        .png()
+        .toBuffer()
+    ).toString('base64');
+  }
   const [w, h] = [
     [1024, 1536],
     [1536, 1024],

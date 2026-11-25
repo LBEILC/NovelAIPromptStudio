@@ -368,13 +368,86 @@ describe('reference encoding and pricing', () => {
       db.close();
     }
   });
+  it('recovers image-free reference metadata including unknown captions', () => {
+    const p = fixture('nai-diffusion-5-full', {
+      director_reference_strengths: [0.8, 1.5],
+      director_reference_secondary_strengths: [0.25, 0],
+      director_reference_descriptions: ['costume', 'delta'].map((base_caption) => ({
+        caption: { base_caption },
+      })),
+    });
+    expect(p.references.precise).toMatchObject([
+      { name: '参考 1', type: 'costume', strength: 0.8, fidelity: 0.75, thumbnail: null },
+      { name: '参考 2', type: 'character&style', strength: 1.5, fidelity: 1, thumbnail: null },
+    ]);
+  });
+  it.each([
+    [1000, 1000, 1024, 1024],
+    [832, 1216, 832, 1216],
+    [2000, 1000, 1408, 704],
+  ])('crops %i × %i to the V5 bucket', async (width, height, w, h) => {
+    const input = await sharp({ create: { width, height, channels: 3, background: '#cf701e' } })
+      .png()
+      .toBuffer();
+    const output = await preciseImage(
+      'data:image/png;base64,' + input.toString('base64'),
+      'nai-diffusion-5-full',
+    );
+    const { data, info } = await sharp(Buffer.from(output, 'base64'))
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect([info.width, info.height]).toEqual([w, h]);
+    for (const offset of [0, w - 1, w * (h - 1), w * h - 1])
+      expect([...data.subarray(offset * 3, offset * 3 + 3)]).toEqual([207, 112, 30]);
+  });
+  it('aligns reference arrays and prices only transmitted images', async () => {
+    const types = ['character_mainoutfit', 'character&style_anyoutfit', 'costume'];
+    const image = (
+      await sharp({ create: { width: 32, height: 32, channels: 3, background: 'red' } })
+        .png()
+        .toBuffer()
+    ).toString('base64');
+    const p = fixture('nai-diffusion-5-full', {
+      director_reference_images: [image, image, image],
+      director_reference_strengths: [1, 2, 3, 4],
+      director_reference_descriptions: types.map((base_caption) => ({ caption: { base_caption } })),
+      director_reference_secondary_strengths: [0.2, 0.4, 0.6],
+    });
+    for (const [model, captions, secondary] of [
+      ['nai-diffusion-5-full', types, [0, 0, 0]],
+      ['nai-diffusion-4-5-full', ['character', 'character&style'], [0.2, 0.4]],
+    ]) {
+      p.params.model = model;
+      const { request } = await buildProjectRequest(p, blankLibrary);
+      const r = request.parameters;
+      expect(r.director_reference_descriptions.map((d) => d.caption.base_caption)).toEqual(
+        captions,
+      );
+      expect(r.director_reference_secondary_strength_values).toHaveLength(secondary.length);
+      secondary.forEach((v, i) =>
+        expect(r.director_reference_secondary_strength_values[i]).toBeCloseTo(v),
+      );
+      for (const [key, values] of Object.entries(r))
+        if (key.startsWith('director_reference_')) expect(values).toHaveLength(captions.length);
+    }
+    p.references.precise = p.references.precise.slice(2);
+    expect(
+      Object.keys((await buildProjectRequest(p, blankLibrary)).request.parameters).some((k) =>
+        k.startsWith('director_reference_'),
+      ),
+    ).toBe(false);
+    p.params.model = 'nai-diffusion-5-full';
+    expect(
+      estimateGeneration((await buildProjectRequest(p, blankLibrary)).request, null).parts.precise,
+    ).toBe(5);
+  });
   it('preprocesses precise references with black borders and sends fidelity inversely', async () => {
     const thumbnail = `data:image/png;base64,${(
       await sharp({ create: { width: 100, height: 40, channels: 3, background: '#ff0000' } })
         .png()
         .toBuffer()
     ).toString('base64')}`;
-    const output = Buffer.from(await preciseImage(thumbnail), 'base64'),
+    const output = Buffer.from(await preciseImage(thumbnail, 'nai-diffusion-4-5-full'), 'base64'),
       metadata = await sharp(output).metadata();
     expect([metadata.width, metadata.height]).toEqual([1536, 1024]);
     const { data } = await sharp(output).raw().toBuffer({ resolveWithObject: true });

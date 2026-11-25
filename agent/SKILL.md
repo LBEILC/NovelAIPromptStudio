@@ -111,11 +111,14 @@ nai-studio work.restore-original --json '{"undo":"UNDO"}'
 nai-studio params.set --json '{"tabId":"tab-id","expectedRevision":0,"patch":{"steps":23,"quality":"Standard"}}'
 nai-studio reference.add-vibe --json '{"tabId":"tab-id","path":"/path/to/reference.png"}'
 nai-studio reference.add-precise --json '{"tabId":"tab-id","imageId":"image-id"}'
+nai-studio reference.set-image --json '{"tabId":"tab-id","id":"reference-id","path":"/path/to/reference.png"}'
 nai-studio reference.set --json '{"tabId":"tab-id","id":"reference-id","strength":0.6}'
 nai-studio reference.remove --json '{"tabId":"tab-id","id":"reference-id"}'
 nai-studio vibe.library --json '{}'
 nai-studio reference.add-vibe --json '{"tabId":"tab-id","libraryId":"vibe-id"}'
 ```
+
+V5 和 V4.5 支持精确参考，强度范围分别为 0–5 和 0–1。V5 Full 添加精确参考会将 Medium 调为 High。添加或修改时可传 `type`，默认 `character&style`（角色和风格、保持原服装）。`character` 表示角色，`style` 表示风格。V5 还支持 `character_mainoutfit`（角色、保持原服装）、`character&style_anyoutfit`（角色和风格、允许换装）和 `costume`（仅服装）。从 PNG 恢复的无图参考不发送、不计费，用 `reference.set-image` 加 `imageId` 或 `path` 可以补图或换图。
 
 Vibe 和精确参考互斥。换模型返回 `needs_confirm` 时，只有用户已授权移除参考图才用 `dropReferences:true` 重试。Medium 的固定参数由命令层执行。添加图片和费用估算不会编码；生成获准执行后才编码，并按图片、模型和信息提取值复用缓存。Agent 必须显式给出参考来源，不能打开文件选择框。
 

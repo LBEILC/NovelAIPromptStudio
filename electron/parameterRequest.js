@@ -18,7 +18,7 @@ import {
 } from '../src/lib/novelaiAutoPrompt.js';
 import { prepareBaseImage } from './baseImage.js';
 import { preciseImage } from './vibeLibrary.js';
-import { MODEL_CAPS } from '../src/shared/params.ts';
+import { preciseKind, MODEL_CAPS } from '../src/shared/params.ts';
 import { fitGenerationSize } from '../src/shared/generationSize.ts';
 
 export async function buildProjectRequest(
@@ -33,11 +33,17 @@ export async function buildProjectRequest(
     refs = p.references;
   const medium = settings.effort === 'Medium',
     model = settings.model + (medium ? '-medium' : '');
-  if (refs.vibes.length && refs.precise.length) throw new Error('Vibe 与精确参考不能同时使用');
-  if (refs.vibes.length > 16 || refs.precise.length > 16) throw new Error('参考图超过上限');
+  const caps = MODEL_CAPS[settings.model];
+  const precise = refs.precise.filter(
+    (r) => r.thumbnail && (caps.precise?.outfit || r.type !== 'costume'),
+  );
+  if (medium && precise.length) throw new Error('有精确参考时只能用 High');
+  if (refs.vibes.length && precise.length) throw new Error('Vibe 与精确参考不能同时使用');
+  if (refs.vibes.length > 16 || precise.length > 16) throw new Error('参考图超过上限');
   if (
+    // V4 can replay embedded Vibe encodings even though adding new Vibes is disabled.
     (refs.vibes.length && settings.model.startsWith('nai-diffusion-5-')) ||
-    (refs.precise.length && !MODEL_CAPS[settings.model].references)
+    (refs.precise.some((r) => r.thumbnail) && !caps.precise)
   )
     throw new Error('这个模型不支持参考图');
   if ((p.prompt_structure?.characters.length || 0) > MODEL_CAPS[settings.model].maxCharacters)
@@ -157,19 +163,22 @@ export async function buildProjectRequest(
       }
     }
   }
-  if (refs.precise.length) {
+  if (precise.length) {
     parameters.director_reference_images = await Promise.all(
-      refs.precise.map((r) => preciseImage(r.thumbnail)),
+      precise.map((r) => preciseImage(r.thumbnail, settings.model)),
     );
-    parameters.director_reference_descriptions = refs.precise.map((r) => ({
-      caption: { base_caption: r.type, char_captions: [] },
+    parameters.director_reference_descriptions = precise.map((r) => ({
+      caption: {
+        base_caption: caps.precise.outfit ? r.type : preciseKind(r.type),
+        char_captions: [],
+      },
       legacy_uc: false,
     }));
-    parameters.director_reference_strength_values = refs.precise.map((r) => r.strength);
-    parameters.director_reference_secondary_strength_values = refs.precise.map(
-      (r) => 1 - r.fidelity,
+    parameters.director_reference_strength_values = precise.map((r) => r.strength);
+    parameters.director_reference_secondary_strength_values = precise.map((r) =>
+      caps.precise.fidelity ? 1 - r.fidelity : 0,
     );
-    parameters.director_reference_information_extracted = refs.precise.map(() => 1);
+    parameters.director_reference_information_extracted = precise.map(() => 1);
   }
   // Local estimate information is deliberately outside the API payload.
   return {

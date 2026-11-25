@@ -244,13 +244,15 @@ export interface VibeReference {
  * 不支持服装的模型（V4.5）发送前：costume 跳过，character_mainoutfit 改成 character，
  * character&style_anyoutfit 改成 character&style（和官方客户端一样）。
  */
-export type PreciseReferenceType =
-  | 'character'
-  | 'character_mainoutfit'
-  | 'style'
-  | 'character&style'
-  | 'character&style_anyoutfit'
-  | 'costume';
+export const PRECISE_TYPES = [
+  'character',
+  'character_mainoutfit',
+  'style',
+  'character&style',
+  'character&style_anyoutfit',
+  'costume',
+] as const;
+export type PreciseReferenceType = (typeof PRECISE_TYPES)[number];
 /** 界面上的四种 */
 export type PreciseKind = 'character' | 'style' | 'character&style' | 'costume';
 export function preciseKind(type: PreciseReferenceType): PreciseKind {

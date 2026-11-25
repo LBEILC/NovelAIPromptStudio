@@ -7,6 +7,7 @@ import { relayChecks } from './relay.js';
 import { inpaintChecks } from './inpaint.js';
 import { outpaintChecks } from './outpaint.js';
 import fs from 'node:fs';
+import sharp from 'sharp';
 import { clipboard } from 'electron';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -675,7 +676,7 @@ async function runGenerationChecks({
     );
   });
   await call('reference.remove', { tabId: refTab, id: referenceId });
-  await call('reference.add-precise', { tabId: refTab, path: files[0] });
+  const initialPrecise = await call('reference.add-precise', { tabId: refTab, path: files[0] });
   const bulkJobs = [];
   for (let i = 0; i < 30; i++)
     bulkJobs.push(await call('generate.start', { tabId: refTab, count: 1 }));
@@ -717,12 +718,16 @@ async function runGenerationChecks({
     const price = await call('generate.estimate', { tabId: refTab, count: 2 });
     return price.parts.precise === 10 && price.parts.base > 0 && price.parts.encode === 0;
   });
+  await call('reference.remove', {
+    tabId: refTab,
+    id: initialPrecise.tab.project.references.precise[0].id,
+  });
   await call('params.set', {
     tabId: refTab,
     patch: { model: 'nai-diffusion-5-full', effort: 'Medium', steps: 50, uc: 'None' },
     dropReferences: true,
   });
-  await check('命令行Medium固定项与参考移除生效', async () => {
+  await check('命令行设置 Medium 后固定参数生效', async () => {
     const p = (await call('workbench.get', { tabId: refTab })).tab.project;
     return (
       p.params.steps === 14 &&
@@ -732,6 +737,46 @@ async function runGenerationChecks({
     );
   });
 
+  const sendReferences = async (tabId) => {
+    const queued = await call('generate.start', { tabId, count: 1 });
+    await invoke('generate.confirm', { ids: [queued.id] });
+    await wait(
+      `window.studio.invoke('generate.status',{id:${JSON.stringify(queued.id)}}).then(r=>r.data.jobs[0].state==='completed')`,
+    );
+    return generationService.state.requests.at(-1).parameters;
+  };
+  await call('reference.add-precise', { tabId: refTab, path: files[0] });
+  const twoRefs = await call('reference.add-precise', { tabId: refTab, path: files[1] });
+  const outfit = twoRefs.tab.project.references.precise[1].id;
+  await call('reference.set', { tabId: refTab, id: outfit, type: 'costume' });
+  await call('reference.set-image', { tabId: refTab, id: outfit, path: files[2] });
+  const denied = await cli('params.set', { tabId: refTab, patch: { effort: 'Medium' } });
+  const price = await call('generate.estimate', { tabId: refTab, count: 1 });
+  const v5 = await sendReferences(refTab);
+  const dimensions = await Promise.all(
+    v5.director_reference_images.map(async (data) => {
+      const { width, height } = await sharp(Buffer.from(data, 'base64')).metadata();
+      return [width, height];
+    }),
+  );
+  await check(
+    'Agent 添加修改和换图后 V5 按两个参考计费并发送比例桶',
+    () =>
+      denied.result.error?.code === 'invalid_input' &&
+      price.parts.precise === 10 &&
+      JSON.stringify(v5.director_reference_descriptions.map((d) => d.caption.base_caption)) ===
+        '["character&style","costume"]' &&
+      JSON.stringify(v5.director_reference_secondary_strength_values) === '[0,0]' &&
+      JSON.stringify(dimensions) === '[[832,1216],[1024,1024]]',
+  );
+  await call('params.set', { tabId: refTab, patch: { model: 'nai-diffusion-4-5-full' } });
+  const v45 = await sendReferences(refTab);
+  await check(
+    '同一作品换到 V4.5 后只发送支持的参考',
+    () =>
+      v45.director_reference_images.length === 1 &&
+      v45.director_reference_descriptions[0].caption.base_caption === 'character&style',
+  );
   const blank = await call('workbench.new', {
     width: 64,
     height: 64,
@@ -892,6 +937,28 @@ async function runGenerationChecks({
   });
   await click('工作台', 'document.querySelector(".tb")');
   await h.screenshot('049-original-restored');
+  const [placeholderFile] = await createWorkbenchFixtures(
+    path.join(mode.root, 'precise-placeholder'),
+    {
+      sizes: [[64, 64]],
+      metadataKey: 'Comment',
+      parameters: [{ model: 'nai-diffusion-5-full', director_reference_strengths: [0.8] }],
+    },
+  );
+  const placeholderTab = (await invoke('workbench.open', { path: placeholderFile })).tab;
+  await wait(
+    `document.querySelector('.wb-body')?.dataset.projectId===${JSON.stringify(placeholderTab.project.id)}`,
+  );
+  await e(`document.querySelector('[data-feature="tab-refs"]').click()`);
+  await h.checkSoon('NovelAI 原图恢复没有参考图的占位行', () =>
+    e(`document.querySelector('[data-prow]')?.textContent.includes('没有参考图')`),
+  );
+  const withoutImage = await sendReferences(placeholderTab.id);
+  await check(
+    '占位参考可以生成且请求里没有精确参考字段',
+    () => !Object.keys(withoutImage).some((k) => k.startsWith('director_reference_')),
+  );
+  await invoke('workbench.close', { tabId: placeholderTab.id });
   const vibeFiles = await createWorkbenchFixtures(path.join(mode.root, 'vibe-length-fixtures'), {
     sizes: [[64, 64]],
     parameters: [

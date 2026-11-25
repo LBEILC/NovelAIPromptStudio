@@ -32,6 +32,7 @@ export async function createWorkbenchFixtures(
     ],
     prompts = [],
     parameters = [],
+    metadataKey = 'Description',
   } = {},
 ) {
   await fs.mkdir(directory, { recursive: true });
@@ -54,7 +55,7 @@ export async function createWorkbenchFixtures(
       model: 'nai-diffusion-4-5-full',
       ...parameters[index],
     };
-    const meta = chunk('tEXt', Buffer.from('Description\0' + JSON.stringify(comment)));
+    const meta = chunk('tEXt', Buffer.from(metadataKey + '\0' + JSON.stringify(comment)));
     await fs.writeFile(
       file,
       Buffer.concat([png.subarray(0, png.length - 12), meta, png.subarray(png.length - 12)]),

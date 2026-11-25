@@ -1,4 +1,5 @@
 import {
+  PRECISE_TYPES,
   MODEL_CAPS,
   MEDIUM_FIXED,
   NEW_WORK_DEFAULTS,
@@ -150,16 +151,28 @@ export function hydrateParameters(project) {
     encoding: encodings[i],
     model,
   }));
-  const precise = (
-    Array.isArray(raw.director_reference_images) ? raw.director_reference_images : []
-  ).map((image, i) => ({
-    id: `embedded-precise-${i}`,
-    name: `Reference ${i + 1}`,
-    thumbnail: `data:image/png;base64,${image}`,
-    type: raw.director_reference_descriptions?.[i]?.caption?.base_caption || 'character&style',
-    strength: raw.director_reference_strength_values?.[i] ?? 1,
-    fidelity: 1 - (raw.director_reference_secondary_strength_values?.[i] ?? 0),
-  }));
+  const images = raw.director_reference_images;
+  const descriptions = raw.director_reference_descriptions;
+  const strengths = raw.director_reference_strengths;
+  const secondary = raw.director_reference_secondary_strengths;
+  const oldStrengths = raw.director_reference_strength_values;
+  const oldSecondary = raw.director_reference_secondary_strength_values;
+  const count = Math.max(
+    ...[images, descriptions, strengths, secondary, oldStrengths, oldSecondary].map((a) =>
+      Array.isArray(a) ? a.length : 0,
+    ),
+  );
+  const precise = Array.from({ length: count }, (_, i) => {
+    const type = descriptions?.[i]?.caption?.base_caption;
+    return {
+      id: `embedded-precise-${i}`,
+      name: `参考 ${i + 1}`,
+      thumbnail: images?.[i] ? `data:image/png;base64,${images[i]}` : null,
+      type: PRECISE_TYPES.includes(type) ? type : 'character&style',
+      strength: strengths?.[i] ?? oldStrengths?.[i] ?? 1,
+      fidelity: 1 - (secondary?.[i] ?? oldSecondary?.[i] ?? 0),
+    };
+  });
   return {
     ...project,
     params: normalizeSettings(project.params || saved.params || {}, params),

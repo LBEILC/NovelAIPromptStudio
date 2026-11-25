@@ -20,17 +20,46 @@ export function parameterCommands({ services, tab, edit, revision, unlocked }) {
   };
   const update = (input, fn) =>
     edit(input, (doc) => fn(hydrateParameters(promptDocumentProject(doc))));
+  async function readImage(input, caller) {
+    if (input.path && input.imageId) fail('只能指定一个参考来源');
+    let source = input.path,
+      name;
+    if (input.imageId) {
+      const image = services.database.loadProject(input.imageId);
+      if (!image) throw new CommandError('not_found', '图片不存在');
+      source = image.image_path;
+      name = image.name;
+    }
+    if (!source && caller.source === 'ui') source = (await services.selectSource?.(caller))?.path;
+    if (!source) fail('请指定参考图片路径或图片 ID');
+    const thumbnail = `data:image/png;base64,${(await referenceImage(source)).toString('base64')}`;
+    name ||= path.basename(source);
+    return { thumbnail, name };
+  }
+  function validateType(type, caps) {
+    if (
+      ['costume', 'character_mainoutfit', 'character&style_anyoutfit'].includes(type) &&
+      !caps?.outfit
+    )
+      fail('这个模型不支持服装参考');
+  }
+  function withImageEffort(project) {
+    return project.params.effort === 'Medium'
+      ? { ...project, params: { ...project.params, effort: 'High' } }
+      : project;
+  }
   async function add(input, caller, kind) {
     const p = draft(input),
       other = kind === 'vibes' ? 'precise' : 'vibes';
-    if (!MODEL_CAPS[p.params.model].references) fail('这个模型不支持添加参考图');
+    const caps = MODEL_CAPS[p.params.model];
+    if (!(kind === 'vibes' ? caps.references : caps.precise)) fail('这个模型不支持添加参考图');
+    if (kind === 'precise') validateType(input.type, caps.precise);
     if (p.references[other].length) fail('Vibe 与精确参考不能同时使用');
     if (p.references[kind].length >= (kind === 'vibes' ? MAX_VIBES : MAX_PRECISE))
       fail('参考图已达到上限');
     if ([input.path, input.imageId, input.libraryId].filter(Boolean).length > 1)
       fail('只能指定一个参考来源');
-    let source = input.path,
-      name,
+    let name,
       libraryId = input.libraryId,
       thumbnail;
     if (libraryId) {
@@ -39,16 +68,7 @@ export function parameterCommands({ services, tab, edit, revision, unlocked }) {
       thumbnail = item.thumbnail || null;
       name = item.name;
     } else {
-      if (input.imageId) {
-        const image = services.database.loadProject(input.imageId);
-        if (!image) throw new CommandError('not_found', '图片不存在');
-        source = image.image_path;
-        name = image.name;
-      }
-      if (!source && caller.source === 'ui') source = (await services.selectSource?.(caller))?.path;
-      if (!source) fail('请指定参考图片路径或图片 ID');
-      thumbnail = `data:image/png;base64,${(await referenceImage(source)).toString('base64')}`;
-      name ||= path.basename(source);
+      ({ thumbnail, name } = await readImage(input, caller));
     }
     const ref =
       kind === 'vibes'
@@ -66,7 +86,7 @@ export function parameterCommands({ services, tab, edit, revision, unlocked }) {
             id: crypto.randomUUID(),
             name,
             thumbnail,
-            type: 'character&style',
+            type: input.type ?? 'character&style',
             strength: 1,
             fidelity: 1,
           };
@@ -78,10 +98,16 @@ export function parameterCommands({ services, tab, edit, revision, unlocked }) {
         ref.file = `${d.id}.naiv4vibe`;
       } else if (!d.image) fail('这个 Vibe 没有适用于当前模型的编码');
     }
-    return update(input, (next) => ({
-      ...next,
+    const result = await update(input, (next) => ({
+      ...(kind === 'precise' ? withImageEffort(next) : next),
       references: { ...next.references, [kind]: [...next.references[kind], ref] },
     }));
+    return kind === 'precise'
+      ? {
+          ...result,
+          notes: p.params.effort === 'Medium' ? ['精确参考需要 High，Effort 已改成 High'] : [],
+        }
+      : result;
   }
   return {
     'params.set': async (input) => {
@@ -90,8 +116,10 @@ export function parameterCommands({ services, tab, edit, revision, unlocked }) {
         caps = MODEL_CAPS[requested.model];
       if ((p.prompt_structure?.characters.length || 0) > caps.maxCharacters)
         fail('目标模型的角色数量上限不足');
-      const refs = p.references.vibes.length + p.references.precise.length;
-      if (requested.model !== p.params.model && !caps.references && refs && !input.dropReferences)
+      const incompatible =
+        (!caps.references && p.references.vibes.length) ||
+        (!caps.precise && p.references.precise.length);
+      if (requested.model !== p.params.model && incompatible && !input.dropReferences)
         throw new CommandError('needs_confirm', '切换模型需要移除参考图');
       const next = normalizeSettings(requested),
         notes = [];
@@ -104,10 +132,16 @@ export function parameterCommands({ services, tab, edit, revision, unlocked }) {
         if (requested[key] !== next[key] && !list.includes(requested[key]))
           notes.push(`${label} ${next[key]}（${caps.name} 没有 ${requested[key]}）`);
       const references = structuredClone(p.references);
-      if (!caps.references && input.dropReferences) {
-        references.vibes = [];
-        references.precise = [];
-      } else if (next.model !== p.params.model)
+      if (input.dropReferences && !caps.references) references.vibes = [];
+      if (input.dropReferences && !caps.precise) references.precise = [];
+      if (next.effort === 'Medium' && references.precise.some((r) => r.thumbnail))
+        fail('有精确参考时只能用 High');
+      if (next.model !== p.params.model && caps.precise?.strengthMax === 1) {
+        const over = references.precise.filter((r) => r.strength > 1);
+        for (const r of over) r.strength = 1;
+        if (over.length) notes.push(`${over.length} 个精确参考的强度超过 1，已改成 1`);
+      }
+      if (next.model !== p.params.model)
         for (const v of references.vibes) {
           if (library.variant(v.libraryId && library.get(v.libraryId), next.model, v.information))
             v.encode = null;
@@ -175,6 +209,25 @@ export function parameterCommands({ services, tab, edit, revision, unlocked }) {
     },
     'reference.add-vibe': (i, c) => add(i, c, 'vibes'),
     'reference.add-precise': (i, c) => add(i, c, 'precise'),
+    'reference.set-image': async (input, caller) => {
+      const p = draft(input);
+      if (!p.references.precise.some((r) => r.id === input.id))
+        throw new CommandError('not_found', '参考图不存在');
+      const { thumbnail } = await readImage(input, caller);
+      return update(input, (next) => {
+        if (!next.references.precise.some((r) => r.id === input.id))
+          throw new CommandError('not_found', '参考图不存在');
+        return {
+          ...withImageEffort(next),
+          references: {
+            ...next.references,
+            precise: next.references.precise.map((r) =>
+              r.id === input.id ? { ...r, thumbnail } : r,
+            ),
+          },
+        };
+      });
+    },
     'reference.set': (input) =>
       update(input, (p) => {
         const references = structuredClone(p.references),
@@ -182,6 +235,13 @@ export function parameterCommands({ services, tab, edit, revision, unlocked }) {
           precise = references.precise.find((v) => v.id === input.id),
           ref = vibe || precise;
         if (!ref) throw new CommandError('not_found', '参考图不存在');
+        const caps = MODEL_CAPS[p.params.model].precise;
+        if (precise) validateType(input.type, caps);
+        if (
+          input.strength !== undefined &&
+          (input.strength < 0 || input.strength > (vibe ? 1 : (caps?.strengthMax ?? 1)))
+        )
+          fail('参考强度超出范围');
         const allowed = vibe ? ['strength', 'information'] : ['strength', 'type', 'fidelity'];
         for (const key of ['strength', 'information', 'type', 'fidelity'])
           if (input[key] !== undefined) {

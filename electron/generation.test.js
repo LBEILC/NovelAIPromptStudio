@@ -206,10 +206,8 @@ describe('generation request contract', () => {
       generationUnavailable({ ...vibe, reference_image_multiple: [] }, 'nai-diffusion-4-5-full'),
     ).toContain('编码没有');
   });
-  it('rejects precise references and unknown models', () => {
-    expect(() =>
-      buildGenerationRequest({ ...raw, director_reference_strengths: [1] }, model),
-    ).toThrow('带参考图');
+  it('allows reference metadata without images and rejects unknown models', () => {
+    expect(generationUnavailable({ ...raw, director_reference_strengths: [1] }, model)).toBe('');
     expect(generationModel('unrecognized')).toBeNull();
     expect(generationModel('NovelAI Diffusion V4.5 Full')).toBe('nai-diffusion-4-5-full');
   });

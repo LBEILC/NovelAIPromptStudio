@@ -103,8 +103,6 @@ export function normalizeVibeParameters(raw) {
 
 export function generationUnavailable(raw, model) {
   if (!GENERATION_MODELS[model]) return '这个模型暂不支持生成';
-  if (Object.keys(raw).some((key) => key.startsWith('director_reference_') && raw[key]?.length))
-    return '带参考图的图暂不支持生成';
   try {
     normalizeVibeParameters(raw);
   } catch (error) {

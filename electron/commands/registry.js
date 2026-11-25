@@ -1,5 +1,5 @@
 // @ts-check
-import { MODEL_ORDER } from '../../src/shared/params.ts';
+import { PRECISE_TYPES, MODEL_ORDER } from '../../src/shared/params.ts';
 import { validSettingsPatch } from './parameterValidation.js';
 /** @typedef {import('../../src/shared/commands').CommandName} CommandName */
 /** @typedef {import('../../src/shared/commands').CommandErrorCode} CommandErrorCode */
@@ -230,11 +230,10 @@ export const commandRegistry = {
     mutation: true,
   },
   'reference.add-precise': {
-    fields: { ...tab, imageId: 'string', path: 'string' },
+    fields: { ...tab, imageId: 'string', path: 'string', type: PRECISE_TYPES.join('|') },
     required: ['tabId'],
     mutation: true,
   },
-  // 界面先接上（设计 V5 精确参考）；命令实现、type 的新值和 V5 强度 0–5 的校验待工程
   'reference.set-image': {
     fields: { ...tab, id: 'string', imageId: 'string', path: 'string' },
     required: ['tabId', 'id'],
@@ -244,9 +243,9 @@ export const commandRegistry = {
     fields: {
       ...tab,
       id: 'string',
-      strength: 'unit',
+      strength: 'number',
       information: 'unit',
-      type: 'character|style|character&style',
+      type: PRECISE_TYPES.join('|'),
       fidelity: 'unit',
     },
     required: ['tabId', 'id'],
