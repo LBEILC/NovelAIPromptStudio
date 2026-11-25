@@ -300,17 +300,19 @@ export function InsertPop({
           )}
         </div>
         <div className="row">
-          <span className="help key-hint">
-            <Kbd keys="↑" />
-            <Kbd keys="↓" />
-            <span>选择</span>
-            <Kbd keys="Enter" />
-            <span>{kind === 'set' ? '套用' : '插入'}</span>
-          </span>
-          <span className="sp" />
+          {/* 整套的底部放不下按键提示：换成"存为整套提示词…" */}
+          {!onSave && (
+            <span className="help key-hint">
+              <Kbd keys="↑" />
+              <Kbd keys="↓" />
+              <span>选择</span>
+              <Kbd keys="Enter" />
+              <span>插入</span>
+            </span>
+          )}
           {onSave && (
             <button
-              className="btn quiet sm"
+              className="btn sm"
               onClick={() => {
                 onClose();
                 onSave();
@@ -319,6 +321,7 @@ export function InsertPop({
               存为整套提示词…
             </button>
           )}
+          <span className="sp" />
           <button
             className="btn quiet sm"
             onClick={() => {
