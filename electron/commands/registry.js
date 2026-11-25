@@ -140,8 +140,8 @@ export const commandRegistry = {
   'material.vibes': { fields: {}, uiOnly: true },
   'material.list': { fields: {}, example: {} },
   'material.save': {
-    fields: { ...scope, block: 'integer', name: 'string' },
-    required: [...scoped, 'name'],
+    fields: { ...scope, block: 'integer', whole: 'boolean', name: 'string' },
+    required: ['tabId', 'name'],
     mutation: true,
     example: { tabId: 'tab-id', scope: 'base:prompt', block: 0, name: '常用场景' },
   },
@@ -1096,6 +1096,10 @@ export function validateCommand(name, input, source) {
   )
     throw new CommandError('invalid_input', '输入格式不正确，请按 help 中的格式填写');
   if (
+    (name === 'material.save' &&
+      (input.whole === true
+        ? input.scope !== undefined || input.block !== undefined
+        : input.whole !== undefined || input.scope === undefined)) ||
     (['library.export', 'library.export.estimate'].includes(name) &&
       Number(input.ids !== undefined) + Number(input.collectionId !== undefined) !== 1) ||
     (['image.copy', 'image.save-as'].includes(name) &&

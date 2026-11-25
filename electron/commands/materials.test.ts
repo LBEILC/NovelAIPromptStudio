@@ -16,7 +16,7 @@ afterEach(async () => {
   for (const cleanup of cleanups.reverse()) await cleanup();
   cleanups.length = 0;
 });
-async function setup() {
+async function setup(prepare?: (project: ImageProject) => void) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'nai-materials-'));
   cleanups.push(() => fs.rm(directory, { recursive: true, force: true }));
   const database = await openDatabase(path.join(directory, 'data'));
@@ -44,6 +44,7 @@ async function setup() {
     prompt_structure: createPromptStructure(metadata),
     tags: parsePrompt(metadata.prompt_raw),
   }) as ImageProject;
+  prepare?.(project);
   database.insertProject(project);
   let reply: unknown = {};
   const requests: unknown[] = [];
@@ -161,6 +162,115 @@ it('restores characters with negative prompts and unique names', async () => {
   expect(next.label).toBe('合成角色 2');
   expect(next.prompt_raw).toBe('standing');
   expect(next.undesired_raw).toBe('lowres');
+});
+it('round trips a complete draft between tabs and through a database backup', async () => {
+  const { call, commands, database, directory, tabId } = await setup((p) => {
+    const structure = p.prompt_structure;
+    structure.use_coords = true;
+    structure.use_order = false;
+    structure.block_annotations = {
+      'base:prompt': [
+        {
+          raw: 'blue hair',
+          start: p.metadata.prompt_raw.indexOf('blue hair'),
+          type: 'paragraph',
+          displayLabel: '场景',
+          translation: '合成译文',
+        },
+      ],
+    };
+    structure.characters = ['Alpha', 'Beta'].map((label, i) => ({
+      id: label,
+      label,
+      center: { x: i ? 0.7 : 0.3, y: 0.5 },
+      prompt_raw: label,
+      undesired_raw: 'fog',
+      prompt_tags: parsePrompt(label),
+      undesired_tags: parsePrompt('fog'),
+    }));
+  });
+  const source = await call('workbench.get', { tabId });
+  const save = () =>
+    call('material.save', {
+      tabId,
+      whole: true,
+      name: 'Synthetic set',
+      expectedRevision: source.revision,
+    });
+  const { item } = await save();
+  for (const field of ['metadata', 'params', 'novelai_auto', 'references'])
+    expect(item).not.toHaveProperty(field);
+  expect(item).toMatchObject({
+    kind: 'set',
+    useCoords: true,
+    useOrder: false,
+    blocks: [
+      { content: 'flim grain, umbrela' },
+      { type: 'paragraph', displayLabel: '场景', translation: '合成译文' },
+    ],
+    negativeBlocks: [{ content: 'lowres' }],
+    characters: [
+      {
+        character: { label: 'Alpha' },
+        blocks: [{ content: 'Alpha' }],
+        negativeBlocks: [{ content: 'fog' }],
+      },
+      {
+        character: { label: 'Beta' },
+        blocks: [{ content: 'Beta' }],
+        negativeBlocks: [{ content: 'fog' }],
+      },
+    ],
+  });
+  expect((await save()).item.name).toBe('Synthetic set 2');
+  expect((await save()).item.name).toBe('Synthetic set 3');
+  const id = item.id;
+  const target = (await call('workbench.new', { width: 384, height: 576, params: { steps: 19 } }))
+    .tab.id;
+  const before = (await call('character.add', { tabId: target, name: 'Previous' })).tab.project;
+  expect(
+    await commands.dispatch(
+      'material.save',
+      { tabId: target, whole: true, name: 'Empty' },
+      'agent',
+    ),
+  ).toMatchObject({
+    ok: false,
+    error: { code: 'invalid_input', message: '提示词是空的' },
+  });
+  await call('workbench.editing', { targets: [{ tabId: target, scope: 'base:prompt' }] }, 'ui');
+  expect(await commands.dispatch('material.insert', { tabId: target, id }, 'agent')).toMatchObject({
+    ok: false,
+    error: { code: 'conflict' },
+  });
+  expect(database.materials.get(id).uses).toBe(0);
+  await call('workbench.editing', { targets: [] }, 'ui');
+  const applied = (await call('material.insert', { tabId: target, id })).tab.project;
+  expect(applied.tags).toEqual(source.tab.project.tags);
+  expect(applied.prompt_structure).toEqual({
+    ...source.tab.project.prompt_structure,
+    novelai_auto: before.prompt_structure.novelai_auto,
+  });
+  expect(applied.params).toEqual(before.params);
+  expect(applied.references).toEqual(before.references);
+  expect(applied.metadata).toEqual({
+    ...before.metadata,
+    prompt_raw: source.tab.project.metadata.prompt_raw,
+    negative_prompt: source.tab.project.metadata.negative_prompt,
+  });
+  expect(await commands.dispatch('material.update', { id, text: 'other' }, 'ui')).toMatchObject({
+    ok: false,
+    error: { code: 'invalid_input' },
+  });
+  await call('material.rename', { id, name: 'Renamed set' }, 'ui');
+  const saved = (await call('material.list')).items.find((m: { id: string }) => m.id === id);
+  expect(saved).toMatchObject({ uses: 1, name: 'Renamed set' });
+  const backup = path.join(directory, 'snapshot.sqlite');
+  database.backup.snapshot(backup);
+  await call('material.delete', { id }, 'ui');
+  expect(database.materials.get(id)).toBeFalsy();
+  database.backup.replace(backup);
+  expect(database.materials.get(id)).toEqual(saved);
 });
 it('filters unsafe AI changes at the command boundary and leaves drafts and names untouched', async () => {
   const s = await setup();

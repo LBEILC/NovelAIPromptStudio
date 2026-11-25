@@ -32,6 +32,7 @@ export async function materialsChecks({ h, mode, database, preferences }) {
   const raw = `(${draftExpression}).prompt_structure.base_prompt_raw`;
   const release = () => fetch(mode.baseUrl.replace('/v1', '/control/ai-continue'));
   let cleanupTab = '';
+  let targetTab = '';
   const screenshot = h.screenshot;
   if (process.env.NPS_COMPARE_033) {
     const output = path.resolve('.codex-runs/033-states');
@@ -185,6 +186,53 @@ export async function materialsChecks({ h, mode, database, preferences }) {
       '角色从素材加回且保留负面提示词',
       `(${draftExpression}).prompt_structure.characters.at(-1).undesired_raw==='lowres'`,
     );
+    await click('整套提示词');
+    await click('存为整套提示词…');
+    await input('[aria-label="整套提示词的名字"]', '合成整套');
+    await key('Enter');
+    await h.until(
+      () => database.materials.list().some((m) => m.name === '合成整套'),
+      '整套保存落库',
+    );
+    const set = database.materials.list().find((m) => m.name === '合成整套');
+    const sourceRaw = await e(raw);
+    const target = await command('workbench.new', {
+      width: 384,
+      height: 576,
+      params: { steps: 19 },
+    });
+    targetTab = target.tab.id;
+    await command('prompt.set', {
+      tabId: targetTab,
+      scope: 'base:prompt',
+      text: 'synthetic target',
+    });
+    await wait(`${raw}==='synthetic target'`);
+    const beforeSet = await e(draftExpression);
+    await click('整套提示词');
+    const option = `document.querySelector('[data-insrow="${set.id}"]')`;
+    await wait(`!!${option}`);
+    await e(`${option}.click()`);
+    await wait(`${raw}===${JSON.stringify(sourceRaw)}`);
+    const applied = await e(draftExpression);
+    await check(
+      '跨标签页套用整套恢复提示词和角色并保留目标参数',
+      () =>
+        applied.prompt_structure.base_prompt_raw === sourceRaw &&
+        applied.prompt_structure.characters.length === set.characters.length &&
+        JSON.stringify(applied.params) === JSON.stringify(beforeSet.params) &&
+        applied.metadata.width === 384 &&
+        applied.metadata.height === 576,
+    );
+    await click(
+      '撤销',
+      'Array.from(document.querySelectorAll(".toast:not(.leaving)")).find(t=>t.textContent.includes("已套用"))',
+    );
+    await wait(`${raw}==='synthetic target'`);
+    await check(
+      '套用通知撤销后恢复目标提示词和角色',
+      `JSON.stringify((${draftExpression}).prompt_structure)===${JSON.stringify(JSON.stringify(beforeSet.prompt_structure))}`,
+    );
     await click('素材', 'document.querySelector(".tb")');
     await wait('!!document.querySelector("[data-mat]")');
     await h.screenshot('033-materials-blocks');
@@ -260,6 +308,17 @@ export async function materialsChecks({ h, mode, database, preferences }) {
     );
     await click('角色', 'document.querySelector(".matp .side")');
     await h.screenshot('033-materials-characters');
+    await click('整套', 'document.querySelector(".matp .side")');
+    const setRow = `document.querySelector('[data-mat="${set.id}"]')`;
+    await wait(`!!${setRow}`);
+    await e(`${setRow}.click()`);
+    const setSections = `${setRow}.parentElement.innerText`;
+    await wait(`${setSections}.includes('基础提示词')`);
+    await check(
+      '整套素材展开可见基础提示词和角色分节',
+      `${setSections}.includes('基础提示词') && ${setSections}.includes(${JSON.stringify(set.characters[0].character.label)})`,
+    );
+    await h.screenshot('135-material-set');
     await click('Vibe', 'document.querySelector(".matp .side")');
     await h.screenshot('033-materials-vibes');
     await click('图片库', 'document.querySelector(".tb")');
@@ -302,6 +361,7 @@ export async function materialsChecks({ h, mode, database, preferences }) {
       database.updateProjectName(id, name, custom, true);
     for (const material of database.materials.list())
       if (!originalMaterials.has(material.id)) database.materials.remove(material.id);
+    if (targetTab) await command('workbench.close', { tabId: targetTab });
     if (cleanupTab) await command('workbench.close', { tabId: cleanupTab });
     database.deleteProject(source.id);
   }

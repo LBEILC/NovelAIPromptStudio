@@ -80,6 +80,65 @@ function joinNegative(parts) {
     .join(', ');
 }
 
+function characterMaterial(document, character) {
+  const blocks = (polarity) =>
+    document.scopes.find(
+      (s) => s.scope.characterId === character.id && s.scope.polarity === polarity,
+    ).blocks;
+  return { character, blocks: blocks('prompt'), negativeBlocks: blocks('undesired') };
+}
+
+function promptSet(document) {
+  if (!document.scopes.some((s) => s.blocks.some((b) => b.content.trim())))
+    throw new CommandError('invalid_input', '提示词是空的');
+  const structure = document.project.prompt_structure;
+  const base = document.scopes.find((s) => s.scope.key === 'base:prompt');
+  const negative = document.scopes.find((s) => s.scope.key === 'base:undesired');
+  return {
+    kind: 'set',
+    blocks: base.blocks,
+    negativeBlocks: negative.blocks,
+    separators: base.separators,
+    negativeSeparators: negative.separators,
+    tags: base.scope.tags,
+    negativeTags: negative.scope.tags,
+    characters: structure.characters.map((c) => characterMaterial(document, c)),
+    useCoords: structure.use_coords,
+    useOrder: structure.use_order,
+  };
+}
+
+function applyPromptSet(doc, set) {
+  const raw = (blocks, separators) =>
+    separators
+      ? serializePromptSection({ blocks, separators })
+      : blocks.map((b) => b.raw).join('\n\n');
+  const positive = raw(set.blocks, set.separators);
+  const negative = raw(set.negativeBlocks, set.negativeSeparators);
+  const fresh = createPromptDocument({
+    ...doc.project,
+    tags: set.tags ?? parsePrompt(positive),
+    prompt_structure: {
+      ...doc.project.prompt_structure,
+      block_annotations: {},
+      base_prompt_raw: positive,
+      base_undesired_raw: negative,
+      base_undesired_tags: set.negativeTags ?? parsePrompt(negative),
+      characters: set.characters.map((c) => c.character),
+      use_coords: set.useCoords,
+      use_order: set.useOrder,
+    },
+  });
+  for (const section of fresh.scopes) {
+    const saved =
+      section.scope.kind === 'base' ? set : set.characters[section.scope.characterIndex];
+    section.blocks = structuredClone(
+      section.scope.polarity === 'prompt' ? saved.blocks : saved.negativeBlocks,
+    );
+  }
+  return fresh;
+}
+
 export function materialCommands({ services, tab, full, edit, locate, revision, renamePool }) {
   const db = services.database.materials;
   const requests = new Map();
@@ -223,6 +282,20 @@ export function materialCommands({ services, tab, full, edit, locate, revision, 
     'material.save': (input) => {
       const current = full(tab(input.tabId));
       revision(input.expectedRevision, current.revision);
+      const name = input.name.trim();
+      const examples = current.tab.source.projectId ? [current.tab.source.projectId] : [];
+      if (input.whole) {
+        const value = promptSet(current.document);
+        const names = new Set(
+          db
+            .list()
+            .filter((m) => m.kind === 'set')
+            .map((m) => m.name),
+        );
+        let unique = name;
+        for (let n = 2; names.has(unique); n++) unique = `${name} ${n}`;
+        return { item: db.save({ ...value, name: unique, examples }) };
+      }
       const { section } = locate(current.document, { ...input, block: undefined });
       let value;
       if (input.block !== undefined && section.scope.polarity === 'undesired') {
@@ -237,21 +310,9 @@ export function materialCommands({ services, tab, full, edit, locate, revision, 
           (c) => c.id === section.scope.characterId,
         );
         if (!character) throw new CommandError('invalid_input', '请选择角色');
-        const scopes = current.document.scopes.filter((s) => s.scope.characterId === character.id);
-        value = {
-          kind: 'character',
-          character: structuredClone(character),
-          blocks: scopes.find((s) => s.scope.polarity === 'prompt')?.blocks || [],
-          negativeBlocks: scopes.find((s) => s.scope.polarity === 'undesired')?.blocks || [],
-        };
+        value = { kind: 'character', ...characterMaterial(current.document, character) };
       }
-      return {
-        item: db.save({
-          ...value,
-          name: input.name.trim(),
-          examples: current.tab.source.projectId ? [current.tab.source.projectId] : [],
-        }),
-      };
+      return { item: db.save({ ...value, name, examples }) };
     },
     'material.rename': ({ id, name }) =>
       read(id).kind === 'pool' && renamePool
@@ -259,6 +320,7 @@ export function materialCommands({ services, tab, full, edit, locate, revision, 
         : { item: db.rename(read(id).id, name.trim()) },
     'material.update': ({ id, block, negative, text, asNew }) => {
       const material = read(id);
+      if (material.kind === 'set') throw new CommandError('invalid_input', '整套提示词不支持编辑');
       if (material.kind === 'pool') throw new CommandError('invalid_input', '请使用随机池条目命令');
       if (typeof text !== 'string' || !text.trim())
         throw new CommandError('invalid_input', '素材内容不能为空');
@@ -294,7 +356,10 @@ export function materialCommands({ services, tab, full, edit, locate, revision, 
       const material = read(input.id);
       if (material.kind === 'pool')
         throw new CommandError('invalid_input', '请使用 block.random.insert');
+      if (material.kind === 'set' && (input.scope !== undefined || input.before !== undefined))
+        throw new CommandError('invalid_input', '套用整套提示词不能指定插入位置');
       const result = await edit(input, (doc) => {
+        if (material.kind === 'set') return applyPromptSet(doc, material);
         if (material.kind === 'character') {
           const before = promptDocumentProject(doc);
           const next = addPromptCharacter(before);

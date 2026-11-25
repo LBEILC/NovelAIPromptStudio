@@ -18,6 +18,11 @@ export interface Material {
     negativeBlocks: PromptBlock[];
   }[];
   useCoords?: boolean;
+  /** Exact spacing and tag annotations of the two base sections. */
+  separators?: string[];
+  negativeSeparators?: string[];
+  tags?: import('./types').Tag[];
+  negativeTags?: import('./types').Tag[];
   useOrder?: boolean;
   examples: string[];
 }
