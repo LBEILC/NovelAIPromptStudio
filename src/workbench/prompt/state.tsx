@@ -30,6 +30,7 @@ import {
   type ControlTag,
 } from '../../lib/v5Controls';
 import type { ImageProject, TagCategory } from '../../shared/types';
+import type { Material } from '../../shared/materials';
 import { blockDuplicates } from '../duplicates';
 import { closeWeightBefore, deleteTags, insertTags } from '../edits';
 import {
@@ -133,7 +134,7 @@ export function usePromptState(p: EditorProps) {
   };
   const [query, setQuery] = useState('');
   const [polarity, setPolarity] = useState<'all' | 'prompt' | 'undesired'>('all');
-  const [pop, setPop] = useState<'' | 'view' | 'copy'>('');
+  const [pop, setPop] = useState<'' | 'view' | 'copy' | 'set'>('');
   const [translating, setTranslating] = useState(false);
   const col = useRef<HTMLDivElement>(null);
   const search = useRef<HTMLInputElement>(null);
@@ -458,11 +459,13 @@ export function usePromptState(p: EditorProps) {
       );
     });
   // anchor：浮层贴在哪里，默认是那一块的菜单按钮；负面那一节贴在节标题的"更多"上
+  // whole：存为整套提示词（2.25），浮层贴在顶部的"整套"按钮上
   const [saveBlock, setSaveBlock] = useState<{
     si: number;
     bi: number;
     name: string;
     anchor?: string;
+    whole?: boolean;
   } | null>(null);
   const [paraTranslate, setParaTranslate] = useState({ key: '', n: 0 });
   const [paraEditing, setParaEditing] = useState<string[]>([]);
@@ -646,6 +649,24 @@ export function usePromptState(p: EditorProps) {
   };
   const saveMaterial = async () => {
     if (!saveBlock?.name.trim() || !p.tabId) return;
+    if (saveBlock.whole) {
+      try {
+        await p.before?.();
+        const { item } = await invokeUI('material.save', {
+          tabId: p.tabId,
+          whole: true,
+          name: saveBlock.name.trim(),
+        });
+        setSaveBlock(null);
+        notify({
+          text: '已存为整套提示词',
+          action: { label: '查看', onClick: () => p.onShowMaterials?.('set', item.id) },
+        });
+      } catch (e) {
+        notify({ text: (e as Error).message, tone: 'error' });
+      }
+      return;
+    }
     try {
       await p.before?.();
       const { item } = await invokeUI('material.save', {
@@ -661,6 +682,37 @@ export function usePromptState(p: EditorProps) {
       });
     } catch (e) {
       notify({ text: (e as Error).message, tone: 'error' });
+    }
+  };
+
+  // ---------- 整套提示词（2.25，#20）----------
+  const saveSet = () =>
+    setSaveBlock({
+      si: 0,
+      bi: -1,
+      whole: true,
+      anchor: '[data-trigger="set"]',
+      name:
+        entries
+          .filter((e) => e.section === 0 && !e.automatic)
+          .slice(0, 2)
+          .map((e) => e.tag.translation || e.tag.tag)
+          .join('、') || '整套提示词',
+    });
+  /** 套用：整份提示词换成这一套，参数不动；不确认，通知带撤销 */
+  const applySet = async (m: Material) => {
+    if (!p.tabId) return;
+    try {
+      await p.before?.();
+      const before = projectRef.current;
+      await invokeUI('material.insert', { tabId: p.tabId, id: m.id });
+      notify({
+        text: `已套用「${m.name}」`,
+        action: { label: '撤销', onClick: () => p.onUpdateProject(before) },
+      });
+    } catch (e) {
+      notify({ text: (e as Error).message, tone: 'error' });
+      throw e;
     }
   };
 
@@ -840,6 +892,8 @@ export function usePromptState(p: EditorProps) {
     saveBlock,
     setSaveBlock,
     saveMaterial,
+    saveSet,
+    applySet,
     random,
   };
 }

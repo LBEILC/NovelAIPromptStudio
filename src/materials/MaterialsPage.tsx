@@ -79,7 +79,9 @@ export function MaterialsPage({
   }, []);
   useEffect(() => {
     if (!target) return;
-    const k = (['block', 'character', 'pool', 'vibe'] as Kind[]).includes(target.kind as Kind)
+    const k = (['block', 'character', 'set', 'pool', 'vibe'] as Kind[]).includes(
+      target.kind as Kind,
+    )
       ? (target.kind as Kind)
       : 'block';
     setKind(k);
@@ -349,6 +351,7 @@ export function MaterialsPage({
             {
               block: '在工作台中打开块的菜单，选择“存为常用块”，就可以在这里反复使用。',
               character: '在工作台中打开角色的“更多”菜单，选择“存为角色”，就可以在这里反复使用。',
+              set: '在工作台提示词栏顶部点“整套”，选择“存为整套提示词”，就能把基础提示词、负面和所有角色一起存下来，以后一键套用。',
               pool: '随机池里放一组可以互换的内容，一行一条：画师串、动作、背景……提示词里的随机块在每张图生成前从中抽取。',
               vibe: '导入带 Vibe 的图片后，用到的 Vibe 会列在这里。',
             }[kind]

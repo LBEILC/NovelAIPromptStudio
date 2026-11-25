@@ -261,7 +261,10 @@ export interface CommandDefinitions {
     output: { items: import('./materials').Material[] };
   };
   'material.save': {
-    input: ScopeInput & { block?: number; name: string };
+    /** whole：把当前草稿的整份提示词存为整套提示词（2.25） */
+    input:
+      | (ScopeInput & { block?: number; name: string })
+      | (TabInput & { whole: true; name: string });
     output: { item: import('./materials').Material };
   };
   'material.insert': {

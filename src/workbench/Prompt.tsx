@@ -82,6 +82,8 @@ export function WorkbenchEditor(p: EditorProps) {
     saveBlock,
     setSaveBlock,
     saveMaterial,
+    saveSet,
+    applySet,
     random,
   } = usePromptState(p);
   const { scroll, drag, docRoot, float, marq } = usePromptDrag({
@@ -270,6 +272,8 @@ export function WorkbenchEditor(p: EditorProps) {
     saveBlock,
     setSaveBlock,
     saveMaterial,
+    saveSet,
+    applySet,
     drag,
     lang,
     float,

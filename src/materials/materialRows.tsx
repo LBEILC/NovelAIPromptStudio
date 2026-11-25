@@ -3,11 +3,12 @@ import { Icon, Kbd, isMod } from '../kit/controls';
 import { invokeUI } from '../lib/commands';
 import { BlurImg, type BlurImage } from '../kit/blur';
 import { Swap } from '../settings/parts';
+import type { PromptBlock } from '../lib/promptDocument';
 import type { Material } from '../shared/materials';
-import { MaterialContent } from '../workbench/Insert';
+import { MaterialContent, setSummary } from '../workbench/Insert';
 import { PoolBody } from './PoolBody';
 
-export type Kind = 'block' | 'character' | 'pool' | 'vibe';
+export type Kind = 'block' | 'character' | 'set' | 'pool' | 'vibe';
 
 export type Vibe = {
   id: string;
@@ -18,6 +19,7 @@ export type Vibe = {
 export const TABS: [Kind, string, string][] = [
   ['block', '常用块', 'stack-line'],
   ['character', '角色', 'user-3-line'],
+  ['set', '整套', 'file-list-3-line'],
   ['pool', '随机池', 'dice-line'],
   ['vibe', 'Vibe', 'palette-line'],
 ];
@@ -25,6 +27,7 @@ export const TABS: [Kind, string, string][] = [
 export const NOUN: Record<Kind, string> = {
   block: '常用块',
   character: '角色',
+  set: '整套提示词',
   vibe: 'Vibe',
   pool: '随机池',
 };
@@ -91,7 +94,13 @@ export function useExamples(ids: string[]) {
 export const contentText = (m: Material) =>
   m.kind === 'pool'
     ? (m.entries || []).map((e) => e.text).join('\n')
-    : [...m.blocks, ...(m.negativeBlocks || [])].map((b) => b.content).join('\n\n');
+    : [
+        ...m.blocks,
+        ...(m.negativeBlocks || []),
+        ...(m.characters || []).flatMap((c) => [...c.blocks, ...c.negativeBlocks]),
+      ]
+        .map((b) => b.content)
+        .join('\n\n');
 
 export const preview = (m: Material) => {
   if (m.kind === 'pool')
@@ -111,6 +120,7 @@ export const preview = (m: Material) => {
 
 export const typeText = (m: Material) => {
   if (m.kind === 'pool') return `${m.entries?.length || 0} 条`;
+  if (m.kind === 'set') return setSummary(m);
   if (m.kind === 'character') {
     const neg = (m.negativeBlocks || []).reduce(
       (n, b) => n + (b.type === 'tags' ? b.tags.length : 0),
@@ -121,6 +131,37 @@ export const typeText = (m: Material) => {
   const b = m.blocks[0];
   return b?.type === 'tags' ? `${m.negative ? '负面 · ' : ''}Tag 块 · ${b.tags.length} 个` : '段落';
 };
+
+const hasTags = (blocks: PromptBlock[] | undefined) =>
+  !!blocks?.some((b) => b.type !== 'tags' || b.tags.length);
+
+/** 整套提示词展开后的内容：基础提示词、负面、每个角色（2.25），只看不改 */
+function SetContent({ m }: { m: Material }) {
+  const part = (label: string, blocks: PromptBlock[] | undefined, empty: string, key?: number) => (
+    <div className="mat-sub" key={key}>
+      <div className="mat-sub-h">
+        <span className="label">{label}</span>
+      </div>
+      {hasTags(blocks) ? (
+        <MaterialContent m={{ ...m, blocks: blocks! }} max={Infinity} />
+      ) : (
+        <p className="help">{empty}</p>
+      )}
+    </div>
+  );
+  return (
+    <>
+      {part('基础提示词', m.blocks, '没有内容')}
+      {part('负面提示词', m.negativeBlocks, '没有 Tag')}
+      {(m.characters || []).flatMap((c, i) => [
+        part(c.character.label, c.blocks, '没有内容', i * 2),
+        hasTags(c.negativeBlocks)
+          ? part(`${c.character.label} · 负面`, c.negativeBlocks, '', i * 2 + 1)
+          : null,
+      ])}
+    </>
+  );
+}
 
 export function PeekCard({ ids, i }: { ids: string[]; i: number }) {
   const ex = useExamples(ids);
@@ -343,7 +384,9 @@ export function Row({
             {open && m.kind === 'pool' && <PoolBody m={m} onChange={onPoolChange} />}
             {open && m.kind !== 'pool' && (
               <>
-                {m.kind === 'character' ? (
+                {m.kind === 'set' ? (
+                  <SetContent m={m} />
+                ) : m.kind === 'character' ? (
                   <>
                     {m.blocks.map((b, i) => (
                       <div className="mat-sub" key={i}>

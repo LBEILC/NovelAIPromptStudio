@@ -75,6 +75,8 @@ export function renderPromptView({
   saveBlock,
   setSaveBlock,
   saveMaterial,
+  saveSet,
+  applySet,
   drag,
   lang,
   float,
@@ -144,6 +146,8 @@ export function renderPromptView({
   | 'saveBlock'
   | 'setSaveBlock'
   | 'saveMaterial'
+  | 'saveSet'
+  | 'applySet'
   | 'drag'
   | 'lang'
   | 'float'
@@ -210,6 +214,18 @@ export function renderPromptView({
                 <span className="lbl">{translating ? '翻译中' : '翻译'}</span>
               </button>
               {tidy.button}
+              {p.tabId && (
+                <button
+                  className={`btn quiet sm ${pop === 'set' ? 'is-hover' : ''}`}
+                  data-trigger="set"
+                  data-tip="整套提示词：把基础提示词、负面和所有角色一起存下来，以后一键套用"
+                  aria-label="整套提示词"
+                  onClick={() => setPop(pop === 'set' ? '' : 'set')}
+                >
+                  <Icon name="file-list-3-line" />
+                  <span className="lbl">整套</span>
+                </button>
+              )}
               <span className="split" data-trigger="copy" data-feature="copy">
                 <button
                   className="btn sm"
@@ -583,6 +599,19 @@ export function renderPromptView({
           onManage={() => p.onShowMaterials?.('character')}
         />
       )}
+      {p.tabId && (
+        <InsertPop
+          open={pop === 'set'}
+          onClose={() => setPop('')}
+          anchor='[data-trigger="set"]'
+          tabId={p.tabId}
+          kind="set"
+          place="below-right"
+          onPick={applySet}
+          onSave={saveSet}
+          onManage={() => p.onShowMaterials?.('set')}
+        />
+      )}
       <Pop
         open={!!saveBlock}
         onClose={() => setSaveBlock(null)}
@@ -593,16 +622,18 @@ export function renderPromptView({
         }
         place="below-right"
         className="popover saveblk-pop"
-        label="存为常用块"
+        label={saveBlock?.whole ? '存为整套提示词' : '存为常用块'}
       >
         {saveBlock && (
           <>
             <div className="vp-h">
-              <b>存为常用块</b>
+              <b>{saveBlock.whole ? '存为整套提示词' : '存为常用块'}</b>
               <span className="help">
-                {doc.scopes[saveBlock.si]?.scope.polarity === 'undesired'
-                  ? '存进素材，以后可以插入任何一张图的负面提示词'
-                  : '存进素材，以后可以插入任何一张图的提示词'}
+                {saveBlock.whole
+                  ? '基础提示词、负面和所有角色一起存进素材；参数不存，套用时跟着当前这一版'
+                  : doc.scopes[saveBlock.si]?.scope.polarity === 'undesired'
+                    ? '存进素材，以后可以插入任何一张图的负面提示词'
+                    : '存进素材，以后可以插入任何一张图的提示词'}
               </span>
             </div>
             <label className="field sm">
@@ -615,8 +646,8 @@ export function renderPromptView({
                   }
                 }}
                 value={saveBlock.name}
-                placeholder="常用块的名字"
-                aria-label="常用块的名字"
+                placeholder={saveBlock.whole ? '整套提示词的名字' : '常用块的名字'}
+                aria-label={saveBlock.whole ? '整套提示词的名字' : '常用块的名字'}
                 onChange={(e) => setSaveBlock({ ...saveBlock, name: e.target.value })}
                 onKeyDown={(e) => {
                   if (!e.nativeEvent.isComposing && e.key === 'Enter') {

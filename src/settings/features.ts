@@ -313,6 +313,13 @@ export const FEATURES: { group: string; items: Feature[] }[] = [
         point: { id: 'materials', tip: '左边选「随机池」' },
         demo: 'random',
       },
+      {
+        name: '整套提示词',
+        text: '基础提示词、负面和所有角色一起存下来，一键套用到当前作品；几套轮流套用、加入队列，就能一次排好一组图',
+        go: 'materials',
+        where: '工作台 · 提示词栏顶部的「整套」；素材 · 整套',
+        point: { id: 'materials', tip: '左边选「整套」' },
+      },
     ],
   },
   {

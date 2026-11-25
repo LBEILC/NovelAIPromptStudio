@@ -49,12 +49,21 @@ function Example({ id, onPeek, cur }: { id: string; onPeek?: (ex: Ex) => void; c
     />
   ) : null;
 }
+/** 整套提示词的概要："2 个角色 · 5 块"，没有角色时只写块数 */
+export const setSummary = (m: Material) => {
+  const chars = m.characters || [];
+  const blocks = m.blocks.length + chars.reduce((n, c) => n + c.blocks.length, 0);
+  return `${chars.length ? `${chars.length} 个角色 · ` : ''}${blocks} 块`;
+};
+
 const typeOf = (m: Material) =>
-  m.kind === 'character'
-    ? `${m.blocks.length} 块`
-    : m.blocks[0]?.type === 'tags'
-      ? `${m.negative ? '负面 · ' : ''}Tag 块 · ${m.blocks[0].tags.length} 个`
-      : '段落';
+  m.kind === 'set'
+    ? setSummary(m)
+    : m.kind === 'character'
+      ? `${m.blocks.length} 块`
+      : m.blocks[0]?.type === 'tags'
+        ? `${m.negative ? '负面 · ' : ''}Tag 块 · ${m.blocks[0].tags.length} 个`
+        : '段落';
 const matText = (m: Material) =>
   m.blocks.map((b) => (b.type === 'tags' ? b.content : b.content)).join('\n\n');
 
@@ -102,6 +111,8 @@ export function InsertPop({
   negative = false,
   place,
   point,
+  onPick,
+  onSave,
 }: {
   /** 插到负面提示词里：只列负面的常用块；插到正面只列正面的（2.25，#21） */
   negative?: boolean;
@@ -113,14 +124,18 @@ export function InsertPop({
   before?: number;
   flush?: () => Promise<void>;
   onManage?: () => void;
-  /** 常用块，或者"添加角色"旁边的箭头：从素材里选一个角色 */
-  kind?: 'block' | 'character';
+  /** 常用块，或者"添加角色"旁边的箭头：从素材里选一个角色；或者提示词栏的"整套"（2.25） */
+  kind?: 'block' | 'character' | 'set';
+  /** 选中一项后做什么（整套提示词是套用，带撤销）；不给就是插入 */
+  onPick?: (m: Material) => Promise<void>;
+  /** 底部"存为整套提示词…" */
+  onSave?: () => void;
   place?: Place;
   /** 开在指针处（文本方式的右键"插入常用块…"） */
   point?: [number, number];
 }) {
   const notify = useNotifications();
-  const noun = kind === 'character' ? '角色' : '常用块';
+  const noun = kind === 'character' ? '角色' : kind === 'set' ? '整套提示词' : '常用块';
   const [items, setItems] = useState<Material[]>([]);
   const [q, setQ] = useState('');
   const [pick, setPick] = useState(-1);
@@ -144,6 +159,11 @@ export function InsertPop({
   );
   const insert = async (m: Material) => {
     try {
+      if (onPick) {
+        await onPick(m);
+        onClose();
+        return;
+      }
       await flush?.();
       await invokeUI(
         'material.insert',
@@ -175,7 +195,9 @@ export function InsertPop({
         className="popover ins-pop"
         place={place}
         point={point}
-        label={kind === 'character' ? '从素材添加角色' : '插入常用块'}
+        label={
+          kind === 'character' ? '从素材添加角色' : kind === 'set' ? '整套提示词' : '插入常用块'
+        }
         deps={[list.length]}
       >
         <label className="field sm">
@@ -267,11 +289,13 @@ export function InsertPop({
             <p className="help ins-empty">
               {q.trim()
                 ? `没有找到匹配的${noun}`
-                : kind === 'character'
-                  ? '暂无保存的角色。在角色的“更多”菜单里选“存为角色”即可添加。'
-                  : negative
-                    ? '暂无负面常用块。在负面提示词的“更多”菜单里选“存为常用块”即可添加。'
-                    : '暂无常用块。在块的菜单里选"存为常用块"即可添加。'}
+                : kind === 'set'
+                  ? '暂无整套提示词。点下面的“存为整套提示词”，把现在的基础提示词、负面和所有角色一起存下来。'
+                  : kind === 'character'
+                    ? '暂无保存的角色。在角色的“更多”菜单里选“存为角色”即可添加。'
+                    : negative
+                      ? '暂无负面常用块。在负面提示词的“更多”菜单里选“存为常用块”即可添加。'
+                      : '暂无常用块。在块的菜单里选"存为常用块"即可添加。'}
             </p>
           )}
         </div>
@@ -281,9 +305,20 @@ export function InsertPop({
             <Kbd keys="↓" />
             <span>选择</span>
             <Kbd keys="Enter" />
-            <span>插入</span>
+            <span>{kind === 'set' ? '套用' : '插入'}</span>
           </span>
           <span className="sp" />
+          {onSave && (
+            <button
+              className="btn quiet sm"
+              onClick={() => {
+                onClose();
+                onSave();
+              }}
+            >
+              存为整套提示词…
+            </button>
+          )}
           <button
             className="btn quiet sm"
             onClick={() => {
@@ -291,7 +326,7 @@ export function InsertPop({
               onManage?.();
             }}
           >
-            管理{noun}
+            {kind === 'set' ? '管理' : `管理${noun}`}
           </button>
         </div>
       </Pop>
