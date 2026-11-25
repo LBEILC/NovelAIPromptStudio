@@ -54,6 +54,8 @@
 .vsl { display: grid; grid-template-columns: 56px minmax(0, 1fr) 40px; gap: var(--sp-2); align-items: center; min-height: var(--ctl-sm); font-size: var(--fs-small); }
 .vsl-l { color: var(--text-2); white-space: nowrap; }
 .vsl > .segc { grid-column: 2 / 4; justify-self: start; }
+.vsl > .vsw { grid-column: 2 / 4; display: inline-flex; align-items: center; gap: var(--ctl-gap); min-width: 0; }
+.vthumb.dim { opacity: var(--dim); }
 .vsl.off .slider, .vsl.off .vval { opacity: var(--dim); }
 .slider.pslider.unknown i, .slider.pslider.unknown b { opacity: 0; }
 .slider.pslider { width: auto; cursor: pointer; touch-action: none; }

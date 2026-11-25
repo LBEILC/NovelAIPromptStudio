@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { Icon, Seg, Slider } from '../kit/controls';
+import { Icon, Seg, Slider, Switch } from '../kit/controls';
 import { MenuPop, type MenuEntry } from '../kit/menu';
 import { invokeUI } from '../lib/commands';
 import { BlurImg } from '../kit/blur';
+import { useNotifications } from '../kit/toast';
 import type { CommandTab } from '../shared/commands';
 import {
+  MAX_PRECISE,
   MAX_VIBES,
   MODEL_CAPS,
   PRECISE_COST,
+  keepsOutfit,
+  preciseKind,
+  preciseType,
+  type PreciseKind,
   VIBE_ENCODE_COST,
   VIBE_EXTRA_COST,
   VIBE_EXTRA_FREE,
@@ -66,10 +72,12 @@ export function RefSlider({
   );
 }
 
-export const TYPES: [PreciseReferenceType, string][] = [
+/** 界面上的四种；服装只有 V5 有（doc/design.md 2.26） */
+export const TYPES: [PreciseKind, string][] = [
   ['character', '角色'],
   ['style', '风格'],
   ['character&style', '角色和风格'],
+  ['costume', '服装'],
 ];
 
 export function RefsPane({
@@ -85,6 +93,7 @@ export function RefsPane({
   highlight?: string;
 }) {
   const { setParams, run, dialog } = useEdit(tab, before);
+  const notify = useNotifications();
   const box = useRef<HTMLDivElement>(null);
   const addBtn = useRef<HTMLButtonElement>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -93,6 +102,7 @@ export function RefsPane({
   const relay = useGeneration().settings.connection === 'relay';
   const model = tab.project?.params?.model;
   const caps = MODEL_CAPS[model as ModelId];
+  const pcaps = caps?.precise || null;
   useEffect(() => {
     if (!highlight) return;
     box.current
@@ -243,43 +253,34 @@ export function RefsPane({
       )}
     </>
   );
-  if (!caps?.references)
+  if (!caps?.references && !pcaps)
     return (
       <div className="doc pdoc">
         {canBase && baseBlock}
-        {canBase ? (
-          <>
-            <div className="sec-h">Vibe 和精确参考</div>
-            <p className="help pnote">
-              {modelName(model)} 没有这两项，NovelAI 只在 V4.5 上提供。
-              <button
-                className="btn quiet sm"
-                onClick={() => void setParams({ model: 'nai-diffusion-4-5-full' })}
-              >
-                换成 V4.5 Full
-              </button>
-            </p>
-          </>
-        ) : (
-          <div className="empty pane-empty">
-            <span className="pe-ic">
-              <Icon name="image-circle-line" />
-            </span>
-            <h3>{modelName(model)} 暂不支持 Vibe 和精确参考</h3>
-            <p>
-              NovelAI 目前只在 V4.5 上提供这两项。可以在“参数”里把模型换成
-              V4.5，生成出来的是新的一版。
-            </p>
-            <div className="acts">
-              <button
-                className="btn"
-                onClick={() => void setParams({ model: 'nai-diffusion-4-5-full' })}
-              >
-                换成 V4.5 Full
-              </button>
-            </div>
+        <div className="empty pane-empty">
+          <span className="pe-ic">
+            <Icon name="image-circle-line" />
+          </span>
+          <h3>{modelName(model)} 没有 Vibe 和精确参考</h3>
+          <p>
+            V5 可以用精确参考（角色、画风、服装），V4.5 可以用 Vibe
+            和精确参考。在“参数”里换模型，生成出来的是新的一版。
+          </p>
+          <div className="acts">
+            <button
+              className="btn"
+              onClick={() => void setParams({ model: 'nai-diffusion-5-full' })}
+            >
+              换成 V5 Full
+            </button>
+            <button
+              className="btn quiet"
+              onClick={() => void setParams({ model: 'nai-diffusion-4-5-full' })}
+            >
+              换成 V4.5 Full
+            </button>
           </div>
-        )}
+        </div>
         {dialog}
       </div>
     );
@@ -294,6 +295,10 @@ export function RefsPane({
       fidelity?: number;
     },
   ) => void run(() => invokeUI('reference.set', { ...target, id, ...patch }));
+  const addPrecise = () =>
+    void run(() => invokeUI('reference.add-precise', target)).then(
+      (r) => r?.notes?.length && notify({ text: r.notes.join('；') }),
+    );
   const remove = (id: string) => void run(() => invokeUI('reference.remove', { ...target, id }));
   const vibes = refs.vibes,
     precise = refs.precise;
@@ -365,24 +370,38 @@ export function RefsPane({
       </div>
     );
   };
-  const prow = (r: PreciseReference) => {
+  const prow = (r: PreciseReference, i: number) => {
     const o = was.precise.find((x) => x.id === r.id);
+    const kind = preciseKind(r.type),
+      outfit = !!pcaps?.outfit;
+    // 不支持服装的模型上，已有的服装参考仍显示这一项（选中），别的行不显示
+    const kinds = TYPES.filter(([k]) => k !== 'costume' || outfit || kind === 'costume');
+    const skipped = kind === 'costume' && !outfit;
+    const keep = keepsOutfit(r.type);
     return (
-      <div key={r.id} className="vrow" data-enter="fade">
-        <span className="vthumb">
-          <BlurImg
-            image={null}
-            path={r.thumbnail}
-            tab={tab.id}
-            eye={false}
-            alt=""
-            draggable={false}
-          />
+      <div key={r.id} className="vrow" data-prow={r.id} data-enter="fade">
+        <span className={`vthumb ${skipped ? 'dim' : ''}`}>
+          {r.thumbnail ? (
+            <BlurImg
+              image={null}
+              path={r.thumbnail}
+              tab={tab.id}
+              eye={false}
+              alt=""
+              draggable={false}
+            />
+          ) : (
+            <span className="vph" data-tip="NovelAI 的图片里没有存参考图">
+              <Icon name="image-line" />
+            </span>
+          )}
         </span>
         <div className="vmain">
           <div className="vh">
-            <b>{r.name}</b>
+            {/* 没起名的图名字是一长串 ID / 哈希，按顺序叫“参考 1”（和底图一样不显示哈希） */}
+            <b>{/^[0-9a-f-]{16,}(\.\w+)?$/i.test(r.name) ? `参考 ${i + 1}` : r.name}</b>
             {!o && <span className="src">新加</span>}
+            {!r.thumbnail && <span className="mono muted vfile">没有参考图</span>}
             <span className="sp" />
             <button
               className="btn quiet sm icon"
@@ -397,23 +416,63 @@ export function RefsPane({
             <span className="vsl-l">类型</span>
             <Seg
               label="类型"
-              items={TYPES}
-              value={r.type}
-              onChange={(type) => set(r.id, { type })}
+              items={kinds.map(([k, name]) =>
+                k === 'costume' && !outfit
+                  ? ([k, name, `${modelName(model)} 不支持服装参考`] as const)
+                  : ([k, name, ''] as const),
+              )}
+              value={kind}
+              disabled={outfit ? [] : ['costume']}
+              onChange={(k) => k !== kind && set(r.id, { type: preciseType(k, keep) })}
             />
           </div>
+          {outfit && (kind === 'character' || kind === 'character&style') && (
+            <div className="vsl" data-enter="fade">
+              <span className="vsl-l">原服装</span>
+              <span className="vsw">
+                <Switch
+                  label="保持参考图里的服装"
+                  on={keep}
+                  onChange={(on) => set(r.id, { type: preciseType(kind, on) })}
+                />
+                <span className={keep ? '' : 'muted'}>
+                  {keep ? '保持参考图里的那一套' : '不保持，可以换别的'}
+                </span>
+              </span>
+            </div>
+          )}
           <RefSlider
             label="强度"
             value={r.strength}
+            max={pcaps?.strengthMax ?? 1}
             changed={!!o && o.strength !== r.strength}
             onCommit={(strength) => set(r.id, { strength })}
           />
-          <RefSlider
-            label="保真度"
-            value={r.fidelity}
-            changed={!!o && o.fidelity !== r.fidelity}
-            onCommit={(fidelity) => set(r.id, { fidelity })}
-          />
+          {pcaps?.fidelity && (
+            <RefSlider
+              label="保真度"
+              value={r.fidelity}
+              changed={!!o && o.fidelity !== r.fidelity}
+              onCommit={(fidelity) => set(r.id, { fidelity })}
+            />
+          )}
+          {!r.thumbnail ? (
+            <span className="help warn vnote base-fit" data-enter="fade">
+              NovelAI 的图片只记了类型和强度，没有参考图，补上之前生成时不用这个参考
+              <button
+                className="btn quiet sm"
+                onClick={() =>
+                  void run(() => invokeUI('reference.set-image', { ...target, id: r.id }))
+                }
+              >
+                补上图片…
+              </button>
+            </span>
+          ) : skipped ? (
+            <span className="help warn vnote" data-enter="fade">
+              {modelName(model)} 不支持服装参考，生成时跳过这一个
+            </span>
+          ) : null}
         </div>
       </div>
     );
@@ -447,58 +506,71 @@ export function RefsPane({
     <div className="doc pdoc" ref={box}>
       {baseBlock}
       <p className="help pnote">
-        参考图让生成的图接近另一张图的气氛（Vibe）或角色、画风（精确参考）。两种不能同时用。
+        {caps?.references
+          ? '参考图让生成的图接近另一张图的气氛（Vibe），或者指定角色、画风（精确参考）。两种不能同时用。'
+          : `精确参考用一张图指定角色、画风或服装，几个参考可以叠加。${modelName(model)} 没有 Vibe，V4.5 才有。`}
       </p>
+      {caps?.references && (
+        <>
+          <div className="sec-h">
+            Vibe
+            <span className="muted">
+              {vibes.length} / {MAX_VIBES}
+            </span>
+            <span className="acts" style={{ marginLeft: 'auto' }}>
+              <button
+                ref={addBtn}
+                className={`btn quiet sm ${precise.length || vibes.length >= MAX_VIBES ? 'is-off' : ''} ${addOpen ? 'is-hover' : ''}`}
+                aria-disabled={precise.length > 0 || vibes.length >= MAX_VIBES || undefined}
+                data-tip={
+                  precise.length
+                    ? 'Vibe 不能和精确参考一起用，先移除精确参考'
+                    : vibes.length >= MAX_VIBES
+                      ? `最多 ${MAX_VIBES} 个`
+                      : undefined
+                }
+                onClick={() => !precise.length && vibes.length < MAX_VIBES && setAddOpen(!addOpen)}
+              >
+                <Icon name="add-line" />
+                添加 Vibe
+                <Icon name="arrow-down-s-line" />
+              </button>
+            </span>
+          </div>
+          {vibes.length ? (
+            vibes.map(vrow)
+          ) : (
+            <p className="help pnote">
+              {relay
+                ? '暂无 Vibe。可以从 Vibe 库里选编过码的；中转站不能给新图编码。'
+                : `暂无 Vibe。可以从 Vibe 库里选，也可以用一张图片新建（首次编码 ${VIBE_ENCODE_COST} Anlas）。`}
+            </p>
+          )}
+          {vibes.length > 0 && !relay && (
+            <p className={`help pnote ${extra ? 'warn' : ''}`}>
+              超过 {VIBE_EXTRA_FREE} 个以后，每多 1 个每张加 {VIBE_EXTRA_COST} Anlas
+              {extra ? `；现在多 ${extra} 个，每张加 ${extra * VIBE_EXTRA_COST} Anlas` : ''}。
+            </p>
+          )}
+        </>
+      )}
       <div className="sec-h">
-        Vibe
+        精确参考
         <span className="muted">
-          {vibes.length} / {MAX_VIBES}
+          {precise.length} / {MAX_PRECISE}
         </span>
         <span className="acts" style={{ marginLeft: 'auto' }}>
           <button
-            ref={addBtn}
-            className={`btn quiet sm ${precise.length || vibes.length >= MAX_VIBES ? 'is-off' : ''} ${addOpen ? 'is-hover' : ''}`}
-            aria-disabled={precise.length > 0 || vibes.length >= MAX_VIBES || undefined}
+            className={`btn quiet sm ${vibes.length || precise.length >= MAX_PRECISE ? 'is-off' : ''}`}
+            aria-disabled={vibes.length > 0 || precise.length >= MAX_PRECISE || undefined}
             data-tip={
-              precise.length
-                ? 'Vibe 不能和精确参考一起用，先移除精确参考'
-                : vibes.length >= MAX_VIBES
-                  ? `最多 ${MAX_VIBES} 个`
+              vibes.length
+                ? '精确参考不能和 Vibe 一起用，先移除 Vibe'
+                : precise.length >= MAX_PRECISE
+                  ? `最多 ${MAX_PRECISE} 个`
                   : undefined
             }
-            onClick={() => !precise.length && vibes.length < MAX_VIBES && setAddOpen(!addOpen)}
-          >
-            <Icon name="add-line" />
-            添加 Vibe
-            <Icon name="arrow-down-s-line" />
-          </button>
-        </span>
-      </div>
-      {vibes.length ? (
-        vibes.map(vrow)
-      ) : (
-        <p className="help pnote">
-          {relay
-            ? '暂无 Vibe。可以从 Vibe 库里选编过码的；中转站不能给新图编码。'
-            : `暂无 Vibe。可以从 Vibe 库里选，也可以用一张图片新建（首次编码 ${VIBE_ENCODE_COST} Anlas）。`}
-        </p>
-      )}
-      {vibes.length > 0 && !relay && (
-        <p className={`help pnote ${extra ? 'warn' : ''}`}>
-          超过 {VIBE_EXTRA_FREE} 个以后，每多 1 个每张加 {VIBE_EXTRA_COST} Anlas
-          {extra ? `；现在多 ${extra} 个，每张加 ${extra * VIBE_EXTRA_COST} Anlas` : ''}。
-        </p>
-      )}
-      <div className="sec-h">
-        精确参考<span className="muted">{precise.length} 个</span>
-        <span className="acts" style={{ marginLeft: 'auto' }}>
-          <button
-            className={`btn quiet sm ${vibes.length ? 'is-off' : ''}`}
-            aria-disabled={vibes.length > 0 || undefined}
-            data-tip={vibes.length ? '精确参考不能和 Vibe 一起用，先移除 Vibe' : undefined}
-            onClick={() =>
-              !vibes.length && void run(() => invokeUI('reference.add-precise', target))
-            }
+            onClick={() => !vibes.length && precise.length < MAX_PRECISE && addPrecise()}
           >
             <Icon name="add-line" />
             添加精确参考
@@ -509,9 +581,15 @@ export function RefsPane({
         precise.map(prow)
       ) : (
         <p className="help pnote">
-          {relay
-            ? '暂无精确参考。用一张图指定角色或画风。'
-            : `暂无精确参考。用一张图指定角色或画风，每个参考每张加 ${PRECISE_COST} Anlas。`}
+          {pcaps?.outfit
+            ? '暂无精确参考。用一张图指定角色、画风或服装；角色和服装可以用两张图分开指定。'
+            : '暂无精确参考。用一张图指定角色或画风。'}
+        </p>
+      )}
+      {(!relay || !pcaps?.inpaint) && (
+        <p className="help pnote">
+          {relay ? '' : `每个参考每张加 ${PRECISE_COST} Anlas，带精确参考时不在 Opus 免费范围内。`}
+          {pcaps?.inpaint ? '' : '局部重绘时不带精确参考。'}
         </p>
       )}
       <MenuPop

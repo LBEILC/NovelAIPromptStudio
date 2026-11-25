@@ -47,7 +47,7 @@ export function PromptTabs({
   const box = useRef<HTMLSpanElement>(null);
   const mod = changedParams(base?.params, tab.project?.params).length > 0;
   const caps = MODEL_CAPS[tab.project?.params?.model as ModelId];
-  const refs = caps?.references ? refCount(tab.project) : 0;
+  const refs = caps?.references || caps?.precise ? refCount(tab.project) : 0;
   useIndicator(box, [value, mod, refs]);
   const item = (k: PromptTab, name: string, extra?: ReactNode) => (
     <button
@@ -144,11 +144,18 @@ export function useEdit(tab: CommandTab, before?: () => Promise<void>) {
         notify({ text: (e as Error).message, tone: 'error' });
         return;
       }
-      const n = refCount(tab.project);
+      // 目标模型没有的那一种参考会被去掉：V5 没有 Vibe，V4 两种都没有
+      const to = MODEL_CAPS[patch.model as ModelId];
+      const vibes = to?.references ? 0 : tab.project?.references?.vibes.length || 0,
+        precise = to?.precise ? 0 : tab.project?.references?.precise.length || 0;
+      const lost = [vibes ? `${vibes} 个 Vibe` : '', precise ? `${precise} 个精确参考` : '']
+        .filter(Boolean)
+        .join('和');
+      const missing = vibes && precise ? 'Vibe 和精确参考' : vibes ? 'Vibe' : '精确参考';
       if (
         !(await ask({
           title: `换成 ${modelName(patch.model)}？`,
-          body: `${modelName(patch.model)} 不支持 Vibe 和精确参考，这一版会去掉现在的 ${n} 个参考图。`,
+          body: `${modelName(patch.model)} 没有${missing}，这一版会去掉现在的 ${lost || `${refCount(tab.project)} 个参考图`}。`,
           ok: '换模型',
         }))
       )

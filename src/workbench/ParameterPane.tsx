@@ -39,6 +39,8 @@ export function ParamsPane({
   if (!p || !b) return <p className="help pnote">正在读取参数…</p>;
   const caps = MODEL_CAPS[p.model];
   const med = !!caps?.effort && p.effort === 'Medium';
+  // 精确参考只能用 High（doc/design.md 2.26）；没有参考图的占位不算
+  const highOnly = !!tab.project?.references?.precise.some((r) => r.thumbnail);
   const vn = base?.name || '原图';
   const chars = tab.project?.prompt_structure.characters || [];
   const keptList = tab.project?.keptParameters || [];
@@ -110,13 +112,18 @@ export function ParamsPane({
           <Seg
             label="Effort"
             items={[
-              ['High', 'High'],
-              ['Medium', 'Medium'],
+              ['High', 'High', ''],
+              ['Medium', 'Medium', highOnly ? '有精确参考时只能用 High，去掉精确参考后才能选' : ''],
             ]}
+            disabled={highOnly ? ['Medium'] : []}
             value={p.effort || 'High'}
             onChange={(effort) => void setParams({ effort })}
           />,
-          med ? '固定 14 步，不用自定义的负面提示词；用量更少' : undefined,
+          med
+            ? '固定 14 步，不用自定义的负面提示词；用量更少'
+            : highOnly
+              ? '有精确参考时只能用 High'
+              : undefined,
         )}
       {row(
         'steps',

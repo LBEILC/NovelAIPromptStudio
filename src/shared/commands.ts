@@ -368,9 +368,21 @@ export interface CommandDefinitions {
     input: TabInput & { libraryId?: string; imageId?: string; path?: string };
     output: TabDocument;
   };
-  /** 加一个精确参考：图片库里的 imageId，或者文件 path；没有就弹出选择框 */
+  /**
+   * 加一个精确参考：图片库里的 imageId，或者文件 path；没有就弹出选择框。
+   * 可选带上 type（默认 character&style）。V5 Full 的 Effort 是 Medium 时改成 High，notes 里写明
+   */
   'reference.add-precise': {
-    input: TabInput & { imageId?: string; path?: string };
+    input: TabInput & {
+      imageId?: string;
+      path?: string;
+      type?: import('./params').PreciseReferenceType;
+    };
+    output: TabDocument & { notes: string[] };
+  };
+  /** 给没有参考图的精确参考（从 NovelAI 原图恢复的）补上图片：imageId 或 path；没有就弹出选择框 */
+  'reference.set-image': {
+    input: TabInput & { id: string; imageId?: string; path?: string };
     output: TabDocument;
   };
   /** 改一个 Vibe 或精确参考：Vibe 改 strength、information；精确参考改 type、strength、fidelity */

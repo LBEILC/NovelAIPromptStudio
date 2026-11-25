@@ -234,6 +234,12 @@ export const commandRegistry = {
     required: ['tabId'],
     mutation: true,
   },
+  // 界面先接上（设计 V5 精确参考）；命令实现、type 的新值和 V5 强度 0–5 的校验待工程
+  'reference.set-image': {
+    fields: { ...tab, id: 'string', imageId: 'string', path: 'string' },
+    required: ['tabId', 'id'],
+    mutation: true,
+  },
   'reference.set': {
     fields: {
       ...tab,

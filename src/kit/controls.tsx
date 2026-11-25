@@ -26,16 +26,19 @@ export function Seg<K extends string>({
   onChange,
   label,
   className = '',
+  disabled = [],
 }: {
   items: readonly (readonly [K, ReactNode])[] | readonly (readonly [K, ReactNode, string])[];
   value: K;
   onChange: (k: K) => void;
   label?: string;
   className?: string;
+  /** 不能选的几项：变淡，点了不动，悬停写第三项的说明 */
+  disabled?: readonly K[];
 }) {
   const box = useRef<HTMLSpanElement>(null);
   useIndicator(box, [value, items.length]);
-  const keys = items.map((x) => x[0]);
+  const keys = items.map((x) => x[0]).filter((k) => k === value || !disabled.includes(k));
   return (
     <span
       ref={box}
@@ -53,20 +56,25 @@ export function Seg<K extends string>({
         e.preventDefault();
         const i = Math.max(0, Math.min(keys.length - 1, keys.indexOf(value) + d));
         onChange(keys[i]);
-        (box.current?.children[i + 1] as HTMLElement | undefined)?.focus();
+        (
+          box.current?.children[items.findIndex((x) => x[0] === keys[i]) + 1] as
+            | HTMLElement
+            | undefined
+        )?.focus();
       }}
     >
       <i className="ind" />
       {items.map((it) => (
         <span
           key={it[0]}
-          className={it[0] === value ? 'on' : ''}
+          className={it[0] === value ? 'on' : disabled.includes(it[0]) ? 'is-off' : ''}
           role="radio"
           aria-checked={it[0] === value}
+          aria-disabled={(it[0] !== value && disabled.includes(it[0])) || undefined}
           tabIndex={it[0] === value ? 0 : -1}
           data-tip={it[2]}
           aria-label={it[2]}
-          onClick={() => onChange(it[0])}
+          onClick={() => (it[0] === value || !disabled.includes(it[0])) && onChange(it[0])}
         >
           {it[1]}
         </span>

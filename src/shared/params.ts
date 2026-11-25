@@ -35,12 +35,27 @@ export interface ModelCaps {
   ucPresets: UcPreset[];
   /** 角色上限。V5 的 22 和官方客户端的 32 有冲突，先按 22（待实测） */
   maxCharacters: number;
-  /** Vibe 和精确参考：产品只在 V4.5 上提供（2.26） */
+  /** Vibe：只有 V4.5（2.26）。V4.5 上 Vibe 和精确参考不能同时用 */
   references: boolean;
+  /** 精确参考：V4.5 和 V5 有，V4 是 null（doc/research/V5精确参考调研.md） */
+  precise: PreciseCaps | null;
   img2img: boolean;
   inpaint: boolean;
   defaults: { steps: number; scale: number };
 }
+/** 一个模型的精确参考能力（官方客户端的模型能力表） */
+export interface PreciseCaps {
+  /** 服装参考和"保持原服装"（V5） */
+  outfit: boolean;
+  /** 能调保真度（V4.5）；不能调时按 1 发送 */
+  fidelity: boolean;
+  /** 强度的上限：V4.5 是 1，V5 是 5 */
+  strengthMax: number;
+  /** 局部重绘时带参考（V4.5）；V5 不带 */
+  inpaint: boolean;
+}
+const PRECISE_V45: PreciseCaps = { outfit: false, fidelity: true, strengthMax: 1, inpaint: true };
+const PRECISE_V5: PreciseCaps = { outfit: true, fidelity: false, strengthMax: 5, inpaint: false };
 export const SAMPLERS: { id: Sampler; name: string }[] = [
   { id: 'k_euler_ancestral', name: 'Euler Ancestral' },
   { id: 'k_euler', name: 'Euler' },
@@ -62,6 +77,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_ALL,
     maxCharacters: 22,
     references: false,
+    precise: PRECISE_V5,
     inpaint: true,
     img2img: true,
     defaults: { steps: 23, scale: 7 },
@@ -75,6 +91,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_ALL,
     maxCharacters: 22,
     references: false,
+    precise: PRECISE_V5,
     inpaint: true,
     img2img: true,
     defaults: { steps: 23, scale: 7 },
@@ -88,6 +105,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_ALL,
     maxCharacters: 6,
     references: true,
+    precise: PRECISE_V45,
     inpaint: true,
     img2img: true,
     defaults: { steps: 23, scale: 5 },
@@ -101,6 +119,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: ['Heavy', 'Light', 'Human Focus', 'None'],
     maxCharacters: 6,
     references: true,
+    precise: PRECISE_V45,
     inpaint: true,
     img2img: true,
     defaults: { steps: 23, scale: 5 },
@@ -114,6 +133,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_V4,
     maxCharacters: 6,
     references: false,
+    precise: null,
     inpaint: true,
     img2img: false,
     defaults: { steps: 23, scale: 5.5 },
@@ -127,6 +147,7 @@ export const MODEL_CAPS: Record<ModelId, ModelCaps> = {
     ucPresets: UC_V4,
     maxCharacters: 6,
     references: false,
+    precise: null,
     inpaint: true,
     img2img: false,
     defaults: { steps: 23, scale: 5.5 },
@@ -215,14 +236,52 @@ export interface VibeReference {
   encoding?: string;
   model?: ModelId;
 }
-export type PreciseReferenceType = 'character' | 'style' | 'character&style';
-/** 一个精确参考（指定角色或画风） */
+/**
+ * 精确参考的类型，存的就是请求里的值。界面上是四种加一个"保持原服装"开关（V5）：
+ * 角色 = character（开关关）/ character_mainoutfit（开）；
+ * 角色和风格 = character&style_anyoutfit（关）/ character&style（开）；
+ * 风格 = style；服装 = costume。
+ * 不支持服装的模型（V4.5）发送前：costume 跳过，character_mainoutfit 改成 character，
+ * character&style_anyoutfit 改成 character&style（和官方客户端一样）。
+ */
+export type PreciseReferenceType =
+  | 'character'
+  | 'character_mainoutfit'
+  | 'style'
+  | 'character&style'
+  | 'character&style_anyoutfit'
+  | 'costume';
+/** 界面上的四种 */
+export type PreciseKind = 'character' | 'style' | 'character&style' | 'costume';
+export function preciseKind(type: PreciseReferenceType): PreciseKind {
+  return type === 'character_mainoutfit'
+    ? 'character'
+    : type === 'character&style_anyoutfit'
+      ? 'character&style'
+      : type;
+}
+/** "保持原服装"开着吗（只对角色、角色和风格有意义） */
+export function keepsOutfit(type: PreciseReferenceType): boolean {
+  return type === 'character_mainoutfit' || type === 'character&style';
+}
+/** 由界面上的类型和开关得出请求里的值 */
+export function preciseType(kind: PreciseKind, keepOutfit: boolean): PreciseReferenceType {
+  if (kind === 'character') return keepOutfit ? 'character_mainoutfit' : 'character';
+  if (kind === 'character&style')
+    return keepOutfit ? 'character&style' : 'character&style_anyoutfit';
+  return kind;
+}
+/** 一个精确参考（指定角色、画风或服装） */
 export interface PreciseReference {
   id: string;
   name: string;
-  thumbnail: string;
+  /**
+   * 参考图。NovelAI 生成的 PNG 只记类型和强度、不带参考图，从这种图恢复的参考是 null：
+   * 界面显示占位行和"补上图片…"，补上之前不发送、不计费
+   */
+  thumbnail: string | null;
   type: PreciseReferenceType;
-  /** 0–1 */
+  /** 0 到模型的 strengthMax（V4.5 是 1，V5 是 5） */
   strength: number;
   /** 0–1；请求里发 1 - fidelity */
   fidelity: number;

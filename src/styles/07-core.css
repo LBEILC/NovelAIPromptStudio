@@ -65,6 +65,7 @@
 .segc .ind { background: var(--seg-thumb); border-radius: var(--r-tag); box-shadow: 0 0 0 var(--bw) var(--border); }
 .segc span.on { background: transparent; box-shadow: none; }
 .segc span { position: relative; z-index: 1; transition: color var(--dur-3) var(--ease-out); }
+.segc span.is-off { color: var(--text-off); }
 /* 导航：当前项只换文字颜色，不加粗 */
 .nav button[aria-current="page"] { font-weight: var(--fw-regular); }
 .nav button { transition: color var(--dur-3) var(--ease-out), background-color var(--dur-1) var(--ease-out); }
