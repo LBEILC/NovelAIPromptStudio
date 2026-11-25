@@ -453,8 +453,8 @@ async function runGenerationChecks({
   const seedJobs = new Set((await invoke('generate.status')).jobs.map((job) => job.id));
   await click('生成', 'document.querySelector(".gen-bar")');
   await h.until(
-    () =>
-      JSON.parse(fs.readFileSync(path.join(userData, 'generation-queue.json'), 'utf8')).some(
+    async () =>
+      (await invoke('generate.status')).jobs.some(
         (job) => job.tabId === tabId && !seedJobs.has(job.id) && job.state === 'completed',
       ),
     '固定 Seed 的新增任务完成后检查请求',
@@ -485,8 +485,8 @@ async function runGenerationChecks({
   const randomSeedJobs = new Set((await invoke('generate.status')).jobs.map((job) => job.id));
   await click('生成', 'document.querySelector(".gen-bar")');
   await h.until(
-    () =>
-      JSON.parse(fs.readFileSync(path.join(userData, 'generation-queue.json'), 'utf8')).some(
+    async () =>
+      (await invoke('generate.status')).jobs.some(
         (job) => job.tabId === tabId && !randomSeedJobs.has(job.id) && job.state === 'completed',
       ),
     '随机 Seed 的新增任务完成后检查请求',
