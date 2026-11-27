@@ -161,7 +161,7 @@ npm run fonts   # 下载并校验界面字体 MiSans（只需一次）
 npm run dev
 ```
 
-`npm test`、`npm run typecheck`、`npm run build`、`npm run verify:app`（启动真实应用做自动化验收）、`npm run package`。提交改动前请阅读[项目文档索引](./doc/README.md)与[协作约束](./AGENTS.md)；维护者发版前请阅读[发版指南](./doc/release-guide.md)。
+`npm test`、`npm run typecheck`、`npm run build`、`npm run verify:app`（启动真实应用做自动化验收）、`npm run package`。提交改动前请阅读[项目文档索引](./doc/README.md)；维护者发版前请阅读[发版指南](./doc/release-guide.md)。
 
 ## 许可证
 
